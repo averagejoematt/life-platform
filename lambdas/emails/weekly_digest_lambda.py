@@ -587,10 +587,10 @@ def ex_character_sheet(recs_dict):
 
     pillar_summary = {}
     for p in pillar_order:
-        start_pd = earliest.get(f"pillar_{p}", {})
-        end_pd = latest.get(f"pillar_{p}", {})
-        xp_earned = sum(recs_dict[d].get(f"pillar_{p}", {}).get("xp_delta", 0) for d in dates)
-        raw_scores = [recs_dict[d].get(f"pillar_{p}", {}).get("raw_score") for d in dates]
+        start_pd = earliest.get(f"pillar_{p}") or {}
+        end_pd = latest.get(f"pillar_{p}") or {}
+        xp_earned = sum((recs_dict[d].get(f"pillar_{p}") or {}).get("xp_delta", 0) for d in dates)
+        raw_scores = [(recs_dict[d].get(f"pillar_{p}") or {}).get("raw_score") for d in dates]
         raw_scores = [r for r in raw_scores if r is not None]
         avg_raw = round(sum(raw_scores) / len(raw_scores), 1) if raw_scores else None
 
@@ -608,7 +608,7 @@ def ex_character_sheet(recs_dict):
     closest_to_tier = None
     min_gap = 999
     for p in pillar_order:
-        end_pd = latest.get(f"pillar_{p}", {})
+        end_pd = latest.get(f"pillar_{p}") or {}
         level = end_pd.get("level", 0)
         tier = end_pd.get("tier", "Foundation")
         tier_idx = tier_order.index(tier) if tier in tier_order else 0
@@ -1411,7 +1411,7 @@ def build_html(data, commentary, profile):
             "relationships": "\U0001f91d",
             "consistency": "\U0001f3af",
         }
-        ps = cs.get("pillar_summary", {})
+        ps = cs.get("pillar_summary") or {}
         cs_html += '<div style="margin-top:8px;">'
         for p_name in ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]:
             pd = ps.get(p_name, {})

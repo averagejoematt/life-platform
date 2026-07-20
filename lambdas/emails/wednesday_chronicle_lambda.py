@@ -737,8 +737,8 @@ def build_data_packet(data):
                 "consistency": "\U0001f3af Consistency",
             }
             for pn in pillar_names:
-                pd = latest_cs.get(f"pillar_{pn}", {})
-                ep = earliest_cs.get(f"pillar_{pn}", {})
+                pd = latest_cs.get(f"pillar_{pn}") or {}
+                ep = earliest_cs.get(f"pillar_{pn}") or {}
                 p_lvl = pd.get("level", 1)
                 p_tier = pd.get("tier", "Foundation")
                 p_raw = pd.get("raw_score")
