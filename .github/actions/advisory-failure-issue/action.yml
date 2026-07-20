@@ -32,10 +32,10 @@ inputs:
     description: Human-readable workflow name for the issue title.
     required: true
   job-status:
-    description: Pass ${{ job.status }} from the caller.
+    description: Pass the caller's job.status value (use the standard expression syntax around job.status in the calling workflow step).
     required: true
   github-token:
-    description: Pass ${{ secrets.GITHUB_TOKEN }} (needs issues:write in the caller's permissions block).
+    description: Pass the caller's GITHUB_TOKEN secret (needs issues:write in the caller's permissions block).
     required: true
   failure-summary:
     description: Optional one-paragraph what-failed context for the issue body / repeat comment.
