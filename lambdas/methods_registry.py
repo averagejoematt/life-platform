@@ -338,7 +338,7 @@ REGISTRY = {
         "computed by one tool call) — not across the platform's entire history of tests.",
         "None entries (untestable pairs) pass through unadjusted and don't count toward m. "
         "Controls the FALSE DISCOVERY rate, not the false-positive rate of any single test — "
-        "with ~23 simultaneous correlation pairs, some individually-significant p-values will "
+        "with dozens of simultaneous correlation pairs, some individually-significant p-values will "
         "still be flagged non-significant after correction, by design.",
         "6fbd08d7dfe7",
         used_by="correlation_report (per-tool FDR across every correlation in a batch).",

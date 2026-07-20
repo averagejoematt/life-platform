@@ -17,10 +17,17 @@ Correlation pairs computed:
   Habits            tier0_pct vs day_grade, tier01_pct vs recovery
   Lifestyle         steps vs recovery, steps vs hrv, mood_score vs hrv
   Weight            weight_lbs vs recovery, calories vs weight_change
+  Cross-domain (#1406, lagged, the fulfillment↔physiology boundary)
+                    values_lived today → protocol adherence tomorrow,
+                    glucose variability (%CV) today → mood valence tomorrow
 
 Schedule: cron(30 18 ? * SUN *) — Sunday 11:30 AM PT (30 min before hypothesis engine)
 
 v1.0.0 — 2026-03-14 (R8-LT9)
+v1.1.0 — 2026-07-19 (#1406) two literature-motivated lagged cross-domain edges:
+         values_lived→next-day adherence + glucose-variability→next-day mood. Both
+         ride the existing n_eff + BH-FDR pipeline; nulls publish honestly. The
+         values_lived edge is stamped SDT-sensitive (autonomy-supportive framing only).
 """
 
 import logging
@@ -32,6 +39,7 @@ from decimal import Decimal
 import boto3
 import digest_utils  # shared query_range implementations (#970)
 import experiment_gates  # #1371: the ONE registry of arming thresholds
+import glycemic  # #1406: deterministic glycemic-variability features (CV, no LLM)
 import stats_core  # bundled shared module (#529): the one sanctioned stats implementation
 
 # OBS-1: Structured logger
@@ -108,8 +116,8 @@ def pearson_r(xs, ys):
 def apply_benjamini_hochberg(results: dict, alpha: float = 0.05) -> dict:
     """Apply Benjamini-Hochberg FDR correction to a dict of correlation results.
 
-    R13-F15: With 23 simultaneous hypothesis tests at nominal alpha=0.05, we
-    expect ~1.15 false positives per run under the null. BH controls the
+    R13-F15: With ~two dozen simultaneous hypothesis tests at nominal alpha=0.05,
+    we expect ~1+ false positives per run under the null. BH controls the
     expected proportion of false discoveries rather than the per-comparison
     error rate (Bonferroni), making it appropriate for exploratory health data
     where some true correlations exist.
@@ -211,6 +219,8 @@ def assemble_daily_series(start_date, end_date):
         # R17-14 / ADR-025: composite_scores partition removed — all fields consolidated
         # into computed_metrics since v3.7.28. No new data written to composite_scores.
         "cgm": fetch_range("apple_health", start_date, end_date),  # CGM is in apple_health
+        # #1406: values-lived (PERMA fact layer, #1403) for the fulfillment↔adherence edge.
+        "flourishing": fetch_range("flourishing", start_date, end_date),
     }
 
     # Build date-indexed lookup per source
@@ -234,6 +244,7 @@ def assemble_daily_series(start_date, end_date):
         ap = src_map.get("apple")
         hab = src_map.get("habitify")
         cm = src_map.get("computed")
+        fl = src_map.get("flourishing")
 
         metrics = {}
 
@@ -277,6 +288,23 @@ def assemble_daily_series(start_date, end_date):
             metrics["habit_pct"] = (done / total) if total > 0 else None
         else:
             metrics["habit_pct"] = None
+
+        # ── Cross-domain (#1406) ──────────────────────────────────────────
+        # Glucose variability = %CV. Prefer the ingestion-persisted CV (computed
+        # from that day's intraday readings, HAE #1406); fall back to CV derived
+        # from the stored mean + population SD so the edge still runs over the
+        # historical window that predates the persisted field. Both are honest
+        # measured-absence (None) when the day carried no CGM (ADR-104).
+        gluc_cv = safe_float(ap, "blood_glucose_cv")
+        if gluc_cv is None and (safe_float(ap, "blood_glucose_readings_count") or 0) >= 2:
+            # single-reading days store std_dev=0 — a CV of 0.0 there would be a
+            # fabricated "zero variability", not a measurement (ADR-104); require n>=2
+            gluc_cv = glycemic.cv_from_mean_sd(safe_float(ap, "blood_glucose_avg"), safe_float(ap, "blood_glucose_std_dev"))
+        metrics["glucose_cv"] = gluc_cv
+        # Mood valence: State-of-Mind daily average (-1..+1), merged into apple_health.
+        metrics["mood_valence"] = safe_float(ap, "som_avg_valence")
+        # Values-lived count (LLM-coded from journal text, #1403). Absent row = None.
+        metrics["values_lived_count"] = safe_float(fl, "values_lived_count")
 
         series[d] = metrics
 
@@ -325,7 +353,27 @@ CORRELATION_PAIRS = [
     ("hrv", "training_kj", "hrv_predicts_next_day_load", 1),
     ("recovery_score", "training_kj", "recovery_predicts_next_day_load", 1),
     ("training_kj", "recovery_score", "load_predicts_next_day_recovery", 1),
+    # Cross-domain edges (#1406) — the fulfillment↔physiology boundary the engine
+    # never tested. Literature-motivated, lagged (D→D+1), through the same n_eff +
+    # BH-FDR pipeline as every other pair; a null is a published finding.
+    ("values_lived_count", "habit_pct", "values_lived_predicts_next_day_adherence", 1),
+    ("glucose_cv", "mood_valence", "glucose_variability_predicts_next_day_mood", 1),
 ]
+
+# AC#4 (#1406): SDT autonomy-support guardrail. The values_lived→adherence edge
+# couples an identity/values signal to a compliance outcome — a coach that frames
+# it as "live your values so you comply" is controlling, not autonomy-supportive
+# (Ryan & Deci, self-determination theory). Edges named here are stamped on the
+# stored result so EVERY downstream consumer (coach prompt-context, the site
+# discoveries panel) renders them as an offered observation, never a directive.
+# Deterministic — set in code, never inferred at generation time.
+SDT_SENSITIVE_EDGES = {
+    "values_lived_predicts_next_day_adherence": (
+        "Autonomy-supportive framing ONLY: describe as an observed association the reader may "
+        "find useful about themselves — never as pressure to 'live your values' in order to comply. "
+        "No directives, no shoulds."
+    ),
+}
 
 
 # DISC-1: Domain knowledge — expected direction for each pair.
@@ -355,6 +403,9 @@ EXPECTED_DIRECTIONS = {
     "hrv_predicts_next_day_load": "positive",  # higher HRV → more training next day
     "recovery_predicts_next_day_load": "positive",  # better recovery → more training next day
     "load_predicts_next_day_recovery": "negative",  # more load → lower recovery next day
+    # #1406 cross-domain edges
+    "values_lived_predicts_next_day_adherence": "positive",  # values-in-action today → better adherence tomorrow
+    "glucose_variability_predicts_next_day_mood": "negative",  # more glycemic swing → lower mood valence next day
 }
 
 
@@ -436,13 +487,21 @@ def compute_correlations(series):
             and abs(r or 0) >= 0.2  # only flag if signal is meaningful
         )
 
+        # AC#4 (#1406): stamp SDT-sensitive edges so any coach/site consumer frames
+        # them autonomy-supportively (deterministic, set here — never inferred).
+        if label in SDT_SENSITIVE_EDGES:
+            results[label]["sdt_sensitive"] = True
+            results[label]["coach_framing"] = "autonomy_supportive"
+            results[label]["framing_note"] = SDT_SENSITIVE_EDGES[label]
+
         if r is not None:
             ci_flag = " ** COUNTERINTUITIVE" if results[label]["counterintuitive"] else ""
             logger.info("  %-45s r=%.3f (n=%d, %s, %s)%s", label, r, n, interpret_r(r, n), correlation_type, ci_flag)
 
-    # R13-F15: Apply Benjamini-Hochberg FDR correction across all m=23 pairs.
-    # With 23 simultaneous tests at alpha=0.05, naive thresholding yields ~1.15
-    # expected false positives. BH controls the false discovery rate instead.
+    # R13-F15: Apply Benjamini-Hochberg FDR correction across all m pairs
+    # (m = len(CORRELATION_PAIRS)). With ~two dozen simultaneous tests at
+    # alpha=0.05, naive thresholding yields ~1+ expected false positives; BH
+    # controls the false discovery rate instead.
     # Adds p_value, p_value_fdr, and fdr_significant fields to each result.
     results = apply_benjamini_hochberg(results, alpha=0.05)
     fdr_sig = sum(1 for v in results.values() if v.get("fdr_significant"))

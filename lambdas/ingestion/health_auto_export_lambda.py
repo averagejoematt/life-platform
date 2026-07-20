@@ -106,6 +106,14 @@ from decimal import Decimal
 
 import boto3
 
+# #1406: deterministic glycemic-variability features (CV / MAGE) computed in pure
+# Python from the day's readings (never an LLM). Fail-soft — if an older bundle
+# lacks the module we simply omit the two derived fields rather than break ingest.
+try:
+    import glycemic
+except ImportError:
+    glycemic = None
+
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
@@ -314,7 +322,7 @@ def process_blood_glucose(metric_data, units):
         # CGM vs manual by sampling cadence, robust to UTC-truncated partial days (#483/D-3)
         cgm_source = _classify_cgm_source(readings, n)
 
-        daily_agg[date] = {
+        agg = {
             "blood_glucose_avg": round(avg, 1),
             "blood_glucose_min": round(min(values), 1),
             "blood_glucose_max": round(max(values), 1),
@@ -326,6 +334,21 @@ def process_blood_glucose(metric_data, units):
             "blood_glucose_time_above_140_pct": round(above_140 / n * 100, 1),
             "cgm_source": cgm_source,
         }
+
+        # #1406: glycemic variability, deterministic pure-Python. CV = %CV over the
+        # day's readings; MAGE needs time-ordered readings and only counts swings
+        # above 1 SD. Both are behavioral-absence-honest (None → field omitted), so
+        # a flat or thin day carries no fabricated variability (ADR-104/105).
+        if glycemic is not None:
+            cv = glycemic.coefficient_of_variation(values)
+            if cv is not None:
+                agg["blood_glucose_cv"] = cv
+            ordered_values = [r["value"] for r in sorted(readings, key=lambda r: r.get("time") or "")]
+            mage_val = glycemic.mage(ordered_values)
+            if mage_val is not None:
+                agg["blood_glucose_mage"] = mage_val
+
+        daily_agg[date] = agg
 
     return daily_agg, daily_readings
 

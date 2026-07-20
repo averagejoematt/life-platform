@@ -456,6 +456,8 @@ Note: Tier 2 fields are suffixed with `_apple` to avoid colliding with SOT field
 | `blood_glucose_min` | number | Daily minimum glucose |
 | `blood_glucose_max` | number | Daily maximum glucose |
 | `blood_glucose_std_dev` | number | Glucose variability (std deviation) |
+| `blood_glucose_cv` | number | Glycemic %CV = 100·sd/mean (Monnier; <36 = stable) — deterministic, `lambdas/glycemic.py` (#1406). Omitted on a thin/degenerate day (behavioral absence). |
+| `blood_glucose_mage` | number | Mean Amplitude of Glycemic Excursions (Service 1970) over the day's time-ordered readings, swings >1 SD only — `lambdas/glycemic.py` (#1406). Omitted on a flat day (no excursion). |
 | `blood_glucose_readings_count` | number | Number of readings that day |
 | `blood_glucose_time_in_range_pct` | number | % of readings 70–180 mg/dL |
 | `blood_glucose_time_below_70_pct` | number | % of readings <70 (hypoglycemia) |
