@@ -132,6 +132,12 @@ findings_refuted}}`) — this file is the comparability mechanism for the next r
   note deltas (improved / flat / regressed). Fold the re-graded table + deltas into this run's
   `docs/reviews/SDLC_REVIEW_<date>.md` as a labeled subsection. Update the Current column in
   `docs/TESTING.md` in this same PR so the next re-grade diffs against this run.
+- **Deviation register (standing, #1338)** — enumerate the platform's textbook-SDLC deviations
+  and assert each has a signed writing (an ADR or a DR-doc row): a deviation without a writing
+  is a finding by definition, even when the deviation itself is sound. Current register:
+  ADR-138 (prod-only release topology, no staging), ADR-139 (post-merge testing topology,
+  advisory pre-merge lane), ADR-136 (site auto-deploy without a human click), ADR-057
+  (single-user data model). A new deviation found here files a story whose fix IS the ADR.
 
 ## Phase 4 — Disposition
 
