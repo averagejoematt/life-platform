@@ -86,7 +86,7 @@ ROSTER = [
             "any out-of-character voice, any blocked content. This is the guard "
             "that catches an AI coach citing a vital that doesn't exist."
         ),
-        "cadence": "daily",
+        "cadence": "3x/week",
         "source": "ai-canary-log/",
     },
     {

@@ -472,14 +472,15 @@ class OperationalStack(Stack):
         # runs pre-registered probes with deterministic quality checks +
         # regression cases for the 2026-07 review defects, emits LifePlatform/
         # AICanary (→ digest alarm + heartbeat), persists findings to
-        # ai-canary-log/. Weekly + read-only + idempotent.
+        # ai-canary-log/. 3×/week + read-only + idempotent (#1443 — the public-AI
+        # blind window was 7d at weekly; Mon/Wed/Fri caps it at ~2-3d).
         create_platform_lambda(
             self,
             "AiQualityCanary",
             function_name="life-platform-ai-quality-canary",
             source_file="lambdas/operational/ai_quality_canary_lambda.py",
             handler="operational.ai_quality_canary_lambda.lambda_handler",
-            schedule="cron(20 16 ? * MON *)",  # weekly, Mon 09:20 AM PT, UTC-fixed
+            schedule="cron(20 16 ? * MON,WED,FRI *)",  # 3×/week, 16:20 UTC (09:20 AM PDT), UTC-fixed
             timeout_seconds=120,
             memory_mb=256,
             custom_policies=rp.operational_ai_quality_canary(),
