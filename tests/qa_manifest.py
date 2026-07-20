@@ -147,6 +147,42 @@ def _archive_entries():
     return out
 
 
+# #1566: the "In my own words" essay permalink pages are GENERATED from
+# site/journal/blog.json by scripts/v4_build_journal.py — so the QA registry
+# derives one static entry per essay from that same manifest, exactly the way
+# _archive_entries() derives from the evidence build registry. An essay now
+# registers ONCE (its blog.json entry); smoke/visual/structural derive here.
+# This kills the "new essay = hand-add a qa_manifest row" trap that shipped
+# alongside the old hand-HTML step.
+def _essay_rows():
+    blog = os.path.join(_REPO, "site", "journal", "blog.json")
+    try:
+        with open(blog, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return []
+    out = []
+    for p in data.get("posts", []):
+        url = p.get("url")
+        if not (url and p.get("title") and p.get("date")):
+            continue
+        out.append(
+            {
+                "path": url,
+                "name": f"Essay · {p['title']}",
+                "tier": 3,
+                "content_class": "static",
+                "api_deps": [],
+                "js_modules": [],
+                "visual": {"checks": [{"selector": "main, article, .post-body", "not_empty": True, "desc": "essay content"}]},
+                # The generated permalink page always carries the essay title in an
+                # <h1 class="post-header__title"> — the stable structural anchor.
+                "structural": {"marker": 'class="post-header__title"'},
+            }
+        )
+    return out
+
+
 # ── Curated entries — everything that is not an archive readout page ──────────
 # visual defs here are moved VERBATIM from the pre-#1426 tests/visual_qa.py
 # PAGES list (coverage identical; the sweep now reads them from this facet).
@@ -541,16 +577,9 @@ _CURATED = [
         },
         "structural": {"marker": 'class="gr-card"'},
     },
-    {
-        "path": "/journal/essays/org-chart-of-one/",
-        "name": "Essay · The Org Chart of One",
-        "tier": 3,
-        "content_class": "static",
-        "api_deps": [],
-        "js_modules": [],
-        "visual": {"checks": [{"selector": "main, article, .post-body", "not_empty": True, "desc": "essay content"}]},
-        "structural": {"marker": 'class="post-header__title"'},
-    },
+    # NB: the essay permalink pages (/journal/essays/<slug>/) are NOT hand-listed
+    # here — they derive from site/journal/blog.json via _essay_rows(), spliced in
+    # by _build() (#1566). Add an essay by adding a blog.json entry, not a row here.
     {
         "path": "/privacy/",
         "name": "Privacy",
@@ -630,7 +659,7 @@ EXEMPT = {
 
 
 def _build():
-    pages = list(_CURATED) + _archive_entries()
+    pages = list(_CURATED) + _archive_entries() + _essay_rows()
     for p in pages:
         p.setdefault("leak_scan", True)
         p.setdefault("smoke", "200")
@@ -755,6 +784,11 @@ def site_files():
             continue
         for f in files:
             if not f.endswith(".html"):
+                continue
+            # #1566: body.html is an essay AUTHORING FRAGMENT (the .prose source that
+            # scripts/v4_build_journal.py renders into index.html), never a standalone
+            # page — don't count it toward the page registry.
+            if f in ("body.html", "body.md") and "journal/essays/" in (rel.replace(os.sep, "/") + "/"):
                 continue
             rp = "/" if rel == "." else f"/{rel.replace(os.sep, '/')}/"
             found.add(rp + f if f != "index.html" else rp)

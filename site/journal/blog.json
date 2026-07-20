@@ -7,9 +7,20 @@
       "date": "2026-07-08",
       "excerpt": "At 07:45 every morning, an AI agent wakes up, reads my infrastructure's overnight alarms, diagnoses what broke, and — for a narrow class of provably-safe problems — fixes it and merges the fix before I've had coffee. The interesting part is not the agent. The interesting part is the sentence at the top of the merge gate's source file.",
       "url": "/journal/essays/org-chart-of-one/",
-      "word_count": 1672
+      "word_count": 1672,
+      "read_minutes": 8,
+      "meta_desc": "I run a production AWS platform with no team — one human plus N instances of Claude. The novel part is what it took to make it not fall over: an org chart, enforced by code.",
+      "og_image": "og-org-chart.png",
+      "og_title": "The Org Chart of One Human and N Agents",
+      "og_desc": "Roles, shift handovers, an audit trail, and a short list of things the AI is never allowed to do — enforced by code, because policy doesn't bind something that reboots every session with no memory.",
+      "twitter_desc": "Roles, shift handovers, an audit trail, and a short list of things the AI is never allowed to do — enforced by code.",
+      "schema_description": "How a one-person production platform is actually run: sessions as mortal employees, deterministic gates holding the keys, one human owning everything irreversible, and the failure log as the credibility.",
+      "article_section": "Build in public",
+      "stats": "every claim receipt-backed against the repo · platform numbers as of the 2026-07-06 snapshot",
+      "nav_prev": {"href": "/story/journal/", "sub": "← In my own words", "label": "All of Matt's writing"},
+      "nav_next": {"href": "/method/build/", "sub": "The machine", "label": "How it's built →"}
     }
   ],
-  "_note": "In My Own Words — Matt's own blog. Add entries to this array; each post's url points at a static permalink page under site/journal/essays/<slug>/. The AI-written weekly chronicle is a separate feed under the Chronicle tab (/journal/posts.json).",
-  "_schema": "Each post: {id, title, date, excerpt, url, word_count?, label?, image_url?, image_credit?}. label is an authored kicker (e.g. \"Essay\") — never a derived Week-N; image_url/image_credit are optional atmospheric cover art (when present the reader renders a warm-duotone header band + attribution)."
+  "_note": "In My Own Words — Matt's own blog. Add entries to this array; each post's url points at a static permalink page under site/journal/essays/<slug>/. The AI-written weekly chronicle is a separate feed under the Chronicle tab (/journal/posts.json). PUBLISHING IS MANUAL: scripts/v4_build_journal.py is dry-run by default and never runs on its own — a new essay is a blog.json entry + a body file (body.html or body.md under the slug dir); the permalink page is generated (--write) only inside the site deploy Matthew triggers.",
+  "_schema": "Each post: {id, title, date, excerpt, url, word_count?, read_minutes?, label?, image_url?, image_credit?, meta_desc?, og_image?, og_title?, og_desc?, twitter_desc?, schema_description?, article_section?, stats?, author?, series?, cta?{title,body,button,href}, nav_prev?{href,sub,label}, nav_next?{href,sub,label}}. label is an authored kicker (e.g. \"Essay\") — never a derived Week-N; the render fields (meta_desc/og_*/schema_description/article_section/stats/nav_*) are OPTIONAL and fall back to sane defaults derived from title+excerpt; body lives in a sibling body.html (verbatim .prose fragment) or body.md (lightweight markdown). image_url/image_credit are optional atmospheric cover art (when present the reader renders a warm-duotone header band + attribution)."
 }
