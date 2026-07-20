@@ -10,6 +10,7 @@ states `**Incidents:** none` explicitly.
 Every test here fails on the pre-#1332 tree (missing gate text / missing backfilled rows).
 """
 
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -72,7 +73,12 @@ def test_incident_log_backfilled_known_2026_07_events():
 
 def test_incident_log_last_updated_bumped():
     log = _log_text()
-    assert "Last updated: 2026-07-19" in log, "#1332: the Last-updated line was not bumped for the backfill"
+    # ">= the backfill date", not "== the backfill date": later sessions legitimately
+    # bump the line again (the 2026-07-20 wrap did), and an exact-date pin turns every
+    # honest bump into a red — the golden-date trap.
+    m = re.search(r"Last updated: (\d{4}-\d{2}-\d{2})", log)
+    assert m, "#1332: no dated Last-updated line in docs/INCIDENT_LOG.md"
+    assert m.group(1) >= "2026-07-19", "#1332: the Last-updated line was not bumped for the backfill"
     assert "#1332" in log.split("Last updated:")[1][:400]
 
 

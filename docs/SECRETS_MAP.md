@@ -138,7 +138,7 @@ Cache TTL note: COST-OPT-1 uses `secret_cache.py` (15-min in-memory TTL — a bu
 | `life-platform/github-dispatch-token` | `remediation-dispatcher` (`lambdas/operational/remediation_dispatcher_lambda.py`) | repo-scoped PAT |
 | `life-platform/subscriber-token-secret` | `life-platform-site-api` (`site_api_social.py`), `site-api-ai` | HMAC signing |
 | `life-platform/ritual-token-secret` | `life-platform-site-api` (`site_api_social.py`), `evening-nudge` | HMAC signing |
-| `life-platform/site-api-origin-secret` | CDK-injected (CloudFront custom origin header ↔ site-api verification; `cdk/stacks/constants.py`) | reference by NAME, not partial ARN |
+| `life-platform/site-api-origin-secret` | CDK-injected (CloudFront custom origin header ↔ site-api verification; `cdk/stacks/constants.py`) + runtime read by `life-platform-ai-quality-canary` (#1589 — probes present the header) | reference by NAME, not partial ARN |
 | `life-platform/google-tts` | podcast pipeline (`google_tts.py`, `gemini_tts.py`) | ADR-087 |
 | `life-platform/pexels` | editorial image fetcher (`editorial_image.py`) | free-tier API key |
 

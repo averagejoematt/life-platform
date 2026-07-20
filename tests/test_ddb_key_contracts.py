@@ -39,6 +39,10 @@ pytestmark = pytest.mark.integration
 KNOWN_OPTIONAL: dict[tuple, str] = {
     ("USER#matthew#ledger", "TOTALS#current"): "zeroed/recreated by restart_ledger_reset (ADR-072)",
     (
+        "USER#matthew#SOURCE#ai_analysis",
+        "EXPERT#experiment_arc",
+    ): "experiment-scoped (ADR-077): wiped at every reset, recreated by the expert analyzer's next weekly run; coherence_sentinel guards both reads with `if arc` (absent for up to a week each genesis)",
+    (
         "USER#matthew#SOURCE#panelcast",
         "STATE#current",
     ): "The Panel series_state — seeded on the first published weekly episode; _state_read tolerates absence (returns {})",
