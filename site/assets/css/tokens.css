@@ -1495,6 +1495,65 @@ html { scroll-padding-top: calc(var(--sp-7) + var(--sp-2)); }
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
+   12d. MICRO-INTERACTION GRAMMAR v2 (#1472) — the designed states for the site's
+   transient + selection surfaces, ONE vocabulary. Every entry names WHY it moves
+   (the Slop Litmus §6 gate — "motion has a reason"); the reasons are documented
+   in DESIGN_SYSTEM_V5.md §7 (the motion-vocabulary registry). All of it is
+   prefers-reduced-motion-gated and FAILS OPEN: each surface is shown/hidden by
+   ATTRIBUTE (hidden / aria-selected) or by JS-rendered content — the animation
+   only decorates the appearance, it never gates it. Under reduced motion every
+   surface is simply present in its final state, instantly (the keyframe rules
+   below don't exist; the transform-free positioning does).
+
+   Three shared entrance primitives, reused across every surface:
+     mi-pop   — a transient overlay lands: fade + 4px rise + 0.98→1 settle,
+                --dur-fast. For popovers + the chart focus dot, whose position is
+                set with top/left (no CSS transform to clobber).
+     mi-fade  — opacity-only fade, --dur-fast. For the chart tooltip, which
+                ALREADY uses `transform` to sit above the cursor — a transform
+                keyframe would fight its positioning, so this one only fades.
+     mi-panel — a selected region confirms the switch: fade + 6px rise, --dur.
+                For tab panels.
+   ════════════════════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes mi-pop   { from { opacity: 0; transform: translateY(4px) scale(0.98); } to { opacity: 1; transform: none; } }
+  @keyframes mi-fade  { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes mi-panel { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  /* Popovers — provenance (#584) + coach-name (CC-04). Reason: a disclosure that
+     blinks into existence is easy to miss; the rise draws the eye to where it
+     landed. transform-origin near the trigger corner so it grows OUT of the chip. */
+  .prov-pop:not([hidden]), .coach-pop:not([hidden]) {
+    animation: mi-pop var(--dur-fast) var(--ease-out) both; transform-origin: top left;
+  }
+
+  /* Chart focus readout — the dot marks the exact point you're inspecting; the
+     pop confirms the readout is fresh for THIS point as you scrub. The dot pops
+     (position is margin/left/top, transform-free); the tip only fades (it keeps
+     its own translate to sit above the cursor). Runs once per touch session, not
+     per pointermove (the elements stay shown while you scrub). */
+  .chart-focus:not([hidden]) { animation: mi-pop var(--dur-fast) var(--ease-out) both; }
+  .chart-tip:not([hidden])   { animation: mi-fade var(--dur-fast) var(--ease-out) both; }
+
+  /* Tab panels — the region a tablist controls, on switch. Reason: a panel that
+     swaps with no transition reads as a page reload, not a response to your
+     click. `.tabpanel` (Data/Protocols kit — toggled via [hidden]) animates on
+     show; `.mi-swap` is the replay hook tabs.js stamps on the shared .dx-tab
+     read region (Coaching / Story / Dispatches re-render one region, so CSS
+     alone can't see the switch — see tabs.js markActiveTab). */
+  .tabpanel:not([hidden]), .mi-swap { animation: mi-panel var(--dur) var(--ease-out) both; }
+}
+
+/* Tab selection state — the ember "you are here" underline + label colour ease
+   in rather than snapping. `transition` (not a keyframe) so it animates BOTH
+   directions and is inert under reduced motion (nothing triggers it without a
+   real state change) — the same pattern as the hover-lift transitions in §12.
+   Covers both tab vocabularies: .tabset (Data/Protocols) + .dx-tab (Story hub). */
+.tabset .tab, .dx-tab {
+  transition: color var(--dur-fast) var(--ease-out), border-bottom-color var(--dur-fast) var(--ease-out);
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
    13. ICONOGRAPHY — the line-icon set (icons.js + /assets/icons/icons.svg) and the
    generative coach sigils (sigils.js). Stroke-based, currentColor, no fills/gloss —
    an instrument set, never decoration. Icons inherit their host element's `color`.

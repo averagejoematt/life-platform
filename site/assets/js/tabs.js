@@ -93,5 +93,14 @@ export function markActiveTab(tabsEl, panelEl, activeKey, { tabSelector = ".dx-t
     panelEl.setAttribute("role", "tabpanel");
     panelEl.setAttribute("aria-labelledby", activeId);
     if (!panelEl.hasAttribute("tabindex")) panelEl.setAttribute("tabindex", "-1");
+    // Micro-interaction grammar v2 (#1472) — replay the panel-swap entrance so the
+    // read region confirms your choice. These tablists re-render ONE persistent
+    // region (innerHTML swap), so CSS can't see the switch; we re-arm the `.mi-swap`
+    // keyframe by removing → reflow → re-adding the hook class. Purely decorative
+    // and reduced-motion-gated in CSS (the keyframe simply doesn't exist there), so
+    // content — already rendered by the caller — is never hidden behind it.
+    panelEl.classList.remove("mi-swap");
+    void panelEl.offsetWidth; // force reflow so the animation restarts on re-add
+    panelEl.classList.add("mi-swap");
   }
 }
