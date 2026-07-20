@@ -6,9 +6,9 @@
     "review_ref": "docs/engines/CHARACTER_MATH_AUDIT_2026-07.md"
   },
   "baseline": {
-    "start_date": "2026-07-19",
-    "start_weight_lbs": 315.65,
-    "start_weight_kg": 143.177,
+    "start_date": "2026-07-20",
+    "start_weight_lbs": 315.0,
+    "start_weight_kg": 142.882,
     "baseline_source": "withings",
     "goal_weight_lbs": 185,
     "weight_phase": "loss",

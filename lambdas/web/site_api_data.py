@@ -2843,6 +2843,7 @@ CYCLE_GENESES = {
     6: "2026-07-13",  # appended by restart_pipeline --close-cycle
     7: "2026-07-18",  # appended by restart_pipeline --close-cycle
     8: "2026-07-19",  # appended by restart_pipeline --close-cycle
+    9: "2026-07-20",  # appended by restart_pipeline --close-cycle
 }
 
 

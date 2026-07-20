@@ -1,0 +1,221 @@
+{
+  "genesis": "2026-07-19",
+  "generated_at": "2026-07-18T22:02:16.279383+00:00",
+  "note": "FROZEN pre-registration (#976) \u2014 never edit; delete deliberately to regenerate.",
+  "coaches": {
+    "sleep_coach": {
+      "coach_name": "Dr. Lisa Park",
+      "predictions": [
+        {
+          "claim_natural": "During the first 7 days (Days 1\u20137), nightly time-in-bed will consistently reach the 7.5-hour target window defined by the 9:00 PM bedtime and 4:30 AM wake time, meaning the wearable will log at least 7.5 hours in bed on each of the 7 nights.",
+          "metric": "",
+          "direction": "up",
+          "window_days": 7,
+          "confidence": "medium",
+          "generator": "bedrock"
+        },
+        {
+          "claim_natural": "Over the first 14 days (Days 1\u201314), sleep consistency \u2014 defined as both the 9:00 PM bedtime and 4:30 AM wake time being hit within a 30-minute window on each logged night \u2014 will trend upward as the fixed schedule reinforces circadian anchoring, with more compliant nights in week 2 than in week 1.",
+          "metric": "",
+          "direction": "up",
+          "window_days": 14,
+          "confidence": "medium",
+          "generator": "bedrock"
+        }
+      ]
+    },
+    "nutrition_coach": {
+      "coach_name": "Dr. Marcus Webb",
+      "predictions": [
+        {
+          "claim_natural": "Daily calorie log entries will show adherence to the 1500 kcal/day target on at least 5 out of every 7 days during the first 14 days, as the structured 11:30am-7:30pm eating window mechanically constrains intake opportunity.",
+          "metric": "",
+          "direction": null,
+          "window_days": 14,
+          "confidence": "medium",
+          "generator": "bedrock"
+        },
+        {
+          "claim_natural": "Logged daily protein intake will meet or exceed the 170 g floor on at least 4 out of the first 7 days, as hitting 170 g within a 1500 kcal budget requires deliberate high-protein food selection that typically takes several days to calibrate from a cold start.",
+          "metric": "",
+          "direction": null,
+          "window_days": 7,
+          "confidence": "medium",
+          "generator": "bedrock"
+        }
+      ]
+    },
+    "training_coach": {
+      "coach_name": "Dr. Sarah Chen",
+      "predictions": [
+        {
+          "claim_natural": "During the first 14 days, daily walking will consistently meet the 3-mile minimum on all 5 post-work weekdays per week, as logged by GPS or step count, because the ramp discipline explicitly schedules walking after work daily and caps intensity to avoid overreach in week 1.",
+          "metric": "",
+          "direction": null,
+          "window_days": 14,
+          "confidence": "high",
+          "generator": "bedrock"
+        },
+        {
+          "claim_natural": "Zone 2 cardio minutes logged per week will be below the 150-minute/week target during the first 2 weeks, because the plan explicitly restricts zone 2 to RPE-guided effort only (no heart-rate-locked sessions) for the first 2 weeks, making it likely that actual accumulated zone 2 time falls short of the 150-minute target while the athlete calibrates perceived exertion.",
+          "metric": "",
+          "direction": "down",
+          "window_days": 14,
+          "confidence": "medium",
+          "generator": "bedrock"
+        }
+      ]
+    },
+    "mind_coach": {
+      "coach_name": "Dr. Nathan Reeves",
+      "predictions": [
+        {
+          "claim_natural": "Adherence to the 11:30am\u20137:30pm eating window will be maintained on at least 6 out of 7 days during the first 14 days, as the structured ramp discipline (reduced volume, no failure sets in week 1) lowers psychological overwhelm and makes behavioral compliance easier to sustain early.",
+          "metric": "",
+          "direction": "up",
+          "window_days": 14,
+          "confidence": "medium",
+          "generator": "bedrock"
+        },
+        {
+          "claim_natural": "The 9:00 PM bedtime target will be logged as met on at least 5 out of 7 nights in the first 7 days, as the fixed 4:30 AM wake time creates a concrete external anchor that reinforces consistent sleep-onset behavior from Day 1.",
+          "metric": "",
+          "direction": "up",
+          "window_days": 7,
+          "confidence": "medium",
+          "generator": "bedrock"
+        }
+      ]
+    },
+    "physical_coach": {
+      "coach_name": "Dr. Victor Reyes",
+      "predictions": [
+        {
+          "claim_natural": "Body weight will trend downward from the 315.65 lb start weight over the first 14 days, driven by the 1500 kcal/day deficit combined with daily ~3-mile walking and 5 gym days/week of Foundation-phase strength training.",
+          "metric": "",
+          "direction": null,
+          "window_days": 14,
+          "confidence": "high",
+          "generator": "bedrock"
+        },
+        {
+          "claim_natural": "Daily protein intake logs will meet or exceed the 170 g protein floor on at least 10 of the first 14 days, as the 1500 kcal/day plan is explicitly structured around that minimum protein target within the 11:30am\u20137:30pm eating window.",
+          "metric": "",
+          "direction": null,
+          "window_days": 14,
+          "confidence": "medium",
+          "generator": "bedrock"
+        }
+      ]
+    },
+    "glucose_coach": {
+      "coach_name": "Dr. Amara Patel",
+      "predictions": [
+        {
+          "claim_natural": "Within the first 14 days, daily post-meal glucose excursions will show a consistent downward trend, driven by the 8-hour eating window (11:30am\u20137:30pm) combined with the 1500 kcal/day intake and daily post-work walking (~3 miles), resulting in measurably lower peak readings by day 14 compared to day 1.",
+          "metric": "",
+          "direction": "down",
+          "window_days": 14,
+          "confidence": "medium",
+          "generator": "bedrock"
+        },
+        {
+          "claim_natural": "Within the first 14 days, fasting glucose readings logged each morning (taken before the 11:30am eating window opens, after the overnight fast beginning at 7:30pm \u2014 a minimum 16-hour fast) will trend downward across the 14-day window, consistent with the caloric deficit of 1500 kcal/day and the enforced nightly fasting period.",
+          "metric": "",
+          "direction": "down",
+          "window_days": 14,
+          "confidence": "medium",
+          "generator": "bedrock"
+        }
+      ]
+    },
+    "labs_coach": {
+      "coach_name": "Dr. James Okafor",
+      "predictions": [
+        {
+          "claim_natural": "Resting heart rate (RHR) will trend downward over the first 14 days, consistent with the plan's daily walking (~3 miles) and 150 min/week Zone 2 target combined with the 7.5-hour sleep protocol beginning Day 1, moving toward the stated long-term biomarker target of 55 bpm.",
+          "metric": "",
+          "direction": "down",
+          "window_days": 14,
+          "confidence": "medium",
+          "generator": "bedrock"
+        },
+        {
+          "claim_natural": "HRV will trend upward over the first 14 days, driven by the ramp-discipline rules (reduced volume in Week 1, no failure sets, Zone 2 by RPE only for the first 2 weeks) limiting autonomic stress while the 9:00 PM\u20134:30 AM sleep window provides consistent 7.5-hour recovery, moving toward the stated biomarker target of 50 ms.",
+          "metric": "",
+          "direction": "up",
+          "window_days": 14,
+          "confidence": "medium",
+          "generator": "bedrock"
+        }
+      ]
+    },
+    "explorer_coach": {
+      "coach_name": "Dr. Henning Brandt",
+      "predictions": [
+        {
+          "claim_natural": "Within the first 14 days, daily calorie log entries will show at least 12 out of 14 days recorded (\u226585% adherence rate), establishing a sufficient N=1 data density baseline for statistical tracking of the 1500 kcal/day target.",
+          "metric": "",
+          "direction": "up",
+          "window_days": 14,
+          "confidence": "medium",
+          "generator": "bedrock"
+        },
+        {
+          "claim_natural": "Across the first 14 days, the within-subject variance in daily step count will be high (coefficient of variation >15%) as the roughly 6,000\u20137,000 step daily walking target self-calibrates during the ramp discipline week-1 reduced-volume phase, reflecting expected early-experiment noise in a single-subject time series.",
+          "metric": "",
+          "direction": null,
+          "window_days": 14,
+          "confidence": "medium",
+          "generator": "bedrock"
+        }
+      ]
+    }
+  },
+  "hypotheses": [
+    {
+      "hypothesis_id": "genesis_prereg_h1",
+      "hypothesis": "On days when logged calories are at or under the 1500 kcal plan target, next-day weight will be lower than after days over target.",
+      "domains": [
+        "nutrition",
+        "weight"
+      ],
+      "evidence": "Pre-registered at genesis from the plan itself: 1500 kcal/day target from a 315.65 lb start (config/user_goals.json); MacroFactor logs daily calories and Withings logs daily weight, so both arms are directly measurable.",
+      "confirmation_criteria": "Mean next-day weight at least 0.1 lbs lower on adherent days within 30 days, 95% CI excluding 0.",
+      "monitoring_window_days": 30,
+      "confidence": "high",
+      "actionable_if_confirmed": "Hold the 1,500 kcal baseline through the Foundation phase; escalate only if the trend stalls.",
+      "test_spec": {
+        "condition_metric": "calories",
+        "condition_op": "<=",
+        "condition_threshold": 1500,
+        "outcome_metric": "weight_lbs",
+        "direction": "lower",
+        "min_effect": 0.1,
+        "lag_days": 1
+      }
+    },
+    {
+      "hypothesis_id": "genesis_prereg_h2",
+      "hypothesis": "On days reaching roughly 6,000+ steps (the 3-mile daily-movement floor), next-day Whoop recovery will be higher than after low-movement days.",
+      "domains": [
+        "movement",
+        "recovery"
+      ],
+      "evidence": "Pre-registered at genesis from the plan itself: daily movement target '3 miles walking minimum (steps will vary by stride length, roughly 6,000-7,000 steps)' (config/user_goals.json); Apple Health logs steps and Whoop logs recovery daily.",
+      "confirmation_criteria": "Next-day recovery at least 3 points higher on 6,000+ step days within 30 days, 95% CI excluding 0.",
+      "monitoring_window_days": 30,
+      "confidence": "medium",
+      "actionable_if_confirmed": "Protect the daily walk as a recovery lever, not just an energy-expenditure line.",
+      "test_spec": {
+        "condition_metric": "steps",
+        "condition_op": ">=",
+        "condition_threshold": 6000,
+        "outcome_metric": "recovery",
+        "direction": "higher",
+        "min_effect": 3,
+        "lag_days": 1
+      }
+    }
+  ]
+}
