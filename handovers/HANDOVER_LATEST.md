@@ -1,121 +1,105 @@
-# HANDOVER — Max autonomous drain: 21 issues closed through a mid-session TCC outage — 2026-07-20 (afternoon/evening)
+# HANDOVER — Opus/no-Fable drain: honest ceiling reached; qa-smoke observability shipped — 2026-07-20 (evening)
 
-> Instruction thread: "ultracode +2M — MAXIMUM AUTONOMOUS DRAIN (~88 → as low as honesty
-> allows), four tiers pre-verified to need zero input, gate:owner fenced, public-repo
-> discipline in every brief, all merges/deploys/pushes authorized (IAM stays user-NAMED),
-> three-kinds-of-close, triage table first, full suite no -x per merge." Mid-session
-> Matthew re-confirmed the blanket merge/deploy/push authorization.
+> Instruction thread: "ultracode +2M — continue the drain (83 → as low as honesty allows), same
+> contract. Tier 1 = carried-over **fable** work (#1481/#1483/#1577). **Addendum: out of Fable
+> credits for 5 days, switched to Opus — DO NOT work on candidates much better done via Fable.**"
+> First-action TCC probe still EPERM → whole session ran from a `/private/tmp` gh clone (the proven
+> pattern). All merges/deploys/pushes authorized; IAM stays user-NAMED.
 
-## Outcome — the board went 98 → 83; the platform grew a pre-merge lane, two signed
-## posture ADRs, a transport-aware canary, and two new chat modes; and half the session
-## ran from a /private/tmp clone because macOS revoked ~/Documents mid-flight
+## Outcome — board 76→75 issues (one epic closed) + 1 Dependabot PR + 1 net-new ops fix
+## filed→shipped→deployed→verified. The honest close ceiling for a solo/no-Fable session is LOW
+## and was reached: a two-agent sweep confirmed **no other issue is honestly closeable** right now.
 
-**Closed (19 stories + 2 epics):** #1451 #1590 #1472 #1474 #1442 #1439 #1586 #1448 #1430
-#1346 #1337 #1324 #1349 #1353 #1578 #1566 #1575 #1576 #1338 #1344 + epics #1460 #342
-(all-children-closed + DoD legs verified). **#1589 reopened deliberately** — see below.
-17 PRs merged (#1591–#1609 minus the fenced ones), every one on a verified full suite
-(no -x), the four doc-sync-literal-conflicted ones through the full reconcile ritual
-(rebase → main's literal files → regen → collect-only → full suite → merge).
+**Closed (this session):**
+- **#1355** (epic — Dead controls) VERIFIED-DONE: all 8 children (#1319–#1326) verified CLOSED.
+- **#1610** (NEW, filed + SHIPPED this session): qa-smoke logged only the EMF summary; the specific
+  failing check went ONLY to the failure email → a latched `qa-smoke-failures` daily alarm was
+  undiagnosable from CloudWatch (hit live — Gmail token also expired). Fix: print every fail/warn
+  as `[QA] {FAIL,WARN} {category}/{name}: {msg}` before the `if not fails:` gate. PR #1611 merged
+  (5af4771), full suite green (no -x), guard proven RED on 5af4771~1. **Deployed** qa-smoke
+  (CodeSha256 `D3imGU5P6+…`, was `rAU+UkBD…`) and **verified live**: a warnings-only invoke now
+  emits 8 named `[QA] WARN …` lines. This is the diagnostic that names the next scheduled FAILURE.
+- **#1191** (Dependabot) MERGED: actions-group bump (checkout v7.0.0→v7.0.1, setup-python
+  v6.3.0→v7.0.0) across 13 workflow YAMLs, all gates green, python pinned 3.12 so the major is safe.
 
-**The headline fixes:**
-- **#1589 canary blind:** root cause = the synthetic direct-invoke events carried NO
-  headers, so site-api-ai's R22-SEC-03 origin gate (correctly) 403'd all 5 probes. Fix
-  is canary-side (reads the origin secret via secret_cache, presents x-amj-origin);
-  gate untouched. NEW transport self-test: an all-None/401/403 run classifies **BLIND**
-  — its own `Blind` gauge + `ai-canary-blind` digest alarm + "NOT an AI-quality verdict"
-  in the digest head. **Proven live**: post-deploy invoke returned status=BLIND exactly
-  as designed (the IAM grant isn't applied yet, which IS the blind condition). Code +
-  Monitoring alarm deployed; the Operational-stack IAM grant is Matthew's (user-NAMED
-  IAM rule — the auto-mode classifier held it, correctly). After his
-  `cdk deploy LifePlatformOperational`: one canary invoke → expect OK/Blind=0 → close.
-- **#1447's filer was broken on every fire:** the advisory-failure-issue composite
-  action had `${{ job.status }}` / `${{ secrets.GITHUB_TOKEN }}` in its input
-  DESCRIPTION strings — GitHub template-validates those even in prose, so the action
-  failed to load exactly when needed (first real fire: the 21:17 UTC standalone
-  visual-QA red). Fixed via the contents API mid-outage (e4a666b1); proven by a green
-  dispatched rerun.
-- **ADR-138 + ADR-139 (PR #1603):** the SDLC posture pair signed — prod-only release
-  topology with its six compensating controls, and the testing topology with a NEW
-  advisory pre-merge lane (`.github/workflows/pr-checks.yml`: collect-only +
-  deploy_critical subset + black --check, ~1 min) whose required-ness is explicitly an
-  owner toggle in github_posture.json (the #1319 lesson: durable controls live in git).
-- **I4 hotfix (5ec629ff):** #1594's merged review-pack lambda had no handler
-  try/except (its agent's six-red suite summary under-itemized this one) — caught in
-  my reconcile suite, fixed forward on main same hour.
+**Owner-queue verification (the "verify, don't assume" mandate — paid off):**
+- **Canary still BLIND.** Invoked `life-platform-ai-quality-canary` → `status=BLIND`, all 5 probes
+  403, transport self-test firing exactly as designed. The Operational-stack IAM grant is **NOT yet
+  applied** → **#1589 correctly stays OPEN** (did not double-do / did not falsely close).
+- **Email stack IS deployed** (many `LifePlatformEmail-*` rules ENABLED, incl. Sunday crons).
+- **TCC still revoked** (~/Documents EPERM) — re-grant is still owner-pending.
+- **Main red = the by-design R8-ST6 Plan gate ONLY** (over the un-applied canary IAM); all
+  test/lint/deploy-critical green on 5af4771. CI queuing healthy — no #1544 silent-death recurrence.
 
-**Deploys executed (all from the clone, CodeSha256/behavior-verified):**
-ai-quality-canary (code), LifePlatformMonitoring (the new alarm), qa-smoke (#1593's
-weekly redirect spot-check), MCP (#1606's checkpoint triggers; boot-verified 401), site
-×2 via auto site-deploy with green gates (live == 51ff229 content at verification time).
+**Deferred with reasons (all have irreducible owner/design/Fable dependencies — NOT punts):**
+- **#1435** perf-trend persistence (opus, sole open child of epic #1425): metrics are ALREADY
+  captured per-page in `tests/visual_qa.py` (`perf_result` → report.json). The gap is persist +
+  weekly trend + retention. BUT the digest lambda role (`LifePlatformOperational-TrafficDigestRole…`)
+  has **no read access to DDB OR the data-bucket S3** (both implicitDeny, simulated live) — so the
+  read side is **owner-gated IAM regardless of store**. DDB TTL is enabled (`ttl` attr) → clean
+  retention. Deploy role CAN write S3 (`matthew-life-platform`) but CANNOT PutItem DDB. Design:
+  persist per-page perf from the daily `visual-qa.yml` (it has OIDC creds) → S3, weekly trend as a
+  new source in `traffic_digest_lambda.collect_green_report()`. **Needs one owner IAM grant.**
+- **#1475** wayfinding (opus, last of the design trio): the `loop_ribbon()` in `scripts/v4_kit.py`
+  ALREADY draws the full loop with the current station marked (so "current+adjacent" is inherently
+  met); it's on ~4 generator families, not all pages. Universalizing it via `v4_apply_chrome.py`
+  (like #1468's loop-forward) is buildable BUT has real design decisions: placement consistency,
+  **fine-key preservation** (method/game pages show ribbon key "method" though door=/data/), and the
+  AC's "footer mega-menu **redesigned through the design round-trip**" — the epic explicitly routes
+  this through the Claude Design pipeline. With Fable exhausted + no live design partner, rushing an
+  all-80-pages change solo was the wrong risk. **Deferred to a design-round-trip/Fable session.**
+- **#1243** orphaned Prologue Part II audio: STILL reproduces — episode "The Plan, On the Record"
+  dated 2026-07-11 vs the article now at **2026-07-19** (moved with the cycle-9 reset); title
+  matches, dates don't → `read_aloud.js` honest-empty. The fix regenerates **reader-facing narrated
+  public audio** (retired chronicle-podcast cron, manual-invoke only) → owner-review content, not an
+  autonomous republish. The regression guard would correctly RED until the audio is regenerated
+  (can't ship green). **Owner regenerates the audio; then land the parity guard.**
+- **#1544** CI-queuing incident: CI queues again (verified), but ACs need owner billing-page
+  confirmation + a new detector in the #1453 lane. Stays open.
 
-## THE INCIDENT — macOS TCC revoked ~/Documents mid-session
-At ~12:45 PT every file read under ~/Documents went EPERM for the whole process tree
-(Bash, Read/Edit — everything; directory listings still worked). Root-cause class is the
-known TCC trap, new escalation: it hit a LIVE interactive session. **The workaround
-that saved the session: `gh repo clone` into /private/tmp** — git, pytest, black, aws,
-cdk, gh all work there (~/.aws, ~/.config/gh, ~/.claude are not TCC-protected). All
-merges, reconciles, deploys, and this wrap ran from clones. **Owner fix (30s): System
-Settings → Privacy & Security → Files & Folders (or Full Disk Access) → re-enable
-Documents for the terminal/Claude app, or restart the app.** Memory updated.
+## Standing-ops glances (this session)
+- **restart_integration_check --expect-cycle 9:** 20 pass / 4 fail / 7 skip. The 4 fails all
+  KNOWN: hevy (6/25), notion (5/25), strava (7/14) dark; + the cloudwatch-alarms line bundling
+  ai-canary-blind/overall (→ IAM deploy), ai-tokens-* (heavy Bedrock load), qa-paused-by-budget
+  (tier posture). **qa-smoke-failures WAS outside the allowlist → investigated → #1610** (latched
+  daily-Maximum on intermittent scheduled fails; clean invoke = 0 fails; now diagnosable).
+- **felt_probe = n=0** (DDB `USER#matthew#SOURCE#felt_probe` COUNT 0) — wrap-noted, not chased.
+- **Tue restart_verify** (expect 12/12) is a *tomorrow* op — the 16:30 UTC compute hasn't run
+  (session is Mon ~16:50 PT). Not applicable this session.
+- **ai-canary-heartbeat** self-heals after Wed 16:20 UTC (unchanged).
 
-## Gotchas hit (durable, all in memory)
-- **Agent-concurrency contamination, two new vectors:** (1) an agent's Bash cwd
-  silently reverted to the shared main checkout (case-twin path) and its `git stash -u`
-  briefly captured MY uncommitted work (restored, confessed in its report); (2) three
-  agents raced the shared scratchpad `repo/` clone — branch switched underfoot, edits
-  clobbered; all recovered via fresh uniquely-named clones. RULE for every future
-  brief: unique clone dir per agent (`repo-<issue>`), stash ban stated verbatim.
-- **The composite-action description-string trap:** GitHub template-validates `${{ }}`
-  inside input descriptions — never put expression syntax in action prose.
-- **gh pr merge races mergeability recompute** after main moves: poll
-  `mergeStateStatus` until non-UNKNOWN; a merge attempt during recompute 405s.
-- The pre-commit doc-sync hook rewriting literals MID-full-suite-run produces phantom
-  platform-stats reds — commit, then run the suite.
+## Gotchas / notes
+- Cosmetic drift: the reconcile bumped `PLATFORM_STATS.test_count` 4794→4795 in
+  `lambdas/web/site_api_common.py`; the LIVE site-api serves 4794 until the next site-api/fleet
+  deploy. Self-heals; not worth a standalone site-api deploy for +1.
+- Gmail MCP token expired — qa-smoke failure emails unreadable this session (part of why #1610
+  matters). Owner re-auth if inbox diagnosis is ever needed.
+- deploy_lambda.sh confirmed ships the FULL tree (single-file-strip class dead, #781) — used for
+  the targeted qa-smoke deploy.
 
 ## Live state at wrap
-- Cycle 9 Day 1; site healthy on latest content; brief went out 17:00 UTC (carried the
-  315 override — tomorrow's carries 321.38; known, by design).
-- **Main:** latest CI/CD conclusions: Unit/lint/deploy-critical green; the ONLY red is
-  `Plan deployments` — the R8-ST6 IAM-review gate red BY DESIGN over the un-applied
-  canary IAM grant; clears with Matthew's Operational deploy. CI Deploy stages are
-  WAITING on the restored production approval gate (the gate working, not a failure).
-- **Harness** (restart_integration_check --expect-cycle 9, run this session): 20 pass /
-  4 fail, all four known (canary-blind pair → IAM deploy; qa-paused-by-budget = tier-1
-  visibility by design; token alarms from the day's heavy Bedrock load; dark sources).
-- felt_probe still n=0. Dark sources unchanged: hevy 6/25, notion 5/25, strava 7/14
-  (gate:owner #1330).
-- Board: **83 open** (98 at session start; #1589 deliberately reopened).
+- **Board: 75 open** (was 76 issues at session start; #1355 closed; #1191 was a PR).
+- **Main:** 5af4771; test/lint/deploy-critical green; Plan gate reds by-design (canary IAM);
+  Deploy stages WAIT on the owner production-approval gate. CI queuing healthy.
+- Cycle 9; site healthy on latest content. Dark sources unchanged. TCC still revoked.
 
-## Residual / next picks
-- **Owner queue (the decision menu, also in the session close):** TCC re-grant;
-  `cdk deploy LifePlatformOperational` (canary IAM → green canary → close #1589, also
-  clears the Plan red); `cdk deploy LifePlatformEmail` (#1594's role+cron, before
-  Sunday 18:00 UTC); approve the newest waiting CI Deploy run (fleet-syncs bundles);
-  optional pr-checks required-ness toggle (ADR-139, not-work — owner call).
-- **#1474 CLS skeletons: MERGED at wrap (PR #1609)** — data/method/protocols CLS
-  0.46–0.67 → ~0.00 measured, per-page cls_budget locked in qa_manifest; its site
-  auto-deploy was in flight at wrap (gates + auto-rollback own it). Next in lane: #1475.
-- Tier-3 remainder, deliberately not rushed at session tail: #1481 (self-calibration),
-  #1483 (semi-private references — its allude-tier PRODUCER lines already ship in
-  /team-meeting + /interview), #1577 (conversational enrichment).
-- Tomorrow (Tue): after the 16:30 UTC compute, `python3 deploy/restart_verify.py` →
-  expect 12/12 (the Day-1 character sheet lands then; not-work — standing op).
-- Dependabot black/garminconnect PRs: not yet filed by Dependabot at wrap; the black
-  one is format-gate-coupled — bump CI pin + requirements-dev + full-tree reformat in
-  ONE PR, solo (not-work — waits for Dependabot).
-- #1329 rotation, #1350 sign-off, SNS confirm click: standing (gate:owner).
-- ai-canary-heartbeat alarm: self-heals after Wednesday 16:20 UTC's run (not-work).
+## Owner queue (the decision menu — nothing blocks; all optional)
+1. **TCC re-grant** (~/Documents) — restores normal local work; else next session forks to clone.
+2. **`cdk deploy LifePlatformOperational`** (canary IAM) → then invoke canary once → expect
+   OK/Blind=0 → **close #1589**; also clears the by-design main Plan-gate red. (user-NAMED IAM)
+3. **#1435 IAM grant** — give the traffic-digest role read on the perf store (DDB or S3) so the
+   perf-trend half can ship. (user-NAMED IAM; the code side is scoped + ready to build once granted.)
+4. **#1243 audio** — regenerate the Prologue Part II read-aloud (dated 2026-07-19 to match the
+   article) so it's no longer orphaned; then the parity guard can land green.
+5. **#1475** — schedule the design-round-trip (or a Fable session) for the wayfinding layer.
+6. **#1544 billing** — confirm root cause from the billing page; decide the budget posture.
+7. Standing (unchanged): approve the waiting CI Deploy run (fleet-sync); pr-checks required-ness
+   toggle (advisory today); Tue restart_verify after the 16:30 UTC compute.
 
-**Build beat:** `2026-07-20-canary-blind-self-test` (merged + deployed + proven live).
-**Docs:** each merged PR carried its own (TESTING.md scorecard, CONVENTIONS §9 gate
-registry, DECISIONS ADR-138/139 + ADR-057/129 addenda + ADR-099 template-retirement
-note, CHAT_MODES two new modes, SECRETS_MAP consumer line, engine docs re-verified);
-wrap adds INCIDENT_LOG rows only. **Decisions:** ADR-138 + ADR-139 filed (PR #1603).
-**Incidents:** 2 rows added (TCC outage P3; agent-concurrency contamination P4).
-**Main:** red — sole failing job is the by-design R8-ST6 Plan gate over the staged
-canary IAM grant (clears on Matthew's Operational deploy); all test/lint/deploy-critical
-jobs green on the latest completed run. **Stash/hooks:** clone stash empty; the main
-checkout's stash/hook state UNVERIFIABLE this session (TCC) — next session re-checks
-after the re-grant.
+**Build beat:** unchanged public build; server-side ops fix (`2026-07-20-qa-smoke-itemized-logging`).
+**Docs:** #1611 carried TESTING.md (test-count) + the #1610 code comment; this wrap adds no ADR/
+INCIDENT rows (TCC already logged; no new incident). **Main:** red — sole failing job is the
+by-design R8-ST6 Plan gate; all test/lint/deploy-critical green on 5af4771. **Stash/hooks:** clone
+stash empty; main-checkout stash/hook state UNVERIFIABLE (TCC) — re-check after the re-grant.
 
-Prior session (same day): `HANDOVER_2026-07-20_Day3-cycle9-reset.md`.
+Prior session: `HANDOVER_2026-07-20_MaxDrain.md`.
