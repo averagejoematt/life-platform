@@ -11,18 +11,23 @@
   "environment_production": {
     "name": "production",
     "required_reviewers": true,
-    "source": "ADR-065 ('CI's production approval gate stays intact') + CLAUDE.md CI/CD section + ci-cd.yml ('requires manual approval via GitHub Environment: production'). KNOWN-DIVERGED as of 2026-07-19: the private-flip dropped the gate (#1319, reference_github_env_protection_private_flip) — this assert fires by design until #1319 either restores the gate or amends all four claiming surfaces AND flips this entry to false."
+    "source": "ADR-065 ('CI's production approval gate stays intact') + CLAUDE.md CI/CD section + ci-cd.yml ('requires manual approval via GitHub Environment: production'). RESOLVED 2026-07-20: the gate is LIVE again (required_reviewers, 1 reviewer) — restored after the public flip made env protection available; the 2026-07-13 private flip had silently dropped it (#1319, closed VERIFIED-DONE). A future private flip drops it AGAIN — see project_repo_visibility memory for the flip-back checklist."
   },
   "main_ruleset": {
     "id": 19162901,
     "enforcement": "active",
-    "rule_types": ["deletion", "non_fast_forward"],
-    "include_refs": ["refs/heads/main"],
+    "rule_types": [
+      "deletion",
+      "non_fast_forward"
+    ],
+    "include_refs": [
+      "refs/heads/main"
+    ],
     "source": "docs/CONVENTIONS.md drift-discovery table + docs/MANAGED_WHERE_LEDGER.md (#1325): exactly main-block-force-push-and-deletion, rules [deletion, non_fast_forward] only, enforcement active, no pull_request/required_status_checks rule."
   },
   "vulnerability_alerts": {
     "enabled": true,
-    "source": "ci-cd.yml pip-audit advisory step ('Dependabot will open a bump PR for the affected package') + ADR-082 (Dependabot is the CVE remediation channel). KNOWN-DIVERGED as of 2026-07-19: alerts are disabled live (SDLC review 2026-07-18 finding P2-4) — enabling is a one-click owner toggle (repo Settings -> Security, or PUT /repos/{repo}/vulnerability-alerts); this assert fires by design until the toggle happens."
+    "source": "ci-cd.yml pip-audit advisory step ('Dependabot will open a bump PR for the affected package') + ADR-082 (Dependabot is the CVE remediation channel). RESOLVED 2026-07-20: alerts ENABLED live (owner toggle after the public flip; SDLC finding P2-4 closed)."
   },
   "push_run_detector": {
     "grace_minutes": 30,
