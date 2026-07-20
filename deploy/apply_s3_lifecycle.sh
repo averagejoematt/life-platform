@@ -18,6 +18,27 @@
 #   raw/           keep current forever; noncurrent versions 7d (keep 1); abort MPU 7d
 #   uploads/       expire 30d; noncurrent 7d
 #   generated/     keep current forever; noncurrent 7d (keep 1)
+#   generated/qa_archive/  expire 90d AT THE BYTE LEVEL (#1441 — generation-time
+#                  archive of every AI surface, text + screenshots; audit-log
+#                  retention class). The bucket is VERSIONED, so a bare
+#                  `Expiration {Days: 90}` only writes a delete marker — the
+#                  bytes live on as a noncurrent version, and the overlapping
+#                  generated/ rule would KEEP that version forever
+#                  (NewerNoncurrentVersions: 1 retains the newest one, which for
+#                  these write-once uuid-keyed objects is ALWAYS the one holding
+#                  100% of the bytes). Hence TWO rules:
+#                  (a) qa-archive-expire-90d — delete-marker the current version
+#                      at 90d AND expire noncurrent versions 7d after they turn
+#                      noncurrent, with NO keep-newest carve-out (on overlap S3
+#                      applies the action that deletes soonest, so the
+#                      generated/ carve-out does not shield these keys);
+#                  (b) qa-archive-clean-delete-markers — sweep the then-expired
+#                      delete markers (ExpiredObjectDeleteMarker cannot share a
+#                      rule with Days, so it needs its own rule).
+#                  Net per object: listed 90d, bytes purged ≈day 97, marker
+#                  swept after. Verify post-apply on a >97d-old day prefix:
+#                  `aws s3api list-object-versions --bucket matthew-life-platform \
+#                     --prefix generated/qa_archive/text/<old-date>/` → empty.
 #   claude-memory-backup/  keep current forever; noncurrent 90d (#1026 —
 #                  daily-changing memory files on a versioned bucket would
 #                  otherwise accrete versions unboundedly)
@@ -86,6 +107,19 @@ aws s3api put-bucket-lifecycle-configuration \
         "Status": "Enabled",
         "Filter": {"Prefix": "generated/"},
         "NoncurrentVersionExpiration": {"NoncurrentDays": 7, "NewerNoncurrentVersions": 1}
+      },
+      {
+        "ID": "qa-archive-expire-90d",
+        "Status": "Enabled",
+        "Filter": {"Prefix": "generated/qa_archive/"},
+        "Expiration": {"Days": 90},
+        "NoncurrentVersionExpiration": {"NoncurrentDays": 7}
+      },
+      {
+        "ID": "qa-archive-clean-delete-markers",
+        "Status": "Enabled",
+        "Filter": {"Prefix": "generated/qa_archive/"},
+        "Expiration": {"ExpiredObjectDeleteMarker": true}
       },
       {
         "ID": "claude-memory-backup-expire-noncurrent-90d",

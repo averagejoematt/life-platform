@@ -464,6 +464,17 @@ def generate_field_notes(iso_week):
     table.put_item(Item=item)
     logger.info(f"Wrote field notes for {iso_week}: {len(item.get('ai_present', ''))} chars")
 
+    # #1441: generation-time archive — the published note fields exactly as the
+    # WEEK# record carries them (the reader-facing surface renders these), to
+    # generated/qa_archive/. Fail-soft inside the module.
+    try:
+        import qa_archive
+
+        note_fields = {k: item[k] for k in ("ai_present", "ai_tone", "ai_cautionary", "ai_affirming") if item.get(k)}
+        qa_archive.archive_text("field_notes", json.dumps(note_fields), meta={"week": iso_week})
+    except Exception as qa_e:  # noqa: BLE001 — the archive is never load-bearing
+        logger.warning(f"[field_notes] qa_archive failed (non-fatal): {qa_e}")
+
     return {"status": "ok", "week": iso_week, "chars": len(item.get("ai_present", ""))}
 
 

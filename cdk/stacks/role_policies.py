@@ -630,12 +630,13 @@ def compute_coach_memoir() -> list[iam.PolicyStatement]:
     COACH# partition (needs PutItem, already granted by _compute_base's
     DynamoDB statement), uses Bedrock (Sonnet, narrative tier) for the
     first-person retrospective, writes generated/coach_memoirs.json.
-    Budget-tier SSM read is granted to every CDK role by create_platform_lambda."""
+    Budget-tier SSM read is granted to every CDK role by create_platform_lambda.
+    #1441: + generated/qa_archive/text/* — the generation-time AI-surface archive (text leg only)."""
     return _compute_base(
         needs_kms=True,
         needs_ai_keys=True,
         needs_s3_config=True,
-        needs_s3_write=["generated/coach_memoirs.json"],
+        needs_s3_write=["generated/coach_memoirs.json", "generated/qa_archive/text/*"],
     )
 
 
@@ -667,11 +668,13 @@ def intelligence_ai_expert() -> list[iam.PolicyStatement]:
 
 
 def intelligence_field_notes() -> list[iam.PolicyStatement]:
-    """Field-notes generator (weekly): reads DDB, uses ai-keys for Bedrock, writes field-note records to DDB."""
+    """Field-notes generator (weekly): reads DDB, uses ai-keys for Bedrock, writes field-note records to DDB.
+    #1441: + generated/qa_archive/text/* — the generation-time AI-surface archive (text leg only)."""
     return _compute_base(
         needs_kms=True,
         needs_ai_keys=True,
         needs_s3_config=True,
+        needs_s3_write=["generated/qa_archive/text/*"],
     )
 
 
@@ -705,11 +708,13 @@ def compute_hypothesis_engine() -> list[iam.PolicyStatement]:
 def compute_state_of_matthew() -> list[iam.PolicyStatement]:
     """#552 State of Matthew weekly brief: reads forecast/hypotheses/coach/calibration
     DDB partitions, uses ai-keys for one weekly Haiku narration call, writes the
-    combined brief back to DDB."""
+    combined brief back to DDB.
+    #1441: + generated/qa_archive/text/* — the generation-time AI-surface archive (text leg only)."""
     return _compute_base(
         needs_kms=True,  # writes state_of_matthew records to DDB
         needs_ai_keys=True,
         needs_s3_config=True,
+        needs_s3_write=["generated/qa_archive/text/*"],
     )
 
 
@@ -923,6 +928,7 @@ def email_daily_brief() -> list[iam.PolicyStatement]:
     Risk-7: also emits ComputePipelineStaleness metric to CloudWatch.
     site/public_stats.json written via site_writer.py for averagejoematt.com.
     Coach Intelligence: invokes coach-computation-engine, coach-narrative-orchestrator, coach-state-updater.
+    #1441: the coach_brief qa_archive writes (generated/qa_archive/text/*) ride the existing generated/* grant.
     """
     return _email_base(
         needs_s3_write=["dashboard/*", "buddy/*", "site/*", "generated/*"],
@@ -1049,8 +1055,15 @@ def email_wednesday_chronicle() -> list[iam.PolicyStatement]:
     site/journal/posts/week-{nn}/index.html + site/journal/posts.json written via publish_to_journal.
     """
     # editorial/* = atmospheric cover art (Part II, fail-soft, kill-switch off); pexels = image API key.
+    # qa_archive/text/* (#1441) = the generation-time AI-surface archive (installment markdown at store time).
     return _email_base(
-        needs_s3_write=["blog/*", "site/journal/*", "generated/journal/*", "generated/assets/images/editorial/*"],
+        needs_s3_write=[
+            "blog/*",
+            "site/journal/*",
+            "generated/journal/*",
+            "generated/assets/images/editorial/*",
+            "generated/qa_archive/text/*",
+        ],
         extra_secrets=["life-platform/pexels"],
         extra_statements=[
             iam.PolicyStatement(
@@ -2282,6 +2295,15 @@ def site_api_ai() -> list[iam.PolicyStatement]:
             sid="S3ConfigRead",
             actions=["s3:GetObject"],
             resources=[f"{BUCKET_ARN}/config/*", f"{BUCKET_ARN}/site/config/*"],
+        ),
+        # #1441: generation-time AI-surface archive — every published board answer
+        # is copied to generated/qa_archive/text/ (fail-soft in code). PutObject only,
+        # scoped to the one archive prefix; this role stays read-only everywhere
+        # else in S3.
+        iam.PolicyStatement(
+            sid="QaArchiveWrite",
+            actions=["s3:PutObject"],
+            resources=[f"{BUCKET_ARN}/generated/qa_archive/text/*"],
         ),
         iam.PolicyStatement(
             sid="AiKeySecret",

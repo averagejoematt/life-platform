@@ -153,6 +153,33 @@ jobs:
         run: |
           python3 tests/accuracy_audit.py --live
 
+      # #1441 — the screenshot leg of the generation-time AI archive: this daily
+      # sweep already captures full-page screenshots of every AI-narrative page
+      # (qa_manifest ai_surface facet), i.e. what a reader actually saw rendered
+      # today. Copy them to generated/qa_archive/screenshots/{date}/ (90-day S3
+      # lifecycle — deploy/apply_s3_lifecycle.sh `qa-archive-expire-90d`; the
+      # TEXT leg is written at generation time by lambdas/qa_archive.py inside
+      # each surface's publishing Lambda). Advisory: an upload failure must not
+      # red the sweep — the diagnosis role's scoped PutObject grant is staged in
+      # infra/iam/github-actions-diagnosis-role.permissions.json and applied
+      # out-of-band (until then this step logs WARNs and exits 0).
+      - name: Archive AI-surface screenshots (#1441)
+        if: always() && steps.dial.outputs.level != 'off'
+        continue-on-error: true
+        run: |
+          DATE=$(date -u +%F)
+          UPLOADED=0
+          for slug in $(python3 tests/qa_manifest.py --emit ai-screens); do
+            f="qa-screenshots/${slug}.png"
+            if [ -f "$f" ]; then
+              aws s3 cp "$f" "s3://matthew-life-platform/generated/qa_archive/screenshots/${DATE}/${slug}.png" --no-progress \
+                && UPLOADED=$((UPLOADED+1)) || echo "WARN: upload failed for ${slug} (advisory — #1441 IAM staging)"
+            else
+              echo "WARN: no screenshot at ${f} (page skipped or capture failed)"
+            fi
+          done
+          echo "qa_archive: ${UPLOADED} AI-surface screenshot(s) archived for ${DATE}"
+
       - name: Upload screenshots + report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

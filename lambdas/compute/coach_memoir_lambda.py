@@ -331,6 +331,14 @@ def _write_memoir_record(table, coach_id, quarter, text, facts):
         }
     )
     table.put_item(Item=item)
+    # #1441: generation-time archive — the gate-passed memoir text that the site
+    # artifact publishes, to generated/qa_archive/. Fail-soft inside the module.
+    try:
+        import qa_archive
+
+        qa_archive.archive_text("memoir", text, variant=coach_id, meta={"quarter": quarter})
+    except Exception as qa_e:  # noqa: BLE001 — the archive is never load-bearing
+        logger.warning("[coach_memoir] qa_archive failed (non-fatal): %s", qa_e)
 
 
 def _latest_memoir(table, coach_id):
