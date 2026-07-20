@@ -236,7 +236,21 @@ SOURCE_CLASS: dict[str, str] = {
 
 # platform_memory is split BY CATEGORY: durable user facts are cross-phase;
 # coach running-state categories are experiment-scoped (tombstoned at restart).
-MEMORY_DURABLE_CATEGORIES = frozenset({"baseline_snapshot", "re_entry", "cycle_marker", "cycle"})
+# The split MUST agree with the `durable` flag in the canonical category
+# registry (lambdas/platform_memory.py, #1482) — drift gate in
+# tests/test_platform_memory_block.py.
+MEMORY_DURABLE_CATEGORIES = frozenset(
+    {
+        "baseline_snapshot",
+        "re_entry",
+        "cycle_marker",
+        "cycle",
+        # #1482 conversation-derived durable user facts — qualitative life
+        # context survives an experiment reset (same reasoning as CHECKIN#).
+        "life_context",
+        "constraints_preferences",
+    }
+)
 MEMORY_SCOPED_CATEGORIES = frozenset(
     {
         "failure_pattern",

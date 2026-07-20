@@ -13,19 +13,24 @@ Tools:
   138. list_memory_categories — what categories exist with record counts
   139. delete_platform_memory — delete a specific memory record
 
-Categories seeded now:
-  weekly_plate   — plate history for anti-repeat (P1)
-  failure_pattern — when IC-4 is built
-  what_worked    — when IC-9 is built
-  coaching_calibration — when IC-11 is built
-  personal_curves — when IC-10 is built
-  journey_milestone — for IC-6 milestone architecture
+The category taxonomy is CODE, not prose (#1482): lambdas/platform_memory.py
+is the canonical registry (per-category channels, retention/relevance window,
+privacy tier, coach-domain relevance, durable-vs-scoped). Writes here are
+validated against it and stamped with honest provenance (channel, provenance)
+so the coach-prompt consumption seam (platform_memory.platform_memory_block)
+can inject conversation-derived memories without passing them off as data.
 """
 
 from datetime import datetime, timedelta, timezone
 
 from mcp.config import USER_ID as _user_id_ref, table as _table_ref
 from mcp.core import decimal_to_float as _d2f
+
+try:
+    # Shared, bundled module (#781) — staged at zip root in the Lambda.
+    import platform_memory as _pm
+except ImportError:  # pragma: no cover — MCP bundle always ships lambdas/ at root
+    from lambdas import platform_memory as _pm
 
 
 def _get_table():
@@ -38,17 +43,10 @@ def _get_user_id():
 
 MEMORY_SOURCE = "platform_memory"
 
-VALID_CATEGORIES = {
-    "weekly_plate",
-    "failure_pattern",
-    "what_worked",
-    "coaching_calibration",
-    "personal_curves",
-    "journey_milestone",
-    "insight",
-    "experiment_result",
-    "baseline_snapshot",
-}
+# Canonical sanctioned set — derived from the code registry (#1482), never a
+# second hand-maintained list. Aliases (failure_pattern → failure_patterns,
+# episodic_wins → what_worked) are normalized on write/read.
+VALID_CATEGORIES = set(_pm.MEMORY_CATEGORIES)
 
 
 def _memory_pk():
@@ -69,28 +67,68 @@ def tool_write_platform_memory(args: dict) -> dict:
     Store a structured memory record in the platform_memory partition.
 
     Args (via args dict):
-        category: Memory category (e.g. 'failure_pattern', 'what_worked',
-                  'coaching_calibration', 'journey_milestone', 'weekly_plate').
+        category: Memory category — must be in the sanctioned taxonomy
+                  (lambdas/platform_memory.py, #1482); aliases normalized
+                  (e.g. 'episodic_wins' → 'what_worked').
         content: Dict of key-value data to store. Will be merged into the DDB item.
+                 Put the human-readable core in a 'summary' or 'text' field —
+                 that's what the coach-prompt block renders.
         date: Date key for the record (YYYY-MM-DD). Defaults to today.
         overwrite: If True (default), overwrites existing record for this category+date.
+        privacy_tier: Optional per-record override ('public_ok' | 'coach_context'
+                      | 'private') — may only TIGHTEN the category default.
+        domains: Optional list of bare coach ids this memory is relevant to
+                 (e.g. ["nutrition", "training"]); default = the category rule.
 
     Returns:
         {"status": "stored", "sk": "...", "category": "...", "date": "..."}
     """
-    category = args.get("category", "")
+    raw_category = args.get("category", "")
     content = args.get("content", {})
     date = args.get("date")
     overwrite = args.get("overwrite", True)
+    privacy_tier = args.get("privacy_tier")
+    domains = args.get("domains")
 
     table = _get_table()
     today = datetime.now(timezone.utc).date().isoformat()
     date_str = date or today
 
-    if not category:
+    if not raw_category:
         return {"error": "category is required"}
+    category = _pm.canonical_category(raw_category)
+    if category is None:
+        return {
+            "error": f"unknown category '{raw_category}' — writes must land in a sanctioned taxonomy category (#1482)",
+            "sanctioned_categories": _pm.sanctioned_categories(),
+            "conversation_categories": _pm.conversation_categories(),
+            "hint": "call list_memory_categories for the full taxonomy (descriptions, channels, privacy tiers)",
+        }
     if not isinstance(content, dict):
         return {"error": "content must be a dict"}
+    # PR #1581 review (minor): content-supplied domains/privacy_tier go through
+    # the SAME validation as the top-level args (args win) — a domains list
+    # smuggled inside `content` can no longer silently exclude the record from
+    # every coach, and an invalid tier is rejected instead of stored raw.
+    if privacy_tier is None:
+        privacy_tier = content.get("privacy_tier")
+    if domains is None:
+        domains = content.get("domains")
+    if privacy_tier is not None and privacy_tier not in _pm.PRIVACY_TIERS:
+        return {"error": f"privacy_tier must be one of {list(_pm.PRIVACY_TIERS)}"}
+    if domains is not None:
+        if not isinstance(domains, list):
+            return {"error": "domains must be a list of bare coach ids"}
+        normalized = [_pm.normalize_domain(d) for d in domains]
+        if any(d is None for d in normalized):
+            return {"error": f"unknown coach domain in {domains} — valid: {sorted(_pm.COACH_DOMAINS)}"}
+        domains = normalized
+
+    # Honest provenance (#1482): this tool is the CHAT surface — a write through
+    # it is conversation-channel when the category sanctions conversation,
+    # otherwise it inherits the category's (computed) channel.
+    spec = _pm.MEMORY_CATEGORIES[category]
+    channel = _pm.CHANNEL_CONVERSATION if _pm.CHANNEL_CONVERSATION in spec["channels"] else spec["channels"][0]
 
     pk = _memory_pk()
     sk = _sk(category, date_str)
@@ -98,11 +136,25 @@ def tool_write_platform_memory(args: dict) -> dict:
     item = {
         "pk": pk,
         "sk": sk,
-        "category": category,
-        "date": date_str,
-        "stored_at": datetime.now(timezone.utc).isoformat(),
     }
     item.update(content)
+    # Meta fields win over any same-named content keys — keys and provenance
+    # are stamped by the platform, never supplied by the writer.
+    item.update(
+        {
+            "pk": pk,
+            "sk": sk,
+            "category": category,
+            "date": date_str,
+            "stored_at": datetime.now(timezone.utc).isoformat(),
+            "channel": channel,
+            "provenance": "mcp",
+        }
+    )
+    if privacy_tier is not None:
+        item["privacy_tier"] = privacy_tier
+    if domains is not None:
+        item["domains"] = domains
 
     # Convert any float values to Decimal for DynamoDB compatibility
     from decimal import Decimal as _Dec
@@ -125,7 +177,7 @@ def tool_write_platform_memory(args: dict) -> dict:
                 return {"status": "skipped", "reason": "record already exists", "sk": sk}
             raise
 
-    return {"status": "stored", "sk": sk, "category": category, "date": date_str}
+    return {"status": "stored", "sk": sk, "category": category, "date": date_str, "channel": channel}
 
 
 def tool_read_platform_memory(args: dict) -> dict:
@@ -143,6 +195,9 @@ def tool_read_platform_memory(args: dict) -> dict:
     category = args.get("category", "")
     days = args.get("days", 30)
     limit = args.get("limit", 10)
+
+    # Accept aliases on read too (failure_pattern → failure_patterns, …).
+    category = _pm.canonical_category(category) or category
 
     table = _get_table()
     days = min(max(1, int(days)), 365)
@@ -250,6 +305,9 @@ def tool_list_memory_categories(args: dict) -> dict:
             "categories": result,
             "total_records": len(items),
             "lookback_days": days,
+            # #1482: the sanctioned taxonomy (code registry: lambdas/platform_memory.py)
+            # — chat modes (#1479) read this to route takeaways into valid categories.
+            "taxonomy": _pm.taxonomy_summary(),
         }
     except Exception as e:
         return {"error": str(e)}

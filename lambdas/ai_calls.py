@@ -1538,6 +1538,27 @@ def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
         # existing generation call's context with #505's journal extraction.
         _journal_mood_block = _build_journal_mood_prompt_block(brief.get("journal_mood"), voice_spec)
 
+        # #1482 (epic #1476): conversation-derived platform memory — a bounded
+        # block of what Matthew SHARED IN CHAT (life context, constraints/
+        # preferences, calibration asks, narrated wins/failures) written through
+        # write_platform_memory, injected with honest provenance so a coach can
+        # use it as "you told me" context, never as sensor data. It sits in the
+        # system prompt ABOVE the few-shot block, so its numbers enter the
+        # ADR-104 fabrication allow-list via _allowlist_prompt — injected
+        # memories are valid grounding sources by construction. Hard item/char
+        # caps in platform_memory.py keep the ADR-063 token cost bounded.
+        # Fail-soft: no records / no module / read failure → empty block,
+        # render unchanged.
+        _memory_block = ""
+        try:
+            from platform_memory import platform_memory_block as _pmb
+
+            _mb = _pmb(coach_id=coach_id)
+            if _mb:
+                _memory_block = "\n\n" + _mb
+        except Exception as _pm_e:
+            print(f"[COACH-V2:{coach_id}] platform memory unavailable (non-blocking): {_pm_e}")
+
         # ADR-104: canonical facts — this render previously injected only the
         # hard-coded goals, so coaches had no authoritative vitals to cite and
         # nothing gated what they invented. Fail-soft: without the helpers the
@@ -1645,7 +1666,7 @@ ENGAGEMENT / PRESENCE: If the generation brief includes `engagement_signal`, Mat
 - If `returned` is true, he's BACK after `resumed_after_days` days. Acknowledge the return warmly, note any real `weight_delta_over_gap_lbs` plainly (regain is data, not a verdict), and be SUPPORTIVE about re-engaging — never punitive. The point is to help him restart, not to shame the lapse.
 - An absent SAME-DAY log is by-design lag (manual sources arrive end-of-day), never a gap — the signal already accounts for this, so trust `gap_days`.
 - If `severity` is "alarm": this is the single most important fact about this period. Address it in the opening paragraph. Do not narrate a normal week. (At "loud", the gap must be clearly acknowledged in your section; a draft that reads like a normal week will be regenerated or held.)
-{_journal_mood_block}
+{_journal_mood_block}{_memory_block}
 
 DATA INTERPRETATION RULES:
 - If an activity count or log is ZERO, that means Matthew hasn't done that activity — say "no training logged this week" NOT "provide your training data"

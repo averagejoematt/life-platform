@@ -1218,24 +1218,50 @@ TOOLS = {
             "name": "write_platform_memory",
             "description": (
                 "Store a structured memory record in the platform_memory partition. "
-                "The compounding intelligence substrate — use to record failure patterns, "
-                "what worked, coaching calibrations, journey milestones, and episodic wins. "
-                "Valid categories: weekly_plate, failure_pattern, what_worked, "
-                "coaching_calibration, personal_curves, journey_milestone, insight, experiment_result."
+                "The compounding intelligence substrate — routes durable takeaways from conversation "
+                "(life events, constraints/preferences, failure patterns, episodic wins, coaching calibration) "
+                "into the store that coach prompt assembly injects (#1482). Conversation-writable categories: "
+                "life_context, constraints_preferences, coaching_calibration, failure_patterns, what_worked. "
+                "Writes are validated against the code taxonomy (lambdas/platform_memory.py) and stamped "
+                "channel=conversation + provenance=mcp. Put the human-readable core in a 'summary' field — "
+                "that is what reaches coach prompts. Call list_memory_categories for the full taxonomy."
             ),
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "category": {
                         "type": "string",
-                        "description": "Memory category (e.g. 'failure_pattern', 'what_worked', 'journey_milestone').",
+                        "description": (
+                            "Sanctioned memory category (e.g. 'life_context', 'constraints_preferences', "
+                            "'failure_patterns', 'what_worked', 'coaching_calibration'). Aliases accepted: "
+                            "'episodic_wins' → what_worked, 'failure_pattern' → failure_patterns."
+                        ),
                     },
                     "content": {
                         "type": "object",
-                        "description": 'Key-value dict of data to store. E.g. {"pattern": "high-stress Tuesdays correlate with missed nutrition", "conditions": [...]}',
+                        "description": (
+                            'Key-value dict of data to store, with the readable core in "summary". '
+                            'E.g. {"summary": "work trip Tue-Fri, hotel gym only", "detail": {...}}'
+                        ),
                     },
                     "date": {"type": "string", "description": "Date for the record (YYYY-MM-DD). Defaults to today."},
                     "overwrite": {"type": "boolean", "description": "Overwrite if record exists (default true)."},
+                    "privacy_tier": {
+                        "type": "string",
+                        "enum": ["public_ok", "coach_context", "private"],
+                        "description": (
+                            "Optional per-record privacy override — may only TIGHTEN the category default. "
+                            "'private' never reaches any generation prompt."
+                        ),
+                    },
+                    "domains": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "Optional bare coach ids this memory is relevant to (sleep, training, nutrition, mind, "
+                            "physical, glucose, labs, explorer). Default: the category's rule (usually all coaches)."
+                        ),
+                    },
                 },
                 "required": ["category", "content"],
             },
@@ -1265,8 +1291,9 @@ TOOLS = {
         "schema": {
             "name": "list_memory_categories",
             "description": (
-                "List all platform_memory categories that have records, with record counts and date ranges. "
-                "Use to understand what intelligence the platform has accumulated so far."
+                "List all platform_memory categories that have records (counts + date ranges), plus the full "
+                "sanctioned category taxonomy (#1482: descriptions, channels, privacy tiers, retention windows). "
+                "Use to understand what the platform has accumulated and where a conversation takeaway should be filed."
             ),
             "inputSchema": {
                 "type": "object",
