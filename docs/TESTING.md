@@ -151,6 +151,29 @@ published `challenges_catalog.json` shipped two `public:false` blocked-category
 templates; those were stripped and the read-path `_is_blocked_vice(name **or** id)`
 bug fixed.)
 
+### 13. AI-content QA — the four planes (QA strategy D-lane, epic #1425)
+AI output is defended in four complementary planes; nothing else is a substitute
+for the plane below it:
+1. **Generation-time honesty gate** (plane 1) — the deterministic ADR-104 grounding
+   gate / `er03_check` fires at publish time on every AI narrative surface; a
+   fabricated number or unhedged small-N claim is blocked or regenerated before a
+   reader ever sees it.
+2. **Faithfulness harness** (plane 2) — section 11 above: an offline labelled corpus
+   proves the gate still catches the four failure classes, wiring-guarded so a
+   refactor can't drop it.
+3. **Generation-time archive** (plane 3, D2 / #1441) — `lambdas/qa_archive.py` copies
+   every gate-passed generation to `generated/qa_archive/` (text + daily screenshots,
+   90-day retention) so any past generation is reconstructable, not screenshot
+   archaeology.
+4. **Human editorial plane** (plane 4, D3 / #1442) — the **weekly AI review-pack email**
+   (`lambdas/emails/ai_review_pack_lambda.py`, Sunday 18:00 UTC). It curates plane-3's
+   archive for the trailing week into one scannable email — Chronicle, Board answers,
+   Coach commentary, State of Matthew, Field notes, Coach memoirs, each with an inline
+   snippet and an S3 link — guaranteeing a human eyeball over every AI surface at the
+   cost of scanning one email. It reads the archive only (no Bedrock calls, no budget
+   gate) and degrades gracefully: a surface that produced nothing shows an explicit
+   note; a quiet week still sends. Tests: `tests/test_ai_review_pack.py`.
+
 ---
 
 ## What's NOT tested

@@ -337,6 +337,12 @@ COVERAGE = {
     "monthly-digest": (EXEMPT, "2026-07-19", "Operator email on a monthly rhythm; a missing first-Monday issue is noticed by its reader."),
     "nutrition-review": (EXEMPT, "2026-07-19", "Operator email (Saturday nutrition review); a missing issue is noticed by its reader."),
     "monday-compass": (EXEMPT, "2026-07-19", "Operator email (Monday week-plan); a missing issue is noticed by its reader same-morning."),
+    "ai-review-pack": (
+        EXEMPT,
+        "2026-07-20",
+        "Operator email (weekly AI editorial review pack, #1442); a missing Sunday issue is noticed by its reader (Matthew). "
+        "It only curates the already-alarmed D2 archive — a read-only digest whose absence carries no data-path risk.",
+    ),
     "evening-nudge": (EXEMPT, "2026-07-19", "Operator email (daily evening nudge); a missing nudge is noticed by its reader that evening."),
     "weekly-plate": (EXEMPT, "2026-07-19", "Operator email (weekly plate planning); a missing issue is noticed by its reader."),
     "weekly-signal": (EXEMPT, "2026-07-19", "Operator email (weekly signal summary); a missing Sunday issue is noticed by its reader."),

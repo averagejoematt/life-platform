@@ -187,6 +187,9 @@
     "lambdas/emails/freshness_checker_lambda.py": {
       "function": "life-platform-freshness-checker"
     },
+    "lambdas/emails/ai_review_pack_lambda.py": {
+      "function": "ai-review-pack"
+    },
     "lambdas/emails/insight_email_parser_lambda.py": {
       "function": "insight-email-parser"
     },
