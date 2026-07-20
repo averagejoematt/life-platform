@@ -3520,6 +3520,32 @@ Measured live 2026-07-05 to confirm the fix and ground the threshold re-eval:
 
 **Consequences.** Removes an unexercised auto-merge path from the trusted deploy perimeter until it demonstrates value; costs nothing (shadow still surfaces every proposed fix for human review). Reversible in one SSM write.
 
+### ADR-129 Amendment (2026-07-20, #1337 — a numeric earn-back bar for shadow → auto)
+
+**Context.** ADR-129 demoted the agent to `shadow` but never defined what re-promotion to `auto` requires — "once safe-class fixes are actually landing" is a vibe, not a bar. The 2026-07-18 SDLC review (`docs/reviews/SDLC_REVIEW_2026-07-18.md`, story #1337) flagged the gap: sampled runs since June show zero merged auto-fix-safe PRs in either mode and one dismissed sentinel true positive (#1228 — the agent triaged away the drift sentinel's one real catch without checking regions). Two things changed since the original ADR that make a numeric bar checkable now: (1) `earn_or_shadow_check` (#396) already encodes a *stay-in-auto* bar (`AUTO_EARN_WINDOW_DAYS = 28`: zero merged `auto-fix-safe` PRs in a rolling 28-day window auto-flags a dial-back), which this amendment mirrors for *entering* auto rather than leaving it; (2) #1264 made a run's workflow conclusion a trustworthy signal — before it, a run that silently truncated triage (turn budget burned out) still reported `success` (`main()` unconditionally `return 0`), so "N green runs" was not evidence of anything. Post-#1264, `success` means triage actually completed (see the Verification section below for live proof this fires).
+
+**Decision — the numeric bar.** Re-promotion from `shadow` to `auto` is Matthew's explicit operator call (flip the SSM parameter), made only after ALL of the following hold over the **10 most recent scheduled remediation runs** (Mon/Wed/Fri cadence ⇒ ~3.3 calendar weeks — deliberately close to `earn_or_shadow_check`'s own 28-day window, so the same cadence gates both entering and remaining in `auto`):
+
+1. **10-for-10 clean runs.** Every one of the 10 runs' workflow conclusion is `success` — i.e. the #1264 `triage_incomplete` gate never fired, and the run wasn't a same-day retry of one that did. A run that reds for *any* reason (triage truncation, an unrelated infra failure such as the #1544 Actions-minutes class) breaks the streak; the count restarts from zero at the next clean run. This is a streak requirement, not "10 of the last N."
+2. **Zero dismissed sentinel true positives.** No run in the window triaged an infra-drift-sentinel finding (`generated/drift-log/latest.json` orphan/drift list) as a false positive when it was in fact real — the #1228 class. One recurrence resets the streak, same as leg 1.
+3. **At least 3 spot-audited `auto-fix-safe` proposals.** Of the 10 runs, at least 3 propose a genuine `auto-fix-safe`-labeled PR (opened, not necessarily merged — shadow mode never merges), and each is spot-audited by Matthew (diff + the triage verdict in its `s3://matthew-life-platform/remediation-log/<date>/<time>.json` `_raw`/report) and confirmed correct. The audit is recorded as a PR comment on the proposal itself, prefixed `audit:` (`audit: correct` or `audit: incorrect`). A proposal with no `audit:` comment, or one marked incorrect, does not count toward the 3 — and an `incorrect` verdict resets the whole streak (it's the same failure class as leg 2, just caught on a proposed fix instead of a dismissed alarm).
+
+If any leg fails on any run, the 10-run counter resets to zero as of the next run — the bar is 10 consecutive clean runs, not a lifetime batting average.
+
+**The audit mechanism (so the next review checks the bar, not re-derives it).** Three read-only lookups, all against tooling that already exists — no new machinery:
+
+```
+gh run list --workflow remediation-agent.yml --limit 10 --json conclusion,createdAt,event
+gh pr list --label auto-fix-safe --state all --search "created:>=<window-start>" --json number,title,url
+gh pr view <n> --comments   # look for the audit: line Matthew leaves on each spot-audited proposal
+```
+
+cross-referenced against `s3://matthew-life-platform/remediation-log/automerge/` (gate decisions) and `generated/drift-log/latest.json` history (sentinel findings, for leg 2). A reviewer who runs these three commands and reads the result **is** applying the bar — nothing about the criterion needs to be re-derived from narrative.
+
+**Verification (#1337 leg 2 — the #1264 gate fires live).** Checked 2026-07-20 against `gh run list --workflow remediation-agent.yml`. Run `29710487874` (2026-07-20T01:09–01:12 UTC, a real `repository_dispatch` triage, not an infra no-op — 16 steps, ~4 minutes) concluded **failure**, with the "Run remediation agent" step logging exactly the #1264 guard's message: `Remediation triage did not complete — 13 signal(s) left untriaged with a truncated agent transcript (_raw present) ... Failing the step so the run reds instead of concluding a deceptive 'success' (#1201)`, exit code 1 — even at the raised `REMEDIATION_MAX_TURNS: 30` (`agent result flagged error (subtype=error_max_turns)`), and the following `automerge.py` step correctly no-op'd (`mode=shadow — no-op`). This is the gate working exactly as #1264 designed it: a truncated triage reds the run instead of masquerading as green. (Separately, several other runs the same day — `29737386092`, `29714106711`/`29714010518`, and today's `29758822148` — also show `conclusion: failure` but with **0 steps** and a 3–4 second duration; those are the unrelated #1544 GitHub-Actions-minutes-exhaustion "jobs refused, no logs" class, not the #1264 gate, and must not be miscounted as gate firings when applying leg 1 above.) `python3 -m pytest tests/test_remediation_agent.py -k "triage_incomplete or main"` — the offline regression guard for the same guard — is 6/6 green locally.
+
+**Consequences.** No code change (the bar is process, evaluated by the operator against existing logs/tooling); `earn_or_shadow_check`'s 28-day stay-in-auto window is unchanged and still fires post-promotion. CLAUDE.md's Self-healing section now states the live mode so it doesn't have to be re-derived from this ADR every time. Next sdlc-review checks this bar with the three commands above instead of re-litigating what "earned" means.
+
 ## ADR-130: GitHub Pages disabled — a second, unmanaged public surface redundant with the canonical CloudFront site (E8/#752)
 
 **Date:** 2026-07-06 · **Status:** Accepted · **Story:** #752 (R21 definitive review, kill list / perimeter close-out)

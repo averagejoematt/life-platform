@@ -134,7 +134,7 @@ Scheduled GitHub Actions workflow (`.github/workflows/remediation-agent.yml`, ~0
 
 **Auth:** AWS OIDC → `github-actions-remediation-role` (Bedrock + read-only diagnosis + scoped audit-log writes, NO deploy/IAM mutate). Model: Sonnet 4.6 on Bedrock — no Anthropic key.
 
-**Kill-switch:** SSM `/life-platform/remediation-mode` = `off | shadow | auto`. Tier-3 budget also no-ops the run.
+**Kill-switch:** SSM `/life-platform/remediation-mode` = `off | shadow | auto`. Tier-3 budget also no-ops the run. **Current mode: `shadow`** (demoted 2026-07-06, ADR-129 — zero merged safe-class PRs in ~6 weeks; the agent still triages and opens PRs, it just doesn't self-merge). Re-promotion to `auto` requires the numeric 10-consecutive-clean-run bar in the ADR-129 2026-07-20 amendment (#1337), an explicit operator SSM flip — never automatic.
 
 **Auto-merge is a deterministic gate, not the agent** (ADR-065). The agent (read-only role) opens `auto-fix-safe` PRs; `remediation/automerge.py` runs after and merges only if ALL hold: every file on a narrow ALLOWLIST (role_policies, lambda_map, monitoring_stack, freshness_checker, qa_smoke, tests/), no file on the DENYLIST (bedrock_client, budget_guard, auth/secrets, deploy/, workflows/, core_stack), diff ≤ 60 lines, lint + offline unit-test subset pass, daily cap (3) not reached. **CI's production approval gate stays intact** — auto-merge does NOT auto-deploy. Infra merges that touch `cdk/` are flagged "needs cdk deploy."
 
