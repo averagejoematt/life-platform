@@ -232,6 +232,25 @@ deleted, fail-open via `[[ -f ]]`, so its doc-sync half silently no-oped).
 - The handover carries one line either way: `**Stash/hooks:** clean` or
   `**Stash/hooks:** <what was found + what you did about it>`.
 
+### (e6) Label-completeness gate — a wrap gate, same shape as (d)/(e)/(e2)/(e3)/(e4)/(e5) (#1349)
+
+The label-routing rule (`.claude/agents/issue-filer.md`'s "exactly one model:*" ADR-099
+contract) is only real if it holds over time — a session seeds work from `gh issue list
+--label model:sonnet ...`-style queries, and an issue with no `model:*` label is silently
+invisible to every one of them. Same shape as the #1259 memory-orphan gate: a one-line
+check that must print nothing.
+
+- Run:
+  ```bash
+  python3 scripts/check_story_labels.py
+  ```
+  It must print `OK`. If it lists violators, add exactly one `model:*` label
+  (`model:sonnet` / `model:opus` / `model:fable`, per issue-filer.md's routing rubric) to
+  each before closing this step — do not leave a printed violator unfixed.
+- If `gh` isn't authenticated/reachable from this session, the script fails open (prints
+  a skip note, exits 0) — note that in the handover rather than silently skipping the
+  check.
+
 ### (f) Commit the wrap
 
 Stage the repo-tracked wrap artifacts only (memory-dir changes from step (c) are outside
@@ -273,3 +292,5 @@ session — status block, handover, build beat (9 R22 smalls #836–#845)`).
 - **Decisions or explicit skip, never silence (#1343).** Every wrap's handover carries a
   `**Decisions:** <ADR-NNN filed or "none needed — reason">` line — a governance decision
   must never land only in a workflow file or a commit message.
+- **Model: label completeness, no silent skips (#1349).** `scripts/check_story_labels.py`
+  must print `OK` before the wrap commit; a violator gets fixed (labeled), not deferred.
