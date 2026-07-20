@@ -295,6 +295,14 @@ def record_email_send(table, lambda_name):
 
 
 def lambda_handler(event, context):
+    try:
+        return _run(event, context)
+    except Exception as e:
+        logger.error("Weekly AI Review Pack failed: %s", e)
+        raise
+
+
+def _run(event, context):
     logger.info("Weekly AI Review Pack starting...")
     dates = week_dates()
     by_surface, screenshots_by_date, read_errors = gather_week(dates)
