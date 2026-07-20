@@ -129,3 +129,44 @@ def test_emitters_run(emit):
         timeout=60,
     )
     assert r.returncode == 0 and len(r.stdout.splitlines()) >= 30, r.stderr
+
+
+# ── #1586: the api_deps facet + its smoke consumer ────────────────────────────
+def test_api_dep_endpoints_is_distinct_and_sorted():
+    deps = qa_manifest.api_dep_endpoints()
+    assert deps == sorted(set(deps)), "api_dep_endpoints() must be a distinct, sorted union (one check per endpoint, not per page)"
+    assert all(d.startswith("/") for d in deps)
+    # every page's declared deps must be a subset of the union (the union IS the derivation)
+    for p in qa_manifest.MANIFEST:
+        assert set(p.get("api_deps") or []) <= set(deps)
+
+
+def test_api_deps_emitter_runs():
+    import subprocess
+
+    r = subprocess.run(
+        [sys.executable, os.path.join(_HERE, "qa_manifest.py"), "--emit", "api_deps"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    lines = r.stdout.splitlines()
+    assert r.returncode == 0 and lines == sorted(set(lines)) and len(lines) > 0, r.stderr
+
+
+def test_smoke_script_sweeps_the_manifest_api_deps_union():
+    """#1586: the JSON-health leg must derive its endpoint list from the manifest
+    (never a hand list) — the same derive-don't-relist contract #1426 applies to
+    pages."""
+    src = open(os.path.join(_REPO, "deploy", "smoke_test_site.sh")).read()
+    assert "--emit api_deps" in src, "smoke script must sweep the manifest's api_deps union (#1586)"
+
+
+def test_no_manifest_api_dep_known_stale():
+    """Regression guard for the exact bug #1586's smoke leg caught on first run:
+    two pages declared api_deps for routes that were never implemented
+    (/api/agents, /api/coach_track_records — typos for the real
+    /api/agent_activity and /api/predictions). A future re-introduction of either
+    stale literal reds here before it ever reaches a live smoke run."""
+    known_stale = {"/api/agents", "/api/coach_track_records"}
+    assert not (set(qa_manifest.api_dep_endpoints()) & known_stale)

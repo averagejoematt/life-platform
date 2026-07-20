@@ -116,25 +116,39 @@ def sweeps_section():
 
 # ── uncovered surface ────────────────────────────────────────────────────────
 def smoke_checked_endpoints():
-    """The /api endpoints the smoke script actually status-checks (parsed live —
-    this is smoke's one remaining hand list, so the audit diffs it)."""
+    """The endpoints the smoke script actually checks: the named hand `check_status`
+    calls (still parsed, so a removed one is still caught as drift) UNION — since
+    #1586 — the full manifest-derived JSON-health sweep (deploy/smoke_test_site.sh's
+    "Manifest api_deps" section, present iff the script sources qa_manifest's
+    `--emit api_deps` emitter). That section checks the DISTINCT union of every
+    manifest api_dep by construction, so once it's present the ratchet is
+    self-maintaining — a newly-declared api_dep is swept the moment it lands in
+    the manifest, with no separate list to keep in sync here."""
     text = _read(os.path.join(_REPO, "deploy", "smoke_test_site.sh"))
-    return sorted(
-        set(re.findall(r'check_status\s+"(/api/[^"|]+)"', text)) | set(re.findall(r'check_status\s+"[^"]*"\s+"\$BASE(/api/[^"]+)"', text))
+    checked = set(re.findall(r'check_status\s+"(/api/[^"|]+)"', text)) | set(
+        re.findall(r'check_status\s+"[^"]*"\s+"\$BASE(/api/[^"]+)"', text)
     )
+    if "--emit" in text and "api_deps" in text:
+        checked |= set(qa_manifest.api_dep_endpoints())
+    return sorted(checked)
 
 
 def uncovered_section():
     no_visual = sorted(p["path"] for p in qa_manifest.MANIFEST if not p.get("visual") and not p.get("visual_variants"))
-    declared = sorted({d for p in qa_manifest.MANIFEST for d in (p.get("api_deps") or []) if d.startswith("/api/")})
+    # #1586: the declared universe is every api_dep the manifest names (not just
+    # the /api/-prefixed subset) — the smoke JSON-health sweep checks all of them,
+    # so the ratchet should too (a stale /journal/posts.json or /panelcast/
+    # episodes.json dep is exactly as real a drift as a stale /api/ one).
+    declared = sorted(qa_manifest.api_dep_endpoints())
     checked = set(smoke_checked_endpoints())
     return {
         "no_visual_def": no_visual,
         "api_deps_declared": len(declared),
         "api_deps_unchecked": [d for d in declared if d not in checked],
         "note": (
-            "api_deps_unchecked = endpoints the manifest declares pages render from but no smoke status-check "
-            "covers directly (they ARE exercised indirectly by the Playwright sweep loading the pages)"
+            "api_deps_unchecked = manifest-declared endpoints the smoke JSON-health sweep (#1586, deploy/"
+            "smoke_test_site.sh's 'Manifest api_deps' section) does not cover — empty on a healthy repo; a "
+            "non-empty result means that section stopped deriving from qa_manifest.api_dep_endpoints()"
         ),
     }
 

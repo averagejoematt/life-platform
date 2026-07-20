@@ -56,6 +56,7 @@ Emitters (for the bash smoke script and ad-hoc use):
     python3 tests/qa_manifest.py --emit static_core # pages that must ship a static core
     python3 tests/qa_manifest.py --emit structural  # "fetch_path|name|marker" (#1429)
     python3 tests/qa_manifest.py --emit ai-screens  # screenshot slugs of ai_surface pages (#1441)
+    python3 tests/qa_manifest.py --emit api_deps    # distinct union of every declared api_dep (#1586)
     python3 tests/qa_manifest.py --check            # internal consistency self-check
 
 No third-party deps. Importable by tests/* (sibling) and deploy/* scripts
@@ -270,7 +271,10 @@ _CURATED = [
         "name": "Story · the agents",
         "tier": 2,
         "content_class": "live-data",
-        "api_deps": ["/api/agents"],
+        # #1586: was declared as "/api/agents" (a route that never existed — a
+        # stale/typo'd dep the new endpoint-health smoke leg caught immediately).
+        # agents.js actually fetches the single real endpoint below.
+        "api_deps": ["/api/agent_activity"],
         "js_modules": ["agents.js"],
         "visual": {"checks": [{"selector": "[data-roster], .agent-card, [data-feed]", "not_empty": True, "desc": "agent roster + feed"}]},
     },
@@ -428,7 +432,10 @@ _CURATED = [
         "name": "Coaching · Scorecard (graded track record)",
         "tier": 2,
         "content_class": "live-data",
-        "api_deps": ["/api/coach_track_records"],
+        # #1586: was declared as "/api/coach_track_records" (a route that never
+        # existed — a stale/typo'd dep the new endpoint-health smoke leg caught
+        # immediately). coaching.js's scorecard tab actually fetches /api/predictions.
+        "api_deps": ["/api/predictions"],
         "js_modules": ["coaching.js"],
         "visual": {
             "wait_for": "[data-dx-read]",
@@ -584,6 +591,9 @@ _CURATED = [
         "js_modules": [],
         # Error page — status-only is the right coverage (smoke already verifies the
         # 200 on direct S3 fetch); no meaningful render behavior to check (#1427).
+        # Exemption reviewed 2026-07-20 (#1586 qa_audit coverage-drift ratchet) —
+        # still holds: an error page has no interactive/data-bound content for
+        # Playwright to assert beyond what the structural marker below already covers.
         "visual": None,
         # #1429: assert the body CloudFront actually serves on a missing path (it
         # arrives with HTTP status 404 — the structural check reads the body and
@@ -601,6 +611,9 @@ _CURATED = [
         "leak_scan": False,
         # Pure meta-refresh redirect stub — no content to check; the target page
         # (/subscribe/) is visually swept directly (#1427).
+        # Exemption reviewed 2026-07-20 (#1586 qa_audit coverage-drift ratchet) —
+        # still holds: a meta-refresh stub has nothing for Playwright to assert
+        # before the browser hops away.
         "visual": None,
     },
 ]
@@ -718,6 +731,17 @@ def structural_rows():
     return rows
 
 
+def api_dep_endpoints():
+    """deploy/smoke_test_site.sh — the DISTINCT union of every page's declared
+    api_deps (#1586). Pages declare the endpoints they render from, but until
+    #1586 nothing asserted those endpoints' health directly — a dead dependency
+    surfaced only as a blank page section (or not at all). This is the ONE list
+    the smoke JSON-health sweep and scripts/qa_audit.py's coverage ratchet both
+    read — one check per endpoint, never per page, so N pages sharing an
+    endpoint cost one check, not N."""
+    return sorted({d for p in MANIFEST for d in (p.get("api_deps") or [])})
+
+
 def site_files():
     """Every page-shaped file under site/ (repo truth for the completeness gate)."""
     site = os.path.join(_REPO, "site")
@@ -781,7 +805,7 @@ def self_check():
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[1])
-    ap.add_argument("--emit", choices=["paths", "smoke", "leak", "static_core", "structural", "coverage", "ai-screens"])
+    ap.add_argument("--emit", choices=["paths", "smoke", "leak", "static_core", "structural", "coverage", "ai-screens", "api_deps"])
     ap.add_argument("--check", action="store_true")
     args = ap.parse_args()
     if args.check:
@@ -819,6 +843,9 @@ def main():
     elif args.emit == "ai-screens":
         for s in ai_screenshot_slugs():
             print(s)
+    elif args.emit == "api_deps":
+        for d in api_dep_endpoints():
+            print(d)
     else:
         ap.print_help()
 
