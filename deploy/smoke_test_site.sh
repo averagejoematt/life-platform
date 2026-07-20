@@ -204,6 +204,61 @@ check_status "/api/coach/eli_marsh" "$BASE/api/coach/eli_marsh"
 check_status "/api/character_calibration" "$BASE/api/character_calibration"
 echo ""
 
+# ── Manifest api_deps (distinct union, JSON health, #1586) ────────────────────
+# Pages declare the endpoints they render from (qa_manifest.py's api_deps
+# facet), but until #1586 nothing asserted those declared endpoints' actual
+# health — a dead dependency surfaced only as a blank page section (or not at
+# all). This sweeps the DISTINCT union across every page — one check per
+# endpoint, never per page — and asserts 200 + a non-empty, well-formed JSON
+# body. Cache-busted (viewer-path /api/* is CloudFront-cached up to 5 minutes,
+# the #1158-class incident) so this reads the live response, not a stale edge
+# hit. Tolerant of honest empty states (e.g. {"data": []} or an object with
+# null/empty fields on a sparse fresh-genesis day, the #1540-class
+# present-None phenomenon) — only an HTTP error, non-200 status, empty body,
+# or malformed JSON fails a row. Endpoints already named above get a second,
+# STRONGER check here (JSON-validity, not just status) — not a double count of
+# the coverage ratchet, which scripts/qa_audit.py computes from this section's
+# presence (see qa_audit.smoke_checked_endpoints).
+echo "── Manifest api_deps (distinct union, JSON health, #1586) ────"
+check_json_endpoint() {
+  local dep_path="$1"
+  local url="${BASE}${dep_path}"
+  local sep="?"
+  [[ "$url" == *\?* ]] && sep="&"
+  local cb_url="${url}${sep}_cb=smoke$(date +%s%N)"
+  local out status body
+  out=$(curl -s --max-time 10 -w $'\n%{http_code}' "$cb_url")
+  status="${out##*$'\n'}"
+  body="${out%$'\n'*}"
+  if [[ "$status" != "200" ]]; then
+    echo "  ❌ api_dep $dep_path — expected 200, got $status ($cb_url)"
+    FAIL=$((FAIL + 1))
+    return
+  fi
+  if [[ -z "$body" ]]; then
+    echo "  ❌ api_dep $dep_path — 200 but empty body ($cb_url)"
+    FAIL=$((FAIL + 1))
+    return
+  fi
+  if ! printf '%s' "$body" | python3 -c "import json,sys; json.load(sys.stdin)" >/dev/null 2>&1; then
+    echo "  ❌ api_dep $dep_path — 200 but body is not valid JSON ($cb_url)"
+    FAIL=$((FAIL + 1))
+    return
+  fi
+  echo "  ✅ api_dep $dep_path"
+  PASS=$((PASS + 1))
+}
+if API_DEP_ROWS=$(python3 "$QA_MANIFEST" --emit api_deps); then
+  while IFS= read -r dep_path; do
+    [[ -z "$dep_path" ]] && continue
+    check_json_endpoint "$dep_path"
+  done <<< "$API_DEP_ROWS"
+else
+  echo "  ❌ qa_manifest api_deps emit failed — endpoint health sweep did not run"
+  FAIL=$((FAIL + 1))
+fi
+echo ""
+
 if [[ "$QUICK" != "--quick" ]]; then
   echo "── Content markers (v4 structure) ───────────────────────"
   # #1526: both checks take the page URL as a 4th arg — a failed needle re-fetches

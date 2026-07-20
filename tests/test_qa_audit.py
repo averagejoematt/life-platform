@@ -116,3 +116,20 @@ def test_render_report_mentions_every_section():
     text = qa_audit.render(audit)
     for needle in ("COVERAGE MAP", "UNCOVERED", "SILENT-SKIP", "ALARM", "CONSUMER", "DRIFT"):
         assert needle in text, f"rendered report missing the {needle} section"
+
+
+# ── #1586: the api_deps coverage ratchet ──────────────────────────────────────
+def test_api_deps_ratchet_holds_zero_unchecked():
+    """The acceptance criterion, encoded permanently: qa_audit's coverage report
+    must show 0 unchecked api_deps. deploy/smoke_test_site.sh's 'Manifest
+    api_deps' section (sourced from qa_manifest.api_dep_endpoints()) makes this
+    self-maintaining — a newly-declared api_dep is swept the moment it lands in
+    the manifest. A red here means that section's derivation broke."""
+    unc = qa_audit.uncovered_section()
+    assert unc["api_deps_unchecked"] == [], f"manifest api_deps not covered by the smoke JSON-health sweep: {unc['api_deps_unchecked']}"
+    assert unc["api_deps_declared"] == len(qa_manifest.api_dep_endpoints())
+
+
+def test_smoke_checked_endpoints_derives_from_manifest_once_the_1586_section_lands():
+    checked = set(qa_audit.smoke_checked_endpoints())
+    assert set(qa_manifest.api_dep_endpoints()) <= checked
