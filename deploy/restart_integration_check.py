@@ -265,7 +265,7 @@ def build_synthetic_som_payload():
         "data": {
             "stateOfMind": [
                 {
-                    "date": f"{SYNTHETIC_DATE} 20:00:00 -0800",
+                    "date": f"{SYNTHETIC_DATE} 08:00:00 -0800",  # NOT evening: -0800 evening rolls into the next UTC day (leaked a 2099-01-02 row on first execution)
                     "valence": 0.5,
                     "kind": "dailyMood",
                     "labels": ["integration_test"],
@@ -511,14 +511,24 @@ def leg_serving(report, args):
     else:
         report.add("serving", f"qa_manifest smoke ({len(rows)} urls)", PASS, "every path served its expected status")
 
-    import boto3
-    from botocore.config import Config
+    if args.brief_full:
+        import boto3
+        from botocore.config import Config
 
-    # the brief generates for ~7.5 min (measured 445-476s; fn timeout 900) — wait past it.
-    # One full generation per harness run, Bedrock cost ~cents; run this leg at resets, not casually.
-    brief_lam = boto3.client("lambda", region_name=REGION, config=Config(read_timeout=910, retries={"max_attempts": 1}))
-    ok, detail = _invoke(brief_lam, "daily-brief", {"dry_run": True})
-    report.add("serving", "daily-brief dry-run (no-send, full generation — costs one brief's Bedrock tokens)", PASS if ok else FAIL, detail)
+        # a full generation runs 7.5-15+ min (fn timeout 900) and costs one brief's Bedrock
+        # tokens — deliberate, once per reset, never casually (the first execution tripped
+        # the ai-tokens-daily-brief-daily alarm on repeated runs).
+        brief_lam = boto3.client("lambda", region_name=REGION, config=Config(read_timeout=910, retries={"max_attempts": 1}))
+        ok, detail = _invoke(brief_lam, "daily-brief", {"dry_run": True})
+        report.add("serving", "daily-brief dry-run (no-send, full generation)", PASS if ok else FAIL, detail)
+    else:
+        report.add(
+            "serving",
+            "daily-brief dry-run",
+            SKIP,
+            "full generation costs a brief's Bedrock tokens + up to 15 min — pass --brief-full (reset runs); "
+            "the invoke/boot path is covered by the compute healthchecks and the next 17:00 UTC brief is the standing proof",
+        )
 
     hits = scan_email_lambdas()
     if hits:
@@ -683,6 +693,9 @@ def leg_synthetic(report, args):
     status3 = post(build_synthetic_som_payload())
     row3 = table.get_item(Key=key).get("Item") or {}
     som_n = int(row3.get("som_check_in_count") or 0)
+    if som_n == 0:  # tz-drift fallback — check the next-UTC-day row before failing
+        alt = table.get_item(Key={"pk": key["pk"], "sk": "DATE#2099-01-02"}).get("Item") or {}
+        som_n = int(alt.get("som_check_in_count") or 0)
     report.add(
         "synthetic",
         "state-of-mind normalization",
@@ -690,9 +703,13 @@ def leg_synthetic(report, args):
         f"http {status3}; som_check_in_count={som_n}",
     )
 
-    table.delete_item(Key=key)
-    gone = table.get_item(Key=key).get("Item") is None
-    report.add("synthetic", "cleanup verified", PASS if gone else FAIL, f"DDB row {key['sk']} deleted and confirmed absent")
+    keys = [key, {"pk": key["pk"], "sk": "DATE#2099-01-02"}]  # tz-rollover belt: an -0800 evening ts lands next UTC day
+    for k in keys:
+        table.delete_item(Key=k)
+    gone = all(table.get_item(Key=k).get("Item") is None for k in keys)
+    report.add(
+        "synthetic", "cleanup verified", PASS if gone else FAIL, "DDB rows DATE#2099-01-01 + DATE#2099-01-02 deleted and confirmed absent"
+    )
     now = datetime.now(timezone.utc)
     print(
         "  ⚠ honest residue (delete-protected raw/ prefix, isolated at the impossible date):\n"
@@ -706,6 +723,9 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[1])
     ap.add_argument("--deep", action="store_true", help="force-recompute today's daily compute records (post-reset mode)")
     ap.add_argument("--synthetic", action="store_true", help="run the HAE synthetic webhook round-trip (tagged writes + verified cleanup)")
+    ap.add_argument(
+        "--brief-full", action="store_true", help="synchronous full daily-brief dry-run (Bedrock cost + up to 15 min; reset runs)"
+    )
     ap.add_argument("--expect-cycle", type=int, default=None, help="assert SSM /life-platform/experiment-cycle equals this")
     ap.add_argument("--allow-alarm", action="append", help="alarm name(s) allowed to be firing (stated exemptions; repeatable)")
     for leg in ("ingestion", "compute", "serving", "ops"):
