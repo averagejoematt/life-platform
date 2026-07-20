@@ -292,3 +292,96 @@ def test_canary_uses_reserved_non_reader_source_ip():
     # TEST-NET-3 (203.0.113.0/24) is reserved/non-routable — its own rate bucket,
     # so a canary run can never spend a real reader's ask/board_ask quota.
     assert canary.CANARY_IP.startswith("203.0.113.")
+
+
+# ── #1589: origin header on the synthetic event + transport-blind self-test ───
+
+
+class _FakePayload:
+    def __init__(self, out):
+        self._raw = json.dumps(out).encode()
+
+    def read(self):
+        return self._raw
+
+
+def _capture_lambda_invoke(monkeypatch, sent):
+    def fake_invoke(FunctionName, InvocationType, Payload):
+        sent["event"] = json.loads(Payload.decode())
+        return {"Payload": _FakePayload({"statusCode": 200, "body": json.dumps({"answer": "ok"})})}
+
+    monkeypatch.setattr(canary._lambda, "invoke", fake_invoke)
+
+
+def test_invoke_presents_the_origin_header(monkeypatch):
+    monkeypatch.setattr(canary, "_origin_secret", lambda: "shh-origin-value")
+    sent = {}
+    _capture_lambda_invoke(monkeypatch, sent)
+    status, _ = canary._invoke("/api/ask", {"question": "hi"})
+    assert status == 200
+    assert sent["event"]["headers"]["x-amj-origin"] == "shh-origin-value"
+    assert sent["event"]["requestContext"]["http"]["sourceIp"] == canary.CANARY_IP  # rate-bucket identity kept
+
+
+def test_invoke_goes_headerless_when_secret_unreadable(monkeypatch):
+    # Fail-open on the CANARY side: an unreadable secret must not crash the run —
+    # the 403s it earns are then classified BLIND, which is the loud path.
+    monkeypatch.setattr(canary, "_origin_secret", lambda: "")
+    sent = {}
+    _capture_lambda_invoke(monkeypatch, sent)
+    canary._invoke("/api/ask", {"question": "hi"})
+    assert "x-amj-origin" not in sent["event"]["headers"]
+
+
+def test_blind_requires_every_probe_transport_rejected():
+    all_403 = [{"probe": p["id"], "status": 403, "response": {}} for p in canary.PROBES]
+    assert canary._blind(all_403) is True
+    assert canary._blind([{"probe": "a", "status": None, "response": {}}]) is True  # invoke failures count
+    reachable = list(all_403)
+    reachable[0] = {"probe": "board_invalid_persona", "status": 400, "response": {}}
+    assert canary._blind(reachable) is False  # one reachable endpoint (even an expected 400) = not blind
+    assert canary._blind([]) is False
+
+
+def test_handler_blind_run_alarms_and_names_the_transport(monkeypatch):
+    monkeypatch.setattr(canary, "_budget_paused", lambda: False)
+    monkeypatch.setattr(canary, "_canonical_facts", lambda: FACTS)
+    monkeypatch.setattr(canary, "_judge", lambda transcript: None)
+    monkeypatch.setattr(canary, "_invoke", lambda endpoint, body: (403, {"error": "Forbidden"}))
+    gauges = []
+    monkeypatch.setattr(canary._cw, "put_metric_data", lambda **kw: gauges.append(kw))
+    monkeypatch.setattr(canary._s3, "put_object", lambda **kw: None)
+
+    out = canary.lambda_handler({}, None)
+    body = json.loads(out["body"])
+    assert body["status"] == "BLIND"
+    assert body["blind"] is True
+    assert "canary_transport" in body["alarms"]
+    assert "NOT an AI-quality verdict" in body["digest"]
+    flat = [m for g in gauges for m in g["MetricData"]]
+    assert any(m["MetricName"] == "Blind" and m["Value"] == 1.0 for m in flat)
+    assert any(m["MetricName"] == "OverallAlarm" and m["Value"] == 1.0 for m in flat)
+
+
+def test_handler_healthy_run_emits_blind_zero(monkeypatch):
+    monkeypatch.setattr(canary, "_budget_paused", lambda: False)
+    monkeypatch.setattr(canary, "_canonical_facts", lambda: FACTS)
+    monkeypatch.setattr(canary, "_judge", lambda transcript: None)
+
+    def fake_invoke(endpoint, body):
+        if body.get("personas") == ["definitely_not_a_real_coach"]:
+            return 400, {"error": "Unknown persona id"}
+        if endpoint == "/api/board_ask":
+            return 200, {"responses": {p: "A clear, in-character, grounded answer for the week ahead." for p in body["personas"]}}
+        return 200, {"answer": "Matthew's weight is 300 lbs and today's recovery is 64%."}
+
+    monkeypatch.setattr(canary, "_invoke", fake_invoke)
+    gauges = []
+    monkeypatch.setattr(canary._cw, "put_metric_data", lambda **kw: gauges.append(kw))
+    monkeypatch.setattr(canary._s3, "put_object", lambda **kw: None)
+
+    out = canary.lambda_handler({}, None)
+    body = json.loads(out["body"])
+    assert body["blind"] is False
+    flat = [m for g in gauges for m in g["MetricData"]]
+    assert any(m["MetricName"] == "Blind" and m["Value"] == 0.0 for m in flat)

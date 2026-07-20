@@ -58,12 +58,18 @@ AI_FN = os.environ.get("AI_FUNCTION_NAME", "life-platform-site-api-ai")
 # A dedicated, non-routable rate-limit identity: the canary consumes ONLY its own
 # per-IP bucket, so it can never spend a real reader's ask/board_ask quota (AC1).
 CANARY_IP = os.environ.get("AI_CANARY_SOURCE_IP", "203.0.113.201")  # TEST-NET-3, reserved
+# #1589: site-api-ai's R22-SEC-03 origin gate rejects any event without the
+# x-amj-origin header once SITE_API_ORIGIN_SECRET is configured — including the
+# canary's direct-invoke synthetic events. The canary reads the same secret and
+# presents the header, exactly like a CloudFront-forwarded request.
+ORIGIN_SECRET_NAME = os.environ.get("SITE_API_ORIGIN_SECRET_NAME", "life-platform/site-api-origin-secret")
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE)
 _cw = boto3.client("cloudwatch", region_name=REGION)
 _s3 = boto3.client("s3", region_name=REGION)
 _lambda = boto3.client("lambda", region_name=REGION)
+_secrets = boto3.client("secretsmanager", region_name=REGION)
 
 # ── status vocab (self-contained; this is a different domain from coherence) ──
 OK, WARN, ALARM = "OK", "WARN", "ALARM"
@@ -273,12 +279,30 @@ def _canonical_facts() -> dict:
         return {}
 
 
+def _origin_secret() -> str:
+    """The x-amj-origin value the target's origin gate requires (#1589). Empty
+    string when unreadable — the probe then goes out headerless and the BLIND
+    classification names the transport loudly instead of a silent 403."""
+    try:
+        from secret_cache import get_secret
+
+        return (get_secret(ORIGIN_SECRET_NAME, _secrets) or "").strip()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("canary: origin secret unavailable: %s", e)
+        return ""
+
+
 def _invoke(endpoint: str, body: dict):
     """Invoke site-api-ai directly with a FunctionURL-shaped event. Returns
     (status:int|None, payload:dict). status None → transport failure."""
+    headers = {"content-type": "application/json"}
+    secret = _origin_secret()
+    if secret:
+        headers["x-amj-origin"] = secret
     event = {
         "rawPath": endpoint,
         "requestContext": {"http": {"method": "POST", "sourceIp": CANARY_IP}},
+        "headers": headers,
         "body": json.dumps(body),
     }
     try:
@@ -474,6 +498,36 @@ def _emit(findings):
         logger.warning("canary: per-check metric emit failed: %s", e)
 
 
+def _blind(transcript) -> bool:
+    """True when EVERY probe was rejected at the transport layer (None = invoke
+    failure, 401/403 = auth gate) — the canary can see nothing, so no AI-quality
+    verdict exists (#1589). Expected non-200s like the invalid-persona 400 do
+    NOT count as transport rejects, so a single reachable endpoint keeps the run
+    in quality territory."""
+    statuses = [t.get("status") for t in transcript]
+    return bool(statuses) and all(s is None or s in (401, 403) for s in statuses)
+
+
+def _blind_finding(transcript) -> "Finding":
+    statuses = ", ".join(f"{t['probe']}={t.get('status')}" for t in transcript)
+    return Finding(
+        "canary_transport",
+        ALARM,
+        f"BLIND — all {len(transcript)} probes rejected at transport ({statuses}). "
+        "This is a probe-path failure, NOT an AI-quality verdict: the canary cannot see the "
+        "endpoints. Check the x-amj-origin secret read + the direct-invoke event shape (#1589).",
+    )
+
+
+def _emit_blind(blind: bool):
+    """A dedicated gauge so a transport-blind canary is distinguishable from a
+    bad-answers canary at the alarm level, not just in the digest (#1589)."""
+    try:
+        _cw.put_metric_data(Namespace=CW_NAMESPACE, MetricData=[{"MetricName": "Blind", "Value": 1.0 if blind else 0.0, "Unit": "Count"}])
+    except Exception as e:  # noqa: BLE001
+        logger.warning("canary: blind metric emit failed: %s", e)
+
+
 def _emit_overall(worst: str):
     """The single dimensionless gauge the alarm watches: 1 when any DETERMINISTIC
     check ALARMed. Mirrors the Coherence Sentinel — the advisory judge never
@@ -485,8 +539,8 @@ def _emit_overall(worst: str):
         logger.warning("canary: overall metric emit failed: %s", e)
 
 
-def _digest(findings, judge, worst) -> str:
-    head = f"AI QUALITY CANARY — {worst}"
+def _digest(findings, judge, worst, blind=False) -> str:
+    head = f"AI QUALITY CANARY — {'BLIND (transport broken — not an AI-quality verdict)' if blind else worst}"
     lines = [head, "=" * len(head)]
     alarms = [f for f in findings if f.is_alarm]
     warns = [f for f in findings if f.status == WARN]
@@ -507,15 +561,18 @@ def _digest(findings, judge, worst) -> str:
     return "\n".join(lines)
 
 
-def build_record(findings, judge, digest, worst, skipped=None):
+def build_record(findings, judge, digest, worst, skipped=None, blind=False):
     """Pure: the durable findings payload (also the Lambda response body). `status`
     MIRRORS the OverallAlarm gauge — the deterministic verdict drives it; the
-    advisory judge is surfaced but never flips it."""
+    advisory judge is surfaced but never flips it. A transport-BLIND run keeps
+    worst=ALARM on the gauge but says BLIND here, so a human triaging latest.json
+    never mistakes an unreachable endpoint for a bad answer (#1589)."""
     from datetime import datetime, timezone
 
     return {
         "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-        "status": skipped or worst,
+        "status": "BLIND" if blind else (skipped or worst),
+        "blind": blind,
         "skipped": skipped,
         "alarms": [f.name for f in findings if f.is_alarm],
         "findings": [{"name": f.name, "status": f.status, "detail": f.detail} for f in findings],
@@ -542,18 +599,23 @@ def lambda_handler(event, context):
         # legitimately quiet — skip the live probes and report OK, don't alarm.
         if _budget_paused():
             _emit_overall(OK)
+            _emit_blind(False)
             record = build_record([], None, "AI budget-paused (tier 3) — probes skipped.", OK, skipped="budget-paused")
             _persist(record)
             logger.info("canary: website AI budget-paused; probes skipped")
             return {"statusCode": 200, "body": json.dumps(record, default=str)}
 
         findings, transcript, judge = run_probes()
+        blind = _blind(transcript)
+        if blind:
+            findings = [_blind_finding(transcript)] + findings
         _emit(findings)
         worst = overall_status(findings)
         _emit_overall(worst)
-        digest = _digest(findings, judge, worst)
+        _emit_blind(blind)
+        digest = _digest(findings, judge, worst, blind=blind)
         logger.info(digest)
-        record = build_record(findings, judge, digest, worst)
+        record = build_record(findings, judge, digest, worst, blind=blind)
         _persist(record)
         return {"statusCode": 200, "body": json.dumps(record, default=str)}
     except Exception as e:  # noqa: BLE001
