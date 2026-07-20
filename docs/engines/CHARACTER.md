@@ -1,8 +1,8 @@
 # Character Engine — pillars, EMA levels, XP
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-18 (post-#1403 values_alignment + flourishing primary input)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-20 (#1590 re-verify — line refs + version stamps re-derived against live source; pillar weights/ema_lambda/leveling knobs cross-checked byte-for-byte against the deployed config; formulas unchanged since #1403)
 > Math audit + 420-day simulation verdicts: [CHARACTER_MATH_AUDIT_2026-07.md](CHARACTER_MATH_AUDIT_2026-07.md) (epic #956).
-> **Sources of truth:** `lambdas/character_engine.py` (v1.6.0), `lambdas/compute/character_sheet_lambda.py`, `config/character_sheet.json` (v1.5.0, deployed to `s3://…/config/matthew/character_sheet.json`)
+> **Sources of truth:** `lambdas/character_engine.py` (v1.8.0 — v1.7.0 #1373 progression receipts, v1.6.1 #1125 level-up drivers, v1.6.0 #965 source wiring; #1412 personal-baselines targets and #1411 fitted-not-authored badges shipped without an engine version bump), `lambdas/compute/character_sheet_lambda.py`, `config/character_sheet.json` (v1.6.0, deployed to `s3://…/config/matthew/character_sheet.json`)
 
 ## Purpose
 
@@ -12,13 +12,13 @@ character mood. Runs in the `character-sheet` compute Lambda (daily, before 11 A
 
 ## The pillar model
 
-Six primary pillars (`PILLAR_COMPUTERS`, `character_engine.py:1539-1546`): sleep, movement,
+Six primary pillars (`PILLAR_COMPUTERS`, `character_engine.py:1684-1693`): sleep, movement,
 nutrition, metabolic, mind, relationships — plus the **consistency** meta-pillar computed from
 the others. Config pillar weights (live `config/character_sheet.json`): sleep 0.20,
 movement 0.18, nutrition 0.18, mind 0.15, metabolic 0.12, consistency 0.10, relationships 0.07.
 
 Each pillar raw score is a weighted mean of components with a **confidence blend**
-(`_weighted_pillar_score`, :928-990):
+(`_weighted_pillar_score`, :1026-1101):
 
 ```
 raw        = Σ(scoreᵢ·wᵢ)/Σwᵢ            over components with data
@@ -43,15 +43,15 @@ always the number the engine leveled on; nothing mutates it post-compute.
 
 **Categorical→numeric bridges** (read-time, in the gather layer):
 - #902/#905: `enriched_mood` (native 1–5 from `journal_enrichment_lambda`) → `mood_avg` on the
-  0–10 scale via `(m−1)/4×10` (`character_sheet_lambda._enriched_mood_to_10`, :168-190).
+  0–10 scale via `(m−1)/4×10` (`character_sheet_lambda._enriched_mood_to_10`, :230-253).
 - #910/#911: categorical `enriched_social_quality` → `social_score` 0–10 by rank,
   `rank/3×10` (alone→0, surface→3.33, meaningful→6.67, deep→10;
-  `character_engine._social_quality_to_10`, :713-742), averaged across the day's entries. The
+  `character_engine._social_quality_to_10`, :786-814), averaged across the day's entries. The
   numeric `social_connection_score` fields remain the primary path (no producer writes them yet).
 - #962: `vice_streaks` is lifted from the day's habit_scores record (daily_metrics_compute has
   always written it) into the top-level key the mind pillar's vice_control component reads;
   `streak_all_above_30th` + `weekend_weekday_ratio` are derived by
-  `character_engine.derive_consistency_inputs` (:804-878) from the same 21-day record window
+  `character_engine.derive_consistency_inputs` (:888-967) from the same 21-day record window
   the EMA histories already fetch. `buddy_engagement` was removed (B-3 precedent — no producer
   ever wrote `buddy_freshness_days`); relationships weights renormalized (.45/.35/.20).
 
@@ -77,7 +77,13 @@ component each — all **day-count** metrics so volume gaming buys nothing:
   gaming can't inflate. Measured class: the record is an automatic daily pull, so absence is an
   ingestion gap, never a behavior verdict.
 
-## EMA smoothing (`compute_ema_level_score`, :998-1019)
+**#1412 (no version bump — read-half in `personal_baselines.py`, not the engine):** component
+targets can arrive personalized via `personal_baselines.apply_character_targets` instead of the
+hand-authored config target; `_weighted_pillar_score` surfaces each target's derivation
+provenance into component details. Target values still live in CONFIG, so a baselines refresh
+shows as labeled `config_drift`, never `engine_drift`, in progression-receipt replay.
+
+## EMA smoothing (`compute_ema_level_score`, :1102-1125)
 
 Exponentially weighted mean over the last `ema_window_days` (21) raw scores, most-recent
 heaviest, per-pillar decay `ema_lambda` (live: sleep 0.85, movement 0.90, nutrition 0.88,
@@ -87,7 +93,7 @@ metabolic 0.95, mind 0.85, relationships 0.93, consistency 0.93):
 level_score = Σ(rawᵢ · λ^age) / Σ λ^age        (empty history → 50)
 ```
 
-## Anti-flip-flop level rules (`evaluate_level_changes`, :1162-1385)
+## Anti-flip-flop level rules (`evaluate_level_changes`, :1266-1494)
 
 `target_level = round(level_score)`. Movement requires consecutive-day streaks, harder by tier
 (live `tier_streak_overrides`: Foundation up 3/down 5 … Elite up 14/down 21; tier-boundary
@@ -124,7 +130,7 @@ Gates, in order:
    failure mode) and recovers ~28 days after resuming. Kill-switch:
    `leveling.neglect_decay.persistent_down_streak`.
 
-## XP and debt (`_compute_xp`, :183-243; buffer `_roll_xp_buffer`, :245-273)
+## XP and debt (`_compute_xp`, :192-253; buffer `_roll_xp_buffer`, :276-309)
 
 Bands on raw score: ≥80 ⇒ +3, ≥60 ⇒ +2, ≥40 ⇒ +1, ≥20 ⇒ 0, else −1; minus `daily_xp_decay`
 (**1** since ADR-134 — the zero-point sits at "a decent day": raw 40–59 nets 0, 60+ grows,
@@ -143,13 +149,13 @@ record stores successfully.
 
 ## Neglect atrophy + mood (#913)
 
-- `neglect_decay_state` (:1042-1076): when `engagement_state.presence_class == "dark"` (and not a
+- `neglect_decay_state` (:1146-1186): when `engagement_state.presence_class == "dark"` (and not a
   planned pause), after `n_grace_days` (3) the level score of pillars whose behavioral weight
   share ≥ 0.3 is multiplied by `0.98^(gap−3)`, floored at the day's own raw score and the config
   floor (0). Models detraining/evidence loss, never punishment (ADR-104). Knobs live in
   `config/character_sheet.json` under `leveling.neglect_decay`
   (`n_grace_days` / `rate` / `floor` / `min_behavioral_share` / `persistent_down_streak`).
-- `compute_character_mood` (:1083-1142), pure code (ADR-105), first match wins:
+- `compute_character_mood` (:1187-1248), pure code (ADR-105), first match wins:
   dark ⇒ **dormant**; quiet or 7d-composite trend ≤ −5 ⇒ **fading**; present/light AND trend ≥ +3
   AND composite ≥ 55 ⇒ **thriving**; else **steady**. Trend = mean(last 3 d) − mean(prior 4 d).
 
@@ -159,8 +165,12 @@ Config `cross_pillar_effects` conditions evaluate EMA level_**scores** — delib
 ADR-134/#963: effects model current-state physiology synergies (poor sleep drags today's
 training capacity), not tier achievements; the config narrative is worded to match. The
 `any_vice_streak` conditions are data-driven since #962 (`compute_cross_pillar_effects`,
-:1427-1466, takes the day's vice_streaks — the Vice Shield can actually fire). Modifiers are
-multiplicative: `adjusted = level_score × (1 + Σ mod)` [F-05].
+:1553-1610, takes the day's vice_streaks — the Vice Shield can actually fire). Modifiers are
+multiplicative: `adjusted = level_score × (1 + Σ mod)` [F-05]. **#1411 (ADR-105):** every fired
+effect carries a `fit_status` badge — config can only declare `authored-prior`; `fitted` is
+earned from data by the quarterly `effect_fitter` re-fit (lagged pairs, block-bootstrap CI,
+BH-FDR — piggybacked on the weekly hypothesis-engine cron, `refit_cross_pillar_effects` in
+`hypothesis_engine_lambda.py`) and merged in at compute/serve time, never hand-written in config.
 
 Overall: `character_level = floor(Σ(levelᵖ·wᵖ)/Σwᵖ)` over **instrumented** pillars [F-14 +
 #960/ADR-134]: a pillar that is `not_instrumented` today and still at level 1 (never earned a
@@ -173,7 +183,7 @@ honestly. Excluded pillars ride the record as `headline_excluded_pillars`. Tiers
 ## Outputs / config surface
 
 Record → `USER#matthew#SOURCE#character_sheet / DATE#<date>` (`store_character_sheet`,
-:1865-1884; pre-genesis dates tagged `phase=pilot`), EXPERIMENT_SCOPED — wiped + rebuilt at
+:2076-2100; pre-genesis dates tagged `phase=pilot`), EXPERIMENT_SCOPED — wiped + rebuilt at
 reset. Per-pillar output carries raw_score, level_score, level, tier, xp_total/xp_delta/xp_debt,
 `raw_modifier`, `challenge_bonus_xp`, confidence, data_coverage, `not_instrumented`,
 `absent_behaviors`, `drivers` (ADR-104 provenance), `coverage_hold`, `neglect_decay`. Config:
@@ -183,4 +193,4 @@ reset. Per-pillar output carries raw_score, level_score, level, tier, xp_total/x
 **Regression harness:** `python3 scripts/character_sim_year.py` (5 scenarios × 420 days
 against the real engine) + `tests/test_character_math_v2.py` — rerun both after any retune.
 
-> **Verified against `lambdas/character_engine.py` + `config/character_sheet.json` @ char-math-v2 (#956) on 2026-07-11.**
+> **Verified against `lambdas/character_engine.py` (v1.8.0) + `config/character_sheet.json` (v1.6.0) @ git `fab48cbd` on 2026-07-20 (#1590).**

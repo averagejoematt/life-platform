@@ -1,7 +1,7 @@
 # Readiness Score
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-13 (post-#970 helper consolidation — formulas unchanged. 2026-07-13: docstring reword only, now that the shared layer is retired by #781 — no logic change)
-> **Sources of truth:** `lambdas/compute/daily_metrics_compute_lambda.py` (`compute_readiness`, :280-320), `mcp/tools_health.py` (`tool_get_readiness_score`), `lambdas/training_load.py`, `lambdas/personal_baselines.py` (`readiness_hrv_score`, :184-199)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-20 (#1590 re-verify — both models' weights/formulas/colour bands, the TSB Banister constants, and the device-agreement deltas cross-checked line-for-line against live source; only the personal_baselines line ref had drifted)
+> **Sources of truth:** `lambdas/compute/daily_metrics_compute_lambda.py` (`compute_readiness`, :280-316), `mcp/tools_health.py` (`tool_get_readiness_score`, :13-398), `lambdas/training_load.py`, `lambdas/personal_baselines.py` (`readiness_hrv_score`, :286-300)
 
 ## Purpose
 
@@ -22,7 +22,7 @@ Components (weight re-normalizes over whichever are present):
 |---|---|---|
 | Whoop recovery (today, else yesterday) | 0.40 | `recovery_score` used directly |
 | Whoop sleep score | 0.25 | `sleep_score` used directly |
-| HRV trend (7d avg / 30d avg) | 0.20 | `personal_baselines.readiness_hrv_score(ratio)` — piecewise linear through personal percentile anchors {p10→0, p50→50, p90→100}, clamped; fallback anchors {0.75, 1.0, 1.25} reproduce the legacy `clamp((ratio − 0.75) × 200)` exactly (#543/ADR-105 rule 4) |
+| HRV trend (7d avg / 30d avg) | 0.20 | `personal_baselines.readiness_hrv_score(ratio, baselines)` — piecewise linear through personal percentile anchors {p10→0, p50→50, p90→100}, clamped; fallback anchors {0.75, 1.0, 1.25} reproduce the legacy `clamp((ratio − 0.75) × 200)` exactly (#543/ADR-105 rule 4) |
 | TSB (training form) | 0.10 | `clamp(round(60 + tsb × 2))` — TSB 0 → 60, −30 → 0, +20 → 100 |
 
 ```
@@ -40,7 +40,7 @@ calibrated to the same scale (#490).
 
 ## Model 2 — live MCP tool (`get_readiness_score`)
 
-`mcp/tools_health.py:13-390`. Same first four components with different sub-formulas, plus a
+`mcp/tools_health.py:13-398`. Same first four components with different sub-formulas, plus a
 fifth:
 
 | component | weight | formula |
@@ -69,4 +69,4 @@ Label bands differ from the stored colour: `GREEN ≥ 70 · YELLOW ≥ 40 · RED
 Stored: `computed_metrics` record (EXPERIMENT_SCOPED — wiped at reset). No env vars; personal
 HRV anchors come from the `personal_baselines` compute (`personal_baselines_lambda.py`).
 
-> **Verified against `lambdas/compute/daily_metrics_compute_lambda.py` and `mcp/tools_health.py` @ git 4d132ec7 on 2026-07-10.**
+> **Verified against `lambdas/compute/daily_metrics_compute_lambda.py`, `mcp/tools_health.py`, and `lambdas/personal_baselines.py` @ git `fab48cbd` on 2026-07-20 (#1590).**
