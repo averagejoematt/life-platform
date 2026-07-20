@@ -287,6 +287,23 @@ class MonitoringStack(Stack):
             to_digest=True,
         )
 
+        # #1589: the canary's transport self-test. Fires when a run was BLIND —
+        # every probe rejected at the invoke/auth layer (403s, invoke failures),
+        # so NO AI-quality verdict exists. Distinguishes "the watcher is broken"
+        # from "the answers are bad" at the alarm level; ai-canary-overall alone
+        # cannot (it fires for both). Digest.
+        _alarm(
+            "AiCanaryBlind",
+            "ai-canary-blind",
+            "LifePlatform/AICanary",
+            "Blind",
+            86400,
+            "Maximum",
+            1,
+            GTE,
+            to_digest=True,
+        )
+
         # #1440: a budget-tier pause of the reader-truth AI QA pass (either hook —
         # tests/visual_ai_qa.assess_reader_truth on CI/local, or the nightly
         # qa_smoke_lambda.check_reader_truth — both call

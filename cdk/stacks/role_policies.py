@@ -1999,6 +1999,13 @@ def operational_ai_quality_canary() -> list[iam.PolicyStatement]:
                 resources=["*"],  # PutMetricData only accepts "*"
             ),
             iam.PolicyStatement(
+                # #1589: the probes must present x-amj-origin or site-api-ai's
+                # R22-SEC-03 gate 403s every synthetic event (canary blind).
+                sid="OriginSecretRead",
+                actions=["secretsmanager:GetSecretValue"],
+                resources=[_secret_arn("life-platform/site-api-origin-secret")],
+            ),
+            iam.PolicyStatement(
                 sid="CanaryAuditLog",
                 actions=["s3:PutObject"],
                 resources=_s3("ai-canary-log/*"),
