@@ -95,6 +95,28 @@ the deploy-role steps of `site-deploy.yml`):
 `CloudWatch DescribeAlarms` (I7), `SecretsManager` (I5), `CloudFormationDiff` (plan `cdk
 diff`), `CDKBootstrapRoleAssume`, `CloudFrontInvalidate` (site-deploy).
 
+---
+
+## Diagnosis-role qa_archive screenshot write — STAGED (#1441), NOT yet applied
+
+> **Status: the checked-in JSON is AHEAD of live.** #1441 adds ONE statement to
+> `github-actions-diagnosis-role.permissions.json`: `QaArchiveScreenshotWrite` —
+> `s3:PutObject` scoped to `matthew-life-platform/generated/qa_archive/screenshots/*`,
+> so the daily standalone visual-qa sweep can archive the AI-surface page screenshots
+> (the screenshot leg of the generation-time AI archive; the workflow step is
+> `continue-on-error` and only WARNs until this lands). Until applied,
+> `verify_oidc_iam.py --strict` reports the pending drift on
+> `github-actions-diagnosis-role:diagnosis-permissions` — this is the staged apply,
+> not an out-of-band change. Apply (attended):
+>
+> ```bash
+> aws iam put-role-policy \
+>   --role-name github-actions-diagnosis-role \
+>   --policy-name diagnosis-permissions \
+>   --policy-document file://infra/iam/github-actions-diagnosis-role.permissions.json
+> python3 deploy/verify_oidc_iam.py --strict   # expect CLEAN (for this role)
+> ```
+
 ### ATTENDED APPLY runbook (#903 — execute under a watched CI run)
 
 > Precondition: attended, matthew-admin, with rollback ready. Same discipline as #687 —

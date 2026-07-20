@@ -1862,6 +1862,21 @@ Write your {domain_label} coaching section now."""
         if _gen_cache is not None and _cache_tbl is not None and _brief_fp and output:
             _gen_cache.store_entry(_cache_tbl, coach_id, output_type, _brief_fp, output, _date_cls.today().isoformat())
 
+        # #1441: generation-time archive — the exact gate-passed text that goes to
+        # the state updater (i.e. what the brief + site publish) lands in
+        # generated/qa_archive/ keyed by date+surface. Fail-soft inside the module.
+        try:
+            import qa_archive
+
+            qa_archive.archive_text(
+                "coach_brief",
+                output,
+                variant=coach_id,
+                meta={"output_type": output_type, "generation_date": _date_cls.today().isoformat()},
+            )
+        except Exception as _qa_e:  # noqa: BLE001 — the archive is never load-bearing
+            print(f"[COACH-V2:{coach_id}] qa_archive failed (non-blocking): {_qa_e}")
+
         # Step 7: Invoke state updater (async) — records the final, gate-passed text.
         try:
             lambda_client.invoke(

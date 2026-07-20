@@ -927,7 +927,17 @@ def _write_board_interaction(pid: str, question: str, answer: str, grounded: boo
     summarizer folds it into COMPRESSED#latest and future outputs can reference
     it. Content is already scrubbed (privacy_guard + blocked terms). The qhash
     is content-addressed, so a repeated question overwrites rather than piles
-    up. Fail-soft: a write failure never affects the reader's response."""
+    up. Fail-soft: a write failure never affects the reader's response.
+
+    #1441: also the board's generation-time archive point — BOTH publish paths
+    (initial ask + follow-up turn) come through here with the final answer the
+    reader saw, so one call covers the whole surface."""
+    try:
+        import qa_archive
+
+        qa_archive.archive_text("board_ask", answer, variant=pid, meta={"question": question[:500], "grounded": grounded})
+    except Exception as e:  # noqa: BLE001 — the archive is never load-bearing
+        logger.warning(f"[board_ask] qa_archive failed for {pid} (non-fatal): {e}")
     try:
         now = datetime.now(timezone.utc)
         qid = hashlib.sha256(question.encode()).hexdigest()[:8]

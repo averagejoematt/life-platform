@@ -256,6 +256,20 @@ PAGE_BINDINGS = [
         ],
     },
     {
+        # #1441: the fragmentless base page joined the visual sweep (its screenshot
+        # is the ai_surface archive artifact) — it auto-selects the first roster
+        # coach, so its data surface is the roster + that coach's read.
+        "path": "/coaching/by-coach/",
+        "name": "Coaching · By Coach",
+        "door": "coaching",
+        "narrative_order": 71.9,
+        "story_intent": "each coach's read on your data — the per-coach entry point (defaults to the first roster coach)",
+        "endpoints": [
+            {"url": "/api/coaches", "role": "primary", "metrics": []},
+            {"url": "/api/coach_team", "role": "secondary", "metrics": []},
+        ],
+    },
+    {
         "path": "/coaching/by-coach/#training_coach",
         "name": "Coaching · By Coach (read-on-data, deep-link)",
         "door": "coaching",

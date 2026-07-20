@@ -97,6 +97,7 @@ Per typical health-data definitions, the following fields are **PII** regardless
 | `raw/` (incomplete uploads) | **Abort after 7 days** | P1.3 — `raw-abort-incomplete-multipart-7d` |
 | `uploads/` (HAE webhooks etc.) | **Current: 30 days; non-current: 7 days** | P1.3 — `uploads-expire-30d` |
 | `generated/` (Lambda-written: OG images, dashboard, journals) | **Current: forever; non-current: 7 days (keep 1)** | P1.3 — `generated-expire-noncurrent-7d` |
+| `generated/qa_archive/` (generation-time AI-surface archive: text + screenshots, #1441) | **Listed 90 days; bytes fully purged ≈ day 97** (audit-log class — the D3 review-pack evidentiary window). Versioned-bucket mechanics: delete marker at 90d → the noncurrent data version expires 7d later (own rule, NO keep-newest carve-out — the `generated/` keep-1 rule must not shield these write-once keys) → expired delete marker swept | #1441 — `qa-archive-expire-90d` + `qa-archive-clean-delete-markers` |
 | `config/` (platform config: filters, schemas) | **Current: forever; non-current: 30 days (keep 3)** | P1.3 — `config-expire-noncurrent-30d` |
 | `deploys/` (Lambda deploy artifacts) | **30 days** | Pre-existing |
 | `cloudtrail/` (audit logs) | **90 days** | P2.5 / P7 — `cloudtrail-expire-90d` |
@@ -222,6 +223,7 @@ If any of these become relevant (e.g., onboarding a second user from CA, sale of
 | 2026-07-13 | Repo flipped PRIVATE (was public since inception) — closes the `docs/coaching/` exposure this doc's own scope note had flagged OPEN | [[project_repo_visibility]] |
 | 2026-07-18 | #1351 current-truth pass: repo-visibility + delete-lambda claims corrected, data-export census note updated (dynamic, not a hand count), 2026-07 data classes (private_intake #1405, flourishing #1403, felt_probe #1409) added, Manual Delete Procedure rewritten around the deployed lambda; `scripts/check_doc_facts.py` now polices repo-visibility/delete-lambda-status/Verified-freshness claims on this doc | #1351 |
 | 2026-07-18 | #1350 code half: "Raj directive" never-delete comment replaced with a pointer to this doc's (unsigned) retention row; `deploy/subscriber_retention_purge.py` purge/anonymize implementation + `delete_user_data_lambda` single-subscriber deletion shipped, one-command-ready pending Matthew's window sign-off | #1350 |
+| 2026-07-19 | `generated/qa_archive/` added (90d, audit-log class): generation-time archive of every AI surface — text written by `lambdas/qa_archive.py` at each surface's publish point, screenshots by the daily standalone visual-qa sweep. No new PII class: archives the already-public reader-facing text plus rendered-page screenshots | #1441 |
 
 ---
 

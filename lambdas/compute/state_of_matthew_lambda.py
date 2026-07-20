@@ -651,6 +651,20 @@ def lambda_handler(event: dict, context) -> dict:
         logger.error(f"[state-of-matthew] write failed: {e}")
         raise
 
+    # #1441: generation-time archive — the exact narrative the brief record
+    # publishes (AI-narrated or the deterministic fallback — both are what the
+    # reader sees; `narrated` in meta tells them apart). Fail-soft inside the module.
+    try:
+        import qa_archive
+
+        qa_archive.archive_text(
+            "state_of_matthew",
+            narration["narrative"],
+            meta={"narrated": narration["narrated"], "model": narration.get("model"), "reason": narration.get("reason"), "date": today_str},
+        )
+    except Exception as qa_e:  # noqa: BLE001 — the archive is never load-bearing
+        logger.warning(f"[state-of-matthew] qa_archive failed (non-fatal): {qa_e}")
+
     result = {
         "date": today_str,
         "sections_available": state["sections_available"],

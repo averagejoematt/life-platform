@@ -28,6 +28,14 @@ Entry fields
   leak_scan      include in restart_verify_rendered token grep (default True
                  for every real HTML page; False only for pure redirects)
   smoke          expected HTTP status for the status sweep (default "200")
+  ai_surface     #1441 (default False): True = the page renders AI-generated
+                 narrative a reader sees (coach commentary, board answers,
+                 chronicle, field notes, State of Matthew). The daily standalone
+                 visual-qa run archives these pages' full-page screenshots to
+                 s3://…/generated/qa_archive/screenshots/{date}/ (90d lifecycle)
+                 — the screenshot leg of the generation-time AI archive
+                 (lambdas/qa_archive.py is the text leg). Under-claiming loses
+                 evidence; over-claiming only costs pennies of S3.
   structural     #1429 (static/utility pages only): {"marker": <fixed string the
                  live body must contain — an expected title/selector fragment>,
                  "fetch_path": <optional viewer-path override — the 404 page is
@@ -47,6 +55,7 @@ Emitters (for the bash smoke script and ad-hoc use):
     python3 tests/qa_manifest.py --emit leak        # leak-scan page paths
     python3 tests/qa_manifest.py --emit static_core # pages that must ship a static core
     python3 tests/qa_manifest.py --emit structural  # "fetch_path|name|marker" (#1429)
+    python3 tests/qa_manifest.py --emit ai-screens  # screenshot slugs of ai_surface pages (#1441)
     python3 tests/qa_manifest.py --check            # internal consistency self-check
 
 No third-party deps. Importable by tests/* (sibling) and deploy/* scripts
@@ -107,6 +116,12 @@ def _readout_visual(path: str, title: str) -> dict:
     return d
 
 
+# #1441: generated archive pages that render reader-visible AI narrative (the
+# board read). The curated entries carry ai_surface literally; these rows are
+# built from the evidence registry, so the flag is keyed by path here.
+_AI_ARCHIVE_PAGES = {"/method/board/"}
+
+
 def _archive_entries():
     out = []
     for path, title, group, mode, endpoint, flags in _evidence_rows():
@@ -123,6 +138,7 @@ def _archive_entries():
                 "leak_scan": True,
                 "smoke": "200",
                 "unlisted": "unlisted" in flags,
+                "ai_surface": path in _AI_ARCHIVE_PAGES,  # #1441
             }
         )
     return out
@@ -206,6 +222,7 @@ _CURATED = [
     },
     {
         "path": "/story/chronicle/",
+        "ai_surface": True,  # #1441: reader-visible AI narrative — daily screenshot archived
         "name": "Story · chronicle",
         "tier": 2,
         "content_class": "narrative",
@@ -215,6 +232,7 @@ _CURATED = [
     },
     {
         "path": "/story/journal/",
+        "ai_surface": True,  # #1441: reader-visible AI narrative — daily screenshot archived
         "name": "Story · journal",
         "tier": 2,
         "content_class": "narrative",
@@ -352,6 +370,7 @@ _CURATED = [
     # ── Coaching door (promoted 2026-06-20) ──────────────────────────────────
     {
         "path": "/coaching/",
+        "ai_surface": True,  # #1441: reader-visible AI narrative — daily screenshot archived
         "name": "Coaching hub (My Team)",
         "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
         "tier": 1,
@@ -368,6 +387,7 @@ _CURATED = [
     },
     {
         "path": "/coaching/by-coach/",
+        "ai_surface": True,  # #1441: reader-visible AI narrative — daily screenshot archived
         "name": "Coaching · By Coach",
         "tier": 2,
         "content_class": "live-data",
@@ -391,7 +411,17 @@ _CURATED = [
                 ],
             },
         ],
-        "visual": None,
+        # #1441: the base (fragmentless) page needs its own visual def — the
+        # ai_surface screenshot archive uploads qa-screenshots/{slug}.png, and
+        # only pages with a `visual` def get a base-slug screenshot (the two
+        # deep-link variants above save under fragment-suffixed names). The page
+        # auto-selects the first roster coach when no fragment is given
+        # (coaching.js selectSection: initId = entries[0].id), so the default
+        # read renders without a hash.
+        "visual": {
+            "wait_for": "[data-dx-read]",
+            "checks": [{"selector": "[data-dx-read]", "not_empty": True, "desc": "by-coach default read rendered (first roster coach)"}],
+        },
     },
     {
         "path": "/coaching/scorecard/",
@@ -419,6 +449,7 @@ _CURATED = [
     },
     {
         "path": "/coaching/lab-notes/",
+        "ai_surface": True,  # #1441: reader-visible AI narrative — daily screenshot archived
         "name": "Coaching · AI lab notes",
         "tier": 2,
         "content_class": "narrative",
@@ -443,6 +474,7 @@ _CURATED = [
     },
     {
         "path": "/coaching/qa/",
+        "ai_surface": True,  # #1441: reader-visible AI narrative — daily screenshot archived
         "name": "Coaching · Reader Q&A",
         "tier": 3,
         "content_class": "narrative",
@@ -455,6 +487,7 @@ _CURATED = [
     },
     {
         "path": "/coaching/read/",
+        "ai_surface": True,  # #1441: reader-visible AI narrative — daily screenshot archived
         "name": "Coaching · The Read",
         "tier": 3,
         "content_class": "narrative",
@@ -644,6 +677,14 @@ def static_core_paths():
     return [p["path"] for p in MANIFEST if p.get("static_core")]
 
 
+def ai_screenshot_slugs():
+    """#1441 — the visual_qa screenshot slugs of every ai_surface page. The
+    standalone visual-qa workflow uploads qa-screenshots/{slug}.png for each to
+    generated/qa_archive/screenshots/{date}/ (the screenshot leg of the AI
+    archive). Slug rule mirrors tests/visual_qa.py capture_page exactly."""
+    return [(p["path"].strip("/").replace("/", "-") or "home") for p in MANIFEST if p.get("ai_surface")]
+
+
 # #1429: the static long-tail = every real 200 page of these classes. Redirect
 # stubs (smoke != 200, or leak_scan=False meta-refresh shells) have no body of
 # their own to assert.
@@ -740,7 +781,7 @@ def self_check():
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[1])
-    ap.add_argument("--emit", choices=["paths", "smoke", "leak", "static_core", "structural", "coverage"])
+    ap.add_argument("--emit", choices=["paths", "smoke", "leak", "static_core", "structural", "coverage", "ai-screens"])
     ap.add_argument("--check", action="store_true")
     args = ap.parse_args()
     if args.check:
@@ -775,6 +816,9 @@ def main():
     elif args.emit == "coverage":
         # sort_keys so the emitted bytes are deterministic (bundle-hash stability, #1446)
         print(json.dumps(coverage_stats(), indent=2, sort_keys=True))
+    elif args.emit == "ai-screens":
+        for s in ai_screenshot_slugs():
+            print(s)
     else:
         ap.print_help()
 

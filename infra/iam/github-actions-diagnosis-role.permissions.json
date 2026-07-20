@@ -11,6 +11,16 @@
         "arn:aws:bedrock:*:205930651321:inference-profile/us.anthropic.claude-*",
         "arn:aws:bedrock:*::foundation-model/anthropic.claude-*"
       ]
+    },
+    {
+      "Sid": "QaArchiveScreenshotWrite",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::matthew-life-platform/generated/qa_archive/screenshots/*"
+      ]
     }
   ]
 }

@@ -2073,6 +2073,19 @@ def store_installment(
             item["weekly_signal_board_quote"] = weekly_signal_board_quote
         table.put_item(Item=item)
         logger.info(f"Installment stored: Week {week_num} (status={status})")
+        # #1441: generation-time archive — the final installment markdown (both
+        # the draft/preview and direct-publish paths land here) to
+        # generated/qa_archive/. Fail-soft inside the module.
+        try:
+            import qa_archive
+
+            qa_archive.archive_text(
+                "chronicle",
+                raw_markdown,
+                meta={"week_number": week_num, "title": title, "status": status, "date": date_str},
+            )
+        except Exception as qa_e:  # noqa: BLE001 — the archive is never load-bearing
+            logger.warning(f"[chronicle] qa_archive failed (non-fatal): {qa_e}")
     except Exception as e:
         logger.warning(f"Failed to store installment: {e}")
 
