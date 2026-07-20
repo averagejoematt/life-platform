@@ -1439,6 +1439,41 @@
         }
       ],
       "why_it_mattered": "A reset used to be an overnight bug harvest — every prior cycle surfaced its Day-1 breakage only when a cron fired hours later. This one was interrogated before, during, and after: the harness caught four of its own bugs on the dry run, four real dark data sources, and a crash-in-waiting in the Monday email, all before genesis. Trust in the instrument now has a test suite of its own — which is the only kind of trust this project is allowed to ask for."
+    },
+    {
+      "id": "2026-07-20-canary-blind-self-test",
+      "date": "2026-07-20",
+      "title": "The watcher learned to say “I can’t see” — and 20 backlog items fell in an afternoon",
+      "shipped": "The AI-quality canary — the scheduled probe that interrogates the site’s public AI answers — turned out to be blind: a security gate added weeks earlier was (correctly) rejecting the canary’s own synthetic requests with 403s, and the failure read exactly like five bad answers. The fix went in on the canary’s side — it now authenticates like real traffic — plus something new: a transport self-test. When every probe dies at the connection layer, the canary now classifies the run BLIND, fires its own dedicated alarm, and says in plain text ‘this is not an AI-quality verdict.’ Around that fix, an autonomous drain session closed 20 backlog items: two signed architecture decisions (the prod-only release topology and the testing topology, each with named compensating controls), a one-minute advisory pre-merge CI lane, a weekly AI review-pack email, checkpoint triggers that propose reflection rituals from the data, an essay generator that kills the hand-HTML step, two new conversational modes (a weekly all-hands with the coaching staff, and a repeatable longform interview), and six QA hardening stories.",
+      "gotcha": "Half the session ran with the laptop’s own filesystem revoked: macOS pulled the app’s Documents permission mid-flight, and every local file read started failing. The session rebuilt itself inside a fresh clone in a temp directory — tests, merges, and deploys all kept running — and the outage never reached the site.",
+      "honest_miss": "The canary’s green run is still one owner-approved permission grant away — the session’s own rules put IAM changes in human hands, so the watcher stays honestly BLIND (and says so) until that click. And the failure-issue filer built the day before turned out to be broken on every firing — a template expression in documentation prose — caught only because its first real failure finally exercised it.",
+      "prs": [
+        {
+          "label": "PR #1599",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1599"
+        },
+        {
+          "label": "PR #1603",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1603"
+        },
+        {
+          "label": "PR #1594",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1594"
+        },
+        {
+          "label": "PR #1605",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1605"
+        },
+        {
+          "label": "PR #1606",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1606"
+        },
+        {
+          "label": "PR #1607",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1607"
+        }
+      ],
+      "why_it_mattered": "A monitoring system that can’t tell ‘the answers are bad’ from ‘I can’t reach the answers’ erodes exactly the trust it exists to build. Blind-versus-bad is now distinguishable at a glance, by an alarm with its own name — and the deviation ledger an acquirer would ask for got two more signed entries instead of two undocumented accidents."
     }
   ]
 }

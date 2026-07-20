@@ -1,212 +1,121 @@
-# HANDOVER — Day 3: THE CYCLE-9 RESET, verified by behavior for the first time — 2026-07-19/20 (night)
+# HANDOVER — Max autonomous drain: 21 issues closed through a mid-session TCC outage — 2026-07-20 (afternoon/evening)
 
-> Instruction thread: "ultracode +2M — ARC 1 the cycle-9 reset (genesis Monday 2026-07-20,
-> #1433 merge first, BUILD #1559 before the reset so the reset becomes its first customer),
-> ARC 2 keep draining, three-kinds-of-close, all merges/deploys/pushes authorized incl. the
-> reset. Decision brackets arrived UNFILLED (= pending, no re-asking) — then Matthew answered
-> the one that mattered mid-session: '315lb for now, and will weigh in at the morning' — the
-> reset went from staged to EXECUTED the same hour." Clock discipline: prompt said Monday,
-> clock said Sunday evening PT — but tonight was the genesis EVE, which made the eve-only
-> machinery (lock email) fire honestly instead of being skipped.
+> Instruction thread: "ultracode +2M — MAXIMUM AUTONOMOUS DRAIN (~88 → as low as honesty
+> allows), four tiers pre-verified to need zero input, gate:owner fenced, public-repo
+> discipline in every brief, all merges/deploys/pushes authorized (IAM stays user-NAMED),
+> three-kinds-of-close, triage table first, full suite no -x per merge." Mid-session
+> Matthew re-confirmed the blanket merge/deploy/push authorization.
 
-## Outcome — the reset ran, the harness proved it, 13 PRs merged, CI's killer identified
+## Outcome — the board went 98 → 83; the platform grew a pre-merge lane, two signed
+## posture ADRs, a transport-aware canary, and two new chat modes; and half the session
+## ran from a /private/tmp clone because macOS revoked ~/Documents mid-flight
 
-**ARC 1 — THE RESET (all four planned steps + the execution itself):**
-1. **#1433 a11y salvaged** — the Day-2 agent had finished but never committed/pushed; work
-   recovered from its worktree, verified, PR #1560, merged. axe 4.12.1 vendored, 73-page
-   debt-ledger baseline, gate = NEW serious/critical only.
-2. **#1559 BUILT + proven pre-reset** (PR #1585): `deploy/restart_integration_check.py` —
-   four legs (ingestion/compute/serving/ops) + `--synthetic` HAE round-trip + the STATIC
-   present-None gate. The gate proved **RED on 12 unguarded pillar chain-reads across 4
-   email lambdas** (monday_compass:415 — which fires Monday 15:00 UTC on the Day-1 sheet —
-   wednesday_chronicle ×2, weekly_digest ×5 — #1540 had fixed only the withings site —
-   monthly_digest, + pillar_scores/pillar_summary siblings); all 12 fixed with the
-   `(d.get(k) or {})` idiom and the gate now lives in CI permanently. Two prove-the-harness
-   runs against live cycle-8: run 1 caught 4 harness bugs (dropbox partition-False facet,
-   `character_level` field name, urllib redirect-following masking a 301, brief timeout);
-   run 2 = clean instrument reporting exactly the true findings.
-3. **THE RESET EXECUTED** (~19:45–20:15 PT): `restart_pipeline.py --genesis 2026-07-20
-   --override-weight-lbs 315 --with-preregistration --apply`. All 16 steps + gates:
-   rendered PASS, semantic PASS (0 poisoned rows / 32 sources), truth SKIPPED honestly
-   (tier-1). One abort at the last hook — the frozen-artifact protection REFUSED to
-   silently regenerate cycle-8's prereg (working as designed, #976/#1378): archived it per
-   convention (`genesis_preregistration_2026-07-19_cycle8.json` + stamp), re-seeded, then
-   the attended chain: publish (dry-run reviewed → --apply), **seal
-   908fa45acca1840713e258d4d6ad6129bf6eece7f7356000999247cdc7181ecc** live at
-   /experiments/prereg/genesis-2026-07-20.json, predict-week live (stamped W29 = tonight's
-   ISO week; **re-run Monday to roll to W30**), and the eve-only **lock email SENT 1/1** —
-   the machinery's first honest eve since it was built. Reset commit d819bdba; cycle-8
-   closed as the honest one-day cycle (LIFETIME# rolled).
-4. **First real #1559 execution post-reset** (`--synthetic --expect-cycle 9`): **cycle=9 ✓,
-   Day-0 Level-1 sheet + replay_verified receipt ✓, 80/80 serving URLs ✓, DLQ 0 ✓, crons
-   armed ✓, synthetic webhook PERFECT (350ml dedup exact, idempotent re-send, verified
-   cleanup)**. True positives it caught same-run: the mid-deploy withings DLQ message
-   (drained), the withings transient token 503 (self-recovered — token healthy for the
-   morning weigh-in), an SoM tz-rollover leak in its own synthetic payload (2099-01-02 row
-   — found + deleted; fixed in follow-up PR #1588 with dual-day cleanup + `--brief-full`).
-   `restart_verify.py` (12/12, day_n>=1 + genesis weigh-in) is deliberately Monday-morning.
+**Closed (19 stories + 2 epics):** #1451 #1590 #1472 #1474 #1442 #1439 #1586 #1448 #1430
+#1346 #1337 #1324 #1349 #1353 #1578 #1566 #1575 #1576 #1338 #1344 + epics #1460 #342
+(all-children-closed + DoD legs verified). **#1589 reopened deliberately** — see below.
+17 PRs merged (#1591–#1609 minus the fenced ones), every one on a verified full suite
+(no -x), the four doc-sync-literal-conflicted ones through the full reconcile ritual
+(rebase → main's literal files → regen → collect-only → full suite → merge).
 
-**THE #1544 ROOT CAUSE, CONFIRMED:** GitHub Actions job annotations state verbatim:
-*"The job was not started because recent account payments have failed or your spending
-limit needs to be increased."* — **owner-side billing**. Evidence on #1544. CI went from
-intermittent to dead mid-session; all 13 merges carried on local full suites (no -x) +
-manual deploys + attended site syncs (version.json verified each time). Matthew push-notified.
+**The headline fixes:**
+- **#1589 canary blind:** root cause = the synthetic direct-invoke events carried NO
+  headers, so site-api-ai's R22-SEC-03 origin gate (correctly) 403'd all 5 probes. Fix
+  is canary-side (reads the origin secret via secret_cache, presents x-amj-origin);
+  gate untouched. NEW transport self-test: an all-None/401/403 run classifies **BLIND**
+  — its own `Blind` gauge + `ai-canary-blind` digest alarm + "NOT an AI-quality verdict"
+  in the digest head. **Proven live**: post-deploy invoke returned status=BLIND exactly
+  as designed (the IAM grant isn't applied yet, which IS the blind condition). Code +
+  Monitoring alarm deployed; the Operational-stack IAM grant is Matthew's (user-NAMED
+  IAM rule — the auto-mode classifier held it, correctly). After his
+  `cdk deploy LifePlatformOperational`: one canary invoke → expect OK/Blind=0 → close.
+- **#1447's filer was broken on every fire:** the advisory-failure-issue composite
+  action had `${{ job.status }}` / `${{ secrets.GITHUB_TOKEN }}` in its input
+  DESCRIPTION strings — GitHub template-validates those even in prose, so the action
+  failed to load exactly when needed (first real fire: the 21:17 UTC standalone
+  visual-QA red). Fixed via the contents API mid-outage (e4a666b1); proven by a green
+  dispatched rerun.
+- **ADR-138 + ADR-139 (PR #1603):** the SDLC posture pair signed — prod-only release
+  topology with its six compensating controls, and the testing topology with a NEW
+  advisory pre-merge lane (`.github/workflows/pr-checks.yml`: collect-only +
+  deploy_critical subset + black --check, ~1 min) whose required-ness is explicitly an
+  owner toggle in github_posture.json (the #1319 lesson: durable controls live in git).
+- **I4 hotfix (5ec629ff):** #1594's merged review-pack lambda had no handler
+  try/except (its agent's six-red suite summary under-itemized this one) — caught in
+  my reconcile suite, fixed forward on main same hour.
 
-**ARC 2 — 13 PRs merged, every one verified, two BLOCKED-then-fixed:**
-#1560 (a11y, #1433) · #1579 (#1438 write-path E2E) · #1562 (#1467 design-sync captures) ·
-#1561 (#1443 canary 3×/wk + heartbeat 7d→4d) · #1585 (#1559) · #1580 (#1455 heartbeat
-completeness — 70 scheduled lambdas: alarm-verified + 45 dated exemptions + 2 NEW
-compute-output alarms) · #1565 (#1406 glucose-CV/MAGE + values→adherence lagged edges;
-review's fabricated-zero-CV guard applied + regression case) · #1583 (#1470 paper-elevation
-ramp, both themes, browser-faithful contrast test) · #1584 (#1484 unified evening flow —
-real PT-vs-UTC keying bug fixed, ADR-137 drinks-only) · #1581 (#1482 coach memory — review
-BLOCKED on a real Limit-200 category-alphabetical starvation trap; fixed with per-category
-begins_with reads + flood-fixture regression) · #1582 (#1441 AI-surface archive — review
-BLOCKED on the versioned-bucket lifecycle making "90d retention" false at the byte level +
-a never-screenshotted surface; both fixed, TRUE 90d retention now) · #1587 (#1466 Slop
-Litmus canonical + structurally-advisory gloss lens, fable solo) · #1588 (#1559 follow-up).
-Adversarial review earned its keep: **2 of 3 deep-reviewed PRs were BLOCKED on real MAJORs.**
-Issue #1586 filed (qa_audit's 39-unchecked-API-deps finding). Deploys: the reset's
-`cdk deploy --all` consolidated the fleet at a5a1057e; targeted post-reset deploys for
-every later merge (4 guard-fixed emails, MCP ×2, daily-brief, chronicle, state-of-matthew,
-coach-memoir, field-notes, site-api, lifecycle rules, Compute/Email/Serve role grants);
-site synced attended, live == 232c838d content, invalidations completed.
+**Deploys executed (all from the clone, CodeSha256/behavior-verified):**
+ai-quality-canary (code), LifePlatformMonitoring (the new alarm), qa-smoke (#1593's
+weekly redirect spot-check), MCP (#1606's checkpoint triggers; boot-verified 401), site
+×2 via auto site-deploy with green gates (live == 51ff229 content at verification time).
+
+## THE INCIDENT — macOS TCC revoked ~/Documents mid-session
+At ~12:45 PT every file read under ~/Documents went EPERM for the whole process tree
+(Bash, Read/Edit — everything; directory listings still worked). Root-cause class is the
+known TCC trap, new escalation: it hit a LIVE interactive session. **The workaround
+that saved the session: `gh repo clone` into /private/tmp** — git, pytest, black, aws,
+cdk, gh all work there (~/.aws, ~/.config/gh, ~/.claude are not TCC-protected). All
+merges, reconciles, deploys, and this wrap ran from clones. **Owner fix (30s): System
+Settings → Privacy & Security → Files & Folders (or Full Disk Access) → re-enable
+Documents for the terminal/Claude app, or restart the app.** Memory updated.
+
+## Gotchas hit (durable, all in memory)
+- **Agent-concurrency contamination, two new vectors:** (1) an agent's Bash cwd
+  silently reverted to the shared main checkout (case-twin path) and its `git stash -u`
+  briefly captured MY uncommitted work (restored, confessed in its report); (2) three
+  agents raced the shared scratchpad `repo/` clone — branch switched underfoot, edits
+  clobbered; all recovered via fresh uniquely-named clones. RULE for every future
+  brief: unique clone dir per agent (`repo-<issue>`), stash ban stated verbatim.
+- **The composite-action description-string trap:** GitHub template-validates `${{ }}`
+  inside input descriptions — never put expression syntax in action prose.
+- **gh pr merge races mergeability recompute** after main moves: poll
+  `mergeStateStatus` until non-UNKNOWN; a merge attempt during recompute 405s.
+- The pre-commit doc-sync hook rewriting literals MID-full-suite-run produces phantom
+  platform-stats reds — commit, then run the suite.
 
 ## Live state at wrap
-- **Cycle 9, genesis 2026-07-20 (today), baseline 315.0 lb (override)** — site in the
-  pre-start countdown state; first weigh-in syncs on the hourly Withings run after Matthew
-  steps on the scale; computes anchor Day 1 at 16:30 UTC; brief 17:00 UTC.
-- **Harness verdict**: everything the platform controls is green; the 4 dark sources are
-  human/provider-side: withings (scale, resolves at the weigh-in), **hevy last row
-  2026-06-25** (poller + cursor healthy — either no lifts logged in 25d or a cursor-jump
-  gap; ASK MATTHEW), **notion journal last 2026-05-25**, **strava last 2026-07-14** (the
-  #1330 token-health class, gate:owner).
-- **Budget tier 1** (today's Ghost + tonight's ultracode load) — accepted posture per the
-  ADR-133 amendment; internal AI paused (incl. visual_ai_qa + the truth gate); reader
-  surfaces + brief protected. ai-canary-heartbeat alarm fires until Monday 16:20 UTC's
-  first 3×/wk run (deploy-order artifact of the 7d→4d window, self-heals).
-- **felt_probe n=0** at wrap — the taps didn't happen tonight; fulfillment adoption
-  unchanged.
-- **Board: ~89 open** (tonight closed #1433 #1438 #1441 #1443 #1455 #1406 #1467 #1470
-  #1482 #1484 #1466 #1559; filed #1586).
-
-## Gotchas hit (durable)
-- **Rebase conflict markers can get COMMITTED when `checkout --ours` reports "Updated 0
-  paths"** — the hook had already staged the conflicted file; a SyntaxError in
-  site_api_common.py surfaced only at the next collection (56 errors). Always
-  `py_compile` / collect after any conflicted rebase, never trust the hook's green alone.
-- **Reconcile discipline: take main's copy ONLY for the generated literal files** — I
-  briefly restored DECISIONS.md/CLAUDE.md from main during #1584's reconcile and threw away
-  ADR-137 + reverted the other session's wrap block (caught both in-session via the ADR
-  index count + a CLAUDE.md diff). The ritual's file list is exact for a reason.
-- **A concurrent session wrapped and pushed to main mid-train** — the reconcile flow
-  absorbed it cleanly (my linearized commit landed on top of their wrap); the ancestry
-  check before every merge is what made that safe.
-- The `--with-preregistration` fold ABORTS (by design) when a prior cycle's freeze exists —
-  archive it per the in-place convention first; the pipeline is idempotent from there.
-- An -0800 EVENING timestamp in any synthetic payload lands on the NEXT UTC day — assert
-  and clean BOTH days (the #1588 class).
+- Cycle 9 Day 1; site healthy on latest content; brief went out 17:00 UTC (carried the
+  315 override — tomorrow's carries 321.38; known, by design).
+- **Main:** latest CI/CD conclusions: Unit/lint/deploy-critical green; the ONLY red is
+  `Plan deployments` — the R8-ST6 IAM-review gate red BY DESIGN over the un-applied
+  canary IAM grant; clears with Matthew's Operational deploy. CI Deploy stages are
+  WAITING on the restored production approval gate (the gate working, not a failure).
+- **Harness** (restart_integration_check --expect-cycle 9, run this session): 20 pass /
+  4 fail, all four known (canary-blind pair → IAM deploy; qa-paused-by-budget = tier-1
+  visibility by design; token alarms from the day's heavy Bedrock load; dark sources).
+- felt_probe still n=0. Dark sources unchanged: hevy 6/25, notion 5/25, strava 7/14
+  (gate:owner #1330).
+- Board: **83 open** (98 at session start; #1589 deliberately reopened).
 
 ## Residual / next picks
-- **Monday morning (owner or next session):** weigh-in → hourly sync → `python3
-  deploy/restart_verify.py` (12/12) → `python3 deploy/build_genesis_predict_week.py
-  --apply` (rolls W29→W30) → glance the 16:00 UTC ops email (first #1446 green report; the
-  2 GitHub drift lines + billing line are EXPECTED) → Monday Compass 15:00 UTC now safe
-  (guards deployed).
-- **Engine-doc drift advisory** (handed over from the voice session): CHARACTER.md /
-  HYPOTHESIS.md / COACH_STANCE.md / READINESS.md flagged behind their sources — filed as
-  #1590; untouched this session (the reset owned the docs surface).
-- Next-tier drain remainder: #1442 (now unblocked by #1582's archive), #1472/#1474 design
-  (one CSS story at a time), chat #1481/#1483 (fable), #1586 (just filed), the #1581 MINOR
-  (deterministic coach_context-number check), #1406's MAGE-backfill question.
-- Pre-existing open PRs unchanged: #1543 deep-context, #1512 portraits (DO-NOT-MERGE),
-  #1491 gh-quota (its drift_sentinel reconcile note stands), #1191 dependabot.
-- The #1582 attended IAM leg: diagnosis-role screenshot grant staged in
-  `infra/iam/github-actions-diagnosis-role.permissions.json` — `verify_oidc_iam.py
-  --strict` shows ONE expected staged drift until Matthew applies it.
+- **Owner queue (the decision menu, also in the session close):** TCC re-grant;
+  `cdk deploy LifePlatformOperational` (canary IAM → green canary → close #1589, also
+  clears the Plan red); `cdk deploy LifePlatformEmail` (#1594's role+cron, before
+  Sunday 18:00 UTC); approve the newest waiting CI Deploy run (fleet-syncs bundles);
+  optional pr-checks required-ness toggle (ADR-139, not-work — owner call).
+- **#1474 CLS skeletons: MERGED at wrap (PR #1609)** — data/method/protocols CLS
+  0.46–0.67 → ~0.00 measured, per-page cls_budget locked in qa_manifest; its site
+  auto-deploy was in flight at wrap (gates + auto-rollback own it). Next in lane: #1475.
+- Tier-3 remainder, deliberately not rushed at session tail: #1481 (self-calibration),
+  #1483 (semi-private references — its allude-tier PRODUCER lines already ship in
+  /team-meeting + /interview), #1577 (conversational enrichment).
+- Tomorrow (Tue): after the 16:30 UTC compute, `python3 deploy/restart_verify.py` →
+  expect 12/12 (the Day-1 character sheet lands then; not-work — standing op).
+- Dependabot black/garminconnect PRs: not yet filed by Dependabot at wrap; the black
+  one is format-gate-coupled — bump CI pin + requirements-dev + full-tree reformat in
+  ONE PR, solo (not-work — waits for Dependabot).
+- #1329 rotation, #1350 sign-off, SNS confirm click: standing (gate:owner).
+- ai-canary-heartbeat alarm: self-heals after Wednesday 16:20 UTC's run (not-work).
 
-**Main:** green by local verification — the last 5 suite runs each 6100+ passed with only
-`test_i16` (live dark-source freshness, self-resolves as cycle-9 data lands). CI cannot
-attest: GitHub billing refusals (see incident row) — every merge tonight was
-locally-suite-verified + manually deployed instead. Live site == main content,
-invalidations completed. **Build beat:** `2026-07-20-cycle9-reset-verified-by-behavior`
-(the reset a harness proved, not just a checklist — merged + deployed + live).
-**Docs:** RUNBOOK (harness + drill step 4), PHASE_TAXONOMY xref, DESIGN_SYSTEM_V5 (§litmus
-+ §4a ramp), DATA_GOVERNANCE (retention truth), DECISIONS (ADR-137), INCIDENT_LOG (+2).
-**Decisions:** ADR-137 (evening ledger stays one-tap); no other new ADR — the reset
-followed ADR-058/059/077 as written. **Incidents:** 2 rows (billing refusals P3
-owner-gated; mid-deploy withings DLQ P4 resolved). **Stash/hooks:** stash empty; merged
-worktrees + branches pruned; hook fresh. **Memory + S3 backup:** updated (monday_reset →
-cycle 9, push_ci_silent_death → billing root cause, shipped archive) + synced.
+**Build beat:** `2026-07-20-canary-blind-self-test` (merged + deployed + proven live).
+**Docs:** each merged PR carried its own (TESTING.md scorecard, CONVENTIONS §9 gate
+registry, DECISIONS ADR-138/139 + ADR-057/129 addenda + ADR-099 template-retirement
+note, CHAT_MODES two new modes, SECRETS_MAP consumer line, engine docs re-verified);
+wrap adds INCIDENT_LOG rows only. **Decisions:** ADR-138 + ADR-139 filed (PR #1603).
+**Incidents:** 2 rows added (TCC outage P3; agent-concurrency contamination P4).
+**Main:** red — sole failing job is the by-design R8-ST6 Plan gate over the staged
+canary IAM grant (clears on Matthew's Operational deploy); all test/lint/deploy-critical
+jobs green on the latest completed run. **Stash/hooks:** clone stash empty; the main
+checkout's stash/hook state UNVERIFIABLE this session (TCC) — next session re-checks
+after the re-grant.
 
-Prior sessions (same day): `HANDOVER_2026-07-19_VoiceStudio-Plan.md`,
-`HANDOVER_2026-07-19_Day2-drain.md`.
-
-
----
-
-## MONDAY-MORNING ADDENDUM (2026-07-20, ~10:45 PT) — the weight re-anchor
-
-Matthew weighed in: **321.38 lb** (measured 15:54 UTC) vs the 315.0 override. Waited out
-the 16:30-17:00 UTC compute/brief window (per the original sequencing note), then the
-full same-genesis re-run: cycle stayed 9 (pipeline detected already-registered — the
-same-genesis path works), rendered+semantic gates PASS, truth SKIPPED (tier-1 again).
-Prereg re-landed VERBATIM — live sha still 908fa45a… (the seal held; Brandt's frozen
-"315.0" reference stays frozen, which is what seals are for). Predict-week rolled to
-**W30**. `restart_verify.py` **11/12** — the 12th (post-genesis character sheet) lands
-with TOMORROW's 16:30 UTC compute by design; deliberately NOT force-computed early
-(a partial today-sheet would make the cron's idempotency skip the real Day-1 sheet).
-Site synced, live == 4718e7b9. Harness re-run: 20 pass, withings now GREEN (17h fresh),
-remaining fails = the 3 known dark sources + **a NEW true positive: the canary's first
-3×/week run found itself BLIND — all 5 probes 403 from site-api-ai while readers verified
-fine (ask 200 live) → issue #1589 with the bisect hint (only #1582 touched
-site_api_ai_lambda in the window; the full-tree bundle refreshes everything though).**
-This morning's 17:00 UTC brief went out saying 315 — one email; tomorrow's carries
-321.38. GitHub billing STILL broken at this writing (runs failing the annotation way).
-
-
----
-
-## SECOND ADDENDUM (2026-07-20, ~11:45 PT) — the public flip + the GitHub estate healed
-
-Actions minutes were 3,000/3,000 exhausted (the TRUE #1544 mechanism — the "billing"
-annotation is GitHub's wording for an exhausted included pool with a $0 spending limit).
-Matthew chose the public flip over a budget bump ("nobody is aware of this repo").
-Executed with the canon protected: **PR #1543's branch force-reset to main + PR closed
-BEFORE exposure spread** (the private canon docs/PLATFORM_CONTEXT.md was on that branch;
-old head 22a72ddf preserved in the locked local worktree; residue = force-push timeline
-SHAs only — GitHub Support scrub is the optional belt-and-braces). **#1543 is
-incompatible with a public repo by design** — re-lands after a flip back OR the
-canon-out-of-git redesign. Post-flip: Pages did NOT resurrect; Actions ALIVE (site-deploy
-rerun green end-to-end incl. smoke + visual-QA against the live Day-1 surface); Matthew
-restored the **production approval gate** (required_reviewers verified live → **#1319
-CLOSED verified-done**, #1338 unblocked in the restore direction) and **enabled
-vulnerability alerts** — which immediately found 2 HIGH: black <26.3.1 (dev-only; the
-bump is format-gate-coupled — full-tree reformat + CI pin in one PR) and garminconnect
-<0.3.5 (paused source; fix rides the Garmin revival layer rebuild). Dependabot opens the
-bump PRs per ADR-082. Posture file divergence notes retired (4574cddf). Both standing
-weekly drift lines now CLEAR.
-
-**Build beat:** `2026-07-20-cycle9-reset-verified-by-behavior` (appended to beats.json
-this wrap, validators green — ships with the wrap push's site-deploy).
-**Docs:** github_posture.json notes retired + INCIDENT_LOG (+2 last night) + RUNBOOK/
-PHASE_TAXONOMY/DSv5/DATA_GOVERNANCE/DECISIONS all landed in-session (listed above);
-this addendum adds none.
-**Decisions:** none filed this addendum — the visibility flip is a recorded temporary
-operational posture (memory + posture file), and the restored-gate direction gets its
-ADR via the already-open #1338.
-**Main:** red — latest completed CI/CD conclusions are Actions-minutes-exhaustion
-refusals (the #1544 mechanism, resolved by the public flip); the CODE is verified by five
-local full suites (no -x, only the documented live-state i16 red) + a green end-to-end
-site-deploy rerun post-flip; the wrap push's fresh CI/CD run is in flight and its Deploy
-stage will WAIT on the newly-restored production approval gate (that pause is the gate
-working, not a failure).
-**Incidents:** none new in this addendum (the flip was deliberate; Dependabot findings
-are alerts, not incidents) — 2 rows from last night stand.
-**Stash/hooks:** clean (stash empty, hook fresh).
-**Residual additions:** Dependabot bump PRs incoming — black one needs the format-gate
-coupling care (not-work until the PRs exist — Dependabot files them); GitHub Support
-scrub of #1543's timeline SHAs (not-work — Matthew's optional call); flip-back-to-private
-checklist lives in project_repo_visibility (not-work — future owner call); canary-blind
-root-cause = #1589; canon-out-of-git redesign — file only if Matthew wants public
-long-term (not-work — awaiting his call).
+Prior session (same day): `HANDOVER_2026-07-20_Day3-cycle9-reset.md`.
