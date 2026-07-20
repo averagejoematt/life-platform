@@ -25,8 +25,10 @@ Entry fields
   js_modules     main ES module(s) the page loads (informational facet, #1431)
   visual         Playwright def for tests/visual_qa.py (wait_for/checks/charts/
                  interact) or None = not yet in the sweep (#1427 extends).
-  leak_scan      include in restart_verify_rendered token grep (default True
-                 for every real HTML page; False only for pure redirects)
+  leak_scan      include in the leak-token grep (default True for every real
+                 HTML page; False only for pure redirects) — driven by
+                 restart_verify_rendered.py at reset time AND by the daily
+                 tests/visual_qa.py sweep (#1448; both share tests/leak_token_sweep.py)
   smoke          expected HTTP status for the status sweep (default "200")
   ai_surface     #1441 (default False): True = the page renders AI-generated
                  narrative a reader sees (coach commentary, board answers,
