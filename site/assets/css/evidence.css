@@ -129,6 +129,13 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .sk-line { height: 12px; width: 70%; }
 .sk-line--short { width: 40%; }
 
+/* CLS paydown (#1474) — the Day-N genesis stamp is written + un-hidden by JS
+   (coach_popover.stampGenesis, evidence.js) AFTER first paint. Reserving its
+   single line here keeps that reveal from pushing the hero + readout down (a
+   measured ~0.22 residual shift on /data,/method,/protocols). One label line,
+   in-flow from the start; empty until the stamp lands, so no shift either way. */
+.hero-day[data-reserve-line] { min-height: calc(var(--fs-label) * var(--lh-body)); }
+
 /* ── Bespoke readouts (the archival / Readout treatment) ──────────────────── */
 .rd-sec { margin-top: var(--sp-7); }
 .rd-grouphead { border-top: var(--border-hair); padding-top: var(--sp-3); }
@@ -337,7 +344,11 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .ev-lede { margin-top: var(--sp-3); color: var(--ink-muted); }
 
 /* Horizontal group tabs */
-.ev-tabs { display: flex; gap: var(--sp-1); margin-top: var(--sp-6); border-bottom: var(--border-hair); overflow-x: auto; scrollbar-width: none; }
+/* min-height reserves the section-tabs row (JS-built from the registry after
+   first paint) so its reveal doesn't push the layout down — #1474 CLS paydown.
+   Tokenized to one tab's box (label line + sp-3 padding top/bottom), a hair over
+   the ~40px filled height so the fill never exceeds the reservation. */
+.ev-tabs { display: flex; gap: var(--sp-1); margin-top: var(--sp-6); min-height: calc(var(--fs-label) * var(--lh-body) + var(--sp-3) * 2); border-bottom: var(--border-hair); overflow-x: auto; scrollbar-width: none; }
 .ev-tabs::-webkit-scrollbar { display: none; }
 .ev-tab { appearance: none; background: transparent; border: 0; cursor: pointer; white-space: nowrap;
   font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.1em; text-transform: uppercase;
