@@ -130,6 +130,47 @@ def test_lambda_handler_emits_emf_metric_before_the_fail_gate():
     )
 
 
+def test_lambda_handler_logs_itemized_fails_and_warns_before_the_fail_gate():
+    """#1610: the specific failing check must reach stdout (CloudWatch), not just
+    the failure email. Statically prove the handler iterates `fails` AND `warns`
+    at the top level of its try-block, printing each, BEFORE the `if not fails:`
+    gate — so a latched FailCount alarm is diagnosable from logs even on a
+    warnings-only run (which early-returns at that gate) and without inbox access."""
+    src = inspect.getsource(qa.lambda_handler)
+    tree = ast.parse(src)
+    func = tree.body[0]
+    try_node = next(n for n in func.body if isinstance(n, ast.Try))
+
+    fail_gate_index = None
+    fails_loop_index = None
+    warns_loop_index = None
+    for i, stmt in enumerate(try_node.body):
+        if (
+            fail_gate_index is None
+            and isinstance(stmt, ast.If)
+            and isinstance(stmt.test, ast.UnaryOp)
+            and isinstance(stmt.test.op, ast.Not)
+            and isinstance(stmt.test.operand, ast.Name)
+            and stmt.test.operand.id == "fails"
+        ):
+            fail_gate_index = i
+        # a top-level `for c in fails:` / `for c in warns:` whose body prints
+        if isinstance(stmt, ast.For) and isinstance(stmt.iter, ast.Name):
+            prints = any(isinstance(sub, ast.Call) and isinstance(sub.func, ast.Name) and sub.func.id == "print" for sub in ast.walk(stmt))
+            if prints and stmt.iter.id == "fails" and fails_loop_index is None:
+                fails_loop_index = i
+            if prints and stmt.iter.id == "warns" and warns_loop_index is None:
+                warns_loop_index = i
+
+    assert fails_loop_index is not None, "lambda_handler never prints each item of `fails` at the top level of its try-block (#1610)"
+    assert warns_loop_index is not None, "lambda_handler never prints each item of `warns` at the top level of its try-block (#1610)"
+    assert fail_gate_index is not None, "lambda_handler's `if not fails:` gate not found — parser broke, investigate"
+    assert fails_loop_index < fail_gate_index and warns_loop_index < fail_gate_index, (
+        "the itemized fail/warn logging is AFTER the `if not fails:` gate — it must run before it so "
+        "a warnings-only run (which returns at that gate) still logs its warns (#1610)"
+    )
+
+
 # ---------------------------------------------------------------------------
 # 3. monitoring_stack.py declares the three LifePlatform/QaSmoke alarms
 # ---------------------------------------------------------------------------

@@ -1009,6 +1009,18 @@ def lambda_handler(event, context):
         paused = [c for c in all_checks if c.paused]
         passes = [c for c in all_checks if c.passed is True and not c.paused]
 
+        # #1610: itemize every fail/warn to the LOG, not just the failure email.
+        # The specific failing check used to appear ONLY in the emailed report, so a
+        # latched daily FailCount alarm was undiagnosable from CloudWatch without inbox
+        # access. Now the check category/name/message rides stdout on any non-clean run
+        # (queryable via Logs Insights), matching the existing `[QA]` print convention.
+        # Messages carry only freshness/sanity metadata, secret NAMES (already in-repo),
+        # and public-dashboard values — no sensitive values.
+        for c in fails:
+            print(f"[QA] FAIL {c.category} / {c.name}: {c.message}")
+        for c in warns:
+            print(f"[QA] WARN {c.category} / {c.name}: {c.message}")
+
         # #1445: emit the EMF summary on EVERY run — including all-green — so
         # the nightly QA layer has a heartbeat and its warnings/failures are
         # queryable metrics, not just the inside of an email nobody reads
