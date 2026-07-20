@@ -68,32 +68,12 @@ the aesthetic is a **beautifully-made instrument**, the opposite of AI-template 
 10. **Privacy absolutes.** Never name substances/vices, never expose genome identifiers or
     chronological age, nothing Matthew-private on a public surface.
 
-## 3. The Slop Litmus v1 (run every proposal through all ten)
+## 3. The Slop Litmus (canonical home: the design system)
 
-A proposal that fails any point goes back for a revision round — cite the point number.
-
-1. **The masthead test.** Cover the wordmark. Is the screen still identifiable as THIS
-   site (the loop, the triad's voices, the instrument vocabulary) — or could it be any
-   AI-generated health dashboard?
-2. **No purple-blue gradient, no glassmorphism, no generic shadcn geometry.** The 2024–26
-   template look is an automatic fail.
-3. **Every decorative mark earns its existence** — derived from the sigil/instrument
-   vocabulary or drawn from real data. Ornament with no data behind it is slop.
-4. **Glow audit.** Point at each glow/bloom: which live signal earns it? No answer = strip it.
-5. **Typography leads with the triad's voices** — a Fraunces human line, Instrument Sans
-   chrome, Plex Mono numbers. A center-aligned hero + three-card grid is the slop
-   silhouette; if the layout could be a SaaS landing template, restructure.
-6. **Motion has a reason.** Name the loop station or live signal each animation serves.
-   "It feels dynamic" is not a reason.
-7. **Uncertainty honest?** Any band, range, or error visual must map to a real computed
-   interval; LOW confidence renders as a point.
-8. **Copy in the site's voice.** Plain, specific, honest — "the sheet grades itself
-   against how the week felt," never "Unlock your journey" SaaS-speak. Numbers cited,
-   hedges kept.
-9. **Both themes designed** — not one theme plus an inversion. Check ember/ink balance in
-   each.
-10. **The loop is findable.** From the proposed screen, can a newcomer tell which loop
-    station they're on and where the loop-forward door is?
+The ten-point litmus is CANONICAL in `docs/DESIGN_SYSTEM_V5.md` ("The Slop Litmus —
+the ten-point distinctiveness gate", #1466) — run every proposal through all ten there;
+a proposal that fails any point goes back for a revision round, citing the point
+number. The self-audit in `NOTES.md` (§4 below) still walks all ten, one line each.
 
 ## 4. The deliverable contract (`proposals/<slug>/`)
 

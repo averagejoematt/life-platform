@@ -209,3 +209,66 @@ def test_assess_results_no_bedrock_client_returns_unavailable_status(tmp_path, m
 
 def test_visual_ai_qa_feature_is_band1_internal_cutoff():
     assert budget_guard._FEATURE_CUTOFF["visual_ai_qa"] == 1
+
+
+# ── the advisory slop-lens (#1466): structurally incapable of gating ──────────
+
+
+def test_gloss_flag_alone_never_fails_a_page():
+    """A flagged template-gloss verdict with clean rendering = warning only."""
+    v = visual_ai_qa._parse_verdict(
+        '{"renders_ok": true, "charts_populated": "yes", "issues": [], '
+        '"template_gloss": {"flagged": true, "note": "purple-blue gradient hero"}, '
+        '"severity": "ok", "summary": "renders fine"}'
+    )
+    assert v["severity"] == "ok"
+    assert v["template_gloss"]["flagged"] is True
+
+
+def test_gloss_misfiled_inside_issues_is_stripped_before_severity():
+    """Prompt rules can't guarantee structure (reference_prompt_structural_guarantees):
+    if the model files the gloss finding INSIDE issues[] at high severity, the
+    deterministic strip must keep it from flipping the page to FAIL."""
+    v = visual_ai_qa._parse_verdict(
+        '{"renders_ok": true, "issues": [{"type": "template_gloss", "severity": "high", '
+        '"note": "glassmorphism"}], "severity": "high", "summary": "gloss drift"}'
+    )
+    assert v["issues"] == []
+    assert v["severity"] == "ok", "a stated severity unsupported by surviving issues must be demoted"
+
+
+def test_gloss_strip_never_touches_real_rendering_issues():
+    v = visual_ai_qa._parse_verdict(
+        '{"renders_ok": false, "issues": [{"type": "blank_chart", "severity": "high", "note": "empty frame"}, '
+        '{"type": "ai-template-gloss", "severity": "med", "note": "SaaS grid"}], '
+        '"severity": "high", "summary": "broken"}'
+    )
+    assert [i["type"] for i in v["issues"]] == ["blank_chart"]
+    assert v["severity"] == "high"  # the REAL issue still gates
+
+
+def test_gloss_flag_merges_as_warning_not_issue(tmp_path, monkeypatch):
+    monkeypatch.setattr(visual_ai_qa, "_import_bedrock", lambda: object())
+    monkeypatch.setattr(budget_guard, "allow", lambda f: True)
+    monkeypatch.setattr(
+        visual_ai_qa,
+        "_assess_page",
+        lambda bedrock, name, path, shots: {
+            "renders_ok": True,
+            "issues": [],
+            "template_gloss": {"flagged": True, "note": "stock template geometry"},
+            "severity": "ok",
+            "summary": "fine",
+        },
+    )
+    r = _result_with_shot(tmp_path)
+    visual_ai_qa.assess_results([r])
+    assert r["status"] != "FAIL"
+    assert not r.get("issues")
+    assert any("slop-lens" in w and "never gating" in w for w in r["warnings"])
+
+
+def test_prompt_carries_the_lens_and_its_non_gating_contract():
+    p = visual_ai_qa._PROMPT
+    assert "template_gloss" in p and "#1466" in p
+    assert "NEVER counts toward severity" in p
