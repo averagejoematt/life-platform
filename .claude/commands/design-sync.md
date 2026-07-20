@@ -30,9 +30,9 @@ targets one proposal; this command has no analogous unit to target.)
 3. Do **not** enumerate, read, write, or delete anything in the June 2026 archive project
    under any circumstance in this command.
 
-## Phase 1 — Build the fresh bundle
+## Phase 1 — Build the fresh bundle + refresh the live reference captures
 
-Run:
+1. Run:
 
 ```bash
 python3 scripts/design_sync_bundle.py
@@ -40,14 +40,34 @@ python3 scripts/design_sync_bundle.py
 
 (default output `scratch/design_sync_bundle/`; pass `--out DIR` only if you have a
 specific reason to write elsewhere — the diff in Phase 2 assumes the default unless
-overridden). This script is already merged and self-contained (#1462) — do not modify it.
-It fully rebuilds (`rmtree` + recreate) on every run from checked-in repo truth
+overridden). This script is already merged and self-contained (#1462) — do not modify it
+mid-run. It fully rebuilds (`rmtree` + recreate) on every run from checked-in repo truth
 (`tokens.css`, `icons.svg`, `charts.js`, `sigils.js`, `v4_kit.py`, the built reference
 pages) and self-verifies on exit (raises on an absolute `/…` asset reference, a literal
 `https://averagejoematt` URL, or a missing `@dsCard` marker). If it raises, stop — do not
-sync a bundle that failed its own verification. The bundle's four directories
-(`assets/`, `foundations/`, `components/`, `reference/`) plus its `MANIFEST.md` are the
-source of truth for Phase 2's diff.
+sync a bundle that failed its own verification.
+
+2. Then refresh `reference/` from the CURRENT live site (#1467 — this step is what keeps
+   the design project's reference layer from rotting into a stale snapshot):
+
+```bash
+python3 scripts/design_sync_capture.py
+```
+
+(same `--out` default — it writes INTO the bundle just built, and refuses to run if the
+bundle isn't there). It screenshots the doors (the `tests/qa_manifest.py` tier-1 set) +
+the data-dense surface (`/data/sleep/`) at 1440×900 dark over the network — read-only
+GETs, honoring the `QA_SITE_URL` override — reusing the visual-QA harness's
+navigation/scroll discipline. It writes `reference/captures/<slug>.png`, one
+`@dsCard group="reference"` card per capture, and `reference/captures_base64.json` (the
+binary-upload mirror of `fonts_base64.json`), then re-runs the bundle-wide verification
+sweep. Requires `playwright install chromium` and network reach to the live site. If it
+raises — including any page failing to load — stop: a bundle whose reference layer is
+stale or partial must not sync (that failure mode is the exact problem #1467 exists to
+prevent).
+
+The bundle's four directories (`assets/`, `foundations/`, `components/`, `reference/`)
+plus its `MANIFEST.md` are the source of truth for Phase 2's diff.
 
 ## Phase 2 — Structural diff (never wholesale replace)
 
@@ -79,6 +99,15 @@ source of truth for Phase 2's diff.
    upload path the tool surface exposes. Do not re-derive base64 from the raw `.woff2`
    copies also present in `assets/` — the manifest exists specifically so this command
    never has to.
+5. Capture binaries (#1467): identical rule for `reference/captures/*.png` — use the
+   base64 values in `reference/captures_base64.json` directly as the write payload. For
+   the byte-compare in step 2, comparing the manifest's base64 entry against the remote
+   copy IS the comparison for a PNG. Expect the capture PNGs (and therefore the manifest)
+   to differ on almost every run — they are screenshots of live-data pages; re-uploading
+   the changed ones is the incremental refresh working as designed, not churn to
+   optimize away. The capture *cards* (`reference/<slug>-capture.html`) change at most
+   once per UTC day (they carry the capture date), and the built page shells stay
+   byte-stable — those still diff to no-ops on an unchanged repo.
 
 ## Phase 3 — `finalize_plan`
 
@@ -106,11 +135,14 @@ Report, in order:
 
 1. What was created / updated / deleted this run (the Phase 3 plan, annotated with the
    actual Phase 4 result), and the project URL/id if the tool surface returns one.
-2. The **no-op property**: running `/design-sync` again immediately, with no repo changes
-   in between, should produce an empty Phase 3 plan and therefore zero `write_files`/
-   `delete_files` calls. This is a property a future run can self-check by doing exactly
-   that (run it twice back to back) — this session does not prove it live if the
-   DesignSync tool surface isn't connected (see Notes).
+2. The **no-op property** (amended by #1467): running `/design-sync` again immediately,
+   with no repo changes in between, should produce a Phase 3 plan that is empty
+   **except for the live-capture layer** — `reference/captures/*.png` +
+   `captures_base64.json` legitimately differ run-to-run (they screenshot live-data
+   pages), and the capture cards roll once per UTC day. Everything else (`assets/`,
+   `foundations/`, `components/`, the reference shells, `BRIEF.md`) must still diff to
+   zero writes. A non-capture file appearing in a back-to-back rerun's plan is a real
+   determinism bug to report, not noise.
 
 ---
 
@@ -135,12 +167,14 @@ Report, in order:
   there is no offline fallback for a push sync (there is nothing meaningful to simulate
   writing to a design project that isn't reachable).
 - This command never touches `site/`, never opens a PR, and never mutates AWS — it is
-  scoped entirely to `scripts/design_sync_bundle.py`'s output plus the DesignSync tool
-  calls above.
+  scoped entirely to `scripts/design_sync_bundle.py` + `scripts/design_sync_capture.py`
+  output plus the DesignSync tool calls above. The capture step's only network activity
+  is read-only GETs against the live site (or `QA_SITE_URL`).
 - Precedent: `scripts/design_sync_bundle.py` (#1462) is the bundle builder this command
-  depends on; `docs/design/DESIGN_PARTNER_BRIEF.md` (#1464) is the contract file this
-  command ships as root `BRIEF.md`; `.claude/commands/design-implement.md` (#1465) is the
-  pull-path mirror of this command.
+  depends on; `scripts/design_sync_capture.py` (#1467) is the live reference-capture
+  refresh that runs right after it; `docs/design/DESIGN_PARTNER_BRIEF.md` (#1464) is the
+  contract file this command ships as root `BRIEF.md`;
+  `.claude/commands/design-implement.md` (#1465) is the pull-path mirror of this command.
 - **Documented assumption, unverified in this session:** the exact parameter names/shapes
   of `list_projects`/`list_files`/`get_file`/`finalize_plan`/`write_files`/`delete_files`
   (e.g. whether `list_files` is natively recursive, whether `write_files` takes a batch or

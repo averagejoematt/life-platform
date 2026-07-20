@@ -121,6 +121,15 @@ class TestDsCardMarker:
             first_line = html_path.read_text(encoding="utf-8").split("\n", 1)[0]
             assert first_line.startswith('<!-- @dsCard group="'), f"{html_path.name}: missing/misplaced @dsCard marker"
 
+    def test_every_reference_shell_has_the_marker(self, built_bundle):
+        """#1467: the @dsCard contract extends to reference/ — reference cards render in
+        the Design System pane alongside foundations/components."""
+        shells = list((built_bundle / "reference").glob("*.html"))
+        assert shells, "no reference shells built"
+        for html_path in shells:
+            first_line = html_path.read_text(encoding="utf-8").split("\n", 1)[0]
+            assert first_line == '<!-- @dsCard group="reference" -->', f"{html_path.name}: missing/misplaced @dsCard marker"
+
     def test_marker_is_byte_zero_not_merely_present(self, built_bundle):
         # A marker anywhere in the file isn't the contract — it must be the literal first
         # line, since a design-project importer keys off line 0 without parsing the DOM.
