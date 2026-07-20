@@ -1970,10 +1970,14 @@ TOOLS = {
                 "completed-needing-driver COUNTS. (3) field_note — this week's status (generated? responded?), "
                 "not the note text. (4) evening_intake — logged tonight? + dose-response arming progress "
                 "(#1405, Matthew-private). (5) reading_recalls — due spaced-retrieval prompt count. "
-                "(6) freshness_flags — stale sources only, name + days_dark. Each section fails soft "
-                "independently: a broken sub-query never blocks the other five, it just reports "
+                "(6) freshness_flags — stale sources only, name + days_dark. (7) suggested_rituals — #1578: "
+                "deterministic checkpoint proposals (cycle milestone, weight band crossed, journal gone dark, "
+                "mood slide, readiness cliff, experiment midpoint), each with its rule, the data that fired it, "
+                "and a stable episode_key so it shows once per episode; pure code decides every one (no LLM), a "
+                "dark source proposes nothing, skipping records nothing. Each section fails soft "
+                "independently: a broken sub-query never blocks the others, it just reports "
                 "{status: 'unavailable'}. Use this FIRST at the start of any chat mode (workout debrief, "
-                "journal interview, speak-to-the-coaches, open check-in) instead of calling the six "
+                "journal interview, speak-to-the-coaches, open check-in) instead of calling the "
                 "underlying tools separately. Skip-without-penalty framing — nothing here is a nag."
             ),
             "inputSchema": {

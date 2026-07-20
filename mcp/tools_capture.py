@@ -32,6 +32,17 @@ re-implements their logic and never opens a new key family:
                       get_freshness_status (full per-source detail — fresh
                       sources, interior gaps, macro drift — stays behind that
                       tool).
+  suggested_rituals — #1578: deterministic checkpoint triggers that PROPOSE a
+                      diary/interview ritual (cycle milestone, weight band
+                      crossed, journal gone dark, mood slide, readiness cliff,
+                      experiment midpoint). Unlike the six pending-capture
+                      surfaces above, this is the platform NOTICING a moment
+                      worth a ritual — never a pending item, never a nag. Pure
+                      code decides every trigger (no LLM, ADR-105); a dark
+                      source proposes nothing (ADR-104); each proposal carries a
+                      stable episode_key so it shows once per condition-episode.
+                      Reuses the freshness read (computed once) for its
+                      journal-dark trigger. Machinery: mcp/ritual_triggers.py.
 
 Fail-soft per section (#1478 hard requirement): each section is computed
 inside its own try/except via `_section()`. One broken sub-queue (a DynamoDB
@@ -43,6 +54,7 @@ section only, and the other five still return complete data.
 from datetime import datetime, timezone
 
 from mcp.config import logger, table
+from mcp.ritual_triggers import build_suggested_rituals
 from mcp.tools_coach_checkin import _present as _present_checkin
 from mcp.tools_coach_intelligence import COACH_IDS
 from mcp.tools_habits import tool_get_habit_reflection_queue
@@ -137,14 +149,32 @@ def _freshness_flags_section():
     return {"status": fs.get("status"), "stale_count": len(flags), "flags": flags}
 
 
+def _suggested_rituals_section(freshness_result):
+    """#1578: deterministic checkpoint triggers proposing a ritual. Reuses the
+    already-computed freshness section (no second freshness read) for its
+    journal-dark trigger; an 'unavailable' freshness result passes None so that
+    trigger simply proposes nothing (the other triggers are unaffected)."""
+    try:  # 'today' is the PACIFIC calendar day, same as the evening-intake section (#1484).
+        from pacific_time import pacific_now
+    except ImportError:  # pragma: no cover — MCP bundle always ships lambdas/ at root
+        from lambdas.pacific_time import pacific_now
+    today = pacific_now().date()
+    usable = freshness_result if isinstance(freshness_result, dict) and freshness_result.get("status") != "unavailable" else None
+    return build_suggested_rituals(today, usable)
+
+
 def tool_get_capture_queues(args):
-    """One-call session opener: every pending capture surface in one read (#1478).
+    """One-call session opener: every pending capture surface in one read (#1478),
+    plus the platform's own checkpoint proposals (#1578).
 
     Aggregates six existing read tools' internals — no new key families, no
-    re-implemented logic. Each section fails soft independently (see module
-    docstring); a broken sub-queue never blocks the other five. Skip-without-
-    penalty framing throughout — nothing here is a nag, just what's possible.
+    re-implemented logic — and adds a seventh `suggested_rituals` section: the
+    deterministic triggers that PROPOSE a diary/interview ritual (#1578). Each
+    section fails soft independently (see module docstring); a broken sub-queue
+    never blocks the others. Skip-without-penalty framing throughout — nothing
+    here is a nag, just what's possible.
     """
+    freshness = _section("freshness_flags", _freshness_flags_section)
     return {
         "as_of": datetime.now(timezone.utc).isoformat(),
         "coach_checkin": _section("coach_checkin", _coach_checkin_section),
@@ -152,7 +182,8 @@ def tool_get_capture_queues(args):
         "field_note": _section("field_note", _field_note_section),
         "evening_intake": _section("evening_intake", _evening_intake_section),
         "reading_recalls": _section("reading_recalls", _reading_recalls_section),
-        "freshness_flags": _section("freshness_flags", _freshness_flags_section),
+        "freshness_flags": freshness,
+        "suggested_rituals": _section("suggested_rituals", lambda: _suggested_rituals_section(freshness)),
         "how_to_use": (
             "One call, six pending-capture surfaces — the canonical session opener for workout debriefs, "
             "journal interviews, speak-to-the-coaches, and open check-ins. Everything here is optional: skip "
