@@ -2,13 +2,13 @@
   "_meta": {
     "version": "1.6.0",
     "description": "Character Sheet v1.6.0 (#1411 fitted-not-authored, ADR-105): every cross-pillar effect declares fit_status='authored-prior' \u2014 the config can only declare the prior; 'fitted' is earned from data by the quarterly effect_fitter re-fit (lagged pairs, block-bootstrap CI, BH-FDR) and merged at compute/serve time, never hand-written here. On v1.5.0's #965 source wiring.",
-    "last_updated": "2026-07-19",
+    "last_updated": "2026-07-20",
     "review_ref": "docs/engines/CHARACTER_MATH_AUDIT_2026-07.md"
   },
   "baseline": {
     "start_date": "2026-07-20",
-    "start_weight_lbs": 315.0,
-    "start_weight_kg": 142.882,
+    "start_weight_lbs": 321.38,
+    "start_weight_kg": 145.776,
     "baseline_source": "withings",
     "goal_weight_lbs": 185,
     "weight_phase": "loss",
