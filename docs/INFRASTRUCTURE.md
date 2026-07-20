@@ -24,7 +24,7 @@
 | Field | Value |
 |-------|-------|
 | Domain | `averagejoematt.com` |
-| Registrar | *(check where you bought the domain — Namecheap, Google Domains, etc.)* |
+| Registrar | NameCheap, Inc. — whois-verified 2026-07-10 (not Route53; DNS is still served by Route53's hosted zone below). Full detail: `docs/ACCOUNTS.md` |
 | Hosted Zone ID | `Z063312432BPXQH9PVXAI` |
 | Nameservers | `ns-214.awsdns-26.com` · `ns-1161.awsdns-17.org` · `ns-858.awsdns-43.net` · `ns-1678.awsdns-17.co.uk` |
 
@@ -195,10 +195,7 @@ Source of truth: `aws lambda list-functions --region us-west-2 --query 'length(F
 - `email-subscriber` — Subscribe form intake
 
 ### Shared-code distribution — the retired layer (#781/ADR-131)
-The shared layer (`life-platform-shared-utils`) was **retired 2026-07-06**: shared modules ship inside every function's code bundle, staged by `deploy/build_bundle.py`. Invariant: zero functions reference the layer (CI plan job + integration test I2). Old layer versions remain published in AWS (`RemovalPolicy.RETAIN`) but nothing references them.
-Dependency layers with real third-party packages remain (they are NOT the shared layer):
-- Pillow: 1 Lambda (og-image-generator)
-- garth: Garmin ingestion
+Canonical in `docs/CONVENTIONS.md` §1. Old layer versions remain published in AWS (`RemovalPolicy.RETAIN`) but nothing references them. Dependency layers with real third-party packages remain (they are NOT the shared layer): Pillow (og-image-generator), garth (Garmin ingestion).
 
 ---
 
@@ -261,4 +258,4 @@ See `deploy/p1_kms_dynamodb.sh` for creation script.
 
 ---
 
-**Verified:** 2026-05-19 — full audit (V2 audit + follow-up). Lambda inventory via `aws lambda list-functions` (both regions), secrets via `aws secretsmanager list-secrets --include-planned-deletion`, alarms via `aws cloudwatch describe-alarms`, EventBridge via `aws events list-rules`, S3 encryption via `aws s3api get-bucket-encryption`, CloudTrail data events via `aws cloudtrail get-event-selectors`, SES config sets via `aws sesv2 list-configuration-sets`. Layer version verified in code at `cdk/stacks/constants.py:37`.
+**Verified:** 2026-05-19 — full audit (V2 audit + follow-up). Lambda inventory via `aws lambda list-functions` (both regions), secrets via `aws secretsmanager list-secrets --include-planned-deletion`, alarms via `aws cloudwatch describe-alarms`, EventBridge via `aws events list-rules`, S3 encryption via `aws s3api get-bucket-encryption`, CloudTrail data events via `aws cloudtrail get-event-selectors`, SES config sets via `aws sesv2 list-configuration-sets`. (The shared layer was retired #781 — there is no "layer version" to verify for it anymore. `cdk/stacks/constants.py:37` is `GARTH_LAYER_VERSION`, the *dependency* layer for Garmin ingestion, not the retired shared layer.)

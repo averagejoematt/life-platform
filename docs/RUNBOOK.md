@@ -78,18 +78,7 @@ aws s3api delete-bucket-policy --bucket matthew-life-platform
 
 ## Shared Modules — ONE bundle, no layer (#781/ADR-131)
 
-The shared layer (`life-platform-shared-utils`) was **retired 2026-07-06**. Shared modules live at the `lambdas/` root and ship **inside every function's code bundle**, staged by `deploy/build_bundle.py` (the whole `lambdas/` tree + `food_vocabulary.json`; MCP also gets `mcp_server.py` + `mcp/`). All deploy paths stage through it (CDK asset, `deploy_lambda.sh`, `deploy_fleet.sh`, `deploy_site_api.sh`), so layer-version drift and partial-zip import breaks are structurally impossible.
-
-**A shared-module change reaches the fleet via** `bash deploy/deploy_fleet.sh` or `cd cdk && npx cdk deploy --all` — CI fleet-deploys automatically when an unmapped `lambdas/` file changes on main.
-
-**Invariant (CI-enforced):** zero functions reference the old layer (plan job + `test_i2_shared_layer_retired`). Verify by hand:
-```bash
-aws lambda list-functions --region us-west-2 \
-  --query "Functions[?Layers[?contains(Arn, 'life-platform-shared-utils')]].FunctionName"
-# Expect: []
-```
-
-Dependency layers with real third-party packages (garth, Pillow) are NOT the shared layer and remain. Full reflex: `docs/CONVENTIONS.md` §1.
+Canonical in `docs/CONVENTIONS.md` §1 (retirement date, `build_bundle.py`, which deploy paths stage through it, the invariant + how to verify it by hand). Don't restate it here.
 
 ---
 

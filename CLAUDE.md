@@ -48,7 +48,10 @@ bash deploy/deploy_lambda.sh <function-name> <source-file>
 # Deploy + run smoke test
 bash deploy/deploy_and_verify.sh <function-name> <source-file>
 
-# CDK deploy all stacks
+# CDK deploy (drift-guarded — runs check_deploy_drift.py first, see CONVENTIONS.md §6)
+bash deploy/cdk_deploy.sh <StackName> [<StackName> ...]
+
+# Bare CDK deploy — override path only, skips the drift guard
 cd cdk && npx cdk deploy --all
 
 # Start MCP bridge for Claude Desktop
@@ -90,7 +93,7 @@ python3 mcp_bridge.py
 
 **EventBridge crons use fixed UTC** — no DST drift. All schedules in `cdk/stacks/` must be UTC-fixed.
 
-**Shared code — ONE bundle, no layer (#781, 2026-07-06)** — the shared layer (`life-platform-shared-utils`) is RETIRED. Shared modules (`ai_calls.py` + its split modules `ai_context.py`/`ai_summaries.py`, `retry_utils.py`, `bedrock_client.py`, `stats_core.py`, `personal_baselines.py`, + the rest of `lambdas/*.py`) ship **inside every function's code bundle**, staged by `deploy/build_bundle.py` (the whole `lambdas/` tree + `food_vocabulary.json`; MCP also gets `mcp_server.py` + `mcp/`). All deploy paths stage through it (CDK asset, `deploy_lambda.sh`, `deploy_fleet.sh`, `deploy_site_api.sh`), so layer-version drift and partial-zip import breaks are structurally impossible. A shared-module change reaches the fleet via `deploy_fleet.sh` or `cdk deploy --all` (CI fleet-deploys automatically on unmapped `lambdas/` changes). Invariant: zero functions reference the old layer (CI plan job + I2). Dependency layers (garth, pillow) remain. See `docs/CONVENTIONS.md` §1.
+**Shared code — ONE bundle, no layer (#781)** — canonical in `docs/CONVENTIONS.md` §1 (retirement date, `build_bundle.py`, which deploy paths stage through it, the zero-references invariant). Don't restate it here.
 
 **Prompt caching (COST-OPT-2)** — `ai_calls.py` and `retry_utils.py` auto-wrap system messages as Anthropic cached content blocks (90% discount). Model tiering: structured tasks use Haiku, narrative content uses Sonnet. All model assignments configurable via `AI_MODEL` env var. See ADR-049.
 
