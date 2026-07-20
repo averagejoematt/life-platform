@@ -580,6 +580,37 @@ aws dynamodb update-continuous-backups \
 
 ---
 
+## Rate-Limiter Live Probe (#1439)
+
+`lambdas/rate_limiter.py` (the DynamoDB-backed per-IP rate limiter) has deterministic
+unit coverage in `tests/test_rate_limiter.py` (429 threshold, TTL/window reset,
+fail-open/fail-closed). A separate **live probe**, `deploy/probe_rate_limiter.py`,
+verifies the real deployed path end-to-end (Lambda → DynamoDB → CloudFront → response)
+against `POST /api/board_ask` — chosen because its rate-limit check runs before body
+validation, so probe requests never reach a Bedrock call (zero model cost) and never
+touch `/api/subscribe` (no real emails).
+
+**Run manually only — never in CI, never on a schedule, never from
+`deploy/smoke_test_site.sh`:**
+```bash
+python3 deploy/probe_rate_limiter.py                 # --mode shape (default, safest): 2 requests, shape-only
+python3 deploy/probe_rate_limiter.py --mode trip429   # up to 6 requests, deliberately observes one real 429
+```
+Cadence: at most once every few weeks, and only after touching `rate_limiter.py`,
+the `_handle_board_ask` rate-limit wiring in `lambdas/web/site_api_ai_lambda.py`, or
+the site-api-ai IAM policy. It always runs from the operator's/agent's own IP, never a
+real reader's — the per-IP counter it may exhaust only affects that one IP for the rest
+of the hour.
+
+**PASS:** every response is well-formed JSON with the expected shape (400 `{"error":
+...}` before the limit, 429 with a `Retry-After` header and `{"error": ...}` once
+tripped). **FAIL:** any other status code, or (trip429 mode) never observing a 429
+within `BOARD_RATE_LIMIT + 1` requests — investigate the rate limiter, the DDB table,
+or the site-api-ai Lambda's IAM policy. Full reasoning + design tradeoffs are in the
+script's module docstring.
+
+---
+
 ## Common Issues
 
 ### Whoop/Withings/Strava: "Token expired" error
