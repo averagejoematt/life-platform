@@ -17,7 +17,12 @@ gitignored):
                      coach sigils + tier emblems, coach portraits, the icon sheet, and a
                      charts.js gallery
     reference/      a handful of representative BUILT pages (home, cockpit, the data hub)
-                     with every asset/nav reference rewritten to resolve from the bundle
+                     with every asset/nav reference rewritten to resolve from the bundle.
+                     The LIVE layer of reference/ — full-page captures of the current
+                     site (the doors + a data-dense surface) — is added by the companion
+                     script scripts/design_sync_capture.py (#1467), which runs AFTER this
+                     builder: captures are network-dependent and change with the live
+                     data, so they stay out of this deterministic build on purpose
 
 Three special cases (from the issue's evidence inventory), each handled explicitly and
 documented here rather than silently:
@@ -59,8 +64,8 @@ Usage:
 Self-verifies on exit: after writing every file, the bundle is swept for the two things a
 Claude Design session cannot resolve (an absolute `/…` asset/nav reference, or a literal
 `https://averagejoematt` URL) and for the `@dsCard` marker contract on every
-foundations/components preview. A violation raises — this script cannot silently ship a
-broken bundle.
+foundations/components/reference card (#1467 extended the marker contract to reference/).
+A violation raises — this script cannot silently ship a broken bundle.
 """
 
 from __future__ import annotations
@@ -749,7 +754,9 @@ def _build_reference_pages(repo_root: Path, out_dir: Path) -> None:
             strip_scripts=common_strip_scripts + ['src="/assets/js/motion.js"'] + extra_scripts,
             strip_meta_containing=common_strip_meta,
         )
-        html = f"<!-- design-sync reference snapshot of site/{src_rel} — see MANIFEST.md -->\n" + html
+        # #1467: reference cards carry the same first-line @dsCard contract as
+        # foundations/ + components/, so they render in the Design System pane.
+        html = f'<!-- @dsCard group="reference" -->\n<!-- design-sync reference snapshot of site/{src_rel} — see MANIFEST.md -->\n' + html
         (out_dir / out_name).write_text(html, encoding="utf-8")
         shutil.copyfile(repo_root / "site/assets/css" / door_css, out_dir / "css" / door_css)
 
@@ -790,7 +797,7 @@ def _verify_bundle(bundle_dir: Path) -> None:
         if _SITE_URL_RE.search(text):
             violations.append(f"{path}: literal https://averagejoematt reference")
 
-    for sub in ("foundations", "components"):
+    for sub in ("foundations", "components", "reference"):
         d = bundle_dir / sub
         if not d.is_dir():
             continue
@@ -828,8 +835,13 @@ so a stale bundle never lingers on disk.
   `charts.js` gallery). `components/js/` carries the two JS modules the JS-rendered
   previews need (`charts.js`, `sigils.js`, `svgtype.js`); `components/img/portraits/`
   carries the checked-in portrait PNGs.
-- `reference/` — {ref_count} representative BUILT pages (home, cockpit, the data hub),
-  each sanitized to resolve entirely from the bundle (see "Special cases" below).
+- `reference/` — {ref_count} representative BUILT page shells (home, cockpit, the data
+  hub), each sanitized to resolve entirely from the bundle (see "Special cases" below).
+  The LIVE layer — `reference/captures/*.png` full-page screenshots of the current site
+  (the doors + a data-dense surface), one `@dsCard` card per capture, plus a
+  `captures_base64.json` upload manifest — is refreshed on every sync by the companion
+  `scripts/design_sync_capture.py` (#1467), so what a design session sees is today's
+  real pages, never a checked-in stale artifact.
 
 ## Special cases (from the #1462 issue's evidence inventory)
 
@@ -866,8 +878,9 @@ transport (served vs. double-clicked) changes what a browser will fetch.
 The builder self-verifies on every run (`_verify_bundle`): it fails loudly if any `.html`/
 `.css`/`.js`/`.json`/`.md` file under the bundle contains an absolute `href`/`src`/`url(...)`
 reference, a literal absolute reference to the live production domain, or a
-`foundations/`/`components/` preview missing its first-line `@dsCard` marker. A green run
-of this script IS the "zero absolute refs" proof.
+`foundations/`/`components/`/`reference/` card missing its first-line `@dsCard` marker
+(#1467). A green run of this script IS the "zero absolute refs" proof; the capture script
+re-runs the same sweep after it adds the live layer.
 """
 
 
