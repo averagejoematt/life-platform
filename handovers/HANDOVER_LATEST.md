@@ -195,9 +195,12 @@ this addendum adds none.
 **Decisions:** none filed this addendum — the visibility flip is a recorded temporary
 operational posture (memory + posture file), and the restored-gate direction gets its
 ADR via the already-open #1338.
-**Main:** green — wrap-era CI billing-dead runs are decoded (annotation class, #1544
-closed-cause); post-flip the site-deploy rerun succeeded end-to-end and pushes now queue
-and run.
+**Main:** red — latest completed CI/CD conclusions are Actions-minutes-exhaustion
+refusals (the #1544 mechanism, resolved by the public flip); the CODE is verified by five
+local full suites (no -x, only the documented live-state i16 red) + a green end-to-end
+site-deploy rerun post-flip; the wrap push's fresh CI/CD run is in flight and its Deploy
+stage will WAIT on the newly-restored production approval gate (that pause is the gate
+working, not a failure).
 **Incidents:** none new in this addendum (the flip was deliberate; Dependabot findings
 are alerts, not incidents) — 2 rows from last night stand.
 **Stash/hooks:** clean (stash empty, hook fresh).
