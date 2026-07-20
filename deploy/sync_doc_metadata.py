@@ -1226,7 +1226,7 @@ PLATFORM_FACTS = {
     "adr_count": 120,  # fallback: ## ADR- headings in docs/DECISIONS.md (record count; max number may differ — see adr_max)
     "secret_count": 21,  # live-verified 2026-07-10 via `aws secretsmanager list-secrets` (not auto-discovered — update after secret add/delete)
     "account_concurrency_limit": 100,  # live-verified 2026-07-18 via `aws lambda get-account-settings` (#1328; raised from 10 by AWS case 177921309700709 — update after any quota change)
-    "alarm_count": 71,  # fallback: auto-discovered from cdk/stacks/*.py when parseable (#795, _auto_discover_alarm_count); 113→65 on #790 (ADR-116); 65→67 on #809 (site-api-ai-errors + recursive-loop adopted into CDK); 67→69 on #1229 (alert-digest Errors + queue-age alarms); 69→71 on #1328 (serve-stack Throttles alarms)
+    "alarm_count": 77,  # fallback: auto-discovered from cdk/stacks/*.py when parseable (#795, _auto_discover_alarm_count); 113→65 on #790 (ADR-116); 65→67 on #809 (site-api-ai-errors + recursive-loop adopted into CDK); 67→69 on #1229 (alert-digest Errors + queue-age alarms); 69→71 on #1328 (serve-stack Throttles alarms); 71→77 refreshed to discovery on #1455 (drift >5; includes compute-outputs-missing + compute-outputs-heartbeat)
     "endpoint_count": 115,  # fallback: AST-derived from site_api_lambda.py (#1437) — ROUTES + _SIMPLE_ROUTES + inline, deduped
     "data_sources": 20,  # google_calendar retired (ADR-030); hevy active (ADR-060)
     "cdk_stacks": 9,

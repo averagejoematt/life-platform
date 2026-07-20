@@ -36,6 +36,13 @@ Covers:
       qa-smoke-warnings    WarnCount Max >= 1, 86400s (digest) — a warnings-only
                             run is now visible in the daily digest, not fully silent.
 
+  #1455 (heartbeat completeness, 2026-07-19): the compute-output check's gauge is
+  now alarmed (it had emitted unalarmed since Phase 3.2):
+      compute-outputs-missing    LifePlatform/Pipeline ComputeOutputsMissing Max >= 1, 86400s (digest)
+      compute-outputs-heartbeat  same gauge ABSENT 2 consecutive days, BREACHING (digest)
+  tests/test_heartbeat_completeness.py asserts every scheduled Lambda has a
+  liveness signal or a dated exemption.
+
   #1440 (ADR-104 applied to QA itself): budget-tier pause visibility for the
   reader-truth AI QA pass (both the CI/local harness and the nightly qa_smoke
   hook — lambdas/reader_truth_qa.emit_budget_pause_metric()):
@@ -898,6 +905,34 @@ class MonitoringStack(Stack):
             GTE,
             dims={"Source": "computed_metrics"},
             to_digest=True,
+        )
+
+        # #1455: compute-output completeness. pipeline-health-check's 16:58 UTC
+        # {check_compute_outputs} run has emitted
+        # LifePlatform/Pipeline::ComputeOutputsMissing on every run since Phase 3.2
+        # — but nothing alarmed it, so a compute cron that silently died
+        # (character-sheet / daily-metrics / daily-insight / adaptive-mode) was only
+        # visible if the brief happened to complain about the one partition IT reads.
+        # Problem alarm + absence heartbeat (the REL-01 pattern): ≥1 missing compute
+        # output = digest alert the same morning; gauge absent 2 straight days = the
+        # detector leg itself went dark. Digest — the brief still sends (with stale
+        # data flagged), so this is a same-day fix item, not a page.
+        _alarm(
+            "ComputeOutputsMissing",
+            "compute-outputs-missing",
+            "LifePlatform/Pipeline",
+            "ComputeOutputsMissing",
+            86400,
+            "Maximum",
+            1,
+            GTE,
+            to_digest=True,
+        )
+        _heartbeat_alarm(
+            "ComputeOutputsHeartbeat",
+            "compute-outputs-heartbeat",
+            "LifePlatform/Pipeline",
+            "ComputeOutputsMissing",
         )
 
         # HAE webhook liveness: the Health Auto Export webhook (CGM/water/BP/State of
