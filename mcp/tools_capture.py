@@ -103,11 +103,23 @@ def _field_note_section():
 
 
 def _evening_intake_section():
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    by_date = ir.fetch_intake_by_date(table, window_days=_INTAKE_ARMING_WINDOW_DAYS)
+    # "Tonight" is the PACIFIC calendar day (#1484): the evening flow runs
+    # 6pm-midnight PT, which is already tomorrow in UTC — a UTC "today" here
+    # reported logged_tonight=False for the very evening being logged (and the
+    # signed-link write path keys by PT, pacific_time.py's documented bug class).
+    try:
+        from pacific_time import pacific_now
+    except ImportError:  # pragma: no cover — MCP bundle always ships lambdas/ at root
+        from lambdas.pacific_time import pacific_now
+    tonight = pacific_now().date()
+    by_date = ir.fetch_intake_by_date(table, window_days=_INTAKE_ARMING_WINDOW_DAYS, today=tonight)
     nonzero = sum(1 for c in by_date.values() if c > 0)
+    tonight_str = tonight.strftime("%Y-%m-%d")
+    tonight_count = by_date.get(tonight_str)
     return {
-        "logged_tonight": today in by_date,
+        "date": tonight_str,
+        "logged_tonight": tonight_str in by_date,
+        "tonight_count": int(tonight_count) if tonight_count is not None else None,
         "logged_evenings": len(by_date),
         "nonzero_evenings": nonzero,
         "dose_response_arming": f"{nonzero}/{ir.DOSE_RESPONSE_MIN_NONZERO}",

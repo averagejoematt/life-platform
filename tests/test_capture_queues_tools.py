@@ -52,7 +52,7 @@ def _stub_all(monkeypatch, **overrides):
     monkeypatch.setattr(
         tc.ir,
         "fetch_intake_by_date",
-        overrides.get("fetch_intake_by_date", lambda table, window_days=180: {"2026-07-17": 2, "2026-07-16": 0}),
+        overrides.get("fetch_intake_by_date", lambda table, window_days=180, today=None: {"2026-07-17": 2, "2026-07-16": 0}),
     )
     monkeypatch.setattr(tc, "tool_get_due_recalls", overrides.get("due_recalls", lambda args: {"due": [], "count": 3}))
     monkeypatch.setattr(
@@ -95,6 +95,33 @@ def test_aggregate_returns_all_six_sections(monkeypatch):
     assert out["freshness_flags"]["flags"][0]["days_dark"] == 3
     assert "as_of" in out
     assert "how_to_use" in out
+
+
+def test_evening_intake_tonight_is_the_pacific_day(monkeypatch):
+    """#1484: 'tonight' is the PACIFIC calendar day, not UTC. An evening flow at
+    8:30pm PT is already tomorrow in UTC — under UTC keying this fixture would
+    look up 2026-07-18 and wrongly report logged_tonight=False for the very
+    evening being logged (the pacific_time.py documented bug class)."""
+    from datetime import date, datetime as dt
+
+    import pacific_time
+
+    # 2026-07-17 20:30 PT == 2026-07-18 03:30 UTC — the dates diverge on purpose.
+    monkeypatch.setattr(pacific_time, "pacific_now", lambda: dt(2026, 7, 17, 20, 30, tzinfo=pacific_time.PACIFIC))
+    seen = {}
+
+    def _fetch(table, window_days=180, today=None):
+        seen["today"] = today
+        return {"2026-07-17": 2, "2026-07-16": 0}
+
+    _stub_all(monkeypatch, fetch_intake_by_date=_fetch)
+    out = tc.tool_get_capture_queues({})
+
+    ei = out["evening_intake"]
+    assert ei["date"] == "2026-07-17"
+    assert ei["logged_tonight"] is True  # would be False under UTC "today" (2026-07-18)
+    assert ei["tonight_count"] == 2
+    assert seen["today"] == date(2026, 7, 17)  # the arming window is anchored to the PT day too
 
 
 def test_coach_checkin_surfaces_persisted_open_questions(monkeypatch):
@@ -161,7 +188,7 @@ def test_fail_soft_each_section_independently(monkeypatch):
         "habit_reflection": lambda: {"habit_reflection": lambda args: (_ for _ in ()).throw(RuntimeError("habit boom"))},
         "field_note": lambda: {"field_notes": lambda args: (_ for _ in ()).throw(RuntimeError("field note boom"))},
         "evening_intake": lambda: {
-            "fetch_intake_by_date": lambda table, window_days=180: (_ for _ in ()).throw(RuntimeError("intake boom"))
+            "fetch_intake_by_date": lambda table, window_days=180, today=None: (_ for _ in ()).throw(RuntimeError("intake boom"))
         },
         "reading_recalls": lambda: {"due_recalls": lambda args: (_ for _ in ()).throw(RuntimeError("recalls boom"))},
         "freshness_flags": lambda: {"freshness": lambda args: (_ for _ in ()).throw(RuntimeError("freshness boom"))},

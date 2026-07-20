@@ -112,12 +112,26 @@ periodic ritual that audits these four for drift (MCP inventory sweep, stale-cha
 check, prompt/config parity against the claude.ai Project prompts). See its own file for
 scope.
 
-**`#1478` (`get_capture_queues`) is not shipped yet.** Once it ships, all four modes'
-queue-gathering step collapses into that one call. Until then, each mode calls the
-individual queue tools directly (`get_coach_checkin_queue`, `get_habit_reflection_queue`,
-`get_field_notes`, `get_freshness_status`, `get_due_recalls`) — this doc and the command
-files will be updated to consume `get_capture_queues` once it lands; do not invent it
-early.
+**`get_capture_queues` (`#1478`) is SHIPPED and is the canonical opener.** Every mode's
+queue-gathering step is that ONE call — it aggregates the coach check-in queue, habit
+reflection counts, the week's field-note status, evening-intake status (`logged_tonight`,
+`tonight_count`, dose-response arming), due reading recalls, and freshness flags. The
+individual tools (`get_coach_checkin_queue`, `get_habit_reflection_queue`,
+`get_field_notes`, `get_freshness_status`, `get_due_recalls`) remain for mid-session
+depth — e.g. `get_coach_checkin_queue` when a fresh question should be *generated*; the
+opener deliberately never triggers generation.
+
+**The evening is ONE flow (`#1484`).** The journal-interview *evening* variant is the
+unified evening ritual, bridging what used to be four separately-skippable surfaces:
+interview → Notion write → the one-tap drinks count (always offered when
+`logged_tonight` is false — the arming dose-response engine needs the zeros too) → at
+most ONE pending coach check-in question, only if it fits the conversation → any
+habit-miss "why" that surfaced naturally. Under 10 minutes; when time runs short the
+journal entry wins and the bridges drop, never the reverse. `log_evening_intake`
+defaults its date to the PACIFIC evening (matching the nudge link's write path) and is
+observably idempotent — re-logging the same evening updates the row and returns
+`previous_count`, never double-counts. The ledger stays drinks-only by decision — no
+evening-energy tap (ADR-137).
 
 ## The route-the-takeaways contract
 
@@ -133,7 +147,7 @@ of re-deriving it:
 | Insight / hypothesis / pattern noticed | `save_insight` | Returns `insight_id` for a later `update_insight_outcome` call. |
 | A decision (followed/overrode platform advice) | `log_decision` | Outcome recorded later via `update_decision_outcome`. |
 | Durable context (calibration, failure pattern, what worked, milestone, weekly plate, personal curve, experiment result) | `write_platform_memory` | `category` must be one of the 7 enum values — see the tool schema. |
-| Evening drinks count | `log_evening_intake` | PRIVATE (`#1405`) — 0-4 tap, no free text. |
+| Evening drinks count | `log_evening_intake` | PRIVATE (`#1405`) — 0-4 tap, no free text. Defaults to the Pacific evening; idempotent (re-log updates, returns `previous_count`). Drinks-only by decision — ADR-137. |
 | Journal entry (Morning/Evening/Weekly Reflection/Stressor/Health Event) | Notion connector (`notion-create-pages`) | **Not** an MCP write — Notion is the sole journal SOT (dual-SOT rejected, see the 2026-07-18 chat-journey session notes). Use the expanded date-key syntax from the section above. |
 | Night-before training session | `manage_hevy_routine` (`draft_custom` → `dry_run` → `commit`) | Never pass `title` — it's auto-rendered. |
 
