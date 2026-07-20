@@ -159,7 +159,7 @@ Every pk/sk family in the `life-platform` table, derived from code (writers = `p
 | `…SOURCE#ai_analysis` / `EXPERT#<name>` | expert-lens analyses | `intelligence/ai_expert_analyzer_lambda.py` | chronicle, site_api_intelligence | ✓ |
 | `…SOURCE#decisions` / `DECISION#<ISO-ts>` | logged decisions + outcomes | `mcp/tools_decisions.py` | `get_decisions` | ✓ |
 | `…SOURCE#rewards` / `REWARD#<id>` | reward definitions | `lambdas/output_writers.py` (MCP `set_reward`) | `get_rewards` | empty |
-| `…SOURCE#platform_memory` / `MEMORY#<category>#<date>` | platform memory — **split by category**: durable categories (baseline_snapshot, re_entry, cycle_marker, cycle) are cross_phase; coach running-state categories are experiment_scoped | `mcp/tools_memory.py`, failure-pattern/insight/hypothesis computes | `read_platform_memory`, digests | ✓ |
+| `…SOURCE#platform_memory` / `MEMORY#<category>#<date>` | platform memory — **split by category**: durable categories (baseline_snapshot, re_entry, cycle_marker, cycle, life_context, constraints_preferences) are cross_phase; coach running-state categories are experiment_scoped. Canonical taxonomy = `lambdas/platform_memory.py` (#1482) | `mcp/tools_memory.py`, failure-pattern/insight/hypothesis computes | `read_platform_memory`, digests, coach prompt injection (`platform_memory_block`) | ✓ |
 
 ### Coach intelligence tier (`pk COACH#<coach_id>` — all EXPERIMENT_SCOPED)
 
@@ -1804,36 +1804,50 @@ Monthly "what changed" — real trailing-30d-vs-prior-30d deltas + correlations 
 
 ---
 
-## Platform Memory Partition (IC-1, v2.86.0)
+## Platform Memory Partition (IC-1, v2.86.0; taxonomy codified #1482)
 
 **pk:** `USER#matthew#SOURCE#platform_memory`  
 **sk:** `MEMORY#<category>#<date>` (e.g. `MEMORY#failure_patterns#2026-03-09`)
 
-Structured key-value memory store for computed intelligence. Written by insight compute Lambda and digest Lambdas. Read by all AI calls as compounding context.
+Structured key-value memory store for compounding intelligence — computed records (insight/digest/hypothesis Lambdas write directly) **plus, since #1482, conversation-derived records** written from chat via the MCP `write_platform_memory` tool (epic #1476: conversation as the fourth ingestion channel).
 
-**Memory categories:**
+**The category taxonomy is CODE, not this table** — `lambdas/platform_memory.py::MEMORY_CATEGORIES` is the canonical registry (the MCP write tool rejects unregistered categories; `phase_taxonomy.py`'s durable/scoped split must agree with each category's `durable` flag — both are test-enforced). The table below is the human-readable mirror:
 
-| SK prefix | Written by | Purpose |
-|-----------|-----------|----------|
-| `MEMORY#failure_patterns` | Weekly attribution pass | Conditions preceding low day grades |
-| `MEMORY#what_worked` | IC-9 (Month 3) | Episodic library of above-baseline outcomes |
-| `MEMORY#coaching_calibration` | IC-11 (Month 3) | Matthew-specific response patterns |
-| `MEMORY#personal_curves` | IC-10 (Month 4) | Personal response curves (weight loss rate vs. intake, etc.) |
-| `MEMORY#temporal_patterns` | IC-26 (Month 2-3) | Cyclical patterns by DOW / week-of-month |
-| `MEMORY#milestone_architecture` | IC-6 (Month 1) | Weight/health milestones with biological significance |
-| `MEMORY#permanent_learnings` | IC-28 (quarterly) | Stable truths confirmed by repeated observation |
-| `MEMORY#intention_tracking` | IC-8 (daily-insight) | Stated intentions vs actual outcomes |
+| Category | Channels | Injection window | Privacy tier | Phase class | Purpose |
+|----------|----------|-----------------|--------------|-------------|---------|
+| `life_context` | conversation | 365d | coach_context | cross_phase | Durable life events/situation shared in chat (travel, work stress, family) |
+| `constraints_preferences` | conversation | 730d | coach_context | cross_phase | Standing constraints + preferences (equipment, injuries, food dislikes, framing) |
+| `coaching_calibration` | conversation, computed | 365d | coach_context | experiment_scoped | How to coach Matthew — computed response patterns + explicit chat asks |
+| `failure_patterns` | conversation, computed | 180d | coach_context | experiment_scoped | Conditions preceding low days (computed attribution + chat-narrated failure modes) |
+| `what_worked` | conversation, computed | 365d | coach_context | experiment_scoped | Episodic wins (issue alias: `episodic_wins`) |
+| `weekly_plate` | computed | 60d | coach_context | experiment_scoped | Plate history for anti-repeat (nutrition domain only) |
+| `personal_curves` | computed | 365d | coach_context | experiment_scoped | Personal response curves (IC-10) |
+| `journey_milestone` | computed | 365d | public_ok | experiment_scoped | Milestones with biological significance (IC-6) |
+| `insight` | computed | 90d | coach_context | experiment_scoped | Ad-hoc structured insights |
+| `experiment_result` | computed | 365d | public_ok | experiment_scoped | Concluded experiment outcomes |
+| `intention_tracking` | computed | 30d | coach_context | experiment_scoped | Stated intentions vs. outcomes (IC-8) |
+| `hypothesis_monitoring` | computed | 60d | coach_context | experiment_scoped | Hypothesis-engine monitoring block (IC-16) |
+| `baseline_snapshot` | computed | — | coach_context | cross_phase | Day-1 baseline capture |
+| `re_entry`, `cycle_marker`, `cycle` | computed | — | private | cross_phase | Restart-tooling markers |
+
+Aliases (normalized on MCP write/read): `failure_pattern` → `failure_patterns`, `episodic_wins` → `what_worked`.
+
+**Privacy tiers** (per-category default; a per-record `privacy_tier` field may only *tighten* it): `public_ok` — a coach may cite it on public surfaces; `coach_context` — reaches coach prompts marked "(shared in confidence)", informs the read without its specifics being restated; `private` — never enters any generation prompt (MCP read only). #1483 will formalize the public-site side.
+
+**Coach prompt injection (#1482):** `platform_memory.platform_memory_block(coach_id)` renders the most recent conversation-channel records (`channel == "conversation"` only — honest provenance) that pass category/retention/privacy/domain filters into a bounded block (≤6 items, ≤1800 chars — ADR-063 budget) that `ai_calls._run_coach_v2_pipeline` injects into the daily-brief coach system prompt. The block sits above the few-shot block, so its numbers enter the ADR-104 fabrication allow-list — injected memories are valid grounding sources; the block's own rules require coaches to cite them as "you mentioned", never as measured data.
 
 **Core fields (all memory records):**
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `category` | string | Memory category label |
+| `category` | string | Canonical category (registry-validated on the MCP path) |
 | `date` | string | YYYY-MM-DD date written |
-| `content` | object | Category-specific structured content |
-| `written_by` | string | Lambda name that wrote this record |
-| `written_at` | string | ISO timestamp |
-| `version` | string | Schema version |
+| `summary` (or `text`/`note`) | string | Human-readable core — what the prompt block renders |
+| `channel` | string | `conversation` (chat via MCP) or `computed` — stamped, not writer-supplied |
+| `provenance` | string | `mcp` on the chat path; computed Lambdas write `written_by` instead |
+| `privacy_tier` | string | Optional per-record tightening of the category default |
+| `domains` | list | Optional bare coach ids the record is relevant to |
+| `stored_at` / `written_at` | string | ISO timestamp |
 
 ---
 
