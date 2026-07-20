@@ -1322,6 +1322,20 @@ an omission):
 - `deploy/restart_verify.py` — the **post-genesis Monday** health check (asserts `day_n >= 1`,
   a genesis weigh-in, a post-genesis character sheet); folding it would structurally fail at
   reset time. Run it Monday morning.
+- `deploy/restart_integration_check.py` (#1559) — the **behavioral** leg: where
+  `restart_verify.py` proves STATE, this proves the pipelines still FLOW. Four legs: ingestion
+  (every `source_registry.py` source really invokes — the same bounded gap-aware runs the crons
+  make; paused/event-driven sources SKIP with the registry-derived reason), compute (healthchecks
+  + honest Day-0 shapes: Level-1 character baseline, replay-verified-or-honestly-absent receipts,
+  fulfillment `insufficient_signal` semantics), serving (the full qa_manifest smoke surface + the
+  daily-brief real dry-run + the static present-None gate over `lambdas/emails/`), ops (DLQ 0,
+  alarms vs a stated allowlist, EventBridge crons armed, SSM cycle). Run it right after `--apply`
+  (`--expect-cycle <N>`), and again post-genesis with `--deep --synthetic` (force-recompute shape
+  asserts + the tagged 2099-dated HAE webhook round-trip with verified DDB cleanup — the
+  delete-protected `raw/` residue it leaves is printed honestly). Dry-running it with no flags
+  against the LIVE current cycle proves the harness itself — drill step 4 below. The genesis-week
+  present-None class (`reference_genesis_week_present_none`) is enforced between resets by its
+  standing CI gate in `tests/test_restart_integration_check.py`.
 - The git commit of regenerated files (constants, configs, `CYCLE_GENESES`, `RESET_LOG.md`) — from MAIN.
 
 **Resume gotcha (`--old-genesis`):** the orchestrator snapshots the outgoing genesis from
@@ -1342,7 +1356,7 @@ agent should classify it as such); bounded pre-start grace is tracked as issue #
 is inert again (`pre_start: false`, no payload change) once genesis ≤ today.
 
 **Pre-reset drill (REQUIRED before any future re-anchor — #1094, first run 2026-07-12):**
-prove the machinery green end-to-end BEFORE the real run. Three commands, all safe against prod:
+prove the machinery green end-to-end BEFORE the real run. Four commands, all safe against prod:
 
 ```bash
 # 1. Dry-run the full folded pipeline against the intended (or a synthetic) genesis —
@@ -1355,6 +1369,11 @@ python3 deploy/restart_verify_semantic.py
 # 3. The AI reader-truth gate, standalone (#1097; skips loudly at budget tier ≥ 1 —
 #    for a full run: tier-0 override, run, restore the honest tier)
 python3 deploy/restart_verify_truth.py
+
+# 4. The behavioral harness against the LIVE current cycle (#1559) — probe-mode invokes are
+#    the same ones the crons make hourly; a true-positive FAIL here (e.g. a dark device past
+#    its own staleness line) is the harness working, not the drill failing
+python3 deploy/restart_integration_check.py
 ```
 
 Drill record 2026-07-12 (genesis day, synthetic genesis 2026-08-02): dry-run previewed all

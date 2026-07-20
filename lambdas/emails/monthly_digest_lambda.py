@@ -963,7 +963,7 @@ def build_html(data, goals, commentary, windows):
             "consistency": "🎯",
         }
         for pname in ("sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"):
-            pd = cs_c.get("pillars", {}).get(pname)
+            pd = (cs_c.get("pillars") or {}).get(pname)
             if not pd:
                 continue
             plvl = pd.get("level", 0)

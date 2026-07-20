@@ -65,4 +65,9 @@ The coach check-in records (`pk COACH#<id>_coach` / `sk CHECKIN#<date>#<uuid8>`,
 
 ---
 
+**Behavioral verification (#1559):** the taxonomy decides what a reset wipes/keeps;
+`deploy/restart_integration_check.py` proves the platform still FLOWS afterwards (ingestion,
+compute Day-0 shapes, serving surface, ops legs) — see `docs/RUNBOOK.md` "Experiment restart"
+for when each leg runs. State verification stays with the `restart_verify*.py` family.
+
 **Verified:** 2026-06-07 — `tests/test_phase_taxonomy.py` covers all 180 live record families (census of 27,083 items).

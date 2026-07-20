@@ -412,7 +412,7 @@ def build_week_state_summary(health_data, profile):
     # Pillar scores from character sheet
     pillar_scores = {}
     for p in ["sleep", "movement", "nutrition", "mind", "metabolic", "consistency", "relationships"]:
-        pd = char.get(f"pillar_{p}", {})
+        pd = char.get(f"pillar_{p}") or {}
         s = pd.get("raw_score")
         if s is not None:
             pillar_scores[p] = round(float(s), 1)
@@ -659,7 +659,7 @@ def build_user_message(week_state, todoist_data, health_data, profile, pillar_ma
     )
 
     pillar_block = []
-    for p, score in sorted(week_state.get("pillar_scores", {}).items(), key=lambda x: x[1]):
+    for p, score in sorted((week_state.get("pillar_scores") or {}).items(), key=lambda x: x[1]):
         emoji = _PILLAR_EMOJIS.get(p, "📌")
         pillar_block.append(f"  {emoji} {(p or "").capitalize()}: {score:.0f}/100")
 
@@ -913,7 +913,7 @@ def lambda_handler(event, context):
                 digest_type="monday_compass",
                 insight_type="coaching",
                 text=ai_content[:800],
-                pillars=list(week_state.get("pillar_scores", {}).keys()),
+                pillars=list((week_state.get("pillar_scores") or {}).keys()),
                 data_sources=["todoist", "character_sheet", "whoop", "computed_metrics"],
                 tags=["planning", "weekly", "compass", "cross_pillar"],
                 confidence="medium",
