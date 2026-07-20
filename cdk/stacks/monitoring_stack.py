@@ -340,18 +340,19 @@ class MonitoringStack(Stack):
             "LifePlatform/Coherence",
             "OverallAlarm",
         )
-        # The canary runs WEEKLY (Mon). CloudWatch caps an hourly+ alarm's window at
-        # 7 days (EvaluationPeriods × Period ≤ 604800), so a >7-day heartbeat is
-        # impossible as a single alarm — days=9 was rejected at CREATE. days=7 is the
-        # max AND exactly right: the trailing-7-day window always contains one
-        # scheduled run, so it fires the first time a weekly run is missed (a full 7
-        # days with no datapoint) and never on a healthy cadence.
+        # The canary runs 3×/week (Mon/Wed/Fri 16:20 UTC — #1443; was weekly, which
+        # left the public AI blind up to 7 days). The max healthy gap is Fri→Mon
+        # (3 calendar days: Sat + Sun empty, Mon's run lands after 16:20), so a
+        # trailing-4-day window always contains at least one scheduled run: days=4
+        # fires the first time a run is missed and never on a healthy cadence.
+        # (Historical: at weekly cadence this was days=7 — the CloudWatch max,
+        # since EvaluationPeriods × Period ≤ 604800; days=9 was rejected at CREATE.)
         _heartbeat_alarm(
             "AiCanaryHeartbeat",
             "ai-canary-heartbeat",
             "LifePlatform/AICanary",
             "OverallAlarm",
-            days=7,
+            days=4,
         )
         # REL-01 extension (#372): cost-governor heartbeat. The governor is the sole
         # writer of the budget tier that gates every AI feature; if it starts erroring
