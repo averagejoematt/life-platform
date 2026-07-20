@@ -99,6 +99,14 @@ def stage_tree(out_dir):
         shutil.copy2(vocab, os.path.join(out_dir, "food_vocabulary.json"))
     else:
         print("⚠️  config/food_vocabulary.json missing — meal grouping will fail to load vocab", file=sys.stderr)
+    # #1430: redirects.map for qa_smoke_lambda's weekly legacy-redirect spot-check
+    # (lambdas/redirect_spotcheck.py searches alongside its own module first, same
+    # pattern as food_vocabulary.json above).
+    redirects_map = os.path.join(REPO_ROOT, "redirects.map")
+    if os.path.isfile(redirects_map):
+        shutil.copy2(redirects_map, os.path.join(out_dir, "redirects.map"))
+    else:
+        print("⚠️  redirects.map missing — the #1430 weekly redirect spot-check will warn+skip", file=sys.stderr)
     # #1446: QA-coverage snapshot for the Monday ops green report (fail-soft).
     stage_qa_coverage(out_dir)
     return out_dir

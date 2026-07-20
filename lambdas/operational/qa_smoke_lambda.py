@@ -810,6 +810,55 @@ def check_hero_weight_arithmetic():
 
 
 # ---------------------------------------------------------------------------
+# CHECK 11 — Legacy redirect spot-check (#1430)
+# ---------------------------------------------------------------------------
+# 84 legacy pages 301 via the CloudFront v4-redirects function, generated 1:1
+# from redirects.map — nothing continuously verified those redirects still
+# resolve correctly, so a CloudFront function edit or a redirects.map drift
+# could silently rot old-URL link equity and reader bookmarks. Sampling
+# design (deterministic per-week bucket, full-map rotation, no-redirect-
+# follow HTTP verification) lives in lambdas/redirect_spotcheck.py — pure and
+# unit-tested offline; this Check just wires it to the WEEKLY cadence the
+# issue asks for (a rotating ~1/N_BUCKETS slice every night would hammer the
+# edge for no benefit — one pass a week, deterministically bucketed by ISO
+# week number, still covers the whole map in ~N_BUCKETS weeks (~1 month)).
+# On non-scheduled nights this reports an explicit paused line — visible,
+# never silently skipped.
+
+REDIRECT_SPOTCHECK_WEEKDAY = 0  # Monday (datetime.weekday(): Mon=0 .. Sun=6)
+
+
+def check_redirect_spotcheck():
+    check = Check("redirect_spotcheck:sample", "Legacy Redirects")
+    now = pt_now()
+    if now.weekday() != REDIRECT_SPOTCHECK_WEEKDAY:
+        return [check.pause(f"redirect spot-check runs Mondays — skipped ({now.strftime('%A')} PT); rotates over ~1 month")]
+
+    try:
+        import redirect_spotcheck
+
+        iso_week = now.isocalendar()[1]
+        result = redirect_spotcheck.run_spotcheck(SITE_BASE_URL, iso_week)
+    except FileNotFoundError as e:
+        # Bundle didn't stage redirects.map — a packaging regression, not a
+        # redirect regression. Warn (visible in the digest) rather than fail.
+        return [check.warn(f"redirects.map not found (fail-soft): {str(e)[:150]}")]
+    except Exception as e:
+        return [check.warn(f"redirect spot-check errored (fail-soft): {str(e)[:150]}")]
+
+    checks = []
+    for err in result["errors"]:
+        checks.append(Check("redirect_spotcheck:fetch", "Legacy Redirects").warn(err))
+
+    where = f"bucket {result['bucket']}/{result['n_buckets']}, ISO week {iso_week}, {result['n_sampled']}/{result['n_total']} sampled"
+    if result["failures"]:
+        checks.append(check.fail(f"{len(result['failures'])} broken redirect(s) ({where}): " + "; ".join(result["failures"][:5])))
+    else:
+        checks.append(check.ok(f"all sampled redirects resolve correctly ({where})"))
+    return checks
+
+
+# ---------------------------------------------------------------------------
 # #1445: EMF summary metrics — emitted on EVERY run, including all-green
 # ---------------------------------------------------------------------------
 # Before this, qa-smoke only spoke by SENDING AN EMAIL, and only on a real
@@ -947,6 +996,7 @@ def lambda_handler(event, context):
         all_checks += check_predict_week_freshness()  # #1198: predict-the-week never live on a stale ISO week
         all_checks += check_hero_weight_arithmetic()  # #1225: home hero stat row reconciles + trend-honest
         all_checks += check_receipt_replay()  # #1373: progression-receipt drift alarm (deterministic replay)
+        all_checks += check_redirect_spotcheck()  # #1430: weekly legacy-redirect sample, rotates over redirects.map
         # blog moved to /story/ in v4 — shown paused (not failed) so it's not forgotten.
         all_checks.append(
             Check("blog:links", "Blog Links").pause("Blog — paused (chronicle now lives at /story/ in v4); will return if revived")
