@@ -97,6 +97,34 @@ def test_aggregate_returns_all_six_sections(monkeypatch):
     assert "how_to_use" in out
 
 
+def test_suggested_rituals_section_present_and_reuses_freshness(monkeypatch):
+    """#1578: the seventh section is the platform's deterministic checkpoint proposals.
+    It reuses the freshness section (computed once) — a notion source dark >= 7d in the
+    freshness stub must surface a /journal-interview proposal without a second read."""
+    _stub_all(
+        monkeypatch,
+        freshness=lambda args: {
+            "status": "red",
+            "stale_sources": [{"source": "notion", "label": "Notion journal", "age_days": 11, "status": "stale"}],
+        },
+    )
+    # Pin the trigger DDB reads so the section is hermetic; only journal-dark should fire.
+    import mcp.ritual_triggers as rt
+
+    monkeypatch.setattr(rt, "_weight_series", lambda today: [])
+    monkeypatch.setattr(rt, "_valence_series", lambda today: [])
+    monkeypatch.setattr(rt, "_recovery_series", lambda today: [])
+    monkeypatch.setattr(rt, "_active_experiments", lambda: [])
+    monkeypatch.setattr(rt._const, "EXPERIMENT_START_DATE", "2000-01-02")  # far past, non-milestone today
+
+    out = tc.tool_get_capture_queues({})
+    sr = out["suggested_rituals"]
+    assert sr.get("status") != "unavailable"
+    rituals = {s["ritual"] for s in sr["suggestions"]}
+    assert "/journal-interview" in rituals
+    assert sr["count"] == len(sr["suggestions"])
+
+
 def test_evening_intake_tonight_is_the_pacific_day(monkeypatch):
     """#1484: 'tonight' is the PACIFIC calendar day, not UTC. An evening flow at
     8:30pm PT is already tomorrow in UTC — under UTC keying this fixture would
