@@ -17,6 +17,12 @@ read-only engine:
      "does this actually render correctly" judgement — robust to daily data changes
      where pixel-diff would be brittle (see tests/visual_ai_qa.py).
   8. Detects stuck loading text, JS errors, 5xx responses, empty sections.
+  9. axe-core accessibility audit per page (#1433, vendored bundle — no CDN):
+     GATES on NEW serious/critical violations vs the committed baseline
+     (tests/a11y_baseline.json); baselined + minor/moderate findings are
+     recorded honestly as warnings, never hidden, never gating. Baseline
+     shrinks/updates DELIBERATELY via --update-baseline (see tests/a11y_audit.py
+     for the full semantics + review discipline).
 
 The site is PUBLIC (no cf-auth gate) — no authentication needed.
 
@@ -31,6 +37,12 @@ Usage:
     python3 tests/visual_qa.py --screenshot --ai-qa --reader-truth
                                                     # + phase-aware truth pass over each
                                                     #   page's rendered prose (#1095)
+    python3 tests/visual_qa.py --update-baseline    # rewrite tests/a11y_baseline.json from
+                                                    #   this run's axe findings (#1433; deliberate,
+                                                    #   review the diff — the run still reds on NEW
+                                                    #   violations so nothing is silently absorbed)
+    python3 tests/visual_qa.py --no-a11y            # skip the axe pass (debug escape hatch;
+                                                    #   every CI run keeps it on)
     python3 tests/visual_qa.py --browser webkit --mobile --max-tier 2 --screenshot
                                                     # the weekly ADVISORY iOS-Safari-engine run
                                                     #   (#1434; .github/workflows/webkit-mobile-qa.yml):
@@ -92,6 +104,7 @@ try {
 # Derivation verified identical to the pre-#1426 hand list (36 entries, same
 # paths + checks); tests/test_qa_manifest.py gates the derivation from drifting.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import a11y_audit  # noqa: E402  (#1433 — pure module, no Playwright import)
 from qa_manifest import visual_pages  # noqa: E402
 
 PAGES = visual_pages()
@@ -460,7 +473,7 @@ def _navigate_with_fallback(page, url, primary_timeout=15000, fallback_timeout=2
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capture_prose=False):
+def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capture_prose=False, a11y_baseline=None):
     """Drive one page def in an open browser context and return its result dict.
 
     Pure capture: navigate, scroll/reveal, run element/chart/interaction checks,
@@ -469,12 +482,20 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capt
     stay in run_sweep so its CI behaviour is byte-for-byte unchanged. Returns:
         {"page", "path", "status", "issues", "warnings", "screenshots"}
 
+    a11y_baseline (#1433): pass a loaded tests/a11y_baseline.json dict to run the
+    axe-core audit on this page (run_sweep does; NEW serious/critical violations
+    vs the baseline become gating issues). The default None skips it, so the
+    direct capture_page callers (site_review, pr_render_gate) are byte-for-byte
+    unchanged — they render against mocked/partial data where axe findings
+    would not match the live-surface baseline.
+
     Extracted from run_sweep's per-page loop (2026-06-20) so tests/site_review.py
     can reuse identical capture without forking the gating visual-qa harness.
     """
     page = context.new_page()
     page.add_init_script(_PERF_INIT_SCRIPT)
     path, name = page_def["path"], page_def["name"]
+    a11y_result = None
     issues, warnings, js_errors, failed_responses, shots = [], [], [], [], []
     perf_result = {"lcp_ms": None, "cls": None, "js_bytes": 0}
     _js_bytes = [0]  # mutable box (perf_js_bytes) — total JS response bytes for the page
@@ -590,6 +611,38 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capt
             issues.append(f"Empty section: .{bs['class'][:40]} (h={bs['height']}px)")
         for st in _check_stale_text(page):
             issues.append(f"Stale text: \"{st['text'][:50]}\" — {st['desc']}")
+
+        # ── axe-core accessibility audit (#1433) — desktop viewport, post-reveal ──
+        # Runs after _scroll_and_reveal forced every section visible so axe sees the
+        # page a reader sees (color-contrast on revealed content, not opacity:0).
+        # Gate: NEW serious/critical vs the committed baseline red the page; every
+        # other finding (baselined debt, new minor/moderate, fixed-vs-baseline) is
+        # recorded honestly as a warning — visible, never gating, never hidden.
+        if a11y_baseline is not None:
+            try:
+                observed = a11y_audit.run_axe(page)
+            except Exception as e:
+                observed = None
+                warnings.append(f"a11y audit did not run (axe inject/run failed: {str(e)[:100]}) — not a pass (#1433)")
+            if observed is not None:
+                a11y_result = a11y_audit.gate_findings(path, observed, a11y_baseline)
+                for v in a11y_result["new"]:
+                    tgt = f" e.g. {v['targets'][0]}" if v.get("targets") else ""
+                    issues.append(f"NEW {v['impact']} a11y violation (axe: {v['id']}): {v['help']} — {v['nodes']} node(s){tgt} (#1433)")
+                if a11y_result["baselined"]:
+                    ids = ", ".join(sorted(v["id"] for v in a11y_result["baselined"]))
+                    warnings.append(
+                        f"a11y baseline debt: {len(a11y_result['baselined'])} known violation(s) ({ids}) — recorded, not gating (#1433)"
+                    )
+                if a11y_result["advisory"]:
+                    ids = ", ".join(sorted(v["id"] for v in a11y_result["advisory"]))
+                    warnings.append(
+                        f"a11y advisory: {len(a11y_result['advisory'])} new minor/moderate violation(s) ({ids}) — not gating (#1433)"
+                    )
+                if a11y_result["fixed"]:
+                    warnings.append(
+                        f"a11y fixed vs baseline: {', '.join(a11y_result['fixed'])} — shrink the ledger via --update-baseline (#1433)"
+                    )
 
         # ── screenshots (full page + chart crops) ──
         slug = path.strip("/").replace("/", "-") or "home"
@@ -716,6 +769,7 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capt
         "warnings": warnings,
         "screenshots": shots,
         "perf": perf_result,
+        "a11y": a11y_result,  # #1433: new/baselined/advisory/fixed/observed, or None if the audit didn't run
     }
 
 
@@ -759,8 +813,18 @@ def run_sweep(
     browser_name="chromium",
     mobile=False,
     max_tier=None,
+    a11y=True,
+    update_a11y_baseline=False,
 ):
     """Run the v4 visual QA sweep. Returns True if no page FAILED.
+
+    a11y / update_a11y_baseline (#1433): the axe-core audit runs per page by
+    default (a11y=False is the debug escape hatch — CI never passes it); NEW
+    serious/critical violations vs tests/a11y_baseline.json gate like any other
+    page issue. update_a11y_baseline=True rewrites the baseline from this run's
+    observations for the pages actually swept (the deliberate, reviewed update
+    path — the run STILL reports new violations red so nothing is silently
+    absorbed; the committed baseline diff is the review surface).
 
     ai_qa_max_tier (#1428): when set, restricts the Claude-vision assessment to
     pages whose qa_manifest tier is <= this value (deploy-time passes `1` to cover
@@ -792,6 +856,9 @@ def run_sweep(
     if ai_qa:
         save_screenshots = True
 
+    # #1433: load the committed a11y baseline once; None disables the audit.
+    a11y_baseline = a11y_audit.load_baseline() if (a11y or update_a11y_baseline) else None
+
     with sync_playwright() as p:
         browser = getattr(p, browser_name).launch(headless=True)
         if mobile:
@@ -807,7 +874,9 @@ def run_sweep(
 
         for page_def in sweep_pages(pages or PAGES, max_tier):
             # --reader-truth needs each page's rendered innerText (the prose dump).
-            result = capture_page(context, page_def, screenshot_dir, save_screenshots, capture_prose=reader_truth)
+            result = capture_page(
+                context, page_def, screenshot_dir, save_screenshots, capture_prose=reader_truth, a11y_baseline=a11y_baseline
+            )
             results.append(result)
             icon = "✅" if not result["issues"] else "❌"
             n_warn = len(result["warnings"])
@@ -850,6 +919,19 @@ def run_sweep(
             from visual_ai_qa import assess_reader_truth
         print("\n── Reader-truth QA (phase-aware, Claude / Bedrock) ──")
         reader_truth_status = assess_reader_truth(results)  # mutates results: truth_findings + high → FAIL
+
+    # ── deliberate a11y-baseline rewrite (#1433) — only the pages this run swept ──
+    if update_a11y_baseline:
+        observed_by_path = {r["path"]: r["a11y"]["observed"] for r in results if r.get("a11y") is not None}
+        skipped = [r["path"] for r in results if r.get("a11y") is None]
+        if observed_by_path:
+            new_baseline = a11y_audit.update_baseline(observed_by_path)
+            counts = a11y_audit.summarize(new_baseline)
+            counts_str = ", ".join(f"{k}: {v}" for k, v in sorted(counts.items())) or "clean — no violations"
+            print(f"\na11y baseline rewritten ({len(observed_by_path)} page(s) captured) → tests/a11y_baseline.json")
+            print(f"  ledger now: {counts_str} — review + commit the diff deliberately (#1433)")
+        if skipped:
+            print(f"  ⚠ a11y baseline NOT updated for {len(skipped)} page(s) where the audit failed to run: {', '.join(skipped[:5])}")
 
     passed = sum(1 for r in results if r["status"] == "PASS")
     failed = sum(1 for r in results if r["status"] == "FAIL")
@@ -923,6 +1005,20 @@ if __name__ == "__main__":
         help="Open the browser context at an iPhone-class mobile profile (390x844, dpr 3, touch) instead of 1440x900 desktop (#1434)",
     )
     ap.add_argument(
+        "--no-a11y",
+        action="store_true",
+        help="Skip the axe-core accessibility audit (#1433). Debug escape hatch only — every CI run keeps the audit on.",
+    )
+    ap.add_argument(
+        "--update-baseline",
+        action="store_true",
+        help=(
+            "Rewrite tests/a11y_baseline.json from this run's axe findings for the pages swept (#1433). DELIBERATE path: "
+            "the run still reds on NEW serious/critical violations, and the committed baseline diff is the review surface "
+            "(added entries = newly accepted debt, removed = fixes). See tests/a11y_audit.py."
+        ),
+    )
+    ap.add_argument(
         "--max-tier",
         type=int,
         default=None,
@@ -951,5 +1047,7 @@ if __name__ == "__main__":
         browser_name=args.browser,
         mobile=args.mobile,
         max_tier=args.max_tier,
+        a11y=not args.no_a11y,
+        update_a11y_baseline=args.update_baseline,
     )
     sys.exit(0 if ok else 1)
