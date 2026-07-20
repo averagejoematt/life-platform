@@ -268,6 +268,74 @@ Then `pre-commit install`.
 
 ---
 
+## QA Strategy Scorecard (quarterly re-grade, #1451)
+
+**Baseline set:** 2026-07-18, by the QA & Testing Strategy review (`review:qa-strategy-2026-07-18`
+label; epic [#1425](https://github.com/averagejoematt/life-platform/issues/1425), a three-agent
+survey with every finding verified against the repo). This is the **durable record** — the
+`/sdlc-review` quarterly checklist step (below, and in `.claude/commands/sdlc-review.md`)
+re-grades against it and overwrites the "Current" column each run so the next re-grade always
+diffs against the *previous* run, not perpetually against 2026-07-18.
+
+### The 8 axes
+
+| Axis | Baseline (2026-07-18) | Target | Current | Evidence for baseline grade |
+|---|---|---|---|---|
+| Deploy gating | A− | A | A− | Production-approval gate + post-deploy smoke + auto-rollback exist and are exercised on every deploy, but `visual-qa` is not yet the only gate with edge cases (see ADR-076 history) and the approval-gate itself has had live drift incidents (#1319 — GitHub env protection dropping on a repo-visibility flip). |
+| Render breadth | C | A− | C | `tests/visual_qa.py` `PAGES` covered ~35 of ~80 live pages at baseline — 44 live pages (including live-data/AI/write pages) had zero render coverage. |
+| FE unit tests | F | B | F | Zero JavaScript unit-test harness existed; no front-end code has ever run under a unit test. |
+| API contracts | B− | A− | B− | ~118 `/api` endpoints (101 `ROUTES` + 13 `_SIMPLE_ROUTES` + ~23 inline) with no per-endpoint schema baselines and no E2E coverage of the 8 write paths. |
+| AI-content QA | B | A− | B | `visual_ai_qa.py` (Haiku vision) and the ER-03 faithfulness harness exist and gate, but AI QA is not yet tiered/budget-visible — a budget-tier pause degrades silently rather than reporting. |
+| Monitoring | B | A | B | Alarms + qa-smoke exist, but notification hygiene gaps: no codified urgent-SNS email path, no qa-smoke heartbeat alarm, advisory scheduled-workflow failures don't self-file issues. |
+| Mobile / cross-browser | C+ | B+ | C+ | No scheduled WebKit/mobile run; desktop Chromium is the only browser under test. |
+| Accessibility (a11y) | C | B+ | C | No `axe-core` audit or baseline gate anywhere in the harness. |
+
+### Grading rubric — what justifies moving a letter grade
+
+Keep this concrete and checkable per axis; a re-grade must cite the specific evidence, not a
+vibe. General ladder (apply per-axis with the axis's own coverage denominator):
+
+- **F → D/C** — the practice exists only as a manual step or a doc, with zero automated/CI
+  enforcement. Bump to C requires: at least one automated check exists and runs in CI (even if
+  advisory), covering a *non-trivial* fraction of the surface (state the fraction).
+- **C → B / B+** — automated coverage crosses a real majority of the relevant surface (state
+  the numerator/denominator, e.g. "62/80 pages", "1 of 3 browser engines"), OR a structural
+  registry drives the coverage so new surface is added automatically rather than by memory.
+  Cite the PR/commit that shipped it.
+- **B / B− → A− / A** — coverage is at or near completeness for the axis's denominator AND the
+  check **gates** (blocks merge/deploy on failure) rather than running advisory-only. Cite the
+  gating config (CI job `needs`/`continue-on-error` state) and, if available, one real incident
+  the gate caught (a regression that would otherwise have shipped).
+- **A− → A** — the above holds, the gate has run clean (no manual overrides, no silent skips)
+  across the trailing quarter, and any known failure mode of the gate itself (e.g. AI-judge
+  false positives, budget-tier pauses) has a documented, non-silent fallback.
+
+A re-grade that can't produce this evidence for a proposed bump leaves the grade where it was —
+"we shipped some of the stories" is not itself a grade change; the coverage/gating facts are.
+
+### Quarterly re-grade checklist (run from `/sdlc-review`)
+
+1. Re-read this table (baseline + target + current) before grading — it is the anchor; do not
+   re-derive targets from memory.
+2. For each of the 8 axes, re-grade against **current reality** using the rubric above: state
+   the fraction/denominator, whether the check gates or is advisory, and cite the file/command/
+   `gh run` evidence (same evidence rule as the rest of `/sdlc-review`).
+3. Diff each axis's new grade against the **Current** column here (not always the 2026-07-18
+   baseline) and record the delta: improved / flat / regressed.
+4. Fold the re-graded table + deltas into this run's `docs/reviews/SDLC_REVIEW_<date>.md` as a
+   labeled subsection (Phase 3) — it is part of that review's artifact, not a separate doc.
+5. Any axis that **regressed** vs its prior Current grade, or remains **two or more quarters
+   short of target with no evidence of movement**, gets a story filed via the `issue-filer`
+   agent per ADR-099 (`type:story`, `area:claude-workflow`, `review:qa-strategy-<date>` label,
+   linked to epic #1425), same as any other `/sdlc-review` finding.
+6. After the review lands, update the **Current** column in this table (in the same PR as the
+   review artifact) so the next quarterly re-grade diffs against this run.
+
+**First scheduled re-grade:** ~2026-10 (next `/sdlc-review` quarterly cadence after this table
+was created), tracked via a comment on epic #1425.
+
+---
+
 ## Adding tests for V2 cleanup work
 
 When you remove a Lambda or rename a file, also remove its tests:
