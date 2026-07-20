@@ -103,6 +103,27 @@ families, `.cb-*` correlation cards, `.dis-*` disagreement cards, coach popover.
   IBM Plex Mono = machine voice & data (tabular-nums).
 - Real first-class light + dark mode; AA contrast both ways.
 
+### 4a. The paper-elevation ramp (#1470) — neutral tonality carries hierarchy
+
+Five designed surface steps (`tokens.css` §1 + the §9 light overrides) so depth comes
+from **neutral tonality**, never from leaning on the accent — the single-ember rule's
+structural partner. Dark lifts toward the ink; light lifts toward warm white (the old
+derived formula *darkened* raised surfaces in light mode — inverted elevation).
+
+| step | token | job |
+|---|---|---|
+| −1 | `--surface-sunken` | the cut well — code/formula fields, track rails behind fills |
+| 0 | `--page` | the desk (behind the paper) |
+| 1 | `--surface` | the paper — panels, cards |
+| 2 | `--surface-2` | toned paper, one step toward the ink in both themes — inset rails, tonal chips/cells |
+| 3 | `--surface-raised` | floating paper — popovers, tooltips, app-bar, sticky TOC (+ shadow) |
+
+**Register rule (enforced by `tests/test_paper_ramp_contrast.py`):** `--ink`,
+`--ink-muted`, `--ink-faint` and `--ember` all hold WCAG AA (≥4.5:1) on steps 0–3 in
+BOTH themes; the sunken well is machine-text territory — full `--ink` only, never
+faint/ember. Pick the step by job, not taste: a rail behind a fill is toned paper
+(`--surface-2`), a floating overlay is raised paper — never the other way around.
+
 ## 5. Adoption order (design-system-first)
 
 1. **Phase A (this doc + `tokens.css` §11):** kit built, dead tokens repaired. ✅
