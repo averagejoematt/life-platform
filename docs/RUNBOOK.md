@@ -1330,7 +1330,7 @@ an omission):
   fulfillment `insufficient_signal` semantics), serving (the full qa_manifest smoke surface + the
   daily-brief real dry-run + the static present-None gate over `lambdas/emails/`), ops (DLQ 0,
   alarms vs a stated allowlist, EventBridge crons armed, SSM cycle). Run it right after `--apply`
-  (`--expect-cycle <N>`), and again post-genesis with `--deep --synthetic` (force-recompute shape
+  (`--expect-cycle <N>` `--brief-full`), and again post-genesis with `--deep --synthetic` (force-recompute shape
   asserts + the tagged 2099-dated HAE webhook round-trip with verified DDB cleanup — the
   delete-protected `raw/` residue it leaves is printed honestly). Dry-running it with no flags
   against the LIVE current cycle proves the harness itself — drill step 4 below. The genesis-week
