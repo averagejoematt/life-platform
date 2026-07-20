@@ -253,7 +253,8 @@
       "Bash(python3 scripts/check_memory_body_facts.py)",
       "Bash(python3 -c \"import json,sys; s=sys.stdin.read\\(\\); b=json.loads\\(json.loads\\(s[:s.rfind\\('{\\\\\"StatusCode\\\\\"'\\)]\\)['body']\\); print\\(json.dumps\\(b.get\\('effect_refit'\\), indent=1\\)\\)\")",
       "Bash(python3 deploy/capture_api_schemas.py)",
-      "Bash(python3 -m pytest tests/test_css_tokens.py tests/test_site_chrome.py -q)"
+      "Bash(python3 -m pytest tests/test_css_tokens.py tests/test_site_chrome.py -q)",
+      "Bash(bash deploy/check_main_green.sh)"
     ]
   },
   "enableAllProjectMcpServers": true,
