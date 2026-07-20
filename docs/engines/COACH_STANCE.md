@@ -1,11 +1,11 @@
 # Coach Stance Engine + the Coach Quality Gate
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-12 (post-#1138 — phase-context block shifted ai_calls line refs; stance/gate logic unchanged)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-20 (#1590 re-verify — line refs re-derived against live source; stance/gate logic, the 8-coach roster, and the ADR-108 fire-rate figure all confirmed unchanged since #390/#1138)
 > **Sources of truth:** `lambdas/coach/coach_history_summarizer.py` (stance engine, :940-1360), `lambdas/coach_stance.py` (stage-ladder fallback), `lambdas/ai_calls.py` (`_enforce_quality_gate`, :1356-1423), `lambdas/coach/coach_quality_gate.py`
 
 ## Purpose
 
-Each of the 8 coaches (`ALL_COACH_IDS`, coach_history_summarizer.py:69-78) maintains a
+Each of the 8 coaches (`ALL_COACH_IDS`, coach_history_summarizer.py:68-77) maintains a
 **STANCE#** record — its evolving, evidence-derived read of Matthew in its domain: what it's
 focused on, what it has set aside, its stage read, and how the read changed. It replaced the
 hand-authored weight-band ladder as the public "read of him"; the ladder
@@ -21,30 +21,30 @@ artifacts, never raw physiological values** (:940-950):
 
 1. `COMPRESSED#latest` — positions taken, key concerns, corrections made, relationship notes.
 2. Scored track record from `LEARNING#` verdicts + per-subdomain `CONFIDENCE#` records
-   (`_summarize_track_record`, :1054-1090: confirmed/refuted counts, `hit_rate_pct`, 8 most
+   (`_summarize_track_record`, :1039-1077: confirmed/refuted counts, `hit_rate_pct`, 8 most
    recent calls — mirrors the public coach-page stat).
 3. The prior `STANCE#latest`.
 
-One Haiku call (`STANCE_SYSTEM_PROMPT`, :970-1006) emits JSON: `headline_read`,
+One Haiku call (`STANCE_SYSTEM_PROMPT`, :955-1003) emits JSON: `headline_read`,
 `focused_on_now[]`, `set_aside_for_now[]`, `stage{label, rationale}`, `how_my_read_changed`,
 `confidence_note`, `evidence_basis[]`.
 
 ## Honesty machinery (in order)
 
-1. **Raw-vitals regex** (`_RAW_VITAL_RE`, :943-1009): a stance must never cite numbers (bpm, ms,
+1. **Raw-vitals regex** (`_RAW_VITAL_RE`, :940-954): a stance must never cite numbers (bpm, ms,
    mg/dl, lbs, kcal, percentages…). A hit ⇒ one strict zero-numbers regeneration, kept only if
    strictly fewer hits; residual hits set `grounding_flag` for the render/Sentinel.
-2. **Change-claim sanitizer** (`_sanitize_stance`, :1115-1153): `how_my_read_changed` is blanked
+2. **Change-claim sanitizer** (`_sanitize_stance`, :1112-1146): `how_my_read_changed` is blanked
    unless grounded in a logged correction or a real stage shift vs the prior stance; first run ⇒
    always blank.
-3. **ADR-104 grounded-generation gate** (#534, `_apply_grounding_gate`, :1155-1200): the shared
+3. **ADR-104 grounded-generation gate** (#534, `_apply_grounding_gate`, :1152-1193): the shared
    allow-list number check over prose fields only, one corrective regen via `regen_once`;
    findings that survive ⇒ **fail-keep-prior** — a stance still citing an ungrounded number is
    never written over a good one.
 
 ## Storage
 
-`_write_stance` (:1256-1266): `pk COACH#<coach_id>` / `sk STANCE#<date>` (immutable history)
+`_write_stance` (:1253-1262): `pk COACH#<coach_id>` / `sk STANCE#<date>` (immutable history)
 **and** `sk STANCE#latest` (live pointer). Phase class: every `COACH#*` pk is EXPERIMENT_SCOPED
 (`phase_taxonomy._PK_RULES`). Readers: `web/site_api_coach.py`, `site_api_ai_lambda.py`,
 chronicle/panelcast emails, `coach_narrative_orchestrator.py` (steers daily generation).
@@ -53,11 +53,11 @@ chronicle/panelcast emails, `coach_narrative_orchestrator.py` (steers daily gene
 
 Separate mechanism guarding daily coach **narrative** outputs (promoted advisory → blocking,
 N-06 #390). The `coach-quality-gate` Lambda is a pure scorer (Haiku): `passed=False` when
-`score < 60` (`PASS_SCORE_THRESHOLD`, coach_quality_gate.py:68); voice distinctiveness < 40 adds
+`score < 60` (`PASS_SCORE_THRESHOLD`, coach_quality_gate.py:67); voice distinctiveness < 40 adds
 a "generic" suggestion. Findings: anti-pattern phrases, decision-class (evidence-ceiling)
 violations, cross-coach similarity.
 
-**Regenerate-or-hold** (ai_calls.py:1343-1410):
+**Regenerate-or-hold** (`ai_calls._enforce_quality_gate`, :1356-1423):
 
 ```
 report = sync invoke coach-quality-gate      # fails OPEN on infra errors only
@@ -65,7 +65,7 @@ while not passed and attempts < 1:           # _QUALITY_GATE_MAX_REGENERATIONS =
     regenerate with a corrective note built from the report's findings
     re-score
 if still not passed: return (None, report)   # HOLD — nothing published this cycle
-# …and since #966 the caller turns that None into a CoachHold sentinel (ai_calls.py:1201):
+# …and since #966 the caller turns that None into a CoachHold sentinel (ai_calls.py:1214):
 # a deliberate hold is TERMINAL for the domain — the daily brief no longer publishes the
 # ungated legacy narrative in the held draft's place (only infra-error Nones fall back).
 ```
@@ -83,6 +83,6 @@ verdicts over 30 days (ADR-108).
   vocabulary (coach_stance.py:23-69, test-enforced).
 - `config/personas.json` — canonical coach names/domains (#531; no local copies).
 - Env: `AI_MODEL_HAIKU`, `TABLE_NAME`, `S3_BUCKET`. Prompt-window bounds are module constants
-  (coach_history_summarizer.py:119-134).
+  (coach_history_summarizer.py:118-134).
 
-> **Verified against `lambdas/coach/coach_history_summarizer.py`, `lambdas/ai_calls.py`, `lambdas/coach/coach_quality_gate.py` @ git 4d132ec7 on 2026-07-10.**
+> **Verified against `lambdas/coach/coach_history_summarizer.py`, `lambdas/ai_calls.py`, `lambdas/coach/coach_quality_gate.py` @ git `fab48cbd` on 2026-07-20 (#1590).**
