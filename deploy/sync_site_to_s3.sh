@@ -80,6 +80,12 @@ if [ "${1:-}" != "--dry-run" ]; then
   # week-gap note + any pending-installment disclosure (a held week must say why
   # instead of going silent). Best-effort — keeps the existing shells if offline.
   python3 "$(dirname "$0")/../scripts/v4_build_dispatches.py" || echo "  ⚠️  dispatches build skipped (offline?) — keeping existing story shells"
+  # #1566: render the "In my own words" essay permalink pages from site/journal/blog.json +
+  # each essay's body fragment (kills the hand-HTML step). --write is REQUIRED — the generator
+  # is dry-run by default so a bare invocation never publishes Matt's words; this deploy step,
+  # which Matthew triggers, is the manual publish gate. Best-effort: keeps existing pages if it
+  # can't run. RSS already merges blog.json (v4_build_rss.py above).
+  python3 "$(dirname "$0")/../scripts/v4_build_journal.py" --write || echo "  ⚠️  journal essays build skipped — keeping existing essay pages"
   # #498: data_sources.json is GENERATED from lambdas/source_registry.py — never hand-edit.
   python3 "$(dirname "$0")/../scripts/v4_build_data_sources.py" || echo "  ⚠️  data_sources build skipped — keeping existing site/data/data_sources.json"
   # #544: /method/registry/ is GENERATED from lambdas/methods_registry.py — never hand-edit.

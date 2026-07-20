@@ -10,7 +10,7 @@
   <meta property="og:site_name" content="averagejoematt">
   <meta property="og:url" content="https://averagejoematt.com/journal/essays/org-chart-of-one/">
   <meta property="og:title" content="The Org Chart of One Human and N Agents">
-  <meta property="og:description" content="Roles, shift handovers, an audit trail, and a short list of things the AI is never allowed to do — enforced by code, because policy doesn't bind something that reboots every session with no memory.">
+  <meta property="og:description" content="Roles, shift handovers, an audit trail, and a short list of things the AI is never allowed to do — enforced by code, because policy doesn&#x27;t bind something that reboots every session with no memory.">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-org-chart.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="The Org Chart of One Human and N Agents">
@@ -31,17 +31,31 @@
     "headline": "The Org Chart of One Human and N Agents",
     "description": "How a one-person production platform is actually run: sessions as mortal employees, deterministic gates holding the keys, one human owning everything irreversible, and the failure log as the credibility.",
     "datePublished": "2026-07-08",
-    "author": {"@type": "Person", "name": "Matt", "url": "https://averagejoematt.com/story/about/"},
+    "author": {
+      "@type": "Person",
+      "name": "Matt",
+      "url": "https://averagejoematt.com/story/about/"
+    },
     "image": "https://averagejoematt.com/assets/images/og-org-chart.png",
     "publisher": {
       "@type": "Organization",
       "name": "The Measured Life",
       "url": "https://averagejoematt.com",
-      "logo": {"@type": "ImageObject", "url": "https://averagejoematt.com/apple-touch-icon.png"}
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://averagejoematt.com/apple-touch-icon.png"
+      }
     },
-    "mainEntityOfPage": {"@type": "WebPage", "@id": "https://averagejoematt.com/journal/essays/org-chart-of-one/"},
+    "mainEntityOfPage": {
+      "@type": "WebPage",
+      "@id": "https://averagejoematt.com/journal/essays/org-chart-of-one/"
+    },
     "articleSection": "Build in public",
-    "isPartOf": {"@type": "Blog", "name": "In My Own Words", "url": "https://averagejoematt.com/story/journal/"}
+    "isPartOf": {
+      "@type": "Blog",
+      "name": "In My Own Words",
+      "url": "https://averagejoematt.com/story/journal/"
+    }
   }
   </script>
   <link rel="preload" href="/assets/fonts/v4/pxiTypc9vsFDm051Uf6KVwgkfoSxQ0GsQv8ToedPibnr0SZe1ZuWi3g.woff2" as="font" type="font/woff2" crossorigin>
@@ -100,48 +114,48 @@
       <span>&middot;</span>
       <span>8 min read</span>
     </div>
-    <div class="post-header__stats">every claim receipt-backed against the repo &middot; platform numbers as of the 2026-07-06 snapshot</div>
+    <div class="post-header__stats">every claim receipt-backed against the repo · platform numbers as of the 2026-07-06 snapshot</div>
   </div>
   <article class="post-body">
     <div class="prose">
-      <p>At 07:45 every morning, an AI agent wakes up, reads my infrastructure's overnight alarms, diagnoses what broke, and — for a narrow class of provably-safe problems — fixes it and merges the fix before I've had coffee. The interesting part is not the agent. The interesting part is the sentence at the top of the merge gate's source file:</p>
-      <blockquote><p>"This gate is the ONLY thing that merges, and it is intentionally NOT an LLM — every decision here is deterministic and auditable." (<code>remediation/automerge.py:7</code>)</p></blockquote>
-      <p>That sentence is the whole org chart, compressed. I run a production AWS platform — 94 Lambda functions, 9 CDK stacks, ~64 MCP tools, a public website, a hard $85-a-month budget — with no team. The engineering headcount is one human who has a day job and a family, plus N instances of Claude, where N is however many sessions ran this week. The humans-to-agents ratio isn't the novel part anymore; half the industry is doing some version of that. The novel part is what it took to make it <em>not fall over</em>: it took an org chart. Roles, shift handovers, performance reviews, an audit trail, and a short list of things the AI is never allowed to do — enforced by code, because policy doesn't bind something that reboots every session with no memory.</p>
+<p>At 07:45 every morning, an AI agent wakes up, reads my infrastructure's overnight alarms, diagnoses what broke, and — for a narrow class of provably-safe problems — fixes it and merges the fix before I've had coffee. The interesting part is not the agent. The interesting part is the sentence at the top of the merge gate's source file:</p>
+<blockquote><p>"This gate is the ONLY thing that merges, and it is intentionally NOT an LLM — every decision here is deterministic and auditable." (<code>remediation/automerge.py:7</code>)</p></blockquote>
+<p>That sentence is the whole org chart, compressed. I run a production AWS platform — 94 Lambda functions, 9 CDK stacks, ~64 MCP tools, a public website, a hard $85-a-month budget — with no team. The engineering headcount is one human who has a day job and a family, plus N instances of Claude, where N is however many sessions ran this week. The humans-to-agents ratio isn't the novel part anymore; half the industry is doing some version of that. The novel part is what it took to make it <em>not fall over</em>: it took an org chart. Roles, shift handovers, performance reviews, an audit trail, and a short list of things the AI is never allowed to do — enforced by code, because policy doesn't bind something that reboots every session with no memory.</p>
 
-      <h2>Sessions are employees who die at the end of every shift</h2>
-      <p>A Claude Code session is a competent engineer with total amnesia. It arrives knowing nothing about yesterday, works for a few hours, and then ceases to exist. Early on I treated that as a limitation to apologize for. The unlock was treating it as a constraint to design an organization around — the way real orgs design around the fact that employees quit, sleep, and forget.</p>
-      <p>So every session ends with a handover document, and every session begins by reading one. There are ~75 of them now, one per shift, spanning about five weeks (<code>handovers/</code>, 2026-05-31 &rarr; 2026-07-06), plus a single "live" status block in the repo's root instructions that each departing session <em>replaces</em> — never appends to — so the incoming worker reads one current state, not a sediment of stale ones (the wrap convention, <code>CLAUDE.md</code>). A handover reads like a shift log at a hospital: what shipped, what's verified, what's mid-flight, and — most load-bearing — the decisions the next worker must NOT make, because they're mine. A real example, verbatim carry-forward: <em>"Re-stamp (#417) SHIPS DISABLED — 2 decisions before enabling"</em> (<code>handovers/HANDOVER_2026-07-06_583-412_and-ci-health.md</code>). The code shipped; the switch waits for the human.</p>
-      <p>Durable lessons don't live in handovers — they get promoted to a memory system and a conventions file, the org's employee handbook. The handbook is written almost entirely in scar tissue. More on the scars below.</p>
+<h2>Sessions are employees who die at the end of every shift</h2>
+<p>A Claude Code session is a competent engineer with total amnesia. It arrives knowing nothing about yesterday, works for a few hours, and then ceases to exist. Early on I treated that as a limitation to apologize for. The unlock was treating it as a constraint to design an organization around — the way real orgs design around the fact that employees quit, sleep, and forget.</p>
+<p>So every session ends with a handover document, and every session begins by reading one. There are ~75 of them now, one per shift, spanning about five weeks (<code>handovers/</code>, 2026-05-31 &rarr; 2026-07-06), plus a single "live" status block in the repo's root instructions that each departing session <em>replaces</em> — never appends to — so the incoming worker reads one current state, not a sediment of stale ones (the wrap convention, <code>CLAUDE.md</code>). A handover reads like a shift log at a hospital: what shipped, what's verified, what's mid-flight, and — most load-bearing — the decisions the next worker must NOT make, because they're mine. A real example, verbatim carry-forward: <em>"Re-stamp (#417) SHIPS DISABLED — 2 decisions before enabling"</em> (<code>handovers/HANDOVER_2026-07-06_583-412_and-ci-health.md</code>). The code shipped; the switch waits for the human.</p>
+<p>Durable lessons don't live in handovers — they get promoted to a memory system and a conventions file, the org's employee handbook. The handbook is written almost entirely in scar tissue. More on the scars below.</p>
 
-      <h2>The gates hold the keys, the models hold opinions</h2>
-      <p>The second structural rule: an LLM never holds authority — it holds a pen. Everywhere an action is irreversible or public-facing, the decision-maker is deterministic code, and the model is upstream of it as a proposer.</p>
-      <p>The morning remediation agent proposes fixes; the thing that merges is a gate that checks an exact-file allowlist, a denylist of substrings (anything touching auth, secrets, budget, deploy, or the gate itself), a 60-line diff cap, a lint-and-test run, and a three-merges-a-day cap — and writes every decision, merge or refusal, to an audit log in S3 (<code>remediation/automerge.py</code>; the agent itself runs on read-only credentials).</p>
-      <p>The AI that writes daily narrative about my health data cannot publish a number I didn't compute. A gate checks that every numeral in its output already exists in the input it was handed; invented endpoints die there. When we built that gate we measured first: roughly one narrative in ten (11 of 112 across 14 days) contained a hard numeric contradiction (ADR-104, <code>docs/DECISIONS.md</code>). That measurement is <em>published on the site</em>, which tells you the org's other rule: failures are inventory, not embarrassment.</p>
-      <p>Even spending is an org-chart problem. A governor checks in every 8 hours, projects month-end cost, and degrades AI features in tiers as the projection climbs — and after the one month we breached the ceiling ($79.80 in June 2026, caused by my own dev sessions, not by readers), the degradation <em>order</em> was inverted so that reader-facing AI is the last thing sacrificed (<code>lambdas/budget_guard.py</code>: "readers degrade LAST"). The postmortem conclusion wasn't "spend less"; it was "the org was protecting the wrong stakeholder."</p>
-      <p>And the one gate that never moved: production deploys require a human click. The agents can build, test, propose, and stage. The approval button is mine. Not because the models aren't capable — because <em>accountability doesn't compress</em>. Someone has to be the person who can be blamed, and an entity that vanishes at the end of its shift can't be it.</p>
+<h2>The gates hold the keys, the models hold opinions</h2>
+<p>The second structural rule: an LLM never holds authority — it holds a pen. Everywhere an action is irreversible or public-facing, the decision-maker is deterministic code, and the model is upstream of it as a proposer.</p>
+<p>The morning remediation agent proposes fixes; the thing that merges is a gate that checks an exact-file allowlist, a denylist of substrings (anything touching auth, secrets, budget, deploy, or the gate itself), a 60-line diff cap, a lint-and-test run, and a three-merges-a-day cap — and writes every decision, merge or refusal, to an audit log in S3 (<code>remediation/automerge.py</code>; the agent itself runs on read-only credentials).</p>
+<p>The AI that writes daily narrative about my health data cannot publish a number I didn't compute. A gate checks that every numeral in its output already exists in the input it was handed; invented endpoints die there. When we built that gate we measured first: roughly one narrative in ten (11 of 112 across 14 days) contained a hard numeric contradiction (ADR-104, <code>docs/DECISIONS.md</code>). That measurement is <em>published on the site</em>, which tells you the org's other rule: failures are inventory, not embarrassment.</p>
+<p>Even spending is an org-chart problem. A governor checks in every 8 hours, projects month-end cost, and degrades AI features in tiers as the projection climbs — and after the one month we breached the ceiling ($79.80 in June 2026, caused by my own dev sessions, not by readers), the degradation <em>order</em> was inverted so that reader-facing AI is the last thing sacrificed (<code>lambdas/budget_guard.py</code>: "readers degrade LAST"). The postmortem conclusion wasn't "spend less"; it was "the org was protecting the wrong stakeholder."</p>
+<p>And the one gate that never moved: production deploys require a human click. The agents can build, test, propose, and stage. The approval button is mine. Not because the models aren't capable — because <em>accountability doesn't compress</em>. Someone has to be the person who can be blamed, and an entity that vanishes at the end of its shift can't be it.</p>
 
-      <h2>What the throughput actually looks like</h2>
-      <p>In the three days before this essay's snapshot, the org merged 186 pull-request commits across 8 documented shifts (git log, 2026-07-03 &rarr; 2026-07-06), each one squash-merged with a <code>Fixes #N</code> back to a public backlog — the backlog itself lives on GitHub Issues because the previous Markdown backlog drifted 27% wrong before anyone noticed (ADR-099). The platform's own internal review calls this "~50 verified stories in 3 days" [CONFIRM: self-reported figure — directionally consistent with the git count, not independently reproduced]. The honest phrasing: throughput at a several-engineer clip, from one person's spare hours, with the verification burden moved onto machinery.</p>
-      <p>That machinery matters more than the count. Every deploy passes a CI chain that ends with a headless browser walking the live site and a <em>vision model</em> reading the screenshots for what a pixel-diff can't judge — a chart that rendered empty, a panel that overflowed — and a "high" verdict from that reviewer blocks the pipeline (<code>.github/workflows/ci-cd.yml</code>, gating since 2026-06-05). One of the org's employees is a QA reviewer whose entire job is to look at the screen.</p>
+<h2>What the throughput actually looks like</h2>
+<p>In the three days before this essay's snapshot, the org merged 186 pull-request commits across 8 documented shifts (git log, 2026-07-03 &rarr; 2026-07-06), each one squash-merged with a <code>Fixes #N</code> back to a public backlog — the backlog itself lives on GitHub Issues because the previous Markdown backlog drifted 27% wrong before anyone noticed (ADR-099). The platform's own internal review calls this "~50 verified stories in 3 days" [CONFIRM: self-reported figure — directionally consistent with the git count, not independently reproduced]. The honest phrasing: throughput at a several-engineer clip, from one person's spare hours, with the verification burden moved onto machinery.</p>
+<p>That machinery matters more than the count. Every deploy passes a CI chain that ends with a headless browser walking the live site and a <em>vision model</em> reading the screenshots for what a pixel-diff can't judge — a chart that rendered empty, a panel that overflowed — and a "high" verdict from that reviewer blocks the pipeline (<code>.github/workflows/ci-cd.yml</code>, gating since 2026-06-05). One of the org's employees is a QA reviewer whose entire job is to look at the screen.</p>
 
-      <h2>The failures are the credibility</h2>
-      <p>Everything above sounds like it worked on the first try. Here is the part that earns the right to the rest.</p>
-      <p><strong>Two agents built the same feature, and a third stomped main.</strong> In July I ran concurrent sessions in the same working directory. One session branched off the shared tree and squash-merged — silently dragging a <em>different agent's</em> half-finished work onto main under the wrong story number, while elsewhere two agents had each built a complete, competing implementation of the same story (PRs #703 and #704). The handover's own postmortem, verbatim: <em>"a concurrent session sharing the primary working dir means <code>git checkout -b</code> can inherit their committed work &rarr; it rides onto main on your squash. Use a worktree for your own work too when another session is live, not just for the subagents"</em> (<code>handovers/HANDOVER_2026-07-05_590-constellation.md</code>). That sentence went into the handbook; the next session's handover records zero stomps. This is what management looks like when your reports are processes: you can't coach the worker, so you coach the <em>workflow</em>.</p>
-      <p><strong>The AI violated the org's own constitution, at the worst possible spot.</strong> The platform's central public claim is falsifiable, graded predictions. A review found the model had been authoring its own prediction IDs and deadlines — years-off dates, duplicates, 88 predictions pending and zero ever graded, each one ungradeable by construction. That broke the org's oldest rule ("the model never authors its own metadata" — the generalization of ADR-106's <em>only code ships</em>) exactly where credibility depended on it. The fix took one shift: strip those fields from the model's reach and stamp them in code (#725, 2026-07-06). The disclosure is published on the site's trust page, because an org that markets its honesty gates and quietly patches its honesty failures is running theater.</p>
-      <p><strong>Green tests lied; the real flow didn't.</strong> A shipped feature computed workout adherence at 47.8% for a workout the human had fully completed — sixteen unit tests green, deploy healthy, number wrong (a template-keyed exercise class the tests never exercised). The lesson is now a standing convention: <em>"drive the real flow, not just tests"</em> — every shift's final verification invokes the actual production Lambda on actual data and reads the actual stored record (<code>handovers/HANDOVER_2026-07-06_583-412_and-ci-health.md</code>).</p>
-      <p><strong>Agent output is a lead list, not a truth feed.</strong> The org runs agent review panels over its own architecture. A large fraction of their findings don't survive verification — one audit's "cost leak" was intentional caching, most of another's accessibility claims were false positives. The handbook rule, verbatim: <em>"the report is a verified lead list, not a fix list — re-verify each before touching"</em> (<code>handovers/HANDOVER_2026-06-15_...EliteReview.md</code>). And the org's most honest sentence about itself, from its own review methodology: internal grades <em>"have only ever ratcheted upward, which is exactly what a self-authored rubric graded by the same kind of model that built the system would predict"</em> (<code>docs/REVIEW_METHODOLOGY.md</code>). The arbiter that counts is a stranger reading it cold.</p>
+<h2>The failures are the credibility</h2>
+<p>Everything above sounds like it worked on the first try. Here is the part that earns the right to the rest.</p>
+<p><strong>Two agents built the same feature, and a third stomped main.</strong> In July I ran concurrent sessions in the same working directory. One session branched off the shared tree and squash-merged — silently dragging a <em>different agent's</em> half-finished work onto main under the wrong story number, while elsewhere two agents had each built a complete, competing implementation of the same story (PRs #703 and #704). The handover's own postmortem, verbatim: <em>"a concurrent session sharing the primary working dir means <code>git checkout -b</code> can inherit their committed work &rarr; it rides onto main on your squash. Use a worktree for your own work too when another session is live, not just for the subagents"</em> (<code>handovers/HANDOVER_2026-07-05_590-constellation.md</code>). That sentence went into the handbook; the next session's handover records zero stomps. This is what management looks like when your reports are processes: you can't coach the worker, so you coach the <em>workflow</em>.</p>
+<p><strong>The AI violated the org's own constitution, at the worst possible spot.</strong> The platform's central public claim is falsifiable, graded predictions. A review found the model had been authoring its own prediction IDs and deadlines — years-off dates, duplicates, 88 predictions pending and zero ever graded, each one ungradeable by construction. That broke the org's oldest rule ("the model never authors its own metadata" — the generalization of ADR-106's <em>only code ships</em>) exactly where credibility depended on it. The fix took one shift: strip those fields from the model's reach and stamp them in code (#725, 2026-07-06). The disclosure is published on the site's trust page, because an org that markets its honesty gates and quietly patches its honesty failures is running theater.</p>
+<p><strong>Green tests lied; the real flow didn't.</strong> A shipped feature computed workout adherence at 47.8% for a workout the human had fully completed — sixteen unit tests green, deploy healthy, number wrong (a template-keyed exercise class the tests never exercised). The lesson is now a standing convention: <em>"drive the real flow, not just tests"</em> — every shift's final verification invokes the actual production Lambda on actual data and reads the actual stored record (<code>handovers/HANDOVER_2026-07-06_583-412_and-ci-health.md</code>).</p>
+<p><strong>Agent output is a lead list, not a truth feed.</strong> The org runs agent review panels over its own architecture. A large fraction of their findings don't survive verification — one audit's "cost leak" was intentional caching, most of another's accessibility claims were false positives. The handbook rule, verbatim: <em>"the report is a verified lead list, not a fix list — re-verify each before touching"</em> (<code>handovers/HANDOVER_2026-06-15_...EliteReview.md</code>). And the org's most honest sentence about itself, from its own review methodology: internal grades <em>"have only ever ratcheted upward, which is exactly what a self-authored rubric graded by the same kind of model that built the system would predict"</em> (<code>docs/REVIEW_METHODOLOGY.md</code>). The arbiter that counts is a stranger reading it cold.</p>
 
-      <h2>The transferable org chart</h2>
-      <p>Strip the health-platform specifics and five rules remain. They look suspiciously like things human organizations already learned, because they are:</p>
-      <ol>
-        <li><strong>Design for mortality.</strong> Workers forget everything; artifacts remember. The handover, the handbook, the one live status block. (Orgs: documentation and shift logs. We just stopped pretending we didn't need them.)</li>
-        <li><strong>Authority lives in deterministic code; models propose.</strong> Allowlists, diff caps, number-gates, spending tiers — auditable, boring, binding. (Orgs: separation of duties.)</li>
-        <li><strong>One human owns everything irreversible.</strong> Prod approval, data mutations, taste. Accountability doesn't compress. (Orgs: the signature line.)</li>
-        <li><strong>Verify in production reality, not in the test's model of it.</strong> Drive the real flow; put a vision-reviewer on the actual screen. (Orgs: "go and see.")</li>
-        <li><strong>Publish the failure log.</strong> The gate baselines, the breach month, the stomped main, the 88 corrupt predictions. An org run by entities that can hallucinate has exactly one durable asset: a public record of catching itself. (Orgs: incident culture — except public.)</li>
-      </ol>
-      <p>The platform this org built measures one ordinary human trying not to fail a seventeenth time. It may yet fail. The org chart, though, already works — and it is, I've come to think, the most transferable thing the whole experiment will produce.</p>
-      <p class="post-receipts">The receipts: every file path cited above is real and public — <a href="https://github.com/averagejoematt/life-platform" rel="noopener">github.com/averagejoematt/life-platform</a>. The machine this essay describes is documented at <a href="/method/build/">/method/build/</a>, and the platform it runs is live at <a href="/cockpit/">/cockpit/</a>.</p>
+<h2>The transferable org chart</h2>
+<p>Strip the health-platform specifics and five rules remain. They look suspiciously like things human organizations already learned, because they are:</p>
+<ol>
+  <li><strong>Design for mortality.</strong> Workers forget everything; artifacts remember. The handover, the handbook, the one live status block. (Orgs: documentation and shift logs. We just stopped pretending we didn't need them.)</li>
+  <li><strong>Authority lives in deterministic code; models propose.</strong> Allowlists, diff caps, number-gates, spending tiers — auditable, boring, binding. (Orgs: separation of duties.)</li>
+  <li><strong>One human owns everything irreversible.</strong> Prod approval, data mutations, taste. Accountability doesn't compress. (Orgs: the signature line.)</li>
+  <li><strong>Verify in production reality, not in the test's model of it.</strong> Drive the real flow; put a vision-reviewer on the actual screen. (Orgs: "go and see.")</li>
+  <li><strong>Publish the failure log.</strong> The gate baselines, the breach month, the stomped main, the 88 corrupt predictions. An org run by entities that can hallucinate has exactly one durable asset: a public record of catching itself. (Orgs: incident culture — except public.)</li>
+</ol>
+<p>The platform this org built measures one ordinary human trying not to fail a seventeenth time. It may yet fail. The org chart, though, already works — and it is, I've come to think, the most transferable thing the whole experiment will produce.</p>
+<p class="post-receipts">The receipts: every file path cited above is real and public — <a href="https://github.com/averagejoematt/life-platform" rel="noopener">github.com/averagejoematt/life-platform</a>. The machine this essay describes is documented at <a href="/method/build/">/method/build/</a>, and the platform it runs is live at <a href="/cockpit/">/cockpit/</a>.</p>
     </div>
   </article>
   <aside class="post-cta">
@@ -150,8 +164,8 @@
     <a class="cta-btn" href="/subscribe/">Follow by email</a>
   </aside>
   <nav class="post-nav">
-    <a href="/story/journal/"><span>&larr; In my own words</span>All of Matt's writing</a>
-    <a href="/method/build/"><span>The machine</span>How it's built &rarr;</a>
+    <a href="/story/journal/"><span>← In my own words</span>All of Matt&#x27;s writing</a>
+    <a href="/method/build/"><span>The machine</span>How it&#x27;s built →</a>
   </nav>
 </div>
 </main>
