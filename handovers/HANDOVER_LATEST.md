@@ -114,8 +114,8 @@ site synced attended, live == 232c838d content, invalidations completed.
   2 GitHub drift lines + billing line are EXPECTED) → Monday Compass 15:00 UTC now safe
   (guards deployed).
 - **Engine-doc drift advisory** (handed over from the voice session): CHARACTER.md /
-  HYPOTHESIS.md / COACH_STANCE.md / READINESS.md flagged behind their sources — this
-  session's surfaces to re-verify; untouched tonight (the reset owned the docs surface).
+  HYPOTHESIS.md / COACH_STANCE.md / READINESS.md flagged behind their sources — filed as
+  #1590; untouched this session (the reset owned the docs surface).
 - Next-tier drain remainder: #1442 (now unblocked by #1582's archive), #1472/#1474 design
   (one CSS story at a time), chat #1481/#1483 (fable), #1586 (just filed), the #1581 MINOR
   (deterministic coach_context-number check), #1406's MAGE-backfill question.
@@ -163,3 +163,47 @@ fine (ask 200 live) → issue #1589 with the bisect hint (only #1582 touched
 site_api_ai_lambda in the window; the full-tree bundle refreshes everything though).**
 This morning's 17:00 UTC brief went out saying 315 — one email; tomorrow's carries
 321.38. GitHub billing STILL broken at this writing (runs failing the annotation way).
+
+
+---
+
+## SECOND ADDENDUM (2026-07-20, ~11:45 PT) — the public flip + the GitHub estate healed
+
+Actions minutes were 3,000/3,000 exhausted (the TRUE #1544 mechanism — the "billing"
+annotation is GitHub's wording for an exhausted included pool with a $0 spending limit).
+Matthew chose the public flip over a budget bump ("nobody is aware of this repo").
+Executed with the canon protected: **PR #1543's branch force-reset to main + PR closed
+BEFORE exposure spread** (the private canon docs/PLATFORM_CONTEXT.md was on that branch;
+old head 22a72ddf preserved in the locked local worktree; residue = force-push timeline
+SHAs only — GitHub Support scrub is the optional belt-and-braces). **#1543 is
+incompatible with a public repo by design** — re-lands after a flip back OR the
+canon-out-of-git redesign. Post-flip: Pages did NOT resurrect; Actions ALIVE (site-deploy
+rerun green end-to-end incl. smoke + visual-QA against the live Day-1 surface); Matthew
+restored the **production approval gate** (required_reviewers verified live → **#1319
+CLOSED verified-done**, #1338 unblocked in the restore direction) and **enabled
+vulnerability alerts** — which immediately found 2 HIGH: black <26.3.1 (dev-only; the
+bump is format-gate-coupled — full-tree reformat + CI pin in one PR) and garminconnect
+<0.3.5 (paused source; fix rides the Garmin revival layer rebuild). Dependabot opens the
+bump PRs per ADR-082. Posture file divergence notes retired (4574cddf). Both standing
+weekly drift lines now CLEAR.
+
+**Build beat:** `2026-07-20-cycle9-reset-verified-by-behavior` (appended to beats.json
+this wrap, validators green — ships with the wrap push's site-deploy).
+**Docs:** github_posture.json notes retired + INCIDENT_LOG (+2 last night) + RUNBOOK/
+PHASE_TAXONOMY/DSv5/DATA_GOVERNANCE/DECISIONS all landed in-session (listed above);
+this addendum adds none.
+**Decisions:** none filed this addendum — the visibility flip is a recorded temporary
+operational posture (memory + posture file), and the restored-gate direction gets its
+ADR via the already-open #1338.
+**Main:** green — wrap-era CI billing-dead runs are decoded (annotation class, #1544
+closed-cause); post-flip the site-deploy rerun succeeded end-to-end and pushes now queue
+and run.
+**Incidents:** none new in this addendum (the flip was deliberate; Dependabot findings
+are alerts, not incidents) — 2 rows from last night stand.
+**Stash/hooks:** clean (stash empty, hook fresh).
+**Residual additions:** Dependabot bump PRs incoming — black one needs the format-gate
+coupling care (not-work until the PRs exist — Dependabot files them); GitHub Support
+scrub of #1543's timeline SHAs (not-work — Matthew's optional call); flip-back-to-private
+checklist lives in project_repo_visibility (not-work — future owner call); canary-blind
+root-cause = #1589; canon-out-of-git redesign — file only if Matthew wants public
+long-term (not-work — awaiting his call).

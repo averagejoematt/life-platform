@@ -1392,6 +1392,53 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/1554"
         }
       ]
+    },
+    {
+      "id": "2026-07-20-cycle9-reset-verified-by-behavior",
+      "date": "2026-07-20",
+      "title": "Day 3: the reset that had to prove itself — cycle 9 opens with a harness watching",
+      "shipped": "Cycle 9 began at 321.38 lb — and for the first time, a restart was verified by behavior, not just a checklist. Before the reset ran, a new integration harness had to prove itself against the live platform: every ingestion source really invokes, every compute writes its honest Day-0 shape (a Level-1 character sheet with a replay-verified receipt), all 80 public pages serve, and a synthetic tagged payload flows the full webhook path — duplicate readings collapse exactly, a re-send changes nothing, and the test rows verifiably delete themselves. The reset then became the harness's first real customer and passed. Around it, thirteen PRs merged the same night: an accessibility gate over all 73 pages, end-to-end tests for every reader write path, two new glucose instruments, the paper-elevation design ramp, a unified evening ritual that fixed a real timezone bug, and the ten-point anti-slop litmus now watching the site's own aesthetics.",
+      "gotcha": "The harness's static scan found twelve unguarded reads in four email generators that would have crashed Monday's coach email on the reset's fresh data — the exact bug class that DLQ'd the weekly digest one cycle earlier, fixed at one site while eleven siblings kept the pattern. And the overnight baseline was an honest placeholder: the declared 315 became a measured 321.38 at the morning weigh-in, so the whole pipeline re-ran — the same cycle, the sealed pre-registration re-landing byte-for-byte, its public SHA-256 fingerprint unchanged.",
+      "honest_miss": "The adversarial review pass blocked two of the night's own PRs on real bugs before merge — a memory query that would silently starve the coach's long-term context within months, and a retention policy whose '90 days' would never actually delete a byte on a version-enabled bucket. Both fixed before landing, but both were written by the same fleet that wrote everything else that shipped.",
+      "prs": [
+        {
+          "label": "PR #1585",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1585"
+        },
+        {
+          "label": "PR #1560",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1560"
+        },
+        {
+          "label": "PR #1580",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1580"
+        },
+        {
+          "label": "PR #1565",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1565"
+        },
+        {
+          "label": "PR #1583",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1583"
+        },
+        {
+          "label": "PR #1584",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1584"
+        },
+        {
+          "label": "PR #1581",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1581"
+        },
+        {
+          "label": "PR #1582",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1582"
+        },
+        {
+          "label": "PR #1587",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1587"
+        }
+      ],
+      "why_it_mattered": "A reset used to be an overnight bug harvest — every prior cycle surfaced its Day-1 breakage only when a cron fired hours later. This one was interrogated before, during, and after: the harness caught four of its own bugs on the dry run, four real dark data sources, and a crash-in-waiting in the Monday email, all before genesis. Trust in the instrument now has a test suite of its own — which is the only kind of trust this project is allowed to ask for."
     }
   ]
 }
