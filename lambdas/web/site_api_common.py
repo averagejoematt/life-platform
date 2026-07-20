@@ -121,11 +121,7 @@ PLATFORM_STATS = {
     "review_grade": "A",
     "active_secrets": 21,
     "site_pages": 77,
-<<<<<<< HEAD
     "test_count": 4585,
-=======
-    "test_count": 4558,
->>>>>>> c0f6528e (feat(restart): #1559 behavioral integration harness — four legs, one honest verdict + the present-None class closed)
     "board_technical": 12,
     "board_product": 8,
     "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,

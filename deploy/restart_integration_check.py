@@ -368,6 +368,10 @@ def leg_ingestion(report, args):
         if not ok:
             report.add("ingestion", src, FAIL, detail)
             continue
+        facets = registry.get(src, {})
+        if facets.get("partition") is False or facets.get("freshness") is False:
+            report.add("ingestion", src, PASS, "invoked clean (no freshness surface by design — partition/freshness False in the registry)")
+            continue
         latest = _latest_date_row(table, src)
         verdict, fdetail = freshness_verdict(latest, stale_overrides.get(src))
         if verdict == "fresh":
@@ -419,14 +423,14 @@ def leg_compute(report, args):
         report.add("compute", "character sheet shape", FAIL, "no untombstoned character_sheet rows at all")
     else:
         sheet = items[0]
-        lvl = sheet.get("level")
+        lvl = sheet.get("character_level")
         lvl_f = float(lvl) if isinstance(lvl, (int, float, Decimal)) else None
         if lvl_f is not None and lvl_f >= 1:
             report.add(
                 "compute", "character sheet shape", PASS, f"{sheet['sk']} level {lvl_f:g} (Level-1 baseline is the honest Day-0 shape)"
             )
         else:
-            report.add("compute", "character sheet shape", FAIL, f"{sheet['sk']} level={lvl!r} — below the Level-1 floor")
+            report.add("compute", "character sheet shape", FAIL, f"{sheet['sk']} character_level={lvl!r} — below the Level-1 floor")
         rec = table.get_item(Key={"pk": f"USER#{USER}#SOURCE#character_receipt", "sk": sheet["sk"]}).get("Item")
         if rec is None:
             report.add(
@@ -459,12 +463,22 @@ def leg_compute(report, args):
         report.add("compute", "fulfillment index", FAIL, f"/api/fulfillment_index unreachable: {str(e)[:100]}")
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    # the manifest's expected status is the RAW status (301 pages must report 301,
+    # exactly like smoke_test_site.sh's redirect-less curl) — never auto-follow
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
+
+
 def _fetch_status(path_expected):
     path, name, expected = path_expected
     url = f"{API}{path}{'&' if '?' in path else '?'}cb=integ{int(time.time())}"
     req = urllib.request.Request(url, headers={"User-Agent": "restart-integration-check/1559"})
     try:
-        with urllib.request.urlopen(req, timeout=25) as resp:
+        with _OPENER.open(req, timeout=25) as resp:
             return path, name, expected, resp.status
     except urllib.error.HTTPError as e:
         return path, name, expected, e.code
@@ -497,9 +511,14 @@ def leg_serving(report, args):
     else:
         report.add("serving", f"qa_manifest smoke ({len(rows)} urls)", PASS, "every path served its expected status")
 
-    lam, _ = _clients()
-    ok, detail = _invoke(lam, "daily-brief", {"dry_run": True})
-    report.add("serving", "daily-brief dry-run (no-send)", PASS if ok else FAIL, detail)
+    import boto3
+    from botocore.config import Config
+
+    # the brief generates for ~7.5 min (measured 445-476s; fn timeout 900) — wait past it.
+    # One full generation per harness run, Bedrock cost ~cents; run this leg at resets, not casually.
+    brief_lam = boto3.client("lambda", region_name=REGION, config=Config(read_timeout=910, retries={"max_attempts": 1}))
+    ok, detail = _invoke(brief_lam, "daily-brief", {"dry_run": True})
+    report.add("serving", "daily-brief dry-run (no-send, full generation — costs one brief's Bedrock tokens)", PASS if ok else FAIL, detail)
 
     hits = scan_email_lambdas()
     if hits:
