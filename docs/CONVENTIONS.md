@@ -383,10 +383,12 @@ AI powered down.** Four layers, each with a named owner-mechanism:
    - `scripts/check_doc_index.py` — every page is indexed from the wiki home, carries
      the status header, the >90d advisory freshness report, and a **blocking 180d ceiling**
      (a canonical page unverified that long fails CI).
-3. **Process gates.** The PR template carries a "Docs impact" checklist; the wrap skill's
-   step (e) is a hard gate — every session ends with `**Docs:** <pages>` or
-   `**Docs:** none needed — <reason>` in the handover, checkers green. The deploy skill
-   prompts the same at deploy time.
+3. **Process gates.** The wrap skill's step (e) is a hard gate — every session ends
+   with `**Docs:** <pages>` or `**Docs:** none needed — <reason>` in the handover,
+   checkers green. The deploy skill prompts the same at deploy time. (A PR-time
+   "Docs impact" checklist asking the same thing had lived in the retired PR
+   template — 0/20 recent merged PRs used it, #1324 — but the wrap-skill gate above
+   was already the mechanism actually enforcing this.)
 4. **Periodic verification.** Each canonical page's `> **Status:** … · **Verified:**`
    header records when a human/agent last verified its content against reality; the
    freshness report is the re-verification worklist. `/accuracy-review` is the deep pass.

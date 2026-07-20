@@ -28,7 +28,7 @@ deployed[- ]as (?:a )?Lambda[- ]Layer	the shared layer is retired (#781); depend
 WAF block	WAF was removed 2026-06
 WAF rule	WAF was removed 2026-06
 \b1[34]\d MCP tools	hardcoded stale tool count — use the sync_doc_metadata discoverer
-\$75/month enforced	the ceiling is $85 base / $100 surge since ADR-133 (2026-07-08)
+\$75/mo(?:nth)? enforced	the ceiling is $85 base / $100 surge since ADR-133 (2026-07-08); #1324 broadened this from the /month-only spelling after the /mo shorthand drifted undetected in .github/ISSUE_TEMPLATE/feature_request.md (outside the scanned surface until the file was retired)
 grep -c '"name":' mcp/registry\.py	banned counting method — over-counts nested schema fields; use the AST discoverer
 hevy-webhook FunctionURL is (live|active|standing)	removed 2026-07-06 (#756)
 test_layer_version_consistency	test retired with the layer (#781) — the invariant is test_i2_shared_layer_retired
@@ -42,3 +42,9 @@ zip -j.*mcp_server	manual MCP zip retired (#781) — it ships no lambdas/ tree a
 hard-rejects.*life-platform-mcp	stale ADR-031 claim — deploy_lambda.sh no longer rejects MCP (#781); it builds the mcp-shaped full bundle via build_bundle.py --mcp
 NEVER use deploy_lambda\.sh for MCP	inverted since #781 — deploy_lambda.sh IS the sanctioned MCP path (mcp-shaped full bundle); the manual zip is what boot-breaks
 deploy_lambda\.sh.{0,3}will refuse	stale ADR-031 claim — deploy_lambda.sh accepts life-platform-mcp since #781 (mcp-shaped full bundle)
+# #1324: the PR template + issue forms were retired (0/20 recent merged PRs used the
+# PR template's parity checkbox; the issue-form 'enhancement' label saw 0 uses ever).
+# Agent filing via `gh pr create`/`gh issue create` per ADR-099 IS the intake now — these
+# rules keep a doc from claiming the retired forms are the live path.
+\.github/PULL_REQUEST_TEMPLATE\.md	retired (#1324) — 0/20 recent merged PRs used it; agent PRs use a freeform What/Why + guard-table body, see docs/CONVENTIONS.md §8
+\.github/ISSUE_TEMPLATE	retired (#1324) — issue forms saw 0 real-world uses (enhancement label: 0 ever); agent filing via `gh issue create` per ADR-099 IS the intake

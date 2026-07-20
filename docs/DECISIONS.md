@@ -2937,6 +2937,8 @@ Every asset URL is now content-hashed and immutable, so an entry module pins the
 
 **Regression guard.** `.claude/agents/issue-filer.md` restates this amended contract (score-line forms, `review:*` reconcile-before-refile, `gate:owner` stamping) so the agent contract and this ADR cannot diverge again without both being edited.
 
+**Addendum (2026-07-20, #1324): `.github/PULL_REQUEST_TEMPLATE.md` and `.github/ISSUE_TEMPLATE/*` are retired — agent filing via `gh pr create`/`gh issue create` in the ADR-099 conventions above IS the intake, not a form GitHub renders.** Evidence: the PR template's "Backfill / Lambda parity check" was used in 0 of the 20 most recent merged PRs (all follow the freeform What/Why + guard-table convention instead); the issue forms' `enhancement` label saw 0 uses since the templates were added 2026-06-07, and `feature_request.md` had drifted to quoting the superseded "$75/mo enforced ceiling" (ADR-133 raised the base to $85) undetected, because `.github/` was never in `check_doc_facts.py`'s or `check_doc_tombstones.py`'s scanned surface. The Backfill/Lambda-parity checkbox's rationale (TD-14/TD-15, the HAE source-priority drift incident) is preserved in `docs/CHANGELOG.md`'s TD-14 entry and `docs/DECISIONS.md`'s TD-19 audit references, not lost with the checkbox.
+
 ## ADR-100: The budget ceiling protects readers — the public ask endpoints degrade LAST
 
 **Date:** 2026-07-03 · **Status:** Accepted · **Amends:** ADR-063
