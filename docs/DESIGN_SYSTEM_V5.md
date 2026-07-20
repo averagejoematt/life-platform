@@ -165,6 +165,38 @@ signals only** (the day counter). **Glow is earned — only on ember/"this-is-up
 decorative.** A neutral number (e.g. the cockpit's ink-colored level) gets depth, not glow. The test:
 if it would read as "AI-template gloss," it's wrong. Restraint is the credibility moat.
 
+### The Slop Litmus — the ten-point distinctiveness gate (#1466, canonical)
+
+Run every visual proposal — internal session or design-partner — through all ten. A miss
+on any point sends the work back for a revision round; cite the point number. (The
+design-partner brief references THIS list; it is not duplicated there.) The advisory
+AI-vision lens in `tests/visual_ai_qa.py` watches the live site for the same drift —
+advisory by construction, it can never block a deploy on its own.
+
+1. **The masthead test.** Cover the wordmark — is the screen still identifiably THIS
+   site (the loop, the triad's voices, the instrument vocabulary), or could it be any
+   AI-generated health dashboard?
+2. **No purple-blue gradients, no glassmorphism, no generic shadcn geometry.** The
+   2024–26 template look is an automatic fail.
+3. **Every decorative mark earns its existence** — derived from the sigil/instrument
+   vocabulary (`icons.js`, `sigils.js`, generative marks) or drawn from real data.
+   Ornament with no data behind it is slop.
+4. **Glow audit.** Point at each glow/bloom and name the live signal that earns it.
+   No answer = strip it (the earned-glow rule above, applied per-element).
+5. **Typography leads with the triad's voices** — a Fraunces human line, Instrument
+   Sans chrome, Plex Mono numbers. A centered hero over a three-card grid is the slop
+   silhouette; if the layout could be a SaaS landing template, restructure.
+6. **Motion has a reason.** Name the loop station or live signal each animation
+   serves. "It feels dynamic" is not a reason.
+7. **Uncertainty honest.** Every band, range, or error visual maps to a real computed
+   interval; LOW confidence renders as a point, never a guessed spread.
+8. **Copy in the site's voice.** Plain, specific, honest — numbers cited, hedges
+   kept. "Unlock your journey" SaaS-speak is an automatic fail.
+9. **Both themes designed** — not one theme plus an inversion; check ember/ink
+   balance in each.
+10. **The loop is findable.** From the proposed screen a newcomer can tell which loop
+    station they're on and where the loop-forward door is.
+
 ### Wiring (every page)
 The motion head-guard goes in `<head>` after the theme script; `<script src="/assets/js/motion.js" defer>`
 goes before the page's main module script. The three builders inject both (evidence/coaching/dispatches

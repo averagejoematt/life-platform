@@ -71,11 +71,20 @@ DO NOT flag (these are CORRECT): honest sparse-data states such as "N readings s
 "awaiting data", or an empty-but-shaped section; normal data variation; intentionally minimal \
 design; or a chart simply having few points.
 
+SEPARATELY (advisory lens, #1466 — NOT a rendering issue, never put it in "issues"): note \
+whether the page has drifted toward generic AI-template gloss — purple-blue gradients, \
+glassmorphism, stock SaaS-template geometry (centered hero over a three-card grid), \
+decoration with no data behind it, or "unlock your journey"-style SaaS copy. The site's own \
+aesthetic (warm paper/ink, ember accents, mono numbers, editorial type) is CORRECT and is \
+not gloss.
+
 Respond with ONLY a JSON object, no prose, no markdown fences:
 {{"renders_ok": true|false, "charts_populated": "yes"|"no"|"n/a", \
 "issues": [{{"type": "string", "severity": "low"|"med"|"high", "note": "string"}}], \
+"template_gloss": {{"flagged": true|false, "note": "string"}}, \
 "severity": "ok"|"low"|"med"|"high", "summary": "one sentence"}}
-Set top-level "severity" to the maximum of the issue severities, or "ok" if there are none."""
+Set top-level "severity" to the maximum of the issue severities, or "ok" if there are none; \
+"template_gloss" NEVER counts toward severity."""
 
 _ICON = {"ok": "✅", "low": "🔵", "med": "🟡", "high": "🔴"}
 
@@ -109,11 +118,24 @@ def _parse_verdict(text):
         v = json.loads(m.group(0))
     except json.JSONDecodeError:
         return {"severity": "ok", "renders_ok": True, "summary": "(unparseable verdict)", "raw": text[:200]}
+    # #1466: the template-gloss lens is advisory BY CONSTRUCTION — if the model
+    # (mis)files it inside issues[], strip it before severity ever computes, so the
+    # lens can never flip a page to FAIL (prompt rules alone can't guarantee
+    # structure — memory: reference_prompt_structural_guarantees).
+    _gloss_markers = ("template_gloss", "template-gloss", "ai-template", "slop")
+    v["issues"] = [i for i in v.get("issues", []) if not any(m in str(i.get("type", "")).lower() for m in _gloss_markers)]
     if v.get("severity") not in ("ok", "low", "med", "high"):
         # derive from issue list if the model omitted/garbled the top-level field
         sevs = [i.get("severity") for i in v.get("issues", []) if i.get("severity") in ("low", "med", "high")]
         order = {"low": 1, "med": 2, "high": 3}
         v["severity"] = max(sevs, key=lambda s: order[s]) if sevs else "ok"
+    else:
+        # never let a stated severity exceed what the (gloss-stripped) issues support
+        sevs = [i.get("severity") for i in v.get("issues", []) if i.get("severity") in ("low", "med", "high")]
+        order = {"ok": 0, "low": 1, "med": 2, "high": 3}
+        supported = max(sevs, key=lambda s: order[s]) if sevs else "ok"
+        if order[v["severity"]] > order[supported]:
+            v["severity"] = supported
     return v
 
 
@@ -196,6 +218,12 @@ def assess_results(results):
             r["status"] = "FAIL"
         elif sev in ("med", "low"):
             r.setdefault("warnings", []).append(f"AI-vision ({sev}): {summary[:140]}")
+
+        gloss = verdict.get("template_gloss") or {}
+        if gloss.get("flagged"):
+            note = (gloss.get("note") or "").strip()[:140]
+            r.setdefault("warnings", []).append(f"AI-vision (advisory slop-lens, #1466 — never gating): {note}")
+            print(f"  🎭 slop-lens · {r['page']}: {note[:96]}")
 
     return {"status": "ok"}
 
