@@ -202,6 +202,28 @@ The motion head-guard goes in `<head>` after the theme script; `<script src="/as
 goes before the page's main module script. The three builders inject both (evidence/coaching/dispatches
 shells); the hand-authored Home + Cockpit have them inline.
 
+### Micro-interaction grammar v2 — the designed-state registry (#1472)
+One motion vocabulary for the site's *transient* and *selection* surfaces, so interaction
+feels deliberate instead of scattered garnish. Source: `tokens.css` §12d + `motion.js` +
+`tabs.js`. **Every entry names the reason it moves** (the Slop Litmus §6 gate — no
+motion-for-motion's-sake). All of it is `prefers-reduced-motion`-gated and **fails open**:
+each surface is shown/hidden by *attribute* (`hidden` / `aria-selected`) or by JS-rendered
+content — the animation only decorates the *appearance*, it never gates the content. Under
+reduced motion each surface is simply present in its final state, instantly.
+
+Three shared entrance primitives (defined once in `tokens.css` §12d, reused everywhere):
+`mi-pop` (fade + 4px rise + 0.98→1 settle, `--dur-fast`), `mi-fade` (opacity only,
+`--dur-fast`), `mi-panel` (fade + 6px rise, `--dur`).
+
+| surface | what moves | primitive | the reason it earns the motion |
+|---|---|---|---|
+| **Tabs — selection** | active-tab ember underline + label colour ease in (`transition`, both directions) | — | The "you are here" marker confirms your choice without a jarring snap; animating both ways ties the old and new tab into one move. |
+| **Tabs — panel swap** | the controlled region fades + rises on switch (`.tabpanel[hidden]` kit auto; the shared `.dx-tab` read region gets a `.mi-swap` replay from `tabs.js` since it re-renders one persistent region) | `mi-panel` | A panel that swaps with no transition reads as a page reload, not a response to your click. |
+| **Chart focus** | focus dot pops in; tooltip fades in as you touch/scrub a trend | dot `mi-pop`, tip `mi-fade` | The dot marks the exact point you're inspecting; the readout announcing itself confirms it's fresh for THIS point. (The tip keeps its own `transform` to sit above the cursor, so it fades only — a transform keyframe would fight its positioning.) Runs once per touch session, not per pointermove. |
+| **Popovers** | provenance (#584) + coach-name (CC-04) disclosures rise + settle out of their trigger (`transform-origin: top left`) | `mi-pop` | A disclosure that blinks into existence is easy to miss; the rise draws the eye to where it landed, next to the chip you clicked. |
+| **Count-ups** | `[data-countup]` numbers tick 0 → value on reveal (`motion.js`; `window.__moCount(el)` re-triggers for values set after load) | JS (cubic ease-out, ~900ms) | A number that counts up says "this was measured and is moving," reinforcing the live-instrument feel — only on real values, never placeholders (`··` is left alone). |
+| **Page transitions** | cross-document View Transitions: the loop-ribbon persists and its ember "you are here" marker slides to the new door while content cross-fades (`tokens.css` §12b) | native VT + `lr-settle` | The site navigates as ONE continuous instrument — the causal loop made continuous, not re-drawn each page. Pure progressive enhancement; a browser without `@view-transition` just navigates. |
+
 ### Headroom (not yet done)
 Every SVG/div chart is now interactive (`data-cpts`, #582). The identity swing was kept deliberately restrained.
 
