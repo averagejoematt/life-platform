@@ -1892,8 +1892,20 @@ def tool_log_evening_intake(args):
     """One-tap alternative to the nudge email's signed link: log the evening's
     intake count (0-4; 4 means 4+) to the Matthew-private partition.
     PK: USER#matthew#SOURCE#private_intake, SK: DATE#YYYY-MM-DD.
+
+    #1484 evening-flow hardening:
+    - The default date is the PACIFIC calendar day (`pacific_today()`), not UTC.
+      The evening flow runs 6pm-midnight PT, which is already tomorrow in UTC —
+      a UTC default would key "tonight" one day forward of the nudge email's
+      signed-link write (which keys by PT), splitting one evening across two
+      DATE# rows and double-counting evenings in the dose-response arming ledger.
+    - Idempotent and OBSERVABLY so: re-logging the same evening updates the one
+      row in place (SET overwrite, unchanged), and the response now reports
+      `updated` + `previous_count` (via ReturnValues=UPDATED_OLD) so the flow
+      can say "updated tonight's count 2 -> 1" instead of silently re-writing.
     """
     from intake_response import PRIVATE_INTAKE_PK
+    from pacific_time import pacific_today
 
     try:
         count = int(args.get("count"))
@@ -1901,18 +1913,30 @@ def tool_log_evening_intake(args):
         raise ValueError("count is required (integer 0-4; 4 = four or more)")
     if not (0 <= count <= 4):
         raise ValueError("count must be between 0 and 4 (4 = four or more)")
-    date_str = (args.get("date") or datetime.now(timezone.utc).strftime("%Y-%m-%d")).strip()
+    date_str = (args.get("date") or pacific_today()).strip()
     datetime.strptime(date_str, "%Y-%m-%d")  # validate; raises on junk
 
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
-    table.update_item(
+    resp = table.update_item(
         Key={"pk": PRIVATE_INTAKE_PK, "sk": f"DATE#{date_str}"},
         UpdateExpression="SET intake_count = :v, intake_count_logged_at = :ts, #src = :src",
         ExpressionAttributeNames={"#src": "source"},
         ExpressionAttributeValues={":v": Decimal(count), ":ts": now_iso, ":src": "mcp"},
+        ReturnValues="UPDATED_OLD",
     )
-    logger.info(f"log_evening_intake: date={date_str} count={count}")
-    return {"logged": True, "date": date_str, "count": count, "private": True}
+    old = (resp or {}).get("Attributes") or {}
+    previous_count = old.get("intake_count")
+    previous_count = int(previous_count) if previous_count is not None else None
+    updated = previous_count is not None
+    logger.info(f"log_evening_intake: date={date_str} count={count} updated={updated} previous={previous_count}")
+    return {
+        "logged": True,
+        "date": date_str,
+        "count": count,
+        "private": True,
+        "updated": updated,  # True = this evening was already logged; row updated in place, never double-counted
+        "previous_count": previous_count,
+    }
 
 
 def tool_get_intake_response(args):

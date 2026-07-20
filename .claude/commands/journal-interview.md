@@ -18,6 +18,14 @@ journaled today → default to offering `evening`).
 
 ## Instructions
 
+### 0. Open with one call (evening especially)
+
+Call `get_capture_queues` once before the first question — it returns everything the
+bridging steps below need in a single read: the evening-intake status (`logged_tonight`,
+`tonight_count`, dose-response arming progress), the open coach check-in questions, and
+the habit-reflection counts. Don't recite any of it at Matthew — it's your pre-flight
+picture, not an agenda. Skip-without-penalty applies to every queue it reports.
+
 ### 1. Pick the template
 
 Valid `Template` select values on the live Notion journal DB: `Morning`, `Evening`,
@@ -33,10 +41,13 @@ fixed checklist. Rough shape per variant (adapt, don't recite verbatim):
 
 - **Morning**: how'd you sleep / how do you feel, what's today's shape (training,
   work, anything specific on your mind), any intention for the day.
-- **Evening**: how did today actually go, what stood out, mood, anything unresolved.
-  Bridge to two things before closing (see step 4): `log_evening_intake` if he mentions
-  drinking, and any pending coach check-in question that's a natural fit for the
-  conversation already happening (`get_coach_checkin_queue` — offer it, don't force it).
+- **Evening — this is THE unified evening flow (#1484)**: how did today actually go,
+  what stood out, mood, anything unresolved. The evening variant is deliberately a
+  bridge across every evening surface, sequenced in step 5: interview → Notion write →
+  the one-tap drinks count → (optionally) ONE pending coach check-in question →
+  (optionally) a habit-miss "why" that already surfaced. Whole thing lands in under
+  10 minutes — if it's running long, the journal entry wins and the bridges drop
+  first, never the reverse.
 - **Weekly Reflection**: zoom out — what pattern showed up this week across training/
   nutrition/mood/work, what he'd change, what he's proud of. Consider pairing with a
   `get_field_notes` read for the current week and offering to fold in a response to the
@@ -72,15 +83,33 @@ Call `notion-create-pages` with:
     If it fails, that's a degraded-not-broken outcome per CHAT_MODES.md — don't panic,
     just note it and prefer explicit Matthew confirmation of the date until fixed.
 
-### 5. Close out
+### 5. Close out — the evening bridge sequence (#1484)
 
 - Confirm the page was created (echo back what was written, or fetch it back if the date
   key needs verifying per step 4).
-- If step 2's evening bridge surfaced a drinks count, call `log_evening_intake` now (0-4
-  tap, count only — no free text needed, that already lives in the journal entry).
-- If step 2 surfaced an answer to a pending coach check-in question, call
-  `log_coach_checkin` with that answer VERBATIM (not the journal's composed prose —
-  pull his actual words for the checkin answer specifically).
+- **Evening only — the intake tap, ALWAYS offered, one tap:** if step 0's
+  `evening_intake` shows `logged_tonight: false`, ask for tonight's drinks count and call
+  `log_evening_intake` (0-4, count only — no free text needed, the texture already lives
+  in the journal entry). Don't wait for him to mention drinking — the whole point is
+  that the arming dose-response engine needs the zeros too; a quiet "and drinks
+  tonight — zero?" is the tap. If he already logged (`logged_tonight: true`), skip
+  silently unless he corrects the number — the tool is idempotent: re-logging the same
+  evening updates the row (it returns `previous_count`), never double-counts. The
+  tool defaults the date to the Pacific evening — only pass `date` explicitly for a
+  backdated entry (yesterday's evening written this morning).
+- **At most ONE coach check-in question, only if it fits:** if step 0's queue has an
+  open question that the conversation already brushed against, offer it ("Reeves has
+  been wondering X — want to answer while we're here?"). One question maximum, skip is
+  always fine, and the answer goes to `log_coach_checkin` VERBATIM (not the journal's
+  composed prose — pull his actual words for the checkin answer specifically). Working
+  the full queue is `speak-to-coaches`' job, not this flow's.
+- **Habit-miss "why", only if it surfaced on its own:** if the interview naturally
+  produced the why behind a missed habit (or the driver behind a completed one), route
+  it to `log_habit_reflection`. Reactive only — never open a habit line of questioning
+  from the queue counts (CHAT_MODES.md's optional-and-reactive rule).
 - Anything else that came up that isn't "journal entry" — a decision, an insight, a
   durable memory — route it per the CHAT_MODES.md contract, don't fold it silently into
   the journal page and leave it uncaptured elsewhere.
+- The evening ledger stays drinks-only by decision — no evening-energy tap, no second
+  numeric field (ADR-137). Mood lives in the journal + the nudge's `mood_valence`;
+  don't invent capture surfaces at the close.

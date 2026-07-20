@@ -590,14 +590,15 @@ TOOLS = {
             "name": "log_evening_intake",
             "description": (
                 "PRIVATE (#1405): log this evening's drinks count (0-4; 4 = four or more) "
-                "to the Matthew-private intake ledger. One tap, no free text. "
+                "to the Matthew-private intake ledger. One tap, no free text. Idempotent: "
+                "re-logging the same evening updates it (returns previous_count), never double-counts. "
                 "Use for: 'log 2 drinks tonight', 'zero drinks yesterday' (pass date)."
             ),
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "count": {"type": "integer", "description": "Evening count, 0-4 (4 = four or more)."},
-                    "date": {"type": "string", "description": "YYYY-MM-DD (default: today UTC)."},
+                    "date": {"type": "string", "description": "YYYY-MM-DD (default: tonight, the Pacific calendar day)."},
                 },
                 "required": ["count"],
             },
