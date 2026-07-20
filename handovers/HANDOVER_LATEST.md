@@ -141,3 +141,25 @@ cycle 9, push_ci_silent_death → billing root cause, shipped archive) + synced.
 
 Prior sessions (same day): `HANDOVER_2026-07-19_VoiceStudio-Plan.md`,
 `HANDOVER_2026-07-19_Day2-drain.md`.
+
+
+---
+
+## MONDAY-MORNING ADDENDUM (2026-07-20, ~10:45 PT) — the weight re-anchor
+
+Matthew weighed in: **321.38 lb** (measured 15:54 UTC) vs the 315.0 override. Waited out
+the 16:30-17:00 UTC compute/brief window (per the original sequencing note), then the
+full same-genesis re-run: cycle stayed 9 (pipeline detected already-registered — the
+same-genesis path works), rendered+semantic gates PASS, truth SKIPPED (tier-1 again).
+Prereg re-landed VERBATIM — live sha still 908fa45a… (the seal held; Brandt's frozen
+"315.0" reference stays frozen, which is what seals are for). Predict-week rolled to
+**W30**. `restart_verify.py` **11/12** — the 12th (post-genesis character sheet) lands
+with TOMORROW's 16:30 UTC compute by design; deliberately NOT force-computed early
+(a partial today-sheet would make the cron's idempotency skip the real Day-1 sheet).
+Site synced, live == 4718e7b9. Harness re-run: 20 pass, withings now GREEN (17h fresh),
+remaining fails = the 3 known dark sources + **a NEW true positive: the canary's first
+3×/week run found itself BLIND — all 5 probes 403 from site-api-ai while readers verified
+fine (ask 200 live) → issue #1589 with the bisect hint (only #1582 touched
+site_api_ai_lambda in the window; the full-tree bundle refreshes everything though).**
+This morning's 17:00 UTC brief went out saying 315 — one email; tomorrow's carries
+321.38. GitHub billing STILL broken at this writing (runs failing the annotation way).
