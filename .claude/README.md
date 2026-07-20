@@ -9,7 +9,7 @@ The single source of project instructions loaded into every session: architectur
 
 **2. The knowledge base — [`/docs/`](../docs/)**
 Designed so an agent can answer "why" without guessing:
-- **ADRs** — every non-trivial decision is recorded in [`docs/DECISIONS.md`](../docs/DECISIONS.md) (ADR-001…137). Reversible, dated, with context + consequences.
+- **ADRs** — every non-trivial decision is recorded in [`docs/DECISIONS.md`](../docs/DECISIONS.md) (ADR-001…139). Reversible, dated, with context + consequences.
 - **Reference** — `ARCHITECTURE.md`, `SCHEMA.md` (authoritative data model), `RUNBOOK.md`, `INFRASTRUCTURE.md`, `MONITORING.md`, `SECURITY.md`, `COST_TRACKER.md`.
 - **[`docs/TAG_CODES.md`](../docs/TAG_CODES.md)** — decodes the internal tag alphabet (ADR/PG/SIMP/IC/SEC/…) so commits and comments are traceable to the decision that motivated them.
 - **`handovers/`** — end-of-session state hand-offs so the next session resumes with full context.

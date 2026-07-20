@@ -1,0 +1,56 @@
+# pr-checks.yml — the minimal ADVISORY pre-merge lane (ADR-139, #1344).
+#
+# Three fast checks (~1 min total) on every PR, killing the two documented
+# agent-merge failure classes at the door:
+#   1. pytest --collect-only  — the #1297 collection-error class
+#   2. the deploy_critical marker subset — ADR-117's fast offline lane
+#   3. black --check — the format gate (same pin as ci-cd.yml lint)
+#
+# ADVISORY BY DESIGN: this lane is deliberately NOT a required status check.
+# Required-ness is a GitHub branch-protection setting, and the #1319 incident
+# proved those silently drop on repo-visibility flips — so the durable control
+# is this file (in git), and flipping it to required is an explicit owner
+# toggle recorded in deploy/github_posture.json (drift_sentinel GET-verifies
+# weekly). Until then the merge ritual's compensating control stands: full
+# local suite, no -x, before every merge. See ADR-139.
+#
+# The reconcile bot pushes directly to main; PR checks never gate direct
+# pushes, so this lane is structurally compatible with it either way.
+
+name: PR checks
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-checks-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  fast-lane:
+    name: Collect + deploy-critical + format
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install lane dependencies
+        run: pip install pytest boto3 botocore black==25.9.0
+
+      - name: Collection gate (the #1297 class dies here)
+        run: python3 -m pytest tests/ --collect-only -q
+
+      - name: Deploy-critical lane (ADR-117 marker subset)
+        run: python3 -m pytest tests/ -m "deploy_critical and not integration" -q --tb=short
+
+      - name: Format gate (same pin as ci-cd lint)
+        run: black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
