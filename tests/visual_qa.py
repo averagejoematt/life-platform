@@ -23,6 +23,12 @@ read-only engine:
      recorded honestly as warnings, never hidden, never gating. Baseline
      shrinks/updates DELIBERATELY via --update-baseline (see tests/a11y_audit.py
      for the full semantics + review discipline).
+  10. Leak-token sweep (#1448, deterministic, no AI, no browser): the SAME
+      token-grep deploy/restart_verify_rendered.py runs at reset time
+      (tests/leak_token_sweep.py) also runs here on every sweep, so a
+      template/leak-token regression (a stale literal, a cached S3 JSON blob,
+      a missed DDB partition) is caught within a day instead of only at the
+      next reset. --no-leak-scan is the debug escape hatch.
 
 The site is PUBLIC (no cf-auth gate) — no authentication needed.
 
@@ -105,7 +111,8 @@ try {
 # paths + checks); tests/test_qa_manifest.py gates the derivation from drifting.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import a11y_audit  # noqa: E402  (#1433 — pure module, no Playwright import)
-from qa_manifest import visual_pages  # noqa: E402
+import leak_token_sweep  # noqa: E402  (#1448 — pure module, no Playwright import)
+from qa_manifest import leak_scan_paths, visual_pages  # noqa: E402
 
 PAGES = visual_pages()
 
@@ -468,6 +475,37 @@ def _navigate_with_fallback(page, url, primary_timeout=15000, fallback_timeout=2
             return f"Page load failed: {e2}"
 
 
+def run_leak_token_sweep(base_url=None):
+    """Deterministic, AI-free leak-token sweep (#1448).
+
+    Reuses the SAME token-grep deploy/restart_verify_rendered.py runs at reset
+    time (tests/leak_token_sweep.py) so a template/leak-token regression — a
+    hardcoded stale literal, a cached S3 JSON blob, a missed DDB partition — is
+    caught within a day instead of only at the next reset. Plain urllib + regex
+    over leak_scan_paths() + the JSON endpoints; no Playwright, no Bedrock, no
+    cost. tokens_for_daily_run() drops the reset-window-only checks (Day-30+,
+    character level, ...) once the current cycle has legitimately matured past
+    them, so real progress never reds this.
+
+    Returns {"ok": bool, "checked": int, "issues": [str, ...]}.
+    """
+    base_url = base_url or SITE_URL
+    tokens = leak_token_sweep.tokens_for_daily_run()
+    pages = leak_scan_paths()
+    page_results = leak_token_sweep.sweep(
+        base_url,
+        pages,
+        leak_token_sweep.JSON_ENDPOINTS,
+        tokens=tokens,
+        allow_503_paths=leak_token_sweep.ALLOW_503_NOT_COMPUTED,
+    )
+    issues = []
+    for r in page_results:
+        for label, samples in r["hits"]:
+            issues.append(f"{r['path']} — [{label}] {' | '.join(samples)}")
+    return {"ok": not issues, "checked": len(page_results), "issues": issues}
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Main sweep
 # ══════════════════════════════════════════════════════════════════════════════
@@ -815,8 +853,16 @@ def run_sweep(
     max_tier=None,
     a11y=True,
     update_a11y_baseline=False,
+    leak_scan=True,
 ):
     """Run the v4 visual QA sweep. Returns True if no page FAILED.
+
+    leak_scan (#1448): runs the deterministic, AI-free leak-token sweep
+    (tests/leak_token_sweep.py — the same checks deploy/restart_verify_rendered.py
+    runs at reset time) against SITE_URL and folds any hit into the pass/fail
+    tally as a synthetic "page" result. True by default (every existing gating
+    run gets it automatically); the CLI's --no-leak-scan is the debug escape
+    hatch, mirroring --no-a11y.
 
     a11y / update_a11y_baseline (#1433): the axe-core audit runs per page by
     default (a11y=False is the debug escape hatch — CI never passes it); NEW
@@ -933,6 +979,31 @@ def run_sweep(
         if skipped:
             print(f"  ⚠ a11y baseline NOT updated for {len(skipped)} page(s) where the audit failed to run: {', '.join(skipped[:5])}")
 
+    # ── deterministic leak-token sweep (#1448) — no AI, no browser; reuses the
+    # SAME token-grep deploy/restart_verify_rendered.py runs at reset time, so a
+    # template/leak-token regression is caught within a day instead of only at
+    # the next reset. Appended AFTER the AI-vision/reader-truth/a11y passes
+    # above so it never becomes an accidental AI-vision or a11y target (it has
+    # no screenshot/a11y payload) — it only affects the pass/fail tally + the
+    # reports below.
+    if leak_scan:
+        leak_status = run_leak_token_sweep()
+        icon = "✅" if leak_status["ok"] else "❌"
+        print("\n── Leak-token sweep (deterministic, #1448) ──")
+        print(f"  {icon} {leak_status['checked']} URL(s) checked, {len(leak_status['issues'])} finding(s)")
+        for x in leak_status["issues"]:
+            print(f"      → {x}")
+        results.append(
+            {
+                "page": "Leak-token sweep",
+                "path": "(cross-cutting — leak_scan_paths + JSON endpoints)",
+                "status": "PASS" if leak_status["ok"] else "FAIL",
+                "issues": leak_status["issues"],
+                "warnings": [],
+                "screenshots": {},
+            }
+        )
+
     passed = sum(1 for r in results if r["status"] == "PASS")
     failed = sum(1 for r in results if r["status"] == "FAIL")
     warns = sum(len(r.get("warnings", [])) for r in results)
@@ -1027,6 +1098,14 @@ if __name__ == "__main__":
             "for the flagship doors + live-data topic pages). Omit for full coverage — every existing gating run does."
         ),
     )
+    ap.add_argument(
+        "--no-leak-scan",
+        action="store_true",
+        help=(
+            "Skip the deterministic leak-token sweep (#1448; tests/leak_token_sweep.py — the same checks "
+            "deploy/restart_verify_rendered.py runs at reset time). Debug escape hatch only — every CI run keeps it on."
+        ),
+    )
     args = ap.parse_args()
 
     pages = None
@@ -1049,5 +1128,6 @@ if __name__ == "__main__":
         max_tier=args.max_tier,
         a11y=not args.no_a11y,
         update_a11y_baseline=args.update_baseline,
+        leak_scan=not args.no_leak_scan,
     )
     sys.exit(0 if ok else 1)

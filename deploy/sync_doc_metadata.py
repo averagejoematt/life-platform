@@ -753,6 +753,25 @@ def _auto_discover_alarm_names() -> set[str] | None:
     return names
 
 
+def _ast_literal_str_list_len(path, name: str) -> int | None:
+    """len() of a module-level `name = [...]` literal string list at `path`, or
+    None if the file/assignment is missing or non-literal. Pure AST — no import,
+    no side effects."""
+    if not path.exists():
+        return None
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    except Exception:
+        return None
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and isinstance(node.value, (ast.List, ast.Tuple)):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == name:
+                    if all(isinstance(e, ast.Constant) and isinstance(e.value, str) for e in node.value.elts):
+                        return len(node.value.elts)
+    return None
+
+
 def _auto_discover_restart_url_counts() -> tuple[int, int] | None:
     """(page_count, json_endpoint_count) from deploy/restart_verify_rendered.py (#973).
 
@@ -800,6 +819,14 @@ def _auto_discover_restart_url_counts() -> tuple[int, int] | None:
                 counts["PAGES"] = n
         except Exception:
             pass
+    if "JSON_ENDPOINTS" not in counts:
+        # #1448: JSON_ENDPOINTS moved to the shared tests/leak_token_sweep.py
+        # module (imported here, not a local literal anymore) so the daily
+        # visual-qa sweep can reuse the same list — fall back to AST-reading
+        # the literal there.
+        n = _ast_literal_str_list_len(ROOT / "tests" / "leak_token_sweep.py", "JSON_ENDPOINTS")
+        if n is not None:
+            counts["JSON_ENDPOINTS"] = n
     pages = counts.get("PAGES")
     endpoints = counts.get("JSON_ENDPOINTS")
     if pages is None or endpoints is None or pages < 10 or endpoints < 3:
