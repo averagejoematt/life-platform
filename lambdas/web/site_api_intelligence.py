@@ -1768,7 +1768,8 @@ def _data_days_this_cycle() -> int | None:
 def handle_correlations(event: dict = None) -> dict:
     """
     GET /api/correlations
-    Returns the most recent weekly correlation matrix (23 pairs)
+    Returns the most recent weekly correlation matrix (all
+    CORRELATION_PAIRS, incl. the #1406 cross-domain edges)
     for the public Correlation Explorer.
 
     HP-06: When ?featured=true is passed, returns a flat array of
