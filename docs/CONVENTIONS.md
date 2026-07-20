@@ -1,6 +1,6 @@
 # CONVENTIONS — the load-bearing reflexes
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-18
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-20
 
 The single canonical home for the hard-won operational reflexes that keep a deploy
 from silently regressing production. Each one was learned from a real incident. When
@@ -431,6 +431,58 @@ unchanged) — spellings the fix's own regex never tried.
 4. **Run the hardened gate on the pre-fix tree and show it RED** before committing
    the fix — that's the proof the rule would have caught the original defect, not
    just a plausible-looking regex.
+
+---
+
+## 9. Gate registry — defect class → owning gate (#1349)
+
+The standing gates (wrap-time, CI, pre-commit) have grown one incident at a time —
+each section above narrates its own origin story, but nothing answered "which gate
+would catch THIS class of defect?" in one glance. This table is a routing index, not a
+restatement: each row is a one-line pointer to the section/file that owns the rule —
+read that section for the incident narrative and the exact mechanics.
+
+**Wrap gates** (session-close, `.claude/commands/wrap.md` — run every `/wrap`):
+
+| Defect class | Owning gate | Where |
+|---|---|---|
+| Session shipped+deployed work with no public dispatch | Build-beat gate (#736), step (d) | `.claude/commands/wrap.md` step (d) |
+| A shipped change invalidated a wiki page and nobody updated it | Doc-impact sweep, step (e) | `.claude/commands/wrap.md` step (e); mechanics in §8 above |
+| A governance-consequential decision landed with no ADR | Decisions gate (#1343), step (e) | `.claude/commands/wrap.md` step (e) |
+| A status block claims "main GREEN" without reading the badge | Green-main gate (#1327), step (e2) | `scripts/check_main_green.py` |
+| An incident-class event (rollback, main red >1h, data gap, budget-tier event) went unlogged | Incident gate (#1332), step (e3) | `docs/INCIDENT_LOG.md` + `.claude/commands/wrap.md` step (e3) |
+| A handover residual/next-picks bullet names real work with no issue number | Residual-queue gate (#1340), step (e4) | `scripts/check_residual_queue.py` |
+| A stale `git stash` entry or a dead pre-commit hook survives across sessions | Stash + hook hygiene gate (#1326), step (e5) | `deploy/session_postflight.py` |
+| An open `type:story` issue carries no `model:*` label (label-routing query silently skips it) | Label-completeness gate (#1349), step (e6) | `scripts/check_story_labels.py` |
+| A memory topic file exists un-indexed from `MEMORY.md`/`project_shipped_archive.md` | Orphan/broken-link gate (#1259), step (c) | inline bash loop, `.claude/commands/wrap.md` step (c) |
+| A `MEMORY.md` index correction didn't carry through to the topic file's body | Body-follows-index gate (#1342), step (c) | `scripts/check_memory_body_facts.py` |
+
+**CI gates** (`.github/workflows/ci-cd.yml` unless noted — every push to `main` or a PR):
+
+| Defect class | Owning gate | Where |
+|---|---|---|
+| Unformatted/unsorted Python, a stale-typed module, a syntax error | Lint job (`black`/`ruff`/`mypy`/`py_compile`) | §4 above |
+| A Lambda/CDK deploy artifact or its wiring is broken (IAM, handler names, DDB patterns, MCP registry) | `test-critical` deploy-critical lane (ADR-117) | §4a above |
+| A dependency/CDK toolchain version silently floats | Pinned-both-directions check | §4 above ("CDK toolchain is pinned both directions") |
+| A deprecated secret name still referenced | "Deprecated secrets scan" step | `.github/workflows/ci-cd.yml`, job `test` |
+| An upstream vendor API payload shape drifted | `test_upstream_contracts.py` (ER-02) | `.github/workflows/ci-cd.yml`, job `test` |
+| Line coverage regresses below the enforced floor | Coverage gate (`--cov-fail-under=40`, ADR-080) | `.github/workflows/ci-cd.yml`, job `test` |
+| The coverage floor silently lags measured coverage | Coverage-gap drift warning (#1206) | `scripts/coverage_gap_warn.py` |
+| The Unit Tests job's own wall-clock silently climbs (157s→294s, no reminder) | Suite-duration budget warning (#1349) | `scripts/coverage_gap_warn.py --duration-seconds` |
+| A visible page/component regresses (layout break, blank data-bind, JS error) | Visual-QA (Playwright + Bedrock vision) | §4b above |
+| A generator-owned artifact (doc-sync literals, ADR index, chrome block) goes stale across a merge queue | Merge-day reconcile job | §4c above |
+| A doc claims a stale count/version/cadence in any phrasing | `check_doc_facts.py` | §8 above |
+| A page references a retired concept | `check_doc_tombstones.py` + `docs/_lint/tombstones.txt` | §8 above |
+| A relative doc link/anchor is broken | `check_doc_links.py` | §8 above |
+| A canonical page is unindexed or unverified >180d | `check_doc_index.py` | §8 above |
+| A doc-sync literal (test/alarm/lambda count) drifts from ground truth | `deploy/sync_doc_metadata.py --check` | §8 above; literals excluded from this table's edits (see CLAUDE.md) |
+
+**Pre-commit hook** (`scripts/install_hooks.sh`, installed once per clone — runs on every local commit):
+
+| Defect class | Owning gate | Where |
+|---|---|---|
+| A staged Python file isn't `black`/`ruff` clean | Format gate (#785/CLAUDE-02) | `scripts/install_hooks.sh` |
+| A doc-sync literal is stale at commit time | `sync_doc_metadata.py --apply`, auto-staged | `scripts/install_hooks.sh` |
 
 ---
 

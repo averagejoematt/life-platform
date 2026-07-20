@@ -469,6 +469,11 @@ jobs:
         with:
           ref: ${{ needs.reconcile.outputs.build_sha }}   # #1173: the reconciled tree
 
+      # #1349: stamp the job's own start epoch so the duration-budget warning
+      # below can compute wall-clock without depending on an external API call.
+      - name: Record job start time (#1349 duration budget)
+        run: echo "UNIT_TESTS_START_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
+
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
@@ -611,14 +616,21 @@ jobs:
               -q 2>&1 | tail -100
           echo "::endgroup::"
 
-      - name: Coverage floor drift warning (self-reminding ratchet, #1206)
-        # Advisory, fail-open. Parses coverage.xml's line-rate and emits a GitHub
-        # ::warning:: annotation when the enforced floor (40) lags measured line
-        # coverage by >10 points, so the ratchet reminds a human to bump it. Reuses
-        # the coverage.xml produced above — no new standing machinery. Never fails
-        # the build (the script exits 0 on any parse blip; keep `if: always()`).
+      - name: Coverage + duration drift warnings (self-reminding ratchet, #1206/#1349)
+        # Advisory, fail-open. Two independent checks in one script (both never
+        # fail the build; keep `if: always()`):
+        #  (1) #1206: parses coverage.xml's line-rate and emits a GitHub
+        #      ::warning:: when the enforced floor (40) lags measured line
+        #      coverage by >10 points, so the ratchet reminds a human to bump it.
+        #  (2) #1349: computes this job's own wall-clock from the start-epoch
+        #      stamped above and warns when it exceeds the 480s (8min) budget —
+        #      suite duration went 157s->294s over 6 days with no standing
+        #      reminder; same self-reminding-ratchet shape, applied to suite cost.
         if: always()
-        run: python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 40 --gap-threshold 10
+        run: |
+          DURATION_SECONDS=$(( $(date +%s) - "${UNIT_TESTS_START_EPOCH:-$(date +%s)}" ))
+          python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 40 --gap-threshold 10 \
+              --duration-seconds "$DURATION_SECONDS" --duration-budget-seconds 480
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
