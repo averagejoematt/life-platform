@@ -1085,6 +1085,51 @@ def email_monday_compass() -> list[iam.PolicyStatement]:
     return _email_base()
 
 
+def email_ai_review_pack() -> list[iam.PolicyStatement]:
+    """Weekly AI review-pack (#1442, QA strategy D3): the human editorial plane.
+
+    Deliberately NOT _email_base — this Lambda curates the already-generated,
+    already-gate-passed D2 archive (generated/qa_archive/); it makes NO Bedrock
+    calls, so it gets neither ai-keys nor a bedrock:InvokeModel grant. Least
+    privilege: read the archive (ListBucket on both qa_archive prefixes +
+    GetObject on the text leg it parses — screenshots are only LINKED, never
+    fetched), write the email-send status record, send via SES, DLQ on failure.
+    """
+    return [
+        iam.PolicyStatement(
+            sid="DynamoDB",
+            actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem"],
+            resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="QaArchiveRead",
+            actions=["s3:GetObject"],
+            resources=_s3("generated/qa_archive/text/*"),
+        ),
+        iam.PolicyStatement(
+            sid="QaArchiveList",
+            actions=["s3:ListBucket"],
+            resources=[BUCKET_ARN],
+            conditions={"StringLike": {"s3:prefix": ["generated/qa_archive/text/*", "generated/qa_archive/screenshots/*"]}},
+        ),
+        iam.PolicyStatement(
+            sid="SES",
+            actions=["ses:SendEmail", "sesv2:SendEmail"],
+            resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="DLQ",
+            actions=["sqs:SendMessage"],
+            resources=[DLQ_ARN],
+        ),
+    ]
+
+
 def email_partner() -> list[iam.PolicyStatement]:
     """Partner weekly email: DDB read, S3 config, ai-keys, SES + the recipient
     SSM parameter (the address is PII, kept out of the repo)."""

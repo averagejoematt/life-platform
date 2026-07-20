@@ -282,6 +282,25 @@ class EmailStack(Stack):
             **shared,
         )
 
+        # Weekly AI review-pack (#1442, QA strategy D3 — the human editorial plane).
+        # Sunday 18:00 UTC (fixed, no DST drift) — after the Sunday weekly-digest
+        # (16:00 UTC), covering the week just ended. Curates the D2 archive
+        # (generated/qa_archive/) into one scannable email; makes NO Bedrock calls,
+        # so it carries a minimal read-the-archive + SES role (no ai-keys/Bedrock).
+        create_platform_lambda(
+            self,
+            "AiReviewPack",
+            function_name="ai-review-pack",
+            handler="emails.ai_review_pack_lambda.lambda_handler",
+            source_file="lambdas/emails/ai_review_pack_lambda.py",
+            schedule="cron(0 18 ? * SUN *)",
+            timeout_seconds=120,
+            memory_mb=256,
+            environment=_email_env,
+            custom_policies=rp.email_ai_review_pack(),
+            **shared,
+        )
+
         # EXTERNAL_EMAILS_ENABLED kill switch — flip to "true" to resume sending to
         # non-Matthew recipients (Partner, confirmed subscribers). Used by
         # partner-weekly-email, chronicle-email-sender, weekly-signal.
