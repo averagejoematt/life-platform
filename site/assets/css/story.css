@@ -620,7 +620,9 @@ body { overflow-x: hidden; }
 .ct-list { list-style: none; margin: var(--sp-3) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-3); max-width: var(--measure); }
 .ct-row { display: grid; gap: 2px; }
 .ct-axis { color: var(--ember); }
-.ct-track { display: block; position: relative; block-size: 6px; border-radius: 3px; background: var(--surface-raised); border: var(--border-hair); overflow: hidden; }
+/* #1470: a track rail is TONED paper (--surface-2), not floating paper — on the light
+   ramp --surface-raised now lifts toward warm white, which would erase the rail. */
+.ct-track { display: block; position: relative; block-size: 6px; border-radius: 3px; background: var(--surface-2); border: var(--border-hair); overflow: hidden; }
 .ct-fill { display: block; block-size: 100%; background: var(--ember); border-radius: inherit; }
 .ct-poles { display: flex; justify-content: space-between; color: var(--ink-faint); font-size: var(--fs-label); }
 .ct-disclosure { display: block; margin-top: var(--sp-3); color: var(--ink-faint); font-style: italic; }

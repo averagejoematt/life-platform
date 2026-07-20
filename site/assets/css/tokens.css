@@ -96,9 +96,12 @@
   --surface:     #16130E;   /* oklch(.19 .010 75)  — paper / panels   */
   --ink:         #ECE3D2;   /* oklch(.91 .022 88)  — primary text      */
   --ink-muted:   #A99F8C;   /* oklch(.69 .020 84)  — secondary         */
-  --ink-faint:   #8B806C;   /* oklch(.56 .018 82)  — labels, ticks · 5.0:1 on --page / 4.8:1 on
-                               --surface (WCAG AA — #579 bump from #857B68, which cleared --page
-                               at 4.68:1 but missed AA on --surface at 4.44:1) */
+  --ink-faint:   #988D78;   /* oklch(.62 .020 82)  — labels, ticks · #1470 bump from #8B806C
+                               (which held 4.8:1 on --surface but only 3.8:1 on --surface-raised,
+                               where popover dt labels already sat): WCAG AA on the whole paper
+                               ramp — 6.0:1 --page / 5.7:1 --surface / 5.1:1 --surface-2 /
+                               4.5:1 --surface-raised. History: #579 bumped #857B68→#8B806C
+                               for the same reason one ramp step lower. */
   --ember:       #DD7A37;   /* oklch(.69 .145 52)  — the one live accent */
   --alert:       #CB634C;   /* restrained oxblood — 5.1:1 on --page / 4.8:1 on --surface (WCAG AA
                                — #579 bump from #B14A33, which measured 3.6:1 on --page, failing
@@ -107,9 +110,26 @@
   --alert-wash:  color-mix(in oklch, var(--alert) 11%, transparent);
   --alert-line:  color-mix(in oklch, var(--alert) 45%, transparent);
 
-  /* Derived tints (OKLCH mixing keeps the ramp even). */
+  /* ── The paper-elevation ramp (#1470) — five designed steps, one per job, so
+     NEUTRAL tonality carries surface hierarchy and the ember accent never has to:
+       -1  --surface-sunken   the cut well — code/formula fields, track rails behind fills
+        0  --page             the desk (behind the paper)
+        1  --surface          the paper — panels, cards
+        2  --surface-2        toned paper, one step toward the ink in BOTH themes
+                              (lighter in dark, deeper in light) — inset rails, tonal
+                              chips/cells. Was a DEAD token: 13 rules referenced
+                              var(--surface-2, --surface) and silently fell back flat.
+        3  --surface-raised   floating paper — popovers, tooltips, app-bar, sticky TOC
+     Dark lifts toward the ink; light lifts toward warm white (see the §9 overrides —
+     the derived formula DARKENED raised in light mode, i.e. inverted elevation).
+     Register rule (WCAG AA, enforced by tests/test_paper_ramp_contrast.py): ink,
+     ink-muted, ink-faint and ember all hold >=4.5:1 on steps 0–3 in both themes;
+     the sunken well is machine-text territory — full --ink only, never faint/ember. */
   --surface-raised: color-mix(in oklch, var(--surface) 88%, var(--ink) 12%);
-  --surface-sunken: color-mix(in oklch, var(--surface) 80%, var(--page) 20%);
+  --surface-2:      color-mix(in oklch, var(--surface) 94%, var(--ink) 6%);
+  --surface-sunken: color-mix(in oklch, var(--page) 88%, #000 12%);
+                    /* #1470: was mix(surface 80%, page 20%) = #14120D — indistinguishable
+                       from the paper it sat on. A well must read as a cut, not a tint. */
   --shelf-spine-deep: #1d1810;  /* warm shadow foot of the mind.css book-spine gradient
                                    — one fixed value across both themes (a lit spine edge) */
   --ink-dim:        color-mix(in oklch, var(--ink) 70%, transparent);
@@ -259,7 +279,9 @@
   --border-hair:   1px solid var(--rule);
   --border-strong: 1px solid var(--rule-strong);
 
-  /* Restrained elevation — flat surfaces, soft depth. No neon glow. */
+  /* Restrained elevation — flat surfaces, soft depth. No neon glow. Shadows pair
+     with the §1 paper-elevation ramp (#1470): tonality states the level, the
+     shadow (on floating surfaces only) states the lift. */
   --shadow-panel: 0 22px 50px rgba(0, 0, 0, 0.32);
   --shadow-soft:  0 6px 18px rgba(0, 0, 0, 0.22);
 }
@@ -302,6 +324,13 @@
     --rule:        rgba(34, 30, 23, 0.13);
     --rule-strong: rgba(34, 30, 23, 0.22);
     --tick:        rgba(34, 30, 23, 0.30);
+    /* The paper ramp, light leg (#1470). Elevation lifts toward warm white here —
+       the root's derived raised formula (12% ink) DARKENED in light mode, so every
+       "floating" surface (popover, tooltip, app-bar, TOC) read as a muddy inset.
+       Sunken cuts a real well below the desk (the derived value was invisible:
+       #FAF6EE on #FBF8F1 paper). --surface-2 self-adapts via the root formula. */
+    --surface-raised: #FFFDF8;
+    --surface-sunken: color-mix(in oklch, var(--page) 92%, var(--ink) 8%);
     --shadow-panel: 0 18px 44px rgba(34, 30, 23, 0.12);
     --shadow-soft:  0 6px 16px rgba(34, 30, 23, 0.08);
   }
@@ -320,6 +349,11 @@
   --rule:        rgba(34, 30, 23, 0.13);
   --rule-strong: rgba(34, 30, 23, 0.22);
   --tick:        rgba(34, 30, 23, 0.30);
+  /* The paper ramp, light leg (#1470) — MUST mirror the @media block above exactly
+     (the explicit-choice block is what makes the toggle win in both directions;
+     tests/test_paper_ramp_contrast.py asserts the two blocks stay identical). */
+  --surface-raised: #FFFDF8;
+  --surface-sunken: color-mix(in oklch, var(--page) 92%, var(--ink) 8%);
   --shadow-panel: 0 18px 44px rgba(34, 30, 23, 0.12);
   --shadow-soft:  0 6px 16px rgba(34, 30, 23, 0.08);
 }
@@ -393,7 +427,7 @@ a { color: inherit; text-underline-offset: 0.18em; }
 /* Dual-device dumbbell (sleep §2, P0.3) — A=ember dot, B=muted dot, connector = the spread.
    "Agreement, not truth." Reuses the .suf-row grid. */
 .db-track { position: relative; height: 10px; }
-.db-track::before { content: ""; position: absolute; left: 0; right: 0; top: 4px; height: 2px; background: var(--surface-2, var(--surface)); border-radius: 2px; }
+.db-track::before { content: ""; position: absolute; left: 0; right: 0; top: 4px; height: 2px; background: var(--surface-2); border-radius: 2px; }
 .db-bar { position: absolute; top: 4px; height: 2px; background: var(--ink-faint); border-radius: 2px; }
 .db-dot { position: absolute; top: 0; width: 9px; height: 9px; border-radius: 50%; transform: translateX(-50%); top: 1px; }
 .db-dot.db-a, .sbar-dot.db-a { background: var(--ember); }
@@ -413,7 +447,7 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .em-strip { display: flex; flex-direction: column; gap: var(--sp-3); margin-top: var(--sp-3); }
 .em-row { display: flex; align-items: center; gap: var(--sp-3); }
 .em-dot { border-radius: 50%; flex: 0 0 auto; border: 1px solid var(--rule);
-  background: color-mix(in oklch, var(--ember) calc(var(--heat, 0.12) * 100%), var(--surface-2, var(--surface))); }
+  background: color-mix(in oklch, var(--ember) calc(var(--heat, 0.12) * 100%), var(--surface-2)); }
 .em-l { font-weight: var(--weight-med); }
 .em-meta { color: var(--ink-faint); margin-left: auto; white-space: nowrap; }
 
@@ -433,7 +467,7 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .st-marker.st-auto { background: var(--ember); }
 .st-chip.st-hold { background: var(--ember-wash); border-color: var(--ember); }
 .st-marker.st-hold { background: color-mix(in oklch, var(--ember) 55%, var(--surface)); }
-.st-chip.st-need { background: var(--surface-2, var(--surface)); border-color: var(--ink-muted); }
+.st-chip.st-need { background: var(--surface-2); border-color: var(--ink-muted); }
 .st-marker.st-need { background: var(--ink-muted); }
 .st-chip.st-backlog { background: transparent; border: 1px dashed var(--rule); color: var(--ink-faint); }
 .st-marker.st-backlog { background: transparent; border: 1px dashed var(--ink-faint); }
@@ -507,7 +541,7 @@ a { color: inherit; text-underline-offset: 0.18em; }
 
 /* Per-muscle volume landmark bars (training §5, P1.3) — MEV–MAV band shaded, MRV tick;
    ember in the optimal band, muted ink under/over (never red). Reuses the .suf-row grid. */
-.lmk-track { position: relative; height: 10px; border-radius: 5px; background: var(--surface-2, var(--surface)); }
+.lmk-track { position: relative; height: 10px; border-radius: 5px; background: var(--surface-2); }
 .lmk-band { position: absolute; top: 0; height: 100%; background: var(--ember-wash);
   border-left: 1px dashed var(--ink-faint); border-right: 1px dashed var(--ink-faint); }
 .lmk-fill { position: absolute; top: 0; height: 100%; border-radius: 5px; }
@@ -534,7 +568,7 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .heat-strip { display: flex; flex-wrap: wrap; gap: 4px; margin-top: var(--sp-3); }
 .heat-cell { flex: 1 1 2.2rem; min-width: 2.2rem; aspect-ratio: 1 / 1; border-radius: var(--radius-xs);
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
-  background: color-mix(in oklch, var(--ember) calc(var(--heat, 0.1) * 100%), var(--surface-2, var(--surface)));
+  background: color-mix(in oklch, var(--ember) calc(var(--heat, 0.1) * 100%), var(--surface-2));
   border: 1px solid var(--rule); }
 .heat-v { font-size: 0.6rem; line-height: 1; color: var(--ink); }
 .heat-d { font-size: 0.5rem; color: var(--ink-faint); }
@@ -590,7 +624,7 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .rt-row { display: grid; grid-template-columns: 7.5em 1fr auto; align-items: center; gap: var(--sp-3); }
 .rt-label { color: var(--ink); font-weight: var(--weight-med); }
 .rt-sub { color: var(--ink-faint); font-family: var(--font-mono); font-size: 0.7rem; }
-.rt-gauge { height: 10px; background: var(--surface-2, var(--surface)); border: 1px solid var(--rule); border-radius: 5px; overflow: hidden; }
+.rt-gauge { height: 10px; background: var(--surface-2); border: 1px solid var(--rule); border-radius: 5px; overflow: hidden; }
 .rt-fill { display: block; height: 100%; }
 .rt-fill.rt-ember { background: var(--ember); }
 .rt-fill.rt-ink { background: var(--ink-muted); }
@@ -917,7 +951,7 @@ a.vg-lit:hover { background: var(--ember-wash); }
 .cbar-l { color: var(--ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
 /* Stacked composition bar (macro split, etc.) — ember = primary/tracked, muted inks for rest. */
-.sbar { display: flex; width: 100%; height: 14px; border-radius: var(--radius-xs); overflow: hidden; margin-top: var(--sp-3); background: var(--surface-2, var(--surface)); }
+.sbar { display: flex; width: 100%; height: 14px; border-radius: var(--radius-xs); overflow: hidden; margin-top: var(--sp-3); background: var(--surface-2); }
 .sbar-seg { height: 100%; display: block; }
 .sbar-ember { background: var(--ember); }
 .sbar-ink { background: var(--ink-muted); }
@@ -936,7 +970,7 @@ a.vg-lit:hover { background: var(--ember-wash); }
   border-bottom: var(--spine-border); }
 .hspine-gap { position: absolute; top: 30px; height: 15px; background: var(--ember-wash);
   border-left: 1px solid var(--ember); border-right: 1px dashed var(--ink-faint); }
-.hspine-gap-surplus { background: var(--surface-2, var(--surface)); border-left: 1px dashed var(--ink-faint); }
+.hspine-gap-surplus { background: var(--surface-2); border-left: 1px dashed var(--ink-faint); }
 /* Zero-width anchor at the value's true position; the tick (::after) stays centered on
    it, the label anchors inward near the edges so a far-right value never clips at 390px. */
 .hspine-mark { position: absolute; top: 0; bottom: 0; width: 0; }
@@ -970,7 +1004,7 @@ a.vg-lit:hover { background: var(--ember-wash); }
 .suf-row { display: grid; grid-template-columns: minmax(4.5rem, 7.5rem) 1fr auto; align-items: center; gap: var(--sp-2) var(--sp-3); }
 .suf-l { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-muted); }
 .suf-track { position: relative; height: 8px; border-radius: 4px;
-  background: var(--surface-2, var(--surface)); border-right: 1px solid var(--ink-faint); }
+  background: var(--surface-2); border-right: 1px solid var(--ink-faint); }
 .suf-fill { display: block; height: 100%; border-radius: 4px; }
 .suf-ember { background: var(--ember); }
 .suf-ink { background: var(--ink-muted); }
@@ -983,7 +1017,7 @@ a.vg-lit:hover { background: var(--ember-wash); }
    SVG. The current cell earns an ember rule; the rest carry their 7-day count. */
 .aqg { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); margin-top: var(--sp-3); }
 .aqg-cell { display: grid; gap: var(--sp-1); padding: var(--sp-3) var(--sp-4);
-  border: 1px solid var(--ink-faint); border-radius: var(--radius, 8px); background: var(--surface-2, var(--surface)); }
+  border: 1px solid var(--ink-faint); border-radius: var(--radius, 8px); background: var(--surface-2); }
 .aqg-cell.is-current { border-color: var(--ember); box-shadow: inset 0 0 0 1px var(--ember); }
 .aqg-name { font-family: var(--font-mono); font-weight: var(--weight-med); letter-spacing: 0.02em; }
 .aqg-cell.is-current .aqg-name { color: var(--ember); }
@@ -997,7 +1031,7 @@ a.vg-lit:hover { background: var(--ember-wash); }
 .zdist { display: flex; flex-direction: column; gap: var(--sp-2); margin-top: var(--sp-3); }
 .zdist-row { display: grid; grid-template-columns: minmax(7rem, 11rem) 1fr auto; align-items: center; gap: var(--sp-2) var(--sp-3); }
 .zdist-l { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-muted); }
-.zdist-track { position: relative; height: 8px; border-radius: 4px; background: var(--surface-2, var(--surface));
+.zdist-track { position: relative; height: 8px; border-radius: 4px; background: var(--surface-2);
   border: 1px solid var(--ink-faint); overflow: hidden; }
 .zdist-fill { display: block; height: 100%; background: var(--ink-muted); border-radius: 4px; }
 .zdist-fill.is-z2 { background: var(--ember); }
@@ -1040,7 +1074,7 @@ a.vg-lit:hover { background: var(--ember-wash); }
 .ewin-rows { display: flex; flex-direction: column; gap: var(--sp-2); margin-top: var(--sp-2); }
 .ewin-row { display: grid; grid-template-columns: minmax(3rem, 4rem) 1fr auto; align-items: center; gap: var(--sp-2) var(--sp-3); }
 .ewin-day { color: var(--ink-muted); white-space: nowrap; }
-.ewin-track { position: relative; height: 12px; border-radius: 3px; background: var(--surface-2, var(--surface)); }
+.ewin-track { position: relative; height: 12px; border-radius: 3px; background: var(--surface-2); }
 .ewin-ref { position: absolute; top: 0; height: 100%; background: var(--ink-faint); opacity: 0.35; border-radius: 3px; }
 .ewin-bar { position: absolute; top: 0; height: 100%; background: var(--ember); border-radius: 3px; }
 .ewin-v { color: var(--ink-faint); white-space: nowrap; font-size: var(--fs-label, 0.78rem); }
@@ -1067,7 +1101,7 @@ a.vg-lit:hover { background: var(--ember-wash); }
 .corr-rows { display: flex; flex-direction: column; gap: var(--sp-2); margin-top: var(--sp-3); }
 .corr-row { display: grid; grid-template-columns: minmax(0,1fr) 90px auto; align-items: center; gap: var(--sp-2); }
 .corr-l { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.corr-bar { height: 6px; border-radius: 3px; background: var(--surface-2, var(--surface)); overflow: hidden; }
+.corr-bar { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
 .corr-fill { display: block; height: 100%; }
 .corr-r { color: var(--ink-faint); font-size: var(--fs-label, 0.78rem); white-space: nowrap; }
 

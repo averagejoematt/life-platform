@@ -216,9 +216,11 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .rd-flagmark { color: var(--ember); font-weight: var(--weight-med); }
 .rd-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, transparent); }
 
-/* #735 /verify/ — raw-payload sample block (identifiers stripped) */
+/* #735 /verify/ — raw-payload sample block (identifiers stripped).
+   #1470: the sunken well is full-ink machine-text territory — --ink-muted misses AA on
+   the light-theme well (4.1:1); the deeper well now carries the de-emphasis instead. */
 .rd-code { margin-top: var(--sp-3); padding: var(--sp-3) var(--sp-4); border-radius: var(--radius-xs); background: var(--surface-sunken);
-  font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-muted); line-height: var(--lh-relaxed); overflow-x: auto;
+  font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink); line-height: var(--lh-relaxed); overflow-x: auto;
   white-space: pre; }
 
 /* Protocol / experiment cards */
