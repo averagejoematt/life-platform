@@ -294,7 +294,7 @@ async function renderRead(s, id) {
       // read from before the pause, not this week's. Disclose it plainly,
       // independent of whether "where we are now" text exists.
       const pausedNote = er.regeneration_paused
-        ? `<p class="tl-recap-asof label">refresh paused (budget guard)${asOfDate ? ` — last written ${esc(asOfDate)}` : ""}</p>`
+        ? `<p class="tl-recap-asof label">refresh paused (budget guard)${asOfDate ? ` — last written ${esc(asOfDate)}` : ""} <a href="/method/receipts/">See the live budget and what tier we're in →</a></p>`
         : "";
       recap = `<aside class="tl-recap tl-recap-elena">` +
         `<p class="tl-recap-k label">previously on · the measured life</p>` +

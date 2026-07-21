@@ -122,6 +122,7 @@ EXPECTED_ROUTE_MAP = {
     "/api/reading_overview": "handle_reading_overview",
     "/api/reading_shelf": "handle_reading_shelf",
     "/api/recap": "handle_recap",
+    "/api/receipts": "handle_receipts",  # #1397 the Glass Engine
     "/api/ritual_log": "_handle_ritual_log",
     "/api/routine": "handle_routine",
     "/api/scenarios": "handle_scenarios",

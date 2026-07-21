@@ -6,6 +6,7 @@
 import { sigil } from "/assets/js/sigils.js";
 import { portrait } from "/assets/js/portraits.js";
 import { esc, tryJSON, isBad, fmt, ttl, fig, figs, sec, empty, note, kvtable } from "/assets/js/evidence_shared.js";
+import { lineChart } from "/assets/js/charts.js";
 
 // The board — pick an expert, read their actual per-domain take + track record.
 // WQA-06 — surface the cross-coach DISAGREEMENTS (the moat), not eight parallel monologues.
@@ -75,6 +76,70 @@ export function renderInference(d) {
     `<tr><td class="rd-name">${esc(f.lambda)}</td><td class="num">${fmt(f.month_input_tokens)}</td><td class="num">${fmt(f.month_output_tokens)}</td></tr>`).join("");
   const features = frows ? sec("By feature (month-to-date tokens)", `<table class="rd-tbl"><thead><tr><th>lambda</th><th>input</th><th>output</th></tr></thead><tbody>${frows}</tbody></table>`) : "";
   return head + models + features + `<p class="correlative">${esc(d.note || "")}</p>`;
+}
+
+/* The Glass Engine (#1397) — the budget envelope as an instrument.
+   /method/inference/ prices the AI calls; this page shows the ceiling around them,
+   where the month is projected to land, and what the current tier has switched off.
+   Honesty contract (ADR-104): when the governor's breakdown is missing or stale the
+   dollar figures are OMITTED and the reason is stated — never frozen at a last-known
+   value, because a silently stale cost page is worse than an absent one. */
+const TIER_BANDS = ["0 · normal", "1 · caution", "2 · restrict", "3 · hard stop"];
+
+export function renderReceipts(d) {
+  if (!d || typeof d !== "object") return empty("Receipts unavailable.");
+
+  // Tier + what it actually pauses reads from SSM independently of the dollar
+  // figures, so it stays truthful even when the breakdown is stale.
+  const tier = d.tier;
+  const tierBlock = tier == null ? "" : sec("What is paused right now",
+    `<div class="rcp-gauge" role="img" aria-label="Budget tier ${esc(String(tier))} of 3">` +
+    TIER_BANDS.map((b, i) => `<span class="rcp-band${i === tier ? " is-on" : ""}${i < tier ? " is-past" : ""}">${esc(b)}</span>`).join("") +
+    `</div><p class="rd-archive">${esc(d.tier_semantics || "")}</p>`);
+
+  // The stale state needs this MORE than the healthy one, not less: "how stale?" is the
+  // reader's first question, and computed_at is the only thing that answers it concretely.
+  // When stale, the TIMESTAMP goes inside the emphasized span too — the date is the part
+  // that answers the question, so leaving it faint would emphasise the wrong half.
+  const provDate = d.computed_at ? ` · last run ${esc(String(d.computed_at).slice(0, 16).replace("T", " "))} UTC` : "";
+  const prov = d.stale
+    ? `<p class="provenance"><span class="pv-src pv-stale">computed every 8h by cost_governor${provDate}</span></p>`
+    : `<p class="provenance"><span class="pv-src">computed every 8h by cost_governor</span>${provDate}</p>`;
+
+  if (d.stale) {
+    return figs([tier != null && fig(String(tier), "budget tier (0–3)")].filter(Boolean)) + tierBlock +
+      empty(`The spend figures aren't current: ${esc(d.stale_reason || "the budget breakdown is unavailable")}. ` +
+        "They're deliberately left blank rather than shown at their last-known value — a cost page that quietly freezes is worse than one that admits the gap.") +
+      prov +
+      note("The governor reprojects every 8 hours; this page fills in on its next run.");
+  }
+
+  const pct = d.projected_pct_of_ceiling;
+  const head = figs([
+    d.month_to_date_usd != null && fig(`$${fmt(d.month_to_date_usd)}`, "spent this month", d.mtd_pct_of_ceiling != null ? `${fmt(d.mtd_pct_of_ceiling)}% of ceiling` : null),
+    d.projected_month_end_usd != null && fig(`$${fmt(d.projected_month_end_usd)}`, "projected month-end", pct != null ? `${fmt(pct)}% of ceiling` : null),
+    d.ceiling_usd != null && fig(`$${fmt(d.ceiling_usd)}`, d.surge_active ? "ceiling (surge mode)" : "hard ceiling (all-in)"),
+    tier != null && fig(String(tier), "budget tier (0–3)"),
+  ].filter(Boolean));
+
+  const curve = (d.history || []).length
+    ? sec("The month so far", lineChart(d.history, { valueKey: "mtd_usd", dateKey: "date", unit: "", label: "month-to-date spend", goal: d.ceiling_usd, emptyMsg: "The spend curve draws in as the month accrues." }))
+    : "";
+
+  const split = (d.ai_daily_usd != null || d.non_ai_daily_usd != null)
+    ? sec("Daily run rate", kvtable({ ai_per_day: d.ai_daily_usd != null ? `$${fmt(d.ai_daily_usd)}` : "—", infrastructure_per_day: d.non_ai_daily_usd != null ? `$${fmt(d.non_ai_daily_usd)}` : "—" }))
+    : "";
+
+  const surge = d.surge_active
+    ? `<p class="rd-archive">Surge mode is active: the ceiling floats from $${fmt(d.base_ceiling_usd)} to $${fmt(d.ceiling_usd)} while reader traffic stays above ${esc(fmt(d.surge_threshold_uniques))} unique visitors over 7 days (currently ${esc(fmt(d.recent_uniques))}) — ADR-133.</p>`
+    : "";
+
+  const feat = d.per_feature_note
+    ? `<p class="correlative">${esc(d.per_feature_note)} <a href="/method/inference/">See the per-model receipt →</a></p>`
+    : "";
+
+  return head + tierBlock + surge + curve + split + feat + prov +
+    `<p class="correlative">${esc(d.note || "")}</p>`;
 }
 
 export function renderGeneric(d, t) { const root = (t && t.root && d[t.root]) ? d[t.root] : d; const scal = Object.entries(root).filter(([k, v]) => !k.startsWith("_") && ["string", "number", "boolean"].includes(typeof v)); let arr = null, key = null; for (const [k, v] of Object.entries(root)) if (Array.isArray(v) && v.length && typeof v[0] === "object") { arr = v; key = k; break; } let tbl = ""; if (arr) { const cols = [...new Set(arr.flatMap((r) => Object.keys(r)))].filter((c) => !c.startsWith("_")).slice(0, 5); tbl = sec(key, `<table class="rd-tbl"><thead><tr>${cols.map((c) => `<th>${esc(ttl(c))}</th>`).join("")}</tr></thead><tbody>${arr.slice(0, 40).map((r) => `<tr>${cols.map((c) => `<td class="num">${esc(fmt(r[c]))}</td>`).join("")}</tr>`).join("")}</tbody></table>`); } if (!scal.length && !tbl) return empty("No data published for this section yet — it fills from the live pipeline."); return figs(scal.slice(0, 4).map(([k, v]) => fig(fmt(v), ttl(k)))) + tbl + note("Correlative read only."); }

@@ -54,7 +54,7 @@ export function mountAsk(container, { chips = [], placeholder = "e.g. how does m
         history.push({ q, a: ans });
         slot.outerHTML = `<p class="ask-answer"><span class="label">the platform</span>${esc(ans)}</p>`;
       } else {
-        slot.outerHTML = `<p class="rd-archive">The data Q&amp;A is paused right now (budget guard) — try again later, or browse the data directly.</p>`;
+        slot.outerHTML = `<p class="rd-archive">The data Q&amp;A is paused right now (budget guard) — try again later, or browse the data directly. <a href="/method/receipts/">See the live budget and what tier we're in →</a></p>`;
       }
     } catch (x) {
       slot.outerHTML = `<p class="rd-archive">Couldn't reach the Q&amp;A service just now.</p>`;
