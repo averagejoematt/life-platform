@@ -113,7 +113,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | `design/` | Current design assets + the portrait runbook |
 | `design-review/` | The paste-ready design-review prompt kit (current tooling) |
 | `coaching/` | Coaching program docs (PRIVATE-flagged content — never surface publicly) |
-| `content/` | Content-production checklists (build dispatches etc.) |
+| `content/` | Content-production checklists (build dispatches etc.) + [REDDIT_PLAYBOOK.md](content/REDDIT_PLAYBOOK.md) — the manual Reddit operating procedure (**do-not-automate**, #1625) |
 | `briefs/` | Dated feature briefs (historical) |
 | `audits/` · `v2-audits/` · `rca/` | Dated audit + post-mortem records |
 | `restart/` | **Machine-written** reset-pipeline run reports (the restart scripts write here — do not relocate) |
