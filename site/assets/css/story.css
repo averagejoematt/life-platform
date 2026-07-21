@@ -22,7 +22,7 @@ body { overflow-x: hidden; }
 @layer chrome-base {
   /* .story-top itself is the shared top-bar chrome rule in tokens.css (#1105). */
   .brand { display: inline-flex; align-items: center; gap: var(--sp-2); text-decoration: none; }
-  .brand-mark { width: 11px; height: 11px; border-radius: 2px; background: var(--ember); box-shadow: 0 0 0 3px var(--ember-wash); }
+  .brand-mark { width: 20px; height: 20px; background: var(--brand-mark) center / contain no-repeat; }
   .brand-name { font-family: var(--font-mono); font-size: var(--fs-small); }
   .doors { display: flex; align-items: center; gap: var(--sp-4); }
   .doors a { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); text-decoration: none; }
