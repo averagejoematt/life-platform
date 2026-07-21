@@ -161,3 +161,22 @@ test("no raw payload object ever reaches the output", () => {
     assert.equal(/\bNaN\b/.test(html), false);
   }
 });
+
+// ── the over-ceiling case (found live on day one: projected $96.09 vs an $85 ceiling) ──
+test("over-ceiling — the breach is stated in prose, not left as a faint delta", () => {
+  const html = renderReceipts({ ...HEALTHY, projected_month_end_usd: 96.09, projected_pct_of_ceiling: 113.0 });
+  assert.ok(html.includes("over the ceiling"), "a projection above the ceiling must be named, not just implied by a percentage");
+  assert.ok(html.includes("$96.1") && html.includes("$85"), "both sides of the comparison appear");
+});
+
+test("under-ceiling — no breach language when the projection is fine", () => {
+  const html = renderReceipts(HEALTHY); // 73.4%
+  assert.equal(html.includes("over the ceiling"), false);
+});
+
+test("run-rate labels read as prose, not ttl()-mangled keys", () => {
+  const html = renderReceipts(HEALTHY);
+  assert.ok(html.includes("AI, per day"), "'ai_per_day' title-cases to the wrong-looking 'Ai Per Day'");
+  assert.ok(html.includes("infrastructure, per day"));
+  assert.equal(/\bAi\b/.test(html), false, "'Ai' must never render — it is AI");
+});
