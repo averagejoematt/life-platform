@@ -90,6 +90,14 @@ PARTITIONS = [
     # serving archived receipts deliberately; the current-cycle "latest" view resets).
     ("character_receipt", "all", {}),
     ("habit_scores", "all", {}),
+    # #1624: the achievement first-earn ledger (BADGE#<id>). "all", not "pregenesis" —
+    # the sk is BADGE#<id>, not DATE#, so there is no date to split on, and every badge
+    # condition is evaluated over current-cycle data anyway (the streak restarts at 0,
+    # the level returns to 1, completed experiments tombstone). Carrying a first-earn
+    # across the reset would keep asserting an earn whose evidence the same endpoint
+    # has just hidden. Tombstoned + cycle-stamped, never deleted, so cycle N's badges
+    # stay navigable in the archive.
+    ("achievements", "all", {}),
     # computed_metrics + ledger: only pre-genesis history is tombstoned; post-genesis
     # records continue accumulating from Day 1 forward. (ledger TOTALS#current is
     # reset to $0 by restart_ledger_reset.py, which also preserves a LIFETIME# aggregate.)

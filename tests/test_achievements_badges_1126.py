@@ -41,9 +41,20 @@ def _cond_strings(cond, out):
 
 
 def _fake_table(rows):
+    """#1624: the handler now builds its queries in achievement_rules, which uses
+    STRING KeyConditionExpressions + ExpressionAttributeValues rather than boto3
+    Key() objects. Resolve the pk from either form so this harness keeps exercising
+    the real handler instead of silently matching nothing (a pk of None matches no
+    row, which would make every badge trivially unearned and these tests vacuous)."""
+
     def hook(table, **kwargs):
-        strings = _cond_strings(kwargs.get("KeyConditionExpression"), [])
-        pk = next((s for s in strings if s.startswith("USER#")), None)
+        cond = kwargs.get("KeyConditionExpression")
+        if isinstance(cond, str):
+            pk = (kwargs.get("ExpressionAttributeValues") or {}).get(":pk")
+        else:
+            strings = _cond_strings(cond, [])
+            pk = next((s for s in strings if s.startswith("USER#")), None)
+        assert pk is not None, f"harness could not resolve a pk from {cond!r}"
         items = [r for r in rows if r.get("pk") == pk]
         limit = kwargs.get("Limit")
         return {"Items": items[:limit] if limit else items}
@@ -51,9 +62,18 @@ def _fake_table(rows):
     return FakeDdbTable(query_hook=hook)
 
 
+def _withings_row(latest_withings):
+    """#1624: weight is read from the withings DATE# series now (the badge engine needs
+    the dated series to derive first-earn dates), not via _latest_item. Materialise the
+    single latest reading these tests supply as one dated row."""
+    if not latest_withings:
+        return []
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return [{"pk": "USER#matthew#SOURCE#withings", "sk": f"DATE#{today}", **latest_withings}]
+
+
 def _call(monkeypatch, rows, latest_withings=None, profile=None):
-    monkeypatch.setattr(vitals, "table", _fake_table(rows))
-    monkeypatch.setattr(vitals, "_latest_item", lambda source, **_k: latest_withings if source == "withings" else None)
+    monkeypatch.setattr(vitals, "table", _fake_table(list(rows) + _withings_row(latest_withings)))
     monkeypatch.setattr(vitals, "_get_profile", lambda: profile or {})
     resp = vitals.handle_achievements()
     assert resp["statusCode"] == 200
