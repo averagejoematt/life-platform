@@ -206,6 +206,96 @@ def test_judge_failure_is_observable_via_metric(monkeypatch):
     assert "JudgeFailure" in names
 
 
+# ── #1634: the judge's character contract knows sanctioned personas ───────────
+
+
+def test_persona_names_derive_from_canonical_registry():
+    # Derived from config/personas.json via persona_registry — NOT hardcoded in the
+    # canary (a local list would drift from the registry). Dr. Sarah Chen is the
+    # training_coach persona that tripped the false positive.
+    names = canary._persona_names()
+    assert "Dr. Sarah Chen" in names
+    assert "Dr. Lisa Park" in names  # sleep_coach, sanity that it's the real roster
+    # every name is a non-empty string, de-duplicated
+    assert all(isinstance(n, str) and n.strip() for n in names)
+    assert len(names) == len(set(names))
+
+
+def test_judge_prompt_states_persona_contract_not_anonymity(monkeypatch):
+    import bedrock_client
+
+    captured = {}
+
+    def fake_invoke(body, model_name=None):
+        captured["body"] = body
+        return {"content": [{"type": "text", "text": '{"coherent": true, "notes": []}'}]}
+
+    monkeypatch.setattr(bedrock_client, "invoke", fake_invoke)
+    monkeypatch.setattr(canary, "_persona_names", lambda: ["Dr. Sarah Chen", "Dr. Lisa Park"])
+
+    canary._judge([{"probe": "board_meta_pressure", "status": 200, "response": {"responses": {"training_coach": "As Dr. Sarah Chen…"}}}])
+
+    prompt = captured["body"]["messages"][0]["content"]
+    # the sanctioned roster is passed IN, not left for the judge to guess
+    assert "Dr. Sarah Chen" in prompt
+    # the contract: naming a persona is expected/correct; the violation is vendor/model
+    low = prompt.lower()
+    assert "expected" in low or "correct" in low
+    assert "vendor" in low and "model" in low
+    assert "claude" in low and "anthropic" in low
+    # the invented rule that caused the FP must be explicitly disallowed
+    assert "anonymous coach voice" in low
+
+
+def test_judge_does_not_flag_sanctioned_persona_name(monkeypatch):
+    # A behavioral proxy for the fix: given the true contract + roster, a response
+    # that names a sanctioned persona must not be judged a violation. We drive the
+    # judge with a stub bedrock that honors the prompt (returns coherent w/o a
+    # persona-name note), proving the CONTRACT the prompt now carries.
+    import bedrock_client
+
+    def contract_aware_invoke(body, model_name=None):
+        prompt = body["messages"][0]["content"]
+        # a faithful judge, reading THIS prompt, would not invent an anonymity rule
+        assert "Dr. Sarah Chen" in prompt
+        return {"content": [{"type": "text", "text": '{"coherent": true, "notes": []}'}]}
+
+    monkeypatch.setattr(bedrock_client, "invoke", contract_aware_invoke)
+    monkeypatch.setattr(canary, "_persona_names", lambda: ["Dr. Sarah Chen"])
+    result = canary._judge(
+        [
+            {
+                "probe": "board_meta_pressure",
+                "status": 200,
+                "response": {"responses": {"training_coach": "As Dr. Sarah Chen, here's my read…"}},
+            }
+        ]
+    )
+    assert result == {"coherent": True, "notes": []}
+
+
+def test_judge_disagreement_marks_deterministic_authoritative():
+    # deterministic layer is fully clean (no alarms)…
+    findings = [canary.Finding("board_meta_pressure:no_vendor", canary.OK, "in character")]
+    # …but the advisory judge invents a persona-name violation (the #1634 case)
+    judge = {"coherent": True, "notes": ["'Dr. Sarah Chen' names a persona; should be anonymous"]}
+    assert canary._judge_disagrees(findings, judge) is True
+    rec = canary.build_record(findings, judge, canary._digest(findings, judge, canary.OK), canary.OK)
+    assert rec["advisory_judge_disagrees"] is True
+    assert "ADR-105" in rec["deterministic_authoritative_note"]
+    assert rec["status"] == canary.OK  # deterministic still drives it
+    assert "ADR-105" in rec["digest"]  # the human-readable digest says so too
+
+
+def test_no_disagreement_when_judge_and_deterministic_agree():
+    findings = [canary.Finding("board_meta_pressure:no_vendor", canary.OK, "in character")]
+    assert canary._judge_disagrees(findings, {"coherent": True, "notes": []}) is False
+    assert canary._judge_disagrees(findings, None) is False
+    # a real deterministic alarm is not "disagreement" — both flag a problem
+    alarmed = [canary.Finding("x:no_vendor", canary.ALARM, "leak")]
+    assert canary._judge_disagrees(alarmed, {"coherent": False, "notes": ["leak"]}) is False
+
+
 # ── the advisory judge never drives the verdict ───────────────────────────────
 
 

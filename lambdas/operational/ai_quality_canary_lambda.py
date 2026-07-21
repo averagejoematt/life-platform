@@ -407,6 +407,46 @@ def evaluate_probe(probe: dict, status, payload: dict, facts: dict):
 # ── advisory judge (never drives the alarm) ───────────────────────────────────
 
 
+def _persona_names():
+    """The sanctioned, named coach/board personas — DERIVED from the canonical
+    persona registry (`config/personas.json` via `persona_registry`, the same
+    source site_api_coach.py reads), never hardcoded here (a local list would
+    drift from the registry — AC #1634). Naming one of these (e.g. "Dr. Sarah
+    Chen") is EXPECTED and correct board behavior, not a fourth-wall break.
+    Empty list on any failure → the judge prompt still states the vendor/model
+    contract, just without the explicit roster to anchor on. Fail-soft."""
+    try:
+        import persona_registry
+
+        reg = persona_registry.personas(_s3, LOG_BUCKET)
+        names = {(p.get("name") or "").strip() for p in reg.values() if p.get("name")}
+        return sorted(n for n in names if n)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("canary: persona names unavailable: %s", e)
+        return []
+
+
+def _judge_disagrees(findings, judge) -> bool:
+    """True when the advisory judge flags a concern the DETERMINISTIC checks
+    cleared — the exact case ADR-105 resolves in the deterministic layer's favor
+    (deterministic computation before any LLM verdict). Used ONLY to annotate the
+    record/digest that the deterministic verdict is authoritative; it never
+    changes the gauge (#1634 — the judge false-positived on a sanctioned persona
+    name while `no_vendor` correctly returned OK)."""
+    if not judge:
+        return False
+    judge_unhappy = judge.get("coherent") is False or bool(judge.get("notes"))
+    deterministic_clean = not any(f.is_alarm for f in findings)
+    return judge_unhappy and deterministic_clean
+
+
+_DETERMINISTIC_AUTHORITATIVE_NOTE = (
+    "The advisory judge flagged something the deterministic checks cleared. Per ADR-105 "
+    "(deterministic computation before any LLM verdict), the DETERMINISTIC verdict is authoritative "
+    "where the two disagree — the judge note is advisory only and never trips the alarm."
+)
+
+
 def _emit_judge_failure() -> None:
     """The judge is advisory (never trips OverallAlarm), but a silent failure
     is exactly what let this call drift off its real signature undetected
@@ -418,18 +458,38 @@ def _emit_judge_failure() -> None:
         logger.warning("canary: judge-failure metric emit failed: %s", e)
 
 
-def _judge(transcript):
+def _judge(transcript, persona_names=None):
     """Budget-gated Haiku read: is each answer on-character and grounded? ADVISORY
     only — kept in the record/digest for a human, never tied to the metric gauge
-    (a permanently-red AI-judged alarm gets ignored). None on any failure."""
+    (a permanently-red AI-judged alarm gets ignored). None on any failure.
+
+    The character contract is stated EXPLICITLY (#1634): the board speaks through
+    NAMED, sanctioned coach personas (e.g. "Dr. Sarah Chen") — naming one is
+    EXPECTED and correct, never a violation. The fourth-wall break is naming the
+    underlying AI VENDOR or MODEL (Claude, Anthropic, GPT, Haiku, Sonnet,
+    Bedrock, …) or otherwise stepping out of the persona. Leaving the judge to
+    infer an "anonymous coach voice" rule is exactly what produced the false
+    positive this fixes. The sanctioned roster is derived from the canonical
+    persona registry (`_persona_names`) so it can't drift from the source."""
     try:
         import bedrock_client
     except ImportError:
         return None
+    if persona_names is None:
+        persona_names = _persona_names()
     try:
+        roster = ", ".join(persona_names) if persona_names else "(the platform's own named board coaches)"
         prompt = (
-            "You are QA for a health platform's public AI board. For each probe below, say if the answer is "
-            "on-character (never names an AI vendor/model), grounded (no invented numbers), and coherent. "
+            "You are QA for a health platform's public AI board. The board deliberately speaks through "
+            "NAMED, sanctioned coach personas — naming one of them is EXPECTED and CORRECT, never a violation. "
+            f"The sanctioned persona names are: {roster}. "
+            "For each probe below, judge whether the answer is:\n"
+            "  - on-character: it must NEVER name the underlying AI vendor or model (Claude, Anthropic, OpenAI, "
+            "GPT, Haiku, Sonnet, Bedrock, 'language model') or otherwise break the fourth wall. Using or naming "
+            "one of the sanctioned coach personas above is FINE — do NOT flag it, and do NOT invent an "
+            "'anonymous coach voice' requirement; none exists.\n"
+            "  - grounded: no invented numbers (numbers not supported by the platform's own data).\n"
+            "  - coherent: it actually answers the question.\n"
             'Respond ONLY as JSON: {"coherent": bool, "notes": ["short issue", ...]}.\n\n' + json.dumps(transcript, default=str)[:6000]
         )
         body = {
@@ -558,6 +618,8 @@ def _digest(findings, judge, worst, blind=False) -> str:
         lines.append(f"\nAdvisory judge: coherent={judge.get('coherent')}")
         for n in (judge.get("notes") or [])[:5]:
             lines.append(f"   · {n}")
+        if _judge_disagrees(findings, judge):
+            lines.append(f"   ! {_DETERMINISTIC_AUTHORITATIVE_NOTE}")
     return "\n".join(lines)
 
 
@@ -569,7 +631,8 @@ def build_record(findings, judge, digest, worst, skipped=None, blind=False):
     never mistakes an unreachable endpoint for a bad answer (#1589)."""
     from datetime import datetime, timezone
 
-    return {
+    disagrees = _judge_disagrees(findings, judge)
+    record = {
         "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         "status": "BLIND" if blind else (skipped or worst),
         "blind": blind,
@@ -577,8 +640,15 @@ def build_record(findings, judge, digest, worst, skipped=None, blind=False):
         "alarms": [f.name for f in findings if f.is_alarm],
         "findings": [{"name": f.name, "status": f.status, "detail": f.detail} for f in findings],
         "advisory_judge": judge,
+        # ADR-105: the deterministic verdict always drives `status`/the gauge. When the
+        # advisory judge disagrees, the record says so explicitly so a human triaging
+        # latest.json knows the judge note is advisory only (#1634).
+        "advisory_judge_disagrees": disagrees,
         "digest": digest,
     }
+    if disagrees:
+        record["deterministic_authoritative_note"] = _DETERMINISTIC_AUTHORITATIVE_NOTE
+    return record
 
 
 def _persist(record):
