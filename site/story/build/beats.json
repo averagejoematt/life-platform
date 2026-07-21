@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-07-18",
+  "updated_at": "2026-07-21",
   "beats": [
     {
       "id": "2026-07-06-dating-the-past-so-it-stops-pretending-to-be-now",
@@ -1512,6 +1512,21 @@
         }
       ],
       "why_it_mattered": "A logo is the cheapest thing to fake and the easiest to get subtly wrong — a mark that looks fine in the design tool but falls back to the wrong font in a link preview, or shows the wrong colour on half of readers' phones, is worse than none, because it's broken in exactly the places you don't look. Shipping it as a rebuildable script with the letters outlined and the theming checked on real devices is the difference between a logo and a picture of a logo. And the mark itself is honest about the project: a gauge, needle already high."
+    },
+    {
+      "id": "2026-07-21-badges-that-stay-earned",
+      "date": "2026-07-21",
+      "title": "Badges that stay earned",
+      "shipped": "The achievements page used to compute badges fresh every night and stamp each one with today’s date — so a badge could quietly un-earn itself when a number dipped back under its threshold, and the site could never say when anything was actually first achieved. Now a durable first-earn record is written once, on the first crossing, by the nightly compute job; the public page only reads it. Once earned, a badge stays earned, and its date is the real first date (or honestly blank where history can’t derive one), never today’s.",
+      "why_it_mattered": "A badge a two-pound water swing can revoke is not a badge — it’s a live threshold wearing a medal. The old behavior made the whole surface untrustworthy: it could only tell you what was true this instant, dressed up as an achievement. This is the honest foundation the milestone work needs before any of it can announce anything.",
+      "gotcha": "The first cut used a plain write-once condition (“only insert if this record doesn’t already exist”). That would have silently frozen the entire ledger after the first experiment reset: the reset tombstones records in place rather than deleting them, and a phase filter hides the tombstone from the reader — so the writer would see an empty ledger, try to write, get refused by the leftover tombstone, swallow the error, and serve blank dates forever. The condition had to also allow writing over a tombstone. A bug that would only have surfaced weeks later, on the next reset, with nothing erroring.",
+      "honest_miss": "A handful of badges can’t be back-dated honestly — the data to reconstruct when they were first earned simply isn’t stored (experiment streaks that depend on ordering, and challenge badges whose completion date was never written). Those are recorded as earned-but-undated rather than given an invented date. Two other things shipped the same day and aren’t in this beat: a one-month budget-ceiling raise that exposed a latent bug where reader traffic would have *lowered* the spending ceiling, and end-to-end signup attribution so a post’s value can finally be measured in subscribers instead of guesses.",
+      "prs": [
+        {
+          "label": "PR #1637",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1637"
+        }
+      ]
     }
   ]
 }

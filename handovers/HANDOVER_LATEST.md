@@ -1,100 +1,62 @@
-# HANDOVER — The AJM brand mark lands (favicon + app icons + header) — 2026-07-21
+# HANDOVER — July ceiling window, achievements ledger, attribution + the CDK drift clear — 2026-07-21
 
-> Instruction thread: "review these images from claude design and look to incorporate
-> the logo appropriately and also the favicon (items 3a), if we need to do a plan first,
-> do that" → "cant you get the images from here <claude.ai/design URL>" → plan approved →
-> "ok yes i agree with your recommendations" (file the two deferred follow-ups) →
-> "i approve you to do all merge and deploys but be conscious of parallel session" →
-> "can you /wrap once done". A parallel session was active throughout (multiple worktrees
-> on issue-1472/1482/1621/1624 etc.) — every merge/deploy checked for file overlap first.
+> Instruction thread: "Pay down as much of the NON-FABLE backlog as possible" → owner
+> approvals given live for push / the $110→$115 ceiling bump / cdk deploy / TikTok handle →
+> "go" (1-2-3 for #1637) → "you go ahead and merge and do the cdk deploy and everything i
+> approve" (#1642 + the full CDK drift clear) → "wrap and then give me back the plan."
+>
+> Third session of 2026-07-21 (after Glass-Engine, then brand-mark). Picked up the residual
+> owner-queue from the first two and drained it.
 
-## What shipped — PR #1638 (MERGED `0e5ac940`, DEPLOYED, live)
+## What shipped (all merged to main AND deployed/verified)
 
-The AJM dial mark from the Claude Design project "AJM Logo Marks", **direction 3a** —
-the full-gauge dial with a single ember graduation at the 1-o'clock tick. The site had
-never had a logo: the header brand was a bare 11px ember square, the favicon a 32×32 PNG
-misnamed `.ico` from May 19.
+**#1635 — July-only ceiling raise ($115 base / $135 surge), self-reverting 2026-08-01** (PR #1635, `8b412d4a`).
+- The projection was $96.09 vs the $85 base (113%), guard parked at **tier 2** — reader narratives paused. Matthew's call: raise for one month only.
+- **$115 not the $110 first approved.** The tier bands are fixed FRACTIONS of the ceiling (≈73/87/97%), so $110 leaves the projection at 87.4% — *still tier 2*. $110 would have paid the full cost of raising the ceiling and bought nothing (missed by $0.87). $115 → 83.6% → tier 1. Verified live: `_decide_tier(96.09, 63.26, 21.0, ceiling=115) == 1`.
+- **Fixed a latent surge inversion found in the process.** `_effective_ceiling` returned `SURGE_CEILING_USD` unconditionally, so any base >$100 made reader arrival LOWER the ceiling ($115→$100) and tighten the guard exactly when surge exists to loosen it — the success-punishes-you failure ADR-133 was written to prevent. Now floored with `max()`; pinned by `test_surge_never_lowers_the_ceiling`. Latent at any base over $100; predates this PR.
+- Dated window (`_TEMP_CEILING_WINDOW`, half-open `[2026-07-01, 2026-08-01)`), auto-reverts with no deploy — tested across six injected dates incl. 2027-07-15 (must not recur annually). Removed the dead `_JUNE_2026_THRESHOLDS`. AWS Budgets backstop deliberately LEFT at $85 so the overrun still signals. **Deployed via `cdk deploy LifePlatformOperational`; governor invoked → tier 2→1 live.** ADR-133 amended.
 
-**Source of truth = `scripts/build_brand_assets.py`.** Three hand-authored masters in
-`site/assets/marks/` (`mark-a.svg` single-A, `mark-ajm.svg` monogram, `lockup.svg`
-wordmark); everything else generated and re-checkable with `--check`. Assets pulled from
-the design project via the DesignSync tool.
+**#1637 — achievements durable first-earn ledger** (PR #1637, `953566a2`, closes #1624).
+- `handle_achievements()` set `earned_date=today if <cond> else None` for all 40 badges → a nightly snapshot dressed as an earned record; badges un-earned on a 2-lb water swing. Fixed as a writer/reader split: `lambdas/achievement_rules.py` (new, single source of catalog + comparators + ledger I/O), writer = `daily-metrics-compute`, reader = `site_api_vitals` (no serving-path writes, `git grep`-verified). Ledger is **EXPERIMENT_SCOPED** (registered in `phase_taxonomy.py`) — tomorrow's cycle-10 reset wipes + rebuilds it, by design.
+- **Deployed: `deploy_site_api.sh` + `deploy_lambda.sh daily-metrics-compute`; writer proven to boot via a live invoke** (`first_earns_written: 0`, no crash — correct, cycle is 1 day old). `/api/achievements` serving 40 badges.
 
-Surfaces changed (all at **existing stable paths → zero HTML edits**, all 134 pages pick
-it up): `site/favicon.ico`, `apple-touch-icon{,-precomposed}.png`, `assets/icons/icon-{192,512}.png`,
-new `icon-maskable-512.png`, `manifest.webmanifest` (+maskable entry), and `--brand-mark`
-token in `tokens.css` consumed by the three `.brand-mark` rules (cockpit/evidence/story.css).
-`design_sync_bundle.py` now carries the marks as a foundation.
+**#1642 — site-wide UTM capture + separate attribution signals** (PR #1642, `0809cc03`, closes #1621).
+- The issue's diagnosis was factually wrong (corrected on-issue): the `source` field *was* sent and `referrer` *was* captured — the real defect was the referrer fallback being dead code on every real signup, plus zero UTM capture. Built: `site/assets/js/attribution.js` (site-wide landing capture, sessionStorage first-write-wins, read at submit), `lambdas/utm.py` (canonical tagger + host-only referrer), three SEPARATE signals stored, canary hard short-circuit, operator count-by-source in the weekly digest.
+- **Deployed: `email-subscriber` + `weekly-digest` lambdas, then merged (site auto-deploy green); `attribution.js` live + hash-wired in the shared footer; canary short-circuit verified on the live endpoint.**
 
-## Two decisions worth knowing (both diverged from the approved plan — for good reasons)
+**CDK drift clear — all 9 stacks** (`npx cdk deploy --all`).
+- The "pending cdk deploy" the brand-mark session flagged as "2 lambdas + a LogRetention runtime bump" was actually that **plus a brand-new scheduled email-sender**: `AiReviewPack` (merged PR #1594, weekly QA review email, defined in CDK but never deployed). Diffed before deploying: **zero deletions, zero replacements**, one new scoped IAM role, schedule `cron(0 18 ? * SUN *)` (no send on deploy). Deployed under explicit broad owner approval. **All 9 stacks UPDATE_COMPLETE; `cdk diff --all` = 0 differences; Plan gate re-run = success.**
 
-1. **Header uses the single-A, not the AJM monogram.** Built it with the monogram first,
-   A/B-rendered at the real 20px size: "AJM" collapses to texture, the "A" stays legible.
-   Bonus — the tab icon and header mark are now the *same* mark. This is the design doc's
-   own favicon rule, extended to the other small surface.
-2. **`--brand-mark` is a token in `tokens.css`, NOT a rule keyed to `[data-theme="light"]`
-   (which the plan said).** Light mode activates on TWO legs — the OS media query AND the
-   explicit toggle — and only `tokens.css` spells both out. The attribute-only rule I'd
-   planned would have shipped a dark mark on light paper for any OS-light reader who never
-   touched the toggle. Verified the OS-light leg resolves the light variant.
-
-## Verified
-
-- **Text-outlining is real and correct** — the delivered SVGs set letters as live
-  `<text font-family='IBM Plex Mono'>` with an empty `<defs>` (the doc's "embedded 13KB
-  subset" claim is false); as an `<img>`/favicon/crawler-fetch that falls back to platform
-  monospace. Script outlines against the site's own self-hosted Plex Mono Medium via
-  fontTools; rendered outlined-vs-live-font side-by-side, letterforms identical. `grep -c
-  '<text'` on every generated file = 0.
-- **Relative `url(../marks/…)` resolves at every page depth** (0/1/3) → same absolute path,
-  HTTP 200. Chosen over absolute because a CSS `url()` resolves against the stylesheet, so
-  it's correct sitewide AND portable into the design-sync bundle (which forbids absolute url).
-- **Header height unchanged at 53px** across home/cockpit/data/story × dark/light.
-- **Suite 6364 passed** (56 skip, 10 xfail); black/flake8/ruff/pii_surface_guard clean.
-  `build_brand_assets.py --check` confirms reproducible output.
-- **Live surface** (post-deploy curl): favicon.ico = new 32px A-dial (1186b, was 1482b),
-  header marks + maskable + manifest(+maskable) all 200, deployed `tokens.css` references
-  the relative mark URL.
-- **Deploy `0e5ac940`: site-deploy run 29869883945 = success** — Deploy + Site smoke +
-  Visual+AI-vision QA all green, auto-rollback did NOT fire.
+## Also done (no code)
+- **#1620** TikTok handle corrected to `averagejoematt`, `gate:owner` cleared (flagged X keeps a trailing underscore, TikTok doesn't).
+- **#1589** closed with simulated-IAM + live-canary evidence (the canary un-blinded after the origin-secret grant landed in the first cdk deploy).
+- **#1625** Reddit playbook shipped (`be6b519b`) — a separate wrap earlier today.
+- **#1634** filed — the canary's advisory judge false-positives on sanctioned coach personas (found while verifying #1589; its own rule says *vendor*, Dr. Sarah Chen is a coach).
 
 ## Gotchas hit
+- **The $110 fractional-band trap.** Tier bands are fractions of the ceiling, not dollars — the "obvious" round number was the one value in the neighborhood that changed nothing. Always check the ratio, not the number.
+- **The surge inversion was invisible at $85.** A bug with no way to fire until the base crossed $100 — raising the ceiling is what would have activated it. Moving the surge value in the same change (not just `max()`) kept the pair coherent.
+- **Agent self-reports are ~50% wrong on their own numbers.** The #1637 agent misreported its badge counts by ~2.3× (said 17 never-dated/23 wrong-date; actual 30/10). The #1621 issue body was factually wrong in two places. `git grep` the claim on the branch and run the suite before relaying — done for both.
+- **`node --test tests/js/` (with a dir arg) fails; CI runs bare `node --test`.** A directory arg makes node try to resolve it as a module. The "JS test failure" was my invocation, not the tests (104 pass).
+- **A hashed asset filename hides from a literal grep.** `attribution.js` looked un-wired until I grepped the live page and found `attribution.6d69289b.js` — the module graph hashes it. Grep the hashed form or the `import` edge, not the bare name.
+- **CDK re-staged the same main tree over my manual lambda deploys** (email-subscriber, daily-metrics-compute) — harmless because both stage from main → identical SHA, not the older-code-overwrite class.
 
-- **Playwright screenshot rejects a `.ico` path** (dispatches encoder off extension). Fix:
-  screenshot to a temp `.png`, copy to the `.ico` name — favicon.ico has always been a PNG.
-- **design_sync_bundle forbids absolute `url(/…)`** (`_URL_ABS_RE`) — my first pass used
-  `url(/assets/marks/…)` and reded `test_design_sync_bundle`. Switched to relative + taught
-  the bundler to copy `mark-header-*.svg` into `marks/`.
-- **`tokens.css` has TWO light-mode legs that a test asserts stay identical**
-  (`test_paper_ramp_contrast`) — the `--brand-mark` token had to be added to all three
-  declarations (root-dark, @media-light, explicit-light).
-
-## Parallel-session hygiene
-
-Confirmed zero file overlap between #1638 and the parallel `issue-1624-first-earn-ledger`
-branch, and main's newer commits (July-ceiling #1635, Reddit playbook #1636) don't touch
-`site/`. Merge + deploy fully isolated. Nothing to hand off to the other session.
+## Gate outcomes
+- **Build beat:** `2026-07-21-badges-that-stay-earned` (the achievements ledger — reader-facing correctness fix; ceiling + attribution mentioned in a clause).
+- **Docs:** DECISIONS.md (ADR-133 amendment), CLAUDE.md (ceiling line + status block); auto-synced literals. No new ADR needed beyond the 133 amendment.
+- **Decisions:** none needed — the ceiling change is an amendment to the existing ADR-133 (filed in #1635), not a new governance decision.
+- **Main:** red — `check_main_green` keys on the latest COMPLETED CI/CD run (`953566a2`, a pre-cdk-deploy Plan-gate failure). HEAD `0809cc03`'s every automated gate is green (Plan/Lint/Reconcile/Deploy-critical/Unit all success); the run only "waiting" at the manual production-approval Deploy gate. The Plan drift that reded `953566a2` was cleared this session (`cdk diff --all` = 0 differences, Plan re-run = success).
+- **Incidents:** none — the standing Plan-gate red (R8-ST6 class, pre-existing across sessions) was RESOLVED this session by the CDK drift clear, not a new firing. No auto-rollbacks; both site deploys green.
+- **Stash/hooks:** clean — `git stash list` empty, hook freshness 🟢.
+- **Labels:** OK — all 71 open type:story issues carry a model:* label.
+- **Memory:** compacted MEMORY.md 20.3KB→15.6KB (Edit-hook read-limit warning); added `reference_budget_ceiling_fractional_bands`; orphan gate + body-fact drift clean; S3-backed up.
 
 ## Residual / next picks
-
-- **#1639** — head-chrome drift: 61 of 82 pages ship no manifest/apple-touch-icon/theme-color,
-  and no page offers the SVG favicon; give `v4_apply_chrome.py` ownership of the `<head>`
-  block with a `--check` gate (Next, area:site-ux, model:sonnet).
-- **#1640** — brand mark on the 13 OG share cards via `card_engine.draw_footer()` (Next,
-  area:growth, model:sonnet). Traps documented in the issue: Pillow can't rasterise SVG,
-  asset must ship via `build_bundle.py`, use the AJM monogram not the single-A.
-- **not-work — owner** — confirm whether `lockup-{dark,light}.svg` (committed, currently
-  unused on-site) is the intended YouTube-banner/social-profile asset for epic #1619, or
-  should be pruned. It was included deliberately per the design doc delivery table.
-
-**Build beat:** `2026-07-21-the-brand-mark`
-**Docs:** none needed — no deploy path / data model / ADR / MCP-tool / secret surface changed;
-brand assets are self-documented in `site/assets/marks/README.md` (shipped in #1638).
-**Decisions:** none needed — the two divergences (single-A header, token-not-attribute) are
-implementation choices, not governance posture; both captured above and in the PR.
-**Incidents:** none — deploy 29869883945 green, auto-rollback did not fire.
-**Main:** red — pre-existing CDK Plan drift (pending owner `cdk deploy`: Lambda bundle-hash S3Key
-churn + a nodejs22→24 runtime bump on the CDK LogRetention helper), red across 6+ prior commits,
-unrelated to this session. My brand-mark change is site-only and deployed **green** via the separate
-Site-deploy workflow (run 29869883945). **not-work — owner** runs the pending `cdk deploy`.
-**Stash/hooks:** clean
+- **cycle-10 reset to 2026-07-22 (Wed)** — the headline of the next session. Full plan + paste prompt in the scratchpad `NEXT_SESSION_PLAN.md` (sent to Matthew). Preflight: NO Withings weigh-in exists for 2026-07-22 yet (latest = 2026-07-20 = 321.38 lbs) → re-check, else `--override-weight-lbs 321.38`. `restart_pipeline.py --apply` runs `cdk deploy --all` = OWNER-ONLY. `not-work — owner-run reset, tracked in NEXT_SESSION_PLAN.md`.
+- **#1618** receipts projection curve — now more interesting: the ceiling moved mid-month, so a curve-vs-ceiling shows the tier crossing. (#1618)
+- **#1634** canary judge false-positive fix. (#1634)
+- **#1639 / #1640** head-chrome drift + OG-image brand marks (coordinate with the shipped #1638). (#1639, #1640)
+- **#1620** outbound social links — unblocked now (TikTok confirmed); runs `v4_apply_chrome` HTML sweep → AFTER any reset. (#1620)
+- **AiReviewPack (#1594) first fires Sunday 18:00 UTC** — a new weekly email to Matthew's inbox, went live in this session's cdk deploy. Matthew may want to review/disable before then. `not-work — owner review of a just-activated schedule`.
+- **The nodejs22→24 LogRetention runtime bump is now deployed** (part of the drift clear). `not-work — resolved this session, no longer outstanding`.
+- **Standing alarms:** none newly outstanding; budget tier 1 (July window working as designed, not an alarm). `not-work — standing-alarms checklist, nothing to action`.
