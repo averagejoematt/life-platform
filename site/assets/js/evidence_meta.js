@@ -126,8 +126,22 @@ export function renderReceipts(d) {
     ? sec("The month so far", lineChart(d.history, { valueKey: "mtd_usd", dateKey: "date", unit: "", label: "month-to-date spend", goal: d.ceiling_usd, emptyMsg: "The spend curve draws in as the month accrues." }))
     : "";
 
+  // Hand-built rather than kvtable(): kvtable title-cases its keys via ttl(), which
+  // renders `ai_per_day` as "Ai Per Day" — wrong for AI, and title case is off-register
+  // for a site whose labels are lowercase throughout.
   const split = (d.ai_daily_usd != null || d.non_ai_daily_usd != null)
-    ? sec("Daily run rate", kvtable({ ai_per_day: d.ai_daily_usd != null ? `$${fmt(d.ai_daily_usd)}` : "—", infrastructure_per_day: d.non_ai_daily_usd != null ? `$${fmt(d.non_ai_daily_usd)}` : "—" }))
+    ? sec("Daily run rate", `<table class="rd-tbl"><tbody>` +
+      `<tr><td class="rd-name">AI, per day</td><td class="num">${d.ai_daily_usd != null ? `$${fmt(d.ai_daily_usd)}` : "—"}</td></tr>` +
+      `<tr><td class="rd-name">infrastructure, per day</td><td class="num">${d.non_ai_daily_usd != null ? `$${fmt(d.non_ai_daily_usd)}` : "—"}</td></tr>` +
+      `</tbody></table>`)
+    : "";
+
+  // A projection ABOVE the ceiling is the single most important thing this page can
+  // say, and in the figure row it renders in the same faint `.rd-delta` as a benign
+  // "74% of ceiling" — no cue that one of them is a breach. State it in prose.
+  const breach = (pct != null && pct > 100)
+    ? `<p class="rd-archive"><b>Projected to finish the month over the ceiling</b> — $${fmt(d.projected_month_end_usd)} against $${fmt(d.ceiling_usd)} (${fmt(pct)}%). ` +
+      `The tier ladder above is the response: features switch off as the projection climbs, which is what pulls the real figure back under.</p>`
     : "";
 
   const surge = d.surge_active
@@ -138,7 +152,7 @@ export function renderReceipts(d) {
     ? `<p class="correlative">${esc(d.per_feature_note)} <a href="/method/inference/">See the per-model receipt →</a></p>`
     : "";
 
-  return head + tierBlock + surge + curve + split + feat + prov +
+  return head + breach + tierBlock + surge + curve + split + feat + prov +
     `<p class="correlative">${esc(d.note || "")}</p>`;
 }
 
