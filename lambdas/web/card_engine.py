@@ -52,6 +52,99 @@ FONT_MONO_BOLD = "ibm-plex-mono-500.ttf"
 W, H = 1200, 630
 MARGIN = 48  # safe left/right margin
 
+# ── The AJM brand mark (#1640) ────────────────────────────────────────────────
+# The full-gauge dial with the single ember graduation at the 1-o'clock tick — the
+# mark #1638 landed as favicon/header/app-icons. It was deferred onto the OG share
+# cards there ("card_engine.py, a separate Lambda deploy"); this is that deploy.
+#
+# The mark is drawn from the SAME vector geometry as site/assets/marks/mark-a.svg
+# (the single-"A" dial master) — transcribed as Pillow primitives rather than
+# rasterizing the SVG, so the cards need NO SVG rasterizer dependency and NO new
+# bundled binary asset (the OG lambda is Pillow-only, urllib/no-external-HTTP repo).
+# Coordinates are the SVG's 100×100 viewBox verbatim, so the corner signature is a
+# byte-faithful miniature of the site's own mark, not a re-drawn lookalike.
+#
+# Brand palette (tokens.css — the mark's own colors, byte-exact per #1638):
+MARK_INK = (236, 227, 210)  # #ECE3D2 — --ink
+MARK_EMBER = (221, 122, 55)  # #DD7A37 — --ember (the one lit graduation)
+
+# (x1, y1, x2, y2, stroke_width, opacity) for the 11 unlit dial graduations, in the
+# 100-unit viewBox. The 12th (1-o'clock) graduation is the ember, drawn separately.
+_MARK_TICKS = (
+    (90.57, 60.87, 84.29, 59.19, 2.4, 0.60),
+    (79.70, 79.70, 77.22, 77.22, 2.0, 0.45),
+    (60.87, 90.57, 59.19, 84.29, 2.4, 0.60),
+    (39.13, 90.57, 40.04, 87.19, 2.0, 0.45),
+    (20.30, 79.70, 24.90, 75.10, 2.4, 0.60),
+    (9.43, 60.87, 12.81, 59.96, 2.0, 0.45),
+    (9.43, 39.13, 15.71, 40.81, 2.4, 0.60),
+    (20.30, 20.30, 22.78, 22.78, 2.0, 0.45),
+    (39.13, 9.43, 40.81, 15.71, 2.4, 0.60),
+    (60.87, 9.43, 59.96, 12.81, 2.0, 0.45),
+    (90.57, 39.13, 87.19, 40.04, 2.0, 0.45),
+)
+
+MARK_SIZE = 64  # rendered edge, px — a signature, not a headline
+_MARK_SS = 4  # supersample factor (anti-alias, then LANCZOS down)
+
+
+def _mark_line(draw, scale, x1, y1, x2, y2, width, color):
+    """A round-capped stroke in viewBox space, scaled onto the supersampled tile.
+    Pillow has no round line-cap, so end-cap discs emulate the SVG's stroke-linecap."""
+    w = max(1, int(round(width * scale)))
+    p1 = (x1 * scale, y1 * scale)
+    p2 = (x2 * scale, y2 * scale)
+    draw.line([p1, p2], fill=color, width=w)
+    r = w / 2.0
+    for cx, cy in (p1, p2):
+        draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=color)
+
+
+def brand_mark_tile(size=MARK_SIZE):
+    """Render the AJM dial mark as an RGBA tile of edge `size`, anti-aliased via
+    supersample + LANCZOS. Transcribes site/assets/marks/mark-a.svg exactly."""
+    tile = size * _MARK_SS
+    scale = tile / 100.0
+    layer = Image.new("RGBA", (tile, tile), (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+
+    def ink(op):
+        return (MARK_INK[0], MARK_INK[1], MARK_INK[2], int(round(op * 255)))
+
+    # The gauge ring (r=42, opacity 0.85).
+    ring_w = max(1, int(round(2.2 * scale)))
+    bbox = [8 * scale, 8 * scale, 92 * scale, 92 * scale]
+    d.ellipse(bbox, outline=ink(0.85), width=ring_w)
+
+    # The 11 unlit graduations.
+    for x1, y1, x2, y2, sw, op in _MARK_TICKS:
+        _mark_line(d, scale, x1, y1, x2, y2, sw, ink(op))
+
+    # The center "A" letterform (two legs + crossbar), full-opacity ink.
+    a = ink(1.0)
+    _mark_line(d, scale, 50, 31, 35, 67, 6.0, a)
+    _mark_line(d, scale, 50, 31, 65, 67, 6.0, a)
+    _mark_line(d, scale, 39.5, 56.5, 60.5, 56.5, 4.5, a)
+
+    # The one lit ember graduation at 1-o'clock (tick + terminal dot).
+    em = (MARK_EMBER[0], MARK_EMBER[1], MARK_EMBER[2], 255)
+    _mark_line(d, scale, 79.7, 20.3, 74.04, 25.96, 3.0, em)
+    er = 3.0 * scale
+    d.ellipse([79.7 * scale - er, 20.3 * scale - er, 79.7 * scale + er, 20.3 * scale + er], fill=em)
+
+    return layer.resize((size, size), Image.LANCZOS)
+
+
+def draw_brand_mark(img, size=MARK_SIZE, margin=MARGIN, top=20):
+    """Composite the AJM dial mark into the card's top-right corner — the brand
+    signature, opposite the top-left `averagejoematt.com` wordmark. Alpha-composited
+    so the dial's translucent graduations read against the card ground."""
+    mark = brand_mark_tile(size)
+    x0 = W - margin - size
+    img.paste(mark, (x0, top), mark)
+    return img
+
+
 # Fonts are bundled TTFs. og_image_lambda historically shipped them beside itself
 # (web/fonts); the canonical source is lambdas/fonts. Probe both so the engine works
 # whether it runs from the deployed package or the repo tree (tests).
@@ -90,6 +183,11 @@ def base_canvas():
     draw = ImageDraw.Draw(img)
     draw.rectangle([0, 0, W, 3], fill=GREEN)  # top accent
     draw.rectangle([0, H - 40, W, H], fill=(6, 10, 8))  # bottom bar
+    # #1640: the AJM dial signs every card in the top-right corner. It lives in
+    # base_canvas — the one shared brand-chrome primitive — so all card families
+    # (daily pages, character, chronicle, moments) carry an identical mark. The
+    # corner is empty on every card type (titles/metrics draw from the left).
+    draw_brand_mark(img)
     return img, draw
 
 

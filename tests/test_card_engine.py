@@ -76,6 +76,44 @@ def test_every_registered_card_type_renders_from_a_fixture():
         assert n > 500  # a real, non-empty card
 
 
+def test_brand_mark_tile_is_rgba_with_the_ember_graduation():
+    """#1640: the AJM dial mark renders as an RGBA tile of the requested edge, with a
+    real (non-empty) alpha and the one lit ember graduation present. Transcribed from
+    site/assets/marks/mark-a.svg — the ember at 1-o'clock is the mark's identity."""
+    tile = ce.brand_mark_tile(96)
+    assert tile.mode == "RGBA" and tile.size == (96, 96)
+    px = tile.load()
+    opaque = ember = 0
+    for x in range(96):
+        for y in range(96):
+            r, g, b, a = px[x, y]
+            if a > 0:
+                opaque += 1
+            if a > 120 and r > 150 and r - b > 60 and g < r:  # ember orange
+                ember += 1
+    assert opaque > 200, "brand mark tile drew almost nothing"
+    assert ember > 0, "the lit ember graduation is missing from the mark"
+
+
+def test_every_card_carries_the_brand_mark_top_right():
+    """#1640: draw_brand_mark lives in base_canvas, so EVERY card family (daily pages,
+    character, chronicle, moments) is signed with an identical dial in the top-right
+    corner. Prove it composites an ember pixel into the mark bbox of a fresh canvas."""
+    img, _ = ce.base_canvas()
+    px = img.load()
+    x0 = ce.W - ce.MARGIN - ce.MARK_SIZE
+    found = False
+    for x in range(x0, x0 + ce.MARK_SIZE):
+        for y in range(20, 20 + ce.MARK_SIZE):
+            r, g, b = px[x, y]
+            if r > 150 and r - b > 60 and g < r:
+                found = True
+                break
+        if found:
+            break
+    assert found, "base_canvas did not composite the AJM ember graduation top-right"
+
+
 def test_unknown_card_type_raises():
     with pytest.raises(KeyError):
         ce.render("no-such-card", {})
