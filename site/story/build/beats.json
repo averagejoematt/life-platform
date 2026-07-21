@@ -1474,6 +1474,29 @@
         }
       ],
       "why_it_mattered": "A monitoring system that can’t tell ‘the answers are bad’ from ‘I can’t reach the answers’ erodes exactly the trust it exists to build. Blind-versus-bad is now distinguishable at a glance, by an alarm with its own name — and the deviation ledger an acquirer would ask for got two more signed entries instead of two undocumented accidents."
+    },
+    {
+      "id": "2026-07-21-the-glass-engine",
+      "date": "2026-07-21",
+      "title": "The machine published its own bill — and the bill immediately said 113%",
+      "shipped": "A new page shows what this platform costs to run, live: month-to-date spend, the projected month-end figure, the hard ceiling, and a four-band ladder showing which AI features are switched off right now and why. Every number is read from the budget governor's own output — the page deliberately does not recompute the maths. A second implementation could disagree with the governor, and then the page that exists to make spending legible would be the thing lying about it. The honesty rule is enforced in code: if the governor's last run is stale or missing, the page shows no dollar figures at all and says why, rather than quietly serving last-known values while looking perfectly healthy. Per-feature usage is reported in tokens rather than dollars, because the underlying metric stream carries no model dimension — a plausible-looking dollar column would have been invention.",
+      "gotcha": "Merging two branches that had both added a check to the same file looked clean — no conflict markers left, the file parsed fine. But concatenating the two sides had silently swallowed a `return` statement that both sides claimed as shared context, and seven existing tests went red with a null-reference error. A text search for leftover merge markers would have passed. Only running the suite caught it. Separately: regenerating the site's archive pages without also running the chrome pass stripped a navigation element from every single page — the two scripts are a pair, and running the first alone is a sitewide regression that looks like a tidy diff.",
+      "honest_miss": "The page went live and immediately reported the month projected to finish at $96.09 against an $85 ceiling — 113% — with reader-facing AI narratives already auto-paused. Rendering it against real data exposed two things the mocked tests had not: that 113% was styled identically to a harmless '74% of ceiling', giving a ceiling breach no more visual weight than ordinary progress, and that a run-rate label rendered as 'Ai Per Day'. Both fixed in a follow-up. A third is filed and not yet fixed: the chart plots spend-to-date only, so its line still sits comfortably under the ceiling and reads 'on budget' while the text above it says the opposite. Both are accurate; the impression is not.",
+      "prs": [
+        {
+          "label": "PR #1616",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1616"
+        },
+        {
+          "label": "PR #1617",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1617"
+        },
+        {
+          "label": "PR #1491",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1491"
+        }
+      ],
+      "why_it_mattered": "Radical cost transparency is easy to claim and easy to fake — a hand-maintained figure on a page ages into a lie within a week. The test of whether it's real is what the page does on a bad day: this one refuses to show a number it can't stand behind, and the first thing it did in public was report that the month is projected to overshoot its own ceiling. An instrument that only ever reads green isn't an instrument."
     }
   ]
 }

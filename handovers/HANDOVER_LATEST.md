@@ -1,99 +1,123 @@
-# HANDOVER — Opus/no-Fable: honest ceiling re-confirmed; #1610 follow-up resolved (window is load-bearing) — 2026-07-20 (late evening)
+# HANDOVER — Backlog paydown: a false closure caught, the Glass Engine shipped — 2026-07-21
 
-> Instruction thread: "ultracode +2M — continue the drain (75 → as low as honesty allows), same
-> contract. **Still opus only** (Fable credits NOT restored → Tier 1 fable work stays fenced)."
-> First-action TCC probe still **EPERM** → whole session ran from a `/private/tmp` gh clone (the
-> proven pattern). All merges/deploys/pushes authorized; IAM stays user-NAMED.
+> Instruction thread: "read memory handover and all open issues and lets see what we
+> recommend doing in this session to pay down the backlog using opus model" → then
+> "yes and you do it if you can", "you are approved to merge", "Take more", "ok".
+> Authorization arrived incrementally; every merge and the one deploy was explicitly
+> approved. The `cdk deploy LifePlatformOperational` was deliberately NOT read into
+> "ok" — IAM grants are user-named (memory rule), so it stays in the owner queue.
 
-## Outcome — board UNCHANGED at 75. Zero honest closes available; NONE forced. This is the ceiling.
-## The one Tier-2 Opus item (#1610 follow-up) was investigated to a definitive conclusion (below).
-## No code merged/deployed — because nothing was honestly shippable, exactly as last session predicted.
+## Outcome — 3 PRs merged + deployed, 2 issues corrected off false evidence, main un-redded
 
-**#1610 follow-up — RESOLVED as "diagnostic works; alarm window is correctly sized; today's fail not
-retroactively nameable":**
-- **Itemized logging works.** The 4:50 PM PT post-deploy run emitted 8 named `[QA] WARN …` lines
-  (freshness/score/mcp). The next scheduled FAILURE will be named `[QA] FAIL {cat}/{name}: {msg}`.
-- **Today's scheduled run DID fail** (18:30 UTC / "11:30 AM PT", RequestId cacf513f, FailCount 1,
-  Pass 18 / Warn 8 / Paused 4) — but it **predates the 23:49 UTC #1610 deploy**, so the itemized
-  line doesn't exist for it. **Not retroactively nameable.**
-- **Dashboard-freshness hypothesis DISPROVEN** (verify-don't-assume paid off again): S3 versioning
-  is ON — `list-object-versions dashboard/matthew/data.json` shows a **17:07 UTC** write, so at the
-  18:30 run the dashboard was **1h23m old → fresh**. `check_s3_freshness` did NOT fail. The 1 fail
-  was a transient MCP/live-fetch/score check that self-cleared (a clean invoke now = 0 fails).
-- **"Shorten the daily-Maximum window" is the WRONG move — the 24h latch is LOAD-BEARING.**
-  `AlertDigest` runs **15:00 UTC** (`cron(0 15 …)`); `qa-smoke` runs **18:30 UTC** (`cron(30 18 …)`).
-  The digest reads `describe_alarms(ALARM)` ~20.5h AFTER the prior qa run, so the alarm MUST stay
-  latched ~24h for the failure to reach the digest. A shorter period would self-clear → the daily
-  digest would **silently miss** qa failures (breaking the #1445 visibility). The real (bigger) fix
-  is re-sequencing qa-smoke BEFORE the 15:00 digest — a system-wide scheduling change (every
-  `to_digest` alarm), route through owner/design, NOT a solo rush. **New memory captured.**
-- **Manual invokes pollute the window**: a dev-session `aws lambda invoke life-platform-qa-smoke`
-  when data.json is >4h old trips `check_s3_freshness` (the only critical freshness FAIL) → spurious
-  FailCount. A latched `qa-smoke-failures` is NOT necessarily a real scheduled-run failure — check
-  the metric timestamp against the 18:30 UTC slot first.
+**The find that shaped the session.** The recommendation pass turned up that **#1334 and
+#1453 were closed on 2026-07-19 citing "SHIPPED via PR #1491 (merged)" — and PR #1491 was
+never merged.** It was open, `DIRTY`, and none of its code was on main:
 
-**Owner-queue verification (verify-don't-assume — unchanged from last session):**
-- **Canary STILL BLIND.** Invoked `life-platform-ai-quality-canary` → `status=BLIND`, all 5 probes
-  403, transport self-test firing as designed. Operational-stack IAM grant **NOT yet applied** →
-  **#1589 correctly stays OPEN** (no false close).
-- **TCC still revoked** (~/Documents EPERM) — re-grant still owner-pending.
-- **Main red = the by-design R8-ST6 Plan gate ONLY** — confirmed the sole failing CI/CD job on
-  5af4771 is "Plan deployments" (over the un-applied canary IAM); every other job green/skipped.
-- No new Dependabot PRs (garminconnect / black 26.x still don't exist → Tier 3 skip).
+```
+git grep -c "check_github_quota" origin/main -- deploy/drift_sentinel.py   → (nothing)
+git grep -c "quota_html" origin/main -- remediation/drift_report.py        → (nothing)
+```
 
-## Standing-ops glances (this session)
-- **restart_integration_check --expect-cycle 9:** 20 pass / 4 fail / 7 skip — IDENTICAL to last
-  session. All 4 fails KNOWN/allowlisted: hevy (6/25), notion (5/25), strava (7/14) dark; +
-  cloudwatch-alarms bundling ai-canary-blind/overall (→ IAM deploy), ai-tokens-* (heavy Bedrock),
-  qa-paused-by-budget (tier), qa-smoke-failures (today's real transient fail, now #1610-diagnosable).
-  **No new finding.** SSM cycle live=9 expected=9. DLQ 0.
-- **felt_probe = n=0** (DDB COUNT 0, unchanged) — wrap-noted, not chased.
-- **Tue restart_verify** (expect 12/12) is a *tomorrow* op — session is Mon ~17:15 PT (16:30 UTC
-  compute hasn't run). Not applicable this session.
-- **ai-canary-heartbeat** self-heals after Wed 16:20 UTC (unchanged).
+The capability those issues claimed to ship is a **warn at 70% of the 3,000-minute Actions
+allowance** — precisely what would have caught #1544 (minutes exhausted → 6 silent merges →
+CI dead for a day → forced public repo flip) before it bit. The backlog believed that guard
+existed. It did not.
 
-## Gotchas / notes
-- **Owner PR #1491** (feat(ops): GitHub quota/billing observability, #1334/#1453) is the OWNER's own
-  PR, stale since 2026-07-19, mergeState UNKNOWN, **failing "Wiki drift gates"** — NOT touched
-  (owner's WIP, failing gate, needs rebase). In the decision menu as resume/rebase-or-close.
-- Cosmetic drift (unchanged): `PLATFORM_STATS.test_count` 4794→4795 in site_api_common.py; live
-  site-api serves 4794 until the next site-api/fleet deploy. Self-heals.
-- Gmail MCP token expired last session — qa-smoke failure emails still unreadable (owner re-auth if
-  ever needed for inbox diagnosis).
+**1. #1491 rebased + merged** (`c4ebefae`). Four conflicts, all the same shape: main's
+#1320/#1544 GitHub-posture checks had taken the exact slots #1491 wanted. Resolution was
+additive — posture keeps checks 6/7, quota became check 8. Both #1334 and #1453 now carry a
+correction comment with commands a reader can run.
+
+**2. The Glass Engine, #1397** (PR #1616 + follow-up #1617) — new `GET /api/receipts` +
+`/method/receipts/`. Live at build `787f95f`. Every figure reads from what `cost_governor`
+already writes; the governor's math is deliberately NOT reimplemented (a second
+implementation could disagree with the governor, and then the page that exists to make
+spending legible would be the thing lying about it). Two honesty properties, both tested:
+a stale/missing breakdown **omits every dollar figure and states the reason** rather than
+freezing at last-known values, and per-feature usage is reported in **tokens, not dollars**
+because the per-Lambda metric stream carries no model dimension.
+
+**3. main un-redded** (`98c49d27`). The 2026-07-20 wrap wrote its residuals under an
+`## Owner queue` heading; `check_residual_queue.py`'s `SECTION_HEADER` only matches
+`.*residual.*next.?pick`, so the #1340 gate found no section at all and
+`test_residual_queue_gate_1340` failed on **every** main Unit Tests run since `68b9f0ca`.
+Renamed to the canonical heading and converted the numbered items to `- ` bullets — which
+also means they are now actually *subject* to the gate rather than invisible to its splitter.
+
+## Verified
+
+- Full suite **6356 passed** / 55 skipped / 10 xfailed; **84 JS tests** (`node --test`).
+- 30 new tests: 14 Python (`test_receipts_endpoint.py`) + 16 JS (`evidence_receipts.test.mjs`).
+- site-api deployed (`CodeSha256 mrTcy4K6RotR7DQ6GyqTquhH6YtGrwf1d3lpmb4OGMk=`), `/api/receipts`
+  200 live, schema baseline captured from live.
+- Site deploy **completed success** on `787f95f1` — smoke + visual-QA green, no auto-rollback.
+  `version.json` build `787f95f` == git HEAD.
+- Render-QA: 4 payload states × both themes × 1280/390 pre-merge (mocked), then again against
+  **live**. Zero console errors, zero horizontal overflow in all runs.
+
+## Gotchas hit (durable)
+
+- **A keep-both conflict resolution silently ate a `return`.** Concatenating both sides of the
+  big `drift_sentinel.py` hunk dropped `check_github_push_runs`'s `return result` — the trailing
+  return was shared context both sides claimed. Seven of main's own tests went red with
+  `'NoneType' object is not subscriptable`. A marker-grep would have passed; only running the
+  tests caught it. Same family as the committed-conflict-marker class, one level subtler.
+- **ESM static imports resolve before a registered loader runs.** A `tests/js/` file that
+  statically imports a module carrying root-relative `/assets/js/…` specifiers fails with
+  `ERR_MODULE_NOT_FOUND` even though `./support/loader.mjs` is imported first — linking happens
+  before evaluation. The house fix is top-level `await import()`.
+- **Regenerating evidence pages without the chrome sweep is a sitewide regression.**
+  `v4_build_evidence.py` alone stripped `<aside class="loop-forward">` from every page;
+  `scripts/v4_apply_chrome.py` restores it. Run the pair, never the builder alone.
+- **A live capture rewrites all 107 API baselines.** Only the new one belonged in the PR; 28
+  others carried real post-reset shape drift (overwhelmingly additive) that is not reviewable
+  inside a feature diff.
+- **An IAM hypothesis that looked certain was wrong.** `role_policies.py` scopes site-api's SSM
+  read to `budget-tier` only while the handler also reads `budget-breakdown` — which read as a
+  live defect. `simulate-principal-policy` said both were **allowed**; the grant lives in
+  `cdk/stacks/lambda_helpers.py:261`. Verify the capability, not the file.
 
 ## Live state at wrap
-- **Board: 75 open** (unchanged).
-- **Main:** 5af4771; test/lint/deploy-critical green; Plan gate reds by-design (canary IAM);
-  Deploy stages WAIT on the owner production-approval gate. CI queuing healthy. (This wrap adds one
-  docs-only commit — the handover + archive — no deploy.)
-- Cycle 9; site healthy on latest content. Dark sources unchanged. TCC still revoked.
 
-## Residual / next picks (the owner decision menu — nothing blocks; all optional)
-- **TCC re-grant** (~/Documents) — restores normal local work; else next session forks to clone.
-  not-work — owner-side macOS setting, no repo change.
-- **`cdk deploy LifePlatformOperational`** (canary IAM) → invoke canary → expect OK/Blind=0 →
-  **close #1589**; also clears the by-design main Plan-gate red. (user-NAMED IAM)
-- **#1435 IAM grant** — traffic-digest role read on the perf store (DDB or S3) so the perf-trend
-  half can ship (closes epic #1425). (user-NAMED IAM; code side scoped + ready.)
-- **#1243 audio** — regenerate the Prologue Part II read-aloud (dated 2026-07-19) so it's no longer
-  orphaned; then the parity guard lands green.
-- **#1475** — schedule the design-round-trip (or a Fable session) for the wayfinding layer.
-- **#1491 — RESOLVED 2026-07-21.** Rebased onto main (4 conflicts, additive vs the #1320/#1544
-  posture checks), merged as `c4ebefae`. #1334/#1453 had been closed on 2026-07-19 citing this PR
-  as merged when it was not — both now carry a correction comment with checkable evidence.
-  The 70% warn is still inert without a scoped PAT → filed as #1613.
-- **#1544 billing** — root cause confirmed (Actions minutes 3000/3000, resolved by the public flip);
-  the recurrence guard is only half-live until #1613 lands. Decide the budget posture.
-- **Fable credits** — if restored, next session's Tier 1 (#1481/#1483/#1577 conversational) is the
-  real meat; still-Opus means the honest ceiling stays low. not-work — account/billing call.
-- Standing (unchanged): approve the waiting CI Deploy run (fleet-sync); Tue restart_verify after
-  the 16:30 UTC compute; if you want the qa-smoke alarm to reflect same-day failures, the real fix
-  is re-sequencing qa-smoke before the 15:00 UTC AlertDigest (system-wide — route through #1610).
+- **Budget: tier 2, projected $96.09 against an $85 ceiling (113%).** Reader narratives
+  (coach commentary, State of Matthew, chronicle) are paused by the governor. Matthew has said
+  the overrun is acceptable this cycle — but accepting it does not un-pause anything, because
+  tier derives from projection ÷ ceiling. Raising `MONTHLY_CEILING_USD` is the only lever.
+- Cycle 9, genesis 2026-07-20. Board **76 open** (filed #1613, #1618).
+- Dark sources: hevy resolved as **human-side — Matthew hasn't trained**, not a defect.
+  notion (2026-05-25) and strava (#1330) unchanged.
 
-**Build beat:** unchanged (no code change this session; server-side qa-smoke build stays
-`2026-07-20-qa-smoke-itemized-logging`). **Docs:** this wrap + one new memory
-(`reference_qa_smoke_alarm_window_load_bearing`). **Main:** red — sole failing job is the by-design
-R8-ST6 Plan gate; all test/lint/deploy-critical green on 5af4771. **Stash/hooks:** clone stash empty;
-main-checkout stash/hook state UNVERIFIABLE (TCC) — re-check after the re-grant.
+## Residual / next picks
 
-Prior session: `HANDOVER_2026-07-20_QaSmokeItemized.md`.
+- **#1613** — the CI-minutes 70% warn is installed but **inert**: the billing API needs a
+  `user`-scoped PAT, and `_gh_api_json` doesn't read the token-preference path the posture
+  checks use, so adding `GH_POSTURE_TOKEN` alone would not light it up. Until it lands, treat
+  CI-minutes metering as observability, not an alarm.
+- **#1618** — `/method/receipts/` plots month-to-date only, so the curve reads "on budget"
+  while the readout says 113%. A dashed projection segment reconciles them.
+- **#1589** — closes once `cdk deploy LifePlatformOperational` lands (canary IAM); that same
+  deploy clears main's by-design R8-ST6 Plan red. (user-NAMED IAM)
+- **Budget ceiling decision** — not-work — an owner call: leave tier 2 to ride out the month,
+  or amend ADR-133 + bump `MONTHLY_CEILING_USD` (~$110 → tier 1, reader narratives back on).
+- **API baselines are 2 days stale** — not-work — 28 snapshots carry real post-reset shape
+  drift; a standalone refresh commit, deliberately not bundled into a feature PR.
+- **#1330** strava token-health (gate:owner) and **#1029** re-entry hardening remain the
+  standing owner-gated security items.
+- Standing alarms: no unactioned digest-routed freshness alarm or manual-rotation secret
+  reminder surfaced this session. not-work — a #1329 checklist confirmation, nothing to file.
+
+**Build beat:** `2026-07-21-the-glass-engine`
+**Docs:** none needed — no deploy path, data model, engine, MCP tool, secret or site-authoring
+contract changed; the new page registers through the existing evidence REGISTRY, and
+`sync_doc_metadata.py` carried the endpoint/test-count literals.
+**Decisions:** none needed — the `/method/receipts/` path choice over the issue's
+`/build/receipts/` is an IA placement within the documented Home + 5 doors, not a new posture;
+the tokens-not-dollars call applies ADR-104 rather than amending it.
+**Main:** red — the by-design R8-ST6 Plan gate on the `AiReviewPackRole` + canary-secret IAM
+diff, pending Matthew's `cdk deploy LifePlatformOperational`. Lint, Unit Tests, and
+Deploy-critical all green on `787f95f1`; Unit Tests went green again this session.
+**Incidents:** 1 row added — budget tier escalated to 2 with month-end projected over the
+ceiling (113%).
+**Stash/hooks:** clean (stash empty; hook freshness 🟢).
+
+Prior session: `HANDOVER_2026-07-20_OpusNoFable.md`.
