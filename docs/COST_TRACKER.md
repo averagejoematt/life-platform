@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-19
 
-Last updated: 2026-07-20 (v8.6.0)
+Last updated: 2026-07-21 (v8.6.0)
 
 > Budget ceiling: **$85/month all-in** base, floating to **$100 in surge mode** on real
 > reader traffic (≥900 trailing-7d uniques — ADR-133). History: $25 → $75 with the
@@ -152,6 +152,81 @@ Then update the two **Verified:** stamps in this doc — CI flags the doc at 45 
 | **Route 53** | $0.50 | 1 hosted zone — flat fee. |
 | **Lambda / DynamoDB / S3 / CloudFront / SES** | ~$1.1–1.4 | On-demand DDB, 30-day log retention, S3 lifecycle — all well-managed. |
 | **WAF** | $0 | Deleted 2026-06 (was ~$8–9/mo); rate limiting is in-Lambda (DynamoDB-backed). |
+
+## GitHub Actions / Repo Hosting (#1334, #1453 — added 2026-07-18)
+
+**The $85 AWS budget governor above covers AWS spend only.** GitHub became a
+*metered production dependency* the moment the repo went private (2026-07-13,
+`project_repo_visibility.md`): CI (`ci-cd.yml`), the standing site-deploy path
+(`site-deploy.yml`), and the remediation agent (`remediation-agent.yml`) all now
+run on GitHub Actions minutes billed against the account's plan allowance — a
+private repo has no unlimited-minutes free tier the way a public repo does.
+
+**Account-specific facts (unverified — needs an owner glance with a scoped PAT):**
+
+| Fact | Value | How to verify |
+|------|-------|----------------|
+| GitHub plan tier (Free/Pro/Team) | **unverified** — assumed Pro per #1334's originating evidence, not confirmed | `gh auth refresh -h github.com -s user` then `gh api user` (look for the `plan` field), or the GitHub billing settings page |
+| Actions minutes used this cycle | **unverified** — billing API 404s with the current token | `gh api users/averagejoematt/settings/billing/actions` (needs the `user` scope — see below) |
+| Actions artifact/Packages storage used | **unverified** | `gh api users/averagejoematt/settings/billing/shared-storage` (same scope requirement) |
+| Spending limit setting | **unverified** | GitHub → Settings → Billing and plans → Spending limit |
+
+**Confirmed by direct probe (2026-07-18, `gh` CLI authenticated as `averagejoematt`,
+scopes `gist, read:org, repo, workflow` — no `user` scope):**
+```
+$ gh api users/averagejoematt/settings/billing/actions
+gh: This API operation needs the "user" scope. To request it, run:
+  gh auth refresh -h github.com -s user
+```
+Same result for `.../settings/billing/shared-storage`, and `/user` returns no `plan`
+field either. **This is the exact scope gap** — the fix is a one-time, human-run
+`gh auth refresh -h github.com -s user` (adds the `user` scope to the *local*
+`gh` credential; it does not by itself get the scope into GitHub Actions' built-in
+`GITHUB_TOKEN`, which is minted per-run and can never carry a broadened scope — a
+real billing-capable CI check would need a **classic PAT stored as a repo secret**,
+owned by the account owner, with no extra named scope beyond being the account
+owner). **Flagged as a follow-up for the decision menu, not done here** — deploy_
+/auth changes are outside this PR's read-only scope.
+
+**Public plan facts (NOT account-specific — from GitHub's published billing docs,
+fetched 2026-07-18; use only as the warn-threshold basis, not as confirmation of
+which plan this account is actually on):**
+
+| Plan | Included Actions minutes/mo | Included artifact storage | Linux 2-core overage |
+|------|------------------------------|----------------------------|------------------------|
+| Free | 2,000 | 500 MB | n/a (private repos on Free get no paid overage — Actions just stops) |
+| **Pro** | **3,000** | 1 GB | $0.006/min |
+| Team | 3,000 | 2 GB | $0.006/min |
+
+Source: [GitHub Actions billing docs](https://docs.github.com/en/billing/managing-billing-for-github-actions/about-billing-for-github-actions).
+
+**The monthly glance (automated, #1334 AC2 + #1453):** `deploy/drift_sentinel.py`'s
+`check_github_quota()` check runs as part of the existing weekly (Monday) drift
+sentinel step in `remediation-agent.yml` — no new cron. It:
+1. Attempts the real billing-usage API and warns at **70%** of the included allowance
+   when it can read one (`GITHUB_ACTIONS_WARN_PCT` in `drift_sentinel.py`); today this
+   always reports the fail-soft "billing API unavailable: …" line above for the
+   reason just confirmed.
+2. Always lists the **top wall-clock-consuming workflows over the trailing 7 days**
+   (`gh run list`, needs only `actions: read`) — a same-direction proxy for billable
+   minutes (not exact — Actions bills per-job, and parallel jobs move wall-clock the
+   opposite direction from billable-minute totals) good enough to attribute a
+   run-rate regression to a specific workflow.
+
+Both land in the remediation agent's one curated weekly email
+(`remediation/drift_report.quota_html()`, called from both `remediation/agent.py`
+and `remediation/automerge.py`) alongside the existing infra-drift status line — see
+`docs/RUNBOOK.md` §"GitHub Actions quota glance" for the manual fallback command.
+
+**CI-minutes run-rate levers already in place:** `concurrency: cancel-in-progress:
+true` (scoped per-ref) on the PR-triggered gates that lacked it — `docs-ci.yml` and
+`v4-gate.yml` — so a rapid string of pushes to one PR no longer burns minutes on
+every superseded run to completion; `visual-qa.yml`/`site-deploy.yml`/`ci-cd.yml`
+already had concurrency groups. `golden-brief-eval.yml` and `eval-harvest.yml`
+(schedule-only) now queue rather than double-run if a manual `workflow_dispatch`
+overlaps their cron.
+
+---
 
 ## Cost Decisions Log
 

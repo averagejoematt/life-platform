@@ -653,6 +653,7 @@ def email_report(report, mode):
     subj = f"🤖 Remediation [{mode}]: {len(af)} fixed, {len(prs)} PRs, {len(nh)} need you"
     if unt:
         subj += f", {len(unt)} untriaged"
+    _drift_record = drift_report.read_latest(_s3, LOG_BUCKET)
     html = (
         f"<p><b>Mode:</b> {mode} · {datetime.now(timezone.utc):%Y-%m-%d %H:%M UTC}</p>"
         + block("✅ Auto-fixed", af, lambda i: f"{i.get('summary','')} — {i.get('pr','')}")
@@ -664,7 +665,9 @@ def email_report(report, mode):
         + ("<p><i>No actionable signals.</i></p>" if not (af or prs or nh or unt) else "")
         # Weekly drift sentinel status — always rendered when a record exists so a clean
         # week reports explicitly clean (never silent about infra drift). AC4 of #394.
-        + drift_report.status_html(drift_report.read_latest(_s3, LOG_BUCKET))
+        + drift_report.status_html(_drift_record)
+        # GitHub Actions quota/billing glance — always rendered alongside it (#1334, #1453).
+        + drift_report.quota_html(_drift_record)
     )
     try:
         _ses.send_email(

@@ -25,6 +25,10 @@ permissions:
                                     # vulnerability-alerts) are NOT grantable to GITHUB_TOKEN
                                     # and fail soft to a needs-owner line unless the
                                     # GH_POSTURE_TOKEN fine-grained PAT secret is added.
+                                    # Also drives the GitHub-quota leg's (#1334, #1453)
+                                    # `gh run list` top-consuming-workflows proxy — the
+                                    # billing-usage endpoint itself needs a `user`-scoped
+                                    # PAT this token doesn't have, and fails soft without it.
 
 concurrency:
   group: remediation
@@ -87,6 +91,10 @@ jobs:
           # Administration:read + Actions:read + Contents:read) that unlocks the
           # rulesets + vulnerability-alerts surfaces — empty until Matthew adds the
           # secret; the sentinel fails soft to a labeled needs-owner line without it.
+          # The same two vars drive the GitHub-quota sub-check (#1334, #1453): `gh run
+          # list` for the top-consuming-workflows proxy (needs actions: read, granted
+          # above) and an attempted billing-usage call that fails soft — the built-in
+          # token lacks the `user` scope billing endpoints require.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GH_POSTURE_TOKEN: ${{ secrets.GH_POSTURE_TOKEN }}

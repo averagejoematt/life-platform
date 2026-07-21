@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-12
 
-Last updated: 2026-07-20 (v8.6.0 — 68 MCP tools, 36-module package, 95 Lambdas, 20 data sources)
+Last updated: 2026-07-21 (v8.6.0 — 68 MCP tools, 36-module package, 95 Lambdas, 20 data sources)
 
 **Ground truth (point-in-time values are drift — run the command instead):**
 - Lambda functions defined (CDK): 95 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
@@ -85,6 +85,22 @@ Canonical in `docs/CONVENTIONS.md` §1 (retirement date, `build_bundle.py`, whic
 ## Secret Caching (COST-OPT-1)
 
 Lambdas cache Secrets Manager reads for 15 minutes via `secret_cache.py` (a bundled shared module). This reduces Secrets Manager API calls by ~90% across 9 Lambdas. The cache is in-memory (per-Lambda instance), so a cold start always fetches fresh secrets.
+
+---
+
+## GitHub Actions quota glance (#1334, #1453)
+
+GitHub is a metered production dependency (repo private since 2026-07-13): CI, site-deploy, and the remediation agent all run on Actions minutes. The **automated** path is `deploy/drift_sentinel.py`'s `check_github_quota()`, which runs weekly (Mondays) inside the existing `remediation-agent.yml` schedule — no dedicated cron. It lands in the remediation agent's one curated email (`remediation/drift_report.quota_html()`) with: real minutes-used-vs-allowance + a 70% warn line when the billing API is reachable, top wall-clock-consuming workflows over the trailing 7 days always. See `docs/COST_TRACKER.md` §"GitHub Actions / Repo Hosting" for the full fact table and the confirmed reason the billing figures read as "unavailable" today (the workflow's built-in `GITHUB_TOKEN` lacks the `user` scope).
+
+**Manual monthly-close fallback** (run locally, needs a `gh` session with the `user` scope — `gh auth refresh -h github.com -s user` once, interactively, as the account owner):
+
+```bash
+gh api users/averagejoematt/settings/billing/actions        # minutes used vs. included
+gh api users/averagejoematt/settings/billing/shared-storage  # artifact/Packages storage used
+python3 deploy/drift_sentinel.py --no-write                  # print the same weekly-sentinel view locally
+```
+
+Assert both quota figures stay under 80% before the month rolls over; if either is close, either wait for the natural reset or reduce run-rate (path-filtered/concurrency-capped workflows — see COST_TRACKER — are the first lever, then trimming schedule frequency).
 
 ---
 
