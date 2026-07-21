@@ -87,6 +87,69 @@ also means they are now actually *subject* to the gate rather than invisible to 
 - Dark sources: hevy resolved as **human-side — Matthew hasn't trained**, not a defect.
   notion (2026-05-25) and strava (#1330) unchanged.
 
+---
+
+# SECOND THREAD (same day) — social distribution: three boards, one denial
+
+> Instruction: "with my averagejoematt.com domain is it possible within AWS to create an
+> email address?" → widened to social handles, then "put plan together and create all issues
+> in git and then we will wrap. And use external product and board counsel to put a plan
+> together on what things matter in this journey."
+
+**Zero repo code changed in this thread.** Output was live DNS, 15 GitHub issues, and one
+memory topic. No PR, no deploy, no beat.
+
+## Shipped (infra + backlog, not code)
+
+**Mail on `averagejoematt.com` is live** — `matt@averagejoematt.com` forwards to Proton via
+**SimpleLogin** (Proton's alias service), which `mattsusername.com` was already running.
+Records added to Route 53 zone `Z063312432BPXQH9PVXAI`, all verified resolving from both the
+authoritative NS and 1.1.1.1: MX (`mx1`/`mx2.simplelogin.co`, 10/20) · apex TXT carrying BOTH
+`sl-verification=…` and `v=spf1 include:simplelogin.co ~all` on one RRset · three DKIM CNAMEs
+(`dkim`/`dkim02`/`dkim03._domainkey`) · `_dmarc` at `p=quarantine; adkim=s; aspf=s`.
+No SES, no Lambda forwarder — the existing paid alias service already did it.
+
+**Epic #1619 + 14 stories filed** from a three-board review (Product / Personal / Technical,
+`docs/BOARDS.md`), label `review:social-boards-2026-07-21`.
+
+## The verdict that shaped it
+
+Matthew asked for milestone/achievement/weigh-in autoposting. **The Personal Board denied it
+on the merits — not deferred pending guardrails.** The reasoning, which the Chair adopted:
+the injury in the documented downturn pattern is not the regression, it is the *outstanding
+public victory-claim the regression contradicts*. An automated milestone bot manufactures
+~50 standing claims/year without conscious participation; guardrails reduce the rate, not the
+kind. Worst case is the bot celebrating during a downturn — the platform's founding failure
+with a megaphone. Rationale kept at that level here and in the issues; detail lives in
+`docs/PLATFORM_CONTEXT.md` (PRIVATE).
+
+Three independent supports: `handle_achievements()` is stateless so badges **un-earn and
+re-earn** on normal 2–3 lb swings (#1624); a bare "10 lbs down" is an unlabeled point estimate
+ADR-105 would red; and ADR-104 fails in *both* directions — wins-only is a highlight reel,
+symmetric auto-setbacks are harmful on acontextual public surfaces. **When both branches of a
+feature fail the honesty ADR, the feature is the problem.**
+
+**Approved instead:** content posting (chronicle/podcast/essay drops — the surface that already
+contains the down-weeks), and **a private digest to 5–8 named humans** (#1623) adopted as the
+priority, because *the notes stopping* is a far better downturn signal than public silence.
+
+## Gotchas hit (durable)
+
+- **Namecheap is registrar-only for `averagejoematt.com`; Route 53 serves the DNS.** Its
+  "Advanced DNS" screen is inert — records entered there are silently ignored. Nearly edited
+  the wrong system. → memory `reference_averagejoematt_dns_and_mail.md`.
+- **SPF must join the apex TXT RRset, not replace it** — a separate change would have wiped the
+  SimpleLogin verification string.
+- **X repriced to pay-per-use (Feb 2026): $0.20/post when the post carries a link**, and every
+  post this platform would make carries one. At 2/day that is 14% of the $85 ceiling — and it
+  is a third-party bill Cost Explorer cannot see, so `budget_guard` structurally cannot gate
+  it. ADR-063's "one budget covers ALL spend" goes false the day X ships (#1631).
+- **`create_platform_lambda` defaults to AWS's 2 async retries** — POST succeeds, response
+  parse throws, Lambda re-invokes, **posts again**. `retry_attempts=0` is four characters and
+  does more real safety work than the whole claim protocol (#1629).
+- **`social` is already taken** — `lambdas/web/site_api_social.py` + `mcp/tools_social.py` mean
+  *social connection*, the loneliness pillar. Any syndication code must not reuse the word.
+
 ## Residual / next picks
 
 - **#1613** — the CI-minutes 70% warn is installed but **inert**: the billing API needs a
@@ -106,6 +169,22 @@ also means they are now actually *subject* to the gate rather than invisible to 
 - Standing alarms: no unactioned digest-routed freshness alarm or manual-rotation secret
   reminder surfaced this session. not-work — a #1329 checklist confirmation, nothing to file.
 
+_Second thread (social distribution):_
+
+- **#1622** is the gate for the whole syndication lane — a 30-day manual-script trial, and
+  **#1629's Bluesky poster does not start until it is used ≥15/30 days.** Automate a proven
+  habit, never a hoped-for one; the remediation agent (ADR-129/103) is the cautionary mirror.
+- **#1624** — `handle_achievements()` statelessness is a live site correctness defect
+  independent of any social plan, and a hard prerequisite for **#1626**'s milestone ledger.
+- **#1627** — the downturn leading-indicator detector arrived sideways as a guardrail, but
+  sleep-midpoint variance leading by 1–3 weeks may be the most valuable thing in the batch.
+  Worth re-ranking on its own merits rather than as a social dependency.
+- **#1402** — overlaps the new epic (it specs the daily-card poster this verdict partly
+  denies). Commented, not closed. not-work — a triage call for Matthew: close as superseded,
+  or narrow to its card-rendering half.
+- **TikTok handle** — the registered handle is `avereagejoematt` (extra `e`). not-work — an
+  owner fix; **#1620 must not link it until corrected.**
+
 **Build beat:** `2026-07-21-the-glass-engine`
 **Docs:** none needed — no deploy path, data model, engine, MCP tool, secret or site-authoring
 contract changed; the new page registers through the existing evidence REGISTRY, and
@@ -119,5 +198,15 @@ Deploy-critical all green on `787f95f1`; Unit Tests went green again this sessio
 **Incidents:** 1 row added — budget tier escalated to 2 with month-end projected over the
 ceiling (113%).
 **Stash/hooks:** clean (stash empty; hook freshness 🟢).
+
+_Second-thread gates (social distribution):_
+**Build beat:** none — zero repo code changed; the thread produced live DNS, 15 issues and one
+memory topic, none of which is merged-and-deployed public build work.
+**Docs:** none needed — no repo doc surface touched; the DNS/mail reflex went to memory
+(`reference_averagejoematt_dns_and_mail.md`), which is outside git by design.
+**Decisions:** none needed this session — the governance call (amending the documented
+anti-auto-posting stance at `chronicle_share_kit.py:19`) is deliberately deferred to **#1630**
+so the ADR lands with the implementation rather than ahead of it.
+**Incidents:** none.
 
 Prior session: `HANDOVER_2026-07-20_OpusNoFable.md`.
