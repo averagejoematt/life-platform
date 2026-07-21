@@ -8,7 +8,7 @@ the early-month window). No AWS calls.
 from __future__ import annotations
 
 import importlib
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import pytest
 
@@ -30,6 +30,21 @@ def _pin_normal_thresholds(gov, monkeypatch):
     black gate was masking until 2026-06-24.
     """
     monkeypatch.setattr(gov, "_active_thresholds", lambda: gov._TIER_THRESHOLDS)
+
+
+@pytest.fixture(autouse=True)
+def _pin_base_ceilings(gov, monkeypatch):
+    """Same treatment for the calendar-scoped CEILING override
+    (_TEMP_CEILING_WINDOW, July 2026). The assertions in this module are written
+    against the $85/$100 base pair; without this pin every ceiling test in here
+    false-fails for the duration of any raise window and silently passes again
+    once it lapses. The window's own behaviour is tested explicitly below, with
+    the clock injected rather than ambient.
+    """
+    # Stash the real implementation first — the window tests below need to call
+    # the thing this fixture is pinning away.
+    monkeypatch.setattr(gov, "_REAL_ACTIVE_CEILINGS", gov._active_ceilings, raising=False)
+    monkeypatch.setattr(gov, "_active_ceilings", lambda: (gov.MONTHLY_CEILING, gov.SURGE_CEILING_USD))
 
 
 # ── _tier_for: threshold mapping ─────────────────────────────────────────────
@@ -267,6 +282,77 @@ def test_tier_for_scales_proportionally_with_surge_ceiling(gov):
     # spend that would have hard-stopped now degrades gently instead.
     assert gov._tier_for(83.0) == 3  # $85 base: $83 is past the $82.73 hard stop
     assert gov._tier_for(83.0, ceiling=100.0) == 1  # $100 surge: same $83 is tier 1
+
+
+# ── temporary raise window (_TEMP_CEILING_WINDOW) ────────────────────────────
+# July 2026 is raised to $115/$135 for one month and reverts on its own date.
+# These tests inject the date instead of reading the clock, so they assert the
+# same thing in August 2026 as they did the day they were written.
+
+
+def _clock_at(day):
+    """Minimal datetime stand-in — _active_ceilings only calls .now(tz).date()."""
+
+    class _Clock:
+        @staticmethod
+        def now(_tz=None):
+            class _Now:
+                @staticmethod
+                def date():
+                    return day
+
+            return _Now()
+
+    return _Clock
+
+
+@pytest.mark.parametrize(
+    "today,expected",
+    [
+        (date(2026, 6, 30), (85.0, 100.0)),  # day before the window opens
+        (date(2026, 7, 1), (115.0, 135.0)),  # inclusive start
+        (date(2026, 7, 21), (115.0, 135.0)),  # the day it was decided
+        (date(2026, 7, 31), (115.0, 135.0)),  # last day inside
+        (date(2026, 8, 1), (85.0, 100.0)),  # EXCLUSIVE end — reverts unattended
+        (date(2027, 7, 15), (85.0, 100.0)),  # does not recur next July
+    ],
+)
+def test_temp_ceiling_window_opens_and_self_reverts(gov, monkeypatch, today, expected):
+    """The whole point of a dated window is that nobody has to remember it.
+    August must revert with no deploy, no SSM flip, and no human in the loop."""
+    monkeypatch.setattr(gov, "datetime", _clock_at(today))
+    assert gov._REAL_ACTIVE_CEILINGS() == expected
+
+
+def test_env_override_defeats_the_window(gov, monkeypatch):
+    """An operator who explicitly sets MONTHLY_CEILING_USD takes full control.
+    Without this, setting the env var mid-window would silently do nothing."""
+    monkeypatch.setattr(gov, "_CEILING_ENV_OVERRIDE", True)
+    monkeypatch.setattr(gov, "datetime", _clock_at(date(2026, 7, 21)))
+    assert gov._REAL_ACTIVE_CEILINGS() == (gov.MONTHLY_CEILING, gov.SURGE_CEILING_USD)
+
+
+def test_surge_never_lowers_the_ceiling(gov, monkeypatch):
+    """Regression guard for the inversion found 2026-07-21: _effective_ceiling
+    returned the surge ceiling unconditionally, so a base above SURGE_CEILING_USD
+    made reader arrival TIGHTEN the guard — the exact opposite of what surge is
+    for. Latent at any base over $100; would have gone live during the July
+    window had the surge value not moved with the base."""
+    monkeypatch.setattr(gov, "_active_ceilings", lambda: (115.0, 100.0))  # deliberately incoherent pair
+    surged, active = gov._effective_ceiling(recent_uniques=5000)
+    assert active is True
+    assert surged == 115.0, "surge floored at the base — it may loosen the guard, never tighten it"
+    base, active = gov._effective_ceiling(recent_uniques=0)
+    assert (base, active) == (115.0, False)
+
+
+def test_july_window_actually_reaches_tier_1(gov, monkeypatch):
+    """The reason $115 and not $110: bands are fractions of the ceiling, so the
+    live 2026-07-21 projection ($96.09) had to land under 86.7% to un-pause
+    reader narratives. $110 leaves it at 87.4% — still tier 2, no change bought."""
+    assert gov._tier_for(96.09, ceiling=110.0) == 2  # the number that would have done nothing
+    assert gov._tier_for(96.09, ceiling=115.0) == 1  # the number chosen
+    assert gov._tier_for(96.09, ceiling=85.0) == 3  # where it stood before
 
 
 def test_decide_tier_default_ceiling_is_the_base(gov):

@@ -23,6 +23,11 @@ _TIER_THRESHOLDS, scaled by _tier_for):
   3 Hard stop ≥ 97% of ceiling  ($82.73 at the $85 base) → + pause the ask endpoints
                                   (/api/ask, /api/board_ask) and daily-brief AI;
                                   brief goes data-only
+(The dollar figures above are the $85-base ones. A temporary raise window is in
+effect — see _TEMP_CEILING_WINDOW for its dates and values — during which the
+same percentages trip at proportionally higher dollars. The bands are fractions,
+so only the dollars move; deliberately not restated here, because a hardcoded
+ceiling figure in a docstring is exactly what check_doc_facts exists to catch.)
 (Bands are the audience-ordered ADR-125 ladder — the authority is
 budget_guard._FEATURE_CUTOFF, which these labels must mirror; tests/
 test_budget_guard_ladder.py pins them in lockstep.)
@@ -39,8 +44,10 @@ traffic. Real reader arrival (e.g. a Reddit hit) would auto-outage the reader
 AI at the moment of success. When the traffic digest's trailing 7-day unique
 visitor count (LifePlatform/Traffic::UniqueVisitors7d, emitted weekly by
 traffic_digest_lambda) crosses SURGE_UNIQUES_THRESHOLD, the effective monthly
-ceiling floats from the $85 base to SURGE_CEILING_USD ($100) — see
-_effective_ceiling.
+ceiling floats from the base to the surge ceiling ($85 → $100 normally; $115 →
+$135 during the July-2026 window, see _TEMP_CEILING_WINDOW) — the pair in effect
+today comes from _active_ceilings, and surge is floored at the base so it can
+never tighten the guard. See _effective_ceiling.
 Tier thresholds scale proportionally with whatever ceiling is in effect (see
 _tier_for). Surge is a pure function of reader traffic, never of spend — so a
 dev-caused spend spike can NOT trigger it (isolates cause from effect, per
@@ -57,7 +64,7 @@ import calendar
 import json
 import logging
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import boto3
 
@@ -93,6 +100,28 @@ MONTHLY_CEILING = float(os.environ.get("MONTHLY_CEILING_USD", "85"))
 SURGE_UNIQUES_THRESHOLD = int(os.environ.get("SURGE_UNIQUES_THRESHOLD", "900"))
 SURGE_CEILING_USD = float(os.environ.get("SURGE_CEILING_USD", "100"))
 SSM_SURGE_PARAM = os.environ.get("SURGE_ACTIVE_PARAM", "/life-platform/surge-active")
+# JULY 2026 ONLY (auto-reverts 2026-08-01, no manual step): Matthew's call on
+# 2026-07-21, with July already projecting $96.09 against the $85 base (113%) and
+# the guard parked at tier 2 — reader narratives paused for the rest of the month.
+# Raised for ONE month to un-pause them; August returns to $85/$100 automatically.
+#
+# $115 not $110: the tier bands are fixed FRACTIONS of the ceiling (≈73/87/97%),
+# so $110 leaves the projection at 87.4% — still tier 2. $110 would have paid the
+# full cost of raising the ceiling and changed nothing. $115 lands at 83.6% (tier
+# 1) with ~$5 of headroom as the projection drifts.
+#
+# The surge value moves WITH the base ($135 keeps the same ~1.18 ratio as 85→100).
+# It has to: _effective_ceiling returns the surge ceiling unconditionally, so a
+# surge ceiling BELOW the base would tighten the guard exactly when readers
+# arrive. _effective_ceiling now floors it with max() as a structural guard, but
+# keeping the pair coherent here means that floor never has to fire.
+_TEMP_CEILING_WINDOW = (date(2026, 7, 1), date(2026, 8, 1))  # [start, end)
+_TEMP_CEILING_USD = 115.0
+_TEMP_SURGE_CEILING_USD = 135.0
+# An explicit MONTHLY_CEILING_USD in the environment is an operator override and
+# defeats the window entirely — otherwise setting the env var during July would
+# silently do nothing, which is the sort of surprise that costs an afternoon.
+_CEILING_ENV_OVERRIDE = "MONTHLY_CEILING_USD" in os.environ
 # Phase B ships observe-only (emit metrics, don't set tier/alert). Phase C flips
 # this to "false" via env to enable enforcement once the estimate is validated.
 OBSERVE_MODE = os.environ.get("OBSERVE_MODE", "true").lower() in ("1", "true", "yes")
@@ -117,19 +146,15 @@ _AI_SAFETY_BUFFER = 1.15  # bias the AI estimate high so we degrade early, never
 _THRESHOLD_REFERENCE_CEILING = 75.0
 _TIER_THRESHOLDS = [(73, 3), (65, 2), (55, 1)]  # checked high→low; else tier 0
 
-# June 2026 ONLY (auto-reverts 2026-07-01): the Coaching-door launch + a heavy
-# multi-day QA/deploy session inflated the trailing-7d AI rate, projecting ~$77 and
-# parking the guard at tier 1 (coach narratives + ensemble paused) even though ACTUAL
-# MTD spend is only ~$50. Per Matt's call, raise the headroom for this month so coach
-# AI stays on; the $75 hard cap (ADR-063) returns automatically next month — no manual
-# revert. Tier 3 (hard stop) still fires at $95, well below any runaway.
-_JUNE_2026_THRESHOLDS = [(95, 3), (88, 2), (80, 1)]
 
-
+# The June-2026 threshold override (#169) was removed 2026-07-21 — its window
+# closed 2026-07-01 and it could never fire again. The seam below is kept: it is
+# where a future calendar-scoped THRESHOLD override goes, and the tests pin it.
+# Note that temporary headroom is now expressed as a raised CEILING
+# (_TEMP_CEILING_WINDOW) rather than as shifted thresholds. That is the better
+# lever — the bands are fractions of the ceiling, so one number moves the whole
+# ladder coherently instead of hand-computing three.
 def _active_thresholds():
-    now = datetime.now(timezone.utc)
-    if now.year == 2026 and now.month == 6:
-        return _JUNE_2026_THRESHOLDS
     return _TIER_THRESHOLDS
 
 
@@ -316,6 +341,21 @@ def _tier_for(projected: float, ceiling: float = None) -> int:
     return 0
 
 
+def _active_ceilings() -> tuple[float, float]:
+    """(base, surge) ceilings in effect today.
+
+    Mirrors _active_thresholds: a calendar-scoped override that reverts on its
+    own date rather than needing anyone to remember. See _TEMP_CEILING_WINDOW
+    for why July 2026 is raised and why the number is $115.
+    """
+    if _CEILING_ENV_OVERRIDE:
+        return MONTHLY_CEILING, SURGE_CEILING_USD
+    start, end = _TEMP_CEILING_WINDOW
+    if start <= datetime.now(timezone.utc).date() < end:
+        return _TEMP_CEILING_USD, _TEMP_SURGE_CEILING_USD
+    return MONTHLY_CEILING, SURGE_CEILING_USD
+
+
 def _effective_ceiling(recent_uniques) -> tuple[float, bool]:
     """(ceiling, surge_active) from the trailing 7-day unique-visitor count.
 
@@ -324,11 +364,18 @@ def _effective_ceiling(recent_uniques) -> tuple[float, bool]:
     (#739 scope constraint: "the ceiling stays at the base when uniques are
     below threshold regardless of projection"). `recent_uniques` is None when
     the metric hasn't been read yet (e.g. transient CloudWatch error) — fails
-    closed to the normal base ceiling ($85), never the surge one.
+    closed to the base ceiling, never the surge one.
+
+    Surge is floored at the base: surging must never LOWER the ceiling. Without
+    the max() a base above SURGE_CEILING_USD would invert the whole mechanism —
+    reader arrival would tighten the guard at the moment surge exists to loosen
+    it. Latent at any base over $100; live during the July 2026 window.
     """
+    base, surge = _active_ceilings()
+    surge = max(surge, base)
     if recent_uniques is not None and recent_uniques >= SURGE_UNIQUES_THRESHOLD:
-        return SURGE_CEILING_USD, True
-    return MONTHLY_CEILING, False
+        return surge, True
+    return base, False
 
 
 def _decide_tier(projected: float, mtd: float, elapsed_days: float, ceiling: float = None) -> int:
