@@ -541,7 +541,9 @@ async function renderByCoach(read, id) {
     if (analysis.key_recommendation) h += `<p class="bc-rec"><span class="label">the one thing</span> ${esc(analysis.key_recommendation)}</p>`;
     if (analysis.cross_domain_note) h += `<p class="bc-xnote label">cross-domain: ${esc(analysis.cross_domain_note)}</p>`;
     if (analysis.confidence_language) h += `<p class="bc-conf label">${esc(analysis.confidence_language)}</p>`;
-    if (asOf) h += `<p class="bc-asof label">${esc(asOf)}</p>`;
+    // #1397: asOf is escaped (it is plain text), so the "why is this paused" link is
+    // appended OUTSIDE the esc() call — putting it inside would render as literal markup.
+    if (asOf) h += `<p class="bc-asof label">${esc(asOf)}${analysis.regeneration_paused ? ' <a href="/method/receipts/">See the live budget and the current tier →</a>' : ""}</p>`;
     h += `</section>`;
   } else if (typeof coach.daily === "string" && coach.daily.trim()) {
     h += `<section class="bc-read"><p class="dx-kicker label">today's read</p><p class="bc-analysis dx-prose">${esc(coach.daily)}</p></section>`;

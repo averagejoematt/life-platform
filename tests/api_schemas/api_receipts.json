@@ -1,0 +1,98 @@
+{
+  "captured_at": "2026-07-21T19:01:46.943633+00:00",
+  "fetch_path": "/api/receipts",
+  "is_prefix_sample": false,
+  "path": "/api/receipts",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ai_daily_usd": {
+        "type": "number"
+      },
+      "as_of": {
+        "type": "string"
+      },
+      "base_ceiling_usd": {
+        "type": "number"
+      },
+      "ceiling_usd": {
+        "type": "number"
+      },
+      "computed_at": {
+        "type": "string"
+      },
+      "history": {
+        "items": {
+          "keys": {
+            "date": {
+              "type": "string"
+            },
+            "mtd_usd": {
+              "type": "number"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 21,
+        "type": "array"
+      },
+      "month_to_date_usd": {
+        "type": "number"
+      },
+      "mtd_pct_of_ceiling": {
+        "type": "number"
+      },
+      "non_ai_daily_usd": {
+        "type": "number"
+      },
+      "note": {
+        "type": "string"
+      },
+      "per_feature_note": {
+        "type": "string"
+      },
+      "projected_month_end_usd": {
+        "type": "number"
+      },
+      "projected_pct_of_ceiling": {
+        "type": "number"
+      },
+      "recent_uniques": {
+        "type": "integer"
+      },
+      "stale": {
+        "type": "boolean"
+      },
+      "stale_reason": {
+        "type": "null"
+      },
+      "surge_active": {
+        "type": "boolean"
+      },
+      "surge_threshold_uniques": {
+        "type": "integer"
+      },
+      "tier": {
+        "type": "integer"
+      },
+      "tier_semantics": {
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

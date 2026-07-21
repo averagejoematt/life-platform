@@ -2171,6 +2171,153 @@ def handle_inference_receipt() -> dict:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# The Glass Engine (#1397) — the budget tier as an instrument.
+#
+# /api/inference_receipt already publishes the AI half (per-model tokens, priced).
+# This endpoint publishes the ENVELOPE that governs it: the governor's own
+# month-to-date and month-end projection, the live ceiling (ADR-063/ADR-133,
+# floating to the surge ceiling), the tier and what that tier actually pauses,
+# and the daily spend curve.
+#
+# Every number is read from what cost_governor_lambda already writes — the SSM
+# breakdown param (#822) and its CloudWatch metrics (LifePlatform/Budget). No
+# hand-maintained figures, and no recomputation of the governor's math here: if
+# the two ever disagreed, the page would be lying about the thing it exists to
+# make legible.
+#
+# Honesty rules this endpoint enforces (ADR-104 / AC4):
+#   * The breakdown param is the only source of mtd/projected/ceiling. If it is
+#     missing or stale, the payload says so via `stale` + `stale_reason` and the
+#     figures are omitted rather than frozen at their last value. A silently
+#     stale cost page is worse than an absent one.
+#   * Per-feature spend is reported in TOKENS, not dollars. The per-Lambda metric
+#     stream (LifePlatform/AI) carries no model dimension, so tokens cannot be
+#     priced per feature without inventing a model mix. Stating tokens and saying
+#     why is honest; a plausible dollar figure would not be.
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Mirrors cost_governor_lambda._TIER_LABELS. Kept as prose the reader can act on:
+# each entry names what is actually switched off at that tier, not a severity word.
+# tests/test_receipts_endpoint.py asserts this stays lockstep with the governor.
+_TIER_SEMANTICS = {
+    0: "All AI features active. Nothing is paused.",
+    1: "Internal/dev AI paused — the ensemble, the chronicle editor, and coherence-semantic checks. Reader-facing AI is untouched.",
+    2: "Reader narratives paused as well — coach commentary, State of Matthew, the chronicle.",
+    3: "Hard stop. The ask endpoints are paused and the daily brief ships data-only, without AI narrative.",
+}
+
+# The governor writes the breakdown every enforcement run (~every 8h). Past this
+# age the figures stop being "live" in any meaningful sense — same 48h bound
+# budget_guard._BREAKDOWN_MAX_AGE_S applies, kept in sync by the same test.
+_BREAKDOWN_MAX_AGE_S = 48 * 3600
+
+
+def _budget_history(cw, month_start, now) -> list:
+    """Daily month-to-date spend curve from the governor's own CloudWatch metric.
+
+    LifePlatform/Budget::EstimatedMonthToDateSpend is emitted every enforcement
+    run, so a day holds several datapoints — Maximum collapses each day to that
+    day's high-water MTD, which is what a cumulative curve should show. Fail-soft
+    to [] (the chart simply doesn't render) — a missing curve must never take the
+    rest of the receipt down with it.
+    """
+    try:
+        r = cw.get_metric_statistics(
+            Namespace="LifePlatform/Budget",
+            MetricName="EstimatedMonthToDateSpend",
+            StartTime=month_start,
+            EndTime=now,
+            Period=86400,
+            Statistics=["Maximum"],
+        )
+        pts = sorted(r.get("Datapoints", []), key=lambda p: p["Timestamp"])
+        return [{"date": p["Timestamp"].strftime("%Y-%m-%d"), "mtd_usd": round(float(p["Maximum"]), 2)} for p in pts]
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[receipts] history unavailable: {e}")
+        return []
+
+
+def handle_receipts() -> dict:
+    """GET /api/receipts — the live bill and the budget tier, as an instrument (#1397)."""
+    try:
+        cw = boto3.client("cloudwatch", region_name="us-west-2")
+        ssm = boto3.client("ssm", region_name="us-west-2")
+        now = datetime.now(timezone.utc)
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        try:
+            tier = int(ssm.get_parameter(Name="/life-platform/budget-tier")["Parameter"]["Value"])
+        except Exception:
+            tier = None
+
+        # The breakdown carries every dollar figure on this page. Anything it
+        # doesn't give us stays None and renders as an honest gap.
+        breakdown, stale, stale_reason = None, True, "budget breakdown unavailable"
+        try:
+            raw = ssm.get_parameter(Name="/life-platform/budget-breakdown")["Parameter"]["Value"]
+            candidate = json.loads(raw)
+            computed_at = candidate.get("computed_at")
+            age_s = None
+            if computed_at:
+                try:
+                    age_s = (now - datetime.fromisoformat(computed_at.replace("Z", "+00:00"))).total_seconds()
+                except Exception:  # noqa: BLE001
+                    age_s = None
+            if age_s is None:
+                stale_reason = "budget breakdown carries no readable computed_at"
+            elif age_s > _BREAKDOWN_MAX_AGE_S:
+                stale_reason = f"budget breakdown last computed {int(age_s // 3600)}h ago (governor runs every 8h)"
+            else:
+                breakdown, stale, stale_reason = candidate, False, None
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[receipts] breakdown read failed: {e}")
+
+        ceiling = float(breakdown["ceiling"]) if breakdown and breakdown.get("ceiling") is not None else None
+        mtd = float(breakdown["mtd"]) if breakdown and breakdown.get("mtd") is not None else None
+        projected = float(breakdown["projected"]) if breakdown and breakdown.get("projected") is not None else None
+        surge_active = bool(breakdown.get("surge_active", False)) if breakdown else False
+
+        payload = {
+            "as_of": now.isoformat(timespec="seconds"),
+            "stale": stale,
+            "stale_reason": stale_reason,
+            "tier": tier,
+            "tier_semantics": _TIER_SEMANTICS.get(tier) if tier is not None else None,
+            "base_ceiling_usd": _ADR133_BASE_CEILING_USD,
+            "ceiling_usd": ceiling,
+            "surge_active": surge_active,
+            "surge_threshold_uniques": (breakdown or {}).get("surge_threshold"),
+            "recent_uniques": (breakdown or {}).get("recent_uniques"),
+            "month_to_date_usd": mtd,
+            "projected_month_end_usd": projected,
+            "ai_daily_usd": (breakdown or {}).get("ai_daily"),
+            "non_ai_daily_usd": (breakdown or {}).get("non_ai_daily"),
+            "computed_at": (breakdown or {}).get("computed_at"),
+            "history": _budget_history(cw, month_start, now),
+            # Why there is no per-feature dollar column — surfaced in the payload so
+            # the page can state it rather than leave a reader guessing.
+            "per_feature_note": (
+                "Per-feature usage is reported in tokens, not dollars: the per-Lambda "
+                "metric stream carries no model dimension, so pricing it would mean "
+                "inventing a model mix. See /method/inference/ for per-model cost."
+            ),
+            "note": (
+                "One AWS budget covers the WHOLE platform, not just AI. The governor "
+                "reprojects month-end spend every 8 hours and writes the tier it "
+                "implies; every AI feature reads that tier before it runs."
+            ),
+        }
+        if ceiling and projected is not None:
+            payload["projected_pct_of_ceiling"] = round(projected / ceiling * 100, 1)
+        if ceiling and mtd is not None:
+            payload["mtd_pct_of_ceiling"] = round(mtd / ceiling * 100, 1)
+        return _ok(payload, cache_seconds=900)
+    except Exception as e:
+        logger.warning(f"[receipts] failed: {e}")
+        return _error(503, "Receipts temporarily unavailable.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # The Wrong Page (2026-06-13) — the AI's misses, in public.
 # Three streams of being wrong, all already recorded:
 #   1. The post-generation validator: coach claims contradicted by the data

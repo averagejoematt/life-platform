@@ -876,3 +876,18 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .ch-cal-row { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: baseline; padding: var(--sp-2) var(--sp-3); border: var(--border-hair); border-radius: var(--radius-sm); }
 .ch-cal-row.is-unprobed, .ch-cal-row.is-uncal { color: var(--ink-faint); }
 .ch-cal-p { font-family: var(--font-sans); min-width: 7.5rem; }
+
+/* ── #1397: the Glass Engine — budget-tier ladder ────────────────────────
+   Four bands, 0–3. The active band is the one the governor has us in; bands
+   below it read as already-crossed. Uses --fs-label (no raw font-size, so the
+   token guard stays green) and the one live accent for the active band only —
+   an "earned glow", never decoration. */
+.rcp-gauge { display: flex; flex-wrap: wrap; gap: var(--sp-1); margin: var(--sp-2) 0 var(--sp-3); }
+.rcp-band {
+  flex: 1 1 0; min-width: 6.5rem; text-align: center;
+  padding: var(--sp-1) var(--sp-2); border: var(--border-hair); border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.04em;
+  color: var(--ink-faint); background: transparent;
+}
+.rcp-band.is-past { color: var(--ink-muted); border-color: var(--ember-line); }
+.rcp-band.is-on { color: var(--ink); border-color: var(--ember); background: var(--ember-wash); }

@@ -141,6 +141,7 @@ from web.site_api_intelligence import (
     handle_pillar_coupling,
     handle_pulse,
     handle_pulse_history,
+    handle_receipts,
     handle_scenarios,
     handle_state_of_matthew,
     handle_status,
@@ -352,6 +353,7 @@ ROUTES = {
     "/api/weight_progress": handle_weight_progress,
     "/api/cycle_compare": handle_cycle_compare,
     "/api/inference_receipt": handle_inference_receipt,
+    "/api/receipts": handle_receipts,  # #1397 the Glass Engine — the budget envelope
     "/api/wrong": handle_wrong,
     "/api/survival": handle_survival,
     "/api/character_config": handle_character_config,  # the sheet's "how the engine works" contract (P1.2)

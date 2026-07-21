@@ -507,6 +507,19 @@ REGISTRY = [
         "/legacy/cost/",
     ),
     (
+        # #1397 the Glass Engine. /method/inference/ prices the AI calls; this page
+        # is the ENVELOPE around them — the ceiling, the projection, and what the
+        # current tier has actually switched off.
+        "receipts",
+        "The receipts",
+        "The live bill and the budget tier as an instrument — what is paused right now, and why.",
+        "Credibility & the machine",
+        "data",
+        "/api/receipts",
+        None,
+        None,
+    ),
+    (
         "results",
         "Results",
         "Outcomes to date — what moved, and where the mechanisms live.",
@@ -582,6 +595,7 @@ _REGROUP = {
     "tools": "The machine",
     "inference": "The machine",
     "cost": "The machine",
+    "receipts": "The machine",  # #1397 the Glass Engine — sits with cost + inference
     "explorer": "The machine",
     "ask": "The machine",
     "kitchen": "The machine",
