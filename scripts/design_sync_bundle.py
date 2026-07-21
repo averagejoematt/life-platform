@@ -626,6 +626,17 @@ def _build_assets(repo_root: Path, out_dir: Path) -> None:
     shutil.copyfile(css_src / "tokens.css", out_dir / "css/tokens.css")
     shutil.copyfile(icons_src, out_dir / "icons/icons.svg")
 
+    # The brand mark is a foundation, so it travels with the bundle. tokens.css
+    # points at these with a bundle-portable relative url(../marks/…), so no
+    # rewrite is needed here — only the files themselves.
+    (out_dir / "marks").mkdir(parents=True, exist_ok=True)
+    marks_src = repo_root / "site/assets/marks"
+    marks = sorted(marks_src.glob("mark-header-*.svg"))
+    if not marks:
+        raise AssertionError(f"no mark-header-*.svg found in {marks_src} — run scripts/build_brand_assets.py")
+    for mark in marks:
+        shutil.copyfile(mark, out_dir / "marks" / mark.name)
+
     # fonts.css references woff2 by absolute `/assets/fonts/v4/…` path on the live site;
     # rewrite to bundle-relative (fonts.css sits in assets/css/, the woff2s in assets/fonts/v4/).
     fonts_css = (css_src / "fonts.css").read_text(encoding="utf-8")

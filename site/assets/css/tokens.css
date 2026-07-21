@@ -110,6 +110,17 @@
   --alert-wash:  color-mix(in oklch, var(--alert) 11%, transparent);
   --alert-line:  color-mix(in oklch, var(--alert) 45%, transparent);
 
+  /* The AJM brand mark, as a theme token. It has to live here rather than beside
+     .brand-mark because light mode activates on TWO legs (the OS media query and
+     the explicit [data-theme="light"] toggle) and this file is the only place
+     that already spells both out. `currentColor` cannot be used — it does not
+     resolve inside a background-image — so each leg points at a pre-tinted file
+     built by scripts/build_brand_assets.py.
+     The path is RELATIVE, unlike fonts.css: a CSS url() resolves against the
+     stylesheet, not the page, so ../marks/ is correct from every page depth AND
+     stays portable into the design-sync bundle, which forbids absolute url(). */
+  --brand-mark: url(../marks/mark-header-dark.svg);
+
   /* ── The paper-elevation ramp (#1470) — five designed steps, one per job, so
      NEUTRAL tonality carries surface hierarchy and the ember accent never has to:
        -1  --surface-sunken   the cut well — code/formula fields, track rails behind fills
@@ -333,6 +344,7 @@
     --surface-sunken: color-mix(in oklch, var(--page) 92%, var(--ink) 8%);
     --shadow-panel: 0 18px 44px rgba(34, 30, 23, 0.12);
     --shadow-soft:  0 6px 16px rgba(34, 30, 23, 0.08);
+    --brand-mark: url(../marks/mark-header-light.svg);
   }
 }
 
@@ -356,6 +368,7 @@
   --surface-sunken: color-mix(in oklch, var(--page) 92%, var(--ink) 8%);
   --shadow-panel: 0 18px 44px rgba(34, 30, 23, 0.12);
   --shadow-soft:  0 6px 16px rgba(34, 30, 23, 0.08);
+  --brand-mark: url(../marks/mark-header-light.svg);
 }
 
 /* ── 10. Minimal base — applies the tokens so every door starts honest ───── */

@@ -60,9 +60,11 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 }
 
 .brand { display: inline-flex; align-items: center; gap: var(--sp-2); text-decoration: none; }
+/* The AJM dial (Claude Design 3a). No ember-wash halo: the mark carries its own
+   ember graduation, and doubling the accent would spend it twice. */
 .brand-mark {
-  width: 11px; height: 11px; border-radius: 2px;
-  background: var(--ember); box-shadow: 0 0 0 3px var(--ember-wash);
+  width: 20px; height: 20px;
+  background: var(--brand-mark) center / contain no-repeat;
 }
 .brand-name { font-family: var(--font-mono); font-size: var(--fs-small); letter-spacing: 0.02em; }
 .brand-door { color: var(--ember); }
