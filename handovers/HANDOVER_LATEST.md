@@ -68,22 +68,27 @@ retroactively nameable":**
   docs-only commit — the handover + archive — no deploy.)
 - Cycle 9; site healthy on latest content. Dark sources unchanged. TCC still revoked.
 
-## Owner queue (the decision menu — nothing blocks; all optional)
-1. **TCC re-grant** (~/Documents) — restores normal local work; else next session forks to clone.
-2. **`cdk deploy LifePlatformOperational`** (canary IAM) → invoke canary → expect OK/Blind=0 →
-   **close #1589**; also clears the by-design main Plan-gate red. (user-NAMED IAM)
-3. **#1435 IAM grant** — traffic-digest role read on the perf store (DDB or S3) so the perf-trend
-   half can ship (closes epic #1425). (user-NAMED IAM; code side scoped + ready.)
-4. **#1243 audio** — regenerate the Prologue Part II read-aloud (dated 2026-07-19) so it's no longer
-   orphaned; then the parity guard lands green.
-5. **#1475** — schedule the design-round-trip (or a Fable session) for the wayfinding layer.
-6. **#1491** — YOUR stale PR (billing observability): resume/rebase (fix Wiki-drift gate) or close?
-7. **#1544 billing** — confirm root cause from the billing page; decide the budget posture.
-8. **Fable credits** — if restored, next session's Tier 1 (#1481/#1483/#1577 conversational) is the
-   real meat; still-Opus means the honest ceiling stays low.
-9. Standing (unchanged): approve the waiting CI Deploy run (fleet-sync); Tue restart_verify after
-   the 16:30 UTC compute; if you want the qa-smoke alarm to reflect same-day failures, the real fix
-   is re-sequencing qa-smoke before the 15:00 UTC AlertDigest (system-wide — route through design).
+## Residual / next picks (the owner decision menu — nothing blocks; all optional)
+- **TCC re-grant** (~/Documents) — restores normal local work; else next session forks to clone.
+  not-work — owner-side macOS setting, no repo change.
+- **`cdk deploy LifePlatformOperational`** (canary IAM) → invoke canary → expect OK/Blind=0 →
+  **close #1589**; also clears the by-design main Plan-gate red. (user-NAMED IAM)
+- **#1435 IAM grant** — traffic-digest role read on the perf store (DDB or S3) so the perf-trend
+  half can ship (closes epic #1425). (user-NAMED IAM; code side scoped + ready.)
+- **#1243 audio** — regenerate the Prologue Part II read-aloud (dated 2026-07-19) so it's no longer
+  orphaned; then the parity guard lands green.
+- **#1475** — schedule the design-round-trip (or a Fable session) for the wayfinding layer.
+- **#1491 — RESOLVED 2026-07-21.** Rebased onto main (4 conflicts, additive vs the #1320/#1544
+  posture checks), merged as `c4ebefae`. #1334/#1453 had been closed on 2026-07-19 citing this PR
+  as merged when it was not — both now carry a correction comment with checkable evidence.
+  The 70% warn is still inert without a scoped PAT → filed as #1613.
+- **#1544 billing** — root cause confirmed (Actions minutes 3000/3000, resolved by the public flip);
+  the recurrence guard is only half-live until #1613 lands. Decide the budget posture.
+- **Fable credits** — if restored, next session's Tier 1 (#1481/#1483/#1577 conversational) is the
+  real meat; still-Opus means the honest ceiling stays low. not-work — account/billing call.
+- Standing (unchanged): approve the waiting CI Deploy run (fleet-sync); Tue restart_verify after
+  the 16:30 UTC compute; if you want the qa-smoke alarm to reflect same-day failures, the real fix
+  is re-sequencing qa-smoke before the 15:00 UTC AlertDigest (system-wide — route through #1610).
 
 **Build beat:** unchanged (no code change this session; server-side qa-smoke build stays
 `2026-07-20-qa-smoke-itemized-logging`). **Docs:** this wrap + one new memory
