@@ -23,6 +23,8 @@ it is trivially unit-testable and safe to call on both the publish and approve p
 import re
 from datetime import datetime, timezone
 
+from utm import with_utm  # #1621 — the ONE canonical outbound UTM tagger
+
 SITE_BASE = "https://averagejoematt.com"
 # The single channel the kit is shaped for (no auto-post; one paste). Kept as data so a
 # future channel switch is a one-line change, not a rewrite.
@@ -83,7 +85,13 @@ def build_kit(*, title, stats_line, label, date_str, canonical_url, excerpt_sour
         caption_bits.append(stats_line)
     if excerpt:
         caption_bits.append(excerpt)
-    caption_bits.append("The honest week, every failure included → " + canonical_url)
+    # #1621: the pasted caption link is UTM-tagged so a signup arriving from the
+    # manual share is attributable. `canonical_url` itself is returned UNTAGGED in the
+    # kit dict below — it's the post's identity (used for the card slug and the S3 key),
+    # not a click target, and tagging it would fork the slug.
+    caption_bits.append(
+        "The honest week, every failure included → " + with_utm(canonical_url, source=CHANNEL, medium="social", campaign="chronicle")
+    )
     caption = "\n\n".join(caption_bits)
 
     return {

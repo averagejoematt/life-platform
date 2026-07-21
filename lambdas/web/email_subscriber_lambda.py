@@ -13,8 +13,27 @@ Record schema:
   created_at  ISO timestamp (first subscribe request)
   confirmed_at ISO timestamp (when double opt-in completed)
   unsubbed_at ISO timestamp (when unsubscribed)
-  source      subscribe_page | referral | ...
+  source      subscribe_page | referral | ...  (see attribution note below)
   ip_hash     SHA256 of source IP (for abuse detection, non-identifying)
+
+Attribution (#1621): three signals of DIFFERENT confidence are stored as SEPARATE
+  attributes, never collapsed into one string, because "the UTM said reddit" and "the
+  user typed Reddit" are not the same claim and the 60-day growth gate has to be able
+  to tell them apart:
+    attr_utm_source/_medium/_campaign  MEASURED — captured site-wide on landing by the
+                                       browser attribution module, persisted in
+                                       sessionStorage, posted with the form.
+    attr_self_reported                 SELF-REPORTED — the free-text "how'd you find
+                                       this?" field. A human's recollection.
+    attr_referrer_host                 MEASURED, WEAK — HOST ONLY from the HTTP Referer
+                                       header. Never the path, never the query string:
+                                       a full Referer URL can carry PII and this
+                                       partition's retention is unsigned. See
+                                       `utm.referrer_host`.
+  `source` remains populated for backward compatibility with every existing reader
+  (the weekly digest's canary-excluding count, the newsletter send path, historical
+  rows) and now carries the highest-confidence signal available, precedence
+  UTM > free-text > referrer host > "subscribe_page". Existing rows are untouched.
 
 Retention (#1350): unsub writes status=unsubscribed + unsubbed_at; this Lambda never
   deletes on unsubscribe. Whether/when an unsubscribed row is later purged or
@@ -60,6 +79,10 @@ import boto3
 # deploy path ships the full-tree bundle (#781), so web/site_api_common.py is
 # guaranteed present alongside this module.
 from client_ip import extract_client_ip  # #1221 — the ONE edge-observed client-IP helper
+from utm import (
+    normalize as _utm_normalize,  # #1621 — shared with the outbound link tagger
+    referrer_host as _referrer_host,
+)
 
 from web.site_api_common import SITE_API_ORIGIN_SECRET
 
@@ -84,6 +107,10 @@ SENDER = os.environ.get("EMAIL_SENDER", "lifeplatform@mattsusername.com")
 SITE_URL = os.environ.get("SITE_URL", "https://averagejoematt.com")
 
 SUBSCRIBERS_PK = f"USER#{USER_ID}#SOURCE#subscribers"
+
+# #1621: the utm_* keys accepted off the subscribe POST body. A subset of utm.UTM_KEYS —
+# content/term are ad-level detail this platform has no use for and no reason to retain.
+UTM_BODY_KEYS = ("utm_source", "utm_medium", "utm_campaign")
 
 dynamodb = boto3.resource("dynamodb", region_name=DYNAMODB_REGION)  # us-west-2
 table = dynamodb.Table(TABLE_NAME)
@@ -211,12 +238,66 @@ _BLOCKED_DOMAINS = {
 }
 
 
-def handle_subscribe(email: str, source_ip: str = "", referrer: str = "", source: str = "") -> dict:
+def build_attribution(source: str = "", referrer: str = "", utm: dict | None = None) -> dict:
+    """Resolve the three attribution signals into the attributes stored on the row.
+
+    Returns a dict of ONLY the non-empty attributes to merge into the DDB item, plus
+    the resolved `source` under the "source" key.
+
+    Precedence for the backward-compatible `source` field is
+    UTM > free-text > referrer host > "subscribe_page" — measured beats self-reported
+    beats weak-measured beats nothing. The separate attr_* fields are always kept
+    alongside so the collapse is never lossy.
+
+    CANARY IS A HARD SHORT-CIRCUIT. The canary (`lambdas/operational/canary_lambda.py`)
+    POSTs a synthetic subscriber every 4h with source='canary'; every count in the
+    platform excludes it by `source <> 'canary'`. If a canary row ever picked up a UTM
+    or referrer, `source` would resolve to that instead and the synthetic subscriber
+    would silently enter the attribution numerator — corrupting the exact metric this
+    story exists to produce. So canary short-circuits: source stays 'canary' and NO
+    attribution attributes are written at all.
+    """
+    if source.strip() == "canary":
+        return {"source": "canary"}
+
+    utm = utm or {}
+    attrs: dict = {}
+    utm_source = _utm_normalize(utm.get("utm_source"))
+    utm_medium = _utm_normalize(utm.get("utm_medium"))
+    utm_campaign = _utm_normalize(utm.get("utm_campaign"))
+    self_reported = source.strip()[:200]
+    ref_host = _referrer_host(referrer)
+
+    if utm_source:
+        attrs["attr_utm_source"] = utm_source
+    if utm_medium:
+        attrs["attr_utm_medium"] = utm_medium
+    if utm_campaign:
+        attrs["attr_utm_campaign"] = utm_campaign
+    if self_reported:
+        attrs["attr_self_reported"] = self_reported
+    if ref_host:
+        attrs["attr_referrer_host"] = ref_host
+
+    # The free-text field defaults to the literal 'subscribe-page' whenever the visitor
+    # leaves it blank (the form sends `src || 'subscribe-page'`), so it is a real answer
+    # only when it differs from that placeholder. Treating the placeholder as a
+    # self-report is what made the old referrer fallback dead code.
+    self_signal = self_reported if self_reported and self_reported != "subscribe-page" else ""
+    attrs["source"] = utm_source or self_signal or ref_host or (self_reported or "subscribe_page")
+    return attrs
+
+
+def handle_subscribe(email: str, source_ip: str = "", referrer: str = "", source: str = "", utm: dict | None = None) -> dict:
     """Create/update pending record and send confirmation email.
 
     source='canary' skips the confirmation email (the canary POSTs a synthetic
     subscriber every 4h to verify the flow; we don't want SES to send a real
     email to canary+<ts>@mattsusername.com which then bounces and floods inbox).
+
+    `utm` is the measured attribution captured site-wide on landing (#1621) — see
+    `build_attribution`. It is optional: a client that doesn't send it (an older
+    cached page) still subscribes normally, just with weaker attribution.
     """
     email = email.strip().lower()
     if not email or "@" not in email or len(email) > 254:
@@ -251,7 +332,11 @@ def handle_subscribe(email: str, source_ip: str = "", referrer: str = "", source
     token_exp = (datetime.now(timezone.utc) + timedelta(hours=48)).isoformat()
     confirm_url = f"{SITE_URL}/api/subscribe?action=confirm&token={token}&h={email_hash[:16]}"
 
-    # Write DDB record
+    # Write DDB record. `attribution` carries the resolved `source` plus the separate
+    # attr_* signals (#1621) — see build_attribution for the precedence and the canary
+    # short-circuit. Spread AFTER the literal fields so `source` resolves to the
+    # attributed value rather than the old collapsed expression.
+    attribution = build_attribution(source=source, referrer=referrer, utm=utm)
     item = {
         "pk": SUBSCRIBERS_PK,
         "sk": f"EMAIL#{email_hash}",
@@ -262,8 +347,8 @@ def handle_subscribe(email: str, source_ip: str = "", referrer: str = "", source
         "confirm_token": token,
         "token_expires": token_exp,
         "ip_hash": _ip_hash(source_ip),
-        "source": source if source else (referrer or "subscribe_page"),
         "updated_at": now_iso,
+        **attribution,
     }
     if existing:
         # Preserve original created_at and confirmed_at if resubscribing
@@ -538,10 +623,14 @@ def lambda_handler(event, context):
                 body = json.loads(event.get("body") or "{}")
                 email = body.get("email", "").strip()
                 source = body.get("source", "").strip()
+                # #1621: measured attribution, captured site-wide on landing. Read
+                # permissively — these are optional extra fields, so a client that
+                # omits them (or an old cached page) still subscribes normally.
+                utm = {k: body.get(k) for k in UTM_BODY_KEYS if isinstance(body.get(k), str)}
             except Exception:
                 return _json_response(400, {"error": "Invalid request body."})
             referrer = (event.get("headers") or {}).get("referer", "")
-            return handle_subscribe(email, source_ip=source_ip, referrer=referrer, source=source)
+            return handle_subscribe(email, source_ip=source_ip, referrer=referrer, source=source, utm=utm)
 
         return _json_response(405, {"error": "Method not allowed."})
     except Exception as e:
