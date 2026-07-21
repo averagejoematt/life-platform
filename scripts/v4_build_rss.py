@@ -29,6 +29,7 @@ from urllib.request import urlopen
 # importing scripts use (e.g. scripts/publish_board_answer.py).
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lambdas"))
 from text_utils import truncate_at_word  # noqa: E402
+from utm import with_utm  # noqa: E402  — the ONE canonical outbound UTM tagger (#1621)
 
 # /journal/posts.json is the live genesis-anchored chronicle feed (served from
 # generated/journal/posts.json on S3).  The old /chronicle/posts.json was a
@@ -104,13 +105,19 @@ def main() -> int:
         # Week-number fragments (#3) collide across experiment cycles and aren't stable URLs.
         post_url = p.get("url") or f"/journal/posts/week-{str(p.get('week', '')).zfill(2)}/"
         link = f"{BASE}{post_url}"
+        # #1621: the reader-facing <link> is UTM-tagged through the ONE canonical
+        # helper so RSS-sourced signups are attributable. The <guid> below stays the
+        # BARE canonical deliberately — guid is a feed reader's identity key, so
+        # tagging it would change every historical item's identity and re-notify
+        # every subscriber of every past post on the next build.
+        tagged_link = with_utm(link, source="rss", medium="feed", campaign="chronicle")
         excerpt = " ".join((p.get("excerpt") or "").split())
         # Word-boundary truncation (#1224 helper) — never a mid-word slice (#1261).
         excerpt = truncate_at_word(excerpt, 360)
         items.append(
             "    <item>\n"
             f"      <title>{esc(p['title'])}</title>\n"
-            f"      <link>{esc(link)}</link>\n"
+            f"      <link>{esc(tagged_link)}</link>\n"
             f'      <guid isPermaLink="true">{esc(link)}</guid>\n'
             f"      <description>{esc(excerpt)}</description>\n"
             f"      <pubDate>{rfc822(p['date'])}</pubDate>\n"

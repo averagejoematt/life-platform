@@ -127,8 +127,21 @@ def site_footer(with_asof: bool = False) -> str:
         '<a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a>'
         '<a href="/story/about/">About</a>'
         '<a href="/privacy/">Privacy</a></div>'
-        f'</nav><p class="sf-base label"><span>averagejoematt</span>{asof}<a href="/">← home</a></p></footer>'
+        f'</nav><p class="sf-base label"><span>averagejoematt</span>{asof}<a href="/">← home</a></p>'
+        f"{ATTRIBUTION_TAG}</footer>"
     )
+
+
+# #1621: site-wide UTM capture. This rides in the canonical footer — INSIDE the
+# `<footer>` element, not after it — because the footer is what `v4_apply_chrome.py`
+# rewrites wholesale, so the tag is idempotent under FOOT_RE and cannot be duplicated
+# or orphaned by a re-sweep. The footer is also the one piece of markup every
+# chrome-bearing page provably carries, which is exactly the "capture on landing
+# ANYWHERE on the site" guarantee the attribution needs: a capture scoped to the
+# subscribe page alone would attribute almost nothing while appearing to work.
+# `type="module"` defers execution to after parse, which is well before any
+# subscribe-form click.
+ATTRIBUTION_TAG = '<script type="module" src="/assets/js/attribution.js"></script>'
 
 
 # ── The loop-forward close (#1468) ─────────────────────────────────────────────

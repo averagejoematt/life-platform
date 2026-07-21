@@ -31,6 +31,7 @@ Sections:
   15. Open Insights
 """
 
+import html as _html
 import json
 import os
 import statistics
@@ -773,6 +774,17 @@ def fetch_stale_insights(days_threshold=7):
 _SUBSCRIBERS_PK = f"USER#{USER_ID}#SOURCE#subscribers"
 
 
+def _esc(value) -> str:
+    """Escape a value for HTML email rendering.
+
+    Load-bearing for #1621: `attr_self_reported` is unvalidated free text a stranger
+    typed into a public form, and it is rendered into an email Matthew opens. The UTM
+    and referrer-host fields are charset-restricted at the write boundary, but the
+    free-text one deliberately is not (it's prose), so it gets escaped at the sink.
+    """
+    return _html.escape(str(value), quote=True)
+
+
 def _count_real_subscribers() -> int:
     """Count confirmed subscribers, excluding synthetic canary records.
 
@@ -796,6 +808,62 @@ def _count_real_subscribers() -> int:
     except Exception as e:
         logger.warning("_count_real_subscribers failed (non-fatal): %s", e)
         return -1
+
+
+def _attribution_breakdown(limit: int = 6) -> list[tuple[str, int]]:
+    """Count confirmed subscribers grouped by attribution source (#1621).
+
+    This is the operator readout for the epic's 60-day growth gate: it makes
+    "where did the subscribers come from" answerable from the digest that already
+    lands every week, instead of an ad-hoc DDB scan. Extending this digest was
+    chosen over a new MCP tool or a new endpoint for three reasons: the digest is
+    already owner-private (the attribution signals are Tier-2 owner-only under
+    docs/DATA_GOVERNANCE.md, and a referrer host can reveal employer/industry — it
+    must never reach a reader surface); it already queries this exact partition and
+    already excludes canary; and the gate is graded on a weekly cadence, which is
+    the cadence this email already has.
+
+    Canary rows are excluded by the SAME filter `_count_real_subscribers` uses, so
+    the breakdown and the headline count always agree on the denominator.
+    Fail-open: returns [] on any error so a broken readout can't block the digest.
+    """
+    try:
+        counts: dict[str, int] = {}
+        kwargs = {
+            "KeyConditionExpression": "pk = :pk",
+            "FilterExpression": "#st = :confirmed AND (#src <> :canary OR attribute_not_exists(#src))",
+            "ExpressionAttributeNames": {"#st": "status", "#src": "source"},
+            "ExpressionAttributeValues": {
+                ":pk": _SUBSCRIBERS_PK,
+                ":confirmed": "confirmed",
+                ":canary": "canary",
+            },
+            "ProjectionExpression": "attr_utm_source, attr_self_reported, attr_referrer_host",
+        }
+        # Paginate: the sibling count path doesn't, but a group-by needs every item,
+        # and a silently truncated breakdown is worse than a slow one.
+        while True:
+            resp = table.query(**kwargs)
+            for item in resp.get("Items", []):
+                # Precedence mirrors email_subscriber_lambda.build_attribution:
+                # measured UTM > self-reported free text > referrer host.
+                if item.get("attr_utm_source"):
+                    label = f"utm:{item['attr_utm_source']}"
+                elif item.get("attr_self_reported"):
+                    label = f"said:{str(item['attr_self_reported'])[:24]}"
+                elif item.get("attr_referrer_host"):
+                    label = f"ref:{item['attr_referrer_host']}"
+                else:
+                    label = "unattributed"
+                counts[label] = counts.get(label, 0) + 1
+            last = resp.get("LastEvaluatedKey")
+            if not last:
+                break
+            kwargs["ExclusiveStartKey"] = last
+        return sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:limit]
+    except Exception as e:
+        logger.warning("_attribution_breakdown failed (non-fatal): %s", e)
+        return []
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1919,12 +1987,23 @@ def build_html(data, commentary, profile):
         _wt_label = f"{_lbs_to_goal} lbs to goal"
     else:
         _wt_label = "—"
+    # #1621 — attribution breakdown. Rendered as an honest absence (ADR-104) rather
+    # than a zero or a blank when nothing is attributed yet: this ships before any
+    # tagged link has been published, so "no attributed signups yet" is the true
+    # state for a while and must not read as a measurement.
+    _attr = _g.get("attribution") or []
+    if _attr:
+        _attr_body = " &nbsp;·&nbsp; ".join(f"{_esc(label)}: <strong>{count}</strong>" for label, count in _attr)
+    else:
+        _attr_body = "<em>no attributed signups yet</em>"
+    _attr_html = f'<div style="margin-top:6px;">by source &nbsp;·&nbsp; {_attr_body}</div>'
     gate_html = (
         '<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;'
         'padding:10px 16px;margin-bottom:20px;font-size:12px;color:#0369a1;">'
         '<span style="font-weight:700;">Gate status</span> &nbsp;·&nbsp; '
         f"confirmed subscribers (real): <strong>{_sub_label}</strong> &nbsp;·&nbsp; "
         f"weight: <strong>{_wt_label}</strong>"
+        f"{_attr_html}"
         "</div>"
     )
 
@@ -2013,13 +2092,15 @@ def record_email_send(table, lambda_name):
         logger.info(f"[status-tracking] Non-fatal write failure: {e}")
 
 
-def _gate_telemetry(data, profile, real_subscribers):
+def _gate_telemetry(data, profile, real_subscribers, attribution=None):
     """PROD-MON-06 gate readout inputs (pure). A wiped/genesis week stores the
     source key WITH value None — `.get(k, {})` does not guard an existing-None
     key (the 2026-07-19 Sunday-digest DLQ crash: this.withings was None the
     morning after a reset; recurs every future reset without the `or {}`)."""
     return {
         "real_subscribers": real_subscribers,
+        # #1621 — list of (label, count); [] when unavailable or nothing attributed yet.
+        "attribution": attribution or [],
         "current_weight": ((data.get("this") or {}).get("withings") or {}).get("weight_latest"),
         "start_weight": profile.get("journey_start_weight_lbs", 0),
         "goal_weight": profile.get("goal_weight_lbs", 185),
@@ -2042,7 +2123,7 @@ def lambda_handler(event, context):
     # PROD-MON-06 (#360): gate telemetry — add subscriber count + weight progress
     # so build_html can render the private gate readout at the top of the digest.
     _real_subs = _count_real_subscribers()
-    data["_gate"] = _gate_telemetry(data, profile, _real_subs)
+    data["_gate"] = _gate_telemetry(data, profile, _real_subs, attribution=_attribution_breakdown())
     logger.info(
         "Gate telemetry: subs=%s weight=%s start=%s goal=%s",
         _real_subs,
