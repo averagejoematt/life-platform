@@ -27,6 +27,7 @@ import re as _re  # #1240: genetic-biomarker strip regexes (handle_labs)
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal  # noqa: F401
 
+import achievement_rules  # #1624: the ONE place badge thresholds live (shared with daily-metrics-compute)
 import boto3  # #1240: S3/DDB clients used by handle_labs / handle_glucose / handle_genome_risks
 import weight_trend  # shared weekly-rate + projection (layer module)
 from boto3.dynamodb.conditions import Key
@@ -1339,488 +1340,41 @@ def handle_journey_waveform() -> dict:
 def handle_achievements() -> dict:
     """
     GET /api/achievements
-    Computes earned/locked achievement badges from DynamoDB.
-    Sources: habit_scores (streaks), character_sheet (level), withings (weight milestones),
-             experiments (first experiment), habits (days tracked).
+    Serves earned/locked achievement badges.
+
+    #1624: this used to compute a nightly threshold snapshot and present it as an
+    earned-badge record — `earned_date=today if <condition> else None` for every
+    badge, so no first-earn was ever recorded and a badge un-earned the moment a
+    metric dipped back under its threshold (a 2-3 lb water swing was enough).
+
+    The threshold logic now lives ONCE, in lambdas/achievement_rules.py, shared with
+    daily-metrics-compute, which persists the durable first-earn record. This handler
+    is READ-ONLY by design — /api/achievements is a core data query and per CLAUDE.md
+    core data queries must never write, so there is deliberately no lazy-persist here.
+    A badge that is true right now but not yet recorded serves earned with a NULL
+    date; the date is never manufactured (ADR-104).
+
+    Sources: habit_scores (streaks, days tracked), character_sheet (level),
+             withings (weight milestones), experiments, challenges,
+             achievements (BADGE#<id> — the first-earn ledger).
     Cache: 3600s (1 hr) — achievements update nightly.
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     d365 = (datetime.now(timezone.utc) - timedelta(days=365)).strftime("%Y-%m-%d")
 
-    # ── Streak data
-    habit_pk = f"{USER_PREFIX}habit_scores"
-    habit_resp = table.query(
-        **with_phase_filter(
-            {  # ADR-058: hide pilot habit scores
-                "KeyConditionExpression": Key("pk").eq(habit_pk),
-                "ScanIndexForward": False,
-                "Limit": 1,
-            }
-        )
-    )
-    habit_items = _decimal_to_float(habit_resp.get("Items", []))
-    latest_habit = habit_items[0] if habit_items else {}
-    current_streak = int(latest_habit.get("t0_perfect_streak") or latest_habit.get("t0_aggregate_streak") or 0)
-
-    # Days tracked = count of habit_score records in last 365 days
-    all_habits_resp = table.query(
-        **with_phase_filter(
-            {  # ADR-058: hide pilot habit scores
-                "KeyConditionExpression": Key("pk").eq(habit_pk) & Key("sk").between(f"DATE#{d365}", f"DATE#{today}"),
-            }
-        )
-    )
-    days_tracked = len(all_habits_resp.get("Items", []))
-
-    # ── Character level
-    char_pk = f"{USER_PREFIX}character_sheet"
-    char_resp = table.query(
-        **with_phase_filter(
-            {  # ADR-058: hide pilot character sheets
-                "KeyConditionExpression": Key("pk").eq(char_pk),
-                "ScanIndexForward": False,
-                "Limit": 1,
-            }
-        )
-    )
-    char_items = _decimal_to_float(char_resp.get("Items", []))
-    current_level = int(float((char_items[0] if char_items else {}).get("character_level", 1)))
-
-    # ── Weight milestones
-    withings = _latest_item("withings")
-    current_weight = float(withings.get("weight_lbs", 999)) if withings else 999.0
     start_weight = float(_get_profile().get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))
-    lost_lbs = round(start_weight - current_weight, 1) if current_weight < start_weight else 0
-
-    # ── First experiment
-    exp_pk = f"{USER_PREFIX}experiments"
-    exp_resp = table.query(
-        **with_phase_filter(
-            {  # ADR-058: hide pilot experiments
-                "KeyConditionExpression": Key("pk").eq(exp_pk),
-                "ScanIndexForward": False,
-                "Limit": 50,
-            }
-        )
+    inputs = achievement_rules.collect_inputs(
+        table, USER_PREFIX, with_phase_filter, start_weight_lbs=start_weight, today=today, window_start=d365
     )
-    all_exps = [i for i in _decimal_to_float(exp_resp.get("Items", [])) if i.get("sk", "").startswith("EXP#")]
-    completed_exps = [i for i in all_exps if i.get("status") in ("completed", "confirmed")]
+    signals = achievement_rules.signals_from(_decimal_to_float(inputs))
 
-    # EL-21: Streak detection — last 3 finished experiments all completed (no abandoned/failed)
-    _exp_has_3_streak = False
-    finished = sorted(
-        [i for i in all_exps if i.get("status") in ("completed", "confirmed", "abandoned")],
-        key=lambda x: x.get("end_date") or x.get("start_date", ""),
-        reverse=True,
-    )
-    if len(finished) >= 3:
-        _exp_has_3_streak = all(e.get("status") in ("completed", "confirmed") for e in finished[:3])
-
-    # EL-21: Pillar coverage — completed experiment in each of 7 pillars
-    _ALL_PILLARS = {"sleep", "movement", "nutrition", "supplements", "mental", "social", "discipline"}
-    _covered_pillars = set()
-    for e in completed_exps:
-        for tag in e.get("tags") or []:
-            tag_lower = tag.lower()
-            for p in _ALL_PILLARS:
-                if p in tag_lower:
-                    _covered_pillars.add(p)
-    _exp_all_pillars_covered = _covered_pillars >= _ALL_PILLARS
-
-    # ── Challenge completion counts
-    challenges_pk = f"USER#{USER_ID}#SOURCE#challenges"
-    completed_challenges = 0
-    perfect_challenges = 0
     try:
-        ch_resp = table.query(
-            **with_phase_filter(
-                {  # ADR-058: hide pilot challenges
-                    "KeyConditionExpression": Key("pk").eq(challenges_pk) & Key("sk").begins_with("CHALLENGE#"),
-                }
-            )
-        )
-        ch_items = _decimal_to_float(ch_resp.get("Items", []))
-        for ch in ch_items:
-            if ch.get("status") == "completed":
-                completed_challenges += 1
-                checkins = ch.get("daily_checkins", [])
-                if checkins:
-                    success = sum(1 for c in checkins if c.get("completed"))
-                    if success == len(checkins):
-                        perfect_challenges += 1
-    except Exception as _ch_e:
-        logger.warning("[achievements] Challenge query failed (non-fatal): %s", _ch_e)
+        first_earns = achievement_rules.read_first_earns(table, USER_PREFIX, with_phase_filter)
+    except Exception as _fe:  # noqa: BLE001 — a missing ledger must not 500 the surface
+        logger.warning("[achievements] First-earn ledger read failed (serving live conditions only): %s", _fe)
+        first_earns = {}
 
-    def badge(id_, label, category, desc, earned, earned_date=None, unlock_hint=None, icon=None):
-        return {
-            "id": id_,
-            "label": label,
-            "category": category,
-            "description": desc,
-            "earned": earned,
-            "earned_date": earned_date,
-            "icon": icon,
-            "unlock_hint": unlock_hint,
-        }
-
-    achievements = [
-        # ── Streak
-        badge(
-            "week_warrior",
-            "Week Warrior",
-            "streak",
-            "7-day Tier 0 habit streak",
-            earned=current_streak >= 7,
-            earned_date=today if current_streak >= 7 else None,
-            unlock_hint=f"{max(0, 7 - current_streak)} days to unlock" if current_streak < 7 else None,
-        ),
-        # #1126: fortnight rung between the week and the month — the first "this is
-        # a pattern, not a good week" mark.
-        badge(
-            "fortnight",
-            "Fortnight",
-            "streak",
-            "14-day Tier 0 habit streak",
-            earned=current_streak >= 14,
-            earned_date=today if current_streak >= 14 else None,
-            unlock_hint=f"{max(0, 14 - current_streak)} days to unlock" if current_streak < 14 else None,
-        ),
-        badge(
-            "monthly_grind",
-            "Monthly Grind",
-            "streak",
-            "30-day Tier 0 habit streak",
-            earned=current_streak >= 30,
-            earned_date=today if current_streak >= 30 else None,
-            unlock_hint=f"{max(0, 30 - current_streak)} days to unlock" if current_streak < 30 else None,
-        ),
-        badge(
-            "quarterly",
-            "Quarterly",
-            "streak",
-            "90-day Tier 0 habit streak",
-            earned=current_streak >= 90,
-            unlock_hint=f"{max(0, 90 - current_streak)} days to unlock" if current_streak < 90 else None,
-        ),
-        # #1126: the long hold — half a year without dropping the Tier 0 floor.
-        badge(
-            "half_year_hold",
-            "Half-Year Hold",
-            "streak",
-            "180-day Tier 0 habit streak",
-            earned=current_streak >= 180,
-            unlock_hint=f"{max(0, 180 - current_streak)} days to unlock" if current_streak < 180 else None,
-        ),
-        # ── Level
-        badge(
-            "first_level_up",
-            "First Level Up",
-            "level",
-            "Reached Character Level 2",
-            earned=current_level >= 2,
-            earned_date=today if current_level >= 2 else None,
-        ),
-        badge(
-            "apprentice",
-            "Apprentice",
-            "level",
-            "Reached Character Level 5",
-            earned=current_level >= 5,
-            unlock_hint=f"Level {current_level} → Level 5 needed" if current_level < 5 else None,
-        ),
-        badge(
-            "journeyman",
-            "Journeyman",
-            "level",
-            "Reached Character Level 10",
-            earned=current_level >= 10,
-            unlock_hint=f"Level {current_level} → Level 10 needed" if current_level < 10 else None,
-        ),
-        # #1126: the ladder above Journeyman — the streak-gated engine makes these rare.
-        badge(
-            "adept",
-            "Adept",
-            "level",
-            "Reached Character Level 20",
-            earned=current_level >= 20,
-            unlock_hint=f"Level {current_level} → Level 20 needed" if current_level < 20 else None,
-        ),
-        badge(
-            "master_of_the_craft",
-            "Master of the Craft",
-            "level",
-            "Reached Character Level 40",
-            earned=current_level >= 40,
-            unlock_hint=f"Level {current_level} → Level 40 needed" if current_level < 40 else None,
-        ),
-        # ── Weight LOSS milestones (every 10 lbs)
-        # #1126: the first honest rung — 5 lbs is real motion, not noise, on this frame.
-        badge(
-            "lost_5",
-            "First Five",
-            "milestone",
-            "Lost 5 lbs from starting weight",
-            earned=lost_lbs >= 5,
-            unlock_hint=f"{5 - lost_lbs:.0f} lbs to go" if lost_lbs < 5 else None,
-        ),
-        badge(
-            "lost_10",
-            "Lost 10 lbs",
-            "milestone",
-            "Lost 10 lbs from starting weight",
-            earned=lost_lbs >= 10,
-            icon="\u2696\ufe0f",
-            unlock_hint=f"{10 - lost_lbs:.0f} lbs to go" if lost_lbs < 10 else None,
-        ),
-        badge(
-            "lost_20",
-            "Lost 20 lbs",
-            "milestone",
-            "Lost 20 lbs from starting weight",
-            earned=lost_lbs >= 20,
-            icon="\u2696\ufe0f",
-            unlock_hint=f"{20 - lost_lbs:.0f} lbs to go" if lost_lbs < 20 else None,
-        ),
-        badge(
-            "lost_30",
-            "Lost 30 lbs",
-            "milestone",
-            "Lost 30 lbs from starting weight",
-            earned=lost_lbs >= 30,
-            icon="\u2696\ufe0f",
-            unlock_hint=f"{30 - lost_lbs:.0f} lbs to go" if lost_lbs < 30 else None,
-        ),
-        badge(
-            "lost_40",
-            "Lost 40 lbs",
-            "milestone",
-            "Lost 40 lbs from starting weight",
-            earned=lost_lbs >= 40,
-            icon="\u2696\ufe0f",
-            unlock_hint=f"{40 - lost_lbs:.0f} lbs to go" if lost_lbs < 40 else None,
-        ),
-        badge(
-            "lost_50",
-            "Lost 50 lbs",
-            "milestone",
-            "Lost 50 lbs from starting weight",
-            earned=lost_lbs >= 50,
-            icon="\u2696\ufe0f",
-            unlock_hint=f"{50 - lost_lbs:.0f} lbs to go" if lost_lbs < 50 else None,
-        ),
-        badge(
-            "lost_60",
-            "Lost 60 lbs",
-            "milestone",
-            "Lost 60 lbs from starting weight",
-            earned=lost_lbs >= 60,
-            icon="\u2696\ufe0f",
-            unlock_hint=f"{60 - lost_lbs:.0f} lbs to go" if lost_lbs < 60 else None,
-        ),
-        badge(
-            "lost_70",
-            "Lost 70 lbs",
-            "milestone",
-            "Lost 70 lbs from starting weight",
-            earned=lost_lbs >= 70,
-            icon="\u2696\ufe0f",
-            unlock_hint=f"{70 - lost_lbs:.0f} lbs to go" if lost_lbs < 70 else None,
-        ),
-        badge(
-            "lost_80",
-            "Lost 80 lbs",
-            "milestone",
-            "Lost 80 lbs from starting weight",
-            earned=lost_lbs >= 80,
-            icon="\u2696\ufe0f",
-            unlock_hint=f"{80 - lost_lbs:.0f} lbs to go" if lost_lbs < 80 else None,
-        ),
-        badge(
-            "lost_90",
-            "Lost 90 lbs",
-            "milestone",
-            "Lost 90 lbs from starting weight",
-            earned=lost_lbs >= 90,
-            icon="\u2696\ufe0f",
-            unlock_hint=f"{90 - lost_lbs:.0f} lbs to go" if lost_lbs < 90 else None,
-        ),
-        badge(
-            "lost_100",
-            "Lost 100 lbs",
-            "milestone",
-            "Lost 100 lbs from starting weight",
-            earned=lost_lbs >= 100,
-            icon="\u2696\ufe0f",
-            unlock_hint=f"{100 - lost_lbs:.0f} lbs to go" if lost_lbs < 100 else None,
-        ),
-        # ── Weight TARGET milestones
-        badge(
-            "sub_280",
-            "Sub-280",
-            "milestone",
-            "Weight under 280 lbs",
-            earned=current_weight < 280,
-            icon="\ud83c\udfaf",
-            unlock_hint=f"{current_weight - 280:.0f} lbs to go" if current_weight >= 280 else None,
-        ),
-        badge(
-            "sub_250",
-            "Sub-250",
-            "milestone",
-            "Weight under 250 lbs",
-            earned=current_weight < 250,
-            icon="\ud83c\udfaf",
-            unlock_hint=f"{current_weight - 250:.0f} lbs to go" if current_weight >= 250 else None,
-        ),
-        badge(
-            "sub_220",
-            "Sub-220",
-            "milestone",
-            "Weight under 220 lbs",
-            earned=current_weight < 220,
-            icon="\ud83c\udfaf",
-            unlock_hint=f"{current_weight - 220:.0f} lbs to go" if current_weight >= 220 else None,
-        ),
-        badge(
-            "sub_200",
-            "Sub-200",
-            "milestone",
-            "Weight under 200 lbs",
-            earned=current_weight < 200,
-            icon="\ud83c\udfaf",
-            unlock_hint=f"{current_weight - 200:.0f} lbs to go" if current_weight >= 200 else None,
-        ),
-        # ── Data
-        # #1126: the first data-consistency rung under the existing 100/365 ladder.
-        badge(
-            "30_days",
-            "Month of Data",
-            "data",
-            "30+ days of habit logging",
-            earned=days_tracked >= 30,
-            earned_date=today if days_tracked >= 30 else None,
-            unlock_hint=f"{max(0, 30 - days_tracked)} days to unlock" if days_tracked < 30 else None,
-        ),
-        badge(
-            "100_days",
-            "100 Days Tracked",
-            "data",
-            "100+ days of habit logging",
-            earned=days_tracked >= 100,
-            earned_date=today if days_tracked >= 100 else None,
-            unlock_hint=f"{max(0, 100 - days_tracked)} days to unlock" if days_tracked < 100 else None,
-        ),
-        badge(
-            "365_days",
-            "Year of Data",
-            "data",
-            "365 days of habit logging",
-            earned=days_tracked >= 365,
-            unlock_hint=f"{max(0, 365 - days_tracked)} days to unlock" if days_tracked < 365 else None,
-        ),
-        # ── Experiment
-        badge(
-            "first_experiment",
-            "First Experiment",
-            "science",
-            "Completed first N=1 experiment",
-            earned=len(completed_exps) >= 1,
-            earned_date=today if completed_exps else None,
-        ),
-        badge(
-            "hypothesis_confirmed",
-            "Hypothesis Confirmed",
-            "science",
-            "N=1 result statistically validated",
-            earned=False,  # requires manual confirmation
-            unlock_hint="Complete a tracked experiment to unlock",
-        ),
-        # EL-21: Experiment evolution badges
-        badge(
-            "exp_3_completed",
-            "Lab Rat",
-            "science",
-            "Completed 3 experiments",
-            earned=len(completed_exps) >= 3,
-            earned_date=today if len(completed_exps) >= 3 else None,
-            unlock_hint=f"{max(0, 3 - len(completed_exps))} experiments to unlock" if len(completed_exps) < 3 else None,
-        ),
-        badge(
-            "exp_5_completed",
-            "Research Fellow",
-            "science",
-            "Completed 5 experiments",
-            earned=len(completed_exps) >= 5,
-            earned_date=today if len(completed_exps) >= 5 else None,
-            unlock_hint=f"{max(0, 5 - len(completed_exps))} experiments to unlock" if len(completed_exps) < 5 else None,
-        ),
-        badge(
-            "exp_10_completed",
-            "Principal Investigator",
-            "science",
-            "Completed 10 experiments",
-            earned=len(completed_exps) >= 10,
-            unlock_hint=f"{max(0, 10 - len(completed_exps))} experiments to unlock" if len(completed_exps) < 10 else None,
-        ),
-        badge(
-            "exp_streak_3",
-            "Hot Streak",
-            "science",
-            "3 consecutive completed experiments (no fails)",
-            earned=_exp_has_3_streak,
-            unlock_hint="Complete 3 experiments in a row without abandoning",
-        ),
-        badge(
-            "exp_all_pillars",
-            "Renaissance Man",
-            "science",
-            "Completed experiment in every pillar",
-            earned=_exp_all_pillars_covered,
-            unlock_hint="Complete at least one experiment in each of the 7 pillars",
-        ),
-        # ── Challenges
-        badge(
-            "first_challenge",
-            "First Challenge",
-            "challenge",
-            "Completed first challenge",
-            earned=completed_challenges >= 1,
-            earned_date=today if completed_challenges >= 1 else None,
-        ),
-        badge(
-            "five_challenges",
-            "Challenge Regular",
-            "challenge",
-            "Completed 5 challenges",
-            earned=completed_challenges >= 5,
-            unlock_hint=f"{max(0, 5 - completed_challenges)} challenges to unlock" if completed_challenges < 5 else None,
-        ),
-        badge(
-            "ten_challenges",
-            "Challenge Veteran",
-            "challenge",
-            "Completed 10 challenges",
-            earned=completed_challenges >= 10,
-            unlock_hint=f"{max(0, 10 - completed_challenges)} challenges to unlock" if completed_challenges < 10 else None,
-        ),
-        badge(
-            "twenty_five_challenges",
-            "Challenge Legend",
-            "challenge",
-            "Completed 25 challenges",
-            earned=completed_challenges >= 25,
-            unlock_hint=f"{max(0, 25 - completed_challenges)} challenges to unlock" if completed_challenges < 25 else None,
-        ),
-        badge(
-            "perfect_challenge",
-            "Flawless",
-            "challenge",
-            "Completed a challenge with 100% success rate (7+ days)",
-            earned=perfect_challenges >= 1,
-            unlock_hint="Complete a 7+ day challenge without missing a single day",
-        ),
-    ]
-
+    achievements = achievement_rules.render(signals, first_earns)
     earned_count = sum(1 for a in achievements if a["earned"])
 
     return _ok(
@@ -1829,12 +1383,12 @@ def handle_achievements() -> dict:
             "summary": {
                 "earned": earned_count,
                 "total": len(achievements),
-                "current_streak": current_streak,
-                "days_tracked": days_tracked,
-                "current_level": current_level,
-                "current_weight": round(current_weight),
-                "completed_challenges": completed_challenges,
-                "perfect_challenges": perfect_challenges,
+                "current_streak": signals["current_streak"],
+                "days_tracked": signals["days_tracked"],
+                "current_level": signals["current_level"],
+                "current_weight": round(signals["current_weight"]),
+                "completed_challenges": signals["completed_challenges"],
+                "perfect_challenges": signals["perfect_challenges"],
             },
         },
         cache_seconds=3600,

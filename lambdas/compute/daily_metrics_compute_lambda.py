@@ -18,6 +18,8 @@ DynamoDB partitions written:
   1. SOURCE#computed_metrics   — primary; Daily Brief + dashboard refresh reads this
   2. SOURCE#day_grade          — existing schema; MCP tools + regrade backfill compat
   3. SOURCE#habit_scores       — existing schema; habit trending MCP tools compat
+  4. SOURCE#achievements       — #1624 first-earn ledger (BADGE#<id>, write-once);
+                                 /api/achievements reads it and never writes
 
 Schedule ordering:
   9:30 AM PT  Whoop recovery refresh (ensures today's data exists)
@@ -29,6 +31,7 @@ Pattern: follows character-sheet-compute Lambda architecture.
 
 v1.0.0 — 2026-03-07
 v1.1.0 — 2026-03-09: Sick day support — grade='sick', streaks preserved
+v1.2.0 — 2026-07-21: #1624 achievement first-earn sweep (durable badge earn dates)
 """
 
 import logging
@@ -37,8 +40,10 @@ import time
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
+import achievement_rules  # #1624: the ONE place badge thresholds live (shared with site_api_vitals)
 import boto3
 import personal_baselines  # #543: percentile bands from Matthew's own distribution (ADR-105 r4)
+import phase_taxonomy  # ADR-077/#1233: write-time provenance stamp for the first-earn ledger
 import scoring_engine
 import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 import weight_trend  # shared weekly-rate + projection (layer module)
@@ -130,6 +135,60 @@ def fetch_profile():
     from intelligence_common import fetch_profile as _shared_fetch_profile
 
     return _shared_fetch_profile(table, USER_ID)
+
+
+def sweep_achievement_first_earns(profile: dict) -> int:
+    """#1624 — persist a durable first-earn record for every newly-earned badge.
+
+    The achievements surface used to be stateless: `/api/achievements` recomputed
+    `earned_date = today if <condition> else None` on every request, so no first-earn
+    was ever recorded and a badge un-earned whenever its metric dipped back under the
+    threshold (a 2-3 lb water swing was enough to revoke `lost_10`). This sweep is the
+    writer half of the fix; the serving path only reads what this writes.
+
+    Why here and not in a new Lambda: daily-metrics-compute is the LAST compute in the
+    daily chain (9:40 AM PT, after character-sheet at 9:35), it already reads or writes
+    every partition the badge engine needs — habit_scores (streak, days tracked) it
+    writes itself moments earlier, withings and the profile baseline it already loads —
+    and the character sheet it reads is freshly written. It also already holds the DDB
+    write grant on this table, so no new IAM surface is required.
+
+    First run doubles as the backfill: an already-true badge with no record gets a
+    first-earn date DERIVED from stored history where the history supports one, and is
+    recorded earned-but-undated where it does not. No date is ever invented (ADR-104).
+
+    Fail-soft: a badge ledger is not worth failing the daily metrics run over.
+    """
+    try:
+        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        window_start = (datetime.now(timezone.utc) - timedelta(days=365)).strftime("%Y-%m-%d")
+        start_weight = float(profile.get("journey_start_weight_lbs") or profile.get("start_weight_lbs") or 0) or None
+        if start_weight is None:
+            from constants import EXPERIMENT_BASELINE_WEIGHT_LBS
+
+            start_weight = float(EXPERIMENT_BASELINE_WEIGHT_LBS)
+
+        inputs = achievement_rules.collect_inputs(
+            table, USER_PREFIX, with_phase_filter, start_weight_lbs=start_weight, today=today_str, window_start=window_start
+        )
+        signals = achievement_rules.signals_from(inputs)
+        existing = achievement_rules.read_first_earns(table, USER_PREFIX, with_phase_filter)
+        histories = achievement_rules.histories_from(inputs)
+        stamp = phase_taxonomy.experiment_stamp()  # ADR-077/#1233 write-time provenance
+
+        written = achievement_rules.persist_first_earns(table, USER_PREFIX, signals, histories, existing, today_str, stamp=stamp)
+        for rec in written:
+            logger.info(
+                "[achievements] First-earn recorded: %s (%s) earned_date=%s basis=%s",
+                rec["badge_id"],
+                rec["label"],
+                rec["earned_date"] or "undated",
+                rec["date_basis"],
+            )
+        return len(written)
+    except Exception as e:  # noqa: BLE001 — fail-soft: the badge ledger never fails the metrics run
+        logger.error("[achievements] First-earn sweep failed (non-fatal): %s", e)
+        return 0
 
 
 def fetch_journal_entries(date_str):
@@ -1141,6 +1200,13 @@ def lambda_handler(event, context):
     # All composite fields live in computed_metrics. composite_scores partition
     # retained in DynamoDB for historical records but no longer written to.
 
+    # ── #1624: achievement first-earn sweep ────────────────────────────────
+    # Must run AFTER store_habit_scores above — the streak and days-tracked
+    # signals read the record this run just wrote. This is the ONLY writer of
+    # SOURCE#achievements; /api/achievements reads it and never writes (a core
+    # data query must not write, CLAUDE.md).
+    first_earns_written = sweep_achievement_first_earns(profile)
+
     elapsed = time.time() - t0
     logger.info("Done in %.1fs", elapsed)
 
@@ -1154,5 +1220,6 @@ def lambda_handler(event, context):
         "readiness_colour": readiness_colour,
         "tier0_streak": streak_data["tier0_streak"],
         "tier01_streak": streak_data["tier01_streak"],
+        "first_earns_written": first_earns_written,
         "elapsed_seconds": round(elapsed, 1),
     }

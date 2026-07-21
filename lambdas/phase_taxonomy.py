@@ -204,6 +204,18 @@ SOURCE_CLASS: dict[str, str] = {
     "field_notes": EXPERIMENT_SCOPED,
     "discovery_annotations": EXPERIMENT_SCOPED,
     "ledger": EXPERIMENT_SCOPED,  # TOTALS#current resets; txns tombstone + LIFETIME# (dec F)
+    # #1624: the achievement first-earn ledger (BADGE#<id> — written once, on first
+    # crossing, by daily-metrics-compute; read by /api/achievements). EXPERIMENT_SCOPED,
+    # deliberately, and the argument is worth keeping: EVERY badge condition is
+    # evaluated over phase-filtered, current-cycle data — the Tier 0 streak restarts at
+    # 0, the character level returns to 1, completed experiments and challenges are
+    # tombstoned. A CROSS_PHASE first-earn would therefore keep asserting "Week Warrior,
+    # earned 2026-03-14" while the streak that earned it is hidden from the very same
+    # endpoint: a claim whose evidence the site has withdrawn. That is the mirror image
+    # of the dishonesty #1624 exists to remove. Same shape as "ledger" above — the
+    # per-cycle record resets, and the wipe cycle-stamps it so cycle N's badges stay
+    # navigable in the archive rather than being destroyed.
+    "achievements": EXPERIMENT_SCOPED,
     "ai_analysis": EXPERIMENT_SCOPED,
     "decisions": EXPERIMENT_SCOPED,
     "rewards": EXPERIMENT_SCOPED,
