@@ -1497,6 +1497,21 @@
         }
       ],
       "why_it_mattered": "Radical cost transparency is easy to claim and easy to fake — a hand-maintained figure on a page ages into a lie within a week. The test of whether it's real is what the page does on a bad day: this one refuses to show a number it can't stand behind, and the first thing it did in public was report that the month is projected to overshoot its own ceiling. An instrument that only ever reads green isn't an instrument."
+    },
+    {
+      "id": "2026-07-21-the-brand-mark",
+      "date": "2026-07-21",
+      "title": "The site got a logo — a measuring dial with the needle already climbing",
+      "shipped": "For its whole life this site had no logo: the header showed a small orange square, and the browser-tab icon was a leftover image from May. It now carries a real mark — a measuring dial, drawn on the site's own colours, with a single ember graduation near the top like a gauge reading high. It's the favicon, the phone home-screen icon, and the header mark, so the same symbol shows up in every place the site announces itself. None of the 134 pages had their code touched: the new artwork was dropped in at the exact file paths the old icons already used, so every page picked it up for free. The mark is built by a committed script from three hand-drawn source files, so it can be rebuilt identically at any time rather than being a pile of exported images nobody can regenerate.",
+      "gotcha": "The delivered artwork set its letters as live text that borrows a font at display time, with a note claiming the font was baked in. It wasn't — the font slot was empty. That's invisible on a design canvas but breaks everywhere a logo actually gets used: as a favicon, as a plain image, or when a social site fetches it to build a link preview, none of which load the font, so the letters would have silently reverted to a generic typeface. The fix was to convert the letters into fixed outlines against the site's own copy of the font, then check every file had zero live-text left and that it still read correctly with no font loaded at all.",
+      "honest_miss": "The plan I'd written and gotten approved had two things wrong, and building it the honest way meant contradicting my own plan. The header was supposed to show the full 'AJM' monogram — but rendered at its real size the three letters just smeared into noise, so it uses a single clean 'A' instead. And the plan wired the light-mode logo to the manual light/dark switch only, which would have shown a dark logo on a light page to anyone whose phone was set to light mode but who never touched the switch. Both only showed up by rendering the thing at true size in real conditions, which is exactly what a mockup doesn't do.",
+      "prs": [
+        {
+          "label": "PR #1638",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1638"
+        }
+      ],
+      "why_it_mattered": "A logo is the cheapest thing to fake and the easiest to get subtly wrong — a mark that looks fine in the design tool but falls back to the wrong font in a link preview, or shows the wrong colour on half of readers' phones, is worse than none, because it's broken in exactly the places you don't look. Shipping it as a rebuildable script with the letters outlined and the theming checked on real devices is the difference between a logo and a picture of a logo. And the mark itself is honest about the project: a gauge, needle already high."
     }
   ]
 }
