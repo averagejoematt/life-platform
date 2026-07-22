@@ -1,0 +1,49 @@
+title = "life-platform gitleaks allowlist"
+
+# #1659 — secret-scanning CI gate. This file EXTENDS gitleaks' built-in
+# default ruleset (does not replace it) and adds a small, narrow allowlist
+# for the false positives actually observed running `gitleaks detect`
+# against the current tree on 2026-07-21. Every entry below is scoped by
+# BOTH file path AND the exact literal string (condition = "AND"), so it
+# can only suppress that one known-safe value in that one known file — not
+# any other secret that happens to share a rule ID.
+#
+# Do NOT add speculative entries. A new allowlist entry requires the same
+# bar: run gitleaks locally, confirm the finding is not a real credential,
+# and record why here.
+#
+# NOTE: the CI gate itself (.github/workflows/secret-scan.yml) scans only
+# the commit range introduced by a PR (--log-opts base..head), not the full
+# repository history and not the full current tree — see that file's header
+# for why (this repo was PUBLIC before 2026-07-13 and its history/tree carry
+# pre-existing strings that would otherwise red every future PR forever).
+# This allowlist is defense-in-depth for the case where a future PR's diff
+# happens to re-touch one of these lines (e.g. edits a neighboring line and
+# pulls the old one into the diff context).
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "tests/test_ritual_log_endpoint.py + tests/test_intake_response.py — hardcoded HMAC signing secret for the ritual-log forgery-guard test suite (#769/#1405). Deliberately fake, self-describing name, used only to sign test tokens in-process; never a live credential."
+condition = "AND"
+regexTarget = "match"
+regexes = ['''test-ritual-secret-0123456789''']
+paths = [
+  '''tests/test_ritual_log_endpoint\.py''',
+  '''tests/test_intake_response\.py''',
+]
+
+[[allowlists]]
+description = "deploy/archive/20260314/r8_p0_verify.sh — deliberately invalid bearer token used to assert the webhook returns 401 on bad auth (Architecture Review #8 P0 check). Not a real token."
+condition = "AND"
+regexTarget = "match"
+regexes = ['''INVALID_TOKEN_R8_TEST''']
+paths = ['''deploy/archive/20260314/r8_p0_verify\.sh''']
+
+[[allowlists]]
+description = "docs/DECISIONS.md — the MacroFactor reverse-engineering ADR. This is the Firebase WEB API key for the sbs-diet-app project, already published in this same ADR as intentionally embeddable: Firebase web keys are not secret by Google's own security model (protection is Auth rules + bundle-ID validation, not key secrecy). Allowlisting here does not increase exposure — the value is already public in-repo and upstream."
+condition = "AND"
+regexTarget = "match"
+regexes = ['''AIzaSyA17Uwy37irVEQSwz6PIyX3wnkHrDBeleA''']
+paths = ['''docs/DECISIONS\.md''']
