@@ -215,6 +215,19 @@ def ingestion_notion() -> list[iam.PolicyStatement]:
     )
 
 
+def ingestion_youtube() -> list[iam.PolicyStatement]:
+    # #1669 (epic #1668): inbound social — YouTube via the free keyless per-channel RSS
+    # feed. No paid token; the life-platform/youtube secret holds only the channel id
+    # (owner-provisioned) and is read GetSecretValue-only (the _ingestion_base default —
+    # no writeback). DDB GetItem (base default) is what the #1670 provenance membrane uses
+    # to cross-reference the BROADCAST_ORIGIN# ledger. Raw archive under raw/matthew/youtube/*.
+    return _ingestion_base(
+        "youtube",
+        secret_name="life-platform/youtube",
+        s3_prefix="raw/matthew/youtube/*",
+    )
+
+
 def ingestion_withings() -> list[iam.PolicyStatement]:
     # #499: OAuth token refresh writes back to the secret via ingestion_framework's
     # enable_secret_writeback path, which calls secretsmanager.update_secret()

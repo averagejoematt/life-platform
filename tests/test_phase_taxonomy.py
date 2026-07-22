@@ -86,6 +86,8 @@ LIVE_FAMILIES = [
     ("USER#matthew#SOURCE#macrofactor_workouts", "DATE#2021-04-12"),
     ("USER#matthew#SOURCE#measurements", "DATE#2026-03-29"),
     ("USER#matthew#SOURCE#notion", "DATE#2023-12-19#journal#journal#1"),
+    ("USER#matthew#SOURCE#youtube", "DATE#2026-07-20#dQw4w9WgXcQ"),  # #1669 inbound social — suffixed sk
+    ("BROADCAST_ORIGIN#youtube", "POST#dQw4w9WgXcQ"),  # #1670 outbound-broadcast ledger — SYSTEM_STATE
     ("USER#matthew#SOURCE#nutrition_review", "DATE#2026-02-28"),
     ("USER#matthew#SOURCE#platform_memory", "MEMORY#baseline_snapshot#2026-05-03"),
     ("USER#matthew#SOURCE#platform_memory", "MEMORY#failure_pattern#2026-03-09#0"),
@@ -213,6 +215,7 @@ def test_unknown_pk_raises():
         ("whoop", pt.RAW_TIMESERIES),
         ("hevy", pt.RAW_TIMESERIES),
         ("food_delivery", pt.RAW_TIMESERIES),
+        ("youtube", pt.RAW_TIMESERIES),  # #1669 inbound social — user-authored posts, like notion
         ("email_log", pt.SYSTEM_STATE),  # dec E
         ("journal_analysis", pt.SYSTEM_STATE),
         ("google_calendar", pt.SYSTEM_STATE),  # dead
@@ -292,6 +295,8 @@ def test_pk_rules():
     # suffixed training_notes pks resolve to the base source (#951)
     assert pt.classify("USER#matthew#SOURCE#training_notes#EXERCISE#79dad4ee", "DATE#2026-07-01#WORKOUT#x") == pt.RAW_TIMESERIES
     assert pt.classify("USER#admin#SOURCE#deletion_log", "DATE#2026-07-01T00:00:00#USER#x") == pt.SYSTEM_STATE
+    # #1670: the outbound-broadcast ledger — SYSTEM_STATE, survives resets, never traversed
+    assert pt.classify("BROADCAST_ORIGIN#youtube", "POST#dQw4w9WgXcQ") == pt.SYSTEM_STATE
 
 
 def test_helper_predicates():

@@ -433,6 +433,14 @@ COVERAGE = {
         "2026-07-19",
         "Day-2 bridge email for new subscribers — low volume; a dead cron delays onboarding sends until noticed. Error-mode is alarmed.",
     ),
+    "youtube-social-ingestion": (
+        EXEMPT,
+        "2026-07-21",
+        "#1669 (epic #1668): inbound-social YouTube source is registry-resident and DORMANT until the owner provisions the "
+        "life-platform/youtube channel_id — active_api:False, no secret yet, so it fetches nothing and writes no INGEST_HEALTH "
+        "sentinel; a real liveness alarm would false-fire every run on a Lambda that cannot invoke by design. When the channel id "
+        "is provisioned, flip active_api:True in source_registry and move this to ('ingest-liveness', 'youtube').",
+    ),
 }
 
 

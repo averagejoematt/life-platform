@@ -257,6 +257,9 @@
     "lambdas/ingestion/notion_lambda.py": {
       "function": "notion-journal-ingestion"
     },
+    "lambdas/ingestion/youtube_lambda.py": {
+      "function": "youtube-social-ingestion"
+    },
     "lambdas/ingestion/strava_lambda.py": {
       "function": "strava-data-ingestion"
     },
