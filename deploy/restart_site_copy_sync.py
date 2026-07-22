@@ -78,11 +78,20 @@ ORPHAN_S3_FILES = [
 
 # Lambdas to invoke after sync to regenerate the JSON files they own.
 # These cover the generated/ prefix files that drive site rendering.
+# (function_name, payload) — #1643:
+#   - The real function is `daily-brief`, NOT `life-platform-daily-brief` (the old
+#     name never existed → a permanent `err(254)` in every reset log, and the two
+#     JSONs it owns were never actually busted).
+#   - It MUST be invoked with {"dry_run": true}: daily-brief regenerates
+#     public_stats.json / pulse.json / dashboard data.json as a side effect, but on a
+#     bare {} payload it ALSO sends the daily brief email (the dry_run gate wraps only
+#     the SES send at ~L2062; the JSON writes at ~L2080 run regardless). Without the
+#     flag, every reset would email Matthew a brief.
 REGEN_LAMBDAS = [
-    "life-platform-daily-brief",  # generated/public_stats.json + generated/pulse.json + dashboard/matthew/data.json
-    "character-sheet-compute",  # generated/data/character_stats.json
-    "site-stats-refresh",  # refreshes vitals in public_stats.json
-    "og-image-generator",  # OG image PNGs for share cards
+    ("daily-brief", {"dry_run": True}),  # generated/public_stats.json + generated/pulse.json + dashboard/matthew/data.json
+    ("character-sheet-compute", {}),  # generated/data/character_stats.json
+    ("site-stats-refresh", {}),  # refreshes vitals in public_stats.json
+    ("og-image-generator", {}),  # OG image PNGs for share cards
 ]
 
 
@@ -331,9 +340,18 @@ def tombstone_orphan_s3_files(apply: bool, now_iso: str) -> list[str]:
 
 
 def invoke_regen_lambdas(apply: bool) -> list[tuple[str, str]]:
-    """Invoke the Lambdas that own the cached JSON artifacts the site reads."""
+    """Invoke the Lambdas that own the cached JSON artifacts the site reads.
+
+    #1643: each entry carries its own payload (daily-brief needs {"dry_run": true}
+    so the cache-bust doesn't also send an email). At dry-run we verify each function
+    name actually resolves via `aws lambda get-function`, so a typo (like the old
+    `life-platform-daily-brief`) fails LOUDLY here instead of printing a silent
+    `err(254)` on every apply run. A get-function that fails for a non-404 reason
+    (no creds / offline) degrades to "would-invoke (unverified)" rather than a false
+    alarm.
+    """
     results = []
-    for fn in REGEN_LAMBDAS:
+    for fn, payload in REGEN_LAMBDAS:
         if apply:
             proc = subprocess.run(
                 [
@@ -347,7 +365,7 @@ def invoke_regen_lambdas(apply: bool) -> list[tuple[str, str]]:
                     "--invocation-type",
                     "RequestResponse",
                     "--payload",
-                    "{}",  # raw JSON — raw-in-base64-out expects the raw payload, not base64
+                    json.dumps(payload),  # raw JSON — raw-in-base64-out expects the raw payload, not base64
                     "--cli-binary-format",
                     "raw-in-base64-out",
                     "/tmp/_regen_" + fn.replace("-", "_") + ".json",
@@ -358,7 +376,21 @@ def invoke_regen_lambdas(apply: bool) -> list[tuple[str, str]]:
             )
             status = "ok" if proc.returncode == 0 else f"err({proc.returncode})"
         else:
-            status = "would-invoke"
+            check = subprocess.run(
+                ["aws", "lambda", "get-function", "--function-name", fn, "--region", REGION],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if check.returncode == 0:
+                status = "would-invoke"
+            elif "ResourceNotFoundException" in (check.stderr or ""):
+                raise RuntimeError(
+                    f"invoke_regen_lambdas: '{fn}' does not exist (get-function → ResourceNotFoundException). "
+                    "Fix the name in REGEN_LAMBDAS before applying — this is the #1643 silent-err(254) trap."
+                )
+            else:
+                status = "would-invoke (unverified — get-function rc=%d)" % check.returncode
         results.append((fn, status))
     return results
 
