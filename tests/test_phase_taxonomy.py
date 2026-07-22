@@ -119,6 +119,7 @@ LIVE_FAMILIES = [
     ("CHALLENGE_FOLLOWS", "EMAIL#0269def9#CH#no-doordash-30"),
     ("USER#matthew#SOURCE#benchmarks", "EPISODE#2026-06-14"),
     ("ENSEMBLE#dispute", "THREAD#2026-W27#deficit_depth"),
+    ("USER#matthew#SOURCE#coach_corrections", "CORRECTION#2026-07-22#a1b2c3d4"),  # #1689
     # Reading / Mind pillar (ADR-097) — CROSS_PHASE, durable identity data
     ("BOOK#0123456789abcdef", "META"),
     ("READING#0123456789abcdef", "STATE"),
@@ -192,6 +193,7 @@ def test_unknown_pk_raises():
         ("chronicling", pt.CROSS_PHASE),  # dec D — frozen "before" archive
         ("subscribers", pt.CROSS_PHASE),
         ("benchmarks", pt.CROSS_PHASE),  # BENCH-1 cut-benchmarking history — cross-cycle by design
+        ("coach_corrections", pt.CROSS_PHASE),  # #1689 — a correction outlives the cycle it was made in
         ("weight_episodes", pt.CROSS_PHASE),  # #930/#951 BENCH-1 — 14y reference, survives resets
         ("training_reference", pt.CROSS_PHASE),  # #930/#951 BENCH-1 — proven prescription singleton
         ("macrofactor_meals", pt.RAW_TIMESERIES),  # #951 — meal facts, follows raw macrofactor
