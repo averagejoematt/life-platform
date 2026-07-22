@@ -51,6 +51,44 @@ def _esc(s: str) -> str:
     return html.escape(str(s), quote=True)
 
 
+# ── Head chrome (#1639) ────────────────────────────────────────────────────────
+#
+# The icon / manifest / theme-color block that belongs in every content page's
+# <head>. Before #1639 this was copy-pasted as an f-string literal across ~10
+# generators and had drifted: only 21 of 79 content pages shipped the manifest and
+# apple-touch-icon, only 24 the theme-color pair, and NO page offered the vector
+# favicon even though `site/assets/marks/favicon-{dark,light}.svg` already ship.
+# `v4_apply_chrome.apply_head_chrome` re-flattens every content page's head to this
+# single block the same way the nav/footer/loop-forward are flattened, so head chrome
+# gets the same anti-drift gate the rest of the chrome already has.
+#
+# Order is load-bearing for the favicon: the `.ico` is declared FIRST as the universal
+# fallback, then the SVG — a browser that understands `image/svg+xml` uses the later,
+# more-capable declaration and renders the vector mark; one that doesn't silently
+# ignores the type it can't decode and falls back to the `.ico`. The single SVG points
+# at the DARK mark by design (rel=icon has no reliable per-scheme media selector across
+# browsers); the light `.ico`/PNG cover light surfaces. The theme-color pair tints the
+# mobile browser chrome to the page in each scheme.
+HEAD_CHROME_TAGS = (
+    '<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4EFE4">',
+    '<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E0C08">',
+    '<link rel="icon" href="/favicon.ico">',
+    '<link rel="icon" type="image/svg+xml" href="/assets/marks/favicon-dark.svg">',
+    '<link rel="manifest" href="/manifest.webmanifest">',
+    '<link rel="apple-touch-icon" href="/apple-touch-icon.png">',
+)
+
+
+def head_chrome(indent: str = "  ") -> str:
+    """The canonical <head> icon/manifest/theme-color block (#1639), one tag per line.
+
+    `indent` is the per-line leading whitespace (pages use two spaces). Returns the tags
+    joined by newlines with NO trailing newline — the caller controls the surrounding
+    whitespace, exactly as `doors_nav()`/`site_footer()` return a bare element.
+    """
+    return "\n".join(indent + tag for tag in HEAD_CHROME_TAGS)
+
+
 def _door_icon(key: str) -> str:
     # Inline <use> of the shared sprite — server-rendered (no JS), inherits .ico-door colour.
     return (

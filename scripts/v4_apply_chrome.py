@@ -25,6 +25,16 @@ detected door as the nav — see `v4_chrome.loop_forward` for the mapping and wh
 right signal. This is what makes "zero dead-end pages" a structural guarantee rather than
 a per-generator opt-in: any page with a doors nav gets one, full stop.
 
+Head chrome (#1639): every content page's `<head>` icon/manifest/theme-color block is
+flattened to `v4_chrome.head_chrome()` — the `.ico` fallback, the SVG favicon, the
+manifest, apple-touch-icon, and the light/dark theme-color pair. Before this the block
+was a copy-pasted f-string literal in ~10 generators and had drifted (only 21 of 79
+pages shipped the manifest/apple-touch-icon, 24 the theme-color pair, none the vector
+favicon). Now it gets the same single-source + `--check` gate the nav/footer already
+have. Only chrome-bearing pages are touched, and a page is only given the block if it
+already carries at least one head-chrome tag to anchor on, so the redirect stubs and
+authoring fragments (which have none) can never be handed one.
+
   python3 scripts/v4_apply_chrome.py            # rewrite in place, print summary
   python3 scripts/v4_apply_chrome.py --check    # exit 1 if any page would change (CI)
 
@@ -59,6 +69,20 @@ CURRENT_RE = re.compile(r'<a href="([^"]+)"[^>]*aria-current="page"')
 FOLLOW_RE = re.compile(r'class="nav-follow"')
 ASOF_RE = re.compile(r'data-bind="asof"')
 
+# #1639: the <head> icon/manifest/theme-color chrome. This matches any ONE canonical
+# head-chrome tag — the theme-color metas, and the icon/manifest/apple-touch-icon links
+# in whatever attribute form they've drifted into (`sizes="180x180"`, the raster-only
+# `.ico`, the SVG favicon) — INCLUDING its leading indentation and trailing newline, so
+# a whole line is consumed cleanly. It deliberately does NOT match the apple-mobile-web-app
+# metas or the service-worker registration (index-only PWA shell, not part of this block).
+# `rel="icon"` and `rel="apple-touch-icon"` don't overlap: the alternation anchors on the
+# closing quote, so `rel="icon"` cannot match inside `rel="apple-touch-icon"`.
+HEAD_CHROME_TAG_RE = re.compile(
+    r"[ \t]*(?:" r'<meta name="theme-color"[^>]*>' r'|<link\b[^>]*\brel="(?:icon|manifest|apple-touch-icon)"[^>]*>' r")[ \t]*\n?"
+)
+HEAD_OPEN_RE = re.compile(r"<head[^>]*>")
+HEAD_CLOSE = "</head>"
+
 
 def iter_html_files(root: str):
     for dirpath, dirnames, filenames in os.walk(root):
@@ -88,9 +112,49 @@ def detect_nav_state(nav_html: str):
     return current_door, with_follow
 
 
+def apply_head_chrome(html: str):
+    """Flatten the <head> icon/manifest/theme-color chrome to `v4_chrome.head_chrome()`.
+
+    Every canonical head-chrome tag (theme-color pair, `.ico`, SVG favicon, manifest,
+    apple-touch-icon) is stripped from `<head>` wherever it has drifted to, and the single
+    canonical block is (re)inserted at the position of the FIRST such tag — the natural
+    anchor, present on every content page as the pre-existing `.ico` link. Only the region
+    between `<head>` and `</head>` is touched, so no `<body>` markup can be caught. Runs
+    ONLY when the page already carries at least one head-chrome tag, so a chrome-free
+    redirect stub or authoring fragment can never be handed a block. Idempotent: on an
+    already-canonical head, strip-all-then-reinsert-at-the-same-anchor is a byte no-op.
+
+    Returns (new_html, changed).
+    """
+    head_open = HEAD_OPEN_RE.search(html)
+    if not head_open:
+        return html, False
+    head_start = head_open.end()
+    head_end = html.find(HEAD_CLOSE, head_start)
+    if head_end == -1:
+        return html, False
+
+    head = html[head_start:head_end]
+    matches = list(HEAD_CHROME_TAG_RE.finditer(head))
+    if not matches:
+        # No existing head chrome — not even the `.ico`. By construction this is a
+        # chrome-free stub/fragment; never inject a block into one.
+        return html, False
+
+    anchor = matches[0].start()
+    new_head = head
+    for m in reversed(matches):
+        new_head = new_head[: m.start()] + new_head[m.end() :]
+    block = v4_chrome.head_chrome() + "\n"
+    new_head = new_head[:anchor] + block + new_head[anchor:]
+
+    new_html = html[:head_start] + new_head + html[head_end:]
+    return new_html, (new_html != html)
+
+
 def rewrite(html: str, self_path: str | None = None):
-    """Return (new_html, nav_changed, foot_changed, door, follow, gained_icons, foot_converted, lf_changed)."""
-    nav_changed = foot_changed = gained_icons = foot_converted = lf_changed = False
+    """Return (new_html, nav_changed, foot_changed, door, follow, gained_icons, foot_converted, lf_changed, head_changed)."""
+    nav_changed = foot_changed = gained_icons = foot_converted = lf_changed = head_changed = False
     door = None
     follow = False
 
@@ -147,7 +211,13 @@ def rewrite(html: str, self_path: str | None = None):
             html = html[:body_at] + v4_chrome.site_footer() + "\n" + html[body_at:]
         foot_changed = foot_converted = True
 
-    return html, nav_changed, foot_changed, door, follow, gained_icons, foot_converted, lf_changed
+    # #1639: flatten the <head> icon/manifest/theme-color chrome. Gated on the same
+    # signal as the rest of this pass — a page with a doors nav OR a canonical footer is
+    # a content page and must carry the full head block; the 3 chrome-free stubs/fragments
+    # never reach here (main() filters them) and carry no head-chrome tag to anchor on.
+    html, head_changed = apply_head_chrome(html)
+
+    return html, nav_changed, foot_changed, door, follow, gained_icons, foot_converted, lf_changed, head_changed
 
 
 def main() -> int:
@@ -160,6 +230,7 @@ def main() -> int:
     foot_converted = []
     gained_icons = []
     lf_changed = []
+    head_changed = []
     by_door: dict[str | None, int] = {}
     follow_count = 0
     total = 0
@@ -170,7 +241,7 @@ def main() -> int:
             continue
         total += 1
         rel = os.path.relpath(path, SITE_ROOT)
-        new, nc, fc, door, follow, gi, conv, lf = rewrite(original, self_path=url_path(rel))
+        new, nc, fc, door, follow, gi, conv, lf, hc = rewrite(original, self_path=url_path(rel))
         if '<nav class="doors"' in original:
             by_door[door] = by_door.get(door, 0) + 1
             if follow:
@@ -185,6 +256,8 @@ def main() -> int:
             gained_icons.append(rel)
         if lf:
             lf_changed.append(rel)
+        if hc:
+            head_changed.append(rel)
         if new != original and not args.check:
             with open(path, "w", encoding="utf-8") as fh:
                 fh.write(new)
@@ -193,6 +266,7 @@ def main() -> int:
     print(f"  nav rewritten:    {len(nav_changed)}")
     print(f"  footer rewritten: {len(foot_changed)}")
     print(f"  loop-forward inserted/rewritten: {len(lf_changed)}")
+    print(f"  head chrome flattened: {len(head_changed)}")
     print(f"  variant/missing footers converted to canonical: {len(foot_converted)}")
     for rel in foot_converted:
         print(f"      + {rel}")
@@ -204,7 +278,7 @@ def main() -> int:
         print(f"      {door if door is not None else '(none)':<12} {by_door[door]}")
     print(f"  follow-pill pages (detected & preserved): {follow_count}")
 
-    if args.check and (nav_changed or foot_changed or lf_changed):
+    if args.check and (nav_changed or foot_changed or lf_changed or head_changed):
         print("\nCHECK FAILED: chrome is out of sync with v4_chrome.py — run without --check.", file=sys.stderr)
         return 1
     return 0
