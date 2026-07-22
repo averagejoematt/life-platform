@@ -1,0 +1,132 @@
+# codeql.yml — CodeQL SAST for Python + JavaScript (#1660, epic #1648).
+#
+# WHY: bandit-via-ruff (ruff's S-rules, several silenced — see pyproject.toml/.flake8)
+# is the only SAST today, and it's rule-based/pattern-matching only — no dataflow
+# analysis (no taint tracking from an HTTP request param through to a shell call, a
+# format string, an S3 key, etc). CodeQL adds a real dataflow-analysis layer on top,
+# complementary to bandit, not a replacement for it.
+#
+# LANGUAGES (verified 2026-07-21, #1660):
+#   - python              — lambdas/, mcp/, cdk/ (cdk/app.py + cdk/stacks/ are Python,
+#                            NOT TypeScript — this repo has no cdk/*.ts), tests/,
+#                            scripts/, deploy/.
+#   - javascript-typescript — the current codeql-action language id for JS (site/assets/js/
+#                            ES modules, tests/js/*.test.mjs); it's a superset alias that
+#                            also covers TS, so if cdk/ or anything else ever grows a .ts
+#                            file it's covered automatically — no workflow change needed.
+#
+# INITIAL ALERT SET — reasoned triage ahead of the first run (grounded in `git grep`,
+# not guesses; CodeQL CLI isn't available in the authoring sandbox, so this is an
+# informed prediction to read the first PR-run's Security-tab results against, not a
+# substitute for reading them):
+#   - subprocess(..., shell=True) — 2 hits (deploy/generate_review_bundle.py,
+#     deploy/archive/20260310/patch_registry.py), both dev-only tooling already
+#     bandit-suppressed (`# noqa: S602`). Expect a `py/command-line-injection` candidate
+#     on at least one; triage as false-positive/accepted-risk (not reachable from any
+#     web-facing input) unless CodeQL's dataflow shows otherwise.
+#   - hashlib.md5/sha1 — 5 hits, all non-security id/hash derivation (cache keys,
+#     content hashes), 3 already carry `usedforsecurity=False` or `# noqa: S324`.
+#     Expect `py/weak-crypto-key`/`py/insecure-hash-algorithm` low-severity candidates;
+#     triage as false-positive (no crypto/auth use).
+#   - `eval(` greps are all `ast.literal_eval` (safe, no code execution) or a comment
+#     string — expect zero real `py/code-injection` hits from these.
+#   - `innerHTML` — ~167 hits across site/assets/js/ (the vanilla-JS ES-module site
+#     has no framework, so template rendering is manual innerHTML/template-literal
+#     composition). Expect `js/xss-through-dom`/`js/unsafe-jquery-plugin`-class
+#     candidates where API response data flows into an innerHTML sink; each needs a
+#     read of whether the source is server-controlled data (this is a single-operator
+#     site with no user-generated HTML surface, so risk is low, but each flagged sink
+#     should still be read, not blanket-dismissed).
+#   - No `os.system`, no `pickle`, no unsafe `yaml.load`, no disabled TLS verification
+#     found repo-wide — do not expect findings in those classes.
+#
+# POSTURE: ADVISORY ONLY (#1660's AC). `analyze`'s default behavior is to upload SARIF
+# to the repo's Security tab — it does NOT fail the job on any finding, and this
+# workflow deliberately adds no step that inspects the SARIF and exits non-zero.
+# Promoting to "blocking on high-severity" + adding this workflow as a required status
+# check is explicit owner territory — see #1662 (gate:owner, branch-protection/repo
+# settings) — do not flip this file's posture without that decision landing there first.
+#
+# TRIGGERS: pull_request (the advisory PR-check signal, results land as PR annotations
+# + Security tab) + push to main (keeps Security-tab results current post-merge, since
+# CodeQL's own query packs evolve between pushes) + a weekly schedule (catches new
+# findings from query-pack updates even with no code change) + workflow_dispatch for
+# manual re-runs.
+
+name: CodeQL
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    # Reuses path globs that already exist in PUSH_TRIGGER_GLOBS (deploy/drift_sentinel.py)
+    # so this filter needs no update to that MAINTAINED-LITERAL union (test_drift_sentinel.py
+    # ::test_push_trigger_globs_match_workflows enforces PUSH_TRIGGER_GLOBS == the union of
+    # every push-to-main workflow's paths — a filter must exist, and it must be no more than
+    # the union of what's already there). Deliberately excludes deploy/** and bare scripts/**:
+    # both are already push-trigger-excluded repo-wide by convention (deploy/ specifically —
+    # see test_drift_sentinel.py's `not _matches_push_trigger('deploy/drift_sentinel.py')`
+    # assertion, "deploy/ is not push-triggered, CONVENTIONS §deploy-from-main"); the PR
+    # trigger above has no path filter, so those dirs still get scanned pre-merge.
+    paths:
+      - 'lambdas/**'
+      - 'mcp/**'
+      - 'cdk/**'
+      - 'tests/**'
+      - 'site/**'
+      - '.github/workflows/**'
+  schedule:
+    # Saturdays 12:13 UTC (fixed UTC — no DST drift). Doesn't collide with the other
+    # scheduled workflows: fresh-eyes=Sun 15:00, golden-brief-eval=Mon 15:17,
+    # webkit-mobile-qa=Tue 21:37, remediation-agent=Mon/Wed/Fri 14:45,
+    # visual-qa=daily 20:07 UTC, eval-harvest=monthly.
+    - cron: '13 12 * * 6'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: CodeQL analysis (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: python
+            build-mode: none
+          - language: javascript-typescript
+            build-mode: none
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@e0647621c2984b5ed2f768cb892365bf2a616ad1 # v4.37.2
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          # Inline config (not a separate .github/codeql/*.yml file) — keeps this one
+          # file the sole push-trigger surface for the drift-sentinel MAINTAINED-LITERAL
+          # union above; a second config file would need its own path glob added to both
+          # this workflow's `paths:` and PUSH_TRIGGER_GLOBS.
+          config: |
+            paths-ignore:
+              # Vendored third-party minified JS (axe-core, for the accessibility QA
+              # harness at tests/visual_qa.py) — not our code, not our bugs to fix, and
+              # CodeQL can't produce an actionable finding on minified output anyway.
+              - tests/vendor/**
+
+      # No autobuild step: both languages run build-mode "none" (interpreted, no
+      # compilation step needed) — see the init step's `build-mode` input above.
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@e0647621c2984b5ed2f768cb892365bf2a616ad1 # v4.37.2
+        with:
+          category: "/language:${{ matrix.language }}"
