@@ -357,11 +357,10 @@ def test_apple_health_xml_lambda_deleted():
     assert 'AppleHealthIngestion"' not in _INGESTION_STACK_SRC.replace("'", '"') or "RETIRED" in _INGESTION_STACK_SRC
 
 
-def test_apple_health_backfill_hard_guarded():
-    src = open(os.path.join(_REPO, "backfill/archive/backfill_apple_health.py")).read()
-    assert "I_UNDERSTAND_THIS_CLOBBERS_HAE_RECORDS" in src
-    # the guard sits before any AWS client is created
-    assert src.index("I_UNDERSTAND_THIS_CLOBBERS_HAE_RECORDS") < src.index("boto3.client")
+# (test_apple_health_backfill_hard_guarded retired 2026-07-22, #1651: the guarded
+#  ran-once script backfill/archive/backfill_apple_health.py was deleted with the
+#  backfill/ tree — the apple_health XML path is retired (#474), so the clobber
+#  guard it asserted is moot. Recoverable via git tag pre-hygiene-2026-07-22.)
 
 
 # ==============================================================================
