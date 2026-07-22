@@ -79,7 +79,7 @@ Historical bug (v4.5.0): `daily_insight_compute` ran at 10:20 AM while reading `
 
 ## 4. MCP Tool Layer (DynamoDB → Claude)
 
-Read-only query layer (with limited writes for memory, insights, decisions, hypotheses, social, supplements, todoist, character config). **68 tools across 24 modules** (count = top-level keys in the `TOOLS` dict in `mcp/registry.py`, via `deploy/sync_doc_metadata.py::_auto_discover_tool_count`; do NOT `grep -c '"name":'` — it over-counts by matching nested input-schema fields).
+Read-only query layer (with limited writes for memory, insights, decisions, hypotheses, social, supplements, todoist, character config). **69 tools across 25 modules** (count = top-level keys in the `TOOLS` dict in `mcp/registry.py`, via `deploy/sync_doc_metadata.py::_auto_discover_tool_count`; do NOT `grep -c '"name":'` — it over-counts by matching nested input-schema fields).
 
 | MCP Module | DDB Partitions Read |
 |------------|-------------------|

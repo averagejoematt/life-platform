@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-18
 
-Last updated: 2026-07-22 (v8.6.0 — 68 tools, 36-module MCP package, 20 data sources, 96 Lambdas, 21 secrets, 78 alarms, 9 CDK stacks deployed).
+Last updated: 2026-07-22 (v8.6.0 — 69 tools, 37-module MCP package, 20 data sources, 96 Lambdas, 21 secrets, 78 alarms, 9 CDK stacks deployed).
 
 > **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **Home + five doors** (v5 IA): the cockpit (`/cockpit/`, live data), the data (`/data/`, the evidence archive — old `/evidence/*` slugs 301), the coaching, the protocols, and the story (`/story/`, the writing hub); the pre-v4 site is preserved verbatim at `/legacy`. Shared code ships **bundled inside every function** (#781/ADR-131 — the shared layer is retired; see [CONVENTIONS.md §1](CONVENTIONS.md)). **137 ADRs** (ADR-001 → ADR-139 — full index auto-generated in [DECISIONS.md](DECISIONS.md)). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
 
@@ -33,7 +33,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
                          │ DynamoDB queries
 ┌────────────────────────▼────────────────────────────────────┐
 │  SERVE LAYER                                                │
-│  MCP Server Lambda (68 tools, 768 MB) + Lambda Function URL │
+│  MCP Server Lambda (69 tools, 768 MB) + Lambda Function URL │
 │  ← Claude Desktop + claude.ai + Claude mobile via remote MCP│
 │                                                             │
 │  COMPUTE LAYER (IC intelligence features)                   │
@@ -224,7 +224,7 @@ SK: DATE#YYYY-MM-DD
 
 ### MCP Server
 
-**Lambda:** `life-platform-mcp` | **Tools:** 68 | **Memory:** 768 MB | **Runtime:** python3.12 | **Modules:** 36 (`mcp/tools_*.py` + helpers)
+**Lambda:** `life-platform-mcp` | **Tools:** 69 | **Memory:** 768 MB | **Runtime:** python3.12 | **Modules:** 37 (`mcp/tools_*.py` + helpers)
 **Remote MCP:** `<not committed — SEC-02 #780; read live: aws lambda get-function-url-config --function-name life-platform-mcp --region us-west-2>`
 **Auth:** OAuth 2.1 auto-approve + HMAC Bearer (remote). Source of truth for tool count: AST parse of top-level `TOOLS` dict keys via `deploy/sync_doc_metadata.py::_auto_discover_tool_count` (see CLAUDE.md — `grep '"name":'` over-counts nested schema fields).
 
@@ -401,7 +401,7 @@ Target: within the **$85/mo all-in budget ceiling** (ADR-063; surge-to-$100 per 
 ~/Documents/Claude/life-platform/
   mcp_server.py                   ← MCP Lambda entry point
   mcp_bridge.py                   ← Local MCP adapter (Claude Desktop → Lambda HTTPS)
-  mcp/                            ← MCP server package (24 tool modules + helpers)
+  mcp/                            ← MCP server package (25 tool modules + helpers)
     handler.py, config.py, utils.py, core.py, helpers.py, labs_helpers.py
     strength_helpers.py, registry.py, warmer.py
     tools_sleep, tools_health, tools_training, tools_nutrition, tools_habits

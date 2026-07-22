@@ -11,7 +11,7 @@
 
 ## What Is This Platform?
 
-A personal health intelligence system built on AWS for a single user (Matthew). It pulls data from ~20 API/webhook/manual sources (wearables, apps, labs, manual uploads), stores everything in a single DynamoDB table, runs a deterministic computation pipeline + an 8-agent coaching layer, and exposes 68 MCP tools so Claude can answer natural-language health questions against real data.
+A personal health intelligence system built on AWS for a single user (Matthew). It pulls data from ~20 API/webhook/manual sources (wearables, apps, labs, manual uploads), stores everything in a single DynamoDB table, runs a deterministic computation pipeline + an 8-agent coaching layer, and exposes 69 MCP tools so Claude can answer natural-language health questions against real data.
 
 The end result: ask Claude a question about your health, and it queries actual readings rather than relying on memory or estimates.
 
@@ -58,7 +58,7 @@ Coach Intelligence pipeline (deterministic math → 8 parallel LLM coaches):
   + site-stats-refresh (writes public_stats.json)
     │
     ▼
-MCP Lambda (68 tools) ← Claude Desktop + claude.ai + mobile via remote MCP
+MCP Lambda (69 tools) ← Claude Desktop + claude.ai + mobile via remote MCP
 site-api Lambda (~119 endpoints, primarily read-only — ADR-037) ← averagejoematt.com
 ```
 
@@ -76,7 +76,7 @@ site-api Lambda (~119 endpoints, primarily read-only — ADR-037) ← averagejoe
 | **EventBridge** | All cron schedules, fixed UTC (no DST drift) | CDK-managed only — never create rules via Console |
 | **Secrets Manager** (`life-platform/*`) | All credentials | 21 active secrets. See `docs/SECRETS_MAP.md` |
 | **CloudFront** (4 distributions) | CDN for `averagejoematt.com`, `dash`, `blog`, `buddy` | S3 website endpoint origins (ADR-053/054). Site syncs invalidate via CDK helpers |
-| **MCP Lambda** | 68 tools across 24 domain modules in `mcp/` | The interface Claude uses to query data |
+| **MCP Lambda** | 69 tools across 25 domain modules in `mcp/` | The interface Claude uses to query data |
 | **AWS Bedrock** (ADR-062) | All Claude inference (coach generation, daily brief sections) via `lambdas/bedrock_client.invoke()` — IAM auth, no API key | Prompt caching enabled (ADR-049); Haiku for structured, Sonnet for narrative; budget-tier gated (ADR-063/133) |
 
 ---
@@ -216,7 +216,7 @@ Reviews are run from `docs/REVIEW_METHODOLOGY.md`. The platform is at audit V2 (
 
 | Term | Meaning |
 |------|---------|
-| **MCP** | Model Context Protocol — Claude's native tool interface. The MCP Lambda exposes 68 tools that Claude calls to query health data. |
+| **MCP** | Model Context Protocol — Claude's native tool interface. The MCP Lambda exposes 69 tools that Claude calls to query health data. |
 | **IC** | Intelligence Capability — the platform's computed health features (IC-1 through IC-30). |
 | **DLQ** | Dead Letter Queue — failed async Lambda invocations. Drained every 6 hours by `dlq-consumer`. |
 | **SOT** | Source of Truth — which device/service owns each health domain (e.g., Whoop owns sleep). See `mcp/config.py`. |
