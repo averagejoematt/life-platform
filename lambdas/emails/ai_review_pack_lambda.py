@@ -45,6 +45,19 @@ from urllib.parse import quote
 import boto3
 import qa_archive
 
+# #1691 (epic #1687): re-run the baseline-freshness gate over each archived
+# coach_brief's TEXT so a stale-baseline/stale-phase brief surfaces a visible flag
+# to the human reader — even for historical entries (re-running over the archived
+# text, not trusting generation-time meta). Both shared modules ship in every
+# bundle (#781); import fail-soft so the email never dies on a missing module.
+try:
+    import grounded_generation as _gg
+    from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE
+except Exception:  # pragma: no cover — bundle-dependent; the flag simply degrades off
+    _gg = None
+    EXPERIMENT_BASELINE_WEIGHT_LBS = None
+    EXPERIMENT_START_DATE = None
+
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
@@ -170,10 +183,46 @@ def _meta_line(entry):
     return html.escape(" · ".join(str(b) for b in bits))
 
 
+def _freshness_findings_for(entry):
+    """#1691: re-run the baseline-freshness gate over a coach_brief entry's archived
+    TEXT (not the generation-time meta) so historical stale-baseline/stale-phase
+    briefs surface too. Returns [] for non-coach_brief entries, a missing bundle
+    module, or no findings. Fail-soft — a bad entry never breaks the email."""
+    if _gg is None or entry.get("surface") != "coach_brief":
+        return []
+    meta = entry.get("meta") or {}
+    gen_date = meta.get("generation_date") or entry.get("date")
+    if not gen_date:
+        return []
+    try:
+        return _gg.baseline_freshness_findings(
+            entry.get("text") or "",
+            generation_date_iso=gen_date,
+            baseline_lbs=EXPERIMENT_BASELINE_WEIGHT_LBS,
+            start_date_iso=EXPERIMENT_START_DATE,
+        )
+    except Exception as e:  # pragma: no cover — advisory flag must never break the pack
+        logger.warning(f"[ai_review_pack] freshness re-check failed for {entry.get('_key')}: {e}")
+        return []
+
+
+def _freshness_flag_html(entry):
+    findings = _freshness_findings_for(entry)
+    if not findings:
+        return ""
+    details = "; ".join(str(f.get("detail", f.get("type", ""))) for f in findings)
+    return (
+        '<div style="color:#fca5a5;background:#3a1216;border:1px solid #7f1d1d;border-radius:6px;'
+        'font-size:12px;padding:6px 8px;margin:2px 0 8px;">'
+        f"&#9888;&#65039; baseline-freshness: {html.escape(details)}</div>"
+    )
+
+
 def _entry_card(entry):
     when = entry.get("archived_at", "")[:16].replace("T", " ")
     meta_line = _meta_line(entry)
     meta_html = f'<div style="color:#9ca3af;font-size:12px;margin:2px 0 8px;">{meta_line}</div>' if meta_line else ""
+    freshness_html = _freshness_flag_html(entry)
     return f"""
       <div style="background:#12162e;border:1px solid #2a2d4a;border-radius:8px;padding:12px 14px;margin-bottom:10px;">
         <div style="display:flex;justify-content:space-between;font-size:11px;color:#6b7280;margin-bottom:4px;">
@@ -181,6 +230,7 @@ def _entry_card(entry):
           <a href="{_console_url(entry['_key'])}" style="color:#6366f1;text-decoration:none;">open in S3 &rsaquo;</a>
         </div>
         {meta_html}
+        {freshness_html}
         <div style="color:#d1d5db;font-size:13px;line-height:1.5;white-space:pre-wrap;">{_snippet(entry.get('text'))}</div>
       </div>"""
 

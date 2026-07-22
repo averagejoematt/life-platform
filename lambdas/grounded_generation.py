@@ -22,6 +22,19 @@ pieces that previously lived apart:
                          improved harness (ai_expert_analyzer / field_notes) so
                          every surface corrects the same way: one rewrite,
                          kept only if findings strictly decrease, never worse.
+  4. Cycle-freshness   — baseline_freshness_findings() (#1691, epic #1687) catches
+                         the "reset-window stale-baseline" class the DATA-grounding
+                         gates above cannot see: a brief that cites a stale STARTING
+                         weight or a stale "Day N" framing (cycle-9 "315 lbs" / "Day 1"
+                         after a cycle-10 genesis) is digit-grounded yet cycle-wrong.
+                         Takes the cycle constants as params so it stays pure.
+
+Reset suppression (AC, #1691): baseline_freshness_findings() IS the promotable
+suppression hook a reset needs — restart_pipeline itself is untouched. A reset-window
+stale brief trips this gate's advisory finding (surfaced in the review pack + stamped
+into qa_archive meta at generation time); promoting the caller from "log + stamp" to
+"hold + regenerate" (the ADR-108 regenerate-or-hold shape) keeps a stale brief from
+reaching a reader without any restart_pipeline change.
 
 Pure functions, no AWS, no HTTP — the caller supplies the regeneration callable.
 Fail modes are the caller's choice: keep-best (internal narratives) or
@@ -424,7 +437,194 @@ def band_adjective_findings(text: str, facts: dict = None, proximity: int = 40) 
     return findings
 
 
-def grounding_findings(text: str, facts: dict = None, allowed: set = None, allowed_dates: set = None) -> list:
+# ── baseline-freshness grounding (#1691, epic #1687) ─────────────────────────
+# A coach brief can be perfectly digit-grounded against the DATA it was handed yet
+# still cite a STALE cycle constant. On 2026-07-22 the 07-20 briefs were frozen
+# with cycle-9 baselines — "starting weight of 315 lbs" (the real cycle-10 baseline
+# is 321.38) and "Day 1" during the pre-start window (genesis 2026-07-22, so 07-20
+# is PRE-START, not Day 1). `grounded:True` passed them because the number/date
+# gates above check claims-vs-DATA, never framing-vs-CYCLE-STATE — 4 of 5
+# high-concern items that day were exactly this "reset-window stale-baseline" class.
+#
+# This deterministic, zero-AI check closes that gap. It takes the cycle constants
+# as PARAMS (baseline_lbs = constants.EXPERIMENT_BASELINE_WEIGHT_LBS, start_date_iso
+# = constants.EXPERIMENT_START_DATE) so it stays pure + unit-testable and never
+# imports AWS or the site-api. Its phase logic MUST agree with
+# site_api_common.pre_start_meta() / constants.day_n(): gen_date < start_date ⇒
+# pre_start (any "Day N" claim is stale framing); gen_date >= start_date ⇒ the
+# expected day is (gen_date - start_date).days + 1 (1-indexed, matching day_n).
+#
+# PROMOTION HOOK (ADR-104/105 posture): this is the deterministic layer, which CAN
+# graduate to a hard/HELD gate. It ships ADVISORY first (surfaced in the review pack
+# + stamped into qa_archive meta at generation time); a reset-window stale brief is
+# exactly what its advisory finding trips, and flipping the caller from "log + stamp"
+# to "hold + regenerate" is the promotable suppression hook the reset AC refers to —
+# no restart_pipeline change is required to satisfy "no stale brief reaches a reader".
+
+# A body-weight token: a 2–3 digit number (optionally decimal) tied to a lb/pound
+# unit. The lookbehind stops it from biting a fragment of a longer number.
+_WEIGHT_LB_RE = re.compile(r"(?<![\d.])(\d{2,3}(?:\.\d+)?)\s*(?:lbs?|pounds?)\b", re.IGNORECASE)
+
+# Baseline/starting-weight FRAMING context. Only a weight sitting next to one of
+# these is a candidate — a current-weight mention ("you now weigh 315 lb") never
+# flags because it carries none of this framing. Mirrors band_adjective_findings'
+# proximity approach.
+_BASELINE_FRAMING_RE = re.compile(
+    r"\b("
+    r"starting weight|start weight|baseline weight|baseline|"
+    r"started at|began at|start(?:ed|ing)? the experiment at|began the experiment at|"
+    r"day 1 weight|day one weight|starting point|initial weight|started out at|started from"
+    r")\b",
+    re.IGNORECASE,
+)
+
+# "Day N" experiment-day framing. N is captured; N==0 is treated as a non-claim
+# for the pre-start case (a "Day 0"/countdown framing is the CORRECT pre-start form).
+_DAY_N_RE = re.compile(r"\bday\s+(\d{1,4})\b", re.IGNORECASE)
+
+
+def _phase_for(generation_date_iso: str, start_date_iso: str):
+    """Pure phase resolver mirroring pre_start_meta()/day_n().
+
+    Returns ("pre_start", None) when generation_date < start_date, else
+    ("in_experiment", expected_day) with expected_day 1-indexed off start_date.
+    Returns (None, None) on unparseable dates (caller skips the phase check).
+    """
+    try:
+        gen = _dt.date.fromisoformat(generation_date_iso)
+        start = _dt.date.fromisoformat(start_date_iso)
+    except (TypeError, ValueError):
+        return None, None
+    if gen < start:
+        return "pre_start", None
+    return "in_experiment", (gen - start).days + 1
+
+
+def baseline_freshness_findings(
+    text: str,
+    *,
+    generation_date_iso: str,
+    baseline_lbs: float = None,
+    start_date_iso: str,
+    weight_tolerance_lbs: float = 1.0,
+    proximity: int = 45,
+) -> list:
+    """Deterministic cycle-freshness check for coach-authored output (#1691).
+
+    Two finding classes, both zero-AI and framing-scoped:
+
+    - "stale_baseline": a cited STARTING/baseline weight (a weight token within
+      `proximity` chars of baseline framing — "starting weight", "baseline",
+      "started at", "Day 1 weight", …) that disagrees with `baseline_lbs` by more
+      than `weight_tolerance_lbs`. Current-weight mentions carry no baseline framing
+      and never flag. Skipped entirely when `baseline_lbs` is None.
+    - "stale_phase": a "Day N" experiment-day framing that disagrees with the true
+      phase of `generation_date_iso`. If pre_start (gen < start): ANY "Day N" (N>=1)
+      is a finding — correct framing is the pre-start countdown. If in-experiment:
+      a cited N != the real day (day_n(gen)) is a finding.
+
+    Same ``{"type": ..., "detail": ...}`` shape as the other grounded_generation
+    finding classes, so it composes with grounding_findings()/correction_prompt().
+    """
+    text = text or ""
+    findings = []
+
+    # ── stale_baseline ────────────────────────────────────────────────────────
+    if baseline_lbs is not None:
+        try:
+            baseline = float(baseline_lbs)
+        except (TypeError, ValueError):
+            baseline = None
+        if baseline is not None:
+            weight_tokens = []  # (start, end, value)
+            for wm in _WEIGHT_LB_RE.finditer(text):
+                try:
+                    weight_tokens.append((wm.start(1), wm.end(1), float(wm.group(1))))
+                except ValueError:
+                    continue
+            seen_tokens = set()
+            for fm in _BASELINE_FRAMING_RE.finditer(text):
+                f_start, f_end = fm.start(), fm.end()
+                # Nearest weight token to THIS baseline-framing phrase, within window.
+                best, best_dist = None, None
+                for ws, we, val in weight_tokens:
+                    if ws >= f_end:
+                        dist = ws - f_end
+                    elif we <= f_start:
+                        dist = f_start - we
+                    else:
+                        dist = 0
+                    if dist <= proximity and (best_dist is None or dist < best_dist):
+                        best, best_dist = (ws, val), dist
+                if best is None:
+                    continue
+                ws, val = best
+                if ws in seen_tokens:
+                    continue
+                seen_tokens.add(ws)
+                if abs(val - baseline) > weight_tolerance_lbs:
+                    findings.append(
+                        {
+                            "type": "stale_baseline",
+                            "claimed": round(val, 4),
+                            "expected": round(baseline, 4),
+                            "detail": (
+                                f"the narrative cites a starting/baseline weight of {val:g} lb next to baseline framing, "
+                                f"but the current cycle baseline is {baseline:g} lb"
+                            ),
+                        }
+                    )
+
+    # ── stale_phase ───────────────────────────────────────────────────────────
+    phase, expected_day = _phase_for(generation_date_iso, start_date_iso)
+    if phase is not None:
+        seen_days = set()
+        for dm in _DAY_N_RE.finditer(text):
+            n = int(dm.group(1))
+            if n in seen_days:
+                continue
+            if phase == "pre_start":
+                if n >= 1:
+                    seen_days.add(n)
+                    findings.append(
+                        {
+                            "type": "stale_phase",
+                            "claimed_day": n,
+                            "detail": (
+                                f'the narrative frames this as "Day {n}", but the generation date '
+                                f"{generation_date_iso} is BEFORE genesis {start_date_iso} (pre-start) — the correct "
+                                f"framing is the pre-start countdown, not a Day count"
+                            ),
+                        }
+                    )
+            else:  # in_experiment
+                if n != expected_day:
+                    seen_days.add(n)
+                    findings.append(
+                        {
+                            "type": "stale_phase",
+                            "claimed_day": n,
+                            "expected_day": expected_day,
+                            "detail": (
+                                f'the narrative cites "Day {n}", but generation date {generation_date_iso} is '
+                                f"Day {expected_day} of the experiment (genesis {start_date_iso})"
+                            ),
+                        }
+                    )
+    return findings
+
+
+def grounding_findings(
+    text: str,
+    facts: dict = None,
+    allowed: set = None,
+    allowed_dates: set = None,
+    *,
+    baseline_lbs: float = None,
+    generation_date_iso: str = None,
+    start_date_iso: str = None,
+    weight_tolerance_lbs: float = 1.0,
+) -> list:
     """Deterministic grounding check. Returns [{type, detail, ...}] — empty = grounded.
 
     - "contradiction": a stated RHR/recovery/HRV hard-contradicts canonical facts
@@ -437,6 +637,12 @@ def grounding_findings(text: str, facts: dict = None, allowed: set = None, allow
       no supplied legitimate date — #1242, fabricated_dates(). Checked ONLY when
       ``allowed_dates`` is passed (an empty set means "no dates are legitimate");
       callers that don't supply it keep the pre-#1242 behavior exactly (no date check).
+    - "stale_baseline"/"stale_phase": a cited starting weight or "Day N" framing that
+      disagrees with the current cycle constants — #1691, baseline_freshness_findings().
+      Checked ONLY when BOTH ``generation_date_iso`` and ``start_date_iso`` are passed
+      (``baseline_lbs`` additionally enables the stale_baseline class); callers that
+      don't supply them keep the pre-#1691 behavior exactly — identical discipline to
+      the optional ``allowed_dates`` param.
     """
     findings = []
     if facts and _hard_contradictions is not None:
@@ -462,6 +668,16 @@ def grounding_findings(text: str, facts: dict = None, allowed: set = None, allow
                     "detail": f"the date {d} appears in the narrative but is not among the dates the data provided",
                 }
             )
+    if generation_date_iso is not None and start_date_iso is not None:
+        findings.extend(
+            baseline_freshness_findings(
+                text,
+                generation_date_iso=generation_date_iso,
+                baseline_lbs=baseline_lbs,
+                start_date_iso=start_date_iso,
+                weight_tolerance_lbs=weight_tolerance_lbs,
+            )
+        )
     return findings
 
 
@@ -480,6 +696,15 @@ def correction_prompt(findings: list) -> str:
             lines.append(f"{i}. {f['detail']}. Use {f['actual_weekday']} for that date, or drop the day-of-week — never guess a weekday.")
         elif f.get("type") == "fabricated_date":
             lines.append(f"{i}. {f['detail']}. Remove the date or cite only a date that appears in the source material — never invent one.")
+        elif f.get("type") == "stale_baseline":
+            lines.append(
+                f"{i}. {f['detail']}. Use {f['expected']:g} lb for the starting/baseline weight, or omit the baseline — never a stale one."
+            )
+        elif f.get("type") == "stale_phase":
+            if f.get("expected_day") is not None:
+                lines.append(f"{i}. {f['detail']}. Use Day {f['expected_day']}, or drop the day count — never a stale one.")
+            else:
+                lines.append(f"{i}. {f['detail']}. Frame it as the pre-start countdown, not a Day count.")
         else:
             lines.append(f"{i}. {f['detail']}. Remove it or describe the pattern qualitatively — never invent a figure.")
     lines.append("\nRewrite with these corrected. Keep your voice and length; do not mention that a correction was made.")
