@@ -1,62 +1,58 @@
-# HANDOVER — Eng-excellence Now-tranche drain + Social Membrane foundation shipped — 2026-07-22
+# HANDOVER — The Coach Correction Loop foundation shipped (epic #1687) — 2026-07-22
 
-> Instruction thread: "clean tree check → (1) owner-merge PR #1647 then drain epic #1648 Now
-> tranche via /uplevel; (2) start the Social Membrane foundation #1669+#1670 together. Fan out
-> worktree-implementers (open PRs, never merge/deploy); VERIFY every agent finding; full suite before
-> any merge; batch merges/deploys into ONE numbered ask; flag every site/** auto-deploy." → batch
-> approved (merge all 5 + reconcile; cdk-deploy the dormant youtube Lambda; small secret-hygiene PR)
-> → "merge 1685 then wrap".
+> Instruction thread: "clean-tree check → check live budget tier → PRIMARY: ship the Coach
+> Correction Loop foundation (epic #1687) IN ORDER — (1) #1691 baseline-freshness gate first
+> (highest-ROI, Now milestone, ship the 07-20 regression replay), then (2) #1689 ledger,
+> #1688 ranked pack (HYBRID ranker), #1690 feedback channels (BOTH). Decisions LOCKED in the
+> epic — don't relitigate. Fan out worktree-implementers (open PRs, never merge/deploy); VERIFY
+> every finding + counts (git-grep the branch); full suite (no -x) before any merge; batch
+> merges/deploys into ONE ask; flag every site/** auto-deploy." → mid-session: "I approve all
+> merge and deploys" (standing authorization) → "can you run the deploy" → "wrap here."
 
 ## What shipped (all merged to main; deploy status per item)
 
-**PR #1647 (epic #1648) — /craft-review skill + ENGINEERING_STANDARDS.md** — merged (docs/command only, no deploy). The 3rd grading ritual + the durable "definition of an A."
+**PR #1694 (#1691) — baseline-freshness gate** — merged + **DEPLOYED** (LifePlatformEmail). The deterministic, zero-AI gate for the **reset-window stale-baseline** class: a coach brief digit-grounded against its DATA yet citing a stale cycle constant ("315 lbs" starting weight vs the real 321.38; "Day 1" during pre-start). New pure `grounded_generation.baseline_freshness_findings(text, *, generation_date_iso, baseline_lbs, start_date_iso, ...)` → two finding types `stale_baseline` / `stale_phase`; composed into `grounding_findings` (pre-existing callers byte-identical). Advisory-wired at coach-brief gen in `ai_calls.py` (stamps qa_archive meta, fail-soft, promotable-to-blocking hook commented) + a ⚠️ flag re-rendered over each archived `coach_brief` in `ai_review_pack_lambda.py`. `tests/test_baseline_freshness_gate.py` replays the 07-20 "315 lbs / Day 1" brief → asserts BOTH classes.
 
-**PR #1683 (#1649) — hygiene cleanup safe-subset** — merged. Retired `archive/` (315 tracked/140M) + verified-dead one-shots (`patches/ backfill/ spikes/ backup/ seeds/archive/` + 10 render PNGs): **−429 files / −109k lines**. `git tag pre-hygiene-2026-07-22`; 135M safety zip handed to Matthew (scratch path — MOVE IT, session-scoped). `freshness_checker` one-line string change rides the next LifePlatformEmail deploy (cosmetic SNS hint). **The audit MISLABELED load-bearing dirs** (`setup/` = DR/re-auth toolkit; `lambdas/{fonts,cf-auth,dashboard,requirements}`; `seeds/*.json` incl. content_filter.json; `mcp_server.py`) — all KEPT after a tree survey; #1651/#1652/#1657 re-scoped via comments.
+**PR #1692 (#1689) — corrections ledger** — merged (inert; #1690 is the first live caller). `lambdas/coach_corrections.py`: pk `USER#matthew#SOURCE#coach_corrections` / sk `CORRECTION#<date>#<id8>`, `ERROR_CLASSES` (8, incl. `other` free-form fallback → `error_class_raw`), `STATUSES`, pure `build_correction_item` + mockable `write_correction`/`get_correction`/`list_corrections`/`update_status`. Classified **CROSS_PHASE** in `phase_taxonomy.py` (coverage assertion green). Uses shared `numeric.floats_to_decimal`. SCHEMA.md + PHASE_TAXONOMY.md updated in-PR.
 
-**PR #1680 (#1659) — gitleaks secret-scan** — merged, LIVE (runs PR-diff-scoped on every PR, `--log-opts base..head` so legacy public-era strings don't red every PR).
+**PR #1695 (#1688) — Hybrid ranker + tagger** — merged + **DEPLOYED** (LifePlatformEmail). New `lambdas/review_pack_ranker.py`: `numbered_entries(by_surface, *, surface_order=DEFAULT_SURFACE_ORDER) -> [(n, entry)]` (stable canonical order; #1690 imports it), deterministic heuristics ALWAYS (baseline-mismatch **reuses** `baseline_freshness_findings`; ungrounded-behavioral-verb; claim-density; hedge-absence) + a **Haiku critic layered on when budget tier ≤ 1** (`_CRITIC_TIER_CEILING=1`, reads `budget_guard.current_tier()`, fail-soft to the deterministic floor; **this made the zero-Bedrock operator email an AI surface** → added `bedrock:InvokeModel` + `ssm:GetParameter` on `AiReviewPackRole` in `role_policies.py`). Error-class tags **import** `coach_corrections.ERROR_CLASSES`. **Agent died mid-response (API connection error) on the IAM-grant step; resumed via SendMessage from its transcript — no rework.**
 
-**PR #1681 (#1660) — CodeQL SAST (python + javascript-typescript)** — merged, LIVE + GREEN on first main run (advisory; promotion-to-blocking is #1662/gate:owner).
+**PR #1696 (#1690) — feedback channels: BOTH** — merged + **DEPLOYED** (LifePlatformEmail + LifePlatformMcp). MCP tool `log_coach_correction` (`mcp/tools_coach_corrections.py`, wired in `registry.py`, wiring-coverage green) + email-reply `#N <correction>` parser on `insight_email_parser_lambda.py`. Shared `lambdas/coach_correction_resolver.py` maps `#N → archived generation → item_ref → coach_corrections.write_correction` via `numbered_entries` over the rebuilt pack week (`gather_week`/`week_dates`). Unknown/malformed `#N` **reported, never dropped**. Added scoped `qa_archive/text/*` read + `QaArchiveList` to BOTH the MCP role and the `insight_email_parser` role (DDB write already table-level on both). Known edge (documented): a reply on a LATER day than the pack send could renumber; resolver exposes an `end_date` override for a future fix.
 
-**PR #1684 (#1643) — reset regen-list fix** — merged (operator script, no deploy). Real name `daily-brief` + `{"dry_run":true}` payload (a bare `{}` would EMAIL the brief every reset — see [[reference_regen_invoke_email_lambda_trap]]) + a dry-run get-function guard.
+**PR #1693 (#1682 follow-up) — youtube `capture_channel` main-red** — merged + **DEPLOYED**. The #1682 social-spine merge gave the `youtube` source a `capture_channel`, but it's a scheduled RSS pull with no human in the capture loop — violated the registry's own contract and had `test_capture_channels_are_matthews_three` **red on main** since #1682 (non-gating Unit Tests job, ADR-117, so it flagged but never blocked deploy). One-line removal + a doc comment so it isn't re-added.
 
-**PR #1682 (#1669 + #1670) — Social Membrane inbound foundation** — merged + **CDK deployed** (`LifePlatformIngestion`). New `youtube-social-ingestion` Lambda LIVE but **DORMANT** (smoke-verified: StatusCode 200, records_written:0, errors:0 — no channel-id secret). `lambdas/social_provenance.py` = the loop-breaker membrane. YouTube = keyless per-channel RSS.
-
-**PR #1685 — secret-hygiene follow-up** — merged. Withings `AUTH_CODE` → env var (spent one-time code); eightsleep `KNOWN_*` documented as public app creds + `gitleaks:allow`.
-
-**Reconcile:** doc-sync `lambda_count` 95→96, `test_count` 4869→4887 (commit `4359d22d`, pushed to main after the batch).
+**Reconcile commits:** doc-sync `test_count` 4887→4917→4937→4960 (three reconciles, one per batch) + `mcp_tools` 68→69; README prose count 68→69 (`7b132040`, `ca873ba7`, and the two earlier reconciles).
 
 ## Verified
-- Full suite on the cleanup branch: **6415 passed** (sole failure = `test_i16_recent_ingest_records_exist`, a `pytest.mark.integration` live-AWS test CI excludes via `-m "not integration"`; failing locally only because cycle-10 is pre-start Day-0).
-- Every merged PR's CI CLEAN/MERGEABLE pre-merge; all 6 `Fixes #N` issues auto-closed (#1649/#1659/#1660/#1669/#1670/#1643).
-- CDK deploy exit 0 (145s); youtube Lambda `Active`, no-ops cleanly. `cdk diff` = new youtube resources + one-bundle hash bump on all ingestion lambdas (expected #781 behavior).
-- Every agent finding git-grep-verified on-branch. **The Social Membrane agent's FIRST report was incomplete** — missed 3 deploy-critical registry gaps (lambda_map / KNOWN_SECRETS / heartbeat exemption); CI's `deploy_critical` marker lane caught them, sent it back, all fixed + re-verified.
+- **Merged-preview** (all Wave-1 branches merged locally + reconciled): `pytest -m "not integration"` → **6465 passed / 0 failed**; `test_capture_channels` PASSES post-#1693.
+- Every agent finding **git-grep-verified on-branch** before merge (numbered_entries sig, ERROR_CLASSES, the two IAM role grants at their function defs, baseline-gate type strings, every doc-sync strip).
+- Both deploys **UPDATE_COMPLETE**: LifePlatformEmail (41.7s — `AiReviewPackRole/DefaultPolicy` + AiReviewPack + DailyBrief + all email lambdas), LifePlatformMcp (36.6s — `McpServerRole/DefaultPolicy` + McpServer). Drift guard passed clean both times.
+- All 4 foundation issues (#1691/#1689/#1688/#1690) auto-closed by `Fixes #N`.
 
 ## Gotchas hit
-- **Audit findings mislabel load-bearing dirs as throwaway** — survey before ANY delete-per-AC ([[reference_audit_mislabels_loadbearing_dirs]]). Deleting per #1651's ACs would have broken prod + DR.
-- **Regen-invoke of an email Lambda with `{}` SENDS the email** — the #1643 latent trap; the wrong function name had been masking it with `err(254)` ([[reference_regen_invoke_email_lambda_trap]]).
-- **Agent self-reports need CI cross-check, not just the agent's targeted run** — deploy-critical marker lane ≠ a targeted pytest subset.
-- **zsh `$VAR:l`** is a lowercase modifier — `git show "$BR:lambdas/…"` ate the `l`; brace it `"${BR}:…"`.
+- **A merge/audit can leave a registry misconfiguration a NON-gating test catches** — youtube `capture_channel` was a 4th #1682 registry gap past the 3 the CI marker-lane caught; the Unit Tests job (ADR-117 non-gating) flagged main but didn't block. Wrap-time full-suite runs surface these ([[reference_audit_mislabels_loadbearing_dirs]]).
+- **A worktree-implementer can die mid-response on an API error** — resume it via `SendMessage` to its agentId; it picks up from its transcript with the worktree intact (no rework). Better than restarting.
+- **CDK deploy is auto-mode-classifier-gated** — blocked until Matthew explicitly asks; even then a PIPED form (`… | grep`) re-blocks — run it UNPIPED. Use `bash deploy/cdk_deploy.sh <Stack> -- --require-approval never` for TTY-less IAM deploys (the guard re-runs; cdk's interactive IAM confirm can't prompt without a TTY) ([[reference_cdk_deploy_classifier_and_approval]]).
+- **zsh `$VAR:l` modifier trap AGAIN** — `git show "$BR:lambdas/…"` ate the `l` as a lowercase modifier; brace it `"${BR}:…"`.
 
 ## Gate outcomes
-- **Build beat:** `2026-07-22-repo-craft-hardening` (the security-gates + honest-cleanup story; gotcha = the mislabeled dirs; honest miss = all under-the-hood + the dormant social spine).
-- **Docs:** `docs/SCHEMA.md` updated (new `youtube` source + `BROADCAST_ORIGIN#` provenance-ledger key families, Verified→2026-07-22); counts reconciled at merge. `check_doc_index` flags `docs/engines/SCORING.md` re-verify (pre-existing — `daily_metrics_compute_lambda.py` changed 2026-07-21, not this session). Links/tombstones/ADR-index green.
-- **Decisions:** none needed — the reset is routine (ADR-077); the security gates were anticipated by ENGINEERING_STANDARDS.md D6 (no new governance choice); the Social Membrane's ADR (if any) lands with #1678's CSP amendment.
-- **Main:** parked — latest CI/CD run (`4359d22d` / `e73adf73`) pending at the manual production Deploy gate; automated Lint/Test/Plan green; older runs auto-cancelled (the standing manual-gate park, not a test break).
-- **Incidents:** none — no auto-rollback fired, no data gap, no main-red>1h beyond the manual-gate park; the youtube dormant no-op is by design.
-- **Stash/hooks:** clean — `git stash list` empty; hook freshness 🟢.
+- **Build beat:** `2026-07-22-coach-correction-loop` (the review pack that trains itself — shipped + deployed the flywheel).
+- **Docs:** SCHEMA.md + PHASE_TAXONOMY.md (#1689, in-PR); MCP_TOOL_CATALOG.md + ARCHITECTURE/tool-count docs (regenerated by the doc-sync hook at reconcile, mcp_tools 68→69); `ai_review_pack_lambda`/`review_pack_ranker` docstrings de-claim "no Bedrock" (in-PR). Wiki checkers green at wrap.
+- **Decisions:** none needed — HYBRID ranker + BOTH channels were pre-locked in epic #1687 (2026-07-21); the baseline gate sits under existing ADR-104/105 grounding posture; the ai-review-pack tier-gated critic is an implementation of that locked decision (budget policy governed by ADR-125 + the epic's explicit tier≤1), not a new governance choice.
+- **Main:** in-flight — latest run (`7b132040`/`ca873ba7`) pending; older runs cancelled (rapid batch-push supersession). Plan reds **by design** on the #1695/#1696 `role_policies.py` change (R8-ST6 IAM-review gate — clears on prod approval); offline suite was green (6465) in merged-preview; both stacks manually deployed UPDATE_COMPLETE. `check_main_green.py --decoded` acknowledged.
+- **Incidents:** none — no auto-rollback, no data gap, no main-red>1h beyond the by-design IAM-gate Plan red; the #1688 agent API death was an agent-infra blip (resumed cleanly), not a platform incident.
+- **Stash/hooks:** clean — `git stash list` empty; hook freshness 🟢. (Postflight `config drift: 1 lambda differs from CDK` is the standing parked-deploy advisory — the pre-existing `4359d22d`/`e73adf73` changes awaiting the manual Deploy gate; not this session's.)
 - **Labels:** OK — 91 open type:story issues all carry `model:*`.
 
 ## Residual / next-picks
-- **Activate YouTube ingestion** — provision the `life-platform/youtube` secret `{"channel_id":"UC..."}`, then flip registry `active_api:True` + drop `freshness:False`/`catalog:False`. `not-work — owner secret provisioning`.
+- **SEED the ledger** with last session's #1–4 findings (epic #1687 body) — the `log_coach_correction` tool deployed THIS session, so it isn't in this session's tool list; seed next session via the live MCP tool, OR write a one-off `write_correction` seed script. Matthew to confirm the exact rows ("the 4 stale-baseline 07-20 briefs" vs a specific list). (#1687)
+- **Coach Correction Loop LATER stories** — S5 prompt-memory injection, S6 pattern-extraction→gate promotion, S7 no-ungrounded-behavioral-claim gate: candidate-listed in the epic body, **not yet filed as stories** — decompose via `/plan` when prioritized. (#1687)
 - **Social Membrane Next tranche** — #1671 (enrichment→coach signals), #1672 (broadcast feed page), #1673 (auto-publish safety gate). (#1671/#1672/#1673)
-- **Eng-excellence remaining** — #1657 (lint waivers, re-scoped as careful surgical work), #1656/#1658 (mypy strict + coverage 70% big-bang), #1655 (CI composition), #1652 (root-clutter guard — the durable win; handovers/ 479-file reduction is gate:owner). (#1657/#1656/#1658/#1655/#1652)
-- **Gate:owner eng-excellence** — #1662 (branch protection Option C), #1666 (proportionality ADR), #1650 (handovers disposition). (#1662/#1666/#1650)
-- **#1620** — outbound social links; runs the `v4_apply_chrome` HTML sweep, land AFTER any site/head sweep. (#1620)
-- **`freshness_checker` string** — the #1683 one-liner deploys with the next LifePlatformEmail stack deploy (or the CI Deploy gate). `not-work — cosmetic, rides next email deploy`.
-- **AiReviewPack (#1594) — DECIDED: KEEP it** (Matthew, 2026-07-22). Instead of muting, it gets uplifted into a self-training correction loop — see the two epics filed post-wrap below.
-- **[EPIC] #1687 The Coach Correction Loop** — uplift the weekly review-pack into numbered + stack-ranked-by-wrongness + class-tagged items whose corrections compound (prompt-memory → deterministic gate → pattern-extraction). **Decisions locked:** ranking=HYBRID (heuristics + Haiku critic when tier ≤1), feedback=BOTH (MCP tool + email reply). Foundation stories: **#1691 baseline-freshness gate (Now — highest-ROI, would've caught 4/5 of this week's coach-brief reds)**, #1688 ranked pack, #1689 corrections ledger, #1690 feedback channels. Seeded by a 2026-07-22 dry-run on the D2 archive that found the **reset-window stale-baseline** class (07-20 briefs frozen at "315 lbs / Day 1"; `grounded:True` missed it). (#1687/#1688/#1689/#1690/#1691)
-- **[EPIC] #1686 The Coach's Prescription** — a coach curates weekly media (reading/podcast/video/article), a follow-up question or coach hand-off, a next-week retrospective "why I sent it" public hook, and feedback→journals. Candidate S1–S4 in the epic body; decompose via `/plan`. (#1686)
-- **`docs/engines/SCORING.md` re-verify** — pre-existing staleness note (source changed 2026-07-21). `not-work — pre-existing doc-verify, unrelated to this session`.
-- **Standing alarms:** none newly outstanding; budget **tier 1** (July $115 window, auto-reverts 2026-08-01 — working as designed). `not-work — standing checklist, nothing to action`.
+- **Eng-excellence remaining** — #1657 (lint waivers, surgical), #1656/#1658 (mypy strict + coverage 70% big-bang), #1655 (CI composition), #1652 (root-clutter guard). Gate:owner — #1662 (branch protection Option C), #1666 (proportionality ADR), #1650 (handovers disposition). (#1657/#1656/#1658/#1655/#1652/#1662/#1666/#1650)
+- **#1620** — outbound social links; runs the `v4_apply_chrome` HTML sweep — land AFTER any site/head sweep. (#1620)
+- **#1686 The Coach's Prescription** — epic filed, NOT decomposed; `/plan` it when prioritized. (#1686)
+- **Activate YouTube ingestion** — provision `life-platform/youtube` `{"channel_id":"UC..."}`, then flip registry `active_api:True` + drop `freshness:False`/`catalog:False`. `not-work — owner secret provisioning`.
+- **Config-drift advisory** — postflight flags 1 lambda differing from CDK (the parked `4359d22d`/`e73adf73` changes at the manual Deploy gate); clears on the next full fleet deploy / prod-gate approval. `not-work — standing parked-deploy state`.
+- **Pre-hygiene archive zip (135M)** — still on last session's scratchpad; Matthew to move it. `not-work — owner file move`.
 
-**Build beat:** 2026-07-22-repo-craft-hardening
+**Build beat:** 2026-07-22-coach-correction-loop

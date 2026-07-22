@@ -1569,6 +1569,37 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/1647"
         }
       ]
+    },
+    {
+      "id": "2026-07-22-coach-correction-loop",
+      "date": "2026-07-22",
+      "title": "The review pack that trains itself",
+      "shipped": "Every week an email lists what the AI coaches wrote. It used to be a flat digest you just read. Now it's a correction loop: each generation gets a stable number, a wrongness rank, and an error-class tag; you reply '#3 wrong — you cited my starting weight as 315, it's 321' from chat (a tool) or straight from the email, and that correction lands in a durable, class-tagged ledger. Under it sits a new deterministic gate that catches the specific failure that started this — a coach brief frozen with last-cycle numbers ('315 lbs', 'Day 1' during the pre-start window) that the old grounding check waved through because the number matched *some* data, just not the current cycle's. A regression test replays that exact bad brief.",
+      "why_it_mattered": "The bet is that feedback compounds: a correction doesn't just fix one line, it attaches to a class of mistake so that class can graduate from a note into a hard check that can't recur. This week's foundation — the gate, the ledger, the ranked pack, and both ways to send a correction — is the machinery that lets that happen. The stale-baseline gate alone would have caught four of five flagged briefs from a real dry-run.",
+      "gotcha": "The full-suite run at merge surfaced a test that had been quietly red on main for a session — a source added last week was mislabeled as a hand-logged capture channel when it's actually an automated pull, and a non-blocking test had been flagging it into the void. Folded the one-line fix into the batch. Lesson: a non-gating test still tells the truth; read it.",
+      "honest_miss": "It's all operator-facing plumbing for now — nothing a public reader sees yet. The smarter ranking (an AI critic pass) only runs when the budget's relaxed, and the ledger still needs seeding with the real corrections that motivated it. And one agent building this died mid-task on a network blip — recoverable, but a reminder the pipeline isn't frictionless.",
+      "prs": [
+        {
+          "label": "PR #1694",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1694"
+        },
+        {
+          "label": "PR #1692",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1692"
+        },
+        {
+          "label": "PR #1695",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1695"
+        },
+        {
+          "label": "PR #1696",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1696"
+        },
+        {
+          "label": "PR #1693",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1693"
+        }
+      ]
     }
   ]
 }

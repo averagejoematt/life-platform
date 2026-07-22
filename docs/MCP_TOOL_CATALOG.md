@@ -1,6 +1,6 @@
 # Life Platform — MCP Tool Catalog
 
-> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-07-19
+> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-07-22
 
 **Version:** v8.6.0 | **Last updated:** 2026-07-22 | **Total tools:** 69
 
@@ -16,7 +16,7 @@
 
 ---
 
-## All 68 Tools — by module
+## All 69 Tools — by module
 
 | Module | Tools |
 |---|---|
@@ -45,6 +45,7 @@
 | `mcp/tools_habits.py` | 2 |
 | `mcp/tools_coach_checkin.py` | 2 |
 | `mcp/tools_capture.py` | 1 |
+| `mcp/tools_coach_corrections.py` | 1 |
 
 ### Training Notes (`mcp/tools_training_notes.py`)
 
@@ -117,7 +118,7 @@
 | Tool | Key Params | Description |
 |------|-----------|-------------|
 | `save_insight` | text, tags=[], source= | Save a new insight to the personal coaching log. Use whenever Claude or Matthew identifies something worth tracking and following up on — a hypothesis, a behavioural change to try, a pattern noticed, or a recommendation to act on. Returns the insight_id needed for update_insight_outcome. Use for: 'save this insight', 'track this idea', 'add this to the coaching log', 'remember to follow up on this'. |
-| `log_evening_intake` | count, date= | PRIVATE (#1405): log this evening's drinks count (0-4; 4 = four or more) to the Matthew-private intake ledger. One tap, no free text. Use for: 'log 2 drinks tonight', 'zero drinks yesterday' (pass date). |
+| `log_evening_intake` | count, date= | PRIVATE (#1405): log this evening's drinks count (0-4; 4 = four or more) to the Matthew-private intake ledger. One tap, no free text. Idempotent: re-logging the same evening updates it (returns previous_count), never double-counts. Use for: 'log 2 drinks tonight', 'zero drinks yesterday' (pass date). |
 | `get_intake_response` | window_days= | PRIVATE (#1405): the intake→next-morning dose-response read. Lagged pairs vs HRV / recovery / REM with effective-n correction (Pyper-Peterman), p on n_eff, zero-vs-nonzero block-bootstrap CI, and dose bins (0/1/2+) once 15 nonzero evenings exist. Reports arming progress below the floors (ADR-105). Use for: 'what do drinks do to my HRV?', 'intake dose-response so far'. |
 | `get_insights` | status_filter=, limit= | List insights from the personal coaching log. Returns all insights newest-first with days_open calculated. Stale flag is set for open insights older than 14 days. Use for: 'what insights are open?', 'show my coaching log', 'what have I been meaning to act on?', 'any stale insights?', 'show me resolved insights'. |
 | `update_insight_outcome` | insight_id, outcome_notes=, status= | Close the loop on a saved insight — record what happened when you acted on it. Updates the insight's status and adds outcome notes. Use for: 'I tried the caffeine cutoff — it worked', 'mark this insight as resolved', 'update the outcome for insight X', 'close out this coaching log item'. |
@@ -174,9 +175,9 @@
 
 | Tool | Key Params | Description |
 |------|-----------|-------------|
-| `write_platform_memory` | category, content, date=, overwrite= | Store a structured memory record in the platform_memory partition. The compounding intelligence substrate — use to record failure patterns, what worked, coaching calibrations, journey milestones, and episodic wins. Valid categories: weekly_plate, failure_pattern, what_worked, coaching_calibration, personal_curves, journey_milestone, insight, experiment_result. |
+| `write_platform_memory` | category, content, date=, overwrite=, privacy_tier=, domains=[] | Store a structured memory record in the platform_memory partition. The compounding intelligence substrate — routes durable takeaways from conversation (life events, constraints/preferences, failure patterns, episodic wins, coaching calibration) into the store that coach prompt assembly injects (#1482). Conversation-writable categories: life_context, constraints_preferences, coaching_calibration, failure_patterns, what_worked. Writes are validated against the code taxonomy (lambdas/platform_memory.py) and stamped channel=conversation + provenance=mcp. Put the human-readable core in a 'summary' field — that is what reaches coach prompts. Call list_memory_categories for the full taxonomy. |
 | `read_platform_memory` | category, days=, limit= | Retrieve recent memory records for a given category from the platform_memory partition. Use to pull coaching calibration, failure patterns, or episodic wins into context. |
-| `list_memory_categories` | days= | List all platform_memory categories that have records, with record counts and date ranges. Use to understand what intelligence the platform has accumulated so far. |
+| `list_memory_categories` | days= | List all platform_memory categories that have records (counts + date ranges), plus the full sanctioned category taxonomy (#1482: descriptions, channels, privacy tiers, retention windows). Use to understand what the platform has accumulated and where a conversation takeaway should be filed. |
 | `delete_platform_memory` | category, date | Delete a specific platform_memory record by category + date. Use to correct bad memories or remove stale records. |
 
 ### Decision Journal (`mcp/tools_decisions.py`)
@@ -237,7 +238,13 @@
 
 | Tool | Key Params | Description |
 |------|-----------|-------------|
-| `get_capture_queues` | — | #1478: The canonical SESSION OPENER — one call instead of 4-6. Aggregates every pending manual-capture surface: (1) coach_checkin — up to 3 persisted open coach questions (coach + context_reason); never generates fresh ones (that stays get_coach_checkin_queue's job — this call is read-only and fast). (2) habit_reflection — missed-needing-why / completed-needing-driver COUNTS. (3) field_note — this week's status (generated? responded?), not the note text. (4) evening_intake — logged tonight? + dose-response arming progress (#1405, Matthew-private). (5) reading_recalls — due spaced-retrieval prompt count. (6) freshness_flags — stale sources only, name + days_dark. Each section fails soft independently: a broken sub-query never blocks the other five, it just reports {status: 'unavailable'}. Use this FIRST at the start of any chat mode (workout debrief, journal interview, speak-to-the-coaches, open check-in) instead of calling the six underlying tools separately. Skip-without-penalty framing — nothing here is a nag. |
+| `get_capture_queues` | — | #1478: The canonical SESSION OPENER — one call instead of 4-6. Aggregates every pending manual-capture surface: (1) coach_checkin — up to 3 persisted open coach questions (coach + context_reason); never generates fresh ones (that stays get_coach_checkin_queue's job — this call is read-only and fast). (2) habit_reflection — missed-needing-why / completed-needing-driver COUNTS. (3) field_note — this week's status (generated? responded?), not the note text. (4) evening_intake — logged tonight? + dose-response arming progress (#1405, Matthew-private). (5) reading_recalls — due spaced-retrieval prompt count. (6) freshness_flags — stale sources only, name + days_dark. (7) suggested_rituals — #1578: deterministic checkpoint proposals (cycle milestone, weight band crossed, journal gone dark, mood slide, readiness cliff, experiment midpoint), each with its rule, the data that fired it, and a stable episode_key so it shows once per episode; pure code decides every one (no LLM), a dark source proposes nothing, skipping records nothing. Each section fails soft independently: a broken sub-query never blocks the others, it just reports {status: 'unavailable'}. Use this FIRST at the start of any chat mode (workout debrief, journal interview, speak-to-the-coaches, open check-in) instead of calling the underlying tools separately. Skip-without-penalty framing — nothing here is a nag. |
+
+### mcp.tools_coach_corrections (`mcp/tools_coach_corrections.py`)
+
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `log_coach_correction` | item_number, correction, error_class= | #1690 (epic #1687): correct a weekly AI-review-pack item by its NUMBER. Matthew reads the ranked review-pack email (each generation carries a stable #N) and corrects an item that's wrong or misleading — this resolves #N back to the exact archived generation the pack numbered and writes ONE row to the corrections ledger, tagged by error-class, so the mistake compounds toward not recurring. Args: item_number (the #N, required), correction (what's wrong + what it should say, required), error_class (OPTIONAL override — one of stale-baseline, ungrounded-behavioral, cross-coach-inconsistency, framing, checkable-metric, hedged-safe, defense-held, other; an unrecognized value is stored as 'other', never rejected). An unknown or out-of-range number is REPORTED (with how many items the week's pack has), never silently dropped. Twin of the email-reply channel — a reply of '#N <correction>' lines lands the same rows. |
 
 ---
 
@@ -264,19 +271,3 @@ filter; the `get_daily_snapshot` dispatcher applies the same filter via
 `mcp.core._apply_phase_filter`. To access pre-genesis data, pass
 `include_pilot=True` (most tools accept this keyword via the args dict). See
 `lambdas/phase_filter.py::with_phase_filter()`.
-
-
-### Phase-filter behavior (ADR-058)
-
-The following tools default to `phase=experiment`-only results and hide
-phase=pilot records:
-
-- `get_date_range`, `find_days`, `get_aggregated_summary`, `search_activities`,
-  `get_field_stats`, `compare_periods`, `get_weekly_summary` — route through
-  `mcp.core.query_source` which applies the filter.
-- `get_latest`, `get_daily_summary` — apply the filter directly.
-- `get_daily_snapshot`, `get_longitudinal_summary` — dispatch to the above.
-
-To access pre-genesis data, pass `include_pilot=True`. Most tools accept this
-keyword via the args dict. See `lambdas/phase_filter.py::with_phase_filter()`
-for the underlying mechanism.
