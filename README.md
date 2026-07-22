@@ -16,7 +16,7 @@ A personal **health-intelligence platform** — it ingests data from ~20 wearabl
 
 | | |
 |---|---|
-| **~95 Lambdas** | Ingest → Store → Serve, all serverless (us-west-2 + us-east-1 edge) |
+| **~96 Lambdas** | Ingest → Store → Serve, all serverless (us-west-2 + us-east-1 edge) |
 | **68 MCP tools** | Claude reads the data back via a Model Context Protocol server |
 | **Single-table DynamoDB** | `USER#…#SOURCE#…` / `DATE#…`, on-demand, 2 sanctioned GSIs (ADR-097; PITR + KMS) |
 | **AWS Bedrock** | Claude Sonnet 4.6 (narrative) + Haiku 4.5 (structured), prompt-cached |

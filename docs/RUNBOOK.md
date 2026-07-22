@@ -2,10 +2,10 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-12
 
-Last updated: 2026-07-22 (v8.6.0 — 68 MCP tools, 36-module package, 95 Lambdas, 20 data sources)
+Last updated: 2026-07-22 (v8.6.0 — 68 MCP tools, 36-module package, 96 Lambdas, 20 data sources)
 
 **Ground truth (point-in-time values are drift — run the command instead):**
-- Lambda functions defined (CDK): 95 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
+- Lambda functions defined (CDK): 96 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
 - Shared layer: **RETIRED** (#781/ADR-131) — shared modules ship in every bundle. Invariant check: `aws lambda list-functions --region us-west-2 --query "Functions[?Layers[?contains(Arn, 'life-platform-shared-utils')]].FunctionName"` → must be empty
 - Account concurrency limit: **100** (raised from 10 via Support case 177921309700709 — verified live 2026-07-10 via `aws lambda get-account-settings`; see `docs/RESERVED_CONCURRENCY.md` for the reservation strategy)
 - Alarms currently firing: point-in-time — check `aws cloudwatch describe-alarms --state-value ALARM --query 'MetricAlarms[].AlarmName' --output table --region us-west-2`
