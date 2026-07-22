@@ -1,5 +1,7 @@
 # Engineering Standards — the "definition of an A" for this codebase
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-21
+
 > **What this is.** The single, durable source for *how code and the repo should look and hold
 > together* here — the craft an outside engineer judges cold. It is both the **standard new
 > code must meet** and the **rubric `/craft-review` grades against** (the two share this one
