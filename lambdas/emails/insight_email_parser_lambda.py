@@ -30,6 +30,7 @@ import re
 from datetime import datetime, timezone
 from decimal import Decimal
 from email import policy
+from html import escape as html_escape
 
 import boto3
 
@@ -41,6 +42,18 @@ try:
 except ImportError:
     logger = logging.getLogger("insight-email-parser")
     logger.setLevel(logging.INFO)
+
+# #1690 (epic #1687): the shared "#N -> archived generation" resolver + the corrections
+# ledger writer, for the email-reply feedback channel (the twin of the MCP
+# log_coach_correction tool). Both bundle at lambdas/ root (#781). Fail-soft import: a
+# missing module must never crash the (unrelated) insight-save path — it only disables
+# correction routing.
+try:
+    import coach_correction_resolver as ccr
+    import coach_corrections
+except Exception:  # pragma: no cover — bundle-dependent
+    ccr = None
+    coach_corrections = None
 
 
 # ── Config (env vars with backwards-compatible defaults) ──
@@ -191,6 +204,126 @@ def send_confirmation(insight_text, insight_id, recipient_email):
     )
 
 
+# ── #1690: weekly-review-pack correction reply channel ──────────────────────
+
+
+def _is_review_pack_reply(subject):
+    """A reply to the weekly AI review-pack email (subject '🗂️ Weekly AI Review Pack …',
+    a reply prefixes 'Re: '). Gated on the subject so a normal insight reply that happens
+    to contain a '#3' is never hijacked into the corrections ledger."""
+    return "review pack" in (subject or "").lower()
+
+
+def _send_correction_confirmation(applied, unresolved, recipient_email, subject=""):
+    """Echo back what landed and what didn't (AC3: unresolved is never silently dropped)."""
+    applied_rows = "".join(
+        f'<li style="margin:2px 0;">#{a["n"]} — {html_escape(str(a.get("surface") or ""))}'
+        f'{(" · " + html_escape(str(a.get("coach")))) if a.get("coach") else ""} '
+        f'<span style="color:#9ca3af;">→ logged</span></li>'
+        for a in applied
+    )
+    unresolved_rows = "".join(f'<li style="margin:2px 0;color:#fca5a5;">{html_escape(str(u))}</li>' for u in unresolved)
+    applied_block = (
+        f'<p style="font-size:12px;color:#374151;margin:8px 0 2px;font-weight:700;">Logged ({len(applied)}):</p>'
+        f'<ul style="margin:0 0 8px;padding-left:18px;font-size:13px;color:#374151;">{applied_rows}</ul>'
+        if applied
+        else ""
+    )
+    unresolved_block = (
+        f'<p style="font-size:12px;color:#b91c1c;margin:8px 0 2px;font-weight:700;">Not applied ({len(unresolved)}):</p>'
+        f'<ul style="margin:0 0 8px;padding-left:18px;font-size:13px;">{unresolved_rows}</ul>'
+        if unresolved
+        else ""
+    )
+    accent = "#10b981" if applied and not unresolved else ("#f59e0b" if applied else "#ef4444")
+    html_body = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <div style="max-width:480px;margin:24px auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+    <div style="background:#1a1a2e;padding:16px 24px;">
+      <p style="color:#8892b0;font-size:11px;margin:0 0 2px;text-transform:uppercase;letter-spacing:1px;">Life Platform · Review Pack</p>
+      <h1 style="color:#fff;font-size:15px;font-weight:700;margin:0;">Corrections received</h1>
+    </div>
+    <div style="padding:16px 24px;border-left:3px solid {accent};">
+      {applied_block}
+      {unresolved_block}
+      <p style="font-size:11px;color:#9ca3af;margin:8px 0 0;">
+        Corrections join the ledger (epic #1687) tagged 'other'. Set a class via the log_coach_correction tool.
+      </p>
+    </div>
+  </div>
+</body>
+</html>"""
+    ses.send_email(
+        FromEmailAddress=SENDER,
+        Destination={"ToAddresses": [recipient_email]},
+        Content={
+            "Simple": {
+                "Subject": {"Data": f"Review-pack corrections: {len(applied)} logged, {len(unresolved)} not applied", "Charset": "UTF-8"},
+                "Body": {"Html": {"Data": html_body, "Charset": "UTF-8"}},
+            }
+        },
+    )
+
+
+def handle_review_pack_reply(reply_text, subject, sender):
+    """Land '#N <correction>' reply lines in the corrections ledger (#1690).
+
+    Each #N resolves — via the shared coach_correction_resolver, the SAME numbering the
+    MCP channel uses — to the archived generation the pack numbered, then writes one
+    ledger row via coach_corrections.write_correction (default class 'other'; the email
+    channel carries no class override). Malformed lines and unknown numbers are collected
+    and echoed back to the sender, never silently dropped (AC3). Returns a summary dict.
+    """
+    if ccr is None or coach_corrections is None:
+        print("[ERROR] review-pack correction modules unavailable — cannot process reply")
+        return {"applied": [], "unresolved": ["correction subsystem unavailable"]}
+
+    parsed = ccr.parse_correction_reply(reply_text)
+    corrections, malformed = parsed["corrections"], parsed["malformed"]
+
+    applied = []
+    unresolved = [f"could not parse as '#N <correction>': {m}" for m in malformed]
+
+    if not corrections and not malformed:
+        unresolved.append("no '#N <correction>' lines found — reply with e.g. '#3 the weight baseline is stale'")
+
+    if corrections:
+        # ONE archive read for the whole reply — resolve every #N against the same week.
+        try:
+            numbered = ccr.numbered_for_week()
+        except Exception as e:  # noqa: BLE001 — a broken read is reported, not swallowed
+            print(f"[ERROR] could not assemble review-pack week: {e}")
+            try:
+                _send_correction_confirmation([], [f"could not read this week's review pack ({e}) — please retry"], sender, subject)
+            except Exception as se:  # pragma: no cover
+                print(f"[WARN] correction confirmation email failed: {se}")
+            return {"applied": [], "unresolved": ["archive read failed"]}
+
+        for n, text in corrections:
+            resolution = ccr.resolve_number(n, numbered=numbered)
+            if not resolution.get("ok"):
+                unresolved.append(f"#{n}: {resolution.get('error')}")
+                continue
+            try:
+                sk = coach_corrections.write_correction(table, resolution["item_ref"], text, "other")
+            except Exception as e:  # noqa: BLE001 — a lost correction must be loud
+                print(f"[ERROR] correction write failed for #{n}: {e}")
+                unresolved.append(f"#{n}: could not be saved ({e})")
+                continue
+            entry = resolution["entry"]
+            applied.append({"n": resolution["n"], "surface": entry.get("surface"), "coach": entry.get("variant"), "sk": sk})
+            print(f"[INFO] correction logged for #{resolution['n']} -> {sk}")
+
+    print(f"[INFO] review-pack reply: {len(applied)} applied, {len(unresolved)} unresolved")
+    try:
+        _send_correction_confirmation(applied, unresolved, sender, subject)
+    except Exception as e:  # pragma: no cover — confirmation is best-effort
+        print(f"[WARN] correction confirmation email failed: {e}")
+    return {"applied": applied, "unresolved": unresolved}
+
+
 def lambda_handler(event, context):
     try:
         """
@@ -264,6 +397,16 @@ def lambda_handler(event, context):
 
             # Extract reply text
             reply_text = extract_reply_text(body_text)
+
+            # #1690 (epic #1687): a reply to the weekly AI review-pack email carrying
+            # "#N <correction>" lines is a CORRECTION, not a generic insight — route it
+            # to the corrections ledger (the same rows the MCP log_coach_correction tool
+            # writes). Handled BEFORE the short-length guard so even a terse "#3 wrong"
+            # reply is processed (and any malformed/unknown line is reported back).
+            if _is_review_pack_reply(subject):
+                print(f"[INFO] review-pack reply detected (subject: {subject[:80]!r}) — routing to corrections ledger")
+                handle_review_pack_reply(reply_text, subject, sender)
+                continue
 
             if not reply_text or len(reply_text) < 5:
                 print(f"[WARN] Reply text too short or empty: '{reply_text[:50]}'")
