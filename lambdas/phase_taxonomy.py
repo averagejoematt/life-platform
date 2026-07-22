@@ -124,6 +124,8 @@ SOURCE_CLASS: dict[str, str] = {
     "macrofactor_workouts": RAW_TIMESERIES,  # #485: dead ~4mo (no writer) — historical rows kept, still exported
     "hevy": RAW_TIMESERIES,  # live strength source (hourly, ADR-060) — #485 repointed brief/digest here
     "notion": RAW_TIMESERIES,  # journal entries — user-authored facts
+    "youtube": RAW_TIMESERIES,  # #1669: inbound social — Matthew's own posts, a logged fact layer
+    # (kept forever, genesis-anchored on read) like notion; provenance (`origin`) lives on the row.
     "food_delivery": RAW_TIMESERIES,  # behavioral archive (incl. longest-ever streak)
     "sick_days": RAW_TIMESERIES,
     "measurements": RAW_TIMESERIES,  # ADR-077 dec B: body fact like weight; GA, not hidden
@@ -326,6 +328,11 @@ _PK_RULES: list = [
     (lambda pk, sk: pk == "PULSE", SYSTEM_STATE),
     (lambda pk, sk: pk.startswith("CACHE#"), SYSTEM_STATE),
     (lambda pk, sk: pk.startswith("SUBSCRIBE#"), SYSTEM_STATE),
+    # #1670: the outbound-broadcast ledger (BROADCAST_ORIGIN#{channel} / POST#{post_id}).
+    # Provenance truth that must survive a reset (a platform post from cycle N is still
+    # platform-authored in cycle N+1) and is never run intelligence — so SYSTEM_STATE:
+    # the phase machinery ignores it entirely (no tag, no wipe, no filter), like SUBSCRIBE#.
+    (lambda pk, sk: pk.startswith("BROADCAST_ORIGIN#"), SYSTEM_STATE),
     (lambda pk, sk: pk.startswith("VOTES#"), SYSTEM_STATE),
     (lambda pk, sk: pk.startswith("EXPERIMENT_FOLLOWS"), SYSTEM_STATE),
     # Challenge-follow interest records (site_api_social.handle_challenge_follow) —

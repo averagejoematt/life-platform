@@ -168,6 +168,27 @@ class IngestionStack(Stack):
             **{k: v for k, v in shared.items() if k != "alerts_topic"},
         )
 
+        # ── 3a. YouTube — inbound social (#1669, epic #1668), hourly.
+        # The reference inbound-social source: Matthew's own public videos ingested back
+        # in as coach-interpretable signal + (later) site display. FREE keyless per-channel
+        # RSS pull (no paid token). The life-platform/youtube secret (owner-provisioned)
+        # holds only the channel id; until it exists the Lambda boots and no-ops cleanly.
+        # Every record is stamped `channel` + `origin` provenance (#1670 membrane) so the
+        # platform's own outbound posts can never echo back in. UTC-fixed cron, no DST drift.
+        create_platform_lambda(
+            self,
+            "YoutubeIngestion",
+            function_name="youtube-social-ingestion",
+            source_file="lambdas/ingestion/youtube_lambda.py",
+            handler="ingestion.youtube_lambda.lambda_handler",
+            schedule=f"cron(0 {INGEST_HOURLY} * * ? *)",
+            timeout_seconds=120,
+            environment={"YOUTUBE_SECRET_NAME": "life-platform/youtube"},
+            custom_policies=rp.ingestion_youtube(),
+            alerts_topic=None,
+            **{k: v for k, v in shared.items() if k != "alerts_topic"},
+        )
+
         # ── 4. Withings — 5x daily (:05 stagger)
         withings = create_platform_lambda(
             self,

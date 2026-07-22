@@ -478,6 +478,44 @@ SOURCE_REGISTRY = {
         # evening-nudge threshold above — different surface, different kindness.)
         "engagement_channel": {"label": "journal", "stale_days": 4},
     },
+    # ── #1669 (epic #1668): inbound social ingestion — YouTube, the reference source.
+    #    Modelled on `notion` (a behavioral, API-pulled, many-items-per-day source), but
+    #    registry-resident for FACETS ONLY until the owner provisions the channel id
+    #    (life-platform/youtube secret `channel_id` or YOUTUBE_CHANNEL_ID env). Keeping
+    #    freshness:False + monitored:False + active_api:False keeps a not-yet-provisioned
+    #    source off every freshness/QA/liveness surface (so it can't false-page while it
+    #    has no data); flip active_api:True (and drop freshness:False) once the channel id
+    #    is live and the first videos land. The raw_layout IS live from day one because
+    #    the ingestion Lambda writes per-post raw archives immediately.
+    "youtube": {
+        "label": "YouTube",
+        "checker_label": "YouTube posts",
+        "desc": "Inbound social — Matthew's own YouTube videos (public voice)",
+        "category": "Inputs",
+        "behavioral": True,  # public posting is the behavior
+        "stale_hours": None,
+        "freshness": False,  # registry-resident until the channel id is provisioned (#1669)
+        "monitored": False,  # never paged; not on the public board yet
+        "active_api": False,  # keyless RSS pull; flip True once the channel id is live
+        "expected_days": None,  # sporadic — not a reconciliation source
+        "qa_tier": None,
+        "method": "Keyless per-channel RSS pull (framework), hourly",
+        "metrics": "Video posts — the outbound public voice, ingested back in",
+        "posture": "portfolio",
+        "capture_channel": "youtube",
+        # Not on the public /data/ + gear catalogues yet — the source is wired but
+        # awaits owner channel-id provisioning + the S4 display story (epic #1668).
+        "catalog": False,
+        # Suffixed per-post layout (many videos per day) — mirrors the notion per-page
+        # archive. The ingestion Lambda writes one file per video; the framework also
+        # writes an incidental per-day feed snapshot (audit copy) under the same tree.
+        "raw_layout": {
+            "prefix": "raw/matthew/youtube",
+            "scheme": "date-tree",
+            "filename": "YYYY-MM-DD-<video_id>.json",
+            "note": "per-post filename (many videos per day); a per-day feed snapshot (YYYY-MM-DD.json) is also written for audit",
+        },
+    },
     "weather": {
         "label": "Weather",
         "checker_label": "Weather",
@@ -761,6 +799,8 @@ def catalog_entries() -> list:
     for k, v in SOURCE_REGISTRY.items():
         if not v.get("metrics"):
             continue  # transport pipes aren't data sources
+        if v.get("catalog") is False:
+            continue  # #1669: wired but not yet publicly advertised (e.g. awaiting owner provisioning)
         rows.append(
             {
                 "id": k,
