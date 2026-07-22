@@ -14,7 +14,7 @@ import time
 import boto3
 
 SECRET_NAME = "life-platform/garmin"
-REGION      = "us-west-2"
+REGION = "us-west-2"
 
 MAX_RETRIES = 3
 RETRY_DELAY = 30  # seconds
@@ -28,6 +28,7 @@ def main():
 
     try:
         import garth
+
         print(f"garth version: {garth.__version__}")
     except ImportError:
         print("ERROR: Required libraries not installed.")
@@ -49,7 +50,7 @@ def main():
     except Exception:
         pass  # Can't parse version, just continue
 
-    email    = input("\nGarmin Connect email: ").strip()
+    email = input("\nGarmin Connect email: ").strip()
     password = getpass.getpass("Garmin Connect password: ")
 
     print()
@@ -57,14 +58,12 @@ def main():
     print("(If Garmin sends an MFA code, enter it when prompted)")
     print()
 
-    last_err = None
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             garth.login(email, password)
             print("Login successful!")
             break
         except Exception as e:
-            last_err = e
             err_str = str(e)
             if "429" in err_str:
                 if attempt < MAX_RETRIES:
@@ -90,7 +89,9 @@ def main():
     except AttributeError:
         # garth 0.8+ changed the serialization API
         try:
-            import tempfile, os
+            import os
+            import tempfile
+
             tmpdir = tempfile.mkdtemp()
             garth.save(tmpdir)
             token_parts = {}
@@ -102,6 +103,7 @@ def main():
             print(f"OAuth tokens captured ({len(garth_tokens)} bytes)")
             # Cleanup
             import shutil
+
             shutil.rmtree(tmpdir, ignore_errors=True)
         except Exception as e2:
             print(f"Warning: could not capture tokens: {e2}")
@@ -128,8 +130,8 @@ def main():
 
     # Store secret
     secret = {
-        "email":        email,
-        "password":     password,
+        "email": email,
+        "password": password,
         "garth_tokens": garth_tokens,
     }
 
@@ -155,7 +157,7 @@ def main():
     print()
     print("  aws lambda invoke \\")
     print("    --function-name garmin-data-ingestion \\")
-    print("    --payload '{\"date\": \"2026-02-22\"}' \\")
+    print('    --payload \'{"date": "2026-02-22"}\' \\')
     print("    --cli-binary-format raw-in-base64-out \\")
     print("    --region us-west-2 /tmp/garmin_test.json && cat /tmp/garmin_test.json")
     print("=" * 60)

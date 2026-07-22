@@ -116,8 +116,8 @@ def verify_access(access_token):
     except urllib.error.HTTPError as e:
         if e.code == 404:
             print(f"\n⚠️  Folder /{ONEDRIVE_FOLDER}/ not found on OneDrive.")
-            print(f"   Create it on OneDrive first, then re-run this script.")
-            print(f"   (Or the Lambda will create-on-read — the folder just needs to exist.)")
+            print("   Create it on OneDrive first, then re-run this script.")
+            print("   (Or the Lambda will create-on-read — the folder just needs to exist.)")
             return True  # Auth works, folder just doesn't exist yet
         error_body = e.read().decode()
         print(f"\n❌ OneDrive access failed: HTTP {e.code}")
@@ -173,7 +173,7 @@ def main():
         print("❌ No refresh token received. Ensure 'offline_access' scope is granted.")
         return
 
-    print(f"\n✅ Tokens received!")
+    print("\n✅ Tokens received!")
     print(f"   Access token: {access_token[:20]}...")
     print(f"   Refresh token: {refresh_token[:20]}...")
 
@@ -190,7 +190,7 @@ def main():
     print()
     print(f"  Secret: {SECRET_NAME}")
     print(f"  Folder: OneDrive:/{ONEDRIVE_FOLDER}/")
-    print(f"  Next: run deploy_onedrive_poll.sh")
+    print("  Next: run deploy_onedrive_poll.sh")
     print()
 
 

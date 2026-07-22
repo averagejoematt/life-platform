@@ -511,7 +511,6 @@ def tool_get_freshness_status(args):
     today = datetime.now(timezone.utc).date()
     per_source = []
     stale_count = 0
-    partial_count = 0  # we don't compute partial here — just stale
 
     for src in keys:
         threshold_hours = SOURCE_STALE_HOURS.get(src, DEFAULT_STALE_HOURS)

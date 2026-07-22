@@ -541,7 +541,6 @@ def _get_training_recommendation(args):
     consecutive_rest_days = 0
     consecutive_training_days = 0
 
-    dates_7d = sorted(strava_by_date.keys())[-7:]
     cardio_types = {"run", "ride", "swim", "hike", "walk", "rowing", "elliptical", "virtualrun", "virtualride", "trailrun"}
     strength_types = {"weighttraining", "crossfit", "workout"}
 

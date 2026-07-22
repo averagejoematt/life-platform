@@ -133,8 +133,6 @@ def save_tokens(secret, token_body):
 
 
 def main():
-    global captured_code
-
     print("=" * 60)
     print("  Withings OAuth Re-Authorization")
     print("=" * 60)
@@ -158,8 +156,8 @@ def main():
         f"&scope=user.metrics"
         f"&state=life-platform"
     )
-    print(f"\n[3/5] Opening browser for Withings authorization...")
-    print(f"  If browser doesn't open, visit:")
+    print("\n[3/5] Opening browser for Withings authorization...")
+    print("  If browser doesn't open, visit:")
     print(f"  {auth_url}")
     webbrowser.open(auth_url)
 
@@ -179,7 +177,7 @@ def main():
 
     # Step 6: Save to Secrets Manager
     print("\n[5/5] Saving tokens to Secrets Manager...")
-    saved = save_tokens(secret, token_body)
+    save_tokens(secret, token_body)
     print("  Saved!")
 
     # Step 7: Test Lambda

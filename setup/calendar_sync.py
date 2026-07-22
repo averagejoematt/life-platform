@@ -3,7 +3,7 @@
 # Kept as reference only. Do not deploy or activate.
 # See docs/DECISIONS.md ADR-030 for full decision log.
 
-#!/usr/bin/env python3
+#!/usr/bin/env python3  # noqa: E265  # non-functional shebang (not line 1) kept verbatim — retired reference script (ADR-030)
 """
 setup/calendar_sync.py — Mac-native calendar sync for Life Platform.
 
@@ -32,7 +32,6 @@ v1.1.0 - 2026-03-15 (single AppleScript call for whole window, not per-date)
 v1.0.0 - 2026-03-15
 """
 
-import json
 import logging
 import os
 import subprocess
@@ -51,19 +50,19 @@ logging.basicConfig(
 logger = logging.getLogger("calendar_sync")
 
 # Configuration
-REGION         = os.environ.get("AWS_REGION",   "us-west-2")
-DYNAMODB_TABLE = os.environ.get("TABLE_NAME",   "life-platform")
-USER_ID        = os.environ.get("USER_ID",      "matthew")
-LOOKBACK_DAYS  = int(os.environ.get("LOOKBACK_DAYS",  "7"))
+REGION = os.environ.get("AWS_REGION", "us-west-2")
+DYNAMODB_TABLE = os.environ.get("TABLE_NAME", "life-platform")
+USER_ID = os.environ.get("USER_ID", "matthew")
+LOOKBACK_DAYS = int(os.environ.get("LOOKBACK_DAYS", "7"))
 LOOKAHEAD_DAYS = int(os.environ.get("LOOKAHEAD_DAYS", "14"))
-USER_PREFIX    = f"USER#{USER_ID}#SOURCE#"
+USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 
 # Calendars to skip — noise/system calendars
 SKIP_CALENDARS = {"Birthdays", "Siri Suggestions", "Holidays in United States"}
 
 # AWS
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
-table    = dynamodb.Table(DYNAMODB_TABLE)
+table = dynamodb.Table(DYNAMODB_TABLE)
 
 
 # ==============================================================================
@@ -139,11 +138,7 @@ def get_all_events(start_date: str, end_date: str) -> dict:
     Returns dict of date_str -> [event_dicts].
     One call for the whole window avoids the 30s-per-date timeout problem.
     """
-    script = _APPLESCRIPT.replace(
-        "START_BOUND", _as_date(start_date, 0)
-    ).replace(
-        "END_BOUND", _as_date(end_date, 23)
-    )
+    script = _APPLESCRIPT.replace("START_BOUND", _as_date(start_date, 0)).replace("END_BOUND", _as_date(end_date, 23))
 
     logger.info("Fetching events %s to %s via AppleScript...", start_date, end_date)
 
@@ -191,7 +186,7 @@ def get_all_events(start_date: str, end_date: str) -> dict:
         duration_min = None
 
         start_dt = _parse_applescript_time(start_raw)
-        end_dt   = _parse_applescript_time(end_raw)
+        end_dt = _parse_applescript_time(end_raw)
 
         if not start_dt:
             continue
@@ -199,27 +194,29 @@ def get_all_events(start_date: str, end_date: str) -> dict:
         event_date = start_dt.strftime("%Y-%m-%d")
 
         if not is_all_day and end_dt:
-            start_time   = start_dt.strftime("%H:%M")
-            end_time     = end_dt.strftime("%H:%M")
+            start_time = start_dt.strftime("%H:%M")
+            end_time = end_dt.strftime("%H:%M")
             duration_min = max(0, int((end_dt - start_dt).total_seconds() / 60))
 
         if not title or title == "missing value":
             title = "(no title)"
 
-        events_by_date.setdefault(event_date, []).append({
-            "title":          title[:120],
-            "calendar":       cal_name,
-            "start_time":     start_time,
-            "end_time":       end_time,
-            "start_date":     event_date,
-            "duration_min":   duration_min,
-            "is_all_day":     is_all_day,
-            "is_recurring":   False,
-            "location":       None,
-            "attendee_count": 0,
-            "is_solo":        True,
-            "status":         "confirmed",
-        })
+        events_by_date.setdefault(event_date, []).append(
+            {
+                "title": title[:120],
+                "calendar": cal_name,
+                "start_time": start_time,
+                "end_time": end_time,
+                "start_date": event_date,
+                "duration_min": duration_min,
+                "is_all_day": is_all_day,
+                "is_recurring": False,
+                "location": None,
+                "attendee_count": 0,
+                "is_solo": True,
+                "status": "confirmed",
+            }
+        )
 
     total = sum(len(v) for v in events_by_date.values())
     logger.info("Got %d events across %d dates", total, len(events_by_date))
@@ -231,37 +228,34 @@ def get_all_events(start_date: str, end_date: str) -> dict:
 # Keep in sync if Lambda logic changes.
 # ==============================================================================
 
+
 def compute_day_stats(events: list) -> dict:
     confirmed = [e for e in events if e.get("status") != "cancelled"]
-    timed = [
-        e for e in confirmed
-        if e.get("duration_min") is not None and not e.get("is_all_day")
-    ]
+    timed = [e for e in confirmed if e.get("duration_min") is not None and not e.get("is_all_day")]
 
     meeting_minutes = sum(e["duration_min"] for e in timed)
-    has_all_day     = any(e.get("is_all_day") for e in confirmed)
-    times           = [e["start_time"] for e in timed if e.get("start_time")]
-    end_times       = [e["end_time"] for e in timed if e.get("end_time")]
-    earliest        = min(times) if times else None
-    latest          = max(end_times) if end_times else None
+    has_all_day = any(e.get("is_all_day") for e in confirmed)
+    times = [e["start_time"] for e in timed if e.get("start_time")]
+    end_times = [e["end_time"] for e in timed if e.get("end_time")]
+    earliest = min(times) if times else None
+    latest = max(end_times) if end_times else None
 
     focus_block_count = None
     timed_with_bounds = [
-        e for e in timed
-        if e.get("start_time") and e.get("end_time")
-        and len(e["start_time"]) == 5 and len(e["end_time"]) == 5
+        e for e in timed if e.get("start_time") and e.get("end_time") and len(e["start_time"]) == 5 and len(e["end_time"]) == 5
     ]
     if timed_with_bounds:
         try:
+
             def _to_min(t: str) -> int:
                 h, m = t.split(":")
                 return int(h) * 60 + int(m)
 
             sorted_ev = sorted(timed_with_bounds, key=lambda e: _to_min(e["start_time"]))
             gap_count = 0
-            prev_end  = None
+            prev_end = None
             for ev in sorted_ev:
-                s     = _to_min(ev["start_time"])
+                s = _to_min(ev["start_time"])
                 e_end = _to_min(ev["end_time"])
                 if prev_end is not None and s - prev_end >= 90:
                     gap_count += 1
@@ -273,12 +267,12 @@ def compute_day_stats(events: list) -> dict:
             focus_block_count = None
 
     return {
-        "event_count":        len(confirmed),
-        "meeting_minutes":    meeting_minutes,
-        "focus_block_count":  focus_block_count,
+        "event_count": len(confirmed),
+        "meeting_minutes": meeting_minutes,
+        "focus_block_count": focus_block_count,
         "has_all_day_events": has_all_day,
-        "earliest_event":     earliest,
-        "latest_event":       latest,
+        "earliest_event": earliest,
+        "latest_event": latest,
     }
 
 
@@ -286,20 +280,24 @@ def compute_day_stats(events: list) -> dict:
 # DYNAMODB - identical schema to google_calendar_lambda.py
 # ==============================================================================
 
+
 def _to_dec(obj):
-    if isinstance(obj, float):  return Decimal(str(obj))
-    if isinstance(obj, dict):   return {k: _to_dec(v) for k, v in obj.items()}
-    if isinstance(obj, list):   return [_to_dec(v) for v in obj]
+    if isinstance(obj, float):
+        return Decimal(str(obj))
+    if isinstance(obj, dict):
+        return {k: _to_dec(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_to_dec(v) for v in obj]
     return obj
 
 
 def store_day(date_str: str, events: list, stats: dict, ingested_at: str):
     item = {
-        "pk":          USER_PREFIX + "google_calendar",
-        "sk":          "DATE#" + date_str,
-        "date":        date_str,
+        "pk": USER_PREFIX + "google_calendar",
+        "sk": "DATE#" + date_str,
+        "date": date_str,
         "ingested_at": ingested_at,
-        "source":      "apple_calendar_sync",
+        "source": "apple_calendar_sync",
         **_to_dec(stats),
     }
     if events:
@@ -313,20 +311,22 @@ def store_lookahead(events_by_date: dict, ingested_at: str):
     for date_str in sorted(events_by_date.keys()):
         day_events = events_by_date[date_str]
         stats = compute_day_stats(day_events)
-        summary.append({
-            "date":            date_str,
-            "event_count":     stats["event_count"],
-            "meeting_minutes": stats["meeting_minutes"],
-            "events":          day_events[:20],
-        })
+        summary.append(
+            {
+                "date": date_str,
+                "event_count": stats["event_count"],
+                "meeting_minutes": stats["meeting_minutes"],
+                "events": day_events[:20],
+            }
+        )
 
     item = {
-        "pk":             USER_PREFIX + "google_calendar",
-        "sk":             "DATE#lookahead",
+        "pk": USER_PREFIX + "google_calendar",
+        "sk": "DATE#lookahead",
         "lookahead_days": Decimal(str(LOOKAHEAD_DAYS)),
-        "generated_at":   ingested_at,
-        "source":         "apple_calendar_sync",
-        "days":           _to_dec(summary),
+        "generated_at": ingested_at,
+        "source": "apple_calendar_sync",
+        "days": _to_dec(summary),
     }
     table.put_item(Item=item)
     logger.info("Stored lookahead: %d days", len(summary))
@@ -336,29 +336,28 @@ def store_lookahead(events_by_date: dict, ingested_at: str):
 # MAIN
 # ==============================================================================
 
-def main() -> int:
-    today        = date.today()
-    today_str    = today.isoformat()
-    ingested_at  = datetime.now(timezone.utc).isoformat()
-    window_start = (today - timedelta(days=LOOKBACK_DAYS)).isoformat()
-    window_end   = (today + timedelta(days=LOOKAHEAD_DAYS)).isoformat()
 
-    logger.info("Calendar sync starting - %s (lookback=%d, lookahead=%d)",
-                today_str, LOOKBACK_DAYS, LOOKAHEAD_DAYS)
+def main() -> int:
+    today = date.today()
+    today_str = today.isoformat()
+    ingested_at = datetime.now(timezone.utc).isoformat()
+    window_start = (today - timedelta(days=LOOKBACK_DAYS)).isoformat()
+    window_end = (today + timedelta(days=LOOKAHEAD_DAYS)).isoformat()
+
+    logger.info("Calendar sync starting - %s (lookback=%d, lookahead=%d)", today_str, LOOKBACK_DAYS, LOOKAHEAD_DAYS)
 
     # Single AppleScript call for the entire window
     all_events = get_all_events(window_start, window_end)
 
     # Store every date in the window
     stored = 0
-    all_dates = (
-        [(today - timedelta(days=i)).isoformat() for i in range(LOOKBACK_DAYS, -1, -1)]
-        + [(today + timedelta(days=i)).isoformat() for i in range(1, LOOKAHEAD_DAYS + 1)]
-    )
+    all_dates = [(today - timedelta(days=i)).isoformat() for i in range(LOOKBACK_DAYS, -1, -1)] + [
+        (today + timedelta(days=i)).isoformat() for i in range(1, LOOKAHEAD_DAYS + 1)
+    ]
 
     for date_str in all_dates:
         events = all_events.get(date_str, [])
-        stats  = compute_day_stats(events)
+        stats = compute_day_stats(events)
         try:
             store_day(date_str, events, stats, ingested_at)
             stored += 1
@@ -367,15 +366,17 @@ def main() -> int:
 
     # Log today prominently
     today_stats = compute_day_stats(all_events.get(today_str, []))
-    logger.info("Today %s: %d events, %d meeting mins, %s focus blocks",
-                today_str, today_stats["event_count"], today_stats["meeting_minutes"],
-                today_stats["focus_block_count"])
+    logger.info(
+        "Today %s: %d events, %d meeting mins, %s focus blocks",
+        today_str,
+        today_stats["event_count"],
+        today_stats["meeting_minutes"],
+        today_stats["focus_block_count"],
+    )
 
     # Store lookahead summary record
     lookahead_by_date = {
-        (today + timedelta(days=i)).isoformat(): all_events.get(
-            (today + timedelta(days=i)).isoformat(), []
-        )
+        (today + timedelta(days=i)).isoformat(): all_events.get((today + timedelta(days=i)).isoformat(), [])
         for i in range(LOOKAHEAD_DAYS + 1)
     }
     store_lookahead(lookahead_by_date, ingested_at)

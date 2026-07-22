@@ -269,7 +269,7 @@ def main():
     print("  Templates:    Morning ☀️ | Evening 🌙 | Stressor 🔴 | Health Event 🏥 | Weekly Reflection 📝")
     print()
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    print(f"  Save this Database ID for setup_notion.sh:")
+    print("  Save this Database ID for setup_notion.sh:")
     print(f"  {db_id}")
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     print()

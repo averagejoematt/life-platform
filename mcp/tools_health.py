@@ -40,7 +40,6 @@ def tool_get_readiness_score(args):
     end_date = args.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     d7_start = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
     d30_start = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=30)).strftime("%Y-%m-%d")
-    d90_start = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=90)).strftime("%Y-%m-%d")
 
     def _clamp(v, lo=0.0, hi=100.0):
         return max(lo, min(hi, v))
@@ -404,9 +403,7 @@ def tool_get_weight_loss_progress(args):
     journey_start = profile.get("journey_start_date")
     journey_start_wt = profile.get("journey_start_weight_lbs")
     goal_weight = profile.get("goal_weight_lbs")
-    target_weekly_loss = profile.get("target_weekly_loss_lbs", 1.5)
     height_in = profile.get("height_inches", 70)
-    dob_str = profile.get("date_of_birth")
 
     # HONOR an explicit start_date verbatim — the old code always overrode it
     # with journey_start. No leak risk: query_source's phase filter (ADR-058)

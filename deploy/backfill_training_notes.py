@@ -53,7 +53,7 @@ def main():
                 if it.get("pain_flag"):
                     tn.elevate_pain(table, it)
                     total_pain += 1
-        print(f"  {w['date']} {w.get('workout_uid','')}: {res['records']} records" + (" [dry-run]" if not args.apply else ""))
+        print(f"  {w['date']} {w.get('workout_uid', '')}: {res['records']} records" + (" [dry-run]" if not args.apply else ""))
 
     print(
         f"\n{'APPLIED' if args.apply else 'DRY-RUN'}: {total_workouts} noted workouts → {total_records} records, {total_pain} pain elevated"

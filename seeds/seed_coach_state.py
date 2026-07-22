@@ -15,7 +15,6 @@ Safe to re-run — uses put_item (idempotent overwrites).
 import argparse
 import json
 import os
-import sys
 from datetime import datetime, timezone
 from decimal import Decimal
 
