@@ -1102,11 +1102,17 @@ def email_ai_review_pack() -> list[iam.PolicyStatement]:
     """Weekly AI review-pack (#1442, QA strategy D3): the human editorial plane.
 
     Deliberately NOT _email_base — this Lambda curates the already-generated,
-    already-gate-passed D2 archive (generated/qa_archive/); it makes NO Bedrock
-    calls, so it gets neither ai-keys nor a bedrock:InvokeModel grant. Least
-    privilege: read the archive (ListBucket on both qa_archive prefixes +
-    GetObject on the text leg it parses — screenshots are only LINKED, never
-    fetched), write the email-send status record, send via SES, DLQ on failure.
+    already-gate-passed D2 archive (generated/qa_archive/). Least privilege: read
+    the archive (ListBucket on both qa_archive prefixes + GetObject on the text leg
+    it parses — screenshots are only LINKED, never fetched), write the email-send
+    status record, send via SES, DLQ on failure.
+
+    #1688 (epic #1687 "The Coach Correction Loop"): the pack now HYBRID-ranks each
+    generation. The deterministic heuristics are zero-cost, but a cheap Haiku "critic"
+    layers on when the budget tier ≤ 1 — so this role now needs bedrock:InvokeModel
+    (scoped to the Anthropic Claude inference profiles / foundation models, as every
+    AI-calling role) AND an ssm:GetParameter on /life-platform/budget-tier (the
+    per-feature tier gate). At tier ≥ 2 the critic is skipped and neither is exercised.
     """
     return [
         iam.PolicyStatement(
@@ -1139,6 +1145,14 @@ def email_ai_review_pack() -> list[iam.PolicyStatement]:
             sid="DLQ",
             actions=["sqs:SendMessage"],
             resources=[DLQ_ARN],
+        ),
+        # #1688: the tier-gated Haiku critic. Bedrock invoke (Anthropic Claude only,
+        # per _bedrock_statement/ADR-062) + the budget-tier SSM read that gates it.
+        _bedrock_statement(),
+        iam.PolicyStatement(
+            sid="BudgetTier",
+            actions=["ssm:GetParameter"],
+            resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/budget-tier"],
         ),
     ]
 
