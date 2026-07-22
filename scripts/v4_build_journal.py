@@ -111,13 +111,9 @@ PAGE = """<!DOCTYPE html>
   <meta name="twitter:title" content="{og_title}">
   <meta name="twitter:description" content="{twitter_desc}">
   <meta name="twitter:image" content="https://averagejoematt.com/assets/images/{og_image}">
-  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4EFE4">
-  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E0C08">
-  <link rel="icon" href="/favicon.ico">
-  <link rel="manifest" href="/manifest.webmanifest">
+{head_chrome}
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Measured Life">
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="alternate" type="application/rss+xml" title="averagejoematt" href="/rss.xml">
   <script type="application/ld+json">
   {ld_json}
@@ -383,6 +379,7 @@ def render(post: dict) -> str:
         og_image=_esc(post.get("og_image") or "og-home.png"),
         ld_json=_ld_json(post, url, title, read_desc),
         style=STYLE,
+        head_chrome=v4_chrome.head_chrome(),
         doors_nav=v4_chrome.doors_nav(STORY_DOOR),
         series=series,
         date_human=_esc(human_date(post["date"])),
