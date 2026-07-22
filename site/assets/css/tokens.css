@@ -598,6 +598,11 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .chart-goal { stroke: var(--ink-faint); stroke-width: 1; stroke-dasharray: 3 4; }
 .chart-down { stroke: var(--ink-muted); stroke-width: 1.5; stroke-dasharray: 4 3; }
 .chart-dot { fill: var(--ember); }
+/* #1618 — the spend-curve PROJECTION: same ember hue as the actual line so the eye reads it
+   as the same series continuing, but DASHED + slightly faded so "forecast, not measured" is
+   legible without a legend. Hollow endpoint dot = a projected point, not a recorded one. */
+.chart-proj { fill: none; stroke: var(--ember); stroke-width: 2; stroke-dasharray: 5 4; stroke-linecap: round; opacity: 0.72; }
+.chart-proj-dot { fill: var(--bg, #fff); stroke: var(--ember); stroke-width: 1.5; opacity: 0.85; }
 /* Interactive line-chart hover (wired by motion.js, data from data-cpts) — a focus dot
    + cursor-following readout that make every trend chart explorable. */
 .chart-focus { position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%;

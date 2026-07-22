@@ -38,7 +38,12 @@ function _points(data, valueKey, dateKey) {
 }
 
 // A trend line with optional goal line + filled area. data: [{<dateKey>,<valueKey>}] or [numbers].
-export function lineChart(data, { valueKey = "value", dateKey = "date", goal = null, height = 130, unit = "", label = "", emptyMsg = "", spine = false } = {}) {
+// `projection` (#1618): a forecast continuation drawn as a DASHED segment from the last actual
+// point to a caller-supplied value at a future date — { value, date, label }. The value is NEVER
+// re-derived here (the whole point is to plot ONE authoritative projection, not a second one that
+// disagrees with it); the segment only engages when the value is finite, the series carries dates,
+// and the projection date sits after the last actual date. Absent/invalid → solid line only.
+export function lineChart(data, { valueKey = "value", dateKey = "date", goal = null, height = 130, unit = "", label = "", emptyMsg = "", spine = false, projection = null } = {}) {
   const pts = _points(data || [], valueKey, dateKey);
   // Fewer than 4 points can't show a real trend — two points draw a straight diagonal that
   // reads as broken/misleading. Show an honest count + latest value instead of a fake line.
@@ -50,23 +55,48 @@ export function lineChart(data, { valueKey = "value", dateKey = "date", goal = n
     return `<figure class="chart chart--empty"><figcaption class="chart-cap label">${escAttr(msg)}</figcaption></figure>`;
   }
   const W = 600, H = height, P = 8;
-  const vals = pts.map((p) => p.v).concat(goal != null ? [Number(goal)] : []);
+  const _r = (n) => (Math.round(n * 10) / 10);
+  const last = pts[pts.length - 1];
+  const _dom = (iso) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || "")); return m ? +m[3] : null; };
+
+  // Projection wiring. `frac` is the share of the drawable width the ACTUAL (solid) line
+  // occupies; the dashed projection fills the remainder out to the right edge (= its date).
+  // frac defaults to 1 (no projection) so every other lineChart caller is byte-for-byte
+  // unchanged. Positioned by real day-of-month, so the dashed length is honest — how much
+  // of the month is still ahead — not a fixed cosmetic stub.
+  const projVal = projection && Number.isFinite(Number(projection.value)) ? Number(projection.value) : null;
+  let frac = 1, projActive = false;
+  if (projVal != null && last.d && projection && projection.date) {
+    const startD = _dom(pts[0].d), curD = _dom(last.d), endD = _dom(projection.date);
+    if (startD != null && curD != null && endD != null && endD > curD && curD > startD) {
+      frac = (curD - startD) / (endD - startD);
+      projActive = true;
+    }
+  }
+
+  const vals = pts.map((p) => p.v).concat(goal != null ? [Number(goal)] : []).concat(projActive ? [projVal] : []);
   let min = Math.min(...vals), max = Math.max(...vals);
   if (min === max) { min -= 1; max += 1; }
-  const x = (i) => P + (i / (pts.length - 1)) * (W - 2 * P);
+  const x = (i) => P + (i / (pts.length - 1)) * frac * (W - 2 * P);
   const y = (v) => P + (1 - (v - min) / (max - min)) * (H - 2 * P);
   const line = pts.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(p.v).toFixed(1)}`).join(" ");
   const area = `M${x(0).toFixed(1)} ${(H - P).toFixed(1)} ` + pts.map((p, i) => `L${x(i).toFixed(1)} ${y(p.v).toFixed(1)}`).join(" ") + ` L${x(pts.length - 1).toFixed(1)} ${(H - P).toFixed(1)} Z`;
-  const last = pts[pts.length - 1];
   const delta = last.v - pts[0].v;
   const dir = Math.abs(delta) < (max - min) * 0.02 ? "holding flat" : (delta > 0 ? "trending up" : "trending down");
-  const _r = (n) => (Math.round(n * 10) / 10);
   // Date range, when the points carry dates — gives the trend a time axis in the
   // caption so a reader can see WHICH days a line covers (the rightmost dot is the
   // latest reading). Silently omitted for dateless numeric series.
   const _short = (iso) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || "")); if (!m) return ""; return `${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][+m[2] - 1]} ${+m[3]}`; };
   const _span = (pts[0].d && last.d) ? `${_short(pts[0].d)}–${_short(last.d)}` : "";
-  const summary = `${label || "Trend"}: ${pts.length} readings${_span ? `, ${_span}` : ""}, latest ${_r(last.v)}${unit}, ${dir}${goal != null ? `, goal ${_r(Number(goal))}${unit}` : ""}.`;
+  // The dashed forecast, from today's dot out to the right edge (month-end). Its endpoint
+  // sits at the projected value, so a projection that crosses `goal` visibly crosses it —
+  // the y-domain above already includes projVal, so the crossing is guaranteed in-frame.
+  const projSeg = projActive
+    ? `<path class="chart-proj" d="M${x(pts.length - 1).toFixed(1)} ${y(last.v).toFixed(1)} L${(W - P).toFixed(1)} ${y(projVal).toFixed(1)}" vector-effect="non-scaling-stroke"/>`
+      + `<circle class="chart-proj-dot" cx="${(W - P).toFixed(1)}" cy="${y(projVal).toFixed(1)}" r="3"/>`
+    : "";
+  const projCap = projActive ? ` · dashed = projected $${_r(projVal)} by month-end (governor estimate)` : "";
+  const summary = `${label || "Trend"}: ${pts.length} readings${_span ? `, ${_span}` : ""}, latest ${_r(last.v)}${unit}, ${dir}${goal != null ? `, goal ${_r(Number(goal))}${unit}` : ""}${projActive ? `, projected ${_r(projVal)}${unit} by month-end (estimate)` : ""}.`;
   const goalLine = goal != null ? `<line class="chart-goal" x1="${P}" y1="${y(Number(goal)).toFixed(1)}" x2="${W - P}" y2="${y(Number(goal)).toFixed(1)}" vector-effect="non-scaling-stroke"/>` : "";
   // SIGNATURE 1 — a measuring-rule tick spine on the y-axis: a ticked rail with the
   // max (top) and min (bottom) value, giving the trend a real scale. Token-driven ticks.
@@ -78,9 +108,9 @@ export function lineChart(data, { valueKey = "value", dateKey = "date", goal = n
   const cpts = pts.map((p, i) => ({ x: +(x(i) / W).toFixed(4), y: +(y(p.v) / H).toFixed(4), l: (p.d ? _short(p.d) + " · " : "") + _r(p.v) + unit }));
   return `<figure class="chart${spine ? " chart--spined" : ""}">${spineEl}<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}" data-cpts="${escAttr(JSON.stringify(cpts))}">` +
     `<path class="chart-fill" d="${area}"/>${goalLine}` +
-    `<path class="chart-line" d="${line}" vector-effect="non-scaling-stroke"/>` +
+    `<path class="chart-line" d="${line}" vector-effect="non-scaling-stroke"/>${projSeg}` +
     `<circle class="chart-dot" cx="${x(pts.length - 1).toFixed(1)}" cy="${y(last.v).toFixed(1)}" r="3.5"/></svg>` +
-    `<figcaption class="chart-cap label">${escAttr(label)}${goal != null ? ` · goal ${escAttr(goal)}${escAttr(unit)}` : ""}${_span ? ` · ${escAttr(_span)}` : ""} · ${pts.length} pts</figcaption></figure>`;
+    `<figcaption class="chart-cap label">${escAttr(label)}${goal != null ? ` · goal ${escAttr(goal)}${escAttr(unit)}` : ""}${_span ? ` · ${escAttr(_span)}` : ""} · ${pts.length} pts${escAttr(projCap)}</figcaption></figure>`;
 }
 
 // #421 — arc-trend line for slow-moving, long-horizon metrics (VO2max, walking HR). Unlike

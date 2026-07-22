@@ -85,6 +85,39 @@ test("lineChart — a flat series reads as 'holding flat', not up or down", () =
   assert.match(out, /holding flat/);
 });
 
+test("lineChart — #1618 a projection draws a DASHED segment + labels the estimate in the caption", () => {
+  const pts = [1, 2, 3, 4, 5].map((v, i) => ({ date: `2026-07-0${i + 1}`, value: v }));
+  const out = lineChart(pts, {
+    valueKey: "value", dateKey: "date", label: "month-to-date spend", goal: 8,
+    projection: { value: 12, date: "2026-07-31", label: "projected" },
+  });
+  // Solid actual line AND the dashed projection segment both present.
+  assert.match(out, /class="chart-line"/);
+  assert.match(out, /class="chart-proj"/);
+  assert.match(out, /class="chart-proj-dot"/);
+  // The caption names the estimate — legible without a legend, and honest about being a forecast.
+  assert.match(out, /dashed = projected \$12 by month-end \(governor estimate\)/);
+  // The projected value (12) sits ABOVE the goal (8) and above every actual (max 5), so it must
+  // widen the y-domain — otherwise the ceiling crossing would fall out of frame (AC3).
+  assert.match(out, /projected 12 by month-end \(estimate\)/); // aria summary carries it too
+});
+
+test("lineChart — #1618 no projection (absent value) draws ONLY the solid line, no phantom dash", () => {
+  const pts = [1, 2, 3, 4, 5].map((v, i) => ({ date: `2026-07-0${i + 1}`, value: v }));
+  const noProj = lineChart(pts, { valueKey: "value", dateKey: "date", label: "spend", goal: 8 });
+  assert.match(noProj, /class="chart-line"/);
+  assert.doesNotMatch(noProj, /chart-proj/);
+  // A null projection object is treated the same as absent — no dashed segment.
+  const nullProj = lineChart(pts, { valueKey: "value", dateKey: "date", goal: 8, projection: null });
+  assert.doesNotMatch(nullProj, /chart-proj/);
+  // A projection whose date is not after the last actual date can't be positioned honestly → skipped.
+  const pastProj = lineChart(pts, { valueKey: "value", dateKey: "date", goal: 8, projection: { value: 12, date: "2026-07-05" } });
+  assert.doesNotMatch(pastProj, /chart-proj/);
+  // A non-finite projection value is ignored, not rendered as NaN.
+  const badProj = lineChart(pts, { valueKey: "value", dateKey: "date", goal: 8, projection: { value: "nope", date: "2026-07-31" } });
+  assert.doesNotMatch(badProj, /chart-proj/);
+});
+
 test("arcTrend — fewer than 4 valid dated points refuses, invalid dates are dropped first", () => {
   const out = arcTrend([{ date: "2026-01-01", value: 1 }, { date: "not-a-date", value: 2 }, { date: "2026-01-02", value: 3 }], { unit: "bpm" });
   assert.match(out, /chart--empty/);

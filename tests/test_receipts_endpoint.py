@@ -231,6 +231,28 @@ def test_per_feature_note_explains_why_tokens_not_dollars(monkeypatch):
     assert "tokens" in note and "model dimension" in note
 
 
+# ── 6. the projection anchor date (#1618) ────────────────────────────────────
+def test_month_end_date_is_the_last_calendar_day_of_this_month(monkeypatch):
+    """The spend curve extends its dashed projection to this date; it must be the
+    real last day of the current month, not a fabricated or off-by-one date."""
+    import calendar as _cal
+
+    _install(monkeypatch, _ssm_with(_breakdown()))
+    d = _payload(sai.handle_receipts())
+    now = datetime.now(timezone.utc)
+    expected = now.replace(day=_cal.monthrange(now.year, now.month)[1]).strftime("%Y-%m-%d")
+    assert d["month_end_date"] == expected
+
+
+def test_month_end_date_is_present_even_when_breakdown_is_stale(monkeypatch):
+    """The anchor is calendar-deterministic, so it is available regardless of the
+    governor's breakdown — the front-end simply won't draw a projection without a value."""
+    _install(monkeypatch, _ssm_with(_breakdown(age_hours=72)))
+    d = _payload(sai.handle_receipts())
+    assert d["stale"] is True
+    assert d["month_end_date"] and d["month_end_date"].startswith(datetime.now(timezone.utc).strftime("%Y-%m"))
+
+
 # ── the route is actually wired ─────────────────────────────────────────────
 def test_receipts_route_registered():
     from web import site_api_lambda as sal

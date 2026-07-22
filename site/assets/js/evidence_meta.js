@@ -122,8 +122,23 @@ export function renderReceipts(d) {
     tier != null && fig(String(tier), "budget tier (0–3)"),
   ].filter(Boolean));
 
-  const curve = (d.history || []).length
-    ? sec("The month so far", lineChart(d.history, { valueKey: "mtd_usd", dateKey: "date", unit: "", label: "month-to-date spend", goal: d.ceiling_usd, emptyMsg: "The spend curve draws in as the month accrues." }))
+  // #1618 — extend the curve past today with a dashed projection to month-end, anchored on
+  // the governor's projected_month_end_usd (NOT re-extrapolated in JS — a second projection
+  // that disagreed with the governor is the exact defect this avoids). When the projection is
+  // absent (stale/null breakdown) `proj` is null and only the solid actual line renders.
+  const proj = (d.projected_month_end_usd != null && d.month_end_date)
+    ? { value: d.projected_month_end_usd, date: d.month_end_date, label: "projected" }
+    : null;
+  const curveChart = (d.history || []).length
+    ? lineChart(d.history, { valueKey: "mtd_usd", dateKey: "date", unit: "", label: "month-to-date spend", goal: d.ceiling_usd, projection: proj, emptyMsg: "The spend curve draws in as the month accrues." })
+    : "";
+  // ADR-105: the dashed line is a forecast, not a measurement — say so in prose, not just the
+  // caption, so a reader can never mistake the projected continuation for recorded spend.
+  const curveNote = (proj && curveChart)
+    ? `<p class="rd-archive">The solid line is what has actually been spent this month; the dashed line is the governor's projection to month-end — $${fmt(d.projected_month_end_usd)}, an estimate it re-runs every 8 hours, not a measured value (ADR-105).</p>`
+    : "";
+  const curve = curveChart
+    ? sec(proj ? "The month so far — and where it's heading" : "The month so far", curveChart + curveNote)
     : "";
 
   // Hand-built rather than kvtable(): kvtable title-cases its keys via ttl(), which
