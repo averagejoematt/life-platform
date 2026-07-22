@@ -1,87 +1,58 @@
-# HANDOVER — Engineering-excellence craft grade: /craft-review skill + standards + epic — 2026-07-21
+# HANDOVER — Cycle-10 reset + non-fable paydown + the Social Membrane epic — 2026-07-21
 
-> Instruction thread: "Pretend I gave my repo to a hiring panel (Eng I → CIO) — plan to get it
-> graded an A, then keep it there; 2026→2028 lens, core engineering + AI; group the issues under
-> a CI/CD/DevOps grouping AND make it a repeatable skill (Fable-runnable). Uplevel the prompt."
-> → plan approved → "yes do it, mind the parallel session" → "yes" (wrap).
+> Instruction thread: "Goal 1 — re-anchor the experiment to 2026-07-22 (cycle 10); full dry-run,
+> report every gate, stage the apply (OWNER), record the tier-1 truth-gate loud-skip honestly.
+> Goal 2 — pay down non-fable backlog (#1618/#1634/#1639/#1640/#1620…), gate:owner to code-complete,
+> verify every agent finding, batch merges into one ask." → "yes go ahead do it, but i do want that
+> article still readable" (reset apply) → "yes i approve you to keep going" (commit + deploys) →
+> `/plan` "how we INGEST socials — both ways… create all issues… imagine product leaders" → plan
+> approved → wrap (sequenced after the parallel eng-excellence session).
 
-## What this session was
-A **planning + skill-build** session, not a shipping session. Produced a graded remediation +
-forward-standards program and built the repeatable grader. **Nothing merged or deployed** —
-the deliverable is an OPEN PR + a filed backlog.
+Ran concurrently with the eng-excellence/craft-review session (its handover archived to
+`HANDOVER_2026-07-21_eng-excellence-craft.md`; its PR #1647 + epic #1648 carried forward below).
 
-## What shipped (all OPEN / filed — not merged, not deployed)
-- **PR #1647** (branch `eng-excellence-craft-review`, OPEN) — two new files + one index line:
-  - `.claude/commands/craft-review.md` — the **3rd grading ritual**. `/fullreview`=product,
-    `/sdlc-review`=process, **`/craft-review`=codebase-as-craft-artifact** (would a panel from
-    Eng I→CIO grade the git an A on cleanliness/structure/naming/aesthetics/gates/standards).
-    Model-agnostic → **Fable runs it unchanged**; Workflow fan-out (seniority-ladder lenses,
-    10 craft dimensions) → finding-verifier → `docs/reviews/craft_grades_<date>.json` (trend)
-    → issue-filer under the epic; schedulable.
-  - `docs/ENGINEERING_STANDARDS.md` — the durable **"definition of an A"**: the 10-dimension
-    rubric the skill grades against AND the standard new code meets (one source). ~800-line
-    module ceiling, real-mypy/no-blanket-waiver rules, CI-as-composition, 2026→2028 AI-era
-    standards, and the CI ratchet-guards. (Carries the required `> **Status:**` header.)
-  - `docs/README.md` — index line for the new standards doc.
-- **Backlog** — `[EPIC] Engineering excellence: repo craft, cleanliness & standards` = **#1648**
-  (`area:infra`), **18 stories #1649–#1666**, label `review:eng-excellence-2026-07-21`,
-  milestones Now/Next/Later. `gate:owner` on **#1662** (branch protection) + **#1666**
-  (proportionality ADR).
+## What shipped (all merged to main AND deployed/verified live)
 
-## The audit that drove it (grounded, 3 parallel reviewers)
-Repo grades **B+/A−**. Excellent bones (OIDC least-privilege roles, prod-approval + auto-rollback,
-the `reconcile` drift auto-fixer, grounded-generation gates, fail-open cost governor, honest ADRs,
-clean commits). Gap to A is **craft, not correctness**: hygiene (`archive/` 315 dead files +
-**111 git-ignored on-disk-only** incl. a real-code downloads backup; `handovers/` 477 transcripts),
-structure (104-file flat `lambdas/` root, 2–3k-line god-modules, 1,490-line `ci-cd.yml`),
-config-trust (mypy disables ~14 codes, blanket `mcp/` waivers, 40% coverage), team/supply-chain
-(no branch protection, no secret-scan/CodeQL, non-blocking CVE gate, example-only tests).
+**Cycle-10 experiment reset → genesis 2026-07-22 (Wed)** (`b206bf21`, `restart_pipeline.py --apply
+--override-weight-lbs 321.38`; no 07-22 weigh-in existed, honest last-known 07-20 baseline used).
+Clean-prologue start — "Before the Numbers" preserved as the genesis−6 lead-in (readable, Prologue·PartI).
+- **Semantic gate 7/7** (authoritative — character zeroed, pre_start flags, **0 poisoned rows / 32 raw-timeseries sources**). Ledger rolled → **$0**. SSM cycle=10, constants=2026-07-22 fleet-wide. Live `/api/journey` confirms `day_n:0, pre_start:true, days_until_start:1, start_weight:321.4`.
+- **Rendered gate: 2 verified FALSE-POSITIVES** — `/api/vitals` + `/panelcast/episodes.json` tripped the "outgoing-genesis literal (2026-07-20)" scan, but 07-20 is *legitimately* the last-data `as_of_date` AND the genesis−2 prequel date. A 2-day-gap reset collides the outgoing genesis with real new-cycle dates; the literal scan can't tell them apart. Semantic gate is authoritative.
+- **Truth gate: LOUD-SKIPPED at budget tier 1** (July window) — the AI reader-truth layer did NOT run this reset. Recorded in `_verify_truth_report.txt` + RESET_LOG. **Not a green.**
 
-## Decisions locked (encoded in the stories — don't relitigate)
-- Config gates = **big-bang to full standard** (mypy strict/empty disable list #1656, zero
-  blanket waivers #1657, coverage **70%** #1658).
-- Branch protection = **Option C** (fast-lane required checks + auto-merge + scoping ADR, #1662).
-- Proportionality = **cut nothing; make the keep/retire ledger legible** (#1666); CI→composition (#1655).
-- Hygiene = **zip-to-local + tag `pre-hygiene-<date>` + git rm** — loss risk resolved live (full
-  history 2,168 commits; handovers/patches/backfill 100% tracked). The ONE risk = the 111 ignored
-  `archive/` files → the zip step in #1649 captures them **before any `git rm`**.
+**#1644 (#1634) — canary judge false-positive fix** (`0fc5acda`). The advisory Haiku judge FP'd on "Dr. Sarah Chen" (a sanctioned coach persona) as an AI-vendor break. Rewrote the prompt to the real contract (vendor/model ≠ coach persona), `_persona_names()` **derives from `persona_registry`/`config/personas.json`** (not hardcoded), deterministic verdict authoritative (ADR-105), judge stays advisory (ADR-108). Deployed `LifePlatformOperational`.
 
-## Verified
-- PR #1647 CI: **wiki-drift ✅** (fixed a missing `> **Status:**` header on the new doc — the only
-  red, cleared by `43ffef51`), deploy-critical+format ✅ (passed), validate=skipping. Pre-commit
-  doc-sync was a clean no-op both pushes.
-- All 19 issues verified via `gh issue view` — labels/milestones/`gate:owner` correct; sanity grep
-  found no story missing type/area/model.
-- Worked entirely in an **isolated worktree** (`eng-excellence-craft-review`) — shared `main` tree
-  never touched (only the harness's `settings.local.json`).
+**#1645 (#1640) — OG share cards signed with the AJM dial mark** (`cde14687`). Mark wired into the shared `card_engine.base_canvas()` (covers all 13 cards, transcribed from `mark-a.svg` as Pillow primitives, no rasterizer). Deployed + invoked `og-image-generator` → **13/13 regenerated**, dial mark confirmed live top-right.
 
-## Gotchas
-- **zsh `read -ra` is bash-only** — the first 4 `gh issue create` calls silently dropped all but
-  the review label (loop split failed). Fixed by `gh issue edit --add-label` and switching to a
-  single comma-separated `--label` (gh splits it). Verify labels after batch-filing on zsh.
-- **New docs need a `> **Status:** canonical · **Owner:** … · **Verified:** …` header** or
-  `check_doc_index.py --strict` (the "Wiki drift gates" job) reds the PR.
-- The 3 engine-doc drift warnings from a full-history local run of `check_doc_index.py --strict`
-  are **pre-existing on main** (config committed 2026-07-21 vs doc verified dates) and don't fire
-  on CI's shallow checkout — not this PR's concern.
-- Agent self-reports on their own numbers are ~50% wrong — the hygiene agent's initial premises
-  (`.DS_Store`/`.coverage` tracked) were FALSE; grep before trusting.
+**#1646 (#1618) — receipts projection curve** (`96d1278a`). `/method/receipts/` now draws solid MTD + a dashed governor projection to month-end (from `projected_month_end_usd`, no JS re-extrapolation), caption = "governor ESTIMATE" (ADR-105). site-api deployed (`month_end_date` field) + site auto-deploy. Render-QA'd live both themes: projection $94.6 under the $115 July ceiling (tier 1) — no crossing, the honest depiction.
 
-## Residual / next picks
-- Merge PR #1647 to make `/craft-review` usable. `not-work — owner merge decision on PR #1647`.
-- Drain the eng-excellence backlog via `/uplevel` — starts with the Now tranche (#1649/#1651/#1652
-  hygiene, #1657 waivers, #1659 gitleaks, #1660 CodeQL). See **#1648**.
-- Confirm **#1650** handovers disposition before executing (touches the wrap workflow /
-  `HANDOVER_LATEST.md` dependency) — see **#1650** (`gate:owner`-adjacent).
-- Schedule the periodic `/craft-review` run. `not-work — scheduling decision, do after #1647 merges`.
-- **Standing (carried from prior session): cycle-10 reset to 2026-07-22 (Wed)** —
-  `restart_pipeline.py --apply` (runs `cdk deploy --all` = OWNER); no 07-22 weigh-in yet, fallback
-  `--override-weight-lbs 321.38`; plan in scratchpad `NEXT_SESSION_PLAN.md`.
-  `not-work — owner-run experiment reset`.
+**#1667 (#1639) — full head-chrome on every content page** (`260e03d3`). Single-source `scripts/v4_chrome.py head_chrome()` + `--check` gate; **79 pages** got the manifest/apple-touch/theme-color/SVG-favicon block (not 61 — that was manifest-only; SVG favicon was on 0). Site-only, auto-deployed.
 
-**Build beat:** none — this session's work landed as OPEN PR #1647 + a filed backlog; nothing merged/deployed (merged-work-only gate #736).
-**Docs:** none needed on main — the session's docs (`ENGINEERING_STANDARDS.md`, `craft-review.md`, README index) live on unmerged PR #1647; no `main` wiki page was invalidated.
-**Decisions:** none needed — no governance decision landed on main this session; the proportionality ADR is filed as story #1666 (`gate:owner`), authored when that story is drained.
-**Main:** red — latest completed non-cancelled CI/CD run is `953566a2`, failed/parked at the manual production Deploy gate (pre-cdk-deploy, per prior session's decode); newer main commits' runs auto-cancelled as superseded — no test breakage, a human-approval park.
-**Incidents:** none
-**Stash/hooks:** clean
+Two doc-sync reconciles handled the cumulative `test_count` (4857→4866 after the batch, →4870 after #1667).
+
+## Also done (no merge)
+- **The Social Membrane** — `/plan` for bidirectional social (ingest own posts → coach signal + display, not just outbound). **Epic #1668 + 11 stories #1669–#1679** filed (Now/Next/Later). The loop-breaker Matthew flagged ("don't re-ingest the platform's own outbound posts → spanning-tree echo") is a foundational story: **#1670 the provenance membrane**. Cross-linked to the pre-existing **outbound** epic **#1619** as its inbound counterpart — one bidirectional program. Locked decisions: all-platforms/auto-where-possible, auto public feed behind a fail-closed sensitivity gate, facades-now/native-later, membrane is foundational. Plan file: `~/.claude/plans/quizzical-riding-chipmunk.md`.
+- **#1643 filed** — `restart_site_copy_sync.py:82` regen-invokes non-existent `life-platform-daily-brief` (real name `daily-brief`) → the benign `err(254)`.
+
+## Gotchas hit
+- **Small-gap reset → rendered-gate false-positives.** When genesis moves only a few days, the outgoing genesis literal collides with legitimate new-cycle dates (last-data `as_of_date`, the genesis−2 prequel). The rendered gate's string scan false-fails; the **semantic gate is the authoritative correctness signal** (it checks meaning, not literals). Don't rollback on a rendered-gate-only fail — diff the actual served JSON first. → memory `reference_small_gap_reset_false_positive`.
+- **Agent self-reports still need verification.** All 6 worktree-agent findings independently `git grep`-verified before relaying — all held this time, but the OG agent correctly flagged the issue's "13 cards" vs stale docstring "6"/"12"; the head-chrome agent corrected "61"→"79". Verify counts, don't relay them.
+- **Concurrent-session shared-tree race (again).** My reconcile `git add -A` (214b7d58) swept in the parallel session's staged `git mv` (their handover archive). No damage, but it's the standing shared-index hazard — wrapping each session from its own worktree would avoid it (noted as a hygiene consideration, not filed).
+- **`node --test tests/js/` with a dir arg fails; CI runs bare `node --test`** (carried from prior session, hit again).
+
+## Gate outcomes
+- **Build beat:** `2026-07-21-receipts-honest-projection` (the #1618 curve — the platform's honesty ethos made visible; OG marks / head-chrome / reset mentioned in a clause).
+- **Docs:** none needed beyond the reset's own auto-sync (CHANGELOG/SCHEMA/RESET_LOG in `b206bf21`) + the two `test_count` reconciles. The 4 code PRs touch no canonical wiki page.
+- **Decisions:** none needed — the reset is routine under ADR-077; the Social Membrane is a filed plan/epic, not a shipped governance choice (its ADR, if any, lands with #1678's CSP amendment).
+- **Main:** red — the latest completed non-cancelled CI/CD run (`953566a2`) is parked/FAILED at the manual production Deploy gate; superseding commits' runs auto-cancelled. My automated gates (Lint/Test/Plan) are green; this is the standing manual-gate park, not a test break.
+- **Incidents:** none — no auto-rollback fired (all site-deploys green), no main-red>1h beyond the standing manual-gate park, no data gap; the tier-1 truth-gate skip is the pre-existing July-window condition (logged in RESET_LOG, not a new incident).
+- **Stash/hooks:** clean — `git stash list` empty, hook freshness 🟢.
+- **Labels:** OK — 97 open type:story issues all carry `model:*`.
+
+## Residual / next-picks
+- **PR #1647 (eng-excellence /craft-review skill + ENGINEERING_STANDARDS.md) OPEN** — owner-merge, then drain epic **#1648** (18 stories #1649–#1666) via `/uplevel` (Now tranche #1649/#1651/#1652/#1657/#1659/#1660). (#1647, #1648)
+- **The Social Membrane** — start the foundation: **#1669** (inbound ingestion framework + YouTube) + **#1670** (provenance membrane, ships together). (#1668/#1669/#1670)
+- **#1620** — outbound social links + follow affordances; the outbound half of #1619/#1668; runs the `v4_apply_chrome` HTML sweep so land it AFTER any reset/head-chrome sweep. (#1620)
+- **#1643** — fix the stale `daily-brief` regen name in `restart_site_copy_sync.py`. (#1643)
+- **AiReviewPack (#1594) first fires Sunday 18:00 UTC** — a new weekly QA email to Matthew; review/mute before then if unwanted. `not-work — owner review of a just-activated schedule`.
+- **Standing alarms:** none newly outstanding; budget **tier 1** (July window working as designed, not an alarm). `not-work — standing-alarms checklist, nothing to action`.
