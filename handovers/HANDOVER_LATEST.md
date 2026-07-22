@@ -1,58 +1,60 @@
-# HANDOVER — Cycle-10 reset + non-fable paydown + the Social Membrane epic — 2026-07-21
+# HANDOVER — Eng-excellence Now-tranche drain + Social Membrane foundation shipped — 2026-07-22
 
-> Instruction thread: "Goal 1 — re-anchor the experiment to 2026-07-22 (cycle 10); full dry-run,
-> report every gate, stage the apply (OWNER), record the tier-1 truth-gate loud-skip honestly.
-> Goal 2 — pay down non-fable backlog (#1618/#1634/#1639/#1640/#1620…), gate:owner to code-complete,
-> verify every agent finding, batch merges into one ask." → "yes go ahead do it, but i do want that
-> article still readable" (reset apply) → "yes i approve you to keep going" (commit + deploys) →
-> `/plan` "how we INGEST socials — both ways… create all issues… imagine product leaders" → plan
-> approved → wrap (sequenced after the parallel eng-excellence session).
+> Instruction thread: "clean tree check → (1) owner-merge PR #1647 then drain epic #1648 Now
+> tranche via /uplevel; (2) start the Social Membrane foundation #1669+#1670 together. Fan out
+> worktree-implementers (open PRs, never merge/deploy); VERIFY every agent finding; full suite before
+> any merge; batch merges/deploys into ONE numbered ask; flag every site/** auto-deploy." → batch
+> approved (merge all 5 + reconcile; cdk-deploy the dormant youtube Lambda; small secret-hygiene PR)
+> → "merge 1685 then wrap".
 
-Ran concurrently with the eng-excellence/craft-review session (its handover archived to
-`HANDOVER_2026-07-21_eng-excellence-craft.md`; its PR #1647 + epic #1648 carried forward below).
+## What shipped (all merged to main; deploy status per item)
 
-## What shipped (all merged to main AND deployed/verified live)
+**PR #1647 (epic #1648) — /craft-review skill + ENGINEERING_STANDARDS.md** — merged (docs/command only, no deploy). The 3rd grading ritual + the durable "definition of an A."
 
-**Cycle-10 experiment reset → genesis 2026-07-22 (Wed)** (`b206bf21`, `restart_pipeline.py --apply
---override-weight-lbs 321.38`; no 07-22 weigh-in existed, honest last-known 07-20 baseline used).
-Clean-prologue start — "Before the Numbers" preserved as the genesis−6 lead-in (readable, Prologue·PartI).
-- **Semantic gate 7/7** (authoritative — character zeroed, pre_start flags, **0 poisoned rows / 32 raw-timeseries sources**). Ledger rolled → **$0**. SSM cycle=10, constants=2026-07-22 fleet-wide. Live `/api/journey` confirms `day_n:0, pre_start:true, days_until_start:1, start_weight:321.4`.
-- **Rendered gate: 2 verified FALSE-POSITIVES** — `/api/vitals` + `/panelcast/episodes.json` tripped the "outgoing-genesis literal (2026-07-20)" scan, but 07-20 is *legitimately* the last-data `as_of_date` AND the genesis−2 prequel date. A 2-day-gap reset collides the outgoing genesis with real new-cycle dates; the literal scan can't tell them apart. Semantic gate is authoritative.
-- **Truth gate: LOUD-SKIPPED at budget tier 1** (July window) — the AI reader-truth layer did NOT run this reset. Recorded in `_verify_truth_report.txt` + RESET_LOG. **Not a green.**
+**PR #1683 (#1649) — hygiene cleanup safe-subset** — merged. Retired `archive/` (315 tracked/140M) + verified-dead one-shots (`patches/ backfill/ spikes/ backup/ seeds/archive/` + 10 render PNGs): **−429 files / −109k lines**. `git tag pre-hygiene-2026-07-22`; 135M safety zip handed to Matthew (scratch path — MOVE IT, session-scoped). `freshness_checker` one-line string change rides the next LifePlatformEmail deploy (cosmetic SNS hint). **The audit MISLABELED load-bearing dirs** (`setup/` = DR/re-auth toolkit; `lambdas/{fonts,cf-auth,dashboard,requirements}`; `seeds/*.json` incl. content_filter.json; `mcp_server.py`) — all KEPT after a tree survey; #1651/#1652/#1657 re-scoped via comments.
 
-**#1644 (#1634) — canary judge false-positive fix** (`0fc5acda`). The advisory Haiku judge FP'd on "Dr. Sarah Chen" (a sanctioned coach persona) as an AI-vendor break. Rewrote the prompt to the real contract (vendor/model ≠ coach persona), `_persona_names()` **derives from `persona_registry`/`config/personas.json`** (not hardcoded), deterministic verdict authoritative (ADR-105), judge stays advisory (ADR-108). Deployed `LifePlatformOperational`.
+**PR #1680 (#1659) — gitleaks secret-scan** — merged, LIVE (runs PR-diff-scoped on every PR, `--log-opts base..head` so legacy public-era strings don't red every PR).
 
-**#1645 (#1640) — OG share cards signed with the AJM dial mark** (`cde14687`). Mark wired into the shared `card_engine.base_canvas()` (covers all 13 cards, transcribed from `mark-a.svg` as Pillow primitives, no rasterizer). Deployed + invoked `og-image-generator` → **13/13 regenerated**, dial mark confirmed live top-right.
+**PR #1681 (#1660) — CodeQL SAST (python + javascript-typescript)** — merged, LIVE + GREEN on first main run (advisory; promotion-to-blocking is #1662/gate:owner).
 
-**#1646 (#1618) — receipts projection curve** (`96d1278a`). `/method/receipts/` now draws solid MTD + a dashed governor projection to month-end (from `projected_month_end_usd`, no JS re-extrapolation), caption = "governor ESTIMATE" (ADR-105). site-api deployed (`month_end_date` field) + site auto-deploy. Render-QA'd live both themes: projection $94.6 under the $115 July ceiling (tier 1) — no crossing, the honest depiction.
+**PR #1684 (#1643) — reset regen-list fix** — merged (operator script, no deploy). Real name `daily-brief` + `{"dry_run":true}` payload (a bare `{}` would EMAIL the brief every reset — see [[reference_regen_invoke_email_lambda_trap]]) + a dry-run get-function guard.
 
-**#1667 (#1639) — full head-chrome on every content page** (`260e03d3`). Single-source `scripts/v4_chrome.py head_chrome()` + `--check` gate; **79 pages** got the manifest/apple-touch/theme-color/SVG-favicon block (not 61 — that was manifest-only; SVG favicon was on 0). Site-only, auto-deployed.
+**PR #1682 (#1669 + #1670) — Social Membrane inbound foundation** — merged + **CDK deployed** (`LifePlatformIngestion`). New `youtube-social-ingestion` Lambda LIVE but **DORMANT** (smoke-verified: StatusCode 200, records_written:0, errors:0 — no channel-id secret). `lambdas/social_provenance.py` = the loop-breaker membrane. YouTube = keyless per-channel RSS.
 
-Two doc-sync reconciles handled the cumulative `test_count` (4857→4866 after the batch, →4870 after #1667).
+**PR #1685 — secret-hygiene follow-up** — merged. Withings `AUTH_CODE` → env var (spent one-time code); eightsleep `KNOWN_*` documented as public app creds + `gitleaks:allow`.
 
-## Also done (no merge)
-- **The Social Membrane** — `/plan` for bidirectional social (ingest own posts → coach signal + display, not just outbound). **Epic #1668 + 11 stories #1669–#1679** filed (Now/Next/Later). The loop-breaker Matthew flagged ("don't re-ingest the platform's own outbound posts → spanning-tree echo") is a foundational story: **#1670 the provenance membrane**. Cross-linked to the pre-existing **outbound** epic **#1619** as its inbound counterpart — one bidirectional program. Locked decisions: all-platforms/auto-where-possible, auto public feed behind a fail-closed sensitivity gate, facades-now/native-later, membrane is foundational. Plan file: `~/.claude/plans/quizzical-riding-chipmunk.md`.
-- **#1643 filed** — `restart_site_copy_sync.py:82` regen-invokes non-existent `life-platform-daily-brief` (real name `daily-brief`) → the benign `err(254)`.
+**Reconcile:** doc-sync `lambda_count` 95→96, `test_count` 4869→4887 (commit `4359d22d`, pushed to main after the batch).
+
+## Verified
+- Full suite on the cleanup branch: **6415 passed** (sole failure = `test_i16_recent_ingest_records_exist`, a `pytest.mark.integration` live-AWS test CI excludes via `-m "not integration"`; failing locally only because cycle-10 is pre-start Day-0).
+- Every merged PR's CI CLEAN/MERGEABLE pre-merge; all 6 `Fixes #N` issues auto-closed (#1649/#1659/#1660/#1669/#1670/#1643).
+- CDK deploy exit 0 (145s); youtube Lambda `Active`, no-ops cleanly. `cdk diff` = new youtube resources + one-bundle hash bump on all ingestion lambdas (expected #781 behavior).
+- Every agent finding git-grep-verified on-branch. **The Social Membrane agent's FIRST report was incomplete** — missed 3 deploy-critical registry gaps (lambda_map / KNOWN_SECRETS / heartbeat exemption); CI's `deploy_critical` marker lane caught them, sent it back, all fixed + re-verified.
 
 ## Gotchas hit
-- **Small-gap reset → rendered-gate false-positives.** When genesis moves only a few days, the outgoing genesis literal collides with legitimate new-cycle dates (last-data `as_of_date`, the genesis−2 prequel). The rendered gate's string scan false-fails; the **semantic gate is the authoritative correctness signal** (it checks meaning, not literals). Don't rollback on a rendered-gate-only fail — diff the actual served JSON first. → memory `reference_small_gap_reset_false_positive`.
-- **Agent self-reports still need verification.** All 6 worktree-agent findings independently `git grep`-verified before relaying — all held this time, but the OG agent correctly flagged the issue's "13 cards" vs stale docstring "6"/"12"; the head-chrome agent corrected "61"→"79". Verify counts, don't relay them.
-- **Concurrent-session shared-tree race (again).** My reconcile `git add -A` (214b7d58) swept in the parallel session's staged `git mv` (their handover archive). No damage, but it's the standing shared-index hazard — wrapping each session from its own worktree would avoid it (noted as a hygiene consideration, not filed).
-- **`node --test tests/js/` with a dir arg fails; CI runs bare `node --test`** (carried from prior session, hit again).
+- **Audit findings mislabel load-bearing dirs as throwaway** — survey before ANY delete-per-AC ([[reference_audit_mislabels_loadbearing_dirs]]). Deleting per #1651's ACs would have broken prod + DR.
+- **Regen-invoke of an email Lambda with `{}` SENDS the email** — the #1643 latent trap; the wrong function name had been masking it with `err(254)` ([[reference_regen_invoke_email_lambda_trap]]).
+- **Agent self-reports need CI cross-check, not just the agent's targeted run** — deploy-critical marker lane ≠ a targeted pytest subset.
+- **zsh `$VAR:l`** is a lowercase modifier — `git show "$BR:lambdas/…"` ate the `l`; brace it `"${BR}:…"`.
 
 ## Gate outcomes
-- **Build beat:** `2026-07-21-receipts-honest-projection` (the #1618 curve — the platform's honesty ethos made visible; OG marks / head-chrome / reset mentioned in a clause).
-- **Docs:** none needed beyond the reset's own auto-sync (CHANGELOG/SCHEMA/RESET_LOG in `b206bf21`) + the two `test_count` reconciles. The 4 code PRs touch no canonical wiki page.
-- **Decisions:** none needed — the reset is routine under ADR-077; the Social Membrane is a filed plan/epic, not a shipped governance choice (its ADR, if any, lands with #1678's CSP amendment).
-- **Main:** red — the latest completed non-cancelled CI/CD run (`953566a2`) is parked/FAILED at the manual production Deploy gate; superseding commits' runs auto-cancelled. My automated gates (Lint/Test/Plan) are green; this is the standing manual-gate park, not a test break.
-- **Incidents:** none — no auto-rollback fired (all site-deploys green), no main-red>1h beyond the standing manual-gate park, no data gap; the tier-1 truth-gate skip is the pre-existing July-window condition (logged in RESET_LOG, not a new incident).
-- **Stash/hooks:** clean — `git stash list` empty, hook freshness 🟢.
-- **Labels:** OK — 97 open type:story issues all carry `model:*`.
+- **Build beat:** `2026-07-22-repo-craft-hardening` (the security-gates + honest-cleanup story; gotcha = the mislabeled dirs; honest miss = all under-the-hood + the dormant social spine).
+- **Docs:** `docs/SCHEMA.md` updated (new `youtube` source + `BROADCAST_ORIGIN#` provenance-ledger key families, Verified→2026-07-22); counts reconciled at merge. `check_doc_index` flags `docs/engines/SCORING.md` re-verify (pre-existing — `daily_metrics_compute_lambda.py` changed 2026-07-21, not this session). Links/tombstones/ADR-index green.
+- **Decisions:** none needed — the reset is routine (ADR-077); the security gates were anticipated by ENGINEERING_STANDARDS.md D6 (no new governance choice); the Social Membrane's ADR (if any) lands with #1678's CSP amendment.
+- **Main:** parked — latest CI/CD run (`4359d22d` / `e73adf73`) pending at the manual production Deploy gate; automated Lint/Test/Plan green; older runs auto-cancelled (the standing manual-gate park, not a test break).
+- **Incidents:** none — no auto-rollback fired, no data gap, no main-red>1h beyond the manual-gate park; the youtube dormant no-op is by design.
+- **Stash/hooks:** clean — `git stash list` empty; hook freshness 🟢.
+- **Labels:** OK — 91 open type:story issues all carry `model:*`.
 
 ## Residual / next-picks
-- **PR #1647 (eng-excellence /craft-review skill + ENGINEERING_STANDARDS.md) OPEN** — owner-merge, then drain epic **#1648** (18 stories #1649–#1666) via `/uplevel` (Now tranche #1649/#1651/#1652/#1657/#1659/#1660). (#1647, #1648)
-- **The Social Membrane** — start the foundation: **#1669** (inbound ingestion framework + YouTube) + **#1670** (provenance membrane, ships together). (#1668/#1669/#1670)
-- **#1620** — outbound social links + follow affordances; the outbound half of #1619/#1668; runs the `v4_apply_chrome` HTML sweep so land it AFTER any reset/head-chrome sweep. (#1620)
-- **#1643** — fix the stale `daily-brief` regen name in `restart_site_copy_sync.py`. (#1643)
-- **AiReviewPack (#1594) first fires Sunday 18:00 UTC** — a new weekly QA email to Matthew; review/mute before then if unwanted. `not-work — owner review of a just-activated schedule`.
-- **Standing alarms:** none newly outstanding; budget **tier 1** (July window working as designed, not an alarm). `not-work — standing-alarms checklist, nothing to action`.
+- **Activate YouTube ingestion** — provision the `life-platform/youtube` secret `{"channel_id":"UC..."}`, then flip registry `active_api:True` + drop `freshness:False`/`catalog:False`. `not-work — owner secret provisioning`.
+- **Social Membrane Next tranche** — #1671 (enrichment→coach signals), #1672 (broadcast feed page), #1673 (auto-publish safety gate). (#1671/#1672/#1673)
+- **Eng-excellence remaining** — #1657 (lint waivers, re-scoped as careful surgical work), #1656/#1658 (mypy strict + coverage 70% big-bang), #1655 (CI composition), #1652 (root-clutter guard — the durable win; handovers/ 479-file reduction is gate:owner). (#1657/#1656/#1658/#1655/#1652)
+- **Gate:owner eng-excellence** — #1662 (branch protection Option C), #1666 (proportionality ADR), #1650 (handovers disposition). (#1662/#1666/#1650)
+- **#1620** — outbound social links; runs the `v4_apply_chrome` HTML sweep, land AFTER any site/head sweep. (#1620)
+- **`freshness_checker` string** — the #1683 one-liner deploys with the next LifePlatformEmail stack deploy (or the CI Deploy gate). `not-work — cosmetic, rides next email deploy`.
+- **AiReviewPack (#1594)** fires Sunday 18:00 UTC — Matthew flagged wanting a mute decision. `not-work — owner decision on a just-activated schedule`.
+- **`docs/engines/SCORING.md` re-verify** — pre-existing staleness note (source changed 2026-07-21). `not-work — pre-existing doc-verify, unrelated to this session`.
+- **Standing alarms:** none newly outstanding; budget **tier 1** (July $115 window, auto-reverts 2026-08-01 — working as designed). `not-work — standing checklist, nothing to action`.
+
+**Build beat:** 2026-07-22-repo-craft-hardening

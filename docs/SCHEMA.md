@@ -1,6 +1,6 @@
 # Life Platform — Schema & Data Dictionary
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-19
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-22
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
@@ -119,6 +119,7 @@ Every pk/sk family in the `life-platform` table, derived from code (writers = `p
 | family (pk / sk) | what it holds | writer | readers | phase class | live? |
 |---|---|---|---|---|---|
 | `…SOURCE#{whoop, withings, strava, garmin, apple_health, eightsleep, habitify, todoist, weather, macrofactor, macrofactor_workouts, hevy, notion}` / `DATE#<d>` (+ `DATE#<d>#WORKOUT#<id>` sub-items, `DELETE#WORKOUT#<id>` tombstones, `DATE#<d>#journal#<template>` for notion) | ingested device/app metrics | `lambdas/ingestion/*_lambda.py` (per source) | `mcp/tools_*`, `lambdas/web/site_api_*`, compute lambdas | raw_timeseries | ✓ (whoop, hevy sampled) |
+| `…SOURCE#youtube` / `DATE#<d>#<post_id>` | **inbound-social foundation (#1669/#1670, epic #1668)** — Matthew's own posts, many-per-day (`#<post_id>` suffix); each row stamps `channel` + `origin` (`human`\|`platform`) provenance | `lambdas/ingestion/youtube_lambda.py` (keyless per-channel RSS) | `lambdas/social_provenance.py` exclusion predicates (S3/S4 pending) | raw_timeseries | empty (DORMANT — awaits `life-platform/youtube` channel_id) |
 | `…SOURCE#{habit_causality, food_delivery, sick_days, measurements, state_of_mind, mood, travel, interactions, exposures, temptations}` / `DATE#<d>` (+ `#TXN#<id>`, `MONTH#`/`YEAR#`/`STREAK#current` for food_delivery) | user-logged facts (MCP log tools / HAE webhook) | `mcp/tools_lifestyle.py`, `tools_social.py`, `tools_sick_days.py`, HAE lambda | same MCP domain tools, site_api | raw_timeseries | ✓ (temptations empty) |
 | `…SOURCE#day_grade` / `DATE#<d>` | the Day-Grade series (see `docs/engines/SCORING.md`) | `daily_metrics_compute_lambda.py`, daily brief | site_api_vitals, MCP | raw_timeseries (ADR-077 dec C) | ✓ |
 | `…SOURCE#flourishing` / `DATE#<d>` | daily PERMA projection over journal enrichment (#1403): `values_lived[_count]`, `gratitude_count`, `flow`, `growth_signals_count`, `ownership_score`, `social_quality_score` + `enrichment_model`/`enrichment_schema_version` provenance per row | `journal_enrichment_lambda.py` via `lambdas/flourishing.py` (idempotent projection; `{"flourishing_only": true}` = zero-LLM backfill) | MCP `get_flourishing_trend`, `character_sheet_lambda` (Relationships primary social input, Mind `values_alignment`) | raw_timeseries (fact layer, follows notion parent) | ✓ |
@@ -215,6 +216,7 @@ Every pk/sk family in the `life-platform` table, derived from code (writers = `p
 | `USER#matthew#ROUTINE#<version>` / — | Hevy routine IR audit trail | `lambdas/routine_repo.py` | routine repo | system_state | n/v |
 | `USER#system` / `CANARY#…` etc. | ops state (canary, DLQ ledger) | operational lambdas | monitors | system_state | ✓ |
 | `PULSE` / `DATE#<d>` | site pulse cache | pulse writer | site | system_state | ✓ |
+| `BROADCAST_ORIGIN#<channel>` / `POST#<post_id>` | **the provenance membrane ledger (#1670, epic #1668)** — one row per post the platform syndicates OUT, so inbound ingestion can stamp its own echoes `origin: platform` and exclude them from the voice feed / enrichment / re-broadcast. SYSTEM_STATE (provenance is cross-phase truth — survives reset). Outbound writer (`social_provenance.record_broadcast_origin`) hooks in when #1402's syndication path lands | `lambdas/social_provenance.py` (write helper); #1402 outbound (pending) | `social_provenance.classify_origin` inbound cross-ref | system_state | empty (DORMANT) |
 | `CACHE#<…>` / — | generation/template caches | `generation_cache.py`, `hevy_template_cache.py` | same | system_state | n/v |
 | `…SOURCE#{journal_analysis, health_check, dropbox_tracker, hevy_id_map, routine_index, email_log#<type>, google_calendar, composite_scores, sleep_unified}` | caches, trackers, sent-mail archive, dead partitions | various (email_log: email lambdas; hevy_id_map: routine_repo) | various | system_state | ✓ (email_log#daily_brief) |
 | `INGEST_HEALTH#<source>`, `CANARY#<…>`, `ALERTSTATE#<…>`, `ENTITY_REGISTRY#current`, `BEHAVIOR_REGISTRY#current`, `USER#admin#SOURCE#deletion_log` | ingest liveness, synthetic monitors, alert dedup, static registries, deletion audit | ingestion_framework, operational lambdas | freshness checker, monitors | system_state (#951 — INGEST_HEALTH#/ALERTSTATE#/registries are sks on already-classified pks; CANARY#* and `deletion_log` classified directly) | n/v |
