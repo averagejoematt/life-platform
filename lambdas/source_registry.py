@@ -502,7 +502,12 @@ SOURCE_REGISTRY = {
         "method": "Keyless per-channel RSS pull (framework), hourly",
         "metrics": "Video posts — the outbound public voice, ingested back in",
         "posture": "portfolio",
-        "capture_channel": "youtube",
+        # #1682 follow-up: deliberately NO capture_channel. YouTube is a scheduled,
+        # keyless RSS pull with no human in the capture loop — per this registry's
+        # contract (see the capture_channel doc above) an automatic pipe must not
+        # carry one. A stray capture_channel here mislabelled youtube as a manual
+        # "you forgot to log" source in evening nudges / coach check-ins / the data
+        # API, and tripped test_capture_channels_are_matthews_three.
         # Not on the public /data/ + gear catalogues yet — the source is wired but
         # awaits owner channel-id provisioning + the S4 display story (epic #1668).
         "catalog": False,
