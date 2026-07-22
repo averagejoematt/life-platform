@@ -169,7 +169,7 @@ def check_apple_health_activity(table, now, sick_suppress):
         "  • Confirm the HAE 'Step counts' automation has Aggregate Data ON (daily totals,\n"
         "    small payload) — raw per-sample exports 413 silently.\n"
         "  • If it just broke, re-send via a one-time Apple Health file export\n"
-        "    (backfill/onetime_apple_health_import_*.py).\n\n"
+        "    (run the HAE 'Health Data' export for the gap window and re-ingest).\n\n"
         f"Checked at: {now.strftime('%Y-%m-%d %H:%M UTC')}"
     )
     return msg, metrics
