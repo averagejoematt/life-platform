@@ -1862,17 +1862,49 @@ Write your {domain_label} coaching section now."""
         if _gen_cache is not None and _cache_tbl is not None and _brief_fp and output:
             _gen_cache.store_entry(_cache_tbl, coach_id, output_type, _brief_fp, output, _date_cls.today().isoformat())
 
+        # #1691 (epic #1687): baseline-freshness gate — ADVISORY. The DATA-grounding
+        # gates above pass a brief that is digit-grounded yet cites a STALE cycle
+        # constant (cycle-9 "315 lbs" / "Day 1" after a cycle-10 genesis — 4 of 5
+        # high-concern items on 2026-07-22 were this class). This deterministic,
+        # zero-AI check flags that class against the LIVE constants. It is advisory
+        # for now — findings are logged + stamped into the qa_archive meta and
+        # surfaced in the weekly review pack; generation is NOT held. PROMOTION HOOK:
+        # to make it fail-closed later (ADR-104/105 — the deterministic layer CAN
+        # block), regenerate-or-hold on `_freshness_findings` here exactly like the
+        # presence-ack gate above. Fail-soft: never raises into the generation path.
+        _gen_date = _date_cls.today().isoformat()
+        _freshness_findings = []
+        try:
+            import grounded_generation as _gg_fresh
+
+            _freshness_findings = _gg_fresh.baseline_freshness_findings(
+                output or "",
+                generation_date_iso=_gen_date,
+                baseline_lbs=EXPERIMENT_BASELINE_WEIGHT_LBS,
+                start_date_iso=EXPERIMENT_START_DATE,
+            )
+            if _freshness_findings:
+                print(
+                    f"[COACH-V2:{coach_id}] baseline-freshness gate (advisory) fired: "
+                    + "; ".join(f.get("detail", "") for f in _freshness_findings)
+                )
+        except Exception as _fresh_e:  # noqa: BLE001 — advisory gate is never load-bearing
+            print(f"[COACH-V2:{coach_id}] baseline-freshness gate failed (non-blocking): {_fresh_e}")
+
         # #1441: generation-time archive — the exact gate-passed text that goes to
         # the state updater (i.e. what the brief + site publish) lands in
         # generated/qa_archive/ keyed by date+surface. Fail-soft inside the module.
         try:
             import qa_archive
 
+            _qa_meta = {"output_type": output_type, "generation_date": _gen_date}
+            if _freshness_findings:
+                _qa_meta["baseline_freshness_findings"] = _freshness_findings
             qa_archive.archive_text(
                 "coach_brief",
                 output,
                 variant=coach_id,
-                meta={"output_type": output_type, "generation_date": _date_cls.today().isoformat()},
+                meta=_qa_meta,
             )
         except Exception as _qa_e:  # noqa: BLE001 — the archive is never load-bearing
             print(f"[COACH-V2:{coach_id}] qa_archive failed (non-blocking): {_qa_e}")
