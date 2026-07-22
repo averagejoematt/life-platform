@@ -137,6 +137,23 @@ def test_build_html_shows_sections_counts_and_screenshot_links():
     assert "console.aws.amazon.com" in html
 
 
+def test_build_html_shows_stable_number_tag_and_ranked_digest():
+    # #1688: a coach_brief with a stale baseline gets numbered, tagged, and stack-ranked.
+    dates = arp.week_dates(end=date(2026, 7, 25))
+    e = _entry(
+        "coach_brief",
+        "Starting weight: 300 lb. You maintained your eating window today.",
+        "2026-07-25T09:00:00+00:00",
+        variant="nutrition",
+        meta={"generation_date": "2026-07-25", "grounded": True},
+    )
+    html = arp.build_html(dates, {"coach_brief": [e]}, {}, read_errors=0)
+    assert "Stack-ranked" in html  # the ranked digest section
+    assert "#1" in html  # a stable number was assigned
+    assert "stale-baseline" in html  # the error-class tag chip
+    assert "checkable claim" in html  # the extracted claim label
+
+
 def test_build_html_quiet_week_still_renders():
     dates = arp.week_dates(end=date(2026, 7, 20))
     html = arp.build_html(dates, {}, {}, read_errors=0)
@@ -165,6 +182,23 @@ def test_unknown_surface_still_renders(monkeypatch):
 def test_lambda_handler_sends_and_records(monkeypatch):
     monkeypatch.setattr(arp.qa_archive, "list_day", lambda d, kind="text": ["k/1"] if (kind == "text" and d == "2026-07-20") else [])
     monkeypatch.setattr(arp.qa_archive, "read_entry", lambda k: _entry("chronicle", "hi", "2026-07-20T09:00:00+00:00"))
+    # #1688: keep the handler test OFFLINE — force the ranking deterministic-only so the
+    # tier-gated Haiku critic (budget_guard SSM read + Bedrock) never fires in unit tests.
+    monkeypatch.setattr(
+        arp,
+        "compute_ranking",
+        lambda by_surface, **kw: (
+            arp._ranker.rank_pack(
+                by_surface,
+                start_date_iso=arp.EXPERIMENT_START_DATE,
+                baseline_lbs=arp.EXPERIMENT_BASELINE_WEIGHT_LBS,
+                surface_order=arp.SURFACE_ORDER,
+                tier_reader=lambda: 99,
+            )
+            if arp._ranker
+            else None
+        ),
+    )
 
     class _FixedDate(datetime):
         @classmethod

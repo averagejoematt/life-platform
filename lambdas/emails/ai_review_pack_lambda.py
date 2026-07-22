@@ -13,10 +13,21 @@ notes, Coach memoirs — as a scannable digest with an inline snippet and a link
 the full archived object. One email = a guaranteed weekly human read of every AI
 surface.
 
+Ranked + tagged (#1688, epic #1687 S1): each generation is numbered (a STABLE number
+so Matthew can correct by #N and the correction compounds — #1689/#1690), stack-ranked
+most-likely-wrong→least, and tagged with a checkable claim + an error-class. Ranking is
+HYBRID (`lambdas/review_pack_ranker.py`): deterministic heuristics ALWAYS (baseline-
+mismatch, ungrounded-behavioral-verb, claim-density, hedge-absence), PLUS a cheap Haiku
+"critic" pass layered on ONLY when the budget tier ≤ 1 (the epic-locked per-feature
+policy — gated directly on tier, not budget_guard's generic band; at tier ≥ 2 the
+deterministic ranking stands and Bedrock is never called).
+
 Design notes:
   * READ-ONLY over the archive. It curates already-generated, already-gate-passed
-    text — it makes NO Bedrock calls, so it needs no ai-keys/Bedrock grant and no
-    budget-tier gate (a review of what already shipped can never be a budget risk).
+    text. It makes at most ONE cheap Haiku critic call per week, and ONLY at budget
+    tier ≤ 1 — so it needs a bedrock:InvokeModel grant + a budget-tier SSM read
+    (added to the ai-review-pack role in role_policies.py by #1688). At tier ≥ 2 it
+    makes NO Bedrock call at all (the deterministic ranking is the zero-cost floor).
   * The archive is S3-private (generated/qa_archive/ is NOT routed by CloudFront —
     web_stack only forwards specific /generated sub-paths). So the "link" for each
     generation is an AWS S3 console deep-link (auth-gated), not a public URL — the
@@ -57,6 +68,13 @@ except Exception:  # pragma: no cover — bundle-dependent; the flag simply degr
     _gg = None
     EXPERIMENT_BASELINE_WEIGHT_LBS = None
     EXPERIMENT_START_DATE = None
+
+# #1688 (epic #1687): the Hybrid ranker + tagger. Bundled (#781); import fail-soft so
+# a missing module degrades the pack to the legacy flat rendering rather than dying.
+try:
+    import review_pack_ranker as _ranker
+except Exception:  # pragma: no cover — bundle-dependent; ranking simply degrades off
+    _ranker = None
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -218,30 +236,147 @@ def _freshness_flag_html(entry):
     )
 
 
-def _entry_card(entry):
+# #1688: per-error-class chip colors. Keyed by coach_corrections.ERROR_CLASSES values.
+_ERROR_CLASS_COLORS = {
+    "stale-baseline": ("#fca5a5", "#3a1216", "#7f1d1d"),
+    "ungrounded-behavioral": ("#fdba74", "#3a2410", "#7c2d12"),
+    "cross-coach-inconsistency": ("#c4b5fd", "#231a3a", "#5b21b6"),
+    "framing": ("#fcd34d", "#332a10", "#78350f"),
+    "checkable-metric": ("#93c5fd", "#111f3a", "#1e3a8a"),
+    "hedged-safe": ("#86efac", "#0f2a1a", "#14532d"),
+    "defense-held": ("#86efac", "#0f2a1a", "#14532d"),
+    "other": ("#9ca3af", "#1f2430", "#374151"),
+}
+
+
+def _tag_chip_html(error_class):
+    fg, bg, border = _ERROR_CLASS_COLORS.get(error_class, _ERROR_CLASS_COLORS["other"])
+    return (
+        f'<span style="display:inline-block;font-size:11px;font-weight:600;color:{fg};background:{bg};'
+        f'border:1px solid {border};border-radius:10px;padding:1px 8px;">{html.escape(error_class)}</span>'
+    )
+
+
+def _flags_html(analysis):
+    """#1688: render the deterministic findings (baseline/genesis/behavioral/cross-coach)
+    as one advisory block — folds in the #1691 baseline-freshness flag. [] → ""."""
+    if not analysis:
+        return ""
+    rows = []
+    for f in analysis.get("baseline", []):
+        rows.append("&#9888;&#65039; baseline-freshness: " + html.escape(str(f.get("detail", f.get("type", "")))))
+    for f in analysis.get("genesis", []):
+        rows.append("&#9888;&#65039; genesis-mismatch: " + html.escape(str(f.get("detail", ""))))
+    for f in analysis.get("behavioral", []):
+        rows.append("&#9888;&#65039; ungrounded-behavioral: " + html.escape(str(f.get("detail", ""))))
+    for f in analysis.get("cross_coach", []):
+        rows.append("&#9888;&#65039; cross-coach: " + html.escape(str(f.get("detail", ""))))
+    if not rows:
+        return ""
+    inner = "<br>".join(rows)
+    return (
+        '<div style="color:#fca5a5;background:#3a1216;border:1px solid #7f1d1d;border-radius:6px;'
+        f'font-size:12px;padding:6px 8px;margin:2px 0 8px;">{inner}</div>'
+    )
+
+
+def _claim_html(analysis):
+    if not analysis or not analysis.get("checkable_claim"):
+        return ""
+    return (
+        '<div style="color:#cbd5e1;font-size:12px;margin:2px 0 6px;">'
+        f'<span style="color:#6b7280;">checkable claim:</span> {html.escape(analysis["checkable_claim"])}</div>'
+    )
+
+
+def _entry_card(entry, num=None, analysis=None):
     when = entry.get("archived_at", "")[:16].replace("T", " ")
     meta_line = _meta_line(entry)
     meta_html = f'<div style="color:#9ca3af;font-size:12px;margin:2px 0 8px;">{meta_line}</div>' if meta_line else ""
-    freshness_html = _freshness_flag_html(entry)
+    # #1688: prefer the analysis-driven flags/claim/tag; fall back to the legacy #1691
+    # freshness flag when no analysis was computed (ranker missing → graceful degrade).
+    if analysis is not None:
+        flags_html = _flags_html(analysis)
+        claim_html = _claim_html(analysis)
+        tag_html = _tag_chip_html(analysis.get("error_class", "other"))
+    else:
+        flags_html = _freshness_flag_html(entry)
+        claim_html = ""
+        tag_html = ""
+    num_badge = f'<span style="color:#f59e0b;font-weight:700;">#{num}</span> ' if num is not None else ""
     return f"""
       <div style="background:#12162e;border:1px solid #2a2d4a;border-radius:8px;padding:12px 14px;margin-bottom:10px;">
-        <div style="display:flex;justify-content:space-between;font-size:11px;color:#6b7280;margin-bottom:4px;">
-          <span>{html.escape(when)} UTC</span>
-          <a href="{_console_url(entry['_key'])}" style="color:#6366f1;text-decoration:none;">open in S3 &rsaquo;</a>
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#6b7280;margin-bottom:4px;">
+          <span>{num_badge}{html.escape(when)} UTC</span>
+          <span>{tag_html} <a href="{_console_url(entry['_key'])}" style="color:#6366f1;text-decoration:none;">open in S3 &rsaquo;</a></span>
         </div>
         {meta_html}
-        {freshness_html}
+        {claim_html}
+        {flags_html}
         <div style="color:#d1d5db;font-size:13px;line-height:1.5;white-space:pre-wrap;">{_snippet(entry.get('text'))}</div>
       </div>"""
 
 
-def _surface_section(surface, entries):
+def _ranked_digest_section(ranking):
+    """#1688 (AC4): the stack-ranked digest — every generation, most-likely-wrong → least,
+    each with its STABLE number, provenance, error-class tag, checkable claim, and flags.
+    This is the headline of the uplifted pack. Empty ranking → "" (quiet week degrades)."""
+    ranked = (ranking or {}).get("ranked") or []
+    if not ranked:
+        return ""
+    critic_note = (
+        ' <span style="color:#22c55e;">· Haiku critic layered on</span>'
+        if ranking.get("critic_ran")
+        else f' <span style="color:#6b7280;">· deterministic only (budget tier {ranking.get("tier")})</span>'
+    )
+    rows = []
+    for n, entry, analysis in ranked:
+        surface = entry.get("surface", "unknown")
+        provenance_bits = [_label(surface)]
+        if entry.get("variant"):
+            provenance_bits.append(str(entry["variant"]))
+        provenance_bits.append(entry.get("date", ""))
+        grounded = (entry.get("meta") or {}).get("grounded")
+        if grounded is not None:
+            provenance_bits.append("grounded" if grounded else "ungrounded")
+        provenance = html.escape(" · ".join(str(b) for b in provenance_bits if b))
+        claim = html.escape(analysis.get("checkable_claim") or "(no checkable claim extracted)")
+        crit = analysis.get("critic")
+        score_bits = f'score {analysis.get("score")}' + (f" (critic {crit})" if crit is not None else "")
+        rows.append(
+            f"""
+      <div style="background:#12162e;border:1px solid #2a2d4a;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <span style="font-size:13px;font-weight:700;color:#f59e0b;">#{n}</span>
+          <span>{_tag_chip_html(analysis.get("error_class", "other"))} <span style="color:#6b7280;font-size:11px;">{html.escape(score_bits)}</span></span>
+        </div>
+        <div style="color:#9ca3af;font-size:11px;margin-bottom:4px;">{provenance} · <a href="{_console_url(entry['_key'])}" style="color:#6366f1;text-decoration:none;">open in S3 &rsaquo;</a></div>
+        <div style="color:#d1d5db;font-size:12px;line-height:1.45;">{claim}</div>
+        {_flags_html(analysis)}
+      </div>"""
+        )
+    return f"""
+    <div style="margin-bottom:26px;">
+      <div style="font-size:14px;font-weight:700;color:#ffffff;border-bottom:1px solid #2a2d4a;padding-bottom:6px;margin-bottom:10px;">
+        🎯 Stack-ranked · most-likely-wrong first <span style="color:#6b7280;font-weight:400;font-size:12px;">({len(ranked)})</span>{critic_note}
+      </div>
+      <div style="color:#6b7280;font-size:11px;margin-bottom:8px;">Correct any item by its number (#N) — the number is stable for the week. Corrections compound (epic #1687).</div>
+      {"".join(rows)}
+    </div>"""
+
+
+def _surface_section(surface, entries, nmap=None):
     icon = SURFACE_ICONS.get(surface, "•")
     label = _label(surface)
     if not entries:
         body = '<div style="color:#6b7280;font-size:12px;font-style:italic;padding:6px 0;">Nothing generated this week.</div>'
     else:
-        body = "".join(_entry_card(e) for e in entries)
+        nmap = nmap or {}
+        cards = []
+        for e in entries:
+            num, analysis = nmap.get(e.get("_key"), (None, None))
+            cards.append(_entry_card(e, num=num, analysis=analysis))
+        body = "".join(cards)
     return f"""
     <div style="margin-bottom:26px;">
       <div style="font-size:14px;font-weight:700;color:#ffffff;border-bottom:1px solid #2a2d4a;padding-bottom:6px;margin-bottom:10px;">
@@ -277,16 +412,51 @@ def _screenshots_section(screenshots_by_date):
     </div>"""
 
 
-def build_html(dates, by_surface, screenshots_by_date, read_errors):
+def compute_ranking(by_surface, *, tier_reader=None, invoke_fn=None):
+    """#1688: HYBRID rank the week's pack (deterministic heuristics + tier-gated Haiku
+    critic). Returns the ranker's result dict, or None if the ranker module is missing
+    (graceful degrade to the legacy flat rendering). This is where the LIVE tier gate +
+    Bedrock call happen — `build_html` never triggers them (it renders a passed-in or
+    deterministic-only ranking), so unit tests stay offline."""
+    if _ranker is None:
+        return None
+    return _ranker.rank_pack(
+        by_surface,
+        baseline_lbs=EXPERIMENT_BASELINE_WEIGHT_LBS,
+        start_date_iso=EXPERIMENT_START_DATE,
+        surface_order=SURFACE_ORDER,
+        tier_reader=tier_reader,
+        invoke_fn=invoke_fn,
+    )
+
+
+def _nmap_from_ranking(ranking):
+    """{_key: (number, analysis)} so the per-surface cards can show each item's stable
+    number + tag + flags."""
+    if not ranking:
+        return {}
+    analyses = ranking.get("analyses") or {}
+    return {entry.get("_key"): (n, analyses.get(n)) for n, entry in ranking.get("numbered", [])}
+
+
+def build_html(dates, by_surface, screenshots_by_date, read_errors, ranking=None):
     total = sum(len(v) for v in by_surface.values())
     active_surfaces = sum(1 for s in SURFACE_ORDER if by_surface.get(s))
     start_label = _fmt_date(dates[0])
     end_label = _fmt_date(dates[-1])
 
-    sections = "".join(_surface_section(s, by_surface.get(s, [])) for s in SURFACE_ORDER)
+    # No live ranking supplied (unit tests / degraded path): compute a DETERMINISTIC-ONLY
+    # ranking — the tier_reader is pinned above the critic ceiling so no Bedrock call and
+    # no SSM read ever fire from build_html. _run() supplies the real, tier-gated ranking.
+    if ranking is None:
+        ranking = compute_ranking(by_surface, tier_reader=lambda: 99)
+
+    nmap = _nmap_from_ranking(ranking)
+    sections = _ranked_digest_section(ranking)
+    sections += "".join(_surface_section(s, by_surface.get(s, []), nmap=nmap) for s in SURFACE_ORDER)
     # Any archived surface not in our known order still gets shown (fail-open).
     for s in sorted(set(by_surface) - set(SURFACE_ORDER)):
-        sections += _surface_section(s, by_surface[s])
+        sections += _surface_section(s, by_surface[s], nmap=nmap)
     sections += _screenshots_section(screenshots_by_date)
 
     err_html = ""
@@ -361,7 +531,22 @@ def _run(event, context):
         f"[ai-review-pack] {total} generations, {sum(len(v) for v in screenshots_by_date.values())} screenshots, {read_errors} read errors over {dates[0]}..{dates[-1]}"
     )
 
-    html_body = build_html(dates, by_surface, screenshots_by_date, read_errors)
+    # #1688: HYBRID ranking — deterministic heuristics always; the Haiku critic layers on
+    # ONLY at budget tier ≤ 1 (the tier gate lives in review_pack_ranker.rank_pack, read
+    # from budget_guard.current_tier). Fail-soft: a ranker/Bedrock error degrades to the
+    # legacy flat rendering, never a lost editorial email.
+    ranking = None
+    try:
+        ranking = compute_ranking(by_surface)
+        if ranking is not None:
+            logger.info(
+                f"[ai-review-pack] ranked {len(ranking.get('numbered', []))} items; critic_ran={ranking.get('critic_ran')} tier={ranking.get('tier')}"
+            )
+    except Exception as e:  # pragma: no cover — ranking is advisory; never sink the email
+        logger.warning(f"[ai-review-pack] ranking failed (non-fatal, legacy render): {e}")
+        ranking = None
+
+    html_body = build_html(dates, by_surface, screenshots_by_date, read_errors, ranking=ranking)
     subject = f"🗂️ Weekly AI Review Pack · {_fmt_date(dates[0])}–{_fmt_date(dates[-1])} · {total} generation(s)"
 
     ses = boto3.client("sesv2", region_name=REGION)
