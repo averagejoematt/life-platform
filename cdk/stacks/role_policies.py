@@ -2150,11 +2150,28 @@ def operational_site_stats_refresh() -> list[iam.PolicyStatement]:
 
 
 def operational_insight_email_parser() -> list[iam.PolicyStatement]:
-    """Insight email parser: reads from SES S3 drop, writes insight records to DDB."""
+    """Insight email parser: reads from SES S3 drop, writes insight records to DDB.
+
+    #1690 (epic #1687): also the email-reply CORRECTION channel — a reply to the weekly
+    review-pack email with '#N <correction>' lines lands rows in the corrections ledger
+    (coach_corrections, the USER#matthew#SOURCE#coach_corrections partition; already
+    covered by the table-level PutItem below). To resolve each #N back to the archived
+    generation the pack numbered, it re-reads the D2 archive exactly as the pack does —
+    so it needs GetObject on the qa_archive text leg + a scoped ListBucket (mirrors the
+    email_ai_review_pack role's QaArchiveRead/QaArchiveList).
+    """
     return _operational_base(
         ddb_actions=["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:UpdateItem"],
-        needs_s3_read=["inbound-email/*"],
+        needs_s3_read=["inbound-email/*", "generated/qa_archive/text/*"],
         needs_dlq=True,
+        extra_statements=[
+            iam.PolicyStatement(
+                sid="QaArchiveList",
+                actions=["s3:ListBucket"],
+                resources=[BUCKET_ARN],
+                conditions={"StringLike": {"s3:prefix": ["generated/qa_archive/text/*"]}},
+            ),
+        ],
     )
 
 
@@ -2495,8 +2512,12 @@ def mcp_server() -> list[iam.PolicyStatement]:
         ),
         iam.PolicyStatement(
             sid="S3Read",
+            # #1690 (epic #1687): + generated/qa_archive/text/* — the log_coach_correction
+            # tool resolves a review-pack #N back to the archived generation it numbered,
+            # reading the D2 archive exactly as the weekly pack does (GetObject on the text
+            # leg; the scoped ListBucket for it is QaArchiveList below).
             actions=["s3:GetObject"],
-            resources=_s3("config/*", "raw/matthew/cgm_readings/*"),
+            resources=_s3("config/*", "raw/matthew/cgm_readings/*", "generated/qa_archive/text/*"),
         ),
         iam.PolicyStatement(
             sid="S3ListCGM",
@@ -2504,6 +2525,15 @@ def mcp_server() -> list[iam.PolicyStatement]:
             actions=["s3:ListBucket"],
             resources=[BUCKET_ARN],
             conditions={"StringLike": {"s3:prefix": ["raw/matthew/cgm_readings/*"]}},
+        ),
+        iam.PolicyStatement(
+            sid="QaArchiveList",
+            # #1690: log_coach_correction lists the review-pack week's archived generations
+            # (qa_archive.list_day) to number them — the same scoped listing the
+            # email_ai_review_pack role uses.
+            actions=["s3:ListBucket"],
+            resources=[BUCKET_ARN],
+            conditions={"StringLike": {"s3:prefix": ["generated/qa_archive/text/*"]}},
         ),
         iam.PolicyStatement(
             sid="S3Write",

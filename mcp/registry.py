@@ -13,6 +13,9 @@ from mcp.tools_cgm import tool_get_cgm
 
 # #915: ad-hoc coach check-in loop — coaches ask, Matthew answers verbatim.
 from mcp.tools_coach_checkin import tool_get_coach_checkin_queue, tool_log_coach_checkin
+
+# #1690 (epic #1687 S3): correct a weekly-review-pack item by number from chat.
+from mcp.tools_coach_corrections import tool_log_coach_correction
 from mcp.tools_coach_intelligence import tool_evaluate_prediction, tool_get_coach_thread, tool_get_coach_track_record, tool_get_predictions
 from mcp.tools_correlation import tool_get_zone2_breakdown
 from mcp.tools_data import (
@@ -1984,6 +1987,46 @@ TOOLS = {
                 "type": "object",
                 "properties": {},
                 "required": [],
+            },
+        },
+    },
+    "log_coach_correction": {
+        "fn": tool_log_coach_correction,
+        "schema": {
+            "name": "log_coach_correction",
+            "description": (
+                "#1690 (epic #1687): correct a weekly AI-review-pack item by its NUMBER. Matthew reads the "
+                "ranked review-pack email (each generation carries a stable #N) and corrects an item that's "
+                "wrong or misleading — this resolves #N back to the exact archived generation the pack numbered "
+                "and writes ONE row to the corrections ledger, tagged by error-class, so the mistake compounds "
+                "toward not recurring. Args: item_number (the #N, required), correction (what's wrong + what it "
+                "should say, required), error_class (OPTIONAL override — one of stale-baseline, "
+                "ungrounded-behavioral, cross-coach-inconsistency, framing, checkable-metric, hedged-safe, "
+                "defense-held, other; an unrecognized value is stored as 'other', never rejected). An unknown "
+                "or out-of-range number is REPORTED (with how many items the week's pack has), never silently "
+                "dropped. Twin of the email-reply channel — a reply of '#N <correction>' lines lands the same rows."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "item_number": {
+                        "type": "integer",
+                        "description": "The pack item number to correct (the #N from this week's review-pack email).",
+                    },
+                    "correction": {
+                        "type": "string",
+                        "description": "What was wrong and what it should say — Matthew's correction, stored verbatim.",
+                    },
+                    "error_class": {
+                        "type": "string",
+                        "description": (
+                            "Optional error-class override. One of: stale-baseline, ungrounded-behavioral, "
+                            "cross-coach-inconsistency, framing, checkable-metric, hedged-safe, defense-held, other. "
+                            "Unrecognized values are stored as 'other' (original label preserved), never rejected."
+                        ),
+                    },
+                },
+                "required": ["item_number", "correction"],
             },
         },
     },
