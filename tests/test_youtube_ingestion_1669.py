@@ -83,9 +83,16 @@ _FIXTURE_FEED = """<?xml version="1.0" encoding="UTF-8"?>
 
 
 def _offline(monkeypatch):
-    """Force offline, deterministic origin classification (empty ledger, no S3)."""
+    """Force offline, deterministic classification (empty ledger, no S3, no Bedrock).
+
+    Also stubs the #1673 sensitivity gate's off-topic classifier to a confident on-topic
+    verdict so transform() stays fully offline while still exercising the real gate (the
+    deterministic layer + the injected classifier). #1673's own tests cover the fail-closed
+    paths in isolation.
+    """
     monkeypatch.setattr(yt, "_ledger_table", lambda: None)
     monkeypatch.setattr(yt, "_S3_BUCKET", "")
+    monkeypatch.setattr(yt.gate, "bedrock_offtopic_classifier", lambda text: yt.gate.OfftopicResult(True, 0.95))
 
 
 # ── Channel-id resolution (the owner input) ─────────────────────────────────────
@@ -151,11 +158,15 @@ def test_transform_writes_suffixed_provenance_records(monkeypatch):
     assert human["origin"] == prov.ORIGIN_HUMAN
     assert human["views"] == Decimal("1234")
     assert isinstance(human["views"], Decimal)
+    # #1673: a clean, on-topic human post is stamped cleared → eligible for the S4 feed.
+    assert human["sensitivity_status"] == yt.gate.SENSITIVITY_CLEARED
 
     # The self-linking video is stamped a platform echo even with an empty ledger (#1670).
     platform = by_id["BBBBBBBBBBB"]
     assert platform["sk_suffix"] == "#BBBBBBBBBBB"
     assert platform["origin"] == prov.ORIGIN_PLATFORM
+    # A platform echo is excluded by the membrane, so the gate never stamps it (#1673).
+    assert "sensitivity_status" not in platform
 
 
 def test_transform_empty_when_no_entries(monkeypatch):

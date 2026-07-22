@@ -48,6 +48,7 @@ try:
 except ImportError:  # pragma: no cover — layer-module fallback
     urlopen_with_retry = urllib.request.urlopen
 
+import broadcast_sensitivity_gate as gate  # #1673: the fail-closed auto-publish sensitivity gate
 import social_provenance as prov  # #1670: the membrane
 
 # ── Config ───────────────────────────────────────────────────────────────────────
@@ -244,21 +245,41 @@ def _origin_for(entry: dict) -> str:
     )
 
 
+def _sensitivity_for(entry: dict) -> dict:
+    """#1673 gate: stamp the fail-closed auto-publish verdict on an origin:human post.
+
+    Runs the sensitivity classifier over the post's title + description and returns the
+    ``sensitivity_status``/``sensitivity_reason``/``sensitivity_categories`` attributes the
+    S4 feed (#1672) filters on. The off-topic layer routes through Bedrock (budget-gated,
+    fail-closed); ANY failure resolves to HELD, never auto-publish. Only ``origin:human``
+    posts are gated — a platform echo is already excluded by the #1670 membrane and never
+    reaches the feed. Fail-closed if classification itself throws.
+    """
+    text = " ".join(t for t in (entry.get("title"), entry.get("description")) if t)
+    try:
+        return gate.classify_and_stamp(text, offtopic_classifier=gate.bedrock_offtopic_classifier)
+    except Exception as e:  # noqa: BLE001 — never let the gate break ingestion; hold on error
+        logger.warning(f"sensitivity gate errored for {entry.get('video_id')}: {e}")
+        return {gate.STATUS_ATTR: gate.SENSITIVITY_HELD, gate.REASON_ATTR: f"gate error: {e}"}
+
+
 def transform(raw, date_str):
     """Map the day's parsed videos to framework DDB records (one per video).
 
-    Each record sets ``sk_suffix=#{video_id}`` → sk=``DATE#{date}#{video_id}``, and stamps
-    ``channel`` + ``origin`` provenance (#1670). ``source``/``sk_suffix`` are consumed by
+    Each record sets ``sk_suffix=#{video_id}`` → sk=``DATE#{date}#{video_id}``, stamps
+    ``channel`` + ``origin`` provenance (#1670), and — for human-origin posts — the #1673
+    ``sensitivity_status`` auto-publish verdict. ``source``/``sk_suffix`` are consumed by
     the framework; everything else persists.
     """
     records = []
     for entry in raw.get("entries", []):
         _archive_post_raw(entry, date_str)
+        origin = _origin_for(entry)
         record = {
             "source": SOURCE,
             "sk_suffix": f"#{entry['video_id']}",
             "channel": CHANNEL,
-            "origin": _origin_for(entry),
+            "origin": origin,
             "post_id": entry["video_id"],
             "post_type": "video",
             "date": date_str,
@@ -269,6 +290,10 @@ def transform(raw, date_str):
             "published_at": entry.get("published", ""),
             "author": entry.get("author", ""),
         }
+        # #1673: classify origin:human posts before they can appear in the S4 feed. A
+        # platform echo (#1670) is never displayed, so it needs no sensitivity verdict.
+        if origin == prov.ORIGIN_HUMAN:
+            record.update(_sensitivity_for(entry))
         if entry.get("views") is not None:
             record["views"] = Decimal(str(entry["views"]))  # Decimal before DDB
         # Drop empty strings to keep items lean.
