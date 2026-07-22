@@ -171,6 +171,13 @@ SOURCE_CLASS: dict[str, str] = {
     # "calibration", it measures the PLATFORM's priors against the whole cross-cycle history —
     # wiping it at reset would un-earn every badge and destroy the only record of priors that
     # failed to confirm (/method/wrong publishes those as findings).
+    "coach_corrections": CROSS_PHASE,  # #1689 (epic #1687 "The Coach Correction Loop"): Matthew's
+    # class-tagged corrections to weekly AI-review-pack items (`lambdas/coach_corrections.py`,
+    # pk USER#matthew#SOURCE#coach_corrections / sk CORRECTION#<date>#<id8>). Same rationale as
+    # "calibration"/EVALRET#: a correction is a durable statement about the coaching MACHINERY's
+    # error, not a property of the current experiment run — wiping it at reset would destroy the
+    # exact feedback the prompt-memory/gate/pattern-extraction downstream stages (#1690/#1691/S5/S6)
+    # need to keep the same class of error from recurring across cycles.
     # — EXPERIMENT_SCOPED: derived intelligence/progress (tag + wipe + cycle-stamp) —
     "character_sheet": EXPERIMENT_SCOPED,  # RPG-style derived scores; wiped "all" + rebuilt
     "character_receipt": EXPERIMENT_SCOPED,  # #1373: audit-grade progression receipts — one per

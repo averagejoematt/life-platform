@@ -131,6 +131,7 @@ Every pk/sk family in the `life-platform` table, derived from code (writers = `p
 | `…SOURCE#calibration` / `CALIB#<date>#<id>` | hypothesis + forecast resolution ledger (the long-run scoreboard) | `hypothesis_engine_lambda.py`, `forecast_engine_lambda.py` | scorecard/site, digests | cross_phase | ✓ |
 | `…SOURCE#effect_fits` / `FIT#<date>` | quarterly cross-pillar effect fits (#1411, ADR-105): per effect `status` (`fitted`\|`authored-prior`) + `reason` (`confirmed`\|`insufficient_n`\|`null_not_excluded`\|`sign_mismatch`), lagged-pair `r`, block-bootstrap `ci_95`, BH-FDR `p_adj`, AR(1)-corrected `n_eff`, per-target rows under `effects.<name>.targets[]`, run `summary`. Written by the weekly hypothesis cron when ≥90d since the last fit (`effect_fitter.refit_due`); every run recomputes from scratch so status moves both directions. Like `calibration`, it measures the platform's priors across the whole cross-cycle history | `compute/hypothesis_engine_lambda.py::refit_cross_pillar_effects` (via `lambdas/effect_fitter.py`) | `character_sheet_lambda` (badge merge), `/api/character_config`, `/api/wrong` | cross_phase | — (first fit pending) |
 | `…SOURCE#benchmarks` / — | cut-benchmarking history (BENCH-1, ADR-089) | `mcp/tools_benchmark.py` | same | cross_phase | empty |
+| `…SOURCE#coach_corrections` / `CORRECTION#<date>#<id8>` | Matthew's class-tagged corrections to weekly AI-review-pack items (#1689, epic #1687) | `lambdas/coach_corrections.py::write_correction` (no writer wired yet — #1690's MCP tool + email parser call it) | `list_corrections`/`get_correction` (#1690 channels, future prompt-memory/gate work) | cross_phase | n/v (foundation story, no live writer) |
 
 ### Derived intelligence (EXPERIMENT_SCOPED — tagged + tombstoned + cycle-stamped at reset)
 
@@ -2116,6 +2117,44 @@ into this partition — `sk CALIB#<resolved-date>#forecast-<metric>-h<horizon>-<
 `record_type = forecast_resolution` — one row per graded forecast (`point`/`lo`/`hi`/`confidence`
 as frozen at issue, `actual`, `covered`, `abs_error`). Same CROSS_PHASE rationale: forecasting
 skill is a property of the platform, not a cycle.
+
+---
+
+## Coach Corrections Partition (#1689, 2026-07-22)
+
+**pk:** `USER#matthew#SOURCE#coach_corrections`
+**sk:** `CORRECTION#<YYYY-MM-DD>#<id8>` (id8 = `uuid.uuid4().hex[:8]`)
+
+The durable ledger for Matthew's corrections to weekly AI-review-pack items (#1594), tagged by
+**error-class**, that epic #1687 "The Coach Correction Loop" feeds into prompt-memory, deterministic
+gates, and pattern-extraction. This story (#1689) is the ledger only — storage plus a pure
+item-builder and a mockable writer/reader in `lambdas/coach_corrections.py`. The feedback CHANNELS
+that populate it (an MCP tool `log_coach_correction` + an email-reply parser) are #1690; the
+downstream consumers (prompt-memory injection, gate promotion) are S5/S6, all out of scope here.
+
+Taxonomy class **`CROSS_PHASE`** (`lambdas/phase_taxonomy.py`): a correction Matthew makes about a
+coach's error stays true across experiment resets — it is not a property of the current run, the
+same rationale as the `calibration` and `EVALRET#` ledgers above. Never tagged, wiped, or
+phase-filtered at restart.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `correction_id` | string | The `id8` suffix of the sk |
+| `item_ref` | map | What was corrected — the S1/#1688 ranked-pack convention is `surface`/`coach`/`date`/`pack_number` (or `pack_item_ref`), but the ledger stores whatever the caller passes (Decimal-cast, no schema enforced here) |
+| `correction_text` | string | The verbatim correction, as Matthew wrote it |
+| `error_class` | string | One of `lambdas/coach_corrections.ERROR_CLASSES`: `stale-baseline` \| `ungrounded-behavioral` \| `cross-coach-inconsistency` \| `framing` \| `checkable-metric` \| `hedged-safe` \| `defense-held` \| `other`. An unrecognized tag from a caller normalizes to `other` rather than being dropped — see `error_class_raw` |
+| `error_class_raw` | string | Present only when the caller passed a class outside `ERROR_CLASSES`: the original, unnormalized value, preserved so no tag is silently lost |
+| `status` | string | `open` (all writes start here) → `applied-to-prompt` \| `applied-to-gate`, via `update_status()` |
+| `created_at` | string | ISO-8601 UTC timestamp |
+
+**Writer/reader interface (`lambdas/coach_corrections.py`, all mockable — `table` is a boto3 Table
+resource passed in, per the `ai_review_pack_lambda.record_email_send` idiom):**
+
+- `build_correction_item(item_ref, correction_text, error_class, *, now=None, correction_id=None) -> dict` — PURE, no AWS; builds the item this table documents.
+- `write_correction(table, item_ref, correction_text, error_class, *, now=None, correction_id=None) -> str` — puts the item, returns its `sk`. Raises on a DDB error (a correction is user-initiated feedback, not a best-effort side channel).
+- `get_correction(table, sk) -> dict | None`
+- `list_corrections(table, *, status=None, error_class=None, limit=100) -> list` — Query on the pk, newest first, with client-side status/error-class filtering. No new GSI (adding one requires an ADR).
+- `update_status(table, sk, new_status) -> bool` — the open → applied-to-prompt/applied-to-gate transition; raises `ValueError` on an unrecognized status.
 
 ---
 
