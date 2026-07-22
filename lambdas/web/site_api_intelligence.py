@@ -18,6 +18,7 @@ local to handle_status — the `global` declarations write back to this
 module's namespace.
 """
 
+import calendar
 import json
 import time
 from datetime import datetime, timedelta, timezone
@@ -2244,6 +2245,11 @@ def handle_receipts() -> dict:
         ssm = boto3.client("ssm", region_name="us-west-2")
         now = datetime.now(timezone.utc)
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        # The calendar-deterministic day the projection lands on. This is NOT a
+        # forecast (the DOLLAR figure is the governor's projected_month_end_usd, below)
+        # — just the x-axis anchor the spend curve extends its dashed projection to, so
+        # the front-end never has to derive a date and risk a second projection (#1618).
+        month_end_date = now.replace(day=calendar.monthrange(now.year, now.month)[1]).strftime("%Y-%m-%d")
 
         try:
             tier = int(ssm.get_parameter(Name="/life-platform/budget-tier")["Parameter"]["Value"])
@@ -2290,6 +2296,9 @@ def handle_receipts() -> dict:
             "recent_uniques": (breakdown or {}).get("recent_uniques"),
             "month_to_date_usd": mtd,
             "projected_month_end_usd": projected,
+            # Where the projection lands (last day of the current month) — the dashed
+            # spend-curve segment extends to this date, anchored on projected above (#1618).
+            "month_end_date": month_end_date,
             "ai_daily_usd": (breakdown or {}).get("ai_daily"),
             "non_ai_daily_usd": (breakdown or {}).get("non_ai_daily"),
             "computed_at": (breakdown or {}).get("computed_at"),

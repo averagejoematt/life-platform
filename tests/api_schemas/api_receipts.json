@@ -49,6 +49,9 @@
         "length_sample": 21,
         "type": "array"
       },
+      "month_end_date": {
+        "type": "string"
+      },
       "month_to_date_usd": {
         "type": "number"
       },
