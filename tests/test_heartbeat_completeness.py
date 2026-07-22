@@ -248,6 +248,13 @@ COVERAGE = {
         "Additive enrichment of already-ingested Notion journal records (notion source is ER-01 liveness-checked); "
         "absence degrades detail only. Failures → DLQ digest + ingestion error aggregate.",
     ),
+    "social-enrichment": (
+        EXEMPT,
+        "2026-07-22",
+        "#1671 (epic #1668): additive enrichment of already-ingested inbound-social posts (writes enriched_* back in place, no "
+        "new source partition). A dead cron degrades coach-signal detail only, never data freshness/correctness; the youtube "
+        "source it reads is itself dormant until the owner provisions a channel id. Failures → DLQ digest + ingestion error aggregate.",
+    ),
     "acwr-compute": (EXEMPT, "2026-07-19", "Derived layer: ACWR training-load ratios recomputed daily from liveness-checked sources."),
     "anomaly-detector": (
         EXEMPT,

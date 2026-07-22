@@ -1129,6 +1129,43 @@ def _build_nutrition_data(data):
     }
 
 
+def _social_posts_by_route(data):
+    """#1671 (epic #1668): bucket enriched social posts by their deterministic coach
+    route so each coach surface can read the voice signals meant for it.
+
+    Rides the SAME ``enriched_*`` fields the journal pipeline produces — no second
+    pipeline. The membrane (S2/#1670) is re-applied read-side as defense in depth (only
+    human-origin, only actually-enriched posts reach a coach); routing is by enriched
+    CONTENT (``social_signals``), so a training-flavoured post lands in the training
+    bucket and a reflective one in the mind bucket. Returns {"training": [...], "mind": [...]}.
+    """
+    buckets = {"training": [], "mind": []}
+    posts = data.get("social_posts") or []
+    if not isinstance(posts, list):
+        return buckets
+    try:
+        import social_provenance as _prov
+        from social_signals import coach_route_of
+    except Exception:  # pragma: no cover — social membrane modules absent
+        return buckets
+    for p in posts:
+        if not isinstance(p, dict) or not _prov.is_human_origin(p) or not p.get("enriched_at"):
+            continue
+        route = coach_route_of(p)
+        buckets.get(route, buckets["mind"]).append(p)
+    return buckets
+
+
+def _union_field(items, field, cap):
+    """Order-preserving de-duped union of a list-valued enriched field across records."""
+    out = []
+    for it in items:
+        for v in it.get(field) or []:
+            if v not in out:
+                out.append(v)
+    return out[:cap]
+
+
 def _build_training_data(data):
     """Extract training-domain data for the training coach."""
     whoop = data.get("whoop") or {}
@@ -1151,6 +1188,20 @@ def _build_training_data(data):
         ],
         "activity_count_7d": len(strava_7d),
         "training_status": "no_training_logged" if len(strava_7d) == 0 else "active",
+        # #1671: Matthew's own training-flavoured public posts, routed here by enriched
+        # content — how he narrates his training in public becomes training-coach signal.
+        **_social_training_signals(_social_posts_by_route(data)["training"]),
+    }
+
+
+def _social_training_signals(posts):
+    """Training-coach view of the routed social posts (#1671)."""
+    exercise_context = [p.get("enriched_exercise_context") for p in posts if p.get("enriched_exercise_context")]
+    return {
+        "social_post_count": len(posts),
+        "social_exercise_context": exercise_context[:4],
+        "social_enriched_themes": _union_field(posts, "enriched_themes", 6),
+        "social_enriched_behaviors": _union_field(posts, "enriched_behaviors", 6),
     }
 
 
@@ -1191,6 +1242,20 @@ def _build_mind_data(data):
         "enriched_growth_signals": _union("enriched_growth_signals", 4),
         "som_avg_valence": _safe_float(som, "som_avg_valence"),
         "som_check_in_count": _safe_float(som, "som_check_in_count"),
+        # #1671: reflective public posts routed to Mind — Matthew's public voice as a
+        # coach signal, riding the same enriched fields as the journal.
+        **_social_mind_signals(_social_posts_by_route(data)["mind"]),
+    }
+
+
+def _social_mind_signals(posts):
+    """Mind-coach view of the routed social posts (#1671)."""
+    sentiments = [p.get("enriched_sentiment") for p in posts if p.get("enriched_sentiment")]
+    return {
+        "social_post_count": len(posts),
+        "social_sentiment": sentiments[-1] if sentiments else None,
+        "social_enriched_themes": _union_field(posts, "enriched_themes", 6),
+        "social_enriched_entities": _union_field(posts, "enriched_entities", 6),
     }
 
 

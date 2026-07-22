@@ -248,6 +248,9 @@
     "lambdas/ingestion/journal_enrichment_lambda.py": {
       "function": "journal-enrichment"
     },
+    "lambdas/ingestion/social_enrichment_lambda.py": {
+      "function": "social-enrichment"
+    },
     "lambdas/ingestion/macrofactor_lambda.py": {
       "function": "macrofactor-data-ingestion"
     },

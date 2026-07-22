@@ -319,6 +319,27 @@ class IngestionStack(Stack):
             **{k: v for k, v in shared.items() if k != "alerts_topic"},
         )
 
+        # ── 7a. Social Enrichment — 6:45 AM PT daily (#1671, epic #1668).
+        # S3 of The Social Membrane: Haiku extraction over ingested inbound-social posts
+        # (youtube …) so Matthew's own public voice becomes a coach signal, riding the
+        # SAME journal enrichment path (no second pipeline). ONLY origin:human posts enter
+        # (the #1670 membrane filters platform echoes); each record is enriched IN PLACE and
+        # routed (training vs mind) by content. Runs after youtube ingestion + journal
+        # enrichment (14:30) and well before the 17:00 UTC brief. UTC-fixed, no DST drift.
+        create_platform_lambda(
+            self,
+            "SocialEnrichment",
+            function_name="social-enrichment",
+            source_file="lambdas/ingestion/social_enrichment_lambda.py",
+            handler="ingestion.social_enrichment_lambda.lambda_handler",
+            schedule="cron(45 14 * * ? *)",
+            timeout_seconds=300,
+            environment={"ANTHROPIC_SECRET": "life-platform/ai-keys", "SOCIAL_CHANNELS": "youtube"},
+            custom_policies=rp.ingestion_social_enrichment(),
+            alerts_topic=None,
+            **{k: v for k, v in shared.items() if k != "alerts_topic"},
+        )
+
         # ── 8. Todoist — 1x daily (TD-12, 2026-05-03): dropped from 2x to 1x.
         # Lambda has a no-op gate that returns early if no changes since last run; in
         # practice most invocations did nothing. Daily cadence is fine for a personal
