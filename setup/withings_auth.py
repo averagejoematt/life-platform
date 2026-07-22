@@ -1,6 +1,7 @@
 import json
 import hmac
 import hashlib
+import os
 import time
 import boto3
 import urllib.request
@@ -10,7 +11,11 @@ SECRET_NAME = "life-platform/withings"
 REGION = "us-west-2"
 WITHINGS_SIG_URL = "https://wbsapi.withings.net/v2/signature"
 WITHINGS_OAUTH_URL = "https://wbsapi.withings.net/v2/oauth2"
-AUTH_CODE = "c530ce264e02d6b0d40957a5e7eb9fd6c26c0a52"
+# The OAuth authorization code is single-use and short-lived — it is NOT a
+# durable credential. Pass the fresh code from the Withings consent redirect via
+# the WITHINGS_AUTH_CODE env var (do not hardcode; a committed code is both dead
+# and a false-positive for secret scanners). See setup/ re-auth runbook.
+AUTH_CODE = os.environ.get("WITHINGS_AUTH_CODE", "")
 REDIRECT_URI = "http://localhost:3000/callback"
 
 
@@ -88,6 +93,11 @@ def save_secret(existing: dict, token_body: dict):
 
 
 def main():
+    if not AUTH_CODE:
+        raise SystemExit(
+            "WITHINGS_AUTH_CODE is empty. Obtain a fresh single-use authorization code from the "
+            "Withings OAuth consent redirect and re-run: WITHINGS_AUTH_CODE=<code> python3 setup/withings_auth.py"
+        )
     print("Reading credentials from Secrets Manager...")
     secret = get_secret()
     client_id = secret["client_id"]

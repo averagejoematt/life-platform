@@ -16,30 +16,38 @@ import urllib.request
 
 import boto3
 
-SECRET_NAME         = "life-platform/eightsleep"
-REGION              = "us-west-2"
-CLIENT_API          = "https://client-api.8slp.net"
-AUTH_API            = "https://auth-api.8slp.net"
-KNOWN_CLIENT_ID     = "0894c7f33bb94800a03f1f4df13a4f38"
-KNOWN_CLIENT_SECRET = "f0954a3ed5763ba3d06834c73731a32f15f168f47d4f164751275def86db0c76"
+SECRET_NAME = "life-platform/eightsleep"
+REGION = "us-west-2"
+CLIENT_API = "https://client-api.8slp.net"
+AUTH_API = "https://auth-api.8slp.net"
+# NOT SECRETS — these are Eight Sleep's *public* mobile-app OAuth client credentials,
+# the same well-known pair every unofficial Eight Sleep integration uses (e.g. pyEight)
+# to reach the password-grant token endpoint. Matthew's actual credentials are his
+# email/password (prompted at runtime, never stored) and the resulting token (saved to
+# life-platform/eightsleep). Documented public so a secret scanner treats them as a
+# known false positive, not a leak. See .gitleaks.toml allowlist.
+KNOWN_CLIENT_ID = "0894c7f33bb94800a03f1f4df13a4f38"  # gitleaks:allow — public app client id
+KNOWN_CLIENT_SECRET = "f0954a3ed5763ba3d06834c73731a32f15f168f47d4f164751275def86db0c76"  # gitleaks:allow — public app client secret
 
 
 def login(email, password):
-    payload = json.dumps({
-        "client_id":     KNOWN_CLIENT_ID,
-        "client_secret": KNOWN_CLIENT_SECRET,
-        "grant_type":    "password",
-        "username":      email,
-        "password":      password,
-    }).encode()
+    payload = json.dumps(
+        {
+            "client_id": KNOWN_CLIENT_ID,
+            "client_secret": KNOWN_CLIENT_SECRET,
+            "grant_type": "password",
+            "username": email,
+            "password": password,
+        }
+    ).encode()
     req = urllib.request.Request(
         f"{AUTH_API}/v1/tokens",
         data=payload,
         headers={
-            "Content-Type":    "application/json",
-            "Accept":          "application/json",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
             "Accept-Encoding": "gzip",
-            "user-agent":      "okhttp/4.9.3",
+            "user-agent": "okhttp/4.9.3",
         },
         method="POST",
     )
@@ -63,10 +71,10 @@ def main():
     print(f"Saves credentials to Secrets Manager: {SECRET_NAME}  ({REGION})")
     print()
 
-    email    = input("Eight Sleep email: ").strip()
+    email = input("Eight Sleep email: ").strip()
     password = getpass.getpass("Eight Sleep password: ")
     bed_side = input("Your bed side [left/right] (default: left): ").strip().lower() or "left"
-    tz       = input("Your timezone (default: America/Los_Angeles): ").strip() or "America/Los_Angeles"
+    tz = input("Your timezone (default: America/Los_Angeles): ").strip() or "America/Los_Angeles"
 
     if bed_side not in ("left", "right"):
         print("Invalid bed side — defaulting to 'left'")
@@ -84,9 +92,9 @@ def main():
         print("  • API rate limiting (wait a few minutes and try again)")
         return
 
-    access_token  = token_data.get("access_token", "")
+    access_token = token_data.get("access_token", "")
     refresh_token = token_data.get("refresh_token", "")
-    user_id       = token_data.get("userId", "")
+    user_id = token_data.get("userId", "")
 
     if not user_id:
         print("Resolving user_id from /v1/users/me ...", flush=True)
@@ -104,13 +112,13 @@ def main():
     print()
 
     secret_value = {
-        "email":         email,
-        "password":      password,
-        "user_id":       user_id,
-        "access_token":  access_token,
+        "email": email,
+        "password": password,
+        "user_id": user_id,
+        "access_token": access_token,
         "refresh_token": refresh_token,
-        "bed_side":      bed_side,
-        "timezone":      tz,
+        "bed_side": bed_side,
+        "timezone": tz,
     }
 
     secrets_client = boto3.client("secretsmanager", region_name=REGION)
@@ -132,7 +140,7 @@ def main():
     print(f"✓ Secret saved to {SECRET_NAME}")
     print()
     print("Next steps:")
-    print("  1. Test one night:  python3 -c \"")
+    print('  1. Test one night:  python3 -c "')
     print("       from eightsleep_lambda import get_secret, ingest_day")
     print("       import json")
     print("       s = get_secret()")
