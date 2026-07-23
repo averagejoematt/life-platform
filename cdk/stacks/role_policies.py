@@ -335,6 +335,46 @@ def ingestion_journal_enrichment() -> list[iam.PolicyStatement]:
     ]
 
 
+def ingestion_social_enrichment() -> list[iam.PolicyStatement]:
+    """Social-post enrichment (#1671, epic #1668): Haiku extraction over ingested
+    inbound-social posts (youtube …), written back in place. Same least-privilege shape as
+    journal enrichment — DDB read/write to enrich the SAME record, ai-keys + Bedrock for
+    Haiku (ADR-062), no raw S3 write (the ingestion Lambda already archived the post)."""
+    return [
+        iam.PolicyStatement(
+            sid="DynamoDB",
+            actions=["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:Query"],
+            resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="Secrets",
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn("life-platform/ai-keys")],
+        ),
+        _bedrock_statement(),  # ADR-062: AI-calling enrichment role → Bedrock invoke
+        iam.PolicyStatement(
+            sid="DLQ",
+            actions=["sqs:SendMessage"],
+            resources=[DLQ_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="XRay",  # R13-XR: X-Ray active tracing
+            actions=[
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+                "xray:GetSamplingRules",
+                "xray:GetSamplingTargets",
+            ],
+            resources=["*"],  # X-Ray does not support resource-level restrictions
+        ),
+    ]
+
+
 def ingestion_todoist() -> list[iam.PolicyStatement]:
     # #499: Todoist uses a static API token — no refresh, no writeback
     # (verified: no update_secret/put_secret_value call anywhere in

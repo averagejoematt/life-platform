@@ -340,6 +340,32 @@ def fetch_journal_entries(date_str):
         return []
 
 
+def fetch_social_posts(start, end):
+    """#1671 (epic #1668): enriched inbound social posts over [start, end] so the coach
+    surfaces (ai_context) can read Matthew's public voice as a routed coach signal.
+
+    Human-origin only — the #1670 membrane (``origin <> platform``) excludes the
+    platform's own re-ingested outbound echoes. Fail-soft: a query error or an
+    unprovisioned channel yields []. Channels come from SOCIAL_CHANNELS (default youtube).
+    """
+    channels = [c.strip() for c in os.environ.get("SOCIAL_CHANNELS", "youtube").split(",") if c.strip()]
+    out = []
+    for ch in channels:
+        try:
+            kwargs = with_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                    # sk=DATE#{date}#{post_id}; the #~ upper bound sorts after every suffix on the end day.
+                    "ExpressionAttributeValues": {":pk": USER_PREFIX + ch, ":s": "DATE#" + start, ":e": "DATE#" + end + "#~"},
+                }
+            )
+            r = table.query(**kwargs)
+            out.extend(d2f(i) for i in r.get("Items", []) if str(i.get("origin", "")) != "platform")
+        except Exception as e:
+            logger.warning("fetch_social_posts(%s): %s", ch, e)
+    return out
+
+
 def fetch_profile():
     from intelligence_common import fetch_profile as _shared_fetch_profile
 
@@ -409,6 +435,9 @@ def gather_daily_data(profile, yesterday):
 
     journal_entries = fetch_journal_entries(yesterday)
     journal = extract_journal_signals(journal_entries)
+
+    # #1671: inbound social posts (trailing 7d), enriched + routed to a coach surface.
+    social_posts = fetch_social_posts((today - timedelta(days=7)).isoformat(), yesterday)
 
     hrv_7d_recs = fetch_range("whoop", (today - timedelta(days=7)).isoformat(), yesterday)
     hrv_30d_recs = fetch_range("whoop", (today - timedelta(days=30)).isoformat(), yesterday)
@@ -604,6 +633,7 @@ def gather_daily_data(profile, yesterday):
         "tsb": tsb,
         "journal": journal,
         "journal_entries": journal_entries,
+        "social_posts": social_posts,  # #1671: enriched public voice → coach signal
         "apple_7d": apple_7d,
         "anomaly": anomaly,
         "latest_weight": latest_weight,
