@@ -219,8 +219,8 @@ def score_habits_registry(data: dict[str, Any], profile: dict[str, Any]) -> Scor
     except Exception:
         is_weekday = True
 
-    tier_scores = {0: [], 1: [], 2: []}
-    tier_status = {0: {}, 1: {}, 2: {}}
+    tier_scores: dict[int, list[float]] = {0: [], 1: [], 2: []}
+    tier_status: dict[int, dict[str, bool]] = {0: {}, 1: {}, 2: {}}
     vice_status = {}
     # T0 (non-negotiable) 3x: missing one T0 tanks the score; T2 (aspirational) 0.5x
     tier_weights = {0: 3.0, 1: 1.0, 2: 0.5}

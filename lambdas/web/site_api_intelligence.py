@@ -23,6 +23,7 @@ import json
 import time
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal  # noqa: F401
+from typing import Any
 
 import boto3  # noqa: F401 — handlers may instantiate clients
 import experiment_gates  # #1371: arming thresholds served to zero-states — same objects the engines enforce
@@ -53,9 +54,9 @@ from web.vitals_resolver import resolve_vitals  # #1369: the ONE current-vitals 
 # ── Module-owned cache state for /api/status ─────────────
 # These were originally globals in site_api_lambda.py; moved here so the
 # `global` declarations in handle_status target this module's namespace.
-_status_cache = {}
+_status_cache: dict[str, Any] = {}
 _status_cache_ts = 0
-_cost_cache = {}
+_cost_cache: dict[str, Any] = {}
 _cost_cache_ts = 0
 
 
@@ -563,7 +564,7 @@ def handle_status() -> dict:
             status = "green" if has_data else "blue"
             rel = "imported" if has_data else "not imported"
             comment = "One-time import \u2014 data on file" if has_data else "Awaiting initial import"
-            uptime = []  # No daily bars for one-time sources
+            uptime: list[Any] = []  # No daily bars for one-time sources
         elif category == "manual":
             # Labs / DEXA / Food Delivery — due-date tracking
             # Board recommendation: labs every 6mo, DEXA every 12mo, food delivery every 3mo
@@ -1400,7 +1401,7 @@ def handle_pulse_history() -> dict:
             withings_by_date[d] = w
     # Steps: Apple Health first; Garmin only if AH-absent AND plausible (>=1000) — drops the
     # phantom ~298 Garmin record that left steps null on 7/8 days (Vitals + Mirror depend on this).
-    steps_by_date = {}
+    steps_by_date: dict[str, int] = {}
     for h in ah_items:
         d = h.get("sk", "").replace("DATE#", "")[:10]
         if d and h.get("steps") and float(h["steps"]) > 0:
@@ -1572,7 +1573,7 @@ def handle_intelligence_summary() -> dict:
         items = _decimal_to_float(resp.get("Items", []))
         public_items = [it for it in items if it.get("public") is not False]
         summary["hypotheses"]["count"] = len(public_items)
-        by_status = {}
+        by_status: dict[str, int] = {}
         for it in public_items:
             s = it.get("status", "pending")
             by_status[s] = by_status.get(s, 0) + 1
@@ -1782,7 +1783,7 @@ def handle_correlations(event: dict = None) -> dict:
     Cache: 3600s.
     """
     # HP-06: Parse query params
-    params = {}
+    params: dict[str, Any] = {}
     if event:
         params = event.get("queryStringParameters") or {}
     featured = (params.get("featured") or "").lower() == "true"
@@ -2371,7 +2372,7 @@ def handle_wrong() -> dict:
             )
             recs = _decimal_to_float(r.get("Items", []))
             live = [x for x in recs if not x.get("tombstone")]
-            counts = {}
+            counts: dict[str, int] = {}
             for x in live:
                 counts[x.get("status", "unknown")] = counts.get(x.get("status", "unknown"), 0) + 1
             if live:

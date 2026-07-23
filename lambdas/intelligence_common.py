@@ -16,6 +16,7 @@ import os
 import re
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from typing import Any
 
 import boto3
 import calibration_core  # #538: the shared prediction-calibration scorer (Brier + reliability)
@@ -86,7 +87,7 @@ def build_data_inventory() -> dict:
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     d90 = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d")
 
-    inventory = {}
+    inventory: dict[str, Any] = {}
     seen_partitions = set()
 
     for label, partition in _INVENTORY_SOURCES:
