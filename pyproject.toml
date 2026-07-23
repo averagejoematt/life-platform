@@ -72,3 +72,15 @@ combine-as-imports = true
 # Import sorting is owned by ruff (tool.ruff.lint select "I" + tool.ruff.lint.isort)
 # — standalone isort was removed: two sorters with different output fought each
 # other and red-walled the CI format gate.
+
+# ── Coverage floor (regression gate, ADR-080/ADR-107; ratcheted by #1658) ─────
+# THE canonical coverage floor. coverage.py + pytest-cov read `fail_under` from
+# here, so a bare `pytest --cov ...` enforces the same floor CI does. CI's
+# "Test coverage gate" step ALSO passes `--cov-fail-under` explicitly (belt +
+# suspenders), and tests/test_coverage_floor_ratchet.py asserts this value, the
+# CI `--cov-fail-under`, and the coverage_gap_warn `--floor` all AGREE and are
+# never below the committed RATCHET_FLOOR — an UP-ONLY gate that can only rise.
+# To ratchet up: raise this number, the two CI literals, AND RATCHET_FLOOR in
+# the guard test, in one PR (verify the suite clears it with headroom first).
+[tool.coverage.report]
+fail_under = 47

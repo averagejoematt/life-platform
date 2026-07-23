@@ -588,14 +588,18 @@ jobs:
 
       - name: Test coverage gate (regression floor, ADR-080)
         # ENFORCED regression floor. The codebase is integration-tested (handlers
-        # run live; the ~3000 offline tests are mostly structural/contract), so
-        # measured offline line coverage is ~45.6% (45.58% on green main run
-        # 29270686464, 2026-07-13). This floor (40%) prevents BACKSLIDING with ~5pt
+        # run live; most offline tests are structural/contract), so measured offline
+        # line coverage is ~51% (6551-test suite, 2026-07-22 — up from the stale
+        # 45.6%/~3000-test figure). This floor (47%) prevents BACKSLIDING with ~4pt
         # headroom under measured so normal fluctuation doesn't red main — it is not
-        # a quality bar. Ratcheted 25→40 by #1206 (lineage: #419 ratchet 9%→25%);
-        # keep ratcheting up over time (ADR-080/ADR-107). The gap-warning step below
-        # emits a ::warning:: reminder when this floor drifts >10pts under measured.
-        # Scope: lambdas/ + mcp/ only (skip tests/, cdk/).
+        # a quality bar. Ratcheted 40→47 by #1658 (lineage: #419 9%→25%, #1206 25→40);
+        # keep ratcheting up (ADR-080/ADR-107). The floor is CANONICAL in
+        # pyproject.toml `[tool.coverage.report] fail_under`; the explicit
+        # `--cov-fail-under` below is belt-and-suspenders and MUST match it —
+        # tests/test_coverage_floor_ratchet.py fails if the two (and the gap-warn
+        # --floor below) ever drift or drop below the committed RATCHET_FLOOR
+        # (up-only). The gap-warning step below reminds a human to ratchet when the
+        # floor drifts >10pts under measured. Scope: lambdas/ + mcp/ only.
         run: |
           echo "::group::Coverage report + gate"
           python3 -m pytest tests/ \
@@ -603,7 +607,7 @@ jobs:
               --cov=lambdas --cov=mcp \
               --cov-report=term-missing:skip-covered \
               --cov-report=xml:coverage.xml \
-              --cov-fail-under=40 \
+              --cov-fail-under=47 \
               -q 2>&1 | tail -100
           echo "::endgroup::"
 
@@ -620,7 +624,7 @@ jobs:
         if: always()
         run: |
           DURATION_SECONDS=$(( $(date +%s) - "${UNIT_TESTS_START_EPOCH:-$(date +%s)}" ))
-          python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 40 --gap-threshold 10 \
+          python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 47 --gap-threshold 10 \
               --duration-seconds "$DURATION_SECONDS" --duration-budget-seconds 480
 
       - name: Upload coverage artifact
