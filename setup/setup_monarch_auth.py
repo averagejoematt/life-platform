@@ -136,7 +136,10 @@ def save_to_secrets_manager(email, token):
 
 
 def save_session_to_s3(session_b64):
-    import boto3, base64
+    import base64
+
+    import boto3
+
     s3 = boto3.client("s3", region_name=REGION)
     session_bytes = base64.b64decode(session_b64)
     s3.put_object(

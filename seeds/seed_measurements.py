@@ -38,7 +38,7 @@ waist_height_ratio = round(Decimal(str(float(raw["waist_navel_in"]) / height_in)
 bilateral_bicep = abs(raw["bicep_relaxed_right_in"] - raw["bicep_relaxed_left_in"])
 bilateral_thigh = abs(raw["thigh_right_in"] - raw["thigh_left_in"])
 limb_avg = round((raw["bicep_relaxed_left_in"] + raw["bicep_relaxed_right_in"] +
-                   raw["thigh_left_in"] + raw["thigh_right_in"]) / 4, 3)
+                  raw["thigh_left_in"] + raw["thigh_right_in"]) / 4, 3)
 trunk_sum = raw["waist_navel_in"] + raw["waist_narrowest_in"]
 
 # Count existing sessions for session_number

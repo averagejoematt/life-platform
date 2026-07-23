@@ -46,17 +46,24 @@ ignore = ["E501", "E402", "E741", "E701", "E702", "E731",
 external = ["CDK_HANDLER_ORPHAN"]
 
 [tool.ruff.lint.per-file-ignores]
-# mcp/ uses an import-driven tool-registration pattern — a blanket F401 removal
-# orphans tools (proven by a reverted attempt). F401/F811/F841 deferred to a
-# careful per-module pass.
-"mcp/*.py" = ["F401", "F811", "F841"]
+# mcp/ blanket F401/F811/F841 waiver RETIRED (#1657) — the "careful per-module pass"
+# the prior waiver deferred is now done: 7 real F841 (dead locals) + 17 real F401
+# (dead imports in helper/core/handler modules) removed, verified no tool orphaned
+# (tests/test_mcp_orphan_tools.py + test_mcp_registry.py + full suite green). The
+# historical "blanket F401 removal orphans tools" hazard came from an automated
+# `ruff --fix` sweep; registration today is fully EXPLICIT (every tool_* named in
+# registry.py's TOOLS dict, so those imports read as used and were never F401). No
+# genuine "registration site" F401 survives, so no per-line noqa is needed here. If
+# a future tool module ever registers via an import SIDE EFFECT (not the TOOLS
+# dict), F401 will red it — add a per-line `# noqa: F401  # <why it must import>`
+# at THAT site rather than re-adding a directory-wide waiver.
 # cdk/stacks: `lambda_x = SomeLambda(...)` bindings are often unused but the call
 # CREATES the resource — auto-removing F841 there would delete infrastructure.
 "cdk/stacks/*.py" = ["F841"]
 # bandit (S) per-file false-positives — secret *names*/URLs/sentinels, not values:
 "cdk/stacks/role_policies.py" = ["F841", "S106"]   # secret_name="life-platform/..." is a Secrets Manager identifier
 "lambdas/ingestion/*_lambda.py" = ["S105", "S314"] # SECRET_NAME/*_TOKEN_URL constants + own-data (Apple Health / xlsx) XML
-"mcp/handler.py" = ["F401", "F811", "F841", "S105"]  # fail-closed bearer-token sentinel ("__NO_KEY_CONFIGURED__")
+"mcp/handler.py" = ["S105"]  # fail-closed bearer-token sentinel ("__NO_KEY_CONFIGURED__") — F401/F811/F841 retired (#1657)
 "tests/*.py" = ["S105", "S106"]                    # dummy tokens/secrets in fixtures
 
 [tool.ruff.lint.isort]

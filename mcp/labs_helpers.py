@@ -2,13 +2,10 @@
 Lab / DEXA / Genome query helpers.
 """
 
-import json
-import logging
-
 from boto3.dynamodb.conditions import Key
 
-from mcp.config import S3_BUCKET, USER_PREFIX, logger, s3_client, table
-from mcp.core import _apply_phase_filter, decimal_to_float, query_source
+from mcp.config import USER_PREFIX, table
+from mcp.core import _apply_phase_filter, decimal_to_float
 
 _GENOME_CACHE_V2 = None
 

@@ -2,15 +2,13 @@
 Shared computation helpers: aggregation, training load, statistics, classification.
 """
 
-import logging
 import math
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import stats_core  # bundled shared module (#529): the one sanctioned stats implementation
 
-from mcp.config import FIELD_ALIASES, P40_GROUPS, logger
-from mcp.core import decimal_to_float, get_profile, get_sot, query_source
+from mcp.core import get_profile, get_sot, query_source
 
 # ── Aggregation ──
 

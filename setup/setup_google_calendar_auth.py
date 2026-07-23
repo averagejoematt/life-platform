@@ -39,8 +39,8 @@ import boto3
 # Google OAuth libraries (install locally, not needed in Lambda)
 try:
     from google_auth_oauthlib.flow import InstalledAppFlow
-    from google.auth.transport.requests import Request
-    import google.oauth2.credentials
+    from google.auth.transport.requests import Request  # noqa: F401  # import-availability probe: fail early if google-auth is missing
+    import google.oauth2.credentials  # noqa: F401  # import-availability probe: fail early if google-auth is missing
 except ImportError:
     print("Install required packages: pip install google-auth-oauthlib google-api-python-client")
     sys.exit(1)

@@ -2,8 +2,6 @@
 Strength training helpers: exercise classification, 1RM estimation, volume tracking.
 """
 
-from mcp.config import logger
-
 _EXERCISE_MUSCLE_MAP = [
     # (keywords, muscle_groups, movement_pattern)
     (["bench press", "chest press", "pec deck", "fly", "flye", "push up", "pushup"], ["Chest", "Triceps", "Shoulders"], "Push"),

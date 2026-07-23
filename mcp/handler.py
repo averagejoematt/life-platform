@@ -20,7 +20,6 @@ import hashlib
 import hmac
 import html
 import json
-import logging
 import os
 import time
 import urllib.parse
@@ -30,7 +29,6 @@ from mcp import audit as mcp_audit
 from mcp.config import __version__, logger
 from mcp.core import (
     SESSION_TOKEN_TTL_SECS,
-    decimal_to_float,
     get_api_key,
     oauth_code_consume,
     oauth_code_store,

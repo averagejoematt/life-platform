@@ -580,7 +580,6 @@ def tool_get_deficit_sustainability(args):
     whoop_items = sorted(sources.get("whoop", []), key=lambda x: x.get("date", ""))
     habit_items = sorted(sources.get("habitify", []), key=lambda x: x.get("date", ""))
     strava_items = sorted(sources.get("strava", []), key=lambda x: x.get("date", ""))
-    hevy_items = sorted(sources.get("hevy", []), key=lambda x: x.get("date", ""))
 
     def safe_avg(vals):
         v = [x for x in vals if x is not None]

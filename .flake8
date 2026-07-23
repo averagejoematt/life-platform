@@ -1,25 +1,37 @@
 [flake8]
+# ── Line length: the 140-col posture (single source of truth = pyproject.toml) ──
+# 140 columns is the platform standard, set in [tool.black] and [tool.ruff] and
+# mirrored here. black + ruff are the ENFORCERS: black wraps code to 140 and ruff
+# (line-length = 140) owns import/format lint. flake8 is the fail-loud floor for
+# the E9/F-syntax class (see .github/workflows/ci-cd.yml). E501 is IGNORED below
+# (not enforced by flake8) so the three tools agree byte-for-byte: black leaves a
+# genuinely un-wrappable line (a long URL, a single string literal, a docstring
+# line) alone, ruff ignores E501, and flake8 must not then red it. max-line-length
+# stays at 140 as documentation of the standard, not as a second, conflicting gate.
 max-line-length = 140
+
+# Only build / vendor / VCS / dead-code trees are excluded — NO live source dir is
+# suppressed here (#1657 retired the blanket deploy/seeds/setup/handovers excludes;
+# backfill/ + patches/ were already deleted by #1683). `archive` mirrors the
+# extend-exclude in pyproject.toml [tool.black]/[tool.ruff]: retired snapshots kept
+# for git history, not held to the live style bar by any of the three tools.
 exclude =
     .git,
     __pycache__,
-    deploy,
-    backfill,
-    patches,
-    seeds,
-    setup,
-    handovers,
-    datadrops,
     .github,
+    archive,
     venv,
     .venv
-# E501: line too long (handled by max-line-length)
-# W503: line break before binary operator (PEP 8 changed its mind)
-# E402: module level import not at top of file (common in Lambda handlers)
-# E741: ambiguous variable name (l, O, I) — too many false positives
-extend-ignore = W503, E402, E741
-per-file-ignores =
-    # MCP tools files have long string literals in docstrings
-    mcp/tools_*.py: E501
-    # Lambda handlers often have long format strings
-    lambdas/*_lambda.py: E501
+
+# Codes ignored to keep flake8 in lockstep with ruff (pyproject [tool.ruff.lint]
+# ignore) and black — each is either owned by the formatter or an intentional
+# platform convention, so flake8 flagging it would contradict a passing black/ruff:
+#   E501  line too long — see the 140-col note above (ruff ignores it too)
+#   E203  whitespace before ':' — black formats slices as `x[a : b]`; the classic
+#         black/pycodestyle conflict (Black docs mandate ignoring E203)
+#   E701/E702  compound statements on one line — intentional compact style ruff keeps
+#   E731  lambda assignment — allowed (ruff ignores)
+#   W503  line break before binary operator (PEP 8 reversed its guidance)
+#   E402  module-level import not at top (common in Lambda handlers / probes)
+#   E741  ambiguous variable name (l, O, I) — too many false positives
+extend-ignore = W503, E402, E741, E203, E501, E701, E702, E731

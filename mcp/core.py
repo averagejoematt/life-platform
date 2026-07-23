@@ -4,7 +4,6 @@ Core data access: profile, caching, DynamoDB queries, serialisation.
 
 import concurrent.futures
 import json
-import logging
 import time
 import uuid
 from datetime import datetime, timezone

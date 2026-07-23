@@ -104,7 +104,7 @@ def main():
             print(f"[WARNING] Could not resolve user_id: {e}")
             print("The Lambda will resolve it automatically on first run.")
 
-    print(f"✓ Login successful")
+    print("✓ Login successful")
     print(f"  user_id  : {user_id or '(will be resolved on first run)'}")
     print(f"  token    : {access_token[:20]}...")
     print(f"  bed_side : {bed_side}")

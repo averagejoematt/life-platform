@@ -62,7 +62,7 @@ def verify_access(access_token):
         with urllib.request.urlopen(req) as resp:
             result = json.loads(resp.read())
             entries = result.get("entries", [])
-            print(f"\n✅ Dropbox access verified! Root folder contents:")
+            print("\n✅ Dropbox access verified! Root folder contents:")
             for e in entries:
                 tag = "📁" if e.get(".tag") == "folder" else "📄"
                 print(f"   {tag} {e.get('name')} (path: {e.get('path_lower', '')})")
@@ -111,8 +111,8 @@ def main():
     auth_url = get_auth_url(app_key)
     print(f"\n{'='*60}")
     print(f"  1. Open: {auth_url}")
-    print(f"  2. Click 'Allow'")
-    print(f"  3. Copy the authorization code")
+    print("  2. Click 'Allow'")
+    print("  3. Copy the authorization code")
     print(f"{'='*60}\n")
 
     auth_code = input("Paste the authorization code: ").strip()
@@ -138,7 +138,7 @@ def main():
     print("  Setup complete!")
     print("=" * 60)
     print()
-    print(f"  Next: bash deploy_dropbox_poll.sh")
+    print("  Next: bash deploy_dropbox_poll.sh")
     print()
 
 

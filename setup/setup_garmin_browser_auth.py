@@ -13,7 +13,6 @@ Requires:
     python -m playwright install chromium
 """
 
-import base64
 import json
 import re
 import sys
@@ -256,7 +255,7 @@ def main():
     print()
     print("  Tokens stored in:")
     print(f"    AWS: {SECRET_NAME}")
-    print(f"    Local: ~/.garth/")
+    print("    Local: ~/.garth/")
     print()
     print("  OAuth1 tokens last ~1 year.")
     print("  OAuth2 access tokens expire but can be refreshed.")

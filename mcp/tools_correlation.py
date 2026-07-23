@@ -28,7 +28,6 @@ def tool_get_zone2_breakdown(args):
     # HR zone thresholds from profile
     profile = get_profile()
     max_hr = float(profile.get("max_heart_rate", 190))
-    rhr = float(profile.get("resting_heart_rate_baseline", 60))
 
     # 5 zones by % of max HR (standard model)
     # Zone 1: 50-60%  (warm-up / recovery)
