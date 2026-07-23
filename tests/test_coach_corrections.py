@@ -187,3 +187,87 @@ def test_update_status_rejects_unknown_status(table):
 def test_all_known_statuses_accepted(table, status):
     sk = cc.write_correction(table, {}, "x", "framing")
     assert cc.update_status(table, sk, status) is True
+
+
+# ── S5 (#1697): prompt-memory injection — read/scope/render/bound ────────────
+def _corr(cid, *, coach, surface="coach_brief", cls="stale-baseline", text="t", status="open", date="2026-07-22"):
+    """Build one persisted-shape correction row for the S5 read tests."""
+    return cc.build_correction_item(
+        {"surface": surface, "coach": coach},
+        text,
+        cls,
+        now=datetime.fromisoformat(f"{date}T12:00:00+00:00"),
+        correction_id=cid,
+    ) | {"status": status}
+
+
+def test_open_corrections_for_scopes_to_the_requested_coach():
+    # Each coach must see ONLY its own corrections — never the global list.
+    rows = [
+        _corr("aaaaaaaa", coach="metabolic_coach", text="315 lbs is stale — baseline is 321.4"),
+        _corr("bbbbbbbb", coach="sleep_coach", text="don't cite 8h as a streak"),
+    ]
+    t = FakeDdbTable(rows=rows)
+    metab = cc.open_corrections_for(t, surface="coach_brief", coach="metabolic_coach")
+    assert [c["correction_id"] for c in metab] == ["aaaaaaaa"]
+    sleep = cc.open_corrections_for(t, surface="coach_brief", coach="sleep_coach")
+    assert [c["correction_id"] for c in sleep] == ["bbbbbbbb"]
+    # A coach with no corrections gets an empty list (→ empty block, no injection).
+    assert cc.open_corrections_for(t, surface="coach_brief", coach="mind_coach") == []
+
+
+def test_open_corrections_for_excludes_non_open_status():
+    rows = [
+        _corr("aaaaaaaa", coach="metabolic_coach", status="open"),
+        _corr("bbbbbbbb", coach="metabolic_coach", status="applied-to-gate"),
+    ]
+    t = FakeDdbTable(rows=rows)
+    got = cc.open_corrections_for(t, surface="coach_brief", coach="metabolic_coach")
+    assert [c["correction_id"] for c in got] == ["aaaaaaaa"]
+
+
+def test_open_corrections_for_is_newest_first_and_bounded():
+    # Rolling bounded window: newest-first, capped at `limit` (no unbounded re-injection).
+    rows = [_corr(f"{i:08d}", coach="metabolic_coach", date=f"2026-07-{10 + i:02d}", text=f"correction {i}") for i in range(6)]
+    t = FakeDdbTable(rows=rows)
+    got = cc.open_corrections_for(t, surface="coach_brief", coach="metabolic_coach", limit=3)
+    assert len(got) == 3
+    # Newest date (2026-07-15, i=5) first; oldest of the window (2026-07-13, i=3) last.
+    assert [c["correction_id"] for c in got] == ["00000005", "00000004", "00000003"]
+
+
+def test_render_corrections_block_empty_is_empty_string():
+    assert cc.render_corrections_block([]) == ""
+
+
+def test_render_corrections_block_tags_class_and_lists_text():
+    block = cc.render_corrections_block(
+        [
+            {"error_class": "stale-baseline", "correction_text": "315 lbs is stale — baseline is 321.4"},
+            {"error_class": "ungrounded-behavioral", "correction_text": "you didn't 'maintain your window'"},
+        ]
+    )
+    assert "DO NOT REPEAT" in block
+    assert "[stale-baseline] 315 lbs is stale" in block
+    assert "[ungrounded-behavioral]" in block
+
+
+def test_corrections_prompt_block_end_to_end_scopes_and_renders():
+    rows = [
+        _corr("aaaaaaaa", coach="metabolic_coach", text="315 lbs is stale — baseline is 321.4"),
+        _corr("bbbbbbbb", coach="sleep_coach", text="sleep-only correction"),
+    ]
+    t = FakeDdbTable(rows=rows)
+    metab = cc.corrections_prompt_block(t, surface="coach_brief", coach="metabolic_coach")
+    assert "315 lbs is stale" in metab
+    assert "sleep-only correction" not in metab  # scoped — no cross-coach leak
+    # A coach with no open corrections → empty string (nothing injected).
+    assert cc.corrections_prompt_block(t, surface="coach_brief", coach="mind_coach") == ""
+
+
+def test_open_corrections_for_does_not_transition_status():
+    # Reading for injection must NOT flip open → applied-to-prompt (rolling window).
+    rows = [_corr("aaaaaaaa", coach="metabolic_coach")]
+    t = FakeDdbTable(rows=rows)
+    cc.open_corrections_for(t, surface="coach_brief", coach="metabolic_coach")
+    assert t.updates == []  # no status write happened on read

@@ -1455,6 +1455,34 @@ def _build_journal_mood_prompt_block(journal_mood, voice_spec):
     return block
 
 
+def _coach_corrections_block(coach_id, *, surface="coach_brief", table=None):
+    """S5 (#1697, epic #1687): the per-coach prompt-memory block — THIS coach's OWN
+    open corrections, bounded + newest-first, rendered for injection into the
+    DYNAMIC user portion of its generation prompt (never the cached system prefix —
+    COST-OPT-2). Scoped by (surface, coach) so each coach sees only its own
+    corrections, never the global list.
+
+    Rolling bounded window, not auto-transition: corrections stay `status="open"`
+    and keep suppressing their error-class every cycle until genuinely resolved
+    (S6/S7 or a manual `update_status`), so this read never mutates status.
+
+    Fail-soft: any error (module/table/read) → "" so a corrections lookup can never
+    break a coach generation. `table` is injectable for offline testing.
+    """
+    try:
+        import coach_corrections as _cc
+
+        if table is None:
+            table = boto3.resource("dynamodb", region_name="us-west-2").Table(os.environ.get("TABLE_NAME", "life-platform"))
+        block = _cc.corrections_prompt_block(table, surface=surface, coach=coach_id)
+        if block:
+            print(f"[COACH-V2:{coach_id}] prompt-memory: injecting {block.count(chr(10))} prior-correction line(s)")
+        return block
+    except Exception as _cc_e:  # noqa: BLE001 — prompt-memory is never load-bearing
+        print(f"[COACH-V2:{coach_id}] corrections prompt-memory unavailable (non-blocking): {_cc_e}")
+        return ""
+
+
 def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
     """
     Generic Coach Intelligence pipeline for any coach.
@@ -1710,6 +1738,27 @@ COMPUTATION OUTPUTS:
 
 Write your {domain_label} coaching section now."""
 
+        # S5 (#1697, epic #1687): prompt-memory injection. Pull THIS coach's OWN
+        # open corrections (scoped by surface="coach_brief" + coach=coach_id) and
+        # render a bounded, newest-first "prior corrections — do not repeat" block
+        # so a past correction suppresses its whole error-CLASS, not just the one
+        # line it fixed. Two decisions (see #1697 PR body):
+        #   • Prompt-cache boundary (COST-OPT-2): the block is DYNAMIC, so it rides
+        #     the user/dynamic portion (`user_message_full` below), NEVER the cached
+        #     system prefix — injecting it into a cached block busts the 90% discount.
+        #   • Rolling bounded window, not auto-transition: corrections stay "open"
+        #     and keep suppressing their class every cycle; "no unbounded
+        #     re-injection" is met by the BOUND, not an open->applied-to-prompt flip.
+        # Fail-soft: any error → empty block, generation unchanged.
+        corrections_block = _coach_corrections_block(coach_id, surface="coach_brief")
+
+        # The dynamic user portion the model actually receives. The corrections
+        # block rides HERE — outside any cached system prefix — but is DELIBERATELY
+        # excluded from the ADR-104 grounding allow-list below (that still derives
+        # from the un-augmented `user_message`): a correction that quotes a wrong
+        # figure ("stop citing 315 lbs as current") must never license that number.
+        user_message_full = user_message + (("\n\n" + corrections_block) if corrections_block else "")
+
         # Step 4.5 (#738 / ADR-126): hash-and-reuse. On a quiet day the semantic
         # brief is identical to the last one, and regenerating just re-says the
         # same silence at full Sonnet + gate cost. Fingerprint the exact generation
@@ -1726,7 +1775,10 @@ Write your {domain_label} coaching section now."""
             import generation_cache as _gen_cache
 
             _cache_tbl = boto3.resource("dynamodb", region_name="us-west-2").Table(os.environ.get("TABLE_NAME", "life-platform"))
-            _brief_fp = _gen_cache.brief_fingerprint(system_prompt, user_message)
+            # #1697: fingerprint over user_message_full so a newly-logged (or
+            # resolved) correction busts the hash-and-reuse and forces a fresh,
+            # corrections-aware generation — reuse can never be stale-but-fresh.
+            _brief_fp = _gen_cache.brief_fingerprint(system_prompt, user_message_full)
             _reuse, _unchanged_since = _gen_cache.check_reuse(_cache_tbl, coach_id, output_type, _brief_fp)
             if _reuse:
                 print(f"[COACH-V2:{coach_id}] brief unchanged since {_unchanged_since} — reusing gated output, skipping generation")
@@ -1759,7 +1811,7 @@ Write your {domain_label} coaching section now."""
 
         # Step 5: Generate with Sonnet
         print(f"[COACH-V2:{coach_id}] Generating output...")
-        output = call_anthropic(system_prompt + "\n\n" + user_message, api_key, max_tokens=600)
+        output = call_anthropic(system_prompt + "\n\n" + user_message_full, api_key, max_tokens=600)
         print(f"[COACH-V2:{coach_id}] Output: {len(output)} chars")
 
         # #952 (ai-content-6): Bedrock outage / tier-3 cutoff returns the
@@ -1792,7 +1844,7 @@ Write your {domain_label} coaching section now."""
                 output, _left, _corrected = _gg_mod.regen_once(
                     output,
                     _findings_fn,
-                    lambda _corr: call_anthropic(system_prompt + "\n\n" + user_message + "\n\n" + _corr, api_key, max_tokens=600),
+                    lambda _corr: call_anthropic(system_prompt + "\n\n" + user_message_full + "\n\n" + _corr, api_key, max_tokens=600),
                 )
                 if _corrected:
                     print(f"[COACH-V2:{coach_id}] grounding self-corrected: {len(_pre)}→{len(_left)} finding(s)")
@@ -1814,7 +1866,9 @@ Write your {domain_label} coaching section now."""
             coach_id,
             output,
             generation_brief,
-            regenerate_fn=lambda _note: call_anthropic(system_prompt + "\n\n" + user_message + "\n\n" + _note, api_key, max_tokens=600),
+            regenerate_fn=lambda _note: call_anthropic(
+                system_prompt + "\n\n" + user_message_full + "\n\n" + _note, api_key, max_tokens=600
+            ),
         )
         if output is None:
             print(f"[COACH-V2:{coach_id}] Held by quality gate (N-06) — no output published this cycle")
@@ -1836,7 +1890,7 @@ Write your {domain_label} coaching section now."""
                     output,
                     _psig,
                     regenerate_fn=lambda _note: call_anthropic(
-                        system_prompt + "\n\n" + user_message + "\n\n" + _note, api_key, max_tokens=600
+                        system_prompt + "\n\n" + user_message_full + "\n\n" + _note, api_key, max_tokens=600
                     ),
                 )
                 if _ack_finding:
