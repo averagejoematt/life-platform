@@ -373,6 +373,15 @@ body { overflow-x: hidden; }
 }
 .dx-startfirst:hover { color: var(--ember); text-decoration: underline; }
 .dx-sub-btn:focus-visible, .dx-sub-rss:focus-visible, .dx-startfirst:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs); }
+/* #1620 — outbound social follow row (end of a chronicle dispatch). Line-art marks
+   inherit ink-muted, warm to ember on hover; flex-wraps so it never overflows narrow
+   (mobile) or wide viewports. */
+.dx-sub-social { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; margin: var(--sp-4) 0 0; }
+.dx-social-row { display: inline-flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.dx-social { display: inline-flex; color: var(--ink-muted); transition: color var(--dur-fast); }
+.dx-social .ico { width: 22px; height: 22px; }
+.dx-social:hover { color: var(--ember); }
+.dx-social:focus-visible { outline: 2px solid var(--ember); outline-offset: 3px; border-radius: var(--radius-xs); }
 /* #733 — per-post share affordance (the crawlable permalink, made shareable) */
 .dx-share { display: flex; align-items: baseline; gap: var(--sp-4); flex-wrap: wrap; margin: var(--sp-6) 0 0; max-width: var(--measure); }
 .dx-share-btn {

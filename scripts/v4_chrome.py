@@ -116,6 +116,27 @@ def doors_nav(current_door: str | None = None, with_follow: bool = False) -> str
 
 ASOF_STAMP = '<span class="label asof" data-bind="asof"></span>'
 
+# #1620 — outbound social follow links for the footer's "Follow &amp; context" column.
+# Before this the live site had ZERO outbound social links, so a post that went viral had
+# nowhere to send follow intent. These are the site's canonical follow destinations. They
+# are external, so each carries target="_blank" + rel="me noopener" — rel=me asserts the
+# identity backlink (Mastodon/IndieAuth-style verification), noopener closes the reverse-
+# tabnabbing handle. Handles are owner-confirmed (2026-07-23): the issue's TikTok typo
+# `avereagejoematt` was corrected to `averagejoematt`. Bluesky uses the default
+# `<handle>.bsky.social` namespace; X is the underscore handle; YouTube/TikTok use the
+# @handle form. This is the ONE source for the footer marks — dispatches.js (the in-app
+# chronicle reader) and wednesday_chronicle_lambda.py (the crawlable post permalink) carry
+# their own copies of the same handle set by necessity (JS + email-Lambda runtimes).
+SOCIAL_LINKS = (
+    ("https://bsky.app/profile/averagejoematt.bsky.social", "Bluesky"),
+    ("https://x.com/averagejoematt_", "X"),
+    ("https://www.instagram.com/averagejoematt/", "Instagram"),
+    ("https://www.reddit.com/user/averagejoematt/", "Reddit"),
+    ("https://www.youtube.com/@averagejoematt", "YouTube"),
+    ("https://www.tiktok.com/@averagejoematt", "TikTok"),
+)
+_SOCIAL_FOOT_HTML = "".join(f'<a href="{href}" target="_blank" rel="me noopener">{label}</a>' for href, label in SOCIAL_LINKS)
+
 
 def site_footer(with_asof: bool = False) -> str:
     """The canonical `.site-foot` footer — one site map on every page.
@@ -162,7 +183,7 @@ def site_footer(with_asof: bool = False) -> str:
         '<a href="/method/platform/">The platform</a><a href="/method/pipeline/">Pipeline status</a>'
         '<a href="/method/cost/">Cost</a><a href="/gear/">The gear</a></div>'
         '<div class="sf-col"><p class="sf-h label">Follow &amp; context</p>'
-        '<a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a>'
+        f'<a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a>{_SOCIAL_FOOT_HTML}'
         '<a href="/story/about/">About</a>'
         '<a href="/privacy/">Privacy</a></div>'
         f'</nav><p class="sf-base label"><span>averagejoematt</span>{asof}<a href="/">← home</a></p>'
