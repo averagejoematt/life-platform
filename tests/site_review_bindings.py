@@ -234,6 +234,15 @@ PAGE_BINDINGS = [
         "endpoints": [{"url": "/api/timeline", "role": "primary", "metrics": []}],
     },
     {
+        # #1672 (The Social Membrane, epic #1668)
+        "path": "/story/broadcast/",
+        "name": "Story · broadcast",
+        "door": "story",
+        "narrative_order": 90.5,
+        "story_intent": "the platform's self-hosted copy of Matthew's public voice — facade cards of his cleared, human-origin posts",
+        "endpoints": [{"url": "/api/broadcast", "role": "primary", "metrics": []}],
+    },
+    {
         "path": "/journal/essays/org-chart-of-one/",
         "name": "Essay · The Org Chart of One",
         "door": "story",

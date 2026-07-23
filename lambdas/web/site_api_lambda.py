@@ -191,6 +191,7 @@ from web.site_api_social import (
     _handle_ritual_log,
     _handle_submit_finding,
     _handle_verify_subscriber,
+    handle_broadcast,
     handle_challenge_catalog,
     handle_challenges,
     handle_current_challenge,
@@ -378,6 +379,10 @@ ROUTES = {
     "/api/character_calibration": handle_character_calibration,  # #1409: felt-reality calibration ledger (aggregates only)
     "/api/journey_timeline": handle_journey_timeline,
     "/api/journey_waveform": handle_journey_waveform,
+    # The Social Membrane — /story/broadcast/ feed (#1672, epic #1668): cleared,
+    # human-origin ingested posts (facade cards). Read-only; membrane filter in
+    # site_api_social._is_broadcast_visible (S2 origin + S5 sensitivity seam).
+    "/api/broadcast": handle_broadcast,
     # Sprint 11: glucose + sleep intelligence pages
     "/api/glucose": handle_glucose,
     "/api/sleep_correlations": handle_sleep_correlations,

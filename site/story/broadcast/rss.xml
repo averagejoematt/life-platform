@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>The Measured Life — Broadcast (averagejoematt)</title>
+    <link>https://averagejoematt.com/story/broadcast/</link>
+    <description>Matthew's own public posts, self-hosted — the platform's copy of his voice, with permalinks and a feed.</description>
+    <language>en-us</language>
+    <lastBuildDate>Thu, 23 Jul 2026 00:07:16 +0000</lastBuildDate>
+    <atom:link href="https://averagejoematt.com/story/broadcast/rss.xml" rel="self" type="application/rss+xml"/>
+  </channel>
+</rss>

@@ -1,0 +1,65 @@
+{
+  "captured_at": "2026-07-22T00:00:00+00:00",
+  "fetch_path": "/api/broadcast",
+  "is_prefix_sample": false,
+  "path": "/api/broadcast",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "as_of_date": {
+        "type": "string"
+      },
+      "items": {
+        "items": {
+          "keys": {
+            "caption": {
+              "type": "string"
+            },
+            "channel": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "excerpt": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "link_out": {
+              "type": "string"
+            },
+            "permalink": {
+              "type": "string"
+            },
+            "thumbnail_url": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 1,
+        "type": "array"
+      },
+      "total": {
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}
