@@ -221,11 +221,16 @@ def ingestion_youtube() -> list[iam.PolicyStatement]:
     # (owner-provisioned) and is read GetSecretValue-only (the _ingestion_base default —
     # no writeback). DDB GetItem (base default) is what the #1670 provenance membrane uses
     # to cross-reference the BROADCAST_ORIGIN# ledger. Raw archive under raw/matthew/youtube/*.
+    #
+    # #1673 (epic #1668): the fail-closed auto-publish sensitivity gate classifies every
+    # origin:human post at ingestion (broadcast_sensitivity_gate) before it can appear in
+    # the S4 feed. Its off-topic layer is a cheap Haiku pass via bedrock_client (ADR-062 —
+    # IAM auth, no raw key), budget-gated and fail-closed, so this role needs bedrock:InvokeModel.
     return _ingestion_base(
         "youtube",
         secret_name="life-platform/youtube",
         s3_prefix="raw/matthew/youtube/*",
-    )
+    ) + [_bedrock_statement()]
 
 
 def ingestion_withings() -> list[iam.PolicyStatement]:
