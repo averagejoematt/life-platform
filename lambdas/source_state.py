@@ -28,7 +28,7 @@ from datetime import datetime
 # said 'paused' for behavioral lapses, and the training coach was told it wasn't a
 # live ingest path. Currently empty on purpose; garmin's pause is registry-driven
 # (source_registry paused=True, ADR-074), not declared here.)
-DECLARED_PAUSED_SOURCES = set()
+DECLARED_PAUSED_SOURCES: set[str] = set()
 
 STATE_LIVE = "live"
 STATE_PAUSED = "paused"

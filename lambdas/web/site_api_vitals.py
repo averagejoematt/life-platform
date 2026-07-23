@@ -26,6 +26,7 @@ import os
 import re as _re  # #1240: genetic-biomarker strip regexes (handle_labs)
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal  # noqa: F401
+from typing import Any
 
 import achievement_rules  # #1624: the ONE place badge thresholds live (shared with daily-metrics-compute)
 import boto3  # #1240: S3/DDB clients used by handle_labs / handle_glucose / handle_genome_risks
@@ -1504,7 +1505,7 @@ def handle_genome_risks() -> dict:
             cache_seconds=3600,
         )
 
-    categories = {}
+    categories: dict[str, list[dict[str, Any]]] = {}
     risk_summary = {"unfavorable": 0, "mixed": 0, "neutral": 0, "favorable": 0}
 
     for snp in items:
@@ -1863,7 +1864,7 @@ def handle_sleep_correlations() -> dict:
     )
     # B3 — day-of-week best duration. Not a Pearson pair; n=1/day at week one = noise.
     durations = {d: v["hours"] for d, v in wd.items() if v["hours"] is not None}
-    dow = {}
+    dow: dict[int, list[float]] = {}
     for d, h in durations.items():
         try:
             dow.setdefault(datetime.strptime(d, "%Y-%m-%d").weekday(), []).append(h)

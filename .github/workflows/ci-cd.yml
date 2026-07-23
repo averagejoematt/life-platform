@@ -298,22 +298,13 @@ jobs:
         if: always()
         run: |
           pip install mypy==2.1.0
-          echo "::group::Mypy on the clean-module set (tier-1 core + split AI modules + tier-2 web/)"
-          # Authoritative list: tests/test_mypy_clean_modules.py::MYPY_CLEAN_MODULES.
-          # Tier-1 (budget/auth/inference): secret_cache, retry_utils, phase_filter,
-          # constants, bedrock_client. Tier-2 (#419): the small, already-clean
-          # slice of the public serving surface (web/*.py) — see that file's
-          # comment for what's excluded and why. Blocking — a type regression
-          # here fails CI.
-          python -m mypy --config-file mypy.ini \
-            lambdas/secret_cache.py lambdas/retry_utils.py lambdas/phase_filter.py \
-            lambdas/constants.py lambdas/bedrock_client.py lambdas/scoring_engine.py \
-            lambdas/character_engine.py lambdas/intelligence_common.py lambdas/ai_calls.py \
-            lambdas/ai_context.py lambdas/ai_summaries.py \
-            lambdas/web/site_api_common.py lambdas/web/site_api_coach.py \
-            lambdas/web/site_api_intelligence.py lambdas/web/site_api_reading.py \
-            lambdas/web/site_api_vitals.py lambdas/web/site_stats_refresh_lambda.py \
-            lambdas/web/og_image_lambda.py lambdas/web/og_moments.py
+          echo "::group::Mypy on the first-party clean surface (#1656)"
+          # Authoritative list: tests/mypy_clean_set.py (single source of truth,
+          # also consumed by tests/test_mypy_clean_modules.py so the two can't
+          # drift). The clean set is the whole lambdas/ + lambdas/web/ top-level
+          # surface MINUS the documented DIRTY denylist — a ratchet that only
+          # grows. Blocking — a type regression here fails CI.
+          python -m mypy --config-file mypy.ini $(python tests/mypy_clean_set.py)
           echo "::endgroup::"
 
       - name: Syntax check (py_compile)

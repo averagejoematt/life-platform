@@ -56,7 +56,8 @@ try:
     from intelligence.grounding_guard import hard_canonical_contradictions as _hard_contradictions
 except ImportError:  # pragma: no cover — environment-dependent
     try:
-        from grounding_guard import hard_canonical_contradictions as _hard_contradictions
+        # dual package/flat import-fallback idiom; both branches bind the same name.
+        from grounding_guard import hard_canonical_contradictions as _hard_contradictions  # type: ignore[no-redef]
     except ImportError:
         _hard_contradictions = None
 

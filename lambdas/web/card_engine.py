@@ -24,6 +24,7 @@ Pillow-only; ships in the same package as ``og_image_lambda`` (pillow-layer, web
 """
 
 import os
+from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -152,7 +153,7 @@ _FONT_DIRS = [
     os.path.join(os.path.dirname(__file__), "fonts"),
     os.path.join(os.path.dirname(os.path.dirname(__file__)), "fonts"),
 ]
-_font_cache = {}
+_font_cache: dict[tuple[str, int], Any] = {}
 
 
 def font(name, size):
@@ -272,7 +273,7 @@ def draw_uncertainty(draw, x, y, value, label, ci=None, n=None, decimals=0, suff
 # ── The card-type registry ───────────────────────────────────────────────────
 # Reach surfaces register a builder keyed by card type. render() dispatches.
 
-CARD_BUILDERS = {}
+CARD_BUILDERS: dict[str, Any] = {}
 
 
 def register_card(card_type, builder):

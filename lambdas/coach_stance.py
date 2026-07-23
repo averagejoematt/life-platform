@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import time
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,7 @@ KNOWN_SIGNALS = {
     "sample_size_n",
 }
 
-_cache = {}  # coach_id -> {"data": dict, "ts": float}
+_cache: dict[str, Any] = {}  # coach_id -> {"data": dict, "ts": float}
 _TTL_S = 300
 
 

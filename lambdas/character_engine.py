@@ -944,7 +944,8 @@ def derive_consistency_inputs(dated_records: list[dict[str, Any]], as_of_date: s
             break
 
     # ── weekend/weekday composite ratio over the trailing 14 days ──
-    weekend, weekday = [], []
+    weekend: list[float] = []
+    weekday: list[float] = []
     for back in range(1, 15):
         d = as_of - timedelta(days=back)
         rec = by_date.get(d.isoformat())
@@ -1568,7 +1569,7 @@ def compute_cross_pillar_effects(
     """
     effects_config = config.get("cross_pillar_effects", [])
     active = []
-    modifiers = {}
+    modifiers: dict[str, float] = {}
 
     for effect in effects_config:
         condition = effect.get("condition", "")
