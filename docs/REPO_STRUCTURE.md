@@ -24,6 +24,9 @@ The canonical top-level layout. Read this before adding a new file so things lan
 | `assets/` | Repo-level static asset(s) (the platform icon). NB: site/OG images live under the S3 `generated/` prefix, not here. |
 | `ingest/` | Local macOS `launchd` drop-folder watchers for manual data uploads (operational tooling, runs on the operator's machine). |
 | `setup/` | One-time OAuth/credential setup scripts per integration (Garmin, Withings, Eight Sleep, …). Run locally for token rotation. |
+| `infra/` | IAM policy/trust JSON snapshots (`infra/iam/`) — the committed audit record of the GitHub-Actions OIDC roles. Live IAM is CDK-owned; this is the reviewable snapshot. |
+
+> **Ratchet:** this allowlist is enforced by `tests/test_root_clutter_guard.py` (#1652, ENGINEERING_STANDARDS.md §1) — a new tracked top-level dir that is not on the guard's allowlist fails CI until it is added there with a one-line reason (or not committed at the root). Support dirs also carry a one-line `README.md`.
 
 ### Audit-trail — run-once, kept as the incident/operation record
 | Dir | Purpose |
