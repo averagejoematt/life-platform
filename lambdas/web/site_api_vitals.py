@@ -171,7 +171,7 @@ def handle_vitals(date: str | None = None) -> dict:
     # by contrast, is same-day "today" — see weight_as_of.)
     _night_of = None
     try:
-        _night_of = (datetime.strptime(_as_of[:10], "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
+        _night_of = (datetime.strptime(_as_of[:10], "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")  # type: ignore[index]  # _as_of is a str date in practice; the float branch of its inferred union never occurs and is guarded by this try/except
     except Exception:
         _night_of = None
     # Nutrition is a manual end-of-day upload — structurally ~24h behind. Its freshness

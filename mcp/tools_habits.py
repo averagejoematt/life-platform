@@ -27,6 +27,7 @@ the two coexist per habit-day and never overwrite each other.
 """
 
 from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING
 
 from boto3.dynamodb.conditions import Key
 
@@ -37,7 +38,8 @@ try:
     # Shared, bundled module (#781) — the deterministic conventions live here.
     from habit_causality import clip_note, parse_note, slugify_habit
 except ImportError:  # pragma: no cover — MCP bundle always ships lambdas/ at root
-    from lambdas.habit_causality import clip_note, parse_note, slugify_habit
+    if not TYPE_CHECKING:
+        from lambdas.habit_causality import clip_note, parse_note, slugify_habit
 
 CAUSALITY_SOURCE = "habit_causality"
 HABITIFY_SOURCE = "habitify"

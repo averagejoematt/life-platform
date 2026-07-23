@@ -106,7 +106,7 @@ def _build_system_block(
     return system
 
 
-def call_anthropic_api(
+def call_anthropic_api(  # type: ignore[return]  # loop always returns on success or re-raises on the final attempt; the fall-through is unreachable
     prompt: str,
     max_tokens: int = 500,
     system: Union[str, list[dict[str, Any]], None] = None,
@@ -184,7 +184,7 @@ def call_anthropic_api(
                 raise
 
 
-def call_anthropic_raw(req: Union[dict[str, Any], urllib.request.Request], timeout: int = 55) -> dict[str, Any]:
+def call_anthropic_raw(req: Union[dict[str, Any], urllib.request.Request], timeout: int = 55) -> dict[str, Any]:  # type: ignore[return]  # loop always returns on success or re-raises on the final attempt; the fall-through is unreachable
     """Retry wrapper around bedrock_client.invoke() for a raw Messages body.
 
     Preferred call shape (#505/J-2): pass the Anthropic Messages dict directly

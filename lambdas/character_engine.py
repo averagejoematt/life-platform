@@ -1553,7 +1553,7 @@ def character_level_up_drivers(pillar_results: dict[str, Any], top_n: int = 3) -
 
 def compute_cross_pillar_effects(
     pillar_levels: dict[str, float], config: dict[str, Any], vice_streaks: Optional[dict[str, Any]] = None
-) -> dict[str, Any]:
+) -> tuple[list[Any], dict[str, float]]:
     """Evaluate cross-pillar effects. Returns (active_effects, modifier_dict). [F-05]
 
     ADR-134 (#963, decided): conditions evaluate EMA level_SCORES, not earned

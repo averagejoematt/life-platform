@@ -16,6 +16,8 @@ An unknown / out-of-range / non-numeric number is REPORTED (an explicit error na
 many items the week's pack has), never silently dropped (AC3).
 """
 
+from typing import TYPE_CHECKING
+
 from mcp.config import logger, table as _table_ref
 
 try:
@@ -23,7 +25,8 @@ try:
     import coach_correction_resolver as ccr
     import coach_corrections
 except ImportError:  # pragma: no cover — the MCP bundle always ships lambdas/ at root
-    from lambdas import coach_correction_resolver as ccr, coach_corrections
+    if not TYPE_CHECKING:
+        from lambdas import coach_correction_resolver as ccr, coach_corrections
 
 
 def tool_log_coach_correction(args):

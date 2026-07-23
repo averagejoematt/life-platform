@@ -52,6 +52,8 @@ MCP and site-api Lambdas resolve it; stacks that bundle lambdas/ get the same
 file at /var/task, which shadows the layer copy harmlessly.
 """
 
+from typing import Any, cast
+
 # Default staleness threshold when a source has no override (hours). The
 # checker may still override its own default via the STALE_HOURS env var.
 DEFAULT_STALE_HOURS = 48
@@ -734,7 +736,9 @@ def engagement_channels() -> dict:
     engagement_core.PRESENCE_PREDICATES (None = any DDB record counts)."""
     out = {}
     for k, v in SOURCE_REGISTRY.items():
-        ch = v.get("engagement_channel")
+        # cast: the registry's heterogeneous dict values infer as `object`; each
+        # engagement_channel entry is a str-keyed sub-dict (no runtime effect).
+        ch = cast("dict[str, Any]", v.get("engagement_channel"))
         if not ch:
             continue
         out[k] = {
@@ -785,14 +789,14 @@ def hae_datatype_thresholds() -> list:
     here from freshness_checker by #746 so every source threshold lives in this one
     registry. Each: {key, label, fields, stale_days, manual}. The checker's
     HAE_DATATYPES aliases this; compute_datatype_liveness reads it."""
-    return [dict(d) for d in SOURCE_REGISTRY["apple_health"].get("hae_datatypes", [])]
+    return [dict(d) for d in cast("list[dict[str, Any]]", SOURCE_REGISTRY["apple_health"].get("hae_datatypes", []))]
 
 
 def manual_hae_datatype_keys() -> set:
     """The HAE sub-datatypes Matthew captures by hand (CGM/water/BP/State of Mind)
     — nudge-eligible, unlike the passive device streams (steps/workouts) which a
     reminder-to-log can't fix (#746)."""
-    return {d["key"] for d in SOURCE_REGISTRY["apple_health"].get("hae_datatypes", []) if d.get("manual")}
+    return {d["key"] for d in cast("list[dict[str, Any]]", SOURCE_REGISTRY["apple_health"].get("hae_datatypes", [])) if d.get("manual")}
 
 
 def catalog_entries() -> list:
