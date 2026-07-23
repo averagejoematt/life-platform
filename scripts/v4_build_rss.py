@@ -40,6 +40,14 @@ SRC = "https://averagejoematt.com/journal/posts.json"
 # the feed on the same deploy that publishes its permalink page.
 BLOG_SRC = Path(__file__).resolve().parent.parent / "site" / "journal" / "blog.json"
 BASE = "https://averagejoematt.com"
+# #1672 (The Social Membrane): the Broadcast feed's own RSS, sourced from the live
+# read-only /api/broadcast (cleared, origin:human posts). A SEPARATE feed — never
+# merged into the chronicle feed, which would spam chronicle subscribers with social
+# posts. Item <link>/<guid> point at the on-site permalink so RSS lands readers on the
+# site (a reader surface, not a link farm — the story's whole point).
+BROADCAST_SRC = f"{BASE}/api/broadcast"
+BROADCAST_TITLE = "The Measured Life — Broadcast (averagejoematt)"
+BROADCAST_DESC = "Matthew's own public posts, self-hosted — the platform's copy of his voice, with permalinks and a feed."
 OUT = Path("site/rss.xml")
 # L-06: some readers probe /feed.xml instead of /rss.xml — emit an identical alias.
 OUT_ALIAS = Path("site/feed.xml")
@@ -83,6 +91,64 @@ def _blog_posts() -> list[dict]:
     except (OSError, json.JSONDecodeError):
         return []
     return [p for p in data.get("posts", []) if p.get("date") and p.get("title") and p.get("url")]
+
+
+def build_broadcast_feed() -> int:
+    """#1672 — write the /story/broadcast/ RSS feed from the live /api/broadcast.
+
+    FAIL-SOFT and self-contained: never raises, and any problem (endpoint 404 before
+    the site-api ships this route, network blip, non-broadcast-shaped body) yields a
+    valid EMPTY feed rather than a broken build. The output path derives from ``OUT``
+    so the test harness that redirects ``OUT`` to a tmp dir redirects this too (no
+    real-tree writes during unit tests). Returns the item count."""
+    out = OUT.parent / "story" / "broadcast" / "rss.xml"
+    try:
+        with urlopen(BROADCAST_SRC, timeout=20) as r:
+            data = json.load(r)
+    except Exception:  # noqa: BLE001 — the endpoint may not be live yet; empty feed is valid
+        data = {}
+    posts = data.get("items", []) if isinstance(data, dict) else []
+    posts = [p for p in posts if p.get("date")]
+    posts.sort(key=lambda p: p["date"], reverse=True)
+
+    now = format_datetime(datetime.now(timezone.utc))
+    items = []
+    for p in posts:
+        # Land readers on-site: <link>/<guid> = the on-site permalink, not the raw
+        # third-party URL. The facade card itself still links out to the platform.
+        permalink = p.get("permalink") or f"/story/broadcast/#{p.get('id', '')}"
+        link = f"{BASE}{permalink}"
+        tagged_link = with_utm(link, source="rss", medium="feed", campaign="broadcast")
+        title = p.get("caption") or p.get("excerpt") or "Post"
+        desc = truncate_at_word(" ".join((p.get("excerpt") or p.get("caption") or "").split()), 360)
+        items.append(
+            "    <item>\n"
+            f"      <title>{esc(title)}</title>\n"
+            f"      <link>{esc(tagged_link)}</link>\n"
+            f'      <guid isPermaLink="true">{esc(link)}</guid>\n'
+            f"      <description>{esc(desc)}</description>\n"
+            f"      <pubDate>{rfc822(p['date'])}</pubDate>\n"
+            "    </item>"
+        )
+
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">\n'
+        "  <channel>\n"
+        f"    <title>{esc(BROADCAST_TITLE)}</title>\n"
+        f"    <link>{BASE}/story/broadcast/</link>\n"
+        f"    <description>{esc(BROADCAST_DESC)}</description>\n"
+        "    <language>en-us</language>\n"
+        f"    <lastBuildDate>{now}</lastBuildDate>\n"
+        f'    <atom:link href="{BASE}/story/broadcast/rss.xml" rel="self" type="application/rss+xml"/>\n'
+        + ("\n".join(items) + "\n" if items else "")
+        + "  </channel>\n"
+        "</rss>\n"
+    )
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(xml, encoding="utf-8")
+    print(f"✅ wrote {out} — {len(items)} broadcast items")
+    return len(items)
 
 
 def main() -> int:
@@ -145,6 +211,13 @@ def main() -> int:
     OUT.write_text(xml, encoding="utf-8")
     OUT_ALIAS.write_text(xml, encoding="utf-8")
     print(f"✅ wrote {OUT} + {OUT_ALIAS} — {len(items)} items, newest {posts[0]['date'] if posts else 'n/a'}")
+
+    # #1672 — the Broadcast feed's own RSS, independent + fail-soft (a broadcast-feed
+    # problem must never break the chronicle feed above).
+    try:
+        build_broadcast_feed()
+    except Exception as e:  # noqa: BLE001 — belt-and-braces; the builder is already fail-soft
+        print(f"⚠️  broadcast feed skipped (non-fatal): {e}", file=sys.stderr)
     return 0
 
 

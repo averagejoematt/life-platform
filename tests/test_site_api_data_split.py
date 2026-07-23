@@ -96,6 +96,7 @@ EXPECTED_ROUTE_MAP = {
     "/api/journey": "handle_journey",
     "/api/journey_timeline": "handle_journey_timeline",
     "/api/journey_waveform": "handle_journey_waveform",
+    "/api/broadcast": "handle_broadcast",  # #1672 — The Social Membrane broadcast feed
     "/api/labs": "handle_labs",
     "/api/last_sync": "handle_last_sync",
     "/api/ledger": "handle_ledger",

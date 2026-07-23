@@ -353,6 +353,17 @@ _CURATED = [
         "visual": {"checks": [{"selector": "main, [data-readout], article", "not_empty": True, "desc": "timeline content"}]},
     },
     {
+        # #1672 (The Social Membrane, epic #1668): the Broadcast feed — facade cards of
+        # Matthew's cleared, origin:human posts, from the read-only /api/broadcast.
+        "path": "/story/broadcast/",
+        "name": "Story · broadcast",
+        "tier": 2,
+        "content_class": "live-data",
+        "api_deps": ["/api/broadcast"],
+        "js_modules": ["story.js"],
+        "visual": {"checks": [{"selector": "main, [data-readout], article", "not_empty": True, "desc": "broadcast content"}]},
+    },
+    {
         "path": "/data/",
         "name": "Data hub",
         "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)

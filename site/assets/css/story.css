@@ -996,3 +996,36 @@ body { overflow-x: hidden; }
 .att-strip { margin-top: var(--sp-2); font-family: var(--font-mono); font-size: var(--fs-small); letter-spacing: 0.08em; color: var(--ink-faint); overflow-wrap: anywhere; }
 .att-note { margin-top: var(--sp-6); color: var(--ink-faint); }
 .att-foot { margin-top: var(--sp-3); color: var(--ink-muted); }
+
+/* ── The Broadcast feed (#1672, The Social Membrane) ─────────────────────────────
+   Facade card grid — thumbnail + caption + link-out. Reverse-chron, responsive,
+   never overflows the reader column (auto-fill + minmax(min(100%, …))), so a single
+   narrow card on mobile collapses to full-width instead of forcing a scrollbar. */
+.bc-feed { list-style: none; margin: var(--sp-5) 0 0; padding: 0;
+  display: grid; gap: var(--sp-4);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); }
+.bc-card { border: var(--border-hair); border-radius: var(--radius-sm);
+  overflow: hidden; background: var(--surface); display: flex; flex-direction: column;
+  transition: border-color var(--dur-fast), transform var(--dur-fast); }
+.bc-card:hover { border-color: var(--ember); }
+.bc-card:target { border-color: var(--ember); box-shadow: 0 0 0 1px var(--ember); }
+.bc-link { text-decoration: none; color: inherit; display: flex; flex-direction: column; height: 100%; }
+.bc-media { margin: 0; aspect-ratio: 16 / 9; background: var(--rule); overflow: hidden;
+  display: flex; align-items: center; justify-content: center; }
+.bc-thumb { width: 100%; height: 100%; object-fit: cover; display: block; max-width: 100%; }
+.bc-thumb-empty { color: var(--ink-faint); letter-spacing: 0.1em; text-transform: uppercase;
+  font-family: var(--font-mono); font-size: var(--fs-label); }
+.bc-body { padding: var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-2); flex: 1; }
+.bc-meta { display: flex; gap: var(--sp-2); align-items: baseline; flex-wrap: wrap; margin: 0; }
+.bc-chan { color: var(--ember); text-transform: uppercase; letter-spacing: 0.1em; font-family: var(--font-mono); }
+.bc-date { color: var(--ink-faint); font-family: var(--font-mono); }
+.bc-caption { margin: 0; font-family: var(--font-serif); font-size: var(--fs-body);
+  line-height: 1.4; color: var(--ink); overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.bc-cta { margin-top: auto; color: var(--ink-muted); font-family: var(--font-mono); }
+.bc-link:hover .bc-cta { color: var(--ember); }
+.bc-foot { margin: 0; padding: 0 var(--sp-3) var(--sp-3); }
+.bc-permalink { color: var(--ink-faint); text-decoration: none; font-family: var(--font-mono); letter-spacing: 0.06em; }
+.bc-permalink:hover { color: var(--ember); text-decoration: underline; }
+.bc-subscribe { margin: var(--sp-5) 0 0; color: var(--ink-muted); font-family: var(--font-mono); }
+.bc-subscribe a { color: var(--ember); }

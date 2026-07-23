@@ -31,6 +31,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 import boto3
+import social_provenance  # #1670 membrane — the origin:human predicate for the broadcast feed (#1672)
 from boto3.dynamodb.conditions import Key
 from client_ip import extract_client_ip  # #1221 — the ONE edge-observed client-IP helper
 from phase_filter import with_phase_filter  # ADR-058
@@ -1712,3 +1713,111 @@ def _handle_board_question(event: dict) -> dict:
             }
         ),
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# The Social Membrane — the Broadcast feed (#1672, epic #1668, story S4)
+# ═══════════════════════════════════════════════════════════════════════════════
+# GET /api/broadcast — the read-only source for /story/broadcast/, the site's
+# canonical home for Matthew's own public voice. Reverse-chron facade cards
+# (thumbnail + caption + link-out) of the ingested social posts (#1669/#1670),
+# filtered to the CLEARED, human-origin set. Modeled on handle_journey_timeline:
+# read-only, aggregate-only, fail-soft, one _ok() envelope.
+
+# The ingested-post partitions (#1669). Today only youtube ships (dormant until the
+# owner provisions a channel id); as more inbound channels land they append here and
+# the feed picks them up with no other change. pk = USER#matthew#SOURCE#<source>,
+# sk = DATE#<date>#<post_id>, one row per post (youtube_lambda.transform).
+_BROADCAST_SOURCES = ("youtube",)
+_BROADCAST_LIMIT = 60  # newest N cleared posts; the feed is a voice highlight, not an archive
+
+# ── S5 sensitivity gate seam — RECONCILED to #1673 (PR #1701) ────────────────────
+# #1672 ships the origin:human feed; #1673 lands the FAIL-CLOSED auto-publish
+# sensitivity gate. This is the ONE place the seam composes. Reconciled to #1673's
+# ACTUAL contract (its `gate` module): the row attribute is `sensitivity_status`
+# (== gate.STATUS_ATTR) and the publishable verdict is the literal "cleared"
+# (NOT "clear") — i.e. gate.is_cleared(post). FAIL CLOSED — a missing / "pending" /
+# "flagged" / any non-"cleared" status is WITHHELD, so a flagged post is absent from
+# the rendered feed (AC) and the feed is honestly empty until #1673 stamps posts.
+#
+# #1673's `gate` module isn't in this branch yet (unmerged sibling PR #1701), so we
+# MIRROR its contract rather than import it. On merge, collapse to the single source
+# of truth: `from <gate_module> import is_cleared` and make _is_sensitivity_cleared a
+# one-line delegate to it (its helpers: is_cleared / filter_cleared / STATUS_ATTR /
+# cleared_filter_expression). The literals below match #1673 exactly.
+SENSITIVITY_STATUS_ATTR = "sensitivity_status"  # == #1673 gate.STATUS_ATTR
+SENSITIVITY_CLEARED = "cleared"  # == #1673's publishable verdict (gate.is_cleared)
+
+
+def _is_sensitivity_cleared(post: dict) -> bool:
+    """FAIL-CLOSED mirror of #1673 gate.is_cleared: only sensitivity_status == "cleared" publishes."""
+    return (post or {}).get(SENSITIVITY_STATUS_ATTR) == SENSITIVITY_CLEARED
+
+
+def _is_broadcast_visible(post: dict) -> bool:
+    """The ONE membrane predicate for the broadcast feed — kept in a single place so
+    #1673's real gate reconciles trivially:
+
+      S2 (#1670) origin:human  AND  S5 (#1673) sensitivity-clear (fail-closed).
+
+    origin:human treats an UNSTAMPED row as human (membrane default, #1670); the
+    sensitivity gate is the opposite posture — unstamped is NOT cleared — because a
+    post no gate has vetted must never auto-publish.
+    """
+    return social_provenance.is_displayable_voice(post) and _is_sensitivity_cleared(post)
+
+
+def _broadcast_card(post: dict) -> dict:
+    """Reduce an ingested-post DDB row to a facade card (thumbnail + caption + link).
+
+    A FACADE by design (#1672): a link-out to where the post lives, never a
+    third-party iframe — so the feed needs zero CSP change (img-src already allows
+    any HTTPS thumbnail). Native players are a later story (S10)."""
+    pid = str(post.get("post_id") or post.get("sk", "").split("#")[-1] or "")
+    return {
+        "id": pid,
+        "date": post.get("date") or str(post.get("sk", "")).replace("DATE#", "").split("#")[0],
+        "channel": post.get("channel", ""),
+        "caption": post.get("title", ""),
+        "excerpt": post.get("description", ""),
+        "thumbnail_url": post.get("thumbnail_url", ""),
+        "link_out": post.get("url", ""),  # where the post actually lives (facade target)
+        "permalink": f"/story/broadcast/#{pid}" if pid else "/story/broadcast/",
+    }
+
+
+def handle_broadcast() -> dict:
+    """GET /api/broadcast — reverse-chron cleared, human-origin posts for /story/broadcast/.
+
+    Read-only; queries the ingested-post partitions, applies the ONE membrane
+    predicate (_is_broadcast_visible), and returns facade cards newest-first.
+    Fail-soft per source (a query error on one channel never breaks the feed).
+    Cache 900s — the feed is refreshed by hourly-ish ingestion, not per-request."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    rows: list = []
+    for source in _BROADCAST_SOURCES:
+        pk = f"{USER_PREFIX}{source}"
+        try:
+            resp = table.query(
+                KeyConditionExpression=Key("pk").eq(pk) & Key("sk").begins_with("DATE#"),
+                ScanIndexForward=False,  # newest-first
+            )
+            rows.extend(_decimal_to_float(resp.get("Items", [])))
+        except Exception as e:  # noqa: BLE001 — one bad channel must not break the feed
+            logger.warning("[site_api] /api/broadcast: source %s query failed (non-fatal): %s", source, e)
+
+    # The membrane, applied in ONE place (origin:human + sensitivity-clear, fail-closed).
+    visible = [r for r in rows if _is_broadcast_visible(r)]
+    # Reverse-chron across all sources (the per-source query is already newest-first;
+    # this re-sorts the merged set). sk carries the post id after the date, so sort on it.
+    visible.sort(key=lambda r: str(r.get("date", "")) + str(r.get("sk", "")), reverse=True)
+    cards = [_broadcast_card(r) for r in visible[:_BROADCAST_LIMIT]]
+
+    return _ok(
+        {
+            "as_of_date": today,
+            "items": cards,
+            "total": len(cards),
+        },
+        cache_seconds=900,
+    )

@@ -31,6 +31,12 @@ const SECTIONS = [
   { key: "panel", label: "Podcast", icon: "podcast", kicker: "Elena + a coach review the week", kind: "podcast", url: "/panelcast/episodes.json" },
   { key: "journal", label: "In my own words", kicker: "Matt's own blog", kind: "posts", url: "/journal/blog.json" },
   { key: "timeline", label: "Timeline", kicker: "level-ups & milestones", kind: "timeline", url: "/api/journey_timeline" },
+  // #1672 (The Social Membrane, epic #1668): the Broadcast feed — Matthew's own public
+  // voice, self-hosted. Facade cards (thumbnail + caption + link-out; no third-party
+  // iframe → zero CSP change). The feed shows CLEARED, origin:human posts only — the
+  // membrane (#1670) + the fail-closed sensitivity gate (#1673) filter server-side in
+  // /api/broadcast, so the client renders exactly what it's given.
+  { key: "broadcast", label: "Broadcast", kicker: "Matthew's own posts, self-hosted", kind: "broadcast", url: "/api/broadcast" },
   // #380 — the engineering exhaust, distilled. Each beat is written at session
   // close from the handover (docs/content/BUILD_DISPATCH_CHECKLIST.md), commits
   // with the code, and narrates ONLY merged + deployed work — never plans.
@@ -373,6 +379,63 @@ async function renderRead(s, id) {
       recap + quiet + body;
     return;
   }
+  if (s.kind === "broadcast") {
+    // #1672 — the facade card feed. Each card is a thumbnail + caption + link-out to
+    // where the post actually lives (no iframe → zero CSP change). The API returns
+    // only cleared, origin:human posts; the client renders exactly what it's given.
+    const head =
+      `<p class="dx-kicker label">${esc(s.kicker)}</p>` +
+      `<h2 class="dx-title">Broadcast</h2>` +
+      `<p class="dx-prose">Matthew's own posts, gathered here and self-hosted — each one links back to where it lives. This is the platform's copy of his public voice, with permalinks and a feed the platforms don't give him.</p>`;
+    read.innerHTML = head + `<p class="dx-loading shimmer">Loading the feed…</p>`;
+    const d = await secFetch(s);
+    const items = (d && d.items) || [];
+    // The API is reverse-chron already; belt-and-braces re-sort newest-first.
+    items.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+    if (!items.length) {
+      read.innerHTML =
+        head +
+        `<p class="dx-prose">Nothing published here yet — cleared posts land in this feed as they're made. Follow along via <a href="/story/broadcast/rss.xml">RSS</a> or <a href="/subscribe/">email</a>.</p>`;
+      return;
+    }
+    const cards = items
+      .map((it) => {
+        const id = esc(it.id || "");
+        const linkOut = it.link_out || it.permalink || `/story/broadcast/#${it.id || ""}`;
+        const chan = it.channel ? `<span class="bc-chan label">${esc(it.channel)}</span>` : "";
+        const date = it.date ? `<span class="bc-date label">${esc(it.date)}</span>` : "";
+        const cap = esc(it.caption || it.excerpt || "Untitled post");
+        // The facade thumbnail. Any HTTPS image renders (CSP img-src 'self' data: https:).
+        // No thumbnail → a labelled placeholder so the card still reads as a card.
+        const media = it.thumbnail_url
+          ? `<img class="bc-thumb" src="${esc(it.thumbnail_url)}" alt="" loading="lazy" decoding="async">`
+          : `<span class="bc-thumb bc-thumb-empty label" aria-hidden="true">${esc(it.channel || "post")}</span>`;
+        return (
+          `<li class="bc-card" id="${id}">` +
+          `<a class="bc-link" href="${esc(linkOut)}" target="_blank" rel="noopener">` +
+          `<figure class="bc-media">${media}</figure>` +
+          `<div class="bc-body"><p class="bc-meta">${chan}${date}</p>` +
+          `<p class="bc-caption">${cap}</p>` +
+          `<span class="bc-cta label">view${it.channel ? " on " + esc(it.channel) : ""} →</span></div>` +
+          `</a>` +
+          // A per-item, in-app permalink (crawlable deep link + share target), a sibling
+          // of the facade link so the two anchors never nest.
+          `<p class="bc-foot"><a class="bc-permalink label" href="/story/broadcast/#${id}">permalink</a></p>` +
+          `</li>`
+        );
+      })
+      .join("");
+    const feedFoot =
+      `<p class="bc-subscribe label">Follow the broadcast via <a href="/story/broadcast/rss.xml">RSS</a> or <a href="/subscribe/">email</a>.</p>`;
+    read.innerHTML = head + `<ul class="bc-feed">${cards}</ul>` + feedFoot;
+    // Deep-link: if the URL carries #<id>, scroll that card into view.
+    const targetId = (location.hash || "").replace("#", "");
+    if (targetId) {
+      const el = read.querySelector(`#${(window.CSS && CSS.escape) ? CSS.escape(targetId) : targetId}`);
+      if (el) el.scrollIntoView({ block: "nearest" });
+    }
+    return;
+  }
   if (s.kind === "fieldnotes") {
     read.innerHTML = `<p class="dx-kicker label"><span class="shimmer">Reading the field note…</span></p>`;
     try {
@@ -580,7 +643,7 @@ async function selectSection(key, preId, push = true) {
   if (push) { try { history.pushState({ sec: key }, "", `/story/${key}/`); } catch (e) {} }
   document.title = `${s.label} — The Story — averagejoematt`;
   const listEl = $("[data-dx-list]");
-  if (s.kind === "about" || s.kind === "timeline") { listEl.innerHTML = `<li class="dx-empty">${esc(s.kicker)}</li>`; renderRead(s, null); return; }
+  if (s.kind === "about" || s.kind === "timeline" || s.kind === "broadcast") { listEl.innerHTML = `<li class="dx-empty">${esc(s.kicker)}</li>`; renderRead(s, null); return; }
   listEl.innerHTML = `<li class="dx-empty"><span class="shimmer">Loading…</span></li>`;
   const data = await secFetch(s);
   const entries = entriesFor(s, data);
