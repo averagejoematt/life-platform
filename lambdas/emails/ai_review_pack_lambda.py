@@ -236,6 +236,27 @@ def _freshness_flag_html(entry):
     )
 
 
+def _behavioral_flag_html(entry):
+    """#1699: surface the generation-time ungrounded-behavioral findings stamped into
+    the coach_brief meta ("you maintained your eating window today" with no log). Unlike
+    the #1691 freshness flag, this is NOT re-run over the archived text — the gate is
+    log-aware (point-in-time available_logs that can't be re-derived later), so only the
+    findings recorded WHEN the brief was generated are trustworthy. Fail-soft — a bad
+    entry never breaks the pack."""
+    if entry.get("surface") != "coach_brief":
+        return ""
+    meta = entry.get("meta") or {}
+    findings = meta.get("ungrounded_behavioral_findings") or []
+    if not findings:
+        return ""
+    details = "; ".join(str(f.get("detail", f.get("type", ""))) for f in findings)
+    return (
+        '<div style="color:#fdba74;background:#3a2410;border:1px solid #7c2d12;border-radius:6px;'
+        'font-size:12px;padding:6px 8px;margin:2px 0 8px;">'
+        f"&#9888;&#65039; ungrounded-behavioral: {html.escape(details)}</div>"
+    )
+
+
 # #1688: per-error-class chip colors. Keyed by coach_corrections.ERROR_CLASSES values.
 _ERROR_CLASS_COLORS = {
     "stale-baseline": ("#fca5a5", "#3a1216", "#7f1d1d"),
@@ -300,7 +321,7 @@ def _entry_card(entry, num=None, analysis=None):
         claim_html = _claim_html(analysis)
         tag_html = _tag_chip_html(analysis.get("error_class", "other"))
     else:
-        flags_html = _freshness_flag_html(entry)
+        flags_html = _freshness_flag_html(entry) + _behavioral_flag_html(entry)
         claim_html = ""
         tag_html = ""
     num_badge = f'<span style="color:#f59e0b;font-weight:700;">#{num}</span> ' if num is not None else ""

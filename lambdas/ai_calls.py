@@ -1483,6 +1483,37 @@ def _coach_corrections_block(coach_id, *, surface="coach_brief", table=None):
         return ""
 
 
+def _available_logs_for_today(data, brief, generation_date_iso):
+    """#1699: best-effort presence map of which BEHAVIOR categories have a log for the
+    generation date, derived ONLY from data already loaded for this render (zero new
+    I/O — keeps the pure gate pure and the render cheap). It is the caller-supplied
+    `available_logs` input to `grounded_generation.ungrounded_behavioral_findings`: a
+    category left OUT here is what lets a same-day behavioral claim in that category
+    trip the (advisory) finding. Conservative by design — a category is marked PRESENT
+    whenever its source has recent data, so the gate errs toward NOT flagging.
+    Vocabulary matches the gate's `_UB_CLAIM_PATTERNS` categories.
+    """
+    logs = set()
+    data = data or {}
+    brief = brief if isinstance(brief, dict) else {}
+    if data.get("garmin"):
+        logs.add("steps")
+    if data.get("macrofactor"):
+        logs.add("nutrition")
+    if data.get("strava_7d"):
+        logs.add("workout")
+    if brief.get("journal_mood"):
+        logs.add("journal")
+    # eating_window / fasting have no standalone source — mark present only when the
+    # nutrition payload carries an explicit window signal, so a bare "you maintained
+    # your eating window today" with no such signal correctly trips the gate.
+    _nut = data.get("macrofactor")
+    if isinstance(_nut, dict) and _nut.get("eating_window"):
+        logs.add("eating_window")
+        logs.add("fasting")
+    return logs
+
+
 def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
     """
     Generic Coach Intelligence pipeline for any coach.
@@ -1945,6 +1976,37 @@ Write your {domain_label} coaching section now."""
         except Exception as _fresh_e:  # noqa: BLE001 — advisory gate is never load-bearing
             print(f"[COACH-V2:{coach_id}] baseline-freshness gate failed (non-blocking): {_fresh_e}")
 
+        # #1699 (epic #1687): ungrounded-behavioral gate — ADVISORY. The SECOND
+        # deterministic gate (baseline-freshness above was the first, #1691). The
+        # DATA-grounding gates pass a brief that asserts a COMPLETED BEHAVIOR with no
+        # log behind it — "you maintained your eating window today" / "you hit your
+        # steps today" with no matching record (the mind coach's 2026-07-22 validation
+        # class). There is no number to check, so the digit gates are blind to it. This
+        # deterministic, zero-AI, log-aware check maps each same-day behavioral claim to
+        # a log category and flags when that category is absent from today's
+        # available_logs (derived from the already-loaded render data, no new I/O). It
+        # is advisory for now — findings are logged + stamped into the qa_archive meta
+        # and surfaced in the weekly review pack; generation is NOT held. PROMOTION
+        # HOOK: to make it fail-closed later (ADR-104/105 — the deterministic layer CAN
+        # block), regenerate-or-hold on `_behavioral_findings` here exactly like the
+        # presence-ack gate above. Fail-soft: never raises into the generation path.
+        _behavioral_findings = []
+        try:
+            import grounded_generation as _gg_behav
+
+            _avail_logs = _available_logs_for_today(data, brief, _gen_date)
+            _behavioral_findings = _gg_behav.ungrounded_behavioral_findings(
+                output or "",
+                available_logs=_avail_logs,
+            )
+            if _behavioral_findings:
+                print(
+                    f"[COACH-V2:{coach_id}] ungrounded-behavioral gate (advisory) fired: "
+                    + "; ".join(f.get("detail", "") for f in _behavioral_findings)
+                )
+        except Exception as _behav_e:  # noqa: BLE001 — advisory gate is never load-bearing
+            print(f"[COACH-V2:{coach_id}] ungrounded-behavioral gate failed (non-blocking): {_behav_e}")
+
         # #1441: generation-time archive — the exact gate-passed text that goes to
         # the state updater (i.e. what the brief + site publish) lands in
         # generated/qa_archive/ keyed by date+surface. Fail-soft inside the module.
@@ -1954,6 +2016,10 @@ Write your {domain_label} coaching section now."""
             _qa_meta = {"output_type": output_type, "generation_date": _gen_date}
             if _freshness_findings:
                 _qa_meta["baseline_freshness_findings"] = _freshness_findings
+            if _behavioral_findings:
+                # #1699: stamp point-in-time — the gate is log-aware, so historical
+                # available_logs can't be re-derived later; the pack reads these.
+                _qa_meta["ungrounded_behavioral_findings"] = _behavioral_findings
             qa_archive.archive_text(
                 "coach_brief",
                 output,
