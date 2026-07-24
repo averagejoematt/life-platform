@@ -65,7 +65,12 @@ on:
 # V2 P4.14 (2026-05-17): prevent concurrent deploys racing on the same branch.
 # cancel-in-progress=false because a deploy mid-flight should complete.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # -v2 salt (2026-07-23): the prior group `CI/CD-${{ github.ref }}` acquired a
+  # phantom stuck-queue entry on GitHub's side — runs entered it and sat pending
+  # with 0 jobs forever, surviving cancellation of every visible member and an
+  # empty group. Salting the group name routes new runs to a fresh queue. Same
+  # concurrency protection; cancel-in-progress stays false so a mid-flight deploy completes.
+  group: ${{ github.workflow }}-${{ github.ref }}-v2
   cancel-in-progress: false
 
 env:
