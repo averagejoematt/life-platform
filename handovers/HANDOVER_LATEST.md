@@ -1,68 +1,115 @@
-# HANDOVER — Wave A shipped: Social Membrane inbound + eng-excellence + coach-correction seeding — 2026-07-23
+# HANDOVER — CI concurrency recovery + validated 3-PR batch shipped & deployed — 2026-07-24
 
-> Instruction thread: "read handover → clean-tree + budget-tier check → FIRST (before fan-out):
-> (1) seed the coach-corrections ledger with last session's #1687 dry-run findings; (2) file the
-> Coach Correction Loop LATER stories S5/S6/S7 under #1687. THEN pay down backlog — fan out
-> worktree-implementers: Wave A (parallel independent) = Social Membrane #1671/#1672/#1673 +
-> eng-excellence #1652/#1657; Wave B (big-bang, alone) = #1656 mypy / #1658 coverage / #1655 CI;
-> #1620 outbound last; /plan #1686; gate:owner #1662/#1666/#1650 stop for sign-off." Working rules:
-> VERIFY every agent finding by git-grepping the branch; full suite (no -x) before any merge; batch
-> merges/deploys into ONE numbered ask; flag site/** auto-deploys; CDK deploys unpiped +
-> `--require-approval never`. Mid-session Matthew: "a" (seed all 6 rows) · "yes accept it" (#1703
-> F401 removal) · "i approve" + "yes run the ingestion cdk deploy, i approve all deploys" · answered
-> #1686 sourcing = "3" (coach web-access) · approved #1709 + #1710 merges · "yes wrap".
+> Instruction thread: continue backlog paydown — "read handover → clean-tree + budget-tier +
+> CI-health check → FIRST confirm #1710 floor + seeded ledger reads back → THEN fan out
+> worktree-implementers (open PRs, never merge) on non-CI backlog; batch merges/deploys into
+> ONE owner ask." Fanned out #1697/#1656/#1620, all landed as verified PRs. Then Matthew asked
+> **"how do i clear billing"** — which turned the session into a full CI-dispatch recovery.
+> Mid-session Matthew: confirmed TikTok handle `averagejoematt` · "go" (merge all 3) ·
+> "yes i approve you to do the deploy" (production Deploy) · "yes /wrap".
 
-## What shipped (all merged to main; deploy status per item)
+## What shipped (all merged to main + deployed; main GREEN 1ec3feba)
 
-**FIRST tasks:**
-- **Coach-corrections ledger SEEDED** — 6 rows written to `USER#matthew#SOURCE#coach_corrections` via a one-off `write_correction` seed script (idempotent, fixed IDs), read back clean, all `status=open`: 4× `stale-baseline` ("315 lbs" + "Day 1" + two more of the 4-of-5 class), 1× `ungrounded-behavioral` ("you maintained your eating window today"), 1× `cross-coach-inconsistency` (protein 170g/190g). The qa_archive was wiped by the cycle-10 reset, so rows came from the epic #1687 body (Matthew confirmed "a" = all 6). This is the flywheel's first data.
-- **Coach Correction Loop LATER stories filed** — **#1697** (S5 prompt-memory, opus) · **#1698** (S6 pattern-extraction→gate, fable) · **#1699** (S7 no-ungrounded-behavioral gate, sonnet), all Later under #1687.
+**The CI recovery (the session's real work) — main CI/CD was wedged, now healthy:**
+- **Root cause = phantom stuck `concurrency` queue, NOT billing.** The repo is PUBLIC
+  (unlimited Actions minutes, [[project_repo_visibility]]), so the "run pending / 0 jobs /
+  frozen timestamp, survives re-run" symptom was never minutes. The `CI/CD` workflow's
+  `concurrency: group: CI/CD-refs/heads/main, cancel-in-progress: false` had a ghost queue
+  entry: every new run queued behind it forever, surviving cancellation of every visible
+  member AND a verifiably empty group. PR/schedule-triggered workflows ran fine; githubstatus
+  green → isolated to that one group.
+- **Fix (`60d6652c`):** salted the group name → `...-${{ github.ref }}-v2`. Routes new runs to
+  a fresh queue; the edit path-matches `.github/workflows/**` so its own run both fixed the
+  wedge AND proved dispatch (went green). Self-proving. Diagnosis + fix saved to
+  [[reference_push_ci_silent_death]] (was mis-attributed to billing — corrected this session).
+- **Deployed `LifePlatformOperational`** (`bash deploy/cdk_deploy.sh` — Matthew ran it; the CDK
+  classifier hard-blocks deploys from the agent) to clear the R8-ST6 Plan gate: the sole real
+  IAM change was `InsightEmailParserRole` +`generated/qa_archive/text/*` read (keeps
+  `inbound-email/*`), from #1441 + the #1687 coach-corrections epic — purely additive. Plan
+  gate green after.
 
-**Wave A — 5 PRs merged + deployed:**
-- **#1700 (#1652)** root-clutter ratchet guard — 19-dir allowlist + 7 support READMEs. Test/docs only, no deploy.
-- **#1701 (#1673)** fail-closed auto-publish sensitivity gate (`broadcast_sensitivity_gate.py`, reuses `privacy_guard`; seam `sensitivity_status=="cleared"` via `gate.cleared_filter_expression()`). **DEPLOYED** LifePlatformIngestion (bedrock grant on youtube role).
-- **#1702 (#1671)** post-enrichment → coach signals (`social_enrichment_lambda.py` + `social_signals.py`; membrane filter BEFORE Haiku; reuses journal `_ground_causal_hints`; consumers `ai_context`/daily-brief). **DEPLOYED** LifePlatformIngestion (new `social-enrichment` Lambda + role) + daily-brief.
-- **#1703 (#1657)** retired blanket lint waivers — Matthew **accepted** the agent's judgment call to remove 17 dead F401 imports (overrode the "keep F401" instruction) after I verified tool count 69==69 + orphan/wiring tests green. Config only.
-- **#1704 (#1672)** Broadcast feed `/story/broadcast/` + `/api/broadcast` (facade cards, 3 registries, seam reconciled to `"cleared"`). **DEPLOYED** site-api + site.
-
-**Wave B (big-bang, one at a time):**
-- **#1709 (#1656)** mypy-strict PARTIAL (Progresses, not Fixes) — clean-set 19→124 modules (`lambdas/`+`web/`), 7 of 14 disabled codes enforced, 9-module DIRTY denylist. Annotations-only (verified `Success: 0 issues, 124 files`). `mcp/` still out of scope. No deploy.
-- **#1710 (#1658)** coverage-floor PARTIAL — floor 40→47 + **up-only ratchet guard** + 52 real behavioral tests (retry_utils/ai_output_validator/vacation_fund). 70% infeasible (61.5k-statement tree). No deploy.
-
-**Also:** #1686 (Coach's Prescription) decomposed → **#1705–#1708** (S1–S4, Later); sourcing decision recorded = **coach web-access** (new capability, own ADR at implement time). Reconciles: `test_count` 4960→4991→4993→5045, `lambda_count` 96→97, endpoints 119→120.
+**The validated 3-PR batch — merged, deployed, live:**
+- **#1713 (#1656)** mypy ratchet — strict clean-set 124→161 modules (adds all of `mcp/` via
+  `if not TYPE_CHECKING:` guards on the dual-import fallbacks), 7→10 of 14 codes enforced
+  (`return`/`attr-defined`/`index`). Annotation-only. `Progresses #1656`. No behavior change.
+- **#1711 (#1697)** coach-corrections → prompt-memory (S5) — each coach's open corrections feed
+  its OWN prompt (rolling bounded window N=5, scoped by `item_ref.surface`/`coach`, injected on
+  `user_message_full` OUTSIDE the cached system prefix per COST-OPT-2). First live consumer of
+  the seeded ledger. Deliberate deviation (in PR body): chose rolling-window, NOT the
+  `open→applied-to-prompt` transition. **Deployed** to the coach-gen lambdas via the CI Deploy.
+- **#1712 (#1620)** outbound social — 6 line-art social icons + follow row at end of dispatches +
+  footer handles + `twitter:site/creator` OG tags (80-file `v4_apply_chrome` sweep). TikTok
+  linked with owner-confirmed `averagejoematt`. **LIVE** on averagejoematt.com (site-deploy ✓).
+- **Reconcile `1ec3feba`:** doc-sync `test_count` 5045→5057 (the +12 from #1711's tests).
+- Diagnostic no-op `6b3ef7b6` (empty commit, superseded — harmless).
 
 ## Verified
-- Every agent finding git-grep-verified on-branch before merge (allowlist=19 dirs, seam literals, IAM grants, membrane-before-Haiku, mypy 124-file clean run, ratchet guard bites, behavioral tests real not theater).
-- **Combined-tree full suite** (all 5 Wave-A branches merged locally + reconciled): **6551 passed / 0 failed**. Per-PR suites green.
-- Deploys: LifePlatformIngestion UPDATE_COMPLETE (146s, drift clean — `social-enrichment` Active, bedrock grant on youtube role); site-api OK; `/api/broadcast` live 200; site smoke **217/0** after recovery.
-- All Wave-A issues auto-closed by `Fixes #N`; #1656/#1658 correctly stay OPEN (partials).
+- Pre-merge: built the combined 3-branch integration tree locally — **zero conflicts** (ai_calls.py
+  auto-merged coherently), full suite **6642 passed / 0 failed**, `black`/`mypy`(161)/`flake8`
+  (batch files) all clean. So the batch was proven-green BEFORE CI recovered.
+- Post-merge final CI run `1ec3feba` = **`completed / success`** — every gate: Reconcile · Lint ·
+  Unit Tests · Deploy-critical · Plan · **Deploy** · Smoke · post-deploy I1/I2/I5 · **Visual-QA**.
+  Auto-rollback never fired.
+- Site-deploy `30062838334` = success (Deploy public site ✓ · smoke ✓ · visual+AI QA ✓).
+- `LifePlatformOperational` deploy: drift-guarded (checkout fresh, live-code clean), UPDATE
+  succeeded in 37s.
+- Every agent finding git-grep-verified on-branch before merge.
 
 ## Gotchas hit
-- **A new `/api/` endpoint + its consuming page in ONE PR races the on-merge site auto-deploy** — #1704's site deploy smoked `/api/broadcast` (404) before I could deploy site-api → auto-rollback. Recovered by deploying site-api then re-syncing. Prevention: API must be live AT merge time. Saved to memory ([[reference_api_before_frontend_autodeploy_race]]).
-- **CI/CD workflow stuck pending, 0 jobs, ~25min** on the post-#1710 main head — matches the known billing/minutes silent-death (#1544): lighter workflows (CodeQL/Docs) ran on the same commit, the heavy CI/CD wouldn't dispatch. Cancel+rerun didn't unstick. **Owner action: check GitHub Actions minutes/billing.**
-- **doc-sync reconcile can pull site/ regenerations into the working tree** — after a `sync_site_to_s3.sh`, the reconcile step showed regenerated `site/rss.xml`/`sitemap.xml`/coaching static fallbacks (live-data-derived, regenerate on every deploy). Do NOT commit them in a doc-sync reconcile — `git checkout -- site/` first, commit only the literal files.
-- **CDK deploy classifier gate is per-command** — batch approval doesn't satisfy it; needs an explicit "run the deploy" ask, then run UNPIPED with `-- --require-approval never` ([[reference_cdk_deploy_classifier_and_approval]]).
-- **A worktree-implementer died mid-response on an API connection error AGAIN** (#1672) — resumed via SendMessage from its transcript, no rework (same class as last session's #1688).
+- **CI "pending/0-jobs" on a PUBLIC repo ≠ billing.** Differential: public⇒not-minutes; do PR/
+  schedule workflows pass? (yes⇒runners fine); githubstatus green?; fresh `workflow_dispatch`
+  still wedges with empty group ⇒ concurrency phantom. Fix = salt the group name.
+- **CI/CD `push:` trigger has a `paths:` filter** (lambdas/mcp/tests/cdk/config/workflows/…). A
+  docs-only or empty commit legitimately creates NO run — that's expected, not a stall. And
+  `workflow_dispatch:` DOES exist (manual re-kick lever).
+- **The CDK-deploy classifier hard-blocks from the agent** even unpiped — Matthew must run the
+  deploy himself (`! bash deploy/cdk_deploy.sh …`) or add a Bash permission rule.
+- **Production Deploy is a GitHub environment gate** — approved via
+  `gh api .../pending_deployments -f state=approved` (Matthew explicitly authorized). The CI
+  Deploy job then ships the batch's mapped lambdas with smoke + auto-rollback (cleaner than
+  manual `deploy_lambda.sh`).
+- **The pre-commit hook sweeps doc "Last updated" dates into any commit** — the ci-cd salt commit
+  pulled in 8 docs date-bumps (harmless). `git checkout -- site/` before a reconcile commit to
+  drop live-data site regens.
 
 ## Gate outcomes
-- **Build beat:** `2026-07-23-broadcast-feed` (the site can now host Matthew's own posts, fail-closed by default).
-- **Docs:** none beyond the auto-synced counters (test_count/lambda_count/endpoints via `sync_doc_metadata.py`, in the reconcile commits) — SCHEMA/PHASE_TAXONOMY updates for the ledger/gate shipped in-PR last session; no new canonical page invalidated this session. Wiki checkers green at wrap.
-- **Decisions:** none needed as a repo ADR this session — the #1686 content-sourcing = coach-web-access decision is recorded on #1705/the epic and explicitly deferred to its own ADR at implement time (not yet governance-consequential in code); the #1703 F401 override was an owner call recorded on the PR.
-- **Main:** see `check_main_green.py` — the latest CI/CD run is the stuck/orphaned one (GitHub couldn't dispatch it; billing/minutes). Offline combined-suite was 6551/0; both deployed stacks UPDATE_COMPLETE. `**Main:** red — CI/CD run orphaned by GitHub Actions dispatch stall (minutes/billing, #1544-class); no code cause, offline suite green.`
-- **Incidents:** 1 row added to `docs/INCIDENT_LOG.md` — the #1704 site auto-rollback (P3, transient `/api/broadcast` 404 pre-API-deploy; recovered same session).
-- **Stash/hooks:** clean — `git stash list` empty; hook freshness 🟢. Postflight `🔴 config drift: 1 lambda differs from CDK` is the standing parked-deploy advisory (not this session's deploys, which all completed UPDATE_COMPLETE); clears on the next full-fleet deploy / prod-gate approval.
-- **Labels:** OK — `check_story_labels.py` green, 93 open stories all carry `model:*`.
+- **Build beat:** `2026-07-24-outbound-social` — follow intent finally has a destination.
+- **Docs:** none needed — CI-concurrency fix + batch are captured in memory + this handover; no
+  canonical page invalidated (ledger schema shipped last session; #1712 is a footer affordance,
+  not a page-intent change). Wiki checkers green (the SCORING.md header-staleness note is
+  pre-existing, not this session's change).
+- **Decisions:** none needed — the concurrency-salt + deploy-approval were operational; #1711's
+  rolling-window choice is an implementation detail recorded on the PR, governed by epic #1687.
+- **Main:** green (1ec3feba) — `check_main_green.py` exit 0.
+- **Incidents:** 1 row added to `docs/INCIDENT_LOG.md` — the CI/CD dispatch stall (P3, main CI
+  unable to dispatch >2h via the concurrency phantom queue; no user impact, no data loss;
+  resolved by the group-salt fix).
+- **Stash/hooks:** clean — `git stash list` empty; hook freshness 🟢. Postflight `🔴 config drift:
+  1 lambda differs from CDK` is the standing fleet-asset-churn advisory (the CI Deploy ships only
+  changed lambdas, not the whole drifted fleet) — clears on a deliberate full-fleet reconcile.
+- **Labels:** OK — `check_story_labels.py` green, 91 open stories all carry `model:*`.
 
 ## Residual / next-picks
-- **Confirm the #1710 coverage floor on CI 3.12** once GitHub Actions recovers — floor 47 measured 51.55% on 3.14; if the post-merge 3.12 Unit Tests run reds, push a one-line floor drop (non-gating, low risk). (#1658)
-- **#1655** CI-composition — the last Wave-B big-bang; edits `ci-cd.yml`, so land it only once CI is healthy (avoid stacking on the stuck run). (#1655)
-- **#1620** outbound social links — runs the `v4_apply_chrome` HTML sweep; land AFTER any site/head sweep. (#1620)
-- **gate:owner** — #1662 (branch-protection Option C), #1666 (proportionality ADR), #1650 (handovers disposition): code-complete then STOP for owner sign-off. (#1662/#1666/#1650)
-- **#1656 mypy** remaining ratchet — `mcp/` + the 7 residual codes + `check_untyped_defs`/`warn_return_any` + the 9 DIRTY modules. (#1656)
-- **#1686 open decisions** — which coach curates, cadence/placement/email, privacy routing (S1/S3/S4 blocked on these). `not-work — owner product decisions`.
-- **Seed→apply the ledger** — the 6 seeded corrections are `status=open`; S5 (#1697) is the first consumer (prompt-memory injection). (#1697)
-- **GitHub Actions minutes/billing** — CI/CD won't dispatch; `not-work — owner billing check`.
-- **Activate YouTube ingestion** — provision `life-platform/youtube` `{"channel_id":"UC..."}` then flip registry `active_api:True` — unblocks the whole Social Membrane inbound path (enrichment/gate/feed are live but dormant). `not-work — owner secret provisioning`.
-- **Pre-hygiene archive zip (135M)** on an old scratchpad — `not-work — owner file move`.
+- **#1655** CI-composition — the last Wave-B big-bang; edits `ci-cd.yml`. **CI is healthy now**, so
+  this is unblocked — run it ALONE.
+- **#1656** mypy remaining ratchet — `mcp/` is done; remaining = the 4 residual codes
+  (assignment/arg-type/return-value/operator) + `check_untyped_defs`/`warn_return_any` + the 9
+  DIRTY modules. `Progresses`, not `Fixes`, again.
+- **#1658** coverage-floor — confirm floor 47 holds on CI Python 3.12 (it did in the `1ec3feba`
+  Unit Tests run — effectively cleared; one-line drop only if a future run reds).
+- **gate:owner** — **#1662** (branch-protection Option C), **#1666** (proportionality ADR),
+  **#1650** (handovers disposition): code-complete then STOP for owner sign-off.
+- **#1686** open product decisions — which coach curates, cadence/placement/privacy (S1/S3/S4
+  blocked). `not-work — owner product decisions`.
+- **Activate YouTube ingestion** — provision `life-platform/youtube` `{"channel_id":"UC..."}` then
+  flip registry `active_api:True` — wakes the dormant Social Membrane inbound path.
+  `not-work — owner secret provisioning`.
+- **Full-fleet CDK reconcile** — the standing `🔴 config drift` (asset churn across ~90 lambdas +
+  cosmetic dashboard tags + LogRetention nodejs22→24). `not-work — owner cdk deploy decision`.
+- **Prune stale agent worktrees** — dozens accumulated across sessions (`git worktree list`);
+  this session added wt-1620/wt-1656/issue-1697. `not-work — housekeeping`.
+- **`docs/engines/SCORING.md` re-verify** — its header (2026-07-13) predates a
+  `daily_metrics_compute_lambda.py` change (2026-07-21); `check_doc_index.py` flags it.
+  `not-work — pre-existing doc-staleness, unrelated to this session`.
 
-**Build beat:** 2026-07-23-broadcast-feed
+**Build beat:** 2026-07-24-outbound-social
