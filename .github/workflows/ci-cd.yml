@@ -441,7 +441,7 @@ jobs:
           cache: 'pip'
 
       - name: Install test dependencies
-        run: pip install pytest boto3 botocore
+        run: pip install pytest boto3 botocore hypothesis==6.161.2  # hypothesis: property tests (#1664) collected in this lane
 
       - name: Run deploy-critical test lane
         run: |
@@ -476,7 +476,7 @@ jobs:
           cache: 'pip'  # V2 P4.14: speeds up CI by ~20s per job
 
       - name: Install test dependencies
-        run: pip install pytest pytest-cov boto3 botocore  # Phase 8.2: pytest-cov for coverage report
+        run: pip install pytest pytest-cov boto3 botocore hypothesis==6.161.2  # Phase 8.2: pytest-cov for coverage report; hypothesis: property tests (#1664)
 
       - name: Run unit tests
         run: |
