@@ -185,3 +185,107 @@ def update_status(table, sk: str, new_status: str) -> bool:
         ExpressionAttributeValues={":s": new_status},
     )
     return True
+
+
+# ==============================================================================
+# S5 (#1697, epic #1687) — prompt-memory injection
+# ------------------------------------------------------------------------------
+# The first live CONSUMER of the ledger: each coach's generation prompt gains a
+# compact "prior corrections — do not repeat" block, scoped to that coach/surface,
+# so a correction stops its *class* of error from recurring (not just the one line
+# it fixed). Wired into `lambdas/ai_calls._run_coach_v2_pipeline` (the per-coach
+# coach_brief generator).
+#
+# TWO decisions baked in here (see the #1697 PR body for the full rationale):
+#
+#   1. Prompt-cache boundary (COST-OPT-2 / ADR-049). This block is DYNAMIC — it
+#      changes as corrections are logged/resolved — so the caller injects it into
+#      the coach's DYNAMIC user portion, OUTSIDE the cached system prefix. Putting
+#      it inside the cached prefix would bust the 90% cache discount on every log.
+#      This module only RENDERS text; the caller owns where it lands.
+#
+#   2. Status lifecycle = ROLLING BOUNDED WINDOW, not auto-transition. A correction
+#      stays `status="open"` and keeps suppressing its error-class on EVERY
+#      generation until it is genuinely resolved (by the S6 pattern-extraction /
+#      S7 gate path, or a manual `update_status`) — NOT after a single injection.
+#      The #1697 acceptance's "no unbounded re-injection" is satisfied by the BOUND
+#      (`PROMPT_MEMORY_MAX_PER_COACH`, newest-first), deliberately NOT by an
+#      `open -> applied-to-prompt` transition on read. A single-generation
+#      transition would let a still-unfixed class recur the very next cycle.
+# ==============================================================================
+
+# The rolling-window bound: at most this many OPEN corrections are injected per
+# coach/surface, newest-first. Keeps the per-coach prompt cost bounded (ADR-063)
+# and satisfies "no unbounded re-injection" without a status transition.
+PROMPT_MEMORY_MAX_PER_COACH = 5
+
+
+def _item_ref_matches(item: dict, *, surface: Optional[str], coach: Optional[str]) -> bool:
+    """True if `item`'s `item_ref` matches the requested coach/surface scope.
+
+    A `None` filter is a wildcard for that axis. Scoping is what makes each coach
+    see ONLY its own corrections (never the global list) — the core #1697 acceptance.
+    """
+    ref = item.get("item_ref") or {}
+    if surface is not None and ref.get("surface") != surface:
+        return False
+    if coach is not None and ref.get("coach") != coach:
+        return False
+    return True
+
+
+def open_corrections_for(
+    table,
+    *,
+    surface: Optional[str] = None,
+    coach: Optional[str] = None,
+    limit: int = PROMPT_MEMORY_MAX_PER_COACH,
+) -> list:
+    """The S5 read: OPEN corrections scoped to one coach/surface, newest-first,
+    bounded to `limit` (the rolling window).
+
+    Status is NOT mutated here — a read never transitions a correction (see the
+    module note: rolling window, not auto-transition). Newest-first is enforced by
+    sorting on `sk` (`CORRECTION#<YYYY-MM-DD>#<id8>`) descending, so the bound is
+    deterministic regardless of the table's native scan order (real DDB already
+    returns newest-first via ScanIndexForward=False; the sort also makes the bound
+    stable under the in-memory test fake).
+    """
+    opened = list_corrections(table, status="open", limit=10000)
+    scoped = [i for i in opened if _item_ref_matches(i, surface=surface, coach=coach)]
+    scoped.sort(key=lambda i: i.get("sk", ""), reverse=True)
+    return scoped[: max(0, int(limit))]
+
+
+def render_corrections_block(corrections: list) -> str:
+    """Pure: render scoped, bounded, newest-first corrections into a compact
+    "PRIOR CORRECTIONS — DO NOT REPEAT" prompt block.
+
+    Empty input -> "" (no block, no padded placeholder — honest-when-empty, the
+    same convention as the journal-signals / presence blocks). Each line carries
+    the error-CLASS tag so the model suppresses the class, not just the one line.
+    """
+    if not corrections:
+        return ""
+    lines = [
+        "PRIOR CORRECTIONS — DO NOT REPEAT (Matthew corrected these exact error classes in past reviews of YOUR"
+        " output; do not reproduce any of them in this generation — treat each as a standing constraint, not a"
+        " one-off):",
+    ]
+    for c in corrections:
+        cls = c.get("error_class", "other")
+        txt = (c.get("correction_text") or "").strip()
+        lines.append(f"- [{cls}] {txt}" if txt else f"- [{cls}]")
+    return "\n".join(lines)
+
+
+def corrections_prompt_block(
+    table,
+    *,
+    surface: Optional[str] = None,
+    coach: Optional[str] = None,
+    limit: int = PROMPT_MEMORY_MAX_PER_COACH,
+) -> str:
+    """Convenience: fetch (open, scoped, newest-first, bounded) + render in one
+    call. Returns "" when there is nothing to inject for this coach/surface."""
+    return render_corrections_block(open_corrections_for(table, surface=surface, coach=coach, limit=limit))
