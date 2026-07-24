@@ -598,6 +598,7 @@ EXTRA_QUERYABLE_PARTITIONS = (
     "habit_scores",
     "health_auto_export",
     "dropbox_poll",
+    "time_affluence",  # #1408: weekly Time-Affluence proxy (PROXY#/EDGE#) + probe (DATE#) — derived, no ingestion
 )
 
 

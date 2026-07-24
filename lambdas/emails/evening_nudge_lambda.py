@@ -64,6 +64,9 @@ RITUAL_LABELS = {
     "felt_vitality": ["Drained", "Low", "Okay", "Alive", "Vigorous"],
     "felt_rest": ["Exhausted", "Under-slept", "Okay", "Rested", "Fresh"],
     "felt_connection": ["Isolated", "Thin", "Some", "Connected", "Rich"],
+    # #1408: the weekly Time-Affluence probe (Sunday nudge only) — one 0-4 ordinal,
+    # framed over the WEEK. A skipped week is a coverage gap in the proxy, never 0.
+    "felt_time": ["Owned by it", "Rushed", "Okay", "Room", "My own"],
 }
 RITUAL_METRIC_TITLES = {
     "connection": "Felt connected today?",
@@ -72,6 +75,7 @@ RITUAL_METRIC_TITLES = {
     "felt_vitality": "This week: how alive did you feel?",
     "felt_rest": "This week: how rested?",
     "felt_connection": "This week: how connected to people?",
+    "felt_time": "This week: how much did your time feel like your own?",
 }
 
 
@@ -180,18 +184,25 @@ def _check_evening_ritual(date_str: str) -> tuple[list[str], str]:
 
 def _missing_felt_probe(date_str: str) -> list[str]:
     """The weekly probe metrics still missing for date_str — empty unless it's
-    Sunday (PT). One probe per week, asked on the week's closing evening."""
+    Sunday (PT). One probe per week, asked on the week's closing evening.
+
+    #1408: the Time-Affluence probe (felt_time) rides the same Sunday cadence but
+    lives in its OWN partition (time_affluence), so it needs its own fetch. Every
+    probe metric is skippable — an unanswered Sunday is a coverage gap, never a 0."""
     from datetime import datetime as _dt
 
-    from ritual_link import FELT_PROBE_SOURCE, WEEKLY_PROBE_METRICS
+    from ritual_link import FELT_PROBE_SOURCE, TIME_AFFLUENCE_PROBE_METRICS, TIME_AFFLUENCE_SOURCE, WEEKLY_PROBE_METRICS
 
     try:
         if _dt.strptime(date_str, "%Y-%m-%d").date().weekday() != 6:  # 6 = Sunday
             return []
     except (TypeError, ValueError):
         return []
-    item = _fetch_date(FELT_PROBE_SOURCE, date_str)
-    return [m for m in sorted(WEEKLY_PROBE_METRICS) if not item or item.get(m) is None]
+    felt_item = _fetch_date(FELT_PROBE_SOURCE, date_str)
+    ta_item = _fetch_date(TIME_AFFLUENCE_SOURCE, date_str)
+    missing = [m for m in WEEKLY_PROBE_METRICS if not felt_item or felt_item.get(m) is None]
+    missing += [m for m in TIME_AFFLUENCE_PROBE_METRICS if not ta_item or ta_item.get(m) is None]
+    return sorted(missing)
 
 
 def _get_ritual_secret() -> str | None:

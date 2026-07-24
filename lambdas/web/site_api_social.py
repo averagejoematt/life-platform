@@ -1371,7 +1371,7 @@ def _handle_ritual_log(event: dict) -> dict:
     # never the evening_ritual record the public wellbeing aggregate reads. The
     # write path is shared (same signed link, same rate limit); only the
     # destination differs, so the public read surface structurally can't see it.
-    from ritual_link import PRIVATE_RITUAL_METRICS, WEEKLY_PROBE_METRICS
+    from ritual_link import PRIVATE_RITUAL_METRICS, TIME_AFFLUENCE_PROBE_METRICS, WEEKLY_PROBE_METRICS
 
     try:
         table.update_item(
@@ -1382,11 +1382,17 @@ def _handle_ritual_log(event: dict) -> dict:
             # #1409: weekly felt-reality probe taps land in felt_probe (their own
             # cadence + the calibration engine's read surface), never the daily
             # evening_ritual aggregate.
+            # #1408: the weekly Time-Affluence probe (felt_time) lands in its own
+            # time_affluence partition — read by the proxy + hypothesis-engine edge.
             Key={
                 "pk": (
                     f"{USER_PREFIX}private_intake"
                     if metric in PRIVATE_RITUAL_METRICS
-                    else f"{USER_PREFIX}felt_probe" if metric in WEEKLY_PROBE_METRICS else f"{USER_PREFIX}evening_ritual"
+                    else (
+                        f"{USER_PREFIX}time_affluence"
+                        if metric in TIME_AFFLUENCE_PROBE_METRICS
+                        else f"{USER_PREFIX}felt_probe" if metric in WEEKLY_PROBE_METRICS else f"{USER_PREFIX}evening_ritual"
+                    )
                 ),
                 "sk": f"DATE#{date_str}",
             },

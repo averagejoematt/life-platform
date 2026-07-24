@@ -78,12 +78,13 @@ def test_fully_logged_reports_both_values(monkeypatch):
 
 
 def test_sunday_adds_the_felt_probe_metrics(monkeypatch):
-    # #1409: on Sundays the three weekly probe taps join the ritual's missing-set
-    # (and the fully-logged weekday shape above is only "full" on a weekday).
+    # #1409: on Sundays the three felt-reality probe taps join the ritual's
+    # missing-set. #1408: the Time-Affluence probe (felt_time) rides the same
+    # Sunday cadence from its own partition — so the Sunday set is now four taps.
     today = _set_ritual_record(monkeypatch, connection=3, mood_valence=1, intake_count=2, date=SUNDAY)
     missing, detail = nudge._check_evening_ritual(today)
-    assert missing == sorted(["felt_vitality", "felt_rest", "felt_connection"])
-    assert "3 taps left" in detail.lower()
+    assert missing == sorted(["felt_vitality", "felt_rest", "felt_connection", "felt_time"])
+    assert "4 taps left" in detail.lower()
 
 
 # ── link minting agrees with the site-api verifier ──────────────────────────
