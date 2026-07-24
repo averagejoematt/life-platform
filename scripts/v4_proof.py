@@ -740,6 +740,11 @@ def _og_tags(url: str, title: str, desc: str, card: str) -> dict:
         ("property", "og:description"): desc,
         ("property", "og:image"): img,
         ("name", "twitter:card"): "summary_large_image",
+        # #1620 — attribute the card to the experiment's X account so a shared link
+        # renders "via @averagejoematt_" instead of an unattributed preview. Both keys
+        # carry the same handle (single-author site: the site IS the creator).
+        ("name", "twitter:site"): "@averagejoematt_",
+        ("name", "twitter:creator"): "@averagejoematt_",
         ("name", "twitter:title"): title,
         ("name", "twitter:description"): desc,
     }

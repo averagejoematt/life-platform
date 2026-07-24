@@ -1681,6 +1681,27 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     # reading styles are chronicle-local and token-based (tokens.css .prose is the base).
     og_image = cur_image.get("image_url") or "https://averagejoematt.com/assets/images/og-home.png"
     canonical_url = f"https://averagejoematt.com/journal/posts/week-{cur_seq:02d}/"
+    # #1620 — outbound social follow set, owner-confirmed 2026-07-23 (the issue's TikTok
+    # typo `avereagejoematt` corrected to `averagejoematt`). This crawlable permalink is
+    # the page a shared/viral chronicle link actually lands on, so the finished reader
+    # needs an off-site next action here, not just an email CTA (Mara Chen's dead-end
+    # bug). Kept in sync with scripts/v4_chrome.SOCIAL_LINKS + assets/js/dispatches.js
+    # SOCIAL — three runtimes (email-Lambda / Python site-gen / browser JS), one handle
+    # set. CTA marks are the line-art sprite via inline <use> (renders with no JS).
+    _social = (
+        ("bluesky", "Bluesky", "https://bsky.app/profile/averagejoematt.bsky.social"),
+        ("x-twitter", "X", "https://x.com/averagejoematt_"),
+        ("instagram", "Instagram", "https://www.instagram.com/averagejoematt/"),
+        ("reddit", "Reddit", "https://www.reddit.com/user/averagejoematt/"),
+        ("youtube", "YouTube", "https://www.youtube.com/@averagejoematt"),
+        ("tiktok", "TikTok", "https://www.tiktok.com/@averagejoematt"),
+    )
+    social_cta_html = "".join(
+        f'<a href="{url}" target="_blank" rel="me noopener" aria-label="Follow on {lbl}">'
+        f'<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="/assets/icons/icons.svg#i-{ic}"/></svg></a>'
+        for ic, lbl, url in _social
+    )
+    social_foot_html = "".join(f'<a href="{url}" target="_blank" rel="me noopener">{lbl}</a>' for _ic, lbl, url in _social)
     post_html = f"""<!DOCTYPE html>
 <html lang="en" data-door="story">
 <head>
@@ -1696,6 +1717,8 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
   <meta property="og:description" content="{stats_line}">
   <meta property="og:image" content="{og_image}">
   <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:site" content="@averagejoematt_">
+  <meta name="twitter:creator" content="@averagejoematt_">
   <meta name="twitter:title" content="{title} — The Measured Life">
   <meta name="twitter:description" content="{stats_line}">
   <meta name="twitter:image" content="{og_image}">
@@ -1756,6 +1779,14 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     .post-cta p {{ color:var(--ink-muted);font-size:var(--fs-small);margin:0 auto var(--sp-4);max-width:44ch; }}
     .post-cta a.cta-btn {{ display:inline-block;font-family:var(--font-mono);font-size:var(--fs-label);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--page);background:var(--ember);padding:10px 20px;border-radius:var(--radius-sm);text-decoration:none; }}
     .post-cta a.cta-btn:hover {{ filter:brightness(1.08); }}
+    /* #1620 — outbound social follow row: the off-site next action at the end of the
+       crawlable post (the page a shared/viral link actually lands on). Line-art marks
+       from the shared sprite via inline <use> — renders with no JS. */
+    .post-cta__social {{ display:flex;align-items:center;justify-content:center;gap:var(--sp-3);flex-wrap:wrap;margin:var(--sp-4) auto 0;max-width:none; }}
+    .post-cta__social .label {{ font-family:var(--font-mono);font-size:var(--fs-label);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--ink-faint); }}
+    .post-cta__social a {{ display:inline-flex;color:var(--ink-muted);transition:color var(--dur-fast); }}
+    .post-cta__social a:hover {{ color:var(--ember); }}
+    .post-cta__social svg {{ width:22px;height:22px; }}
     .post-nav {{ padding:var(--sp-5) 0 var(--sp-8);border-top:var(--border-hair);display:flex;justify-content:space-between;gap:var(--sp-5); }}
     .post-nav a {{ font-family:var(--font-serif);font-size:var(--fs-body);color:var(--ink);text-decoration:none;transition:color var(--dur-fast); }}
     .post-nav a:hover {{ color:var(--ember); }}
@@ -1798,6 +1829,7 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     <h2>Follow the experiment</h2>
     <p>A new installment every week — the data, the coaches, and what actually moved. No spam, unsubscribe anytime.</p>
     <a class="cta-btn" href="/subscribe/">Follow by email</a>
+    <p class="post-cta__social"><span class="label">or follow off-site</span>{social_cta_html}</p>
   </aside>
   <nav class="post-nav">
     <a href="/story/chronicle/"><span>&larr; All installments</span>The Measured Life archive</a>
@@ -1816,7 +1848,7 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     <div class="sf-col"><p class="sf-h label">The Protocols</p>
       <a href="/protocols/">All protocols</a><a href="/protocols/supplements/">Supplements</a><a href="/protocols/experiments/">Experiments</a><a href="/protocols/challenges/">Challenges</a></div>
     <div class="sf-col"><p class="sf-h label">Follow &amp; context</p>
-      <a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a><a href="/method/">The method</a><a href="/story/about/">About</a><a href="/privacy/">Privacy</a></div>
+      <a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a>{social_foot_html}<a href="/method/">The method</a><a href="/story/about/">About</a><a href="/privacy/">Privacy</a></div>
   </nav>
   <p class="sf-base label"><span>averagejoematt · the story</span><a href="/">← home</a></p>
 </footer>

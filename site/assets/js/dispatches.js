@@ -529,6 +529,28 @@ async function renderRead(s, id) {
   enhanceCoachNames(read);  // CC-04: coach-name popovers in chronicle/journal prose
 }
 
+// #1620 — outbound social follow row for the end of a dispatch. Mara Chen's UX bug:
+// a reader finishes ~1,700 words of an Elena Voss chronicle installment and there is
+// nothing to DO next but leave. Email is one next action; this row is the off-site one.
+// Line-art marks come from the shared sprite via icon() (KNOWN-gated in icons.js). Kept
+// in sync with the footer's SOCIAL_LINKS (scripts/v4_chrome.py) and the crawlable post
+// permalink (wednesday_chronicle_lambda.py) — three runtimes, one owner-confirmed handle
+// set (2026-07-23; TikTok's issue typo `avereagejoematt` corrected to `averagejoematt`).
+const SOCIAL = [
+  { id: "bluesky", label: "Bluesky", url: "https://bsky.app/profile/averagejoematt.bsky.social" },
+  { id: "x-twitter", label: "X", url: "https://x.com/averagejoematt_" },
+  { id: "instagram", label: "Instagram", url: "https://www.instagram.com/averagejoematt/" },
+  { id: "reddit", label: "Reddit", url: "https://www.reddit.com/user/averagejoematt/" },
+  { id: "youtube", label: "YouTube", url: "https://www.youtube.com/@averagejoematt" },
+  { id: "tiktok", label: "TikTok", url: "https://www.tiktok.com/@averagejoematt" },
+];
+function socialRow() {
+  const links = SOCIAL.map((x) =>
+    `<a class="dx-social" href="${esc(x.url)}" target="_blank" rel="me noopener" aria-label="Follow on ${esc(x.label)}">${icon(x.id)}</a>`
+  ).join("");
+  return `<p class="dx-sub-social"><span class="label">or follow off-site</span><span class="dx-social-row">${links}</span></p>`;
+}
+
 // PG-03 / #733 — the per-dispatch foot: a SHARE affordance for this post (the
 // crawlable permalink is the organic-share engine), a subscribe CTA for future
 // dispatches, and a "start from the beginning" link. The first dispatch is the
@@ -558,6 +580,7 @@ function dispatchFoot(s, ent, all) {
       <p class="dx-sub-h">Follow the experiment as it's written.</p>
       <p class="dx-sub-p">New dispatches land here first — the down weeks included. No selling, unsubscribe anytime.</p>
       <p class="dx-sub-cta"><a class="dx-sub-btn" href="/subscribe/">Subscribe by email</a><a class="dx-sub-rss" href="/rss.xml">or follow via RSS</a></p>
+      ${socialRow()}
       ${startLink}
     </aside>`;
 }
