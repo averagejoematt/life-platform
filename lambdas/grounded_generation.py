@@ -28,6 +28,12 @@ pieces that previously lived apart:
                          weight or a stale "Day N" framing (cycle-9 "315 lbs" / "Day 1"
                          after a cycle-10 genesis) is digit-grounded yet cycle-wrong.
                          Takes the cycle constants as params so it stays pure.
+  5. Behavioral-log    — ungrounded_behavioral_findings() (#1699, epic #1687) catches
+     grounding           the "hallucinated behavior" class the DATA-grounding gates
+                         cannot see: a same-day completed-action claim ("you maintained
+                         your eating window today", "you hit your steps") with no
+                         corresponding log. Log-aware and deterministic — takes the
+                         caller-supplied available_logs set so it stays pure (no I/O).
 
 Reset suppression (AC, #1691): baseline_freshness_findings() IS the promotable
 suppression hook a reset needs — restart_pipeline itself is untouched. A reset-window
@@ -615,6 +621,168 @@ def baseline_freshness_findings(
     return findings
 
 
+# ── Ungrounded-behavioral gate (#1699, epic #1687) ───────────────────────────
+# A coach asserting a COMPLETED behavior about the generation day ("you maintained
+# your eating window today", "you hit your steps", "you journaled today") when NO
+# corresponding log exists for that day is an ungrounded behavioral claim — a
+# hallucinated behavior the DATA-grounding gates cannot see (there is no number to
+# check; the assertion is about an ACTION, not a figure). This is the
+# `ungrounded-behavioral` error-class in coach_corrections.ERROR_CLASSES, and the
+# mind coach's 2026-07-22 "you maintained your eating window today" (no log) is its
+# canonical instance.
+#
+# The check is deterministic and log-aware: each behavioral claim maps to a LOG
+# CATEGORY, and a same-day claim whose category is ABSENT from `available_logs`
+# flags. `available_logs` is caller-supplied (a set of category tokens present for
+# the generation date) — the function does ZERO I/O and stays pure, exactly the
+# #1691 discipline. The generation-date scoping is LOAD-BEARING: `available_logs` is
+# a point-in-time map for TODAY, so only a claim tied to a same-day framing token
+# ("today", "this morning", …) is checked; a past-tense reference to a prior period
+# ("last week you hit your steps") is out of scope and never flags. A modal /
+# conditional / future framing ("if you keep your window today", "try to hit your
+# steps") is advice, not a completed-action claim, and is likewise skipped.
+
+# Same-day framing — a claim is checked only when one of these appears in its sentence.
+_UB_TODAY_RE = re.compile(
+    r"\b(today|todays|this\s+morning|this\s+afternoon|this\s+evening|tonight|so\s+far\s+today|as\s+of\s+today|right\s+now)\b",
+    re.IGNORECASE,
+)
+# Second-person — the claim must be about Matthew ("you"/"your"), never the coach itself.
+_UB_SECOND_PERSON_RE = re.compile(r"\byou(?:r|'ve|'ll|'d)?\b", re.IGNORECASE)
+# Modal / conditional / future markers that turn a behavioral verb into advice, not a
+# claim of a completed action. Deliberately EXCLUDES a bare "to" (it would swallow the
+# legitimate "stuck to your window today" completed-action verb form).
+_UB_MODAL_RE = re.compile(
+    r"\b(could|should|would|can|will|might|may|must|need\s+to|want\s+to|try(?:ing)?\s+to|"
+    r"let'?s|if\s+you|when\s+you|keep\s+(?:up|on|going)|make\s+sure|aim\s+to|remember\s+to)\b",
+    re.IGNORECASE,
+)
+_UB_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
+
+# Each pattern pairs a "verb + activity" behavioral assertion with the LOG CATEGORY
+# that would substantiate it. Kept tight (verb near its activity noun) to hold down
+# false positives; the modal guard above drops advice framings. Category vocabulary is
+# the contract with the caller's `available_logs` set:
+#   eating_window · fasting · steps · journal · nutrition · workout
+_UB_CLAIM_PATTERNS = [
+    # eating / fasting window adherence
+    (
+        "eating_window",
+        re.compile(
+            r"\b(?:maintained|kept|held|stuck\s+(?:to|with)|hit|nailed|closed|sustained|followed)\b"
+            r"[^.]{0,40}?\b(?:eating|fasting|feeding)\s+window\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "fasting",
+        re.compile(
+            r"\b(?:maintained|kept|held|completed|finished|nailed|hit)\b" r"[^.]{0,30}?\b(?:\d+\s*[- ]?hour\s+)?fast(?:ed|ing)?\b",
+            re.IGNORECASE,
+        ),
+    ),
+    # step target
+    (
+        "steps",
+        re.compile(
+            r"\b(?:hit|nailed|crushed|logged|reached|racked\s+up|got|smashed|closed)\b" r"[^.]{0,30}?\bsteps?\b",
+            re.IGNORECASE,
+        ),
+    ),
+    # journaling
+    ("journal", re.compile(r"\bjournal(?:ed|led|ing)\b", re.IGNORECASE)),
+    (
+        "journal",
+        re.compile(r"\b(?:wrote|filled\s+out|completed|logged|finished)\b[^.]{0,25}?\bjournal\b", re.IGNORECASE),
+    ),
+    # nutrition logging / calorie or macro adherence
+    (
+        "nutrition",
+        re.compile(
+            r"\b(?:logged|tracked|recorded)\b[^.]{0,25}?\b(?:meal|meals|food|nutrition|macros?|calories?|protein)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "nutrition",
+        re.compile(
+            r"\b(?:stayed|came\s+in|landed)\s+under\b[^.]{0,30}?\b(?:calorie|calories|deficit|target|budget|maintenance)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    # workout / training completion
+    (
+        "workout",
+        re.compile(
+            r"\b(?:completed|finished|crushed|logged|did|nailed|knocked\s+out)\b"
+            r"[^.]{0,30}?\b(?:workout|training\s+session|lift(?:ing)?|strength\s+session|gym\s+session)\b",
+            re.IGNORECASE,
+        ),
+    ),
+]
+
+
+def ungrounded_behavioral_findings(text: str, *, available_logs) -> list:
+    """Deterministic, zero-AI ungrounded-behavioral check for coach output (#1699).
+
+    Flags a same-day COMPLETED-behavior assertion whose supporting LOG CATEGORY is
+    absent from `available_logs` — "you maintained your eating window today" with no
+    eating-window record, "you hit your steps today" with no step log. Each finding is
+    the shared ``{"type": ..., "detail": ...}`` shape (type ``"ungrounded_behavioral"``,
+    plus ``category`` and ``claim``) so it composes with grounding_findings() /
+    correction_prompt().
+
+    `available_logs` is REQUIRED and caller-supplied — a set/iterable of category
+    tokens present for the generation date (vocabulary: eating_window, fasting, steps,
+    journal, nutrition, workout). Passing ``None`` returns [] (the caller opted out);
+    an empty set means "no logs today", so every same-day behavioral claim flags. The
+    function does no I/O and stays pure — the caller owns the availability lookup.
+
+    Scoping (all three must hold for a sentence to be checked): it addresses Matthew
+    ("you"/"your"), it carries a same-day framing token ("today"/"this morning"/…),
+    and it is NOT modal/conditional/future (advice is not a completed-action claim).
+    """
+    text = text or ""
+    if available_logs is None:
+        return []
+    present = {str(c).strip().lower() for c in available_logs}
+    findings = []
+    seen = set()
+    for raw in _UB_SENTENCE_SPLIT_RE.split(text.strip()):
+        sent = raw.strip()
+        if not sent:
+            continue
+        if not _UB_SECOND_PERSON_RE.search(sent):
+            continue
+        if not _UB_TODAY_RE.search(sent):  # only same-day claims are checkable against today's logs
+            continue
+        if _UB_MODAL_RE.search(sent):  # advice / conditional / future — not a completed action
+            continue
+        for category, rx in _UB_CLAIM_PATTERNS:
+            m = rx.search(sent)
+            if not m:
+                continue
+            if category in present:  # a real log substantiates it → grounded, no finding
+                continue
+            key = (category, m.group(0).lower())
+            if key in seen:
+                continue
+            seen.add(key)
+            snippet = sent if len(sent) <= 140 else sent[:137].rstrip() + "…"
+            findings.append(
+                {
+                    "type": "ungrounded_behavioral",
+                    "category": category,
+                    "claim": m.group(0).strip(),
+                    "detail": (
+                        f'the narrative asserts a same-day "{category}" behavior ("{snippet}"), '
+                        f"but no {category} log exists for the generation date"
+                    ),
+                }
+            )
+    return findings
+
+
 def grounding_findings(
     text: str,
     facts: dict = None,
@@ -625,6 +793,7 @@ def grounding_findings(
     generation_date_iso: str = None,
     start_date_iso: str = None,
     weight_tolerance_lbs: float = 1.0,
+    available_logs=None,
 ) -> list:
     """Deterministic grounding check. Returns [{type, detail, ...}] — empty = grounded.
 
@@ -644,6 +813,12 @@ def grounding_findings(
       (``baseline_lbs`` additionally enables the stale_baseline class); callers that
       don't supply them keep the pre-#1691 behavior exactly — identical discipline to
       the optional ``allowed_dates`` param.
+    - "ungrounded_behavioral": a same-day completed-behavior claim ("you maintained
+      your eating window today") whose supporting log category is absent from
+      ``available_logs`` — #1699, ungrounded_behavioral_findings(). Checked ONLY when
+      ``available_logs`` is passed (an empty set means "no logs today"); callers that
+      don't supply it keep the pre-#1699 behavior exactly — same optional-param
+      discipline as ``allowed_dates`` / the #1691 params.
     """
     findings = []
     if facts and _hard_contradictions is not None:
@@ -679,6 +854,8 @@ def grounding_findings(
                 weight_tolerance_lbs=weight_tolerance_lbs,
             )
         )
+    if available_logs is not None:
+        findings.extend(ungrounded_behavioral_findings(text, available_logs=available_logs))
     return findings
 
 
@@ -706,6 +883,11 @@ def correction_prompt(findings: list) -> str:
                 lines.append(f"{i}. {f['detail']}. Use Day {f['expected_day']}, or drop the day count — never a stale one.")
             else:
                 lines.append(f"{i}. {f['detail']}. Frame it as the pre-start countdown, not a Day count.")
+        elif f.get("type") == "ungrounded_behavioral":
+            lines.append(
+                f"{i}. {f['detail']}. Remove the claim or hedge it (\"if you kept your window today\"), or cite the "
+                f"actual log — never assert a completed behavior with no record behind it."
+            )
         else:
             lines.append(f"{i}. {f['detail']}. Remove it or describe the pattern qualitatively — never invent a figure.")
     lines.append("\nRewrite with these corrected. Keep your voice and length; do not mention that a correction was made.")
