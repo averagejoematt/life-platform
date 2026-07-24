@@ -12,8 +12,7 @@ is symmetric (an unhedged small-N claim flags; adding a hedge clears exactly tha
 import os
 import sys
 
-from hypothesis import given, settings
-from hypothesis import strategies as st
+from hypothesis import given, settings, strategies as st
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
