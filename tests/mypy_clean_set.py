@@ -1,9 +1,9 @@
 """Single source of truth for the mypy clean-module gate (#1656, eng-excellence #1648).
 
-The clean set is the WHOLE first-party shared-engine + serving surface —
-``lambdas/*.py`` and ``lambdas/web/*.py`` (non-recursive) — MINUS a small,
-explicitly-documented ``DIRTY`` denylist. This is a ratchet: the denylist only
-shrinks (the clean set only grows). A newly-added top-level module is covered
+The clean set is the WHOLE first-party shared-engine + serving + MCP surface —
+``lambdas/*.py``, ``lambdas/web/*.py`` and ``mcp/*.py`` (non-recursive) — MINUS a
+small, explicitly-documented ``DIRTY`` denylist. This is a ratchet: the denylist
+only shrinks (the clean set only grows). A newly-added top-level module is covered
 automatically and must pass mypy under ``mypy.ini`` or be added to ``DIRTY``
 with a reason in review.
 
@@ -13,11 +13,11 @@ Both consumers read this list so they can never drift:
     $(python tests/mypy_clean_set.py)``
 
 Scope note: the disable_error_code list in mypy.ini is being emptied
-incrementally (#1656 landed 7 of the original 14 codes; 7 structural codes —
-assignment/attr-defined/index/arg-type/return-value/return/operator — plus
-check_untyped_defs/warn_return_any remain, each documented in mypy.ini). The
-clean set is "clean under the CURRENT mypy.ini", so it grows again with each
-future code the config removes.
+incrementally (#1656 landed 10 of the original 14 codes; the mcp/ ratchet step
+added return/attr-defined/index. Four structural codes —
+assignment/arg-type/return-value/operator — plus check_untyped_defs/warn_return_any
+remain, each documented in mypy.ini). The clean set is "clean under the CURRENT
+mypy.ini", so it grows again with each future code the config removes.
 """
 
 from pathlib import Path
@@ -27,7 +27,12 @@ ROOT = Path(__file__).resolve().parent.parent
 # Directories whose top-level *.py form the clean surface (non-recursive:
 # subpackages like emails/, intelligence/, compute/, ingestion/ still have
 # unresolved cross-Lambda flat-copy imports and are a later ratchet step).
-CLEAN_DIRS = ["lambdas", "lambdas/web"]
+# ``mcp`` (the ~37-module MCP tool package) joined the clean surface with the
+# #1656 mcp/ ratchet step: its Lambda-bundle dual-import fallbacks
+# (``except ImportError: from lambdas import X``) are guarded behind
+# ``if not TYPE_CHECKING:`` so mypy sees one canonical module name (no
+# "source file found twice") while runtime behavior is unchanged.
+CLEAN_DIRS = ["lambdas", "lambdas/web", "mcp"]
 
 # Modules that do NOT yet pass under mypy.ini. Each MUST carry a reason. This
 # denylist only shrinks. Paths are repo-root-relative.
@@ -74,6 +79,10 @@ CORE = [
     "lambdas/web/site_stats_refresh_lambda.py",
     "lambdas/web/og_image_lambda.py",
     "lambdas/web/og_moments.py",
+    # MCP package entry + registry (joined the clean set with the #1656 mcp/ step).
+    "mcp/handler.py",
+    "mcp/registry.py",
+    "mcp/core.py",
 ]
 
 

@@ -22,6 +22,7 @@ can inject conversation-derived memories without passing them off as data.
 """
 
 from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING
 
 from mcp.config import USER_ID as _user_id_ref, table as _table_ref
 from mcp.core import decimal_to_float as _d2f
@@ -30,7 +31,8 @@ try:
     # Shared, bundled module (#781) — staged at zip root in the Lambda.
     import platform_memory as _pm
 except ImportError:  # pragma: no cover — MCP bundle always ships lambdas/ at root
-    from lambdas import platform_memory as _pm
+    if not TYPE_CHECKING:
+        from lambdas import platform_memory as _pm
 
 
 def _get_table():

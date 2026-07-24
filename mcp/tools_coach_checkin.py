@@ -25,6 +25,7 @@ PR #915 (the write is system-generated question text, never user data).
 """
 
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 from boto3.dynamodb.conditions import Key
 
@@ -38,8 +39,9 @@ try:
     import persona_registry
     from source_registry import DEFAULT_STALE_HOURS, manual_capture_sources
 except ImportError:  # pragma: no cover — MCP bundle always ships lambdas/ at root
-    from lambdas import coach_checkin as cc, persona_registry
-    from lambdas.source_registry import DEFAULT_STALE_HOURS, manual_capture_sources
+    if not TYPE_CHECKING:
+        from lambdas import coach_checkin as cc, persona_registry
+        from lambdas.source_registry import DEFAULT_STALE_HOURS, manual_capture_sources
 
 # Manual-capture source → the coach whose domain that channel informs. Sources
 # without a mapping still appear in the snapshot but never drive coach choice.

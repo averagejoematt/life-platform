@@ -1554,7 +1554,7 @@ def handle_intelligence_summary() -> dict:
       - last computed-at timestamps per signal class
     Cache: 1800s.
     """
-    summary = {
+    summary: dict[str, Any] = {
         "hypotheses": {"count": 0, "by_status": {}},
         "correlations": {"count": 0, "last_week": None},
         "experiments": {"active": 0},

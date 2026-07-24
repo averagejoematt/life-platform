@@ -24,6 +24,7 @@ import os
 import time
 import urllib.parse
 import uuid
+from typing import Any, cast
 
 from mcp import audit as mcp_audit
 from mcp.config import __version__, logger
@@ -154,7 +155,9 @@ def _validate_tool_args(name: str, arguments: dict) -> str | None:
     Only validates required fields and basic type checking — not deep schema
     validation (no jsonschema dep). Covers the main injection/crash vectors.
     """
-    tool = TOOLS.get(name)
+    # cast: TOOLS' heterogeneous entries infer as `object`; each is a str-keyed
+    # tool-spec dict (no runtime effect).
+    tool = cast("dict[str, Any]", TOOLS.get(name))
     if not tool:
         return None  # unknown tool handled separately
 
@@ -344,7 +347,7 @@ def _parse_body(event):
 # exchanges the PKCE-bound code for a short-lived, revocable session bearer
 # (#893-A) rather than the permanent key-derived Desktop bearer.
 
-_BEARER_TOKEN_CACHE = {}
+_BEARER_TOKEN_CACHE: dict[str, Any] = {}
 _BEARER_CACHE_TTL = 300  # 5 min — ensures warm containers pick up new key after rotation
 
 # R13-F12: Per-invocation write tool rate limiting.

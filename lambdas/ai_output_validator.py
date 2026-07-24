@@ -56,7 +56,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -590,7 +590,7 @@ def validate_daily_brief_outputs(
     """
     ctx = health_context or {}
     all_warnings = []
-    results = {}
+    results: dict[str, Any] = {}
 
     # BoD coaching
     bod_result = validate_ai_output(bod_insight, AIOutputType.BOD_COACHING, ctx)

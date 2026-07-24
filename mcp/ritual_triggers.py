@@ -45,6 +45,7 @@ level and stay hermetic.
 
 import math
 from datetime import date, timedelta
+from typing import TYPE_CHECKING
 
 from mcp.config import logger
 from mcp.core import query_source
@@ -54,7 +55,8 @@ try:
     import constants as _const
     import personal_baselines as _pb
 except ImportError:  # pragma: no cover — the MCP bundle always ships lambdas/ at root
-    from lambdas import constants as _const, personal_baselines as _pb
+    if not TYPE_CHECKING:
+        from lambdas import constants as _const, personal_baselines as _pb
 
 # ── Trigger thresholds ───────────────────────────────────────────────────────
 # Journaling sources whose darkness proposes a spoken/written interview. A source

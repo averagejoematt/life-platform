@@ -2,6 +2,8 @@
 Tool registry: maps tool names to their functions and JSON schemas.
 """
 
+from typing import Any, cast
+
 from mcp.config import RAW_DAY_LIMIT, SOURCES
 
 # BENCH-1: cut-benchmarking & regain firewall (PRIVATE, view-dispatched).
@@ -2098,4 +2100,4 @@ def tool_list_available_tools(args=None):
 # that it's defined. The string was a marker for test_r2_all_fn_references_exist
 # (which looks for tool_* names as fn-refs); rebinding here makes the dispatcher
 # resolve to the callable at runtime.
-TOOLS["list_available_tools"]["fn"] = tool_list_available_tools
+cast("dict[str, Any]", TOOLS["list_available_tools"])["fn"] = tool_list_available_tools

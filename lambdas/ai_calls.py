@@ -275,7 +275,7 @@ def _build_system_block(system, cache_system):
     return system
 
 
-def call_anthropic(
+def call_anthropic(  # type: ignore[return]  # loop always returns text or the AI_UNAVAILABLE sentinel on the final attempt; the fall-through is unreachable
     prompt: str,
     api_key: str = "",  # ADR-062: ignored — Bedrock uses IAM auth. Kept default for compat.
     max_tokens: int = 200,

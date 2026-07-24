@@ -52,6 +52,7 @@ section only, and the other five still return complete data.
 """
 
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 from mcp.config import logger, table
 from mcp.ritual_triggers import build_suggested_rituals
@@ -67,7 +68,8 @@ try:
     import coach_checkin as cc
     import intake_response as ir
 except ImportError:  # pragma: no cover — MCP bundle always ships lambdas/ at root
-    from lambdas import coach_checkin as cc, intake_response as ir
+    if not TYPE_CHECKING:
+        from lambdas import coach_checkin as cc, intake_response as ir
 
 # Evening-intake arming progress reads over the same window compute_intake_response
 # defaults to (#1405), so the fraction reported here matches get_intake_response.
@@ -122,7 +124,8 @@ def _evening_intake_section():
     try:
         from pacific_time import pacific_now
     except ImportError:  # pragma: no cover — MCP bundle always ships lambdas/ at root
-        from lambdas.pacific_time import pacific_now
+        if not TYPE_CHECKING:
+            from lambdas.pacific_time import pacific_now
     tonight = pacific_now().date()
     by_date = ir.fetch_intake_by_date(table, window_days=_INTAKE_ARMING_WINDOW_DAYS, today=tonight)
     nonzero = sum(1 for c in by_date.values() if c > 0)
@@ -157,7 +160,8 @@ def _suggested_rituals_section(freshness_result):
     try:  # 'today' is the PACIFIC calendar day, same as the evening-intake section (#1484).
         from pacific_time import pacific_now
     except ImportError:  # pragma: no cover — MCP bundle always ships lambdas/ at root
-        from lambdas.pacific_time import pacific_now
+        if not TYPE_CHECKING:
+            from lambdas.pacific_time import pacific_now
     today = pacific_now().date()
     usable = freshness_result if isinstance(freshness_result, dict) and freshness_result.get("status") != "unavailable" else None
     return build_suggested_rituals(today, usable)
