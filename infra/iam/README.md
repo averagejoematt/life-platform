@@ -117,6 +117,23 @@ diff`), `CDKBootstrapRoleAssume`, `CloudFrontInvalidate` (site-deploy).
 > python3 deploy/verify_oidc_iam.py --strict   # expect CLEAN (for this role)
 > ```
 
+## Diagnosis-role qa_archive perf-trend read/write — STAGED (#1435), NOT yet applied
+
+> **Status: the checked-in JSON is AHEAD of live.** #1435 adds two statements to
+> `github-actions-diagnosis-role.permissions.json`: `QaArchivePerfReadWrite`
+> (`s3:PutObject` + `s3:GetObject` scoped to
+> `matthew-life-platform/generated/qa_archive/perf/*`) and `QaArchivePerfList`
+> (`s3:ListBucket` prefix-conditioned to `generated/qa_archive/perf/*`), so the
+> daily standalone visual-qa sweep can persist each run's per-page web-vitals
+> (LCP/CLS/JS-bytes) and rebuild the weekly regression trend line
+> (`generated/qa_archive/perf/trend.json`). The workflow step is
+> `continue-on-error` and `tests/perf_trend.py` is fail-soft, so until this lands
+> the perf trend simply does not accrue — it never reds the sweep. Applied by the
+> **same** one-line `put-role-policy` as the #1441 screenshot grant above (both
+> statements ship in the one file), so a single apply lands both. Until then,
+> `verify_oidc_iam.py --strict` reports the pending drift on
+> `github-actions-diagnosis-role:diagnosis-permissions`.
+
 ### ATTENDED APPLY runbook (#903 — execute under a watched CI run)
 
 > Precondition: attended, matthew-admin, with rollback ready. Same discipline as #687 —

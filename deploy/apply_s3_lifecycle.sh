@@ -36,7 +36,11 @@
 #                      delete markers (ExpiredObjectDeleteMarker cannot share a
 #                      rule with Days, so it needs its own rule).
 #                  Net per object: listed 90d, bytes purged ≈day 97, marker
-#                  swept after. Verify post-apply on a >97d-old day prefix:
+#                  swept after. NB (#1435): generated/qa_archive/perf/ — the
+#                  visual-QA web-vitals snapshots + weekly trend.json — rides this
+#                  SAME rule (the filter is the generated/qa_archive/ prefix), so
+#                  the perf trend's retention is bounded here with no extra rule.
+#                  Verify post-apply on a >97d-old day prefix:
 #                  `aws s3api list-object-versions --bucket matthew-life-platform \
 #                     --prefix generated/qa_archive/text/<old-date>/` → empty.
 #   claude-memory-backup/  keep current forever; noncurrent 90d (#1026 —

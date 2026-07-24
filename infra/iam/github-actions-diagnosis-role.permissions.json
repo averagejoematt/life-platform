@@ -21,6 +21,34 @@
       "Resource": [
         "arn:aws:s3:::matthew-life-platform/generated/qa_archive/screenshots/*"
       ]
+    },
+    {
+      "Sid": "QaArchivePerfReadWrite",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:GetObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::matthew-life-platform/generated/qa_archive/perf/*"
+      ]
+    },
+    {
+      "Sid": "QaArchivePerfList",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::matthew-life-platform"
+      ],
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": [
+            "generated/qa_archive/perf/*"
+          ]
+        }
+      }
     }
   ]
 }

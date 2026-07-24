@@ -180,6 +180,28 @@ jobs:
           done
           echo "qa_archive: ${UPLOADED} AI-surface screenshot(s) archived for ${DATE}"
 
+      # #1435 — persist this run's per-page web-vitals (LCP/CLS/JS-bytes, already
+      # measured by the sweep and sitting in qa-screenshots/report.json) to S3 and
+      # rebuild the weekly regression trend line. Rides generated/qa_archive/perf/,
+      # so the existing qa-archive-expire-90d lifecycle rule already bounds
+      # retention — no new rule. Advisory: like the #1441 screenshot archive above,
+      # the diagnosis role's perf grant is staged in
+      # infra/iam/github-actions-diagnosis-role.permissions.json and applied
+      # out-of-band; until it lands (and always, by fail-soft contract) a persist
+      # failure only WARNs — it must never red this sweep. The daily fire (not the
+      # partial-coverage deploy-time copy in ci-cd.yml) is the trend's source so
+      # every point covers the full page surface at one cadence.
+      - name: Persist perf vitals + weekly trend (#1435)
+        if: always() && steps.dial.outputs.level != 'off'
+        continue-on-error: true
+        run: |
+          if [ -f qa-screenshots/report.json ]; then
+            python3 tests/perf_trend.py --from-report qa-screenshots/report.json --persist --rollup \
+              || echo "::warning::perf-trend persist/rollup failed (advisory — #1435 IAM staging or transient S3)"
+          else
+            echo "::warning::no qa-screenshots/report.json — perf-trend persist skipped (sweep produced no report)"
+          fi
+
       - name: Upload screenshots + report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
