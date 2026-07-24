@@ -1,3 +1,31 @@
-# Code ownership — solo-maintained.
-# Every change is reviewed/owned by the maintainer.
-* @averagejoematt
+# CODEOWNERS — review routing by top-level area.
+#
+# Solo-maintained today (every area resolves to the same owner), but routed per
+# area so onboarding a second maintainer is a one-line-per-area change, not a
+# rewrite. GitHub requests the matching owner as a reviewer on every PR that
+# touches the path. Later-matching patterns win, so the catch-all comes first.
+#
+# See CONTRIBUTING.md for how a change actually lands.
+
+# Catch-all (must be first so the per-area rules below override it).
+*               @averagejoematt
+
+# Serving + compute code
+/lambdas/       @averagejoematt
+/mcp/           @averagejoematt
+/web/           @averagejoematt
+
+# Infrastructure as code
+/cdk/           @averagejoematt
+
+# Public website (static site + build generators)
+/site/          @averagejoematt
+
+# Tests
+/tests/         @averagejoematt
+
+# Documentation
+/docs/          @averagejoematt
+
+# CI/CD control plane (workflows, composite actions, CODEOWNERS, dependabot)
+/.github/       @averagejoematt
