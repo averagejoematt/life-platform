@@ -1,0 +1,16 @@
+# pip-audit allowlist (#1661) — advisory IDs the BLOCKING pip-audit gate ignores.
+#
+# The CI gate ("Dependency Security Scan" in ci-cd.yml) is blocking: a known CVE
+# on any scanned dependency (requirements-dev.txt, cdk/requirements.txt) fails the
+# build. This file is the escape hatch so a single unfixable / not-yet-fixed /
+# inapplicable transitive advisory can't red-wall main indefinitely. Every entry
+# is passed to pip-audit as `--ignore-vuln <ID>`.
+#
+# Format: one advisory ID per line. The first whitespace-delimited token is the ID;
+# everything after `#` is human rationale. Blank lines and full-line comments are
+# ignored. Each entry MUST state (a) why it's safe to ignore and (b) a removal path
+# (the bump/PR that retires it) — an entry with no removal path is a bug, not a waiver.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+PYSEC-2026-2120  # black 25.9.0 — psf/black GitHub Action `use_pyproject:true` RCE. NOT EXPLOITABLE here: CI pip-installs black and runs `black --check` directly; it does not use the psf/black Action or use_pyproject. Removal path: the CQ-01 coordinated black bump (requirements-dev.txt + ci-cd.yml black== pins, bumped together) to >=26.3.0 — Dependabot's dev-tooling group opens it.
+PYSEC-2026-2121  # black 25.9.0 — `--python-cell-magics` cache-file path traversal. NOT EXPLOITABLE here: CI never passes --python-cell-magics (default empty). Removal path: same CQ-01 black bump to >=26.3.1.

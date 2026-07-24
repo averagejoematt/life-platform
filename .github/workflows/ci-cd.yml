@@ -333,26 +333,74 @@ jobs:
           fi
           echo "✅ All files pass syntax check"
 
-      - name: Dependency Security Scan (advisory)
-        # pip-audit for known CVEs. 2026-06-09 (Tier-1 hardening): broadened from
-        # cdk-only to BOTH dependency manifests + a loud, actionable warning on any
-        # finding (the platform's "advisory-but-visible" pattern). Stays NON-blocking
-        # — Dependabot (.github/dependabot.yml) opens the fix PRs, so a sudden
-        # unfixable transitive CVE never red-walls deploys. (Lambda runtime is
-        # stdlib-only, so there is no lambdas/ requirements to scan.)
+      - name: Dependency Security Scan (pip-audit — ENFORCED, allowlisted)
+        # pip-audit for known CVEs across BOTH dependency manifests. 2026-06-09
+        # (Tier-1 hardening): broadened from cdk-only to both manifests. #1661: flipped
+        # from advisory to BLOCKING — a known-vuln dependency now FAILS the build. The
+        # escape hatch is a DOCUMENTED allowlist (.github/pip-audit-allowlist.txt),
+        # fed to pip-audit as `--ignore-vuln` IDs, so a single unfixable / inapplicable
+        # transitive CVE can't red-wall main indefinitely; every allowlist entry needs
+        # a rationale + removal path. Dependabot (.github/dependabot.yml) still opens
+        # the bump PRs. (Lambda runtime is stdlib-only, so there is no lambdas/
+        # requirements to scan.) Pinned like the other lint-gate tools (CQ-01 style).
         if: always()
         run: |
-          pip install pip-audit 2>/dev/null
-          FOUND=0
+          pip install pip-audit==2.10.1
+          ALLOWLIST=.github/pip-audit-allowlist.txt
+          IGNORE_ARGS=()
+          if [ -f "$ALLOWLIST" ]; then
+            while IFS= read -r line; do
+              line="${line%%#*}"                          # strip inline comment / rationale
+              id="$(echo "$line" | tr -d '[:space:]')"    # ID is the only remaining token
+              [ -n "$id" ] && IGNORE_ARGS+=(--ignore-vuln "$id")
+            done < "$ALLOWLIST"
+            echo "pip-audit allowlist (--ignore-vuln): ${IGNORE_ARGS[*]:-<none>}"
+          fi
+          RC=0
           for req in requirements-dev.txt cdk/requirements.txt; do
             echo "::group::pip-audit $req"
-            pip-audit -r "$req" --desc on 2>&1 || FOUND=1
+            pip-audit -r "$req" --desc on "${IGNORE_ARGS[@]}" || RC=1
             echo "::endgroup::"
           done
-          if [ "$FOUND" = "1" ]; then
-            echo "::warning title=Dependency vulnerability (advisory)::pip-audit flagged known CVEs — review the grouped logs; Dependabot will open a bump PR for the affected package."
+          if [ "$RC" != "0" ]; then
+            echo "::error title=Dependency vulnerability (blocking)::pip-audit found a known CVE not on the allowlist. Fix: bump the dependency (Dependabot may already have a PR), or — if unfixable/inapplicable — add the advisory ID to .github/pip-audit-allowlist.txt with a rationale + removal path."
+            exit 1
           fi
-          echo "Dependency scan complete — advisory (non-blocking); Dependabot drives remediation."
+          echo "✅ Dependency scan clean (allowlisted IDs excluded) — blocking gate green."
+
+      - name: Generate SBOM (syft — supply-chain provenance, #1661)
+        # Syft produces a Software Bill of Materials over the checked-out tree in both
+        # SPDX and CycloneDX JSON, uploaded as a build artifact for provenance. Version
+        # PINNED (CQ-01 style) — bump deliberately, not by drift. NON-gating
+        # (continue-on-error): a transient anchore.io download hiccup must not red-wall
+        # deploys, and SBOM capture is provenance, not a pass/fail security gate (that's
+        # pip-audit above). Trivy scan intentionally DEFERRED (#1661 optional item) —
+        # it adds meaningful CI time/complexity for little marginal signal over pip-audit
+        # on a stdlib-only Lambda runtime; revisit if container images enter the build.
+        if: always()
+        continue-on-error: true
+        env:
+          SYFT_VERSION: v1.49.0
+          SYFT_CHECK_FOR_APP_UPDATE: "false"
+        run: |
+          curl -sSfL "https://raw.githubusercontent.com/anchore/syft/${SYFT_VERSION}/install.sh" \
+            | sh -s -- -b "$RUNNER_TEMP/bin" "$SYFT_VERSION"
+          "$RUNNER_TEMP/bin/syft" version
+          "$RUNNER_TEMP/bin/syft" scan dir:. -q \
+            -o "spdx-json=sbom.spdx.json" \
+            -o "cyclonedx-json=sbom.cyclonedx.json"
+          echo "SBOM generated: sbom.spdx.json (SPDX) + sbom.cyclonedx.json (CycloneDX)"
+
+      - name: Upload SBOM artifact (#1661)
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: sbom
+          path: |
+            sbom.spdx.json
+            sbom.cyclonedx.json
+          retention-days: 14
+          if-no-files-found: warn
 
       - name: Check lambda_map coverage
         # R18-F03: Detect Lambda source files missing from ci/lambda_map.json.
