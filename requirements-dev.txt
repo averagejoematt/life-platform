@@ -5,6 +5,10 @@
 # Testing
 pytest==9.1.1
 pytest-cov==7.1.0
+# Property-based testing (Hypothesis @given) — pure calculators + AI grounding
+# gates (tests/test_prop_*.py, #1664). Deterministic + bounded example counts so CI
+# stays fast; no browser/native deps.
+hypothesis==6.161.2
 
 # Visual QA — Playwright browser automation (tests/visual_qa.py).
 # After install: `playwright install --with-deps chromium`
