@@ -833,6 +833,11 @@ def tool_create_experiment(args):
     measurement = (args.get("measurement") or "").strip()
     evidence_links = args.get("evidence_links") or []
     source_hypothesis_id = (args.get("source_hypothesis_id") or "").strip()
+    # #1569 the Third Wall, widened: an OPTIONAL verbatim Matthew note — "why I said
+    # yes to this one, in his words" — carried on the experiment card beside the
+    # machine's read. Opt-in per experiment; absent = the field simply isn't written
+    # and the card renders nothing for it (no nag state).
+    matthew_note = (args.get("matthew_note") or "").strip()
 
     if not name:
         raise ValueError("name is required (e.g. 'Creatine 5g daily', 'No caffeine after 10am')")
@@ -959,6 +964,10 @@ def tool_create_experiment(args):
         "hoped_outcome": hoped_outcome or None,
         "measurement": measurement or None,
         "evidence_links": evidence_links or None,
+        # #1569: verbatim Matthew note (his words) + when he wrote it. Truncated to a
+        # tweet-length quote; None when omitted (dropped by the clean-None pass below).
+        "matthew_note": matthew_note[:500] or None,
+        "matthew_note_at": now.strftime("%Y-%m-%dT%H:%M:%S") if matthew_note else None,
     }
 
     # #728: freeze the pre-registration as a PUBLIC, timestamped S3 artifact —
@@ -1051,6 +1060,8 @@ def tool_create_experiment(args):
         "hoped_outcome": hoped_outcome or None,
         "measurement": measurement or None,
         "evidence_links": evidence_links or None,
+        # #1569: echo the verbatim note so the caller sees it landed (only when set).
+        **({"matthew_note": matthew_note[:500]} if matthew_note else {}),
         **({"pre_registration_warning": prereg_warning} if prereg_warning else {}),
         "board_of_directors": {
             "Huberman": "One variable at a time. Track for at least 2 weeks before drawing conclusions. Control for confounders: sleep timing, stress, travel.",
@@ -1380,6 +1391,10 @@ def tool_end_experiment(args):
     grade = (args.get("grade") or "").strip()
     compliance_pct = args.get("compliance_pct")
     reflection = (args.get("reflection") or "").strip()
+    # #1569: review-time write of the verbatim Matthew note — set/update "in his
+    # words" when closing an experiment (the other half of the widened Third Wall).
+    # Opt-in; absent leaves any existing note untouched.
+    matthew_note = (args.get("matthew_note") or "").strip()
 
     if not exp_id:
         raise ValueError("experiment_id is required")
@@ -1416,6 +1431,10 @@ def tool_end_experiment(args):
     if reflection:
         update_expr += ", reflection = :ref"
         expr_values[":ref"] = reflection
+    if matthew_note:
+        update_expr += ", matthew_note = :mn, matthew_note_at = :mnat"
+        expr_values[":mn"] = matthew_note[:500]
+        expr_values[":mnat"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
 
     # #539: designed experiments close with the pre-registered paired analysis \u2014
     # baseline vs washout-trimmed intervention window, block-bootstrap 95% CI,

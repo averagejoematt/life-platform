@@ -53,6 +53,11 @@ def tool_log_decision(args):
     override_reason = args.get("override_reason", "")
     pillars = args.get("pillars", [])
     date = args.get("date") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    # #1569 the Third Wall, widened to decisions: an OPTIONAL verbatim Matthew note —
+    # "his call, in his words" — the human voice beside the platform's recommendation.
+    # Opt-in per decision; absent = the field isn't written and the site renders
+    # nothing (no nag). This is what makes a logged decision publishable verbatim.
+    note = (args.get("note") or "").strip()
 
     if not decision_text:
         return {"error": "decision text is required"}
@@ -69,6 +74,10 @@ def tool_log_decision(args):
         "followed": followed,
         "override_reason": override_reason[:300] if override_reason else None,
         "pillars": pillars,
+        # #1569: verbatim, publishable note + when it was written (None when omitted,
+        # dropped by the clean-None pass below).
+        "note": note[:500] if note else None,
+        "note_at": ts if note else None,
         "outcome_metric": None,
         "outcome_delta": None,
         "outcome_notes": None,
@@ -87,6 +96,7 @@ def tool_log_decision(args):
         "sk": sk,
         "decision": decision_text[:100],
         "followed": status,
+        **({"note": note[:500]} if note else {}),
         "tip": "Use update_decision_outcome in 1-3 days to record what happened.",
     }
 
@@ -166,6 +176,9 @@ def tool_get_decisions(args):
                     "source": i.get("source"),
                     "followed": i.get("followed"),
                     "override_reason": i.get("override_reason"),
+                    # #1569: the verbatim "in his words" note, when present.
+                    "note": i.get("note"),
+                    "note_at": i.get("note_at"),
                     "outcome_metric": i.get("outcome_metric"),
                     "outcome_delta": i.get("outcome_delta"),
                     "outcome_notes": i.get("outcome_notes"),

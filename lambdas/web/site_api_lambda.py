@@ -71,6 +71,7 @@ from web.site_api_coach import (
     handle_coach_team,
     handle_coach_timeline,
     handle_coaches,
+    handle_decisions,
     handle_experiment_synthesis,
     handle_field_notes,
     handle_month_rollup,
@@ -703,6 +704,9 @@ def lambda_handler(event, context):
     # BL-04: Field Notes (GET with optional ?week= query param)
     if path == "/api/field_notes":
         return handle_field_notes(event)
+    # #1569: logged decisions carrying a verbatim note (the widened Third Wall).
+    if path == "/api/decisions":
+        return handle_decisions(event)
     if path == "/api/ai_analysis":
         return handle_ai_analysis(event)
     if path == "/api/coach_analysis":

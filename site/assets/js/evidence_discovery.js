@@ -7,6 +7,18 @@ import { evidenceBar } from "/assets/js/evidence_bar.js";
 import { domainIcon, icon } from "/assets/js/icons.js";
 import { esc, tryJSON, isBad, has, fmt, ttl, fig, figs, sec, empty, note, warmup, evClass, kvtable, postJSON, voteFollowRow, wireVoteButtons, wireFollowForms } from "/assets/js/evidence_shared.js";
 
+// #1569 — the widened Third Wall: Matthew's verbatim voice beside the machine's read.
+// The SAME two-voice pattern the lab-notes field note uses (voice / who / what),
+// reused here for experiment cards and decisions. Renders NOTHING when the text is
+// absent or flagged bad — an empty slot is honest, never a nag state (AC3). The
+// server already content-filters the text; this only escapes + tags + dates it.
+function hisWordsBlock(text, at, tag) {
+  if (!text || isBad(text)) return "";
+  const d = at ? String(at).slice(0, 10) : "";
+  const who = tag || "Matthew · in his words";
+  return `<div class="voice human his-words"><span class="who">${esc(who)}</span><p class="what">${esc(text)}</p>${d ? `<p class="his-words-date label">${esc(d)}</p>` : ""}</div>`;
+}
+
 // One machine-bet card: domains + status badge in the header, the falsifiable
 // statement as the body, the verdict trail once graded, the founding evidence
 // collapsed behind a details toggle (it's long — 4-5 cited sentences).
@@ -410,7 +422,7 @@ export async function renderExperiments(d) {
     const whyNowProv = x.why_now && !isBad(x.why_now) && x.why_now_source && x.why_now_source !== "explicit"
       ? (x.why_now_source === "hypothesis" ? "why-now from confirmed hypothesis" : "why-now from library promotion")
       : null;
-    return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(x.name)}</h3><span class="rd-badge ${done ? "" : "rd-badge-live"}">${esc(x.status || "")}</span></header>${x.hypothesis ? `<p class="rd-why"><span class="label">hypothesis</span> ${esc(x.hypothesis)}</p>` : ""}${just}${design}${x.mechanism && !isBad(x.mechanism) ? `<p class="rd-line"><span class="label">mechanism</span> ${esc(x.mechanism)}</p>` : ""}${prog}${compliance}${analysis}${finding}${receipt}${reflect}${x.result_summary && !isBad(x.result_summary) && !finding ? `<p class="rd-line">${esc(x.result_summary)}</p>` : ""}<p class="rd-meta label">${[verdict, x.priority && !isBad(x.priority) && "priority " + x.priority, preReg && `pre-registered ${preReg}`, whyNowProv, x.primary_metric && !done && "tracking " + esc(x.primary_metric), x.grade && "grade " + esc(x.grade)].filter(Boolean).map(esc).join("  ·  ")}</p></article>`;
+    return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(x.name)}</h3><span class="rd-badge ${done ? "" : "rd-badge-live"}">${esc(x.status || "")}</span></header>${x.hypothesis ? `<p class="rd-why"><span class="label">hypothesis</span> ${esc(x.hypothesis)}</p>` : ""}${just}${design}${x.mechanism && !isBad(x.mechanism) ? `<p class="rd-line"><span class="label">mechanism</span> ${esc(x.mechanism)}</p>` : ""}${prog}${compliance}${analysis}${finding}${receipt}${reflect}${x.result_summary && !isBad(x.result_summary) && !finding ? `<p class="rd-line">${esc(x.result_summary)}</p>` : ""}${hisWordsBlock(x.matthew_note, x.matthew_note_at)}<p class="rd-meta label">${[verdict, x.priority && !isBad(x.priority) && "priority " + x.priority, preReg && `pre-registered ${preReg}`, whyNowProv, x.primary_metric && !done && "tracking " + esc(x.primary_metric), x.grade && "grade " + esc(x.grade)].filter(Boolean).map(esc).join("  ·  ")}</p></article>`;
   };
   const libCard = (x) => {
     // P2.1 — evidence_tier gets the evClass chip treatment (strong/moderate/emerging).
@@ -423,6 +435,25 @@ export async function renderExperiments(d) {
     return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(x.name)}</h3><span class="rd-badge">${esc(x.status)}</span></header>${x.hypothesis ? `<p class="rd-why">${esc(x.hypothesis)}</p>` : x.result_summary ? `<p class="rd-why">${esc(x.result_summary)}</p>` : ""}<p class="rd-meta label">${tc ? `<span class="supp-evlabel ${tc}">${esc(tl)}</span>  ·  ` : ""}${meta}${link}</p>${x.id ? voteFollowRow("experiment", "library_id", x.id, votes) : ""}</article>`;
   };
   const runSec = sec("Running now", running.length ? `<div class="rd-cards">${running.map(runCard).join("")}</div>` : empty("Nothing running yet this cycle — the experiment just started."));
+  // #1569 the widened Third Wall, decisions half: logged decisions Matthew chose to
+  // publish (a verbatim note), each shown as the platform's recommendation (machine)
+  // beside his own words (human), dated. The server returns ONLY decisions carrying a
+  // note — no note, no row — so an empty/absent feed renders NOTHING here (no nag).
+  const dec = await tryJSON("/api/decisions");
+  const decisions = (dec && Array.isArray(dec.decisions)) ? dec.decisions.filter((r) => r && r.note && !isBad(r.note)) : [];
+  const decCard = (r) => {
+    const rec = r.decision && !isBad(r.decision)
+      ? `<div class="voice machine"><span class="who">the platform recommended</span><p class="what">${esc(r.decision)}</p></div>`
+      : "";
+    const stance = r.followed === true ? "followed" : r.followed === false ? "overrode it" : null;
+    const why = r.followed === false && r.override_reason && !isBad(r.override_reason)
+      ? `<p class="rd-line"><span class="label">why he went his own way</span> ${esc(r.override_reason)}</p>` : "";
+    const meta = [r.source && !isBad(r.source) && "from the " + String(r.source).replace(/_/g, " "), stance].filter(Boolean).map(esc).join("  ·  ");
+    return `<article class="rd-card">${rec}${why}${hisWordsBlock(r.note, r.note_at || r.date, "Matthew · his call")}${meta ? `<p class="rd-meta label">${meta}</p>` : ""}</article>`;
+  };
+  const decSec = decisions.length
+    ? sec("His calls, in his words", `<div class="rd-cards">${decisions.map(decCard).join("")}</div>` + note("The platform's recommendation, and what he actually decided — verbatim, dated. Only decisions he chose to publish appear here."))
+    : "";
   const pipeline = [...avail, ...backlog];
   const pipeSec = pipeline.length ? sec(`In the pipeline (${pipeline.length})`, `<div class="rd-cards">${pipeline.slice(0, 60).map(libCard).join("")}</div>`) : "";
   // Reader participation: suggest the next experiment — a moderated idea queue
@@ -432,7 +463,7 @@ export async function renderExperiments(d) {
     `<textarea id="sg-idea" data-suggest-idea placeholder="e.g. cold shower before bed vs deep sleep %" maxlength="500" required></textarea>` +
     `<label class="label" for="sg-source">Name or site (optional)</label><input id="sg-source" type="text" data-suggest-source maxlength="100">` +
     `<button class="part-btn" type="submit">Send</button><p class="part-msg" data-suggest-msg></p></form>`);
-  return arcBand + head + runSec + pipeSec + suggestSec + note("N=1 instrument. “Running now” are live on the ledger; the pipeline is the experiment library — candidates not yet run.");
+  return arcBand + head + runSec + decSec + pipeSec + suggestSec + note("N=1 instrument. “Running now” are live on the ledger; the pipeline is the experiment library — candidates not yet run.");
 }
 
 // Wired after renderExperiments mounts: the shared vote/follow controls on

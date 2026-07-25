@@ -11,6 +11,7 @@ the dispatcher as `return handle_X(event)`.
 
 Endpoints:
   /api/field_notes      — weekly Field Notes (optional ?week= param)
+  /api/decisions        — logged decisions carrying a verbatim note (#1569, the widened Third Wall)
   /api/ai_analysis      — cached AI expert analysis (?expert= param)
   /api/coach_analysis   — coach intelligence dashboard (?domain= param)
   /api/predictions      — coach prediction ledger (?status=&coach_id=&limit=)
@@ -21,6 +22,7 @@ Endpoints:
 
 import json
 import os
+import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from decimal import Decimal  # noqa: F401
@@ -54,6 +56,7 @@ from web.site_api_common import (
     _error,
     _load_s3_json,
     _ok,
+    _scrub_blocked_terms,
     logger,
     pre_start_meta,
     table,
@@ -926,6 +929,84 @@ def handle_field_notes(event):
         return _ok({"entries": entries, "count": len(entries)}, cache_seconds=300)
 
     # AI Analysis (GET with ?expert= query param)
+
+
+def _public_decision_note(text):
+    """#1569: screen a VERBATIM decision note for public serving.
+
+    Same runtime content filter (marijuana/porn etc.) the CI content-policy scan
+    enforces. A verbatim quote is all-or-nothing: if the filter would alter it at all
+    (a blocked term excised, or the refuse-whole sentinel), the note is withheld
+    ENTIRELY — a decision whose note doesn't cleanly survive simply isn't shown."""
+    if not text or not str(text).strip():
+        return None
+    raw = str(text).strip()
+    scrubbed = _scrub_blocked_terms(raw)
+    if not scrubbed or re.sub(r"\s+", " ", scrubbed).strip() != re.sub(r"\s+", " ", raw).strip():
+        return None
+    return scrubbed.strip()
+
+
+def handle_decisions(event):
+    """GET /api/decisions — the widened Third Wall for logged decisions (#1569).
+
+    Renders `log_decision` rationale that Matthew chose to publish: ONLY decisions
+    carrying an opt-in verbatim `note` ("his call, in his words") are returned, each
+    dated, with the platform's recommendation as the machine voice beside it. A
+    decision with no note is private and never appears (AC3: absent renders nothing —
+    no nag). Phase-filtered (ADR-058) so a wiped cycle's decisions don't resurface.
+    Content-filtered at serve time (the same term list the CI scan enforces).
+
+    Read-only. Optional ?limit= (default 20, max 50).
+    """
+    qs = event.get("queryStringParameters") or {}
+    try:
+        limit = max(1, min(50, int(qs.get("limit", 20))))
+    except (TypeError, ValueError):
+        limit = 20
+
+    dec_pk = f"{USER_PREFIX}decisions"
+    try:
+        resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058: hide pilot/other-cycle decisions
+                    "KeyConditionExpression": Key("pk").eq(dec_pk) & Key("sk").begins_with("DECISION#"),
+                    "ScanIndexForward": False,
+                    "Limit": 100,
+                }
+            )
+        )
+        items = _decimal_to_float(resp.get("Items", []))
+    except Exception as e:  # pragma: no cover - defensive; a query hiccup serves shaped-empty
+        logger.warning(f"[decisions] query failed: {e}")
+        items = []
+
+    entries = []
+    for i in items:
+        note = _public_decision_note(i.get("note"))
+        if not note:
+            continue  # opt-in: no publishable note = not shown
+        followed = i.get("followed")
+        entries.append(
+            {
+                "date": i.get("date"),
+                # The platform's recommendation — the MACHINE voice half of the wall.
+                # Surgically scrubbed (defensive; it's platform text, not a sacred
+                # verbatim quote, so a stray term is excised rather than blanking it).
+                "decision": _scrub_blocked_terms(str(i.get("decision") or "")),
+                "source": i.get("source"),
+                "followed": followed,
+                "override_reason": (_scrub_blocked_terms(str(i.get("override_reason"))) if i.get("override_reason") else None),
+                # The HUMAN voice — Matthew's verbatim, dated note.
+                "note": note,
+                "note_at": i.get("note_at"),
+                "pillars": i.get("pillars", []),
+            }
+        )
+        if len(entries) >= limit:
+            break
+
+    return _ok({"decisions": entries, "count": len(entries)}, cache_seconds=300)
 
 
 def handle_experiment_synthesis():

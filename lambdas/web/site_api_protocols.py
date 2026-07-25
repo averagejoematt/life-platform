@@ -2,6 +2,7 @@
 site_api_data.py (#1654): experiments / supplements / protocols / domains / routine.
 Handlers read facade state via `_g` (see freshness)."""
 
+import re
 from datetime import datetime, timedelta, timezone
 
 from boto3.dynamodb.conditions import Key
@@ -15,8 +16,32 @@ from web.site_api_common import (
     _load_s3_json,
     _load_supp_metadata,
     _ok,
+    _scrub_blocked_terms,
     logger,
 )
+
+
+def _norm_ws(s):
+    return re.sub(r"\s+", " ", str(s)).strip()
+
+
+def _public_note(text):
+    """#1569: screen a VERBATIM Matthew note for public serving.
+
+    Runs the canonical runtime content filter (marijuana/porn etc. — the same term
+    list the CI content-policy scan enforces). A verbatim quote is all-or-nothing:
+    if the filter would alter it at all (a blocked term excised, or the refuse-whole
+    sentinel), the note is withheld ENTIRELY rather than published as a mangled
+    fragment. Empty/withheld → None, and an absent note renders NOTHING on the card
+    (no nag state) — the honest-empty contract (AC3, #1569)."""
+    if not text or not str(text).strip():
+        return None
+    raw = str(text).strip()
+    scrubbed = _scrub_blocked_terms(raw)
+    if not scrubbed or _norm_ws(scrubbed) != _norm_ws(raw):
+        return None
+    return scrubbed.strip()
+
 
 # S3-config container caches for the protocols/domains passthroughs.
 _protocols_cache = None
@@ -81,6 +106,12 @@ def experiments(*, _g) -> dict:
         if status == "active" and days_in is not None and planned_duration:
             progress_pct = min(100, round(days_in / int(planned_duration) * 100))
 
+        # #1569 the widened Third Wall: the OPTIONAL verbatim Matthew note ("why I
+        # said yes, in his words"), content-filtered for public serving. Only added
+        # to the payload when present + clean — an absent note is simply not a key,
+        # so the card's honest-empty render (nothing) needs no null handling.
+        matthew_note = _public_note(item.get("matthew_note"))
+
         experiments.append(
             {
                 "id": item.get("sk", "").replace("EXP#", ""),
@@ -140,6 +171,10 @@ def experiments(*, _g) -> dict:
                 "measurement": item.get("measurement"),
                 "evidence_links": item.get("evidence_links") or [],
                 "origin": "live",  # an actual run on the ledger (this experiment cycle)
+                # #1569: verbatim note (his words) beside the machine's read. Present
+                # ONLY when written + clean; absent keys keep the default card shape.
+                **({"matthew_note": matthew_note} if matthew_note else {}),
+                **({"matthew_note_at": item.get("matthew_note_at")} if matthew_note and item.get("matthew_note_at") else {}),
             }
         )
     experiments.sort(key=lambda x: x["start_date"], reverse=True)
