@@ -38,7 +38,11 @@ RATCHET_FLOOR = 47
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
 _PYPROJECT = os.path.join(_REPO, "pyproject.toml")
-_CI = os.path.join(_REPO, ".github", "workflows", "ci-cd.yml")
+# The enforced coverage gate (--cov-fail-under / coverage_gap_warn --floor) moved into
+# the reusable ci-test.yml when #1655 split ci-cd.yml. Read the whole CI gate surface so
+# this ratchet-guard follows the literal wherever it lives.
+_CI_FILES = [os.path.join(_REPO, ".github", "workflows", f) for f in ("ci-cd.yml", "ci-test.yml", "ci-lint.yml")]
+_CI = _CI_FILES[0]  # kept for messages/back-compat
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -53,8 +57,12 @@ def _pyproject_fail_under():
 
 
 def _ci_text():
-    with open(_CI, encoding="utf-8") as fh:
-        return fh.read()
+    parts = []
+    for p in _CI_FILES:
+        if os.path.exists(p):
+            with open(p, encoding="utf-8") as fh:
+                parts.append(fh.read())
+    return "\n".join(parts)
 
 
 def _ci_cov_fail_under():

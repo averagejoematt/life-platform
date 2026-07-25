@@ -85,6 +85,11 @@ def test_site_deploy_uses_same_pinned_actions_as_ci_cd():
     assert uses, "no pinned actions found in site-deploy.yml"
     for ref in uses:
         action, _, sha = ref.partition("@")
+        if action.startswith("./"):
+            # Local composite action (#1655) — pinned by tree, not by SHA. Still enforce
+            # lockstep: the same local ref must appear in ci-cd.yml so it can't drift.
+            assert ref in ci, f"{ref} local action must be referenced in lockstep with ci-cd.yml"
+            continue
         assert re.fullmatch(r"[0-9a-f]{40}", sha), f"{action} is not SHA-pinned in site-deploy.yml"
         assert ref in ci, f"{ref} is pinned differently from ci-cd.yml — bump the pins in lockstep"
     assert "role/github-actions-deploy-role" in site, "must assume the standard OIDC deploy role"
