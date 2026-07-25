@@ -112,4 +112,32 @@ stranded chronicle via `deploy_all`. Saved to memory `reference_content_policy_a
 - `not-work — housekeeping`: standing `email-subscriber: NOT DEPLOYED` config-drift (intentional skeleton);
   prune stale agent worktrees.
 
+## Next-session ranked hit-list (maximize CLOSED count without sacrificing quality)
+Backlog reality: 102 open = 22 epics + 37 model:fable + 12 gate:owner + 1 misc + **30 addressable**
+(sonnet/opus, non-gate:owner). Of the 30, ~12 are genuinely fan-out-clean; the rest are blocked/
+concurrent/multi-slice. Realistic clean closure ≈ 5–8/session. Multi-slice issues undercount the badge
+(this session: 3 merged PRs on #1654 → 0 net closed because it reopened). **On any multi-slice issue put
+`Fixes #N` only on the LAST slice.** model:fable stays SKIPPED.
+
+- **Tier A — quick/clean, count 1:1 (start here):**
+  - #1544 — CI push-runs-not-queuing: **likely already fixed** last session (salted the concurrency group
+    name). Verify push-runs queue normally now → close with evidence. Near-free.
+  - #1379 — Daily Fingerprint + Wall (pure seeded SVG of the day's metrics + one page; no AI/secret).
+  - #1381 — Theme River (journal-enrichment viz + one page).
+  - #1377 — The Wrong Feed (graded-failures feed over existing forecast data).
+  - #1572 — transcript landing path / Video Diary (**Now**; reuses the journal pipeline, no new UI).
+- **Tier B — single-PR with a page/endpoint tax (real work, still 1:1):** #1569 widen Third Wall ·
+  #1574 coach reactions to diary · #1385 whole-life-context chronicle (**AI surface — grounding gates**) ·
+  #1394 Cohort Strip (**new endpoint → autodeploy-race**) · #1393 Engagement Ladder ·
+  #1401 Fork My Life-Stack (**touches CDK**) · #1475 nav wayfinding (**design-heavy**).
+- **Tier C — multi-slice/infra, work ≫ count:** #1653 packaging (CDK-per-slice) · #1654 slice 4
+  (needs #1656 first) · #1658 coverage→70% (big test-writing; up-only guard half already done) ·
+  #1656 mypy strict-clean — `not-work — a concurrent session owns this; don't touch (mypy.ini contention)`.
+- **Tier D — blocked, surface don't attempt:** #741 (`not-work — owner publishes`) · #1029
+  (`not-work — human-only checklist; domain renews 2026-08-20`) · #1396 (`not-work — owner OSS repo`) ·
+  #1243 (`not-work — owner podcast-audio regen`) · #1650 (`not-work — owner picks destination: sibling
+  repo vs archive branch`) · #1705/#1706/#1707/#1708 (`not-work — blocked on #1686 product decisions`) ·
+  #1402/#1674/#1675/#1676/#1679 (`not-work — blocked on owner social secrets: life-platform/youtube +
+  Bluesky/Mastodon tokens; provisioning these frees all 5`).
+
 **Build beat:** 2026-07-25-god-module-breakup
