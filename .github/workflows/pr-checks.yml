@@ -44,7 +44,7 @@ jobs:
           python-cache: 'pip'
 
       - name: Install lane dependencies
-        run: pip install pytest boto3 botocore black==25.9.0
+        run: pip install pytest boto3 botocore black==25.9.0 hypothesis==6.161.2  # hypothesis: property tests (#1664) are imported by the full-tree collection gate below (#1720 lane tail)
 
       - name: Collection gate (the #1297 class dies here)
         run: python3 -m pytest tests/ --collect-only -q
