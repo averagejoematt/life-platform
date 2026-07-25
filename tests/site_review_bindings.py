@@ -208,6 +208,18 @@ PAGE_BINDINGS = [
         "story_intent": "the honesty machinery made visible — the watchdog agents policing the platform's own AI, and a weekly readout of what they caught (#399)",
         "endpoints": [{"url": "/api/agent_activity", "role": "primary", "metrics": []}],
     },
+    {
+        # #1381 (epic #1364): the Theme River — enriched journal themes across the attempt.
+        # Static-artifact page (/data/theme_river.json baked by scripts/v4_build_theme_river.py),
+        # like /story/build/agent-review/'s sidecar — no live /api dep. narrative_order 6.7 keeps
+        # it in the core story walk, just after the agents page (6.5), ahead of the 88+ build cluster.
+        "path": "/story/theme-river/",
+        "name": "Story · the theme river",
+        "door": "story",
+        "narrative_order": 6.7,
+        "story_intent": "what the journal has been ABOUT, over time — the enriched themes of the writing as a monochrome river; honest-empty until the attempt accrues entries (#1381)",
+        "endpoints": [{"url": "/data/theme_river.json", "role": "primary", "metrics": []}],  # build-time baked static artifact
+    },
     # #1427: three more /story/ pages joined visual_qa.PAGES.
     {
         "path": "/story/build/",
