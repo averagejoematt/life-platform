@@ -1,6 +1,6 @@
 # Life Platform — MCP Tool Catalog
 
-> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-07-22
+> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-07-25
 
 **Version:** v8.6.0 | **Last updated:** 2026-07-25 | **Total tools:** 72
 
@@ -16,7 +16,7 @@
 
 ---
 
-## All 69 Tools — by module
+## All 72 Tools — by module
 
 | Module | Tools |
 |---|---|
@@ -40,7 +40,7 @@
 | `mcp/tools_decisions.py` | 3 |
 | `mcp/tools_hevy.py` | 2 |
 | `mcp/tools_hevy_routine.py` | 1 |
-| `mcp/tools_reading.py` | 8 |
+| `mcp/tools_reading.py` | 11 |
 | `mcp/registry.py` | 1 |
 | `mcp/tools_habits.py` | 2 |
 | `mcp/tools_coach_checkin.py` | 2 |
@@ -122,10 +122,10 @@
 | `get_intake_response` | window_days= | PRIVATE (#1405): the intake→next-morning dose-response read. Lagged pairs vs HRV / recovery / REM with effective-n correction (Pyper-Peterman), p on n_eff, zero-vs-nonzero block-bootstrap CI, and dose bins (0/1/2+) once 15 nonzero evenings exist. Reports arming progress below the floors (ADR-105). Use for: 'what do drinks do to my HRV?', 'intake dose-response so far'. |
 | `get_insights` | status_filter=, limit= | List insights from the personal coaching log. Returns all insights newest-first with days_open calculated. Stale flag is set for open insights older than 14 days. Use for: 'what insights are open?', 'show my coaching log', 'what have I been meaning to act on?', 'any stale insights?', 'show me resolved insights'. |
 | `update_insight_outcome` | insight_id, outcome_notes=, status= | Close the loop on a saved insight — record what happened when you acted on it. Updates the insight's status and adds outcome notes. Use for: 'I tried the caffeine cutoff — it worked', 'mark this insight as resolved', 'update the outcome for insight X', 'close out this coaching log item'. |
-| `create_experiment` | name, hypothesis, start_date=, tags=[], notes=, library_id=, duration_tier=, experiment_type=, planned_duration_days=, why_now=, priority=, hoped_outcome=, measurement=, evidence_links=[], source_hypothesis_id=, design= | Start tracking a new N=1 experiment. An experiment is a specific protocol change (supplement, diet shift, sleep hygiene tweak, training adjustment) with a hypothesis and start date. The system will automatically compare before/after metrics when you call get_experiment_results. Board rules: one variable at a time, minimum 14 days, define success criteria upfront. Use for: 'I'm starting creatine today', 'track my no-caffeine-after-10am experiment', 'create experiment for cold plunge protocol', 'I want to test if X improves Y'. |
+| `create_experiment` | name, hypothesis, start_date=, tags=[], notes=, library_id=, duration_tier=, experiment_type=, planned_duration_days=, why_now=, priority=, hoped_outcome=, measurement=, evidence_links=[], source_hypothesis_id=, matthew_note=, design= | Start tracking a new N=1 experiment. An experiment is a specific protocol change (supplement, diet shift, sleep hygiene tweak, training adjustment) with a hypothesis and start date. The system will automatically compare before/after metrics when you call get_experiment_results. Board rules: one variable at a time, minimum 14 days, define success criteria upfront. Use for: 'I'm starting creatine today', 'track my no-caffeine-after-10am experiment', 'create experiment for cold plunge protocol', 'I want to test if X improves Y'. |
 | `list_experiments` | status= | List all N=1 experiments with their status, duration, and whether minimum data threshold (14 days) has been met. Filter by status. Use for: 'what experiments am I running?', 'show active experiments', 'list completed experiments', 'any experiments ready to evaluate?'. |
 | `get_experiment_results` | experiment_id | Auto-compare before vs during metrics for an N=1 experiment. Automatically queries sleep, recovery, stress, body composition, nutrition, movement, and glucose metrics for both the pre-experiment baseline period and the experiment period. Reports deltas, % changes, and direction (improved/worsened). Board of Directors evaluates results against hypothesis. Use for: 'how is my creatine experiment going?', 'did cutting caffeine help my sleep?', 'show experiment results', 'evaluate my N=1', 'did this actually work?'. |
-| `end_experiment` | experiment_id, outcome=, status=, end_date=, grade=, compliance_pct=, reflection= | End an active N=1 experiment and record the outcome. Run get_experiment_results first to review the data. Status can be 'completed' (ran full course) or 'abandoned' (stopped early). Use for: 'end my creatine experiment', 'I'm stopping the no-caffeine experiment', 'mark experiment as completed', 'abandon experiment X'. |
+| `end_experiment` | experiment_id, outcome=, status=, end_date=, grade=, compliance_pct=, reflection=, matthew_note= | End an active N=1 experiment and record the outcome. Run get_experiment_results first to review the data. Status can be 'completed' (ran full course) or 'abandoned' (stopped early). Use for: 'end my creatine experiment', 'I'm stopping the no-caffeine experiment', 'mark experiment as completed', 'abandon experiment X'. |
 | `get_social_connection_trend` | start_date=, end_date= | Social connection quality trend from journal entries. Tracks enriched_social_quality (alone/surface/meaningful/deep) over time with rolling averages, streaks, and PERMA wellbeing model context. Correlates social quality with recovery, HRV, sleep, stress. Seligman: Relationships are the #1 predictor of sustained wellbeing. Use for: 'social connection trend', 'meaningful connections', 'PERMA score'. |
 | `get_field_notes` | week= | Retrieve the weekly Field Notes entry — AI Lab Notes (present/lookback/focus paragraphs) and any existing Matthew response. Defaults to current week if no week specified. Use for: 'show me this week's field notes', 'what did the AI say this week', 'read field notes for week 14', 'get my lab notebook'. |
 | `log_field_note_response` | week, notes, agreement=, disputed=[], added= | Write Matthew's response to the right page of a Field Notes entry. The AI Lab Notes must already exist for that week. Uses update_item to never overwrite AI fields. Use for: 'respond to field notes', 'write my side of the lab notebook', 'I disagree with the AI notes this week', 'add my response to week 14'. |
@@ -184,7 +184,7 @@
 
 | Tool | Key Params | Description |
 |------|-----------|-------------|
-| `log_decision` | decision, followed=, override_reason=, source=, pillars=[], date= | IC-19: Log a platform-guided decision for trust calibration. Record what the platform recommended, whether Matthew followed or overrode the advice, and why. Outcome recorded later via update_decision_outcome. Use for: 'the brief said rest day but I trained', 'followed protein advice', 'platform recommended X and I did Y'. |
+| `log_decision` | decision, followed=, override_reason=, note=, source=, pillars=[], date= | IC-19: Log a platform-guided decision for trust calibration. Record what the platform recommended, whether Matthew followed or overrode the advice, and why. Outcome recorded later via update_decision_outcome. Use for: 'the brief said rest day but I trained', 'followed protein advice', 'platform recommended X and I did Y'. |
 | `get_decisions` | days=, pillar=, outcome_only= | IC-19: Retrieve recent platform-guided decisions with outcomes and trust calibration. Shows follow vs override patterns and which approach produces better outcomes. Use for: 'how often do I follow platform advice?', 'should I trust the system?', 'decision journal', 'when do my overrides work?'. |
 | `update_decision_outcome` | sk, outcome_metric=, outcome_delta=, outcome_notes=, effectiveness= | IC-19: Record the outcome of a past decision. Call 1-3 days after logging a decision to capture what actually happened. Over time builds trust calibration: when to follow vs override platform advice. Use for: 'that rest day advice worked', 'I ignored the protein tip and felt fine'. |
 
@@ -213,6 +213,9 @@
 | `get_reading_track_record` | limit= | Cora's reading-recommendation track record + auditable hit rate (low-confidence until enough recommendations resolve). |
 | `get_constellation` | idea_id= | The Constellation idea-graph (Mind pillar signature). Honest empty state below the node threshold; pass idea_id to fetch one node + its edges. Whole-graph enumeration ships in Phase E. |
 | `manage_reading` | action, dry_run=, bookId=, title=, author=, isbn13=, olid=, pageCount=, status=, abandon_reason=, minutes=, pages=, date=, type=, text=, public=, takeaway=, prompt_id=, answer=, next_due=, ts=, resolved_outcome=, answers= | Write fat-tool for the reading library (draft -> dry_run -> commit). Every mutating action PREVIEWS by default (dry_run=true) and writes only on an explicit dry_run=false. Actions: add_book, update_status (abandon requires abandon_reason), log_session, add_note, answer_recall, debrief, log_outcome, update_profile, onboard (taste-archaeology interview). |
+| `get_horizons` | limit= | Horizons (Mind pillar): the weekly coach-curated media pick that broadens Matthew's horizons across all pillars (article\|podcast\|video\|paper\|news\|longform\|essay\|song). Returns the current pick + past picks (newest first). Honest empty state before the first pick. |
+| `curate_horizon` | url, title, format, rationale_tag, pitch=, source=, week=, dry_run= | Author the week's Horizons pick (the Mind coach, curating broadly across all pillars). Runs the link-verification gate (ADR-104: no fabricated links) and stores the pick ONLY if its URL resolves to real content — fail-closed. draft->dry_run->commit: verifies in both modes; writes only on explicit dry_run=false. An unverified link is rejected and never stored. |
+| `archive_horizon` | week=, dry_run= | Archive a prior Horizons pick with the Mind coach's grounded retrospective (the week AFTER the pick): why you recommended it and what you hoped it would do for Matthew. GROUNDED (ADR-104 — built only from the stored pick, never Matthew's private reactions), budget-gated (reader-narrative), and passed through the #1673 fail-closed sensitivity gate before it can publish. draft->dry_run->commit: writes only on explicit dry_run=false. Defaults to last week. |
 
 ### Meta (`mcp/registry.py`)
 
