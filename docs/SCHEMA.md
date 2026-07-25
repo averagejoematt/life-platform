@@ -899,14 +899,15 @@ Notion journal uses multiple SK patterns per day (one per template type):
 | `DATE#YYYY-MM-DD#journal#stressor#N` | Stressor Deep-Dive (numbered) |
 | `DATE#YYYY-MM-DD#journal#health#N` | Health Event (numbered) |
 | `DATE#YYYY-MM-DD#journal#video_diary#N` | Video Diary — Diary-Studio transcript (#1572, numbered/stable-suffix) |
+| `DATE#YYYY-MM-DD#journal#solo_recording#N` | Solo Recording — local-Whisper solo-diary transcript (#1573, numbered/stable-suffix) |
 | `DATE#YYYY-MM-DD#journal#journal#N` | Fallback for unstructured entries without a Template property (numbered) |
 
 **Common fields (all templates):**
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `template` | string | Morning / Evening / Stressor / Health Event / Weekly Reflection / Video Diary |
-| `channel` | string | Capture-channel provenance (#1572): `video_diary` for a Video Diary transcript, else `journal`. Provenance only — never feeds character scoring (same enrichment codes both). Also projected onto the `flourishing` row as `channels`/`channel_entry_counts`. |
+| `template` | string | Morning / Evening / Stressor / Health Event / Weekly Reflection / Video Diary / Solo Recording |
+| `channel` | string | Capture-channel provenance (#1572/#1573): `video_diary` for a Video Diary transcript, `solo_recording` for a local-Whisper solo-diary transcript, else `journal`. Provenance only — never feeds character scoring (same enrichment codes all three). Also projected onto the `flourishing` row as `channels`/`channel_entry_counts`. |
 | `raw_text` | string | Concatenated text of all fields (for Haiku enrichment) |
 | `notion_page_id` | string | Notion page UUID |
 | `notion_last_edited` | string | Notion last_edited_time ISO |

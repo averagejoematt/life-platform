@@ -54,6 +54,7 @@ def _query_journal(start_date, end_date, template=None):
             "health_event": "health",
             "health": "health",
             "video_diary": "video_diary",  # #1572 Diary-Studio transcript channel
+            "solo_recording": "solo_recording",  # #1573 local-Whisper solo transcript channel
         }
         sk_suffix = alias_map.get(template_lower, template_lower)
         items = [i for i in items if f"#journal#{sk_suffix}" in i.get("sk", "")]
@@ -167,8 +168,9 @@ def _get_mood_trend(args):
         theme_counts[t] = theme_counts.get(t, 0) + 1
     top_themes = sorted(theme_counts.items(), key=lambda x: -x[1])[:5]
 
-    # #1572: which capture channels appear across the window + a note when
-    # video-diary transcripts are mixed in (same enrichment pass codes both).
+    # #1572/#1573: which capture channels appear across the window + a note when
+    # transcript channels (video_diary / solo_recording) are mixed in (the same
+    # enrichment pass codes all of them).
     channels_present = sorted({c for d in trend for c in d.get("channels", [])})
 
     result = {
@@ -179,9 +181,12 @@ def _get_mood_trend(args):
         "date_range": f"{start} to {end}",
         "channels_present": channels_present,
     }
-    if "video_diary" in channels_present:
+    _TRANSCRIPT_CHANNEL_LABELS = {"video_diary": "video-diary", "solo_recording": "solo-recording"}
+    transcript_channels = [c for c in channels_present if c in _TRANSCRIPT_CHANNEL_LABELS]
+    if transcript_channels:
+        labels = ", ".join(_TRANSCRIPT_CHANNEL_LABELS[c] for c in transcript_channels)
         result["channel_note"] = (
-            "Includes video-diary transcript entries (channel=video_diary), coded by the "
+            f"Includes transcript entries ({labels}), coded by the "
             "same enrichment pass as typed journal. Per-day 'channels' lists what contributed."
         )
 

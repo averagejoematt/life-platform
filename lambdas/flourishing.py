@@ -24,29 +24,43 @@ from decimal import Decimal
 
 FLOURISHING_SOURCE = "flourishing"
 
-# ── Channel provenance (#1572) ────────────────────────────────────────────────
-# A journal entry's `channel` distinguishes a Video-Diary transcript from a typed
-# entry. The SAME enrichment pass codes both — the enriched_* signals are
-# identical regardless of how the prose was captured — so the channel is
-# provenance only: it never feeds character scoring math. It is stamped on the
-# notion entry at ingest (notion_lambda) and derived from the Template as a
-# fallback for pre-#1572 rows that predate the stamp.
+# ── Channel provenance (#1572, extended #1573) ────────────────────────────────
+# A journal entry's `channel` distinguishes HOW the prose was captured:
+#   - journal        typed entry (default)
+#   - video_diary    Diary-Studio transcript, Claude as live interviewer (#1572)
+#   - solo_recording locally-transcribed solo voice memo / video, no interviewer
+#                    (#1573 — transcribed on-device via Whisper, audio never leaves)
+# The SAME enrichment pass codes all three — the enriched_* signals are identical
+# regardless of capture channel — so the channel is provenance only: it never
+# feeds character scoring math. It is stamped on the notion entry at ingest
+# (notion_lambda) and derived from the Template as a fallback for rows that
+# predate the stamp.
 VIDEO_DIARY_TEMPLATE = "Video Diary"
+SOLO_RECORDING_TEMPLATE = "Solo Recording"
 CHANNEL_JOURNAL = "journal"
 CHANNEL_VIDEO_DIARY = "video_diary"
+CHANNEL_SOLO_RECORDING = "solo_recording"
+
+# Notion Template label → capture-channel provenance. Any template not listed
+# here is a typed journal entry (CHANNEL_JOURNAL).
+_TEMPLATE_CHANNEL = {
+    VIDEO_DIARY_TEMPLATE: CHANNEL_VIDEO_DIARY,
+    SOLO_RECORDING_TEMPLATE: CHANNEL_SOLO_RECORDING,
+}
 
 
 def entry_channel(entry):
     """Channel provenance for one journal entry.
 
-    Returns 'video_diary' for a Video Diary entry, else 'journal'. Prefers an
-    explicitly-stored `channel` attribute, falling back to the Template so rows
-    written before the #1572 stamp still classify correctly.
+    Returns the capture channel ('video_diary', 'solo_recording', else
+    'journal'). Prefers an explicitly-stored `channel` attribute, falling back to
+    the Template so rows written before the channel stamp still classify
+    correctly.
     """
     ch = entry.get("channel")
     if isinstance(ch, str) and ch.strip():
         return ch.strip()
-    return CHANNEL_VIDEO_DIARY if entry.get("template") == VIDEO_DIARY_TEMPLATE else CHANNEL_JOURNAL
+    return _TEMPLATE_CHANNEL.get(entry.get("template"), CHANNEL_JOURNAL)
 
 
 # Ordered rungs of the categorical social_quality — mirrors
