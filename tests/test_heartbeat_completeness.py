@@ -236,6 +236,14 @@ COVERAGE = {
     #     digest error alarm + DLQ digest — it is ABSENCE that is accepted here.
     #   * "operator email": the output IS an email to Matthew on a human rhythm;
     #     a missing issue is noticed by its reader, and error-mode is alarmed.
+    "life-platform-delete-user-data": (
+        EXEMPT,
+        "2026-07-25",
+        "#1350: the weekly subscriber-retention sweep is a slow-moving compliance job — a missed run purges eligible "
+        "unsubscribed emails one week later (no freshness/correctness impact), and a week with no eligible rows "
+        "legitimately writes nothing, so ABSENCE of output is a sanctioned state an absence alarm would false-fire on. "
+        "The lambda's primary role is on-demand user-data deletion; error-mode is covered by its digest error alarm.",
+    ),
     "activity-enrichment": (
         EXEMPT,
         "2026-07-19",

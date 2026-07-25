@@ -55,6 +55,7 @@ WRITE_VERBS = frozenset(
         "complete",
         "create",
         "curate",  # curate_horizon — writes the weekly Horizons pick (#1705)
+        "archive",  # archive_horizon — archives a pick + writes its retrospective (#1707)
         "delete",
         "end",
         "evaluate",
