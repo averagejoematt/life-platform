@@ -34,6 +34,10 @@ READING_PK = "READING#{book_id}"
 REC_PK = "READING#REC"
 PROFILE_PK = "READING#PROFILE"
 IDEA_PK = "READING#IDEA#{idea_id}"
+# Horizons (#1705): the weekly coach media pick lives in the reading rail (ADR-097)
+# — NOT a new partition/GSI. One item per ISO week under a single READING# pk,
+# begins_with-queryable and classified CROSS_PHASE by the READING# prefix rule.
+HORIZON_PK = "READING#HORIZON"
 
 SK_BOOK_META = "META"
 SK_READING_STATE = "STATE"
@@ -45,6 +49,7 @@ SK_NOTE_PREFIX = "NOTE#"
 SK_RECALL_PREFIX = "RECALL#"
 SK_REC_PREFIX = "REC#"
 SK_EDGE_PREFIX = "EDGE#"
+SK_HORIZON_PREFIX = "PICK#"  # + <iso-week> e.g. PICK#2026-W30
 
 # ── GSI attribute / value constants ───────────────────────────────────────────
 GSI1_PK_ATTR = "GSI1PK"
@@ -115,6 +120,13 @@ def rec_key(iso_ts: str) -> dict:
 
 def profile_key() -> dict:
     return {"pk": PROFILE_PK, "sk": SK_PROFILE}
+
+
+def horizon_key(week: str) -> dict:
+    """A Horizons weekly pick: one item per ISO week (e.g. '2026-W30'). ISO-week
+    strings (YYYY-Www, zero-padded) sort lexicographically == chronologically, so
+    a begins_with(PICK#) query descending yields newest-first."""
+    return {"pk": HORIZON_PK, "sk": f"{SK_HORIZON_PREFIX}{week}"}
 
 
 def idea_key(idea_id: str) -> dict:

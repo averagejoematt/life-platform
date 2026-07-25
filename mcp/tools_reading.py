@@ -19,6 +19,8 @@ from datetime import datetime, timezone
 
 from boto3.dynamodb.conditions import Key
 from reading import (
+    horizons_garden,
+    horizons_verify,
     reading_constellation,
     reading_enrich,
     reading_keys as rk,
@@ -228,6 +230,91 @@ def tool_get_constellation(args):
             "note": "The constellation begins with the first idea you keep.",
         }
     return {"ready": True, "nodes": graph["nodes"], "edges": graph["edges"], "node_count": graph["node_count"]}
+
+
+# ── HORIZONS: the weekly coach media pick (#1705, epic #1686 S1) ──────────────
+def _iso_week(d=None) -> str:
+    """ISO week label 'YYYY-Www' for a date (default: today, UTC)."""
+    d = d or datetime.now(timezone.utc).date()
+    year, week, _ = d.isocalendar()
+    return f"{year}-W{week:02d}"
+
+
+def tool_get_horizons(args):
+    """Horizons — the weekly coach-curated media pick that broadens horizons.
+    Returns the current pick + the past picks (newest first). Honest empty state
+    before the first pick is curated."""
+    args = args or {}
+    limit = int(args.get("limit", 26))
+    picks = reading_store.horizon_picks(limit=limit)
+    current = picks[0] if picks else None
+    if not current:
+        return {
+            "current": None,
+            "past": [],
+            "count": 0,
+            "note": "No Horizons pick yet — the Mind coach curates one weekly (curate_horizon).",
+            "as_of": _today(),
+        }
+    return {"current": current, "past": picks[1:], "count": len(picks), "as_of": _today()}
+
+
+def tool_curate_horizon(args=None):
+    """Author the week's Horizons pick (the Mind coach, curating broadly across
+    all pillars). Runs the link-verification gate (ADR-104: no fabricated links)
+    and stores the pick ONLY if the URL resolves to real content — fail-closed.
+
+    draft → dry_run → commit: verifies the link in BOTH modes so the coach sees
+    whether it resolves before committing; writes only on explicit dry_run=false.
+    An unverified link is REJECTED and never stored.
+    """
+    args = args or {}
+    url = (args.get("url") or "").strip()
+    title = (args.get("title") or "").strip()
+    fmt = (args.get("format") or "").strip().lower()
+    rationale_tag = (args.get("rationale_tag") or "").strip().lower()
+    pitch = (args.get("pitch") or "").strip()
+    source = (args.get("source") or "").strip()
+    week = (args.get("week") or "").strip() or _iso_week()
+
+    if not url or not title:
+        return mcp_error("curate_horizon requires url + title", error_code="MISSING_ARG")
+    if not horizons_garden.is_valid_format(fmt):
+        return mcp_error(f"format must be one of {list(horizons_garden.FORMATS)}", error_code="INVALID_ARG")
+    if not horizons_garden.is_valid_rationale(rationale_tag):
+        return mcp_error(f"rationale_tag must be one of {list(horizons_garden.RATIONALE_TAGS)}", error_code="INVALID_ARG")
+
+    # The load-bearing gate — fetch the URL and confirm real content (fail-closed).
+    verdict = horizons_verify.verify_url(url)
+
+    dry_run = args.get("dry_run", True)
+    if isinstance(dry_run, str):
+        dry_run = dry_run.strip().lower() not in ("false", "0", "no")
+
+    plan = {
+        "week": week,
+        "format": fmt,
+        "url": url,
+        "title": title,
+        "source": source or None,
+        "pitch": pitch or None,
+        "rationale_tag": rationale_tag,
+        "curator": horizons_garden.CURATOR,
+        "verification": verdict,
+    }
+
+    if not verdict.get("verified"):
+        # Rejected — never stored, in dry_run OR commit (ADR-104 fail-closed).
+        return mcp_error(
+            f"link did not verify — pick rejected (not stored): {verdict.get('reason')}",
+            error_code="LINK_UNVERIFIED",
+        )
+
+    if dry_run:
+        return _preview("curate_horizon", plan)
+
+    item = reading_store.put_horizon_pick(plan)
+    return {"status": "committed", "action": "curate_horizon", "pick": item}
 
 
 # ── WRITE FAT-TOOL (draft → dry_run → commit) ─────────────────────────────────

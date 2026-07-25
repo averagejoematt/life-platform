@@ -35,7 +35,7 @@ REGISTRY_PATH = os.path.join(MCP_DIR, "registry.py")
 
 # Expected tool count range — update when consolidating or adding tools
 EXPECTED_MIN_TOOLS = 50  # #395 ER-04 prune (2026-07-08): registry cut 143 -> 60 against 30d usage telemetry
-EXPECTED_MAX_TOOLS = 70  # #395: hold the pruned surface — deliberate additions bump this consciously, not by drift
+EXPECTED_MAX_TOOLS = 72  # #395 held 70; +2 for Horizons get_horizons/curate_horizon (#1705) — a deliberate addition
 
 
 def _read(path):
