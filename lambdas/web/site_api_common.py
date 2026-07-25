@@ -104,7 +104,7 @@ CORS_HEADERS = {
 # hand-maintained.
 PLATFORM_STATS = {
     "data_sources": 20,
-    "mcp_tools": 69,
+    "mcp_tools": 71,
     "lambdas": 97,
     "cdk_stacks": 8,
     "alarms": 78,
@@ -121,7 +121,7 @@ PLATFORM_STATS = {
     "review_grade": "A",
     "active_secrets": 21,
     "site_pages": 77,
-    "test_count": 5295,
+    "test_count": 5314,
     "board_technical": 12,
     "board_product": 8,
     "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,
