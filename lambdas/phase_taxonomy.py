@@ -184,6 +184,13 @@ SOURCE_CLASS: dict[str, str] = {
     # error, not a property of the current experiment run — wiping it at reset would destroy the
     # exact feedback the prompt-memory/gate/pattern-extraction downstream stages (#1690/#1691/S5/S6)
     # need to keep the same class of error from recurring across cycles.
+    # #1384 (epic #1080): the semantic-recall embedding index (Titan-v2 vectors over
+    # chronicle/coach/journal docs, one item per doc). CROSS_PHASE is LOAD-BEARING for
+    # the feature: cross-reset recall is the entire point ("when did I feel like this
+    # before?"), so the index must survive resets and stay visible to a raw Query (no
+    # phase filter). Each item carries its own `cycle` stamp, so a precedent from cycle
+    # N is still labeled cycle N in cycle N+1 — the archive stays navigable, not wiped.
+    "recall_embeddings": CROSS_PHASE,
     "eyeball_estimate": CROSS_PHASE,  # #1390 (epic #1080): meal-photo Haiku macro ESTIMATES + their
     # grades against MacroFactor truth (`lambdas/eyeball_calibration.py`, pk
     # USER#matthew#SOURCE#eyeball_estimate / sk ESTIMATE#|GRADE#<date>#<id8>). Same rationale as

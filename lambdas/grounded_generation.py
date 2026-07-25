@@ -888,6 +888,11 @@ def correction_prompt(findings: list) -> str:
                 f"{i}. {f['detail']}. Remove the claim or hedge it (\"if you kept your window today\"), or cite the "
                 f"actual log — never assert a completed behavior with no record behind it."
             )
+        elif f.get("type") == "unresolvable_precedent":
+            lines.append(
+                f"{i}. {f['detail']}. Cite ONLY a precedent date that was provided to you (with its link + similarity), "
+                f"or drop the precedent entirely — never invent one the archive can't back."
+            )
         else:
             lines.append(f"{i}. {f['detail']}. Remove it or describe the pattern qualitatively — never invent a figure.")
     lines.append("\nRewrite with these corrected. Keep your voice and length; do not mention that a correction was made.")

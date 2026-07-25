@@ -49,11 +49,13 @@ def _bedrock_statement() -> iam.PolicyStatement:
 
     Migration from direct Anthropic API → Bedrock. Granted to every AI-calling
     role (anywhere ai-keys was previously granted). Scoped to Anthropic Claude
-    only — both the cross-region inference profiles (`us.anthropic.claude-*`,
+    inference — both the cross-region inference profiles (`us.anthropic.claude-*`,
     which on-demand 4.x models require) AND the underlying foundation-model
-    ARNs the profiles fan out to (InvokeModel is authorized against both).
-    Region wildcard because the us. profile routes across us-east-1/us-east-2/
-    us-west-2.
+    ARNs the profiles fan out to (InvokeModel is authorized against both) — plus
+    Amazon Titan-v2 text embeddings (#1384, semantic recall): a bare
+    foundation-model id (no inference profile), routed through the same
+    bedrock_client chokepoint (ADR-062). Region wildcard because the us. profile
+    routes across us-east-1/us-east-2/us-west-2.
     """
     return iam.PolicyStatement(
         sid="BedrockInvoke",
@@ -61,6 +63,8 @@ def _bedrock_statement() -> iam.PolicyStatement:
         resources=[
             f"arn:aws:bedrock:*:{ACCT}:inference-profile/us.anthropic.claude-*",
             "arn:aws:bedrock:*::foundation-model/anthropic.claude-*",
+            # #1384: Titan-v2 embeddings for semantic recall (bedrock_client.embed_text).
+            "arn:aws:bedrock:*::foundation-model/amazon.titan-embed-text-v2:0",
         ],
     )
 

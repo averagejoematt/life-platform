@@ -1483,6 +1483,44 @@ def _coach_corrections_block(coach_id, *, surface="coach_brief", table=None):
         return ""
 
 
+def _semantic_recall_for_coach(coach_id, query_text, *, table=None, exclude_dates=None):
+    """#1384 (epic #1080): semantic recall — retrieve the earlier periods whose signal
+    RESEMBLES the current one (Titan-v2 embeddings + cosine over Matthew's own
+    cross-cycle archive) and return (block_text, resolved_precedents).
+
+    - Only precedents that RESOLVE to a real record are returned (AC2) — an
+      unresolvable one is dropped before it can be cited, and the resolved dates
+      also feed the coach's grounding allow-list so an invented precedent is blocked.
+    - Budget-gated (band 2, ADR-125) + fully fail-soft: budget pause, no module, no
+      corpus, no embedding, or any error → ("", []) so the coach reads exactly as it
+      did before recall existed. Adds no behavior on the hot path when it can't run.
+    """
+    try:
+        if not (query_text or "").strip():
+            return "", []
+        try:
+            from budget_guard import allow as _budget_allow
+
+            if not _budget_allow("semantic_recall"):
+                return "", []
+        except ImportError:
+            pass
+        import bedrock_client as _bc
+        import semantic_recall as _sr
+
+        if table is None:
+            table = boto3.resource("dynamodb", region_name="us-west-2").Table(os.environ.get("TABLE_NAME", "life-platform"))
+        query_vec = _bc.embed_text(query_text)
+        precedents = _sr.retrieve(table, query_vec, exclude_dates=exclude_dates, resolve=True)
+        block = _sr.recall_block(precedents)
+        if precedents:
+            print(f"[COACH-V2:{coach_id}] semantic recall: {len(precedents)} resolved precedent(s)")
+        return block, precedents
+    except Exception as _sr_e:  # noqa: BLE001 — semantic recall is never load-bearing
+        print(f"[COACH-V2:{coach_id}] semantic recall unavailable (non-blocking): {_sr_e}")
+        return "", []
+
+
 def _available_logs_for_today(data, brief, generation_date_iso):
     """#1699: best-effort presence map of which BEHAVIOR categories have a log for the
     generation date, derived ONLY from data already loaded for this render (zero new
@@ -1618,6 +1656,11 @@ def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
         except Exception as _pm_e:
             print(f"[COACH-V2:{coach_id}] platform memory unavailable (non-blocking): {_pm_e}")
 
+        # #1384: semantic-recall precedents — populated after the facts block below
+        # (it is the query text). Defaults keep the render unchanged if recall no-ops.
+        _recall_block = ""
+        _recall_precedents = []
+
         # ADR-104: canonical facts — this render previously injected only the
         # hard-coded goals, so coaches had no authoritative vitals to cite and
         # nothing gated what they invented. Fail-soft: without the helpers the
@@ -1678,6 +1721,20 @@ def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
         except Exception as _gf_e:
             print(f"[COACH-V2:{coach_id}] canonical facts unavailable (non-blocking): {_gf_e}")
 
+        # #1384: retrieve precedents whose signal resembles the CURRENT state. The
+        # query is the authoritative facts + journal-mood text (the coach's own
+        # current-state summary); exclude today's date so a period never matches
+        # itself. Fail-soft — ("", []) leaves the render identical to pre-recall.
+        try:
+            _recall_query = "\n".join(s for s in (_facts_block, _journal_mood_block) if s).strip()
+            _recall_gen_date = (brief.get("generation_date") if isinstance(brief, dict) else None) or _date_cls.today().isoformat()
+            _recall_block, _recall_precedents = _semantic_recall_for_coach(
+                coach_id, _recall_query, exclude_dates={_recall_gen_date} if _recall_gen_date else None
+            )
+        except Exception as _sr_e:
+            print(f"[COACH-V2:{coach_id}] semantic recall wiring failed (non-blocking): {_sr_e}")
+            _recall_block, _recall_precedents = "", []
+
         system_prompt = f"""You are {voice_spec['display_name']}, {voice_spec.get('domain', '')} specialist.
 
 VOICE RULES:
@@ -1725,7 +1782,7 @@ ENGAGEMENT / PRESENCE: If the generation brief includes `engagement_signal`, Mat
 - If `returned` is true, he's BACK after `resumed_after_days` days. Acknowledge the return warmly, note any real `weight_delta_over_gap_lbs` plainly (regain is data, not a verdict), and be SUPPORTIVE about re-engaging — never punitive. The point is to help him restart, not to shame the lapse.
 - An absent SAME-DAY log is by-design lag (manual sources arrive end-of-day), never a gap — the signal already accounts for this, so trust `gap_days`.
 - If `severity` is "alarm": this is the single most important fact about this period. Address it in the opening paragraph. Do not narrate a normal week. (At "loud", the gap must be clearly acknowledged in your section; a draft that reads like a normal week will be regenerated or held.)
-{_journal_mood_block}{_memory_block}
+{_journal_mood_block}{_memory_block}{(chr(10) + chr(10) + _recall_block) if _recall_block else ""}
 
 DATA INTERPRETATION RULES:
 - If an activity count or log is ZERO, that means Matthew hasn't done that activity — say "no training logged this week" NOT "provide your training data"
@@ -1866,8 +1923,22 @@ Write your {domain_label} coaching section now."""
                 # license a parroted number as grounded.
                 _allowed = _gg_mod.allowed_numbers(_allowlist_prompt(system_prompt, few_shot_block), user_message)
 
+                # #1384 (AC2): a coach may cite a precedent ONLY if it resolves to a
+                # real record. precedent_citation_findings is framing-scoped (it flags a
+                # precedent-FRAMED date — "resembles the week of 2026-04-06" — that isn't
+                # among the resolved precedents), so it blocks a phantom precedent via
+                # regen_once WITHOUT false-flagging ordinary data dates the way a blanket
+                # allowed_dates gate would. Additive, never load-bearing.
+                try:
+                    import semantic_recall as _sr_mod
+                except Exception:  # noqa: BLE001
+                    _sr_mod = None
+
                 def _findings_fn(_t):
-                    return _gg_mod.grounding_findings(_t, facts=_canon_facts or None, allowed=_allowed)
+                    _f = _gg_mod.grounding_findings(_t, facts=_canon_facts or None, allowed=_allowed)
+                    if _sr_mod is not None:
+                        _f = _f + _sr_mod.precedent_citation_findings(_t, _recall_precedents)
+                    return _f
 
                 _pre = _findings_fn(output)
                 if _pre:

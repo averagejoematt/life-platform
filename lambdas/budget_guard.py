@@ -119,6 +119,15 @@ _FEATURE_CUTOFF = {
     # podcast's only input). Kept at 2 in lockstep with the Panel lambda's own
     # SKIP_TIER=2. Weekly Bedrock cost is ~$1 — negligible vs the ceiling.
     "chronicle": 2,
+    # semantic_recall (#1384): the "when did I feel like this before?" precedent
+    # retrieval — Titan-v2 embeddings + cosine. A reader-narrative ENHANCEMENT (the
+    # coach precedent line + chronicle recall card), so it pauses in band 2 with the
+    # rest of the reader narrative: when the reader narratives it decorates are
+    # themselves paused, spending on precedents for them is pointless. Titan is
+    # ~$0.02/1M tokens so the cost is negligible; the band placement is about
+    # audience order, not dollars. A paused call ⇒ no precedent block/card (the
+    # coach reads exactly as it did before recall existed).
+    "semantic_recall": 2,
     # ── Band 3: the two IRREDUCIBLE reader promises — pause LAST (ADR-100/125).
     #
     # website_ai: the PUBLIC /api/ask + /api/board_ask hook — the platform's most
