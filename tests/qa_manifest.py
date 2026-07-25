@@ -429,6 +429,39 @@ _CURATED = [
             ]
         },
     },
+    {
+        # #1390: the tone dial — three coach registers + their prompts published verbatim
+        # (GENERATED — scripts/v4_build_tone.py from lambdas/coach_register.py).
+        "path": "/method/tone/",
+        "name": "Method · the tone dial",
+        "tier": 3,
+        "content_class": "generated",
+        "api_deps": [],
+        "js_modules": [],
+        "visual": {
+            "checks": [
+                {"selector": "main, article", "not_empty": True, "desc": "tone dial content"},
+                {"selector": ".td-card", "min_count": 3, "desc": "three register cards rendered"},
+            ]
+        },
+    },
+    {
+        # #1390: the eyeball-calibration reliability chart (GENERATED — scripts/v4_build_eyeball.py).
+        # Reads a STATIC generated artifact (/data/eyeball_calibration.json), NOT a site-api /api
+        # endpoint — so it has no api_deps and no autodeploy race. Honest zero-state at n=0.
+        "path": "/method/eyeball/",
+        "name": "Method · how wrong is the AI at eyeballing food",
+        "tier": 3,
+        "content_class": "generated",
+        "api_deps": [],
+        "js_modules": [],
+        "visual": {
+            "wait_for": "[data-readout]",
+            "checks": [
+                {"selector": "[data-readout]", "not_empty": True, "desc": "eyeball reliability readout rendered (empty/low-n/reported)"},
+            ],
+        },
+    },
     # ── Coaching door (promoted 2026-06-20) ──────────────────────────────────
     {
         "path": "/coaching/",

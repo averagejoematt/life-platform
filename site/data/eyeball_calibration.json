@@ -1,0 +1,38 @@
+{
+  "as_of": "2026-07-24",
+  "disclaimer": "These are the AI's meal-photo macro ESTIMATES graded against the day's logged MacroFactor truth. Estimates are never entered as nutrition data \u2014 they exist only to be graded here (ADR-105).",
+  "macros": {
+    "calories": {
+      "bias_pct": null,
+      "mape_pct": null,
+      "median_abs_pct": null,
+      "n": 0,
+      "sufficient": false
+    },
+    "carbs_g": {
+      "bias_pct": null,
+      "mape_pct": null,
+      "median_abs_pct": null,
+      "n": 0,
+      "sufficient": false
+    },
+    "fat_g": {
+      "bias_pct": null,
+      "mape_pct": null,
+      "median_abs_pct": null,
+      "n": 0,
+      "sufficient": false
+    },
+    "protein_g": {
+      "bias_pct": null,
+      "mape_pct": null,
+      "median_abs_pct": null,
+      "n": 0,
+      "sufficient": false
+    }
+  },
+  "min_n": 5,
+  "n_days": 0,
+  "source": "eyeball_estimate",
+  "state": "empty"
+}

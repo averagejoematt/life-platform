@@ -184,6 +184,13 @@ SOURCE_CLASS: dict[str, str] = {
     # error, not a property of the current experiment run — wiping it at reset would destroy the
     # exact feedback the prompt-memory/gate/pattern-extraction downstream stages (#1690/#1691/S5/S6)
     # need to keep the same class of error from recurring across cycles.
+    "eyeball_estimate": CROSS_PHASE,  # #1390 (epic #1080): meal-photo Haiku macro ESTIMATES + their
+    # grades against MacroFactor truth (`lambdas/eyeball_calibration.py`, pk
+    # USER#matthew#SOURCE#eyeball_estimate / sk ESTIMATE#|GRADE#<date>#<id8>). Same rationale as
+    # "calibration"/"coach_corrections": the reliability record measures the MODEL's eyeballing
+    # accuracy across the whole cross-cycle history, not a property of the current run — wiping it
+    # at reset would discard the accumulating error distribution the public chart is built on.
+    # (These are graded probes, NEVER nutrition data — see the isolation guard in that module.)
     # — EXPERIMENT_SCOPED: derived intelligence/progress (tag + wipe + cycle-stamp) —
     "character_sheet": EXPERIMENT_SCOPED,  # RPG-style derived scores; wiped "all" + rebuilt
     "character_receipt": EXPERIMENT_SCOPED,  # #1373: audit-grade progression receipts — one per
