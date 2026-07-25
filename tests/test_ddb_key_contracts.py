@@ -77,6 +77,11 @@ KNOWN_OPTIONAL: dict[tuple, str] = {
         "EXPERT#integrator_month",
     ): "#1115 the integrator's month rollup — written by ai-expert-analyzer's weekly pass once >=2 weekly lab "
     "notes exist (honest-skip before then); handle_month_rollup serves the designed null until it lands",
+    (
+        "VOTES#ladder_replicator",
+        "COUNT",
+    ): "#1393 the engagement-ladder Replication-Kit completions aggregate — seeded on the first self-certified "
+    "completion; _ladder_replicator_count tolerates absence (returns 0 for a missing item / empty cert_count)",
 }
 
 # Module-level constant values used to resolve f-strings statically.
