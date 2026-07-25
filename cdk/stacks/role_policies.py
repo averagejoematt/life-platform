@@ -1574,11 +1574,17 @@ def operational_freshness_checker() -> list[iam.PolicyStatement]:
             # (Phase 2.6) but the role only granted the 4 OAuth secrets → every run
             # AccessDenied'd on the manual ones (swallowed), so the "catch the next
             # dead OAuth integration" safeguard could never fire. Added the manual set.
-            # Dropped strava (paused 2026-05-28) and dropbox (secret soft-deleted).
+            # Dropped dropbox (secret soft-deleted).
+            # 2026-07-25 (#1330): re-added strava — it was RE-ENABLED in the checker's
+            # OAUTH_SECRETS on 2026-06-20 but the grant was never restored, so the
+            # DescribeSecret call AccessDenied'd every day for ~4 weeks (the identical
+            # incident class this comment documents). tests/test_freshness_checker_iam_parity.py
+            # now asserts the monitored set ⊆ this grant so it can't drift silently again.
             actions=["secretsmanager:DescribeSecret"],
             resources=[
                 _secret_arn("life-platform/whoop"),
                 _secret_arn("life-platform/withings"),
+                _secret_arn("life-platform/strava"),
                 _secret_arn("life-platform/garmin"),
                 _secret_arn("life-platform/ai-keys"),
                 _secret_arn("life-platform/site-api-ai-key"),
