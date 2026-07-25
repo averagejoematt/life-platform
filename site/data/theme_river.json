@@ -1,0 +1,31 @@
+{
+  "bands": [],
+  "n_days": 0,
+  "n_entries": 0,
+  "n_themes": 0,
+  "provenance": {
+    "field": "enriched_themes",
+    "model": "claude-haiku-4-5-20251001",
+    "schema_version": 2,
+    "source": "journal_enrichment"
+  },
+  "rising_theme": null,
+  "schema": "theme_river/1",
+  "state": "empty",
+  "warming_up_min_days": 14,
+  "weeks": [
+    {
+      "counts": {},
+      "end": "2026-07-25",
+      "n_days": 0,
+      "n_entries": 0,
+      "start": "2026-07-22",
+      "week": 0
+    }
+  ],
+  "window": {
+    "end": "2026-07-25",
+    "start": "2026-07-22",
+    "weeks": 1
+  }
+}

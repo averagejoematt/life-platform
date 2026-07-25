@@ -378,6 +378,25 @@ _CURATED = [
         "visual": {"checks": [{"selector": "main, [data-readout], article", "not_empty": True, "desc": "broadcast content"}]},
     },
     {
+        # #1381 (epic #1364): the Theme River — evolving journal-enrichment themes across
+        # the attempt, rendered as monochrome small-multiples. GENERATED —
+        # scripts/v4_build_theme_river.py bakes the HTML + reads a STATIC artifact
+        # (/data/theme_river.json), NOT a site-api /api endpoint — so NO api_deps and NO
+        # autodeploy race. Honest empty/warming-up at low n (currently n=0 at genesis+days).
+        "path": "/story/theme-river/",
+        "name": "Story · the theme river (#1381)",
+        "tier": 3,
+        "content_class": "generated",
+        "api_deps": [],
+        "js_modules": [],
+        "visual": {
+            "wait_for": "[data-readout]",
+            "checks": [
+                {"selector": "[data-readout]", "not_empty": True, "desc": "theme river readout rendered (empty/warming-up/flowing)"},
+            ],
+        },
+    },
+    {
         "path": "/data/",
         "name": "Data hub",
         "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
