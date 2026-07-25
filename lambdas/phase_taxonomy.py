@@ -117,6 +117,12 @@ SOURCE_CLASS: dict[str, str] = {
     "habit_causality": RAW_TIMESERIES,  # #422: user-authored why/trigger/reward per habit-day — a logged fact, kept forever
     "private_intake": RAW_TIMESERIES,  # #1405: Matthew-private evening intake count — logged fact, cross-cycle physiology, NEVER public-served
     "felt_probe": RAW_TIMESERIES,  # #1409: weekly felt-reality probe (Sunday one-tap, 0-4×3) — self-report fact; calibration reads it cycle-stamped
+    "time_affluence": RAW_TIMESERIES,  # #1408: Time-Affluence Meter — weekly 1-item probe (DATE# rows, a
+    # logged self-report fact, the durable spine) PLUS idempotently-recomputable derived rows (PROXY#/EDGE#
+    # written weekly by the hypothesis engine). Classed with its probe like felt_probe/macrofactor_meals: the
+    # derived rows recompute from scratch each Sunday, so keeping them across a reset costs nothing and they
+    # stay date-stamped/navigable. NB: pk carries non-DATE# suffixes (PROXY#<sunday>, EDGE#<sunday>) —
+    # _source_of() resolves them all to this entry.
     "flourishing": RAW_TIMESERIES,  # #1403: daily PERMA projection over journal enrichment (flourishing.py) — fact layer, follows the notion parent
     "todoist": RAW_TIMESERIES,
     "weather": RAW_TIMESERIES,

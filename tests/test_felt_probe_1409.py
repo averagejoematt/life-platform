@@ -70,12 +70,16 @@ def test_nudge_probe_absent_on_a_weekday(monkeypatch):
 
 def test_nudge_probe_asks_all_three_on_a_dark_sunday(monkeypatch):
     nudge = _nudge(monkeypatch, {})
-    assert nudge._missing_felt_probe("2026-07-19") == ["felt_connection", "felt_rest", "felt_vitality"]
+    # #1408: the Time-Affluence probe (felt_time, its own partition) joins the
+    # Sunday set, so a dark Sunday now surfaces all four weekly taps.
+    assert nudge._missing_felt_probe("2026-07-19") == ["felt_connection", "felt_rest", "felt_time", "felt_vitality"]
 
 
 def test_nudge_probe_reprompts_only_whats_missing(monkeypatch):
+    # felt_probe has rest+vitality logged; felt_connection (felt_probe) and
+    # felt_time (time_affluence, absent) remain open. #1408.
     nudge = _nudge(monkeypatch, {"felt_probe": {"felt_rest": 3, "felt_vitality": 2}})
-    assert nudge._missing_felt_probe("2026-07-19") == ["felt_connection"]
+    assert nudge._missing_felt_probe("2026-07-19") == ["felt_connection", "felt_time"]
 
 
 def test_nudge_has_labels_and_titles_for_every_probe_metric():

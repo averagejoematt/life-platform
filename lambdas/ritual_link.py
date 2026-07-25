@@ -30,6 +30,11 @@ RITUAL_METRICS = (
     "felt_vitality",
     "felt_rest",
     "felt_connection",
+    # #1408: the weekly 1-item Time-Affluence probe (Sunday nudge only). Single
+    # 0-4 ordinal "this week: how much time did your week feel like your own?";
+    # lands in SOURCE#time_affluence (its own partition, never evening_ritual),
+    # feeding the deterministic proxy + the weekly hypothesis-engine edge test.
+    "felt_time",
 )
 RITUAL_VALUE_MIN = 0
 RITUAL_VALUE_MAX = 4
@@ -50,6 +55,17 @@ PRIVATE_INTAKE_SOURCE = "private_intake"  # DDB: USER#matthew#SOURCE#private_int
 # following the ADR-124 C-floor posture.
 WEEKLY_PROBE_METRICS = frozenset({"felt_vitality", "felt_rest", "felt_connection"})
 FELT_PROBE_SOURCE = "felt_probe"  # DDB: USER#matthew#SOURCE#felt_probe / DATE#YYYY-MM-DD (the Sunday)
+
+# #1408: the weekly Time-Affluence probe — same Sunday one-tap cadence as the felt
+# probe, but routed to its OWN partition (the Time-Affluence proxy + edge test read
+# exactly one probe per week and must not mix into the felt-reality calibration).
+# A skipped week is a coverage gap in the proxy, never a 0 (ADR-104). Item value is
+# Matthew-level self-report but NOT sensitive (no private-intake handling).
+TIME_AFFLUENCE_PROBE_METRICS = frozenset({"felt_time"})
+TIME_AFFLUENCE_SOURCE = "time_affluence"  # DDB: USER#matthew#SOURCE#time_affluence / DATE#YYYY-MM-DD (the Sunday)
+
+# All metrics asked on the Sunday weekly-probe nudge, across partitions.
+ALL_WEEKLY_PROBE_METRICS = WEEKLY_PROBE_METRICS | TIME_AFFLUENCE_PROBE_METRICS
 
 # Probe item → character pillar it calibrates (character_engine pillar names).
 # The four unmapped pillars render an honest "unprobed" state on the card.

@@ -1203,6 +1203,62 @@ def refit_cross_pillar_effects(force=False):
         return {"ran": False, "reason": f"error: {e}"}
 
 
+def run_time_affluence_weekly(force=False):
+    """#1408 Time-Affluence Meter — deterministic weekly proxy + lagged edge test,
+    piggybacked on this weekly cron (mirrors refit_cross_pillar_effects). Reads
+    existing partitions only (no new ingestion, ADR-030 calendar re-integration
+    stays out of scope), computes the standardised weekly proxy over a rolling
+    window, tests edge-week affluence -> next-week adherence with n_eff + BH-FDR
+    (stats_core, no LLM — ADR-105), and persists PROXY#/EDGE# rows. Absence is
+    coverage-flagged, never zeroed (ADR-104). Never fatal to the hypothesis run."""
+    import time_affluence as ta
+
+    try:
+        end = datetime.now(timezone.utc).date()
+        start = (end - timedelta(weeks=ta.PROXY_WINDOW_WEEKS + 1)).isoformat()
+        end_s = end.isoformat()
+        computed_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+
+        todoist_rows = query_range("todoist", start, end_s)
+        ritual_rows = query_range("evening_ritual", start, end_s)
+        probe_rows = query_range(ta.TIME_AFFLUENCE_SOURCE, start, end_s)
+        habit_rows = query_range("habitify", start, end_s)
+
+        proxy_weeks = ta.compute_weekly_proxies(todoist_rows, ritual_rows, probe_rows)
+        if not proxy_weeks:
+            return {"ran": False, "reason": "no_weeks"}
+
+        adherence = ta.weekly_adherence(habit_rows)
+        edge = ta.test_edge(proxy_weeks, adherence)
+
+        # Persist every week's proxy (idempotent PUT per Sunday) + the latest edge.
+        scored = 0
+        for wk in proxy_weeks:
+            item = floats_to_decimal(ta.build_proxy_item(wk, USER_ID, computed_at))
+            table.put_item(Item=item)
+            if wk.get("score") is not None:
+                scored += 1
+        latest_week = proxy_weeks[-1]["week"]
+        table.put_item(Item=floats_to_decimal(ta.build_edge_item(edge, latest_week, USER_ID, computed_at)))
+
+        hypothesis_lag = next((r for r in edge["lags"] if r["lag_weeks"] == 1), {})
+        logger.info(
+            f"[#1408] Time-Affluence proxy: {scored}/{len(proxy_weeks)} weeks scored; "
+            f"edge next-week adherence r={hypothesis_lag.get('r')} n_eff={hypothesis_lag.get('n_eff')} "
+            f"p_fdr={hypothesis_lag.get('p_fdr')} verdict={hypothesis_lag.get('verdict')}"
+        )
+        return {
+            "ran": True,
+            "weeks": len(proxy_weeks),
+            "weeks_scored": scored,
+            "latest_week": latest_week,
+            "edge_next_week": {k: hypothesis_lag.get(k) for k in ("r", "n", "n_eff", "p_fdr", "verdict")},
+        }
+    except Exception as e:
+        logger.warning(f"[#1408] Time-Affluence weekly run failed (non-fatal): {e}")
+        return {"ran": False, "reason": f"error: {e}"}
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # MAIN HANDLER
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1315,6 +1371,11 @@ def lambda_handler(event, context):
         # event {"force_effect_refit": true} forces one for testing/backfill)
         effect_refit = refit_cross_pillar_effects(force=bool(event.get("force_effect_refit")))
 
+        # 7. #1408: Time-Affluence Meter — deterministic weekly proxy + the
+        # lagged edge (edge-week affluence -> next-week adherence), piggybacked
+        # on this weekly cron. stats_core only, no LLM (ADR-105). Never fatal.
+        time_affluence = run_time_affluence_weekly()
+
         summary = {
             "new_hypotheses": new_hypotheses_stored,
             "validation_rejected": validation_rejected,
@@ -1326,6 +1387,7 @@ def lambda_handler(event, context):
             "data_complete_days": complete_days,
             "data_sufficient": is_sufficient,
             "effect_refit": effect_refit,  # #1411 quarterly fit outcome
+            "time_affluence": time_affluence,  # #1408 weekly proxy + edge outcome
         }
         logger.info(f"Complete: {summary}")
         return {"statusCode": 200, "body": json.dumps(summary)}
