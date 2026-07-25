@@ -77,6 +77,7 @@ EXPECTED_ROUTE_MAP = {
     "/api/experiment_synthesis": "handle_experiment_synthesis",
     "/api/experiment_vote": "_handle_experiment_vote",
     "/api/experiments": "handle_experiments",
+    "/api/decisions": "handle_decisions",
     "/api/field_notes": "handle_field_notes",
     "/api/food_delivery_overview": "handle_food_delivery_overview",
     "/api/forecast": "handle_forecast",

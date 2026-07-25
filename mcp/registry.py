@@ -864,6 +864,14 @@ TOOLS = {
                             "promoted from — why_now then auto-derives from it (with the measured effect + CI)."
                         ),
                     },
+                    "matthew_note": {
+                        "type": "string",
+                        "description": (
+                            "#1569: OPTIONAL verbatim note in Matthew's own words — 'why I said yes to this one' "
+                            "(max 500 chars). Rendered PUBLICLY on the experiment card, voice-tagged human, beside "
+                            "the machine's read (the widened Third Wall). Opt-in; omit and the card shows nothing."
+                        ),
+                    },
                     "design": {
                         "type": "object",
                         "description": (
@@ -1036,6 +1044,14 @@ TOOLS = {
                     },
                     "compliance_pct": {"type": "integer", "description": "0-100, percentage of days the intervention was performed."},
                     "reflection": {"type": "string", "description": "What I'd do differently next time."},
+                    "matthew_note": {
+                        "type": "string",
+                        "description": (
+                            "#1569: OPTIONAL verbatim note in Matthew's own words at review time — 'here's how it "
+                            "actually went, in his words' (max 500 chars). Public on the experiment card, voice-tagged "
+                            "human. Opt-in; omit to leave any existing note untouched."
+                        ),
+                    },
                 },
                 "required": ["experiment_id"],
             },
@@ -1346,6 +1362,15 @@ TOOLS = {
                         "description": "True if Matthew followed the advice, False if overridden. Omit if not yet decided.",
                     },
                     "override_reason": {"type": "string", "description": "Why Matthew chose differently (if overridden). Optional."},
+                    "note": {
+                        "type": "string",
+                        "description": (
+                            "#1569: OPTIONAL verbatim note in Matthew's own words — 'his call, in his words' "
+                            "(max 500 chars). This is what makes the decision PUBLISHABLE: only decisions carrying "
+                            "a note render on the site (lab-notes / experiment archive), voice-tagged human, dated. "
+                            "Opt-in; omit and the decision stays private (renders nothing)."
+                        ),
+                    },
                     "source": {
                         "type": "string",
                         "description": "Which digest/email made the recommendation. Default: daily_brief.",

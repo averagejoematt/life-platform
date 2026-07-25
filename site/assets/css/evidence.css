@@ -822,6 +822,17 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .pr-row .label { color: var(--ink-faint); }
 /* The completed-run reflection — the second (human) voice. */
 .rd-reflect { margin-top: var(--sp-2); font-family: var(--font-serif); font-style: italic; font-size: var(--fs-body); color: var(--ink-muted); line-height: 1.5; }
+/* #1569 — the widened Third Wall on the protocols/experiments surface: the same
+   two-voice component the lab-notes field note uses (voice / who / what), styled
+   here for the rd-card context (story.css's .voice scope isn't loaded on this page).
+   The machine voice is the platform's read; the human voice is Matthew's verbatim
+   note, set off with the honest border + ember wash and the human (serif) font. */
+.rd-card .voice { display: grid; gap: var(--sp-1); margin-top: var(--sp-3); }
+.rd-card .voice .who { font-family: var(--voice-who-font); font-size: var(--voice-who-size); letter-spacing: var(--voice-who-tracking); text-transform: uppercase; color: var(--ink-faint); }
+.rd-card .voice.machine .what { font-family: var(--voice-machine-font); font-size: var(--fs-body); line-height: 1.55; color: var(--ink); margin: 0; }
+.rd-card .voice.human.his-words { border: 1px solid var(--ember-line); border-radius: var(--radius-sm); background: var(--ember-wash); padding: var(--sp-3) var(--sp-4); }
+.rd-card .voice.human .what { font-family: var(--voice-human-font); font-style: italic; font-size: var(--fs-quote); line-height: 1.45; color: var(--ink); margin: 0; }
+.his-words-date { margin: var(--sp-1) 0 0; color: var(--ink-muted); }
 /* The challenge check-in grid — one cell per day of the run. */
 .cg { display: flex; flex-wrap: wrap; gap: 3px; margin-top: var(--sp-2); }
 .cg-cell { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--rule); display: inline-block; }
