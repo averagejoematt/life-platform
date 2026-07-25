@@ -2,8 +2,14 @@
 """
 Notion Journal → DynamoDB ingestion Lambda.
 
-Pulls journal entries from a single Notion database with 5 template types:
-Morning, Evening, Stressor, Health Event, Weekly Reflection.
+Pulls journal entries from a single Notion database with 6 template types:
+Morning, Evening, Stressor, Health Event, Weekly Reflection, Video Diary.
+
+Video Diary (#1572): a Diary-Studio transcript enters as an ordinary Notion
+journal page (Template = "Video Diary") so it flows the EXISTING enrichment →
+flourishing → character → hypothesis pipeline — no second pipeline (epic #1564).
+Each entry is stamped channel="video_diary" (typed entries are channel="journal")
+so every downstream consumer can analyse the signal by capture channel.
 
 DynamoDB schema:
   pk: USER#matthew#SOURCE#notion
@@ -115,11 +121,14 @@ TEMPLATE_SK = {
     "Weekly Reflection": "weekly",
     "Stressor": "stressor",  # numbered: stressor#1, stressor#2
     "Health Event": "health",  # numbered: health#1, health#2
+    "Video Diary": "video_diary",  # #1572: Diary-Studio transcript; multiple per day
     "journal": "journal",  # fallback for unstructured entries without Template property
 }
 
-# Templates that allow multiple entries per day
-MULTI_PER_DAY = {"Stressor", "Health Event", "journal"}
+# Templates that allow multiple entries per day. Video Diary joins these (#1572):
+# a day can hold several recording sessions, and the stable per-page SK suffix
+# dedups them idempotently (no positional renumbering).
+MULTI_PER_DAY = {"Stressor", "Health Event", "Video Diary", "journal"}
 
 # ── AWS clients ───────────────────────────────────────────────────────────────
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")  # #476/X-7 raw archive
@@ -503,6 +512,17 @@ def parse_page(page, api_key=None):
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "notion_last_edited": page.get("last_edited_time", ""),
     }
+
+    # #1572: channel provenance — a Video Diary transcript vs a typed entry. The
+    # same enrichment pass codes both, so this is provenance metadata only (it
+    # never feeds character scoring). Single source of truth in flourishing.py,
+    # with an inline fallback if the shared module isn't on the bundle path.
+    try:
+        from flourishing import entry_channel
+
+        item["channel"] = entry_channel(item)
+    except ImportError:  # pragma: no cover — bundle-path fallback
+        item["channel"] = "video_diary" if template == "Video Diary" else "journal"
 
     # Dynamic property extraction — reads ALL non-empty fields
     prop_fields, prop_lines = extract_all_properties(props)

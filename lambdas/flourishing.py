@@ -24,6 +24,31 @@ from decimal import Decimal
 
 FLOURISHING_SOURCE = "flourishing"
 
+# ── Channel provenance (#1572) ────────────────────────────────────────────────
+# A journal entry's `channel` distinguishes a Video-Diary transcript from a typed
+# entry. The SAME enrichment pass codes both — the enriched_* signals are
+# identical regardless of how the prose was captured — so the channel is
+# provenance only: it never feeds character scoring math. It is stamped on the
+# notion entry at ingest (notion_lambda) and derived from the Template as a
+# fallback for pre-#1572 rows that predate the stamp.
+VIDEO_DIARY_TEMPLATE = "Video Diary"
+CHANNEL_JOURNAL = "journal"
+CHANNEL_VIDEO_DIARY = "video_diary"
+
+
+def entry_channel(entry):
+    """Channel provenance for one journal entry.
+
+    Returns 'video_diary' for a Video Diary entry, else 'journal'. Prefers an
+    explicitly-stored `channel` attribute, falling back to the Template so rows
+    written before the #1572 stamp still classify correctly.
+    """
+    ch = entry.get("channel")
+    if isinstance(ch, str) and ch.strip():
+        return ch.strip()
+    return CHANNEL_VIDEO_DIARY if entry.get("template") == VIDEO_DIARY_TEMPLATE else CHANNEL_JOURNAL
+
+
 # Ordered rungs of the categorical social_quality — mirrors
 # character_engine._SOCIAL_QUALITY_RANK (#910) on the same 0-10 scale.
 _SOCIAL_RANK = {"alone": 0, "surface": 1, "meaningful": 2, "deep": 3}
@@ -68,6 +93,10 @@ def aggregate_entries(entries):
     enriched = [e for e in entries if e.get("enriched_at")]
     if not enriched:
         return None
+    channel_counts: dict = {}
+    for e in enriched:
+        ch = entry_channel(e)
+        channel_counts[ch] = channel_counts.get(ch, 0) + 1
     values = []
     gratitude = 0
     flow_any = False
@@ -96,6 +125,12 @@ def aggregate_entries(entries):
         "values_lived_count": len(values),
         "gratitude_count": gratitude,
         "growth_signals_count": growth,
+        # #1572: which capture channels contributed to this day's row, so any
+        # consumer can analyse the PERMA signal by channel (video_diary vs
+        # typed journal). Provenance only — the signal values above are
+        # channel-blind (identical enrichment either way).
+        "channels": sorted(channel_counts),
+        "channel_entry_counts": channel_counts,
     }
     if flow_seen:
         row["flow"] = 1 if flow_any else 0

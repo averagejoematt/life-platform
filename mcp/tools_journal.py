@@ -53,6 +53,7 @@ def _query_journal(start_date, end_date, template=None):
             "stressor": "stressor",
             "health_event": "health",
             "health": "health",
+            "video_diary": "video_diary",  # #1572 Diary-Studio transcript channel
         }
         sk_suffix = alias_map.get(template_lower, template_lower)
         items = [i for i in items if f"#journal#{sk_suffix}" in i.get("sk", "")]
@@ -72,8 +73,10 @@ def _get_mood_trend(args):
     if not items:
         return {"trend": [], "error": "No journal entries found for this period."}
 
+    from flourishing import entry_channel  # #1572 channel provenance
+
     # Build daily scores (prefer enriched, fall back to structured)
-    daily = {}  # date -> {mood, energy, stress, themes, sentiment}
+    daily = {}  # date -> {mood, energy, stress, themes, sentiment, channels}
     for item in items:
         date = item.get("date")
         if not date:
@@ -83,6 +86,13 @@ def _get_mood_trend(args):
 
         daily[date]["entries"] += 1
         template = item.get("template", "")
+
+        # #1572: record which capture channel(s) contributed to the day so the
+        # trend can be read by channel (video_diary transcript vs typed journal).
+        ch = entry_channel(item)
+        chans = daily[date].setdefault("channels", [])
+        if ch not in chans:
+            chans.append(ch)
 
         # Mood: enriched > morning_mood > day_rating
         mood = item.get("enriched_mood") or item.get("morning_mood") or item.get("day_rating")
@@ -157,13 +167,23 @@ def _get_mood_trend(args):
         theme_counts[t] = theme_counts.get(t, 0) + 1
     top_themes = sorted(theme_counts.items(), key=lambda x: -x[1])[:5]
 
+    # #1572: which capture channels appear across the window + a note when
+    # video-diary transcripts are mixed in (same enrichment pass codes both).
+    channels_present = sorted({c for d in trend for c in d.get("channels", [])})
+
     result = {
         "trend": trend,
         "summary": summary,
         "top_themes": [{"theme": t, "count": c} for t, c in top_themes],
         "days_with_entries": len(trend),
         "date_range": f"{start} to {end}",
+        "channels_present": channels_present,
     }
+    if "video_diary" in channels_present:
+        result["channel_note"] = (
+            "Includes video-diary transcript entries (channel=video_diary), coded by the "
+            "same enrichment pass as typed journal. Per-day 'channels' lists what contributed."
+        )
 
     # Filter to requested metric if not "all"
     if metric != "all" and metric in summary:
@@ -222,11 +242,15 @@ def tool_get_flourishing_trend(args):
             "latest": {"date": series[-1][0], "value": series[-1][1]},
         }
     model = rows[-1].get("enrichment_model") if rows else None
+    # #1572: capture channels that fed the window's rows, so the PERMA trend can
+    # be read by channel (video_diary transcript vs typed journal).
+    channels_present = sorted({c for r in rows for c in (r.get("channels") or [])})
     return {
         "window_days": days,
         "ema_span": span,
         "days_with_rows": len(rows),
         "signals": trends,
+        "channels_present": channels_present,
         "provenance": provenance_line(model),
         "_framing": (
             "These are inputs you influence, not a verdict on you. A low stretch is "
