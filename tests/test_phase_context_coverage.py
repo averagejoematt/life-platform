@@ -411,7 +411,7 @@ class TestEveryNarrativePromptBuilderCarriesTheBlock:
 NARRATIVE_BUILDER_FILES = [
     "lambdas/ai_calls.py",
     "lambdas/compute/state_of_matthew_lambda.py",
-    "lambdas/emails/wednesday_chronicle_lambda.py",
+    "lambdas/emails/chronicle_data.py",  # #1654 — build_data_packet (the phase-context injector) split out here
     "lambdas/emails/coach_panel_podcast_lambda.py",
     "lambdas/emails/podcast_script_v2.py",
     "lambdas/web/site_api_ai_lambda.py",

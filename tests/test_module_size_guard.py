@@ -76,7 +76,7 @@ _EXCEPTION_SCAN_LINES = 40
 # ─────────────────────────────────────────────────────────────────────────────
 BASELINE = {
     "lambdas/web/site_api_data.py": "3016 lines",
-    "lambdas/emails/wednesday_chronicle_lambda.py": "2975 lines",
+    # wednesday_chronicle_lambda.py (2975) split into chronicle_* helpers + a <1,200-line facade (#1654) — pruned.
     "cdk/stacks/role_policies.py": "2848 lines",
     # site_api_observatory.py drained to a ~150-line facade by #1654 slice 3 — the handler
     # logic now lives in cohesive web/site_api_{nutrition,meals,training,physical,mind}.py
