@@ -746,10 +746,18 @@ jobs:
         run: |
           echo "Running qa-smoke Lambda..."
 
-          # qa-smoke may not exist yet (CDK skeleton) — warn and continue
+          # qa-smoke may not exist yet (CDK skeleton / fresh account bootstrap) — warn
+          # and fall through. #1345: this exit 0 is a LEGITIMATELY-OPTIONAL path, NOT a
+          # fail-open: the "Verify canary" step below invokes life-platform-canary
+          # unconditionally (no existence guard) and gates on it, so a missing qa-smoke
+          # never leaves the smoke-test job without an oracle. Hard-failing here would
+          # break the documented bootstrap/DR-rebuild path for no safety gain, so we keep
+          # the fall-through. The genuinely-broken-oracle cases (unparseable response) are
+          # closed below and in the canary step via smoke_oracle_decision.py (PARSE_ERROR
+          # is gating).
           if ! aws lambda get-function --function-name life-platform-qa-smoke --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
             echo "::warning::life-platform-qa-smoke Lambda does not exist in AWS — skipping (deploy via CDK to enable)"
-            echo "Falling through to canary check as primary smoke test."
+            echo "Falling through to canary check as primary smoke test (canary gates unconditionally)."
             exit 0
           fi
 
@@ -763,28 +771,10 @@ jobs:
           echo "Smoke test result:"
           python3 -m json.tool /tmp/smoke.json 2>/dev/null || cat /tmp/smoke.json
 
-          STATUS=$(python3 -c "
-          import json, sys
-          try:
-              result = json.load(open('/tmp/smoke.json'))
-              status = result.get('status', result.get('statusCode', ''))
-              s = str(status).lower()
-              if s in ('ok', 'pass', '200') or (s and 'error' not in s and 'fail' not in s):
-                  print('PASS')
-              else:
-                  print(f'FAIL:{status}')
-          except Exception as e:
-              print(f'PARSE_ERROR:{e}')
-          ")
-
-          if [[ "$STATUS" == PASS ]]; then
-            echo "✅ Smoke test passed"
-          elif [[ "$STATUS" == PARSE_ERROR* ]]; then
-            echo "::warning::Could not parse smoke test output as JSON — check life-platform-qa-smoke Lambda response format"
-          else
-            echo "::error::Smoke test reported failure: $STATUS"
-            exit 1
-          fi
+          # #1345: decision extracted to deploy/lib/smoke_oracle_decision.py so it is
+          # unit-tested and shared with the canary step. PARSE_ERROR is now GATING
+          # (exit 1) — an unparseable smoke result must not fail-open past the oracle.
+          python3 deploy/lib/smoke_oracle_decision.py /tmp/smoke.json "Smoke test"
 
       - name: Verify canary
         run: |
@@ -799,28 +789,9 @@ jobs:
           echo "Canary result:"
           python3 -m json.tool /tmp/canary.json 2>/dev/null || cat /tmp/canary.json
 
-          STATUS=$(python3 -c "
-          import json, sys
-          try:
-              result = json.load(open('/tmp/canary.json'))
-              status = result.get('status', result.get('statusCode', ''))
-              s = str(status).lower()
-              if s in ('ok', 'pass', '200', 'healthy') or (s and 'error' not in s and 'fail' not in s):
-                  print('PASS')
-              else:
-                  print(f'FAIL:{status}')
-          except Exception as e:
-              print(f'PARSE_ERROR:{e}')
-          ")
-
-          if [[ "$STATUS" == PASS ]]; then
-            echo "✅ Canary healthy"
-          elif [[ "$STATUS" == PARSE_ERROR* ]]; then
-            echo "::warning::Could not parse canary output — check life-platform-canary response format"
-          else
-            echo "::error::Canary unhealthy after deploy: $STATUS — check CloudWatch logs"
-            exit 1
-          fi
+          # #1345: same shared decision as the smoke step; canary additionally
+          # accepts "healthy". PARSE_ERROR is GATING (exit 1), no longer fail-open.
+          python3 deploy/lib/smoke_oracle_decision.py /tmp/canary.json "Canary" --ok-extra healthy
 
   # ════════════════════════════════════════════════════════════════
   # Job 5c: Visual + AI-vision QA (Playwright → Claude). GATING.
