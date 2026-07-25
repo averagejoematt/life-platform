@@ -1048,6 +1048,25 @@ async function renderScorecard(read, id) {
     if (decidedCalls.length) {
       h += `<p class="dx-kicker label sc-sub">recently graded</p>` + decidedCalls.map((p) => _scCallHTML(p, momentUrl(p))).join("");
     }
+    // #1377 — "Most Wrong This Month": the graded-failure obituaries from /api/wrong,
+    // filtered to the current PT month. Sourced only from deterministic verdicts; links
+    // out to the full Wrong Feed. Fail-soft — a missing /api/wrong never breaks the card.
+    const wrong = (await tryJSON("/api/wrong")) || {};
+    const monthPrefix = new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }).slice(0, 7);
+    const monthObits = (Array.isArray(wrong.obituaries) ? wrong.obituaries : [])
+      .filter((o) => String(o.date || "").slice(0, 7) === monthPrefix)
+      .slice(0, 5);
+    if (monthObits.length) {
+      h += `<p class="dx-kicker label sc-sub">most wrong this month</p>` +
+        `<ul class="sc-wronglist">` +
+        monthObits.map((o) =>
+          `<li class="sc-wrong"><a href="/method/wrong/#obit-${esc(o.id || "")}">` +
+          `<span class="sc-wrong-believed">${esc(o.believed || "")}</span>` +
+          (o.number ? `<span class="sc-wrong-num label">${esc(o.number)}</span>` : "") +
+          `<span class="sc-wrong-meta label">${esc(o.coach || "")} · ${esc(String(o.date || "").slice(0, 10))}</span></a></li>`).join("") +
+        `</ul>` +
+        `<p class="sc-note label"><a href="/method/wrong/">the full Wrong Feed →</a></p>`;
+    }
     read.innerHTML = h;
     read.querySelectorAll(".sc-coachbtn").forEach((b) => b.addEventListener("click", () => selectEntry(BYKEY.scorecard, b.dataset.coach)));
     enhanceCoachNames(read);

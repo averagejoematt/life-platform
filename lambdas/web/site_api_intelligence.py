@@ -19,6 +19,7 @@ module's namespace.
 """
 
 import calendar
+import hashlib
 import json
 import time
 from datetime import datetime, timedelta, timezone
@@ -2340,6 +2341,75 @@ def handle_receipts() -> dict:
 # ══════════════════════════════════════════════════════════════════════════════
 _WRONG_COACHES = ("sleep", "nutrition", "training", "glucose", "mind", "physical", "labs", "explorer")
 
+# #1377 (The Wrong Feed): plain-English phrasing for a graded verdict's comparison
+# operator. Templated only — the obituary NEVER lets an LLM assert wrongness; every
+# field below is lifted from the deterministic evaluator's LEARNING# record (metric,
+# condition, threshold, actual_value, reason). ADR-104 grounding: pure projection.
+_WRONG_COND_PHRASE = {
+    "gt": "above",
+    "gte": "at or above",
+    "lt": "below",
+    "lte": "at or below",
+    "eq": "at",
+    "up": "trending up",
+    "down": "trending down",
+}
+
+
+def _wrong_num(v) -> str:
+    """Format a graded number without a spurious trailing .0 (7.0 -> '7', 6.8 -> '6.8')."""
+    if v is None:
+        return ""
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return str(v)
+    return str(int(f)) if f == int(f) else f"{round(f, 2)}"
+
+
+def _wrong_obituary(coach: str, rec: dict) -> dict:
+    """Build ONE obituary card for a graded failure — a refuted deterministic verdict.
+
+    #1377: what we believed / the number that killed it / what changed. Sourced ONLY
+    from the LEARNING# record's own fields (never AI-asserted). The id is a stable
+    deterministic slug so the permalink + OG card + RSS entry all agree, and re-sweeping
+    is idempotent.
+    """
+    metric = str(rec.get("metric") or "").strip()
+    cond = str(rec.get("condition") or "").strip()
+    thr = rec.get("threshold")
+    actual = rec.get("actual_value")
+    reason = str(rec.get("reason") or "").strip()
+    pid = str(rec.get("prediction_id") or str(rec.get("sk", "")).replace("LEARNING#", "")).strip()
+    oid = hashlib.sha256(f"{coach}|{pid}|refuted".encode()).hexdigest()[:12]
+
+    metric_label = metric.replace("_", " ") if metric else ""
+    phrase = _WRONG_COND_PHRASE.get(cond, cond)
+    if metric_label and phrase and thr is not None:
+        believed = f"{metric_label} would come in {phrase} {_wrong_num(thr)}"
+    else:
+        believed = reason or "a dated call the data refused to confirm"
+
+    number = ""
+    if actual is not None and metric_label:
+        number = f"{metric_label} measured {_wrong_num(actual)}"
+        if thr is not None and phrase:
+            number += f" — the call was {phrase} {_wrong_num(thr)}"
+
+    return {
+        "id": oid,
+        "date": rec.get("date"),
+        "coach": coach,
+        "believed": believed[:240],
+        "number": number[:240],
+        "what_changed": reason[:240],
+        "verdict": "refuted",
+        # Generated feed item (no PAGE_BINDINGS entry): the moments sweep draws the
+        # permalink shell + data-driven OG card at these exact paths (og_moments._sweep_wrong).
+        "permalink": f"/moments/wrong/{oid}/",
+        "og_image": f"/moments/assets/wrong-{oid}.png",
+    }
+
 
 def handle_wrong() -> dict:
     """GET /api/wrong — the public ledger of AI misses."""
@@ -2365,7 +2435,9 @@ def handle_wrong() -> dict:
         catches.sort(key=lambda c: c.get("date") or "", reverse=True)
 
         # 2. Prediction verdicts per coach
-        ledger, recent_misses = [], []
+        # #1377: every refuted verdict also becomes a first-class OBITUARY card (what we
+        # believed / the number that killed it / what changed) — the feed the page renders.
+        ledger, recent_misses, obituaries = [], [], []
         for c in _WRONG_COACHES:
             r = table.query(
                 KeyConditionExpression=Key("pk").eq(f"COACH#{c}_coach") & Key("sk").begins_with("LEARNING#"),
@@ -2382,7 +2454,11 @@ def handle_wrong() -> dict:
                     recent_misses.append(
                         {"date": x.get("date"), "coach": c, "what": str(x.get("condition") or x.get("reason") or "")[:240]}
                     )
+                    obituaries.append(_wrong_obituary(c, x))
         recent_misses.sort(key=lambda m: m.get("date") or "", reverse=True)
+        # De-dup by stable id (idempotent re-grades) then sort newest-first.
+        obituaries = list({o["id"]: o for o in obituaries}.values())
+        obituaries.sort(key=lambda o: o.get("date") or "", reverse=True)
 
         # 3. #1411 (ADR-105): authored priors the data hasn't confirmed — the
         # character engine's cross-pillar effects, quarterly-fitted as lagged
@@ -2443,6 +2519,12 @@ def handle_wrong() -> dict:
                     "recent": catches[:25],
                 },
                 "predictions": {"by_coach": ledger, "refuted_recent": recent_misses[:25]},
+                # #1377 (The Wrong Feed): one obituary card per graded failure. The
+                # headline "graded failures" count DERIVES from this list (obituary_count
+                # == len(obituaries) by construction) — the front-end renders one card per
+                # entry and counts the cards it drew, killing the header-drift class (AC4).
+                "obituaries": obituaries[:60],
+                "obituary_count": len(obituaries),
                 "effect_fits": effect_fits,  # #1411: null fits are findings, not footnotes
                 "note": (
                     "Uncurated. The validator audits every coach claim against the data it cites; "

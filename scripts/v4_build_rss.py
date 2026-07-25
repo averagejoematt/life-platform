@@ -48,6 +48,14 @@ BASE = "https://averagejoematt.com"
 BROADCAST_SRC = f"{BASE}/api/broadcast"
 BROADCAST_TITLE = "The Measured Life — Broadcast (averagejoematt)"
 BROADCAST_DESC = "Matthew's own public posts, self-hosted — the platform's copy of his voice, with permalinks and a feed."
+# #1377 (The Wrong Feed): a SEPARATE feed of graded failures, sourced from the live
+# read-only /api/wrong obituaries. Every item is a deterministic verdict — never AI-
+# asserted. Item <link>/<guid> point at the on-site moments permalink shell.
+WRONG_SRC = f"{BASE}/api/wrong"
+WRONG_TITLE = "The Measured Life — The Wrong Feed (averagejoematt)"
+WRONG_DESC = (
+    "Every graded failure, in public — what the model believed, the number that killed it, and what changed. Deterministic verdicts only."
+)
 OUT = Path("site/rss.xml")
 # L-06: some readers probe /feed.xml instead of /rss.xml — emit an identical alias.
 OUT_ALIAS = Path("site/feed.xml")
@@ -151,6 +159,63 @@ def build_broadcast_feed() -> int:
     return len(items)
 
 
+def build_wrong_feed() -> int:
+    """#1377 — write the /method/wrong/ RSS feed from the live /api/wrong obituaries.
+
+    FAIL-SOFT and self-contained (same contract as build_broadcast_feed): never raises,
+    any problem yields a valid EMPTY feed. The output path derives from ``OUT`` so the
+    test harness that redirects ``OUT`` redirects this too. Returns the item count."""
+    out = OUT.parent / "method" / "wrong" / "rss.xml"
+    try:
+        with urlopen(WRONG_SRC, timeout=20) as r:
+            data = json.load(r)
+        if isinstance(data.get("data"), dict):
+            data = data["data"]
+    except Exception:  # noqa: BLE001 — endpoint blip / not live yet; empty feed is valid
+        data = {}
+    obits = data.get("obituaries", []) if isinstance(data, dict) else []
+    obits = [o for o in obits if o.get("date") and o.get("believed") and o.get("id")]
+    obits.sort(key=lambda o: o["date"], reverse=True)
+
+    now = format_datetime(datetime.now(timezone.utc))
+    items = []
+    for o in obits:
+        permalink = o.get("permalink") or f"/moments/wrong/{o['id']}/"
+        link = f"{BASE}{permalink}"
+        tagged_link = with_utm(link, source="rss", medium="feed", campaign="wrong")
+        title = f"The AI was wrong: {o['believed']}"
+        desc_bits = [o.get("number") or "", o.get("what_changed") or ""]
+        desc = truncate_at_word(" — ".join(b for b in (s.strip() for s in desc_bits) if b), 360)
+        items.append(
+            "    <item>\n"
+            f"      <title>{esc(title)}</title>\n"
+            f"      <link>{esc(tagged_link)}</link>\n"
+            f'      <guid isPermaLink="true">{esc(link)}</guid>\n'
+            f"      <description>{esc(desc)}</description>\n"
+            f"      <pubDate>{rfc822(o['date'])}</pubDate>\n"
+            "    </item>"
+        )
+
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">\n'
+        "  <channel>\n"
+        f"    <title>{esc(WRONG_TITLE)}</title>\n"
+        f"    <link>{BASE}/method/wrong/</link>\n"
+        f"    <description>{esc(WRONG_DESC)}</description>\n"
+        "    <language>en-us</language>\n"
+        f"    <lastBuildDate>{now}</lastBuildDate>\n"
+        f'    <atom:link href="{BASE}/method/wrong/rss.xml" rel="self" type="application/rss+xml"/>\n'
+        + ("\n".join(items) + "\n" if items else "")
+        + "  </channel>\n"
+        "</rss>\n"
+    )
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(xml, encoding="utf-8")
+    print(f"✅ wrote {out} — {len(items)} wrong-feed items")
+    return len(items)
+
+
 def main() -> int:
     with urlopen(SRC, timeout=20) as r:
         data = json.load(r)
@@ -218,6 +283,11 @@ def main() -> int:
         build_broadcast_feed()
     except Exception as e:  # noqa: BLE001 — belt-and-braces; the builder is already fail-soft
         print(f"⚠️  broadcast feed skipped (non-fatal): {e}", file=sys.stderr)
+    # #1377 — the Wrong Feed's own RSS, independent + fail-soft (never breaks chronicle).
+    try:
+        build_wrong_feed()
+    except Exception as e:  # noqa: BLE001 — belt-and-braces; the builder is already fail-soft
+        print(f"⚠️  wrong feed skipped (non-fatal): {e}", file=sys.stderr)
     return 0
 
 

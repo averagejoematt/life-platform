@@ -142,21 +142,45 @@ export function renderScenarios(d) {
     note(`Correlative only — “similar days” share one feature, not a life. Cells with an effective n under ${fmt(d.min_effective_n || 8)} are hidden, not padded${d.cells_hidden_thin ? ` (${fmt(d.cells_hidden_thin)} hidden today)` : ""}.`);
 }
 
-// The Wrong Page — the AI's misses, uncurated.
+// The Wrong Page — the AI's misses, uncurated. #1377: a FEED of obituary cards,
+// one per graded failure, plus the validator/ledger tables underneath.
 export function renderWrong(d) {
   const v = d.validator || {}, pr = d.predictions || {};
-  // #1369: the header count DERIVES from the parts the page can account for —
+  // #1369: the validator's own count DERIVES from the parts the page can account for —
   // detailed catches (the rows below) + count-only catches from older records
-  // (explicitly annotated under the table). "4 caught" over 2 unexplained rows
-  // was a live self-contradiction on the one page whose job is honesty.
+  // (explicitly annotated under the table).
   const detailed = v.caught_detailed ?? (v.recent || []).length;
   const undetailed = v.caught_undetailed || 0;
   const caughtTotal = v.caught_detailed != null ? detailed + undetailed : v.caught;
+
+  // #1377 (AC1): the obituary feed — one card per GRADED failure, sourced only from
+  // deterministic verdicts (never AI-asserted). Build the cards FIRST so the headline
+  // count can be computed from the cards actually rendered.
+  const obits = Array.isArray(d.obituaries) ? d.obituaries : [];
+  const obitCards = obits.map((o) => {
+    const perma = o.permalink || "";
+    const link = perma ? `<a class="wrong-ob-perma" href="${esc(perma)}">permalink →</a>` : "";
+    return `<article class="wrong-ob" id="obit-${esc(o.id || "")}">` +
+      `<p class="wrong-ob-head label"><span class="wrong-ob-verdict">refuted</span> · ${esc(String(o.date || "").slice(0, 10))} · ${esc(o.coach || "")}</p>` +
+      `<p class="wrong-ob-believed">We believed: ${esc(o.believed || "")}</p>` +
+      (o.number ? `<p class="wrong-ob-number">The number that killed it: ${esc(o.number)}</p>` : "") +
+      (o.what_changed ? `<p class="wrong-ob-changed label">What changed: ${esc(o.what_changed)}</p>` : "") +
+      link +
+      `</article>`;
+  }).join("");
+  // #1377 (AC4): the headline count IS the number of obituary cards rendered above —
+  // computed from `obits`, never a separate literal that can drift from the feed.
+  const gradedFailures = obits.length;
+
   const head = figs([
+    fig(fmt(gradedFailures), "graded failures"),
     fig(fmt(v.claims_checked), "claims audited"),
     fig(fmt(caughtTotal), "caught wrong"),
-    fig(fmt((pr.refuted_recent || []).length), "predictions refuted"),
   ]);
+  const feed = obitCards
+    ? sec("The obituaries — one card per graded failure", `<div class="wrong-feed">${obitCards}</div>`)
+    : sec("The obituaries — one card per graded failure",
+      `<p class="rd-archive">No graded failures on the board yet — an empty slate right after a reset is honest, not flattering. Each refuted call earns its own card here as the evaluator grades it.</p>`);
   const cr = (v.recent || []).map((c) =>
     `<tr class="${c.severity === "error" ? "rd-flag" : ""}"><td class="rd-name">${esc(String(c.date || "").slice(0, 10))}</td><td>${esc(c.coach || "")}</td><td>${esc(c.what)}</td></tr>`).join("");
   const undetailedNote = undetailed
@@ -191,7 +215,7 @@ export function renderWrong(d) {
     fits = sec("Authored priors the data hasn't confirmed — the character engine's cross-pillar effects",
       `<p class="rd-archive">${esc(ef.note || "The first quarterly effect fit has not run yet — every cross-pillar effect currently wears its authored-prior badge.")}</p>`);
   }
-  return head + caught + ledger + misses + fits + `<p class="correlative">${esc(d.note || "")}</p>`;
+  return head + feed + caught + ledger + misses + fits + `<p class="correlative">${esc(d.note || "")}</p>`;
 }
 
 // Cycle vs cycle — matched first-K-days windows across experiment restarts.
