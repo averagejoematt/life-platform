@@ -85,6 +85,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | [PHASE_TAXONOMY.md](PHASE_TAXONOMY.md) | What resets vs. persists at experiment restart (ADR-077) |
 | [DATA_GOVERNANCE.md](DATA_GOVERNANCE.md) | PII classification + retention |
 | [SECURITY.md](SECURITY.md) | Threat model, defense layers, accepted risks |
+| [LICENSES.md](LICENSES.md) | Third-party license inventory (3 binary layers · CDK · dev deps), the LGPL-LAME edge as a written non-issue, repo LICENSE posture + AI-content ownership stance (#1352) |
 | [REMEDIATION_TAXONOMY.md](REMEDIATION_TAXONOMY.md) | The self-healing agent's classifier rubric |
 | [MANAGED_WHERE_LEDGER.md](MANAGED_WHERE_LEDGER.md) | Out-of-IaC resources — what's managed where |
 | [SITE_MAP_AND_INTENT.md](SITE_MAP_AND_INTENT.md) · [DESIGN_SYSTEM_V5.md](DESIGN_SYSTEM_V5.md) · [SITE_UPLEVEL_PLAYBOOK.md](SITE_UPLEVEL_PLAYBOOK.md) | The v5 site brief (intent · standards · change discipline) |
