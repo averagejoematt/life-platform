@@ -743,27 +743,77 @@ aws dynamodb update-time-to-live \
 
 If Claude tools are returning errors or the MCP server appears unresponsive:
 
+**First, isolate which transport is broken — there are two, with independent auth.** They fail
+separately, and the symptom is easy to misread:
+
+| Transport | Client | Auth | Reads |
+|---|---|---|---|
+| **Function URL** (remote) | claude.ai connector, mobile | OAuth 2.1 Bearer | — |
+| **Bridge** (stdio) | Claude Code, Claude Desktop | `x-api-key` header | `.config.json` |
+
+Tools working in claude.ai while Claude Code reports **"Could not attach to MCP server
+life-platform"** means the bridge is broken, *not* the URL. Don't go looking for a bad endpoint.
+
 1. Check Lambda logs:
 ```bash
 aws logs tail /aws/lambda/life-platform-mcp --since 1h
 ```
 
-2. Verify the Lambda Function URL is up:
+2. Verify the Function URL is up. Discover it rather than pasting a literal — it changes when the
+   Function URL is recreated, and stale URLs in old docs are dead, not merely unauthorized:
 ```bash
-curl -s -o /dev/null -w "%{http_code}" \
-  -H "x-api-key: <your-key>" \
-  https://votqefkra435xwrccmapxxbj6y0jawgn.lambda-url.us-west-2.on.aws/
+MCP_URL=$(aws lambda list-function-url-configs --function-name life-platform-mcp \
+  --region us-west-2 --query 'FunctionUrlConfigs[0].FunctionUrl' --output text)
+
+# Health probe: OAuth discovery is unauthenticated and must return 200.
+curl -s -o /dev/null -w "%{http_code}\n" "${MCP_URL}.well-known/oauth-authorization-server"
+```
+   A `401 {"error": "Unauthorized: invalid Bearer token"}` on `GET /` is **correct** — that is the
+   handshake trigger, not a fault. A connection error or DNS failure means a dead URL.
+
+3. Confirm the bridge's API key matches Secrets Manager. **The key lives in gitignored
+   `.config.json`, not in `mcp_bridge.py`.** Compare hashes so the secret never hits your scrollback
+   or shell history:
+```bash
+python3 -c "import json,hashlib;print(hashlib.sha256(json.load(open('.config.json'))['api_key'].encode()).hexdigest()[:12])"
+aws secretsmanager get-secret-value --secret-id life-platform/mcp-api-key --region us-west-2 \
+  --query SecretString --output text | shasum -a 256 | cut -c1-12
 ```
 
-3. Confirm the API key in `mcp_bridge.py` matches the value in Secrets Manager:
+4. **If the hashes differ, the 90-day rotation is the cause.** `life-platform/mcp-api-key` rotates
+   automatically (`life-platform-key-rotator`, `AutomaticallyAfterDays: 90`), and nothing updates
+   your local `.config.json` when it does. The bridge then writes `{"error": "Unauthorized"}` to
+   stdout instead of a JSON-RPC frame, so the handshake never completes and the client reports
+   "Could not attach." Meanwhile the claude.ai connector keeps working — different auth path.
+   Rewrite the key, then **restart the client** (the bridge is a subprocess spawned at attach time,
+   so an in-place fix does nothing until relaunch):
 ```bash
-aws secretsmanager get-secret-value \
-  --secret-id life-platform/mcp-api-key \
-  --query SecretString --output text
+python3 - <<'PY'
+import json, boto3
+cfg = json.load(open(".config.json"))
+cfg["api_key"] = boto3.client("secretsmanager", region_name=cfg.get("region", "us-west-2")) \
+    .get_secret_value(SecretId="life-platform/mcp-api-key")["SecretString"].strip()
+json.dump(cfg, open(".config.json", "w"), indent=2)
+PY
+```
+   Check when it next fires, and expect this failure within a day of it:
+```bash
+aws secretsmanager describe-secret --secret-id life-platform/mcp-api-key --region us-west-2 \
+  --query '{LastChanged:LastChangedDate,NextRotation:NextRotationDate}'
 ```
 
-4. If the Lambda itself is broken, check for a recent deploy that may have introduced a syntax error — redeploy the last known-good version from the local `.py` file.
-5. Check Lambda memory is 1024 MB (doubled in v2.33.0). If reverted, heavy queries will be slow:
+5. Verify the bridge end-to-end before blaming the client — this exercises config, IAM, and the
+   Lambda in one shot:
+```bash
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | python3 mcp_bridge.py
+```
+   Expect a JSON-RPC frame listing the full tool set. `{"error": "Unauthorized"}` sends you to
+   step 3.
+
+6. If the Lambda itself is broken, check for a recent deploy that may have introduced a syntax error — redeploy the last known-good version from the local `.py` file.
+7. Check Lambda memory is **768 MB** — the power-tuned, cost-optimal value (R5, AWS Lambda Power
+   Tuning v4.4.0), declared in `cdk/stacks/mcp_stack.py`. It is deliberately *not* higher; don't
+   raise it to "fix" slowness without re-running the power tuner:
 ```bash
 aws lambda get-function-configuration --function-name life-platform-mcp --query 'MemorySize'
 ```
