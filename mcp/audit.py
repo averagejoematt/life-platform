@@ -54,6 +54,7 @@ WRITE_VERBS = frozenset(
         "close",
         "complete",
         "create",
+        "curate",  # curate_horizon — writes the weekly Horizons pick (#1705)
         "delete",
         "end",
         "evaluate",

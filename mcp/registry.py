@@ -61,8 +61,10 @@ from mcp.tools_memory import (
 )
 from mcp.tools_nutrition import tool_get_deficit_sustainability, tool_get_nutrition
 from mcp.tools_reading import (
+    tool_curate_horizon,
     tool_get_constellation,
     tool_get_due_recalls,
+    tool_get_horizons,
     tool_get_reading_history,
     tool_get_reading_profile,
     tool_get_reading_recommendation,
@@ -1790,6 +1792,57 @@ TOOLS = {
                     },
                 },
                 "required": ["action"],
+            },
+        },
+    },
+    # Horizons (#1705, epic #1686 S1): the weekly coach-curated media pick.
+    "get_horizons": {
+        "fn": tool_get_horizons,
+        "schema": {
+            "name": "get_horizons",
+            "description": (
+                "Horizons (Mind pillar): the weekly coach-curated media pick that broadens Matthew's horizons "
+                "across all pillars (article|podcast|video|paper|news|longform|essay|song). Returns the current "
+                "pick + past picks (newest first). Honest empty state before the first pick."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {"limit": {"type": "integer", "description": "Max picks to return, newest first (default 26)."}},
+                "required": [],
+            },
+        },
+    },
+    "curate_horizon": {
+        "fn": tool_curate_horizon,
+        "schema": {
+            "name": "curate_horizon",
+            "description": (
+                "Author the week's Horizons pick (the Mind coach, curating broadly across all pillars). Runs the "
+                "link-verification gate (ADR-104: no fabricated links) and stores the pick ONLY if its URL resolves "
+                "to real content — fail-closed. draft->dry_run->commit: verifies in both modes; writes only on "
+                "explicit dry_run=false. An unverified link is rejected and never stored."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "The pick's link (fetched + verified before storage)."},
+                    "title": {"type": "string", "description": "The pick's title."},
+                    "format": {
+                        "type": "string",
+                        "enum": ["article", "podcast", "video", "paper", "news", "longform", "essay", "song"],
+                        "description": "The media format.",
+                    },
+                    "rationale_tag": {
+                        "type": "string",
+                        "enum": ["topical", "experiment-relevant"],
+                        "description": "Why this pick, this week.",
+                    },
+                    "pitch": {"type": "string", "description": "A short 'why I sent it' pitch."},
+                    "source": {"type": "string", "description": "The outlet / source name (optional)."},
+                    "week": {"type": "string", "description": "ISO week 'YYYY-Www' (default: current week)."},
+                    "dry_run": {"type": "boolean", "description": "Preview + verify without writing (default true). Set false to commit."},
+                },
+                "required": ["url", "title", "format", "rationale_tag"],
             },
         },
     },

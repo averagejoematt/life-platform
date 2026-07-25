@@ -225,6 +225,45 @@ def put_profile(profile: dict) -> dict:
     return item
 
 
+def put_horizon_pick(pick: dict, *, now: str | None = None) -> dict:
+    """Write/overwrite the Horizons weekly pick for `pick['week']` (#1705).
+
+    One item per ISO week under READING#HORIZON / PICK#<week>. CROSS_PHASE like
+    the rest of the reading rail — a curation pick survives an experiment reset
+    (never phase-stamped, never wiped). Callers MUST have run the verification
+    gate first: the pick carries its `verification` block and is only written by
+    the authoring tool after a verified verdict (no fabricated links reach here).
+    """
+    now = now or _now_iso()
+    item = dict(pick)
+    item.setdefault("curatedAt", now)
+    item.update(rk.horizon_key(item["week"]))
+    _put(item)
+    return item
+
+
+def get_horizon_pick(week: str) -> dict | None:
+    """The Horizons pick for one ISO week (or None)."""
+    return _strip(_get(rk.horizon_key(week)))
+
+
+def horizon_picks(limit: int | None = None) -> list:
+    """All Horizons picks, newest ISO-week first (begins_with PICK# on the main
+    table — no GSI). ISO-week keys sort chronologically."""
+    items = _query(
+        KeyConditionExpression=Key("pk").eq(rk.HORIZON_PK) & Key("sk").begins_with(rk.SK_HORIZON_PREFIX),
+        ScanIndexForward=False,
+    )
+    items = [_strip(i) for i in items]
+    return items[:limit] if limit else items
+
+
+def current_horizon_pick() -> dict | None:
+    """The most recent Horizons pick (or None if none has been curated yet)."""
+    picks = horizon_picks(limit=1)
+    return picks[0] if picks else None
+
+
 def update_cover_key(book_id: str, cover_s3_key: str | None, cover_source: str, now: str | None = None) -> dict | None:
     """Set BOOK#<id>.coverS3Key + coverSource (called by the cover pipeline)."""
     book = _get(rk.book_key(book_id))
