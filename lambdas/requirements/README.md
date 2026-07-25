@@ -23,7 +23,6 @@ Pinned dependency files per Lambda group (MAINT-1, v2.99.0).
 | `mcp.txt` | life-platform-mcp | stdlib + boto3 |
 | `dashboard_refresh.txt` | dashboard-refresh | stdlib + boto3 |
 | `infra.txt` | freshness-checker, key-rotator, data-export, qa-smoke, dlq-consumer, insight-email-parser, dropbox-poll | stdlib + boto3 |
-| `layer.txt` | Lambda Layer (shared modules) | stdlib + boto3 |
 
 ## Key findings
 

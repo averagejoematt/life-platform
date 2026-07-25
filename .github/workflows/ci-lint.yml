@@ -134,6 +134,28 @@ jobs:
           fi
           echo "✅ Dependency scan clean (allowlisted IDs excluded) — blocking gate green."
 
+      - name: License inventory (pip-licenses — ADVISORY, #1352)
+        # Prints the resolved license of every dev/CDK dependency each build so a new or
+        # bumped package that changes license SURFACES in the log instead of drifting
+        # silently past docs/LICENSES.md. NON-gating (continue-on-error): a new copyleft
+        # dependency is a human decision (update docs/LICENSES.md §1–3), not a build
+        # break — this is an inventory-honesty aid beside the CVE gate (pip-audit),
+        # exactly as docs/LICENSES.md §6 promises. Lambda runtime is stdlib-only, so
+        # there is nothing shipped to scan here beyond the three pinned binary layers
+        # (inventoried by hand in docs/LICENSES.md §1 — they aren't pip-resolvable).
+        if: always()
+        continue-on-error: true
+        run: |
+          pip install pip-licenses==5.0.0
+          # Resolve into the same envs pip-audit scans, then report license per package.
+          for req in requirements-dev.txt cdk/requirements.txt; do
+            echo "::group::pip-licenses $req"
+            pip install -q -r "$req" || true
+            echo "::endgroup::"
+          done
+          pip-licenses --format=markdown --with-authors --order=license \
+            || echo "::warning::pip-licenses run failed (advisory) — license inventory not refreshed this run"
+
       - name: Generate SBOM (syft — supply-chain provenance, #1661)
         # Syft produces a Software Bill of Materials over the checked-out tree in both
         # SPDX and CycloneDX JSON, uploaded as a build artifact for provenance. Version
