@@ -76,7 +76,7 @@ _EXCEPTION_SCAN_LINES = 40
 # ─────────────────────────────────────────────────────────────────────────────
 BASELINE = {
     "lambdas/web/site_api_data.py": "3016 lines",
-    "lambdas/emails/wednesday_chronicle_lambda.py": "2975 lines",
+    # wednesday_chronicle_lambda.py (2975) split into chronicle_* helpers + a <1,200-line facade (#1654) — pruned.
     "cdk/stacks/role_policies.py": "2848 lines",
     "lambdas/web/site_api_observatory.py": "2826 lines",
     "lambdas/emails/daily_brief_lambda.py": "2472 lines",

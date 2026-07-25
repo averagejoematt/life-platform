@@ -16,7 +16,7 @@ MAX_LINES = 2000
 # shrink it by splitting the module (see the ai_calls.py split, 2026-06-08).
 GRANDFATHERED = {
     "lambdas/emails/daily_brief_lambda.py",
-    "lambdas/emails/wednesday_chronicle_lambda.py",
+    # wednesday_chronicle_lambda.py split into cohesive chronicle_* helpers (#1654) — now a thin facade under the cap.
     "lambdas/emails/weekly_digest_lambda.py",  # tightly-coupled email pipeline; #360 gate readout added
     "lambdas/compute/daily_insight_compute_lambda.py",
 }
