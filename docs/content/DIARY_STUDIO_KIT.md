@@ -53,6 +53,33 @@ exact existing path:
 Channel provenance surfaces to the coach/MCP via `get_mood` (per-day `channels` +
 a `channel_note`) and `get_flourishing_trend` (`channels_present`).
 
+## Coach reactions on lab-notes (#1574) — the V3-consent opt-in
+
+When a diary entry lands, the relevant coach (routed by the entry's enriched themes —
+**mind coach by default**) can write ONE short, grounded reaction that renders on the
+public **lab-notes** surface (`/coaching/lab-notes/`) beside a V3-consented sliver of
+the entry — the coaches responding to the human, not just the sensors. Producer:
+`lambdas/coach/coach_diary_reaction.py`; served by `/api/diary_reactions`; the private
+entry is reduced to a leak-proof public context by `lambdas/diary_consent.py` BEFORE
+anything is generated or stored.
+
+**A diary entry is PRIVATE by default — nothing crosses to the public reaction unless
+you explicitly opt it in.** Two owner-set Notion properties on the diary page control
+this (the `#1483` quote/allude/never tiers, entry-level until the per-line ADR ships):
+
+- `public_reaction_consent` — set to **`allude`** to allow a public reaction that may
+  reference the entry's *theme* only (no verbatim words ever), or **`quote`** to also
+  allow one specific line to be quoted. **Absent / anything else ⇒ private ⇒ no
+  reaction, nothing renders** (fail-closed).
+- `public_quote` — (quote tier only) the ONE verbatim line you cleared for quoting. It
+  is honored only if it is a literal substring of the entry body (ADR-104 grounding);
+  a paraphrase or typo is dropped and the reaction falls back to allude (theme-only).
+
+Budget: gated on the `coach_diary_reaction` reader-narrative feature (`budget_guard`)
+— pauses at **tier 2** with the other reader narratives; one Haiku/Sonnet call per
+entry; a paused call yields no reaction. Quality: the draft passes the ADR-108
+coach quality gate (hold-or-publish, no regenerate — keeps the one-call bound).
+
 ## Solo recordings — local Whisper, no interviewer (#1573)
 
 A **solo recording** is a raw diary made WITHOUT Claude in the room — a voice memo

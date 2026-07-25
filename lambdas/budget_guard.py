@@ -127,6 +127,14 @@ _FEATURE_CUTOFF = {
     # band placement is audience-order, not dollars. A paused call yields NO
     # retrospective (honest "coach's note coming" state), never a fabricated one.
     "horizons_retrospective": 2,
+    # coach_diary_reaction (#1574, epic #1564): the coach's short grounded reaction to
+    # a Video Diary / Solo Recording entry, rendered on the public lab-notes surface
+    # (the coaches responding to the human, not the sensors). A reader NARRATIVE
+    # surface, so it pauses in band 2 with the rest of the reader narrative — after all
+    # internal AI, before the two irreducible reader promises. One short Haiku/Sonnet
+    # call per entry; a paused call yields NO reaction (nothing renders — AC3), never a
+    # fabricated one.
+    "coach_diary_reaction": 2,
     # semantic_recall (#1384): the "when did I feel like this before?" precedent
     # retrieval — Titan-v2 embeddings + cosine. A reader-narrative ENHANCEMENT (the
     # coach precedent line + chronicle recall card), so it pauses in band 2 with the
