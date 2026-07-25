@@ -218,6 +218,15 @@ PAGE_BINDINGS = [
         "endpoints": [],  # editorial
     },
     {
+        # #1399: the remediation agent's public track record
+        "path": "/story/build/agent-review/",
+        "name": "Story · the agent's performance review",
+        "door": "story",
+        "narrative_order": 100,
+        "story_intent": "the self-healing agent gets the same public track record as the coaches — computed from its own audit log, security items allowlist-excluded (R22)",
+        "endpoints": [{"url": "/story/build/agent-review/track-record.json", "role": "primary", "metrics": []}],  # build-time baked sidecar
+    },
+    {
         "path": "/story/panel/",
         "name": "Story · panelcast",
         "door": "story",
