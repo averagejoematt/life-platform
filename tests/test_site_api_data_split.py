@@ -100,6 +100,7 @@ EXPECTED_ROUTE_MAP = {
     "/api/journey_timeline": "handle_journey_timeline",
     "/api/journey_waveform": "handle_journey_waveform",
     "/api/broadcast": "handle_broadcast",  # #1672 — The Social Membrane broadcast feed
+    "/api/ladder_counts": "handle_ladder_counts",  # #1393 — the Engagement Ladder public rung counts
     "/api/labs": "handle_labs",
     "/api/last_sync": "handle_last_sync",
     "/api/ledger": "handle_ledger",
@@ -127,6 +128,7 @@ EXPECTED_ROUTE_MAP = {
     "/api/reading_shelf": "handle_reading_shelf",
     "/api/recap": "handle_recap",
     "/api/receipts": "handle_receipts",  # #1397 the Glass Engine
+    "/api/replicate_certify": "_handle_replicate_certify",  # #1393 — Replicator self-cert (POST)
     "/api/ritual_log": "_handle_ritual_log",
     "/api/routine": "handle_routine",
     "/api/scenarios": "handle_scenarios",

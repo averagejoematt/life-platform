@@ -1827,3 +1827,227 @@ def handle_broadcast() -> dict:
         },
         cache_seconds=900,
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# The Engagement Ladder (#1393, epic #1366) — Reader → Subscriber → Predictor →
+# Replicator → Contributor.
+# ═══════════════════════════════════════════════════════════════════════════════
+# Participation made legible as rungs. The reader's OWN rung is computed CLIENT-side
+# from the EXISTING subscriber HMAC token + localStorage (engagement_ladder.js) — no
+# auth system is built, no new identity, no PII stored server-side. This module
+# publishes only the PUBLIC, aggregate rung COUNTS, each DERIVED FROM DATA already in
+# the system and stamped with a `.provenance` block (never a hand-maintained number).
+# Two endpoints:
+#   GET  /api/ladder_counts     — read-only public counts + provenance (the only thing
+#                                 rendered on the site).
+#   POST /api/replicate_certify — a reader self-certifies a completed Replication Kit
+#                                 run; a per-source-deduped aggregate counter, no PII.
+# SDT note (the design warning the story carries): the streak/participation surface is
+# INFORMATION ONLY — never loss-framed, gaps neutral, skippable. That copy lives in
+# engagement_ladder.js; the server only reports counts.
+
+# The self-cert Replicator aggregate lives under a VOTES#* pk, so it is already covered
+# by the site_api role's LeadingKeys (VOTES#*) — no IAM change. The per-IP dedup rows
+# ride the shared VOTES#rate_limit partition (exactly like predict-week), REPL# prefixed.
+_LADDER_REPLICATOR_PK = "VOTES#ladder_replicator"
+# The Contributor rung wires to the EXISTING findings moderation path: when Matthew
+# verifies + publishes a reader-submitted finding, that path appends it to this single
+# index object ({id, credit_opt_in, credit_name} — never an email/identity). The
+# site-api has GetObject on generated/* (NOT ListBucket), so it reads this ONE known key
+# rather than enumerating the findings queue. Absent/empty ⇒ an honest 0.
+_PUBLISHED_FINDINGS_INDEX_KEY = "generated/findings/_published_index.json"
+
+
+def _ladder_subscriber_count() -> int:
+    """Confirmed-subscriber count — the same COUNT query behind /api/sub_count."""
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"USER#{USER_ID}#SOURCE#subscribers"),
+            Select="COUNT",
+            FilterExpression="attribute_exists(#s) AND #s = :confirmed",
+            ExpressionAttributeNames={"#s": "status"},
+            ExpressionAttributeValues={":confirmed": "confirmed"},
+        )
+        return int(resp.get("Count", 0))
+    except Exception as e:
+        logger.warning(f"[ladder] subscriber count failed: {e}")
+        return 0
+
+
+def _ladder_predictor_count() -> int:
+    """Distinct predict-the-week participants in the active window.
+
+    Counts DISTINCT ip_hash across the predict dedup rows (pk VOTES#rate_limit,
+    sk PRED#{ip_hash}#{week}#{metric}). Those rows carry an 8-day TTL, so this is
+    honestly 'participants in the current prediction window', not an all-time total —
+    the provenance says exactly that. No new partition, no PII (ip_hash only, already
+    the site's dedup primitive)."""
+    seen: set = set()
+    try:
+        kwargs: dict = {"KeyConditionExpression": Key("pk").eq("VOTES#rate_limit") & Key("sk").begins_with("PRED#")}
+        for _ in range(50):  # page cap — bounded by the 8-day TTL window, personal scale
+            resp = table.query(**kwargs)
+            for it in resp.get("Items", []):
+                parts = str(it.get("sk", "")).split("#")
+                if len(parts) >= 2 and parts[1]:
+                    seen.add(parts[1])
+            lek = resp.get("LastEvaluatedKey")
+            if not lek:
+                break
+            kwargs["ExclusiveStartKey"] = lek
+    except Exception as e:
+        logger.warning(f"[ladder] predictor count failed: {e}")
+    return len(seen)
+
+
+def _ladder_replicator_count() -> int:
+    """Self-certified Replication Kit completions — the aggregate counter row."""
+    try:
+        resp = table.get_item(Key={"pk": _LADDER_REPLICATOR_PK, "sk": "COUNT"})
+        item = _decimal_to_float(resp.get("Item") or {})
+        return int(item.get("cert_count", 0) or 0)
+    except Exception as e:
+        logger.warning(f"[ladder] replicator count failed: {e}")
+        return 0
+
+
+def _ladder_contributors() -> tuple:
+    """(count, credited_names) of verified+published reader findings.
+
+    Reads the single published-findings index the moderation path maintains. Only
+    opt-in display names are surfaced — never an email or reader identity. Fail-soft to
+    (0, []) when nothing has been published yet."""
+    idx = _load_s3_json(_PUBLISHED_FINDINGS_INDEX_KEY, "published_findings_index")
+    entries = idx.get("published") if isinstance(idx, dict) else None
+    if not isinstance(entries, list):
+        return 0, []
+    credited: list = []
+    for e in entries:
+        if isinstance(e, dict) and e.get("credit_opt_in") and isinstance(e.get("credit_name"), str):
+            nm = e["credit_name"].strip()[:60]
+            if nm:
+                credited.append(nm)
+    return len(entries), credited
+
+
+def handle_ladder_counts() -> dict:
+    """GET /api/ladder_counts — public engagement-ladder rung counts + provenance.
+
+    Read-only. Every published count is DERIVED FROM DATA (never hand-maintained) and
+    carries a .provenance block naming its source + method. The Reader rung is the
+    anonymous base — deliberately uncounted (no identity is tracked), which the
+    provenance states rather than fabricating a number."""
+    subscribers = _ladder_subscriber_count()
+    predictors = _ladder_predictor_count()
+    replicators = _ladder_replicator_count()
+    contributors, credited = _ladder_contributors()
+    rungs = {
+        "reader": {
+            "label": "Reader",
+            "count": None,
+            "countable": False,
+            "provenance": {
+                "source": "none",
+                "method": "not counted — anonymous, no identity or PII is stored",
+                "note": "everyone who reads; the base rung has no number by design",
+            },
+        },
+        "subscriber": {
+            "label": "Subscriber",
+            "count": subscribers,
+            "countable": True,
+            "provenance": {
+                "source": "ddb:USER#matthew#SOURCE#subscribers",
+                "method": "COUNT of confirmed (double-opt-in) subscriber records",
+                "note": "the same query behind /api/sub_count",
+            },
+        },
+        "predictor": {
+            "label": "Predictor",
+            "count": predictors,
+            "countable": True,
+            "provenance": {
+                "source": "ddb:VOTES#rate_limit (PRED# dedup rows)",
+                "method": "distinct participants who cast a predict-the-week call",
+                "note": "the active window only — dedup rows carry an 8-day TTL",
+            },
+        },
+        "replicator": {
+            "label": "Replicator",
+            "count": replicators,
+            "countable": True,
+            "provenance": {
+                "source": "ddb:VOTES#ladder_replicator",
+                "method": "self-certified Replication Kit completions, deduped per source",
+                "note": "self-reported; no proof required or stored",
+            },
+        },
+        "contributor": {
+            "label": "Contributor",
+            "count": contributors,
+            "countable": True,
+            "credited": credited,
+            "provenance": {
+                "source": "s3:generated/findings/_published_index.json",
+                "method": "reader findings verified + published via the existing moderation path",
+                "note": "named credit is opt-in only; no emails or identities are exposed",
+            },
+        },
+    }
+    return _ok(
+        {
+            "order": ["reader", "subscriber", "predictor", "replicator", "contributor"],
+            "rungs": rungs,
+        },
+        cache_seconds=300,
+    )
+
+
+def _handle_replicate_certify(event: dict) -> dict:
+    """POST /api/replicate_certify — a reader self-certifies a completed Replication
+    Kit run, bumping the public Replicator rung count.
+
+    SELF-CERTIFIED by design (#1393): no proof is required and none is stored — the
+    reader asserts they ran a kit. Deduped per source (one cert per IP, 8-day TTL row on
+    the shared VOTES#rate_limit partition) so a double-tap / retry can't inflate the
+    count. No PII: only an ip_hash (already the site's dedup primitive) and an aggregate
+    counter. ZERO moderation load — nothing lands in a review queue."""
+    source_ip = extract_client_ip(event)
+    ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
+    now_epoch = int(datetime.now(timezone.utc).timestamp())
+    try:
+        table.put_item(
+            Item={
+                "pk": "VOTES#rate_limit",
+                "sk": f"REPL#{ip_hash}",
+                "voted_at": now_epoch,
+                "ttl": now_epoch + 8 * 86400,
+            },
+            ConditionExpression="attribute_not_exists(pk)",
+        )
+    except Exception as e:
+        if "ConditionalCheckFailedException" in str(e):
+            # Idempotent: already counted this source in the window. Report success so
+            # the reader's own rung still resolves, but do NOT double-count.
+            return {
+                "statusCode": 200,
+                "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
+                "body": json.dumps({"certified": True, "counted": False, "message": "Already counted — thanks for replicating."}),
+            }
+        logger.error(f"[replicate_certify] dedup write failed: {e}")
+        return _error(500, "Could not record certification")
+    try:
+        table.update_item(
+            Key={"pk": _LADDER_REPLICATOR_PK, "sk": "COUNT"},
+            UpdateExpression="ADD cert_count :one SET last_certified = :ts",
+            ExpressionAttributeValues={":one": 1, ":ts": now_epoch},
+        )
+    except Exception as e:
+        logger.error(f"[replicate_certify] counter increment failed: {e}")
+        return _error(500, "Could not record certification")
+    return {
+        "statusCode": 200,
+        "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
+        "body": json.dumps({"certified": True, "counted": True, "message": "Logged — you're on the Replicator rung."}),
+    }

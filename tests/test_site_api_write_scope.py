@@ -39,6 +39,7 @@ _WRITTEN_KEYS = [
     "VOTES#experiment_library",  # experiment votes
     "VOTES#challenges",  # challenge votes
     "VOTES#predict_week",  # predict-the-week votes
+    "VOTES#ladder_replicator",  # #1393 — engagement-ladder self-cert Replicator counter
     "EXPERIMENT_FOLLOWS",  # experiment follows
     "CHALLENGE_FOLLOWS",  # challenge follows
     "USER#matthew#SOURCE#experiment_suggestions",  # reader experiment suggestions
@@ -58,8 +59,8 @@ def test_write_call_site_canary():
     """If this count changes, a write was added/removed — verify its partition is in
     _WRITTEN_KEYS and the role's LeadingKeys before updating this baseline."""
     n = len(re.findall(r"\.(put_item|update_item)\(", _read(_SOCIAL)))
-    assert n == 13, (
-        f"site_api_social write count is {n}, baseline 13 — a write was added/removed. "
+    assert n == 15, (
+        f"site_api_social write count is {n}, baseline 15 — a write was added/removed. "
         "Confirm its partition is in the SEC-01 LeadingKeys allowlist + _WRITTEN_KEYS, then update this baseline."
     )
 

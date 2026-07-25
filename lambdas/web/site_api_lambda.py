@@ -190,6 +190,7 @@ from web.site_api_social import (
     _handle_experiment_vote,
     _handle_nudge,
     _handle_predict_week,
+    _handle_replicate_certify,
     _handle_ritual_log,
     _handle_submit_finding,
     _handle_verify_subscriber,
@@ -198,6 +199,7 @@ from web.site_api_social import (
     handle_challenges,
     handle_current_challenge,
     handle_experiment_library,
+    handle_ladder_counts,
     handle_predict_week_tally,
     handle_subscriber_count,
 )
@@ -388,6 +390,11 @@ ROUTES = {
     # human-origin ingested posts (facade cards). Read-only; membrane filter in
     # site_api_social._is_broadcast_visible (S2 origin + S5 sensitivity seam).
     "/api/broadcast": handle_broadcast,
+    # The Engagement Ladder (#1393, epic #1366): public rung counts + provenance.
+    # Read-only; the reader's OWN rung is computed client-side from the subscriber
+    # token + localStorage (engagement_ladder.js). POST /api/replicate_certify (the
+    # self-cert) is in _SIMPLE_ROUTES below.
+    "/api/ladder_counts": handle_ladder_counts,
     # Sprint 11: glucose + sleep intelligence pages
     "/api/glucose": handle_glucose,
     "/api/sleep_correlations": handle_sleep_correlations,
@@ -521,6 +528,7 @@ _SIMPLE_ROUTES = {
     "/api/experiment_detail": (None, _handle_experiment_detail),
     "/api/predict_week": ({"GET", "POST"}, _route_predict_week),
     "/api/board_question": ({"POST"}, _handle_board_question),
+    "/api/replicate_certify": ({"POST"}, _handle_replicate_certify),  # #1393 — Replicator self-cert
 }
 
 
