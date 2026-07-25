@@ -1,0 +1,204 @@
+# Reusable: Unit Tests — the exhaustive offline suite (#1655)
+# Extracted verbatim from ci-cd.yml's `test` job. NON-GATING for deploy (#416/ADR-117):
+# the orchestrator wires nothing except notify-failure to this call, so a red here still
+# flags main but no longer skips plan → deploy → visual-QA. Offline (no AWS), so
+# `contents: read` suffices. build_sha (the #1173 reconciled tree) is passed in.
+name: CI · Unit Tests
+
+on:
+  workflow_call:
+    inputs:
+      build_sha:
+        description: 'The reconciled tree SHA to check out (#1173).'
+        required: true
+        type: string
+
+# Reusable workflows do NOT inherit the caller's permissions — declare our own.
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.build_sha }}   # #1173: the reconciled tree
+
+      # #1349: stamp the job's own start epoch so the duration-budget warning
+      # below can compute wall-clock without depending on an external API call.
+      # Kept BEFORE setup-python (unchanged ordering) so the measured window matches
+      # the original job byte-for-behavior.
+      - name: Record job start time (#1349 duration budget)
+        run: echo "UNIT_TESTS_START_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
+
+      # setup-python (v7.0.0, cache: pip) via the shared composite (#1655)
+      - uses: ./.github/actions/setup-ci
+        with:
+          python-cache: 'pip'  # V2 P4.14: speeds up CI by ~20s per job
+
+      - name: Install test dependencies
+        run: pip install pytest pytest-cov boto3 botocore hypothesis==6.161.2  # Phase 8.2: pytest-cov for coverage report; hypothesis: property tests (#1664)
+
+      - name: Run unit tests
+        run: |
+          echo "::group::Running tests/test_shared_modules.py"
+          python3 -m pytest tests/test_shared_modules.py -v --tb=short
+          echo "::endgroup::"
+
+      - name: IAM policy linter (test_role_policies.py)
+        run: |
+          echo "::group::IAM policy linter"
+          python3 -m pytest tests/test_role_policies.py -v --tb=short
+          echo "::endgroup::"
+
+      - name: CDK handler consistency linter (test_cdk_handler_consistency.py)
+        run: |
+          echo "::group::CDK handler consistency linter"
+          python3 -m pytest tests/test_cdk_handler_consistency.py -v --tb=short
+          echo "::endgroup::"
+
+      - name: CDK S3 path linter (test_cdk_s3_paths.py)
+        run: |
+          echo "::group::CDK S3 path linter"
+          python3 -m pytest tests/test_cdk_s3_paths.py -v --tb=short
+          echo "::endgroup::"
+
+      - name: Safety module wiring linter (test_wiring_coverage.py)
+        run: |
+          echo "::group::Wiring coverage linter"
+          python3 -m pytest tests/test_wiring_coverage.py -v --tb=short
+          echo "::endgroup::"
+
+      - name: DynamoDB pattern linter (test_ddb_patterns.py)
+        run: |
+          echo "::group::DynamoDB pattern linter"
+          python3 -m pytest tests/test_ddb_patterns.py -v --tb=short
+          echo "::endgroup::"
+
+      - name: MCP registry integrity linter (test_mcp_registry.py)
+        run: |
+          echo "::group::MCP registry integrity linter"
+          python3 -m pytest tests/test_mcp_registry.py -v --tb=short
+          echo "::endgroup::"
+
+      - name: Lambda handler integration linter (test_lambda_handlers.py)
+        # TB7-24: I1-I6 — file existence, syntax, handler signature, try/except, orphans, MCP entry point
+        run: |
+          echo "::group::Lambda handler integration linter"
+          python3 -m pytest tests/test_lambda_handlers.py -v --tb=short
+          echo "::endgroup::"
+
+      - name: Deprecated secrets scan
+        run: |
+          echo "::group::Deprecated secrets scan"
+          FAILED=0
+
+          while IFS= read -r line; do
+            secret=$(echo "$line" | sed 's/#.*//' | xargs)
+            [ -z "$secret" ] && continue
+
+            echo "Scanning for deprecated secret: $secret"
+            MATCHES=$(grep -rn --include='*.py' --include='*.json' --include='*.yml' --include='*.yaml' --include='*.sh' "$secret" \
+              lambdas/ mcp/ cdk/ .github/ ci/ \
+              --exclude-dir='.venv' --exclude-dir='cdk.out' \
+              2>/dev/null | grep -v 'deprecated_secrets.txt' | grep -v '^Binary' || true)
+
+            if [ -n "$MATCHES" ]; then
+              echo "::error::Deprecated secret '$secret' still referenced:"
+              echo "$MATCHES" | head -20
+              FAILED=$((FAILED + 1))
+            else
+              echo "  ✅ No references to '$secret'"
+            fi
+          done < ci/deprecated_secrets.txt
+
+          echo "::endgroup::"
+          if [ "$FAILED" -gt 0 ]; then
+            echo "::error::$FAILED deprecated secret(s) still referenced. Update to current secret names before merging."
+            exit 1
+          fi
+          echo "✅ Deprecated secrets scan passed"
+
+      - name: IAM/secrets consistency linter (test_iam_secrets_consistency.py)
+        # R8-8: Cross-refs IAM secret ARN patterns against known-secrets list
+        run: |
+          echo "::group::IAM/secrets consistency linter"
+          python3 -m pytest tests/test_iam_secrets_consistency.py -v --tb=short
+          echo "::endgroup::"
+
+      - name: Secret references linter (test_secret_references.py)
+        # R13-F04: Validates Lambda source secret name literals against known-secrets list.
+        # Prevents Todoist-style 2-day outage caused by wrong SECRET_NAME default value.
+        run: |
+          echo "::group::Secret references linter"
+          python3 -m pytest tests/test_secret_references.py -v --tb=short
+          echo "::endgroup::"
+
+      - name: Upstream-API contract tests (test_upstream_contracts.py)
+        # ER-02: assert each active source's transform contract against committed,
+        # scrubbed fixtures (tests/fixtures/upstream/**). Catches vendor payload
+        # drift (field rename/renest/retype) before it corrupts data at 4 AM.
+        # Fully offline — no live AWS/vendor calls; the live-refresh path is
+        # deploy/refresh_upstream_fixtures.py (run by hand, with creds).
+        run: |
+          echo "::group::Upstream-API contract tests (ER-02)"
+          python3 -m pytest tests/test_upstream_contracts.py -v --tb=short
+          echo "::endgroup::"
+
+      - name: Full test suite
+        # R20-F01: Run the complete pytest suite (excluding AWS integration tests)
+        run: |
+          echo "::group::Full pytest suite"
+          python3 -m pytest tests/ -v --tb=short --ignore=tests/test_integration_aws.py
+          echo "::endgroup::"
+
+      - name: Test coverage gate (regression floor, ADR-080)
+        # ENFORCED regression floor. The codebase is integration-tested (handlers
+        # run live; most offline tests are structural/contract), so measured offline
+        # line coverage is ~51% (6551-test suite, 2026-07-22 — up from the stale
+        # 45.6%/~3000-test figure). This floor (47%) prevents BACKSLIDING with ~4pt
+        # headroom under measured so normal fluctuation doesn't red main — it is not
+        # a quality bar. Ratcheted 40→47 by #1658 (lineage: #419 9%→25%, #1206 25→40);
+        # keep ratcheting up (ADR-080/ADR-107). The floor is CANONICAL in
+        # pyproject.toml `[tool.coverage.report] fail_under`; the explicit
+        # `--cov-fail-under` below is belt-and-suspenders and MUST match it —
+        # tests/test_coverage_floor_ratchet.py fails if the two (and the gap-warn
+        # --floor below) ever drift or drop below the committed RATCHET_FLOOR
+        # (up-only). The gap-warning step below reminds a human to ratchet when the
+        # floor drifts >10pts under measured. Scope: lambdas/ + mcp/ only.
+        run: |
+          echo "::group::Coverage report + gate"
+          python3 -m pytest tests/ \
+              --ignore=tests/test_integration_aws.py \
+              --cov=lambdas --cov=mcp \
+              --cov-report=term-missing:skip-covered \
+              --cov-report=xml:coverage.xml \
+              --cov-fail-under=47 \
+              -q 2>&1 | tail -100
+          echo "::endgroup::"
+
+      - name: Coverage + duration drift warnings (self-reminding ratchet, #1206/#1349)
+        # Advisory, fail-open. Two independent checks in one script (both never
+        # fail the build; keep `if: always()`):
+        #  (1) #1206: parses coverage.xml's line-rate and emits a GitHub
+        #      ::warning:: when the enforced floor (40) lags measured line
+        #      coverage by >10 points, so the ratchet reminds a human to bump it.
+        #  (2) #1349: computes this job's own wall-clock from the start-epoch
+        #      stamped above and warns when it exceeds the 480s (8min) budget —
+        #      suite duration went 157s->294s over 6 days with no standing
+        #      reminder; same self-reminding-ratchet shape, applied to suite cost.
+        if: always()
+        run: |
+          DURATION_SECONDS=$(( $(date +%s) - "${UNIT_TESTS_START_EPOCH:-$(date +%s)}" ))
+          python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 47 --gap-threshold 10 \
+              --duration-seconds "$DURATION_SECONDS" --duration-budget-seconds 480
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-report
+          path: coverage.xml
+          retention-days: 14
+        if: always()

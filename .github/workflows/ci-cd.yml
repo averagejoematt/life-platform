@@ -130,9 +130,8 @@ jobs:
         with:
           fetch-depth: 0   # pushing + the concurrent-push retry need real history
 
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: '3.12'
+      # setup-python (v7.0.0, no cache) via the shared composite (#1655)
+      - uses: ./.github/actions/setup-ci
 
       - name: Regenerate derived artifacts; commit + push if (and only if) whitelist-clean
         id: reconcile
@@ -248,214 +247,14 @@ jobs:
   # Job 1: Lint + Syntax Check
   # ════════════════════════════════════════════════════════════════
   lint:
-    name: Lint + Syntax Check
-    runs-on: ubuntu-latest
-    # #1173: gate on reconcile and check out its build_sha — the doc-drift +
-    # wiki gates below assert generator output freshness, so they must see the
-    # reconciled tree, not the pre-reconcile push.
+    # #1655: extracted verbatim to the reusable workflow .github/workflows/ci-lint.yml
+    # (same steps, same gates, same pinned SHAs). #1173: gate on reconcile and pass its
+    # build_sha so the doc-drift + wiki gates see the reconciled tree. Offline (no AWS /
+    # secrets), so nothing beyond build_sha is passed.
     needs: reconcile
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ needs.reconcile.outputs.build_sha }}   # #1173: the reconciled tree
-
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: '3.12'
-          cache: 'pip'  # V2 P4.14: speeds up CI by ~20s per job
-
-      - name: Install flake8
-        run: pip install flake8
-
-      - name: Run flake8
-        run: |
-          echo "::group::Linting lambdas/"
-          flake8 lambdas/ --count --show-source --statistics || true
-          echo "::endgroup::"
-
-          echo "::group::Linting mcp/"
-          flake8 mcp/ --count --show-source --statistics || true
-          echo "::endgroup::"
-
-          # Fail on syntax errors and undefined names; pass on style warnings
-          flake8 lambdas/ mcp/ --count --select=E9,F63,F7,F82 --show-source --statistics
-
-      - name: Install black + ruff
-        # if: always() (here + on every gate below) — #749: the lint gates used to
-        # run strictly sequentially, so the FIRST red gate stopped the job and MASKED
-        # every gate after it (fix black → discover ruff was also red → fix → discover
-        # mypy → …, one push per layer). always() makes each gate run and report
-        # independently in ONE run, so all violations surface at once. Gating is
-        # unchanged: any red gate still fails the job (each step's own non-zero exit),
-        # which still skips test-critical → plan → deploy.
-        if: always()
-        run: pip install black==25.9.0 ruff==0.14.14
-
-      - name: Format gate (black — ENFORCED, config in pyproject.toml)
-        if: always()
-        run: black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
-
-      - name: Lint gate (ruff — ENFORCED; import-sort via ruff's isort rules)
-        if: always()
-        run: ruff check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
-
-      - name: Mypy gate (ENFORCED — clean-module set, ADR-080)
-        if: always()
-        run: |
-          pip install mypy==2.1.0
-          echo "::group::Mypy on the first-party clean surface (#1656)"
-          # Authoritative list: tests/mypy_clean_set.py (single source of truth,
-          # also consumed by tests/test_mypy_clean_modules.py so the two can't
-          # drift). The clean set is the whole lambdas/ + lambdas/web/ top-level
-          # surface MINUS the documented DIRTY denylist — a ratchet that only
-          # grows. Blocking — a type regression here fails CI.
-          python -m mypy --config-file mypy.ini $(python tests/mypy_clean_set.py)
-          echo "::endgroup::"
-
-      - name: Syntax check (py_compile)
-        # Catches broken syntax that flake8 misses (e.g. invalid f-strings, truncated files)
-        if: always()
-        run: |
-          echo "::group::Syntax checking lambdas/ and mcp/"
-          FAILED=0
-          while IFS= read -r -d '' f; do
-            if python3 -m py_compile "$f" 2>&1; then
-              echo "  ✅ $f"
-            else
-              echo "  ❌ SYNTAX ERROR: $f"
-              FAILED=$((FAILED + 1))
-            fi
-          done < <(find lambdas/ mcp/ -name '*.py' -print0)
-          echo "::endgroup::"
-          if [ "$FAILED" -gt 0 ]; then
-            echo "::error::$FAILED file(s) failed syntax check"
-            exit 1
-          fi
-          echo "✅ All files pass syntax check"
-
-      - name: Dependency Security Scan (pip-audit — ENFORCED, allowlisted)
-        # pip-audit for known CVEs across BOTH dependency manifests. 2026-06-09
-        # (Tier-1 hardening): broadened from cdk-only to both manifests. #1661: flipped
-        # from advisory to BLOCKING — a known-vuln dependency now FAILS the build. The
-        # escape hatch is a DOCUMENTED allowlist (.github/pip-audit-allowlist.txt),
-        # fed to pip-audit as `--ignore-vuln` IDs, so a single unfixable / inapplicable
-        # transitive CVE can't red-wall main indefinitely; every allowlist entry needs
-        # a rationale + removal path. Dependabot (.github/dependabot.yml) still opens
-        # the bump PRs. (Lambda runtime is stdlib-only, so there is no lambdas/
-        # requirements to scan.) Pinned like the other lint-gate tools (CQ-01 style).
-        if: always()
-        run: |
-          pip install pip-audit==2.10.1
-          ALLOWLIST=.github/pip-audit-allowlist.txt
-          IGNORE_ARGS=()
-          if [ -f "$ALLOWLIST" ]; then
-            while IFS= read -r line; do
-              line="${line%%#*}"                          # strip inline comment / rationale
-              id="$(echo "$line" | tr -d '[:space:]')"    # ID is the only remaining token
-              [ -n "$id" ] && IGNORE_ARGS+=(--ignore-vuln "$id")
-            done < "$ALLOWLIST"
-            echo "pip-audit allowlist (--ignore-vuln): ${IGNORE_ARGS[*]:-<none>}"
-          fi
-          RC=0
-          for req in requirements-dev.txt cdk/requirements.txt; do
-            echo "::group::pip-audit $req"
-            pip-audit -r "$req" --desc on "${IGNORE_ARGS[@]}" || RC=1
-            echo "::endgroup::"
-          done
-          if [ "$RC" != "0" ]; then
-            echo "::error title=Dependency vulnerability (blocking)::pip-audit found a known CVE not on the allowlist. Fix: bump the dependency (Dependabot may already have a PR), or — if unfixable/inapplicable — add the advisory ID to .github/pip-audit-allowlist.txt with a rationale + removal path."
-            exit 1
-          fi
-          echo "✅ Dependency scan clean (allowlisted IDs excluded) — blocking gate green."
-
-      - name: Generate SBOM (syft — supply-chain provenance, #1661)
-        # Syft produces a Software Bill of Materials over the checked-out tree in both
-        # SPDX and CycloneDX JSON, uploaded as a build artifact for provenance. Version
-        # PINNED (CQ-01 style) — bump deliberately, not by drift. NON-gating
-        # (continue-on-error): a transient anchore.io download hiccup must not red-wall
-        # deploys, and SBOM capture is provenance, not a pass/fail security gate (that's
-        # pip-audit above). Trivy scan intentionally DEFERRED (#1661 optional item) —
-        # it adds meaningful CI time/complexity for little marginal signal over pip-audit
-        # on a stdlib-only Lambda runtime; revisit if container images enter the build.
-        if: always()
-        continue-on-error: true
-        env:
-          SYFT_VERSION: v1.49.0
-          SYFT_CHECK_FOR_APP_UPDATE: "false"
-        run: |
-          curl -sSfL "https://raw.githubusercontent.com/anchore/syft/${SYFT_VERSION}/install.sh" \
-            | sh -s -- -b "$RUNNER_TEMP/bin" "$SYFT_VERSION"
-          "$RUNNER_TEMP/bin/syft" version
-          "$RUNNER_TEMP/bin/syft" scan dir:. -q \
-            -o "spdx-json=sbom.spdx.json" \
-            -o "cyclonedx-json=sbom.cyclonedx.json"
-          echo "SBOM generated: sbom.spdx.json (SPDX) + sbom.cyclonedx.json (CycloneDX)"
-
-      - name: Upload SBOM artifact (#1661)
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: always()
-        with:
-          name: sbom
-          path: |
-            sbom.spdx.json
-            sbom.cyclonedx.json
-          retention-days: 14
-          if-no-files-found: warn
-
-      - name: Check lambda_map coverage
-        # R18-F03: Detect Lambda source files missing from ci/lambda_map.json.
-        # 2026-05-28: the old `for f in lambdas/*_lambda.py` glob matched ZERO
-        # files after the P3.1 subpackage restructure (everything moved under
-        # lambdas/<domain>/), so this check silently passed and let unmapped
-        # Lambdas slip through (the qa-smoke / lambda_map drift class). Now uses
-        # a recursive find and FAILS the build — a Lambda source must be mapped.
-        if: always()
-        run: |
-          MISSING=0
-          while IFS= read -r f; do
-            if ! grep -q "\"$f\"" ci/lambda_map.json; then
-              echo "::error file=$f::Lambda source file not in ci/lambda_map.json — add it to the .lambdas section"
-              MISSING=$((MISSING + 1))
-            fi
-          done < <(find lambdas -name '*_lambda.py' -o -name '*_handler.py')
-          if [ $MISSING -gt 0 ]; then
-            echo "::error::$MISSING Lambda source file(s) missing from lambda_map.json"
-            exit 1
-          else
-            echo "✅ All Lambda source files present in lambda_map.json"
-          fi
-
-      - name: Content-policy scan (ENFORCED — #354)
-        # Scans public-facing surfaces (site/, email lambdas, mcp/) for blocked terms
-        # from seeds/content_filter.json — the same list the runtime filter enforces.
-        # Catches personal-content leaks before they reach the public repo.
-        if: always()
-        run: python3 scripts/content_policy_scan.py
-
-      - name: Doc-drift gate (ENFORCED — #389)
-        # sync_doc_metadata.py --check asserts the literal counts quoted in CLAUDE.md
-        # and docs/*.md (tool/Lambda/module/ADR/test counts, served PLATFORM_STATS)
-        # against what AST/regex discovery finds in the source right now. Writes
-        # nothing; a mismatch means a fact changed (new tool, new Lambda, new ADR,
-        # new test) and nobody reran `sync_doc_metadata.py --apply` before merging.
-        if: always()
-        run: python3 deploy/sync_doc_metadata.py --check
-
-      - name: Wiki gates (ENFORCED — links, tombstones, facts, index, ADR index)
-        # The wiki drift machinery (CONVENTIONS §8): dead relative links, live docs
-        # (and lambdas/+mcp/ docstrings) referencing retired concepts
-        # (docs/_lint/tombstones.txt), stale counts/budget stated in any phrasing
-        # (check_doc_facts), index coverage + status headers, and the generated ADR
-        # index being current. docs-ci.yml runs the same gates on docs-only pushes;
-        # this copy catches code pushes that invalidate docs (e.g. a source docstring
-        # that revives a retired concept, or deleting a script a doc links to).
-        if: always()
-        run: |
-          python3 scripts/check_doc_links.py
-          python3 scripts/check_doc_tombstones.py
-          python3 scripts/check_doc_facts.py
-          python3 scripts/check_doc_index.py --strict
-          python3 scripts/generate_adr_index.py --check
+    uses: ./.github/workflows/ci-lint.yml
+    with:
+      build_sha: ${{ needs.reconcile.outputs.build_sha }}
 
   # ════════════════════════════════════════════════════════════════
   # Job 2a: Deploy-critical test lane (#416, ADR-117) — GATES the chain
@@ -483,10 +282,10 @@ jobs:
         with:
           ref: ${{ needs.reconcile.outputs.build_sha }}   # #1173: the reconciled tree
 
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      # setup-python (v7.0.0, cache: pip) via the shared composite (#1655)
+      - uses: ./.github/actions/setup-ci
         with:
-          python-version: '3.12'
-          cache: 'pip'
+          python-cache: 'pip'
 
       - name: Install test dependencies
         run: pip install pytest boto3 botocore hypothesis==6.161.2  # hypothesis: property tests (#1664) collected in this lane
@@ -505,188 +304,14 @@ jobs:
   # emails a CI failure) but no longer skips plan → deploy → visual-QA.
   # The deploy-gating subset is job `test-critical` above.
   test:
-    name: Unit Tests
-    runs-on: ubuntu-latest
+    # #1655: extracted verbatim to the reusable workflow .github/workflows/ci-test.yml
+    # (same steps, same pinned SHAs). NON-GATING for deploy (#416/ADR-117): only
+    # notify-failure `needs` this call, so a red here flags main but never skips
+    # plan → deploy → visual-QA. Offline (no AWS / secrets) — only build_sha is passed.
     needs: [reconcile, lint]   # #1173: reconcile listed to read build_sha
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ needs.reconcile.outputs.build_sha }}   # #1173: the reconciled tree
-
-      # #1349: stamp the job's own start epoch so the duration-budget warning
-      # below can compute wall-clock without depending on an external API call.
-      - name: Record job start time (#1349 duration budget)
-        run: echo "UNIT_TESTS_START_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
-
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: '3.12'
-          cache: 'pip'  # V2 P4.14: speeds up CI by ~20s per job
-
-      - name: Install test dependencies
-        run: pip install pytest pytest-cov boto3 botocore hypothesis==6.161.2  # Phase 8.2: pytest-cov for coverage report; hypothesis: property tests (#1664)
-
-      - name: Run unit tests
-        run: |
-          echo "::group::Running tests/test_shared_modules.py"
-          python3 -m pytest tests/test_shared_modules.py -v --tb=short
-          echo "::endgroup::"
-
-      - name: IAM policy linter (test_role_policies.py)
-        run: |
-          echo "::group::IAM policy linter"
-          python3 -m pytest tests/test_role_policies.py -v --tb=short
-          echo "::endgroup::"
-
-      - name: CDK handler consistency linter (test_cdk_handler_consistency.py)
-        run: |
-          echo "::group::CDK handler consistency linter"
-          python3 -m pytest tests/test_cdk_handler_consistency.py -v --tb=short
-          echo "::endgroup::"
-
-      - name: CDK S3 path linter (test_cdk_s3_paths.py)
-        run: |
-          echo "::group::CDK S3 path linter"
-          python3 -m pytest tests/test_cdk_s3_paths.py -v --tb=short
-          echo "::endgroup::"
-
-      - name: Safety module wiring linter (test_wiring_coverage.py)
-        run: |
-          echo "::group::Wiring coverage linter"
-          python3 -m pytest tests/test_wiring_coverage.py -v --tb=short
-          echo "::endgroup::"
-
-      - name: DynamoDB pattern linter (test_ddb_patterns.py)
-        run: |
-          echo "::group::DynamoDB pattern linter"
-          python3 -m pytest tests/test_ddb_patterns.py -v --tb=short
-          echo "::endgroup::"
-
-      - name: MCP registry integrity linter (test_mcp_registry.py)
-        run: |
-          echo "::group::MCP registry integrity linter"
-          python3 -m pytest tests/test_mcp_registry.py -v --tb=short
-          echo "::endgroup::"
-
-      - name: Lambda handler integration linter (test_lambda_handlers.py)
-        # TB7-24: I1-I6 — file existence, syntax, handler signature, try/except, orphans, MCP entry point
-        run: |
-          echo "::group::Lambda handler integration linter"
-          python3 -m pytest tests/test_lambda_handlers.py -v --tb=short
-          echo "::endgroup::"
-
-      - name: Deprecated secrets scan
-        run: |
-          echo "::group::Deprecated secrets scan"
-          FAILED=0
-
-          while IFS= read -r line; do
-            secret=$(echo "$line" | sed 's/#.*//' | xargs)
-            [ -z "$secret" ] && continue
-
-            echo "Scanning for deprecated secret: $secret"
-            MATCHES=$(grep -rn --include='*.py' --include='*.json' --include='*.yml' --include='*.yaml' --include='*.sh' "$secret" \
-              lambdas/ mcp/ cdk/ .github/ ci/ \
-              --exclude-dir='.venv' --exclude-dir='cdk.out' \
-              2>/dev/null | grep -v 'deprecated_secrets.txt' | grep -v '^Binary' || true)
-
-            if [ -n "$MATCHES" ]; then
-              echo "::error::Deprecated secret '$secret' still referenced:"
-              echo "$MATCHES" | head -20
-              FAILED=$((FAILED + 1))
-            else
-              echo "  ✅ No references to '$secret'"
-            fi
-          done < ci/deprecated_secrets.txt
-
-          echo "::endgroup::"
-          if [ "$FAILED" -gt 0 ]; then
-            echo "::error::$FAILED deprecated secret(s) still referenced. Update to current secret names before merging."
-            exit 1
-          fi
-          echo "✅ Deprecated secrets scan passed"
-
-      - name: IAM/secrets consistency linter (test_iam_secrets_consistency.py)
-        # R8-8: Cross-refs IAM secret ARN patterns against known-secrets list
-        run: |
-          echo "::group::IAM/secrets consistency linter"
-          python3 -m pytest tests/test_iam_secrets_consistency.py -v --tb=short
-          echo "::endgroup::"
-
-      - name: Secret references linter (test_secret_references.py)
-        # R13-F04: Validates Lambda source secret name literals against known-secrets list.
-        # Prevents Todoist-style 2-day outage caused by wrong SECRET_NAME default value.
-        run: |
-          echo "::group::Secret references linter"
-          python3 -m pytest tests/test_secret_references.py -v --tb=short
-          echo "::endgroup::"
-
-      - name: Upstream-API contract tests (test_upstream_contracts.py)
-        # ER-02: assert each active source's transform contract against committed,
-        # scrubbed fixtures (tests/fixtures/upstream/**). Catches vendor payload
-        # drift (field rename/renest/retype) before it corrupts data at 4 AM.
-        # Fully offline — no live AWS/vendor calls; the live-refresh path is
-        # deploy/refresh_upstream_fixtures.py (run by hand, with creds).
-        run: |
-          echo "::group::Upstream-API contract tests (ER-02)"
-          python3 -m pytest tests/test_upstream_contracts.py -v --tb=short
-          echo "::endgroup::"
-
-      - name: Full test suite
-        # R20-F01: Run the complete pytest suite (excluding AWS integration tests)
-        run: |
-          echo "::group::Full pytest suite"
-          python3 -m pytest tests/ -v --tb=short --ignore=tests/test_integration_aws.py
-          echo "::endgroup::"
-
-      - name: Test coverage gate (regression floor, ADR-080)
-        # ENFORCED regression floor. The codebase is integration-tested (handlers
-        # run live; most offline tests are structural/contract), so measured offline
-        # line coverage is ~51% (6551-test suite, 2026-07-22 — up from the stale
-        # 45.6%/~3000-test figure). This floor (47%) prevents BACKSLIDING with ~4pt
-        # headroom under measured so normal fluctuation doesn't red main — it is not
-        # a quality bar. Ratcheted 40→47 by #1658 (lineage: #419 9%→25%, #1206 25→40);
-        # keep ratcheting up (ADR-080/ADR-107). The floor is CANONICAL in
-        # pyproject.toml `[tool.coverage.report] fail_under`; the explicit
-        # `--cov-fail-under` below is belt-and-suspenders and MUST match it —
-        # tests/test_coverage_floor_ratchet.py fails if the two (and the gap-warn
-        # --floor below) ever drift or drop below the committed RATCHET_FLOOR
-        # (up-only). The gap-warning step below reminds a human to ratchet when the
-        # floor drifts >10pts under measured. Scope: lambdas/ + mcp/ only.
-        run: |
-          echo "::group::Coverage report + gate"
-          python3 -m pytest tests/ \
-              --ignore=tests/test_integration_aws.py \
-              --cov=lambdas --cov=mcp \
-              --cov-report=term-missing:skip-covered \
-              --cov-report=xml:coverage.xml \
-              --cov-fail-under=47 \
-              -q 2>&1 | tail -100
-          echo "::endgroup::"
-
-      - name: Coverage + duration drift warnings (self-reminding ratchet, #1206/#1349)
-        # Advisory, fail-open. Two independent checks in one script (both never
-        # fail the build; keep `if: always()`):
-        #  (1) #1206: parses coverage.xml's line-rate and emits a GitHub
-        #      ::warning:: when the enforced floor (40) lags measured line
-        #      coverage by >10 points, so the ratchet reminds a human to bump it.
-        #  (2) #1349: computes this job's own wall-clock from the start-epoch
-        #      stamped above and warns when it exceeds the 480s (8min) budget —
-        #      suite duration went 157s->294s over 6 days with no standing
-        #      reminder; same self-reminding-ratchet shape, applied to suite cost.
-        if: always()
-        run: |
-          DURATION_SECONDS=$(( $(date +%s) - "${UNIT_TESTS_START_EPOCH:-$(date +%s)}" ))
-          python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 47 --gap-threshold 10 \
-              --duration-seconds "$DURATION_SECONDS" --duration-budget-seconds 480
-
-      - name: Upload coverage artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: coverage-report
-          path: coverage.xml
-          retention-days: 14
-        if: always()
+    uses: ./.github/workflows/ci-test.yml
+    with:
+      build_sha: ${{ needs.reconcile.outputs.build_sha }}
 
   # ════════════════════════════════════════════════════════════════
   # Job 3: Plan — validate map, detect changes, build deploy plan
@@ -728,9 +353,10 @@ jobs:
           echo "✅ lambda_map.json valid — all source files present"
 
       - name: Configure AWS credentials (OIDC) — plan
-        uses: aws-actions/configure-aws-credentials@517a711dbcd0e402f90c77e7e2f81e849156e31d # v6.2.2
+        uses: ./.github/actions/setup-ci
         with:
-          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
+          python: 'false'
+          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
           aws-region: ${{ env.AWS_REGION }}
 
       - name: CDK diff — detect IAM/infra drift
@@ -991,9 +617,10 @@ jobs:
           ref: ${{ needs.reconcile.outputs.build_sha }}   # #1173: deploy the reconciled tree (e.g. the synced site_api_common literals)
 
       - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@517a711dbcd0e402f90c77e7e2f81e849156e31d # v6.2.2
+        uses: ./.github/actions/setup-ci
         with:
-          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
+          python: 'false'
+          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Fleet deploy (shared module changed)
@@ -1228,10 +855,9 @@ jobs:
         with:
           ref: ${{ needs.reconcile.outputs.build_sha }}   # #1173: the reconciled tree
 
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: ./.github/actions/setup-ci
         with:
-          python-version: '3.12'
-          cache: 'pip'
+          python-cache: 'pip'
 
       - name: Install Playwright + Chromium
         run: |
@@ -1240,9 +866,10 @@ jobs:
           python -m playwright install --with-deps chromium
 
       - name: Configure AWS credentials (OIDC — for Bedrock vision QA)
-        uses: aws-actions/configure-aws-credentials@517a711dbcd0e402f90c77e7e2f81e849156e31d # v6.2.2
+        uses: ./.github/actions/setup-ci
         with:
-          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-diagnosis-role
+          python: 'false'
+          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-diagnosis-role
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Run visual + AI-vision QA sweep
@@ -1294,18 +921,18 @@ jobs:
           # structurally unable to pass in CI. Full history fixes it (2026-07-08).
           fetch-depth: 0
 
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: ./.github/actions/setup-ci
         with:
-          python-version: '3.12'
-          cache: 'pip'  # V2 P4.14: speeds up CI by ~20s per job
+          python-cache: 'pip'
 
       - name: Install boto3 + pytest
         run: pip install boto3 pytest --quiet
 
       - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@517a711dbcd0e402f90c77e7e2f81e849156e31d # v6.2.2
+        uses: ./.github/actions/setup-ci
         with:
-          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
+          python: 'false'
+          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
           aws-region: ${{ env.AWS_REGION }}
 
       - name: I1 — Lambda handler names match expected module names
@@ -1416,9 +1043,10 @@ jobs:
           ref: ${{ needs.reconcile.outputs.build_sha }}   # #1173: same tree the deploy used
 
       - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@517a711dbcd0e402f90c77e7e2f81e849156e31d # v6.2.2
+        uses: ./.github/actions/setup-ci
         with:
-          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
+          python: 'false'
+          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Rollback deployed Lambdas

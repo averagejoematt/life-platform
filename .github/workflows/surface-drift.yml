@@ -44,9 +44,8 @@ jobs:
           # and reads base-revision file contents via `git show`
           fetch-depth: 0
 
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: '3.12'
+      # setup-python (v7.0.0) via the shared composite (#1655)
+      - uses: ./.github/actions/setup-ci
 
       - name: Surface-drift gate (#1454)
         run: python3 scripts/surface_drift_gate.py --base origin/main
