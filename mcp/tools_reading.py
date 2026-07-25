@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from boto3.dynamodb.conditions import Key
 from reading import (
     horizons_garden,
+    horizons_retrospective,
     horizons_verify,
     reading_constellation,
     reading_enrich,
@@ -315,6 +316,46 @@ def tool_curate_horizon(args=None):
 
     item = reading_store.put_horizon_pick(plan)
     return {"status": "committed", "action": "curate_horizon", "pick": item}
+
+
+def _prior_iso_week() -> str:
+    """The ISO-week label for 7 days ago (the pick due for its retrospective)."""
+    return _iso_week((datetime.now(timezone.utc).date().fromordinal(datetime.now(timezone.utc).date().toordinal() - 7)))
+
+
+def tool_archive_horizon(args=None):
+    """Archive a prior Horizons pick with the Mind coach's retrospective (#1707, S3).
+
+    The week AFTER a pick, the coach writes a grounded, public "why I recommended it /
+    what I hoped it'd do" reflection. GROUNDED (ADR-104 — built only from the stored
+    pick), BUDGET-GATED (reader-narrative band 2), and passed through the #1673
+    fail-closed sensitivity gate before it can publish. Only a gate-CLEARED retrospective
+    becomes reader-visible on /data/horizons/; a held/paused verdict stores its status
+    (never prose). draft → dry_run → commit: writes only on explicit dry_run=false.
+    """
+    args = args or {}
+    week = (args.get("week") or "").strip() or _prior_iso_week()
+    pick = reading_store.get_horizon_pick(week)
+    if not pick:
+        return mcp_error(f"no Horizons pick for week {week} to archive", error_code="NO_DATA")
+
+    retro = horizons_retrospective.generate(pick)
+
+    dry_run = args.get("dry_run", True)
+    if isinstance(dry_run, str):
+        dry_run = dry_run.strip().lower() not in ("false", "0", "no")
+
+    if dry_run:
+        return {
+            "status": "preview",
+            "action": "archive_horizon",
+            "week": week,
+            "retrospective": retro,
+            "note": "Dry run — nothing written. Re-call with dry_run=false to commit.",
+        }
+
+    updated = reading_store.set_horizon_retrospective(week, retro)
+    return {"status": "committed", "action": "archive_horizon", "week": week, "retrospective_status": retro.get("status"), "pick": updated}
 
 
 # ── WRITE FAT-TOOL (draft → dry_run → commit) ─────────────────────────────────

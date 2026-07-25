@@ -61,6 +61,7 @@ from mcp.tools_memory import (
 )
 from mcp.tools_nutrition import tool_get_deficit_sustainability, tool_get_nutrition
 from mcp.tools_reading import (
+    tool_archive_horizon,
     tool_curate_horizon,
     tool_get_constellation,
     tool_get_due_recalls,
@@ -1843,6 +1844,30 @@ TOOLS = {
                     "dry_run": {"type": "boolean", "description": "Preview + verify without writing (default true). Set false to commit."},
                 },
                 "required": ["url", "title", "format", "rationale_tag"],
+            },
+        },
+    },
+    "archive_horizon": {
+        "fn": tool_archive_horizon,
+        "schema": {
+            "name": "archive_horizon",
+            "description": (
+                "Archive a prior Horizons pick with the Mind coach's grounded retrospective (the week AFTER "
+                "the pick): why you recommended it and what you hoped it would do for Matthew. GROUNDED "
+                "(ADR-104 — built only from the stored pick, never Matthew's private reactions), budget-gated "
+                "(reader-narrative), and passed through the #1673 fail-closed sensitivity gate before it can "
+                "publish. draft->dry_run->commit: writes only on explicit dry_run=false. Defaults to last week."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "week": {"type": "string", "description": "ISO week 'YYYY-Www' to archive (default: last week)."},
+                    "dry_run": {
+                        "type": "boolean",
+                        "description": "Preview the retrospective without writing (default true). Set false to commit.",
+                    },
+                },
+                "required": [],
             },
         },
     },

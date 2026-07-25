@@ -94,6 +94,7 @@ EXPECTED_ROUTE_MAP = {
     "/api/habit_registry": "handle_habit_registry",
     "/api/habit_streaks": "handle_habit_streaks",
     "/api/habits": "handle_habits",
+    "/api/horizons": "handle_horizons",  # #1707 — Horizons coach-curated picks + retrospectives feed
     "/api/hypotheses": "handle_hypotheses",
     "/api/inference_receipt": "handle_inference_receipt",
     "/api/intelligence_summary": "handle_intelligence_summary",

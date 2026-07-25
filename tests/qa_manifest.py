@@ -378,6 +378,21 @@ _CURATED = [
         "visual": {"checks": [{"selector": "main, [data-readout], article", "not_empty": True, "desc": "broadcast content"}]},
     },
     {
+        # #1707 (epic #1686 S3): Horizons — the Mind coach's weekly media picks + their
+        # grounded retrospectives, on the DATA door near the reading shelf. From the
+        # read-only /api/horizons; degrades to an honest empty/"note coming" state at low n.
+        "path": "/data/horizons/",
+        "name": "Data · horizons",
+        "tier": 2,
+        "content_class": "live-data",
+        "api_deps": ["/api/horizons"],
+        "js_modules": ["horizons.js"],
+        "visual": {
+            "wait_for": "[data-horizons]",
+            "checks": [{"selector": "[data-horizons]", "not_empty": True, "desc": "horizons feed rendered (picks or honest empty state)"}],
+        },
+    },
+    {
         # #1381 (epic #1364): the Theme River — evolving journal-enrichment themes across
         # the attempt, rendered as monochrome small-multiples. GENERATED —
         # scripts/v4_build_theme_river.py bakes the HTML + reads a STATIC artifact

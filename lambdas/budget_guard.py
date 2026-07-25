@@ -119,6 +119,14 @@ _FEATURE_CUTOFF = {
     # podcast's only input). Kept at 2 in lockstep with the Panel lambda's own
     # SKIP_TIER=2. Weekly Bedrock cost is ~$1 — negligible vs the ceiling.
     "chronicle": 2,
+    # horizons_retrospective (#1707, epic #1686 S3): the Mind coach's weekly grounded
+    # "why I recommended it" retrospective on the /data/horizons/ feed — a reader
+    # NARRATIVE surface, so it pauses in band 2 with the rest of the reader narrative,
+    # after all internal AI and before the two irreducible reader promises. Weekly +
+    # cached (stored on the pick, never regenerated per request), so ~pennies/mo; the
+    # band placement is audience-order, not dollars. A paused call yields NO
+    # retrospective (honest "coach's note coming" state), never a fabricated one.
+    "horizons_retrospective": 2,
     # semantic_recall (#1384): the "when did I feel like this before?" precedent
     # retrieval — Titan-v2 embeddings + cosine. A reader-narrative ENHANCEMENT (the
     # coach precedent line + chronicle recall card), so it pauses in band 2 with the

@@ -1039,6 +1039,28 @@ body { overflow-x: hidden; }
 .bc-subscribe { margin: var(--sp-5) 0 0; color: var(--ink-muted); font-family: var(--font-mono); }
 .bc-subscribe a { color: var(--ember); }
 
+/* #1707 — Horizons: the coach-curated media picks feed (Data door, /data/horizons/).
+   A reverse-chron reading-column list (not the image grid) — the retrospective is the
+   narrative pull, so each card is prose-first. Reuses the type triad + tokens. */
+.hz-feed { list-style: none; margin: var(--sp-5) 0 0; padding: 0; display: grid; gap: var(--sp-4); }
+.hz-card { border: var(--border-hair); border-left: 2px solid var(--ember); border-radius: var(--radius-sm);
+  background: var(--surface); padding: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-2); }
+.hz-meta { display: flex; gap: var(--sp-2); align-items: baseline; flex-wrap: wrap; margin: 0; }
+.hz-format { color: var(--ember); text-transform: uppercase; letter-spacing: 0.1em; font-family: var(--font-mono); font-size: var(--fs-label); }
+.hz-source { color: var(--ink-muted); font-family: var(--font-mono); font-size: var(--fs-label); }
+.hz-week { color: var(--ink-faint); font-family: var(--font-mono); font-size: var(--fs-label); margin-left: auto; }
+.hz-title { margin: 0; font-family: var(--font-serif); font-size: var(--fs-h3); line-height: 1.25; }
+.hz-title a { color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }
+.hz-title a:hover { color: var(--ember); text-decoration: underline; }
+.hz-pitch { margin: 0; color: var(--ink-muted); font-size: var(--fs-small); line-height: 1.5; }
+.hz-retro { margin: var(--sp-2) 0 0; padding: var(--sp-3); border-radius: var(--radius-sm); background: var(--rule); }
+.hz-retro-label { display: block; margin-bottom: 4px; color: var(--ink-faint); text-transform: uppercase;
+  letter-spacing: 0.1em; font-family: var(--font-mono); font-size: var(--fs-label); }
+.hz-retro-text { margin: 0; font-family: var(--font-serif); font-size: var(--fs-body); line-height: 1.5; color: var(--ink); }
+.hz-retro-pending { margin: var(--sp-2) 0 0; color: var(--ink-faint); font-family: var(--font-mono); font-size: var(--fs-label); }
+.hz-cta { color: var(--ink-muted); font-family: var(--font-mono); font-size: var(--fs-label); text-decoration: none; }
+.hz-cta:hover { color: var(--ember); }
+
 /* #1377 — "Most Wrong This Month" on the scorecard: the graded-failure obituaries. */
 .sc-wronglist { list-style: none; margin: var(--sp-2) 0; padding: 0; display: grid; gap: 4px; }
 .sc-wrong a { display: grid; gap: 2px; padding: var(--sp-3); border: var(--border-hair); border-left: 2px solid var(--ember);

@@ -97,6 +97,58 @@ def handle_constellation():
     )
 
 
+_HORIZONS_LIMIT = 52  # ~a year of weekly picks; the feed is a highlight rail, not an archive
+
+
+def _public_horizon_card(pick: dict) -> dict:
+    """A public Horizons card — an EXPLICIT allowlist projection (fail-closed).
+
+    Only the reader-safe pick facts + the coach's retrospective (ONLY when the #1673
+    gate cleared it, i.e. retrospectiveStatus == "published") leave this module. Any
+    field not named here — including S4's future private reactions — is unreachable BY
+    CONSTRUCTION, the same architectural posture as reading_visibility.project_public.
+    """
+    p = pick or {}
+    card = {
+        "week": p.get("week"),
+        "format": p.get("format"),
+        "title": p.get("title"),
+        "url": p.get("url"),
+        "source": p.get("source"),
+        "pitch": p.get("pitch"),
+        "rationale_tag": p.get("rationale_tag"),
+        "curator": p.get("curator") or "mind",
+        "curated_at": p.get("curatedAt"),
+    }
+    # The retrospective is the reader hook — but only a gate-CLEARED one is public. A
+    # held/paused/absent verdict yields an honest "coach's note coming" state client-side.
+    if p.get("retrospectiveStatus") == "published" and p.get("retrospective"):
+        card["retrospective"] = p["retrospective"]
+        card["retrospective_at"] = p.get("retrospectiveAt")
+        card["retrospective_curator"] = p.get("retrospectiveCurator") or "mind"
+    return card
+
+
+def handle_horizons():
+    """GET /api/horizons — the public Horizons feed (#1707, epic #1686 S3).
+
+    Reverse-chron coach-curated media picks + their grounded retrospectives, for the
+    /data/horizons/ page. Read-only; explicit public allowlist per card (never Matthew's
+    private reactions). Honest empty state before the first pick — no picks yet is normal.
+    """
+    picks = reading_store.horizon_picks(limit=_HORIZONS_LIMIT)
+    cards = [_public_horizon_card(p) for p in picks]
+    return _ok(
+        {
+            "items": cards,
+            "count": len(cards),
+            "note": None if cards else "The Mind coach curates one pick a week — the first lands soon.",
+            "as_of": _today(),
+        },
+        cache_seconds=300,
+    )
+
+
 def handle_reading_overview():
     """Roundedness wheel + public stats + the cockpit reading line."""
     today = _today()

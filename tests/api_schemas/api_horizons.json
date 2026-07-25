@@ -1,0 +1,77 @@
+{
+  "captured_at": "2026-07-25T00:00:00+00:00",
+  "fetch_path": "/api/horizons",
+  "is_prefix_sample": false,
+  "path": "/api/horizons",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "as_of": {
+        "type": "string"
+      },
+      "count": {
+        "type": "integer"
+      },
+      "items": {
+        "items": {
+          "keys": {
+            "curated_at": {
+              "type": "string"
+            },
+            "curator": {
+              "type": "string"
+            },
+            "format": {
+              "type": "string"
+            },
+            "pitch": {
+              "type": "string"
+            },
+            "rationale_tag": {
+              "type": "string"
+            },
+            "retrospective": {
+              "type": "string"
+            },
+            "retrospective_at": {
+              "type": "string"
+            },
+            "retrospective_curator": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            },
+            "week": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 1,
+        "type": "array"
+      },
+      "note": {
+        "type": "null"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}
