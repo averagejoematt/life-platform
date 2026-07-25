@@ -35,6 +35,10 @@
     "category": "write-path",
     "reason": "POST-only \u2014 evening nudge action (write)"
   },
+  "/api/replicate_certify": {
+    "category": "write-path",
+    "reason": "POST-only — #1393 engagement-ladder Replicator self-cert; deduped per source, increments the VOTES#ladder_replicator aggregate counter (write)"
+  },
   "/api/ritual_log": {
     "category": "write-path",
     "reason": "GET-verb but MUTATING: one-tap evening-ritual write gated by a signed HMAC token (ADR-124, #769) \u2014 no read-only variant exists; there is no safe way to probe it that doesn't attempt a write"

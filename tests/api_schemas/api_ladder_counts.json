@@ -1,0 +1,111 @@
+{
+  "captured_at": "2026-07-25T00:00:00+00:00",
+  "fetch_path": "/api/ladder_counts",
+  "is_prefix_sample": false,
+  "path": "/api/ladder_counts",
+  "status": 200,
+  "shape": {
+    "type": "object",
+    "keys": {
+      "_meta": {
+        "type": "object",
+        "keys": {
+          "cache_seconds": {"type": "integer"},
+          "generated_at": {"type": "string"},
+          "request_id": {"type": "string"}
+        }
+      },
+      "order": {
+        "type": "array",
+        "items": {"type": "string"},
+        "length_sample": 5
+      },
+      "rungs": {
+        "type": "object",
+        "keys": {
+          "reader": {
+            "type": "object",
+            "keys": {
+              "label": {"type": "string"},
+              "count": {"type": "null"},
+              "countable": {"type": "boolean"},
+              "provenance": {
+                "type": "object",
+                "keys": {
+                  "source": {"type": "string"},
+                  "method": {"type": "string"},
+                  "note": {"type": "string"}
+                }
+              }
+            }
+          },
+          "subscriber": {
+            "type": "object",
+            "keys": {
+              "label": {"type": "string"},
+              "count": {"type": "integer"},
+              "countable": {"type": "boolean"},
+              "provenance": {
+                "type": "object",
+                "keys": {
+                  "source": {"type": "string"},
+                  "method": {"type": "string"},
+                  "note": {"type": "string"}
+                }
+              }
+            }
+          },
+          "predictor": {
+            "type": "object",
+            "keys": {
+              "label": {"type": "string"},
+              "count": {"type": "integer"},
+              "countable": {"type": "boolean"},
+              "provenance": {
+                "type": "object",
+                "keys": {
+                  "source": {"type": "string"},
+                  "method": {"type": "string"},
+                  "note": {"type": "string"}
+                }
+              }
+            }
+          },
+          "replicator": {
+            "type": "object",
+            "keys": {
+              "label": {"type": "string"},
+              "count": {"type": "integer"},
+              "countable": {"type": "boolean"},
+              "provenance": {
+                "type": "object",
+                "keys": {
+                  "source": {"type": "string"},
+                  "method": {"type": "string"},
+                  "note": {"type": "string"}
+                }
+              }
+            }
+          },
+          "contributor": {
+            "type": "object",
+            "keys": {
+              "label": {"type": "string"},
+              "count": {"type": "integer"},
+              "countable": {"type": "boolean"},
+              "credited": {"type": "array", "items": null, "length_sample": 0},
+              "provenance": {
+                "type": "object",
+                "keys": {
+                  "source": {"type": "string"},
+                  "method": {"type": "string"},
+                  "note": {"type": "string"}
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
