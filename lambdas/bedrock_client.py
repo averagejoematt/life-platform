@@ -78,8 +78,22 @@ _PRICES = {
     "opus": {"in": 5.00, "out": 25.00, "cache_read": 0.50, "cache_write": 6.25},
     "sonnet": {"in": 3.00, "out": 15.00, "cache_read": 0.30, "cache_write": 3.75},
     "haiku": {"in": 1.00, "out": 5.00, "cache_read": 0.10, "cache_write": 1.25},
+    # #1384: Amazon Titan Text Embeddings V2 — input-only, ~$0.02/1M tokens, no output/
+    # cache tiers. Keyed by the "titan" substring of amazon.titan-embed-text-v2:0 so
+    # embed_text() spend meters correctly instead of defaulting to the most-expensive tier.
+    "titan": {"in": 0.02, "out": 0.00, "cache_read": 0.00, "cache_write": 0.00},
 }
 _DEFAULT_PRICE = _PRICES["fable"]
+
+# ── Titan-v2 embeddings (semantic recall #1384) ─────────────────────────────
+# Amazon Titan is NOT an inference profile: a bare foundation-model id, on-demand,
+# no `us.` prefix and not in _MODEL_MAP. 256 dims (Titan v2 supports 256/512/1024)
+# is plenty for a small corpus and keeps each stored vector ~1KB; normalize=True so
+# cosine reduces to a dot product. Titan does no sampling, so the embedding is
+# DETERMINISTIC — the same text always yields the same vector, the property #1384's
+# reproducible retrieval relies on.
+TITAN_EMBED_MODEL_ID = os.environ.get("TITAN_EMBED_MODEL_ID", "amazon.titan-embed-text-v2:0")
+TITAN_EMBED_DIMENSIONS = int(os.environ.get("TITAN_EMBED_DIMENSIONS", "256"))
 _CW = None
 
 
@@ -244,3 +258,64 @@ def invoke(body: dict, model_name: str | None = None) -> dict:
     # G1: meter token usage + estimated spend at the single chokepoint. Fail-open.
     _emit_usage_metrics(parsed.get("usage") or {}, model_id)
     return parsed
+
+
+def _shadow_embedding(text: str, dims: int) -> list:
+    """Deterministic pseudo-embedding for BEDROCK_SHADOW_MODE — a unit-length vector
+    seeded from a hash of the text, so shadow/dev pipelines (and the backfill's
+    no-spend path) produce STABLE vectors without a real Bedrock call. Same text ⇒
+    same vector; different text ⇒ (almost surely) different vector."""
+    import hashlib
+    import math as _math
+
+    vec = []
+    for i in range(dims):
+        h = hashlib.sha256(f"{text}|{i}".encode("utf-8")).digest()
+        # Map the first 4 bytes to a float in [-1, 1].
+        n = int.from_bytes(h[:4], "big") / 0xFFFFFFFF
+        vec.append(2.0 * n - 1.0)
+    norm = _math.sqrt(sum(x * x for x in vec)) or 1.0
+    return [x / norm for x in vec]
+
+
+def embed_text(text: str, *, dimensions: int | None = None, model_id: str | None = None, normalize: bool = True) -> list:
+    """Return a Titan-v2 text embedding (list[float]) — the Bedrock chokepoint's
+    embeddings arm (ADR-062: every Bedrock call routes through this module).
+
+    Deterministic by construction (Titan does no sampling). Respects the same
+    tier-3 budget backstop as invoke() (fail-open on a missing budget_guard) and
+    meters spend through the shared _emit_usage_metrics path (Titan priced via the
+    "titan" _PRICES entry). Raises ValueError on empty input; propagates
+    botocore ClientError on Bedrock errors so callers own retry/fallback.
+    """
+    text = (text or "").strip()
+    if not text:
+        raise ValueError("embed_text: empty input text")
+    dims = int(dimensions or TITAN_EMBED_DIMENSIONS)
+    mid = model_id or TITAN_EMBED_MODEL_ID
+
+    if os.environ.get("BEDROCK_SHADOW_MODE"):
+        return _shadow_embedding(text, dims)
+
+    # Budget backstop — the same tier-3 hard stop invoke() enforces. At tier 3 all
+    # AI is paused; pausing embeddings too is correct (backfill runs off-peak anyway).
+    try:
+        from budget_guard import BudgetExceeded, current_tier
+
+        if current_tier() >= 3:
+            raise BudgetExceeded("AI paused — monthly budget ceiling reached (tier 3). Auto-resumes at month rollover.")
+    except ImportError:
+        pass
+
+    body = {"inputText": text, "dimensions": dims, "normalize": bool(normalize)}
+    resp = _client().invoke_model(
+        modelId=mid,
+        body=json.dumps(body),
+        contentType="application/json",
+        accept="application/json",
+    )
+    parsed = json.loads(resp["body"].read())
+    # Titan reports inputTextTokenCount (no output tokens) — meter it fail-open.
+    tok = int(parsed.get("inputTextTokenCount", 0) or 0)
+    _emit_usage_metrics({"input_tokens": tok, "output_tokens": 0}, mid)
+    return parsed.get("embedding") or []
