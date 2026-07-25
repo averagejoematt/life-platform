@@ -319,7 +319,10 @@ def bedrock_offtopic_classifier(text: str) -> OfftopicResult:
     for block in resp.get("content") or []:
         if block.get("type") == "text":
             raw += block.get("text", "")
-    parsed = json.loads(re.search(r"\{.*\}", raw, re.DOTALL).group(0))
+    m = re.search(r"\{.*\}", raw, re.DOTALL)
+    if m is None:  # no JSON object in the reply → unparseable verdict → uncertain → hold
+        return OfftopicResult(None, 0.0)
+    parsed = json.loads(m.group(0))
     on_topic = parsed.get("on_topic")
     if not isinstance(on_topic, bool):
         return OfftopicResult(None, 0.0)  # unparseable verdict → uncertain → hold

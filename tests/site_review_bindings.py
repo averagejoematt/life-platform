@@ -264,6 +264,16 @@ PAGE_BINDINGS = [
         "endpoints": [{"url": "/api/broadcast", "role": "primary", "metrics": []}],
     },
     {
+        # #1707 (epic #1686 S3) — Horizons on the DATA door (near the reading shelf).
+        # narrative_order 90.6: unused (broadcast=90.5, next is 91), globally-unique.
+        "path": "/data/horizons/",
+        "name": "Data · horizons",
+        "door": "data",
+        "narrative_order": 90.6,
+        "story_intent": "the coach broadening the aperture — a weekly media pick, then a grounded retrospective on why it went out",
+        "endpoints": [{"url": "/api/horizons", "role": "primary", "metrics": []}],
+    },
+    {
         "path": "/journal/essays/org-chart-of-one/",
         "name": "Essay · The Org Chart of One",
         "door": "story",

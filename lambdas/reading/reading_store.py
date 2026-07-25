@@ -264,6 +264,37 @@ def current_horizon_pick() -> dict | None:
     return picks[0] if picks else None
 
 
+def set_horizon_retrospective(week: str, retro: dict, *, now: str | None = None) -> dict | None:
+    """Attach the Mind coach's retrospective verdict to an existing week's pick (#1707).
+
+    The retrospective is generated the week AFTER a pick and stored ON the pick record
+    (no new partition) so the public /data/horizons/ feed reads it with the pick in one
+    query. Public-safe by construction: the fields written are the coach's own reflection
+    (retrospective / retrospectiveStatus / retrospectiveReason / retrospectiveCurator /
+    retrospectiveAt), never any of Matthew's private reactions (S4 scope, never stored
+    here). Returns the updated pick, or None if no pick exists for `week`.
+    """
+    item = _get(rk.horizon_key(week))
+    if not item:
+        return None
+    item = {k: v for k, v in item.items() if k not in ("pk", "sk")}
+    status = retro.get("status")
+    item["retrospectiveStatus"] = status
+    item["retrospectiveAt"] = retro.get("generatedAt") or (now or _now_iso())
+    item["retrospectiveCurator"] = retro.get("curator") or "mind"
+    # Only a published (gate-cleared) retrospective carries reader-visible text; a held /
+    # paused verdict stores its status + reason for the review surface but NO prose — so a
+    # withheld retrospective can never leak onto the public feed (fail-closed by storage).
+    if status == "published" and retro.get("text"):
+        item["retrospective"] = retro["text"]
+        item.pop("retrospectiveReason", None)
+    else:
+        item.pop("retrospective", None)
+        if retro.get("reason"):
+            item["retrospectiveReason"] = retro["reason"]
+    return put_horizon_pick(item, now=now)
+
+
 def update_cover_key(book_id: str, cover_s3_key: str | None, cover_source: str, now: str | None = None) -> dict | None:
     """Set BOOK#<id>.coverS3Key + coverSource (called by the cover pipeline)."""
     book = _get(rk.book_key(book_id))

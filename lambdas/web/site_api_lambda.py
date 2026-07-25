@@ -174,6 +174,7 @@ from web.site_api_observatory import (
 # P1.1 Phase B step 5 (2026-05-26): vitals cluster extracted.
 from web.site_api_reading import (
     handle_constellation,
+    handle_horizons,
     handle_reading_overview,
     handle_reading_shelf,
 )
@@ -348,6 +349,7 @@ ROUTES = {
     "/api/zone2": handle_zone2_breakdown,
     "/api/reading_shelf": handle_reading_shelf,  # Mind pillar (ADR-097) — public shelf
     "/api/reading_overview": handle_reading_overview,  # Mind pillar — wheel + stats + cockpit line
+    "/api/horizons": handle_horizons,  # Horizons (#1707, epic #1686 S3) — coach-curated picks + grounded retrospectives
     "/api/constellation": handle_constellation,  # Mind pillar (Phase E) — the idea-graph signature
     "/api/journey": handle_journey,
     "/api/vacation_fund": handle_vacation_fund,
