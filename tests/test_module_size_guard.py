@@ -78,7 +78,9 @@ BASELINE = {
     "lambdas/web/site_api_data.py": "3016 lines",
     "lambdas/emails/wednesday_chronicle_lambda.py": "2975 lines",
     "cdk/stacks/role_policies.py": "2848 lines",
-    "lambdas/web/site_api_observatory.py": "2826 lines",
+    # site_api_observatory.py drained to a ~150-line facade by #1654 slice 3 — the handler
+    # logic now lives in cohesive web/site_api_{nutrition,meals,training,physical,mind}.py
+    # (each well under the ceiling). The pure-subset ratchet allows removing a shrunk entry.
     "lambdas/emails/daily_brief_lambda.py": "2472 lines",
     "lambdas/web/site_api_intelligence.py": "2460 lines",
     "lambdas/web/site_api_vitals.py": "2407 lines",

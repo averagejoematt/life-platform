@@ -13,7 +13,9 @@ import re
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 _PRODUCER = os.path.join(ROOT, "lambdas", "compute", "daily_metrics_compute_lambda.py")
-_SERVER = os.path.join(ROOT, "lambdas", "web", "site_api_observatory.py")
+# #1654 slice 3: nutrition_overview (the serving-layer producer of these protein fields)
+# moved from the site_api_observatory facade into the cohesive web/site_api_nutrition.py.
+_SERVER = os.path.join(ROOT, "lambdas", "web", "site_api_nutrition.py")
 
 _PAIR_RE = re.compile(r'\.get\(\s*"(protein_(?:target|floor)_g)"\s*,\s*(\d+)')
 
