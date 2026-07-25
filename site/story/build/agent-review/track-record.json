@@ -1,0 +1,43 @@
+{
+  "generated_at": "2026-07-25T01:13:07.555470+00:00",
+  "window_days": 14,
+  "mode": "shadow",
+  "first_run": "2026-05-29",
+  "last_run": "2026-07-22",
+  "counts": {
+    "agent_runs": 33,
+    "signals_triaged": 232,
+    "prs_opened": 1,
+    "auto_fixed": 0,
+    "gate_merges": 0,
+    "gate_holds": 0,
+    "needs_human": 20
+  },
+  "survival": {
+    "held": 0,
+    "regressed": 0,
+    "not_yet_gradeable": 0,
+    "n_gradeable": 0,
+    "held_rate": null,
+    "window_days": 14
+  },
+  "cases": [
+    {
+      "kind": "proposed-pr",
+      "alarm_class": "source-freshness",
+      "pr": null,
+      "url": "https://github.com/averagejoematt/life-platform/compare/remediation/freshness-sk-sort-bug",
+      "title": "fix(freshness): filter DDB query to DATE# SKs to prevent false-fire stale count (needs-review). Branch pushed: remediation/freshness-sk-sort-bug. PR creation blocked \u2014 GitHub Actions bot lacks createPullRequest permission on this repo. Operator must open the PR manually from the pushed branch. Root cause: two non-DATE# SKs (garmin REFRESH_RATELIMIT, food_delivery YEAR#2026) sort above DATE# in descending order, causing strptime ValueError and false-firing ~2 stale counts per day since ~2026-05-04. Fix: add begins_with(sk, 'DATE#') to the KeyConditionExpression in freshness_checker_lambda.py line 120. One-line change, no schema/IAM/logic impact.",
+      "reason": "",
+      "infra": false,
+      "landed_on": null,
+      "decided_on": "2026-05-31",
+      "survival": null,
+      "provenance": {
+        "log": "agent-run",
+        "source": "remediation-log/2026/05/31/160107.json"
+      }
+    }
+  ],
+  "excluded_case_count": 0
+}

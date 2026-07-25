@@ -335,6 +335,20 @@ _CURATED = [
         "visual": {"checks": [{"selector": "main, [data-readout], article", "not_empty": True, "desc": "build dispatches content"}]},
     },
     {
+        # #1399: the Remediation Agent's public track record. Static build-time page —
+        # scripts/v4_build_agent_review.py bakes the computed track record (from the
+        # remediation-log audit trail via remediation/track_record.py) into the HTML,
+        # so there is NO /api dep and no autodeploy race. Re-run the builder to refresh.
+        "path": "/story/build/agent-review/",
+        "name": "Story · agent performance review (#1399)",
+        "tier": 3,
+        "content_class": "static",
+        "api_deps": [],
+        "js_modules": [],
+        "structural": {"marker": 'class="ar-main"'},
+        "visual": {"checks": [{"selector": ".ar-stats, .ar-case, .ar-empty", "not_empty": True, "desc": "agent track record"}]},
+    },
+    {
         "path": "/story/panel/",
         "name": "Story · panelcast",
         "tier": 3,

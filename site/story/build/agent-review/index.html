@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en" data-door="story">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>The Agent&#x27;s Performance Review — The Story — averagejoematt</title>
+  <meta name="description" content="The self-healing remediation agent&#x27;s public track record — triaged alarms, PRs opened, auto-merge gate decisions, and honest fix-survival-at-14-days grading. Computed from the audit log the agent already writes; security-shaped items are withheld.">
+  <link rel="canonical" href="https://averagejoematt.com/story/build/agent-review/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="averagejoematt">
+  <meta property="og:url" content="https://averagejoematt.com/story/build/agent-review/">
+  <meta property="og:title" content="The Agent&#x27;s Performance Review — The Story — averagejoematt">
+  <meta property="og:description" content="The self-healing remediation agent&#x27;s public track record — triaged alarms, PRs opened, auto-merge gate decisions, and honest fix-survival-at-14-days grading. Computed from the audit log the agent already writes; security-shaped items are withheld.">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-builders.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="The Agent&#x27;s Performance Review — The Story — averagejoematt">
+  <meta name="twitter:description" content="The self-healing remediation agent&#x27;s public track record — triaged alarms, PRs opened, auto-merge gate decisions, and honest fix-survival-at-14-days grading. Computed from the audit log the agent already writes; security-shaped items are withheld.">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4EFE4">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E0C08">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="icon" type="image/svg+xml" href="/assets/marks/favicon-dark.svg">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="preload" href="/assets/fonts/v4/pxiTypc9vsFDm051Uf6KVwgkfoSxQ0GsQv8ToedPibnr0SZe1ZuWi3g.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/assets/fonts/v4/6NU78FyLNQOQZAnv9bYEvDiIdE9Ea92uemAk_WBq8U_9v0c2Wa0KxC9TeP2Xz5c.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/assets/fonts/v4/-F63fjptAgt5VM-kVkqdyU8n1i8q131nj-o.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/assets/css/fonts.css">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/story.css">
+  
+<style>
+.ar-main { max-width: var(--container); margin-inline: auto; padding: 0 var(--gutter) var(--sp-10); }
+.ar-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--sp-3); margin-top: var(--sp-6); }
+.ar-stat { border: 1px solid var(--border-hair); border-radius: var(--radius); padding: var(--sp-4); background: var(--surface-raised); }
+.ar-stat .ar-n { font-family: var(--font-serif); font-size: var(--fs-h2); line-height: 1; color: var(--ink); }
+.ar-stat .ar-k { display: block; margin-top: var(--sp-2); font-family: var(--font-mono); font-size: var(--fs-label);
+  letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--ink-faint); }
+.section-label { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-dim); margin: var(--sp-8) 0 var(--sp-3); }
+.ar-survival { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--sp-3); }
+.ar-surv { border: 1px solid var(--border-hair); border-radius: var(--radius); padding: var(--sp-4); }
+.ar-surv .ar-n { font-family: var(--font-serif); font-size: var(--fs-h3); }
+.ar-surv[data-g="held"] .ar-n { color: var(--signal); }
+.ar-surv[data-g="regressed"] .ar-n { color: var(--alert); }
+.ar-surv[data-g="not-yet"] .ar-n { color: var(--ink-muted); }
+.ar-surv .ar-k { display: block; margin-top: var(--sp-2); font-family: var(--font-mono); font-size: var(--fs-label);
+  letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--ink-faint); }
+.ar-note { color: var(--ink-muted); font-size: var(--fs-small); line-height: var(--lh-relaxed); max-width: var(--measure); margin-top: var(--sp-3); }
+.ar-cases { list-style: none; margin: var(--sp-3) 0 0; padding: 0; display: grid; gap: var(--sp-3); }
+.ar-case { border: 1px solid var(--border-hair); border-radius: var(--radius); padding: var(--sp-4); background: var(--surface-raised); min-width: 0; }
+.ar-case-top { display: flex; align-items: baseline; gap: var(--sp-3); flex-wrap: wrap; }
+.ar-badge { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--ink-faint); border: 1px solid var(--border-hair); border-radius: var(--radius-xs); padding: 2px var(--sp-2); }
+.ar-grade { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label); text-transform: uppercase; }
+.ar-grade[data-g="held"] { color: var(--signal); }
+.ar-grade[data-g="regressed"] { color: var(--alert); }
+.ar-grade[data-g="not-yet"] { color: var(--ink-muted); }
+.ar-case-title { margin: var(--sp-2) 0 0; color: var(--ink); line-height: var(--lh-snug); overflow-wrap: anywhere; }
+.ar-case-foot { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); flex-wrap: wrap; margin-top: var(--sp-3); }
+.ar-case-foot a { color: var(--ember); font-family: var(--font-mono); font-size: var(--fs-small); }
+.ar-empty { border: 1px dashed var(--border-hair); border-radius: var(--radius); padding: var(--sp-6);
+  color: var(--ink-muted); line-height: var(--lh-relaxed); text-align: center; }
+.ar-provenance { margin-top: var(--sp-8); }
+</style>
+
+  <script>(function(){try{var t=localStorage.getItem("ajm-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+  <script>(function(){try{if(!("IntersectionObserver" in window))return;if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;document.documentElement.classList.add("mo");window.__moFail=setTimeout(function(){document.documentElement.classList.remove("mo");},2600);}catch(e){}})();</script>
+</head>
+<body class="dx-page">
+  <a class="skip" href="#ar">Skip to the track record</a>
+  <header class="story-top">
+    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">averagejoematt</span> <span class="brand-door label">the story</span></a>
+    <nav class="doors" aria-label="Doors"><a href="/cockpit/" title="Today&#x27;s live instrument — your daily numbers, read back to you"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-cockpit"></use></svg>the cockpit</a><a href="/data/" title="Every source the platform reads — trends now and over time"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-data"></use></svg>the data</a><a href="/coaching/" title="The AI team &amp; their arguments — stances, track records, disagreements"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-coaching"></use></svg>the coaching</a><a href="/protocols/" title="The levers — supplements, experiments, challenges, discoveries"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-protocols"></use></svg>the protocols</a><a href="/story/" title="The writing &amp; the why — chronicle, journal, timeline, about" aria-current="page"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-story"></use></svg>the story</a><button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button></nav>
+  </header>
+  <main id="ar" class="ar-main">
+    <div class="page-hero">
+      <p class="ph-kicker label">the story &middot; the honesty machinery, graded</p>
+      <h1 class="ph-title">The Agent's Performance Review</h1>
+      <p class="ph-promise">The self-healing remediation agent gets the same treatment as the coaches: a public track record. Everything below is computed from the audit log the agent already writes &mdash; what it triaged, what it proposed, what the auto-merge gate decided, and whether each landed fix actually <em>held</em> for 14 days or the alarm re-fired. It is currently in <strong>shadow</strong> mode.</p>
+      <nav class="loop-ribbon" aria-label="Where this sits in the loop"><a href="/cockpit/">Now</a><span class="lr-sep" aria-hidden="true">&middot;</span><a href="/data/">Data</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/coaching/">Coaching</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/protocols/">Protocols</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><span class="lr-here" aria-current="page">Story</span><span class="lr-arrow" aria-hidden="true">&#8635;</span></nav>
+    </div>
+
+    <p class="section-label">The record spanning 2026-05-29 → 2026-07-22</p>
+    <div class="ar-stats"><div class="ar-stat"><span class="ar-n">33</span><span class="ar-k">agent runs</span></div><div class="ar-stat"><span class="ar-n">232</span><span class="ar-k">signals triaged</span></div><div class="ar-stat"><span class="ar-n">1</span><span class="ar-k">PRs opened</span></div><div class="ar-stat"><span class="ar-n">0</span><span class="ar-k">gate auto-merges</span></div><div class="ar-stat"><span class="ar-n">0</span><span class="ar-k">gate holds</span></div><div class="ar-stat"><span class="ar-n">20</span><span class="ar-k">escalated to human</span></div></div>
+
+    <p class="section-label">Did the fixes hold? &mdash; survival at 14 days</p>
+    <div class="ar-survival"><div class="ar-surv" data-g="held"><span class="ar-n">0</span><span class="ar-k">held</span></div><div class="ar-surv" data-g="regressed"><span class="ar-n">0</span><span class="ar-k">regressed</span></div><div class="ar-surv" data-g="not-yet"><span class="ar-n">0</span><span class="ar-k">not yet gradeable</span></div></div>
+    <p class="ar-note">No fix has cleared the 14-day window yet — nothing gradeable, so no rate is claimed. A fix younger than 14 days is <strong>not-yet-gradeable</strong> &mdash; it is never counted as a success (ADR-104). &ldquo;Regressed&rdquo; means the same alarm class re-fired inside the window; &ldquo;held&rdquo; means the window elapsed clean.</p>
+
+    <p class="section-label">Case files</p>
+    <ul class="ar-cases"><li class="ar-case"><div class="ar-case-top"><span class="ar-badge">source freshness</span><span class="ar-badge">PR opened for a human</span></div><p class="ar-case-title">fix(freshness): filter DDB query to DATE# SKs to prevent false-fire stale count (needs-review). Branch pushed: remediation/freshness-sk-sort-bug. PR creation blocked — GitHub Actions bot lacks createPullRequest permission on this repo. Operator must open the PR manually from the pushed branch. Root cause: two non-DATE# SKs (garmin REFRESH_RATELIMIT, food_delivery YEAR#2026) sort above DATE# in descending order, causing strptime ValueError and false-firing ~2 stale counts per day since ~2026-05-04. Fix: add begins_with(sk, &#x27;DATE#&#x27;) to the KeyConditionExpression in freshness_checker_lambda.py line 120. One-line change, no schema/IAM/logic impact.</p><div class="ar-case-foot"><p class="provenance"><span class="pv-src">source: agent-run log &middot; 2026-05-31</span></p><a href="https://github.com/averagejoematt/life-platform/compare/remediation/freshness-sk-sort-bug" target="_blank" rel="noopener">view PR &rarr;</a></div><p class="provenance"><span class="pv-src">remediation-log/2026/05/31/160107.json</span></p></li></ul>
+    
+
+    <section class="ar-provenance">
+      <p class="provenance"><span class="pv-src">Computed by <code>scripts/v4_build_agent_review.py</code> from <code>remediation-log/</code> (the agent + auto-merge-gate audit log) via <code>remediation/track_record.py</code> &middot; as of 2026-07-25</span></p>
+      <p class="ar-note">No new inference and no hand-kept numbers: this page reads records the platform wrote about itself. Case files pass an alarm-type allowlist before they render &mdash; security- or exploit-adjacent classes are excluded by design (R22), and the count withheld is shown above rather than hidden.</p>
+    </section>
+  </main>
+  <aside class="loop-forward" aria-label="Continue the loop"><p class="lf-next"><span class="label">next on the loop</span> <a href="/cockpit/">the cockpit</a> — Check today&#x27;s live read</p><p class="lf-return"><span class="label">or come back</span> <a href="/subscribe/">follow by email</a> for the next entry</p></aside>
+  <footer class="site-foot"><nav class="site-foot-cols" aria-label="Site map"><div class="sf-col"><p class="sf-h label">The Story</p><a href="/story/chronicle/">Chronicle</a><a href="/story/panel/">Podcast</a><a href="/story/journal/">In my own words</a><a href="/story/timeline/">Timeline</a><a href="/story/attempts/">The attempts</a><a href="/story/agents/">The agents</a><a href="/story/about/">About</a></div><div class="sf-col"><p class="sf-h label">The Data</p><a href="/data/">All topics</a><a href="/method/ask/">Ask the data</a><a href="/data/labs/">Labs</a><a href="/data/training/">Training</a><a href="/data/sleep/">Sleep</a><a href="/data/ledger/">The ledger</a></div><div class="sf-col"><p class="sf-h label">The Protocols</p><a href="/protocols/">All protocols</a><a href="/protocols/supplements/">Supplements</a><a href="/protocols/experiments/">Experiments</a><a href="/protocols/challenges/">Challenges</a></div><div class="sf-col"><p class="sf-h label">The Coaching</p><a href="/coaching/">The Read</a><a href="/coaching/by-coach/">By Coach</a><a href="/coaching/scorecard/">Scorecard</a><a href="/coaching/team/">The Team</a><a href="/coaching/lab-notes/">AI lab notes</a></div><div class="sf-col"><p class="sf-h label">The Technology</p><a href="/method/">The machine</a><a href="/story/build/">Build log</a><a href="/method/platform/">The platform</a><a href="/method/pipeline/">Pipeline status</a><a href="/method/cost/">Cost</a><a href="/gear/">The gear</a></div><div class="sf-col"><p class="sf-h label">Follow &amp; context</p><a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a><a href="https://bsky.app/profile/averagejoematt.bsky.social" target="_blank" rel="me noopener">Bluesky</a><a href="https://x.com/averagejoematt_" target="_blank" rel="me noopener">X</a><a href="https://www.instagram.com/averagejoematt/" target="_blank" rel="me noopener">Instagram</a><a href="https://www.reddit.com/user/averagejoematt/" target="_blank" rel="me noopener">Reddit</a><a href="https://www.youtube.com/@averagejoematt" target="_blank" rel="me noopener">YouTube</a><a href="https://www.tiktok.com/@averagejoematt" target="_blank" rel="me noopener">TikTok</a><a href="/story/about/">About</a><a href="/privacy/">Privacy</a></div></nav><p class="sf-base label"><span>averagejoematt</span><a href="/">← home</a></p><script type="module" src="/assets/js/attribution.js"></script></footer>
+  <script src="/assets/js/motion.js" defer></script>
+  <script type="module">import { initTheme } from "/assets/js/theme.js"; initTheme();</script>
+</body>
+</html>
