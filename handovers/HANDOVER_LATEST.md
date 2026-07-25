@@ -78,6 +78,40 @@ validated 200 — staged; the #1676/#1629 consumers aren't built yet).
 - `not-work — owner decision`: the repo private-flip (ping for the post-flip checklist — metered minutes return + re-verify env protection).
 - `not-work — standing ops reminder`: no aged-alarm / stale-secret escalations outstanding at wrap (remediation agent in `shadow`; SECRETS_ROTATION monitoring clean).
 
+## Next-session paydown queue (opus + sonnet triage)
+37 open non-fable (27 `model:opus` + 10 `model:sonnet`). Realistic close target **10–14**
+(→ ~18 if X + Instagram + billing-PAT creds land first). Ranked:
+
+- **DO FIRST — near-free closes:** doc-ADRs I write directly (no worktree agent) — #1666
+  (complexity ledger) · #1352 (LICENSE all-rights-reserved + docs/LICENSES.md) · #1333 (paging
+  ADR + SNS topic) · #1662 (branch-protection required-check wiring + ADR). Execute **#1650**
+  (orphan-branch move — decision locked). Check **#1656**: if merged → land **#1654 slice 4**
+  (`web/site_api_intelligence.py` 2460 lines, facade + `_g` hand-off like #1727/#1729/#1730).
+- **Owner-decided this session → now buildable (sign-off done):** #1336 (SCA code parts) · #1345
+  (rollback drill) · #1678 (native embeds CSP + ADR) + #1674 (the embeds) · #1330 (Strava check) ·
+  #1662/#1666/#1352/#1333 (above).
+- **Clean buildable (opus/sonnet):** #1570 (diary cards) · #1407 (Monarch honest-half) · #1623
+  (milestone digest) · #1574 (coach reactions to diary — #1572 live) · #1706 (prescription S2) ·
+  #1708 (prescription S4) · #1385 (whole-life chronicle — AI, grounding) · #1740/#1741 (podcast
+  script layer, non-audio parts).
+- **Infra/multi-slice (work ≫ count):** #1658 (coverage→70%) · #1653 (lambdas/ packaging,
+  CDK-per-slice with me) · #1401 (Fork My Life-Stack — CDK) · #1475 (nav — design, U1-dep).
+- **Credential-gated — SKIP until keys land (`life-platform/x`, `life-platform/instagram`):**
+  #1402 · #1679 · #1675 · #1677 · #1632 · #1633. #1676 (Bluesky inbound) CAN build (secret staged;
+  Mastodon half needs a token; small CDK for the role's GetSecretValue). #1613 build code, dormant
+  until the billing PAT.
+- **Owner-only / deferred — surface, don't build:** #1742/#1738/#1739 (podcast bake-off — my ear) ·
+  #1396 (deferred, private-IP conflict) · #1622 (posture confirmed) · #1243 · #1029 (before 2026-08-20) · #741.
+
+**Method (all held this session):** fan out worktree-implementers 2–4 at a time in DIFFERENT areas
+(never two on the same shared registry) → verify each on-branch (git-grep counts, ~50% false) →
+combined-tree FULL suite (catches cross-cutting registry gaps targeted suites miss) → FULL 6-dir ruff
++ black + content-policy + mypy-clean-set (NOT in pytest) → land code-reconcile waves via local-merge /
+fast-forward to main (`gh pr merge` drops integration-only fixes) → pre-deploy site-api for new
+endpoints (autodeploy race) → merge the wave → ONE `deploy_all` → approve gate with
+`bash deploy/approve_deployment.sh <run_id>`. role_policies.py change = R8-ST6 IAM Plan gate reds by
+design → prep the CDK command for Matthew.
+
 ## Gate outcomes
 - **Build beat:** `2026-07-25-horizons-live` (Horizons end-to-end — curate → public feed → grounded retrospective).
 - **Docs:** DATA_GOVERNANCE (retention policy, #1350) + SCHEMA (diary channels + horizon pick shape) + DIARY_STUDIO_KIT
