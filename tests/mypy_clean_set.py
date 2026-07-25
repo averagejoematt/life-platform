@@ -53,7 +53,15 @@ DIRTY = {
     # The 3,000-line endpoint handlers — explicitly OUT of scope (var-annotated
     # + misc + call-overload); the next ratchet step, not attempted here.
     "lambdas/web/site_api_data.py",
-    "lambdas/web/site_api_observatory.py",
+    # #1654 slice 3: site_api_observatory.py is now a mypy-clean facade (dropped from
+    # this denylist — the ratchet tightening). Its handler bodies moved verbatim into
+    # these cohesive siblings, carrying their pre-existing var-annotated debt with them
+    # (relocation, not new debt — the same next-ratchet-step as site_api_data).
+    "lambdas/web/site_api_nutrition.py",
+    "lambdas/web/site_api_meals.py",
+    "lambdas/web/site_api_training.py",
+    "lambdas/web/site_api_physical.py",
+    "lambdas/web/site_api_mind.py",
 }
 
 # Crown-jewel modules that must ALWAYS be in the clean set (a guard against the

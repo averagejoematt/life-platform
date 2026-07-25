@@ -63,7 +63,9 @@ def test_checkpoint_entries_are_all_checkpoint_kind():
 
 
 def test_next_dexa_recommended_shares_the_constant():
-    src = open(os.path.join(_REPO, "lambdas", "web", "site_api_observatory.py")).read()
+    # #1654 slice 3: physical_overview (the DEXA-countdown handler) moved from the
+    # site_api_observatory facade into the cohesive web/site_api_physical.py module.
+    src = open(os.path.join(_REPO, "lambdas", "web", "site_api_physical.py")).read()
     assert "timedelta(days=DEXA_RECHECK_DAYS)" in src
     # the old hand-typed interval is gone from the DEXA path
     assert "scan_dt + timedelta(days=90)" not in src
