@@ -1,0 +1,224 @@
+# Reusable: Lint + Syntax Check (#1655)
+# Extracted verbatim from ci-cd.yml's `lint` job — same steps, same gates, same
+# SHAs. Called by ci-cd.yml as a workflow_call. Offline (no AWS), so `contents: read`
+# is the only permission it needs. build_sha (the #1173 reconciled tree) is passed in.
+name: CI · Lint
+
+on:
+  workflow_call:
+    inputs:
+      build_sha:
+        description: 'The reconciled tree SHA to check out (#1173).'
+        required: true
+        type: string
+
+# Reusable workflows do NOT inherit the caller's permissions — declare our own.
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint + Syntax Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.build_sha }}   # #1173: the reconciled tree
+
+      # setup-python (v7.0.0, cache: pip) via the shared composite (#1655)
+      - uses: ./.github/actions/setup-ci
+        with:
+          python-cache: 'pip'  # V2 P4.14: speeds up CI by ~20s per job
+
+      - name: Install flake8
+        run: pip install flake8
+
+      - name: Run flake8
+        run: |
+          echo "::group::Linting lambdas/"
+          flake8 lambdas/ --count --show-source --statistics || true
+          echo "::endgroup::"
+
+          echo "::group::Linting mcp/"
+          flake8 mcp/ --count --show-source --statistics || true
+          echo "::endgroup::"
+
+          # Fail on syntax errors and undefined names; pass on style warnings
+          flake8 lambdas/ mcp/ --count --select=E9,F63,F7,F82 --show-source --statistics
+
+      - name: Install black + ruff
+        # if: always() (here + on every gate below) — #749: the lint gates used to
+        # run strictly sequentially, so the FIRST red gate stopped the job and MASKED
+        # every gate after it (fix black → discover ruff was also red → fix → discover
+        # mypy → …, one push per layer). always() makes each gate run and report
+        # independently in ONE run, so all violations surface at once. Gating is
+        # unchanged: any red gate still fails the job (each step's own non-zero exit),
+        # which still skips test-critical → plan → deploy.
+        if: always()
+        run: pip install black==25.9.0 ruff==0.14.14
+
+      - name: Format gate (black — ENFORCED, config in pyproject.toml)
+        if: always()
+        run: black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
+
+      - name: Lint gate (ruff — ENFORCED; import-sort via ruff's isort rules)
+        if: always()
+        run: ruff check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
+
+      - name: Mypy gate (ENFORCED — clean-module set, ADR-080)
+        if: always()
+        run: |
+          pip install mypy==2.1.0
+          echo "::group::Mypy on the first-party clean surface (#1656)"
+          # Authoritative list: tests/mypy_clean_set.py (single source of truth,
+          # also consumed by tests/test_mypy_clean_modules.py so the two can't
+          # drift). The clean set is the whole lambdas/ + lambdas/web/ top-level
+          # surface MINUS the documented DIRTY denylist — a ratchet that only
+          # grows. Blocking — a type regression here fails CI.
+          python -m mypy --config-file mypy.ini $(python tests/mypy_clean_set.py)
+          echo "::endgroup::"
+
+      - name: Syntax check (py_compile)
+        # Catches broken syntax that flake8 misses (e.g. invalid f-strings, truncated files)
+        if: always()
+        run: |
+          echo "::group::Syntax checking lambdas/ and mcp/"
+          FAILED=0
+          while IFS= read -r -d '' f; do
+            if python3 -m py_compile "$f" 2>&1; then
+              echo "  ✅ $f"
+            else
+              echo "  ❌ SYNTAX ERROR: $f"
+              FAILED=$((FAILED + 1))
+            fi
+          done < <(find lambdas/ mcp/ -name '*.py' -print0)
+          echo "::endgroup::"
+          if [ "$FAILED" -gt 0 ]; then
+            echo "::error::$FAILED file(s) failed syntax check"
+            exit 1
+          fi
+          echo "✅ All files pass syntax check"
+
+      - name: Dependency Security Scan (pip-audit — ENFORCED, allowlisted)
+        # pip-audit for known CVEs across BOTH dependency manifests. 2026-06-09
+        # (Tier-1 hardening): broadened from cdk-only to both manifests. #1661: flipped
+        # from advisory to BLOCKING — a known-vuln dependency now FAILS the build. The
+        # escape hatch is a DOCUMENTED allowlist (.github/pip-audit-allowlist.txt),
+        # fed to pip-audit as `--ignore-vuln` IDs, so a single unfixable / inapplicable
+        # transitive CVE can't red-wall main indefinitely; every allowlist entry needs
+        # a rationale + removal path. Dependabot (.github/dependabot.yml) still opens
+        # the bump PRs. (Lambda runtime is stdlib-only, so there is no lambdas/
+        # requirements to scan.) Pinned like the other lint-gate tools (CQ-01 style).
+        if: always()
+        run: |
+          pip install pip-audit==2.10.1
+          ALLOWLIST=.github/pip-audit-allowlist.txt
+          IGNORE_ARGS=()
+          if [ -f "$ALLOWLIST" ]; then
+            while IFS= read -r line; do
+              line="${line%%#*}"                          # strip inline comment / rationale
+              id="$(echo "$line" | tr -d '[:space:]')"    # ID is the only remaining token
+              [ -n "$id" ] && IGNORE_ARGS+=(--ignore-vuln "$id")
+            done < "$ALLOWLIST"
+            echo "pip-audit allowlist (--ignore-vuln): ${IGNORE_ARGS[*]:-<none>}"
+          fi
+          RC=0
+          for req in requirements-dev.txt cdk/requirements.txt; do
+            echo "::group::pip-audit $req"
+            pip-audit -r "$req" --desc on "${IGNORE_ARGS[@]}" || RC=1
+            echo "::endgroup::"
+          done
+          if [ "$RC" != "0" ]; then
+            echo "::error title=Dependency vulnerability (blocking)::pip-audit found a known CVE not on the allowlist. Fix: bump the dependency (Dependabot may already have a PR), or — if unfixable/inapplicable — add the advisory ID to .github/pip-audit-allowlist.txt with a rationale + removal path."
+            exit 1
+          fi
+          echo "✅ Dependency scan clean (allowlisted IDs excluded) — blocking gate green."
+
+      - name: Generate SBOM (syft — supply-chain provenance, #1661)
+        # Syft produces a Software Bill of Materials over the checked-out tree in both
+        # SPDX and CycloneDX JSON, uploaded as a build artifact for provenance. Version
+        # PINNED (CQ-01 style) — bump deliberately, not by drift. NON-gating
+        # (continue-on-error): a transient anchore.io download hiccup must not red-wall
+        # deploys, and SBOM capture is provenance, not a pass/fail security gate (that's
+        # pip-audit above). Trivy scan intentionally DEFERRED (#1661 optional item) —
+        # it adds meaningful CI time/complexity for little marginal signal over pip-audit
+        # on a stdlib-only Lambda runtime; revisit if container images enter the build.
+        if: always()
+        continue-on-error: true
+        env:
+          SYFT_VERSION: v1.49.0
+          SYFT_CHECK_FOR_APP_UPDATE: "false"
+        run: |
+          curl -sSfL "https://raw.githubusercontent.com/anchore/syft/${SYFT_VERSION}/install.sh" \
+            | sh -s -- -b "$RUNNER_TEMP/bin" "$SYFT_VERSION"
+          "$RUNNER_TEMP/bin/syft" version
+          "$RUNNER_TEMP/bin/syft" scan dir:. -q \
+            -o "spdx-json=sbom.spdx.json" \
+            -o "cyclonedx-json=sbom.cyclonedx.json"
+          echo "SBOM generated: sbom.spdx.json (SPDX) + sbom.cyclonedx.json (CycloneDX)"
+
+      - name: Upload SBOM artifact (#1661)
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: sbom
+          path: |
+            sbom.spdx.json
+            sbom.cyclonedx.json
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Check lambda_map coverage
+        # R18-F03: Detect Lambda source files missing from ci/lambda_map.json.
+        # 2026-05-28: the old `for f in lambdas/*_lambda.py` glob matched ZERO
+        # files after the P3.1 subpackage restructure (everything moved under
+        # lambdas/<domain>/), so this check silently passed and let unmapped
+        # Lambdas slip through (the qa-smoke / lambda_map drift class). Now uses
+        # a recursive find and FAILS the build — a Lambda source must be mapped.
+        if: always()
+        run: |
+          MISSING=0
+          while IFS= read -r f; do
+            if ! grep -q "\"$f\"" ci/lambda_map.json; then
+              echo "::error file=$f::Lambda source file not in ci/lambda_map.json — add it to the .lambdas section"
+              MISSING=$((MISSING + 1))
+            fi
+          done < <(find lambdas -name '*_lambda.py' -o -name '*_handler.py')
+          if [ $MISSING -gt 0 ]; then
+            echo "::error::$MISSING Lambda source file(s) missing from lambda_map.json"
+            exit 1
+          else
+            echo "✅ All Lambda source files present in lambda_map.json"
+          fi
+
+      - name: Content-policy scan (ENFORCED — #354)
+        # Scans public-facing surfaces (site/, email lambdas, mcp/) for blocked terms
+        # from seeds/content_filter.json — the same list the runtime filter enforces.
+        # Catches personal-content leaks before they reach the public repo.
+        if: always()
+        run: python3 scripts/content_policy_scan.py
+
+      - name: Doc-drift gate (ENFORCED — #389)
+        # sync_doc_metadata.py --check asserts the literal counts quoted in CLAUDE.md
+        # and docs/*.md (tool/Lambda/module/ADR/test counts, served PLATFORM_STATS)
+        # against what AST/regex discovery finds in the source right now. Writes
+        # nothing; a mismatch means a fact changed (new tool, new Lambda, new ADR,
+        # new test) and nobody reran `sync_doc_metadata.py --apply` before merging.
+        if: always()
+        run: python3 deploy/sync_doc_metadata.py --check
+
+      - name: Wiki gates (ENFORCED — links, tombstones, facts, index, ADR index)
+        # The wiki drift machinery (CONVENTIONS §8): dead relative links, live docs
+        # (and lambdas/+mcp/ docstrings) referencing retired concepts
+        # (docs/_lint/tombstones.txt), stale counts/budget stated in any phrasing
+        # (check_doc_facts), index coverage + status headers, and the generated ADR
+        # index being current. docs-ci.yml runs the same gates on docs-only pushes;
+        # this copy catches code pushes that invalidate docs (e.g. a source docstring
+        # that revives a retired concept, or deleting a script a doc links to).
+        if: always()
+        run: |
+          python3 scripts/check_doc_links.py
+          python3 scripts/check_doc_tombstones.py
+          python3 scripts/check_doc_facts.py
+          python3 scripts/check_doc_index.py --strict
+          python3 scripts/generate_adr_index.py --check
