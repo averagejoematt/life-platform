@@ -1,6 +1,6 @@
 # Data Governance — PII Classification + Retention Policy
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-18
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-25
 
 Phase 7 (2026-05-16, refreshed 2026-07-18 — #1351 current-truth pass: repo visibility,
 delete-lambda status, current data classes, subscriber-retention readiness #1350):
@@ -87,7 +87,7 @@ Per typical health-data definitions, the following fields are **PII** regardless
 | Rate limit counters | `RATE#{endpoint}#{ip_hash}` | **2 hours (DDB TTL)** | Auto-expire via `ttl` attribute (P1.7) |
 | Auth failure markers | `USER#matthew#SOURCE#{src}` `sk=AUTH_FAILURE` | **24 hours (DDB TTL)** | Circuit breaker; auto-expire (P3.6) |
 | Health check results | `USER#matthew#SOURCE#health_check` | **Forever** | Operational audit trail |
-| **Subscriber emails** (#1350 — third-party PII) | `USER#matthew#SOURCE#subscribers` `sk=EMAIL#{sha256(email)}` | **UNSIGNED — owner signs per #1350** | Decision options for Matthew to pick ONE: **(A)** keep forever — today's de facto posture, plaintext `email` field never purged; **(B)** purge N days after `unsubbed_at`; **(C)** anonymize N days after `unsubbed_at` (redact `email`, keep the hash/status/timestamps for aggregate analytics). Purge/anonymize is implemented and one-command-ready: `python3 deploy/subscriber_retention_purge.py --window-days N --mode {purge,anonymize} --apply` (omit `--apply` for a dry run); only `status=unsubscribed` rows are ever touched by it. A single subscriber can also be deleted on request, independent of any retention window, via `delete_user_data_lambda`'s `{"subscriber_email": "...", "confirm": "DELETE"}` event shape. **To sign:** replace the "UNSIGNED" cell above with the chosen option + a day-count window, e.g. `**Anonymize, 180 days post-unsubscribe**` — `tests/test_data_governance_retention_coverage.py` requires a signed row to still name a window. |
+| **Subscriber emails** (#1350 — third-party PII) | `USER#matthew#SOURCE#subscribers` `sk=EMAIL#{sha256(email)}` | **Anonymize, 548 days (18 months) post-unsubscribe** (signed 2026-07-25) | **SIGNED (#1350, [gate:owner], 2026-07-25):** on an unsubscribed row (`status=unsubscribed`), 548 days (18 months) after `unsubbed_at`, the plaintext `email` is anonymized — redacted to `[redacted]`, `ip_hash` dropped, `anonymized_at` stamped — while the sk (the sha256 hash), `status`, and timestamps are KEPT so the subscriber COUNT and confirmation state that public stats reference survive. Active (pending/confirmed) subscribers are never touched. The signed window + mode are a single constant: `lambdas/subscriber_retention.py::RETENTION_WINDOW_DAYS` (=548) / `RETENTION_MODE` (=`anonymize`). **Enacted** weekly (Mon 08:00 UTC) by `delete_user_data_lambda`'s `{"subscriber_retention_sweep": true, "apply": true}` EventBridge rule; the attended equivalent is `python3 deploy/subscriber_retention_purge.py --mode anonymize --apply` (defaults to the signed 548d window; omit `--apply` for a dry run). A single subscriber can also be deleted on request, independent of the window, via `delete_user_data_lambda`'s `{"subscriber_email": "...", "confirm": "DELETE"}` shape. `tests/test_data_governance_retention_coverage.py` requires this signed row to keep naming a day-count window; `tests/test_subscriber_retention_sweep.py` asserts the window is 18 months and that no eligible row survives un-anonymized. |
 
 ### Warm tier (S3)
 
@@ -224,10 +224,11 @@ If any of these become relevant (e.g., onboarding a second user from CA, sale of
 | 2026-07-18 | #1351 current-truth pass: repo-visibility + delete-lambda claims corrected, data-export census note updated (dynamic, not a hand count), 2026-07 data classes (private_intake #1405, flourishing #1403, felt_probe #1409) added, Manual Delete Procedure rewritten around the deployed lambda; `scripts/check_doc_facts.py` now polices repo-visibility/delete-lambda-status/Verified-freshness claims on this doc | #1351 |
 | 2026-07-18 | #1350 code half: "Raj directive" never-delete comment replaced with a pointer to this doc's (unsigned) retention row; `deploy/subscriber_retention_purge.py` purge/anonymize implementation + `delete_user_data_lambda` single-subscriber deletion shipped, one-command-ready pending Matthew's window sign-off | #1350 |
 | 2026-07-19 | `generated/qa_archive/` added (90d, audit-log class): generation-time archive of every AI surface — text written by `lambdas/qa_archive.py` at each surface's publish point, screenshots by the daily standalone visual-qa sweep. No new PII class: archives the already-public reader-facing text plus rendered-page screenshots | #1441 |
+| 2026-07-25 | #1350 [gate:owner] **SIGNED**: subscriber emails → anonymize 548 days (18 months) post-unsubscribe (was UNSIGNED). Signed window/mode centralized in `lambdas/subscriber_retention.py`; enacted weekly by `delete_user_data_lambda`'s `subscriber_retention_sweep` EventBridge rule (reuses existing IAM — no role change); guard test `tests/test_subscriber_retention_sweep.py` added | #1350 |
 
 ---
 
-**Verified:** 2026-07-18
+**Verified:** 2026-07-25
 
 
 ## Editorial guardrails (public surfaces) — canonical home

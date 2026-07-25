@@ -403,12 +403,12 @@ class OperationalStack(Stack):
             digest=True,
         )
 
-        # ── 7b. Delete User Data (P7.3) — on-demand only ──
+        # ── 7b. Delete User Data (P7.3) — on-demand + weekly retention sweep ──
         # Phase 7.3 (2026-05-16): right-to-be-forgotten flow. Invoked manually
         # via `aws lambda invoke --payload '{"user_id":"X","dry_run":true}'`.
         # Refuses protected users (matthew/admin/system) in code. Writes audit
         # record to USER#admin#SOURCE#deletion_log on every real run.
-        create_platform_lambda(
+        delete_user_data_fn = create_platform_lambda(
             self,
             "DeleteUserData",
             function_name="life-platform-delete-user-data",
@@ -424,6 +424,25 @@ class OperationalStack(Stack):
             alerts_topic=local_alerts_topic,
             digest_topic=local_digest_topic,
             digest=True,
+        )
+
+        # #1350: weekly subscriber-email retention sweep. Enacts the SIGNED policy in
+        # docs/DATA_GOVERNANCE.md's "Subscriber emails" row — anonymize the plaintext
+        # email on unsubscribed rows older than the signed 18-month (548d) window. Reuses
+        # the delete-user-data role (Scan + PutItem + DeleteItem already granted) — NO
+        # new IAM. Monday 08:00 UTC (after the 07:30 UTC reconciliation job), UTC-fixed
+        # (no DST drift). {"apply": True} enacts; flip to False to make it observe-only.
+        subscriber_retention_rule = events.Rule(
+            self,
+            "SubscriberRetentionSweep",
+            schedule=events.Schedule.expression("cron(0 8 ? * MON *)"),
+            description="#1350: anonymize unsubscribed subscriber emails past the signed 18-month retention window",
+        )
+        subscriber_retention_rule.add_target(
+            targets.LambdaFunction(
+                delete_user_data_fn,
+                event=events.RuleTargetInput.from_object({"subscriber_retention_sweep": True, "apply": True}),
+            )
         )
 
         # ── 8. Data Reconciliation — Monday 12:30 AM PT

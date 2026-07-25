@@ -12,12 +12,12 @@ BACKGROUND
   than Matthew, and required an owner-signed retention decision instead of an
   in-code directive attributed to a fictional persona.
 
-NO DEFAULT WINDOW — --window-days is REQUIRED on every invocation, with no fallback.
-  The choice of window is Matthew's signature: docs/DATA_GOVERNANCE.md's "Subscriber
-  emails" retention-table row must be SIGNED (not "UNSIGNED — owner signs per #1350")
-  before this script represents the authorized production posture. Running it before
-  that is still SAFE (dry-run by default; --apply is an explicit, separate flag) but
-  is not yet backed by a signed policy.
+SIGNED WINDOW (#1350, 2026-07-25) — --window-days / --mode DEFAULT to the signed
+  policy in docs/DATA_GOVERNANCE.md's "Subscriber emails" row: anonymize 548 days
+  (18 months) post-unsubscribe. Those defaults come from the ONE source of truth,
+  lambdas/subscriber_retention.py (RETENTION_WINDOW_DAYS / RETENTION_MODE), so this
+  attended CLI can never drift from the scheduled sweep. Both remain overridable for
+  an ad-hoc run. Still SAFE by default: dry-run unless --apply is passed.
 
 MODES
   --mode purge      hard-delete the DDB row (irreversible)
@@ -45,10 +45,16 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 from datetime import datetime, timedelta, timezone
 
 import boto3
 from boto3.dynamodb.conditions import Key
+
+# #1350: the signed window/mode are defined ONCE in lambdas/subscriber_retention.py so
+# this attended CLI and the scheduled sweep (delete_user_data_lambda) can't drift.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lambdas"))
+from subscriber_retention import RETENTION_MODE, RETENTION_WINDOW_DAYS  # noqa: E402
 
 TABLE_NAME = os.environ.get("TABLE_NAME", os.environ.get("LIFE_PLATFORM_TABLE", "life-platform"))
 REGION = os.environ.get("AWS_REGION", "us-west-2")
@@ -97,11 +103,14 @@ def main() -> None:
     ap.add_argument(
         "--window-days",
         type=int,
-        required=True,
-        help="Retention window in days since unsubscribe. REQUIRED, no default — this is Matthew's signed choice (#1350).",
+        default=RETENTION_WINDOW_DAYS,
+        help=f"Retention window in days since unsubscribe. Defaults to the signed {RETENTION_WINDOW_DAYS}d (18 months) window (#1350); override for an ad-hoc run.",
     )
     ap.add_argument(
-        "--mode", choices=["purge", "anonymize"], required=True, help="purge = hard-delete row; anonymize = scrub email, keep hash/status."
+        "--mode",
+        choices=["purge", "anonymize"],
+        default=RETENTION_MODE,
+        help=f"purge = hard-delete row; anonymize = scrub email, keep hash/status. Defaults to the signed mode ({RETENTION_MODE}).",
     )
     ap.add_argument("--apply", action="store_true", help="Perform the writes. Default is dry run (list offenders only).")
     args = ap.parse_args()

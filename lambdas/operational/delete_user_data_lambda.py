@@ -35,9 +35,19 @@ SUBSCRIBER DELETION (#1350):
     {"subscriber_email": "person@example.com", "confirm": "DELETE"} # actual delete
 
   This is the right-to-be-forgotten path for an individual subscriber. It is distinct
-  from the RETENTION-WINDOW bulk purge/anonymize of already-unsubscribed rows, which is
-  `deploy/subscriber_retention_purge.py` (gated on the window Matthew signs into
-  docs/DATA_GOVERNANCE.md's "Subscriber emails" retention row — see #1350).
+  from the RETENTION-WINDOW bulk sweep below.
+
+SUBSCRIBER RETENTION SWEEP (#1350):
+  A weekly EventBridge rule (operational_stack.py) invokes this Lambda with
+
+    {"subscriber_retention_sweep": true, "apply": true}     # enact (anonymize)
+    {"subscriber_retention_sweep": true}                    # dry-run (plan only)
+
+  enacting the SIGNED policy in docs/DATA_GOVERNANCE.md's "Subscriber emails" row:
+  anonymize the plaintext email on `status=unsubscribed` rows older than the signed
+  18-month window (lambdas/subscriber_retention.py::RETENTION_WINDOW_DAYS). Only the
+  PII is scrubbed — sk/status/timestamps and the subscriber COUNT are preserved. The
+  attended operator equivalent is deploy/subscriber_retention_purge.py.
 """
 
 from __future__ import annotations
@@ -50,6 +60,18 @@ import time
 from datetime import datetime, timezone
 
 import boto3
+
+# #1350: the SIGNED subscriber-email retention policy — window/mode/eligibility live in
+# ONE bundled module (lambdas/subscriber_retention.py, imported by bare name like every
+# other shared-layer module per #781), so the scheduled sweep here and the attended CLI
+# (deploy/subscriber_retention_purge.py) can never drift on the window Matthew signed.
+from subscriber_retention import (
+    RETENTION_MODE,
+    RETENTION_WINDOW_DAYS,
+    anonymized_item,
+    needs_anonymization,
+    retention_cutoff_iso,
+)
 
 try:
     from platform_logger import get_logger
@@ -232,6 +254,75 @@ def _handle_subscriber_deletion(email: str, dry_run: bool, confirmed: bool) -> d
     return {"statusCode": 200, "body": json.dumps(summary)}
 
 
+def _scan_subscribers() -> list[dict]:
+    """Every row in the single subscribers partition. Uses Scan + a pk FilterExpression
+    (the delete-user-data role already grants Scan + PutItem + DeleteItem — the sweep
+    adds NO new IAM; #1350) and paginates like `_scan_user_pks`. The partition is small
+    (one item per subscriber), so a filtered scan is fine for a weekly job."""
+    items: list[dict] = []
+    last_evaluated = None
+    while True:
+        scan_kwargs: dict = {
+            "FilterExpression": "pk = :pk",
+            "ExpressionAttributeValues": {":pk": SUBSCRIBERS_PK},
+        }
+        if last_evaluated:
+            scan_kwargs["ExclusiveStartKey"] = last_evaluated
+        resp = table.scan(**scan_kwargs)
+        items.extend(resp.get("Items", []))
+        last_evaluated = resp.get("LastEvaluatedKey")
+        if not last_evaluated:
+            break
+    return items
+
+
+def _handle_retention_sweep(apply: bool) -> dict:
+    """#1350 SCHEDULED retention enactment (weekly EventBridge rule). Enacts the signed
+    policy (docs/DATA_GOVERNANCE.md "Subscriber emails" row): anonymize the plaintext
+    email on unsubscribed rows older than the signed 18-month window. Dry-run unless
+    `apply` is True (a bare/manual invoke reports the plan, changes nothing).
+
+    Anonymize is done via PutItem-overwrite (the role has PutItem, not UpdateItem) with
+    the row rebuilt by `subscriber_retention.anonymized_item`. Idempotent — already
+    -anonymized rows no longer match `needs_anonymization`, so a re-run is a no-op.
+    Only `status=unsubscribed` rows past the window are ever touched; active
+    (pending/confirmed) subscribers and the subscriber COUNT are preserved."""
+    cutoff_iso = retention_cutoff_iso()
+    rows = _scan_subscribers()
+    targets = [r for r in rows if needs_anonymization(r, cutoff_iso)]
+
+    plan = {
+        "mode": RETENTION_MODE,
+        "window_days": RETENTION_WINDOW_DAYS,
+        "cutoff": cutoff_iso,
+        "subscribers_total": len(rows),
+        "eligible": len(targets),
+        "apply": apply,
+    }
+
+    if not apply:
+        logger.info("retention_sweep_dryrun %s", plan)
+        return {"statusCode": 200, "body": json.dumps({"plan": plan})}
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    acted = 0
+    for row in targets:
+        if RETENTION_MODE == "purge":
+            table.delete_item(Key={"pk": SUBSCRIBERS_PK, "sk": row["sk"]})
+        else:  # anonymize (signed mode) — PutItem-overwrite, keeps hash/status/count
+            table.put_item(Item=anonymized_item(row, now_iso))
+        acted += 1
+
+    summary = {**plan, "acted": acted, "completed_at": now_iso}
+    # Audit by aggregate only — the trail never holds a plaintext email.
+    _write_audit_record(
+        "subscriber_retention_sweep",
+        {"acted": acted, "eligible": len(targets), "mode": RETENTION_MODE, "window_days": RETENTION_WINDOW_DAYS},
+    )
+    logger.info("retention_sweep_complete %s", summary)
+    return {"statusCode": 200, "body": json.dumps(summary)}
+
+
 def _write_audit_record(user_id: str, summary: dict) -> None:
     """Audit log: a non-deletable record of every deletion event."""
     now = datetime.now(timezone.utc)
@@ -258,6 +349,12 @@ def lambda_handler(event: dict, context) -> dict:
     Returns counts + audit metadata. Refuses on protected users or missing confirm.
     """
     try:
+        # #1350: the SCHEDULED bulk retention sweep — anonymize unsubscribed subscriber
+        # emails past the signed 18-month window. Dry-run unless {"apply": true}. A
+        # separate, aggregate path — never routes through the user_id logic below.
+        if event.get("subscriber_retention_sweep"):
+            return _handle_retention_sweep(apply=bool(event.get("apply")))
+
         # #1350: a distinct, narrower path for a single subscriber — never routes
         # through the user_id/PROTECTED_USERS logic below (subscriber rows live
         # under the OWNER's pk namespace, so they can never be reached that way).
