@@ -261,6 +261,55 @@ def _sweep_predictions(s3):
     return out
 
 
+def _sweep_wrong(s3):
+    """#1377 (The Wrong Feed): one shareable obituary per GRADED failure — fetched from
+    the PUBLIC /api/wrong payload so a card can never say more than the site publishes.
+
+    The obituary id / permalink / og_image are read straight off the payload (the API
+    already computed the stable slug), so the permalink shell, the OG card, and the
+    front-end card all agree by construction. Sourced only from deterministic verdicts —
+    never AI-asserted wrongness. Idempotent; an empty feed writes nothing."""
+    try:
+        req = urllib.request.Request(f"{SITE_BASE}/api/wrong", headers={"accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        if isinstance(data.get("data"), dict):
+            data = data["data"]
+    except Exception as e:
+        print(f"[moments] wrong feed fetch skipped: {e}")
+        return {}
+    out = {}
+    for o in data.get("obituaries", []):
+        oid = str(o.get("id", "")).strip()
+        believed = (o.get("believed") or "").strip()
+        if not oid or not believed:
+            continue
+        date = str(o.get("date") or "").strip()
+        coach = str(o.get("coach") or "the board").strip()
+        meta = f"{coach} · {date} · REFUTED"
+        card = build_moment_card("a graded failure — the AI was wrong", believed, meta, "graded by the evaluator, not asserted")
+        number = (o.get("number") or "").strip()
+        changed = (o.get("what_changed") or "").strip()
+        body = (
+            f"<p><strong>We believed:</strong> {html.escape(believed)}</p>"
+            + (f"<p><strong>The number that killed it:</strong> {html.escape(number)}</p>" if number else "")
+            + (f"<p><strong>What changed:</strong> {html.escape(changed)}</p>" if changed else "")
+        )
+        shell = _shell_html(
+            "a graded failure — the AI was wrong",
+            believed,
+            f"REFUTED — {coach}'s call, graded against the data. {number}"[:200],
+            meta,
+            body,
+            f"/moments/wrong/{oid}/",
+            f"/moments/assets/wrong-{oid}.png",
+            f"{SITE_BASE}/method/wrong/#obit-{oid}",
+        )
+        out[oid] = _put_moment(s3, "wrong", oid, card, shell)
+    print(f"[moments] swept {len(out)} wrong-feed obituary card(s)")
+    return out
+
+
 def _post_slug(url):
     """/journal/posts/week-05/ -> week-05 (the stable per-post card slug)."""
     return (str(url or "").strip("/").split("/") or ["post"])[-1] or "post"
@@ -321,11 +370,12 @@ def sweep_moments(s3, stats):
         "qa": _sweep_board_answers(s3),
         "predictions": _sweep_predictions(s3),
         "chronicles": _sweep_chronicles(s3),
+        "wrong": _sweep_wrong(s3),  # #1377 — the graded-failure obituary feed
     }
     _put(s3, f"{MOMENTS_PREFIX}index.json", json.dumps(index).encode("utf-8"), "application/json", cache="max-age=300")
-    n = (1 if index["week"] else 0) + len(index["qa"]) + len(index["predictions"]) + len(index["chronicles"])
+    n = (1 if index["week"] else 0) + len(index["qa"]) + len(index["predictions"]) + len(index["chronicles"]) + len(index["wrong"])
     print(
         f"[moments] swept {n} moment(s): week={bool(index['week'])} qa={len(index['qa'])} "
-        f"predictions={len(index['predictions'])} chronicles={len(index['chronicles'])}"
+        f"predictions={len(index['predictions'])} chronicles={len(index['chronicles'])} wrong={len(index['wrong'])}"
     )
     return index

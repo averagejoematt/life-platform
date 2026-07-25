@@ -923,3 +923,18 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .wall-attempt:not(.is-live) .wall-cell { opacity: .55; }        /* sealed attempts recede */
 .wall-cell.is-warming { opacity: .5; }
 .wall-cell svg, .wall-cell .fingerprint { width: 100%; height: auto; display: block; }
+
+/* #1377 — The Wrong Feed: obituary cards, one per graded failure. Appended (localized)
+   so a concurrent sibling touching this file 3-way-merges cleanly. */
+.wrong-feed { display: grid; gap: var(--sp-3); margin: var(--sp-3) 0; }
+.wrong-ob { border: var(--border-hair); border-left: 2px solid var(--ember); border-radius: var(--radius-sm);
+  background: var(--surface); padding: var(--sp-3) var(--sp-4); scroll-margin-top: var(--sp-5); }
+.wrong-ob:target { border-left-color: var(--ember); box-shadow: 0 0 0 1px var(--ember-soft); }
+.wrong-ob-head { color: var(--ink-faint); margin: 0 0 var(--sp-2); }
+.wrong-ob-verdict { color: var(--ember); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
+.wrong-ob-believed { color: var(--ink); margin: 0 0 4px; }
+.wrong-ob-number { color: var(--ink); font-family: var(--font-mono); margin: 0 0 4px; }
+.wrong-ob-changed { color: var(--ink-muted); margin: 0 0 var(--sp-2); }
+.wrong-ob-perma { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.06em;
+  color: var(--ink-faint); text-decoration: none; }
+.wrong-ob-perma:hover { color: var(--ember); text-decoration: underline; }
