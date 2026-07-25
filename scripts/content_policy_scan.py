@@ -49,6 +49,7 @@ ALLOWLIST_FILES = {
     # LLM system-prompt strings that enumerate blocked terms to instruct the model
     # what NOT to mention — necessary, never served to readers.
     "lambdas/emails/wednesday_chronicle_lambda.py",
+    "lambdas/emails/chronicle_prompt.py",  # the Elena system-prompt's substance-privacy guardrail (extracted from wednesday_chronicle_lambda, #1654)
     "lambdas/emails/coach_panel_podcast_lambda.py",
     "lambdas/emails/panelcast_scripts.py",  # the intro/weekly builders' safety guardrail (extracted from the lambda, #1185)
 }
