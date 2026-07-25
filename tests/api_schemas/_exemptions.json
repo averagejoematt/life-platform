@@ -7,6 +7,10 @@
     "category": "write-path",
     "reason": "POST-only \u2014 board follow-up turn (write)"
   },
+  "/api/cohort_submit": {
+    "category": "write-path",
+    "reason": "POST-only \u2014 #1394 one-tap weekly cohort single-number submission (write)"
+  },
   "/api/challenge_checkin": {
     "category": "write-path",
     "reason": "POST-only \u2014 records a challenge check-in (write)"

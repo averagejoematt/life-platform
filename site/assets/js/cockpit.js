@@ -638,6 +638,127 @@ async function _castPredict(item, week, metric, label, choice) {
   }
 }
 
+/* ── The Cohort Strip (#1394, epic #1366): where do I sit this week? ──────────
+   A weekly ANONYMOUS distribution of participant-reported single numbers with
+   Matthew's dot marked. One-tap submit (a bounded slider — a single number, never
+   free text). Hidden entirely below n≥5 (k-anonymity), with a dignified waiting
+   state — never a fabricated chart. Self-hides when no cohort week is active. */
+function _cohortKey(week) { return `ajm-cohort-${week}`; }
+function _cohortDone(week) { try { return localStorage.getItem(_cohortKey(week)) === "1"; } catch (e) { return false; } }
+function _num(v, digits = 1) { return Number(v).toFixed(digits).replace(/\.0$/, ""); }
+
+async function renderCohort() {
+  const sec = $("[data-cohort]");
+  if (!sec) return;
+  let d;
+  try { d = await getJSON(`${API}/cohort_strip`); } catch (e) { d = null; }
+  if (!d || !d.active) { sec.hidden = true; return; }
+  const body = bind("cohort-body");
+  if (!body) { sec.hidden = true; return; }
+  const unit = d.unit ? ` ${escapeHTML(String(d.unit))}` : "";
+  const label = escapeHTML(String(d.label || d.metric_id || "this week's number"));
+
+  if (d.visible) {
+    // At/above the floor — the aggregate strip + Matthew's dot + provenance.
+    body.innerHTML =
+      `<p class="cohort-q">This week: <strong>${label}</strong></p>` +
+      _cohortStripSVG(d, unit) +
+      `<p class="cohort-read label">` +
+      (d.matthew_value != null
+        ? `Matthew: <span class="cohort-me num">${escapeHTML(_num(d.matthew_value))}${unit}</span>` +
+          (d.matthew_percentile != null ? ` · ahead of ${d.matthew_percentile}% of the cohort` : "")
+        : "") +
+      ` · median <span class="num">${escapeHTML(_num(d.median))}${unit}</span></p>` +
+      `<p class="provenance">n=${d.n} · self-reported · ${escapeHTML(String(d.week))}</p>` +
+      _cohortSubmit(d, unit);
+  } else {
+    // HARD k-anonymity gate not yet met — a dignified waiting state, no chart.
+    const need = Math.max(0, (d.floor || 5) - (d.n || 0));
+    body.innerHTML =
+      `<p class="cohort-q">This week: <strong>${label}</strong></p>` +
+      `<p class="cohort-wait">The strip stays hidden until at least ${d.floor || 5} people have added a number — ` +
+      `so no one is identifiable. <span class="cohort-need">${d.n || 0} in · ${need} to go.</span></p>` +
+      `<p class="provenance">n=${d.n || 0} · self-reported · ${escapeHTML(String(d.week))}</p>` +
+      _cohortSubmit(d, unit);
+  }
+  _wireCohortSubmit(sec, d, unit);
+  sec.hidden = false;
+}
+
+function _cohortStripSVG(d, unit) {
+  const bins = Array.isArray(d.bins) ? d.bins : [];
+  const nBins = bins.length || 1;
+  const W = 320, H = 84, padX = 6, padTop = 22, baseY = H - 16;
+  const plotW = W - padX * 2;
+  const bw = plotW / nBins;
+  const maxCount = Math.max(1, ...bins);
+  const span = (d.axis_max - d.axis_min) || 1;
+  const xOf = (v) => padX + ((v - d.axis_min) / span) * plotW;
+  let bars = "";
+  bins.forEach((c, i) => {
+    const h = c > 0 ? Math.max(2, (c / maxCount) * (baseY - padTop)) : 0;
+    if (h <= 0) return;
+    const x = padX + i * bw + 1;
+    bars += `<rect class="ch-bar" x="${x.toFixed(1)}" y="${(baseY - h).toFixed(1)}" width="${(bw - 2).toFixed(1)}" height="${h.toFixed(1)}" rx="1"></rect>`;
+  });
+  // Matthew's dot — an ember marker with a stem, above the bars.
+  let me = "";
+  if (d.matthew_value != null) {
+    const mx = Math.max(padX, Math.min(W - padX, xOf(d.matthew_value)));
+    me =
+      `<line class="ch-mstem" x1="${mx.toFixed(1)}" y1="${padTop - 6}" x2="${mx.toFixed(1)}" y2="${baseY}"></line>` +
+      `<circle class="ch-mdot" cx="${mx.toFixed(1)}" cy="${padTop - 8}" r="4"></circle>`;
+  }
+  const axis = `<line class="ch-axis" x1="${padX}" y1="${baseY}" x2="${W - padX}" y2="${baseY}"></line>`;
+  const lo = `<text class="ch-tick" x="${padX}" y="${H - 3}" text-anchor="start">${escapeHTML(_num(d.axis_min))}${escapeHTML(String(unit).trim())}</text>`;
+  const hi = `<text class="ch-tick" x="${W - padX}" y="${H - 3}" text-anchor="end">${escapeHTML(_num(d.axis_max))}${escapeHTML(String(unit).trim())}</text>`;
+  const aria = `Distribution of ${d.n} self-reported values${d.matthew_value != null ? `; Matthew at ${_num(d.matthew_value)}` : ""}.`;
+  return `<svg class="cohort-strip-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${escapeHTML(aria)}" preserveAspectRatio="xMidYMid meet">${axis}${bars}${me}${lo}${hi}</svg>`;
+}
+
+function _cohortSubmit(d, unit) {
+  if (_cohortDone(d.week)) {
+    return `<p class="cohort-thanks label">Your number's in for ${escapeHTML(String(d.week))}. Thanks for adding it.</p>`;
+  }
+  const mid = Math.round((d.axis_min + d.axis_max) / 2);
+  return (
+    `<div class="cohort-add" role="group" aria-label="Add your number">` +
+    `<label class="cohort-add-lbl label" for="cohort-range">your number` +
+    `<output class="cohort-out num" data-bind="cohort-out">${mid}${escapeHTML(String(unit))}</output></label>` +
+    `<input class="cohort-range" id="cohort-range" type="range" min="${d.axis_min}" max="${d.axis_max}" value="${mid}" step="1" aria-label="Your ${escapeHTML(String(d.label || "value"))}">` +
+    `<button class="cohort-btn" type="button" data-cohort-go>Add my number</button>` +
+    `</div>`
+  );
+}
+
+function _wireCohortSubmit(sec, d, unit) {
+  const range = sec.querySelector(".cohort-range");
+  const out = sec.querySelector("[data-bind='cohort-out']");
+  const btn = sec.querySelector("[data-cohort-go]");
+  if (range && out) range.addEventListener("input", () => { out.textContent = `${range.value}${String(unit)}`; });
+  if (btn && range) btn.addEventListener("click", () => _castCohort(sec, d, unit, Number(range.value)));
+}
+
+async function _castCohort(sec, d, unit, value) {
+  const btn = sec.querySelector("[data-cohort-go]");
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch(`${API}/cohort_submit`, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({ value }),
+    });
+    if (res.ok || res.status === 429) {
+      try { localStorage.setItem(_cohortKey(d.week), "1"); } catch (e) {}
+      renderCohort(); // re-read — the aggregate may now cross the floor
+    } else if (btn) {
+      btn.disabled = false;
+    }
+  } catch (e) {
+    if (btn) btn.disabled = false;
+  }
+}
+
 /* ── Tonight's forecast: circadian-compliance (predictive) ─────────────────── */
 async function renderCircadian() {
   const sec = $("[data-circadian]");
@@ -1334,6 +1455,7 @@ async function load(dateStr) {
     renderReading();    // fire-and-forget; hides itself if no book in hand
     renderFingerprint(); // #1379 fire-and-forget; the day's deterministic mark in the masthead
     renderPredict();    // fire-and-forget; hides itself if no active weekly prediction
+    renderCohort();     // #1394 fire-and-forget; the anonymous cohort strip — hides below n≥5 / when no cohort week active
     renderLevers(pre);  // fire-and-forget (#974); the Protocols station — staged pre-genesis, self-hiding
 
     if (pre) {

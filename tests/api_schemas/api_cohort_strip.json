@@ -1,0 +1,86 @@
+{
+  "captured_at": "2026-07-25T00:00:00+00:00",
+  "fetch_path": "/api/cohort_strip",
+  "is_prefix_sample": false,
+  "path": "/api/cohort_strip",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "active": {
+        "type": "boolean"
+      },
+      "axis_max": {
+        "type": "number"
+      },
+      "axis_min": {
+        "type": "number"
+      },
+      "bin_count": {
+        "type": "integer"
+      },
+      "bins": {
+        "items": {
+          "type": "integer"
+        },
+        "length_sample": 12,
+        "type": "array"
+      },
+      "floor": {
+        "type": "integer"
+      },
+      "label": {
+        "type": "string"
+      },
+      "lower_is_better": {
+        "type": "boolean"
+      },
+      "matthew_percentile": {
+        "type": "integer"
+      },
+      "matthew_value": {
+        "type": "number"
+      },
+      "max": {
+        "type": "number"
+      },
+      "median": {
+        "type": "number"
+      },
+      "metric_id": {
+        "type": "string"
+      },
+      "min": {
+        "type": "number"
+      },
+      "n": {
+        "type": "integer"
+      },
+      "p25": {
+        "type": "number"
+      },
+      "p75": {
+        "type": "number"
+      },
+      "unit": {
+        "type": "string"
+      },
+      "visible": {
+        "type": "boolean"
+      },
+      "week": {
+        "type": "string"
+      }
+    },
+    "type": "object"
+  }
+}

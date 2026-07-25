@@ -211,6 +211,41 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .predict-foot { margin-top: var(--sp-3); color: var(--ink-faint); }
 @media (max-width: 480px) { .predict-vote { flex-direction: column; } .predict-btn { flex: none; } }
 
+/* The Cohort Strip (#1394, epic #1366) — anonymous weekly distribution, Matthew's
+   dot marked, k-anonymity waiting state, one-tap bounded-slider submit. */
+.cohort { margin-top: var(--sp-5); padding: var(--sp-4) var(--sp-5); background: var(--surface);
+  border: var(--border-hair); border-left: 3px solid var(--ember); border-radius: var(--radius); }
+.cohort .cap { color: var(--ember); }
+.cohort-body { display: grid; gap: var(--sp-3); margin-top: var(--sp-2); }
+.cohort-q { color: var(--ink); line-height: 1.4; }
+.cohort-q strong { color: var(--ink); font-weight: var(--weight-med); }
+.cohort-strip-svg { width: 100%; max-width: 100%; height: auto; display: block; }
+.cohort-strip-svg .ch-bar { fill: var(--body-tint); }
+.cohort-strip-svg .ch-axis { stroke: var(--rule); stroke-width: 1; }
+.cohort-strip-svg .ch-mstem { stroke: var(--ember-line); stroke-width: 1; }
+.cohort-strip-svg .ch-mdot { fill: var(--ember); stroke: var(--surface); stroke-width: 1.5; }
+.cohort-strip-svg .ch-tick { fill: var(--ink-faint); font-family: var(--font-mono); font-size: 9px; }
+.cohort-read { color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.cohort-me { color: var(--ember); }
+.cohort-wait { color: var(--ink-muted); font-size: var(--fs-small); line-height: 1.5; }
+.cohort-need { color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.cohort-thanks { color: var(--ink-faint); }
+.cohort-foot { margin-top: var(--sp-3); color: var(--ink-faint); }
+.cohort-add { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
+.cohort-add-lbl { display: inline-flex; align-items: baseline; gap: var(--sp-2); color: var(--ink-muted); }
+.cohort-out { color: var(--ember); font-variant-numeric: tabular-nums; }
+.cohort-range { flex: 1 1 140px; min-width: 120px; accent-color: var(--ember); min-height: 44px; }
+.cohort-range:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+.cohort-btn { appearance: none; cursor: pointer; min-height: 44px;
+  background: var(--ember-wash); color: var(--ink); border: 1px solid var(--ember-line);
+  border-radius: var(--radius-sm); padding: var(--sp-2) var(--sp-4);
+  font-family: var(--font-mono); font-size: var(--fs-small); letter-spacing: 0.02em;
+  transition: background var(--dur-fast), border-color var(--dur-fast); }
+.cohort-btn:hover { background: color-mix(in oklch, var(--ember) 16%, transparent); border-color: var(--ember); }
+.cohort-btn:disabled { opacity: 0.5; cursor: progress; }
+.cohort-btn:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+@media (max-width: 480px) { .cohort-add { flex-direction: column; align-items: stretch; } .cohort-btn { width: 100%; } }
+
 /* uplevel P4 — the time-travel day-slider (the date input stays as fallback). */
 .scrub-wrap { display: inline-flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
 .scrub-days { width: 150px; accent-color: var(--ember); }

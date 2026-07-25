@@ -291,6 +291,16 @@
           <p class="predict-foot label">No streaks, no nags — just your instinct against the board's. The result shows up next week.</p>
         </section>
 
+        <!-- The Cohort Strip (#1394, epic #1366): where do I sit this week? A weekly
+             anonymous distribution of participant-reported single numbers with
+             Matthew's dot marked. One-tap submit; hidden below n≥5 (k-anonymity);
+             self-reported/unverified. Self-hides when no cohort week is active. -->
+        <section class="cohort" data-cohort hidden aria-label="The cohort strip — where do I sit this week">
+          <p class="cap label">the cohort · where do I sit this week</p>
+          <div class="cohort-body" data-bind="cohort-body"></div>
+          <p class="cohort-foot label">Self-reported by participants, unverified. Never pooled into Matthew's own numbers.</p>
+        </section>
+
         <!-- Week scope: six instruments, seven days (S-03) — real /api/observatory_week reads -->
         <section class="weekview" data-weekview hidden aria-label="The week's instruments">
           <p class="cap label" data-bind="week-cap">seven days, by instrument</p>
