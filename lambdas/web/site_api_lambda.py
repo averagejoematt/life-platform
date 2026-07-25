@@ -184,6 +184,7 @@ from web.site_api_social import (
     _handle_challenge_checkin,
     _handle_challenge_follow,
     _handle_challenge_vote,
+    _handle_cohort_submit,
     _handle_experiment_detail,
     _handle_experiment_follow,
     _handle_experiment_suggest,
@@ -197,6 +198,7 @@ from web.site_api_social import (
     handle_broadcast,
     handle_challenge_catalog,
     handle_challenges,
+    handle_cohort_strip,
     handle_current_challenge,
     handle_experiment_library,
     handle_ladder_counts,
@@ -426,6 +428,9 @@ ROUTES = {
     "/api/challenge_vote": None,  # POST handler in lambda_handler
     "/api/challenge_follow": None,  # POST handler in lambda_handler
     "/api/challenge_checkin": None,  # POST handler in lambda_handler
+    # #1394 (epic #1366): The Cohort Strip — anonymous weekly distribution (GET, aggregate-only,
+    # k-anonymity n≥5 hard gate inside the handler). Submission is /api/cohort_submit (POST, below).
+    "/api/cohort_strip": handle_cohort_strip,
     "/api/domains": handle_domains,
     "/api/habit_registry": handle_habit_registry,
     # PULSE-A4: Daily pulse endpoint
@@ -522,6 +527,7 @@ _SIMPLE_ROUTES = {
     "/api/experiment_follow": ({"POST"}, _handle_experiment_follow),
     "/api/experiment_suggest": ({"POST"}, _handle_experiment_suggest),
     "/api/challenge_checkin": ({"POST"}, _handle_challenge_checkin),
+    "/api/cohort_submit": ({"POST"}, _handle_cohort_submit),  # #1394: one-tap weekly cohort single-number
     "/api/ritual_log": ({"GET", "OPTIONS"}, _handle_ritual_log),  # #769 (ADR-124): one-tap evening ritual
     "/api/challenge_vote": ({"POST"}, _handle_challenge_vote),
     "/api/challenge_follow": ({"POST"}, _handle_challenge_follow),

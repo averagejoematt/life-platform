@@ -2051,3 +2051,238 @@ def _handle_replicate_certify(event: dict) -> dict:
         "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
         "body": json.dumps({"certified": True, "counted": True, "message": "Logged — you're on the Replicator rung."}),
     }
+
+
+# ── #1394 (epic #1366): The Cohort Strip — "where do I sit this week?" ──────────
+# A weekly ANONYMOUS distribution of participant-reported single numbers (one
+# metric per week) with Matthew's dot marked. One-tap submission reuses this
+# module's check-in write class verbatim — the same DynamoDB `table` and the same
+# DDB-backed `_ddb_rate_check` that _handle_challenge_checkin uses (no fork, no new
+# rate limiter). There is NO free-text field, so there is zero moderation surface.
+#
+# Structural isolation (the load-bearing privacy invariant): cohort submissions
+# live in their OWN partition family, `COHORT#<metric>#<week>` — deliberately NOT a
+# `USER#matthew#SOURCE#…` partition. Matthew's stats/calibration pipelines only ever
+# query his own `USER#…#SOURCE#…` partitions, so they can never read pooled cohort
+# numbers. tests/test_cohort_strip_isolation_1394.py asserts this both directions.
+# Matthew's dot on the strip is his own metric value, supplied by the weekly config
+# (not read back out of the cohort partition), keeping the two data sets disjoint.
+COHORT_PK_PREFIX = "COHORT#"  # the cohort partition family — NEVER a USER#…#SOURCE# key
+COHORT_K_FLOOR = 5  # k-anonymity: the strip stays hidden until n ≥ this (a HARD gate, not copy)
+COHORT_SUBMIT_WINDOW = 604800  # 1 submission per IP per week (7 days), DDB-backed
+COHORT_HIST_BINS = 12  # inline-SVG histogram resolution across the metric's axis
+_cohort_config_cache = None
+
+
+def _cohort_partition(metric_id: str, week: str) -> str:
+    """The one place a cohort pk is minted — `COHORT#<metric>#<week>`.
+
+    Kept literal-prefixed with COHORT_PK_PREFIX so the isolation test can prove no
+    stats/calibration module references this family and both handlers only ever
+    touch it (never a USER#…#SOURCE# partition).
+    """
+    return f"{COHORT_PK_PREFIX}{metric_id}#{week}"
+
+
+def _load_cohort_config() -> dict | None:
+    """Load the active weekly cohort metric from S3 config (module-cached).
+
+    Shape (site/config/cohort_week.json):
+      {"metric_id": "resting_heart_rate", "label": "Resting heart rate",
+       "unit": "bpm", "week": "2026-W30", "matthew_value": 52,
+       "axis_min": 40, "axis_max": 90, "lower_is_better": true}
+
+    Absent/malformed → None, which both handlers treat as "no active cohort week"
+    (the strip self-hides; submissions 404) — never a fabricated metric.
+    """
+    global _cohort_config_cache
+    if _cohort_config_cache is None:
+        _cohort_config_cache = _load_s3_json("site/config/cohort_week.json", "cohort_week") or {}
+    cfg = _cohort_config_cache
+    if not cfg or not cfg.get("metric_id") or not cfg.get("week"):
+        return None
+    try:
+        amin = float(cfg["axis_min"])
+        amax = float(cfg["axis_max"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not (amax > amin):
+        return None
+    return cfg
+
+
+def _handle_cohort_submit(event: dict) -> dict:
+    """POST /api/cohort_submit — one-tap weekly single-number submission (#1394).
+
+    Body: {"value": <number>}. NO free text — a single number is the entire payload,
+    so there is nothing to moderate. Reuses the check-in write class: same DynamoDB
+    `table`, same DDB-backed `_ddb_rate_check` (1 submission / IP / week), same
+    idempotent read-free write discipline as _handle_challenge_checkin.
+
+    The write lands in the cohort partition `COHORT#<metric>#<week>` at sk
+    `SUBMIT#<ip_hash>` — a re-tap from the same IP overwrites its own row (last-tap
+    wins), so a double-tap can never inflate n. The individual value is never read
+    back out for display; only the aggregate strip is ever served.
+    """
+    cfg = _load_cohort_config()
+    if not cfg:
+        return _error(404, "No cohort metric active this week")
+
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except (json.JSONDecodeError, TypeError):
+        return _error(400, "Invalid JSON body")
+
+    raw = body.get("value")
+    if isinstance(raw, bool) or raw is None:
+        return _error(400, "value (number) required")
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return _error(400, "value must be a number")
+    if value != value or value in (float("inf"), float("-inf")):  # NaN / inf guard
+        return _error(400, "value must be a finite number")
+
+    amin, amax = float(cfg["axis_min"]), float(cfg["axis_max"])
+    if not (amin <= value <= amax):
+        return _error(400, f"value must be between {amin:g} and {amax:g} {cfg.get('unit', '')}".strip())
+
+    metric_id = str(cfg["metric_id"])
+    week = str(cfg["week"])
+
+    ip = extract_client_ip(event)
+    ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
+
+    # Rate limit: 1 submission per IP per week — DDB-backed (the SAME limiter the
+    # challenge check-in uses), survives warm-container distribution.
+    if _RATE_LIMITER_READY:
+        allowed, _rem, _retry = _ddb_rate_check(
+            table, endpoint=f"cohort_submit:{week}", ip_hash=ip_hash, limit=1, window_seconds=COHORT_SUBMIT_WINDOW, fail_open=True
+        )
+        if not allowed:
+            return {
+                "statusCode": 429,
+                "headers": {**CORS_HEADERS, "Retry-After": str(COHORT_SUBMIT_WINDOW), "Cache-Control": "no-store"},
+                "body": json.dumps({"error": "You've already added your number this week."}),
+            }
+
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    try:
+        # pk INLINE via _cohort_partition — the cohort family, never a USER#…#SOURCE#
+        # partition. sk keyed by ip_hash makes the write idempotent per participant.
+        table.put_item(
+            Item={
+                "pk": _cohort_partition(metric_id, week),
+                "sk": f"SUBMIT#{ip_hash}",
+                "value": Decimal(str(value)),
+                "week": week,
+                "metric_id": metric_id,
+                "logged_at": now_iso,
+                "source": "website",
+            }
+        )
+    except Exception as e:
+        logger.error(f"[cohort_submit] DDB put failed: {e}")
+        return _error(500, "Failed to record your number")
+
+    logger.info(f"[cohort_submit] metric={metric_id} week={week} ip_hash={ip_hash}")
+    # Never echo n or any other participant's number — the client refreshes the
+    # aggregate strip through /api/cohort_strip, which enforces the k-anonymity floor.
+    return _ok({"submitted": True, "metric_id": metric_id, "week": week}, cache_seconds=0)
+
+
+def handle_cohort_strip() -> dict:
+    """GET /api/cohort_strip — the anonymous weekly distribution strip (#1394).
+
+    Enforces the k-anonymity floor (n ≥ COHORT_K_FLOOR) as a HARD gate: below it the
+    payload carries `visible: false` and NO distribution at all (a dignified
+    "waiting for n≥5" state on the client, never a fabricated chart or band —
+    ADR-105 confidence grammar). At or above the floor it returns AGGREGATES ONLY —
+    a histogram + quartiles + Matthew's percentile. Individual submissions are never
+    returned. Matthew's dot value comes from the weekly config, not the cohort
+    partition, so his stats stay disjoint from the pool.
+    """
+    cfg = _load_cohort_config()
+    if not cfg:
+        return _ok({"active": False}, cache_seconds=300)
+
+    metric_id = str(cfg["metric_id"])
+    week = str(cfg["week"])
+    label = str(cfg.get("label", metric_id))
+    unit = str(cfg.get("unit", ""))
+    amin, amax = float(cfg["axis_min"]), float(cfg["axis_max"])
+    matthew_value = cfg.get("matthew_value")
+    try:
+        matthew_value = float(matthew_value) if matthew_value is not None else None
+    except (TypeError, ValueError):
+        matthew_value = None
+
+    base = {
+        "active": True,
+        "week": week,
+        "metric_id": metric_id,
+        "label": label,
+        "unit": unit,
+        "axis_min": amin,
+        "axis_max": amax,
+        "matthew_value": matthew_value,
+        "floor": COHORT_K_FLOOR,
+        "lower_is_better": bool(cfg.get("lower_is_better", False)),
+    }
+
+    try:
+        resp = table.query(KeyConditionExpression=Key("pk").eq(_cohort_partition(metric_id, week)))
+        items = resp.get("Items", []) or []
+    except Exception as e:
+        logger.error(f"[cohort_strip] DDB query failed: {e}")
+        return _error(500, "Database error")
+
+    values = []
+    for it in items:
+        v = _decimal_to_float(it.get("value"))
+        if isinstance(v, (int, float)) and amin <= v <= amax:
+            values.append(float(v))
+    n = len(values)
+
+    # HARD k-anonymity gate — below the floor, no distribution is emitted at all.
+    if n < COHORT_K_FLOOR:
+        return _ok({**base, "visible": False, "n": n}, cache_seconds=60)
+
+    values.sort()
+    span = amax - amin
+    bins = [0] * COHORT_HIST_BINS
+    for v in values:
+        idx = int((v - amin) / span * COHORT_HIST_BINS)
+        idx = min(COHORT_HIST_BINS - 1, max(0, idx))
+        bins[idx] += 1
+
+    def _pctile(p: float) -> float:
+        if n == 1:
+            return values[0]
+        k = (n - 1) * p
+        lo = int(k)
+        hi = min(lo + 1, n - 1)
+        return values[lo] + (values[hi] - values[lo]) * (k - lo)
+
+    # Matthew's rank among the pool — a percentile, never his row exposed to others.
+    m_pctile = None
+    if matthew_value is not None:
+        below = sum(1 for v in values if v < matthew_value)
+        m_pctile = round(below / n * 100)
+
+    return _ok(
+        {
+            **base,
+            "visible": True,
+            "n": n,
+            "bins": bins,
+            "bin_count": COHORT_HIST_BINS,
+            "min": round(values[0], 2),
+            "p25": round(_pctile(0.25), 2),
+            "median": round(_pctile(0.5), 2),
+            "p75": round(_pctile(0.75), 2),
+            "max": round(values[-1], 2),
+            "matthew_percentile": m_pctile,
+        },
+        cache_seconds=120,
+    )

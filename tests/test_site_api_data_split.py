@@ -51,6 +51,8 @@ EXPECTED_ROUTE_MAP = {
     "/api/challenge_checkin": "_handle_challenge_checkin",
     "/api/challenge_follow": "_handle_challenge_follow",
     "/api/challenge_vote": "_handle_challenge_vote",
+    "/api/cohort_strip": "handle_cohort_strip",  # #1394 — the cohort strip (GET, aggregate-only)
+    "/api/cohort_submit": "_handle_cohort_submit",  # #1394 — one-tap weekly single-number (POST)
     "/api/challenges": "handle_challenges",
     "/api/changes-since": "handle_changes_since",
     "/api/character": "handle_character",

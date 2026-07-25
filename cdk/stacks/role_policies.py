@@ -2296,6 +2296,7 @@ def site_api() -> list[iam.PolicyStatement]:
                         "USER#matthew#SOURCE#experiment_suggestions",  # reader experiment suggestions
                         "USER#matthew#SOURCE#challenges",  # challenge daily check-ins
                         "USER#matthew#SOURCE#evening_ritual",  # #769 (ADR-124): one-tap ritual taps
+                        "COHORT#*",  # #1394 (epic #1366): anonymous cohort-strip submissions (COHORT#<metric>#<week>)
                     ],
                 },
             },
