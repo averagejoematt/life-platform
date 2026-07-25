@@ -92,6 +92,12 @@ _FEATURE_CUTOFF = {
     # cutoff and only surfaced as a per-page "AI-QA error") — the same class of defect
     # ADR-125 fixed for coherence_semantic.
     "visual_ai_qa": 1,
+    # eyeball_estimate (#1390): the meal-photo Haiku vision macro estimate — a self-grading
+    # calibration probe (`lambdas/eyeball_calibration.py`), never a reader narrative and never
+    # nutrition data. Internal/self-grading, so it pauses FIRST like the rest of band 1; a paused
+    # call returns an explicit {"status": "paused"} (never a fabricated estimate). ~$1/mo, so it
+    # is the cheapest thing to sacrifice under any pressure.
+    "eyeball_estimate": 1,
     # ── Band 2: reader NARRATIVE content — pauses only under real pressure, a full
     #    tier AFTER all internal AI. The biggest recurring daily bucket, so it's
     #    the real cost lever, but the reader product is never the first sacrifice.

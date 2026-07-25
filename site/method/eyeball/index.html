@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en" data-door="method">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>How wrong is the AI at eyeballing food? — The Method — averagejoematt</title>
+  <meta name="description" content="The AI estimates a meal&#x27;s macros from a photo, then gets graded against the logged truth. Its error, in public — never entered as data.">
+  <link rel="canonical" href="https://averagejoematt.com/method/eyeball/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="averagejoematt">
+  <meta property="og:url" content="https://averagejoematt.com/method/eyeball/">
+  <meta property="og:title" content="How wrong is the AI at eyeballing food? — The Method — averagejoematt">
+  <meta property="og:description" content="The AI estimates a meal&#x27;s macros from a photo, then gets graded against the logged truth. Its error, in public — never entered as data.">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-home.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="How wrong is the AI at eyeballing food? — The Method — averagejoematt">
+  <meta name="twitter:description" content="The AI estimates a meal&#x27;s macros from a photo, then gets graded against the logged truth. Its error, in public — never entered as data.">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4EFE4">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E0C08">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="icon" type="image/svg+xml" href="/assets/marks/favicon-dark.svg">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="preload" href="/assets/fonts/v4/pxiTypc9vsFDm051Uf6KVwgkfoSxQ0GsQv8ToedPibnr0SZe1ZuWi3g.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/assets/fonts/v4/6NU58FyLNQOQZAnv9ZwNjucMHVn85Ni7emAe9lKqZTnbB-gzTK0K1ChjeveQ7ZXk8g.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/assets/fonts/v4/-F63fjptAgt5VM-kVkqdyU8n1i8q131nj-o.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/assets/css/fonts.css">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/evidence.css">
+  
+<style>
+.eb-wrap { max-width: var(--container); margin-inline: auto; padding: 0 var(--gutter) var(--sp-9); }
+.eb-state { margin-top: var(--sp-5); border: var(--border-hair); border-radius: var(--radius); padding: var(--sp-6); background: var(--surface-raised); }
+.eb-empty { color: var(--ink-muted); line-height: var(--lh-relaxed); }
+.eb-grid { display: grid; gap: var(--sp-4); margin-top: var(--sp-5); min-width: 0; }
+@media (min-width: 720px) { .eb-grid { grid-template-columns: repeat(2, 1fr); } }
+.eb-macro { border: var(--border-hair); border-radius: var(--radius); padding: var(--sp-5); background: var(--surface-raised); min-width: 0; }
+.eb-macro h3 { margin: 0; font-family: var(--font-serif); font-size: var(--fs-h3); color: var(--ink); }
+.eb-macro .eb-n { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-faint); }
+.eb-bar-row { display: grid; grid-template-columns: 84px 1fr auto; align-items: center; gap: var(--sp-3); margin-top: var(--sp-3); }
+.eb-bar-label { font-family: var(--font-mono); font-size: var(--fs-label); text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--ink-faint); }
+.eb-bar-track { height: 10px; border-radius: 999px; background: var(--surface-sunken); overflow: hidden; }
+.eb-bar-fill { height: 100%; border-radius: 999px; background: var(--accent, var(--ink-muted)); }
+.eb-bar-val { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink); }
+.eb-lown { margin-top: var(--sp-3); font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-faint); }
+.eb-trend { margin-top: var(--sp-2); font-size: var(--fs-small); color: var(--ink-muted); }
+.eb-disclaimer { margin-top: var(--sp-6); color: var(--ink-muted); line-height: var(--lh-relaxed); }
+.eb-disclaimer code { overflow-wrap: anywhere; }
+</style>
+
+  <script>(function(){try{var t=localStorage.getItem("ajm-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+  <script>(function(){try{if(!("IntersectionObserver" in window))return;if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;document.documentElement.classList.add("mo");window.__moFail=setTimeout(function(){document.documentElement.classList.remove("mo");},2600);}catch(e){}})();</script>
+</head>
+<body>
+  <a class="skip" href="#eb">Skip to the content</a>
+  <header class="ev-top"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">averagejoematt</span> <span class="brand-door label">method</span></a><nav class="doors" aria-label="Doors"><a href="/cockpit/" title="Today&#x27;s live instrument — your daily numbers, read back to you"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-cockpit"></use></svg>the cockpit</a><a href="/data/" title="Every source the platform reads — trends now and over time" aria-current="page"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-data"></use></svg>the data</a><a href="/coaching/" title="The AI team &amp; their arguments — stances, track records, disagreements"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-coaching"></use></svg>the coaching</a><a href="/protocols/" title="The levers — supplements, experiments, challenges, discoveries"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-protocols"></use></svg>the protocols</a><a href="/story/" title="The writing &amp; the why — chronicle, journal, timeline, about"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-story"></use></svg>the story</a><button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button></nav></header>
+  <main id="eb">
+    <div class="page-hero">
+      <p class="ph-kicker label">the method &middot; the model graded</p>
+      <h1 class="ph-title">How wrong is the AI at eyeballing food?</h1>
+      <p class="ph-promise">Hand a vision model a meal photo and it will confidently guess the macros. So we let it — then grade every guess against the day actually logged in MacroFactor. The error is published here. The estimates are <strong>never</strong> entered as nutrition data; they exist only to be graded (ADR-105). Below the threshold, no accuracy number is claimed at all.</p>
+      <nav class="loop-ribbon" aria-label="Where this sits in the loop"><a href="/cockpit/">Now</a><span class="lr-sep" aria-hidden="true">&middot;</span><a href="/data/">Data</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/coaching/">Coaching</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/protocols/">Protocols</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/story/">Story</a><span class="lr-arrow" aria-hidden="true">&#8635;</span></nav>
+    </div>
+    <div class="eb-wrap">
+      <section class="rd-sec" style="margin-top:0">
+        <h2 class="rd-h">The reliability chart</h2>
+        <p class="rd-prose">Per macro: mean and median absolute percent error, the direction of any bias (does it over- or under-estimate?), and whether recent guesses are getting better. Everything here is computed deterministically from the graded records; the model never scores itself.</p>
+        <div id="eb-readout"></div>
+      </section>
+      <p class="eb-disclaimer">The estimate lives in its own database partition (<code>SOURCE#eyeball_estimate</code>), walled off from the nutrition record by a structural test (<code>tests/test_eyeball_isolation_1390.py</code>) that fails if an estimate value could ever reach a nutrition metric path. The vision call is Haiku-tier and budget-gated (~$1/mo, ADR-063).</p>
+      <p class="correlative">Generated by <code>scripts/v4_build_eyeball.py</code> from <code>lambdas/eyeball_calibration.py</code>. The chart reads a static artifact at <code>/data/eyeball_calibration.json</code>. <span class="confidence conf-low">graded, not asserted</span></p>
+    </div>
+  </main>
+  <aside class="loop-forward" aria-label="Continue the loop"><p class="lf-next"><span class="label">next on the loop</span> <a href="/coaching/">the coaching</a> — See what the AI team makes of it</p><p class="lf-return"><span class="label">or come back</span> <a href="/subscribe/">follow by email</a> for the next entry</p></aside><footer class="site-foot"><nav class="site-foot-cols" aria-label="Site map"><div class="sf-col"><p class="sf-h label">The Story</p><a href="/story/chronicle/">Chronicle</a><a href="/story/panel/">Podcast</a><a href="/story/journal/">In my own words</a><a href="/story/timeline/">Timeline</a><a href="/story/attempts/">The attempts</a><a href="/story/agents/">The agents</a><a href="/story/about/">About</a></div><div class="sf-col"><p class="sf-h label">The Data</p><a href="/data/">All topics</a><a href="/method/ask/">Ask the data</a><a href="/data/labs/">Labs</a><a href="/data/training/">Training</a><a href="/data/sleep/">Sleep</a><a href="/data/ledger/">The ledger</a></div><div class="sf-col"><p class="sf-h label">The Protocols</p><a href="/protocols/">All protocols</a><a href="/protocols/supplements/">Supplements</a><a href="/protocols/experiments/">Experiments</a><a href="/protocols/challenges/">Challenges</a></div><div class="sf-col"><p class="sf-h label">The Coaching</p><a href="/coaching/">The Read</a><a href="/coaching/by-coach/">By Coach</a><a href="/coaching/scorecard/">Scorecard</a><a href="/coaching/team/">The Team</a><a href="/coaching/lab-notes/">AI lab notes</a></div><div class="sf-col"><p class="sf-h label">The Technology</p><a href="/method/">The machine</a><a href="/story/build/">Build log</a><a href="/method/platform/">The platform</a><a href="/method/pipeline/">Pipeline status</a><a href="/method/cost/">Cost</a><a href="/gear/">The gear</a></div><div class="sf-col"><p class="sf-h label">Follow &amp; context</p><a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a><a href="https://bsky.app/profile/averagejoematt.bsky.social" target="_blank" rel="me noopener">Bluesky</a><a href="https://x.com/averagejoematt_" target="_blank" rel="me noopener">X</a><a href="https://www.instagram.com/averagejoematt/" target="_blank" rel="me noopener">Instagram</a><a href="https://www.reddit.com/user/averagejoematt/" target="_blank" rel="me noopener">Reddit</a><a href="https://www.youtube.com/@averagejoematt" target="_blank" rel="me noopener">YouTube</a><a href="https://www.tiktok.com/@averagejoematt" target="_blank" rel="me noopener">TikTok</a><a href="/story/about/">About</a><a href="/privacy/">Privacy</a></div></nav><p class="sf-base label"><span>averagejoematt</span><a href="/">← home</a></p><script type="module" src="/assets/js/attribution.js"></script></footer>
+  <script src="/assets/js/motion.js" defer></script>
+  
+<script>
+(function () {
+  var MACRO_LABELS = { calories: "Calories", protein_g: "Protein", carbs_g: "Carbs", fat_g: "Fat" };
+  var root = document.getElementById("eb-readout");
+  function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
+  function el(html){ var d=document.createElement("div"); d.innerHTML=html; return d.firstElementChild; }
+  function emptyState(a){
+    return '<div class="eb-state eb-empty" data-readout data-state="empty">' +
+      '<p><strong>No graded photos yet.</strong> Nothing has been eyeballed and graded, so there is no error to report ' +
+      '(n = 0). This chart fills in only as real meal photos are estimated and checked against the logged day — ' +
+      'it will never show a made-up accuracy number.</p></div>';
+  }
+  function bar(label, mape){
+    var pct = Math.max(0, Math.min(100, mape));
+    return '<div class="eb-bar-row"><span class="eb-bar-label">' + esc(label) + '</span>' +
+      '<span class="eb-bar-track"><span class="eb-bar-fill" style="width:' + pct.toFixed(1) + '%"></span></span>' +
+      '<span class="eb-bar-val">' + mape.toFixed(1) + '% MAPE</span></div>';
+  }
+  function macroCard(key, cell){
+    var name = MACRO_LABELS[key] || key;
+    if (!cell || !cell.sufficient) {
+      var n = (cell && cell.n) || 0;
+      return '<div class="eb-macro"><h3>' + esc(name) + '</h3>' +
+        '<div class="eb-lown">n = ' + n + ' — too few to score yet. Stats are withheld until there are enough graded days ' +
+        '(honest low-n; no precision claimed on thin data).</div></div>';
+    }
+    var body = '<div class="eb-macro"><h3>' + esc(name) + '</h3>' +
+      '<div class="eb-n">n = ' + cell.n + ' graded days</div>' +
+      bar("Mean abs err", cell.mape_pct) +
+      '<div class="eb-bar-row"><span class="eb-bar-label">Median</span><span></span>' +
+        '<span class="eb-bar-val">' + cell.median_abs_pct.toFixed(1) + '%</span></div>' +
+      '<div class="eb-bar-row"><span class="eb-bar-label">Bias</span><span></span>' +
+        '<span class="eb-bar-val">' + (cell.bias_pct > 0 ? "+" : "") + cell.bias_pct.toFixed(1) + '% (' +
+          (cell.bias_pct > 0 ? "over" : (cell.bias_pct < 0 ? "under" : "no bias")) + ')</span></div>';
+    if (cell.trend) {
+      body += '<p class="eb-trend">Trend: ' + esc(cell.trend.direction) + ' — recent ' +
+        cell.trend.recent_mape_pct.toFixed(1) + '% vs earlier ' + cell.trend.earlier_mape_pct.toFixed(1) + '%.</p>';
+    }
+    return body + '</div>';
+  }
+  function render(a){
+    if (!a || a.state === "empty" || a.n_days === 0) { root.appendChild(el(emptyState(a))); return; }
+    var wrap = el('<div class="eb-state" data-readout data-state="' + esc(a.state) + '"></div>');
+    var head = '<p class="eb-n" style="font-family:var(--font-mono);color:var(--ink-faint)">' +
+      a.n_days + ' graded day' + (a.n_days === 1 ? "" : "s") + ' &middot; as of ' + esc(a.as_of || "") +
+      (a.state === "low_n" ? ' &middot; low-n: summary stats withheld below the threshold of ' + esc(a.min_n) : '') + '</p>';
+    wrap.innerHTML = head + '<div class="eb-grid">' +
+      Object.keys(MACRO_LABELS).map(function(k){ return macroCard(k, (a.macros||{})[k]); }).join("") + '</div>';
+    root.appendChild(wrap);
+  }
+  fetch('/data/eyeball_calibration.json', { cache: "no-store" })
+    .then(function(r){ if (!r.ok) throw new Error("no artifact"); return r.json(); })
+    .then(render)
+    .catch(function(){ root.appendChild(el(emptyState(null))); });
+})();
+</script>
+
+</body>
+</html>

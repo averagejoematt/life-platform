@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-12
 
-Last updated: 2026-07-24 (v8.6.0 — 69 MCP tools, 37-module package, 97 Lambdas, 20 data sources)
+Last updated: 2026-07-25 (v8.6.0 — 69 MCP tools, 37-module package, 97 Lambdas, 20 data sources)
 
 **Ground truth (point-in-time values are drift — run the command instead):**
 - Lambda functions defined (CDK): 97 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
@@ -1312,7 +1312,7 @@ nonzero aborts the run and prints what already ran; `--continue-on-error` is the
 14. With `--sync-site` (opt-in, #1092): `bash deploy/sync_site_to_s3.sh` — the full-site
     content-hashed sync + rss.xml regen (deliberately NOT default: heavy + interactive;
     without the flag it stays a printed next command)
-15. `restart_verify_rendered.py --old-genesis <outgoing>` — hard gate over the 86-URL v4 surface (apply mode only)
+15. `restart_verify_rendered.py --old-genesis <outgoing>` — hard gate over the 88-URL v4 surface (apply mode only)
 16. `restart_verify_semantic.py` — **the #1093 semantic hard gate** (apply mode only): deterministic
     assertions on what the live site SAYS pre-start (`pre_start` flags on snapshot/journey, zeroed
     character, no current-cycle findings on /api/discoveries, coach_team dispute null-or-current-cycle,
