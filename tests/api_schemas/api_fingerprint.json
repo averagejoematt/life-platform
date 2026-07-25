@@ -1,0 +1,33 @@
+{
+  "captured_at": "2026-07-25T00:00:00+00:00",
+  "fetch_path": "/api/fingerprint",
+  "is_prefix_sample": false,
+  "path": "/api/fingerprint",
+  "status": 200,
+  "shape": {
+    "type": "object",
+    "keys": {
+      "_meta": {
+        "type": "object",
+        "keys": {
+          "cache_seconds": { "type": "integer" },
+          "generated_at": { "type": "string" },
+          "request_id": { "type": "string" }
+        }
+      },
+      "fingerprint": {
+        "type": "object",
+        "keys": {
+          "date": { "type": "string" },
+          "day_number": { "type": "integer" },
+          "svg": { "type": "string" },
+          "warming_up": { "type": "boolean" },
+          "earned_score": { "type": "number" },
+          "n": { "type": "integer" },
+          "metrics": { "type": "object", "keys": {} },
+          "mapping": { "type": "object", "keys": {} }
+        }
+      }
+    }
+  }
+}

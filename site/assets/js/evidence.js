@@ -24,6 +24,7 @@ import { renderResults, renderPostmortems, renderSurvival, renderMirror, renderS
 import { renderBoard, renderPlatform, renderCost, renderData, renderTools, renderInference, renderReceipts, renderPipeline, renderAsk, renderExplorer, renderVerify, renderGeneric, ASK_CHIPS } from "/assets/js/evidence_meta.js";
 import { renderNutrition, renderGlucose } from "/assets/js/evidence_nutrition.js";
 import { renderReading } from "/assets/js/evidence_reading.js";
+import { renderWall } from "/assets/js/evidence_wall.js"; // #1379 — the all-attempts fingerprint field
 import { renderSleep, renderMind, renderVices } from "/assets/js/evidence_sleep.js";
 import { renderPulse } from "/assets/js/evidence_vitals.js";
 import { renderAutonomic, renderZone2 } from "/assets/js/evidence_autonomic.js";
@@ -64,7 +65,7 @@ const DOORTITLE = window.__ARCHIVE_TITLE__ || "Evidence";
 const slugFromPath = () => resolveSlugFromPath(location.pathname);
 
 const RENDERERS = {
-  vitals: renderPulse, autonomic: renderAutonomic, zone2: renderZone2, supplements: renderSupplements, labs: renderLabs, physical: renderPhysical, training: renderTraining, nutrition: renderNutrition, glucose: renderGlucose, sleep: renderSleep, mind: renderMind, reading: renderReading, vices: renderVices, ledger: renderLedger, discoveries: renderDiscoveries, biology: renderGenome, challenges: renderChallenges, protocols: renderProtocols, experiments: renderExperiments, habits: renderHabits, board: renderBoard, platform: renderPlatform, cost: renderCost, data: renderData, pipeline: renderPipeline, results: renderResults, tools: renderTools, ask: renderAsk, cycles: renderCycles, inference: renderInference, receipts: renderReceipts, wrong: renderWrong, survival: renderSurvival, postmortems: renderPostmortems, mirror: renderMirror, explorer: renderExplorer, verify: renderVerify, intelligence: renderCorrelations, predictions: renderPredictions, calibration: renderCalibration, benchmarks: renderBenchmarks, character: renderCharacter, badges: renderBadges, scenarios: renderScenarios };
+  vitals: renderPulse, autonomic: renderAutonomic, zone2: renderZone2, supplements: renderSupplements, labs: renderLabs, physical: renderPhysical, training: renderTraining, nutrition: renderNutrition, glucose: renderGlucose, sleep: renderSleep, mind: renderMind, reading: renderReading, vices: renderVices, ledger: renderLedger, discoveries: renderDiscoveries, biology: renderGenome, challenges: renderChallenges, protocols: renderProtocols, experiments: renderExperiments, habits: renderHabits, board: renderBoard, platform: renderPlatform, cost: renderCost, data: renderData, pipeline: renderPipeline, results: renderResults, tools: renderTools, ask: renderAsk, cycles: renderCycles, inference: renderInference, receipts: renderReceipts, wrong: renderWrong, survival: renderSurvival, postmortems: renderPostmortems, mirror: renderMirror, explorer: renderExplorer, verify: renderVerify, intelligence: renderCorrelations, predictions: renderPredictions, calibration: renderCalibration, benchmarks: renderBenchmarks, character: renderCharacter, badges: renderBadges, scenarios: renderScenarios, wall: renderWall };
 
 const WIRE = {
   ask: () => {

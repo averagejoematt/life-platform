@@ -223,6 +223,18 @@ REGISTRY = [
         None,
         None,
     ),
+    # #1379: the Daily Fingerprint wall — every attempt, every day, as a deterministic
+    # mark of that day's real numbers. Watch attempt 3 die and attempt 7 begin.
+    (
+        "wall",
+        "The wall",
+        "Every attempt, every day — a deterministic mark of that day's real numbers, earned glow only. Watch attempts begin and die.",
+        "The character",
+        "data",
+        "/api/wall",
+        None,
+        None,
+    ),
     # ── Protocol & experiments ─────────────────────────────────────────────
     (
         "supplements",
@@ -321,6 +333,18 @@ REGISTRY = [
         "How it's built",
         "Build-in-public — the AI agents, the budget governor, and keeping a model honest about my own data.",
         "Credibility & the machine",
+        "editorial",
+        None,
+        None,
+        None,
+    ),
+    # #1379: the metric→visual contract for the Daily Fingerprint — documented on
+    # /method/ so the mark's grammar is legible (AC2). Editorial (no endpoint).
+    (
+        "fingerprint",
+        "The daily fingerprint",
+        "How a day's real numbers become its mark — the metric→visual mapping, and why the glow can't be faked.",
+        "The machine",
         "editorial",
         None,
         None,
@@ -614,6 +638,22 @@ GROUP_ORDER = [
 
 # Authored editorial content (faithful to the preserved legacy + the locked docs).
 EDITORIAL = {
+    "fingerprint": (
+        '<p class="rd-lede">Every day gets a mark — a small, code-drawn sigil that is a <strong>pure function of that day\'s real numbers</strong>. Same day, same data, same mark, down to the byte. It cannot be styled by hand and it cannot be faked; the glow is earned or it is absent.</p>'
+        '<section class="rd-sec"><h2 class="rd-h">Deterministic by construction</h2>'
+        "<p class=\"rd-prose\">The mark is seeded by a SHA-256 of the date plus that day's measured metrics. A tiny deterministic PRNG scatters the geometry — never Python's <code>random</code> (unseeded) or <code>hash()</code> (salted per process), both of which would make the mark drift. A unit test pins the invariant: identical inputs produce a byte-identical SVG across a hundred calls and across separate processes. The mark you see on the cockpit, on the share card, and on the wall is the one artifact.</p></section>"
+        '<section class="rd-sec"><h2 class="rd-h">The metric → visual mapping</h2>'
+        '<ul class="rd-tierlist">'
+        "<li><strong>The core</strong> — its size grows with the day's overall score (the mean of what was measured).</li>"
+        "<li><strong>The nodes</strong> — one per measured signal: recovery, sleep, steps, streak, HRV, strain. A node <em>lights</em> (ember) only when that signal is genuinely high.</li>"
+        "<li><strong>The earned glow</strong> — the ember halo appears <em>only</em> on a strong day and grows with the score. A thin or low day withholds it entirely. There is no way to draw the glow without the numbers.</li>"
+        "<li><strong>Warming up</strong> — fewer than three measured metrics renders a dashed, staged core: an honest low-data state, never a fabricated dense field.</li>"
+        "</ul>"
+        '<p class="rd-prose">Down is not red. A low day is sparse and quiet — the palette never turns to a warning colour, it simply doesn\'t light. The only colours are the ember (earned) and the ink tokens (structure); the mark themes with the page and adds nothing outside the design system.</p></section>'
+        '<section class="rd-sec"><h2 class="rd-h">The wall</h2>'
+        '<p class="rd-prose">Line every day up and you get <a href="/data/wall/">the wall</a> — every attempt, every day, as its own mark. The living attempt glows where it earned it; sealed past attempts show honest low-data marks, because the day-by-day vitality of a wiped cycle is not something the platform will invent. You can watch one attempt die and the next begin.</p></section>'
+        '<p class="correlative">One life, marked in code, one day at a time. <span class="confidence conf-low">deterministic · earned-only</span></p>'
+    ),
     "methodology": (
         '<p class="rd-lede">How raw inputs become scores — and why an experiment of one is built the way it is.</p>'
         '<section class="rd-sec"><h2 class="rd-h">Why N=1</h2>'
@@ -873,6 +913,7 @@ OG_CARD_BY_SLUG = {
     "mind": "og-mind.png",
     "labs": "og-labs.png",
     "experiments": "og-experiments.png",
+    "wall": "og-fingerprint.png",  # #1379 — the wall shares the day's deterministic mark card
 }
 
 

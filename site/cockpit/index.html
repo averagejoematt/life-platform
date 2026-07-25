@@ -77,6 +77,10 @@
        the big score below is the real headline. -->
   <div class="page-hero cockpit-hero">
     <p class="ph-kicker label">the cockpit · one life, measured live</p>
+    <!-- #1379: the Daily Fingerprint masthead — the day's deterministic mark (a pure
+         function of today's real numbers), injected by cockpit.js from /api/fingerprint.
+         Earned glow only; links through to the wall of every attempt. Self-hides. -->
+    <div class="cockpit-fingerprint" data-bind="fingerprint" hidden></div>
     <!-- #1375: attempt framing — day-1 emptiness reads as stakes, not failure.
          Derived live from /api/survival by cockpit.js; self-hides without data. -->
     <p class="ph-attempt label" data-bind="attempt" hidden></p>

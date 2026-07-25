@@ -1,0 +1,56 @@
+{
+  "captured_at": "2026-07-25T00:00:00+00:00",
+  "fetch_path": "/api/wall",
+  "is_prefix_sample": false,
+  "path": "/api/wall",
+  "status": 200,
+  "shape": {
+    "type": "object",
+    "keys": {
+      "_meta": {
+        "type": "object",
+        "keys": {
+          "cache_seconds": { "type": "integer" },
+          "generated_at": { "type": "string" },
+          "request_id": { "type": "string" }
+        }
+      },
+      "wall": {
+        "type": "object",
+        "keys": {
+          "attempt_count": { "type": "integer" },
+          "living_cycle": { "type": "integer" },
+          "note": { "type": "string" },
+          "attempts": {
+            "type": "array",
+            "length_sample": 1,
+            "items": {
+              "type": "object",
+              "keys": {
+                "cycle": { "type": "integer" },
+                "genesis": { "type": "string" },
+                "ended": { "type": "string" },
+                "day_count": { "type": "integer" },
+                "alive": { "type": "boolean" },
+                "days": {
+                  "type": "array",
+                  "length_sample": 1,
+                  "items": {
+                    "type": "object",
+                    "keys": {
+                      "date": { "type": "string" },
+                      "day_number": { "type": "integer" },
+                      "svg": { "type": "string" },
+                      "warming_up": { "type": "boolean" },
+                      "earned": { "type": "number" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

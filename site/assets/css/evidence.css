@@ -891,3 +891,24 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 }
 .rcp-band.is-past { color: var(--ink-muted); border-color: var(--ember-line); }
 .rcp-band.is-on { color: var(--ink); border-color: var(--ember); background: var(--ember-wash); }
+
+/* ── #1379: the Wall — the all-attempts field of daily fingerprints ──────────
+   Each cell holds the canonical server-rendered mark SVG (its fills resolve to
+   tokens.css vars here). Sealed attempts read faint; the living attempt is lifted.
+   No new colour outside the token set; the earned ember does the signalling. */
+.wall-legend { color: var(--ink-muted); font-size: var(--fs-small); max-width: 60ch; margin: 0 0 var(--sp-4); }
+.wall-legend a { color: var(--ember); }
+.wall-attempts { display: flex; flex-direction: column; gap: var(--sp-4); }
+.wall-attempt { padding: var(--sp-3); border: var(--border-hair); border-radius: 10px; background: var(--surface-2); }
+.wall-attempt.is-live { border-color: var(--ember-line); }
+.wall-head { display: flex; align-items: baseline; gap: var(--sp-2); flex-wrap: wrap; margin-bottom: var(--sp-2); }
+.wall-n { font-weight: var(--weight-med); color: var(--ink); }
+.wall-genesis { color: var(--ink-faint); }
+.wall-status { margin-left: auto; font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label); }
+.wall-live { color: var(--ember); }
+.wall-dead { color: var(--ink-faint); }
+.wall-field { display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 4px; }
+.wall-cell { display: block; line-height: 0; opacity: .9; }
+.wall-attempt:not(.is-live) .wall-cell { opacity: .55; }        /* sealed attempts recede */
+.wall-cell.is-warming { opacity: .5; }
+.wall-cell svg, .wall-cell .fingerprint { width: 100%; height: auto; display: block; }

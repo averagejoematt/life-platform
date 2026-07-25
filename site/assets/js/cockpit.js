@@ -1000,6 +1000,23 @@ async function renderLevers(pre) {
 
 // Reading line (Mind pillar, ADR-097): current book + read-today tick + streak.
 // Recall prompts/retention are owner-private — never fetched on the public cockpit.
+/* ── #1379: the Daily Fingerprint in the masthead ─────────────────────────────
+   The day's deterministic mark — a pure function of today's real numbers, rendered
+   server-side by lambdas/web/fingerprint.py and injected here (no client-side mark
+   maths, no new dep). Fire-and-forget: a grace note, never a broken box — a missing
+   endpoint just leaves the masthead as it was. */
+async function renderFingerprint() {
+  const mount = bind("fingerprint");
+  if (!mount) return;
+  let d = null;
+  try { d = await getJSON(`${API}/fingerprint`); } catch (e) { return; }
+  const fp = d && d.fingerprint;
+  if (!fp || !fp.svg) return;
+  const cap = fp.warming_up ? "today's mark · warming up" : "today's mark · earned glow";
+  mount.innerHTML = `<a class="cfp-link" href="/data/wall/" aria-label="Today's fingerprint — see the whole wall of attempts">${fp.svg}<span class="cfp-cap label">${cap}</span></a>`;
+  mount.hidden = false;
+}
+
 async function renderReading() {
   const sec = $("[data-reading]");
   if (!sec) return;
@@ -1315,6 +1332,7 @@ async function load(dateStr) {
     renderCircadian();  // fire-and-forget; hides itself if no forecast available
     renderForecast();   // fire-and-forget (#541); hides itself until the engine has a summary
     renderReading();    // fire-and-forget; hides itself if no book in hand
+    renderFingerprint(); // #1379 fire-and-forget; the day's deterministic mark in the masthead
     renderPredict();    // fire-and-forget; hides itself if no active weekly prediction
     renderLevers(pre);  // fire-and-forget (#974); the Protocols station — staged pre-genesis, self-hiding
 
@@ -1358,6 +1376,9 @@ async function load(dateStr) {
     // #1106: the strip still renders without a sheet — staged instruments at "—"
     // are the designed pre-start/empty state, never a blank hero.
     renderHeroInstruments({ pre: preC });
+    // #1379: the fingerprint is independent of the character sheet — it renders
+    // from its own endpoint even in the empty / pre-start state (a warming-up mark).
+    renderFingerprint();
     $(".panel").setAttribute("aria-busy", "false");
   }
 }
