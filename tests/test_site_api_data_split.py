@@ -54,6 +54,8 @@ EXPECTED_ROUTE_MAP = {
     "/api/challenges": "handle_challenges",
     "/api/changes-since": "handle_changes_since",
     "/api/character": "handle_character",
+    "/api/fingerprint": "handle_fingerprint",  # #1379 the Daily Fingerprint
+    "/api/wall": "handle_wall",  # #1379 the Wall — all-attempts field
     "/api/character_receipt": "handle_character_receipt",  # #1373 progression receipts
     "/api/character_config": "handle_character_config",
     "/api/character_stats": "handle_character_stats",

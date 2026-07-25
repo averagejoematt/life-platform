@@ -130,6 +130,7 @@ from web.site_api_data import (
     handle_vice_streaks,
     handle_what_changed,
 )
+from web.site_api_fingerprint import handle_fingerprint, handle_wall  # #1379 — the Daily Fingerprint + the Wall
 
 # P1.1 Phase B step 3 (2026-05-26): status + pulse handlers extracted.
 # #1240: intelligence-adjacent domain handlers moved here from site_api_data.
@@ -348,6 +349,9 @@ ROUTES = {
     "/api/vacation_fund": handle_vacation_fund,
     "/api/methods": handle_methods,  # #544: the auto-generated statistics registry (ADR-105)
     "/api/character": handle_character,
+    # #1379: the Daily Fingerprint (dateless = today; ?date=YYYY-MM-DD handled inline below) + the Wall (all-attempts field)
+    "/api/fingerprint": handle_fingerprint,
+    "/api/wall": handle_wall,
     "/api/character_receipt": handle_character_receipt,  # #1373: progression receipts (dateless = latest; ?date/&verify below)
     "/api/status": handle_status,
     "/api/status/summary": handle_status_summary,
@@ -689,6 +693,11 @@ def lambda_handler(event, context):
     # cockpit as of a past date. Dateless requests fall through to the ROUTES default.
     if path == "/api/vitals" and (event.get("queryStringParameters") or {}).get("date"):
         return handle_vitals(date=event["queryStringParameters"]["date"].strip())
+
+    # #1379: /api/fingerprint?date=YYYY-MM-DD — a past day's mark. Dateless falls
+    # through to the ROUTES default (today's fingerprint).
+    if path == "/api/fingerprint" and (event.get("queryStringParameters") or {}).get("date"):
+        return handle_fingerprint(date=event["queryStringParameters"]["date"].strip())
 
     # Phase 1: Observatory week (GET with query params)
     if path == "/api/observatory_week":

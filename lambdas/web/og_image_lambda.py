@@ -43,6 +43,7 @@ TEXT = card_engine.TEXT
 MUTED = card_engine.MUTED
 FAINT = card_engine.FAINT
 GREEN = card_engine.GREEN
+AMBER = card_engine.AMBER  # #1379 — the earned-glow ember, mirrors tokens.css --ember
 BORDER = card_engine.BORDER
 FONT_DISPLAY = card_engine.FONT_DISPLAY
 FONT_MONO = card_engine.FONT_MONO
@@ -282,6 +283,80 @@ def build_builders(stats):
     return img
 
 
+def _blend(a, b, t):
+    """Linear blend a→b by t∈[0,1] — approximates SVG opacity for the RGB card."""
+    t = max(0.0, min(1.0, t))
+    return tuple(int(round(a[i] + (b[i] - a[i]) * t)) for i in range(3))
+
+
+def _draw_mark(draw, mark, box_cx, box_cy, scale):
+    """Render a fingerprint mark spec (web.fingerprint.build_mark) into the PNG card
+    using the SAME primitives the inline SVG draws — one source of truth (#1379).
+    ink→TEXT, ink-faint→FAINT, ember→AMBER; the earned glow is drawn behind."""
+
+    def _pt(x, y):
+        return (box_cx + (x - 50.0) * scale, box_cy + (y - 50.0) * scale)
+
+    cx, cy = mark["center"]
+    ccx, ccy = _pt(cx, cy)
+    # 1. earned glow (dim amber rings behind the structure)
+    for ring in mark["glow"]["rings"]:
+        r = ring["r"] * scale
+        col = _blend(BG, AMBER, min(1.0, ring["opacity"] * 3.2))
+        draw.ellipse([ccx - r, ccy - r, ccx + r, ccy + r], outline=col, width=2)
+    # 2. rays
+    for ray in mark["rays"]:
+        rx, ry = _pt(ray["x"], ray["y"])
+        col = AMBER if ray["lit"] else _blend(BG, FAINT, 0.7)
+        draw.line([ccx, ccy, rx, ry], fill=col, width=2)
+    # 3. nodes
+    for node in mark["nodes"]:
+        nx, ny = _pt(node["x"], node["y"])
+        r = max(2.0, node["r"] * scale)
+        col = AMBER if node["lit"] else FAINT
+        draw.ellipse([nx - r, ny - r, nx + r, ny + r], fill=col)
+    # 4. core
+    r = mark["core_r"] * scale
+    if mark["warming_up"]:
+        draw.ellipse([ccx - r, ccy - r, ccx + r, ccy + r], outline=FAINT, width=2)
+    else:
+        draw.ellipse([ccx - r, ccy - r, ccx + r, ccy + r], fill=TEXT)
+
+
+def build_fingerprint(stats):
+    """#1379: today's Daily Fingerprint as an OG share card. The mark is the SAME
+    deterministic artifact the cockpit masthead and /data/wall/ render — a pure
+    function of today's real vitals, earned glow only."""
+    from datetime import datetime, timezone
+
+    from web.fingerprint import build_mark
+
+    vitals = stats.get("vitals", {})
+    platform = stats.get("platform", {})
+    metrics = {}
+    if vitals.get("recovery_pct") is not None:
+        metrics["recovery"] = vitals["recovery_pct"]
+    if vitals.get("sleep_hours") is not None:
+        metrics["sleep_hours"] = vitals["sleep_hours"]
+    if vitals.get("hrv_ms") is not None:
+        metrics["hrv"] = vitals["hrv_ms"]
+    if platform.get("tier0_streak") is not None:
+        metrics["streak"] = platform["tier0_streak"]
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    mark = build_mark(today, metrics)
+
+    img, draw = _base_image()
+    _draw_header(draw, "The Daily Fingerprint")
+    draw.text((48, 100), "TODAY'S MARK", fill=TEXT, font=_font(FONT_DISPLAY, 66))
+    draw.text((48, 180), "A pure function of today's real numbers.", fill=MUTED, font=_font(FONT_MONO, 14))
+    tagline = "Earned glow — it can't be faked." if not mark["warming_up"] else "Warming up — too few numbers in yet to earn the glow."
+    draw.text((48, 210), tagline, fill=FAINT, font=_font(FONT_MONO, 13))
+    # the mark, drawn large on the right
+    _draw_mark(draw, mark, box_cx=900, box_cy=320, scale=3.4)
+    _draw_footer(draw, stats)
+    return img
+
+
 PAGES = [
     ("og-home", build_home),
     ("og-sleep", build_sleep),
@@ -296,6 +371,7 @@ PAGES = [
     ("og-experiments", build_experiments),
     ("og-builders", build_builders),
     ("og-org-chart", build_essay_org_chart),  # #741 — the career-artifact essay card
+    ("og-fingerprint", build_fingerprint),  # #1379 — the day's deterministic mark
 ]
 
 
