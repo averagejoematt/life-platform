@@ -234,7 +234,9 @@ def test_chronicle_prompt_gains_the_notebook():
 def test_chronicle_body_joins_the_grounding_gate():
     assert "grounded_generation" in CHRONICLE_SRC
     assert "regen_once" in CHRONICLE_SRC
-    assert "allowed_numbers(elena_prompt, user_message)" in CHRONICLE_SRC
+    # #1385: the allow-list now also folds in the whole-life archive Elena is shown,
+    # so a real dated callback passes while a fabricated one is still caught.
+    assert "allowed_numbers(elena_prompt, user_message, _archive_text)" in CHRONICLE_SRC
 
 
 # ── E8: the downstream surfaces read the same state ───────────────────────────

@@ -46,6 +46,7 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 import calibration_core  # #538: shared Brier + reliability scorer (layer module)
+import whole_life_context  # #1385: full multi-cycle archive as a 1-hour cached block
 from ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
 from boto3.dynamodb.conditions import Key
 from er03_gate import BANNED_CAUSAL  # reuse the platform's one causal-language list
@@ -359,10 +360,16 @@ def build_narration_body(state: dict) -> dict:
             )
     data_blob = json.dumps(_narration_payload(state), indent=2, default=str)
     user = "This week's pre-computed platform state:\n\n" + data_blob + "\n\nWrite the connecting narrative."
+    # #1385: the full multi-cycle chronicle archive rides as a 1-hour cached content
+    # block for whole-life callbacks. Context only — every NUMBER the narration voices
+    # still comes from the pre-computed payload above (ADR-104); the archive's numbers
+    # join the grounding allow-list in narration_gate() so a real archival callback
+    # isn't false-flagged, but the narrator is not licensed to compute anything new.
+    system_value = whole_life_context.with_cached_archive(system, state.get("archive_text"))
     return {
         "model": MODEL,
         "max_tokens": MAX_TOKENS,
-        "system": system,
+        "system": system_value,
         "messages": [{"role": "user", "content": user}],
     }
 
@@ -379,8 +386,16 @@ def narration_gate(state: dict, text: str) -> tuple:
     applies to the one weekly narration: every number must exist in the
     narration payload, and no banned causal connective may appear. Extracted
     (#812) so the golden-surface eval harness replays fixtures through the
-    ACTUAL gate path. ([], []) = the narrative would ship."""
+    ACTUAL gate path. ([], []) = the narrative would ship.
+
+    #1385: when the whole-life archive was shown to the narrator (state["archive_text"]),
+    its numbers join the allow-list — a number recalled from a real prior installment is
+    grounded, not fabricated. The narrator still may not COMPUTE a new figure: anything
+    absent from BOTH the payload and the archive it saw is still caught."""
     allowed = allowed_numbers(_narration_payload(state))
+    archive_text = state.get("archive_text")
+    if archive_text:
+        allowed |= allowed_numbers(archive_text)
     return grounding_findings(text, facts=None, allowed=allowed), _causal_language(text)
 
 
@@ -642,6 +657,18 @@ def lambda_handler(event: dict, context) -> dict:
     # #914: presence rides the state so the narration must acknowledge a real
     # logging stall (and its numbers join the grounding allow-list). Fail-soft.
     state["presence"] = gather_presence_section(fetch_engagement_signal())
+    # #1385: whole-life context — the full multi-cycle chronicle archive rides the
+    # state as a 1-hour cached block (build_narration_body) and its numbers join the
+    # grounding allow-list (narration_gate). Fail-soft to "" (no block, gate unchanged).
+    try:
+        state["archive_text"] = whole_life_context.format_full_archive(
+            whole_life_context.fetch_full_installment_archive(
+                table, f"{USER_PREFIX}chronicle", d2f=decimals_to_float, phase_filter=with_phase_filter
+            )
+        )
+    except Exception as _arch_e:  # noqa: BLE001 — the archive is context, never load-bearing
+        logger.warning(f"[state-of-matthew] #1385 archive build skipped (non-fatal): {_arch_e}")
+        state["archive_text"] = ""
     narration = narrate(state)
     item = build_summary_item(state, narration, today_str)
 
