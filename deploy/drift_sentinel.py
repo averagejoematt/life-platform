@@ -908,11 +908,21 @@ GITHUB_ACTIONS_WARN_PCT = 70
 def _gh_api_json(path, timeout=30):
     """`gh api <path>` as parsed JSON; None (never raise) on any failure — billing
     endpoints are EXPECTED to fail with the workflow's default GITHUB_TOKEN (no
-    `user` scope), so the caller treats None as "unavailable", not an error."""
+    billing scope), so the caller treats None as "unavailable", not an error.
+
+    #1613: prefers GH_BILLING_TOKEN (the owner's user-scoped PAT, stored at
+    Secrets Manager `life-platform/github-billing` + the GH_BILLING_TOKEN repo
+    secret), then GH_POSTURE_TOKEN, over the ambient GH_TOKEN — the same
+    preference pattern as `_gh_api_result` (#1320). Without this, wiring a
+    scoped PAT into the workflow env changed nothing."""
     import subprocess
 
+    env = dict(os.environ)
+    token = env.get("GH_BILLING_TOKEN") or env.get("GH_POSTURE_TOKEN")
+    if token:
+        env["GH_TOKEN"] = token
     try:
-        out = subprocess.run(["gh", "api", path], capture_output=True, text=True, timeout=timeout, cwd=_ROOT)
+        out = subprocess.run(["gh", "api", path], capture_output=True, text=True, timeout=timeout, cwd=_ROOT, env=env)
     except Exception:  # noqa: BLE001
         return None
     if out.returncode != 0:
@@ -959,16 +969,15 @@ def check_github_quota():
 
     Two independent, both fail-soft, sub-checks:
 
-    1. BILLING API — `GET /users/{owner}/settings/billing/actions` (the real minutes-
-       used-vs-included figure). This needs the `user` OAuth scope; the Actions
-       built-in GITHUB_TOKEN does not carry it and gets a 404 "needs the user scope"
-       (verified live 2026-07-18 — see docs/COST_TRACKER.md). Rather than treating
-       that as an error (which would make this check flap "degraded" every week for
-       a structural, known limitation), a failed billing call is reported as an
-       explicit `"billing_api": {"available": False, "detail": "..."}` — the
-       "billing API unavailable: <reason>" line #1453 asks for. If a scoped PAT is
-       ever wired in (see docs/COST_TRACKER.md for the exact `gh auth refresh`
-       command), this starts reporting real numbers with no code change needed.
+    1. BILLING USAGE API — `GET /users/{owner}/settings/billing/usage?year=&month=`
+       (#1613). The legacy `/settings/billing/actions` endpoint is 410 Gone
+       (verified live 2026-07-26); the enhanced-billing replacement returns
+       per-SKU `usageItems`, from which month-to-date Actions minutes =
+       Σ quantity (product=actions, unitType=Minutes) and paid overage =
+       Σ netAmount. Needs a user-scoped PAT — GH_BILLING_TOKEN via
+       `_gh_api_json`'s token preference; the built-in GITHUB_TOKEN cannot carry
+       it, and its failure is reported as an explicit
+       `"billing_api": {"available": False, ...}`, never a flapping error.
     2. TOP-CONSUMING WORKFLOWS — a same-scope wall-clock proxy: sums each run's
        (updatedAt - startedAt) per workflow name over the trailing 7 days via
        `gh run list` (needs only `actions: read`, which the built-in token gets).
@@ -976,41 +985,66 @@ def check_github_quota():
        in one workflow multiply wall-clock down, not up) — it's a same-direction
        proxy good enough to say "workflow X grew 3x this week," per #1453 AC2.
 
-    `status` is "drift" (escalated into the weekly needs-human signal) only when
-    real billing data says usage crossed the 70% warn line — the proxy path never
-    sets warn, since it isn't calibrated against the real quota.
+    `status` is "drift" only when real billing data warrants it — the proxy path
+    never sets warn. Warn semantics (#1613, honest to the plan mechanics):
+      * paid overage (Σ netAmount > 0) → always warn (real money is leaving);
+      * minutes ≥ 70% of the included allowance → warn ONLY if the repo is
+        private (or its visibility can't be read — conservative, the #1544
+        failure was a silent private-repo cap). Public-repo standard-runner
+        minutes are free and don't consume the allowance, so the same figure on
+        a public repo is reported but explicitly warn-suppressed — otherwise the
+        alarm would scream permanently while public and train us to ignore it.
     """
     result = {"billing_api": {"available": False}, "top_workflows_7d": []}
 
     repo = os.environ.get("GITHUB_REPOSITORY", "averagejoematt/life-platform")
     owner = repo.split("/")[0]
-    billing = _gh_api_json(f"users/{owner}/settings/billing/actions")
-    if billing is None:
+    now = datetime.now(timezone.utc)
+    billing = _gh_api_json(f"users/{owner}/settings/billing/usage?year={now.year}&month={now.month}")
+    if billing is None or not isinstance(billing.get("usageItems"), list):
         result["billing_api"] = {
             "available": False,
             "detail": (
-                "billing API unavailable: GET /users/{owner}/settings/billing/actions needs the "
-                "'user' OAuth scope, which the workflow's built-in GITHUB_TOKEN does not carry "
-                "(confirmed 2026-07-18). A scoped PAT would need `gh auth refresh -h github.com "
-                "-s user` — see docs/COST_TRACKER.md for the human-side follow-up. Falling back "
-                "to the trailing-7d wall-clock proxy below."
+                "billing usage API unavailable: GET /users/{owner}/settings/billing/usage needs a "
+                "user-scoped PAT (GH_BILLING_TOKEN — Secrets Manager life-platform/github-billing, "
+                "#1613); the workflow's built-in GITHUB_TOKEN cannot carry it. NB the legacy "
+                "/settings/billing/actions endpoint is 410 Gone (2026-07-26). Falling back to the "
+                "trailing-7d wall-clock proxy below."
             ),
         }
     else:
-        used = billing.get("total_minutes_used")
-        included = billing.get("included_minutes", GITHUB_ACTIONS_INCLUDED_MINUTES)
-        pct = (used / included * 100) if (used is not None and included) else None
+        month_prefix = f"{now.year:04d}-{now.month:02d}"
+        items = [i for i in billing["usageItems"] if i.get("product") == "actions" and str(i.get("date", "")).startswith(month_prefix)]
+        used = sum(float(i.get("quantity") or 0) for i in items if i.get("unitType") == "Minutes")
+        paid_usd = sum(float(i.get("netAmount") or 0) for i in items)
+        included = GITHUB_ACTIONS_INCLUDED_MINUTES
+        pct = used / included * 100 if included else None
+        repo_meta = _gh_api_json(f"repos/{repo}")
+        repo_private = repo_meta.get("private") if isinstance(repo_meta, dict) else None
         result["billing_api"] = {
             "available": True,
-            "total_minutes_used": used,
+            "total_minutes_used": round(used, 1),
             "included_minutes": included,
             "pct_used": round(pct, 1) if pct is not None else None,
-            "total_paid_minutes_used": billing.get("total_paid_minutes_used"),
+            "paid_overage_usd": round(paid_usd, 2),
+            "repo_private": repo_private,
         }
-        if pct is not None and pct >= GITHUB_ACTIONS_WARN_PCT:
-            result["warn"] = (
-                f"GitHub Actions minutes at {pct:.1f}% of the {included}-min allowance " f"(warn threshold {GITHUB_ACTIONS_WARN_PCT}%)"
-            )
+        if paid_usd > 0:
+            result["warn"] = f"GitHub Actions paid overage this month: ${paid_usd:.2f} (minutes {used:.0f})"
+        elif pct is not None and pct >= GITHUB_ACTIONS_WARN_PCT:
+            if repo_private is False:
+                result["billing_api"]["detail"] = (
+                    f"minutes at {pct:.1f}% of the {included}-min allowance, but the repo is PUBLIC "
+                    "(standard-runner minutes free, allowance not consumed) — warn suppressed. "
+                    "This line re-arms automatically if the repo flips private."
+                )
+            else:
+                result["warn"] = (
+                    f"GitHub Actions minutes at {pct:.1f}% of the {included}-min allowance "
+                    f"(warn threshold {GITHUB_ACTIONS_WARN_PCT}%"
+                    + (", repo visibility unreadable — assuming private" if repo_private is None else "")
+                    + ")"
+                )
 
     try:
         runs = _gh_run_list_trailing()

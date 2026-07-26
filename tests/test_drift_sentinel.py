@@ -733,8 +733,39 @@ def test_github_quota_billing_unavailable_falls_back_to_proxy(monkeypatch):
     assert "warn" not in res
 
 
+def _usage_payload(minutes, net_usd=0.0):
+    """A new-endpoint (#1613) usage response dated inside the CURRENT month —
+    generated at runtime so the month filter matches without wall-clock math."""
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc)
+    return {
+        "usageItems": [
+            {
+                "date": f"{now.year:04d}-{now.month:02d}-01T00:00:00Z",
+                "product": "actions",
+                "sku": "Actions Linux",
+                "quantity": float(minutes),
+                "unitType": "Minutes",
+                "netAmount": float(net_usd),
+            }
+        ]
+    }
+
+
+def _route_gh_api(usage, private):
+    def _fake(path, **k):
+        if "settings/billing/usage" in path:
+            return usage
+        if path.startswith("repos/"):
+            return {"private": private} if private is not None else None
+        return None
+
+    return _fake
+
+
 def test_github_quota_billing_available_under_threshold_is_clean(monkeypatch):
-    monkeypatch.setattr(ds, "_gh_api_json", lambda path, **k: {"total_minutes_used": 900, "included_minutes": 3000})
+    monkeypatch.setattr(ds, "_gh_api_json", _route_gh_api(_usage_payload(900), private=True))
     monkeypatch.setattr(ds, "_gh_run_list_trailing", lambda **k: [])
     res = ds.check_github_quota()
     assert res["status"] == "clean"
@@ -743,13 +774,79 @@ def test_github_quota_billing_available_under_threshold_is_clean(monkeypatch):
     assert "warn" not in res
 
 
-def test_github_quota_billing_over_70pct_warns_and_drifts(monkeypatch):
-    monkeypatch.setattr(ds, "_gh_api_json", lambda path, **k: {"total_minutes_used": 2200, "included_minutes": 3000})
+def test_github_quota_billing_over_70pct_private_warns_and_drifts(monkeypatch):
+    monkeypatch.setattr(ds, "_gh_api_json", _route_gh_api(_usage_payload(2200), private=True))
     monkeypatch.setattr(ds, "_gh_run_list_trailing", lambda **k: [])
     res = ds.check_github_quota()
     assert res["status"] == "drift"
     assert res["billing_api"]["pct_used"] == pytest.approx(73.3, abs=0.1)
     assert "70%" in res["warn"]
+
+
+def test_github_quota_over_70pct_public_repo_suppresses_warn(monkeypatch):
+    # #1613: public-repo standard-runner minutes are free and don't consume the
+    # allowance — the same figure must be REPORTED but never alarmed, or the warn
+    # screams permanently while public and trains us to ignore it.
+    monkeypatch.setattr(ds, "_gh_api_json", _route_gh_api(_usage_payload(11790), private=False))
+    monkeypatch.setattr(ds, "_gh_run_list_trailing", lambda **k: [])
+    res = ds.check_github_quota()
+    assert res["status"] == "clean"
+    assert "warn" not in res
+    assert "PUBLIC" in res["billing_api"]["detail"]
+    assert res["billing_api"]["total_minutes_used"] == 11790.0
+
+
+def test_github_quota_unknown_visibility_at_threshold_warns_conservatively(monkeypatch):
+    # Visibility unreadable → assume private (the #1544 failure was a silent
+    # private-repo cap; a false alarm beats a dead one).
+    monkeypatch.setattr(ds, "_gh_api_json", _route_gh_api(_usage_payload(2500), private=None))
+    monkeypatch.setattr(ds, "_gh_run_list_trailing", lambda **k: [])
+    res = ds.check_github_quota()
+    assert res["status"] == "drift"
+    assert "assuming private" in res["warn"]
+
+
+def test_github_quota_paid_overage_always_warns(monkeypatch):
+    monkeypatch.setattr(ds, "_gh_api_json", _route_gh_api(_usage_payload(3400, net_usd=3.20), private=False))
+    monkeypatch.setattr(ds, "_gh_run_list_trailing", lambda **k: [])
+    res = ds.check_github_quota()
+    assert res["status"] == "drift"
+    assert "$3.20" in res["warn"]
+
+
+def test_github_quota_warn_reaches_through_the_billing_token_path(monkeypatch):
+    """#1613 AC4: the ≥70% warn proven through the REAL token-preference path —
+    subprocess-level fake, not a monkeypatched _gh_api_json. Asserts the billing
+    call actually carries GH_BILLING_TOKEN as GH_TOKEN."""
+    import json as _json
+    import subprocess as _sp
+
+    seen_envs = {}
+
+    class _Out:
+        returncode = 0
+        stderr = ""
+
+        def __init__(self, stdout):
+            self.stdout = stdout
+
+    def _fake_run(cmd, **kwargs):
+        path = cmd[2] if len(cmd) > 2 else ""
+        seen_envs[path] = (kwargs.get("env") or {}).get("GH_TOKEN")
+        if "settings/billing/usage" in path:
+            return _Out(_json.dumps(_usage_payload(2900)))
+        if path.startswith("repos/"):
+            return _Out(_json.dumps({"private": True}))
+        return _Out("{}")
+
+    monkeypatch.setenv("GH_BILLING_TOKEN", "github_pat_TESTTOKEN")
+    monkeypatch.delenv("GH_POSTURE_TOKEN", raising=False)
+    monkeypatch.setattr(_sp, "run", _fake_run)
+    monkeypatch.setattr(ds, "_gh_run_list_trailing", lambda **k: [])
+    res = ds.check_github_quota()
+    assert res["status"] == "drift" and "70%" in res["warn"]
+    billing_call = next(p for p in seen_envs if "settings/billing/usage" in p)
+    assert seen_envs[billing_call] == "github_pat_TESTTOKEN"
 
 
 def test_github_quota_top_workflows_proxy_error_is_soft(monkeypatch):

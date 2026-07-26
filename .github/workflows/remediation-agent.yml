@@ -99,6 +99,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GH_POSTURE_TOKEN: ${{ secrets.GH_POSTURE_TOKEN }}
+          # #1613: user-scoped PAT for the billing USAGE endpoint (the legacy
+          # /settings/billing/actions is 410 Gone). Durable copy lives at
+          # Secrets Manager life-platform/github-billing; _gh_api_json prefers
+          # this var over the ambient token. Empty → billing leg fails soft.
+          GH_BILLING_TOKEN: ${{ secrets.GH_BILLING_TOKEN }}
         run: |
           # Cron fires Mon/Wed/Fri; keep the sentinel weekly by running only on Mondays
           # (or any manual dispatch). date -u +%u == 1 → Monday UTC.

@@ -162,31 +162,25 @@ Then update the two **Verified:** stamps in this doc — CI flags the doc at 45 
 run on GitHub Actions minutes billed against the account's plan allowance — a
 private repo has no unlimited-minutes free tier the way a public repo does.
 
-**Account-specific facts (unverified — needs an owner glance with a scoped PAT):**
+**Account-specific facts — RESOLVED 2026-07-26 (#1613): the owner's user-scoped
+PAT is stored at Secrets Manager `life-platform/github-billing` and as the
+`GH_BILLING_TOKEN` repo secret; `deploy/drift_sentinel.py::check_github_quota`
+now reads the real figures weekly.**
 
-| Fact | Value | How to verify |
+| Fact | Value | How verified |
 |------|-------|----------------|
-| GitHub plan tier (Free/Pro/Team) | **unverified** — assumed Pro per #1334's originating evidence, not confirmed | `gh auth refresh -h github.com -s user` then `gh api user` (look for the `plan` field), or the GitHub billing settings page |
-| Actions minutes used this cycle | **unverified** — billing API 404s with the current token | `gh api users/averagejoematt/settings/billing/actions` (needs the `user` scope — see below) |
-| Actions artifact/Packages storage used | **unverified** | `gh api users/averagejoematt/settings/billing/shared-storage` (same scope requirement) |
+| Actions minutes used this month | **live** — e.g. 11,790 min July 2026 (public repo, $0 net) | sentinel billing leg: `GET /users/averagejoematt/settings/billing/usage?year=&month=` |
+| Paid overage this month | **live** — Σ `netAmount` over the month's actions usage items | same call; any value > $0 sets `warn` |
 | Spending limit setting | **unverified** | GitHub → Settings → Billing and plans → Spending limit |
 
-**Confirmed by direct probe (2026-07-18, `gh` CLI authenticated as `averagejoematt`,
-scopes `gist, read:org, repo, workflow` — no `user` scope):**
-```
-$ gh api users/averagejoematt/settings/billing/actions
-gh: This API operation needs the "user" scope. To request it, run:
-  gh auth refresh -h github.com -s user
-```
-Same result for `.../settings/billing/shared-storage`, and `/user` returns no `plan`
-field either. **This is the exact scope gap** — the fix is a one-time, human-run
-`gh auth refresh -h github.com -s user` (adds the `user` scope to the *local*
-`gh` credential; it does not by itself get the scope into GitHub Actions' built-in
-`GITHUB_TOKEN`, which is minted per-run and can never carry a broadened scope — a
-real billing-capable CI check would need a **classic PAT stored as a repo secret**,
-owned by the account owner, with no extra named scope beyond being the account
-owner). **Flagged as a follow-up for the decision menu, not done here** — deploy_
-/auth changes are outside this PR's read-only scope.
+**Endpoint history:** the legacy `GET /users/{owner}/settings/billing/actions`
+(and `.../shared-storage`) probed 2026-07-18 as needing the `user` scope is now
+**410 Gone** (verified 2026-07-26) — replaced by the enhanced-billing usage API
+above, which returns per-SKU `usageItems` (quantity/netAmount) instead of
+`total_minutes_used`/`included_minutes`. The included-minutes figure is therefore
+the `GITHUB_ACTIONS_INCLUDED_MINUTES` constant (3000, Pro assumption), and the
+70% warn is **visibility-aware**: public-repo standard-runner minutes are free,
+so the warn only arms while the repo is private (or visibility is unreadable).
 
 **Public plan facts (NOT account-specific — from GitHub's published billing docs,
 fetched 2026-07-18; use only as the warn-threshold basis, not as confirmation of
