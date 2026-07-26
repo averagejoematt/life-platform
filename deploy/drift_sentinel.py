@@ -46,13 +46,16 @@ What it checks (all read-only; CloudFormation drift-detection API calls are free
   8. GITHUB QUOTA/BILLING (#1334, #1453) — GitHub became a metered production
      dependency when the repo went private (2026-07-13): CI, site-deploy, and this
      agent itself all run on Actions minutes billed against the account's plan
-     allowance. Attempts the Actions billing-usage API (minutes used vs. the
-     included allowance, warn at 70%) — FAIL-SOFT: the workflow's built-in
-     GITHUB_TOKEN cannot read billing endpoints (confirmed 2026-07-18: 404 "needs
-     the user scope"), so this reports a clearly-labeled "billing API unavailable"
-     line rather than erroring. Independently lists the top wall-clock-consuming
-     workflows over the trailing 7 days (`gh run list`, needs only `actions: read`)
-     so a run-rate regression is attributable even without billing-API access.
+     allowance. Reads the enhanced-billing usage API (#1613 — the legacy
+     /settings/billing/actions endpoint is 410 Gone since 2026-07-26) via the
+     GH_BILLING_TOKEN user-scoped PAT; warn at 70% of the included allowance,
+     visibility-aware (public-repo minutes are free → reported, warn-suppressed),
+     paid overage always warns. FAIL-SOFT without the PAT: the built-in
+     GITHUB_TOKEN cannot read billing endpoints, so it reports a clearly-labeled
+     "billing usage API unavailable" line rather than erroring. Independently
+     lists the top wall-clock-consuming workflows over the trailing 7 days
+     (`gh run list`, needs only `actions: read`) so a run-rate regression is
+     attributable even without billing-API access.
 
 Output: a findings record written to s3://<bucket>/drift-log/{latest,<date>}.json
 (mirrors the Coherence Sentinel's coherence-log pattern) so the remediation agent can
