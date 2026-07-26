@@ -252,9 +252,13 @@ COVERAGE = {
     ),
     "journal-enrichment": (
         EXEMPT,
-        "2026-07-19",
+        "2026-07-26",
         "Additive enrichment of already-ingested Notion journal records (notion source is ER-01 liveness-checked); "
-        "absence degrades detail only. Failures → DLQ digest + ingestion error aggregate.",
+        "absence degrades detail only. Failures → DLQ digest + ingestion error aggregate. #1756 added the #1574 "
+        "diary-reaction trigger to this pass — still additive and still absence-safe: a reaction is produced only "
+        "for an entry Matthew explicitly consented (rare by construction, so an absence alarm would false-fire on "
+        "every ordinary day), it is fail-open (never fails the enrichment run), and an absent reaction renders "
+        "nothing on lab-notes by design (#1574 AC3).",
     ),
     "social-enrichment": (
         EXEMPT,

@@ -260,6 +260,14 @@ SOURCE_CLASS: dict[str, str] = {
     # per-cycle record resets, and the wipe cycle-stamps it so cycle N's badges stay
     # navigable in the archive rather than being destroyed.
     "achievements": EXPERIMENT_SCOPED,
+    "diary_reactions": EXPERIMENT_SCOPED,  # #1574/#1756: the coach's short public reaction to a
+    # V3-consented Video Diary / Solo Recording entry (coach/coach_diary_reaction.py, sk
+    # DATE#<date>#<channel>#<entry_uid>). Derived coach NARRATIVE — same class as every other
+    # generated coach output (ai_analysis, chronicle, state_of_matthew): it is written against
+    # the current cycle's coaching voice and reads back through the phase-filtered
+    # /api/diary_reactions query, so it tags + tombstones + cycle-stamps at restart. NB the
+    # SOURCE ENTRY it reacts to (notion) is RAW_TIMESERIES and is kept forever — the human's
+    # words survive the reset; only the machine's reaction to them resets with the run.
     "ai_analysis": EXPERIMENT_SCOPED,
     "decisions": EXPERIMENT_SCOPED,
     "rewards": EXPERIMENT_SCOPED,

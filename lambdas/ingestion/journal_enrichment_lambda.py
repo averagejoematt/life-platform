@@ -35,6 +35,12 @@ Runs on:
     (the coach check-in / habit reflection / field-note sweep also runs
     automatically after every journal pass — see conversation_enrichment.py)
 
+#1756 (the #1574 production trigger): after an entry is enriched, a Video Diary /
+Solo Recording entry that Matthew explicitly opted in (`public_reaction_consent`)
+gets ONE short coach reaction, produced by coach/coach_diary_reaction.py and served
+on lab-notes. Consent-gated and budget-gated before any Bedrock call, idempotent per
+entry, and fail-open — a reaction never fails enrichment (see maybe_react_to_diary).
+
 Environment variables:
   TABLE_NAME          — DynamoDB table (default: life-platform)
   MODEL               — Claude model (default: claude-haiku-4-5-20251001)
@@ -309,6 +315,53 @@ def apply_enrichment(item, enrichment):
     return True
 
 
+def entry_with_enrichment(item, enrichment):
+    """The stored item as it will look AFTER this run's enrichment lands (#1756).
+
+    ``apply_enrichment`` writes to DynamoDB with update_item; it does not mutate the
+    in-memory item. The diary-reaction trigger routes on the enriched themes/sentiment
+    this pass just produced, so it is handed this merged view rather than the stale
+    record. Derived from FIELD_MAPPING — never a second hand-maintained key list.
+    """
+    view = dict(item)
+    for haiku_key, (dynamo_key, _dtype) in FIELD_MAPPING.items():
+        val = enrichment.get(haiku_key)
+        if val is not None:
+            view[dynamo_key] = val
+    return view
+
+
+def maybe_react_to_diary(item, enrichment):
+    """#1756 (the #1574 production trigger): a coach reacts to a just-enriched Video
+    Diary / Solo Recording entry.
+
+    Option A — inline in the record-enrichment pipeline, no second pipeline (the same
+    "4th channel" principle as the conversational sweep above and social_enrichment).
+    This is also the only place the enriched themes the reaction routes on exist.
+
+    Cost posture: ``maybe_react`` self-filters BEFORE any Bedrock call — a non-diary
+    channel and an entry without an explicit ``public_reaction_consent`` marker (the
+    fail-closed default, i.e. essentially every entry) cost nothing at all, and an
+    entry that already has a reaction costs one GetItem. Budget tiering is enforced
+    inside the producer (``coach_diary_reaction`` pauses at tier 2).
+
+    Fail-OPEN by contract: any failure here is logged and swallowed — a reaction must
+    never fail journal enrichment. Returns the trigger's result dict.
+    """
+    try:
+        from coach.coach_diary_reaction import maybe_react
+
+        result = maybe_react(entry_with_enrichment(item, enrichment), table_=table)
+    except Exception as e:  # noqa: BLE001 — belt-and-braces around the import itself
+        logger.error(f"  diary reaction failed (non-fatal) for {item.get('sk')}: {e}")
+        return {"reacted": False, "reason": "error", "error": str(e)}
+    if result.get("reacted"):
+        logger.info(f"  ✓ diary reaction stored for {item.get('sk')}: {result.get('coach_id')} → {result.get('sk')}")
+    elif result.get("reason") not in ("not_diary", "private", "exists"):
+        logger.info(f"  diary reaction not produced for {item.get('sk')}: {result.get('reason')}")
+    return result
+
+
 def _parse_ts(value):
     """Parse an ISO timestamp (Notion 'Z' suffix or stdlib '+00:00') to an aware datetime; None on failure."""
     if not value:
@@ -390,7 +443,7 @@ def _run_conversational(event, start_date, end_date, force):
     )
 
 
-def lambda_handler(event, context):
+def lambda_handler(event: dict, context) -> dict:
     try:
         """
         Lambda entry point.
@@ -452,6 +505,7 @@ def lambda_handler(event, context):
         enriched = 0
         skipped = 0
         errors = 0
+        diary_reactions = 0  # #1756
 
         for item in entries:
             sk = item.get("sk", "")
@@ -473,6 +527,14 @@ def lambda_handler(event, context):
             if not force and item.get("enriched_at") and not edited and not stale_schema:
                 logger.info(f"Skipping {sk}: already enriched at {item['enriched_at']}")
                 skipped += 1
+                # #1756: an entry can be consented AFTER it was enriched, and a
+                # reaction can legitimately not exist yet (budget-paused tier,
+                # quality-gate hold, an entry enriched before this trigger shipped).
+                # Re-offer the already-enriched record: the channel + consent
+                # pre-filters are free, so this costs NOTHING for an ordinary entry
+                # and one GetItem for a consented diary that already reacted.
+                if maybe_react_to_diary(item, {}).get("reacted"):
+                    diary_reactions += 1
                 continue
             if edited:
                 logger.info(f"Re-enriching {sk}: edited {item.get('notion_last_edited')} after enrichment {item.get('enriched_at')}")
@@ -498,6 +560,10 @@ def lambda_handler(event, context):
                             f"themes={enrichment.get('themes', [])}, "
                             f"causal_hints={len(enrichment.get('causal_hints') or [])}"
                         )
+                        # #1756: the #1574 diary-reaction trigger — consent-gated,
+                        # budget-gated, fail-open (see maybe_react_to_diary).
+                        if maybe_react_to_diary(item, enrichment).get("reacted"):
+                            diary_reactions += 1
                     else:
                         skipped += 1
                 else:
@@ -533,6 +599,7 @@ def lambda_handler(event, context):
             "enriched": enriched,
             "skipped": skipped,
             "errors": errors,
+            "diary_reactions": diary_reactions,  # #1756
             "flourishing_rows": flourishing_rows,
             "conversational": conversational,
             "date_range": f"{start_date} → {end_date}",

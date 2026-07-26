@@ -143,6 +143,12 @@ PARTITIONS = [
     ("engagement_state", "all", {}),  # STATE#current singleton — presence/quiet-stretch
     ("what_changed", "all", {}),  # SNAPSHOT#current + first-seen ledger (SS-08)
     ("panelcast", "all", {}),  # The Panel series_state singleton (open bets, recent topics)
+    # #1756 (the #1574 trigger): coach reactions to consented diary entries, sk
+    # DATE#<date>#<channel>#<entry_uid>. "pregenesis" like the other DATE#-keyed derived
+    # narrative — post-genesis reactions accumulate from Day 1, pre-genesis ones are hidden
+    # from the phase-filtered /api/diary_reactions read. The diary ENTRIES themselves are
+    # untouched (SOURCE#notion is RAW_TIMESERIES — the human's words are kept forever).
+    ("diary_reactions", "pregenesis", {}),
 ]
 
 # Full-pk entries OUTSIDE the USER#matthew#SOURCE# namespace. The original tagger
