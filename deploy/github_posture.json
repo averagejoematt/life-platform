@@ -33,7 +33,6 @@
     "grace_minutes": 30,
     "lookback_days": 7,
     "max_commits": 30,
-    "gap_cluster_threshold": 2,
-    "source": "#1544: six consecutive squash merges to main (2026-07-19 16:17-19:20 UTC) produced ZERO push-event workflow runs — not red, ABSENT. A trigger-matching merge with no queued run within grace_minutes is the alarm condition."
+    "source": "#1544: six consecutive squash merges to main (2026-07-19 16:17-19:20 UTC) produced ZERO push-event workflow runs — not red, ABSENT. A trigger-matching merge with no queued run within grace_minutes is the alarm condition. #1782 (2026-07-26): the historical-gap cluster threshold was removed — non-head commits of a multi-commit push have no run of their own by GitHub design, so a count of uncovered older commits is reported, never alarmed; only a push HEAD with no run past grace_minutes drifts."
   }
 }
