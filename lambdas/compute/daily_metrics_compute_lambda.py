@@ -20,6 +20,9 @@ DynamoDB partitions written:
   3. SOURCE#habit_scores       — existing schema; habit trending MCP tools compat
   4. SOURCE#achievements       — #1624 first-earn ledger (BADGE#<id>, write-once);
                                  /api/achievements reads it and never writes
+  5. SOURCE#milestones         — #1626 durable milestone event ledger (MILESTONE#<id>,
+                                 write-once, trailing-mean weight rungs, global cooldown,
+                                 permanent hysteresis); consumers read-only (#1628)
 
 Schedule ordering:
   9:30 AM PT  Whoop recovery refresh (ensures today's data exists)
@@ -32,6 +35,7 @@ Pattern: follows character-sheet-compute Lambda architecture.
 v1.0.0 — 2026-03-07
 v1.1.0 — 2026-03-09: Sick day support — grade='sick', streaks preserved
 v1.2.0 — 2026-07-21: #1624 achievement first-earn sweep (durable badge earn dates)
+v1.3.0 — 2026-07-25: #1626 milestone event ledger sweep (write-once MILESTONE# rungs)
 """
 
 import logging
@@ -42,6 +46,7 @@ from decimal import Decimal
 
 import achievement_rules  # #1624: the ONE place badge thresholds live (shared with site_api_vitals)
 import boto3
+import milestone_ledger  # #1626: the durable MILESTONE# event ledger (write-once, global cooldown)
 import personal_baselines  # #543: percentile bands from Matthew's own distribution (ADR-105 r4)
 import phase_taxonomy  # ADR-077/#1233: write-time provenance stamp for the first-earn ledger
 import scoring_engine
@@ -188,6 +193,52 @@ def sweep_achievement_first_earns(profile: dict) -> int:
         return len(written)
     except Exception as e:  # noqa: BLE001 — fail-soft: the badge ledger never fails the metrics run
         logger.error("[achievements] First-earn sweep failed (non-fatal): %s", e)
+        return 0
+
+
+def sweep_milestone_ledger() -> int:
+    """#1626 — evaluate the durable MILESTONE# event ledger; returns announced count.
+
+    The ledger is the write-once memory the achievements surface never had: a rung
+    crossed is a rung consumed, forever. Weight rungs fire on the trailing 7-day
+    mean (never a single weigh-in) and the stored event carries window/n/mean
+    (ADR-105); one global cooldown spans ALL categories combined; consumers
+    (#1628) only ever read what this writes.
+
+    Why here: same reasoning as the #1624 achievements sweep above — this is the
+    last compute in the daily chain, the streak/character/withings partitions it
+    reads are fresh, and the Lambda already holds the DDB write grant, so no new
+    IAM surface. Must run AFTER store_habit_scores (the streak signal reads the
+    record this run just wrote).
+
+    The ledger partition is CROSS_PHASE (phase_taxonomy.py — an event is a dated
+    past fact, not a present-state claim), so the write-time stamp carries the
+    cycle only, never a phase attribute (the weight_episodes precedent), and the
+    ledger read inside the module takes no phase filter.
+
+    Fail-soft: a milestone ledger is not worth failing the daily metrics run over.
+    """
+    try:
+        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        stamp = phase_taxonomy.experiment_stamp(include_phase=False)  # cycle-only provenance
+        result = milestone_ledger.sweep(table, USER_PREFIX, with_phase_filter, today_str, stamp=stamp)
+        if result["genesis"]:
+            logger.info(
+                "[milestones] Ledger genesis: %d already-satisfied rung(s) consumed as baseline (announced nothing)", len(result["written"])
+            )
+        for rec in result["announced"]:
+            logger.info(
+                "[milestones] Event: %s (%s) event_date=%s measurement=%s",
+                rec["milestone_id"],
+                rec["label"],
+                rec["event_date"],
+                rec["measurement"],
+            )
+        if result["cooldown_active"] and result["deferred"]:
+            logger.info("[milestones] Global cooldown active — deferred: %s", result["deferred"])
+        return len(result["announced"])
+    except Exception as e:  # noqa: BLE001 — fail-soft: the milestone ledger never fails the metrics run
+        logger.error("[milestones] Milestone sweep failed (non-fatal): %s", e)
         return 0
 
 
@@ -1207,6 +1258,12 @@ def lambda_handler(event, context):
     # data query must not write, CLAUDE.md).
     first_earns_written = sweep_achievement_first_earns(profile)
 
+    # ── #1626: milestone event-ledger sweep ────────────────────────────────
+    # After the achievements sweep, same fresh-data reasoning. The ONLY writer
+    # of SOURCE#milestones; consumers (#1628) read the ledger and never derive
+    # "a milestone happened" from a live threshold comparison.
+    milestones_announced = sweep_milestone_ledger()
+
     elapsed = time.time() - t0
     logger.info("Done in %.1fs", elapsed)
 
@@ -1221,5 +1278,6 @@ def lambda_handler(event, context):
         "tier0_streak": streak_data["tier0_streak"],
         "tier01_streak": streak_data["tier01_streak"],
         "first_earns_written": first_earns_written,
+        "milestones_announced": milestones_announced,
         "elapsed_seconds": round(elapsed, 1),
     }

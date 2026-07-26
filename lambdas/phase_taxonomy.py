@@ -198,6 +198,18 @@ SOURCE_CLASS: dict[str, str] = {
     # accuracy across the whole cross-cycle history, not a property of the current run — wiping it
     # at reset would discard the accumulating error distribution the public chart is built on.
     # (These are graded probes, NEVER nutrition data — see the isolation guard in that module.)
+    "milestones": CROSS_PHASE,  # #1626: the durable MILESTONE# event ledger (milestone_ledger.py —
+    # write-once on first crossing, global cooldown, permanent hysteresis; written by
+    # daily-metrics-compute only). CROSS_PHASE, deliberately, and the contrast with
+    # "achievements" (EXPERIMENT_SCOPED, below) is the point: a badge asserts present STATE
+    # ("you hold a 30-day streak") whose supporting evidence is phase-filtered and resets with
+    # the run, so its first-earn record must reset with it (#1624). A milestone event asserts a
+    # dated PAST FACT ("the trailing 7-day mean first went under 250 lbs on date D") — true
+    # forever regardless of cycle, same family as weight_episodes/calibration. The no-re-fire
+    # guarantee ("a rung crossed is a rung consumed, forever") is load-bearing ACROSS resets:
+    # wipe this partition and the same rung re-announces in cycle N+1 — exactly the defect
+    # #1626 exists to remove. Records carry a cycle stamp only (no phase attribute, the
+    # weight_episodes precedent) and ledger reads take NO phase filter.
     # — EXPERIMENT_SCOPED: derived intelligence/progress (tag + wipe + cycle-stamp) —
     "character_sheet": EXPERIMENT_SCOPED,  # RPG-style derived scores; wiped "all" + rebuilt
     "character_receipt": EXPERIMENT_SCOPED,  # #1373: audit-grade progression receipts — one per
