@@ -30,6 +30,7 @@ import inspect
 
 import bsts_lite
 import calibration_core
+import conversation_enrichment
 import stats_core
 
 
@@ -86,6 +87,17 @@ SOURCE_MODULES = {
             "The one prediction-calibration scorer (#538, ADR-105) — grades every forecast the "
             "platform makes against what actually happened, so the public calibration scoreboard, "
             "/api/coach_team, and the coach track-record tool all read the same numbers."
+        ),
+    },
+    "conversation_enrichment": {
+        "title": "conversation_enrichment.py",
+        "path": "lambdas/conversation_enrichment.py",
+        "description": (
+            "The conversational-capture enrichment layer (#1577) — coach check-in answers, habit "
+            "reflections, and field-note responses coded by the same LLM enrichment pass as journal "
+            "text. The entry registered here is its pure, deterministic SCOPE POLICY: these signals "
+            "are ANALYSIS-ONLY in v1 — they seed hypothesis candidates and are visible as context, "
+            "but they do not move character or flourishing scoring."
         ),
     },
 }
@@ -438,6 +450,31 @@ REGISTRY = {
         "base rate — it reads not-yet-skillful (#1370).",
         "96a2d825721f",
         used_by="Coach cards that need a single at-a-glance credibility word.",
+    ),
+    "conversational_enrichment_scope": _entry(
+        "conversational_enrichment_scope",
+        "Conversational enrichment signals — analysis-only scope",
+        conversation_enrichment.enrichment_policy,
+        "Provenance",
+        "scope = analysis_only (v1, #1577): LLM-coded signals from coach check-in answers, habit reflections, and "
+        "field-note responses seed HYPO_CANDIDATE# rows (channel-tagged) and are visible as enriched context, but "
+        "they do NOT enter character or flourishing scoring. Absence of conversation is 'no data', never a zero "
+        "(ADR-104). Dedup vs the journal (AC4): content-hash equality, or a ≥40-char normalized containment match.",
+        "Rolling 14-day sweep on the daily 6:30 AM enrichment cadence; each record is coded once "
+        "(re-coded only on a schema bump or explicit force).",
+        "These numbers are a language model's (Haiku) reading of short conversational prose — never sensor data, and "
+        "shorter/noisier input than a journal entry. ANALYSIS-ONLY by declared policy: promotion into character or "
+        "flourishing scoring requires personal-variance thresholds derived from an observed baseline FIRST (ADR-105) "
+        "plus a human re-review of this entry — the fingerprint below trips if the policy function changes without "
+        "that review. Causal hints survive only the deterministic verbatim-quote grounding gate (ADR-104). "
+        "Enrichment pauses at budget tier 1 (internal band, ADR-125); paused windows are visible as unenriched "
+        "records, never fabricated.",
+        "0fab2eb65070",
+        min_n=None,
+        used_by=(
+            "journal_analyzer_lambda HYPO_CANDIDATE# aggregation (channel provenance on every quote) → the weekly "
+            "hypothesis engine's candidate seeding; enriched context wherever enriched_* fields are read."
+        ),
     ),
 }
 

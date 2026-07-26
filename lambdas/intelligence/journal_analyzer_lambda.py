@@ -312,9 +312,19 @@ def build_hypo_candidates(dated_entries):
     """One candidate per distinct cause→effect pair, verbatim quotes as provenance.
 
     testable = both sides map into the hypothesis engine's metric vocabulary;
-    otherwise needs_instrumentation — surfaced, never silently dropped."""
+    otherwise needs_instrumentation — surfaced, never silently dropped.
+
+    #1577: entries may be (date, entry) journal tuples OR (date, entry, channel)
+    conversational tuples (coach_checkin / habit_reflection / field_note — see
+    conversation_enrichment.py). Every quote and every candidate carries channel
+    provenance, so a hypothesis born from a check-in says so."""
     cands = {}
-    for date_str, entry in dated_entries:
+    for tup in dated_entries:
+        if len(tup) == 3:
+            date_str, entry, channel = tup
+        else:
+            date_str, entry = tup
+            channel = "journal"
         for hint in entry.get("enriched_causal_hints") or []:
             if not isinstance(hint, dict) or not hint.get("cause") or not hint.get("effect"):
                 continue
@@ -331,16 +341,19 @@ def build_hypo_candidates(dated_entries):
                     "mentions": 0,
                     "first_seen": date_str,
                     "last_seen": date_str,
+                    "channel_mentions": {},
                 },
             )
             slot["mentions"] += 1
+            slot["channel_mentions"][channel] = slot["channel_mentions"].get(channel, 0) + 1
             slot["first_seen"] = min(slot["first_seen"], date_str)
             slot["last_seen"] = max(slot["last_seen"], date_str)
             quote = str(hint.get("quote") or "").strip()
             if quote and len(slot["quotes"]) < MAX_QUOTES_PER_CANDIDATE and quote not in [q["quote"] for q in slot["quotes"]]:
-                slot["quotes"].append({"date": date_str, "quote": quote})
+                slot["quotes"].append({"date": date_str, "quote": quote, "channel": channel})
     out = []
     for slot in cands.values():
+        slot["channels"] = sorted(slot["channel_mentions"])
         cause_metric = map_phrase_to_metric(slot["cause"])
         effect_metric = map_phrase_to_metric(slot["effect"])
         slot["cause_metric"] = cause_metric
@@ -417,7 +430,20 @@ def lambda_handler(event, context):
         habit_names = fetch_habit_names()
         entities = build_entity_registry(dated)
         behaviors = build_behavior_registry(dated, habit_names)
-        candidates = build_hypo_candidates(dated)
+
+        # #1577 AC3: fold the enriched CONVERSATIONAL corpus (coach check-ins,
+        # habit reflections, field-note responses) into candidate aggregation —
+        # each contribution channel-tagged. Fail-soft: conversational
+        # unavailability must never break journal aggregation.
+        conv_dated = []
+        try:
+            import conversation_enrichment
+
+            conv_dated = conversation_enrichment.enriched_conversational_records(table, start_date, today)
+        except Exception as ce:
+            logger.warning(f"[#1577] conversational records unavailable (non-blocking): {ce}")
+
+        candidates = build_hypo_candidates(dated + conv_dated)
 
         now_iso = datetime.now(timezone.utc).isoformat()
         common = {
@@ -448,6 +474,7 @@ def lambda_handler(event, context):
             "behaviors": len(behaviors),
             "behaviors_habitify_matched": sum(1 for b in behaviors if b["habitify_match"]),
             "hypo_candidates": len(candidates),
+            "conversational_records": len(conv_dated),
             "testable": sum(1 for c in candidates if c["status"] == "testable"),
             "needs_instrumentation": sum(1 for c in candidates if c["status"] == "needs_instrumentation"),
             "date_range": {"start": start_date, "end": today},

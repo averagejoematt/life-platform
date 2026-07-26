@@ -849,8 +849,19 @@ def fetch_journal_candidates(limit=5):
         return []
 
 
+# #1577: human-readable labels for conversational candidate channels (candidates may
+# now be heard via coach check-ins / habit reflections / field-note responses, not
+# only journal text — conversation_enrichment.py; provenance travels with the seed).
+_CANDIDATE_CHANNEL_LABELS = {
+    "journal": "journal",
+    "coach_checkin": "coach check-in",
+    "habit_reflection": "habit reflection",
+    "field_note": "field-note response",
+}
+
+
 def format_journal_candidates(candidates):
-    """The prompt block for journal-derived seeds. Empty string when none."""
+    """The prompt block for journal/conversation-derived seeds. Empty string when none."""
     if not candidates:
         return ""
     lines = []
@@ -858,16 +869,24 @@ def format_journal_candidates(candidates):
         quote = ""
         quotes = c.get("quotes") or []
         if quotes:
-            quote = f" — journal quote ({quotes[0].get('date', '?')}): \"{quotes[0].get('quote', '')[:160]}\""
+            q0 = quotes[0]
+            q_src = _CANDIDATE_CHANNEL_LABELS.get(q0.get("channel") or "journal", q0.get("channel") or "journal")
+            quote = f" — {q_src} quote ({q0.get('date', '?')}): \"{q0.get('quote', '')[:160]}\""
+        conv_channels = [ch for ch in (c.get("channels") or []) if ch != "journal"]
+        via = ""
+        if conv_channels:
+            via = f" [heard via {', '.join(_CANDIDATE_CHANNEL_LABELS.get(ch, ch) for ch in conv_channels)}]"
         lines.append(
             f"- \"{c.get('cause', '?')}\" -> \"{c.get('effect', '?')}\" "
             f"(metric mapping: {c.get('cause_metric')} -> {c.get('effect_metric')}; "
-            f"mentioned {int(c.get('mentions') or 1)}x{quote})"
+            f"mentioned {int(c.get('mentions') or 1)}x{quote}){via}"
         )
     return (
-        "\n\nJOURNAL-DERIVED CANDIDATES (#506 — Matthew's own stated cause->effect hints, quotes are verbatim provenance).\n"
-        "Prefer formalizing one of these into a hypothesis when the data supports it, using the given metric mapping in test_spec:\n"
-        + "\n".join(lines)
+        "\n\nJOURNAL-DERIVED CANDIDATES (#506/#1577 — Matthew's own stated cause->effect hints from his journal AND his conversational "
+        "answers (coach check-ins, habit reflections, field-note responses); quotes are verbatim provenance).\n"
+        "Prefer formalizing one of these into a hypothesis when the data supports it, using the given metric mapping in test_spec. "
+        "When you formalize a candidate marked [heard via ...], name that channel in the evidence field so the hypothesis says where "
+        "it was born:\n" + "\n".join(lines)
     )
 
 

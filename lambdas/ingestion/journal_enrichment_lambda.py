@@ -31,6 +31,9 @@ Runs on:
   - Full re-enrichment: {"full_sync": true}
   - Skip already-enriched: default true, override with {"force": true}
     (entries enriched under schema v1 re-enrich automatically)
+  - Conversational corpus only (#1577): {"conversations_only": true}
+    (the coach check-in / habit reflection / field-note sweep also runs
+    automatically after every journal pass — see conversation_enrichment.py)
 
 Environment variables:
   TABLE_NAME          — DynamoDB table (default: life-platform)
@@ -368,6 +371,25 @@ def _write_flourishing_rows(entries) -> int:
     return written
 
 
+def _run_conversational(event, start_date, end_date, force):
+    """#1577: the conversational-corpus sweep (module: conversation_enrichment).
+
+    Explicit-range events pass their window through; the default daily cadence
+    passes start=None so the module applies its own wider lookback (field notes
+    are weekly, check-ins land on Matthew's schedule). Budget-gated inside the
+    module (band-1 ``conversation_enrichment``); a paused run reports
+    ``paused_by_budget`` explicitly, never silent."""
+    import conversation_enrichment
+
+    explicit = bool(event.get("full_sync") or "date" in event or ("start" in event and "end" in event))
+    return conversation_enrichment.run(
+        table=table,
+        start_date=start_date if explicit else None,
+        end_date=end_date,
+        force=force,
+    )
+
+
 def lambda_handler(event, context):
     try:
         """
@@ -405,6 +427,14 @@ def lambda_handler(event, context):
             start_date = (now_pacific - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
 
         logger.info(f"Enriching journal entries: {start_date} → {end_date} " f"(force={force}, full_sync={full_sync})")
+
+        # #1577: conversational-corpus enrichment (coach check-ins, habit reflections,
+        # field-note responses) rides this Lambda's 6:30 AM cadence — no second
+        # pipeline. conversations_only runs JUST that sweep (backfill/testing).
+        if event.get("conversations_only"):
+            summary = _run_conversational(event, start_date, end_date, force)
+            logger.info(f"Conversations-only complete: {summary}")
+            return {"statusCode": 200, "body": json.dumps(summary)}
 
         entries = query_journal_entries(start_date, end_date, full_sync)
         logger.info(f"Found {len(entries)} journal entries")
@@ -486,12 +516,25 @@ def lambda_handler(event, context):
         except Exception as fe:
             logger.error(f"flourishing projection failed (non-fatal): {fe}")
 
+        # #1577: conversational-corpus sweep AFTER the journal pass, so the AC4
+        # dedup corpus includes today's freshly-stored journal text. Fail-soft —
+        # a conversational failure must never fail journal enrichment. NOTE: the
+        # conversational signals are ANALYSIS-ONLY (see conversation_enrichment.
+        # enrichment_policy) — they never enter _write_flourishing_rows above.
+        conversational = {}
+        try:
+            conversational = _run_conversational(event, start_date, end_date, force)
+        except Exception as ce:
+            logger.error(f"conversational enrichment failed (non-fatal): {ce}")
+            conversational = {"status": "error", "error": str(ce)}
+
         summary = {
             "entries_found": len(entries),
             "enriched": enriched,
             "skipped": skipped,
             "errors": errors,
             "flourishing_rows": flourishing_rows,
+            "conversational": conversational,
             "date_range": f"{start_date} → {end_date}",
         }
         logger.info(f"Complete: {summary}")
