@@ -1,6 +1,6 @@
 # New-Machine Bootstrap — bare metal to operational
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-13 (reconciled #1026 status — memory backup landed + live; datadrops + ingest are manual by decision, no FDA grant, §3c; fixed the datadrops S3 prefix; added .config.json regen §3b)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-26 (#1029 — fixed the stale "Identity Center being provisioned" rebuild caveat in §Step 3; the 2026-07-13 reconciliation of #1026 status — memory backup landed + live; datadrops + ingest are manual by decision, no FDA grant, §3c; fixed the datadrops S3 prefix; added .config.json regen §3b — still stands)
 > **Sources of truth:** `docs/AWS_ACCESS.md` (auth) · `docs/QUICKSTART.md` (toolchain + deploy tree) · `docs/CONTINUITY.md` (the laptop-only state surfaces) · `ingest/README.md` (drop-folder runtime) · `requirements-dev.txt` (pinned dev deps)
 
 This is the **from-zero rebuild runbook**: a fresh Mac, nothing installed, no
@@ -14,7 +14,10 @@ It exists because of the 2026-07-11 stolen-laptop resilience audit (epic **#1024
 *ordered* runbook stitched them into one rebuild. Companion pages from the same audit:
 **#1027** adds the "stolen/lost laptop" rotation scenario to `docs/DISASTER_RECOVERY.md`;
 **#1026** is the scheduled backup that keeps the laptop-only state restorable (its status
-is called out in step 4).
+is called out in step 4); **#1029** is the owner-gated re-entry hardening checklist
+(Identity Center, break-glass keys, estate/MFA-recovery pointers, FileVault, the
+registrar, repo visibility) — `scripts/check_reentry_hardening.py` gives a live,
+read-only status snapshot of it.
 
 **The bar:** with only this repo, AWS access, and the S3 backups, a competent engineer
 rebuilds an operable machine in well under an hour — nothing irreplaceable dies with the
@@ -130,12 +133,16 @@ order + the rebuild caveat.** The platform is account **205930651321**, region
 
 - **Primary path — IAM Identity Center (SSO):** `aws configure sso` once, then
   `aws sso login` daily (`docs/AWS_ACCESS.md` §2).
-- **Rebuild caveat (audit finding):** Identity Center is flagged **"being provisioned as
-  of 2026-07-10"** in `docs/AWS_ACCESS.md` §2. If SSO is not yet live on this account, a
-  fresh machine must bootstrap with the **break-glass `matthew-admin` access keys**
-  (`docs/AWS_ACCESS.md` §3) — which means the keys must be reachable from *off* the lost
-  laptop (a password manager / hardware token, never the repo). This owner-only re-entry
-  risk is exactly what epic **#1024** and the **#1027** rotation scenario track.
+- **Rebuild caveat, updated (#1029, re-verified 2026-07-26 read-only via
+  `sso-admin:ListInstances`):** Identity Center has been **LIVE since 2026-07-12**
+  (`docs/AWS_ACCESS.md` §2) — the "being provisioned" state this caveat used to warn
+  about is resolved. The residual risk is narrower now: `matthew-admin`'s break-glass
+  keys (`docs/AWS_ACCESS.md` §3) are still Active rather than parked, so they remain a
+  fallback path if SSO itself has an outage. Either way, the keys must be reachable
+  from *off* the lost laptop (a password manager / hardware token, never the repo).
+  This owner-only re-entry risk is exactly what epic **#1024**, story **#1029**, and
+  the **#1027** rotation scenario track. Run `python3 scripts/check_reentry_hardening.py`
+  for a live read-only status snapshot of this and the rest of the #1029 checklist.
 
 Human keys live **only** in `~/.aws/credentials` (or the OS keychain) — never in `.env`,
 never in the repo, never in Secrets Manager (`docs/AWS_ACCESS.md` §3, "The rule").

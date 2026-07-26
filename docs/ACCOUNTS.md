@@ -1,6 +1,6 @@
 # External Accounts Inventory — what a successor needs to keep the platform alive
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-10
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-26 (#1029 — added a pointer to `scripts/check_reentry_hardening.py`; the two ⚠️ estate rows below remain open, owner action)
 > **Sources of truth:** `lambdas/source_registry.py` (data sources) · `docs/SECRETS_MAP.md` (credential locations) · `aws route53 list-hosted-zones` + `whois averagejoematt.com` (domain facts) · `aws ses list-identities` (email identities)
 
 Every external account/service the platform depends on, what it's for, where its
@@ -83,3 +83,8 @@ successor needs, recorded pointer-level only:
 
 Until both ⚠️ rows are filled, treat bus-factor as **1** regardless of how good the rest
 of this wiki is. This section exists so the gap is loud, not silent.
+
+**Live status check (#1029):** `python3 scripts/check_reentry_hardening.py` re-derives
+this section's open/closed state (plus Identity Center, the break-glass key, FileVault,
+the domain-renewal window, and repo visibility) read-only, on demand — so "still
+UNDOCUMENTED" never has to be re-confirmed by eye or trusted from a stale handover.

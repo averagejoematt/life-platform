@@ -1,6 +1,6 @@
 # Re-Entry Protocol — Reusable Runbook
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-26 (#1029 added the stolen-laptop cross-reference in "See also"; the day-by-day content itself is unchanged since the 2026-05-19 V2 audit sweep)
 
 Last updated: 2026-05-19 (V2 audit operational sweep)
 
@@ -190,7 +190,8 @@ By Day 2 evening:
 - `handovers/HANDOVER_v6.8.7.md` — what shipped 2026-05-03 (the re-entry session itself)
 - `Downloads/ajm_reentry_plan.md` — the original 2026-05-02 plan this runbook was synthesized from
 - `docs/INCIDENT_LOG.md` — Garmin OAuth outage entry (2026-04-05 → 2026-05-19) is the canonical example of "what breaks during gaps without active pause-mode discipline"
+- `docs/ACCOUNTS.md` / `docs/AWS_ACCESS.md` / `docs/NEW_MACHINE_BOOTSTRAP.md` + `scripts/check_reentry_hardening.py` — a *stolen or lost* laptop is a different, harder gap than the ones this runbook covers (data silence vs. losing the device itself); issue **#1029** (epic #1024) is the owner-gated hardening checklist for that scenario
 
 ---
 
-**Verified:** 2026-05-19 (V2 audit operational sweep)
+**Verified:** 2026-07-26 (#1029 — added the stolen-laptop cross-reference; the runbook's own day-by-day content is unchanged, still last substantively verified 2026-05-19)
