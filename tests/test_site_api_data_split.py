@@ -82,6 +82,7 @@ EXPECTED_ROUTE_MAP = {
     "/api/experiment_vote": "_handle_experiment_vote",
     "/api/experiments": "handle_experiments",
     "/api/decisions": "handle_decisions",
+    "/api/diary_reactions": "handle_diary_reactions",  # #1574 — coach reactions to diary entries (GET, consent-gated)
     "/api/field_notes": "handle_field_notes",
     "/api/food_delivery_overview": "handle_food_delivery_overview",
     "/api/forecast": "handle_forecast",
