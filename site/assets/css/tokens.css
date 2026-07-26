@@ -1758,6 +1758,22 @@ html { scroll-padding-top: calc(var(--sp-7) + var(--sp-2)); }
 .img-credit { position: absolute; right: var(--sp-2); bottom: var(--sp-2); margin: 0; padding: 2px 7px;
   border-radius: var(--radius-xs); background: color-mix(in oklch, #000 48%, transparent); color: #ECE3D2; }
 
+/* ── The editorial texture layer (#1471) — code-drawn art for narrative
+   surfaces (texture.js: the story hub's hero band · chronicle chapter bands ·
+   season banners on the premiere beat + the attempts ledger). Same §13
+   instrument vocabulary — texture.js seeds from sigils.js's own hash machinery
+   and reuses .sigil-ring/-tick/-node, so the draw-in and reduced-motion rules
+   above apply unchanged. Quiet by rule: muted ink, low opacity, aria-hidden,
+   inert. The ONE ember note is the counted beads (.art-count) — a real week or
+   attempt number, earned per §8.5, never decoration-confetti. */
+.art-band { color: var(--ink-faint); opacity: 0.6; pointer-events: none; }
+.art-band .art-tex { display: block; inline-size: 100%; block-size: 26px; overflow: hidden; }
+.art-band .art-count { fill: var(--ember); opacity: 0.85; }
+.page-hero .art-band { margin-block-start: var(--sp-4); }
+.art-chapter { margin-block-end: var(--sp-3); }
+.beat-cycle .art-band { margin-block-end: var(--sp-3); }
+.att-card .art-band { margin-block-end: var(--sp-2); }
+
 /* ════════════════════════════════════════════════════════════════════════════
    §13 — the shared "ask the data" widget (assets/js/ask.js, uplevel P2).
    Moved up from evidence.css so Home (tokens+story only) mounts the same

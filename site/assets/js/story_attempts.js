@@ -13,6 +13,7 @@
 */
 
 import "/assets/js/svgtype.js";
+import { seasonBand } from "/assets/js/texture.js"; // #1471 — a season banner per attempt
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -89,6 +90,10 @@ function logCards(cycles, byN, collapseDef) {
       m.avg_sleep_hours != null ? `avg sleep ${n(m.avg_sleep_hours)}h` : null,
     ].filter(Boolean).join(" · ");
     return `<li class="tt-card att-card${c.is_current ? " is-live" : ""}">` +
+      // #1471 — each attempt is a season: its banner's texture is seeded by the
+      // attempt's own identity (cycle + genesis date → byte-identical forever)
+      // and the ember beads count the real attempt number.
+      `<div class="art-band art-season" aria-hidden="true">${seasonBand(c.cycle, { seed: "attempt:" + c.cycle + ":" + (c.genesis || "") })}</div>` +
       `<p class="att-head"><span class="att-no num">Attempt #${n(c.cycle)}</span> ` +
       `<span class="label">${esc(c.genesis)} · showed up ${n(c.engaged_days)} of ${n(c.window_days)} day${c.window_days === 1 ? "" : "s"}</span></p>` +
       `<p class="att-fate">${fateLine(c, collapseDef)}.${changed}</p>` +
