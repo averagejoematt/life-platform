@@ -287,20 +287,22 @@ def test_run_step_strips_apply_in_dry_run(monkeypatch):
 def test_leadin_seq_and_labels_continue_at_week_03(monkeypatch):
     monkeypatch.setattr(leadin, "EXPERIMENT_START_DATE", GENESIS)
     resolved = handler.resolve_calendar(GENESIS)
-    pre_dates = [e["date"] for e in resolved if e["kind"] == "chronicle"]
-    assert len(pre_dates) == 1, "#1090 curation: ONE calendar lead-in (Before the Numbers)"
+    pre_dates = sorted(e["date"] for e in resolved if e["kind"] == "chronicle")
+    # 2026-07-26 curation: TWO calendar lead-ins — Before the Numbers (genesis−6)
+    # + The Night Before Everything (genesis−1, cycle-11 promotion).
+    assert len(pre_dates) == 2
     prereg_date = "2026-07-11"  # genesis − 1 — publish_genesis_preregistration.py's chapter
     first_publish = "2026-07-15"  # first post-genesis Wednesday
     all_dates = sorted(pre_dates + [prereg_date, first_publish])
-    # the chronicle OPENS on the calendar lead-in, then the prereg chapter (#1090)…
+    # the chronicle OPENS on the calendar lead-in, then the prologue arc…
     assert all_dates[0] == pre_dates[0]
     assert leadin.seq_for(pre_dates[0], all_dates, 0) == 1
     assert leadin.series_label(pre_dates[0], all_dates, 0) == "Prologue · Part I"
-    assert leadin.seq_for(prereg_date, all_dates, 0) == 2
-    assert leadin.series_label(prereg_date, all_dates, 0) == "Prologue · Part II"
+    assert leadin.seq_for(pre_dates[1], all_dates, 0) == 2
+    assert leadin.series_label(pre_dates[1], all_dates, 0) == "Prologue · Part II"
     # …and the next real publish (wednesday_chronicle_lambda._seq_for uses the same
-    # date-sorted index) continues at week-03, labelled Week 1.
-    assert leadin.seq_for(first_publish, all_dates, 1) == 3
+    # date-sorted index) continues after the prologue block, labelled Week 1.
+    assert leadin.seq_for(first_publish, all_dates, 1) == 4
     assert leadin.series_label(first_publish, all_dates, 1) == "Week 1"
 
 
@@ -309,10 +311,13 @@ def test_leadin_seq_and_labels_continue_at_week_03(monkeypatch):
 
 def test_calendar_curation_1090_retired_the_two_entries():
     sks = [e["sk"] for e in handler.PRELAUNCH_CALENDAR if e["kind"] == "chronicle"]
-    assert sks == ["DATE#2026-02-28"], "the chronicle opens with 'Before the Numbers' only"
+    # #1090 opened on 'Before the Numbers' only; 2026-07-26 (cycle-11 reset,
+    # Matthew-directed) added 'The Night Before Everything' at genesis−1.
+    assert sks == ["DATE#2026-02-28", "DATE#2026-07-21"]
     assert "DATE#2026-03-03" not in sks  # The Empty Journal — retired
     assert "DATE#2026-02-22" not in sks  # The Body Votes First — retired
     assert any("Before the Numbers" in e.get("label", "") for e in handler.PRELAUNCH_CALENDAR)
+    assert any("Night Before Everything" in e.get("label", "") for e in handler.PRELAUNCH_CALENDAR)
 
 
 def test_retirement_plan_targets_only_uncurated_pre_genesis():

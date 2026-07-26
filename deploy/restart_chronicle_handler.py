@@ -96,6 +96,14 @@ CHRONICLE_PREFIXES = [
 PRELAUNCH_CALENDAR = [
     {"kind": "chronicle", "sk": "DATE#2026-02-28", "days_before": 6, "label": "Prologue · Before the Numbers"},
     {"kind": "podcast", "asset": "wk0", "days_before": 2, "title": "Prologue — Elena previews the experiment"},
+    # 2026-07-26 (cycle-11 reset, Matthew-directed): "The Night Before Everything" —
+    # the genesis-eve piece — joins the rolling arc at genesis−1. Prose was made
+    # date-agnostic by deploy/vet_night_before_leadin.py (weekdays neutralized,
+    # "for the first time" dropped, cycle-10 start-weight figure generalized).
+    # The prereg chapter ("The Plan, On the Record") is ALSO genesis−1 by design
+    # and is NOT a calendar entry — it re-publishes after every pipeline run and
+    # sorts after this one within the day.
+    {"kind": "chronicle", "sk": "DATE#2026-07-21", "days_before": 1, "label": "Prologue · The Night Before Everything"},
 ]
 
 # Back-compat alias (pre-calendar name, 2026-06-21): the chronicle sks, in
