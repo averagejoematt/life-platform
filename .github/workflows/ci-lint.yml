@@ -24,6 +24,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.build_sha }}   # #1173: the reconciled tree
+          # fetch-depth: 0 so the gitleaks step below can resolve the push commit range
+          # (a shallow clone can be missing the merge base). Checkout cost only — the
+          # gitleaks scan still walks only the pushed commits, not full history (#1336).
+          fetch-depth: 0
 
       # setup-python (v7.0.0, cache: pip) via the shared composite (#1655)
       - uses: ./.github/actions/setup-ci
@@ -107,8 +111,11 @@ jobs:
         # fed to pip-audit as `--ignore-vuln` IDs, so a single unfixable / inapplicable
         # transitive CVE can't red-wall main indefinitely; every allowlist entry needs
         # a rationale + removal path. Dependabot (.github/dependabot.yml) still opens
-        # the bump PRs. (Lambda runtime is stdlib-only, so there is no lambdas/
-        # requirements to scan.) Pinned like the other lint-gate tools (CQ-01 style).
+        # the bump PRs. (Lambda *source* is stdlib-only, but three pinned binary *layers*
+        # ship pillow/garth/lameenc into running Lambdas — those are manifest-pinned in
+        # lambdas/requirements/ and scanned by the scheduled pip_audit_lambda, whose
+        # check_layer_manifest_coverage() reds if a layer ARN lacks a manifest (#1336).)
+        # Pinned like the other lint-gate tools (CQ-01 style).
         if: always()
         run: |
           pip install pip-audit==2.10.1
@@ -133,6 +140,26 @@ jobs:
             exit 1
           fi
           echo "✅ Dependency scan clean (allowlisted IDs excluded) — blocking gate green."
+
+      - name: Secret scan (gitleaks — ENFORCED, default ruleset, ~30s)
+        # #1336: restores committed-credential detection lost when the repo went private
+        # 2026-07-13 (GitHub secret scanning had a real catch — the Firebase key,
+        # DECISIONS.md). .github/workflows/secret-scan.yml already runs gitleaks on the
+        # PULL_REQUEST path; ci-cd.yml (this workflow's caller) triggers on PUSH to main,
+        # where PRs are frequently bypassed (integration merges push straight to main) — so
+        # this step adds the same coverage on the push path, which secret-scan.yml never
+        # sees. On a push event gitleaks-action scans only the commits the push INTRODUCES
+        # (not full history/tree), and .gitleaks.toml (extend useDefault=true) allowlists
+        # the repo's pre-existing public-era strings (Firebase web key, fake test HMACs), so
+        # it can't red-wall on them. Personal repo ⇒ no GITLEAKS_LICENSE needed. Action is
+        # SHA-pinned (not a floating tag), matching the repo's action-pinning convention.
+        if: always()
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+          GITLEAKS_ENABLE_SUMMARY: "false"
 
       - name: License inventory (pip-licenses — ADVISORY, #1352)
         # Prints the resolved license of every dev/CDK dependency each build so a new or
@@ -164,7 +191,9 @@ jobs:
         # deploys, and SBOM capture is provenance, not a pass/fail security gate (that's
         # pip-audit above). Trivy scan intentionally DEFERRED (#1661 optional item) —
         # it adds meaningful CI time/complexity for little marginal signal over pip-audit
-        # on a stdlib-only Lambda runtime; revisit if container images enter the build.
+        # on a stdlib-source Lambda runtime (the only third-party code shipped is the three
+        # pinned binary layers, manifest-scanned by pip-audit); revisit if container images
+        # enter the build.
         if: always()
         continue-on-error: true
         env:

@@ -1,0 +1,16 @@
+# lameenc-layer (binary dependency layer, x86_64) — #1336
+#
+# Attached to: coach-panel-podcast (lambdas/audio_encode.py — LAME MP3 compression of
+# the Panel's Gemini-TTS WAV; fails open to WAV when the layer is absent).
+# Layer ARN: cdk/stacks/constants.py::LAMEENC_LAYER_ARN (lameenc-layer:1).
+# Build: deploy/build_lameenc_layer.sh (downloads the lameenc wheel unpinned at build time).
+#
+# WHY THIS FILE EXISTS: lameenc is a compiled third-party wheel that ships INTO a running
+# Lambda via lameenc-layer, so it must be pinned in a manifest pip-audit can scan. Before
+# #1336 there was no manifest and lameenc was scanned by nothing.
+#
+# ⚠️ VERSION UNVERIFIED against the live layer. build_lameenc_layer.sh pins nothing (it
+# installs whatever was PyPI-latest when the layer was published), so the deployed version
+# is unknown offline. Pinned to the current PyPI-latest below. OWNER ACTION: confirm with
+# `aws lambda get-layer-version-by-arn --arn <LAMEENC_LAYER_ARN>` and correct if it differs.
+lameenc==1.8.4

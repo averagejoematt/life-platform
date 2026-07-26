@@ -1,7 +1,10 @@
 # Dependabot — automated dependency-update PRs (2026-06-09, Tier-1 hardening).
 # Actions are SHA-pinned; Dependabot bumps the SHA + version comment for us.
-# Lambda runtime deps are stdlib-only (no requirements there) — only the dev +
-# CDK toolchains are tracked.
+# Lambda *source* is stdlib-only, but three binary *layers* (pillow/garth/lameenc) ship
+# third-party code into running Lambdas — those are version-pinned in
+# lambdas/requirements/ and CVE-scanned by the scheduled pip_audit_lambda (#1336), not by
+# Dependabot (which can't resolve a binary Lambda layer). Here only the dev + CDK
+# toolchains are Dependabot-tracked.
 version: 2
 updates:
   # GitHub Actions — keep the SHA-pinned actions current + patched.

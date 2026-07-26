@@ -32,9 +32,12 @@ v1.0.0 — 2026-03-08 (SEC-5)
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 import tempfile
+import urllib.error
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -59,6 +62,114 @@ REQ_S3_PREFIX = os.environ.get("REQ_S3_PREFIX", "config/requirements/")
 
 s3 = boto3.client("s3", region_name=REGION)
 ses = boto3.client("sesv2", region_name=REGION)
+
+# ── SCA layer-manifest coverage guard (#1336) ───────────────────────────────────
+# Every binary dependency layer referenced by a `*_LAYER_ARN` in cdk/stacks/constants.py
+# ships third-party code INTO a running Lambda (pillow-layer→Pillow, garth-layer→garth,
+# lameenc-layer→lameenc), so each MUST have a pinned manifest under lambdas/requirements/
+# that pip-audit can scan. If a layer is added to constants.py without a matching manifest,
+# this guard fails the scan RED — closing the SCA blind spot that let pillow-layer run
+# unscanned for months (#1336, SDLC review 2026-07-18).
+
+# `arn:...:layer:<short>-layer:<version>` → capture <short>. Non-greedy so an internal
+# hyphen in a future layer name still resolves against the `-layer:` anchor.
+_LAYER_ARN_RE = re.compile(r"layer:([a-z0-9_-]+?)-layer:")
+
+# A layer's third-party package may be pinned in a differently-named manifest. garth-layer's
+# `garth==x.y.z` is pinned inside garmin.txt (the garmin-data-ingestion manifest), so garth
+# is covered without a standalone garth.txt. Map layer short-name → acceptable manifest(s).
+_LAYER_MANIFEST_ALIASES = {
+    "garth": ["garth.txt", "garmin.txt"],
+}
+
+# Resolve the repo tree from this file: lambdas/operational/pip_audit_lambda.py → repo root.
+_MODULE_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _MODULE_DIR.parents[1]
+
+
+def _default_constants_path() -> Path:
+    return Path(os.environ.get("CONSTANTS_PATH", str(_REPO_ROOT / "cdk" / "stacks" / "constants.py")))
+
+
+def _default_requirements_dir() -> Path:
+    env = os.environ.get("REQUIREMENTS_DIR")
+    if env:
+        return Path(env)
+    repo_dir = _REPO_ROOT / "lambdas" / "requirements"
+    if repo_dir.is_dir():
+        return repo_dir
+    # Lambda bundle may ship the manifests alongside the code.
+    return Path("/var/task/requirements")
+
+
+def _layer_names_from_constants(constants_text: str) -> list[str]:
+    """Return sorted-unique layer short-names from every `*_LAYER_ARN` literal."""
+    return sorted({m.group(1) for m in _LAYER_ARN_RE.finditer(constants_text)})
+
+
+def check_layer_manifest_coverage(constants_path=None, requirements_dir=None) -> list[str]:
+    """Return layer short-names referenced in constants.py that have NO scanning manifest.
+
+    Empty list == every referenced binary layer is covered by a pinned manifest. A
+    non-empty list is the RED signal: those layers ship third-party code pip-audit cannot
+    see. Fails on today's tree until pillow.txt/lameenc.txt exist; passes once they do.
+
+    If constants.py cannot be read (e.g. not bundled into the Lambda), returns [] and logs
+    a warning — the authoritative enforcement is the CI unit test, which always sees the
+    repo tree.
+    """
+    cpath = Path(constants_path) if constants_path is not None else _default_constants_path()
+    rdir = Path(requirements_dir) if requirements_dir is not None else _default_requirements_dir()
+    try:
+        constants_text = cpath.read_text()
+    except OSError as e:
+        logger.warning(f"[pip_audit] Cannot read constants for layer-manifest guard ({cpath}): {e}")
+        return []
+    missing = []
+    for name in _layer_names_from_constants(constants_text):
+        candidates = _LAYER_MANIFEST_ALIASES.get(name, [f"{name}.txt"])
+        if not any((rdir / c).is_file() for c in candidates):
+            missing.append(name)
+    return missing
+
+
+def check_alerts_enabled() -> dict:
+    """AC5 regression guard (#1336): verify GitHub vulnerability + Dependabot alerts are ON
+    so a future silent disablement (the exact #1336 root cause) is caught on this scheduled
+    surface.
+
+    The scheduled Lambda holds NO GitHub credentials, so without a token this is an honest
+    SKIP (a lightweight assertion the Lambda genuinely can't make offline). To ACTIVATE the
+    guard, wire a fine-grained read-only PAT into the Lambda's env as GH_ALERTS_TOKEN — then
+    a disabled state returns status="disabled", which the handler escalates to RED.
+
+    Returns a status dict for the report: status in {enabled, disabled, skipped, error}.
+    """
+    token = os.environ.get("GH_ALERTS_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    repo = os.environ.get("GITHUB_REPO", "averagejoematt/life-platform")
+    if not token:
+        return {
+            "status": "skipped",
+            "reason": "no GitHub token in Lambda env — set GH_ALERTS_TOKEN (read-only PAT) to activate (#1336 AC5)",
+        }
+    # GET /repos/{repo}/vulnerability-alerts → 204 enabled, 404 disabled.
+    url = f"https://api.github.com/repos/{repo}/vulnerability-alerts"
+    req = urllib.request.Request(url, method="GET")
+    req.add_header("Authorization", f"Bearer {token}")
+    req.add_header("Accept", "application/vnd.github+json")
+    req.add_header("X-GitHub-Api-Version", "2022-11-28")
+    req.add_header("User-Agent", "life-platform-pip-audit")
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            if resp.status == 204:
+                return {"status": "enabled", "reason": "repo vulnerability alerts ON"}
+            return {"status": "error", "reason": f"unexpected status {resp.status}"}
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return {"status": "disabled", "reason": "GitHub vulnerability alerts are DISABLED (#1336 gate:owner)"}
+        return {"status": "error", "reason": f"HTTP {e.code} querying vulnerability-alerts"}
+    except Exception as e:  # noqa: BLE001 — network/DNS, degrade to a non-fatal note
+        return {"status": "error", "reason": f"alerts check failed: {e}"}
 
 
 def list_requirements_files() -> list[str]:
@@ -385,6 +496,66 @@ def lambda_handler(event, context):
             if result["vulnerabilities"]:
                 logger.warning(f"[pip_audit] {lambda_name}: {len(result['vulnerabilities'])} vulnerabilities found")
 
+    # ── SCA layer-manifest coverage guard (#1336 AC2) — RED if a deployed binary layer
+    # referenced in cdk/stacks/constants.py has no manifest for pip-audit to scan.
+    missing_layer_manifests = check_layer_manifest_coverage()
+    if missing_layer_manifests:
+        logger.error(f"[pip_audit] SCA GAP — deployed layer(s) with no scanning manifest: {missing_layer_manifests}")
+        results.append(
+            {
+                "lambda": "sca-layer-coverage",
+                "packages_checked": 0,
+                "status": "vulnerable",
+                "vulnerabilities": [
+                    {
+                        "package": f"{name}-layer",
+                        "version": "(deployed, unpinned)",
+                        "vuln_id": "SCA-UNSCANNED-LAYER",
+                        "description": (
+                            f"Binary layer '{name}-layer' is referenced by a *_LAYER_ARN in cdk/stacks/constants.py "
+                            f"but has NO pinned manifest in lambdas/requirements/ — its third-party code is scanned "
+                            f"by nothing. Add lambdas/requirements/{name}.txt (#1336)."
+                        ),
+                        "fix_versions": [f"add lambdas/requirements/{name}.txt"],
+                        "aliases": [],
+                    }
+                    for name in missing_layer_manifests
+                ],
+            }
+        )
+
+    # ── AC5 regression guard (#1336) — verify GitHub vulnerability/Dependabot alerts stay ON.
+    alerts = check_alerts_enabled()
+    logger.info(f"[pip_audit] GitHub alerts guard: {alerts}")
+    if alerts["status"] == "disabled":
+        results.append(
+            {
+                "lambda": "github-alerts-guard",
+                "packages_checked": 0,
+                "status": "vulnerable",
+                "vulnerabilities": [
+                    {
+                        "package": "repo:vulnerability-alerts",
+                        "version": "disabled",
+                        "vuln_id": "SCA-ALERTS-DISABLED",
+                        "description": alerts["reason"] + " — CVE-triggered Dependabot bump PRs cannot fire while off.",
+                        "fix_versions": ["enable repo vulnerability + Dependabot alerts (gate:owner)"],
+                        "aliases": [],
+                    }
+                ],
+            }
+        )
+    else:
+        results.append(
+            {
+                "lambda": "github-alerts-guard",
+                "packages_checked": 0,
+                "vulnerabilities": [],
+                "status": "clean" if alerts["status"] == "enabled" else "empty",
+                "notes": f"alerts guard [{alerts['status']}]: {alerts['reason']}",
+            }
+        )
+
     html, has_vulns = build_report_html(results, scan_date)
     total_vulns = sum(len(r["vulnerabilities"]) for r in results)
     vuln_icon = "🔴" if has_vulns else "🟢"
@@ -405,6 +576,18 @@ def lambda_handler(event, context):
     except Exception as e:
         logger.error(f"[pip_audit] Failed to send report: {e}")
         raise
+
+    # RED-on-missing-manifest / disabled-alerts: fail the invocation (non-zero → CloudWatch
+    # Errors alarm) AFTER the report email is sent, so the operator sees the detail AND the
+    # scheduled run pages (#1336 AC2/AC5). Vulnerable-package findings intentionally stay
+    # email-only (unchanged prior behavior); only the CONFIG gaps this story closes hard-fail.
+    hard_fail_reasons = []
+    if missing_layer_manifests:
+        hard_fail_reasons.append(f"unscanned deployed layer(s) with no manifest: {missing_layer_manifests}")
+    if alerts["status"] == "disabled":
+        hard_fail_reasons.append("GitHub vulnerability/Dependabot alerts DISABLED")
+    if hard_fail_reasons:
+        raise RuntimeError("SCA guard RED (#1336): " + "; ".join(hard_fail_reasons))
 
     return {
         "statusCode": 200,
