@@ -13,12 +13,29 @@ Run these steps **in order**. Each has a hard guardrail — read it before actin
 
 ### (a) Archive the outgoing handover, write the new one
 
+**Dated handovers live on the `session-archive` branch, NOT on `main` (#1650).** `main`
+tracks exactly one handover — `handovers/HANDOVER_LATEST.md`, the live pointer — plus
+`handovers/README.md`. `.gitignore` enforces it, and `tests/test_archive_handover.py` is
+the ratchet. Never `git mv` the outgoing handover into a dated file on `main`; that is the
+old flow and it is what grew the directory to 489 files.
+
 1. Read the current `handovers/HANDOVER_LATEST.md` — pull its session date and slug from
-   its title line (existing files follow `HANDOVER_<YYYY-MM-DD>_<Slug>.md`, e.g.
-   `handovers/HANDOVER_2026-07-06_R22-review.md`).
-2. `git mv handovers/HANDOVER_LATEST.md handovers/HANDOVER_<that-date>_<that-slug>.md` —
-   this is a straight rename, the content does not change.
-3. Write a **new** `handovers/HANDOVER_LATEST.md` for the session that's ending now. Match
+   its title line (archived files follow `HANDOVER_<YYYY-MM-DD>_<Slug>.md`, e.g.
+   `HANDOVER_2026-07-06_R22-review.md`).
+2. Archive it onto `session-archive`:
+   ```bash
+   python3 scripts/archive_handover.py --slug <that-slug>   # add --dry-run first to preview
+   ```
+   The script builds the archive commit with git plumbing — it never checks out
+   `session-archive`, never moves `HEAD`, and never touches the working tree (safe with
+   concurrent worktrees active). It derives the date from the handover, refuses rather than
+   clobbering an existing entry, is a no-op on identical content, and pushes
+   `session-archive` when it succeeds. If the push fails (offline, no remote), the commit
+   is safe on the local ref — re-run `git push origin session-archive` before closing (f).
+   Read the archive later with `git show origin/session-archive:handovers/<name>.md` (see
+   `handovers/README.md`).
+3. **Overwrite** `handovers/HANDOVER_LATEST.md` in place with the handover for the session
+   that's ending now — the file stays at the same path, only its content changes. Match
    the shape of the archived files: the driving instruction/prompt, what shipped (PRs,
    merged/deployed status), what was verified (tests, smoke, live checks), gotchas hit,
    and the residual/next-picks queue. This file is the live driver the next session reads
@@ -90,7 +107,8 @@ NOT git-tracked and is a separate step from the commit in (f).
   `STALE_STACK_CLAIMS` in the script when a new ownership move needs policing) before
   closing (c). The script no-ops harmlessly if the memory dir isn't present (e.g. a
   fresh machine) — it is a session reflex, not something repo CI can enforce.
-- **Rule of placement:** session-specific narrative → `handovers/` (step a). Durable
+- **Rule of placement:** session-specific narrative → `HANDOVER_LATEST.md` → the
+  `session-archive` branch at the next wrap (step a). Durable
   lessons/reflexes → memory topic files (this step) or `docs/CONVENTIONS.md` if it's a
   load-bearing repo-wide rule. The CLAUDE.md status block (step b) is a terse pointer,
   never the primary home for either.
@@ -257,7 +275,7 @@ Stage the repo-tracked wrap artifacts only (memory-dir changes from step (c) are
 git and are never part of this commit):
 
 ```bash
-git add handovers/ CLAUDE.md docs/ site/story/build/beats.json   # beats.json only if (d) fired; docs/ only if (e) touched pages
+git add handovers/HANDOVER_LATEST.md CLAUDE.md docs/ site/story/build/beats.json   # beats.json only if (d) fired; docs/ only if (e) touched pages
 git commit -m "$(cat <<'EOF'
 docs(wrap): <short session theme> (<n items/PRs shipped>)
 
@@ -272,8 +290,10 @@ session — status block, handover, build beat (9 R22 smalls #836–#845)`).
 ## Guardrails (verbatim from CLAUDE.md — do not relax these)
 
 - **Replace, don't stack.** CLAUDE.md's status block is one paragraph, always.
-- **One live block.** `handovers/HANDOVER_LATEST.md` is the only "current" handover;
-  everything else is archived under its dated name.
+- **One live block.** `handovers/HANDOVER_LATEST.md` is the only "current" handover — and
+  since #1650 it is the only handover tracked on `main` at all; everything else is archived
+  under its dated name on the `session-archive` branch by `scripts/archive_handover.py`.
+  A dated `HANDOVER_*.md` committed to `main` reds `tests/test_archive_handover.py`.
 - **Merged-work-only dispatch.** A build beat narrates what shipped and is live — never
   a plan, never an open PR.
 - **Beat or explicit skip, never silence (#736).** Every wrap's handover carries a

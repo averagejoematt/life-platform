@@ -73,7 +73,7 @@ One agent per lens. Twelve lenses, each grading a lifecycle stage or cross-cutti
 | 8 | Operations & oversight | Running it | alarm estate vs real failure modes, DLQ hygiene, SLOs as practiced, remediation-agent + fresh-eyes **efficacy** (PRs merged / true-positive rate / cost — are the autonomous loops earning their keep?), incident log discipline, on-call-of-one sustainability |
 | 9 | Security & supply chain | The attack surface as process | SCA/CVE + SAST posture (Dependabot bumps ≠ vuln scanning), secrets rotation as practiced vs documented, IAM change process, OIDC posture, public-surface hardening cadence |
 | 10 | Cost engineering | Unit economics | ADR-063 governor as practice, spend attribution granularity, cost-per-feature visibility, the unit-economics story a commercialization would need |
-| 11 | Knowledge & continuity | The second brain | docs mass (60+ process docs, 100+ handovers): asset or drag — doc-maintenance cost per change, staleness beyond the gated facts, bus-factor/successor path (CONTINUITY, ACCOUNTS, bootstrap docs) actually walkable |
+| 11 | Knowledge & continuity | The second brain | docs mass (60+ process docs; the session log on the `session-archive` branch): asset or drag — doc-maintenance cost per change, staleness beyond the gated facts, bus-factor/successor path (CONTINUITY, ACCOUNTS, bootstrap docs) actually walkable |
 | 12 | Commercialization readiness | The acquirer's audit | multi-tenancy distance, health-data compliance surface (PII/HIPAA-adjacency of the data classes held), licensing/IP hygiene, which best-practice deviations are documented postures vs accidents, the ordered path to "defensible product" |
 
 **Every lens brief MUST carry:**

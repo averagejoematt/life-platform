@@ -17,7 +17,7 @@ merged and live, it doesn't exist here.**
 shipped nothing eligible, the wrap's handover records
 `**Build beat:** none — <one-clause reason>` instead. An empty week is honest;
 an unexplained empty slot is not — the skip line is what keeps the cadence
-auditable across `handovers/`.
+auditable across the session log (`HANDOVER_LATEST.md`, archived to the `session-archive` branch).
 
 ## The template (four sections, ~60–120 words each)
 

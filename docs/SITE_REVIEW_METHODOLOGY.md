@@ -135,4 +135,4 @@ The binding map (`tests/site_review_bindings.py`) is the single source of truth 
 - **Weekly** for the first 3 months (high-change period), then **monthly**.
 - **One door per weekly run** (Cockpit / Story / Evidence) keeps each session focused and within Claude Code's image-context budget; rotate doors week to week.
 - **Full-site pass** before launching any new door or major surface, and at each monthly review.
-- Phase 2 (designed, deferred): an automated budget-gated vision panel runs the Product Board over the captured screenshots weekly and emails a ranked digest, seeding the human run. See the plan in `handovers/`.
+- Phase 2 (designed, deferred): an automated budget-gated vision panel runs the Product Board over the captured screenshots weekly and emails a ranked digest, seeding the human run. See the plan in the session log (`session-archive` branch).

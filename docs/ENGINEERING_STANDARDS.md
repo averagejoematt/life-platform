@@ -47,7 +47,10 @@ public platform's stated postures*," not "A for a 50-engineer org."
   migration scripts that already ran, throwaway spikes, before/after render PNGs, or personal
   workstation tooling. If you need old state, it's in history (`git show <sha>:path`).
 - **Process exhaust stays out of the product tree.** Session handovers, RCA scratch, and review
-  churn are engineering-log, not product — keep only the live pointer in-tree.
+  churn are engineering-log, not product — keep only the live pointer in-tree. Done for the
+  session log by **#1650**: `handovers/` on `main` is `HANDOVER_LATEST.md` + a README, and the
+  489-file corpus moved to the `session-archive` branch (ratcheted by `.gitignore` +
+  `tests/test_archive_handover.py`).
 - Enforced by the **root-clutter ratchet guard** (below).
 
 ### 2. Structure & module size (D2)

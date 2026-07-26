@@ -168,10 +168,15 @@ Regenerates constants, deploys Core/Compute/Email (constants ship in every bundl
 ## Session status (the ONE live block — replace, don't stack)
 
 **Wrap convention (#365):** on session close, the outgoing status block REPLACES the
-block below — it never stacks. Full session history lives in `handovers/` (one file per
-session, `HANDOVER_LATEST.md` = the live driver) and the pre-2026-07 diary is archived at
-`handovers/archive/CLAUDE_MD_SESSION_DIARY_2026-07-03.md`. Durable lessons go to the
-memory system or the convention sections above, not into this block. **Build-beat wrap
+block below — it never stacks. `handovers/HANDOVER_LATEST.md` is the live driver and the
+**only** handover tracked on `main` (#1650); every prior session — plus the pre-2026-07
+diary `handovers/archive/CLAUDE_MD_SESSION_DIARY_2026-07-03.md` — lives on the
+**`session-archive` branch** of this repo (`git show
+origin/session-archive:handovers/<name>.md`; see `handovers/README.md`). `/wrap` step (a)
+appends there via `python3 scripts/archive_handover.py --slug <slug>`, then overwrites
+`HANDOVER_LATEST.md` in place — never `git mv` a dated handover onto `main`. Durable
+lessons go to the memory system or the convention sections above, not into this block.
+**Build-beat wrap
 gate (#736): every wrap either distills ONE public build beat per
 `docs/content/BUILD_DISPATCH_CHECKLIST.md` (#380 — merged+deployed work only, never
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;

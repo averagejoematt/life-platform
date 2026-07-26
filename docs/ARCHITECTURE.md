@@ -460,7 +460,7 @@ Target: within the **$85/mo all-in budget ceiling** (ADR-063; surge-to-$100 per 
   deploy/                         ← ~120 deploy scripts
   cdk/                            ← 9 CDK stacks
   tests/                          ← 1075+ passing tests, 8 CI linters
-  handovers/                      ← Session handover notes
+  handovers/                      ← The live session pointer (HANDOVER_LATEST.md); history on the session-archive branch
 ```
 
 ---

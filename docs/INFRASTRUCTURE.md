@@ -251,7 +251,7 @@ See `deploy/p1_kms_dynamodb.sh` for creation script.
 ├── config/                # Local copies of S3 configs
 ├── content/               # Manually-written Chronicle installments
 ├── docs/                  # All documentation (.md)
-├── handovers/             # Session handover notes
+├── handovers/             # Live session pointer only (history: session-archive branch)
 ├── backfill/ seeds/ patches/ setup/ tests/ datadrops/
 └── .config.json           # Local MCP bridge credentials (gitignored)
 ```
