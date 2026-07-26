@@ -39,6 +39,7 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas", "compute"))
 import budget_guard  # noqa: E402
 import conversation_enrichment as ce  # noqa: E402
 import journal_analyzer_lambda as jal  # noqa: E402
+from botocore.exceptions import ClientError  # noqa: E402
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -503,3 +504,124 @@ class TestCadenceWiring:
         je.lambda_handler({"conversations_only": True}, None)
         assert seen["start"] is None  # module default: DEFAULT_LOOKBACK_DAYS ending today
         assert seen["end"]  # the handler's computed end date passes through
+
+
+# ── ADR-077 (#1790): the conversational seam never reads or writes across a ──
+# ── reset boundary — with_phase_filter on the query, tombstone-safe writes  ──
+
+
+class FakeConditionalTable:
+    """Honors ConditionExpression like real DynamoDB, keyed on a caller-supplied
+    tombstoned-keys set — proves apply_enrichment/mark_deduped genuinely refuse
+    to land on a row that's tombstoned, not just skip it in Python."""
+
+    def __init__(self, tombstoned_keys=()):
+        self.tombstoned_keys = set(tombstoned_keys)
+        self.updates = []
+
+    def update_item(self, Key, ConditionExpression=None, **kw):  # noqa: N803 — boto3 shape
+        key = (Key["pk"], Key["sk"])
+        if ConditionExpression and key in self.tombstoned_keys:
+            raise ClientError(
+                {"Error": {"Code": "ConditionalCheckFailedException", "Message": "The conditional request failed"}}, "UpdateItem"
+            )
+        self.updates.append({"Key": Key, **kw})
+
+
+class TestPhaseFilterOnTheSingleQueryHelper:
+    """`_query_between` is the ONE query helper for all three conversational
+    partitions plus the journal dedup corpus (module docstring) — wiring
+    with_phase_filter here is the single fix that closes the read-side gap for
+    every caller at once."""
+
+    def test_query_between_applies_the_phase_filter(self):
+        captured = {}
+
+        class _Table:
+            def query(self, **kwargs):
+                captured.update(kwargs)
+                return {"Items": []}
+
+        items = ce._query_between(_Table(), "COACH#mind_coach", "CHECKIN#2026-07-14", "CHECKIN#2026-07-27#~")
+        assert items == []
+        assert "phase" in captured.get("FilterExpression", "")
+        assert captured["ExpressionAttributeNames"]["#phase"] == "phase"
+        assert ":phase_experiment" in captured["ExpressionAttributeValues"]
+
+    def test_paginated_query_still_carries_the_filter_on_every_page(self):
+        pages = [
+            {"Items": [{"sk": "CHECKIN#2026-07-14#a"}], "LastEvaluatedKey": {"pk": "x", "sk": "y"}},
+            {"Items": [{"sk": "CHECKIN#2026-07-15#b"}]},
+        ]
+        seen_kwargs = []
+
+        class _Table:
+            def query(self, **kwargs):
+                seen_kwargs.append(kwargs)
+                return pages.pop(0)
+
+        items = ce._query_between(_Table(), "COACH#mind_coach", "CHECKIN#2026-07-14", "CHECKIN#2026-07-27#~")
+        assert len(items) == 2
+        assert all("FilterExpression" in kw for kw in seen_kwargs)
+
+
+class TestWriteTimeTombstoneGuard:
+    """Defense-in-depth on top of the phase-filtered read: a reset can land
+    between collection and the Haiku round-trip, so the write itself must
+    refuse to enrich (or mark-deduped) a row that's since been tombstoned."""
+
+    def test_apply_enrichment_refuses_a_since_tombstoned_row(self):
+        item = _checkin(ANSWER)
+        table = FakeConditionalTable(tombstoned_keys={(item["pk"], item["sk"])})
+        ok = ce.apply_enrichment(table, item, ce.CHANNEL_COACH_CHECKIN, {"sentiment": "negative", "causal_hints": []}, ANSWER)
+        assert ok is False
+        assert table.updates == []
+
+    def test_apply_enrichment_writes_normally_when_not_tombstoned(self):
+        item = _checkin(ANSWER)
+        table = FakeConditionalTable()
+        ok = ce.apply_enrichment(table, item, ce.CHANNEL_COACH_CHECKIN, {"sentiment": "negative", "causal_hints": []}, ANSWER)
+        assert ok is True
+        assert len(table.updates) == 1
+
+    def test_mark_deduped_refuses_a_since_tombstoned_row(self):
+        item = _checkin(ANSWER)
+        table = FakeConditionalTable(tombstoned_keys={(item["pk"], item["sk"])})
+        ok = ce.mark_deduped(table, item, "journal_duplicate", ANSWER)
+        assert ok is False
+        assert table.updates == []
+
+    def test_run_counts_a_since_tombstoned_enrichment_as_skipped_not_enriched(self, monkeypatch):
+        monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
+        monkeypatch.setattr(ce, "fetch_journal_texts", lambda *a, **k: [])
+        item = _checkin(ANSWER)
+        monkeypatch.setattr(
+            ce,
+            "collect_conversational_items",
+            lambda *a, **k: [{"item": item, "channel": ce.CHANNEL_COACH_CHECKIN, "text": ANSWER, "date": "2026-07-20", "context": "q"}],
+        )
+        table = FakeConditionalTable(tombstoned_keys={(item["pk"], item["sk"])})
+        summary = ce.run(
+            table=table,
+            start_date="2026-07-14",
+            end_date="2026-07-27",
+            caller=_haiku_caller({"sentiment": "negative", "causal_hints": []}),
+        )
+        assert summary["enriched"] == 0
+        assert summary["skipped"] == 1
+        assert table.updates == []
+
+    def test_run_counts_a_since_tombstoned_dedup_as_skipped_not_deduped(self, monkeypatch):
+        monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
+        monkeypatch.setattr(ce, "fetch_journal_texts", lambda *a, **k: [ANSWER])  # forces the journal-dedup path
+        item = _checkin(ANSWER)
+        monkeypatch.setattr(
+            ce,
+            "collect_conversational_items",
+            lambda *a, **k: [{"item": item, "channel": ce.CHANNEL_COACH_CHECKIN, "text": ANSWER, "date": "2026-07-20", "context": "q"}],
+        )
+        table = FakeConditionalTable(tombstoned_keys={(item["pk"], item["sk"])})
+        summary = ce.run(table=table, start_date="2026-07-14", end_date="2026-07-27", caller=_haiku_caller({}))
+        assert summary["deduped"] == 0
+        assert summary["skipped"] == 1
+        assert table.updates == []

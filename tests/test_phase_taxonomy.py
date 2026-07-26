@@ -300,6 +300,11 @@ def test_pk_rules():
     assert pt.classify("USER#admin#SOURCE#deletion_log", "DATE#2026-07-01T00:00:00#USER#x") == pt.SYSTEM_STATE
     # #1670: the outbound-broadcast ledger — SYSTEM_STATE, survives resets, never traversed
     assert pt.classify("BROADCAST_ORIGIN#youtube", "POST#dQw4w9WgXcQ") == pt.SYSTEM_STATE
+    # #1394/#1819: cohort-strip pool — reader-submitted audience data like VOTES#/
+    # CHALLENGE_FOLLOWS above, not Matthew's own experiment intelligence. Was
+    # unclassified (classify() raised KeyError), which would hard-fail the next
+    # restart_pipeline.py census preflight the moment the first reader submits.
+    assert pt.classify("COHORT#resting_heart_rate#2026-W30", "SUBMIT#a1b2c3d4e5f6a1b2") == pt.SYSTEM_STATE
 
 
 def test_helper_predicates():

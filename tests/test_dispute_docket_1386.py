@@ -22,6 +22,7 @@ Acceptance criteria pinned here (one test class per AC):
 
 import os
 import sys
+from decimal import Decimal
 
 os.environ.setdefault("TABLE_NAME", "life-platform-test")
 os.environ.setdefault("S3_BUCKET", "test-bucket")
@@ -512,3 +513,42 @@ class TestPartitionRegistry:
         # is the #813 bug class this pins against)
         for metric, sub in dd._METRIC_SUBDOMAIN.items():
             assert sub in evaluator.SUBDOMAIN_TO_DOMAIN, f"{metric} → {sub} missing from SUBDOMAIN_TO_DOMAIN"
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# ADR-077 (#1788): a tombstoned CONFIDENCE# row must never be frozen into a stake
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+class TestConfidenceAtOpenTombstoneGuard:
+    """774631fb closed this hole on the two CONFIDENCE# WRITE paths; this pins the
+    same guard on dispute_docket's READ (get_item bypasses query-level phase
+    filters entirely, so a wiped prior-cycle mean would otherwise freeze into the
+    public docket stake at open)."""
+
+    def test_tombstoned_row_falls_back_to_uninformed_prior(self, fake_table):
+        fake_table.put_item(
+            Item={
+                "pk": "COACH#sleep_coach",
+                "sk": "CONFIDENCE#sleep_quality",
+                "mean_confidence": Decimal("0.91"),  # a wiped prior-cycle mean
+                "tombstone": True,
+                "tombstoned_reason": "experiment_restart_2026-07-27",
+            }
+        )
+        assert dd._confidence_at_open("sleep_coach", "sleep_quality") == 0.5
+
+    def test_current_cycle_row_is_used_normally(self, fake_table):
+        fake_table.put_item(Item={"pk": "COACH#sleep_coach", "sk": "CONFIDENCE#sleep_quality", "mean_confidence": Decimal("0.82")})
+        assert dd._confidence_at_open("sleep_coach", "sleep_quality") == 0.82
+
+    def test_absent_row_is_the_uninformed_prior(self, fake_table):
+        assert dd._confidence_at_open("sleep_coach", "never_written") == 0.5
+
+    def test_stake_built_at_open_never_carries_a_tombstoned_mean(self, fake_table):
+        """End-to-end through build_stake — the exact call site open_docket uses."""
+        fake_table.put_item(
+            Item={"pk": "COACH#physical_coach", "sk": "CONFIDENCE#weight", "mean_confidence": Decimal("0.99"), "tombstone": True}
+        )
+        stake = dd.build_stake("physical_coach", "weight")
+        assert stake["confidence"] == 0.5
