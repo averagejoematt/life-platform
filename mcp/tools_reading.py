@@ -38,12 +38,15 @@ from mcp.utils import mcp_error
 
 def _coach_checkin_module():
     """The shared coach-checkin core, importable under both the flat MCP bundle
-    and the `lambdas.` package layout (mirrors tools_coach_checkin's fallback)."""
+    (`coach_checkin`) and the `lambdas.` package layout. Resolved via importlib so
+    mypy's clean-set pass doesn't see `coach_checkin.py` under two module names
+    (the 'source file found twice' footgun)."""
+    import importlib
+
     try:
-        import coach_checkin as cc
+        return importlib.import_module("coach_checkin")
     except ImportError:  # pragma: no cover — package-layout fallback
-        from lambdas import coach_checkin as cc
-    return cc
+        return importlib.import_module("lambdas.coach_checkin")
 
 
 def _prescription_followup_spec(args, valid_coach_ids):
