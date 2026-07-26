@@ -235,7 +235,11 @@ def test_track_record_summary_separates_conversation_from_verdicts():
     cl = t["conversation_learnings"]
     assert cl["count"] == 1
     assert cl["recent"][0]["checkin_id"] == "CHECKIN#2026-07-20#abcd1234"
-    assert cl["recent"][0]["his_words"] == "I stopped winding down and just doomscrolled"
+    # ADR-141 §4 hardening (2026-07-26): the verbatim answer never enters the
+    # track dict — STANCE#/COMPRESSED# prose serves publicly behind numeric-only
+    # gates, so the quote is structurally absent from every LLM-bound payload.
+    assert "his_words" not in cl["recent"][0]
+    assert "doomscrolled" not in str(cl["recent"][0])
     assert t["confidence_provenance"] == {"duration": "data", "sleep_quality": "conversation"}
 
 
@@ -259,7 +263,11 @@ def test_compression_message_renders_conversation_learnings_distinctly():
     assert "## Prediction Outcomes (1 newest resolved)" in msg  # conversation not counted here
     assert "## Conversation Learnings (1 newest" in msg
     assert "NOT data-derived" in msg
-    assert 'grounded in his answer: "I stopped winding down and just doomscrolled"' in msg
+    # ADR-141 §4 hardening (2026-07-26): the compression prompt carries the takeaway
+    # + checkin pointer, NEVER the verbatim answer_quote (COMPRESSED#.summary feeds
+    # public board answers behind a numeric-only gate).
+    assert "doomscrolled" not in msg
+    assert "(checkin CHECKIN#2026-07-20#abcd1234)" in msg
 
 
 def test_stance_grounding_message_carries_and_flags_conversation_learnings():
@@ -396,3 +404,27 @@ def test_public_track_record_filters_conversation_learnings(monkeypatch):
     out = capi._track_record("sleep_coach")
     assert out["confirmed"] == 1 and out["decided"] == 1
     assert all("doomscrolled" not in str(r) for r in out["recent"])
+
+
+# ── 2026-07-26 review-fix regressions ─────────────────────────────────────────
+
+
+def test_cap_probe_failure_refuses_the_write():
+    """Review P3→fixed: if the per-answer cap probe can't run, the write is
+    REFUSED (fail-closed) — a transient DDB error must never bypass the ADR-141
+    bound. Nothing is written."""
+
+    def _broken_query(table, **kwargs):
+        raise RuntimeError("simulated DDB outage")
+
+    fake = FakeDdbTable(put_item_hook=_conditional_put_hook, query_hook=_broken_query)
+    out = ccal.apply_conversation_calibration(
+        fake,
+        _answered_item(),
+        subdomain="sleep_quality",
+        direction="down",
+        takeaway="Evenings are the lever.",
+        answer_excerpt="stopped winding down",
+    )
+    assert "error" in out and "refusing" in out["error"]
+    assert fake.store == {} or not any("LEARNING#" in str(k) for k in fake.store)  # nothing written

@@ -217,9 +217,12 @@ def apply_conversation_calibration(
 
         resp = table.query(KeyConditionExpression=Key("pk").eq(pk) & Key("sk").begins_with(prefix))
         existing = [it.get("sk") for it in resp.get("Items", [])]
-    except Exception as e:  # noqa: BLE001 — a cap probe failure must not corrupt the cap
+    except Exception as e:  # noqa: BLE001
+        # Fail CLOSED (2026-07-26 review): if the cap probe can't run, refuse the
+        # write rather than proceed uncapped — a transient DDB error must not let
+        # one answer exceed the ADR-141 bound. Single-operator tool; retrying is cheap.
         logger.warning("[coach_calibration] cap probe failed for %s: %s", pk, e)
-        existing = []
+        return {"error": f"calibration bound probe failed ({e}); refusing to write uncapped — retry shortly."}
     if learning_sk in existing:
         return {"status": "already_recorded", "learning_sk": learning_sk, "confidence_moved": False}
     if len(existing) >= MAX_CALIBRATIONS_PER_CHECKIN:

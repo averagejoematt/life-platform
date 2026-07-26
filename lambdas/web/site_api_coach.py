@@ -1139,6 +1139,13 @@ def handle_journal_quotes(event):
 
     quotes = []
     for i in items:
+        # ADR-104 hardening (2026-07-26 review): only grounding="verified" serves.
+        # A mark made before the day's Notion ingestion lands is recorded honestly
+        # as pending_ingestion — it is WITHHELD here until the mark_journal_quote
+        # tool's list action re-verifies it against the ingested entry. Fail-closed:
+        # an absent/unknown grounding value never serves either.
+        if i.get("grounding") != "verified":
+            continue
         screened = _public_decision_note(i.get("quote"))
         if not screened:
             continue  # all-or-nothing: a quote that wouldn't survive intact isn't shown
@@ -1424,6 +1431,12 @@ def handle_coach_analysis(event):
             )
             for item in learn_resp.get("Items", []):
                 item = _decimal_to_float(item)
+                # ADR-141 §4 defense-in-depth (2026-07-26 review): conversation-channel
+                # learnings are Matthew-private — filter explicitly, don't rely on the
+                # type-field vocabulary alone. Also keeps conversation rows from
+                # crowding the Limit=3 window a real position_revision needs.
+                if (item.get("channel") or "data") == "conversation":
+                    continue
                 if item.get("type") == "position_revision":
                     revision_signal = item.get("revised_position", "")[:100]
                     break

@@ -62,6 +62,25 @@ SUBSTANCE_EXTRA = (
     "hangover",
     "vape",
     "vaping",
+    # 2026-07-26 review widening: the intoxication terms alone let beverage-noun
+    # phrasings through ("split a bottle of wine", "three beers"). Word-boundary
+    # matched; a false positive only refuses a MARK (fail-closed toward privacy —
+    # Matthew can rephrase), so the wide net is the right trade.
+    "beer",
+    "beers",
+    "wine",
+    "liquor",
+    "vodka",
+    "whiskey",
+    "whisky",
+    "tequila",
+    "rum",
+    "cocktail",
+    "cocktails",
+    "drinks",
+    "drinking",
+    "tipsy",
+    "buzzed",
 )
 
 # Family-specifics: close-kin phrases and the in-law family from the brief

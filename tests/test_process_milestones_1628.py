@@ -139,8 +139,13 @@ def test_return_after_gap_is_a_window_function_not_a_day_trigger():
     three_later = pm.return_after_gap(days, "2026-02-13")
     assert on_the_day is not None and three_later is not None
     assert on_the_day[0].id == three_later[0].id == "return_after_gap_2026-02-10"
-    # …and a month later it is archaeology, not news.
-    assert pm.return_after_gap(days, "2026-03-15") is None
+    # …and beyond the 45-day emit window it is archaeology, not news. (Window
+    # widened 14→45 by the 2026-07-26 review: breaker suppression after a spiral
+    # regularly outlasts 14 days and was silently losing the restart fact; the
+    # entry stays identity-anchored to the true return date, so a late write is
+    # still the honest dated record.)
+    assert pm.return_after_gap(days, "2026-03-27") is not None  # day 45 — still emittable
+    assert pm.return_after_gap(days, "2026-03-28") is None  # day 46 — aged out
 
 
 # ── AC: sustained_sessions is a non-decline, never a peak ─────────────────────
@@ -447,3 +452,65 @@ def test_genesis_consumes_already_true_window_milestones_without_announcing():
     # …and it never announces later.
     r = _sweep(table, "2026-05-02")
     assert r["announced"] == []
+
+
+# ── 2026-07-26 review-fix regressions ─────────────────────────────────────────
+
+
+def test_windows_genesis_guard_baselines_without_announcing():
+    """Review P2 (the deploy-sequencing trap): a ledger whose rung genesis was
+    written by #1626-era code has never baselined the window family — the first
+    sweep with window rules must CONSUME already-true window candidates as
+    origin=baseline (announce=False), never announce them as fresh crossings."""
+    table = FakeTable()
+    # A #1626-era genesis exists, but no window marker and no window events.
+    table.put_item(Item={"pk": LEDGER_PK, "sk": ml.GENESIS_SK, "genesis_date": "2026-07-25", "recorded_at": "2026-07-25"})
+
+    # Signals with a currently-satisfied return_after_gap: train through 06-07,
+    # miss exactly a week (06-08..06-14), return 06-15, today 06-17.
+    training = [f"2026-06-0{d}" for d in range(1, 8)] + ["2026-06-15"]
+    signals = {
+        "weight_series": [],
+        "tier0_streak": 0,
+        "days_tracked": 0,
+        "character_level": None,
+        "training_dates": training,
+        "strength_volume_by_day": {},
+        "zone2_minutes_by_day": {},
+        "rhr_by_day": {},
+        "hrv_by_day": {},
+        "calories_by_day": {},
+        "expenditure_by_day": {},
+        "waist_by_day": {},
+    }
+    out = ml.sweep(table, USER_PREFIX, None, "2026-06-17", signals=signals, suppressed=False)
+
+    assert out["announced"] == []  # nothing manufactured as news
+    baselined = [e for e in out["written"] if e.get("origin") == ml.ORIGIN_BASELINE]
+    assert any("return_after_gap" in str(e.get("milestone_id", "")) for e in baselined)
+    # The marker is stamped so the guard never re-runs.
+    assert (LEDGER_PK, ml.WINDOWS_GENESIS_SK) in table.items
+
+    # A LATER real crossing announces normally: new gap + return well after.
+    training2 = training + ["2026-07-01", "2026-07-02", "2026-07-03", "2026-07-04", "2026-07-05", "2026-07-06", "2026-07-07", "2026-07-15"]
+    signals2 = dict(signals, training_dates=training2)
+    out2 = ml.sweep(table, USER_PREFIX, None, "2026-07-16", signals=signals2, suppressed=False)
+    assert any("return_after_gap" in str(e.get("milestone_id", "")) for e in out2["announced"])
+
+
+def test_zone2_takes_per_day_max_of_garmin_and_strava_not_sum():
+    """Review P2: garmin activities auto-sync to Strava — summing the two sources
+    double-counts the same workout. Per-day max keeps the better-covered source."""
+    table = FakeTable()
+    # Same day, both sources report the same 40-minute ride.
+    table.put_item(Item={"pk": "USER#matthew#SOURCE#garmin", "sk": "DATE#2026-07-20", "zone2_minutes": 40})
+    table.put_item(Item={"pk": "USER#matthew#SOURCE#strava", "sk": "DATE#2026-07-20", "total_zone2_seconds": 2400})
+    # A garmin-only day and a strava-only day survive untouched.
+    table.put_item(Item={"pk": "USER#matthew#SOURCE#garmin", "sk": "DATE#2026-07-21", "zone2_minutes": 25})
+    table.put_item(Item={"pk": "USER#matthew#SOURCE#strava", "sk": "DATE#2026-07-22", "total_zone2_seconds": 1800})
+
+    signals = ml.collect_signals(table, "USER#matthew#SOURCE#", None, "2026-07-23")
+    z2 = signals["zone2_minutes_by_day"]
+    assert z2["2026-07-20"] == 40.0  # max, not 80
+    assert z2["2026-07-21"] == 25.0
+    assert z2["2026-07-22"] == 30.0

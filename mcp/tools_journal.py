@@ -303,9 +303,48 @@ def tool_mark_journal_quote(args):
                 break
             kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
         items = [decimal_to_float(i) for i in items]
+        # ADR-104 re-verification (2026-07-26 review): marks made before the day's
+        # Notion ingestion are grounding=pending_ingestion and WITHHELD from the
+        # public serve path. Each list call re-checks pendings against the now-
+        # ingested entry: verbatim match → upgraded to verified (starts serving);
+        # entry present but line absent → flagged grounding_mismatch (stays
+        # withheld — unmark it or re-mark his exact words); entry still absent →
+        # stays pending. The journal-interview close runs a list, so yesterday's
+        # marks verify on the next session without a separate job.
+        for i in items:
+            if i.get("grounding") != "pending_ingestion":
+                continue
+            q_date, q_sk = i.get("date"), i.get("sk")
+            if not q_date or not q_sk:
+                continue
+            entry_resp = table.query(
+                KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}notion") & Key("sk").begins_with(f"DATE#{q_date}#journal"),
+            )
+            entries = entry_resp.get("Items", [])
+            if not entries:
+                continue  # not ingested yet — honestly still pending
+            if any(jq.grounds_in(i.get("quote"), e.get("raw_text")) for e in entries):
+                table.update_item(
+                    Key={"pk": _quotes_pk(), "sk": q_sk},
+                    UpdateExpression="SET grounding = :v",
+                    ConditionExpression="grounding = :p",
+                    ExpressionAttributeValues={":v": "verified", ":p": "pending_ingestion"},
+                )
+                i["grounding"] = "verified"
+            else:
+                i["grounding"] = "grounding_mismatch"  # advisory in this response; the stored row stays pending (withheld)
         return {
             "count": len(items),
-            "quotes": [{"sk": i.get("sk"), "date": i.get("date"), "quote": i.get("quote"), "marked_at": i.get("marked_at")} for i in items],
+            "quotes": [
+                {
+                    "sk": i.get("sk"),
+                    "date": i.get("date"),
+                    "quote": i.get("quote"),
+                    "marked_at": i.get("marked_at"),
+                    "grounding": i.get("grounding"),
+                }
+                for i in items
+            ],
         }
 
     date = (args.get("date") or "").strip()
@@ -366,7 +405,11 @@ def tool_mark_journal_quote(args):
     if len([e for e in existing if e.get("sk") != sk]) >= jq.MAX_QUOTES_PER_DAY:
         return {"error": f"refused: {jq.MAX_QUOTES_PER_DAY} lines are already marked for {date} — the cap is 0–2 per entry."}
 
-    marked_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # Featured-slot stability (2026-07-26 review): an idempotent re-mark must not
+    # refresh marked_at — featured_for_week keys on first-marked, and an overwrite
+    # would rotate the home slot mid-week. Preserve the original timestamp.
+    _prior = next((e for e in existing if e.get("sk") == sk), None)
+    marked_at = (_prior or {}).get("marked_at") or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     table.put_item(
         Item={
             "pk": "USER#matthew#SOURCE#journal_quotes",  # literal (orphan-gate greppable); == _quotes_pk()

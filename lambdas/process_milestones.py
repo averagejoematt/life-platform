@@ -67,7 +67,14 @@ CATEGORY_COMPOSITION = "composition"
 RETURN_MISSED_WEEK_DAYS = 7  # a "missed week" = this many consecutive days with no training
 RETURN_WITHIN_DAYS = 7  # the return must land within this many days AFTER the missed week completes
 RETURN_LOOKBACK_DAYS = 60  # the window the gap/return pattern is evaluated over
-RETURN_EMIT_WINDOW_DAYS = 14  # only emit while the return is recent enough to be news, not archaeology
+# 45, not 14 (2026-07-26 review): the spiral breaker suppresses announcements in
+# exactly the weeks that follow a gap (stale SoM, habit_collapse holds), and the
+# 12-day global cooldown adds more delay — a 14-day emit window silently LOST the
+# flagship restart fact whenever suppression outlasted it. The entry is write-once
+# and identity-anchored to the true return date, so a late write is still the
+# honest dated fact; 45 days rides out any plausible suppression stretch while
+# still refusing genuine archaeology.
+RETURN_EMIT_WINDOW_DAYS = 45
 
 # ── sustained_sessions ────────────────────────────────────────────────────────
 SUSTAIN_RUNG_WEEKS = (8, 12, 26)  # ladder rungs, in weeks of sustained non-decline

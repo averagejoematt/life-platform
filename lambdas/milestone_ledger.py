@@ -92,6 +92,7 @@ v1.1.0 — 2026-07-26 (#1628): window-validated process milestones, weight
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any, NamedTuple
@@ -102,6 +103,12 @@ import process_milestones  # #1628: the pure window functions (no I/O — this m
 MILESTONES_SOURCE = "milestones"
 EVENT_SK_PREFIX = "MILESTONE#"
 GENESIS_SK = "LEDGER#genesis"
+# #1628 deploy-sequencing guard (2026-07-26 review): the window family arrived after
+# #1626's rung genesis could already exist. A ledger whose genesis predates the
+# window rules has no honest baseline for them — without this second marker, the
+# first post-deploy sweep would announce months-old window states as fresh
+# "crossing" news into a write-once ledger (ADR-104 violation, uncorrectable).
+WINDOWS_GENESIS_SK = "LEDGER#genesis#windows"
 
 # The partition, spelled out in full (single-writer / orphan-guard visibility,
 # same convention as achievement_rules.ACHIEVEMENTS_PK).
@@ -423,6 +430,7 @@ def read_ledger(table, user_prefix: str) -> dict:
         "existing_ids": existing_ids,
         "last_event_date": max(announced_dates) if announced_dates else None,
         "has_genesis": any(str(i.get("sk", "")) == GENESIS_SK for i in items),
+        "has_windows_genesis": any(str(i.get("sk", "")) == WINDOWS_GENESIS_SK for i in items),
         "events": events,
     }
 
@@ -543,13 +551,18 @@ def collect_signals(table, user_prefix: str, phase_filter, today: str) -> dict:
             if vol is not None:
                 strength_volume_by_day[day] = strength_volume_by_day.get(day, 0.0) + vol
 
-    # Zone 2 minutes: garmin daily zone2_minutes + strava total_zone2_seconds.
-    zone2_by_day: dict[str, float] = {}
+    # Zone 2 minutes: per-day MAX of garmin's all-day zone2_minutes vs strava's
+    # per-activity total_zone2_seconds — never the sum. Garmin activities auto-sync
+    # to Strava, so summing double-counts the same workout (2026-07-26 review), and
+    # the two fields measure different things (all-day vs per-activity). max() keeps
+    # the better-covered source per day and preserves the sum_undercount_only claim.
+    garmin_z2_by_day: dict[str, float] = {}
+    strava_z2_by_day: dict[str, float] = {}
     for item in garmin:
         sk = str(item.get("sk") or "")
         z2 = _f(item.get("zone2_minutes")) or _f(item.get("time_in_zone_2_minutes"))
         if sk.startswith("DATE#") and len(sk) == 15 and z2 is not None:
-            zone2_by_day[sk[5:15]] = zone2_by_day.get(sk[5:15], 0.0) + z2
+            garmin_z2_by_day[sk[5:15]] = garmin_z2_by_day.get(sk[5:15], 0.0) + z2
     for item in strava:
         sk = str(item.get("sk") or "")
         if not sk.startswith("DATE#"):
@@ -558,7 +571,10 @@ def collect_signals(table, user_prefix: str, phase_filter, today: str) -> dict:
         training_days.add(day)
         z2s = _f(item.get("total_zone2_seconds"))
         if z2s is not None:
-            zone2_by_day[day] = zone2_by_day.get(day, 0.0) + z2s / 60.0
+            strava_z2_by_day[day] = strava_z2_by_day.get(day, 0.0) + z2s / 60.0
+    zone2_by_day: dict[str, float] = {
+        day: max(garmin_z2_by_day.get(day, 0.0), strava_z2_by_day.get(day, 0.0)) for day in set(garmin_z2_by_day) | set(strava_z2_by_day)
+    }
 
     # RHR / HRV: whoop daily records (skip interleaved #WORKOUT# sub-records).
     rhr_by_day: dict[str, float] = {}
@@ -626,7 +642,11 @@ def _celebration_suppressed(table, today: str) -> bool:
 
         allowed, _verdict = spiral_breaker.check_celebration_allowed("milestone_announcements", now=today, table=table)
         return not allowed
-    except Exception:  # noqa: BLE001 — any breaker failure means "not explicitly clear" -> suppress
+    except Exception as e:  # noqa: BLE001 — any breaker failure means "not explicitly clear" -> suppress
+        # Fail closed but never SILENT (2026-07-26 review): a broken breaker import
+        # in a bundle would otherwise suppress every announcement forever while
+        # looking identical to "nothing satisfied".
+        logging.getLogger(__name__).warning("[milestone_ledger] breaker check failed — suppressing announcements: %s", e)
         return True
 
 
@@ -662,13 +682,33 @@ def sweep(
             if _put_once(table, user_prefix, entry, stamp):
                 written.append(entry)
         _put_once(table, user_prefix, {"sk": GENESIS_SK, "genesis_date": today, "recorded_at": today}, stamp)
+        # The first-ever run baselined window candidates too (_all_satisfied includes
+        # them) — stamp the window-family marker so the guard below never re-runs.
+        _put_once(table, user_prefix, {"sk": WINDOWS_GENESIS_SK, "genesis_date": today, "recorded_at": today}, stamp)
         return {"written": written, "announced": [], "genesis": True, "cooldown_active": False, "suppressed": False, "deferred": []}
+
+    # #1628 deploy-sequencing guard: rung genesis exists but the window family has
+    # never been baselined (its rules shipped after that genesis was written).
+    # Consume every already-true window candidate now, announce nothing — the same
+    # no-honest-event-date logic as genesis itself. Announcements start with the
+    # NEXT real crossing. Not celebratory, so the breaker is not consulted.
+    baseline_written: list[dict] = []
+    if not ledger["has_windows_genesis"]:
+        for cand, meas in process_milestones.candidates(signals, today):
+            if cand.id in ledger["existing_ids"]:
+                continue
+            entry = _entry(cand, meas, today, announce=False, origin=ORIGIN_BASELINE)
+            if _put_once(table, user_prefix, entry, stamp):
+                ledger["existing_ids"].add(cand.id)
+                baseline_written.append(entry)
+        _put_once(table, user_prefix, {"sk": WINDOWS_GENESIS_SK, "genesis_date": today, "recorded_at": today}, stamp)
 
     if suppressed is None:
         suppressed = _celebration_suppressed(table, today)
 
     result = evaluate(signals, ledger["existing_ids"], ledger["last_event_date"], today, suppressed=suppressed)
     written = [e for e in result["to_write"] if _put_once(table, user_prefix, e, stamp)]
+    written = baseline_written + written
     return {
         "written": written,
         "announced": [e for e in written if e["announce"]],

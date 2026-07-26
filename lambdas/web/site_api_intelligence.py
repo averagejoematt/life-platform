@@ -2443,7 +2443,11 @@ def handle_wrong() -> dict:
                 KeyConditionExpression=Key("pk").eq(f"COACH#{c}_coach") & Key("sk").begins_with("LEARNING#"),
             )
             recs = _decimal_to_float(r.get("Items", []))
-            live = [x for x in recs if not x.get("tombstone")]
+            # ADR-141 §4 defense-in-depth (2026-07-26 review): conversation-channel
+            # learnings are Matthew-private and outside the verdict vocabulary —
+            # exclude explicitly so a future status writer can't put private reason
+            # text on /api/wrong, and so conversation rows never pad the ledger counts.
+            live = [x for x in recs if not x.get("tombstone") and (x.get("channel") or "data") != "conversation"]
             counts: dict[str, int] = {}
             for x in live:
                 counts[x.get("status", "unknown")] = counts.get(x.get("status", "unknown"), 0) + 1

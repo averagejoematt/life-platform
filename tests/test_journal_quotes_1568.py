@@ -148,6 +148,16 @@ class FakeTable:
     def delete_item(self, Key):
         self.store.pop((Key["pk"], Key["sk"]), None)
 
+    def update_item(self, Key, UpdateExpression=None, ConditionExpression=None, ExpressionAttributeValues=None):
+        # Enough for the list re-verify upgrade: SET grounding = :v IF grounding = :p
+        item = self.store.get((Key["pk"], Key["sk"]))
+        if item is None:
+            raise Exception("ConditionalCheckFailedException")
+        vals = ExpressionAttributeValues or {}
+        if ConditionExpression and item.get("grounding") != vals.get(":p"):
+            raise Exception("ConditionalCheckFailedException")
+        item["grounding"] = vals.get(":v")
+
     def query(self, KeyConditionExpression=None, **kw):
         # Resolve the boto3 condition into (pk, sk_prefix) — enough for these paths.
         expr = KeyConditionExpression.get_expression()
@@ -256,6 +266,7 @@ def test_endpoint_serves_dated_labeled_quotes_with_receipts(coach_module):
             "date": "2026-07-21",
             "quote": CLEAN_LINE,
             "marked_at": "2026-07-21T20:00:00Z",
+            "grounding": "verified",
         }
     )
     body = _body(sc.handle_journal_quotes({"queryStringParameters": None}))
@@ -278,6 +289,7 @@ def test_endpoint_withholds_a_quote_the_filter_would_alter(coach_module):
             "date": "2026-07-21",
             "quote": "weed on my mind",
             "marked_at": "2026-07-21T20:00:00Z",
+            "grounding": "verified",
         }
     )
     body = _body(sc.handle_journal_quotes({"queryStringParameters": None}))
@@ -296,6 +308,7 @@ def test_endpoint_featured_respects_the_weekly_cap(coach_module):
             "date": d,
             "quote": "This week I kept the promise.",
             "marked_at": f"{d}T08:00:00Z",
+            "grounding": "verified",
         }
     )
     ft.put_item(
@@ -305,6 +318,7 @@ def test_endpoint_featured_respects_the_weekly_cap(coach_module):
             "date": d,
             "quote": "A second marked line.",
             "marked_at": f"{d}T09:00:00Z",
+            "grounding": "verified",
         }
     )
     body = _body(sc.handle_journal_quotes({"queryStringParameters": None}))
@@ -367,3 +381,85 @@ def test_adr_index_is_current():
 
     r = subprocess.run([sys.executable, os.path.join(_REPO, "scripts", "generate_adr_index.py"), "--check"], capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
+
+
+# ── 2026-07-26 review-fix regressions ─────────────────────────────────────────
+
+
+def test_beverage_nouns_trip_the_mark_gate():
+    """Review P2: the alcohol family must cover beverage phrasings, not just
+    intoxication states — 'split a bottle of wine' is exactly the class of line
+    the brief says never ships."""
+    for line in (
+        "We split a bottle of wine with dinner.",
+        "Had three beers watching the game.",
+        "A couple of drinks took the edge off.",
+        "Felt tipsy walking home.",
+    ):
+        assert jq.find_mark_violations(line), line
+
+
+def test_endpoint_withholds_pending_ingestion_quotes(coach_module):
+    """Review P2: a mark made before the day's Notion ingestion is grounding=
+    pending_ingestion — it must NOT serve until the list action re-verifies it.
+    Fail-closed: absent grounding never serves either."""
+    sc, ft = coach_module
+    for grounding in ("pending_ingestion", None):
+        item = {
+            "pk": QUOTES_PK,
+            "sk": jq.quote_sk("2026-07-21", CLEAN_LINE),
+            "date": "2026-07-21",
+            "quote": CLEAN_LINE,
+            "marked_at": "2026-07-21T20:00:00Z",
+        }
+        if grounding:
+            item["grounding"] = grounding
+        ft.put_item(Item=item)
+        body = _body(sc.handle_journal_quotes({"queryStringParameters": None}))
+        assert body["quotes"] == [] and body["featured"] is None, f"served with grounding={grounding!r}"
+
+
+def test_remark_preserves_marked_at(fake_table):
+    """Review P3: an idempotent re-mark must not refresh marked_at — the home
+    featured slot keys on first-marked and would rotate mid-week."""
+    first = tj.tool_mark_journal_quote({"date": "2026-07-25", "quote": CLEAN_LINE, "approved": True})
+    assert first.get("status") == "marked"
+    stored = fake_table.store[(QUOTES_PK, first["sk"])]
+    stored["marked_at"] = "2026-07-20T00:00:00Z"  # pin an old timestamp, then re-mark
+    again = tj.tool_mark_journal_quote({"date": "2026-07-25", "quote": CLEAN_LINE, "approved": True})
+    assert again.get("status") == "marked"
+    assert fake_table.store[(QUOTES_PK, again["sk"])]["marked_at"] == "2026-07-20T00:00:00Z"
+
+
+def test_list_reverifies_pending_quotes(fake_table):
+    """Review P2: the list action upgrades pending_ingestion → verified once the
+    entry is ingested and the line grounds; a non-grounding line is flagged
+    grounding_mismatch and the stored row stays withheld."""
+    ok_sk = jq.quote_sk("2026-07-25", CLEAN_LINE)
+    fake_table.put_item(
+        Item={
+            "pk": QUOTES_PK,
+            "sk": ok_sk,
+            "date": "2026-07-25",
+            "quote": CLEAN_LINE,
+            "marked_at": "2026-07-25T20:00:00Z",
+            "grounding": "pending_ingestion",
+        }
+    )
+    bad_sk = jq.quote_sk("2026-07-25", "A line he never actually wrote.")
+    fake_table.put_item(
+        Item={
+            "pk": QUOTES_PK,
+            "sk": bad_sk,
+            "date": "2026-07-25",
+            "quote": "A line he never actually wrote.",
+            "marked_at": "2026-07-25T20:01:00Z",
+            "grounding": "pending_ingestion",
+        }
+    )
+    out = tj.tool_mark_journal_quote({"action": "list"})
+    by_sk = {q["sk"]: q for q in out["quotes"]}
+    assert by_sk[ok_sk]["grounding"] == "verified"
+    assert fake_table.store[(QUOTES_PK, ok_sk)]["grounding"] == "verified"  # persisted upgrade
+    assert by_sk[bad_sk]["grounding"] == "grounding_mismatch"  # advisory in the response…
+    assert fake_table.store[(QUOTES_PK, bad_sk)]["grounding"] == "pending_ingestion"  # …stored row stays withheld

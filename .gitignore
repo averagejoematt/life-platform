@@ -108,3 +108,4 @@ htmlcov/
 # committed to this PUBLIC repo. Only config/pii_denylist.example.json is tracked.
 config/pii_denylist.local.json
 cdk/_bundle_staging/
+.worktrees/

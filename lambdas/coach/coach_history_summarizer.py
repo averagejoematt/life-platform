@@ -720,8 +720,14 @@ def _build_compression_message(coach_id, state):
             subdomain = rec.get("subdomain", "general")
             direction = rec.get("confidence_direction", "hold")
             takeaway = str(rec.get("takeaway", ""))[:200]
-            quote = str(rec.get("answer_quote", ""))[:160]
-            parts.append(f'  - [{date}] ({subdomain}, confidence {direction}) {takeaway} — grounded in his answer: "{quote}"')
+            # ADR-141 §4 hardening (2026-07-26 review): the verbatim answer_quote is
+            # Matthew-private and this prompt's output (COMPRESSED#/STANCE#) feeds
+            # public surfaces through numeric-only gates — so the quote never enters
+            # the prompt at all (leakage structurally impossible, the ADR-142 pattern).
+            # The takeaway + checkin_id pointer suffice; the quote stays in the
+            # private LEARNING# row for Matthew's own audit.
+            checkin_ref = rec.get("checkin_id", "")
+            parts.append(f"  - [{date}] ({subdomain}, confidence {direction}) {takeaway} (checkin {checkin_ref})")
         parts.append("")
 
     parts.append(
@@ -1084,7 +1090,9 @@ def _summarize_track_record(learning, confidence_records):
                         "subdomain": rec.get("subdomain", ""),
                         "confidence_direction": rec.get("confidence_direction", "hold"),
                         "takeaway": str(rec.get("takeaway") or "")[:200],
-                        "his_words": str(rec.get("answer_quote") or "")[:160],
+                        # ADR-141 §4 hardening: no verbatim answer text in the stance
+                        # grounding message — STANCE# prose serves publicly behind
+                        # numeric-only gates. checkin_id is the pointer for audit.
                         "checkin_id": rec.get("checkin_id", ""),
                     }
                 )
