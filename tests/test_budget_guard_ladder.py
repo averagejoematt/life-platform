@@ -33,6 +33,7 @@ _READER_NARRATIVE = (
     "semantic_recall",
     "horizons_retrospective",
     "coach_diary_reaction",
+    "coach_nudge",  # #1382: proactive decision-moment nudge — band 2, tier ≥2 silences (AC2)
 )
 _IRREDUCIBLE_READER = ("website_ai", "daily_brief_ai")
 

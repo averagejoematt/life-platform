@@ -127,6 +127,13 @@ _FEATURE_CUTOFF = {
     # band placement is audience-order, not dollars. A paused call yields NO
     # retrospective (honest "coach's note coming" state), never a fabricated one.
     "horizons_retrospective": 2,
+    # coach_nudge (#1382, epic #1080): the proactive decision-moment nudge — one
+    # short Haiku phrasing call per day AT MOST (deterministic triggers + a ≤1/day
+    # ledger cap decide everything; the model only phrases). Matthew-facing coach
+    # voice, so it sits in band 2 with the rest of the coach narrative: tier ≥2
+    # silences it entirely (AC2), and a silenced day is a silent day — no fallback
+    # copy, no template nudge (a canned nudge would be noise, not coaching).
+    "coach_nudge": 2,
     # coach_diary_reaction (#1574, epic #1564): the coach's short grounded reaction to
     # a Video Diary / Solo Recording entry, rendered on the public lab-notes surface
     # (the coaches responding to the human, not the sensors). A reader NARRATIVE
