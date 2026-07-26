@@ -923,6 +923,11 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .wall-attempt:not(.is-live) .wall-cell { opacity: .55; }        /* sealed attempts recede */
 .wall-cell.is-warming { opacity: .5; }
 .wall-cell svg, .wall-cell .fingerprint { width: 100%; height: auto; display: block; }
+/* #1822: a staged attempt (genesis not yet reached) — upcoming, not dead. */
+.wall-attempt.is-staged { border-style: dashed; opacity: .8; }
+.wall-staged { color: var(--ink-muted); }
+.wall-field-staged { display: block; padding: var(--sp-2) 0; }
+.wall-staged-note { color: var(--ink-faint); font-size: var(--fs-small); font-style: italic; }
 
 /* #1377 — The Wrong Feed: obituary cards, one per graded failure. Appended (localized)
    so a concurrent sibling touching this file 3-way-merges cleanly. */

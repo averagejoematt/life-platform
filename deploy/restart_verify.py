@@ -14,6 +14,7 @@ Checks (each pass/fail):
   8. Character sheet exists for at least one post-genesis day
   9. No habit streak > day_n (would indicate leak from pre-genesis data)
  10. pytest layer-retirement test passes (i2)
+ 11. Baked static/no-JS + OG proof (Home + Coaching) is fresh post-genesis (#1815)
 
 Returns 0 if all checks pass, 1 if any fail.
 
@@ -169,6 +170,40 @@ def main():
     )
     pytest_ok = proc.returncode == 0
     check("pytest layer-retirement test passes", pytest_ok, proc.stdout.strip().splitlines()[-1] if proc.stdout else "no output")
+
+    # 11. Static/no-JS + OG proof rebake (#1815). Home's <noscript> core + OG tags and
+    # /coaching/'s OG title are BAKED (scripts/v4_build_home_proof.py, v4_build_coaching.py)
+    # and only regenerate as a side effect of `deploy/sync_site_to_s3.sh` — which only runs
+    # on a site/** push. If genesis has passed with no incidental site/** merge since, the
+    # crawler/social/no-JS layer is still serving pre-start copy ("the experiment begins
+    # Monday..."). Re-run the two generators here (offline-safe: they fall back to the
+    # committed proof_snapshot.json if the live API is unreachable) and diff the result —
+    # any change means the baked layer WAS stale and has now been rebaked in the working
+    # tree; commit + push (touches site/**, so the standing site-deploy.yml auto-deploys
+    # it) to actually publish the fix.
+    watched = ["site/index.html", "site/coaching/index.html"]
+    before = {}
+    for rel in watched:
+        p = REPO_ROOT / rel
+        before[rel] = p.read_text(encoding="utf-8") if p.exists() else None
+    rebake_errors = []
+    # v4_apply_chrome.py MUST run last (same order as sync_site_to_s3.sh) — it
+    # re-flattens the doors nav/footer/head-chrome to the single source, so a
+    # generator alone would otherwise leave the page on its own stale inline
+    # chrome and manufacture a false "changed" diff below.
+    for script in ("scripts/v4_build_home_proof.py", "scripts/v4_build_coaching.py", "scripts/v4_apply_chrome.py"):
+        r = subprocess.run(["python3", script], cwd=REPO_ROOT, capture_output=True, text=True)
+        if r.returncode != 0:
+            rebake_errors.append(f"{script}: exit {r.returncode}: {r.stderr.strip().splitlines()[-1] if r.stderr else ''}")
+    changed = [rel for rel in watched if (REPO_ROOT / rel).exists() and (REPO_ROOT / rel).read_text(encoding="utf-8") != before[rel]]
+    if rebake_errors:
+        check("Static/OG proof rebake ran cleanly", False, "; ".join(rebake_errors))
+    else:
+        check(
+            "Baked static/OG proof was already fresh (no rebake needed)",
+            not changed,
+            f"rebaked (now dirty in the working tree, commit+push to deploy): {changed}" if changed else "up to date",
+        )
 
     # Summary
     total = len(checks)

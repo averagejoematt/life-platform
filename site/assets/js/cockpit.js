@@ -25,6 +25,7 @@ import { domainIcon, icon } from "/assets/js/icons.js";
 import { explainMount } from "/assets/js/explain.js"; // #403 one-tap explainer
 import { momentsIndex, shareMount } from "/assets/js/share.js"; // #404 moment permalinks
 import { preStart, GENESIS_ISO } from "/assets/js/coach_popover.js"; // #931 pre-start countdown · #1088 scrub-floor fallback
+import { cohortAheadPercent } from "/assets/js/cohort_math.js"; // #1820 — direction-aware cohort percentile
 
 const API = "/api";
 
@@ -666,7 +667,10 @@ async function renderCohort() {
       `<p class="cohort-read label">` +
       (d.matthew_value != null
         ? `Matthew: <span class="cohort-me num">${escapeHTML(_num(d.matthew_value))}${unit}</span>` +
-          (d.matthew_percentile != null ? ` · ahead of ${d.matthew_percentile}% of the cohort` : "")
+          (() => {
+            const ahead = cohortAheadPercent(d.matthew_percentile, d.lower_is_better);
+            return ahead != null ? ` · ahead of ${ahead}% of the cohort` : "";
+          })()
         : "") +
       ` · median <span class="num">${escapeHTML(_num(d.median))}${unit}</span></p>` +
       `<p class="provenance">n=${d.n} · self-reported · ${escapeHTML(String(d.week))}</p>` +
