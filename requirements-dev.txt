@@ -8,7 +8,7 @@ pytest-cov==7.1.0
 # Property-based testing (Hypothesis @given) — pure calculators + AI grounding
 # gates (tests/test_prop_*.py, #1664). Deterministic + bounded example counts so CI
 # stays fast; no browser/native deps.
-hypothesis==6.161.2
+hypothesis==6.161.5
 
 # Visual QA — Playwright browser automation (tests/visual_qa.py).
 # After install: `playwright install --with-deps chromium`
@@ -29,12 +29,12 @@ black==25.9.0
 mypy==2.3.0
 
 # AWS SDK (for tests that call boto3 directly)
-boto3==1.43.52
-botocore==1.43.52
+boto3==1.43.56
+botocore==1.43.56
 
 # CDK (synth + diff) — pinned exactly, MUST equal cdk/requirements.txt's pins
 # (#814, R22-MOD-01: a floor-only `>=` let an untested aws-cdk-lib release
 # reach CI unpinned). Bump both files together as a deliberate PR, plus the
 # `npm install -g aws-cdk@X.Y.Z` CLI pin in ci-cd.yml.
-aws-cdk-lib==2.261.0
+aws-cdk-lib==2.262.1
 constructs==10.7.1
