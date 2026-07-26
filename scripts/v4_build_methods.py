@@ -198,7 +198,7 @@ def render(stats: list[dict], categories: list[str]) -> str:
     <div class="mr-wrap">
       <section class="rd-sec" style="margin-top:0">
         <h2 class="rd-h">Where this comes from</h2>
-        <p class="rd-prose">Two modules currently back every number here — both pure, deterministic, stdlib-only Python with no AI and no I/O (ADR-105's "deterministic computation before any LLM verdict" rule, made literal).</p>
+        <p class="rd-prose">The modules below back every entry here. The statistical cores are pure, deterministic, stdlib-only Python with no AI and no I/O (ADR-105's "deterministic computation before any LLM verdict" rule, made literal); where an entry documents the declared scope of an LLM-assisted layer, the registered function is that pure policy itself — fingerprinted the same way.</p>
         <div class="mr-modules">{modules_html}</div>
       </section>
       {"".join(sections)}

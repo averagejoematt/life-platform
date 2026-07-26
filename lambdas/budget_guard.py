@@ -98,6 +98,13 @@ _FEATURE_CUTOFF = {
     # call returns an explicit {"status": "paused"} (never a fabricated estimate). ~$1/mo, so it
     # is the cheapest thing to sacrifice under any pressure.
     "eyeball_estimate": 1,
+    # conversation_enrichment (#1577): the Haiku sweep over the conversational corpus
+    # (coach check-in answers, habit reflections, field-note responses) that turns
+    # them into analysis-only enriched signals + hypothesis-candidate seeds. An
+    # internal analysis layer — nothing a reader reads pauses with it, and the
+    # verbatim records remain fully stored either way (enrichment just resumes and
+    # backfills when the tier drops). ~a few short Haiku calls/day.
+    "conversation_enrichment": 1,
     # ── Band 2: reader NARRATIVE content — pauses only under real pressure, a full
     #    tier AFTER all internal AI. The biggest recurring daily bucket, so it's
     #    the real cost lever, but the reader product is never the first sacrifice.
