@@ -1080,6 +1080,8 @@ def _summarize_track_record(learning, confidence_records):
     recent = []
     conversation_recent = []
     conversation_count = 0
+    concessions = []  # #1386: docket disputes this coach LOST — future reads must cite them
+    concession_count = 0
     for rec in learning or []:
         if (rec.get("channel") or "data") == "conversation":
             conversation_count += 1
@@ -1102,6 +1104,20 @@ def _summarize_track_record(learning, confidence_records):
             confirmed += 1
         elif verdict in _miss:
             refuted += 1
+        # #1386: a lost docket dispute wrote its concession VERBATIM to this
+        # coach's memory — surface it as a standing, citable evidence class
+        # (it also counts as a refuted verdict above, channel=data).
+        if rec.get("record_type") == "docket_concession":
+            concession_count += 1
+            if len(concessions) < 5:
+                concessions.append(
+                    {
+                        "date": rec.get("date") or rec.get("sk", "").replace("LEARNING#", "").split("#")[0],
+                        "topic": rec.get("topic", ""),
+                        "concession": rec.get("concession", ""),
+                        "docket_ref": rec.get("docket_ref", ""),
+                    }
+                )
         if len(recent) < 8:
             recent.append(
                 {
@@ -1132,6 +1148,15 @@ def _summarize_track_record(learning, confidence_records):
                 "channel=conversation — what this coach learned from Matthew's own check-in answers "
                 "(self-graded, bounded). A different evidence class than the data-derived verdicts above; "
                 "never counted in the hit rate."
+            ),
+        },
+        "standing_concessions": {
+            "count": concession_count,
+            "recent": concessions,
+            "note": (
+                "Docket disputes this coach LOST (#1386) — resolved by deterministic code against a "
+                "criterion agreed at open, concession recorded verbatim. When the stance touches one of "
+                "these topics it must cite the concession, never relitigate it."
             ),
         },
     }
@@ -1170,11 +1195,21 @@ def _build_stance_message(coach_id, compressed, track, prior_stance):
             "check-in conversations (channel=conversation, ADR-141) — treat them as qualitative evidence, "
             "distinct from your data-derived prediction verdicts, and never conflate the two.\n\n"
         )
+    concession_note = ""
+    if (track or {}).get("standing_concessions", {}).get("count"):
+        concession_note = (
+            "The track record's `standing_concessions` are docket disputes you LOST (#1386) — the "
+            "resolution criterion you agreed to at open was graded by deterministic code against real "
+            "data. If your stance touches one of those topics you MUST cite the concession (its date "
+            "and what you conceded) rather than restating the losing position; concessions are on the "
+            "record and are never relitigated.\n\n"
+        )
     return (
         f"## Coach: {meta['display_name']} ({meta['domain']})\n\n"
         "Form your CURRENT stance toward Matthew from this grounding. If there is no previous "
         'stance, "how_my_read_changed" MUST be an empty string.\n\n'
         f"{conversation_note}"
+        f"{concession_note}"
         f"{json.dumps(grounding, indent=2, default=str)}"
     )
 

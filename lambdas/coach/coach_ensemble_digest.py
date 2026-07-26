@@ -345,13 +345,40 @@ ENSEMBLE_SYSTEM_PROMPT = (
     '      "coaches": ["coach_a", "coach_b"],\n'
     '      "positions": {"coach_a": "...", "coach_b": "..."},\n'
     '      "status": "unresolved",\n'
-    '      "data_needed_to_resolve": "string"\n'
+    '      "data_needed_to_resolve": "string",\n'
+    '      "resolution_criterion": {"metric": "...", "condition": "gt|gte|lt|lte", "threshold": 0,'
+    ' "resolution_days": 14, "sides": {"coach_a": true, "coach_b": false}}\n'
     "    }\n"
     "  ],\n"
     '  "unanimous_flags": ["..."]\n'
     "}\n\n"
+    "## Dispute Docket criteria (#1386)\n\n"
+    "If — and ONLY if — a disagreement can be settled by one of the platform's measurable "
+    "metrics, attach a `resolution_criterion`: the metric key, a numeric threshold, a "
+    "condition (gt/gte/lt/lte), `resolution_days` (3–90 days out), and `sides` mapping each "
+    "of the two disputing coach ids to true (claims the condition WILL hold on the "
+    "resolution date) or false (claims it will not). The two coaches MUST take opposite "
+    "sides. Valid metric keys: {metric_keys} — each also gradable as a _7day_avg, "
+    "_14day_avg, or _30day_avg aggregate. If no listed metric can grade the disagreement, "
+    "set `resolution_criterion` to null: the disagreement stays narrative. Deterministic "
+    "code validates and resolves every criterion — an invalid one is simply ignored, and "
+    "no AI ever grades the outcome.\n\n"
     "No markdown wrapping, no explanation, no preamble. ONLY the JSON object."
 )
+
+
+def _ensemble_system_prompt():
+    """The system prompt with the CURRENT measurable-metric vocabulary baked in —
+    derived from measurable_metrics.METRIC_SOURCES (the evaluator's own source map,
+    #1386) so the docket criteria the LLM may propose and the criteria code can
+    grade cannot diverge."""
+    try:
+        from measurable_metrics import METRIC_SOURCES
+
+        keys = ", ".join(sorted(METRIC_SOURCES))
+    except Exception:
+        keys = "(unavailable — propose no resolution_criterion this cycle)"
+    return ENSEMBLE_SYSTEM_PROMPT.replace("{metric_keys}", keys)
 
 
 def _build_user_message(coach_data, cycle_date, expected_coach_ids=None):
@@ -539,6 +566,11 @@ def _write_disagreements(disagreements, cycle_date):
                 "last_cycle_date": cycle_date,
             }
 
+        # #1386: carry the PROPOSED docket criterion through — dispute_docket's
+        # deterministic gate (not this writer) decides whether it opens a docket.
+        if isinstance(disagreement.get("resolution_criterion"), dict):
+            item["resolution_criterion"] = disagreement["resolution_criterion"]
+
         if _put_item(item):
             written += 1
 
@@ -678,7 +710,7 @@ def lambda_handler(event, context):
         if not _budget_allow("ensemble"):
             raise RuntimeError("ensemble digest AI paused by budget tier — using fallback")
         result = _call_haiku(
-            system=ENSEMBLE_SYSTEM_PROMPT,
+            system=_ensemble_system_prompt(),
             user_message=user_message,
             # 2026-05-28: was 2000 — occasionally truncated the digest JSON
             # (7 parse-fails/48h) → fell back. Same bug class as the orchestrator.
@@ -716,6 +748,21 @@ def lambda_handler(event, context):
     disagreements = digest.get("active_disagreements", [])
     if disagreements:
         _write_disagreements(disagreements, cycle_date)
+
+        # Step 4b (#1386): open Dispute Docket entries for machine-checkable
+        # divergences. dispute_docket.validate_criterion is the deterministic
+        # gate; non-resolvable disagreements stay narrative. Fail-soft — a
+        # docket error must never sink the digest.
+        try:
+            import dispute_docket
+
+            docket_stats = dispute_docket.open_from_disagreements(disagreements, cycle_date)
+            digest["docket"] = {
+                "opened": len(docket_stats.get("opened", [])),
+                "skipped": len(docket_stats.get("skipped", [])),
+            }
+        except Exception as e:
+            logger.warning("dispute-docket open pass failed (non-fatal): %s", e)
 
     # Step 5: Update each coach's compressed state with digest contribution
     _update_coach_compressed_states(digest, coach_data, cycle_date)

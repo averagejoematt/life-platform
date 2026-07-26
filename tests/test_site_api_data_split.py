@@ -63,6 +63,7 @@ EXPECTED_ROUTE_MAP = {
     "/api/character_stats": "handle_character_stats",
     "/api/circadian": "handle_circadian",
     "/api/coach_analysis": "handle_coach_analysis",
+    "/api/coach_docket": "handle_coach_docket",  # #1386 — the Dispute Docket (open positions + resolved history)
     "/api/coach_team": "handle_coach_team",
     "/api/coach_timeline": "handle_coach_timeline",
     "/api/coaches": "handle_coaches",

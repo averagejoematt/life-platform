@@ -1526,6 +1526,18 @@ def lambda_handler(event: dict, context) -> dict:
         except Exception as e:
             logger.error("Stance-event detection failed (non-fatal): %s", e)
 
+        # #1386: resolve due Dispute Docket entries in the same deterministic
+        # lane (ADR-105 — verdicts are code; the docket resolver reuses THIS
+        # module's metric resolution + Bayesian update). Fail-soft — a docket
+        # error must never sink prediction evaluation.
+        docket_stats = {}
+        try:
+            import dispute_docket
+
+            docket_stats = dispute_docket.resolve_due(today_str)
+        except Exception as e:
+            logger.error("Dispute-docket resolution failed (non-fatal): %s", e)
+
         # #727: scientific-liveness — emit decided/gradable counts + the
         # days-since-last-decided gauge EVERY run (the stall alarm needs a daily
         # datapoint). gradable_count is the evaluable predictions found this run.
@@ -1544,6 +1556,7 @@ def lambda_handler(event: dict, context) -> dict:
             "stats": stats,
             "commitment_stats": commitment_stats,
             "stance_refresh_stats": stance_refresh_stats,
+            "docket_stats": docket_stats,
             "liveness": liveness,
             "evaluations": evaluations,
         }

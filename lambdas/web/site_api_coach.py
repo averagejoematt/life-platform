@@ -10,6 +10,7 @@ with no args). Now they're proper functions taking event, callable from
 the dispatcher as `return handle_X(event)`.
 
 Endpoints:
+  /api/coach_docket     — the Dispute Docket (#1386): open positions with frozen stakes + resolved history
   /api/field_notes      — weekly Field Notes (optional ?week= param)
   /api/decisions        — logged decisions carrying a verbatim note (#1569, the widened Third Wall)
   /api/journal_quotes   — consent-per-line verbatim journal pull-quotes (#1568, ADR-142)
@@ -706,6 +707,75 @@ def handle_panel_ledger(event):
             "ledger": list(reversed(ledger)),  # newest first
             "record": record,
             "disclosure": "The coaches make falsifiable calls; we score them against real data, hits and misses alike.",
+        },
+        cache_seconds=300,
+    )
+
+
+def handle_coach_docket(event):
+    """GET /api/coach_docket — The Dispute Docket (#1386): standing coach
+    disagreements with skin in the game.
+
+    Open positions carry each side's claim verbatim, the machine-checkable
+    criterion + resolution date FROZEN at open, and each coach's domain Brier
+    as the stake. Resolved history lists wins, losses, and no-data voids in the
+    SAME shape and order — a lost dispute renders with the same dignity as a
+    won one (no burying; ADR-104). Verdicts are computed by code in the
+    prediction evaluator's daily lane — no LLM ever grades an outcome
+    (ADR-105). Shaped-empty 200 until the first docket opens."""
+    open_entries, resolved = [], []
+    try:
+        items = table.query(
+            KeyConditionExpression=Key("pk").eq("ENSEMBLE#docket"),
+            ScanIndexForward=False,  # RESOLVED# sorts after OPEN#, so resolved arrive first, newest first
+            Limit=80,
+        ).get("Items", [])
+        for it in items:
+            if not singleton_visible(it):  # ADR-058/#946: a wiped cycle's docket never serves pre-start
+                continue
+            it = _decimal_to_float(it)
+            sk = str(it.get("sk", ""))
+            entry = {
+                "topic": it.get("topic"),
+                "topic_slug": it.get("topic_slug"),
+                "coach_a": it.get("coach_a"),
+                "coach_b": it.get("coach_b"),
+                "claims": it.get("claims") or {},
+                "criterion": it.get("criterion") or {},
+                "sides": it.get("sides") or {},
+                "resolution_date": it.get("resolution_date"),
+                "opened_date": it.get("opened_date"),
+                "stakes": it.get("stakes") or {},
+            }
+            if sk.startswith("OPEN#"):
+                open_entries.append(entry)
+            elif sk.startswith("RESOLVED#"):
+                verdict = it.get("verdict") or {}
+                entry.update(
+                    {
+                        "verdict": verdict,
+                        "winner": it.get("winner") or verdict.get("winner"),
+                        "loser": it.get("loser") or verdict.get("loser"),
+                        "actual_value": it.get("actual_value", verdict.get("actual_value")),
+                        "resolved_date": it.get("resolved_date"),
+                        "concession": it.get("concession"),
+                    }
+                )
+                resolved.append(entry)
+    except Exception as _e:
+        logger.warning(f"[coach_docket] {_e}")
+    open_entries.sort(key=lambda e: (e.get("resolution_date") or "", e.get("topic_slug") or ""))
+    return _ok(
+        {
+            "open": open_entries,
+            "resolved": resolved,
+            "counts": {"open": len(open_entries), "resolved": len(resolved)},
+            "disclosure": (
+                "Standing disagreements between AI coaches, each with skin in the game: the stake is the "
+                "coach's own Brier record, frozen when the docket opened. The resolution criterion and date "
+                "are agreed at open and graded by deterministic code against real data — no AI writes the "
+                "verdict, and lost disputes stay on the record next to the wins."
+            ),
         },
         cache_seconds=300,
     )

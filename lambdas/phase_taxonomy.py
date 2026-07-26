@@ -331,6 +331,7 @@ _PK_RULES: list = [
     (lambda pk, sk: pk == "ENSEMBLE#digest", EXPERIMENT_SCOPED),
     (lambda pk, sk: pk == "ENSEMBLE#disagreements", EXPERIMENT_SCOPED),
     (lambda pk, sk: pk == "ENSEMBLE#dispute", EXPERIMENT_SCOPED),  # #540 inter-coach threads
+    (lambda pk, sk: pk == "ENSEMBLE#docket", EXPERIMENT_SCOPED),  # #1386 dispute docket (OPEN#/RESOLVED#)
     (lambda pk, sk: pk == "ENSEMBLE#influence_graph", SYSTEM_STATE),  # static config
     (lambda pk, sk: pk == "NARRATIVE#arc", EXPERIMENT_SCOPED),
     # #946: Elena's narrative running state (open THREADs, pending CALLBACKs,
