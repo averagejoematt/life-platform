@@ -193,6 +193,20 @@ def resolve_model_id(model_name: str | None) -> str:
     return _MODEL_MAP.get(model_name, _DEFAULT_PROFILE)
 
 
+def structured_output_config(schema: dict) -> dict:
+    """Build the Anthropic Structured Outputs `output_config` for a JSON `schema`
+    (#1385). Bedrock supports Structured Outputs GA via the same wire shape as the
+    direct API, so the value is passed straight through by invoke() (it forwards
+    every body key except "model"). Callers do:
+
+        body["output_config"] = structured_output_config(MY_SCHEMA)
+
+    to constrain the model's output to `schema` — schema-guaranteed shape instead of
+    parse-and-pray. No beta header; no chokepoint change beyond this builder.
+    """
+    return {"format": {"type": "json_schema", "schema": schema}}
+
+
 def invoke(body: dict, model_name: str | None = None) -> dict:
     """Invoke a Claude model on Bedrock.
 
@@ -200,7 +214,8 @@ def invoke(body: dict, model_name: str | None = None) -> dict:
         body: an Anthropic Messages dict — {messages, max_tokens, system?}.
               A top-level "model" key (Anthropic-style name) is honored for
               routing if model_name isn't passed, then stripped from the
-              Bedrock request body.
+              Bedrock request body. Any "output_config" (Structured Outputs,
+              #1385) or cache_control blocks pass straight through to Bedrock.
         model_name: explicit model name/profile override.
 
     Returns the parsed JSON response — identical shape to the direct

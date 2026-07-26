@@ -157,20 +157,31 @@ Write in clean paragraphs. No bullet points. No numbered lists. No headers withi
     return prompt
 
 
-def call_anthropic(system_prompt, user_message):
+def call_anthropic(system_prompt, user_message, archive_text=None):
     # Delegates to retry_utils for exponential backoff + CloudWatch metrics (P1.8/P1.9)
     import retry_utils
+
+    # #1385: the full multi-cycle archive rides as a 1-hour cached content block in
+    # the system (after the persona prompt, before the volatile weekly data packet in
+    # the user turn) — the run's several calls (first draft, regen-once, Margaret pass)
+    # reuse the one cache write at ~0.1x reads. retry_utils passes a pre-built block
+    # list straight through (its own cache_control is preserved).
+    system = system_prompt
+    if archive_text:
+        import whole_life_context
+
+        system = whole_life_context.with_cached_archive(system_prompt, archive_text)
 
     return retry_utils.call_anthropic_api(
         prompt=user_message,
         max_tokens=4096,
-        system=system_prompt,
+        system=system,
         temperature=0.6,
         timeout=90,
     )
 
 
-def installment_grounding_findings(elena_prompt, user_message, text):
+def installment_grounding_findings(elena_prompt, user_message, text, archive_text=None):
     """#537/ADR-104 chronicle gate core: every number in the installment must exist
     somewhere in what Elena was given (her prompt + the data packet / user message).
     This is the exact findings function the live regen-once loop applies; extracted
@@ -184,13 +195,20 @@ def installment_grounding_findings(elena_prompt, user_message, text):
     cites that was NOT in her prompt or data packet is a fabricated_date finding
     (the number gate is blind to it: '2026-07-08' tokenizes to benign 2026/7/8).
     The allow-list is built the same way as the number allow-list, from exactly what
-    she was given. Regen-once-then-fail-open, so a false positive costs one rewrite."""
+    she was given. Regen-once-then-fail-open, so a false positive costs one rewrite.
+
+    #1385: `archive_text` is the full multi-cycle archive Elena is now shown as a
+    cached block. It MUST join the allow-list source — a real dated callback ("he
+    tried this in attempt 3, on 2026-05-08") is grounded because that date/number is
+    in the archive she saw; a fabricated one is still caught because it appears
+    nowhere in prompt + data packet + archive. Widening the window without widening
+    the allow-list would false-flag every legitimate callback."""
     import grounded_generation as _gg
 
     findings = _gg.grounding_findings(
         text,
-        allowed=_gg.allowed_numbers(elena_prompt, user_message),
-        allowed_dates=_gg.allowed_dates(elena_prompt, user_message),
+        allowed=_gg.allowed_numbers(elena_prompt, user_message, archive_text),
+        allowed_dates=_gg.allowed_dates(elena_prompt, user_message, archive_text),
     )
     year, month = _covered_year_month(user_message)
     if year is not None:

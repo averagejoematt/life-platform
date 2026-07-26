@@ -282,12 +282,12 @@ def _build_elena_prompt_from_config():
     return _prompt._build_elena_prompt_from_config(_g=globals())
 
 
-def call_anthropic(system_prompt, user_message):
-    return _prompt.call_anthropic(system_prompt, user_message)
+def call_anthropic(system_prompt, user_message, archive_text=None):
+    return _prompt.call_anthropic(system_prompt, user_message, archive_text=archive_text)
 
 
-def installment_grounding_findings(elena_prompt, user_message, text):
-    return _prompt.installment_grounding_findings(elena_prompt, user_message, text)
+def installment_grounding_findings(elena_prompt, user_message, text, archive_text=None):
+    return _prompt.installment_grounding_findings(elena_prompt, user_message, text, archive_text=archive_text)
 
 
 def build_recap(data, new_installment_md=None, new_meta=None):
@@ -734,10 +734,31 @@ def lambda_handler(event: dict, context) -> dict:
         except Exception as e:
             logger.warning(f"IC-16 failed: {e}")
 
-    # Call Sonnet
-    logger.info("Calling Sonnet 4.5 for Elena's installment...")
+    # #1385: the ENTIRE multi-cycle installment archive, un-truncated, as a 1-hour
+    # cached content block — the whole-life context Elena reasons over for long-range
+    # callbacks. Fetched here (all cycles) rather than the inline 4-week/2000-char
+    # window; fail-soft to the already-loaded prev_installments, then to "" (no block).
+    # The SAME text feeds the grounding allow-list below so a real dated callback
+    # passes while a fabricated one is still caught (#1242 / ADR-104).
     try:
-        raw_installment = call_anthropic(elena_prompt, user_message)
+        import whole_life_context
+        from phase_filter import with_phase_filter as _wpf
+
+        _archive_items = whole_life_context.fetch_full_installment_archive(
+            table, f"USER#{USER_ID}#SOURCE#chronicle", d2f=d2f, phase_filter=_wpf
+        )
+        if not _archive_items:
+            _archive_items = data.get("prev_installments") or []
+        _archive_text = whole_life_context.format_full_archive(_archive_items)
+        logger.info(f"[#1385] whole-life archive: {len(_archive_items)} installment(s), {len(_archive_text)} chars (1h-cached block)")
+    except Exception as _arch_e:  # noqa: BLE001 — the archive is context, never load-bearing
+        logger.warning(f"[#1385] archive build skipped (non-fatal): {_arch_e}")
+        _archive_text = ""
+
+    # Call Sonnet
+    logger.info("Calling Sonnet for Elena's installment (whole-life-context, 1h-cached archive)...")
+    try:
+        raw_installment = call_anthropic(elena_prompt, user_message, archive_text=_archive_text)
     except Exception as e:
         logger.error(f"Anthropic failed: {e}")
         return {"statusCode": 500, "body": f"AI generation failed: {e}"}
@@ -754,10 +775,12 @@ def lambda_handler(event: dict, context) -> dict:
     try:
         import grounded_generation as _gg
 
-        _allowed = _gg.allowed_numbers(elena_prompt, user_message)
+        # #1385: fold the whole-life archive into the allow-list source — Elena was
+        # shown it, so its numbers/dates are grounded vocabulary, not fabrications.
+        _allowed = _gg.allowed_numbers(elena_prompt, user_message, _archive_text)
         _draft_before_gate = raw_installment  # #812/#744: keep the pre-gate draft for retention
-        _findings_fn = lambda t: installment_grounding_findings(elena_prompt, user_message, t)  # noqa: E731
-        _regen_fn = lambda corr: call_anthropic(elena_prompt, user_message + "\n\n" + corr)  # noqa: E731
+        _findings_fn = lambda t: installment_grounding_findings(elena_prompt, user_message, t, archive_text=_archive_text)  # noqa: E731
+        _regen_fn = lambda corr: call_anthropic(elena_prompt, user_message + "\n\n" + corr, archive_text=_archive_text)  # noqa: E731
         raw_installment, _residual, _corrected = _gg.regen_once(raw_installment, _findings_fn, _regen_fn)
         if _corrected:
             logger.info(f"[ADR-104] chronicle corrected once; residual findings: {len(_residual)}")
@@ -801,7 +824,7 @@ def lambda_handler(event: dict, context) -> dict:
             raw_installment, _ack_finding = _epa(
                 raw_installment,
                 _presence_sig,
-                regenerate_fn=lambda note: call_anthropic(elena_prompt, user_message + "\n\n" + note),
+                regenerate_fn=lambda note: call_anthropic(elena_prompt, user_message + "\n\n" + note, archive_text=_archive_text),
             )
             if _ack_finding:
                 logger.warning(f"[#914] chronicle presence-ack gate fired: {_ack_finding.get('detail')}")
@@ -824,6 +847,22 @@ def lambda_handler(event: dict, context) -> dict:
 
     # Parse the installment
     title, stats_line, body_md = parse_installment(raw_installment)
+
+    # #1385 (AC4): validate the parsed installment envelope against the guaranteed
+    # schema — a $0, no-AI rigor gate that turns the fragile stat-line parse into a
+    # caught error instead of a silently mis-rendered stat line. Non-blocking (the
+    # week is human-reviewed in PREVIEW_MODE + privacy-gated downstream); the
+    # chokepoint (bedrock_client.structured_output_config) is ready to make the shape
+    # model-guaranteed once deploy-time prose parity is confirmed (see PR POST-MERGE).
+    try:
+        import chronicle_schema
+
+        _envelope = chronicle_schema.installment_from_stats(title, chronicle_schema.parse_stats_line(stats_line), body_md)
+        _schema_errs = chronicle_schema.validate_installment(_envelope)
+        if _schema_errs:
+            logger.warning(f"[#1385] installment envelope failed schema validation (non-blocking): {_schema_errs}")
+    except Exception as _sc_e:  # noqa: BLE001 — validation is a safety net, never load-bearing
+        logger.warning(f"[#1385] installment schema validation error (non-fatal): {_sc_e}")
 
     # BS-05: Compute confidence badge based on total journey data depth.
     # Henning: LOW (<14d data), MEDIUM (14-49d), HIGH (≥50d + sig + effect).
