@@ -1769,6 +1769,16 @@
         }
       ],
       "why_it_mattered": "The coaching layer stopped being a one-way broadcast this session: coaches now update their own beliefs from conversation, stake their credibility on disagreements, expose their actual memory for inspection, and reach out first when a decision moment arrives. Every one of those mechanisms is deterministic where it counts — verdicts are code, stakes are published, and the privacy boundaries are structural, not promises."
+    },
+    {
+      "id": "2026-07-26-cycle-11-reset-rolling-prologue",
+      "date": "2026-07-26",
+      "title": "Reset eve: cycle 11 anchors to Monday, and the origin story learns to travel with it",
+      "shipped": "The platform re-anchored to genesis 2026-07-27 in one command — 87 partition families classified, 332 intelligence records archived, three verification gates (93/93 pages, 7/7 semantic checks, an honest loud-skip on the AI truth pass at budget tier 1) — and the site flipped to its Day-1 countdown. New this cycle: the prologue arc now ROLLS with the experiment. 'The Night Before Everything', written on the original launch eve, joined the pre-launch calendar at genesis-minus-one after a date-agnostic vet pass, so every future restart re-stages the genuine origin story as a countdown instead of a blank slate. The full genesis-eve ritual ran too: 16 board predictions frozen and SHA-256-sealed before any Day-1 data exists, the predict-the-week widget armed against the frozen targets, and the one 'predictions lock tonight' email sent. Also closed: the CI-minutes alarm that could never fire — GitHub had retired the billing endpoint it watched — rebuilt on the new usage API with an honest visibility-aware threshold.",
+      "gotcha": "Rolling two articles onto the same eve date exposed a silent collision: the journal's page keys were indexed by date alone, so the freshly published pre-registration chapter overwrote the eve article's page in place — live, for about 40 minutes. Page keys now carry the record's original identity, and a regression test holds the tie legal.",
+      "honest_miss": "The reset's baseline weight is an override from four days ago — genesis is tomorrow and no Day-1 weigh-in exists yet, so every surface says so honestly. And the billing-alarm fix red-lined the CI unit gate on its way in (a module grew past the 1200-line ceiling), which cost an extraction commit before main went green.",
+      "prs": [],
+      "why_it_mattered": "A restart is this project's most dangerous moment — it's where past attempts quietly lost their history, their honesty, or both. This one is the first where the origin story survives by design (re-staged, not rewritten), where the board's opening claims are cryptographically frozen before the first data point can flatter them, and where the machinery that grades the coaches was hardened against inheriting its own pre-reset beliefs. Cycle 11 starts with nothing to hide behind."
     }
   ]
 }
