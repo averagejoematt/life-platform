@@ -350,6 +350,13 @@ COVERAGE = {
         "Operator email on a weekly rhythm; a missing Sunday issue is noticed by its reader (Matthew).",
     ),
     "monthly-digest": (EXEMPT, "2026-07-19", "Operator email on a monthly rhythm; a missing first-Monday issue is noticed by its reader."),
+    "milestone-digest": (
+        EXEMPT,
+        "2026-07-26",
+        "#1623: sends are rare by design (>=10-14 day ledger cooldown) and most daily runs are honest no-ops (quiet/disarmed), "
+        "so an absence alarm cannot distinguish 'dead cron' from 'nothing to celebrate'. Error-mode is covered by the digest "
+        "error alarm + DLQ. Revisit when the recipient secret is provisioned and the first real send lands.",
+    ),
     "nutrition-review": (EXEMPT, "2026-07-19", "Operator email (Saturday nutrition review); a missing issue is noticed by its reader."),
     "monday-compass": (EXEMPT, "2026-07-19", "Operator email (Monday week-plan); a missing issue is noticed by its reader same-morning."),
     "ai-review-pack": (

@@ -134,6 +134,16 @@ def _celebration_allowed() -> bool:
 
 
 def lambda_handler(event: dict, context) -> dict:  # noqa: ARG001
+    try:
+        return _run()
+    except Exception:
+        # I4: fail loudly into the DLQ/digest-alarm path — a swallowed error here
+        # would silently kill the platform's best downturn-signal channel.
+        logger.exception("[milestone-digest] run failed")
+        raise
+
+
+def _run() -> dict:
     today = pacific_today()
     stamp = experiment_stamp()
 
