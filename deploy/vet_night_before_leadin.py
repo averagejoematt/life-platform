@@ -91,26 +91,66 @@ VET_EDITS: list[tuple[str, str]] = [
     ),
 ]
 
+# Round 2 (2026-07-26, #1811 + #1812 — the deep-quality sweep's live findings):
+# the round-1 vet caught the weight figure but not the NUTRITION figures (the
+# piece stated 1,800 kcal / 190 g against the registered 1,500/170 — #1811),
+# and its "eve of genesis" re-framing re-ATTRIBUTED measured facts (the 2/100
+# night, measured 2026-07-21) to whatever date the calendar assigns (#1812).
+# Round 2: figures generalized to the pre-registration (durable across cycles),
+# and every measured claim date-framed to the night it was actually measured.
+VET_EDITS_ROUND2: list[tuple[str, str]] = [
+    (
+        "The habit tracker logged a 2 out of 100 on the eve of genesis.",
+        "The habit tracker logged a 2 out of 100 on the eve of an earlier launch — the night this piece was written; its numbers are kept verbatim.",
+    ),
+    (
+        "Two points, on a scale that runs to a hundred, on the last day before the experiment Matthew has spent months building finally begins.",
+        "Two points, on a scale that runs to a hundred, on the last night before an experiment Matthew had spent months building finally began.",
+    ),
+    (
+        "It's part of what makes the eve-of-genesis number so interesting:",
+        "It's part of what makes that night's number so interesting:",
+    ),
+    (
+        "The day before genesis — the 2 out of 100 — that's not a bad day.",
+        "That night — the 2 out of 100 — that's not a bad day.",
+    ),
+    (
+        "The target he's set for himself is 1,800 calories a day, 190 grams of protein. For context: 190 grams of protein is a serious number.",
+        "The targets he's set for himself are locked in the public pre-registration: a hard daily calorie ceiling, and a protein floor that is — for context — a serious number.",
+    ),
+]
+
 FORBIDDEN_AFTER = ["Tuesday", "Wednesday", "321.38", "for the first time"]
+# "months before genesis" is legitimately date-agnostic (true relative to any
+# genesis) — only the measured-claim forms are forbidden.
+FORBIDDEN_AFTER_ROUND2 = FORBIDDEN_AFTER + ["1,800", "190 grams", "eve of genesis", "eve-of-genesis", "day before genesis"]
+
+# (name, edits, forbidden-after) — applied in order; a round already present in
+# the record is skipped (idempotent), a partial match aborts.
+ROUNDS: list[tuple[str, list[tuple[str, str]], list[str]]] = [
+    ("round1-date-agnostic", VET_EDITS, FORBIDDEN_AFTER),
+    ("round2-1811-1812-figures-and-provenance", VET_EDITS_ROUND2, FORBIDDEN_AFTER_ROUND2),
+]
 
 
-def apply_edits(text: str, field: str) -> str:
-    """Apply VET_EDITS to one content field, exactly-once per edit, or abort."""
-    for old, new in VET_EDITS:
+def apply_round(text: str, field: str, edits: list[tuple[str, str]], forbidden: list[str]) -> str:
+    """Apply one round's edits to one content field, exactly-once per edit, or abort."""
+    for old, new in edits:
         n = text.count(old)
         if n != 1:
             print(f"  ABORT: edit matched {n}x (expected 1) in {field}: {old[:60]!r}…")
             sys.exit(1)
         text = text.replace(old, new)
-    for tok in FORBIDDEN_AFTER:
+    for tok in forbidden:
         if tok in text:
             print(f"  ABORT: forbidden token {tok!r} still present in {field} after edits")
             sys.exit(1)
     return text
 
 
-def already_vetted(text: str) -> bool:
-    return all(old not in text for old, _ in VET_EDITS) and all(new in text for _, new in VET_EDITS)
+def round_applied(text: str, edits: list[tuple[str, str]]) -> bool:
+    return all(old not in text for old, _ in edits) and all(new in text for _, new in edits)
 
 
 def main() -> None:
@@ -127,13 +167,19 @@ def main() -> None:
         sys.exit(1)
 
     md, html = item.get("content_markdown", ""), item.get("content_html", "")
-    if already_vetted(md) and already_vetted(html):
-        print(f"{SK}: already vetted — nothing to do.")
+    new_md, new_html = md, html
+    applied_rounds = []
+    for name, edits, forbidden in ROUNDS:
+        if round_applied(new_md, edits) and round_applied(new_html, edits):
+            print(f"{SK}: {name} already applied — skipping.")
+            continue
+        new_md = apply_round(new_md, "content_markdown", edits, forbidden)
+        new_html = apply_round(new_html, "content_html", edits, forbidden)
+        applied_rounds.append(name)
+        print(f"{SK}: {name} — {len(edits)} edits verified exactly-once in both fields.")
+    if not applied_rounds:
+        print(f"{SK}: already vetted (all rounds) — nothing to do.")
         return
-
-    new_md = apply_edits(md, "content_markdown")
-    new_html = apply_edits(html, "content_html")
-    print(f"{SK}: {len(VET_EDITS)} edits verified exactly-once in both fields.")
     print(f"  md {len(md)} → {len(new_md)} chars; html {len(html)} → {len(new_html)} chars")
 
     if not args.apply:
