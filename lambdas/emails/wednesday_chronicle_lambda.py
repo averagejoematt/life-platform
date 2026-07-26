@@ -750,7 +750,13 @@ def lambda_handler(event: dict, context) -> dict:
         if not _archive_items:
             _archive_items = data.get("prev_installments") or []
         _archive_text = whole_life_context.format_full_archive(_archive_items)
-        logger.info(f"[#1385] whole-life archive: {len(_archive_items)} installment(s), {len(_archive_text)} chars (1h-cached block)")
+        # #1829: log the REAL scope (count + cycles present), not a bare count — a run
+        # whose archive collapsed to the current cycle must be visible here.
+        _scope = whole_life_context.archive_scope(_archive_items)
+        logger.info(
+            f"[#1385] whole-life archive (phase-filtered, ADR-058 default-deny): {_scope['count']} installment(s), "
+            f"cycles={_scope['cycles']}, unlabeled={_scope['unlabeled']}, {len(_archive_text)} chars (1h-cached block)"
+        )
     except Exception as _arch_e:  # noqa: BLE001 — the archive is context, never load-bearing
         logger.warning(f"[#1385] archive build skipped (non-fatal): {_arch_e}")
         _archive_text = ""

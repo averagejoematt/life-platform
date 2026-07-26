@@ -24,7 +24,16 @@ The vector is a base64-packed float32 STRING attribute (`emb`) — compact (256-
 ≈ 1.4 KB vs 256 Decimals), exact enough for retrieval, and it sidesteps the
 float→Decimal rule entirely. Classified CROSS_PHASE in phase_taxonomy so the
 cross-reset memory index survives resets; each item carries its own `cycle` stamp
-so every precedent is labeled with its source cycle (AC5).
+so every precedent is labeled with its source cycle (AC5). That stamp is FROZEN at
+backfill time while the artifact it points at is re-stamped by every reset (ADR-077
+carry-forward), so the label is RE-DERIVED from the artifact record at retrieval
+(`reconcile_precedent`, #1828) — the artifact's current stamp is authoritative, and an
+unstamped record yields no cycle claim at all rather than a guess.
+
+Links (#1827): a precedent's `link` must be an openable page or absent. The original
+backfill emitted `/chronicle/week-N/`, which 404s; `safe_link` drops that form on read
+and `deploy/backfill_recall_embeddings.py` now derives the published
+`/journal/posts/week-NN/` URL (and emits none for an installment that isn't published).
 
 Pure where it can be (encode/decode/cosine/rank/render/findings — unit-testable
 with no AWS); the two AWS touchpoints (load_corpus, resolve_precedent) take an
@@ -54,6 +63,15 @@ KIND_CHRONICLE = "chronicle"
 KIND_COACH = "coach_output"
 KIND_JOURNAL = "journal"
 KINDS = (KIND_CHRONICLE, KIND_COACH, KIND_JOURNAL)
+
+# #1827: the link form the original backfill emitted for chronicle precedents.
+# `/chronicle/week-N/` is NOT a page on averagejoematt.com (installments publish at
+# `/journal/posts/week-NN/` — `chronicle_render.journal_post_ref`) and no redirect
+# covers it, so all 17 live rows carried a 404 into the coach prompt as the ONLY
+# citable reference. `deploy/backfill_recall_embeddings.py` now emits the published
+# form; this pattern is the READ-SIDE guard so a legacy row (or any future writer
+# that guesses the slug) can never inject a dead link again.
+_DEAD_LINK_RES = (re.compile(r"^/chronicle/week-\d+/?$"),)
 
 
 # ── vector codec: base64-packed little-endian float32 ───────────────────────
@@ -94,6 +112,21 @@ def cosine(a, b) -> float:
     if na <= 0.0 or nb <= 0.0:
         return 0.0
     return dot / (math.sqrt(na) * math.sqrt(nb))
+
+
+def safe_link(link) -> str:
+    """#1827: a precedent link is either openable or ABSENT — never a known-dead URL.
+
+    ADR-104's contract for this module is "a pointer to a dated, openable artifact".
+    A `/chronicle/week-N/` link is a 404 (and non-unique across cycles — `week-0`
+    appeared 6 times live), so it is dropped rather than rendered: the precedent line
+    then cites the DATE alone, which is true, instead of a link that lies. Anything
+    else passes through untouched.
+    """
+    link = str(link or "").strip()
+    if not link:
+        return ""
+    return "" if any(rx.match(link) for rx in _DEAD_LINK_RES) else link
 
 
 def sha_text(text: str) -> str:
@@ -187,7 +220,10 @@ def load_corpus(table) -> list:
                 "kind": it.get("kind", ""),
                 "doc_date": it.get("doc_date", ""),
                 "cycle": int(cyc) if cyc is not None else None,
-                "link": it.get("link", ""),
+                # #1827: a known-dead link never enters the corpus, so no downstream
+                # consumer (rank → render → card → the coach's citation allow-list)
+                # can surface it, whether or not the backfill has been re-run.
+                "link": safe_link(it.get("link", "")),
                 "snippet": it.get("snippet", ""),
                 "artifact_pk": it.get("artifact_pk", ""),
                 "artifact_sk": it.get("artifact_sk", ""),
@@ -202,15 +238,53 @@ def resolve_precedent(table, precedent: dict) -> bool:
     points at (artifact_pk/artifact_sk) still exists in the table. A precedent whose
     underlying artifact is gone must NOT be cited — the caller drops it and/or the
     grounded gate blocks any output that cites it. Fail-closed: any error ⇒ False."""
+    return resolve_artifact(table, precedent) is not None
+
+
+def resolve_artifact(table, precedent: dict):
+    """The record a precedent points at, or None. Same fail-closed contract as
+    `resolve_precedent` — split out so the resolution read can ALSO be the join that
+    re-derives the precedent's cycle label (#1828) instead of costing a second read."""
     apk = (precedent or {}).get("artifact_pk")
     ask = (precedent or {}).get("artifact_sk")
     if not apk or not ask:
-        return False
+        return None
     try:
-        resp = table.get_item(Key={"pk": apk, "sk": ask})
-        return bool(resp.get("Item"))
+        return (table.get_item(Key={"pk": apk, "sk": ask}) or {}).get("Item") or None
     except Exception:  # noqa: BLE001 — resolution failure is treated as "does not resolve"
-        return False
+        return None
+
+
+def reconcile_precedent(table, precedent: dict):
+    """#1828: resolve a precedent AND reconcile its label against the authoritative
+    record. Returns a corrected copy, or None when it does not resolve.
+
+    The embedding row's `cycle` is frozen at backfill time, but the artifact it points
+    at is RE-STAMPED by every experiment reset (ADR-077 carry-forward), and nothing
+    re-stamps `recall_embeddings` (correctly CROSS_PHASE, so the tagger skips it, and
+    the backfill's `text_sha` idempotency perpetuates the stale value). The two labels
+    therefore drift — live at filing, a cycle-11 chronicle record was cited as
+    "cycle 10", and another with no stamp on its embedding row rendered as the literal
+    "an earlier cycle" about a CURRENT-cycle installment.
+
+    ADR-077 makes the ARTIFACT's current stamp authoritative — including for a
+    carried-forward installment, which genuinely belongs to the cycle it was carried
+    into — so the label is re-derived here, at render time, from the record itself. A
+    record with no `cycle` attribute yields cycle=None, and the renderer then makes NO
+    cycle claim at all rather than asserting "an earlier cycle" (ADR-104: absence stays
+    absent). This costs no extra read — it is the resolution read the caller already does.
+    """
+    item = resolve_artifact(table, precedent)
+    if item is None:
+        return None
+    out = dict(precedent or {})
+    cyc = item.get("cycle")
+    try:
+        out["cycle"] = int(cyc) if cyc is not None else None
+    except (TypeError, ValueError):
+        out["cycle"] = None
+    out["link"] = safe_link(out.get("link", ""))
+    return out
 
 
 # ── retrieval (pure, deterministic) ─────────────────────────────────────────
@@ -260,7 +334,11 @@ def rank_precedents(query_vector, corpus, *, top_k=DEFAULT_TOP_K, threshold=DEFA
 def retrieve(table, query_vector, *, top_k=DEFAULT_TOP_K, threshold=DEFAULT_THRESHOLD, exclude_dates=None, resolve=True) -> list:
     """Convenience: load_corpus + rank_precedents, then (AC2) drop any precedent
     that does not resolve to a real record. The precedents that survive are safe to
-    cite — every one points at a dated artifact the reader can open."""
+    cite — every one points at a dated artifact the reader can open.
+
+    The resolution pass is also the RECONCILIATION pass (#1828): each surviving
+    precedent's cycle label is re-derived from the authoritative artifact record, so a
+    reset's re-stamping can never leave the citation labeled with a stale cycle."""
     ranked = rank_precedents(
         query_vector,
         load_corpus(table),
@@ -270,24 +348,37 @@ def retrieve(table, query_vector, *, top_k=DEFAULT_TOP_K, threshold=DEFAULT_THRE
     )
     if not resolve:
         return ranked
-    return [p for p in ranked if resolve_precedent(table, p)]
+    reconciled = [reconcile_precedent(table, p) for p in ranked]
+    return [p for p in reconciled if p is not None]
 
 
 # ── copy (ADR-105: hypothesis, never cause) ─────────────────────────────────
 def _cycle_label(cycle) -> str:
-    return f"cycle {int(cycle)}" if cycle is not None else "an earlier cycle"
+    """ "cycle N" for a known stamp, "" when the source cycle is unknown (#1828).
+
+    The old fallback asserted "an earlier cycle" for an unstamped row — which read as a
+    positive claim about WHEN, and was demonstrably wrong live (a CURRENT-cycle
+    installment described as earlier). ADR-104: an unknown cycle makes no cycle claim.
+    """
+    try:
+        return f"cycle {int(cycle)}" if cycle is not None else ""
+    except (TypeError, ValueError):
+        return ""
 
 
 def render_precedent_line(precedent: dict) -> str:
-    """One grounded citation line — dated, cycle-labeled, similarity-bearing, with a
-    link. 'echoes'/'resembles', never causal. This is what a coach may cite."""
+    """One grounded citation line — dated, cycle-labeled (when the cycle is known),
+    similarity-bearing, with a link (when there is an openable one). 'echoes'/
+    'resembles', never causal. This is what a coach may cite."""
     p = precedent or {}
     date = p.get("date", "")
     sim = p.get("similarity")
-    link = p.get("link", "")
+    link = safe_link(p.get("link", ""))
     sim_txt = f"{sim:.2f}" if isinstance(sim, (int, float)) else "?"
     tail = f" — {link}" if link else ""
-    return f"This period echoes the week of {date} ({_cycle_label(p.get('cycle'))}, similarity {sim_txt}){tail}"
+    cyc = _cycle_label(p.get("cycle"))
+    paren = f"{cyc}, similarity {sim_txt}" if cyc else f"similarity {sim_txt}"
+    return f"This period echoes the week of {date} ({paren}){tail}"
 
 
 def recall_block(precedents: list) -> str:
@@ -307,9 +398,10 @@ def recall_block(precedents: list) -> str:
     lines.append(
         "RULES: similarity is a HYPOTHESIS, not a cause — say the current period "
         '"resembles" or "echoes" one above; NEVER assert it was CAUSED by it or that '
-        'the same thing "will" happen. Cite ONLY a date + link shown above; if none '
-        "is shown, do not invent a precedent. Always show the similarity score with "
-        "the date."
+        'the same thing "will" happen. Cite ONLY a date shown above (with its link '
+        "when one is shown — a precedent with no link has no reader-facing page, so "
+        "cite the date alone and NEVER invent a URL for it). If no precedent is "
+        "shown, do not invent one. Always show the similarity score with the date."
     )
     return "\n".join(lines)
 
@@ -333,12 +425,12 @@ def recall_card(precedents: list, *, threshold=DEFAULT_THRESHOLD) -> dict | None
         "similarity": sim,
         "cycle": top.get("cycle"),
         "source": top.get("source", top.get("kind", "")),
-        "link": top.get("link", ""),
+        "link": safe_link(top.get("link", "")),  # #1827 — an openable link or none
         "snippet": top.get("snippet", ""),
         "phrase": f"This week resembles the week of {top.get('date', '')}, similarity {sim:.2f}",
         "provenance": (
             f"cosine similarity {sim:.2f} vs the {top.get('kind', 'archive')} of "
-            f"{top.get('date', '')} ({_cycle_label(top.get('cycle'))})"
+            f"{top.get('date', '')}" + (f" ({_cycle_label(top.get('cycle'))})" if _cycle_label(top.get("cycle")) else "")
         ),
     }
 

@@ -71,18 +71,45 @@ def _snippet(text: str, n: int = 240) -> str:
     return text[:n]
 
 
+def published_post_links(installments) -> dict:
+    """{(date, sk): "/journal/posts/week-NN/"} for the installments that are ACTUALLY
+    PUBLISHED — #1827.
+
+    The original backfill emitted `/chronicle/week-{week_number}/`, which is not a page
+    on the live site (all 17 live rows 404'd, and the form was non-unique across cycles:
+    `week-0` appeared 6 times). Installments publish at `/journal/posts/week-{seq:02d}/`
+    where `seq` is the position in the (date, sk)-sorted list of VISIBLE installments —
+    exactly `chronicle_render.publish_to_journal::_seq_for` / `journal_post_ref`, which
+    `tests/test_recall_precedent_links_1827.py` pins this against.
+
+    Visibility matters: only phase-visible installments are published, so a wiped
+    prior-cycle installment gets NO url here. It stays in the recall corpus (cross-cycle
+    memory is the point) but is cited by DATE alone — an honest absence beats a link to
+    some other week's page.
+    """
+    from phase_filter import singleton_visible
+
+    keys = sorted((i.get("date", ""), str(i.get("sk", ""))) for i in installments if singleton_visible(i) and i.get("date"))
+    return {key: f"/journal/posts/week-{n + 1:02d}/" for n, key in enumerate(keys)}
+
+
 def gather_chronicle(table):
-    """Chronicle installments — pk SOURCE#chronicle, sk DATE#<date>. One doc/week."""
+    """Chronicle installments — pk SOURCE#chronicle, sk DATE#<date>. One doc/week.
+
+    Queried UNFILTERED (cross-reset recall is the point), but the reader link is derived
+    from the PUBLISHED ordering (#1827) so every link that renders is a real page.
+    """
     docs = []
     resp = table.query(KeyConditionExpression=Key("pk").eq(f"{USER_PK_PREFIX}chronicle") & Key("sk").begins_with("DATE#"))
-    for it in resp.get("Items", []):
+    items = list(resp.get("Items", []))
+    links = published_post_links(items)
+    for it in items:
         date = _date_from_sk(it.get("sk", ""))
         if not date:
             continue
         text = " ".join(s for s in (it.get("title", ""), it.get("subtitle", ""), it.get("content_markdown", "")) if s).strip()
         if not text:
             continue
-        wk = it.get("week_number")
         docs.append(
             {
                 "kind": sr.KIND_CHRONICLE,
@@ -90,7 +117,10 @@ def gather_chronicle(table):
                 "text": text,
                 "artifact_pk": it["pk"],
                 "artifact_sk": it["sk"],
-                "link": f"/chronicle/week-{int(wk)}/" if wk is not None else "/story/chronicle/",
+                # Published → its real post URL. Not published (wiped prior cycle) → no
+                # link at all; `semantic_recall.render_precedent_line` then cites the
+                # date alone rather than a URL that 404s or points at another week.
+                "link": links.get((it.get("date", ""), str(it.get("sk", ""))), ""),
                 "cycle": it.get("cycle"),
             }
         )
@@ -150,19 +180,69 @@ def gather_journal(table):
     return docs
 
 
-def existing_shas(table):
-    """{sk: text_sha} for the current recall partition — the idempotency ledger."""
+def existing_rows(table):
+    """{sk: {text_sha, link, cycle}} for the current recall partition.
+
+    `text_sha` is the embed-idempotency key; `link`/`cycle` ride along so a re-run can
+    REFRESH stale METADATA without paying to re-embed unchanged text (#1827/#1828 — the
+    17 live rows carry a dead link, and a row's frozen `cycle` drifts from the chronicle
+    record every time a reset re-stamps it).
+    """
     out = {}
     kwargs = {"KeyConditionExpression": Key("pk").eq(sr.RECALL_PK)}
     while True:
         resp = table.query(**kwargs)
         for it in resp.get("Items", []):
-            out[it.get("sk", "")] = it.get("text_sha", "")
+            out[it.get("sk", "")] = {
+                "text_sha": it.get("text_sha", ""),
+                "link": it.get("link", "") or "",
+                "cycle": it.get("cycle"),
+            }
         lek = resp.get("LastEvaluatedKey")
         if not lek:
             break
         kwargs["ExclusiveStartKey"] = lek
     return out
+
+
+def metadata_drift(existing: dict, doc: dict) -> dict:
+    """{attr: new_value} for the metadata that no longer matches the source record —
+    `{}` when the stored row is already correct. Compares only what a re-run can fix
+    without re-embedding: the reader `link` and the source `cycle` stamp."""
+    drift = {}
+    new_link = doc.get("link", "") or ""
+    if (existing.get("link") or "") != new_link:
+        drift["link"] = new_link
+    old_cycle = existing.get("cycle")
+    new_cycle = doc.get("cycle")
+    old_i = int(old_cycle) if old_cycle is not None else None
+    new_i = int(new_cycle) if new_cycle is not None else None
+    if old_i != new_i:
+        drift["cycle"] = new_i
+    return drift
+
+
+def refresh_metadata(table, sk: str, drift: dict) -> None:
+    """Write ONLY the drifted metadata attributes — no embedding call, no spend. A
+    `cycle` that went away (source record lost its stamp) is REMOVED, not zeroed, so
+    `_cycle_label` makes no cycle claim rather than a false one."""
+    sets, removes, names, values = [], [], {}, {}
+    for i, (attr, val) in enumerate(sorted(drift.items())):
+        names[f"#a{i}"] = attr
+        if val is None:
+            removes.append(f"#a{i}")
+        else:
+            sets.append(f"#a{i} = :v{i}")
+            values[f":v{i}"] = val
+    expr = " ".join(filter(None, ["SET " + ", ".join(sets) if sets else "", "REMOVE " + ", ".join(removes) if removes else ""]))
+    kwargs = {
+        "Key": {"pk": sr.RECALL_PK, "sk": sk},
+        "UpdateExpression": expr,
+        "ExpressionAttributeNames": names,
+    }
+    if values:
+        kwargs["ExpressionAttributeValues"] = values
+    table.update_item(**kwargs)
 
 
 def main():
@@ -186,8 +266,8 @@ def main():
     if sr.KIND_JOURNAL in kinds:
         docs += gather_journal(table)
 
-    shas = existing_shas(table)
-    embedded = skipped = 0
+    rows = existing_rows(table)
+    embedded = skipped = relinked = 0
     est_tokens = 0
     est_usd = 0.0
     for doc in docs:
@@ -195,8 +275,20 @@ def main():
             break
         sk = sr.sk_for(doc["kind"], doc["date"])
         new_sha = sr.sha_text(doc["text"])
-        if not args.force and shas.get(sk) == new_sha:
-            skipped += 1
+        existing = rows.get(sk)
+        if not args.force and existing is not None and existing.get("text_sha") == new_sha:
+            # Text unchanged ⇒ no re-embed. But the METADATA can still be stale
+            # (#1827 dead links, #1828 drifted cycle stamps) — refresh it for free.
+            drift = metadata_drift(existing, doc)
+            if drift:
+                if args.apply:
+                    refresh_metadata(table, sk, drift)
+                    print(f"  metadata-refresh {sk}: {drift} (no re-embed, no spend)")
+                else:
+                    print(f"  [dry-run] would refresh metadata {sk}: {drift} (no re-embed, no spend)")
+                relinked += 1
+            else:
+                skipped += 1
             continue
         # est tokens ~ chars/4 (only for the rollup; real spend meters at the chokepoint)
         est_tokens += max(1, len(doc["text"]) // 4)
@@ -227,7 +319,8 @@ def main():
     est_usd = est_tokens * bc._PRICES["titan"]["in"] / 1_000_000.0
     mode = "APPLIED (single bulk run)" if args.apply else "DRY-RUN (no spend)"
     print(
-        f"\n{mode}: {embedded} embedded, {skipped} skipped (unchanged), {len(docs)} scanned. "
+        f"\n{mode}: {embedded} embedded, {relinked} metadata-refreshed (link/cycle, no spend), "
+        f"{skipped} skipped (unchanged), {len(docs)} scanned. "
         f"~{est_tokens} input tokens ≈ ${est_usd:.4f} (Titan v2 @ $0.02/1M). "
         f"Incremental re-runs are cheap; re-run after new chronicle/coach/journal writes."
     )
