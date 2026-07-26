@@ -552,25 +552,46 @@ def test_push_runs_drift_when_head_stalled(monkeypatch):
     assert "NOT QUEUING" in res["detail"]
 
 
-def test_push_runs_drift_on_the_sixmerge_historical_gap(monkeypatch):
-    # The exact 2026-07-19 incident shape: runs RESUMED on the newest merge, but six
-    # earlier consecutive merges never got any push-event run (their site/docs deploys
-    # silently never fired). Must alarm as a historical gap cluster.
+def test_push_runs_sixmerge_historical_gap_is_clean_not_drift(monkeypatch):
+    # #1782: this is the exact false-positive shape flagged 2026-07-26 — a single
+    # batch `git push` lands SIX intermediate commits plus its head in one go.
+    # GitHub gives exactly one push-event run, at the head (5cacecba); the six
+    # predecessors structurally never get their own run. Before the fix this
+    # historical-gap cluster (>= gap_cluster_threshold) alarmed as "drift" — a
+    # count-based threshold cannot distinguish "6 commits individually missed CI"
+    # from "6 commits are the non-head tail of one healthy batch push," and the
+    # latter is the overwhelmingly common shape for a solo multi-commit session.
     six = ["e1156b57", "48fad430", "0987479a", "65b88eb0", "9d1c5b42", "cec2a3c4"]
     commits = [_commit("5cacecba", _iso_minutes_ago(60))] + [_commit(s, _iso_minutes_ago(90 + 10 * i)) for i, s in enumerate(six)]
     commits += [_commit("85ac4ad7", _iso_minutes_ago(240))]
     runs = [_run("5cacecba", _iso_minutes_ago(59)), _run("85ac4ad7", _iso_minutes_ago(239))]
     _push_routes(monkeypatch, commits, runs)
     res = ds.check_github_push_runs()
-    assert res["status"] == "drift"
+    assert res["status"] == "clean"
     assert [g["sha"] for g in res["gap_commits"]] == six
-    assert "historical gap: 6" in res["detail"]
+    assert "6 uncovered historical commit" in res["note"]
+    assert res["stalled"] == []
+    assert "detail" not in res
+
+
+def test_push_runs_batch_push_of_eighteen_is_clean(monkeypatch):
+    # The literal reported shape (#1782): ONE solo-session push lands 18 commits;
+    # only the head gets a run. N commits, 1 run on HEAD = healthy, regardless of N.
+    eighteen = [f"c{i:02d}aaaaa" for i in range(18)]
+    commits = [_commit("head9999", _iso_minutes_ago(60))]
+    commits += [_commit(s, _iso_minutes_ago(65 + 5 * i)) for i, s in enumerate(eighteen)]
+    commits += [_commit("prevhead0", _iso_minutes_ago(500))]
+    runs = [_run("head9999", _iso_minutes_ago(59)), _run("prevhead0", _iso_minutes_ago(499))]
+    _push_routes(monkeypatch, commits, runs)
+    res = ds.check_github_push_runs()
+    assert res["status"] == "clean"
+    assert len(res["gap_commits"]) == 18
     assert res["stalled"] == []
 
 
 def test_push_runs_single_gap_is_reported_not_alarmed(monkeypatch):
     # ONE uncovered non-head commit could be the tail of a multi-commit push (only the
-    # push head gets runs) — reported honestly, below the cluster threshold, no drift.
+    # push head gets runs) — reported honestly, never drift (#1782).
     commits = [_commit("head", _iso_minutes_ago(60)), _commit("mid", _iso_minutes_ago(70)), _commit("old", _iso_minutes_ago(200))]
     runs = [_run("head", _iso_minutes_ago(59)), _run("old", _iso_minutes_ago(199))]
     _push_routes(monkeypatch, commits, runs)

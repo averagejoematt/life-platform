@@ -764,12 +764,23 @@ def check_github_push_runs(max_file_lookups=15):
         window, NEWER than the newest run-covered commit, with no push-event run
         whose head_sha matches — the live "merges are landing, nothing queues"
         state (six merges sat in exactly this state for ~3h on 2026-07-19).
-      * HISTORICAL GAP (drift at ≥ gap_cluster_threshold): trigger-matching
-        commits older than the newest covered commit that never got a run even
-        though runs resumed — the class where a site/-touching merge silently
-        missed its site-deploy (the superseded-skip trap). A SINGLE gap is
-        reported but not drift: a non-head commit of a multi-commit push
-        legitimately has no run of its own (only the push head gets runs).
+      * HISTORICAL GAP (reported, NEVER alarmed — #1782): trigger-matching
+        commits older than the newest covered commit that never got a run of
+        their own. This is NOT evidence of a miss: a multi-commit `git push`
+        produces exactly ONE push event, whose run's head_sha is the push HEAD
+        — every OTHER commit in that same push structurally has zero runs, by
+        GitHub design, no matter how many commits the push carries. The
+        2026-07-26 sweep flagged 18 such commits from one solo-session batch
+        push as "drift" before this fix. A real single-commit push that
+        silently missed its own run is *indistinguishable* from a batch-push
+        tail using only /commits + /actions/runs data (both look identical:
+        "an uncovered commit sits just behind a covered one") — a count-based
+        cluster threshold on this signal alone cannot safely alarm without
+        false-positiving on every ordinary multi-commit push session, so it no
+        longer tries to. `gap_commits` stays populated for visibility. The one
+        alarm this check keeps is STALLED above — a push HEAD (the only commit
+        GitHub could ever have run CI for) with no run past the grace window is
+        unambiguous and stays load-bearing (#1544).
 
     Path-filter aware via PUSH_TRIGGER_GLOBS — commits touching only e.g.
     handovers/ trigger nothing and are never counted. Commits committed by a
@@ -789,7 +800,6 @@ def check_github_push_runs(max_file_lookups=15):
     grace_min = int(cfg.get("grace_minutes", 30))
     lookback_days = int(cfg.get("lookback_days", 7))
     max_commits = int(cfg.get("max_commits", 30))
-    cluster = int(cfg.get("gap_cluster_threshold", 2))
 
     repo = _github_repo()
     commits, err = _gh_api_result(f"repos/{repo}/commits?sha=main&per_page={max_commits}")
@@ -870,11 +880,13 @@ def check_github_push_runs(max_file_lookups=15):
             f"run-covered commit have zero workflow runs after the {grace_min}-min grace window (the #1544 class) — "
             "check githubstatus.com + the Actions spending limit, and deploy manually from main until resolved"
         )
-    if len(gaps) >= cluster:
-        detail_parts.append(
-            f"historical gap: {len(gaps)} trigger-matching merge(s) got zero push-event runs even though runs resumed — "
-            "their per-path deploys (site-deploy/docs-ci) never fired; verify the live surfaces are at HEAD"
-        )
+    # #1782: historical gaps are reported, never alarmed. A count-based cluster
+    # threshold here false-positived on ordinary multi-commit pushes (18 non-head
+    # commits from ONE batch push flagged "drift" on 2026-07-26) — GitHub gives
+    # exactly one run per push, at the push HEAD, so N-1 uncovered predecessors is
+    # the expected, healthy shape for a push of N commits, not evidence of anything
+    # missed. STALLED above (a push HEAD itself with no run) is the one signal this
+    # data can actually prove and remains the sole drift trigger.
     status = "drift" if detail_parts else "clean"
     result = {
         "status": status,
@@ -886,10 +898,10 @@ def check_github_push_runs(max_file_lookups=15):
     }
     if detail_parts:
         result["detail"] = "; ".join(detail_parts)
-    if gaps and len(gaps) < cluster:
+    if gaps:
         result["note"] = (
-            f"{len(gaps)} uncovered commit(s) below the cluster threshold ({cluster}) — could be non-head commits "
-            "of a multi-commit push (only the push head gets runs); reported, not alarmed"
+            f"{len(gaps)} uncovered historical commit(s) — non-head commits of a multi-commit push legitimately "
+            "have no run of their own (only the push HEAD gets one); reported for visibility, never alarmed (#1782)"
         )
     if notes:
         result["skipped"] = notes[:10]
