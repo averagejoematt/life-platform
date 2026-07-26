@@ -49,6 +49,10 @@ WRITE_VERBS = frozenset(
     {
         "activate",
         "annotate",
+        # audit_coach_dossier (#1387) — action=view is a read, but retract/correct
+        # write correction rows to the #1689 ledger; classified WRITE (fail-closed,
+        # same rationale as manage_*: the mutating arm decides the class).
+        "audit",
         "capture",
         "checkin",
         "close",

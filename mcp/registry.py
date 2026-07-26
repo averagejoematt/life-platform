@@ -18,7 +18,13 @@ from mcp.tools_coach_checkin import tool_get_coach_checkin_queue, tool_log_coach
 
 # #1690 (epic #1687 S3): correct a weekly-review-pack item by number from chat.
 from mcp.tools_coach_corrections import tool_log_coach_correction
-from mcp.tools_coach_intelligence import tool_evaluate_prediction, tool_get_coach_thread, tool_get_coach_track_record, tool_get_predictions
+from mcp.tools_coach_intelligence import (
+    tool_audit_coach_dossier,
+    tool_evaluate_prediction,
+    tool_get_coach_thread,
+    tool_get_coach_track_record,
+    tool_get_predictions,
+)
 from mcp.tools_correlation import tool_get_zone2_breakdown
 from mcp.tools_data import (
     tool_find_days,
@@ -264,6 +270,44 @@ TOOLS = {
                     },
                     "days": {"type": "number", "description": "Lookback window in days (default 30)"},
                     "subdomain": {"type": "string", "description": "Optional subdomain filter (e.g. 'sleep_quality', 'caloric_intake')"},
+                },
+                "required": ["coach_id"],
+            },
+        },
+    },
+    "audit_coach_dossier": {
+        "fn": tool_audit_coach_dossier,
+        "schema": {
+            "name": "audit_coach_dossier",
+            "description": (
+                "#1387: Matthew's PRIVATE audit + correction affordance over a coach's public dossier "
+                "('what this coach knows' on /coaching/by-coach/, rendered verbatim from COACH# memory). "
+                "action='view' (default) returns the FULL UNFILTERED memory — commitments, learnings "
+                "(including the ADR-141 conversation-channel rows the public dossier must never show, "
+                "flagged), quality trail, relationship state — plus any dossier corrections already logged. "
+                "action='retract' removes a record from the public dossier; action='correct' renders a dated "
+                "correction note under it. Both write a dated row to the #1689 corrections ledger "
+                "(item_ref.surface='coach_dossier') and NEVER edit the memory record in place — the memory "
+                "stays auditable, corrections are themselves on the record. Args: coach_id (required), "
+                "action (view|retract|correct), record_sk + note (required for retract/correct; get the "
+                "record_sk from action=view)."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "coach_id": {
+                        "type": "string",
+                        "description": "Coach name: sleep, nutrition, training, mind, physical, glucose, labs, explorer (accepts _coach suffix too)",
+                    },
+                    "action": {"type": "string", "enum": ["view", "retract", "correct"], "description": "Default: view"},
+                    "record_sk": {
+                        "type": "string",
+                        "description": "The exact sk of the memory record to retract/correct (e.g. 'COMMITMENT#commit_20260722_...'), from action=view",
+                    },
+                    "note": {
+                        "type": "string",
+                        "description": "Why it's retracted / what the correction is — logged verbatim to the corrections ledger",
+                    },
                 },
                 "required": ["coach_id"],
             },
