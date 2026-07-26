@@ -19,7 +19,7 @@ The canonical top-level layout. Read this before adding a new file so things lan
 | `config/` | DynamoDB schemas, `user_goals.json` (genesis/baseline source), feature configs. |
 | `site/` | v4 static site (Cockpit/Story/Evidence), deployed to S3 + CloudFront. |
 | `ci/` | CI support — `lambda_map.json` (source-file → function → stack mapping). |
-| `handovers/` | Session handover docs. `HANDOVER_LATEST.md` is current; prior ones are dated + archived. |
+| `handovers/` | The live session pointer only — `HANDOVER_LATEST.md` + `README.md`. Prior sessions live on the `session-archive` branch (#1650). |
 | `remediation/` | Self-healing agent (`agent.py`, `automerge.py`) — driven by `.github/workflows/remediation-agent.yml`. |
 | `assets/` | Repo-level static asset(s) (the platform icon). NB: site/OG images live under the S3 `generated/` prefix, not here. |
 | `ingest/` | Local macOS `launchd` drop-folder watchers for manual data uploads (operational tooling, runs on the operator's machine). |
@@ -47,7 +47,7 @@ Run `make clean` to reclaim local build/cache cruft (chiefly `cdk/cdk.out`, ~6 G
 - **One-shot data fix** → `patches/patch_<desc>.py` (keep it; it's the audit trail).
 - **One-shot data import** → `backfill/`.
 - **A decision worth recording** → an ADR in `docs/DECISIONS.md`.
-- **End-of-session handover** → rewrite `handovers/HANDOVER_LATEST.md` (archive the prior one as `HANDOVER_<date>_<Topic>.md`).
+- **End-of-session handover** → archive the prior one onto the `session-archive` branch (`python3 scripts/archive_handover.py --slug <slug>`), then overwrite `handovers/HANDOVER_LATEST.md` in place (#1650).
 - **Throwaway experiment / prototype** → `spikes/` (kept out of the deployed product) or `/tmp`.
 
 ## Conventions

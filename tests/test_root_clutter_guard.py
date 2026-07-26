@@ -47,7 +47,7 @@ ALLOWLIST = {
     "config": "Runtime config catalogs the lambdas load (schemas, user_goals.json genesis/baseline, feature configs).",
     # --- Sanctioned support (each carries a README.md explaining why it is kept) ---
     "ci": "CI support data — lambda_map.json (source-file -> function -> stack mapping) + related CI manifests.",
-    "handovers": "Session handover docs — HANDOVER_LATEST.md is the live driver; prior ones dated + archived.",
+    "handovers": "The LIVE session pointer only (HANDOVER_LATEST.md + README.md) — prior sessions moved to the session-archive branch (#1650).",
     "remediation": "Self-healing agent (agent.py/automerge.py) driven by .github/workflows/remediation-agent.yml.",
     "assets": "Repo-level static asset(s) — the platform icon (site/OG images live under the S3 generated/ prefix, not here).",
     "ingest": "Local macOS launchd drop-folder watchers for manual data uploads (operator-machine tooling).",

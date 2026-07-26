@@ -109,3 +109,10 @@ htmlcov/
 config/pii_denylist.local.json
 cdk/_bundle_staging/
 .worktrees/
+
+# #1650: session exhaust lives on the `session-archive` branch, not in the product
+# tree. Only the LIVE pointer (HANDOVER_LATEST.md) + the directory README are tracked
+# on main — a dated handover left on disk after a wrap can never be re-committed here.
+handovers/*
+!handovers/HANDOVER_LATEST.md
+!handovers/README.md

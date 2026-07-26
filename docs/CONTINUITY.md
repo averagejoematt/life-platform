@@ -1,7 +1,7 @@
 # CONTINUITY — if the AI is gone
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-13 (datadrops backup is a manual push, no FDA grant — §3c posture)
-> **Sources of truth:** handovers/, .claude/commands/, mcp memory tool code, this repo's git history
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-26 (handovers/ split to the `session-archive` branch, #1650; datadrops backup is a manual push, no FDA grant — §3c posture)
+> **Sources of truth:** handovers/HANDOVER_LATEST.md + the `session-archive` branch, .claude/commands/, mcp memory tool code, this repo's git history
 
 This page maps every piece of operational state that lives **outside `docs/`** — where
 it is, how a human reads it, and how to export it. The bar: with all AI tooling powered
@@ -9,29 +9,48 @@ down, an engineer holding only this repo (plus AWS access — see `docs/AWS_ACCE
 can reconstruct what the platform was doing, what the last session changed, and what
 the accumulated institutional memory says.
 
-There are six state surfaces. Three are in this repo (`handovers/`, the CLAUDE.md
+There are six state surfaces. Three are in this repo (the session log — `handovers/` on
+`main` plus the `session-archive` branch — the CLAUDE.md
 session block, `.claude/commands/`), one is in DynamoDB (platform memory), one is on
 Matthew's laptop only (Claude Code file memory — **one of the TWO laptop-only assets (see the launchd runtime below)**), and one
 is on GitHub (the Issues backlog).
 
 ---
 
-## 1. `handovers/` — the session log
+## 1. The session log — `handovers/` on `main` + the `session-archive` branch
 
 Every working session ends with a handover file. This is the platform's operational
 diary: what shipped, what was deployed, what broke, what is waiting on Matthew.
 
-- **`handovers/HANDOVER_LATEST.md`** — the live driver: the most recent session's full
-  narrative. Read this first; it is always the "where were we" document.
-- **`handovers/HANDOVER_<date>_<slug>.md`** — one file per prior session, dated.
-- **`handovers/archive/`** — older per-session files plus the pre-2026-07 diary,
-  archived from CLAUDE.md at `handovers/archive/CLAUDE_MD_SESSION_DIARY_2026-07-03.md`.
+Since **#1650** the log is split in two, so the product tree reads as engineering rather
+than transcript (`docs/ENGINEERING_STANDARDS.md` §1) — **both halves travel with the
+repo**, so a clone is still self-sufficient:
 
-**The wrap convention (#365):** at session close, the outgoing session (a) writes its
-handover file, (b) archives the previous `HANDOVER_LATEST.md` under its dated name, and
-(c) REPLACES the single session-status block at the bottom of `CLAUDE.md` — it never
-stacks. So: `CLAUDE.md` block = last session's summary; `HANDOVER_LATEST.md` = last
-session's detail; dated files = history.
+- **On `main`: `handovers/HANDOVER_LATEST.md`** — the live driver: the most recent
+  session's full narrative. Read this first; it is always the "where were we" document.
+  It is the ONLY handover tracked on `main` (plus `handovers/README.md`, the pointer).
+- **On the `session-archive` branch: `handovers/HANDOVER_<date>_<slug>.md`** — one file
+  per prior session, dated — and **`handovers/archive/`**, the older per-session files
+  plus the pre-2026-07 diary
+  (`handovers/archive/CLAUDE_MD_SESSION_DIARY_2026-07-03.md`).
+
+```bash
+git fetch origin session-archive
+git log  origin/session-archive --oneline -- handovers/          # the log of the log
+git show origin/session-archive:handovers/HANDOVER_2026-07-21_Glass-Engine.md
+git worktree add ../life-platform-sessions origin/session-archive   # browse the corpus
+```
+
+The archive branch is parented on `main` and the files kept their original `handovers/…`
+paths, so `git log --follow` walks a handover's history straight through the split.
+
+**The wrap convention (#365):** at session close, the outgoing session (a) archives the
+previous `HANDOVER_LATEST.md` onto `session-archive` under its dated name
+(`python3 scripts/archive_handover.py --slug <slug>`) and overwrites
+`HANDOVER_LATEST.md` in place with its own, and (b) REPLACES the single session-status
+block at the bottom of `CLAUDE.md` — it never stacks. So: `CLAUDE.md` block = last
+session's summary; `HANDOVER_LATEST.md` = last session's detail; the archive branch =
+history.
 
 A real handover (2026-07-10) has this structure — they are consistent enough to skim
 mechanically:
@@ -50,7 +69,8 @@ mechanically:
 ## Watch                             ← things that should be checked next session
 ```
 
-To reconstruct history: read `HANDOVER_LATEST.md`, then walk the dated files backwards.
+To reconstruct history: read `HANDOVER_LATEST.md` on `main`, then walk the dated files on
+`session-archive` backwards (`git log origin/session-archive --oneline -- handovers/`).
 Durable lessons are supposed to graduate out of handovers into `docs/CONVENTIONS.md`
 (rules) or the Claude Code memory system (§4, incident narratives) — a gotcha that only
 exists in a handover is a lesson that has not been homed yet.

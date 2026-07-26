@@ -182,11 +182,11 @@ Current split (ADR-056/060, per `docs/ARCHITECTURE.md`): 8 SIMP-2 framework adop
 
 ## Session Handover Protocol
 
-Every development session ends with a handover file written to `handovers/`. Ask Claude:
+Every development session ends with a handover written to `handovers/HANDOVER_LATEST.md`. Ask Claude:
 
 > "Write a session handover"
 
-The handover captures: version bump, what changed, what's pending, and context for the next session. This is how context is preserved across Claude's session limits. Handovers live at `handovers/YYYY-MM-DD-session<N>-<slug>.md`; the latest is referenced from `handovers/HANDOVER_LATEST.md`.
+The handover captures: version bump, what changed, what's pending, and context for the next session. This is how context is preserved across Claude's session limits. `handovers/HANDOVER_LATEST.md` is the only handover tracked on `main`; at the next wrap it is archived to the **`session-archive` branch** as `handovers/HANDOVER_<date>_<Slug>.md` and overwritten in place (#1650). Read the history with `git show origin/session-archive:handovers/<name>.md` — see `handovers/README.md`.
 
 ---
 

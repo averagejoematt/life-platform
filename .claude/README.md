@@ -12,7 +12,7 @@ Designed so an agent can answer "why" without guessing:
 - **ADRs** — every non-trivial decision is recorded in [`docs/DECISIONS.md`](../docs/DECISIONS.md) (ADR-001…144). Reversible, dated, with context + consequences.
 - **Reference** — `ARCHITECTURE.md`, `SCHEMA.md` (authoritative data model), `RUNBOOK.md`, `INFRASTRUCTURE.md`, `MONITORING.md`, `SECURITY.md`, `COST_TRACKER.md`.
 - **[`docs/TAG_CODES.md`](../docs/TAG_CODES.md)** — decodes the internal tag alphabet (ADR/PG/SIMP/IC/SEC/…) so commits and comments are traceable to the decision that motivated them.
-- **`handovers/`** — end-of-session state hand-offs so the next session resumes with full context.
+- **`handovers/`** — the live end-of-session hand-off (`HANDOVER_LATEST.md`) so the next session resumes with full context. Prior sessions live on the **`session-archive`** branch (#1650) — `git show origin/session-archive:handovers/<name>.md`.
 
 **3. Slash commands — [`.claude/commands/`](commands/)**
 Repeatable playbooks the agent invokes by name:
@@ -48,7 +48,7 @@ stop re-improvising briefs from memory prose (#796).
 ## Onboarding a fresh agent (or human)
 
 1. Read [`/CLAUDE.md`](../CLAUDE.md), then [`docs/ONBOARDING.md`](../docs/ONBOARDING.md).
-2. Skim the latest `handovers/HANDOVER_LATEST.md` for in-flight state.
+2. Skim `handovers/HANDOVER_LATEST.md` for in-flight state (earlier sessions: the `session-archive` branch).
 3. Use `docs/TAG_CODES.md` + `docs/DECISIONS.md` to decode any tag or "why".
 4. `make check` (lint + syntax + tests) before proposing changes; deploy only via the [`deploy`](commands/deploy.md) playbook.
 
