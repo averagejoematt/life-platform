@@ -344,6 +344,28 @@ class EmailStack(Stack):
             **shared,
         )
 
+        # #1382: Coach nudge — "the coach who texts first". Deterministic decision-moment
+        # triggers (no dinner log while a nutrition experiment is active, ACWR crossing
+        # into an alert band, a verdict resolving tomorrow) fire ONE short coach-voiced
+        # email per day at most; Haiku only phrases the precomputed trigger payload.
+        # Hourly cron over UTC 15-23 + 0-5 covers the Pacific send window (08:00-19:00 PT,
+        # enforced in code — the UTC-fixed cron just provides coverage across DST) AND the
+        # +2h outcome-grading pass that runs on every tick (a sent nudge with no graded
+        # outcome is a bug — AC3). Budget tier >=2 silences it (budget_guard "coach_nudge").
+        create_platform_lambda(
+            self,
+            "CoachNudge",
+            function_name="coach-nudge",
+            handler="emails.coach_nudge_lambda.lambda_handler",
+            source_file="lambdas/emails/coach_nudge_lambda.py",
+            schedule="cron(10 0-5,15-23 * * ? *)",
+            timeout_seconds=120,
+            memory_mb=256,
+            environment=_email_env,
+            custom_policies=rp.email_coach_nudge(),
+            **shared,
+        )
+
         # PB-06: Weekly Signal — curated 5-section subscriber email every Sunday 9:30 AM PT.
         # Reads pre-computed data from S3 + DynamoDB — no AI calls.
         # Independent DLQ + alarm. timeout_seconds=300: headroom for rate-limited sends.

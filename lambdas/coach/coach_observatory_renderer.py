@@ -492,6 +492,31 @@ def _render_coach_card(domain, include_threads=True):
     except Exception as e:
         logger.warning("track_record query failed for %s: %s", coach_id, e)
 
+    # ── 6c. Proactivity track record (#1382) ─────────────────────────────────
+    # The coach-who-texts-first record: every proactive NUDGE# this coach sent
+    # in the last 30 days, with its graded hit/miss outcome ("did the targeted
+    # log/action appear within the outcome window?") and the resulting Brier —
+    # proactivity itself carries a public track record (ADR-104). Tallying is
+    # pure (coach_nudge_engine.proactivity_summary); this block only reads.
+    proactivity = None
+    try:
+        from coach_nudge_engine import NUDGE_SK_PREFIX, proactivity_summary
+
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+        nudge_resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058
+                    "KeyConditionExpression": Key("pk").eq(coach_pk)
+                    & Key("sk").between(f"{NUDGE_SK_PREFIX}{cutoff}", f"{NUDGE_SK_PREFIX}~"),
+                }
+            )
+        )
+        proactivity = proactivity_summary(_decimal_to_float(nudge_resp.get("Items", [])))
+        if proactivity is not None:
+            proactivity["window_days"] = 30
+    except Exception as e:
+        logger.warning("proactivity query failed for %s: %s", coach_id, e)
+
     # ── 7. Assemble the card ─────────────────────────────────────────────────
     week_number, days_in_experiment = _compute_experiment_timing()
 
@@ -510,6 +535,7 @@ def _render_coach_card(domain, include_threads=True):
         "thread_reference": thread_reference,
         "revision_signal": revision_signal,
         "track_record": track_record,
+        "proactivity": proactivity,  # #1382: graded proactive-nudge record
         "cross_coach_reference": cross_coach_reference,
         "confidence_language": confidence_language,
         "confidence_provenance": confidence_provenance,  # #1481 (ADR-141): data vs conversation

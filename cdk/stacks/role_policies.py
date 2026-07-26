@@ -1218,6 +1218,35 @@ def email_partner() -> list[iam.PolicyStatement]:
     ]
 
 
+def email_coach_nudge() -> list[iam.PolicyStatement]:
+    """Coach nudge (#1382): DDB read/write (trigger facts, NUDGE#/ledger records,
+    outcome grading), S3 config read (personas.json), Bedrock (Haiku phrasing —
+    the ONLY model call, over a precomputed payload), SES, plus:
+      - ssm:GetParameter on budget-tier (budget_guard tier gate, AC2) and
+        experiment-cycle (ADR-077 cycle stamp on NUDGE# records);
+      - lambda:InvokeFunction on coach-quality-gate — the blocking quality gate
+        (ai_calls._enforce_quality_gate, max_regenerations=0: blocked = dropped
+        silently, never regenerated — AC4).
+    """
+    return _email_base(
+        extra_statements=[
+            iam.PolicyStatement(
+                sid="SSMRead",
+                actions=["ssm:GetParameter"],
+                resources=[
+                    f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/budget-tier",
+                    f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle",
+                ],
+            ),
+            iam.PolicyStatement(
+                sid="QualityGateInvoke",
+                actions=["lambda:InvokeFunction"],
+                resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:coach-quality-gate"],
+            ),
+        ]
+    )
+
+
 def email_evening_nudge() -> list[iam.PolicyStatement]:
     """Evening nudge: DDB read (supplements, notion, apple_health, state_of_mind), SES. No ai-keys needed.
 
