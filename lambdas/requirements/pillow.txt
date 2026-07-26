@@ -14,4 +14,4 @@
 # so the scan errs toward RED, never a false GREEN. OWNER ACTION: confirm the real version
 # with `aws lambda get-layer-version-by-arn --arn <PILLOW_LAYER_ARN>` (download + inspect
 # the wheel), then correct this pin so pip-audit reflects what is actually deployed.
-Pillow==11.2.1
+Pillow==12.3.0
