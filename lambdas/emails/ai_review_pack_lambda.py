@@ -76,6 +76,16 @@ try:
 except Exception:  # pragma: no cover — bundle-dependent; ranking simply degrades off
     _ranker = None
 
+# #1698 (epic #1687 S6): pattern-extraction → gate-promotion PROPOSALS. Reads the
+# corrections ledger (#1689), clusters recurring error classes, and proposes which
+# have earned a hard deterministic gate — PROPOSAL ONLY, never an auto-promotion
+# (ADR-104/105; promotion is a human-authored gate PR). Bundled (#781); import
+# fail-soft so a missing module degrades the section off rather than dying.
+try:
+    import correction_promotion as _promo
+except Exception:  # pragma: no cover — bundle-dependent; proposals simply degrade off
+    _promo = None
+
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
@@ -386,6 +396,45 @@ def _ranked_digest_section(ranking):
     </div>"""
 
 
+def _promotion_section(proposals):
+    """#1698 (S6): render the gate-promotion PROPOSALS — recurring error classes that
+    have earned graduation from prompt-memory to a hard deterministic gate. Each row
+    carries the class, its recurrence count, the coach spread, and example ledger refs.
+    PROPOSAL ONLY: nothing here (or anywhere) auto-promotes — the section says so, and
+    promotion is a human-authored gate PR (ADR-104/105). Empty/None → "" (quiet weeks
+    and a missing module both degrade to no section)."""
+    if not proposals:
+        return ""
+    rows = []
+    for p in proposals:
+        coaches = html.escape(", ".join(p.get("coaches") or []))
+        refs = "".join(
+            f'<div style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#9ca3af;">{html.escape(r)}</div>'
+            for r in (p.get("example_refs") or [])
+        )
+        rows.append(
+            f"""
+      <div style="background:#12162e;border:1px solid #2a2d4a;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <span>{_tag_chip_html(p.get("error_class", "other"))}</span>
+          <span style="color:#f59e0b;font-size:12px;font-weight:700;">recurred {int(p.get("recurrence", 0))}&times; across {int(p.get("coach_count", 0))} coaches</span>
+        </div>
+        <div style="color:#d1d5db;font-size:12px;line-height:1.45;margin-bottom:4px;">{html.escape(p.get("statement", ""))}</div>
+        <div style="color:#6b7280;font-size:11px;margin-bottom:2px;">coaches: {coaches}</div>
+        {refs}
+      </div>"""
+        )
+    return f"""
+    <div style="margin-bottom:26px;">
+      <div style="font-size:14px;font-weight:700;color:#ffffff;border-bottom:1px solid #2a2d4a;padding-bottom:6px;margin-bottom:10px;">
+        ⬆️ Gate-promotion proposals <span style="color:#6b7280;font-weight:400;font-size:12px;">({len(proposals)})</span>
+      </div>
+      <div style="color:#6b7280;font-size:11px;margin-bottom:8px;">Recurring correction classes that have earned a hard deterministic gate (epic #1687 S6).
+      Proposal only — nothing is auto-promoted; promotion is a human-authored gate PR you approve (ADR-104/105).</div>
+      {"".join(rows)}
+    </div>"""
+
+
 def _surface_section(surface, entries, nmap=None):
     icon = SURFACE_ICONS.get(surface, "•")
     label = _label(surface)
@@ -460,7 +509,17 @@ def _nmap_from_ranking(ranking):
     return {entry.get("_key"): (n, analyses.get(n)) for n, entry in ranking.get("numbered", [])}
 
 
-def build_html(dates, by_surface, screenshots_by_date, read_errors, ranking=None):
+def compute_promotion_proposals(table):
+    """#1698 (S6): read the corrections ledger and compute gate-promotion proposals.
+    Returns the proposal list, or None when the module is missing (graceful degrade —
+    the section simply doesn't render). STRICTLY READ-ONLY over the ledger: proposals
+    never transition a correction or flip a gate (ADR-104/105)."""
+    if _promo is None:
+        return None
+    return _promo.gate_promotion_proposals(table)
+
+
+def build_html(dates, by_surface, screenshots_by_date, read_errors, ranking=None, proposals=None):
     total = sum(len(v) for v in by_surface.values())
     active_surfaces = sum(1 for s in SURFACE_ORDER if by_surface.get(s))
     start_label = _fmt_date(dates[0])
@@ -474,6 +533,9 @@ def build_html(dates, by_surface, screenshots_by_date, read_errors, ranking=None
 
     nmap = _nmap_from_ranking(ranking)
     sections = _ranked_digest_section(ranking)
+    # #1698: the S6 gate-promotion proposals ride between the ranked digest and the
+    # per-surface sections. None/[] → no section (quiet ledger / missing module).
+    sections += _promotion_section(proposals)
     sections += "".join(_surface_section(s, by_surface.get(s, []), nmap=nmap) for s in SURFACE_ORDER)
     # Any archived surface not in our known order still gets shown (fail-open).
     for s in sorted(set(by_surface) - set(SURFACE_ORDER)):
@@ -567,7 +629,20 @@ def _run(event, context):
         logger.warning(f"[ai-review-pack] ranking failed (non-fatal, legacy render): {e}")
         ranking = None
 
-    html_body = build_html(dates, by_surface, screenshots_by_date, read_errors, ranking=ranking)
+    # #1698 (S6): gate-promotion proposals from the corrections ledger. Fail-soft —
+    # a ledger read error degrades the section off, never a lost editorial email.
+    # READ-ONLY: this path only queries; it never writes or flips anything.
+    table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE_NAME)
+    proposals = None
+    try:
+        proposals = compute_promotion_proposals(table)
+        if proposals is not None:
+            logger.info(f"[ai-review-pack] {len(proposals)} gate-promotion proposal(s) from the corrections ledger")
+    except Exception as e:  # pragma: no cover — advisory; never sink the email
+        logger.warning(f"[ai-review-pack] promotion-proposal analysis failed (non-fatal): {e}")
+        proposals = None
+
+    html_body = build_html(dates, by_surface, screenshots_by_date, read_errors, ranking=ranking, proposals=proposals)
     subject = f"🗂️ Weekly AI Review Pack · {_fmt_date(dates[0])}–{_fmt_date(dates[-1])} · {total} generation(s)"
 
     ses = boto3.client("sesv2", region_name=REGION)
@@ -583,7 +658,6 @@ def _run(event, context):
     )
     logger.info(f"Sent: {subject}")
 
-    table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE_NAME)
     record_email_send(table, "ai-review-pack")
     return {
         "statusCode": 200,
