@@ -80,6 +80,28 @@ Budget: gated on the `coach_diary_reaction` reader-narrative feature (`budget_gu
 entry; a paused call yields no reaction. Quality: the draft passes the ADR-108
 coach quality gate (hold-or-publish, no regenerate — keeps the one-call bound).
 
+**When it fires (#1756).** The reaction is produced by the daily **journal-enrichment**
+pass (6:30 AM PT), right after that entry's enrichment lands — the same pipeline, no
+second one, and the only place the enriched themes the routing uses exist. So: record
+today, mark the consent property, and the reaction appears the next morning. Practical
+consequences worth knowing:
+
+- **Marking consent later still works.** Editing the Notion page bumps its
+  `last_edited_time`, which re-ingests and re-enriches the entry — and the next
+  enrichment pass produces the reaction.
+- **One reaction per entry, ever.** The reaction is keyed per entry
+  (`DATE#<date>#<channel>#<entry-uid>`), and an entry that already has one is skipped
+  before any model call — so re-enrichment (the Sunday 30-day sweep, a schema bump, an
+  edit) never re-spends or overwrites. Two recordings on the SAME day each keep their
+  own reaction. To deliberately regenerate one, invoke `coach-diary-reaction` manually
+  with `{"entry": {...}, "force": true}`.
+- **Un-marking does not retract a published reaction.** Consent is read at generation
+  time; removing the property afterwards stops future reactions but does not delete the
+  stored row — delete the row (or ask for it to be deleted) to pull it off the site.
+- **Failures are silent by design.** A budget pause, a quality-gate hold, or an AI error
+  yields no reaction and no error: enrichment is never failed by a reaction, and an
+  absent reaction renders nothing on lab-notes.
+
 ## Solo recordings — local Whisper, no interviewer (#1573)
 
 A **solo recording** is a raw diary made WITHOUT Claude in the room — a voice memo

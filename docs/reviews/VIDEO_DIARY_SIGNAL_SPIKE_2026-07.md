@@ -42,12 +42,14 @@ Source: `lambdas/ingestion/notion_lambda.py`, `lambdas/ingestion/journal_enrichm
   `quote | allude | private`; anything absent or malformed resolves `private`; a cleared
   quote is honored only if it is a literal substring of `raw_text` (ADR-104 grounding);
   `raw_text` and `enriched_notable_quote` never enter the public context object.
-- **The one reader-facing consumer is dormant.** `coach_diary_reaction.py` (#1574) is
-  code-complete, budget-registered (`coach_diary_reaction: 2` in
-  `lambdas/budget_guard.py`), and served at `/api/diary_reactions` — but has **no CDK
-  function and no trigger** (`grep -rn coach_diary_reaction cdk/ deploy/` is empty). See
-  story S-0 in §7. A second latent defect: its sk `DATE#{date}#{channel}` collides when
-  two same-day entries share a channel.
+- **The one reader-facing consumer was dormant — S-0 has since shipped (#1756).** As
+  written at spike time, `coach_diary_reaction.py` (#1574) was code-complete,
+  budget-registered (`coach_diary_reaction: 2` in `lambdas/budget_guard.py`) and served
+  at `/api/diary_reactions`, but had **no trigger** — nothing ever called it — and its sk
+  `DATE#{date}#{channel}` collided when two same-day entries shared a channel. #1756
+  fixed both: the trigger is an inline, consent- and budget-gated, fail-open call from
+  `ingestion/journal_enrichment_lambda` (Option A — no new Lambda, no second pipeline),
+  and the sk carries the per-entry uid (`DATE#{date}#{channel}#{entry_uid}`).
 - **No prosody, audio-DSP, or video-frame analysis exists anywhere in the repo.** The
   Fingerprint (#1379, `lambdas/web/fingerprint.py`) is pure/stdlib, consumes six
   device/streak metrics, no journal input; a burned-in video overlay has not shipped.
@@ -341,12 +343,13 @@ Sequencing constraints that bind (in order):
 ## 7. Candidate follow-up stories (for owner triage — deliberately NOT filed)
 
 **S-0 · ops: wire the coach-diary-reaction trigger (and fix the same-day sk collision)** —
-`coach_diary_reaction.lambda_handler` has no CDK function, no EventBridge rule, and no
-caller; the read endpoint and lab-notes render are live but nothing produces rows. Add the
-CDK function + a post-enrichment trigger (it must run *after* the 6:30 AM enrichment pass,
-which produces the themes it routes on), and widen the sk to include the entry suffix so
-two same-day recordings on one channel don't overwrite. Effort: **S**. (Genuine bug-class
-finding of this spike; highest immediate value.)
+**SHIPPED as #1756.** `coach_diary_reaction.lambda_handler` had no CDK function, no
+EventBridge rule, and no caller; the read endpoint and lab-notes render were live but
+nothing produced rows. Resolved by calling the producer inline from the 6:30 AM journal
+enrichment pass (which is exactly where the themes it routes on are produced — so no new
+Lambda, no schedule, and no ordering risk), plus the per-entry sk uid so two same-day
+recordings on one channel no longer overwrite. Effort was **S** as estimated. (Genuine
+bug-class finding of this spike; highest immediate value.)
 
 **S-1 · analysis: channel-shift calibration of the enrichment schema** — once ≥ 20
 video/solo entries exist, a one-off deterministic comparison of `enriched_*` distributions

@@ -34,14 +34,29 @@ The four guarantees this module upholds (the story's acceptance criteria):
 
 DynamoDB:
   PK = USER#matthew#SOURCE#diary_reactions
-  SK = DATE#{YYYY-MM-DD}#{channel}
+  SK = DATE#{YYYY-MM-DD}#{channel}#{entry_uid}
 
-Trigger (ops — wired at deploy, see PR): invoked per enriched Video Diary /
-Solo Recording journal entry. Pure-importable; the AI/quality-gate/budget callables are
-dependency-injected (lazy real defaults) so the unit suite runs with no live call.
+  #1756: the entry_uid segment is the fix for a same-day sk collision — the original
+  two-segment key meant a SECOND Video Diary on the same day overwrote the first
+  entry's reaction. The uid is the SAME stable per-page suffix the journal sk uses
+  (notion_lambda.build_sk / #476-E-6: the last 12 hex of the Notion page id), so the
+  reaction key is per-ENTRY, idempotent, and re-derivable without a lookup. A legacy
+  entry that carries neither a page id nor a stable sk suffix still writes the
+  two-segment key (unchanged behaviour, and nothing else can claim it).
+
+Trigger (#1756): ``maybe_react(entry)`` is called per enriched Video Diary / Solo
+Recording entry from ``ingestion/journal_enrichment_lambda`` — Option A, inline in the
+record-enrichment pipeline (no second pipeline, the 4th-channel principle), which is
+also the only place the enriched themes this routes on exist. It is fail-open by
+contract: a reaction failure never fails enrichment. ``lambda_handler`` remains for a
+manual/backfill invoke of one entry.
+
+Pure-importable; the AI/quality-gate/budget callables are dependency-injected (lazy real
+defaults) so the unit suite runs with no live call.
 """
 
 import os
+import re
 from datetime import datetime, timezone
 
 # Deterministic public-theme → coach routing. mind_coach owns Matthew's inner state
@@ -82,6 +97,38 @@ DIARY_REACTIONS_PK = f"USER#{USER_ID}#SOURCE#diary_reactions"
 BUDGET_FEATURE = "coach_diary_reaction"
 
 _MAX_TOKENS = 220  # a SHORT reaction — a few sentences, not an essay
+
+# #1756: the ONLY channels a reaction is produced for. A typed journal entry
+# (channel="journal") is never a diary, so it never reaches the consent gate — the
+# reaction surface is "the coaches responding to a RECORDING", by definition.
+DIARY_CHANNELS = ("video_diary", "solo_recording")
+
+# The #476/E-6 stable per-page sk suffix: last 12 hex of the de-hyphenated Notion page id.
+_STABLE_SUFFIX_RE = re.compile(r"^[0-9a-f]{12}$")
+
+
+def entry_uid(entry):
+    """The stable per-entry id used to key this entry's reaction (#1756), or "".
+
+    Prefers the Notion page id (canonical — it is exactly what notion_lambda.build_sk
+    derives the journal sk's stable suffix from), and falls back to that suffix when
+    the sk is present but the page id isn't. Anything that doesn't look like the
+    stable 12-hex suffix is rejected rather than guessed at, so a single-per-day
+    template sk (…#journal#morning) can never be mistaken for an entry id.
+    """
+    page_id = str(entry.get("notion_page_id") or "").replace("-", "").strip().lower()
+    if len(page_id) >= 12 and _STABLE_SUFFIX_RE.match(page_id[-12:]):
+        return page_id[-12:]
+    tail = str(entry.get("sk") or "").rsplit("#", 1)[-1].strip().lower()
+    return tail if _STABLE_SUFFIX_RE.match(tail) else ""
+
+
+def reaction_sk(entry_date, channel=None, uid=""):
+    """The reaction's sort key. Per-ENTRY when a uid is known (#1756 — two diaries on
+    the same day+channel no longer overwrite each other); the legacy two-segment form
+    only when no stable entry id exists at all."""
+    base = f"DATE#{entry_date}#{channel or 'video_diary'}"
+    return f"{base}#{uid}" if uid else base
 
 
 def route_coach(entry):
@@ -227,6 +274,9 @@ def generate_diary_reaction(
         "entry_date": ctx.get("date"),
         "generated_at": now,
     }
+    uid = entry_uid(entry)
+    if uid:
+        reaction["entry_uid"] = uid  # #1756: per-entry sk segment (same-day collision fix)
     if ctx.get("quote"):
         reaction["quote"] = ctx["quote"]
     return reaction
@@ -238,42 +288,122 @@ def _default_budget_allow(feature):
     return budget_guard.allow(feature)
 
 
-def store_reaction(reaction, table_=None):
-    """Persist a produced reaction. Phase-tagged (ADR-058) so a wiped cycle's
-    reactions are hidden by the serve query. Returns the SK written."""
-    if not reaction or not reaction.get("entry_date"):
-        return None
-    if table_ is None:
-        import boto3
+def _table():
+    import boto3
 
-        table_ = boto3.resource("dynamodb", region_name=os.environ.get("AWS_REGION", "us-west-2")).Table(
-            os.environ.get("TABLE_NAME", "life-platform")
-        )
+    return boto3.resource("dynamodb", region_name=os.environ.get("AWS_REGION", "us-west-2")).Table(
+        os.environ.get("TABLE_NAME", "life-platform")
+    )
+
+
+def _stamp():
+    """The ADR-058/#1233 write-time provenance stamp (phase + cycle), fail-soft.
+    A missing stamp must never block the write, so this degrades to phase-only."""
+    try:
+        from phase_taxonomy import experiment_stamp
+
+        stamp = experiment_stamp()
+        if stamp.get("phase"):
+            return stamp
+    except Exception:  # noqa: BLE001 — provenance never breaks a write
+        pass
     try:
         from constants import EXPERIMENT_PHASE_CURRENT
 
-        phase = EXPERIMENT_PHASE_CURRENT
+        return {"phase": EXPERIMENT_PHASE_CURRENT}
     except Exception:  # noqa: BLE001
-        phase = "current"
+        return {"phase": "current"}
 
-    sk = f"DATE#{reaction['entry_date']}#{reaction.get('channel', 'video_diary')}"
-    item = {"pk": DIARY_REACTIONS_PK, "sk": sk, "phase": phase, **reaction}
+
+def store_reaction(reaction, table_=None):
+    """Persist a produced reaction. Phase-tagged + cycle-stamped (ADR-058/#1233) so a
+    wiped cycle's reactions are hidden by the serve query and each row names its own
+    reset generation. Returns the SK written."""
+    if not reaction or not reaction.get("entry_date"):
+        return None
+    if table_ is None:
+        table_ = _table()
+
+    sk = reaction_sk(reaction["entry_date"], reaction.get("channel"), reaction.get("entry_uid", ""))
+    item = {"pk": DIARY_REACTIONS_PK, "sk": sk, **_stamp(), **reaction}
     table_.put_item(Item=item)
     return sk
 
 
-def lambda_handler(event, context=None):
-    """Generate + store the reaction for one journal entry.
+def reaction_exists(entry, table_=None):
+    """True when this entry already has a stored reaction (#1756 idempotency).
 
-    Event: ``{"entry": {...}}`` — the enriched journal item (must carry raw_text,
-    enriched_themes/dominant_theme, the public_reaction_consent marker, date, channel).
-    Returns ``{"stored": bool, "coach_id": ..., "sk": ...}``.
+    Keyed on the SAME per-entry sk the writer builds, so a re-enrichment pass (the
+    Sunday 30-day sweep, a schema bump, a Notion edit) never spends a second Bedrock
+    call on an entry that has already been reacted to. Fail-soft to False — an
+    unreadable table must not silently suppress a legitimate first reaction; the
+    put_item that follows is idempotent on the same key anyway.
     """
-    import boto3
+    date = entry.get("date") or entry.get("entry_date")
+    if not date:
+        return False
+    if table_ is None:
+        table_ = _table()
+    sk = reaction_sk(date, entry.get("channel"), entry_uid(entry))
+    try:
+        return bool(table_.get_item(Key={"pk": DIARY_REACTIONS_PK, "sk": sk}).get("Item"))
+    except Exception:  # noqa: BLE001
+        return False
 
-    entry = (event or {}).get("entry") or {}
-    reaction = generate_diary_reaction(entry, lambda_client=boto3.client("lambda", region_name=os.environ.get("AWS_REGION", "us-west-2")))
-    if not reaction:
-        return {"stored": False, "reason": "no_reaction"}
-    sk = store_reaction(reaction)
-    return {"stored": bool(sk), "coach_id": reaction["coach_id"], "sk": sk}
+
+def maybe_react(entry, *, table_=None, lambda_client=None, force=False, **generate_kwargs):
+    """THE TRIGGER (#1756). Produce + store the reaction for one enriched journal
+    entry, or explain why it didn't. Never raises — the caller (journal enrichment)
+    is a hot ingestion path and a reaction is never allowed to fail it.
+
+    The gates, in cost order — every one of them is BEFORE any Bedrock call:
+      1. ``not_diary``  — channel isn't a Video Diary / Solo Recording (free, no I/O)
+      2. ``private``    — no ``public_reaction_consent`` opt-in marker; the fail-closed
+                          default for 99.9% of entries (free, no I/O)
+      3. ``exists``     — this entry already has a reaction (one cheap GetItem)
+    Only then does ``generate_diary_reaction`` run, which itself checks the budget tier
+    before spending anything (a tier-≥2 run returns ``no_reaction``).
+
+    Returns ``{"reacted": bool, "reason": str, ...}``.
+    """
+    try:
+        entry = entry or {}
+        if str(entry.get("channel") or "").strip().lower() not in DIARY_CHANNELS:
+            return {"reacted": False, "reason": "not_diary"}
+
+        from diary_consent import TIER_PRIVATE, resolve_consent
+
+        if resolve_consent(entry) == TIER_PRIVATE:
+            return {"reacted": False, "reason": "private"}
+
+        if table_ is None:
+            table_ = _table()
+        if not force and reaction_exists(entry, table_):
+            return {"reacted": False, "reason": "exists"}
+
+        if lambda_client is None:
+            import boto3
+
+            lambda_client = boto3.client("lambda", region_name=os.environ.get("AWS_REGION", "us-west-2"))
+        reaction = generate_diary_reaction(entry, lambda_client=lambda_client, **generate_kwargs)
+        if not reaction:
+            # budget-paused, quality-gate HOLD, or an AI failure — nothing renders (AC3)
+            return {"reacted": False, "reason": "no_reaction"}
+
+        sk = store_reaction(reaction, table_=table_)
+        return {"reacted": bool(sk), "reason": "stored" if sk else "store_failed", "sk": sk, "coach_id": reaction["coach_id"]}
+    except Exception as e:  # noqa: BLE001 — fail-OPEN: a reaction never fails enrichment
+        return {"reacted": False, "reason": "error", "error": str(e)}
+
+
+def lambda_handler(event: dict, context=None) -> dict:
+    """Generate + store the reaction for one journal entry (manual / backfill invoke —
+    the production trigger is the inline ``maybe_react`` call from journal enrichment).
+
+    Event: ``{"entry": {...}, "force": bool}`` — the enriched journal item (must carry
+    raw_text, enriched_themes/dominant_theme, the public_reaction_consent marker, date,
+    channel). Returns ``{"stored": bool, "reason": ..., "coach_id": ..., "sk": ...}``.
+    """
+    event = event or {}
+    out = maybe_react(event.get("entry") or {}, force=bool(event.get("force")))
+    return {"stored": out.get("reacted", False), **out}
