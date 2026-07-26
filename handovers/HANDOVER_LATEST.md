@@ -1,65 +1,70 @@
-# HANDOVER — opus+sonnet paydown (7) + fable reconcile wave (6) + 2 CI-gate fixes — 2026-07-26
+# HANDOVER — solo fable paydown (9) + post-merge review hardening + owner-unblock round — 2026-07-26
 
-> Instruction thread: continue the standing autonomous backlog paydown (`model:opus`/`model:sonnet`,
-> skip `model:fable`), standing approval for ALL merges + deploys + Deploy-gate approvals; CDK deploys
-> prepared for Matthew to run via `!`. Mid-session: an interactive owner-decision triage, a **parallel
-> fable session** launched (isolated OPEN-PR paydown), then this session **reconciled + merged + deployed
-> that fable session's 6 shippable PRs**.
+> Instruction thread: **solo** standing autonomous backlog paydown, `model:fable` ONLY, this
+> session owns main (merge + deploy own work); standing approval for ALL merges, Deploy-gate
+> approvals, and deploys incl. `deploy_all`; CDK deploys prepared for Matthew to run via `!`.
+> Mid-session Matthew flagged the session driver had accidentally been Opus — the
+> worktree-implementers were all genuinely fable (explicit `model: fable` override on every
+> Agent call); only orchestration ran on Opus until the `/model` switch. Response: a full
+> **3-reviewer post-merge audit** of the already-merged wave before approving the production
+> gate. Session closed with an interactive **owner-decision unblock round** (Matthew answered
+> the full gate:owner menu inline).
 
-## What shipped — 13 issues closed, all merged to main + deployed + verified; main GREEN
+## What shipped — 9 fable stories closed, all merged + deployed + live-verified; main GREEN
 
-**My paydown (7 — worktree-implementer fan-outs + direct):**
-- **#1352** docs/LICENSES.md third-party inventory + advisory pip-licenses gate; deleted stale `layer.txt` (PR #1750).
-- **#1330** restore strava token-health check (DescribeSecret grant) + monitored⊆IAM-grant parity test (PR #1751; role deployed via `LifePlatformOperational` CDK by Matthew).
-- **#1345** close the smoke-oracle fail-open paths + PARSE_ERROR gating test, extracted `deploy/lib/smoke_oracle_decision.py` (PR #1752).
-- **#1574** coach reactions to diary entries (grounding gate + producer + `/api/diary_reactions` + lab-notes render) — trigger deferred to **#1756** (PR #1754).
-- **#1385** whole-life-context chronicle (1M + 1-hr cached archive into chronicle + State of Matthew, folded into the grounding allow-list; Structured Outputs at the bedrock chokepoint) (PR #1755).
-- **#1336** SCA gaps — pillow/lameenc manifests + pip_audit RED-on-unscanned-layer guard + SHA-pinned gitleaks + fixed the false stdlib claims (PR #1757).
-- **#1706** the Prescription follow-up hook (question / cross-coach hand-off, reusing the coach check-in queue) (PR #1765).
+**Wave 1 (4 worktree-implementers in parallel):**
+- **#1628** window-validated process milestones — pure window fns (`return_after_gap` flagship, weight demoted to companion-only), through the MILESTONE# ledger + spiral breaker, uncertainty+n per ADR-105 (PR #1771).
+- **#1481** conversational self-calibration — check-in answers move CONFIDENCE#/LEARNING# with `channel=conversation` provenance, bounded to one pseudo-observation; **ADR-141**; new MCP tool `log_coach_calibration` (PR #1770).
+- **#1698** corrections pattern-extraction → gate-promotion PROPOSALS (deterministic clustering, proposal-only, review-pack surface) (PR #1769).
+- **#1568** opt-in verbatim journal pull-quotes — consent-per-line, mark-time taboo gate, `/api/journal_quotes` + story-hub/home render; **ADR-142** (the shared three-tier journal privacy model) (PR #1772).
 
-**Fable reconcile wave (6 — reconciled from the parallel fable session's OPEN PRs, merged in one queue):**
-- **#1626** durable MILESTONE# event ledger (write-once conditional puts; → daily-metrics-compute) · **#1630** ADR-140 (anti-auto-posting amendment) · **#1471** editorial texture/art layer (site) · **#1567** /journal-interview publish mode · **#1627** spiral circuit breaker (ships unwired) · **#1743** video-diary signal spike (docs).
+**Review-fix batch (`fc2293e5`, after the 3-reviewer audit — findings verified ~50% rule, then fixed + regression-tested):**
+verbatim `answer_quote` structurally removed from summarizer/stance prompts (ADR-141 §4 — public-feeding LLM outputs had only numeric gates) · `/api/journal_quotes` serves only `grounding=verified` + the tool's `list` action re-verifies pendings · beverage-noun taboo widening · `marked_at` preserved on re-mark · calibration cap probe fail-closed · explicit `channel=conversation` filters on `/api/wrong` + `revision_signal` · **`LEDGER#genesis#windows` marker** (deploy-sequencing guard: a rule family added after genesis baselines once, never manufactures "news") · zone2 = per-day max(garmin, strava), never sum · breaker failure logs before suppressing · `RETURN_EMIT_WINDOW_DAYS` 14→45 (suppression was silently losing the flagship restart fact). Reviewer verdicts: 2× SAFE, 1× BLOCK whose premise (prod `LEDGER#genesis` exists) was **disproved against live DDB** — the guard was made structural anyway.
 
-**2 CI-gate fixes (would have broken every future deploy — both merged + live):**
-- **gitleaks push-only** (`6ff5e80d`): #1336's scan fell back to full-history on `workflow_dispatch` and tripped the pre-private Firebase key → red-walled every `deploy_all`. Guard = `github.event_name == 'push'`.
-- **#1345 smoke-oracle regression** (`44e7bc5e`): the extracted `smoke_oracle_decision.py` was referenced by the smoke-test job, but that job had **NO checkout** → "No such file" → smoke failed on a healthy deploy → **spurious partial fleet rollback (50/97)**. Fix = add the reconciled-tree checkout to the smoke-test job.
+**Wave 2:**
+- **#1483** allude-tier conversation references — `conversation_reference()` builds from sanctioned fields only (leakage structurally impossible); by-coach page + chronicle packet; tier 2 of ADR-142, no new ADR (PR #1773).
+- **#1577** conversational capture → numeric signal — enrichment over checkin/reflection/field-note partitions, channel-tagged, **analysis-only v1** (Methods Registry fingerprinted), HYPO_CANDIDATE# provenance, dedup by content hash (PR #1774).
+- **#1382** proactive coach nudges — deterministic triggers (nutrition-gap/ACWR/verdict-resolving), Haiku phrases only the payload, ≤1/day + quiet hours + tier≥2 silence, outcome-graded into Brier; **new CDK lambda `coach-nudge`** (LifePlatformEmail, Matthew ran the cdk_deploy via `!`) (PR #1775). Driver added the missed registry wiring (lambda_map, heartbeat COVERAGE exemption, typed handler).
+- **Wave 3:** **#1386** Dispute Docket — machine-checkable criterion frozen at open, deterministic resolution reusing the evaluator, concession→loser's memory (grounding-enforced), `/api/coach_docket`, per-pair-per-topic throttle replaces the weekly cap (PR #1776) · **#1387** Coach Dossier — verbatim COACH# render behind a fail-closed privacy filter (reuses `find_mark_violations` + genotype patterns; conversation-channel excluded), `audit_coach_dossier` MCP tool (view/retract/correct via the #1689 corrections ledger, never mutates), honest zero-states (PR #1777).
 
-**Owner CDK (Matthew ran):** `bash deploy/cdk_deploy.sh LifePlatformOperational -- --require-approval never` (strava grant).
+**Owner-unblock round (Matthew answered inline):** **YouTube membrane LIVE** (api_key + channel_id `UCB4u65MnU5EV_BVPz2u-PsQ` in `life-platform/youtube`; ingestion invoked: 200, 7 dates, honest no_data) · **#1333 = Option B** (SNS→SMS for a named small alarm set; phone in SSM `/life-platform/paging-phone` SecureString; gate:owner removed) · **#1623 unblocked** (first recipient provisioned in `life-platform/digest`; gate:owner removed) · **#1666 approved** (gate:owner removed) · #1383 deferred to ~2026-08-26 · private-flip intent noted on #1662 · #1768 + #1622 parked by owner ("-").
 
 ## Verified
-- Each wave: on-branch git-grep of agent claims + **combined-tree full suite** GREEN before merge (6924 → 6987 → **7041** after the fable wave). All CI-only gates each merge (black, ruff 6-dir, content-policy, mypy clean-set, tombstones, wiki index --strict, ADR index).
-- Deploys: the wave fleet via `deploy_all` (after the two CI fixes) + the fable wave via change-detection push — both **Deploy/Smoke/Post-deploy-integration/Visual-QA GREEN, no rollback**. All 6 wave lambdas + daily-metrics-compute show fresh `LastModified`; **life-platform-mcp boots clean** (200, no FunctionError — validates the #1706 importlib + new imports in the deployed bundle).
-- `/api/diary_reactions` pre-deployed live (200, empty — correct dormant state); story hub 200 post art-layer; #1336 pillow/lameenc manifests uploaded to `s3://…/config/requirements/`.
+- Combined-tree FULL suite at every merge point: 7134 → 7182 → 7236 → **7311** (final tree, 0 failures) + 6-dir black/ruff, content-policy, mypy clean-set (189 files), check_doc_index --strict, ADR index (140 records → ADR-142), sync_doc_metadata clean.
+- **Three `deploy_all` runs GREEN** (Deploy/Smoke/Post-deploy/Visual-QA, no rollback) + Matthew's `cdk_deploy LifePlatformEmail` (coach-nudge infra) + two site-api pre-deploys + final site-deploy GREEN after two auto-rollback incidents (below).
+- Live probes: `/api/journal_quotes` 200 honest-empty · `/api/coach_docket` 200 honest-empty (+ CloudFront viewer-path invalidation) · `/api/coach/{id}` carries `dossier` (all 8 keys) + `conversations` blocks · coaching page 200 · MCP boots (75 tools, no FunctionError) · `coach-nudge` fresh bundle code · youtube ingestion end-to-end 200.
 
-## Gotchas hit (durable lessons → memory)
-- **gitleaks-action scans full history on non-push events** → guard secret-scan gates to `github.event_name == 'push'`. → `reference_gitleaks_push_only`.
-- **An extracted CI-step script needs a checkout in EVERY job that calls it** — the smoke-test job had none; #1345's extraction assumed one. Review workflow-context availability, not just the script logic. → `reference_ci_extracted_script_needs_checkout`.
-- **A spurious smoke failure triggers a partial fleet rollback** (50/97 here — lambdas without a `previous.zip` fail the revert, leaving a mixed state); recovery = re-`deploy_all` from the fixed tree (additive changes make the mixed state functional meanwhile).
-- **mypy clean-set "source found twice"**: a runtime `from lambdas import X` fallback next to `import X` makes mypy resolve the file under two module names — use `importlib.import_module` to hide the fallback from the static resolver.
-- **Fable-branch reconcile is conflict-free when each branch reverted its doc-sync literals** — the 3-way merge keeps main's literal (branch made no change); recompute once with `sync_doc_metadata --apply` at the end.
+## Gotchas hit (durable → memory)
+- **The API-before-frontend race fires on ANY push of a merged branch with site/** JS + a new endpoint** — even when you plan to "batch the deploy later": the push itself triggers site-deploy. #1386's push → smoke 404 on `/api/coach_docket` → auto-rollback (readers unaffected). Pre-deploy site-api BEFORE pushing the merge, not before "the deploy". → `reference_api_before_frontend_autodeploy_race` (updated).
+- **`curl` exit 28 (transient timeout) in site smoke reads as a failure → spurious auto-rollback**; recovery = `gh workflow run "Site deploy"` redispatch (workflow_dispatch supported). → `reference_site_smoke_transient_timeout_rollback` (new).
+- **In-repo agent worktrees (`.worktrees/`) pollute filesystem-walking tests** (hevy-compiler isolation red on a healthy tree); `.worktrees/` now gitignored + agents briefed to use external paths. → `reference_inrepo_worktree_pollutes_scanners` (new).
+- **A rule family added AFTER a write-once ledger's genesis needs its own baseline marker** — or the first sweep announces months-old states as news, uncorrectably (the `LEDGER#genesis#windows` pattern).
+- Reviewer BLOCK verdicts need their premises checked against live state before acting (the "prod genesis exists" premise was false — `get-item` returned null).
 
-## Next-session paydown queue — residual / next-picks (opus + sonnet + fable triage)
-**not-work — owner actions (on Matthew, surfaced this session):**
-- `not-work — owner decision`: **#1768** portrait art-direction v2 option-round PR is **OPEN**, awaiting ADR-106 approval (pick ONE direction) — the only fable PR deliberately not merged.
-- `not-work — owner provisions credentials`: X (`life-platform/x`), Instagram (`life-platform/instagram`), user-scoped billing PAT (#1613) — unlock the syndication/inbound tranche + the CI-minutes alarm.
-- `not-work — owner GitHub toggles`: Dependabot + vuln-alerts + secret-scanning (#1336 gate:owner) — NB Dependabot IS now auto-merging dev-tooling bumps (#1760 landed mid-session), so alerts may already be partly on; confirm. Branch-protection ruleset (#1662) AFTER the private flip.
-- `not-work — owner chore`: #1029 re-entry hardening before the 2026-08-20 domain renewal; publish #741; confirm phone on the #1333 SNS paging sub; ratify LICENSES.md §5 (AI-content ownership stance).
-- `not-work — standing ops reminder`: #1330 strava verifies on the next freshness-checker run (9:45 AM PT); #1385 cache-hit on the next chronicle (Wed); #1626 ledger genesis on the next daily-metrics run. No aged-alarm / stale-secret escalations outstanding (remediation agent `shadow`).
+## Next-session paydown queue — residual / next-picks
+**Buildable next (owner-cleared this session):**
+- **#1623** private milestone digest (Now) — recipients secret provisioned; data source = the #1628 MILESTONE# ledger.
+- **#1333** paging channel (Next) — decision B recorded; build = ADR + dedicated SNS topic (NOT the alerts topic) + named alarm set + SMS sub from the SSM param.
+- **#1666** proportionality ADR (Next) — approved, doc-only.
+- **#1571** /vlog mode + format library (Now, fable) — untouched this session.
+- Dependabot triage (21 vulns, 16 high) once Matthew flips the #1336 toggles.
 
-**Buildable next (issue-cited):**
-- **#1756** (the #1574 production trigger — inline-vs-lambda + IAM + the same-day sk-collision fix #1767 found) · **#1708** (prescription S4 — blocked on #1756 + a calibration-target design call, noted on-issue) · **#1650** (handovers→orphan-branch move — deferred, wrap-ritual coupling; noted on-issue).
-- Doc-ADRs (fable): #1666 · #1333 · #1662. Code (opus/sonnet): #1570 · #1407 · #1623 · #1385-follow-ons. Infra multi-slice: #1658 (coverage→70%) · #1653 · #1654 · #1656.
+**not-work — owner actions still pending:**
+- `not-work — owner browser tasks`: #1336 security toggles + #1613 billing PAT (instructions delivered in-session; PAT to be pasted → store at `life-platform/github-billing`).
+- `not-work — owner decision parked`: #1768 portrait direction ("-" this round) · #1622 posting-trial commitment ("-") · #1407/#1388/#1570/#1633/#1742/#1677/#1678 "discuss later".
+- `not-work — owner chore`: #1029 re-entry hardening before 2026-08-20 · LICENSES.md §5 ratify · #741 publish gate (needs a survived bad week).
+- `not-work — standing ops reminders (#1329)`: youtube captures its first video on the next upload (verify enrichment→gate→feed then) · first coach-nudge send + its 2h grading · first docket open (digest may propose criteria) · #1330 strava freshness green-run · no aged-alarm/stale-secret escalations outstanding (remediation agent `shadow`; digest-routed alarms clean at wrap).
 
-**Method (held this session):** worktree-implementers 2–4 at a time in DIFFERENT areas → verify each on-branch (git-grep, ~50% false) → combined-tree FULL suite + FULL 6-dir gates → land code-reconcile waves via local-merge to main → pre-deploy site-api for new endpoints → `deploy_all` (or change-detection push) + `approve_deployment.sh <run_id>`. Parallel fable session = isolated OPEN-PRs only (it must NOT touch main); reconcile its PRs here via `/reconcile-branch` once its backlog is exhausted.
+**Method (held):** 2–4 fable worktree-implementers in DIFFERENT areas → on-branch git-grep verification (~50% false-positive rule held: 2 reviewer premises disproved) → combined-tree full suite + 6-dir gates → local merge waves → **post-merge 3-reviewer audit before the production gate when provenance is questioned** → pre-deploy site-api before ANY push carrying a new-endpoint consumer → `deploy_all` + `approve_deployment.sh`.
 
 ## Gate outcomes
-- **Build beat:** `2026-07-26-thirteen-closed` (see below).
-- **Docs:** LICENSES.md (new, #1352) + docs/README index + ADR-140 (#1630 via the fable PR) + 5 engine-doc re-verifications (2026-07-26, unblocking check_doc_index --strict after #1336's fetch-depth:0 de-vacuumed it); `sync_doc_metadata` reconciled (test_count 5475, adrs 138, adr_max 140); wiki checkers green.
-- **Decisions:** none newly filed by me — ADR-140 shipped via the fable #1630 PR; the governance decisions from prior sessions still ship their ADRs at implementation (queued: #1662/#1666/#1333).
-- **Main:** green (`44e7bc5e` latest completed; the fable-wave `3eb04d07` run completing on Visual-QA at wrap — Deploy/Smoke/Post-deploy already green).
-- **Incidents:** 1 row — (P3) spurious smoke failure (missing `smoke_oracle_decision.py` in the un-checked-out smoke-test job) → partial fleet auto-rollback (50/97) → recovered by re-`deploy_all` from the fixed tree; false-positive class (deploy was healthy, `failed:0`).
+- **Build beat:** `2026-07-26-nine-stories-coach-layer` (see beats.json).
+- **Docs:** shipped-in-PR — ADR-141 + ADR-142 (+ index, 140 records), SCHEMA.md §Conversational Self-Calibration, Methods Registry entry (#1577) + regenerated `site/method/registry/`; wrap adds 2 INCIDENT_LOG rows; doc-sync literals reconciled at every merge (75 tools / 98 lambdas / test_count); wiki checkers green at wrap.
+- **Decisions:** ADR-141 + ADR-142 filed (shipped via PRs #1770/#1772); no further governance decisions this session (owner decisions recorded on-issue, not ADR-class until built — #1333's ADR ships with its build).
+- **Main:** green (`e3373196` — final `deploy_all` + site-deploy redispatch both success).
+- **Incidents:** 2 rows added — (P3) #1386 API-before-frontend site auto-rollback (self-inflicted race, readers unaffected); (P4, false positive) transient curl-28 smoke timeout → site auto-rollback → redispatch green.
 - **Stash/hooks:** clean (stash empty; hook 🟢).
-- **Labels:** OK (61 open stories, all `model:*`).
-- **Live: budget tier 1.**
+- **Labels:** OK.
+- **Live: budget tier 1** (unchanged).
 
-**Build beat:** 2026-07-26-thirteen-closed
+**Build beat:** 2026-07-26-nine-stories-coach-layer

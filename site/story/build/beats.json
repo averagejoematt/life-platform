@@ -1746,6 +1746,29 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/1765"
         }
       ]
+    },
+    {
+      "id": "2026-07-26-nine-stories-coach-layer",
+      "date": "2026-07-26",
+      "title": "Nine stories in one sitting — and the coaches start keeping receipts on themselves",
+      "shipped": "Nine backlog stories went live in a single session, almost all deepening the coaching layer: the platform now recognises process milestones as properties of a WINDOW, not a day — headlined by 'trained again within 7 days of a missed week', the restart behaviour every previous cycle died without, with weight demoted so it can never headline alone; coaches re-grade their own confidence from check-in conversations (bounded so one persuasive chat never outweighs a graded prediction); two coaches who disagree on a measurable claim now open a standing docket entry with their calibration scores as the stake, resolved by code on a frozen date; each coach gets a public dossier rendered verbatim from its actual memory behind a fail-closed privacy filter; journal lines Matthew explicitly approves — one per line, never in bulk — can appear on the site in his own words; and a coach can now text FIRST at a decision moment, from deterministic triggers, with every nudge outcome-graded so proactivity itself earns a track record.",
+      "gotcha": "Two safety nets fired on the same afternoon and both were the machinery working: pushing a merge whose page JS consumed a brand-new API endpoint auto-deployed the page before the API existed — the smoke check caught the single 404 out of 230 checks and rolled the site back before any reader saw it; then a plain network timeout mid-check failed a perfectly healthy re-deploy and rolled back again. Lesson burned in: the API ships before the push, not before 'the deploy' — the push IS the deploy.",
+      "honest_miss": "Every new surface is live but empty — zero marked quotes, zero open disputes, zero nudges sent — because each one waits on real behaviour (an approved journal line, a measurable coach disagreement, a missed dinner log) rather than seeding itself with demo content. Honest zero-states everywhere until life provides the data. A mid-session model mix-up (the orchestrator ran on the wrong model for half the session) triggered a full three-reviewer audit of the merged work: nine real defects found and fixed before the production gate — including private conversation text that could have reached public-facing prompts.",
+      "prs": [
+        {
+          "label": "PR #1771",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1771"
+        },
+        {
+          "label": "PR #1776",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1776"
+        },
+        {
+          "label": "PR #1777",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1777"
+        }
+      ],
+      "why_it_mattered": "The coaching layer stopped being a one-way broadcast this session: coaches now update their own beliefs from conversation, stake their credibility on disagreements, expose their actual memory for inspection, and reach out first when a decision moment arrives. Every one of those mechanisms is deterministic where it counts — verdicts are code, stakes are published, and the privacy boundaries are structural, not promises."
     }
   ]
 }
