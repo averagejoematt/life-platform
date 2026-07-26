@@ -139,10 +139,19 @@ def _active_nutrition_experiments() -> list:
 def _acwr_readings() -> tuple:
     """(latest, previous) {date, acwr, zone} from computed_metrics, else (None, None)."""
     try:
+        # #1793: computed_metrics is EXPERIMENT_SCOPED — without the phase filter,
+        # the first reads after a reset return tombstoned dead-cycle rows and an
+        # ACWR nudge presents a discarded cycle's training load as today's fact.
+        from phase_filter import with_phase_filter
+
         resp = _table().query(
-            KeyConditionExpression=Key("pk").eq(f"USER#{USER_ID}#SOURCE#computed_metrics") & Key("sk").begins_with("DATE#"),
-            ScanIndexForward=False,
-            Limit=10,
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(f"USER#{USER_ID}#SOURCE#computed_metrics") & Key("sk").begins_with("DATE#"),
+                    "ScanIndexForward": False,
+                    "Limit": 10,
+                }
+            )
         )
         readings = []
         for it in resp.get("Items", []):
@@ -184,8 +193,17 @@ def _verdicts_resolving_tomorrow(tomorrow_pt: str) -> list:
     out = []
     for coach_id in OPERATIONAL_COACH_IDS:
         try:
+            # #1793: COACH#/PREDICTION# is EXPERIMENT_SCOPED — unfiltered, a wiped
+            # cycle's ~348 pending predictions keep "resolving tomorrow" for weeks
+            # after a reset, burning the daily nudge cap on dead intelligence.
+            from phase_filter import with_phase_filter
+
             resp = _table().query(
-                KeyConditionExpression=Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with("PREDICTION#"),
+                **with_phase_filter(
+                    {
+                        "KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with("PREDICTION#"),
+                    }
+                )
             )
         except Exception as e:  # noqa: BLE001 — one bad partition never hides the rest
             logger.warning("[nudge] prediction query failed for %s: %s", coach_id, e)

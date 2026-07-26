@@ -672,3 +672,28 @@ def test_nudge_keys_and_builder_shapes():
     assert ledger["graded"] is False and ledger["nudge_sk"] == item["sk"]
     ledger_blocked = eng.build_ledger_item("2026-07-24", blocked)
     assert ledger_blocked["graded"] is True  # nothing to grade — never delivered
+
+
+# ── #1793: phase filter on computed_metrics + PREDICTION# reads ───────────────
+# A cycle reset tags prior-cycle rows phase=pilot (often tombstoned). Unfiltered,
+# _acwr_readings served a discarded cycle's training load as today's fact and
+# _verdicts_resolving_tomorrow surfaced wiped predictions for weeks (the daily
+# nudge cap burned on dead intelligence — fired live on 2026-07-26).
+
+
+def test_1793_acwr_read_carries_phase_filter(monkeypatch):
+    fake = _fake_table(rows=[])
+    monkeypatch.setattr(shell, "_table_ref", fake)
+    shell._acwr_readings()
+    assert fake.query_calls, "expected a computed_metrics query"
+    for c in fake.query_calls:
+        assert "FilterExpression" in c and "#phase" in str(c["FilterExpression"]), "#1793: computed_metrics read must be phase-filtered"
+
+
+def test_1793_prediction_read_carries_phase_filter(monkeypatch):
+    fake = _fake_table(rows=[])
+    monkeypatch.setattr(shell, "_table_ref", fake)
+    shell._verdicts_resolving_tomorrow("2026-07-27")
+    assert len(fake.query_calls) >= 2, "expected one PREDICTION# query per operational coach"
+    for c in fake.query_calls:
+        assert "FilterExpression" in c and "#phase" in str(c["FilterExpression"]), "#1793: PREDICTION# reads must be phase-filtered"
