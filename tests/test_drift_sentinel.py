@@ -15,6 +15,7 @@ for p in (os.path.join(_ROOT, "deploy"), os.path.join(_ROOT, "remediation")):
 
 import drift_report  # noqa: E402
 import drift_sentinel as ds  # noqa: E402
+import sentinel_quota as sq  # noqa: E402  — quota internals live here (#1665 split)
 
 # ── bucket-policy delete-protection (AC3) ────────────────────────────────────
 
@@ -713,9 +714,9 @@ def test_github_quota_billing_unavailable_falls_back_to_proxy(monkeypatch):
     # The realistic case: GITHUB_TOKEN lacks the `user` scope billing needs (confirmed
     # 2026-07-18 live) — must report a clearly-labeled unavailable reason, never crash,
     # and never claim "error"/"degraded" for a structural, known limitation.
-    monkeypatch.setattr(ds, "_gh_api_json", lambda path, **k: None)
+    monkeypatch.setattr(sq, "_gh_api_json", lambda path, **k: None)
     monkeypatch.setattr(
-        ds,
+        sq,
         "_gh_run_list_trailing",
         lambda **k: [
             {"workflowName": "CI/CD", "startedAt": "2026-07-14T00:00:00Z", "updatedAt": "2026-07-14T00:10:00Z"},
@@ -765,8 +766,8 @@ def _route_gh_api(usage, private):
 
 
 def test_github_quota_billing_available_under_threshold_is_clean(monkeypatch):
-    monkeypatch.setattr(ds, "_gh_api_json", _route_gh_api(_usage_payload(900), private=True))
-    monkeypatch.setattr(ds, "_gh_run_list_trailing", lambda **k: [])
+    monkeypatch.setattr(sq, "_gh_api_json", _route_gh_api(_usage_payload(900), private=True))
+    monkeypatch.setattr(sq, "_gh_run_list_trailing", lambda **k: [])
     res = ds.check_github_quota()
     assert res["status"] == "clean"
     assert res["billing_api"]["available"] is True
@@ -775,8 +776,8 @@ def test_github_quota_billing_available_under_threshold_is_clean(monkeypatch):
 
 
 def test_github_quota_billing_over_70pct_private_warns_and_drifts(monkeypatch):
-    monkeypatch.setattr(ds, "_gh_api_json", _route_gh_api(_usage_payload(2200), private=True))
-    monkeypatch.setattr(ds, "_gh_run_list_trailing", lambda **k: [])
+    monkeypatch.setattr(sq, "_gh_api_json", _route_gh_api(_usage_payload(2200), private=True))
+    monkeypatch.setattr(sq, "_gh_run_list_trailing", lambda **k: [])
     res = ds.check_github_quota()
     assert res["status"] == "drift"
     assert res["billing_api"]["pct_used"] == pytest.approx(73.3, abs=0.1)
@@ -787,8 +788,8 @@ def test_github_quota_over_70pct_public_repo_suppresses_warn(monkeypatch):
     # #1613: public-repo standard-runner minutes are free and don't consume the
     # allowance — the same figure must be REPORTED but never alarmed, or the warn
     # screams permanently while public and trains us to ignore it.
-    monkeypatch.setattr(ds, "_gh_api_json", _route_gh_api(_usage_payload(11790), private=False))
-    monkeypatch.setattr(ds, "_gh_run_list_trailing", lambda **k: [])
+    monkeypatch.setattr(sq, "_gh_api_json", _route_gh_api(_usage_payload(11790), private=False))
+    monkeypatch.setattr(sq, "_gh_run_list_trailing", lambda **k: [])
     res = ds.check_github_quota()
     assert res["status"] == "clean"
     assert "warn" not in res
@@ -799,16 +800,16 @@ def test_github_quota_over_70pct_public_repo_suppresses_warn(monkeypatch):
 def test_github_quota_unknown_visibility_at_threshold_warns_conservatively(monkeypatch):
     # Visibility unreadable → assume private (the #1544 failure was a silent
     # private-repo cap; a false alarm beats a dead one).
-    monkeypatch.setattr(ds, "_gh_api_json", _route_gh_api(_usage_payload(2500), private=None))
-    monkeypatch.setattr(ds, "_gh_run_list_trailing", lambda **k: [])
+    monkeypatch.setattr(sq, "_gh_api_json", _route_gh_api(_usage_payload(2500), private=None))
+    monkeypatch.setattr(sq, "_gh_run_list_trailing", lambda **k: [])
     res = ds.check_github_quota()
     assert res["status"] == "drift"
     assert "assuming private" in res["warn"]
 
 
 def test_github_quota_paid_overage_always_warns(monkeypatch):
-    monkeypatch.setattr(ds, "_gh_api_json", _route_gh_api(_usage_payload(3400, net_usd=3.20), private=False))
-    monkeypatch.setattr(ds, "_gh_run_list_trailing", lambda **k: [])
+    monkeypatch.setattr(sq, "_gh_api_json", _route_gh_api(_usage_payload(3400, net_usd=3.20), private=False))
+    monkeypatch.setattr(sq, "_gh_run_list_trailing", lambda **k: [])
     res = ds.check_github_quota()
     assert res["status"] == "drift"
     assert "$3.20" in res["warn"]
@@ -842,7 +843,7 @@ def test_github_quota_warn_reaches_through_the_billing_token_path(monkeypatch):
     monkeypatch.setenv("GH_BILLING_TOKEN", "github_pat_TESTTOKEN")
     monkeypatch.delenv("GH_POSTURE_TOKEN", raising=False)
     monkeypatch.setattr(_sp, "run", _fake_run)
-    monkeypatch.setattr(ds, "_gh_run_list_trailing", lambda **k: [])
+    monkeypatch.setattr(sq, "_gh_run_list_trailing", lambda **k: [])
     res = ds.check_github_quota()
     assert res["status"] == "drift" and "70%" in res["warn"]
     billing_call = next(p for p in seen_envs if "settings/billing/usage" in p)
@@ -850,12 +851,12 @@ def test_github_quota_warn_reaches_through_the_billing_token_path(monkeypatch):
 
 
 def test_github_quota_top_workflows_proxy_error_is_soft(monkeypatch):
-    monkeypatch.setattr(ds, "_gh_api_json", lambda path, **k: None)
+    monkeypatch.setattr(sq, "_gh_api_json", lambda path, **k: None)
 
     def _boom(**k):
         raise RuntimeError("gh: rate limited")
 
-    monkeypatch.setattr(ds, "_gh_run_list_trailing", _boom)
+    monkeypatch.setattr(sq, "_gh_run_list_trailing", _boom)
     res = ds.check_github_quota()
     assert res["status"] == "unavailable"  # still fail-soft, never crashes the sweep
     assert "rate limited" in res["top_workflows_error"]
