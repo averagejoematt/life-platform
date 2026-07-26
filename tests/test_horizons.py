@@ -19,7 +19,9 @@ os.environ.setdefault("AWS_REGION", "us-west-2")
 os.environ.setdefault("S3_BUCKET", "matthew-life-platform")  # mcp.config requires these at import
 os.environ.setdefault("USER_ID", "matthew")
 
+import coach_checkin as cc  # noqa: E402
 import pytest  # noqa: E402
+from boto3.dynamodb.conditions import Key  # noqa: E402
 from reading import horizons_garden, horizons_verify, reading_keys as rk, reading_store as rs  # noqa: E402
 from reading_fakes import FakeTable  # noqa: E402
 
@@ -230,3 +232,103 @@ def test_curate_horizon_rejects_bad_format(fake_table, monkeypatch):
 def test_curate_horizon_requires_url_and_title(fake_table):
     out = tr.tool_curate_horizon({"format": "article", "rationale_tag": "topical"})
     assert out.get("error_code") == "MISSING_ARG"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #1706 (epic #1686) — the Prescription follow-up hook: a pick threads into the
+# coaching loop as a coach check-in item (question to Matthew, or cross-coach
+# hand-off) instead of sitting inert. No follow-up is also valid.
+# ══════════════════════════════════════════════════════════════════════════════
+def _checkins(table, coach_id):
+    """The CHECKIN# items surfaced under a coach, via the fake table."""
+    got = table.query(KeyConditionExpression=Key("pk").eq(cc.checkin_pk(coach_id)) & Key("sk").begins_with("CHECKIN#"))
+    return got.get("Items", [])
+
+
+def test_followup_builder_question_surfaces_under_curating_coach():
+    item = cc.build_prescription_followup_item(
+        "2026-W30", "mind", {"type": "question", "text": "Did this land?"}, now="2026-07-26T00:00:00Z"
+    )
+    assert item["pk"] == "COACH#mind_coach"
+    assert item["question"] == "Did this land?"
+    assert item["status"] == cc.STATUS_OPEN
+    assert item["prescription_week"] == "2026-W30"
+    assert item["generated_by"] == "prescription_followup"
+    assert "handoff_from" not in item
+
+
+def test_followup_builder_handoff_surfaces_under_target_coach():
+    item = cc.build_prescription_followup_item(
+        "2026-W30", "mind", {"type": "handoff", "text": "Raise this in training", "to_coach": "training"}, now="x"
+    )
+    assert item["pk"] == "COACH#training_coach"  # surfaced under the TARGET coach
+    assert item["handoff_from"] == "mind"
+    assert item["prescription_followup_type"] == "handoff"
+
+
+def test_followup_builder_returns_none_when_empty_or_typeless():
+    assert cc.build_prescription_followup_item("2026-W30", "mind", None) is None
+    assert cc.build_prescription_followup_item("2026-W30", "mind", {}) is None
+    assert cc.build_prescription_followup_item("2026-W30", "mind", {"type": "question", "text": "  "}) is None
+    assert cc.build_prescription_followup_item("2026-W30", "mind", {"type": "bogus", "text": "hi"}) is None
+    # handoff without a target is not surfaceable
+    assert cc.build_prescription_followup_item("2026-W30", "mind", {"type": "handoff", "text": "hi"}) is None
+
+
+def _commit_args(**extra):
+    base = {
+        "url": "https://example.com/great-essay",
+        "title": "A Great Essay",
+        "format": "essay",
+        "rationale_tag": "experiment-relevant",
+        "week": "2026-W30",
+        "dry_run": False,
+    }
+    base.update(extra)
+    return base
+
+
+def test_curate_with_question_writes_checkin_under_mind(fake_table, monkeypatch):
+    monkeypatch.setattr(horizons_verify, "_urllib_fetch", _ok_fetch)
+    out = tr.tool_curate_horizon(_commit_args(follow_up_question="Did the essay reframe your rest?"))
+    assert out["status"] == "committed" and out["follow_up_surfaced"] is True
+    # recorded on the pick + cross-referenced
+    assert out["pick"]["follow_up"]["type"] == "question"
+    assert out["pick"]["follow_up"]["surfaced_checkin_sk"].startswith("CHECKIN#")
+    # surfaced in the Mind coach's check-in queue
+    items = _checkins(fake_table, "mind")
+    assert len(items) == 1 and items[0]["question"] == "Did the essay reframe your rest?"
+    assert _checkins(fake_table, "training") == []
+
+
+def test_curate_handoff_writes_checkin_under_target(fake_table, monkeypatch):
+    monkeypatch.setattr(horizons_verify, "_urllib_fetch", _ok_fetch)
+    out = tr.tool_curate_horizon(_commit_args(follow_up_question="Worth a training angle?", handoff_to_coach="training"))
+    assert out["status"] == "committed" and out["follow_up_surfaced"] is True
+    assert out["pick"]["follow_up"]["type"] == "handoff" and out["pick"]["follow_up"]["to_coach"] == "training"
+    assert _checkins(fake_table, "training") and not _checkins(fake_table, "mind")
+    assert _checkins(fake_table, "training")[0]["handoff_from"] == "mind"
+
+
+def test_curate_handoff_to_unknown_coach_is_rejected(fake_table, monkeypatch):
+    monkeypatch.setattr(horizons_verify, "_urllib_fetch", _ok_fetch)
+    out = tr.tool_curate_horizon(_commit_args(follow_up_question="x", handoff_to_coach="wizard"))
+    assert out.get("error_code") == "INVALID_ARG"
+    assert rs.current_horizon_pick() is None  # nothing written on the rejected call
+
+
+def test_curate_dry_run_previews_followup_without_writing(fake_table, monkeypatch):
+    monkeypatch.setattr(horizons_verify, "_urllib_fetch", _ok_fetch)
+    out = tr.tool_curate_horizon(_commit_args(dry_run=True, follow_up_question="preview?"))
+    assert out["status"] == "preview"
+    assert out["would_write"]["follow_up"]["text"] == "preview?"
+    assert rs.current_horizon_pick() is None
+    assert _checkins(fake_table, "mind") == []  # no check-in written on a dry run
+
+
+def test_curate_without_followup_is_unchanged(fake_table, monkeypatch):
+    monkeypatch.setattr(horizons_verify, "_urllib_fetch", _ok_fetch)
+    out = tr.tool_curate_horizon(_commit_args())
+    assert out["status"] == "committed" and out["follow_up_surfaced"] is False
+    assert "follow_up" not in out["pick"]
+    assert _checkins(fake_table, "mind") == []

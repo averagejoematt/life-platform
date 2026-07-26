@@ -1842,6 +1842,20 @@ TOOLS = {
                     "source": {"type": "string", "description": "The outlet / source name (optional)."},
                     "week": {"type": "string", "description": "ISO week 'YYYY-Www' (default: current week)."},
                     "dry_run": {"type": "boolean", "description": "Preview + verify without writing (default true). Set false to commit."},
+                    "follow_up_question": {
+                        "type": "string",
+                        "description": (
+                            "Optional (#1706): a question about the pick to surface in the coach check-in queue. "
+                            "Alone → asked under the Mind (curating) coach; with handoff_to_coach → the item that coach raises."
+                        ),
+                    },
+                    "handoff_to_coach": {
+                        "type": "string",
+                        "description": (
+                            "Optional (#1706): hand the follow-up to another coach (bare id, e.g. 'training') who raises "
+                            "follow_up_question in their next brief/check-in. Requires follow_up_question."
+                        ),
+                    },
                 },
                 "required": ["url", "title", "format", "rationale_tag"],
             },
