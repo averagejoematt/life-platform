@@ -68,6 +68,7 @@ from web.site_api_coach import (
     handle_calibration,
     handle_coach,
     handle_coach_analysis,
+    handle_coach_docket,
     handle_coach_team,
     handle_coach_timeline,
     handle_coaches,
@@ -751,6 +752,10 @@ def lambda_handler(event, context):
         return handle_coaches(event)
     if path == "/api/coach_team":
         return handle_coach_team(event)
+    # #1386: the Dispute Docket — standing coach disagreements with frozen
+    # stakes; open positions + resolved history (losses never buried).
+    if path == "/api/coach_docket":
+        return handle_coach_docket(event)
     if path == "/api/panel_ledger":
         return handle_panel_ledger(event)
     if path.startswith("/api/coach/"):

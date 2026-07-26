@@ -54,7 +54,7 @@ def test_scoped_ensemble_pks_covered():
     """Every ENSEMBLE#* pk the taxonomy scopes must appear in FULL_PK_PARTITIONS
     (ENSEMBLE#dispute was scoped in the taxonomy but absent from the wipe)."""
     covered_pks = {pk for pk, *_ in wipe.FULL_PK_PARTITIONS}
-    for pk in ("ENSEMBLE#digest", "ENSEMBLE#disagreements", "ENSEMBLE#dispute", "NARRATIVE#arc"):
+    for pk in ("ENSEMBLE#digest", "ENSEMBLE#disagreements", "ENSEMBLE#dispute", "ENSEMBLE#docket", "NARRATIVE#arc"):
         assert taxonomy.classify(pk, "X#1") == taxonomy.EXPERIMENT_SCOPED
         assert pk in covered_pks, f"scoped pk {pk} missing from FULL_PK_PARTITIONS"
 

@@ -522,7 +522,9 @@ _CURATED = [
         "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
         "tier": 1,
         "content_class": "live-data",
-        "api_deps": ["/api/coaches", "/api/coach_team"],
+        # #1386: the Read tab also renders the Dispute Docket band (graceful-empty
+        # until the first docket opens).
+        "api_deps": ["/api/coaches", "/api/coach_team", "/api/coach_docket"],
         "js_modules": ["coaching.js"],
         "visual": {
             "wait_for": "[data-dx-tabs]",

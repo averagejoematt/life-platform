@@ -21,8 +21,16 @@ the ensemble's most persistent dispute an actual exchange, once a week:
      coaches' state updaters record it (output_type inter_coach_dispute) so the
      exchange lands in each coach's own OUTPUT#/THREAD# history.
 
-Budget: tier >= 1 pauses the whole run (the ensemble's own cutoff). ≤1 dispute
-per ISO week — the weekly cap is enforced here (the digest runs daily).
+Budget: tier >= 1 pauses the whole run (the ensemble's own cutoff).
+
+#1386 (Dispute Docket) RETIRED the ≤1-dispute-per-ISO-week cap. The natural
+throttles in its place: (a) machine-checkable divergences carry a standing
+docket entry — ONE open docket per coach-pair per topic (dispute_docket's
+conditional put); (b) a topic can't re-air inside AIRING_COOLDOWN_WEEKS; and
+(c) ≤ MAX_AIRINGS_PER_RUN exchanges per run keep the Haiku spend bounded
+(each exchange is still ≤2 generations + ≤2 gate regens). The docket itself
+never depends on this lambda — opening happens in the ensemble digest and
+resolution is pure code in coach_prediction_evaluator (ADR-105).
 
 Runs Sunday 18:00 UTC (11 AM PT) — after coach-history-summarizer (17:00), so
 the week's disagreement ledger is settled.
@@ -49,6 +57,9 @@ DISPUTE_PK = "ENSEMBLE#dispute"
 INFLUENCE_PK = "ENSEMBLE#influence_graph"
 AIRING_COOLDOWN_WEEKS = 4
 MAX_TURN_WORDS = 120
+# #1386: the retired ≤1/week cap's cost-bounding replacement — at most this many
+# exchanges per run (each still ≤2 generations + ≤2 gate regens).
+MAX_AIRINGS_PER_RUN = 2
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE_NAME)
@@ -220,22 +231,33 @@ def lambda_handler(event: dict, context) -> dict:
         pass  # fail-open: a budget blip must not block forever
 
     this_week = iso_week()
-    # ≤1 dispute/week, enforced here (the digest that feeds us runs daily).
-    existing = table.query(
-        KeyConditionExpression=Key("pk").eq(DISPUTE_PK) & Key("sk").begins_with(f"THREAD#{this_week}"),
-        Limit=1,
-    ).get("Items", [])
-    if existing:
-        return {"skipped": "already_aired", "week": this_week}
-
+    # #1386: the ≤1-dispute/week cap is RETIRED. Throttles now: the per-topic
+    # airing cooldown (select_dispute), one open docket per coach-pair per topic
+    # (dispute_docket), and MAX_AIRINGS_PER_RUN as the cost bound.
     topics = table.query(
         KeyConditionExpression=Key("pk").eq(DISAGREEMENTS_PK) & Key("sk").begins_with("ACTIVE#"),
     ).get("Items", [])
     weights = load_influence_weights()
-    pick = select_dispute(topics, weights, this_week)
-    if not pick:
-        return {"skipped": "no_qualifying_dispute", "topics_seen": len(topics)}
 
+    aired, excluded_sks = [], set()
+    for _ in range(MAX_AIRINGS_PER_RUN):
+        pick = select_dispute([t for t in topics if t.get("sk") not in excluded_sks], weights, this_week)
+        if not pick:
+            break
+        excluded_sks.add(pick["topic"].get("sk"))
+        result = _air_one(pick, this_week)
+        if result:
+            aired.append(result)
+    if not aired:
+        return {"skipped": "no_qualifying_dispute", "topics_seen": len(topics), "week": this_week}
+    out = {"week": this_week, "aired": aired, "count": len(aired), **aired[0]}
+    logger.info(json.dumps(out, default=str))
+    return out
+
+
+def _air_one(pick, this_week):
+    """Air ONE dispute exchange (the former single-shot handler body). Returns a
+    result dict on success, None when generation failed."""
     topic = pick["topic"]
     a_id, b_id = pick["coach_a"], pick["coach_b"]
     positions = topic.get("positions") or {}
@@ -254,7 +276,8 @@ def lambda_handler(event: dict, context) -> dict:
     sys1, user1 = build_turn_prompt(pb, pa, topic_text, positions.get(a_id, ""), positions.get(b_id, ""), vb_rules, vb_ex)
     reply_b, left1 = generate_gated_turn(sys1, user1, [positions.get(a_id, ""), positions.get(b_id, "")])
     if not reply_b:
-        return {"skipped": "generation_failed", "turn": 1}
+        logger.warning("turn-1 generation failed for %r — exchange skipped", topic_text[:60])
+        return None
 
     # Turn 2 — A's one rejoinder to what B actually said.
     sys2, user2 = build_turn_prompt(

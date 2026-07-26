@@ -162,6 +162,9 @@ FULL_PK_PARTITIONS = [
     # intelligence like ENSEMBLE#disagreements; was scoped in phase_taxonomy but
     # absent here (2026-07-10 clean-sweep audit).
     ("ENSEMBLE#dispute", "ensemble_dispute", "all", {}, ""),
+    # Dispute Docket (#1386, sk OPEN#/RESOLVED#) — standing coach disagreements
+    # with frozen stakes; cycle intelligence exactly like ENSEMBLE#disagreements.
+    ("ENSEMBLE#docket", "ensemble_docket", "all", {}, ""),
     # Narrative arc: pre-genesis HISTORY# snapshots AND STATE#current (dated via
     # its entered_date attr — extract_date #946). The original "left for the first
     # post-genesis run to recompute" assumption was WRONG (#946 engine-bugs-1):
@@ -363,6 +366,7 @@ def assert_registry_coverage():
         "ENSEMBLE#digest",
         "ENSEMBLE#disagreements",
         "ENSEMBLE#dispute",
+        "ENSEMBLE#docket",  # #1386
         "NARRATIVE#arc",
         "PERSONA#elena",
     } | {

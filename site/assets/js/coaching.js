@@ -337,6 +337,49 @@ function tensionsHTML(d) {
   return h + `</section>`;
 }
 
+// ── THE DISPUTE DOCKET (#1386) — standing disagreements, skin in the game ──
+// Verdicts are code against the criterion frozen at open; each side's stake is
+// its own Brier record. Losses and no-data voids render in the same shape and
+// order as wins — nothing gets buried. Renders nothing until the first docket
+// opens (graceful-empty by design).
+function docketHTML(dk) {
+  const open = (dk && Array.isArray(dk.open)) ? dk.open : [];
+  const resolved = (dk && Array.isArray(dk.resolved)) ? dk.resolved : [];
+  if (!open.length && !resolved.length) return "";
+  const _pretty = (id) => String(id || "").replace(/_coach$/, "").replace(/_/g, " ") || "a coach";
+  const symbols = { gt: ">", gte: "≥", lt: "<", lte: "≤", eq: "=" };
+  const critLine = (c) => (c && c.metric) ? `${c.metric} ${symbols[c.condition] || c.condition || ""} ${c.threshold}` : "";
+  const stakeLine = (s) => !s ? "" : (s.brier == null ? "stake: unscored Brier (no graded calls yet)" :
+    `stake: Brier ${s.brier}${s.brier_n ? ` over ${s.brier_n} graded calls` : ""}`);
+  let h = `<section class="team-tension"><p class="dx-kicker label">the dispute docket · standing disagreements, skin in the game</p>`;
+  if (open.length) {
+    h += `<ul class="tt-list">` + open.map((e) => {
+      const claims = e.claims || {}, stakes = e.stakes || {}, sides = e.sides || {};
+      const pos = (id) => `<div class="tt-pos"><span class="tt-who label">${esc(_pretty(id))}` +
+        (sides[id] === true ? ` · says it holds` : sides[id] === false ? ` · says it won't` : ``) +
+        (stakeLine(stakes[id]) ? ` · ${esc(stakeLine(stakes[id]))}` : ``) +
+        `</span><p class="tt-text">${esc(claims[id] || "")}</p></div>`;
+      return `<li class="tt-card"><p class="tt-topic">${esc(e.topic || "An open docket")}</p>` +
+        `<div class="tt-cols">${pos(e.coach_a)}${pos(e.coach_b)}</div>` +
+        `<p class="tt-call"><span class="tt-call-k label">resolves by code</span> ${esc(critLine(e.criterion))}${e.resolution_date ? ` · on ${esc(e.resolution_date)}` : ""}</p></li>`;
+    }).join("") + `</ul>`;
+  }
+  if (resolved.length) {
+    h += `<p class="cl-trail-k label">resolved — wins and losses alike</p><ol class="ce-trail">` + resolved.slice(0, 6).map((e) => {
+      const v = e.verdict || {};
+      const w = e.winner || v.winner, l = e.loser || v.loser;
+      const line = w
+        ? `${_pretty(w)} was right; ${_pretty(l)} conceded.`
+        : `No verdict — ${v.reason || "no data arrived by the deadline"}.`;
+      return `<li class="ce-item"><span class="ce-date label">${esc(String(e.resolved_date || "").slice(0, 10))}${e.topic ? ` · ${esc(e.topic)}` : ""}</span>` +
+        `<p class="ce-say">${esc(line)}${e.actual_value != null ? ` (${esc(critLine(e.criterion))}; actual ${esc(String(e.actual_value))})` : ""}</p>` +
+        (e.concession ? `<p class="ce-themes label">${esc(e.concession)}</p>` : "") + `</li>`;
+    }).join("") + `</ol>`;
+  }
+  h += `<p class="ttd-note label">Each side's stake is its own Brier record, frozen when the docket opened. The verdict is computed from the data on the agreed date — no AI grades the outcome, and lost disputes stay on the record.</p>`;
+  return h + `</section>`;
+}
+
 // ── THE READ (default) — Today / This week / The experiment ──
 // #949 pre-start: until Day 1 exists, the stored board read narrates the WIPED
 // prior cycle (the exact leak cockpit.js guards its verdict slot against) — the
@@ -355,10 +398,11 @@ async function renderReadToday(read) {
   // #1115: Today leads with the DAILY one-liner (public_stats.json, minted each
   // morning by the daily brief) — never the integrator's weekly priority, which
   // lives on the This-week lens. Same sentence, two labels = the exact defect.
-  const [d, team, stats] = await Promise.all([
+  const [d, team, stats, docket] = await Promise.all([
     tryJSON("/api/coaching-dashboard"),
     tryJSON("/api/coach_team"), // for the tensions band + disclosure
     tryJSON("/public_stats.json"),
+    tryJSON("/api/coach_docket"), // #1386 — the Dispute Docket band (empty until the first docket opens)
   ]);
   if (!d) { read.innerHTML = `<p class="dx-prose">Couldn't load the board's read just now.</p>`; return; }
   let h = `<p class="dx-kicker label">the board's read on you · right now</p><h2 class="dx-title">What the board is saying</h2>`;
@@ -368,6 +412,7 @@ async function renderReadToday(read) {
       `<blockquote class="rp-text">${esc(daily)}</blockquote></section>`;
   }
   if (team) h += tensionsHTML(team);
+  h += docketHTML(docket); // #1386 — renders "" until the first docket opens
   // The stacked all-coach digest — each coach's LIVE read (position_summary), domain-labeled, deep-linking into By Coach.
   const coaches = (d.coaches || []).filter((c) => String(c.position_summary || "").trim());
   if (coaches.length) {
