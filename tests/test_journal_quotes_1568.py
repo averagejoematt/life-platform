@@ -145,8 +145,9 @@ class FakeTable:
     def put_item(self, Item):
         self.store[(Item["pk"], Item["sk"])] = dict(Item)
 
-    def delete_item(self, Key):
-        self.store.pop((Key["pk"], Key["sk"]), None)
+    def delete_item(self, Key, ReturnValues=None):
+        old = self.store.pop((Key["pk"], Key["sk"]), None)
+        return {"Attributes": old} if (ReturnValues == "ALL_OLD" and old is not None) else {}
 
     def update_item(self, Key, UpdateExpression=None, ConditionExpression=None, ExpressionAttributeValues=None):
         # Enough for the list re-verify upgrade: SET grounding = :v IF grounding = :p
@@ -463,3 +464,34 @@ def test_list_reverifies_pending_quotes(fake_table):
     assert fake_table.store[(QUOTES_PK, ok_sk)]["grounding"] == "verified"  # persisted upgrade
     assert by_sk[bad_sk]["grounding"] == "grounding_mismatch"  # advisory in the response…
     assert fake_table.store[(QUOTES_PK, bad_sk)]["grounding"] == "pending_ingestion"  # …stored row stays withheld
+
+
+# ── #1802: revocation is verified, never asserted ─────────────────────────────
+# A DDB delete on a missing key is a successful no-op; the sk is a content hash,
+# so any byte drift between the typed text and the frozen bytes silently derives
+# a different key. "revoked" must mean a row actually died.
+
+
+def test_1802_unmark_miss_is_honest_not_found(fake_table):
+    out = tj.tool_mark_journal_quote({"date": "2026-07-25", "quote": CLEAN_LINE, "approved": True})
+    assert out.get("status") == "marked"
+    drifted = CLEAN_LINE.replace(" - ", " \u2014 ")  # one punctuation drift => different hash
+    out2 = tj.tool_mark_journal_quote({"action": "unmark", "date": "2026-07-25", "quote": drifted})
+    assert out2["status"] == "not_found"
+    assert "NOTHING was revoked" in out2["error"]
+    assert out2["marked_lines_for_date"] and out2["marked_lines_for_date"][0]["quote"] == CLEAN_LINE
+    assert any(pk == QUOTES_PK for pk, _ in fake_table.store)  # the row SURVIVED
+
+
+def test_1802_unmark_by_sk_needs_no_quote(fake_table):
+    out = tj.tool_mark_journal_quote({"date": "2026-07-25", "quote": CLEAN_LINE, "approved": True})
+    sk = out["sk"]
+    out2 = tj.tool_mark_journal_quote({"action": "unmark", "sk": sk})
+    assert out2["status"] == "revoked" and out2["sk"] == sk
+    assert not any(pk == QUOTES_PK for pk, _ in fake_table.store)
+
+
+def test_1802_mark_advertises_sk_as_the_revoke_handle(fake_table):
+    out = tj.tool_mark_journal_quote({"date": "2026-07-25", "quote": CLEAN_LINE, "approved": True})
+    assert out.get("status") == "marked"
+    assert f"sk='{out['sk']}'" in out["revoke"]

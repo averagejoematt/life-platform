@@ -349,15 +349,37 @@ def tool_mark_journal_quote(args):
 
     date = (args.get("date") or "").strip()
     quote = " ".join(str(args.get("quote") or "").split())
+    # #1802: sk IS the revoke handle — an unmark that supplies it needs neither
+    # date nor quote (the sk embeds the date: QUOTE#YYYY-MM-DD#hash).
+    _sk_arg = str(args.get("sk") or "")
+    if action == "unmark" and _sk_arg.startswith(jq.SK_PREFIX):
+        date = date if _DATE_RE.match(date) else _sk_arg.split("#")[1]
     if not _DATE_RE.match(date):
         return {"error": "date is required (YYYY-MM-DD — the journal entry's day)."}
-    if not quote:
+    if not quote and not (action == "unmark" and _sk_arg):
         return {"error": "quote is required — the exact verbatim line."}
 
     if action == "unmark":
+        # #1802: revocation must be VERIFIED, never asserted. A DDB delete on a
+        # missing key is a successful no-op, and the sk is a content hash — one
+        # smart quote or trailing period between the typed text and the frozen
+        # bytes means "revoked" while the line keeps serving. ALL_OLD proves the
+        # delete; a miss answers honestly with that date's actual marked lines.
         sk = args.get("sk") or jq.quote_sk(date, quote)
-        table.delete_item(Key={"pk": _quotes_pk(), "sk": sk})
-        return {"status": "revoked", "sk": sk, "note": "The line is private again; the public surface drops it on next fetch."}
+        resp = table.delete_item(Key={"pk": _quotes_pk(), "sk": sk}, ReturnValues="ALL_OLD")
+        if resp.get("Attributes"):
+            return {"status": "revoked", "sk": sk, "note": "The line is private again; the public surface drops it on next fetch."}
+        candidates = table.query(
+            KeyConditionExpression=Key("pk").eq(_quotes_pk()) & Key("sk").begins_with(f"{jq.SK_PREFIX}{date}#"),
+        ).get("Items", [])
+        return {
+            "status": "not_found",
+            "sk": sk,
+            "error": "NOTHING was revoked — no marked line matches that exact text/date (the sk is a hash of the frozen bytes; "
+            "a punctuation or date mismatch derives a different key).",
+            "marked_lines_for_date": [{"sk": c.get("sk"), "quote": c.get("quote")} for c in candidates],
+            "how_to_revoke": "call again with the exact sk from the list above (sk is THE revoke handle).",
+        }
 
     if action != "mark":
         return {"error": f"Unknown action '{action}'.", "valid_actions": ["mark", "unmark", "list"]}
@@ -429,5 +451,7 @@ def tool_mark_journal_quote(args):
         "quote": quote,
         "grounding": grounding,
         "surface": "story hub archive + at most one featured line per week on home (/api/journal_quotes)",
-        "revoke": "mark_journal_quote(action='unmark', date=…, quote=…) any time — consent is revocable.",
+        # #1802: the sk is THE revoke handle — the date+quote form silently derives
+        # a different key on any byte drift from the frozen text.
+        "revoke": f"mark_journal_quote(action='unmark', date='{date}', sk='{sk}') any time — consent is revocable; keep this sk.",
     }
