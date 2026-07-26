@@ -64,7 +64,24 @@ const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</
 async function getJSON(p) { const r = await fetch(p, { headers: { accept: "application/json" } }); if (!r.ok) throw new Error(p + " " + r.status); return r.json(); }
 async function tryJSON(p) { try { return await getJSON(p); } catch (e) { return null; } }
 const cache = {};
-async function secFetch(s) { if (!s.url) return null; if (cache[s.key]) return cache[s.key]; const d = await tryJSON(s.url); cache[s.key] = d; return d; }
+async function secFetch(s) {
+  if (!s.url) return null;
+  if (cache[s.key]) return cache[s.key];
+  let d = await tryJSON(s.url);
+  // #1574: the lab-notes surface also carries the coaches' reactions to diary entries
+  // (the Third Wall, polarity inverted — the coach reacts to the human). Merge them
+  // onto the section data so entriesFor lists them beside the weekly field notes.
+  // Absent → nothing added (honest empty — an absent reaction renders nothing).
+  if (s.key === "lab-notes") {
+    const dr = await tryJSON("/api/diary_reactions");
+    if (dr && Array.isArray(dr.reactions) && dr.reactions.length) {
+      d = d || { entries: [] };
+      d.diary_reactions = dr.reactions;
+    }
+  }
+  cache[s.key] = d;
+  return d;
+}
 const domainOf = (pid) => String(pid || "").replace(/_coach$/, "");
 
 // #802 (R22-CONTENT-03): honest "as of / refresh paused" disclosure for a
@@ -98,7 +115,17 @@ function entriesFor(s, data) {
     // /story/coaches/ surface) — the head coach + huddle live here now.
     return s.kind === "team" ? [{ id: "team", title: "My Team", date: "the team's collective read on you" }].concat(roster) : roster;
   }
-  if (s.kind === "fieldnotes") return (data.entries || []).map((e) => ({ id: e.week, title: `Week ${e.week} field note`, date: e.ai_generated_at ? String(e.ai_generated_at).slice(0, 10) : "" }));
+  if (s.kind === "fieldnotes") {
+    const weeks = (data.entries || []).map((e) => ({ id: e.week, title: `Week ${e.week} field note`, date: e.ai_generated_at ? String(e.ai_generated_at).slice(0, 10) : "" }));
+    // #1574: coach reactions to diary entries, listed above the weekly notes. The id
+    // encodes date@channel so the renderer can find the reaction in the cached list.
+    const reactions = (data.diary_reactions || []).map((r) => ({
+      id: `diary:${r.date}${r.channel ? "@" + r.channel : ""}`,
+      title: `${r.coach_name || "A coach"} on the diary`,
+      date: r.date || "",
+    }));
+    return reactions.concat(weeks);
+  }
   if (s.kind === "scorecard") {
     const o = (data && data.overall) || {};
     const out = [{ id: "all", title: "The whole board", date: o.decided ? `${o.decided} decided` : `${o.total || 0} calls` }];
@@ -749,6 +776,35 @@ async function renderFieldNote(read, id) {
   enhanceCoachNames(read);
 }
 
+// ── COACH REACTIONS TO DIARY ENTRIES (#1574) — the Third Wall, polarity inverted ──
+// The HUMAN (a V3-consented diary entry) is the primary voice; the coach REACTS.
+// The reaction is already in the section's cached data (secFetch merged it), so this
+// is a pure render — no second fetch. The private entry never crossed the wire: the
+// producer reduced it to a leak-proof public context (theme + optional owner-cleared
+// quote) before storing, so nothing here can leak unmarked journal words.
+function renderDiaryReaction(read, id) {
+  const list = (cache["lab-notes"] || {}).diary_reactions || [];
+  const r = list.find((x) => `diary:${x.date}${x.channel ? "@" + x.channel : ""}` === id);
+  if (!r) { read.innerHTML = `<p class="dx-prose">This diary reaction isn't available.</p>`; return; }
+  const channelLabel = { video_diary: "video diary", solo_recording: "solo recording" }[r.channel] || "diary";
+  const themeLabel = String(r.theme || "").replace(/_/g, " ");
+  // The HUMAN voice — the V3-consented sliver: (quote tier) the one line he cleared,
+  // else an allude-only line naming the theme. His raw words stay private otherwise.
+  let human = `<div class="voice human"><span class="who">Matthew · ${esc(channelLabel)}</span>`;
+  human += r.quote
+    ? `<p class="what">“${esc(r.quote)}”</p>`
+    : `<p class="what pending-lead">He recorded a ${esc(channelLabel)}${themeLabel ? ` on ${esc(themeLabel)}` : ""} and cleared a short public reaction — the words themselves stay private.</p>`;
+  human += `</div>`;
+  // The MACHINE voice — the coach, responding to the human, not the sensors.
+  const machine = r.reaction
+    ? `<div class="voice machine"><span class="who">${esc(r.coach_name || "The coach")}</span><p class="what">${esc(r.reaction)}</p></div>`
+    : "";
+  read.innerHTML =
+    `<p class="dx-kicker label">diary reaction · ${esc(r.date || "")} · Matthew ↔ ${esc(r.coach_name || "the coach")}${r.tone ? ` · ${esc(r.tone)}` : ""}</p>` +
+    human + machine;
+  enhanceCoachNames(read);
+}
+
 // #743: "grounded in: recovery 48% · protein 7d avg 132g · presence quiet 9d" —
 // the reader-facing receipt for what the coach actually read before answering.
 // `grounding` is the server's `[{label, value}, ...]` array — every value is
@@ -957,7 +1013,7 @@ async function renderRead(s, id) {
   if (s.kind === "read") { if (id === "week") return renderReadWeek(read); if (id === "month") return renderReadMonth(read); if (id === "experiment") return renderReadExperiment(read); return renderReadToday(read); }
   if (s.kind === "bycoach") return renderByCoach(read, id);
   if (s.kind === "team") return String(id) === "team" ? renderTeamRead(read) : renderTeamCoach(read, id);
-  if (s.kind === "fieldnotes") return renderFieldNote(read, id);
+  if (s.kind === "fieldnotes") return String(id).startsWith("diary:") ? renderDiaryReaction(read, id) : renderFieldNote(read, id);
   if (s.kind === "scorecard") return renderScorecard(read, id);
   if (s.kind === "qa") { if (String(id) === "ask") return renderAskBoard(read); return renderAnswer(read, id); }
 }

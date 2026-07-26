@@ -931,6 +931,86 @@ def handle_field_notes(event):
     # AI Analysis (GET with ?expert= query param)
 
 
+def handle_diary_reactions(event):
+    """GET /api/diary_reactions — coach reactions to Video Diary entries (#1574).
+
+    The lab-notes counterpart of the field-note Third Wall, with the polarity
+    inverted: the HUMAN (a V3-consented diary entry) is the primary voice and the
+    coach REACTS. Read-only. Only reactions the producer stored are returned; the
+    entry itself is private — the producer (coach_diary_reaction) has already
+    reduced it to a leak-proof public context (theme + optional owner-cleared quote)
+    before anything was persisted, so this endpoint serves stored fields verbatim.
+
+    Absent → empty list (AC3: the site renders nothing, no empty shell). Phase-filtered
+    (ADR-058) so a wiped cycle's reactions don't resurface. Optional ?date= single mode,
+    else list (most recent first, ?limit= default 20 / max 50).
+    """
+    qs = event.get("queryStringParameters") or {}
+    dr_pk = f"{USER_PREFIX}diary_reactions"
+
+    def _shape(i):
+        out = {
+            "date": i.get("entry_date") or str(i.get("sk", "")).replace("DATE#", "").split("#")[0],
+            "channel": i.get("channel", "video_diary"),
+            "coach_id": i.get("coach_id"),
+            "coach_name": i.get("coach_name"),
+            "tone": i.get("tone", "reflective"),
+            "theme": i.get("theme"),
+            "tier": i.get("tier"),
+            # The coach's reaction — the MACHINE voice. Surgically scrubbed (defensive;
+            # it is platform-generated text, and its private-content boundary was already
+            # enforced at generation by diary_consent).
+            "reaction": _scrub_blocked_terms(str(i.get("reaction") or "")),
+            "generated_at": i.get("generated_at"),
+        }
+        # The single owner-cleared verbatim line (quote tier only) — the consented sliver
+        # of the HUMAN voice. All-or-nothing content screen (same as _public_decision_note):
+        # if scrubbing would alter it at all, drop it rather than serve a mangled quote.
+        q = i.get("quote")
+        if q:
+            note = _public_decision_note(q)
+            if note:
+                out["quote"] = note
+        return out
+
+    date_param = qs.get("date")
+    if date_param:
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(dr_pk) & Key("sk").begins_with(f"DATE#{date_param}"),
+                    "ScanIndexForward": False,
+                    "Limit": 5,
+                }
+            )
+        )
+        items = [i for i in _decimal_to_float(resp.get("Items", [])) if singleton_visible(i)]
+        if not items:
+            return _ok({"reaction": None, "date": date_param}, cache_seconds=300)
+        return _ok({"reaction": _shape(items[0]), "date": date_param}, cache_seconds=300)
+
+    try:
+        limit = max(1, min(50, int(qs.get("limit", 20))))
+    except (TypeError, ValueError):
+        limit = 20
+    try:
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(dr_pk) & Key("sk").begins_with("DATE#"),
+                    "ScanIndexForward": False,
+                    "Limit": 100,
+                }
+            )
+        )
+        items = [i for i in _decimal_to_float(resp.get("Items", [])) if singleton_visible(i)]
+    except Exception as e:  # pragma: no cover — a query hiccup serves shaped-empty
+        logger.warning(f"[diary_reactions] query failed: {e}")
+        items = []
+    reactions = [_shape(i) for i in items][:limit]
+    return _ok({"reactions": reactions, "count": len(reactions)}, cache_seconds=300)
+
+
 def _public_decision_note(text):
     """#1569: screen a VERBATIM decision note for public serving.
 
