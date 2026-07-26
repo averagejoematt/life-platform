@@ -6,11 +6,17 @@ No un-fire, no re-fire. The acceptance criteria, mapped to tests:
   * write-once / idempotent / immutable       → test_hysteresis_*, test_entries_are_never_mutated
   * trailing 7-day mean, never one weigh-in   → test_weight_needs_a_real_window_not_one_weigh_in
     (stored event carries window + n + mean)     test_event_carries_window_n_and_mean
-  * ONE global cooldown across ALL categories → test_three_categories_in_one_week_yield_one_event
+  * ONE global cooldown across ALL categories → test_multiple_categories_in_one_week_yield_one_event
   * permanent hysteresis                      → test_hysteresis_back_and_forth_yields_exactly_one_event
   * deliberate reset behaviour (ADR-077)      → test_partition_is_registered_cross_phase
   * consumers read, never re-derive           → test_single_writer_and_no_mutation_paths,
                                                 test_read_paths_write_nothing
+
+#1628 amended the emission rules this file exercises: weight is DEMOTED — a
+weight rung never emits alone, only as a companion of a same-run process or
+composition milestone (the weight fixtures below co-fire `return_after_gap`
+where a weight event is required). The weight-alone structural tests live in
+tests/test_process_milestones_1628.py.
 """
 
 import ast
@@ -66,8 +72,14 @@ def _habit_day(date: str, streak: int) -> dict:
     return {"pk": USER_PREFIX + "habit_scores", "sk": f"DATE#{date}", "t0_perfect_streak": streak}
 
 
+def _strava_day(date: str) -> dict:
+    return {"pk": USER_PREFIX + "strava", "sk": f"DATE#{date}"}
+
+
 def _sweep(table, today: str) -> dict:
-    return ml.sweep(table, USER_PREFIX, None, today)
+    # suppressed=False: the spiral-breaker gate has its own tests (#1628); these
+    # tests exercise the ledger mechanics with the breaker explicitly clear.
+    return ml.sweep(table, USER_PREFIX, None, today, suppressed=False)
 
 
 def _ledger_items(table) -> dict[str, dict]:
@@ -82,56 +94,75 @@ def _dates(start_md: str, n: int) -> list[str]:
     return [(d0 + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(n)]
 
 
+def _weight_companion_fixture():
+    """The recurring #1628-era fixture: three weigh-ins at 245 crossing sub_250,
+    plus a `return_after_gap` co-firing on 2026-05-05 so the weight rung has the
+    process companion it now requires to emit."""
+    table = FakeTable()
+    table.put_item(Item=_strava_day("2026-04-22"))
+    table.put_item(Item=_strava_day("2026-04-25"))
+    _sweep(table, "2026-05-01")  # genesis: nothing satisfied yet
+    for d in ("2026-05-02", "2026-05-03", "2026-05-04"):
+        table.put_item(Item=_weight_day(d, 245.0))
+        _sweep(table, d)
+    table.put_item(Item=_strava_day("2026-05-05"))  # 9 missed days after 04-25 -> return on day 3
+    return table
+
+
 # ── AC: trailing mean, never a single weigh-in ───────────────────────────────
 
 
 def test_weight_needs_a_real_window_not_one_weigh_in():
-    """A single weigh-in far below the threshold must NOT fire; the rung fires
-    only once the trailing 7-day window holds >= 3 weigh-ins whose mean crosses."""
+    """A single weigh-in far below the threshold must NOT fire; the rung needs a
+    trailing 7-day window holding >= 3 weigh-ins whose mean crosses — and since
+    #1628 it additionally needs a same-run process/composition companion."""
     table = FakeTable()
+    table.put_item(Item=_strava_day("2026-04-22"))
+    table.put_item(Item=_strava_day("2026-04-25"))
     _sweep(table, "2026-05-01")  # genesis: empty ledger, nothing satisfied
 
     table.put_item(Item=_weight_day("2026-05-02", 245.0))
     r = _sweep(table, "2026-05-02")
-    assert r["announced"] == [], "one weigh-in fired a weight milestone — the AC forbids exactly this"
+    assert r["announced"] == [] and r["deferred"] == [], "one weigh-in satisfied a weight rung — the AC forbids exactly this"
 
     table.put_item(Item=_weight_day("2026-05-03", 245.0))
     r = _sweep(table, "2026-05-03")
-    assert r["announced"] == [], "two weigh-ins fired — the window needs n >= 3"
+    assert r["announced"] == [] and r["deferred"] == [], "two weigh-ins satisfied a rung — the window needs n >= 3"
 
     table.put_item(Item=_weight_day("2026-05-04", 245.0))
     r = _sweep(table, "2026-05-04")
-    assert [e["milestone_id"] for e in r["announced"]] == ["weight_sub_250"]
+    assert r["announced"] == [], "a weight rung emitted with no companion (#1628 demotion)"
+    assert "weight_sub_250" in r["deferred"], "with n >= 3 the rung is satisfied — deferred until a companion co-fires"
+
+    table.put_item(Item=_strava_day("2026-05-05"))
+    r = _sweep(table, "2026-05-05")
+    assert [e["milestone_id"] for e in r["announced"]] == ["return_after_gap_2026-05-05", "weight_sub_250"]
 
 
 def test_event_carries_window_n_and_mean():
-    """ADR-105: the stored event must carry the window, the n, and the mean —
-    a consumer can render the claim with its uncertainty, or refuse to."""
-    table = FakeTable()
-    _sweep(table, "2026-05-01")
-    for d in ("2026-05-02", "2026-05-03", "2026-05-04"):
-        table.put_item(Item=_weight_day(d, 245.0))
-        _sweep(table, d)
+    """ADR-105: the stored event must carry the window, the n, the mean and the
+    spread — a consumer can render the claim with its uncertainty, or refuse to."""
+    table = _weight_companion_fixture()
+    _sweep(table, "2026-05-05")
 
     rec = table.items[(LEDGER_PK, "MILESTONE#weight_sub_250")]
     meas = rec["measurement"]
     assert meas["window_days"] == 7
     assert meas["n"] == 3
     assert meas["mean_lbs"] == Decimal("245.0")
+    assert meas["sd_lbs"] == Decimal("0.0")
     assert meas["threshold_lbs"] == 250
-    assert meas["window_start"] == "2026-04-28" and meas["window_end"] == "2026-05-04"
-    assert rec["event_date"] == "2026-05-04"
+    assert meas["window_start"] == "2026-04-29" and meas["window_end"] == "2026-05-05"
+    assert rec["event_date"] == "2026-05-05"
+    assert rec["companion_to"] == "return_after_gap_2026-05-05"  # #1628: never alone
 
 
 def test_same_ladder_rungs_crossed_together_are_subsumed_not_drip_announced():
-    """Mean 245 satisfies sub_340…sub_250 at once. The deepest rung announces;
-    the shallower ones are consumed silently (subsumed) — a lesser rung must
-    never be announced AFTER a greater one."""
-    table = FakeTable()
-    _sweep(table, "2026-05-01")
-    for d in ("2026-05-02", "2026-05-03", "2026-05-04"):
-        table.put_item(Item=_weight_day(d, 245.0))
-        _sweep(table, d)
+    """Mean 245 satisfies sub_340…sub_250 at once. The deepest rung emits (as the
+    companion); the shallower ones are consumed silently (subsumed) — a lesser
+    rung must never be announced AFTER a greater one."""
+    table = _weight_companion_fixture()
+    _sweep(table, "2026-05-05")
 
     items = _ledger_items(table)
     assert items["MILESTONE#weight_sub_250"]["announce"] is True
@@ -149,10 +180,11 @@ def test_same_ladder_rungs_crossed_together_are_subsumed_not_drip_announced():
 # ── AC: ONE global cooldown across ALL categories combined ───────────────────
 
 
-def test_three_categories_in_one_week_yield_exactly_one_event():
-    """The fixture the issue names: weight, streak and days_tracked all trip
-    inside one week — exactly ONE event may announce. The deferred rungs are
-    NOT consumed: they announce later, after the global cooldown."""
+def test_multiple_categories_in_one_week_yield_exactly_one_event():
+    """Weight, streak and days_tracked all trip inside one week — exactly ONE
+    event may announce (the global cooldown spans ALL categories). Since #1628
+    weight ranks LAST and never emits without a process/composition companion,
+    so the streak rung is the announced event and weight stays deferred."""
     table = FakeTable()
 
     # Genesis state: mean ~252 (consumes sub_260+ as baseline), streak 3,
@@ -179,16 +211,22 @@ def test_three_categories_in_one_week_yield_exactly_one_event():
         r = _sweep(table, d)
         announced += [e["milestone_id"] for e in r["announced"]]
 
-    assert announced == ["weight_sub_250"], f"three categories tripped in one week must yield exactly one event, got {announced}"
+    assert announced == ["streak_7"], f"three categories tripped in one week must yield exactly one event, got {announced}"
 
-    # The deferred categories announce AFTER the cooldown — one per window,
-    # highest-priority category first.
+    # The deferred category announces AFTER the cooldown — one per window,
+    # highest-priority ladder first. Weight NEVER announces here: no
+    # process/composition companion ever co-fires (#1628).
     later = []
     for d in _dates("05-09", 12):  # through 2026-05-20
         table.put_item(Item=_habit_day(d, 9))
         r = _sweep(table, d)
         later += [(d, e["milestone_id"]) for e in r["announced"]]
-    assert later == [("2026-05-16", "streak_7")], f"the deferred streak rung must fire once the 12-day global cooldown expires, got {later}"
+    assert later == [("2026-05-17", "days_tracked_30")], f"the deferred rung must fire once the 12-day global cooldown expires, got {later}"
+    # No weight rung ever CROSSED (genesis baselines are consumption, not emission):
+    # sub_250 stayed deferred all month because no process/composition companion co-fired.
+    weight_items = [v for sk, v in _ledger_items(table).items() if sk.startswith("MILESTONE#weight_")]
+    assert weight_items and all(v["origin"] == "baseline" and v["announce"] is False for v in weight_items)
+    assert "MILESTONE#weight_sub_250" not in _ledger_items(table), "a weight rung emitted without a companion"
 
 
 def test_cooldown_constant_is_inside_the_issue_band():
@@ -199,20 +237,27 @@ def test_cooldown_constant_is_inside_the_issue_band():
 
 
 def test_hysteresis_back_and_forth_yields_exactly_one_event():
-    """Drive the trailing mean below the threshold, back above, and below again
-    (with the cooldown fully expired in between) — exactly one event may exist,
-    and the stored entry must be byte-identical to the day it was written."""
+    """Drive the trailing mean below the threshold (with a companion co-firing so
+    the rung can emit at all), back above, and below again — exactly one weight
+    event may exist, and the stored entry must be byte-identical to the day it
+    was written."""
     table = FakeTable()
+    table.put_item(Item=_strava_day("2026-04-21"))
+    table.put_item(Item=_strava_day("2026-04-24"))
     for d in ("2026-04-29", "2026-04-30", "2026-05-01"):
         table.put_item(Item=_weight_day(d, 252.0))
     _sweep(table, "2026-05-01")  # genesis (consumes sub_260+ as baseline)
 
-    # Below: crossing confirmed.
+    # Below: crossing confirmed on 05-04, the day the return co-fires
+    # (04-24 -> 05-04 = 9 missed days, back on day 3 of the return window).
     for d, lbs in [("2026-05-02", 246.0), ("2026-05-03", 245.0), ("2026-05-04", 244.0)]:
         table.put_item(Item=_weight_day(d, lbs))
+        if d == "2026-05-04":
+            table.put_item(Item=_strava_day(d))
         _sweep(table, d)
     assert (LEDGER_PK, "MILESTONE#weight_sub_250") in table.items
     snapshot = dict(table.items[(LEDGER_PK, "MILESTONE#weight_sub_250")])
+    assert snapshot["companion_to"] == "return_after_gap_2026-05-04"
 
     # Back above for 16 days (cooldown long expired), then below again for 7.
     for d in _dates("05-05", 16):
@@ -232,16 +277,13 @@ def test_hysteresis_back_and_forth_yields_exactly_one_event():
 
 def test_entries_are_never_mutated_by_re_evaluation():
     """Idempotency: sweeping the same day repeatedly writes nothing new and
-    changes nothing existing."""
-    table = FakeTable()
-    _sweep(table, "2026-05-01")
-    for d in ("2026-05-02", "2026-05-03", "2026-05-04"):
-        table.put_item(Item=_weight_day(d, 245.0))
-        _sweep(table, d)
+    changes nothing existing — including the day real events were written."""
+    table = _weight_companion_fixture()
+    _sweep(table, "2026-05-05")  # writes return_after_gap + the weight companion ladder
     before = {k: dict(v) for k, v in table.items.items()}
 
     for _ in range(5):
-        r = _sweep(table, "2026-05-04")
+        r = _sweep(table, "2026-05-05")
         assert r["written"] == [] and r["announced"] == []
     assert table.items == before
 
@@ -254,6 +296,8 @@ def test_genesis_consumes_already_true_rungs_without_announcing():
     baseline — announce=False, event_date=None (their crossings predate the
     ledger; no honest date exists) — and can never fire later."""
     table = FakeTable()
+    table.put_item(Item=_strava_day("2026-04-18"))
+    table.put_item(Item=_strava_day("2026-04-25"))
     for d in ("2026-04-29", "2026-04-30", "2026-05-01"):
         table.put_item(Item=_weight_day(d, 252.0))
     for i, d in enumerate(_dates("03-01", 40)):
@@ -273,11 +317,19 @@ def test_genesis_consumes_already_true_rungs_without_announcing():
     # Nothing announced from history, ever: the consumer surface is empty.
     assert ml.read_announced_events(table, USER_PREFIX) == []
 
-    # And genesis is a one-time state: a later fresh crossing IS announced.
+    # And genesis is a one-time state: a later fresh crossing IS announced —
+    # but a weight crossing alone stays silent until its companion co-fires (#1628).
     for d, lbs in [("2026-05-02", 246.0), ("2026-05-03", 245.0), ("2026-05-04", 244.0)]:
         table.put_item(Item=_weight_day(d, lbs))
         r = _sweep(table, d)
-    assert [e["milestone_id"] for e in ml.read_announced_events(table, USER_PREFIX)] == ["weight_sub_250"]
+    assert ml.read_announced_events(table, USER_PREFIX) == []
+    assert "MILESTONE#weight_sub_250" not in _ledger_items(table)
+
+    table.put_item(Item=_strava_day("2026-05-05"))  # 9 missed days after 04-25 -> return on day 3
+    _sweep(table, "2026-05-05")
+    announced = ml.read_announced_events(table, USER_PREFIX)
+    assert [e["milestone_id"] for e in announced] == ["return_after_gap_2026-05-05", "weight_sub_250"]
+    assert announced[1]["companion_to"] == "return_after_gap_2026-05-05"
 
 
 # ── Reset behaviour (ADR-077) ────────────────────────────────────────────────
@@ -299,11 +351,8 @@ def test_partition_is_registered_cross_phase():
 
 
 def test_read_paths_write_nothing():
-    table = FakeTable()
-    _sweep(table, "2026-05-01")
-    for d in ("2026-05-02", "2026-05-03", "2026-05-04"):
-        table.put_item(Item=_weight_day(d, 245.0))
-        _sweep(table, d)
+    table = _weight_companion_fixture()
+    _sweep(table, "2026-05-05")
     snapshot = {k: dict(v) for k, v in table.items.items()}
 
     ml.read_ledger(table, USER_PREFIX)
@@ -314,7 +363,7 @@ def test_read_paths_write_nothing():
 def test_single_writer_and_no_mutation_paths():
     """Exactly one module in lambdas/ + mcp/ may write the milestones partition,
     and that module must expose NO update or delete path (immutability is
-    structural, not a convention)."""
+    structural, not a convention). process_milestones.py stays pure by design."""
     writers = set()
     for base in (ROOT / "lambdas", ROOT / "mcp"):
         for path in base.rglob("*.py"):
@@ -335,7 +384,8 @@ def test_single_writer_and_no_mutation_paths():
 
 
 def test_written_items_are_decimal_safe():
-    """boto3 rejects Python floats — every stored number must be Decimal/int."""
+    """boto3 rejects Python floats — every stored number must be Decimal/int
+    (including the process-milestone measurements' sd/sem fields, #1628)."""
 
     def _no_floats(obj, path="item"):
         if isinstance(obj, float):
@@ -347,12 +397,11 @@ def test_written_items_are_decimal_safe():
             for i, v in enumerate(obj):
                 _no_floats(v, f"{path}[{i}]")
 
-    table = FakeTable()
-    _sweep(table, "2026-05-01")
-    for d in ("2026-05-02", "2026-05-03", "2026-05-04"):
-        table.put_item(Item=_weight_day(d, 245.0))
-        _sweep(table, d)
-    for sk, item in _ledger_items(table).items():
+    table = _weight_companion_fixture()
+    _sweep(table, "2026-05-05")
+    items = _ledger_items(table)
+    assert any(sk.startswith("MILESTONE#") for sk in items), "fixture wrote no events to check"
+    for sk, item in items.items():
         _no_floats(item, sk)
 
 
@@ -361,4 +410,8 @@ def test_catalog_ids_unique_and_ladders_ordered():
     for cat in ml.CATEGORY_PRIORITY:
         depths = [r.depth for r in ml.MILESTONE_RULES if r.category == cat]
         assert depths == sorted(depths), f"{cat} ladder depths out of order"
-    assert set(r.category for r in ml.MILESTONE_RULES) == set(ml.CATEGORY_PRIORITY)
+    # Static rungs cover the pre-#1628 categories; the window-milestone categories
+    # (process/composition) come from process_milestones and rank ABOVE them.
+    assert set(r.category for r in ml.MILESTONE_RULES) == {"weight", "streak", "days_tracked", "level"}
+    assert set(ml.CATEGORY_PRIORITY) == {"process", "composition", "weight", "streak", "days_tracked", "level"}
+    assert ml.CATEGORY_PRIORITY[-1] == "weight" and ml.LADDER_PRIORITY[-1] == "weight", "#1628: weight is demoted to last"

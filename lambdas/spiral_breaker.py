@@ -132,7 +132,9 @@ CELEBRATORY_EMITTERS = {
     "state_of_matthew": {"path": "lambdas/compute/state_of_matthew_lambda.py", "wired": False},
     "coach_commentary": {"path": "lambdas/web/site_api_coach.py", "wired": False},
     "og_share_cards": {"path": "lambdas/og_image_lambda.mjs", "wired": False},
-    "milestone_announcements": {"path": "lambdas/milestone_ledger.py", "wired": False, "pending_issue": 1626},
+    # #1628: milestone_ledger.sweep routes announcements through check_celebration_allowed
+    # (fail-closed; suppressed rungs stay unconsumed and re-evaluate later).
+    "milestone_announcements": {"path": "lambdas/milestone_ledger.py", "wired": True},
 }
 
 USER_PREFIX = "USER#matthew#SOURCE#"
