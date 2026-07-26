@@ -258,10 +258,18 @@ def _domain_brier(coach_id):
 
 def _confidence_at_open(coach_id, subdomain):
     """Bayesian CONFIDENCE# mean for the metric's subdomain (0.5 uninformed) —
-    the honest, data-derived confidence this docket position is scored at."""
+    the honest, data-derived confidence this docket position is scored at.
+
+    ADR-077: get_item bypasses query-level phase filters entirely, so a
+    tombstoned (wiped prior-cycle) CONFIDENCE# row must be treated as absent —
+    the same guard 774631fb landed on the two CONFIDENCE# WRITE paths, applied
+    here on the read (#1788). Falls back to the uninformed 0.5 prior exactly
+    like the never-written case."""
     try:
+        from phase_filter import singleton_visible
+
         item = table.get_item(Key={"pk": f"COACH#{coach_id}", "sk": f"CONFIDENCE#{subdomain}"}).get("Item")
-        if item and item.get("mean_confidence") is not None:
+        if singleton_visible(item) and item.get("mean_confidence") is not None:
             return round(float(item["mean_confidence"]), 3)
     except Exception as e:
         logger.warning("confidence read failed for %s/%s: %s", coach_id, subdomain, e)
