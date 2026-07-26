@@ -1,6 +1,6 @@
 # AWS Access — the authoritative human-access procedure
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-12
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-26 (#1029 re-entry hardening — §3 break-glass status re-verified read-only)
 > **Sources of truth:** `grep -h "role-to-assume" .github/workflows/*.yml | sort -u` (CI role inventory) · `aws sts get-caller-identity` (live auth check) · `docs/SECURITY.md` (policy stance) · `docs/OPERATOR_GUIDE.md` (day-1 checklist)
 
 This file is the **single home** for how a human gets AWS access to the platform.
@@ -111,6 +111,19 @@ just `aws sso login` again.
 **When this is acceptable:** IAM Identity Center outage, or initial bootstrap
 (no Identity Center provisioned yet — the state as of 2026-07-10). Not for daily
 work once SSO is live.
+
+> ⚠️ **#1029 finding (verified 2026-07-26, read-only `iam:ListAccessKeys`):**
+> Identity Center has been LIVE since 2026-07-12 (§2), but `matthew-admin` still
+> has one **Active** access key created 2026-02-21 — 155+ days old, well past
+> the 90-day rotation cadence below, and now redundant now that SSO is the
+> daily path. **Owner action required** (deactivating a key is an IAM mutation
+> — no AI session performs it). Get the exact key ID first (never hardcode it
+> in a doc — this repo is public), then park it:
+> ```bash
+> aws iam list-access-keys --user-name matthew-admin                 # get the AccessKeyId
+> aws iam update-access-key --user-name matthew-admin --access-key-id <id-from-above> --status Inactive
+> ```
+> Re-run `python3 scripts/check_reentry_hardening.py` after to confirm it reports PASS.
 
 **Create** (Console → IAM → Users → `matthew-admin` → Security credentials →
 Create access key, or from an already-authenticated shell):
