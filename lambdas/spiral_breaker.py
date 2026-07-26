@@ -135,6 +135,9 @@ CELEBRATORY_EMITTERS = {
     # #1628: milestone_ledger.sweep routes announcements through check_celebration_allowed
     # (fail-closed; suppressed rungs stay unconsumed and re-evaluate later).
     "milestone_announcements": {"path": "lambdas/milestone_ledger.py", "wired": True},
+    # #1623: the private milestone digest — no celebratory note to the named
+    # humans during a suspected downturn (fail-closed; event stays pending).
+    "milestone_digest": {"path": "lambdas/emails/milestone_digest_lambda.py", "wired": True},
 }
 
 USER_PREFIX = "USER#matthew#SOURCE#"

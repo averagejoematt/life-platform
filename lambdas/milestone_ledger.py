@@ -445,6 +445,80 @@ def read_announced_events(table, user_prefix: str) -> list[dict]:
     return sorted(events, key=lambda e: str(e["event_date"]))
 
 
+# ── Digest cursor (#1623) ─────────────────────────────────────────────────────
+# The private milestone digest is the ledger's first consumer with a "which
+# announced events were already delivered" boundary. The cursor rows live in
+# THIS partition (CROSS_PHASE — a reset must never cause a re-send) and are
+# written only through this module, preserving the single-writer discipline
+# stated in the module header. Same genesis semantics as the ledger itself:
+# the first digest run BASELINES every already-announced event (never mails
+# old news) — only crossings announced after arming produce a note.
+DIGEST_SK_PREFIX = "DIGEST#sent#"
+DIGEST_GENESIS_SK = "DIGEST#genesis"
+DIGEST_ORIGIN_SENT = "sent"
+DIGEST_ORIGIN_BASELINE = "baseline"
+
+
+def read_digest_state(table, user_prefix: str) -> dict:
+    """Digest cursor: {"sent_ids": set, "last_sent_date": str|None, "has_genesis": bool}.
+
+    ``last_sent_date`` counts only genuinely mailed notes (origin="sent") —
+    baseline rows are consumed history, not deliveries.
+    """
+    kwargs: dict[str, Any] = {
+        "KeyConditionExpression": "pk = :pk AND begins_with(sk, :d)",
+        "ExpressionAttributeValues": {":pk": user_prefix + MILESTONES_SOURCE, ":d": "DIGEST#"},
+    }
+    items: list[dict] = []
+    while True:
+        resp = table.query(**kwargs)
+        items.extend(resp.get("Items", []))
+        last = resp.get("LastEvaluatedKey")
+        if not last:
+            break
+        kwargs = dict(kwargs, ExclusiveStartKey=last)
+
+    sent_rows = [i for i in items if str(i.get("sk", "")).startswith(DIGEST_SK_PREFIX)]
+    sent_dates = [str(i["sent_date"]) for i in sent_rows if i.get("origin") == DIGEST_ORIGIN_SENT and i.get("sent_date")]
+    return {
+        "sent_ids": {i.get("milestone_id") or str(i.get("sk", ""))[len(DIGEST_SK_PREFIX) :] for i in sent_rows},
+        "last_sent_date": max(sent_dates) if sent_dates else None,
+        "has_genesis": any(str(i.get("sk", "")) == DIGEST_GENESIS_SK for i in items),
+    }
+
+
+def write_digest_genesis(table, user_prefix: str, armed_date: str, stamp: dict | None = None) -> bool:
+    """Arm the digest: one write-once marker recording when delivery began."""
+    return _put_once(table, user_prefix, {"sk": DIGEST_GENESIS_SK, "armed_date": armed_date, "recorded_at": armed_date}, stamp)
+
+
+def mark_digest_sent(
+    table,
+    user_prefix: str,
+    milestone_id: str,
+    *,
+    origin: str,
+    sent_date: str | None,
+    recorded_at: str,
+    delivered: int = 0,
+    stamp: dict | None = None,
+) -> bool:
+    """Write-once digest cursor row for one announced event.
+
+    origin="baseline" (pre-arming history, sent_date=None, never mailed) or
+    origin="sent" (a note actually went out on sent_date to ``delivered`` people).
+    """
+    entry = {
+        "sk": DIGEST_SK_PREFIX + milestone_id,
+        "milestone_id": milestone_id,
+        "origin": origin,
+        "sent_date": sent_date,
+        "delivered": delivered,
+        "recorded_at": recorded_at,
+    }
+    return _put_once(table, user_prefix, entry, stamp)
+
+
 def _put_once(table, user_prefix: str, entry: dict, stamp: dict | None) -> bool:
     """Conditional write-once put. Returns False when the key already exists.
 

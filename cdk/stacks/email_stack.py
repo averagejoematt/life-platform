@@ -344,6 +344,25 @@ class EmailStack(Stack):
             **shared,
         )
 
+        # #1623: Private milestone digest — a short replyable note to the 5-8 people
+        # Matthew chose, only on a durable MILESTONE# announcement, spiral-breaker
+        # gated, ledger-spaced (>=10-14 days). Runs daily AFTER the 16:40 UTC
+        # milestone sweep; a run with nothing new (or no recipients configured
+        # yet) is a logged no-op. cron(15 17 * * ? *) = 10:15 AM PDT.
+        create_platform_lambda(
+            self,
+            "MilestoneDigest",
+            function_name="milestone-digest",
+            handler="emails.milestone_digest_lambda.lambda_handler",
+            source_file="lambdas/emails/milestone_digest_lambda.py",
+            schedule="cron(15 17 * * ? *)",
+            timeout_seconds=60,
+            memory_mb=256,
+            environment={**_email_env, "DIGEST_SECRET": "life-platform/digest"},
+            custom_policies=rp.email_milestone_digest(),
+            **shared,
+        )
+
         # #1382: Coach nudge — "the coach who texts first". Deterministic decision-moment
         # triggers (no dinner log while a nutrition experiment is active, ACWR crossing
         # into an alert band, a verdict resolving tomorrow) fire ONE short coach-voiced

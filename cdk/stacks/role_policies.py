@@ -1049,6 +1049,12 @@ def email_nutrition_review() -> list[iam.PolicyStatement]:
     return _email_base()
 
 
+def email_milestone_digest() -> list[iam.PolicyStatement]:
+    """Milestone digest (#1623): DDB read/write (ledger + digest cursor), SES,
+    plus the operator-configured recipient list at life-platform/digest."""
+    return _email_base(extra_secrets=["life-platform/digest"])
+
+
 def email_chronicle_podcast() -> list[iam.PolicyStatement]:
     """Chronicle podcast: DDB read (content_markdown), S3 read the LIVE chronicle
     manifest (generated/journal/posts.json — #1121; site/chronicle/posts.json is
