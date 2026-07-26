@@ -127,3 +127,12 @@ before 2026-08-20 · LICENSES §5 (`not-work — owner actions`).
 - **Live: budget tier 1** (unchanged all session).
 
 **Build beat:** 2026-07-26-cycle-11-reset-rolling-prologue
+
+## Residual / next picks
+
+- Monday Day-1 verification checklist (restart_verify.py, flip, weigh-in supersedes override, brief, first cron billing run) — not-work — standing ops reminders, executes 2026-07-27 morning.
+- `python3 deploy/rebaseline_milestone_ledger_1807.py --apply` — owner runs via `!` (dry-run reviewed 2026-07-26, 27 rungs) — closes #1807.
+- CDK deploy LifePlatformCore/Email/Monitoring/Operational (paging topic #1333, milestone-digest #1623, paging alarms) + `deploy/wire_paging_phone.sh` — owner runs via `!`.
+- `life-platform/digest` recipients secret — not-work — owner provisions to arm #1623.
+- #1738 TTS pick — not-work — owner listens to the three parked renders.
+- #1571 AC4 — not-work — owner's 5-minute voice-mode phone test.
