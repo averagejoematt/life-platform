@@ -14,6 +14,7 @@ import { isNewSince, mountSinceRibbon } from "/assets/js/since.js"; // uplevel P
 import { instrumentMark } from "/assets/js/sigils.js";
 import { portrait, wireSpeakingAudio } from "/assets/js/portraits.js"; // §8.7 — portrait(c) || sigil(c); #594 semantic states
 import { icon } from "/assets/js/icons.js";
+import { ruleBand } from "/assets/js/texture.js"; // #1471 — the editorial texture layer
 import { wireTabList, markActiveTab } from "/assets/js/tabs.js"; // #579 — real ARIA tabs
 import { readAloudFor } from "/assets/js/read_aloud.js"; // #1121 — per-article, reset-safe audio join
 
@@ -516,7 +517,17 @@ async function renderRead(s, id) {
   const elenaMark = s.key === "chronicle"
     ? (portrait({ persona_id: "elena_voss", name: "Elena Voss" }, { size: 26, state: "writing" }) || "")
     : "";
-  read.innerHTML = art + `<p class="dx-kicker label">${s.key === "chronicle" ? `${elenaMark ? `<span class="coach-mark" style="--coach:#94a3b8">${elenaMark}</span>` : ""}chronicle · Elena Voss` : "journal"}${ent.label ? ` · ${esc(ent.label)}` : s.key === "chronicle" && ent.id ? ` · week ${esc(ent.id)}` : ""}${ent.date ? ` · ${esc(ent.date)}` : ""}</p>` +
+  // #1471 — per-installment texture: a thin measuring-rule band above the
+  // chronicle header, seeded by the installment itself (same installment →
+  // byte-identical, forever); the ember beads count the real week number. The
+  // genesis-anchored LABEL is the honest week source (ent.id is the date; the
+  // raw `week` field can repeat — see entriesFor). A Prologue installment is
+  // pre-genesis, so it honestly carries no counted beads.
+  const wkm = s.key === "chronicle" ? /^Week (\d+)$/.exec(ent.label || "") : null;
+  const chapterArt = s.key === "chronicle"
+    ? `<div class="art-band art-chapter" aria-hidden="true">${ruleBand("chronicle:" + (ent.date || ent.id || ""), { emphasis: wkm ? Number(wkm[1]) : 0 })}</div>`
+    : "";
+  read.innerHTML = chapterArt + art + `<p class="dx-kicker label">${s.key === "chronicle" ? `${elenaMark ? `<span class="coach-mark" style="--coach:#94a3b8">${elenaMark}</span>` : ""}chronicle · Elena Voss` : "journal"}${ent.label ? ` · ${esc(ent.label)}` : s.key === "chronicle" && ent.id ? ` · week ${esc(ent.id)}` : ""}${ent.date ? ` · ${esc(ent.date)}` : ""}</p>` +
     `<h2 class="dx-title">${esc(ent.title)}</h2>` + listen + (ent.meta ? `<p class="dx-stats label">${esc(ent.meta)}</p>` : "") +
     prevRail + `<p class="dx-prose dx-excerpt">${esc(ent.excerpt || "")}</p>` + readmore + dispatchFoot(s, ent, all);
   read.querySelectorAll(".dx-prevlink").forEach((b) => b.addEventListener("click", () => selectEntry(s, b.dataset.id)));
@@ -704,5 +715,21 @@ stampGenesis();  // cross-site Day-N/Week-N anchor (matches the Home hero)
     rib.hidden = true;
     head.insertAdjacentElement("afterend", rib);
     mountSinceRibbon(rib);
+  } catch (e) { /* enhancement only */ }
+})();
+
+// #1471 — the editorial texture layer: one quiet measuring-rule band closing
+// the story hub's hero. Deterministic (fixed seed → byte-identical, forever),
+// instrument vocabulary only (texture.js), decorative by contract — a no-JS
+// reader loses nothing but atmosphere.
+(function storyArt() {
+  try {
+    const hero = document.querySelector(".page-hero");
+    if (!hero || hero.querySelector(".art-band")) return;
+    const band = document.createElement("div");
+    band.className = "art-band art-hub";
+    band.setAttribute("aria-hidden", "true");
+    band.innerHTML = ruleBand("the-story");
+    hero.appendChild(band);
   } catch (e) { /* enhancement only */ }
 })();

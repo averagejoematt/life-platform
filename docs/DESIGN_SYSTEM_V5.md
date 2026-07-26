@@ -353,6 +353,33 @@ procedure in `docs/design/PORTRAIT_RUNBOOK.md`):
 - **Disclosure is structural**: `aria-label="Illustrated portrait of <name>, a fictional AI
   persona"`; team/about surfaces carry the one-line disclosure sentence (runbook §6).
 
+### 8.8 The editorial texture layer — `site/assets/js/texture.js` (#1471)
+
+Code-drawn art for the narrative surfaces where readers linger — the story hub, chronicle
+installment headers, and season (attempt/cycle) banners. **Not a new vocabulary**: `texture.js`
+imports the SAME identity machinery `sigils.js` exports (FNV-1a → mulberry32 — one hash vocabulary
+across sigils, portraits, and texture; shared drawing machinery lives in ONE place, per the
+#1471/#1379/#1114 compose-don't-duplicate rule) and draws only instrument geometry — rule lines,
+measuring graduations, orbital nodes — with the `.sigil-ring/-tick/-node` stroke grammar, so the
+§13 draw-in and reduced-motion behaviour apply unchanged. No stock imagery, no runtime AI
+generation, no random state: same seed → byte-identical SVG, forever.
+
+- `ruleBand(seed, {emphasis})` — a wide measuring-rule strip (baseline + seeded graduations +
+  resting nodes). The story hub's hero closes with one (fixed seed); each chronicle installment
+  header opens with its own (seeded by the installment, `emphasis` = the real week number).
+- `seasonBand(cycle, {seed})` — the season banner: the rule band whose counted ember beads ARE
+  the attempt number (cycle 10 renders ten beads — the mark literally counts the record). On the
+  home season-premiere beat (#1244) and every card of the attempts ledger (#1375).
+
+Rules: texture is decorative (`aria-hidden`, `pointer-events: none`, no `<text>` — nothing for the
+§10.5 SVG type floor to police), quiet (muted ink at low opacity — the `.art-band` host classes in
+`tokens.css`), and fail-open (JS-injected; a no-JS or reduced-motion reader loses nothing but
+atmosphere). The ONE ember note is the data-derived count (`.art-count`) — earned per §8.5, never
+decoration-confetti. Narrative surfaces only — data/meal/vitals surfaces stay texture-free for the
+same reason they stay image-free (§8.3). Extending it: new marks derive from the instrument
+vocabulary or from real data, and any vocabulary a second module needs moves into
+`texture.js`/`sigils.js` — never gets copied.
+
 ## 9. Performance budget — LCP/CLS/JS-bytes (#580)
 
 The craft floor the later motion/cinematic phases build on top of: `tests/visual_qa.py` (the

@@ -18,6 +18,7 @@ import { mountAsk } from "/assets/js/ask.js"; // uplevel P2 — the live inline 
 import { mountSinceRibbon } from "/assets/js/since.js"; // uplevel P5 — returnability, reader-keyed
 import { instrumentMark, fnv1a, mulberry32 } from "/assets/js/sigils.js"; // visual P2 + #590 seeded drift
 import { domainIcon } from "/assets/js/icons.js"; // #590 — pillar icon for the hover door affordance
+import { seasonBand } from "/assets/js/texture.js"; // #1471 — the season banner on the premiere beat
 
 const $ = (s, r = document) => r.querySelector(s);
 const bind = (n, r = document) => r.querySelector(`[data-bind="${n}"]`);
@@ -937,6 +938,14 @@ function cycleBeat(d) {
   set("[data-home-cycle-kicker]", beat.kicker);
   set("[data-home-cycle-h]", beat.h);
   set("[data-home-cycle-note]", beat.note);
+  // #1471 — the season banner: the premiere beat opens with the cycle's own
+  // texture band, and the counted ember beads ARE the attempt number (real
+  // data from the same payload — never hardcoded). Idempotent re-mount guard.
+  const cur = Number(d.current_cycle);
+  if (Number.isFinite(cur) && cur > 0 && !wrap.querySelector("[data-art-season]")) {
+    wrap.insertAdjacentHTML("afterbegin",
+      `<div class="art-band art-season" data-art-season aria-hidden="true">${seasonBand(cur)}</div>`);
+  }
   wrap.hidden = false;
 })();
 
