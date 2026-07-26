@@ -39,6 +39,9 @@
       },
       "resolved": {
         "type": "array"
+      },
+      "withheld": {
+        "type": "integer"
       }
     },
     "type": "object"

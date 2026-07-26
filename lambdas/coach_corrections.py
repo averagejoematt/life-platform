@@ -156,18 +156,32 @@ def list_corrections(
     `status` and/or `error_class`. No GSI (adding one requires an ADR) — this is a
     single-partition Query with client-side filtering, which is the right tradeoff
     for a durable feedback ledger that is written at human speed, not high volume.
+
+    Paginates via `LastEvaluatedKey` (#1796): a single Query response silently
+    caps at DynamoDB's ~1MB-per-page limit, which used to mean that once the
+    partition outgrew one page, the OLDEST corrections (queried newest-first)
+    were simply never seen — including retractions, whose subjects would then
+    reappear on the public dossier with no error and no signal. Pages are
+    fetched newest-first until either the (post-filter) result reaches `limit`
+    or the partition is exhausted, so the common small-ledger case still costs
+    exactly one page.
     """
     from boto3.dynamodb.conditions import Key
 
-    resp = table.query(
-        KeyConditionExpression=Key("pk").eq(PK),
-        ScanIndexForward=False,
-    )
-    items = resp.get("Items", [])
-    if status is not None:
-        items = [i for i in items if i.get("status") == status]
-    if error_class is not None:
-        items = [i for i in items if i.get("error_class") == error_class]
+    items: list = []
+    kwargs = {"KeyConditionExpression": Key("pk").eq(PK), "ScanIndexForward": False}
+    while True:
+        resp = table.query(**kwargs)
+        for i in resp.get("Items", []):
+            if status is not None and i.get("status") != status:
+                continue
+            if error_class is not None and i.get("error_class") != error_class:
+                continue
+            items.append(i)
+        last_key = resp.get("LastEvaluatedKey")
+        if not last_key or len(items) >= limit:
+            break
+        kwargs["ExclusiveStartKey"] = last_key
     return items[:limit]
 
 

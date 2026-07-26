@@ -428,9 +428,15 @@ def _dossier_block(coach_id):
     + genotype patterns) — a hit withholds the WHOLE record and the payload counts
     it. ADR-141 §4: channel=conversation LEARNING# rows never enter this block.
     Corrections reuse the #1689 ledger (surface=coach_dossier): retractions remove
-    a record here (counted); correction notes render dated under the original line.
-    Per-section fail-soft — a query error yields that section's honest empty, never
-    a 500 (the dossier must not take the coach page down)."""
+    a record here (counted, including RELATIONSHIP#state — #1794); correction
+    notes render dated under the original line. Per-SECTION fail-soft — a
+    commitments/learnings/relationship/docket query error yields that section's
+    honest empty, never a 500 (the dossier must not take the coach page down).
+    The CORRECTIONS read is different and deliberately fail-CLOSED (#1796): an
+    error there withholds every section corrections apply to (rather than
+    serving them unfiltered, which could republish a record under an unread
+    retraction) and sets `degraded=True` so the failure is disclosed, not
+    masked behind `retracted: 0`."""
     withheld = 0
 
     def _rows(sk_prefix, limit):
@@ -500,6 +506,7 @@ def _dossier_block(coach_id):
     docket_positions.sort(key=lambda e: e.get("resolution_date") or "")
 
     retracted = 0
+    degraded = False
     try:
         ledger = [_decimal_to_float(r) for r in coach_corrections.list_corrections(table, limit=500)]
         corrections = coach_dossier.dossier_corrections(ledger, coach_id)
@@ -507,9 +514,34 @@ def _dossier_block(coach_id):
             commitments, r1 = coach_dossier.apply_corrections(commitments, corrections)
             learnings, r2 = coach_dossier.apply_corrections(learnings, corrections)
             docket_positions, r3 = coach_dossier.apply_corrections(docket_positions, corrections)
-            retracted = r1 + r2 + r3
+            # #1794: relationship is a single dict, not a list — round-trip it
+            # through the same list-shaped apply_corrections so RELATIONSHIP#state
+            # retractions are honored exactly like every other record class.
+            relationship_wrapped, r4 = coach_dossier.apply_corrections([relationship] if relationship else [], corrections)
+            relationship = relationship_wrapped[0] if relationship_wrapped else None
+            retracted = r1 + r2 + r3 + r4
     except Exception as _e:
         logger.warning(f"[dossier] corrections {coach_id}: {_e}")
+        # #1796: FAIL CLOSED. A corrections-read error must never let a possibly-
+        # retracted record slip out uncorrected — the corrected sections are
+        # withheld entirely (honest-empty) rather than served unfiltered, and the
+        # payload's own honesty ledger discloses the degradation instead of
+        # silently reporting retracted=0 while serving retracted content.
+        commitments, learnings, docket_positions, relationship = [], [], [], None
+        degraded = True
+
+    disclosure = (
+        "Rendered verbatim from this coach's memory records — deterministic build, no AI in the "
+        "render path. Every line carries its date. Lines that fail the standing privacy filter are "
+        "withheld and counted; records Matthew has retracted are removed and counted — the "
+        "retraction itself is a logged correction, never a silent edit."
+    )
+    if degraded:
+        disclosure += (
+            " The corrections ledger could not be read for this request, so commitments, learnings, "
+            "docket positions, and relationship state are withheld rather than risk serving a record "
+            "under an unread retraction."
+        )
 
     return {
         "verbatim": True,
@@ -520,12 +552,8 @@ def _dossier_block(coach_id):
         "docket_positions": docket_positions,
         "withheld": withheld,
         "retracted": retracted,
-        "disclosure": (
-            "Rendered verbatim from this coach's memory records — deterministic build, no AI in the "
-            "render path. Every line carries its date. Lines that fail the standing privacy filter are "
-            "withheld and counted; records Matthew has retracted are removed and counted — the "
-            "retraction itself is a logged correction, never a silent edit."
-        ),
+        "degraded": degraded,
+        "disclosure": disclosure,
     }
 
 
@@ -835,8 +863,18 @@ def handle_coach_docket(event):
     SAME shape and order — a lost dispute renders with the same dignity as a
     won one (no burying; ADR-104). Verdicts are computed by code in the
     prediction evaluator's daily lane — no LLM ever grades an outcome
-    (ADR-105). Shaped-empty 200 until the first docket opens."""
+    (ADR-105). Shaped-empty 200 until the first docket opens.
+
+    #1795 — privacy pass: `claims`/`topic`/`criterion.description`/`concession`
+    are LLM-authored (the ensemble digest's disagreement text, stored verbatim
+    by dispute_docket.open_docket / recorded verbatim on resolve). This is the
+    same free-text class the coach dossier withholds via
+    coach_dossier.find_dossier_violations — reused here, not forked, so this
+    public surface can't leak what the dossier is fail-closed to protect. A hit
+    anywhere in an entry withholds the WHOLE entry (never a partial redaction)
+    and the payload counts it."""
     open_entries, resolved = [], []
+    withheld = 0
     try:
         items = table.query(
             KeyConditionExpression=Key("pk").eq("ENSEMBLE#docket"),
@@ -848,13 +886,19 @@ def handle_coach_docket(event):
                 continue
             it = _decimal_to_float(it)
             sk = str(it.get("sk", ""))
+            claims = it.get("claims") or {}
+            criterion = it.get("criterion") or {}
+            concession = it.get("concession")
+            if not coach_dossier.dossier_safe(*claims.values(), it.get("topic"), criterion.get("description"), concession):
+                withheld += 1
+                continue
             entry = {
                 "topic": it.get("topic"),
                 "topic_slug": it.get("topic_slug"),
                 "coach_a": it.get("coach_a"),
                 "coach_b": it.get("coach_b"),
-                "claims": it.get("claims") or {},
-                "criterion": it.get("criterion") or {},
+                "claims": claims,
+                "criterion": criterion,
                 "sides": it.get("sides") or {},
                 "resolution_date": it.get("resolution_date"),
                 "opened_date": it.get("opened_date"),
@@ -871,7 +915,7 @@ def handle_coach_docket(event):
                         "loser": it.get("loser") or verdict.get("loser"),
                         "actual_value": it.get("actual_value", verdict.get("actual_value")),
                         "resolved_date": it.get("resolved_date"),
-                        "concession": it.get("concession"),
+                        "concession": concession,
                     }
                 )
                 resolved.append(entry)
@@ -883,11 +927,14 @@ def handle_coach_docket(event):
             "open": open_entries,
             "resolved": resolved,
             "counts": {"open": len(open_entries), "resolved": len(resolved)},
+            "withheld": withheld,
             "disclosure": (
                 "Standing disagreements between AI coaches, each with skin in the game: the stake is the "
                 "coach's own Brier record, frozen when the docket opened. The resolution criterion and date "
                 "are agreed at open and graded by deterministic code against real data — no AI writes the "
-                "verdict, and lost disputes stay on the record next to the wins."
+                "verdict, and lost disputes stay on the record next to the wins. Claims and concessions cross "
+                "the same standing privacy filter as the coach dossier before publishing; any hit withholds "
+                "the whole entry and this payload counts it."
             ),
         },
         cache_seconds=300,

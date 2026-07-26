@@ -241,6 +241,10 @@ def relationship_entry(item: dict):
         rapport = None
     entry = {
         "kind": "relationship",
+        # #1794: without a record_id, apply_corrections has nothing to match a
+        # retraction against — RELATIONSHIP#state is a singleton, so the sk is
+        # a fixed fallback when the source item lacks one (defensive only).
+        "record_id": item.get("sk") or "RELATIONSHIP#state",
         "date": date,
         "journey_phase": item.get("journey_phase"),
         "rapport_level": rapport,

@@ -167,6 +167,42 @@ def test_list_corrections_queries_the_partition_key():
     assert len(t.query_calls) == 1
 
 
+def test_list_corrections_paginates_beyond_one_page():
+    # #1796: a single unpaginated Query page used to silently cap the ledger —
+    # once the partition outgrew one page, the OLDEST corrections (queried
+    # newest-first) were simply never seen, including retractions whose
+    # subjects would then reappear on the public dossier with no signal.
+    page1 = [cc.build_correction_item({}, "newer", "other", correction_id=f"{i:08d}") for i in range(3)]
+    page2 = [cc.build_correction_item({}, "older", "other", correction_id=f"{i:08d}") for i in range(3, 6)]
+
+    def _hook(table, **kw):
+        if "ExclusiveStartKey" not in kw:
+            return {"Items": page1, "LastEvaluatedKey": {"sk": "cursor"}}
+        return {"Items": page2}
+
+    t = FakeDdbTable(query_hook=_hook)
+    got = cc.list_corrections(t, limit=100)
+    assert len(got) == 6
+    assert {i["correction_text"] for i in got} == {"newer", "older"}
+
+
+def test_list_corrections_stops_paginating_once_limit_reached():
+    calls = []
+
+    def _hook(table, **kw):
+        calls.append(kw)
+        idx = len(calls)
+        return {
+            "Items": [cc.build_correction_item({}, f"page{idx}", "other", correction_id=f"{idx:08d}")],
+            "LastEvaluatedKey": {"sk": f"cursor{idx}"},
+        }
+
+    t = FakeDdbTable(query_hook=_hook)
+    got = cc.list_corrections(t, limit=1)
+    assert len(got) == 1
+    assert len(calls) == 1  # stopped after the first page — never fetched one it didn't need
+
+
 def test_update_status_writes_expected_expression(table):
     sk = cc.write_correction(table, {}, "x", "framing")
     assert cc.update_status(table, sk, "applied-to-prompt") is True
