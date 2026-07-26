@@ -1,129 +1,65 @@
-# HANDOVER — backlog paydown + Horizons/diary features + owner-decision blitz — 2026-07-25
+# HANDOVER — opus+sonnet paydown (7) + fable reconcile wave (6) + 2 CI-gate fixes — 2026-07-26
 
-> Instruction thread: continue the standing autonomous backlog paydown (`model:sonnet`/`model:opus`,
+> Instruction thread: continue the standing autonomous backlog paydown (`model:opus`/`model:sonnet`,
 > skip `model:fable`), standing approval for ALL merges + deploys + Deploy-gate approvals; CDK deploys
-> prepared for Matthew to run via `!`. Mid-session pivoted into an interactive **owner-decision blitz**
-> (Matthew worked the whole owner-dependent backlog with ELI5/options/rec per item) + wired two social
-> credentials + built the Horizons feature (S1+S3) end-to-end.
+> prepared for Matthew to run via `!`. Mid-session: an interactive owner-decision triage, a **parallel
+> fable session** launched (isolated OPEN-PR paydown), then this session **reconciled + merged + deployed
+> that fable session's 6 shippable PRs**.
 
-## What shipped (12 issues closed, all merged to main + deployed; main GREEN)
+## What shipped — 13 issues closed, all merged to main + deployed + verified; main GREEN
 
-**Backlog paydown — 3 waves (worktree-implementers → combined-tree verify → merge → deploy_all):**
-- **Wave 1:** **#1572** Video Diary journal template (PR #1732) · **#1569** widen the Third Wall (#1733) ·
-  **#1379** Daily Fingerprint + `/data/wall/` (#1734).
-- **Wave 2:** **#1377** the Wrong Feed (#1735) · **#1381** the Theme River `/story/theme-river/` (#1736).
-- **Wave 3:** **#1393** Engagement Ladder (#1744) · **#1394** Cohort Strip (#1745, `COHORT#` grant CDK-deployed by Matthew).
-- **#1544** closed (CI push-run stall — root-caused to the phantom concurrency queue, not billing; salt fix
-  `60d6652c` verified; INCIDENT_LOG row present).
+**My paydown (7 — worktree-implementer fan-outs + direct):**
+- **#1352** docs/LICENSES.md third-party inventory + advisory pip-licenses gate; deleted stale `layer.txt` (PR #1750).
+- **#1330** restore strava token-health check (DescribeSecret grant) + monitored⊆IAM-grant parity test (PR #1751; role deployed via `LifePlatformOperational` CDK by Matthew).
+- **#1345** close the smoke-oracle fail-open paths + PARSE_ERROR gating test, extracted `deploy/lib/smoke_oracle_decision.py` (PR #1752).
+- **#1574** coach reactions to diary entries (grounding gate + producer + `/api/diary_reactions` + lab-notes render) — trigger deferred to **#1756** (PR #1754).
+- **#1385** whole-life-context chronicle (1M + 1-hr cached archive into chronicle + State of Matthew, folded into the grounding allow-list; Structured Outputs at the bedrock chokepoint) (PR #1755).
+- **#1336** SCA gaps — pillow/lameenc manifests + pip_audit RED-on-unscanned-layer guard + SHA-pinned gitleaks + fixed the false stdlib claims (PR #1757).
+- **#1706** the Prescription follow-up hook (question / cross-coach hand-off, reusing the coach check-in queue) (PR #1765).
 
-**Feature builds (this session's back half):**
-- **#1705 Horizons S1** (PR #1746) — weekly curation engine: pick model on the reading rail
-  (`READING#HORIZON`/`PICK#<week>`), a categorized source **garden** (`lambdas/reading/horizons_garden.py`),
-  a **fail-closed link-verification gate** (`horizons_verify.py`), MCP tools `curate_horizon`/`get_horizons`.
-- **#1707 Horizons S3** (PR #1749) — the public **`/data/horizons/`** feed + the grounded, **budget-gated**
-  (band-2) "why I sent it" retrospective (`horizons_retrospective.py`) through the #1673 sensitivity gate;
-  new `GET /api/horizons`; MCP `archive_horizon`.
-- **#1573 Whisper** (PR #1747) — solo local-Whisper transcription → the existing diary pipeline, `solo_recording` channel.
-- **#1350 email purge** (PR #1748) — 18-month subscriber-email anonymize sweep + signed DATA_GOVERNANCE + a
-  weekly EventBridge rule (`SubscriberRetentionSweep`, Mon 08:00 UTC — Matthew CDK-deployed `LifePlatformOperational`).
+**Fable reconcile wave (6 — reconciled from the parallel fable session's OPEN PRs, merged in one queue):**
+- **#1626** durable MILESTONE# event ledger (write-once conditional puts; → daily-metrics-compute) · **#1630** ADR-140 (anti-auto-posting amendment) · **#1471** editorial texture/art layer (site) · **#1567** /journal-interview publish mode · **#1627** spiral circuit breaker (ships unwired) · **#1743** video-diary signal spike (docs).
 
-**Credentials wired (Social Membrane):** `life-platform/youtube` (channel_id `UCB4u65MnU5EV_BVPz2u-PsQ` — inbound
-lambda live-invoked, feed reads clean) · `life-platform/bluesky` (handle + app password, `createSession`
-validated 200 — staged; the #1676/#1629 consumers aren't built yet).
+**2 CI-gate fixes (would have broken every future deploy — both merged + live):**
+- **gitleaks push-only** (`6ff5e80d`): #1336's scan fell back to full-history on `workflow_dispatch` and tripped the pre-private Firebase key → red-walled every `deploy_all`. Guard = `github.event_name == 'push'`.
+- **#1345 smoke-oracle regression** (`44e7bc5e`): the extracted `smoke_oracle_decision.py` was referenced by the smoke-test job, but that job had **NO checkout** → "No such file" → smoke failed on a healthy deploy → **spurious partial fleet rollback (50/97)**. Fix = add the reconciled-tree checkout to the smoke-test job.
 
-**Deliverables:** owner-decision worksheet artifact + the **#741 career-essay draft** ("Proof, Not Promises") artifact.
-
-**~21 owner decisions recorded** on their issues (see the residual queue for the resulting build backlog).
+**Owner CDK (Matthew ran):** `bash deploy/cdk_deploy.sh LifePlatformOperational -- --require-approval never` (strava grant).
 
 ## Verified
-- Each wave: on-branch git-grep of agent claims + **combined-tree full suite** (no `-x`, `--ignore=test_integration_aws`)
-  GREEN before merge — 6822 (w1) → 6840 (w2) → 6860 (w3) → **6924** (Horizons wave). All CI-only gates each merge
-  (content-policy, `black`, ruff **6-dir**, mypy clean-set, doc-sync).
-- Load-bearing ACs confirmed genuinely-asserting: #1379 byte-identical SVG; #1377 header==card count + graded-verdict
-  sourcing (no AI-asserted wrongness); #1394 k-anonymity + stats-partition isolation test; #1705 fail-closed verify gate;
-  #1707 budget-gating + grounded retrospective.
-- Endpoints pre-deployed live before each site-page merge (autodeploy-race mitigation): `/api/fingerprint`, `/api/wall`,
-  `/api/decisions`, `/api/wrong`, `/api/ladder_counts`, `/api/cohort_strip`, `/api/horizons` — all 200.
-- Deploys: five `deploy_all` runs (Deploy/Smoke/Post-deploy/Visual-QA), plus Matthew's two CDK deploys (`LifePlatformServe`
-  COHORT grant + `LifePlatformOperational` retention rule) — both verified live (grant on the role, rule `cron(0 8 ? * MON *)` ENABLED).
+- Each wave: on-branch git-grep of agent claims + **combined-tree full suite** GREEN before merge (6924 → 6987 → **7041** after the fable wave). All CI-only gates each merge (black, ruff 6-dir, content-policy, mypy clean-set, tombstones, wiki index --strict, ADR index).
+- Deploys: the wave fleet via `deploy_all` (after the two CI fixes) + the fable wave via change-detection push — both **Deploy/Smoke/Post-deploy-integration/Visual-QA GREEN, no rollback**. All 6 wave lambdas + daily-metrics-compute show fresh `LastModified`; **life-platform-mcp boots clean** (200, no FunctionError — validates the #1706 importlib + new imports in the deployed bundle).
+- `/api/diary_reactions` pre-deployed live (200, empty — correct dormant state); story hub 200 post art-layer; #1336 pillow/lameenc manifests uploaded to `s3://…/config/requirements/`.
 
 ## Gotchas hit (durable lessons → memory)
-- **CI ruff gate covers 6 dirs**, not `lambdas/ mcp/` — a narrow local run missed a `tests/` I001 → wave-2 `deploy_all`
-  red at lint (caught pre-deploy, no bad ship). → memory `reference_ruff_full_dir_set`.
-- **`gh pr merge` ships the branch, not your reconciled integration tree** — code reconcile fixes (CSS fs-ok, canary
-  counts, registry classifications) made only on the integration branch are LOST on squash-merge. Land waves with a
-  code-level reconcile via a **local merge / fast-forward to main** (auto-closes each PR). → memory
-  `reference_gh_merge_takes_branch_not_integration_tree`.
-- **Combined full-suite catches cross-cutting registry gaps individual agents miss** (targeted suites ≠ full): the
-  Horizons wave surfaced 3 — a new scheduled lambda needing a heartbeat exemption (#1748), an unclassified MCP verb
-  `archive` (#1749), a retired-term "shared layer" phrase (#1748). All fixed on the integration branch before merge.
-- **Site-deploy `--delete` race**: an older site-only merge's deploy re-synced its tree last and removed the newer
-  page (theme-river 404 window) — recovered via manual `sync_site_to_s3.sh` (see Incidents).
+- **gitleaks-action scans full history on non-push events** → guard secret-scan gates to `github.event_name == 'push'`. → `reference_gitleaks_push_only`.
+- **An extracted CI-step script needs a checkout in EVERY job that calls it** — the smoke-test job had none; #1345's extraction assumed one. Review workflow-context availability, not just the script logic. → `reference_ci_extracted_script_needs_checkout`.
+- **A spurious smoke failure triggers a partial fleet rollback** (50/97 here — lambdas without a `previous.zip` fail the revert, leaving a mixed state); recovery = re-`deploy_all` from the fixed tree (additive changes make the mixed state functional meanwhile).
+- **mypy clean-set "source found twice"**: a runtime `from lambdas import X` fallback next to `import X` makes mypy resolve the file under two module names — use `importlib.import_module` to hide the fallback from the static resolver.
+- **Fable-branch reconcile is conflict-free when each branch reverted its doc-sync literals** — the 3-way merge keeps main's literal (branch made no change); recompute once with `sync_doc_metadata --apply` at the end.
 
-## Residual / next-picks (all issue-cited or `not-work`-tagged)
-**Recorded build queue (approved this session, unbuilt — pick up next session):**
-- Doc-ADRs (docs-only, sonnet): #1666 · #1352 · #1333 · #1662
-- Code stories (sonnet/opus): #1330 · #1345 · #1570 · #1407 · #1623 · #1613 · #1336 · #1388
-- Credential-gated builds (build code, dormant until owner keys land): #1631 (X) · #1632 (Instagram) ·
-  #1676 + #1629 (Bluesky consumers — secret already staged) · #1678 + #1674 (embeds/CSP)
-- Deferred (recorded): #1383 · #1396 · #1742
+## Next-session paydown queue — residual / next-picks (opus + sonnet + fable triage)
+**not-work — owner actions (on Matthew, surfaced this session):**
+- `not-work — owner decision`: **#1768** portrait art-direction v2 option-round PR is **OPEN**, awaiting ADR-106 approval (pick ONE direction) — the only fable PR deliberately not merged.
+- `not-work — owner provisions credentials`: X (`life-platform/x`), Instagram (`life-platform/instagram`), user-scoped billing PAT (#1613) — unlock the syndication/inbound tranche + the CI-minutes alarm.
+- `not-work — owner GitHub toggles`: Dependabot + vuln-alerts + secret-scanning (#1336 gate:owner) — NB Dependabot IS now auto-merging dev-tooling bumps (#1760 landed mid-session), so alerts may already be partly on; confirm. Branch-protection ruleset (#1662) AFTER the private flip.
+- `not-work — owner chore`: #1029 re-entry hardening before the 2026-08-20 domain renewal; publish #741; confirm phone on the #1333 SNS paging sub; ratify LICENSES.md §5 (AI-content ownership stance).
+- `not-work — standing ops reminder`: #1330 strava verifies on the next freshness-checker run (9:45 AM PT); #1385 cache-hit on the next chronicle (Wed); #1626 ledger genesis on the next daily-metrics run. No aged-alarm / stale-secret escalations outstanding (remediation agent `shadow`).
 
-**`not-work` — owner actions (surfaced, on Matthew):**
-- `not-work — owner provisions credentials`: X API keys (`life-platform/x`), Instagram Graph token
-  (`life-platform/instagram`), a user-scoped billing PAT (for #1613).
-- `not-work — owner GitHub toggles`: enable Dependabot + vuln-alerts + secret-scanning (#1336); apply the
-  branch-protection ruleset (#1662) AFTER the private flip (it drops on the flip, #1319 class).
-- `not-work — owner chore`: #1029 re-entry hardening before the 2026-08-20 domain renewal; #1243 podcast-audio regen;
-  publish #741; confirm phone number on the #1333 SNS paging subscription.
-- `not-work — owner decision`: the repo private-flip (ping for the post-flip checklist — metered minutes return + re-verify env protection).
-- `not-work — standing ops reminder`: no aged-alarm / stale-secret escalations outstanding at wrap (remediation agent in `shadow`; SECRETS_ROTATION monitoring clean).
+**Buildable next (issue-cited):**
+- **#1756** (the #1574 production trigger — inline-vs-lambda + IAM + the same-day sk-collision fix #1767 found) · **#1708** (prescription S4 — blocked on #1756 + a calibration-target design call, noted on-issue) · **#1650** (handovers→orphan-branch move — deferred, wrap-ritual coupling; noted on-issue).
+- Doc-ADRs (fable): #1666 · #1333 · #1662. Code (opus/sonnet): #1570 · #1407 · #1623 · #1385-follow-ons. Infra multi-slice: #1658 (coverage→70%) · #1653 · #1654 · #1656.
 
-## Next-session paydown queue (opus + sonnet triage)
-37 open non-fable (27 `model:opus` + 10 `model:sonnet`). Realistic close target **10–14**
-(→ ~18 if X + Instagram + billing-PAT creds land first). Ranked:
-
-- **DO FIRST — near-free closes:** doc-ADRs I write directly (no worktree agent) — #1666
-  (complexity ledger) · #1352 (LICENSE all-rights-reserved + docs/LICENSES.md) · #1333 (paging
-  ADR + SNS topic) · #1662 (branch-protection required-check wiring + ADR). Execute **#1650**
-  (orphan-branch move — decision locked). Check **#1656**: if merged → land **#1654 slice 4**
-  (`web/site_api_intelligence.py` 2460 lines, facade + `_g` hand-off like #1727/#1729/#1730).
-- **Owner-decided this session → now buildable (sign-off done):** #1336 (SCA code parts) · #1345
-  (rollback drill) · #1678 (native embeds CSP + ADR) + #1674 (the embeds) · #1330 (Strava check) ·
-  #1662/#1666/#1352/#1333 (above).
-- **Clean buildable (opus/sonnet):** #1570 (diary cards) · #1407 (Monarch honest-half) · #1623
-  (milestone digest) · #1574 (coach reactions to diary — #1572 live) · #1706 (prescription S2) ·
-  #1708 (prescription S4) · #1385 (whole-life chronicle — AI, grounding) · #1740/#1741 (podcast
-  script layer, non-audio parts).
-- **Infra/multi-slice (work ≫ count):** #1658 (coverage→70%) · #1653 (lambdas/ packaging,
-  CDK-per-slice with me) · #1401 (Fork My Life-Stack — CDK) · #1475 (nav — design, U1-dep).
-- **Credential-gated — SKIP until keys land (`life-platform/x`, `life-platform/instagram`):**
-  #1402 · #1679 · #1675 · #1677 · #1632 · #1633. #1676 (Bluesky inbound) CAN build (secret staged;
-  Mastodon half needs a token; small CDK for the role's GetSecretValue). #1613 build code, dormant
-  until the billing PAT.
-- **Owner-only / deferred — surface, don't build:** #1742/#1738/#1739 (podcast bake-off — my ear) ·
-  #1396 (deferred, private-IP conflict) · #1622 (posture confirmed) · #1243 · #1029 (before 2026-08-20) · #741.
-
-**Method (all held this session):** fan out worktree-implementers 2–4 at a time in DIFFERENT areas
-(never two on the same shared registry) → verify each on-branch (git-grep counts, ~50% false) →
-combined-tree FULL suite (catches cross-cutting registry gaps targeted suites miss) → FULL 6-dir ruff
-+ black + content-policy + mypy-clean-set (NOT in pytest) → land code-reconcile waves via local-merge /
-fast-forward to main (`gh pr merge` drops integration-only fixes) → pre-deploy site-api for new
-endpoints (autodeploy race) → merge the wave → ONE `deploy_all` → approve gate with
-`bash deploy/approve_deployment.sh <run_id>`. role_policies.py change = R8-ST6 IAM Plan gate reds by
-design → prep the CDK command for Matthew.
+**Method (held this session):** worktree-implementers 2–4 at a time in DIFFERENT areas → verify each on-branch (git-grep, ~50% false) → combined-tree FULL suite + FULL 6-dir gates → land code-reconcile waves via local-merge to main → pre-deploy site-api for new endpoints → `deploy_all` (or change-detection push) + `approve_deployment.sh <run_id>`. Parallel fable session = isolated OPEN-PRs only (it must NOT touch main); reconcile its PRs here via `/reconcile-branch` once its backlog is exhausted.
 
 ## Gate outcomes
-- **Build beat:** `2026-07-25-horizons-live` (Horizons end-to-end — curate → public feed → grounded retrospective).
-- **Docs:** DATA_GOVERNANCE (retention policy, #1350) + SCHEMA (diary channels + horizon pick shape) + DIARY_STUDIO_KIT
-  updated by the shipping PRs; `sync_doc_metadata` reconciled (tools 72, endpoints 128, test_count 5359); doc checkers green.
-- **Decisions:** none filed — the governance decisions made this session (license posture #1352, paging #1333,
-  branch-protection #1662, embed-CSP #1678, complexity ledger #1666) are recorded on their issues and each ships its
-  ADR at implementation time (all queued).
-- **Main:** green (`270271ca` — the Horizons-wave deploy_all was completing at wrap; prior completed run `57c1365c` green, no red run).
-- **Incidents:** 2 rows — (P4) wave-2 `deploy_all` lint-gate failure (ruff 6-dir scope gap, caught pre-deploy, fixed via
-  the #1381 tail commit); (P4) theme-river 404 window from the older #1377 site-deploy `--delete` race, recovered via manual sync.
-- **Stash/hooks:** clean.
-- **Labels:** OK.
+- **Build beat:** `2026-07-26-thirteen-closed` (see below).
+- **Docs:** LICENSES.md (new, #1352) + docs/README index + ADR-140 (#1630 via the fable PR) + 5 engine-doc re-verifications (2026-07-26, unblocking check_doc_index --strict after #1336's fetch-depth:0 de-vacuumed it); `sync_doc_metadata` reconciled (test_count 5475, adrs 138, adr_max 140); wiki checkers green.
+- **Decisions:** none newly filed by me — ADR-140 shipped via the fable #1630 PR; the governance decisions from prior sessions still ship their ADRs at implementation (queued: #1662/#1666/#1333).
+- **Main:** green (`44e7bc5e` latest completed; the fable-wave `3eb04d07` run completing on Visual-QA at wrap — Deploy/Smoke/Post-deploy already green).
+- **Incidents:** 1 row — (P3) spurious smoke failure (missing `smoke_oracle_decision.py` in the un-checked-out smoke-test job) → partial fleet auto-rollback (50/97) → recovered by re-`deploy_all` from the fixed tree; false-positive class (deploy was healthy, `failed:0`).
+- **Stash/hooks:** clean (stash empty; hook 🟢).
+- **Labels:** OK (61 open stories, all `model:*`).
 - **Live: budget tier 1.**
 
-**Build beat:** 2026-07-25-horizons-live
+**Build beat:** 2026-07-26-thirteen-closed
