@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-19
 
-Last updated: 2026-07-19 (#1329 — manual-rotation staleness routed to the remediation agent's curated needs-human email instead of raw daily SNS; one-command `deploy/rotate_ai_keys.sh` prep. Prior: #935 — Whoop re-auth script moved to `setup/setup_whoop_auth.py`, callback-server flow)
+Last updated: 2026-07-25 (#1630 — `life-platform/bluesky` app-password row + procedure, ADR-140 precondition; see `docs/RUNBOOK_SYNDICATION.md`. Prior: #1329 — manual-rotation staleness routed to the remediation agent's curated needs-human email instead of raw daily SNS; one-command `deploy/rotate_ai_keys.sh` prep; #935 — Whoop re-auth script moved to `setup/setup_whoop_auth.py`, callback-server flow)
 
 Phase 2.6 (2026-05-16): single source of truth for how each Life Platform secret is rotated. Used by both the operator (manual rotations) and the freshness checker (staleness alerts).
 
@@ -26,6 +26,7 @@ Phase 2.6 (2026-05-16): single source of truth for how each Life Platform secret
 | `life-platform/habitify` | API key | **Manual** | 180 days | 120 days |
 | `life-platform/ingestion-keys` | Bundle (Notion + Habitify + Todoist + Dropbox + HAE) | **Manual** | follow individual | 120 days |
 | `life-platform/eightsleep-client` | OAuth client credentials | **Manual** (rare) | 365 days | 120 days |
+| `life-platform/bluesky` | Bluesky **scoped app password** (AT `createSession`; never the account password) | **Manual** — `docs/RUNBOOK_SYNDICATION.md` Runbook 1 | 180 days | — (not yet in the freshness checker's `MANUAL_ROTATION_SECRETS`; add in the #1629 PR when the poster consumer ships) |
 
 ## Auto-rotation: `mcp-api-key`
 
@@ -148,6 +149,16 @@ Same as `ai-keys` above. Separate from main key so site-API abuse cannot exhaust
    ```
 4. Verify next ingestion run succeeds (check CloudWatch logs of the corresponding ingestion Lambda)
 5. Revoke the old token
+
+### `bluesky` (syndication + inbound — app password)
+
+Added 2026-07-25 (#1630, ADR-140 precondition — the rotation runbook exists BEFORE any
+automated poster). Full procedure, including the **leaked-token emergency path** (revoke
+at the source first — phone-operable) and the post-recall companion runbook:
+**`docs/RUNBOOK_SYNDICATION.md`**. Summary: create new app password at Bluesky →
+Settings → Privacy and Security → App Passwords, `put-secret-value` on
+`life-platform/bluesky` (preserve the JSON shape), verify via `createSession`, then
+revoke the old app password. 15-min `secret_cache.py` TTL applies.
 
 ### `notion`, `dropbox`, HAE webhook key (bundle path — V2 update)
 
