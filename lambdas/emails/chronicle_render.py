@@ -180,7 +180,7 @@ def build_email_html(title, stats_line, body_html, week_num, date_str, series_ur
 _JOURNAL_ROMAN = {1: "I", 2: "II", 3: "III", 4: "IV", 5: "V", 6: "VI", 7: "VII", 8: "VIII"}
 
 
-def journal_post_ref(date_str, all_installments, week_num, *, _g):
+def journal_post_ref(date_str, all_installments, week_num, *, _g, sk=""):
     """The canonical journal-post reference for a chronicle date: (seq, label, url).
 
     #405: the share kit derives its canonical URL + card slug from the SAME sequential
@@ -192,10 +192,20 @@ def journal_post_ref(date_str, all_installments, week_num, *, _g):
     """
     EXPERIMENT_START_DATE = _g["EXPERIMENT_START_DATE"]
     genesis = EXPERIMENT_START_DATE
-    all_dates = sorted(x.get("date", "") for x in all_installments if x.get("date", ""))
+    # Tie-safe ordering: two installments can share a date (the genesis−1 lead-in
+    # + the prereg chapter) — index by (date, sk) when the caller supplies sk,
+    # else fall back to first-occurrence-by-date. Parity with
+    # deploy/restart_leadin_pages.installment_keys.
+    all_keys = sorted((x.get("date", ""), str(x.get("sk", ""))) for x in all_installments if x.get("date", ""))
+    all_dates = [k[0] for k in all_keys]
+    key = (date_str, str(sk)) if sk else None
     pre = [d for d in all_dates if d < genesis]
     if date_str and date_str < genesis:
-        n = pre.index(date_str) + 1 if date_str in pre else 1
+        if key is not None:
+            pre_keys = [k for k in all_keys if k[0] < genesis]
+            n = pre_keys.index(key) + 1 if key in pre_keys else 1
+        else:
+            n = pre.index(date_str) + 1 if date_str in pre else 1
         label = f"Prologue · Part {_JOURNAL_ROMAN.get(n, n)}"
     elif date_str:
         try:
@@ -208,7 +218,10 @@ def journal_post_ref(date_str, all_installments, week_num, *, _g):
         label = f"Week {wk}"
     else:
         label = f"Week {int(week_num)}"
-    seq = (all_dates.index(date_str) + 1) if date_str in all_dates else int(week_num)
+    if key is not None and key in all_keys:
+        seq = all_keys.index(key) + 1
+    else:
+        seq = (all_dates.index(date_str) + 1) if date_str in all_dates else int(week_num)
     url = f"https://averagejoematt.com/journal/posts/week-{seq:02d}/"
     return seq, label, url
 
@@ -264,14 +277,23 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     # where pre-genesis lead-ins were numbered as experiment weeks — 2026-06-21.)
     _ROMAN = {1: "I", 2: "II", 3: "III", 4: "IV", 5: "V", 6: "VI", 7: "VII", 8: "VIII"}
     _genesis = EXPERIMENT_START_DATE
-    _all_dates = sorted(x.get("date", "") for x in all_installments if x.get("date", ""))
-    _pre = [d for d in _all_dates if d < _genesis]
+    # Tie-safe (date, sk) ordering — parity with journal_post_ref above and
+    # deploy/restart_leadin_pages.installment_keys: a shared date (genesis−1
+    # lead-in + prereg chapter) must not collide on the same week-NN page key.
+    _all_keys = sorted((x.get("date", ""), str(x.get("sk", ""))) for x in all_installments if x.get("date", ""))
+    _all_dates = [k[0] for k in _all_keys]
+    _pre_keys = [k for k in _all_keys if k[0] < _genesis]
 
-    def _series_label(d):
+    def _series_label(d, k=""):
         if not d:
             return f"Week {int(week_num)}"
         if d < _genesis:
-            n = _pre.index(d) + 1 if d in _pre else 1
+            key = (d, str(k))
+            if k and key in _pre_keys:
+                n = _pre_keys.index(key) + 1
+            else:
+                pre_dates = [p[0] for p in _pre_keys]
+                n = pre_dates.index(d) + 1 if d in pre_dates else 1
             return f"Prologue · Part {_ROMAN.get(n, n)}"
         try:
             wk = max(1, ((datetime.strptime(d, "%Y-%m-%d").date() - datetime.strptime(_genesis, "%Y-%m-%d").date()).days // 7) + 1)
@@ -279,11 +301,15 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
             wk = int(week_num)
         return f"Week {wk}"
 
-    def _seq_for(d):
+    def _seq_for(d, k=""):
+        key = (d, str(k))
+        if k and key in _all_keys:
+            return _all_keys.index(key) + 1
         return (_all_dates.index(d) + 1) if d in _all_dates else int(week_num)
 
-    cur_label = _series_label(date_str)
-    cur_seq = _seq_for(date_str)
+    # The current post is a native chronicle record: its sk is DATE#<its date>.
+    cur_label = _series_label(date_str, f"DATE#{date_str}")
+    cur_seq = _seq_for(date_str, f"DATE#{date_str}")
 
     # Editorial cover image (Part II — atmospheric, free-license; fail-soft, kill-switch
     # default OFF). Carry past images forward from the existing manifest so we only fetch
@@ -530,14 +556,14 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     posts_manifest = []
     for inst in sorted(all_installments, key=lambda x: x.get("date", ""), reverse=True):
         idate = inst.get("date", "")
-        seq = _seq_for(idate)
+        seq = _seq_for(idate, inst.get("sk", ""))
         _u = f"/journal/posts/week-{seq:02d}/"
         # current post → freshly fetched image; past posts → carried forward from the prior manifest.
-        _im = cur_image if idate == date_str else _prior_imgs.get(_u, {})
+        _im = cur_image if str(inst.get("sk", "")) == f"DATE#{date_str}" else _prior_imgs.get(_u, {})
         posts_manifest.append(
             {
                 "week": int(inst.get("week_number", 0) or 0),
-                "label": _series_label(idate),
+                "label": _series_label(idate, inst.get("sk", "")),
                 "title": inst.get("title", ""),
                 "date": idate,
                 "stats_line": display_stats_line(inst.get("stats_line", ""), idate, _g=_g),  # #949 — prologue-framed dek pre-genesis

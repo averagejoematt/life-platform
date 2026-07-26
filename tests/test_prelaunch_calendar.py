@@ -432,3 +432,52 @@ def test_display_stats_line_parity_with_wednesday_lambda(monkeypatch):
     ]
     for line, d in cases:
         assert chron.display_stats_line(line, d) == leadin.display_stats_line(line, d), (line, d)
+
+
+# ── 2026-07-26: date-tie page-key collision (genesis−1 lead-in + prereg chapter) ──
+
+
+def test_shared_date_installments_get_distinct_seq_and_labels(monkeypatch):
+    """Two installments on the SAME date (the promoted genesis−1 lead-in and the
+    prereg chapter) must land on DISTINCT week-NN page keys and sequential Part
+    labels — a date-only index made the later write silently overwrite the
+    earlier post (live incident, cycle-11 eve)."""
+    monkeypatch.setattr(leadin, "EXPERIMENT_START_DATE", GENESIS)
+    installments = [
+        {"date": "2026-07-06", "sk": "DATE#2026-02-28"},  # Before the Numbers (−6)
+        {"date": "2026-07-11", "sk": "DATE#2026-03-15"},  # carried genesis−1 lead-in (older origin sk)
+        {"date": "2026-07-11", "sk": "DATE#2026-07-11"},  # The Plan, On the Record (prereg, native sk)
+    ]
+    all_keys = leadin.installment_keys(installments)
+    all_dates = sorted(x["date"] for x in installments)
+    seqs = [leadin.seq_for(x["date"], all_dates, 0, sk=x["sk"], all_keys=all_keys) for x in installments]
+    labels = [leadin.series_label(x["date"], all_dates, 0, sk=x["sk"], all_keys=all_keys) for x in installments]
+    assert seqs == [1, 2, 3], "distinct page keys — no overwrite on a shared date"
+    assert labels == ["Prologue · Part I", "Prologue · Part II", "Prologue · Part III"]
+    # the older origin-story sk sorts first on the tie (narrative order held —
+    # a carried lead-in's original sk always predates the prereg chapter's)
+    assert all_keys[1] == ("2026-07-11", "DATE#2026-03-15")
+
+
+def test_journal_post_ref_tie_safe_with_sk(monkeypatch):
+    """chronicle_render.journal_post_ref parity: same tie, same answer."""
+    import os
+
+    os.environ.setdefault("TABLE_NAME", "life-platform-test")
+    sys.path.insert(0, str(REPO_ROOT / "lambdas"))
+    sys.path.insert(0, str(REPO_ROOT / "lambdas" / "emails"))
+    import chronicle_render as cr
+
+    _g = {"EXPERIMENT_START_DATE": GENESIS}
+    insts = [
+        {"date": "2026-07-06", "sk": "DATE#2026-02-28"},
+        {"date": "2026-07-11", "sk": "DATE#2026-03-15"},
+        {"date": "2026-07-11", "sk": "DATE#2026-07-11"},
+    ]
+    seq_a, label_a, url_a = cr.journal_post_ref("2026-07-11", insts, 0, _g=_g, sk="DATE#2026-03-15")
+    seq_b, label_b, url_b = cr.journal_post_ref("2026-07-11", insts, 0, _g=_g, sk="DATE#2026-07-11")
+    assert (seq_a, seq_b) == (2, 3) and url_a != url_b
+    assert label_a == "Prologue · Part II" and label_b == "Prologue · Part III"
+    # date-only callers keep the legacy first-occurrence behavior
+    seq_c, _, _ = cr.journal_post_ref("2026-07-11", insts, 0, _g=_g)
+    assert seq_c == 2

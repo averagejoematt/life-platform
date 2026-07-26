@@ -188,13 +188,30 @@ def markdown_to_html(md_text):
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def series_label(date_str, all_dates, week_num):
+def installment_keys(installments):
+    """Sorted (date, sk) pairs — the tie-safe ordering key for seq/label.
+
+    Two installments can legitimately share a date (the genesis−1 calendar
+    lead-in and the prereg chapter both land the eve of Day 1, 2026-07-26) —
+    a date-only index then collides on the SAME week-NN page key and the later
+    write silently overwrites the earlier post. The record sk (its original,
+    never-re-dated DATE#…) breaks the tie deterministically and preserves
+    narrative order (older origin story first)."""
+    return sorted((x.get("date", ""), str(x.get("sk", ""))) for x in installments if x.get("date", ""))
+
+
+def series_label(date_str, all_dates, week_num, sk="", all_keys=None):
     genesis = EXPERIMENT_START_DATE
-    pre = [d for d in all_dates if d < genesis]
     if not date_str:
         return f"Week {int(week_num)}"
     if date_str < genesis:
-        n = pre.index(date_str) + 1 if date_str in pre else 1
+        if sk and all_keys is not None:
+            pre_keys = [k for k in all_keys if k[0] < genesis]
+            key = (date_str, str(sk))
+            n = pre_keys.index(key) + 1 if key in pre_keys else 1
+        else:
+            pre = [d for d in all_dates if d < genesis]
+            n = pre.index(date_str) + 1 if date_str in pre else 1
         return f"Prologue · Part {_ROMAN.get(n, n)}"
     try:
         wk = max(1, ((datetime.strptime(date_str, "%Y-%m-%d").date() - datetime.strptime(genesis, "%Y-%m-%d").date()).days // 7) + 1)
@@ -203,7 +220,10 @@ def series_label(date_str, all_dates, week_num):
     return f"Week {wk}"
 
 
-def seq_for(date_str, all_dates, week_num):
+def seq_for(date_str, all_dates, week_num, sk="", all_keys=None):
+    if sk and all_keys is not None:
+        key = (date_str, str(sk))
+        return (all_keys.index(key) + 1) if key in all_keys else int(week_num)
     return (all_dates.index(date_str) + 1) if date_str in all_dates else int(week_num)
 
 
@@ -436,6 +456,7 @@ def run(apply: bool = False, no_invalidate: bool = False) -> int:
         print("No visible (phase=experiment, non-tombstoned) chronicle installments — writing an empty manifest.")
 
     all_dates = sorted(x.get("date", "") for x in installments if x.get("date", ""))
+    all_keys = installment_keys(installments)
     genesis = EXPERIMENT_START_DATE
     print(f"Genesis: {genesis} · visible installments: {len(installments)}")
 
@@ -447,8 +468,8 @@ def run(apply: bool = False, no_invalidate: bool = False) -> int:
         week_num = int(item.get("week_number", 0) or 0)
         title = item.get("title", "Untitled")
         stats_line = display_stats_line(item.get("stats_line", ""), date_str)  # #949 — prologue-framed dek pre-genesis
-        label = series_label(date_str, all_dates, week_num)
-        seq = seq_for(date_str, all_dates, week_num)
+        label = series_label(date_str, all_dates, week_num, sk=item.get("sk", ""), all_keys=all_keys)
+        seq = seq_for(date_str, all_dates, week_num, sk=item.get("sk", ""), all_keys=all_keys)
         body_html = body_html_from_record(item)
         page = render_post_html(title, stats_line, body_html, label, date_str, seq)
         key = f"generated/journal/posts/week-{seq:02d}/index.html"
@@ -460,11 +481,11 @@ def run(apply: bool = False, no_invalidate: bool = False) -> int:
     posts_manifest = []
     for item in sorted(installments, key=lambda x: x.get("date", ""), reverse=True):
         date_str = item.get("date", "")
-        seq = seq_for(date_str, all_dates, int(item.get("week_number", 0) or 0))
+        seq = seq_for(date_str, all_dates, int(item.get("week_number", 0) or 0), sk=item.get("sk", ""), all_keys=all_keys)
         posts_manifest.append(
             {
                 "week": int(item.get("week_number", 0) or 0),
-                "label": series_label(date_str, all_dates, int(item.get("week_number", 0) or 0)),
+                "label": series_label(date_str, all_dates, int(item.get("week_number", 0) or 0), sk=item.get("sk", ""), all_keys=all_keys),
                 "title": item.get("title", ""),
                 "date": date_str,
                 "stats_line": display_stats_line(item.get("stats_line", ""), date_str),  # #949 — prologue-framed dek
