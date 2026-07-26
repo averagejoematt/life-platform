@@ -194,8 +194,7 @@
       "function": "insight-email-parser"
     },
     "lambdas/emails/milestone_digest_lambda.py": {
-      "function": "milestone-digest",
-      "not_deployed": true
+      "function": "milestone-digest"
     },
     "lambdas/emails/monday_compass_lambda.py": {
       "function": "monday-compass"
