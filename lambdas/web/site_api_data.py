@@ -108,6 +108,7 @@ CYCLE_GENESES = {
     8: "2026-07-19",  # appended by restart_pipeline --close-cycle
     9: "2026-07-20",  # appended by restart_pipeline --close-cycle
     10: "2026-07-22",  # appended by restart_pipeline --close-cycle
+    11: "2026-07-27",  # appended by restart_pipeline --close-cycle
 }
 
 # #1066: container cache for the training-phase registry (read by the routine handler
