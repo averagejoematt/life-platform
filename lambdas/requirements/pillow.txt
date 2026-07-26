@@ -1,0 +1,17 @@
+# pillow-layer (binary dependency layer, x86_64) — #1336
+#
+# Attached to: og-image-generator (and any web/operational Lambda that imports PIL).
+# Layer ARN: cdk/stacks/constants.py::PILLOW_LAYER_ARN (pillow-layer:1, created 2026-03-28).
+#
+# WHY THIS FILE EXISTS: Pillow is a third-party image/font parser with a long CVE
+# history. It ships INTO a running Lambda via pillow-layer, so it must be pinned in a
+# manifest that pip-audit (deploy/run_pip_audit.sh + the scheduled pip_audit_lambda)
+# can scan. Before #1336 there was no manifest and Pillow was scanned by nothing.
+#
+# ⚠️ VERSION UNVERIFIED against the live layer. pillow-layer:1 was built offline and its
+# exact Pillow version could not be read without AWS access. The pin below is a
+# CONSERVATIVE (older-than-or-equal, fail-closed) estimate for the 2026-03-28 build date
+# so the scan errs toward RED, never a false GREEN. OWNER ACTION: confirm the real version
+# with `aws lambda get-layer-version-by-arn --arn <PILLOW_LAYER_ARN>` (download + inspect
+# the wheel), then correct this pin so pip-audit reflects what is actually deployed.
+Pillow==11.2.1

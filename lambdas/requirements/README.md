@@ -6,7 +6,9 @@ Pinned dependency files per Lambda group (MAINT-1, v2.99.0).
 
 | File | Lambda(s) | Notes |
 |------|-----------|-------|
-| `garmin.txt` | garmin-data-ingestion | Built via `fix_garmin_deps.sh` — cross-platform wheels |
+| `garmin.txt` | garmin-data-ingestion | Built via `fix_garmin_deps.sh` — cross-platform wheels; **also pins `garth` (the `garth-layer` binary layer)** |
+| `pillow.txt` | og-image-generator (+ web/operational PIL users) | **Binary layer** `pillow-layer` (`PILLOW_LAYER_ARN`). ⚠️ Version UNVERIFIED vs live layer — confirm + correct (#1336) |
+| `lameenc.txt` | coach-panel-podcast | **Binary layer** `lameenc-layer` (`LAMEENC_LAYER_ARN`). ⚠️ Version UNVERIFIED vs live layer — confirm + correct (#1336) |
 | `withings.txt` | withings-data-ingestion | withings-api SDK |
 | `strava.txt` | strava-data-ingestion | stdlib urllib only |
 | `whoop.txt` | whoop-data-ingestion | stdlib urllib only |
@@ -30,9 +32,16 @@ Pinned dependency files per Lambda group (MAINT-1, v2.99.0).
 (boto3, botocore). All Anthropic API calls use raw `urllib.request` — no `anthropic` SDK
 is needed, which keeps zip sizes minimal and eliminates a major dependency surface.
 
-**Only two Lambdas have third-party deps:**
-- `garmin-data-ingestion` → `garminconnect` + `garth` (deployed via `fix_garmin_deps.sh`)
-- `withings-data-ingestion` → `withings-api` + transitive deps
+**Lambda *source* is stdlib-only, but three binary *layers* ship third-party code**
+into running Lambdas — these are the real SCA surface and each has a pinned manifest here:
+- `garth-layer` → `garth` (pinned in `garmin.txt` alongside `garminconnect`)
+- `pillow-layer` → `Pillow` (`pillow.txt`)
+- `lameenc-layer` → `lameenc` (`lameenc.txt`)
+
+The layer ARNs live in `cdk/stacks/constants.py` (`*_LAYER_ARN`). **`pip_audit_lambda`
+enforces coverage**: `check_layer_manifest_coverage()` enumerates those ARNs and fails the
+scan RED if any referenced layer has no matching manifest here — so a future layer added
+without a pinned manifest can't slip back into the unscanned state that #1336 fixed.
 
 ## Vulnerability scanning
 
