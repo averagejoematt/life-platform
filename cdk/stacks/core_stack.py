@@ -67,6 +67,16 @@ class CoreStack(Stack):
             "DigestTopic",
             topic_name="life-platform-alerts-digest",
         )
+        # ADR-143 (#1333): the paging channel — SMS for the named ≤5-alarm P1 set
+        # ONLY (never the alerts topic; that would page on every alarm). The phone
+        # subscription is wired out-of-band from SSM /life-platform/paging-phone by
+        # deploy/wire_paging_phone.sh — a SecureString can't be a CFN SNS endpoint,
+        # and the number stays out of git and the template.
+        self.paging_topic = sns.Topic(
+            self,
+            "PagingTopic",
+            topic_name="life-platform-paging",
+        )
 
         # ── S3 CMK retired (ADR-058, 2026-05-24) ───────────────────────
         # The Phase 2.4 customer-managed S3 KMS key (5c50ca02-...) was

@@ -62,6 +62,7 @@ from stacks.constants import ACCT, REGION, S3_BUCKET, TABLE_NAME  # CONF-01
 
 ALERTS_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"
 DIGEST_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"
+PAGING_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-paging"  # ADR-143 (#1333)
 
 GTE = cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD
 LT = cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD
@@ -897,6 +898,50 @@ class MonitoringStack(Stack):
             GTE,
             to_digest=True,
         )
+
+        # ══════════════════════════════════════════════════════════════
+        # ADR-143 (#1333): the paging P1 set — the ONLY alarms that reach the
+        # phone, via the DEDICATED life-platform-paging topic (CoreStack). The
+        # SMS subscription is operator-wired from SSM /life-platform/paging-phone
+        # by deploy/wire_paging_phone.sh. Set membership (≤5, incl. the two
+        # canary outage legs in operational_stack) is pinned by
+        # tests/test_paging_alarms_1333.py; growing it is an ADR-143 amendment.
+        # ══════════════════════════════════════════════════════════════
+        paging = sns.Topic.from_topic_arn(self, "PagingTopic", PAGING_TOPIC_ARN)
+
+        # Budget tier 3 = the ADR-063 hard cutoff (website AI dark, brief degraded).
+        # Distinct from life-platform-budget-tier-escalation above (>=2, digest):
+        # tier 2 is a posture change worth reading about; tier 3 is worth a page.
+        paging_budget_tier3 = cloudwatch.Alarm(
+            self,
+            "PagingBudgetTier3",
+            alarm_name="paging-budget-tier-3",
+            metric=cloudwatch.Metric(
+                namespace="LifePlatform/Budget", metric_name="BudgetTier", period=Duration.seconds(3600), statistic="Maximum"
+            ),
+            evaluation_periods=1,
+            threshold=3,
+            comparison_operator=GTE,
+            treat_missing_data=NB,
+        )
+        paging_budget_tier3.add_alarm_action(cw_actions.SnsAction(paging))
+
+        # Total-pipeline-failure class: >=8 of the ~15 ingestion sources stale at
+        # once (creds/region/scheduler dead), not one flaky source — single-source
+        # staleness stays a digest item (slo-source-freshness above).
+        paging_pipeline_dead = cloudwatch.Alarm(
+            self,
+            "PagingPipelineDead",
+            alarm_name="paging-pipeline-dead",
+            metric=cloudwatch.Metric(
+                namespace="LifePlatform/Freshness", metric_name="StaleSourceCount", period=Duration.seconds(86400), statistic="Maximum"
+            ),
+            evaluation_periods=1,
+            threshold=8,
+            comparison_operator=GTE,
+            treat_missing_data=NB,
+        )
+        paging_pipeline_dead.add_alarm_action(cw_actions.SnsAction(paging))
 
         # ══════════════════════════════════════════════════════════════
         # #411 / ADR-116: two UNIQUE silent-failure signals adopted into IaC.

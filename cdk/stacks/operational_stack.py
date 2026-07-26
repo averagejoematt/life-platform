@@ -58,6 +58,7 @@ LIFE_PLATFORM_TABLE = TABLE_NAME
 LIFE_PLATFORM_BUCKET = "matthew-life-platform"
 ALERTS_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"
 DIGEST_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"
+PAGING_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-paging"  # ADR-143 (#1333)
 
 
 class OperationalStack(Stack):
@@ -534,7 +535,14 @@ class OperationalStack(Stack):
         )
 
         # ── Canary custom metric alarms ──
-        def _canary_alarm(aid, aname, mname):
+        # ADR-143 (#1333): the DDB + S3 canary legs are the serving path's
+        # true-outage signals (serve_stack routes site-api degradation alarms to
+        # digest and names these as the outage detectors) — they page via the
+        # dedicated life-platform-paging topic IN ADDITION to the digest. MCP
+        # failure is not a reader outage; it stays digest-only.
+        local_paging_topic = sns.Topic.from_topic_arn(self, "PagingTopic", PAGING_TOPIC_ARN)
+
+        def _canary_alarm(aid, aname, mname, page=False):
             a = cloudwatch.Alarm(
                 self,
                 aid,
@@ -547,12 +555,14 @@ class OperationalStack(Stack):
             )
             a.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
             a.add_ok_action(cw_actions.SnsAction(local_digest_topic))
+            if page:
+                a.add_alarm_action(cw_actions.SnsAction(local_paging_topic))
 
         # NOTE: CanaryAnyFailureAlarm removed 2026-03-10 — bug: watched CanaryDDBFail
         # (identical to canary-ddb-failure). The 3 individual alarms below provide full coverage.
-        _canary_alarm("CanaryDdbFailureAlarm", "life-platform-canary-ddb-failure", "CanaryDDBFail")
+        _canary_alarm("CanaryDdbFailureAlarm", "life-platform-canary-ddb-failure", "CanaryDDBFail", page=True)
         _canary_alarm("CanaryMcpFailureAlarm", "life-platform-canary-mcp-failure", "CanaryMCPFail")
-        _canary_alarm("CanaryS3FailureAlarm", "life-platform-canary-s3-failure", "CanaryS3Fail")
+        _canary_alarm("CanaryS3FailureAlarm", "life-platform-canary-s3-failure", "CanaryS3Fail", page=True)
         # Reentry sweep (2026-05-03): catches the "Anthropic API access turned off"
         # failure mode (key disabled by Anthropic for billing). Canary runs every 4h,
         # makes a $0.0001 Anthropic call per run, alarm fires within ≤4h of any 4xx.
