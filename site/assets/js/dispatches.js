@@ -17,6 +17,7 @@ import { icon } from "/assets/js/icons.js";
 import { ruleBand } from "/assets/js/texture.js"; // #1471 — the editorial texture layer
 import { wireTabList, markActiveTab } from "/assets/js/tabs.js"; // #579 — real ARIA tabs
 import { readAloudFor } from "/assets/js/read_aloud.js"; // #1121 — per-article, reset-safe audio join
+import { quotesArchiveHTML } from "/assets/js/journal_quotes.js"; // #1568 — consent-per-line pull-quotes (ADR-142)
 
 // NB (2026-06-20): "The Coaches" + "AI lab notes" moved OUT to their own top-level
 // door, /coaching/ (assets/js/coaching.js). The coach/fieldnotes renderer functions
@@ -666,6 +667,15 @@ function chronicleNoteHTML(data, entries) {
   return bits.join("");
 }
 
+// #1568: fetch the consented pull-quotes and prepend the archive block to the
+// journal list rail. Fire-and-forget: a failed/empty fetch renders nothing.
+async function injectJournalQuotes(listEl) {
+  const d = await tryJSON("/api/journal_quotes");
+  const html = quotesArchiveHTML(d);
+  if (!html || !listEl.isConnected) return;
+  listEl.insertAdjacentHTML("afterbegin", `<li class="jq-rail">${html}</li>`);
+}
+
 function selectEntry(s, id, silent) {
   document.querySelectorAll(".dx-item").forEach((b) => b.classList.toggle("is-active", String(b.dataset.id) === String(id)));
   if (!silent) { try { history.replaceState({ sec: s.key, id }, "", `/story/${s.key}/#${id}`); } catch (e) {} }
@@ -681,10 +691,14 @@ async function selectSection(key, preId, push = true) {
   listEl.innerHTML = `<li class="dx-empty"><span class="shimmer">Loading…</span></li>`;
   const data = await secFetch(s);
   const entries = entriesFor(s, data);
-  if (!entries.length) { listEl.innerHTML = `<li class="dx-empty">Nothing published here yet — it fills as the experiment runs.</li>`; $("[data-dx-read]").innerHTML = `<p class="dx-empty">Nothing to read yet. The first entries land once the experiment is underway — check back after Day 1.</p>`; return; }
+  if (!entries.length) { listEl.innerHTML = `<li class="dx-empty">Nothing published here yet — it fills as the experiment runs.</li>`; $("[data-dx-read]").innerHTML = `<p class="dx-empty">Nothing to read yet. The first entries land once the experiment is underway — check back after Day 1.</p>`; if (s.key === "journal") injectJournalQuotes(listEl); return; }
   const noteHTML = s.key === "chronicle" ? chronicleNoteHTML(data, entries) : "";
   listEl.innerHTML = noteHTML + entries.map((e) => `<li><button class="dx-item" data-id="${esc(e.id)}"><span class="dx-item-t">${esc(e.title)}${isNewSince(e.date) ? ` <span class="dx-new label">new</span>` : ""}</span><span class="dx-item-d label">${esc(e.date || "")}</span></button></li>`).join("");
   listEl.querySelectorAll(".dx-item").forEach((b) => b.addEventListener("click", () => selectEntry(s, b.dataset.id)));
+  // #1568 (ADR-142): the pull-quote archive on the "In my own words" section —
+  // only lines Matthew marked publishable, one by one; nothing marked ⇒ nothing
+  // rendered (the block is dormant, never an empty shell).
+  if (s.key === "journal") injectJournalQuotes(listEl);
   const initId = preId && entries.some((e) => String(e.id) === String(preId)) ? preId : entries[0].id;
   selectEntry(s, initId, true);
 }

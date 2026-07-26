@@ -19,6 +19,7 @@ import { mountSinceRibbon } from "/assets/js/since.js"; // uplevel P5 — return
 import { instrumentMark, fnv1a, mulberry32 } from "/assets/js/sigils.js"; // visual P2 + #590 seeded drift
 import { domainIcon } from "/assets/js/icons.js"; // #590 — pillar icon for the hover door affordance
 import { seasonBand } from "/assets/js/texture.js"; // #1471 — the season banner on the premiere beat
+import { featuredQuoteHTML } from "/assets/js/journal_quotes.js"; // #1568 — the weekly featured line (ADR-142)
 
 const $ = (s, r = document) => r.querySelector(s);
 const bind = (n, r = document) => r.querySelector(`[data-bind="${n}"]`);
@@ -897,6 +898,23 @@ load();
     }
   } catch (e) { /* honest silence */ }
   if ((rib && !rib.hidden) || !wrap.querySelector("[data-home-unlocked]").hidden) wrap.hidden = false;
+})();
+
+// #1568 (ADR-142) — "from the journal, in his words": the weekly featured line.
+// Same self-hiding contract as homePulse: the server enforces the volume cap (at
+// most ONE featured line per ISO week, only a line Matthew explicitly marked
+// publishable); the client renders exactly what it's given or stays dormant.
+(async function homeJournalQuote() {
+  const wrap = document.querySelector("[data-home-quote-wrap]");
+  const mount = bind("journal-quote");
+  if (!wrap || !mount) return;
+  try {
+    const d = await getJSON("/api/journal_quotes");
+    const html = featuredQuoteHTML(d);
+    if (!html) return; // nothing marked this week ⇒ the beat never appears
+    mount.innerHTML = html;
+    wrap.hidden = false;
+  } catch (e) { /* honest silence — dormant on any failure */ }
 })();
 
 // >>> CYCLE_BEAT_START (#1244) — the season-premiere beat's self-hiding decision +

@@ -100,6 +100,7 @@ EXPECTED_ROUTE_MAP = {
     "/api/inference_receipt": "handle_inference_receipt",
     "/api/intelligence_summary": "handle_intelligence_summary",
     "/api/journal_analysis": "handle_journal_analysis",
+    "/api/journal_quotes": "handle_journal_quotes",  # #1568 — consent-per-line verbatim journal pull-quotes (ADR-142)
     "/api/journey": "handle_journey",
     "/api/journey_timeline": "handle_journey_timeline",
     "/api/journey_waveform": "handle_journey_waveform",

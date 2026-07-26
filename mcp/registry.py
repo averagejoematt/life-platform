@@ -37,7 +37,7 @@ from mcp.tools_hevy import tool_get_workout_detail, tool_get_workouts
 
 # ADR-066 (2026-05-31): Hevy routine write-loop fat tool.
 from mcp.tools_hevy_routine import tool_manage_hevy_routine
-from mcp.tools_journal import tool_get_flourishing_trend, tool_get_mood
+from mcp.tools_journal import tool_get_flourishing_trend, tool_get_mood, tool_mark_journal_quote
 from mcp.tools_labs import tool_get_freshness_status, tool_get_labs
 from mcp.tools_lifestyle import (
     tool_create_experiment,
@@ -1387,6 +1387,50 @@ TOOLS = {
                     "date": {"type": "string", "description": "Date of the decision (YYYY-MM-DD). Defaults to today."},
                 },
                 "required": ["decision"],
+            },
+        },
+    },
+    # ── #1568 (ADR-142): consent-per-line verbatim journal pull-quotes ────────────
+    "mark_journal_quote": {
+        "fn": tool_mark_journal_quote,
+        "schema": {
+            "name": "mark_journal_quote",
+            "description": (
+                "#1568 (ADR-142): mark ONE verbatim journal line explicitly publishable — the consent-per-line "
+                "'from the journal, in his words' channel. Use ONLY during a journal-interview / vlog close, after "
+                "nominating at most 2 quote-worthy lines and getting Matthew's explicit per-line yes; pass "
+                "approved=true only when he said yes to THIS exact line. The tool refuses (fail-closed) any line "
+                "touching the mark-time taboo list (substances / family-specifics / age / private events / real "
+                "names — the ELENA brief's omit list, enforced in code), any paraphrase that isn't verbatim in that "
+                "day's entry (ADR-104 grounding), and a third line on a day (cap 0–2). Marked lines surface on the "
+                "story hub archive + at most one featured line per week on home, dated, with a receipts link. "
+                "action='unmark' revokes a line (consent is revocable); action='list' shows what's marked. "
+                "The chronicle's never-quote rule is untouched — never quote unmarked journal text anywhere."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "enum": ["mark", "unmark", "list"],
+                        "description": "mark (default) = store an explicitly-approved line; unmark = revoke; list = show marked lines.",
+                    },
+                    "date": {"type": "string", "description": "The journal entry's day (YYYY-MM-DD). Required for mark/unmark."},
+                    "quote": {
+                        "type": "string",
+                        "description": "The exact verbatim line (max 500 chars). Required for mark/unmark.",
+                    },
+                    "approved": {
+                        "type": "boolean",
+                        "description": "MUST be exactly true, and only after Matthew explicitly approved THIS line. Never inferred.",
+                    },
+                    "channel": {
+                        "type": "string",
+                        "description": "Capture channel the line came from (journal | video_diary | solo_recording). Default journal.",
+                    },
+                    "sk": {"type": "string", "description": "Exact record sk (from list) — alternative selector for unmark."},
+                },
+                "required": [],
             },
         },
     },

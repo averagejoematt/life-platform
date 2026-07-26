@@ -1068,3 +1068,20 @@ body { overflow-x: hidden; }
 .sc-wrong-believed { color: var(--ink); }
 .sc-wrong-num { color: var(--ink-muted); font-family: var(--font-mono); }
 .sc-wrong-meta { color: var(--ink-faint); }
+
+/* #1568 (ADR-142) — "from the journal, in his words": the consent-per-line
+   pull-quotes. .jq-rail hosts the archive block inside the story journal list;
+   .beat-journal-quote/.home-quote is the (dormant-by-default) weekly featured
+   slot on home. Verbatim quotes take the .prose blockquote register — serif,
+   italic, ember rule — because they are the human voice, not machine copy. */
+.jq-rail { list-style: none; margin: 0 0 var(--sp-4); padding: 0 0 var(--sp-4); border-bottom: var(--border-hair); }
+.jq-block { display: grid; gap: var(--sp-3); }
+.jq-kicker { color: var(--ember); }
+.jq-note { color: var(--ink-faint); }
+.jq-card { margin: 0; }
+.jq-text { margin: 0; font-family: var(--font-serif); font-style: italic; font-size: var(--fs-quote); line-height: 1.5;
+  color: var(--ink); border-left: 2px solid var(--ember); padding-left: var(--sp-4); }
+.jq-meta { display: block; margin-top: var(--sp-2); color: var(--ink-faint); }
+.jq-meta a.jq-receipts { color: var(--ember); text-decoration: none; border-bottom: 1px solid var(--ember-line); }
+.beat-journal-quote .jq-text { font-size: var(--fs-h3); }
+.beat-journal-quote .home-quote { max-width: var(--container-read); }

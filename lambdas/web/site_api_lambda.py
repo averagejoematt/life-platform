@@ -75,6 +75,7 @@ from web.site_api_coach import (
     handle_diary_reactions,
     handle_experiment_synthesis,
     handle_field_notes,
+    handle_journal_quotes,
     handle_month_rollup,
     handle_panel_ledger,
     handle_predictions,
@@ -737,6 +738,10 @@ def lambda_handler(event, context):
     # polarity inverted (the coach reacts to the human). Optional ?date=, ?limit=.
     if path == "/api/diary_reactions":
         return handle_diary_reactions(event)
+    # #1568 (ADR-142): consent-per-line verbatim journal pull-quotes — "from the
+    # journal, in his words". Only explicitly-marked lines; honest-empty otherwise.
+    if path == "/api/journal_quotes":
+        return handle_journal_quotes(event)
     if path == "/api/ai_analysis":
         return handle_ai_analysis(event)
     if path == "/api/coach_analysis":

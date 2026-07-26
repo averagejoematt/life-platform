@@ -323,6 +323,15 @@
       <p class="beat-deeper"><a href="/coaching/" class="cta">Read the full Third Wall &amp; meet the coaching team →</a></p>
     </section>
 
+    <!-- #1568 (ADR-142): "from the journal, in his words" — at most ONE featured
+         line per week, and only a line Matthew explicitly marked publishable.
+         Dormant (hidden) until /api/journal_quotes serves a featured quote;
+         story.js unhides it. No marked quote ⇒ this section never appears. -->
+    <section class="beat beat-journal-quote" data-home-quote-wrap hidden aria-label="From the journal, in his words">
+      <div class="home-quote" data-bind="journal-quote"></div>
+      <p class="beat-deeper"><a href="/story/journal/" class="cta cta-quiet">All the lines he's chosen to share →</a></p>
+    </section>
+
     <!-- Dispatches: the native archive — Elena's chronicle, the podcast, the journal -->
     <section class="beat beat-dispatches" id="dispatches">
       <p class="beat-kicker label">the story · the writing</p>
