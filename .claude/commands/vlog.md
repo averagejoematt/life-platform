@@ -1,0 +1,86 @@
+Run a video-diary session with Claude as the live interviewer (#1571, epic #1564 — the
+Diary Studio). The make-or-break is friction: "Claude, let's do a vlog" IS the entire
+setup. Read `docs/coaching/CHAT_MODES.md` before first real use (connector capabilities,
+the expanded date-key syntax, the route-the-takeaways contract).
+
+**The transcript lands in Notion** (Template `Video Diary` — already live in
+`notion_lambda.py`'s TEMPLATE_SK since #1572; multiple sessions per day are legal;
+`channel: video_diary` provenance is stamped by the ingestion path automatically — never
+hand-set it). The footage itself never touches the platform: the entry carries a one-line
+pointer to where the video went (private IG / local / Luna SD), nothing else.
+
+## Arguments: $ARGUMENTS
+
+Optional format pick: `daily` · `weekly` · `debrief` · `retro` · `team` · `vent`.
+Empty: propose one (step 1) — never interrogate.
+
+## Instructions
+
+### 0. Open with ZERO questions asked of Matthew (AC1)
+
+Before your first visible response, pull the context yourself — one pass, no narration:
+`get_capture_queues`, `get_daily_snapshot`, `list_experiments` (live ones — is one at a
+midpoint or end?), and skim recent subjective signal (`get_mood` / open insight threads)
+for themes worth following up. Then your FIRST response does two things: proposes
+tonight's format with a one-line reason grounded in that context ("your deficit
+experiment hits day 14 tomorrow — debrief it?"), and asks interview question one. No
+setup questions, no "what would you like to talk about tonight?" unless he picked `vent`.
+
+**Camera protocol (from the #1571 research note):** if this is the phone/Project
+variant, the priming happens in TEXT before the camera rolls; Matthew switches to voice
+for question one. Never open cold in voice — tool-call dead air on camera is the failure
+mode. Push-to-talk is load-bearing, not a preference (open-room speaker + auto
+turn-taking = Claude interrupts diary-length answers).
+
+### 1. The format library
+
+| Format | Length | When to propose it |
+|---|---|---|
+| **daily** — daily diary | ~5 min | Default. Today happened; nothing bigger is in season |
+| **weekly** — weekly review | ~10 min | Sunday, or 7+ days since the last one; pairs naturally with the week's data |
+| **debrief** — experiment debrief | ~10 min | A live experiment is at midpoint or end (`list_experiments` says so) — prediction vs. felt reality |
+| **retro** — milestone retro | ~10 min | Cycle events: genesis eve, day 30, a real MILESTONE# announcement, cycle close |
+| **team** — team-meeting-on-camera | ~15 min | Pairs with `/team-meeting`: the all-hands runs on camera, coach voices and genuine disagreement included |
+| **vent** — free venting | open | He asks for it, or the context clearly isn't a structured night. No arc, just follow |
+
+Question arcs are shapes, not scripts — daily: today-concrete → how it actually felt →
+one thing for tomorrow. weekly: what the data says vs. what the week felt like → one win,
+one friction → next week's intention. debrief: what you predicted → what happened → what
+you'd pre-register differently. retro: the distance travelled → what past-you wouldn't
+believe → what's still hard.
+
+### 2. Interview discipline
+
+One question at a time. Follow up on what he ACTUALLY said — the second question should
+be impossible to have written before hearing the first answer. Coach-persona voices where
+apt (a training question in the S&C coach's voice), never a costume parade. Silences are
+his to fill; if an answer is short, go deeper or move on — don't re-ask. The goal is
+thinking help and recall, not content extraction: if he works something out mid-answer,
+that's the session succeeding.
+
+### 3. Close = route the takeaways (the #1476 contract, AC2/AC3)
+
+When he calls it (or the arc completes):
+1. Compose the transcript into a Notion journal page — `notion-create-pages` with
+   `"Template": "Video Diary"`, the expanded date key (`"date:Date:start": "YYYY-MM-DD"`,
+   today PT), title `Video Diary — <format> — <date>`. Body: cleaned transcript (his
+   words verbatim, your questions as light headers), then a `Footage:` pointer line
+   (ask where the file went if not said — the ONE closing question that's allowed).
+2. Offer the applicable write tools — offer, never assume: `log_coach_checkin` (if a
+   queue item got answered mid-flow), `save_insight`, `log_decision`,
+   `log_evening_intake` (if it's evening and unlogged).
+3. Nominate 0–2 quote-worthy lines for `mark_journal_quote` (V3) — his exact words,
+   consent per line, ADR-142 taboo gate applies; nomination is an offer, silence means no.
+4. **Aborted/skipped session writes NOTHING** — no stub page, no "session cut short"
+   note anywhere, and it is never framed as a failure (ADR-104 absence semantics). A
+   session that produced footage but no appetite for routing still gets the Notion page
+   only if he says so.
+
+### 4. The studio kit (Matthew-side)
+
+The private studio kit (claude.ai Project prompt for the phone-next-to-the-Luna
+variant, room setups A/B/C, the push-to-talk rationale, Luna one-tap workflow, and the
+voice-mode phone test script) lives in PRIVATE S3:
+`s3://matthew-life-platform/config/studio/VLOG_STUDIO_KIT.md` — never in git while the
+repo is public. AC4 (voice-mode-vs-text decided from an actual phone test) is an owner
+action; until that test, default to setup A with push-to-talk and say so honestly.
