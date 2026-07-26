@@ -8,13 +8,19 @@ route-the-takeaways contract.
 through a life-platform MCP tool — there is no such tool, by deliberate decision (dual-SOT
 was rejected). The only write path is the Notion connector (`notion-create-pages` /
 `notion-update-page`), which are external claude.ai connector tools, not part of this
-repo's MCP registry.
+repo's MCP registry. (The `publish` variant in step 6 is not an exception: it produces a
+*public essay* on the separate "In my own words" surface via a PR — the private journal
+entry, when one is written, still lands in Notion and only in Notion.)
 
 ## Arguments: $ARGUMENTS
 
-Optional: `morning`, `evening`, or `weekly` to pick the variant directly. Empty: ask
+Optional: `morning`, `evening`, or `weekly` to pick the variant directly, or `publish`
+(#1567) to run the interview → approved-public-essay flow in step 6. Empty: ask
 Matthew which one he wants (or infer from context — e.g. it's evening and he hasn't
-journaled today → default to offering `evening`).
+journaled today → default to offering `evening`). After any regular variant, if the
+conversation surfaced something that clearly wants a public airing, you may *offer* the
+publish flow at the close ("want to turn this into a public essay?") — offer, never
+assume.
 
 ## Instructions
 
@@ -113,3 +119,62 @@ Call `notion-create-pages` with:
 - The evening ledger stays drinks-only by decision — no evening-energy tap, no second
   numeric field (ADR-137). Mood lives in the journal + the nudge's `mood_valence`;
   don't invent capture surfaces at the close.
+
+### 6. The `publish` variant — interview → approved public essay (#1567)
+
+Compose a PUBLIC essay from what Matthew said in the interview and land it as a PR on
+the "In my own words" surface (the #1566 generator — read `scripts/v4_build_journal.py`'s
+header before the first run). This is the only journal-adjacent path that leaves Notion,
+so every rule below is a **runtime rule of the command**, not guidance. The interview
+itself runs exactly like step 2 — conversational, one question at a time; only the
+composition and destination change.
+
+**a. Grounding — the ADR-104 bar, stricter than step 3.** Every factual claim in the
+essay must trace to (i) something Matthew actually said in *this* interview, or (ii)
+computed platform data you read via a tool during this session (cite the number as
+read, don't round it into a nicer story). Nothing invented: no color he didn't give,
+no reconstructed dialogue, no invented chronology, no "surely he felt X" bridging. If
+a paragraph needs a fact you don't have, ask him mid-interview or cut the paragraph.
+
+**b. Privacy guardrails applied AT COMPOSITION TIME.** The standing rules are the
+Privacy Guardrails + what-to-abstract sections of `docs/content/ELENA_PREQUEL_BRIEF.md`
+— re-read them before composing, every time. In particular: abstract family,
+relationship, substance, and age specifics; no names or identifying details of people
+close to him; no locations/events specific enough to dox; emotional truth over
+triggering detail. Shape the abstraction while composing — never draft raw and
+sanitize afterward, because raw phrasing leaks through edits.
+
+**c. The approval gate — Matthew approves the EXACT final text in-chat before any PR
+opens.** Paste the complete essay body in the chat, plus the metadata he's implicitly
+approving (title, excerpt, date, slug/url). He reviews line by line. Any change he
+asks for produces a fresh *full* paste for re-approval — the text that lands in the PR
+must be byte-for-byte the text he approved. No post-approval tightening, no silent
+typo fixes; a typo fix is a new approval round. **If he does not approve (or goes
+quiet, or says "not this one"): save the draft privately to Notion instead (step 4's
+write path — pick a fitting template per step 1, note in the body that it's an
+unpublished essay draft) and STOP. No approval → no PR, nothing public, ever.**
+
+**d. Landing it — a PR, never a direct publish.** The approved essay is two files plus
+metadata (the #1566 two-edit contract), on a branch, as an ordinary PR Matthew merges
+himself:
+
+1. Append one entry to `site/journal/blog.json` `posts[]` per its `_schema` (id,
+   title, date, excerpt, `url: /journal/essays/<slug>/`, label, word_count…),
+   **including the provenance line**:
+   `"provenance": "composed from a YYYY-MM-DD interview, approved by Matthew"`
+   (the *interview* date, not the publish date). The generator renders it after the
+   body in the receipts register.
+2. Write the approved body **verbatim** to `site/journal/essays/<slug>/body.md`
+   (or `body.html` if what he approved was styled HTML) — the file content IS the
+   approved text.
+
+Verify before opening the PR: `python3 scripts/v4_build_journal.py` (dry-run — the new
+page must render and pass the fail-closed `privacy_guard` gate) and
+`python3 scripts/content_policy_scan.py` (essay bodies and blog.json sit inside its
+`site/` scan scope automatically — no config change is ever needed for a new essay).
+**A privacy-guard or scanner hit means rewrite → re-approve (back to c) — NEVER add an
+essay path to the scanner's `ALLOWLIST_FILES`**; those path-keyed exemptions exist for
+filter *definitions*, not for content, and allowlisting content would neuter the gate.
+Publishing stays Matthew's act: merging the PR is the publish trigger (a `site/**`
+merge auto-deploys, #750, and the deploy path is what passes the generator `--write`).
+You never merge, never deploy, and never run `--write` yourself.
