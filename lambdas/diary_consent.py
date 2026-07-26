@@ -35,7 +35,19 @@ grounds as a literal substring.
 
 Bundled shared module (#781) — no AWS, no I/O, pure functions, so the leak-proof
 invariant is unit-testable without any live call.
+
+#1483 (ADR-142 tier 2) also lives here: the conversation-allude channel. Coach
+check-in conversations (CHECKIN# answers and the conversation LEARNING# trail
+they produce — ADR-141, coach_calibration.py) are Matthew-private verbatim, but
+public coach narrative may allude to them at exactly three strengths: that a
+conversation OCCURRED, its COARSE theme (the same 8-way laundered vocabulary as
+``public_theme``), and the resulting read/confidence DELTA. See the
+``conversation_reference`` section below — the projection is BUILT from an
+allowlist, never filtered from the source record, so verbatim text cannot ride
+along: leakage is structurally impossible, not just discouraged.
 """
+
+import re as _re
 
 TIER_QUOTE = "quote"
 TIER_ALLUDE = "allude"
@@ -142,3 +154,162 @@ def public_context(entry):
     if quote:
         ctx["quote"] = quote
     return ctx
+
+
+# ── #1483 (ADR-142 tier 2) — conversation references: coaches ALLUDE to
+#    check-in conversations without quoting them ─────────────────────────────
+#
+# Source records: the channel=conversation LEARNING# rows written by
+# lambdas/coach_calibration.py (ADR-141). Their `answer_quote`, `takeaway`, and
+# `question` fields quote or reconstruct Matthew's verbatim check-in answers —
+# Matthew-private, never public. What IS public (this tier):
+#   (a) that a conversation occurred            → `occurred` / `date`
+#   (b) its theme at COARSE granularity         → `theme` — laundered through
+#       the SAME 8-way public vocabulary as every other allude surface
+#   (c) the resulting read/confidence change    → `direction` + bounded `weight`
+#       (the ADR-141 delta, already public-adjacent provenance)
+# NOTHING else. `conversation_reference` BUILDS its output dict field-by-field
+# from this allowlist — it never copies-and-filters the source record — so the
+# private fields cannot ride along even if the schema grows.
+
+CONVERSATION_KIND = "conversation_reference"
+CONVERSATION_SANCTIONED_FIELDS = ("kind", "occurred", "date", "coach_id", "theme", "direction", "weight")
+_CONVERSATION_DIRECTIONS = ("up", "down", "hold")
+
+_PUBLIC_THEME_SET = frozenset(c for c, _ in _THEME_CATEGORIES) | {"other"}
+
+# Evaluator-vocabulary subdomains (coach_calibration.normalize_subdomain slugs
+# like 'protein_intake', 'evening_discipline') that the journal keyword map
+# alone can't place. INPUT-side widening only — the OUTPUT vocabulary stays
+# exactly the 8 public categories + "other"; an unmatched slug is "other",
+# never a raw private tag.
+_CONVERSATION_THEME_EXTRA = (
+    ("health_body", ("protein", "nutrition", "recovery", "hrv", "glucose", "cgm", "hydration", "cardio", "strength", "readiness", "steps")),
+    ("anxiety_stress", ("mood", "emotion", "burnout")),
+    ("personal_growth", ("consistency", "adherence", "motivation", "streak", "routine", "evening", "morning")),
+)
+
+_ISO_DATE_RE = _re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_COACH_SLUG_RE = _re.compile(r"[^a-z0-9_]+")
+
+
+def conversation_theme(subdomain):
+    """The coarse public theme for a check-in subdomain — always one of the
+    8 allowlisted categories or "other". Same laundering as ``public_theme``;
+    a slug the map doesn't recognise degrades to "other", never leaks."""
+    t = _norm(str(subdomain or "").replace("_", " "))
+    if not t:
+        return "other"
+    for category, keywords in _THEME_CATEGORIES:
+        if any(k in t for k in keywords):
+            return category
+    for category, keywords in _CONVERSATION_THEME_EXTRA:
+        if any(k in t for k in keywords):
+            return category
+    return "other"
+
+
+def conversation_reference(item):
+    """The ONLY public projection of a conversation record, or ``None``.
+
+    Accepts either a raw channel=conversation LEARNING# row (ADR-141) or an
+    already-sanctioned reference (idempotent re-projection — consumers can
+    defensively re-launder whatever they are handed). FAIL-CLOSED: anything
+    else — a data-channel learning, a missing/malformed date, a bare CHECKIN#
+    record (no ``channel``) — returns ``None`` and nothing renders.
+
+    The returned dict is constructed key-by-key from
+    ``CONVERSATION_SANCTIONED_FIELDS``; no source field is ever copied through
+    wholesale, so ``answer_quote``/``takeaway``/``question`` are structurally
+    unreachable from any public payload built on this."""
+    item = item or {}
+    is_ref = item.get("kind") == CONVERSATION_KIND
+    if not is_ref and str(item.get("channel") or "").strip().lower() != "conversation":
+        return None
+
+    date = str(item.get("date") or "").strip()
+    if not _ISO_DATE_RE.match(date):
+        return None
+
+    theme = item.get("theme") if is_ref else None
+    if theme not in _PUBLIC_THEME_SET:
+        theme = conversation_theme(item.get("subdomain")) if not is_ref else "other"
+
+    d = str((item.get("direction") if is_ref else item.get("confidence_direction")) or "").strip().lower()
+    if d not in _CONVERSATION_DIRECTIONS:
+        d = "hold"
+
+    try:
+        w = float((item.get("weight") if is_ref else item.get("confidence_weight")) or 0)
+    except (TypeError, ValueError):
+        w = 0.0
+    w = max(0.0, min(1.0, w))
+
+    coach = _COACH_SLUG_RE.sub("", str(item.get("coach_id") or "").strip().lower())
+
+    ref = {
+        "kind": CONVERSATION_KIND,
+        "occurred": True,
+        "date": date,
+        "theme": theme,
+        "direction": d,
+        "weight": round(w, 2),
+    }
+    if coach:
+        ref["coach_id"] = coach
+    return ref
+
+
+# Reader/narrative copy for the laundered theme — deliberately vague, matching
+# the coarse granularity of the tier ("other" renders as no theme at all).
+CONVERSATION_THEME_COPY = {
+    "anxiety_stress": "stress and worry",
+    "health_body": "the body — training, sleep, food",
+    "relationships": "relationships",
+    "work_ambition": "work and ambition",
+    "gratitude": "gratitude",
+    "personal_growth": "habits and growth",
+    "reflection": "reflection",
+    "other": "",
+}
+
+_CONVERSATION_DIRECTION_COPY = {
+    "up": "came away more confident in their read",
+    "down": "walked their read back a step",
+    "hold": "held their read where it was",
+}
+
+CONVERSATION_BLOCK_HEADER = "=== PRIVATE CONVERSATIONS (allude only — ADR-142 theme-referenceable tier) ==="
+
+
+def conversation_prompt_block(items):
+    """The ONLY form in which check-in conversations may enter a PUBLIC
+    narrative-generation prompt (#1483). Every item is re-projected through
+    ``conversation_reference`` — hand it raw LEARNING# rows or sanctioned refs,
+    the rendered block is identical — so the block carries the sanctioned
+    fields (date, coarse theme, read delta) and NOTHING else. The verbatim
+    answers are deliberately absent from the prompt: a public generation
+    cannot quote or reconstruct words it was never given (consistent with the
+    ADR-104 grounding gates, which check outputs against sanctioned inputs).
+
+    Empty/None/unsanctionable input → "" — the surface stays silent, it never
+    scaffolds an empty section."""
+    refs = [r for r in (conversation_reference(i) for i in items or []) if r]
+    if not refs:
+        return ""
+    lines = [
+        CONVERSATION_BLOCK_HEADER,
+        "These coach check-in conversations happened during this window. You were not",
+        "in the room: the words exchanged are private and are deliberately NOT in this",
+        "prompt. You may reference that a conversation occurred, its coarse theme, and",
+        "how it moved the coach's read — exactly what is listed below, nothing more.",
+        "NEVER quote, paraphrase-as-quote, reconstruct, or invent dialogue from these",
+        "conversations — write around the boundary, not through it.",
+    ]
+    for r in sorted(refs, key=lambda x: (x["date"], x.get("coach_id", ""))):
+        coach = str(r.get("coach_id") or "").replace("_coach", "").replace("_", " ").strip()
+        who = f"his {coach} coach" if coach else "one of his coaches"
+        theme_copy = CONVERSATION_THEME_COPY.get(r["theme"], "")
+        about = f" about {theme_copy}" if theme_copy else ""
+        lines.append(f"- {r['date']}: Matthew and {who} talked{about}; the coach {_CONVERSATION_DIRECTION_COPY[r['direction']]}.")
+    return "\n".join(lines)

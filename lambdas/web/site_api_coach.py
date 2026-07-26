@@ -31,6 +31,7 @@ from decimal import Decimal  # noqa: F401
 import boto3
 import calibration_core  # #538: the ONE prediction-calibration scorer (Brier + reliability)
 import coach_traits  # #1113: authored trait scores for the immersive bios (bundled module)
+import diary_consent  # #1483 (ADR-142 tier 2): the conversation-allude projection (bundled module)
 from boto3.dynamodb.conditions import Key
 from phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 
@@ -209,6 +210,42 @@ def _track_record(coach_id):
         "n_note": "preliminary — fewer than 12 decided predictions" if decided < 12 else f"n={decided} decided",
         "recent": recent,
         "caveat": "Self-assessment of this coach's own calls — not external validation.",
+    }
+
+
+def _conversation_references(coach_id, limit=5):
+    """#1483 (ADR-142 theme-referenceable tier): the coach's recent check-in
+    conversations with Matthew, projected to SANCTIONED fields only — date,
+    coarse laundered theme, read direction/weight — via
+    diary_consent.conversation_reference. The verbatim conversation text
+    (answer_quote / takeaway / question on the ADR-141 LEARNING# rows —
+    Matthew-private) never enters this payload: the projection BUILDS from an
+    allowlist, it does not copy-and-filter. Honest-empty on no data or failure."""
+    refs = []
+    try:
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with("LEARNING#"),
+                    "ScanIndexForward": False,
+                    "Limit": 60,
+                }
+            )
+        )
+        for it in resp.get("Items", []):
+            if (it.get("channel") or "data") != "conversation":
+                continue
+            ref = diary_consent.conversation_reference(_decimal_to_float(it))
+            if ref:
+                refs.append(ref)
+            if len(refs) >= limit:
+                break
+    except Exception as _e:
+        logger.warning(f"[coaches] conversation refs {coach_id}: {_e}")
+    return {
+        "references": refs,
+        "count": len(refs),
+        "note": "What was said stays private — these record only that a conversation happened, its coarse theme, and how it moved the coach's read (ADR-142).",
     }
 
 
@@ -855,6 +892,9 @@ def handle_coach(event):
                     "tuning_log": _tuning_log_for(pid),
                 },
                 "recent_outputs": _recent_outputs(pid),
+                # #1483 (ADR-142 tier 2): semi-private conversation references —
+                # sanctioned fields only; the words exchanged never cross the wire.
+                "conversations": _conversation_references(pid),
                 "daily": _coach_daily(pid),
                 "memoir": _coach_memoir(pid),
             },
