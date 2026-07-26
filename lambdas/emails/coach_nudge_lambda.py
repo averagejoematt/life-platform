@@ -403,7 +403,7 @@ def _finalize(date_pt: str, nudge_item: dict) -> None:
     _table().put_item(Item=engine.build_ledger_item(date_pt, nudge_item))
 
 
-def lambda_handler(event, context):
+def lambda_handler(event: dict, context) -> dict:
     now_utc = datetime.now(timezone.utc)
     now_pt = now_utc.astimezone(PACIFIC)
     date_pt = now_pt.date().isoformat()

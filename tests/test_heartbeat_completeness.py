@@ -359,6 +359,13 @@ COVERAGE = {
         "It only curates the already-alarmed D2 archive — a read-only digest whose absence carries no data-path risk.",
     ),
     "evening-nudge": (EXEMPT, "2026-07-19", "Operator email (daily evening nudge); a missing nudge is noticed by its reader that evening."),
+    "coach-nudge": (
+        EXEMPT,
+        "2026-07-25",
+        "Proactive coach nudge (#1382): most hourly ticks legitimately send nothing (deterministic triggers + 1/day cap), "
+        "so no-invocation alarms would be noise at the send layer; the observatory proactivity card surfaces sent/graded "
+        "counts, and a dead cron shows as a permanently-stale card. Revisit once nudges have a real send history.",
+    ),
     "weekly-plate": (EXEMPT, "2026-07-19", "Operator email (weekly plate planning); a missing issue is noticed by its reader."),
     "weekly-signal": (EXEMPT, "2026-07-19", "Operator email (weekly signal summary); a missing Sunday issue is noticed by its reader."),
     "partner-weekly-email": (
