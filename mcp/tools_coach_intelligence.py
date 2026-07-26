@@ -344,3 +344,119 @@ def tool_evaluate_prediction(args):
             pass
 
     return {"error": f"Prediction {prediction_id} not found in any coach thread"}
+
+
+# ── #1387: the Coach Dossier audit + correction affordance ────────────────────
+# Private by construction (MCP = Matthew's channel): the FULL unfiltered memory
+# view — including the ADR-141 conversation-channel rows the public dossier must
+# never render — plus retract/correct, which write a dated row to the #1689
+# corrections ledger (item_ref.surface="coach_dossier") and NEVER mutate the
+# COACH# record in place. The public /api/coach dossier applies those rows at
+# read time (retract = removed + counted, correct = dated note under the line).
+
+try:
+    # Shared, bundled modules (#781) — staged at zip root in the Lambda.
+    import coach_corrections as _cc
+    import coach_dossier as _cd
+except ImportError:  # pragma: no cover — local/test path
+    from lambdas import coach_corrections as _cc, coach_dossier as _cd
+
+_DOSSIER_PREFIXES = ("COMMITMENT#", "LEARNING#", "QUALITY#")
+_DOSSIER_SINGLETONS = ("RELATIONSHIP#state",)
+
+
+def _dossier_coach_pk(coach_id):
+    bare = str(coach_id or "").strip()
+    if bare.endswith("_coach"):
+        bare = bare[: -len("_coach")]
+    return (bare, f"COACH#{bare}_coach") if bare else (bare, "")
+
+
+def tool_audit_coach_dossier(args):
+    """#1387 AC3 — Matthew's PRIVATE audit + correction affordance over a coach's
+    dossier memory. action=view returns the full UNFILTERED records (conversation
+    channel included, flagged); action=retract/correct logs a dated correction row
+    to the #1689 ledger — memory is auditable, never silently editable."""
+    args = args or {}
+    coach_id = str(args.get("coach_id") or "").strip()
+    bare, coach_pk = _dossier_coach_pk(coach_id)
+    if bare not in COACH_IDS:
+        return {"error": "coach_id required. Valid: " + ", ".join(COACH_IDS)}
+    action = str(args.get("action") or "view").strip().lower()
+
+    if action in ("retract", "correct"):
+        record_sk = str(args.get("record_sk") or "").strip()
+        note = str(args.get("note") or "").strip()
+        if not record_sk:
+            return {"error": "record_sk required — the exact sk of the memory record (from action=view)"}
+        if not note:
+            return {"error": "note required — say WHY this record is retracted / what the correction is (it is logged verbatim)"}
+        try:
+            existing = table.get_item(Key={"pk": coach_pk, "sk": record_sk}).get("Item")
+        except Exception as ex:
+            return {"error": f"could not verify record {record_sk}: {ex}"}
+        if not existing:
+            return {"error": f"no record at {coach_pk} / {record_sk} — retract/correct must reference a real memory row"}
+        try:
+            correction_sk = _cc.write_correction(
+                table,
+                {"surface": _cd.CORRECTION_SURFACE, "coach": f"{bare}_coach", "record_sk": record_sk, "action": action},
+                note,
+                "other",  # dossier corrections aren't review-pack error classes
+            )
+        except Exception as ex:
+            return {"error": f"correction write failed (nothing was changed): {ex}"}
+        return {
+            "success": True,
+            "action": action,
+            "coach_id": bare,
+            "record_sk": record_sk,
+            "correction_sk": correction_sk,
+            "note": (
+                "Logged to the corrections ledger — the memory record itself was NOT modified. "
+                + (
+                    "The public dossier now omits this record and counts the retraction."
+                    if action == "retract"
+                    else "The public dossier renders your dated correction under the original line."
+                )
+            ),
+        }
+
+    if action != "view":
+        return {"error": f"unknown action {action!r} — one of view, retract, correct"}
+
+    # action=view — the full unfiltered memory (PRIVATE; never rendered publicly).
+    records = {}
+    for prefix in _DOSSIER_PREFIXES:
+        try:
+            resp = table.query(
+                KeyConditionExpression=Key("pk").eq(coach_pk) & Key("sk").begins_with(prefix),
+                ScanIndexForward=False,
+                Limit=100,
+            )
+            rows = [decimal_to_float(i) for i in resp.get("Items", [])]
+        except Exception as ex:
+            rows = [{"error": str(ex)}]
+        for r in rows:
+            if isinstance(r, dict) and _cd.is_conversation_channel(r):
+                r["_private_channel"] = "conversation — ADR-141 §4: never appears in the public dossier"
+        records[prefix.rstrip("#").lower()] = rows
+    for sk in _DOSSIER_SINGLETONS:
+        try:
+            item = table.get_item(Key={"pk": coach_pk, "sk": sk}).get("Item")
+            records[sk.split("#")[0].lower()] = decimal_to_float(item) if item else None
+        except Exception as ex:
+            records[sk.split("#")[0].lower()] = {"error": str(ex)}
+    try:
+        ledger = [decimal_to_float(r) for r in _cc.list_corrections(table, limit=500)]
+        corrections = _cd.dossier_corrections(ledger, f"{bare}_coach")
+    except Exception as ex:
+        corrections = [{"error": str(ex)}]
+    return {
+        "coach_id": bare,
+        "coach_name": COACH_NAMES.get(bare, bare),
+        "view": "FULL UNFILTERED memory — private to Matthew; the public dossier applies the privacy filter, the ADR-141 conversation exclusion, and these corrections",
+        "records": records,
+        "dossier_corrections": corrections,
+        "how_to_correct": "call again with action='retract' (remove from public dossier) or action='correct' (annotate) + record_sk + note — the correction is logged, the record is never edited in place",
+    }

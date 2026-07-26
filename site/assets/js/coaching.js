@@ -205,6 +205,81 @@ function disclose(summary, innerHTML) {
   return `<details class="coach-more"><summary class="dx-kicker label">${esc(summary)}</summary>${innerHTML}</details>`;
 }
 
+// ── #1387 THE DOSSIER — what this coach KNOWS, verbatim from memory ──────────
+// Renders /api/coach/{id}.dossier exactly as served: a deterministic projection
+// of the COACH# records (no AI wrote or rewrote any line here). Every line
+// carries its date; empty sections render an honest zero-state, never padding.
+function coachDossierHTML(coach) {
+  const d = coach && coach.dossier;
+  if (!d) return ""; // payload predates the dossier — show nothing, invent nothing
+  const first = String(coach.name || "This coach").replace(/^Dr\.?\s+/i, "").split(" ")[0] || "This coach";
+  const dateLine = (date, extra) => `<span class="ce-date label">${esc(String(date || "").slice(0, 10))}${extra ? " · " + extra : ""}</span>`;
+  const evLink = (e) => (e && e.evidence_link ? ` <a class="label" href="${esc(e.evidence_link)}">evidence ↗</a>` : "");
+  const corrNotes = (e) => ((e && e.corrections) || []).map((c) =>
+    `<p class="cd-corr label">corrected by Matthew · ${esc(String(c.date || "").slice(0, 10))}${c.note ? ` — ${esc(c.note)}` : c.note_withheld ? " — note withheld by the privacy filter" : ""}</p>`).join("");
+
+  let h = `<section class="bc-dossier"><p class="dx-kicker label">the dossier · what ${esc(first.toLowerCase())} knows — verbatim from memory</p>`;
+
+  // Commitments held — the honest zero-state is the AC4 reference line.
+  const cc = d.commitment_counts || {};
+  const commits = d.commitments || [];
+  h += `<p class="cd-h label">commitments held</p>`;
+  if (!commits.length) {
+    h += `<p class="dx-prose">${esc(first)} has held ${esc(cc.held || 0)} commitments this cycle.</p>`;
+  } else {
+    h += `<p class="cd-count label">${esc(cc.held || commits.length)} held · ${esc(cc.kept || 0)} kept · ${esc(cc.broken || 0)} broken · ${esc((cc.pending || 0) + (cc.unresolved || 0))} open</p><ul class="ce-trail">`;
+    for (const c of commits.slice(0, 8)) {
+      const st = c.status && c.status !== "pending" ? esc(c.status) : (c.due_date ? `due ${esc(c.due_date)}` : "open");
+      h += `<li class="ce-item">${dateLine(c.date, st)}<p class="ce-say">${esc(c.text)}</p>${c.check ? `<p class="label cd-check">graded on ${esc(c.check.metric)} ${esc(c.check.direction)}${evLink(c)}</p>` : ""}${corrNotes(c)}</li>`;
+    }
+    h += `</ul>`;
+  }
+
+  // Learnings — each from a graded call; evidence lives on the public scorecard.
+  const learns = d.learnings || [];
+  h += `<p class="cd-h label">learnings on the record</p>`;
+  if (!learns.length) {
+    h += `<p class="dx-prose">${esc(first)} has 0 learnings on the record this cycle — they accrue as the evaluator grades real calls.</p>`;
+  } else {
+    h += `<ul class="ce-trail">`;
+    for (const l of learns.slice(0, 8)) {
+      h += `<li class="ce-item">${dateLine(l.date, l.status ? esc(l.status) : "")}<p class="ce-say">${esc(l.reason || l.metric || "")}</p>${l.evidence_link ? `<p class="label cd-check"><a href="${esc(l.evidence_link)}">the graded call ↗</a></p>` : ""}${corrNotes(l)}</li>`;
+    }
+    h += `</ul>`;
+  }
+
+  // Relationship state — the deterministic rapport arc (#536), dated.
+  const r = d.relationship;
+  h += `<p class="cd-h label">the working relationship</p>`;
+  if (r) {
+    const bits = [r.journey_phase ? `phase: ${esc(String(r.journey_phase).replace(/_/g, " "))}` : "", r.tenure_days ? `${esc(r.tenure_days)} days in` : "", `${esc(r.interaction_count || 0)} interactions`].filter(Boolean).join(" · ");
+    h += `<p class="ce-say">${bits}${r.first_interaction_date ? ` <span class="label">· since ${esc(r.first_interaction_date)}</span>` : ""} <span class="label">· as of ${esc(r.date)}</span></p>`;
+  } else {
+    h += `<p class="dx-prose">No relationship state on record yet.</p>`;
+  }
+
+  // Open docket positions — this coach's frozen claims with skin in the game (#1386).
+  const dockets = d.docket_positions || [];
+  h += `<p class="cd-h label">open docket positions</p>`;
+  if (!dockets.length) {
+    h += `<p class="dx-prose">${esc(first)} holds 0 open docket positions.</p>`;
+  } else {
+    h += `<ul class="ce-trail">`;
+    for (const p of dockets.slice(0, 4)) {
+      h += `<li class="ce-item">${dateLine(p.date, p.topic ? esc(p.topic) : "")}<p class="ce-say">&ldquo;${esc(p.my_claim)}&rdquo;${p.versus ? ` <span class="label">vs ${esc(String(p.versus).replace(/_coach$/, ""))} coach</span>` : ""}</p><p class="label cd-check">${p.criterion ? `resolves by code: ${esc(p.criterion)}` : ""}${p.resolution_date ? ` · ${esc(p.resolution_date)}` : ""}${evLink(p)}</p>${corrNotes(p)}</li>`;
+    }
+    h += `</ul>`;
+  }
+
+  // The honesty ledger: withheld + retracted are disclosed, never silent.
+  const audit = [];
+  if (d.withheld) audit.push(`${d.withheld} line${d.withheld === 1 ? "" : "s"} withheld by the privacy filter`);
+  if (d.retracted) audit.push(`${d.retracted} record${d.retracted === 1 ? "" : "s"} retracted by Matthew (each retraction is itself logged)`);
+  if (audit.length) h += `<p class="cd-audit label">${esc(audit.join(" · "))}</p>`;
+  if (d.disclosure) h += `<p class="dx-disclosure label">${esc(d.disclosure)}</p>`;
+  return h + `</section>`;
+}
+
 // ── #1113 immersive bios — the three dossier layers ──────────────────────────
 // 1) THE CAST SHEET — authored trait scores. Deterministic config written by the
 //    author (lambdas/coach_traits.py), rendered as position-between-poles bars.
@@ -709,6 +784,9 @@ async function renderByCoach(read, id) {
       }).join("")}</ul>` +
       `<p class="bc-conv-note label">What was said stays between us — the record shows only that we talked, the theme, and how it moved my read.</p></section>`;
   }
+  // 3.4) THE DOSSIER (#1387) — what this coach knows, rendered verbatim from the
+  // COACH# memory records (privacy-filtered server-side; honest zero-states).
+  h += coachDossierHTML(coach);
   // 3.5) THE EVOLVING READ — prefer the dated STANCE# trail (how the coach's read of
   //      Matthew actually moved, week to week), falling back to recent dated commentary.
   const sh = (coach.stance_history || []).filter((s) => s && (s.how_my_read_changed || s.headline_read));

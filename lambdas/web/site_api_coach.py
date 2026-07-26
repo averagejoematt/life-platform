@@ -31,6 +31,8 @@ from decimal import Decimal  # noqa: F401
 
 import boto3
 import calibration_core  # #538: the ONE prediction-calibration scorer (Brier + reliability)
+import coach_corrections  # #1689 ledger — reused by the dossier retract/correct path (#1387)
+import coach_dossier  # #1387: the verbatim, privacy-filtered dossier projection (bundled module)
 import coach_traits  # #1113: authored trait scores for the immersive bios (bundled module)
 import diary_consent  # #1483 (ADR-142 tier 2): the conversation-allude projection (bundled module)
 from boto3.dynamodb.conditions import Key
@@ -414,6 +416,117 @@ def _recent_outputs(coach_id, limit=25):  # CC-07: depth for the daily-journey t
     except Exception:
         pass
     return out
+
+
+def _dossier_block(coach_id):
+    """#1387 — The Coach Dossier: what this coach knows, rendered VERBATIM from the
+    COACH# partitions. Deterministic build — no LLM anywhere in this path; every
+    line carries its date and, where derivable, an evidence link.
+
+    Privacy pass first (AC2): every free-text field crosses
+    coach_dossier.find_dossier_violations (journal_quotes/privacy_guard vocabularies
+    + genotype patterns) — a hit withholds the WHOLE record and the payload counts
+    it. ADR-141 §4: channel=conversation LEARNING# rows never enter this block.
+    Corrections reuse the #1689 ledger (surface=coach_dossier): retractions remove
+    a record here (counted); correction notes render dated under the original line.
+    Per-section fail-soft — a query error yields that section's honest empty, never
+    a 500 (the dossier must not take the coach page down)."""
+    withheld = 0
+
+    def _rows(sk_prefix, limit):
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with(sk_prefix),
+                    "ScanIndexForward": False,
+                    "Limit": limit,
+                }
+            )
+        )
+        return [_decimal_to_float(i) for i in resp.get("Items", [])]
+
+    commitments = []
+    try:
+        for it in _rows("COMMITMENT#", 60):
+            entry, status = coach_dossier.commitment_entry(it)
+            if status == coach_dossier.WITHHELD:
+                withheld += 1
+            elif entry:
+                commitments.append(entry)
+    except Exception as _e:
+        logger.warning(f"[dossier] commitments {coach_id}: {_e}")
+    commitments.sort(key=lambda e: e.get("date") or "", reverse=True)
+
+    learnings = []
+    try:
+        for it in _rows("LEARNING#", 60):
+            entry, status = coach_dossier.learning_entry(it, reason_translator=_reader_reason)
+            if status == coach_dossier.WITHHELD:
+                withheld += 1
+            elif entry:
+                learnings.append(entry)
+    except Exception as _e:
+        logger.warning(f"[dossier] learnings {coach_id}: {_e}")
+    learnings = learnings[:25]
+
+    relationship = None
+    try:
+        rel_item = table.get_item(Key={"pk": f"COACH#{coach_id}", "sk": "RELATIONSHIP#state"}).get("Item")
+        if singleton_visible(rel_item):  # #946/#1085: a wiped cycle's state never serves pre-start
+            entry, status = coach_dossier.relationship_entry(_decimal_to_float(rel_item))
+            if status == coach_dossier.WITHHELD:
+                withheld += 1
+            else:
+                relationship = entry
+    except Exception as _e:
+        logger.warning(f"[dossier] relationship {coach_id}: {_e}")
+
+    docket_positions = []
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq("ENSEMBLE#docket") & Key("sk").begins_with("OPEN#"),
+            Limit=40,
+        )
+        for it in resp.get("Items", []):
+            if not singleton_visible(it):
+                continue
+            entry, status = coach_dossier.docket_entry(_decimal_to_float(it), coach_id)
+            if status == coach_dossier.WITHHELD:
+                withheld += 1
+            elif entry:
+                docket_positions.append(entry)
+    except Exception as _e:
+        logger.warning(f"[dossier] docket {coach_id}: {_e}")
+    docket_positions.sort(key=lambda e: e.get("resolution_date") or "")
+
+    retracted = 0
+    try:
+        ledger = [_decimal_to_float(r) for r in coach_corrections.list_corrections(table, limit=500)]
+        corrections = coach_dossier.dossier_corrections(ledger, coach_id)
+        if corrections:
+            commitments, r1 = coach_dossier.apply_corrections(commitments, corrections)
+            learnings, r2 = coach_dossier.apply_corrections(learnings, corrections)
+            docket_positions, r3 = coach_dossier.apply_corrections(docket_positions, corrections)
+            retracted = r1 + r2 + r3
+    except Exception as _e:
+        logger.warning(f"[dossier] corrections {coach_id}: {_e}")
+
+    return {
+        "verbatim": True,
+        "commitments": commitments,
+        "commitment_counts": coach_dossier.commitment_counts(commitments),
+        "learnings": learnings,
+        "relationship": relationship,
+        "docket_positions": docket_positions,
+        "withheld": withheld,
+        "retracted": retracted,
+        "disclosure": (
+            "Rendered verbatim from this coach's memory records — deterministic build, no AI in the "
+            "render path. Every line carries its date. Lines that fail the standing privacy filter are "
+            "withheld and counted; records Matthew has retracted are removed and counted — the "
+            "retraction itself is a logged correction, never a silent edit."
+        ),
+    }
 
 
 def _stance_latest(coach_id):
@@ -965,6 +1078,9 @@ def handle_coach(event):
                 # #1483 (ADR-142 tier 2): semi-private conversation references —
                 # sanctioned fields only; the words exchanged never cross the wire.
                 "conversations": _conversation_references(pid),
+                # #1387: the dossier — what this coach knows, verbatim from COACH#
+                # memory (privacy-filtered, correction-aware, no LLM in the path).
+                "dossier": _dossier_block(pid),
                 "daily": _coach_daily(pid),
                 "memoir": _coach_memoir(pid),
             },

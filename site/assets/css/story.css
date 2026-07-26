@@ -899,6 +899,14 @@ body { overflow-x: hidden; }
 .bc-datalink { margin: var(--sp-3) 0 0; }
 .bc-datalink a, .bc-track { color: var(--ember); }
 .bc-track { display: block; margin: var(--sp-3) 0; }
+/* #1387 The Dossier — verbatim memory sections on the by-coach page. */
+.bc-dossier { margin: var(--sp-4) 0; padding: var(--sp-4); border: var(--border-hair); border-radius: var(--radius-sm); background: var(--surface); }
+.cd-h { color: var(--ember); margin: var(--sp-4) 0 var(--sp-2); }
+.cd-count { color: var(--ink-muted); margin: 0 0 var(--sp-2); }
+.cd-check { margin: 2px 0 0; color: var(--ink-faint); }
+.cd-check a, .cd-corr { color: var(--ember); }
+.cd-corr { margin: 4px 0 0; }
+.cd-audit { margin: var(--sp-3) 0 0; color: var(--ink-faint); }
 .dx-item-sub { display: block; margin-top: 4px; font-family: var(--font-sans); font-size: var(--fs-small); color: var(--ink-faint); line-height: 1.4; }
 .bc-session { margin: var(--sp-4) 0; padding: var(--sp-4); border: var(--border-hair); border-radius: var(--radius-sm); background: var(--surface); }
 .ms-title { margin: var(--sp-2) 0 0; font-family: var(--font-serif); color: var(--ink); }
