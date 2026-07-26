@@ -102,6 +102,90 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+# ── The Coach's Prescription follow-up hook (#1706, epic #1686) ───────────────
+
+FOLLOWUP_QUESTION = "question"
+FOLLOWUP_HANDOFF = "handoff"
+FOLLOWUP_TYPES = (FOLLOWUP_QUESTION, FOLLOWUP_HANDOFF)
+
+
+def build_prescription_followup_item(
+    week: str,
+    curating_coach: str,
+    follow_up: Optional[dict],
+    *,
+    cycle: Optional[int] = None,
+    now: Optional[str] = None,
+    coach_name_of=None,
+) -> Optional[dict]:
+    """Build ONE CHECKIN# item that threads a weekly Prescription pick into the
+    coaching loop (#1706) — reusing the coach check-in queue, not a new mechanism.
+
+    `follow_up` (all fields optional; a falsy/typeless value returns None — no
+    follow-up is a valid pick):
+      - ``type``     — ``question`` (default) or ``handoff``.
+      - ``text``     — the question the coach wants Matthew to answer.
+      - ``to_coach`` — for ``handoff``: the bare coach id who should raise it in
+                       their next brief/check-in.
+
+    Routing:
+      - ``question`` → surfaced under the CURATING coach's queue.
+      - ``handoff``  → surfaced under ``to_coach``'s queue, provenance recording
+        the hand-off FROM the curating coach (mirrors how coaches already flag
+        items for each other).
+
+    Returns the item dict (caller writes it) or ``None`` when there is nothing to
+    surface. Pure — `now`/`cycle` are injected so it is deterministically testable.
+    Callers MUST validate ``to_coach`` against the live roster before writing.
+    """
+    if not follow_up:
+        return None
+    text = (follow_up.get("text") or "").strip()
+    if not text:
+        return None
+    ftype = (follow_up.get("type") or FOLLOWUP_QUESTION).strip().lower()
+    if ftype not in FOLLOWUP_TYPES:
+        return None
+
+    curating = normalize_coach_id(curating_coach)
+    if ftype == FOLLOWUP_HANDOFF:
+        target = normalize_coach_id(follow_up.get("to_coach") or "")
+        if not target:
+            return None
+        surface_coach = target
+        context_reason = f"prescription hand-off from the {curating} coach re: the week-{week} pick"
+        tags = ["prescription", "horizons", "handoff", week]
+    else:
+        surface_coach = curating
+        context_reason = f"follow-up on the {curating} coach's week-{week} prescription pick"
+        tags = ["prescription", "horizons", week]
+
+    resolve_name = coach_name_of or (lambda cid: cid)
+    stamp = now or now_iso()
+    item = {
+        "pk": checkin_pk(surface_coach),
+        "sk": new_checkin_sk(),
+        "record_type": "coach_checkin",
+        "coach_id": surface_coach,
+        "coach_name": resolve_name(surface_coach),
+        "question": text,
+        "tags": tags,
+        "status": STATUS_OPEN,
+        "asked_at": stamp,
+        "provenance": PROVENANCE,
+        "context_reason": context_reason,
+        "generated_by": "prescription_followup",
+        "prescription_week": week,
+        "prescription_followup_type": ftype,
+        "prescription_curator": curating,
+    }
+    if ftype == FOLLOWUP_HANDOFF:
+        item["handoff_from"] = curating
+    if cycle is not None:
+        item["cycle"] = int(cycle)
+    return item
+
+
 # ── cycle stamp (ADR-077 navigability) ───────────────────────────────────────
 
 _cycle_cache: dict = {"value": None, "read": False}

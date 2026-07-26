@@ -32,7 +32,42 @@ from reading import (
 )
 
 from mcp.config import logger, table
+from mcp.tools_coach_intelligence import COACH_IDS, COACH_NAMES
 from mcp.utils import mcp_error
+
+
+def _coach_checkin_module():
+    """The shared coach-checkin core, importable under both the flat MCP bundle
+    and the `lambdas.` package layout (mirrors tools_coach_checkin's fallback)."""
+    try:
+        import coach_checkin as cc
+    except ImportError:  # pragma: no cover — package-layout fallback
+        from lambdas import coach_checkin as cc
+    return cc
+
+
+def _prescription_followup_spec(args, valid_coach_ids):
+    """Parse the optional #1706 follow-up hook off curate_horizon's args.
+
+    Returns ``(spec | None, error | None)``. ``handoff_to_coach`` wins over a bare
+    question (a hand-off IS the question, raised by another coach). An unknown
+    ``handoff_to_coach`` is a hard error — a pick must never surface under a
+    non-existent coach."""
+    cc = _coach_checkin_module()
+    text = (args.get("follow_up_question") or "").strip()
+    to_coach = (args.get("handoff_to_coach") or "").strip()
+    if not text and not to_coach:
+        return None, None
+    if to_coach:
+        norm = cc.normalize_coach_id(to_coach)
+        roster = {cc.normalize_coach_id(c) for c in valid_coach_ids}
+        if norm not in roster:
+            return None, f"handoff_to_coach '{to_coach}' is not a known coach ({sorted(roster)})"
+        if not text:
+            return None, "handoff_to_coach requires follow_up_question (the item the other coach raises)"
+        return {"type": cc.FOLLOWUP_HANDOFF, "text": text, "to_coach": norm}, None
+    return {"type": cc.FOLLOWUP_QUESTION, "text": text}, None
+
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 _CONSTELLATION_MIN_NODES = 4  # honest empty state below this (brief §2)
@@ -311,11 +346,46 @@ def tool_curate_horizon(args=None):
             error_code="LINK_UNVERIFIED",
         )
 
+    # #1706 — the optional follow-up hook: the coach can attach a question for
+    # Matthew, or hand the pick to another coach to raise. Parsed (+ validated)
+    # before commit so an unknown target coach fails the whole call.
+    follow_up, fu_err = _prescription_followup_spec(args, COACH_IDS)
+    if fu_err:
+        return mcp_error(fu_err, error_code="INVALID_ARG")
+    if follow_up:
+        plan["follow_up"] = dict(follow_up)
+
     if dry_run:
         return _preview("curate_horizon", plan)
 
+    checkin_item = None
+    if follow_up:
+        cc = _coach_checkin_module()
+        checkin_item = cc.build_prescription_followup_item(
+            week,
+            horizons_garden.CURATOR,
+            follow_up,
+            cycle=cc.read_cycle(),
+            coach_name_of=lambda cid: COACH_NAMES.get(cid) or COACH_NAMES.get(f"{cid}_coach") or cid,
+        )
+        if checkin_item:
+            # Thread the surfaced check-in back onto the pick so the two records
+            # cross-reference (and a re-curate can see a follow-up already fired).
+            plan["follow_up"] = {
+                **follow_up,
+                "surfaced_checkin_sk": checkin_item["sk"],
+                "surfaced_coach": checkin_item["coach_id"],
+            }
+
     item = reading_store.put_horizon_pick(plan)
-    return {"status": "committed", "action": "curate_horizon", "pick": item}
+    if checkin_item:
+        table.put_item(Item=checkin_item)
+    return {
+        "status": "committed",
+        "action": "curate_horizon",
+        "pick": item,
+        "follow_up_surfaced": bool(checkin_item),
+    }
 
 
 def _prior_iso_week() -> str:
