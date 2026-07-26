@@ -2302,6 +2302,15 @@ def site_api() -> list[iam.PolicyStatement]:
     R17-04: Added dedicated Secrets read for life-platform/site-api-ai-key (isolated from main ai-keys).
     BL-02: Added S3 dashboard/* and generated/* read for /api/labs (clinical.json) and health check (public_stats.json).
     BL-02: Added S3 generated/findings/* write for /api/submit_finding.
+    #1781: codified 3 permissions that were live-only (out-of-band console grants,
+    never in CDK) since the status/observatory page shipped — docs/audits/
+    AUDIT_2026-03-30_security.md documented them as intentional exceptions but they
+    were never folded into role_policies.py, so the drift sentinel flagged all three
+    as MODIFIED every week. site_api_intelligence.py actually calls all three APIs
+    (DLQ depth, cost tracking, alarm overlay on the observatory/status surface):
+      - ce:GetCostAndUsage (Cost Explorer has no resource-level scoping)
+      - cloudwatch:DescribeAlarms (CloudWatch alarm APIs have no resource-level scoping)
+      - sqs:GetQueueAttributes, scoped to the ingestion DLQ
     """
     return [
         iam.PolicyStatement(
@@ -2396,6 +2405,24 @@ def site_api() -> list[iam.PolicyStatement]:
             sid="ExperimentCycleRead",
             actions=["ssm:GetParameter"],
             resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle"],
+        ),
+        # #1781: the three status/observatory-page permissions above (docstring) —
+        # codifying the live out-of-band grants that site_api_intelligence.py has
+        # actually relied on since the page shipped.
+        iam.PolicyStatement(
+            sid="CostExplorerRead",
+            actions=["ce:GetCostAndUsage"],
+            resources=["*"],  # Cost Explorer has no resource-level scoping
+        ),
+        iam.PolicyStatement(
+            sid="CloudWatchAlarmRead",
+            actions=["cloudwatch:DescribeAlarms"],
+            resources=["*"],  # CloudWatch alarm APIs have no resource-level scoping
+        ),
+        iam.PolicyStatement(
+            sid="SqsDlqRead",
+            actions=["sqs:GetQueueAttributes"],
+            resources=[DLQ_ARN],
         ),
     ]
 
