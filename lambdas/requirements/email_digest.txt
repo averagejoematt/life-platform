@@ -1,8 +1,0 @@
-# Shared requirements for all email/digest/compute Lambdas:
-#   daily-brief, weekly-digest, monthly-digest, nutrition-review,
-#   wednesday-chronicle, weekly-plate, monday-compass, anomaly-detector,
-#   character-sheet-compute, adaptive-mode-compute, daily-metrics-compute,
-#   daily-insight-compute, hypothesis-engine
-#
-# NOTE: All AI calls use raw urllib.request (not the anthropic SDK).
-# No third-party packages required beyond the Lambda runtime.

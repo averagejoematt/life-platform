@@ -1,2 +1,0 @@
-# apple-health-ingestion
-# No third-party dependencies — uses stdlib xml.etree.ElementTree.

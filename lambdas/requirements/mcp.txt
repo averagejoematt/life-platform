@@ -1,3 +1,0 @@
-# life-platform-mcp
-# Uses raw urllib for all HTTP — no third-party packages needed.
-# boto3/botocore provided by Lambda runtime.

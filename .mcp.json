@@ -1,9 +1,0 @@
-{
-  "mcpServers": {
-    "life-platform": {
-      "command": "python3",
-      "args": ["mcp_bridge.py"],
-      "cwd": "/Users/matthewwalker/Documents/Claude/life-platform"
-    }
-  }
-}

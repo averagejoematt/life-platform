@@ -1,61 +1,38 @@
-# Life Platform
+# session-archive — the ship's log
 
-[![CI](https://github.com/averagejoematt/life-platform/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/averagejoematt/life-platform/actions/workflows/ci-cd.yml)
-![AWS](https://img.shields.io/badge/cloud-AWS_serverless-232F3E?logo=amazonaws)
-![Python](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)
-![IaC](https://img.shields.io/badge/IaC-AWS_CDK-FF9900)
-![License](https://img.shields.io/badge/license-proprietary-lightgrey)
+This branch is the **archive of `handovers/`**: one markdown file per Claude Code session,
+2026-02 → present. It was split out of `main` by **#1650** so the product tree reads as
+engineering, not transcript.
 
-A personal **health-intelligence platform** — it ingests data from ~20 wearables/apps/labs, stores it in a single-table data model, runs a deterministic computation pipeline plus an 8-agent AI coaching layer, and publishes the results (privately and at **[averagejoematt.com](https://averagejoematt.com)**) — all on a hard **$85/month enforced budget** (floats to $100 in reader-traffic surge mode — ADR-133).
+## What lives here
 
-> **N=1, in public, kept honest.** Everything is correlative (never causal), confidence-labelled, and the down weeks are shown, not hidden.
+- `handovers/HANDOVER_<YYYY-MM-DD>_<Slug>.md` — one dated file per closed session.
+- `handovers/archive/` — the older per-session files plus the pre-2026-07 CLAUDE.md
+  session diary (`CLAUDE_MD_SESSION_DIARY_2026-07-03.md`).
 
----
+## What is NOT here
 
-## At a glance
+`handovers/HANDOVER_LATEST.md` — the **live** driver for the current session — stays
+tracked on `main`. That is the only handover the wrap ritual, `/uplevel`, the review
+skills, `deploy/generate_review_bundle.py` and `scripts/check_residual_queue.py` resolve.
 
-| | |
-|---|---|
-| **~98 Lambdas** | Ingest → Store → Serve, all serverless (us-west-2 + us-east-1 edge) |
-| **75 MCP tools** | Claude reads the data back via a Model Context Protocol server |
-| **Single-table DynamoDB** | `USER#…#SOURCE#…` / `DATE#…`, on-demand, 2 sanctioned GSIs (ADR-097; PITR + KMS) |
-| **AWS Bedrock** | Claude Sonnet 4.6 (narrative) + Haiku 4.5 (structured), prompt-cached |
-| **9 CDK stacks** | 100% infrastructure-as-code; OIDC CI/CD with a production-approval gate + auto-rollback |
-| **$85/mo, enforced** | A cost-governor degrades AI by budget tier; an independent AWS Budget backstops it |
-| **v4 site** | Three doors — Cockpit (`/cockpit/`), Story (`/story/`), Evidence (`/evidence/`) |
+## How to read it
 
-## Architecture (one line)
+```bash
+git fetch origin session-archive
+git log origin/session-archive --oneline -- handovers/          # the log of the log
+git show origin/session-archive:handovers/HANDOVER_2026-07-21_Glass-Engine.md
+git worktree add ../life-platform-sessions origin/session-archive   # browse the whole corpus
+```
 
-**Ingest** (scheduled EventBridge Lambdas + HAE webhooks) → **Store** (raw JSON in S3, normalized metrics in DynamoDB) → **Serve** (compute Lambdas, daily-brief emails, the MCP server, and a read-only Site API behind CloudFront).
+This branch's first commit is parented on `main`, and the files keep their original
+`handovers/…` paths — so `git log --follow` walks a handover's full history straight
+through the split. Nothing was rewritten and nothing was lost.
 
-## Start here
+## How it grows
 
-**📖 The engineering wiki lives at [`docs/README.md`](docs/README.md)** (the GitHub wiki *tab* is just a signpost — docs-as-code is the single gated source of truth) — role-based entry
-paths, the full page registry, and the drift-prevention contract that keeps it accurate.
+`/wrap` step (a) appends the outgoing handover here via `scripts/archive_handover.py`
+(on `main`), which writes the commit with git plumbing — it never checks this branch out
+and never touches the working tree.
 
-| You want to… | Read |
-|---|---|
-| Build the mental model | [`docs/ONBOARDING.md`](docs/ONBOARDING.md) |
-| Find your way around the repo | [`docs/REPO_STRUCTURE.md`](docs/REPO_STRUCTURE.md) |
-| Run first-day commands | [`docs/QUICKSTART.md`](docs/QUICKSTART.md) |
-| Understand the system | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
-| Operate / troubleshoot | [`docs/RUNBOOK.md`](docs/RUNBOOK.md) |
-| Know *why* (ADRs) | [`docs/DECISIONS.md`](docs/DECISIONS.md) · [`docs/TAG_CODES.md`](docs/TAG_CODES.md) |
-| The data model | [`docs/SCHEMA.md`](docs/SCHEMA.md) |
-| See what shipped | [`docs/CHANGELOG.md`](docs/CHANGELOG.md) |
-| How the AI agent builds this | [`CLAUDE.md`](CLAUDE.md) |
-
-## Tech stack
-
-Python 3.12 (stdlib-only HTTP — no `requests`/`httpx`) · AWS Lambda · DynamoDB · S3 · CloudFront · EventBridge · Secrets Manager · SES · **Bedrock** · **AWS CDK** (TypeScript app, Python stacks) · GitHub Actions (OIDC, no long-lived keys) · pytest + Playwright + AI-vision QA.
-
-## Conventions (the short version)
-
-- **IaC only** — change AWS via `cdk/`, never the console (see [`CLAUDE.md`](CLAUDE.md)).
-- **Secrets** live in AWS Secrets Manager under `life-platform/`; never in the repo.
-- **Decimal**, not float, for DynamoDB. **Single table**, no GSIs without an ADR.
-- Every non-trivial decision is an **ADR** in `docs/DECISIONS.md`; internal tag-codes are decoded in [`docs/TAG_CODES.md`](docs/TAG_CODES.md).
-
-## License
-
-**Proprietary — © 2026 Matthew. All rights reserved.** See [`LICENSE`](LICENSE). Solo-maintained; not open for external contribution.
+**Never merge this branch into `main`.** It is an archive ref, not a feature branch.
