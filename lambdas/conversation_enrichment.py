@@ -201,21 +201,10 @@ def conversation_context(item, channel) -> str:
 
 
 def _query_between(table, pk, sk_lo, sk_hi):
-    """Paginated Key-condition query pk + sk BETWEEN [sk_lo, sk_hi].
-
-    ADR-077/phase_filter.py contract: every read of platform DDB data passes
-    through with_phase_filter() — this is the SINGLE query helper for all
-    three conversational partitions plus the journal dedup corpus, so wiring
-    it here closes the gap module-wide in one place (#1790). Two of the three
-    conversational source families are EXPERIMENT_SCOPED (field_notes,
-    coach_checkin via the COACH#* rule) and the 14-day rolling lookback can
-    reach across a genesis into the wiped prior cycle; without this, a
-    tombstoned row would be enriched and its `enriched_*` fields would seed
-    new-cycle hypotheses from conversation the reset declared erased."""
+    """Paginated Key-condition query pk + sk BETWEEN [sk_lo, sk_hi]."""
     from boto3.dynamodb.conditions import Key
-    from phase_filter import with_phase_filter
 
-    kwargs = with_phase_filter({"KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(sk_lo, sk_hi)})
+    kwargs = {"KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(sk_lo, sk_hi)}
     items = []
     while True:
         resp = table.query(**kwargs)
@@ -413,21 +402,11 @@ FIELD_MAPPING = {
 }
 
 
-#  ADR-077 (#1790): a defense-in-depth belt on top of the phase-filtered read —
-#  the write itself must refuse to land on a row that has since been
-#  tombstoned (a reset can run between collection and the Haiku round-trip).
-#  Mirrors singleton_visible's tombstone predicate as a DDB condition.
-_NOT_TOMBSTONED_CONDITION = "attribute_not_exists(tombstone) OR tombstone = :ce_not_tombstoned"
-_NOT_TOMBSTONED_VALUE = {":ce_not_tombstoned": False}
-
-
 def apply_enrichment(table, item, channel, enrichment, text):
     """Write the enriched_* fields IN PLACE onto the conversational record, with the
     #1577 provenance stamps: enriched_channel (AC1), enriched_scope (AC2 —
     analysis_only), enriched_content_hash (AC4), enriched_at + schema version.
-    Grounding gate runs BEFORE anything is written. Returns True when written,
-    False when the write was refused because the row is now tombstoned
-    (ADR-077, #1790) — the caller must not count that as an enrichment."""
+    Grounding gate runs BEFORE anything is written. Returns True when written."""
     if enrichment.get("causal_hints"):
         kept, dropped = _ground_causal_hints(enrichment["causal_hints"], text)
         enrichment["causal_hints"] = kept
