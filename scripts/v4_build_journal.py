@@ -150,7 +150,7 @@ PAGE = """<!DOCTYPE html>
 {body}
     </div>
   </article>
-  <aside class="post-cta">
+{provenance_block}  <aside class="post-cta">
     <h2>{cta_title}</h2>
     <p>{cta_body}</p>
     <a class="cta-btn" href="{cta_href}">{cta_button}</a>
@@ -341,7 +341,7 @@ def render(post: dict) -> str:
     body = load_body(slug)
 
     # Fail-closed publish gate on everything reader-visible (ADR-104).
-    for field, txt in (("title", title), ("excerpt", excerpt), ("body", body)):
+    for field, txt in (("title", title), ("excerpt", excerpt), ("body", body), ("provenance", post.get("provenance") or "")):
         privacy_guard.assert_clean(txt, context=f"{slug}.{field}")
 
     label = post.get("label") or "Essay"
@@ -356,6 +356,13 @@ def render(post: dict) -> str:
 
     stats = post.get("stats")
     stats_block = f'    <div class="post-header__stats">{_esc(stats)}</div>\n' if stats else ""
+
+    # Provenance (#1567): interview-composed essays carry an explicit origin line
+    # ("composed from a <date> interview, approved by Matthew") rendered after the
+    # body in the receipts register. Optional — absent field emits NOTHING, so
+    # pre-#1567 pages stay byte-identical.
+    provenance = post.get("provenance")
+    provenance_block = f'  <div class="post-receipts">{_esc(provenance)}</div>\n' if provenance else ""
 
     cta = post.get("cta") or {}
     cta_title = cta.get("title") or "Follow the experiment"
@@ -385,6 +392,7 @@ def render(post: dict) -> str:
         date_human=_esc(human_date(post["date"])),
         read_minutes=read_minutes(post),
         stats_block=stats_block,
+        provenance_block=provenance_block,
         body=body,
         cta_title=_esc(cta_title),
         cta_body=_esc(cta_body),
