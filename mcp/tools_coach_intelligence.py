@@ -188,10 +188,35 @@ def tool_get_coach_track_record(args):
     if subdomain_filter:
         learnings = [l for l in learnings if l.get("subdomain", "").lower() == subdomain_filter]
 
+    # #1481 (ADR-141): provenance split — conversation-channel learnings (the
+    # coach's self-calibration from Matthew's check-in answers) are a distinct
+    # evidence class: surfaced, counted, but structurally outside the
+    # data-derived outcome/hit-rate accounting.
+    by_channel = defaultdict(int)
+    conversation_recent = []
+    data_learnings = []
+    for l in learnings:
+        channel = l.get("channel") or "data"
+        by_channel[channel] += 1
+        if channel == "conversation":
+            if len(conversation_recent) < 8:
+                conversation_recent.append(
+                    {
+                        "date": l.get("date") or l.get("sk", "").replace("LEARNING#", "").split("#")[0],
+                        "subdomain": l.get("subdomain"),
+                        "confidence_direction": l.get("confidence_direction"),
+                        "takeaway": l.get("takeaway"),
+                        "checkin_id": l.get("checkin_id"),
+                        "channel": "conversation",
+                    }
+                )
+        else:
+            data_learnings.append(l)
+
     by_outcome = defaultdict(int)
     by_subdomain = defaultdict(lambda: defaultdict(int))
     by_metric = defaultdict(lambda: defaultdict(int))
-    for l in learnings:
+    for l in data_learnings:
         status = l.get("status", "unknown")
         subdomain = l.get("subdomain", "unspecified")
         metric = l.get("metric", "unspecified")
@@ -231,7 +256,7 @@ def tool_get_coach_track_record(args):
     # Recent evaluations — last 10 by date, with prediction text from the
     # source PREDICTION# record when accessible.
     recent = []
-    for l in learnings[:10]:
+    for l in data_learnings[:10]:
         pred_id = l.get("prediction_id", "")
         recent.append(
             {
@@ -241,6 +266,7 @@ def tool_get_coach_track_record(args):
                 "status": l.get("status"),
                 "reason": l.get("reason"),
                 "prediction_id": pred_id,
+                "channel": l.get("channel") or "data",
             }
         )
 
@@ -250,6 +276,7 @@ def tool_get_coach_track_record(args):
         "window_days": days,
         "subdomain_filter": subdomain_filter,
         "total_evaluations": len(learnings),
+        "by_channel": dict(by_channel),
         "by_outcome": dict(by_outcome),
         "decided_count": decided,
         "hit_rate_pct": hit_rate_pct,
@@ -257,6 +284,13 @@ def tool_get_coach_track_record(args):
         "by_subdomain": {k: dict(v) for k, v in by_subdomain.items()},
         "by_metric": {k: dict(v) for k, v in by_metric.items()},
         "recent_evaluations": recent,
+        # #1481 (ADR-141): conversation-sourced self-calibration — provenance
+        # data vs conversation is explicit; these never enter the hit rate.
+        "conversation_learnings": {
+            "count": by_channel.get("conversation", 0),
+            "recent": conversation_recent,
+            "note": "channel=conversation — self-calibration from Matthew's check-in answers; excluded from hit_rate_pct/by_outcome by construction.",
+        },
     }
 
 

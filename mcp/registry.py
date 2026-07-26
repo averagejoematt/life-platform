@@ -14,7 +14,7 @@ from mcp.tools_capture import tool_get_capture_queues
 from mcp.tools_cgm import tool_get_cgm
 
 # #915: ad-hoc coach check-in loop — coaches ask, Matthew answers verbatim.
-from mcp.tools_coach_checkin import tool_get_coach_checkin_queue, tool_log_coach_checkin
+from mcp.tools_coach_checkin import tool_get_coach_checkin_queue, tool_log_coach_calibration, tool_log_coach_checkin
 
 # #1690 (epic #1687 S3): correct a weekly-review-pack item by number from chat.
 from mcp.tools_coach_corrections import tool_log_coach_correction
@@ -2076,6 +2076,55 @@ TOOLS = {
                     "tags": {"type": "array", "items": {"type": "string"}, "description": "Optional topic tags (max 5)."},
                 },
                 "required": ["checkin_id"],
+            },
+        },
+    },
+    # #1481: conversational self-calibration — the asking coach re-grades itself from the answer.
+    "log_coach_calibration": {
+        "fn": tool_log_coach_calibration,
+        "schema": {
+            "name": "log_coach_calibration",
+            "description": (
+                "#1481: After a check-in answer is logged, the ASKING coach updates its own read of Matthew — a "
+                "bounded per-subdomain confidence move (source=conversation) plus a LEARNING# record "
+                "(channel=conversation) that quotes the verbatim answer by checkin_id (ADR-104/ADR-141). Rules: "
+                "only an ANSWERED check-in qualifies (never a skip); max 2 subdomains per answer; one write per "
+                "(answer, subdomain) — replays are idempotent; one conversation can never move confidence more "
+                "than one graded prediction would. Prefer the coach's existing CONFIDENCE# subdomain vocabulary "
+                "(e.g. sleep_quality, protein_intake, mood, training_load). "
+                "Use after log_coach_checkin, when the answer genuinely changed (or confirmed) the coach's read."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "checkin_id": {
+                        "type": "string",
+                        "description": "The ANSWERED check-in this calibration derives from (starts with 'CHECKIN#').",
+                    },
+                    "coach_id": {"type": "string", "description": "Optional: the asking coach's id — speeds up the lookup."},
+                    "subdomain": {
+                        "type": "string",
+                        "description": "The subdomain being re-graded (reuse existing CONFIDENCE# vocabulary where it fits).",
+                    },
+                    "direction": {
+                        "type": "string",
+                        "enum": ["up", "down", "hold"],
+                        "description": "up = the answer clarified/confirmed the coach's read; down = it revealed a blind spot; hold = record the learning without a confidence move.",
+                    },
+                    "takeaway": {
+                        "type": "string",
+                        "description": "What the coach learned, tightly paraphrasing the answer — no invented context (max 600 chars).",
+                    },
+                    "answer_excerpt": {
+                        "type": "string",
+                        "description": "Optional: the exact phrase of Matthew's answer this rests on — must appear verbatim in the stored answer.",
+                    },
+                    "weight": {
+                        "type": "number",
+                        "description": "Optional confidence-move weight 0.1-1.0 (default 0.5; 1.0 = as strong as one graded prediction, the hard cap).",
+                    },
+                },
+                "required": ["checkin_id", "subdomain", "direction", "takeaway"],
             },
         },
     },

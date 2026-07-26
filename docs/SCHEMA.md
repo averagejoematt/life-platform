@@ -4,7 +4,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
-**Last updated:** 2026-07-26 (v8.6.0 — 72 MCP tools, 20 data sources, 97 Lambdas, 12 cached tools)
+**Last updated:** 2026-07-26 (v8.6.0 — 73 MCP tools, 20 data sources, 97 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -2479,6 +2479,41 @@ The MCP check-in loop (#917): a coach asks Matthew a qualitative question via `g
 | `generated_by` | string | `bedrock` \| `fallback` (canned question when generation is unavailable) |
 
 **Phase taxonomy:** PENDING follow-up (#917) — currently inherits the COACH#\* default (experiment_scoped); recommended cross_phase. See the note in the key-family catalog above.
+
+### Conversational Self-Calibration (#1481, ADR-141)
+
+**pk:** `COACH#{coach_id}_coach` (same bare partition family as above)
+**sk:** `LEARNING#{YYYY-MM-DD}#conv-{checkin_uid}-{subdomain}` — deterministic per (answer, subdomain), so a replayed `log_coach_calibration` collides with the conditional put instead of double-counting. The same write also updates `CONFIDENCE#{subdomain}` in place.
+
+After an ANSWERED check-in, the asking coach re-grades its per-subdomain confidence and records what it learned (`log_coach_calibration` → `lambdas/coach_calibration.py` — deterministic, no LLM in the write path). Bounds and provenance rules: ADR-141.
+
+**Conversation LEARNING# fields (in addition to the shared learning shape):**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `record_type` | string | Constant `coach_learning` |
+| `channel` | string | Constant `conversation` (the evaluator's data path stamps `data`) |
+| `source` | string | Constant `conversation` |
+| `evaluation_type` | string | Constant `conversation_calibration` |
+| `status` | string | Constant `insight` — deliberately outside `confirmed`/`refuted`, so no hit-rate surface can absorb it |
+| `subdomain` | string | The re-graded subdomain (normalized slug; reuse the evaluator vocabulary where it fits) |
+| `takeaway` | string | What the coach learned — tight paraphrase, max 600 chars |
+| `checkin_id` | string | The full `CHECKIN#...` sk this learning derives from (ADR-104 attribution BY ID) |
+| `question` | string | The question that was asked (trimmed) |
+| `answer_quote` | string | VERBATIM excerpt of Matthew's stored answer (validated substring, max 280 chars) — Matthew-private; public surfaces filter `channel=conversation` |
+| `confidence_direction` | string | `up` \| `down` \| `hold` |
+| `confidence_weight` | number | The applied pseudo-observation weight (0 when `hold`; clamped 0.1–1.0) |
+| `created_at` | string | ISO timestamp |
+| `cycle` | number | Experiment cycle at write time (fail-soft absent) |
+
+**CONFIDENCE#{subdomain} provenance fields added by ADR-141** (both write paths):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `source` | string | Channel of the LAST update: `data` (coach-prediction-evaluator) or `conversation` (coach_calibration) |
+| `last_checkin_id` | string | The check-in behind the last conversational move (conversation path only) |
+| `conversation_alpha` | number | Running conversational contribution to `alpha` (carried forward by the data path's full-item put) |
+| `conversation_beta` | number | Running conversational contribution to `beta_param` |
 
 ### Ensemble Digest
 

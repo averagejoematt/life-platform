@@ -35,12 +35,13 @@ from mcp.tools_coach_intelligence import COACH_IDS, COACH_NAMES
 
 try:
     # Shared, bundled modules (#781) — staged at zip root in the Lambda.
+    import coach_calibration as ccal
     import coach_checkin as cc
     import persona_registry
     from source_registry import DEFAULT_STALE_HOURS, manual_capture_sources
 except ImportError:  # pragma: no cover — MCP bundle always ships lambdas/ at root
     if not TYPE_CHECKING:
-        from lambdas import coach_checkin as cc, persona_registry
+        from lambdas import coach_calibration as ccal, coach_checkin as cc, persona_registry
         from lambdas.source_registry import DEFAULT_STALE_HOURS, manual_capture_sources
 
 # Manual-capture source → the coach whose domain that channel informs. Sources
@@ -163,6 +164,21 @@ def _present(item):
     }
 
 
+def _find_checkin(checkin_id, coach_hint=""):
+    """Locate one CHECKIN# item — direct when a coach hint is given, else a
+    search across all coaches. Returns (pk, item-as-floats) or (None, None)."""
+    candidates = [coach_hint] if coach_hint else COACH_IDS
+    for cid in candidates:
+        try:
+            item = _table_ref.get_item(Key={"pk": cc.checkin_pk(cid), "sk": checkin_id}).get("Item")
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[#915] checkin lookup failed for {cid}: {e}")
+            item = None
+        if item:
+            return cc.checkin_pk(cid), _d2f(item)
+    return None, None
+
+
 # ── tools ────────────────────────────────────────────────────────────────────
 
 
@@ -263,20 +279,7 @@ def tool_log_coach_checkin(args):
         return {"error": "provide answer (Matthew's words, verbatim) or skip=true (always valid, zero penalty)"}
 
     # Locate the question — direct when coach_id is given, else search all coaches.
-    coach_hint = cc.normalize_coach_id(args.get("coach_id") or "")
-    candidates = [coach_hint] if coach_hint else COACH_IDS
-    found_pk = None
-    existing = None
-    for cid in candidates:
-        try:
-            item = _table_ref.get_item(Key={"pk": cc.checkin_pk(cid), "sk": checkin_id}).get("Item")
-        except Exception as e:  # noqa: BLE001
-            logger.warning(f"[#915] checkin lookup failed for {cid}: {e}")
-            item = None
-        if item:
-            found_pk = cc.checkin_pk(cid)
-            existing = _d2f(item)
-            break
+    found_pk, existing = _find_checkin(checkin_id, cc.normalize_coach_id(args.get("coach_id") or ""))
     if not found_pk:
         return {"error": f"check-in '{checkin_id}' not found — call get_coach_checkin_queue for the current open questions"}
 
@@ -313,4 +316,57 @@ def tool_log_coach_checkin(args):
             f"Answer recorded verbatim for {coach_name}. It becomes qualitative context the platform "
             "pairs with (or uses to explain the absence of) the quantitative data."
         ),
+        "next_step": (
+            "If this answer genuinely changed the coach's read, call log_coach_calibration (once per subdomain, "
+            "max 2) so the coach re-grades its own confidence from the conversation — bounded, never required."
+        ),
     }
+
+
+def tool_log_coach_calibration(args):
+    """#1481: the asking coach re-grades its per-subdomain confidence and
+    records what it learned from an ANSWERED check-in — bounded and grounded
+    in the verbatim answer by checkin_id (ADR-141, ADR-104)."""
+    args = args or {}
+    checkin_id = (args.get("checkin_id") or "").strip()
+    if not checkin_id.startswith(cc.CHECKIN_SK_PREFIX):
+        return {"error": "checkin_id required — the id of the ANSWERED check-in this calibration derives from (starts with 'CHECKIN#')"}
+
+    found_pk, existing = _find_checkin(checkin_id, cc.normalize_coach_id(args.get("coach_id") or ""))
+    if not found_pk:
+        return {"error": f"check-in '{checkin_id}' not found — call get_coach_checkin_queue for the current questions"}
+    if existing.get("status") == cc.STATUS_SKIPPED:
+        return {"error": "this check-in was skipped — a skip is a boundary, never evidence; nothing to calibrate from (ADR-141)"}
+    if existing.get("status") != cc.STATUS_ANSWERED or not str(existing.get("answer") or "").strip():
+        return {"error": "this check-in has no answer yet — log Matthew's answer first (log_coach_checkin), then calibrate from it"}
+
+    result = ccal.apply_conversation_calibration(
+        _table_ref,
+        {**existing, "pk": found_pk, "sk": checkin_id},
+        subdomain=args.get("subdomain"),
+        direction=args.get("direction"),
+        takeaway=args.get("takeaway"),
+        answer_excerpt=args.get("answer_excerpt"),
+        weight=args.get("weight"),
+        cycle=cc.read_cycle(),
+    )
+    if result.get("error"):
+        return result
+
+    coach_name = existing.get("coach_name") or COACH_NAMES.get(existing.get("coach_id"), existing.get("coach_id"))
+    result["coach_name"] = coach_name
+    if result.get("status") == "already_recorded":
+        result["message"] = "This (answer, subdomain) calibration already exists — idempotent, nothing double-counted."
+        return result
+    conf = result.get("confidence")
+    moved = (
+        f"confidence on '{conf['subdomain']}' moved {conf['direction']} ({conf['mean_before']} → {conf['mean_after']}, weight {conf['weight']})"
+        if conf
+        else "confidence held (direction=hold) — learning recorded without a confidence move"
+    )
+    result["message"] = (
+        f"{coach_name} recalibrated from Matthew's own words: {moved}. "
+        "Recorded with channel=conversation provenance — it feeds the stance engine and track record, "
+        "distinguished from data-derived verdicts and never counted in any hit rate."
+    )
+    return result
