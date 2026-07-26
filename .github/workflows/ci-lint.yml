@@ -153,7 +153,15 @@ jobs:
         # the repo's pre-existing public-era strings (Firebase web key, fake test HMACs), so
         # it can't red-wall on them. Personal repo ⇒ no GITLEAKS_LICENSE needed. Action is
         # SHA-pinned (not a floating tag), matching the repo's action-pinning convention.
-        if: always()
+        #
+        # PUSH-ONLY (#1336 follow-up, 2026-07-26): gitleaks-action scans the pushed-commit
+        # range ONLY on a push event; on a workflow_dispatch (e.g. a `deploy_all` re-deploy of
+        # already-scanned code) it has no range and falls back to scanning FULL history, which
+        # trips on the repo's pre-private-era Firebase key (DECISIONS.md) and red-walls every
+        # dispatch. Since this gate exists to catch NEW secrets on the push-to-main path (PRs
+        # are covered by secret-scan.yml), it is correctly a no-op on dispatch. `always()` is
+        # kept so it still runs independently of earlier gate failures on the push path.
+        if: always() && github.event_name == 'push'
         uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         env:
           GITHUB_TOKEN: ${{ github.token }}
