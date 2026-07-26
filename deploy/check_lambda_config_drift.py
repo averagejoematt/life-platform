@@ -36,6 +36,12 @@ REGION = os.environ.get("AWS_REGION", "us-west-2")
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 STACKS_DIR = os.path.join(ROOT, "cdk", "stacks")
 
+# Stacks that deploy outside the home region (mirrors drift_sentinel.STACKS /
+# cdk/app.py). Without this, every web_stack lambda (us-east-1, e.g.
+# email-subscriber) reads as "NOT DEPLOYED" from a us-west-2 client — the false
+# positive the 2026-07-26 sentinel sweep surfaced.
+STACK_FILE_REGION = {"web_stack.py": "us-east-1"}
+
 # Mirrors cdk/stacks/lambda_helpers.py::create_platform_lambda defaults.
 DEFAULT_TIMEOUT = 120
 DEFAULT_MEMORY = 256
@@ -87,7 +93,14 @@ def parse_cdk_lambdas() -> tuple[list[dict], list[str]]:
                     unparseable.append(f"{function_name} (non-literal memory_mb)")
                 else:
                     memory = v
-            specs.append({"function_name": function_name, "timeout": timeout, "memory": memory})
+            specs.append(
+                {
+                    "function_name": function_name,
+                    "timeout": timeout,
+                    "memory": memory,
+                    "region": STACK_FILE_REGION.get(fname, REGION),
+                }
+            )
     return specs, unparseable
 
 
@@ -95,10 +108,14 @@ def check(specs: list[dict]) -> list[dict]:
     """Compare each CDK spec to the live Lambda config. Returns drift records."""
     import boto3
 
-    lam = boto3.client("lambda", region_name=REGION)
+    clients = {}
     drift = []
     for s in specs:
         fn = s["function_name"]
+        region = s.get("region", REGION)
+        if region not in clients:
+            clients[region] = boto3.client("lambda", region_name=region)
+        lam = clients[region]
         try:
             cfg = lam.get_function_configuration(FunctionName=fn)
         except lam.exceptions.ResourceNotFoundException:
