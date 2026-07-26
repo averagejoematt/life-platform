@@ -360,7 +360,12 @@ class ComputeStack(Stack):
             self,
             "DashboardRefreshEveningRule",
             schedule=events.Schedule.expression("cron(0 1 * * ? *)"),
-            description="Dashboard refresh — 6:00 PM PDT",
+            # #1781: was "6:00 PM PDT" — the fixed-UTC cron only reads 6:00 PM during
+            # PDT (summer); it reads 5:00 PM once the clocks fall back to PST. An
+            # out-of-band console edit already corrected this live (caught by the
+            # drift sentinel as an AWS::Events::Rule MODIFIED); codifying the same
+            # DST-agnostic wording here so CDK matches live and the drift clears.
+            description="Dashboard refresh — 6:00 PM PT",
         )
         evening_rule.add_target(targets.LambdaFunction(dashboard))
 

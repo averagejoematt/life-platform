@@ -331,6 +331,132 @@ def test_cfn_drift_partial_or_transient_error_stays_degraded(monkeypatch):
     assert not res.get("dead_capability")
 
 
+# ── #1781 — known CFN drift-detection false positives (access-log ARN wildcard
+# suffix + Lambda Function URL CORS header casing) must filter, but ONLY the exact
+# documented pattern — never a blanket resource-type or stack-wide suppression.
+
+
+def test_known_cfn_noise_access_log_wildcard_suffix():
+    prop = {
+        "PropertyPath": "/AccessLogSettings/DestinationArn",
+        "ExpectedValue": "arn:aws:logs:us-west-2:205930651321:log-group:/aws/apigateway/x:*",
+        "ActualValue": "arn:aws:logs:us-west-2:205930651321:log-group:/aws/apigateway/x",
+    }
+    reason = ds._known_cfn_noise_reason("AWS::ApiGatewayV2::Stage", prop)
+    assert reason and "wildcard" in reason
+
+
+def test_known_cfn_noise_rejects_access_log_real_change():
+    # A genuinely different destination log group (not just the trailing ':*') must
+    # NOT be filtered — that would be a real drift.
+    prop = {
+        "PropertyPath": "/AccessLogSettings/DestinationArn",
+        "ExpectedValue": "arn:aws:logs:us-west-2:205930651321:log-group:/aws/apigateway/x:*",
+        "ActualValue": "arn:aws:logs:us-west-2:205930651321:log-group:/aws/apigateway/DIFFERENT",
+    }
+    assert ds._known_cfn_noise_reason("AWS::ApiGatewayV2::Stage", prop) is None
+
+
+def test_known_cfn_noise_cors_header_case_only():
+    prop = {"PropertyPath": "/Cors/AllowHeaders/0", "ExpectedValue": "Content-Type", "ActualValue": "content-type"}
+    reason = ds._known_cfn_noise_reason("AWS::Lambda::Url", prop)
+    assert reason and "case" in reason.lower()
+
+
+def test_known_cfn_noise_rejects_cors_header_real_change():
+    # A genuinely different header name (not a case variant) must NOT be filtered.
+    prop = {"PropertyPath": "/Cors/AllowHeaders/0", "ExpectedValue": "Content-Type", "ActualValue": "X-Custom-Header"}
+    assert ds._known_cfn_noise_reason("AWS::Lambda::Url", prop) is None
+
+
+def test_known_cfn_noise_scoped_to_exact_resource_type():
+    # The identical property path + case-only diff on an UNRELATED resource type
+    # must not match — the allowlist is resource-type-scoped, never path-alone.
+    prop = {"PropertyPath": "/Cors/AllowHeaders/0", "ExpectedValue": "Content-Type", "ActualValue": "content-type"}
+    assert ds._known_cfn_noise_reason("AWS::IAM::Role", prop) is None
+
+
+def _resource_drift(logical_id, rtype, diffs, status="MODIFIED", physical_id="phys-1"):
+    return {
+        "LogicalResourceId": logical_id,
+        "PhysicalResourceId": physical_id,
+        "ResourceType": rtype,
+        "StackResourceDriftStatus": status,
+        "PropertyDifferences": diffs,
+    }
+
+
+class _FakeCfnDrift:
+    """Full-sweep fake CFN client: detect_stack_drift + poll + resource-drift
+    listing, driven by {stack_name: (StackDriftStatus, [resource_drift_dict])}.
+    A stack absent from the map defaults to IN_SYNC / no resource drifts."""
+
+    def __init__(self, per_stack):
+        self._per_stack = per_stack
+
+    def detect_stack_drift(self, StackName):  # noqa: N803 — boto3 kwarg casing
+        return {"StackDriftDetectionId": StackName}
+
+    def describe_stack_drift_detection_status(self, StackDriftDetectionId):  # noqa: N803
+        status, _ = self._per_stack.get(StackDriftDetectionId, ("IN_SYNC", []))
+        return {"DetectionStatus": "DETECTION_COMPLETE", "StackDriftStatus": status}
+
+    def describe_stack_resource_drifts(self, StackName, StackResourceDriftStatusFilters=None, NextToken=None):  # noqa: N803
+        _, resources = self._per_stack.get(StackName, ("IN_SYNC", []))
+        return {"StackResourceDrifts": resources}
+
+
+def test_drifted_resources_filters_pure_noise_resource():
+    cors_diff = {"PropertyPath": "/Cors/AllowHeaders/0", "ExpectedValue": "Content-Type", "ActualValue": "content-type"}
+    fake = _FakeCfnDrift({"S": ("DRIFTED", [_resource_drift("UrlA", "AWS::Lambda::Url", [cors_diff])])})
+    drifted, noise = ds._drifted_resources(fake, "S")
+    assert drifted == []
+    assert len(noise) == 1 and noise[0]["logical_id"] == "UrlA"
+
+
+def test_drifted_resources_keeps_resource_with_any_real_diff():
+    # A resource with ONE noise diff and ONE real diff must still count as drifted —
+    # the filter operates per-difference, never per-resource wholesale.
+    cors_diff = {"PropertyPath": "/Cors/AllowHeaders/0", "ExpectedValue": "Content-Type", "ActualValue": "content-type"}
+    real_diff = {"PropertyPath": "/Cors/AllowHeaders/1", "ExpectedValue": "X-Foo", "ActualValue": "X-Bar"}
+    fake = _FakeCfnDrift({"S": ("DRIFTED", [_resource_drift("UrlA", "AWS::Lambda::Url", [cors_diff, real_diff])])})
+    drifted, noise = ds._drifted_resources(fake, "S")
+    assert len(drifted) == 1 and drifted[0]["logical_id"] == "UrlA"
+    assert noise == []
+
+
+def test_check_cfn_drift_all_noise_reports_clean_for_that_stack(monkeypatch):
+    cors_diff = {"PropertyPath": "/Cors/AllowHeaders/0", "ExpectedValue": "Content-Type", "ActualValue": "content-type"}
+    per_stack = {name: ("IN_SYNC", []) for name in ds.STACKS}
+    per_stack["LifePlatformServe"] = ("DRIFTED", [_resource_drift("SiteApiLambdaFunctionUrl", "AWS::Lambda::Url", [cors_diff])])
+    monkeypatch.setattr(ds, "_client", lambda *a, **k: _FakeCfnDrift(per_stack))
+    res = ds.check_cfn_drift(per_stack_timeout=1)
+    assert res["status"] == "clean", res
+    serve = res["stacks"]["LifePlatformServe"]
+    assert serve["status"] == "clean"
+    assert serve["filtered_noise"] and serve["filtered_noise"][0]["logical_id"] == "SiteApiLambdaFunctionUrl"
+
+
+def test_check_cfn_drift_real_drift_reports_alongside_filtered_noise(monkeypatch):
+    cors_diff = {"PropertyPath": "/Cors/AllowHeaders/0", "ExpectedValue": "Content-Type", "ActualValue": "content-type"}
+    real_diff = {"PropertyPath": "/Policies/0", "ExpectedValue": "null", "ActualValue": '{"PolicyName": "X"}'}
+    per_stack = {name: ("IN_SYNC", []) for name in ds.STACKS}
+    per_stack["LifePlatformServe"] = (
+        "DRIFTED",
+        [
+            _resource_drift("SiteApiLambdaFunctionUrl", "AWS::Lambda::Url", [cors_diff]),
+            _resource_drift("SiteApiLambdaRole", "AWS::IAM::Role", [real_diff]),
+        ],
+    )
+    monkeypatch.setattr(ds, "_client", lambda *a, **k: _FakeCfnDrift(per_stack))
+    res = ds.check_cfn_drift(per_stack_timeout=1)
+    assert res["status"] == "drift"
+    serve = res["stacks"]["LifePlatformServe"]
+    assert serve["status"] == "drift"
+    assert [d["logical_id"] for d in serve["drifted"]] == ["SiteApiLambdaRole"]
+    assert [n["logical_id"] for n in serve["filtered_noise"]] == ["SiteApiLambdaFunctionUrl"]
+
+
 def test_remediation_role_grants_detect_stack_resource_drift():
     # #1227: the drift op fans out to per-resource detection; without this action the
     # sentinel's flagship check is dead-on-arrival. Guard the grant so it can't regress.

@@ -11,7 +11,13 @@ What it checks (all read-only; CloudFormation drift-detection API calls are free
 
   1. CFN DRIFT — `detect_stack_drift` across all 9 stacks, then reports every
      MODIFIED / DELETED resource (`describe_stack_resource_drifts`). This is the live
-     state vs. the deployed template, which `cdk diff` cannot see.
+     state vs. the deployed template, which `cdk diff` cannot see. Two documented
+     PropertyDifference patterns are known CFN drift-detection false positives, not
+     real out-of-band changes (#1781 — see `_known_cfn_noise_reason`): an
+     ApiGatewayV2 Stage access-log ARN's trailing `:*`, and a Lambda Function URL's
+     lowercased-live CORS header names. A resource whose every difference matches
+     one of those never counts as drift — it's recorded under `filtered_noise`
+     instead so it stays visible without paging anyone.
   2. POSTFLIGHT REUSE — the human-invoked-only checks from session_postflight:
      layer retirement (#781: zero shared-utils references), lambda config
      drift, bundled-asset completeness.
@@ -75,6 +81,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import time
 from datetime import datetime, timezone
@@ -153,9 +160,22 @@ def check_cfn_drift(per_stack_timeout=180):
                 if status.get("StackDriftStatus") != "DRIFTED":
                     out[name] = {"status": "clean", "drift_status": status.get("StackDriftStatus", "IN_SYNC")}
                     continue
-                resources = _drifted_resources(cfn, name)
-                out[name] = {"status": "drift", "drifted": resources}
-                saw_drift = True
+                resources, noise = _drifted_resources(cfn, name)
+                if resources:
+                    out[name] = {"status": "drift", "drifted": resources}
+                    if noise:
+                        out[name]["filtered_noise"] = noise
+                    saw_drift = True
+                else:
+                    # CFN says DRIFTED but every flagged resource's differences matched
+                    # a documented false-positive (#1781) — clean for our purposes, the
+                    # noise stays visible rather than silently vanishing.
+                    out[name] = {
+                        "status": "clean",
+                        "drift_status": status.get("StackDriftStatus", "IN_SYNC"),
+                        "filtered_noise": noise,
+                        "detail": "CFN reported DRIFTED but every PropertyDifference matched a documented false-positive (#1781)",
+                    }
             except Exception as e:  # noqa: BLE001 — surface as error, never crash the sweep
                 out[name] = {"status": "error", "detail": str(e)[:300]}
                 saw_error = True
@@ -189,9 +209,61 @@ def _poll_drift(cfn, detection_id, timeout):
     return None
 
 
+# ── Known CFN drift-detection false positives (#1781) ────────────────────────
+# The 2026-07-26 sentinel sweep flagged AWS::IAM::Role MODIFIED across 7 stacks.
+# Triaging every describe_stack_resource_drifts PropertyDifference against the
+# live IAM state + the code that actually calls each API found two resource/
+# property combinations that are NEVER a functional difference — CloudFormation
+# drift detection itself disagreeing with the live API's own normalization,
+# not a real out-of-band change:
+#
+#   1. AWS::ApiGatewayV2::Stage AccessLogSettings.DestinationArn — the stack's
+#      stored template always renders this log-group ARN with a trailing ':*'
+#      wildcard; the live GetStage response never includes it. Same destination
+#      log group either way (verified against HaeWebhookApiDefaultStage).
+#   2. AWS::Lambda::Url Cors.AllowHeaders — a Function URL's live
+#      GetFunctionUrlConfig response lowercases every header name; the
+#      CDK-authored casing (e.g. "Content-Type") only survives in the template.
+#      HTTP header names are case-insensitive (RFC 7230 §3.2), so a case-only
+#      difference is cosmetic (verified against SiteApiLambdaFunctionUrl,
+#      SiteApiAiLambdaFunctionUrl, EmailSubscriberLambdaFunctionUrl).
+#
+# A PropertyDifference matching one of these is never silently dropped — a
+# resource whose EVERY difference is known noise moves to "filtered_noise" in
+# the sweep record (still visible) instead of counting as drift. A resource
+# with a MIX of real + noise differences still reports the real ones as drift.
+# Never widen this beyond the exact, verified pattern below — no blanket
+# resource-type or stack-wide suppression (the issue's own AC: "never a
+# blanket ignore").
+_NOISE_ACCESS_LOG_ARN = re.compile(r"^/AccessLogSettings/DestinationArn$")
+_NOISE_CORS_HEADER = re.compile(r"^/Cors/AllowHeaders/\d+$")
+
+
+def _known_cfn_noise_reason(resource_type, prop):
+    """Return a short justification string if `prop` (one PropertyDifference
+    dict) is a documented CFN drift-detection false positive, else None."""
+    path = prop.get("PropertyPath") or ""
+    expected = prop.get("ExpectedValue")
+    actual = prop.get("ActualValue")
+    if not isinstance(expected, str) or not isinstance(actual, str):
+        return None
+    if resource_type == "AWS::ApiGatewayV2::Stage" and _NOISE_ACCESS_LOG_ARN.match(path) and expected == actual + ":*":
+        return "CFN template wildcard-suffixes the access-log ARN; live GetStage never does (#1781)"
+    if resource_type == "AWS::Lambda::Url" and _NOISE_CORS_HEADER.match(path) and expected != actual and expected.lower() == actual.lower():
+        return "Lambda Function URL lowercases CORS header names live; case-only, RFC 7230 is case-insensitive (#1781)"
+    return None
+
+
 def _drifted_resources(cfn, stack):
-    """List MODIFIED/DELETED resources for a drifted stack (paginated)."""
+    """List MODIFIED/DELETED resources for a drifted stack (paginated).
+
+    Returns (drifted, filtered_noise). `drifted` holds resources with at least
+    one PropertyDifference that isn't documented CFN noise (#1781, see above).
+    A resource whose every difference matches a known-noise pattern moves
+    entirely to `filtered_noise` instead — visible in the record, but not
+    counted toward "status": "drift"."""
     drifted = []
+    filtered_noise = []
     token = None
     while True:
         kw = {"StackName": stack, "StackResourceDriftStatusFilters": list(_DRIFT_STATUSES)}
@@ -199,18 +271,30 @@ def _drifted_resources(cfn, stack):
             kw["NextToken"] = token
         resp = cfn.describe_stack_resource_drifts(**kw)
         for d in resp.get("StackResourceDrifts", []):
-            drifted.append(
-                {
-                    "logical_id": d.get("LogicalResourceId"),
-                    "type": d.get("ResourceType"),
-                    "drift": d.get("StackResourceDriftStatus"),
-                    "physical_id": d.get("PhysicalResourceId"),
-                }
-            )
+            rtype = d.get("ResourceType")
+            entry = {
+                "logical_id": d.get("LogicalResourceId"),
+                "type": rtype,
+                "drift": d.get("StackResourceDriftStatus"),
+                "physical_id": d.get("PhysicalResourceId"),
+            }
+            diffs = d.get("PropertyDifferences") or []
+            noise_diffs = []
+            has_real_diff = not diffs  # no PropertyDifferences at all (e.g. DELETED) -> always real
+            for p in diffs:
+                reason = _known_cfn_noise_reason(rtype, p)
+                if reason:
+                    noise_diffs.append({"PropertyPath": p.get("PropertyPath"), "reason": reason})
+                else:
+                    has_real_diff = True
+            if has_real_diff:
+                drifted.append(entry)
+            elif noise_diffs:
+                filtered_noise.append({**entry, "known_noise": noise_diffs})
         token = resp.get("NextToken")
         if not token:
             break
-    return drifted
+    return drifted, filtered_noise
 
 
 # ── 2. Postflight reuse (layer / config / asset) ─────────────────────────────
@@ -1030,6 +1114,13 @@ def print_summary(record):
         elif st == "error":
             detail = f" — {c.get('detail', '')}"
         print(f"   {mark} {name}: {st}{detail}")
+        # #1781: known-CFN-noise PropertyDifferences are never silently dropped — a
+        # per-stack count always prints (whether the stack is clean or drift) so the
+        # filter stays honest and visible.
+        if name == "cfn_drift":
+            noisy = {s: len(v.get("filtered_noise", [])) for s, v in c.get("stacks", {}).items() if v.get("filtered_noise")}
+            if noisy:
+                print(f"      [filtered known-noise, #1781] {noisy}")
         # #1320 fail-soft honesty: a scope-gapped GitHub surface surfaces its
         # needs-owner line (the exact PAT permission to add) — visible, never red.
         if name in ("github_config", "github_push_runs") and c.get("needs_owner"):
