@@ -14,7 +14,12 @@ Honesty contract (matches the chronicle's own gates):
     numbers, no new claims, nothing narrated here.
   - The honest-stats line IS the creative: a week graded 57 with a broken streak is the
     point. Never sanitized.
-  - One channel only, no auto-posting — the human step stays optional by design.
+  - This kit itself never posts — it prepares a paste, and the human step stays
+    optional by design. Automated syndication is a SEPARATE, governed surface:
+    ADR-140 (docs/DECISIONS.md, amending the old blanket "no auto-posting" stance)
+    sanctions projection-only posting of already-published artifacts, with approval
+    upstream, a kill switch, caps, and milestones/body-composition permanently
+    excluded. Runbooks: docs/RUNBOOK_SYNDICATION.md.
 
 This module is pure/deterministic (re-runnable, byte-stable for a given installment) so
 it is trivially unit-testable and safe to call on both the publish and approve paths.
@@ -26,8 +31,9 @@ from datetime import datetime, timezone
 from utm import with_utm  # #1621 — the ONE canonical outbound UTM tagger
 
 SITE_BASE = "https://averagejoematt.com"
-# The single channel the kit is shaped for (no auto-post; one paste). Kept as data so a
-# future channel switch is a one-line change, not a rewrite.
+# The single channel the kit is shaped for (one manual paste; automated posting is
+# governed separately by ADR-140). Kept as data so a future channel switch is a
+# one-line change, not a rewrite.
 CHANNEL = "x"
 
 # Where the kit + its card live under the already-CloudFront-routed /moments/* prefix
