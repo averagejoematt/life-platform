@@ -1,6 +1,6 @@
 # Coach Stance Engine + the Coach Quality Gate
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-20 (#1590 re-verify — line refs re-derived against live source; stance/gate logic, the 8-coach roster, and the ADR-108 fire-rate figure all confirmed unchanged since #390/#1138)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-26 (#1590 re-verify — line refs re-derived against live source; stance/gate logic, the 8-coach roster, and the ADR-108 fire-rate figure all confirmed unchanged since #390/#1138. 2026-07-26 re-verify: #1656 mypy churn in `coach_stance.py` + additive `structured_output_config` in `ai_calls.py` (#1385) since; stance/gate logic unchanged)
 > **Sources of truth:** `lambdas/coach/coach_history_summarizer.py` (stance engine, :940-1360), `lambdas/coach_stance.py` (stage-ladder fallback), `lambdas/ai_calls.py` (`_enforce_quality_gate`, :1356-1423), `lambdas/coach/coach_quality_gate.py`
 
 ## Purpose

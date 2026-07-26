@@ -1,6 +1,6 @@
 # Readiness Score
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-20 (#1590 re-verify — both models' weights/formulas/colour bands, the TSB Banister constants, and the device-agreement deltas cross-checked line-for-line against live source; only the personal_baselines line ref had drifted)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-26 (#1590 re-verify — both models' weights/formulas/colour bands, the TSB Banister constants, and the device-agreement deltas cross-checked line-for-line against live source; only the personal_baselines line ref had drifted. 2026-07-26 re-verify: since 07-20 `daily_metrics_compute_lambda.py` changed only via the #1624 achievements-ledger fix — out of readiness scope, not documented here — and `mcp/tools_health.py`; the readiness weights/formulas are unchanged)
 > **Sources of truth:** `lambdas/compute/daily_metrics_compute_lambda.py` (`compute_readiness`, :280-316), `mcp/tools_health.py` (`tool_get_readiness_score`, :13-398), `lambdas/training_load.py`, `lambdas/personal_baselines.py` (`readiness_hrv_score`, :286-300)
 
 ## Purpose

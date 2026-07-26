@@ -1,6 +1,6 @@
 # Hypothesis Engine
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-20 (#1590 re-verify — line refs re-derived against live source; the arming thresholds (10 days / 5 metrics-per-day / 7-day check floor / 5-per-arm) now live in `lambdas/experiment_gates.py` (#1371, moved so the site's zero-state serves the same values — no drift possible) rather than as bare module constants, values unchanged; the quarterly cross-pillar effect re-fit (#1411, `refit_cross_pillar_effects`) piggybacks on this same weekly cron and is new since the prior verification — added below)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-26 (#1590 re-verify — line refs re-derived against live source; the arming thresholds (10 days / 5 metrics-per-day / 7-day check floor / 5-per-arm) now live in `lambdas/experiment_gates.py` (#1371, moved so the site's zero-state serves the same values — no drift possible) rather than as bare module constants, values unchanged; the quarterly cross-pillar effect re-fit (#1411, `refit_cross_pillar_effects`) piggybacks on this same weekly cron and is new since the prior verification — added below. 2026-07-26 re-verify: #1408 added a Time-Affluence hypothesis edge (a new input signal the documented framework already accommodates); the engine's arming/scoring algorithm is unchanged)
 > **Sources of truth:** `lambdas/compute/hypothesis_engine_lambda.py` (v2, #530/ADR-105), `lambdas/stats_core.py`, `lambdas/experiment_gates.py` (arming thresholds, #1371)
 
 ## Purpose

@@ -1,6 +1,6 @@
 # Scoring Engine — the Day Grade
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-13 (post-#970 — scoring_engine deliberately KEPT its typed safe_float; formulas unchanged. 2026-07-13: docstring reword only, now that the shared layer is retired by #781 — no logic change)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-26 (post-#970 — scoring_engine deliberately KEPT its typed safe_float; formulas unchanged. 2026-07-13: docstring reword only, now that the shared layer is retired by #781 — no logic change. 2026-07-26 re-verify: only #1656 mypy type-annotation churn in `scoring_engine.py`/`daily_metrics_compute_lambda.py` since; documented formulas unchanged)
 > **Sources of truth:** `lambdas/scoring_engine.py`, `lambdas/compute/daily_metrics_compute_lambda.py`, profile record `USER#matthew / PROFILE#v1` (`day_grade_weights`)
 
 ## Purpose

@@ -1,6 +1,6 @@
 # Character Engine — pillars, EMA levels, XP
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-20 (#1590 re-verify — line refs + version stamps re-derived against live source; pillar weights/ema_lambda/leveling knobs cross-checked byte-for-byte against the deployed config; formulas unchanged since #1403)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-26 (#1590 re-verify — line refs + version stamps re-derived against live source; pillar weights/ema_lambda/leveling knobs cross-checked byte-for-byte against the deployed config; formulas unchanged since #1403. 2026-07-26 re-verify: only #1656/#1709/#1713 mypy type-annotation churn in `character_engine.py` since; weights/knobs/formulas unchanged)
 > Math audit + 420-day simulation verdicts: [CHARACTER_MATH_AUDIT_2026-07.md](CHARACTER_MATH_AUDIT_2026-07.md) (epic #956).
 > **Sources of truth:** `lambdas/character_engine.py` (v1.8.0 — v1.7.0 #1373 progression receipts, v1.6.1 #1125 level-up drivers, v1.6.0 #965 source wiring; #1412 personal-baselines targets and #1411 fitted-not-authored badges shipped without an engine version bump), `lambdas/compute/character_sheet_lambda.py`, `config/character_sheet.json` (v1.6.0, deployed to `s3://…/config/matthew/character_sheet.json`)
 
