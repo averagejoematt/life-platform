@@ -130,6 +130,9 @@ SOURCE_CLASS: dict[str, str] = {
     "macrofactor_workouts": RAW_TIMESERIES,  # #485: dead ~4mo (no writer) — historical rows kept, still exported
     "hevy": RAW_TIMESERIES,  # live strength source (hourly, ADR-060) — #485 repointed brief/digest here
     "notion": RAW_TIMESERIES,  # journal entries — user-authored facts
+    "journal_quotes": RAW_TIMESERIES,  # #1568/ADR-142: consent-per-line verbatim quote marks — owner
+    # consent artifacts frozen at mark time (exact approved text). Follows the notion parent: kept
+    # forever, genesis-anchored on read; revocation is an explicit unmark, never a reset wipe.
     "youtube": RAW_TIMESERIES,  # #1669: inbound social — Matthew's own posts, a logged fact layer
     # (kept forever, genesis-anchored on read) like notion; provenance (`origin`) lives on the row.
     "food_delivery": RAW_TIMESERIES,  # behavioral archive (incl. longest-ever streak)

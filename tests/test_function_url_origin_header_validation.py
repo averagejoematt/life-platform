@@ -75,6 +75,36 @@ def _fake_aws_modules() -> dict:
     }
 
 
+def _resync_web_package():
+    """Undo the module split-brain the patched-window reimports leave behind (#1568).
+
+    mock.patch.dict restores sys.modules itself, but any `web.*` submodule
+    re-imported INSIDE the window also rebound the attribute on the `web`
+    package object (the import machinery does setattr(web, "site_api_coach",
+    <new module>)). The dict restore does not undo that setattr, so afterwards
+    sys.modules["web.site_api_coach"] is the original clean module while
+    `from web import site_api_coach` returns the window's mock-infected twin
+    (MagicMock boto3/Key baked into its globals) — an order-dependent poison
+    for every later test that builds real boto3 conditions through it (first
+    bitten: tests/test_journal_quotes_1568.py). Re-point every web.<name>
+    attribute at the canonical sys.modules entry — and DELETE any submodule
+    attribute whose sys.modules entry is gone entirely (the restore removed a
+    module first imported inside the window): `from web import X` checks the
+    package attribute BEFORE sys.modules, so a stale attribute would satisfy
+    the import forever and the fresh re-import would never happen."""
+    web_pkg = sys.modules.get("web")
+    if web_pkg is None:
+        return
+    for _attr, _val in list(vars(web_pkg).items()):
+        if not isinstance(_val, types.ModuleType):
+            continue
+        _canonical = sys.modules.get(f"web.{_attr}")
+        if _canonical is None:
+            delattr(web_pkg, _attr)  # force a real re-import on next `from web import _attr`
+        elif _canonical is not _val:
+            setattr(web_pkg, _attr, _canonical)
+
+
 def _load_site_api(origin_secret: str = ""):
     """Import site_api_lambda with all AWS calls patched out."""
     with (
@@ -98,6 +128,7 @@ def _load_site_api(origin_secret: str = ""):
             if "site_api" in _name:
                 del sys.modules[_name]
         mod = importlib.import_module("site_api_lambda")
+    _resync_web_package()
     return mod
 
 
@@ -260,6 +291,7 @@ def _load_subscriber(origin_secret: str | None = ""):
             if "site_api" in _name or "email_subscriber" in _name:
                 del sys.modules[_name]
         mod = importlib.import_module("web.email_subscriber_lambda")
+    _resync_web_package()
     return mod
 
 

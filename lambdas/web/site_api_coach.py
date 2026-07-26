@@ -12,6 +12,7 @@ the dispatcher as `return handle_X(event)`.
 Endpoints:
   /api/field_notes      — weekly Field Notes (optional ?week= param)
   /api/decisions        — logged decisions carrying a verbatim note (#1569, the widened Third Wall)
+  /api/journal_quotes   — consent-per-line verbatim journal pull-quotes (#1568, ADR-142)
   /api/ai_analysis      — cached AI expert analysis (?expert= param)
   /api/coach_analysis   — coach intelligence dashboard (?domain= param)
   /api/predictions      — coach prediction ledger (?status=&coach_id=&limit=)
@@ -1087,6 +1088,69 @@ def handle_decisions(event):
             break
 
     return _ok({"decisions": entries, "count": len(entries)}, cache_seconds=300)
+
+
+def handle_journal_quotes(event):
+    """GET /api/journal_quotes — consent-per-line verbatim journal pull-quotes (#1568, ADR-142).
+
+    "From the journal, in his words." Serves ONLY lines Matthew explicitly marked
+    publishable through the mark_journal_quote MCP tool (the per-line consent
+    channel; the taboo gate already ran fail-closed at mark time). An unmarked
+    journal line can never appear here — this endpoint reads the consent
+    partition (SOURCE#journal_quotes), never the journal itself. The chronicle's
+    never-quote rule is untouched.
+
+    Each quote is dated, labeled, and carries a receipts link to that day's data
+    (/cockpit/?date=). `featured` is the AT-MOST-ONE line home may show this ISO
+    week (AC2's volume cap — deterministic: first-marked line whose entry date
+    falls in the current PT week; stable for the whole week). Absent → honest
+    empty ({"quotes": [], "featured": null}) so the render stays dormant.
+
+    Deliberately NOT phase-filtered: like the journal it excerpts (cross-phase by
+    owner decision 2026-06-06), a consented quote is a durable archive entry —
+    it leaves this surface only by explicit unmark. Verbatim text is screened
+    all-or-nothing at serve time (_public_decision_note — the #1569 rule): a
+    quote the content filter would alter at all is withheld, never mangled.
+    """
+    import journal_quotes as jq
+
+    qs = event.get("queryStringParameters") or {}
+    try:
+        limit = max(1, min(50, int(qs.get("limit", 20))))
+    except (TypeError, ValueError):
+        limit = 20
+
+    jq_pk = f"{USER_PREFIX}journal_quotes"
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(jq_pk) & Key("sk").begins_with("QUOTE#"),
+            ScanIndexForward=False,
+            Limit=100,
+        )
+        items = _decimal_to_float(resp.get("Items", []))
+    except Exception as e:  # pragma: no cover - defensive; a query hiccup serves shaped-empty
+        logger.warning(f"[journal_quotes] query failed: {e}")
+        items = []
+
+    quotes = []
+    for i in items:
+        screened = _public_decision_note(i.get("quote"))
+        if not screened:
+            continue  # all-or-nothing: a quote that wouldn't survive intact isn't shown
+        shaped = jq.shape_public(i)
+        shaped["quote"] = screened
+        quotes.append(shaped)
+
+    featured = jq.featured_for_week(quotes, datetime.now(PT).date())
+    return _ok(
+        {
+            "quotes": quotes[:limit],
+            "count": len(quotes[:limit]),
+            "featured": featured,
+            "label": jq.PUBLIC_LABEL,
+        },
+        cache_seconds=300,
+    )
 
 
 def handle_experiment_synthesis():

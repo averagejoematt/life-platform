@@ -206,7 +206,9 @@ _CURATED = [
         "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
         "tier": 1,
         "content_class": "live-data",
-        "api_deps": ["/api/journey", "/api/character"],
+        # /api/journal_quotes (#1568): the weekly featured line — the beat is dormant
+        # (hidden) without a featured quote, but the endpoint must stay healthy.
+        "api_deps": ["/api/journey", "/api/character", "/api/journal_quotes"],
         "js_modules": ["home.js"],
         "visual": {
             "wait_for": ".constellation svg",
@@ -284,7 +286,9 @@ _CURATED = [
         "name": "Story · journal",
         "tier": 2,
         "content_class": "narrative",
-        "api_deps": ["/journal/posts.json"],
+        # /api/journal_quotes (#1568): the consent-per-line pull-quote archive — the
+        # page renders it dormant-empty, but the endpoint itself must stay healthy.
+        "api_deps": ["/journal/posts.json", "/api/journal_quotes"],
         "js_modules": ["story.js"],
         "visual": {"checks": [{"selector": "main, [data-readout], article", "not_empty": True, "desc": "journal content"}]},
     },

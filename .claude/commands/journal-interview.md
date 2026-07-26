@@ -113,6 +113,27 @@ Call `notion-create-pages` with:
   produced the why behind a missed habit (or the driver behind a completed one), route
   it to `log_habit_reflection`. Reactive only — never open a habit line of questioning
   from the queue counts (CHAT_MODES.md's optional-and-reactive rule).
+- **Pull-quote nomination — optional, 0–2 lines, consent per line (#1568, ADR-142):**
+  after the entry is written, you MAY nominate at most 2 lines from it as quote-worthy
+  for the public "from the journal, in his words" surface. Runtime rules, all hard:
+  - **Nominate verbatim lines only** — his exact words from the entry just written,
+    never a paraphrase or a composite (ADR-104 grounding; the tool re-verifies).
+  - **Refuse to nominate any line touching the taboo list** — the abstract/omit
+    sections of `docs/content/ELENA_PREQUEL_BRIEF.md`: substances, family-specifics,
+    age, private events (wedding/funeral/therapy/work specifics), real names. The
+    `mark_journal_quote` tool enforces the same list in code (fail-closed), but the
+    refusal starts with you: a taboo line is never even offered.
+  - **Explicit per-line consent:** present each nominated line and ask plainly —
+    "want this one public, word for word?" Only on an explicit yes for THAT line call
+    `mark_journal_quote` with `approved: true` (date = the entry's date). Silence,
+    "maybe", or a general "sure, whatever" is NOT consent to any specific line.
+    No nomination lands anywhere without the mark — nothing is ever quotable by default.
+  - **Never a nag:** if he says no (or nothing jumps out), drop it silently — zero
+    nominations is the normal case, not a failure. Consent is revocable any time via
+    `mark_journal_quote(action='unmark', …)`.
+  - **The chronicle's never-quote rule is untouched** — this marked-line channel is
+    the ONLY path journal words may take to the public site, and it never loosens
+    deep-background anywhere else.
 - Anything else that came up that isn't "journal entry" — a decision, an insight, a
   durable memory — route it per the CHAT_MODES.md contract, don't fold it silently into
   the journal page and leave it uncaptured elsewhere.

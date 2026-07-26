@@ -1,7 +1,10 @@
 """
-Journal tools: entries, search, mood, insights, correlations.
+Journal tools: entries, search, mood, insights, correlations — plus the ONE write
+tool of this module, mark_journal_quote (#1568/ADR-142): the consent-per-line
+publishable marker for "from the journal, in his words".
 """
 
+import re
 from datetime import datetime, timedelta, timezone
 
 from boto3.dynamodb.conditions import Key
@@ -262,4 +265,126 @@ def tool_get_flourishing_trend(args):
             "information about conditions (sleep, load, season), never identity — and "
             "if reviewing them feels heavy, a tracking break is a sanctioned move."
         ),
+    }
+
+
+# ── #1568 (ADR-142): mark_journal_quote — the consent-per-line publish marker ──
+#
+# The ONLY write path of the verbatim-public quote channel. Nothing is ever
+# quotable without an explicit per-line mark made through here (approved=true is
+# a hard argument, never inferred), and the ELENA_PREQUEL_BRIEF taboo gate
+# (lambdas/journal_quotes.find_mark_violations — substances / family-specifics /
+# age / private events / real names) runs fail-closed BEFORE any write. The
+# chronicle's never-quote rule is untouched: this channel is a separate,
+# owner-consented lane, not a loosening of deep-background.
+
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _quotes_pk():
+    return f"{USER_PREFIX}journal_quotes"
+
+
+def tool_mark_journal_quote(args):
+    """Mark / unmark / list explicitly-publishable verbatim journal lines."""
+    import journal_quotes as jq  # bundled shared module (#781) — the pure gate
+
+    action = (args.get("action") or "mark").strip().lower()
+    if action == "list":
+        items = []
+        kwargs = {
+            "KeyConditionExpression": Key("pk").eq(_quotes_pk()) & Key("sk").begins_with(jq.SK_PREFIX),
+            "ScanIndexForward": False,
+        }
+        while True:
+            resp = table.query(**kwargs)
+            items.extend(resp.get("Items", []))
+            if "LastEvaluatedKey" not in resp:
+                break
+            kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+        items = [decimal_to_float(i) for i in items]
+        return {
+            "count": len(items),
+            "quotes": [{"sk": i.get("sk"), "date": i.get("date"), "quote": i.get("quote"), "marked_at": i.get("marked_at")} for i in items],
+        }
+
+    date = (args.get("date") or "").strip()
+    quote = " ".join(str(args.get("quote") or "").split())
+    if not _DATE_RE.match(date):
+        return {"error": "date is required (YYYY-MM-DD — the journal entry's day)."}
+    if not quote:
+        return {"error": "quote is required — the exact verbatim line."}
+
+    if action == "unmark":
+        sk = args.get("sk") or jq.quote_sk(date, quote)
+        table.delete_item(Key={"pk": _quotes_pk(), "sk": sk})
+        return {"status": "revoked", "sk": sk, "note": "The line is private again; the public surface drops it on next fetch."}
+
+    if action != "mark":
+        return {"error": f"Unknown action '{action}'.", "valid_actions": ["mark", "unmark", "list"]}
+
+    # 1) Consent is explicit, per line, never inferred (AC1).
+    if args.get("approved") is not True:
+        return {
+            "error": "refused: approved must be exactly true — Matthew must explicitly mark THIS line publishable.",
+            "consent_contract": "Nothing is ever quotable without an explicit per-line mark (ADR-142).",
+        }
+    if len(quote) > jq.MAX_QUOTE_CHARS:
+        return {"error": f"refused: quote exceeds {jq.MAX_QUOTE_CHARS} chars — a pull-quote is a line, not a passage."}
+
+    # 2) The mark-time taboo gate (AC3) — fail-closed, deterministic.
+    violations = jq.find_mark_violations(quote)
+    if violations:
+        return {
+            "error": "refused: this line touches the mark-time taboo list and can never be nominated or published.",
+            "violations": [{"category": c, "term": t} for c, t in violations],
+            "policy": "ELENA_PREQUEL_BRIEF abstract/omit list, enforced in code (lambdas/journal_quotes.py).",
+        }
+
+    # 3) ADR-104 grounding: the line must be his actual words from that day's entry.
+    #    Entries land via the hourly Notion ingestion; right after an interview the
+    #    entry may not be in DDB yet — that's recorded honestly, never faked.
+    entry_resp = table.query(
+        KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}notion") & Key("sk").begins_with(f"DATE#{date}#journal"),
+    )
+    entries = entry_resp.get("Items", [])
+    if entries:
+        if not any(jq.grounds_in(quote, e.get("raw_text")) for e in entries):
+            return {
+                "error": "refused: the line does not appear verbatim in that day's journal entry (ADR-104 grounding). "
+                "Quote his exact words or don't quote at all.",
+            }
+        grounding = "verified"
+    else:
+        grounding = "pending_ingestion"
+
+    # 4) The per-day nomination cap (0–2 lines per close).
+    existing = table.query(
+        KeyConditionExpression=Key("pk").eq(_quotes_pk()) & Key("sk").begins_with(f"{jq.SK_PREFIX}{date}#"),
+    ).get("Items", [])
+    sk = jq.quote_sk(date, quote)
+    if len([e for e in existing if e.get("sk") != sk]) >= jq.MAX_QUOTES_PER_DAY:
+        return {"error": f"refused: {jq.MAX_QUOTES_PER_DAY} lines are already marked for {date} — the cap is 0–2 per entry."}
+
+    marked_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    table.put_item(
+        Item={
+            "pk": "USER#matthew#SOURCE#journal_quotes",  # literal (orphan-gate greppable); == _quotes_pk()
+            "sk": sk,
+            "date": date,
+            "quote": quote,
+            "marked_at": marked_at,
+            "channel": (args.get("channel") or "journal").strip() or "journal",
+            "grounding": grounding,
+            "guard_version": __import__("privacy_guard").GUARD_VERSION,
+        }
+    )
+    return {
+        "status": "marked",
+        "sk": sk,
+        "date": date,
+        "quote": quote,
+        "grounding": grounding,
+        "surface": "story hub archive + at most one featured line per week on home (/api/journal_quotes)",
+        "revoke": "mark_journal_quote(action='unmark', date=…, quote=…) any time — consent is revocable.",
     }

@@ -61,6 +61,7 @@ WRITE_VERBS = frozenset(
         "evaluate",
         "log",
         "manage",
+        "mark",  # mark_journal_quote — writes/revokes a consent-per-line quote record (#1568, ADR-142)
         "retire",
         "save",
         "set",

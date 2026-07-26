@@ -1,0 +1,61 @@
+{
+  "captured_at": "2026-07-25T00:00:00+00:00",
+  "fetch_path": "/api/journal_quotes",
+  "is_prefix_sample": false,
+  "path": "/api/journal_quotes",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "count": {
+        "type": "integer"
+      },
+      "featured": {
+        "type": "null"
+      },
+      "label": {
+        "type": "string"
+      },
+      "quotes": {
+        "items": {
+          "keys": {
+            "channel": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "marked_at": {
+              "type": "string"
+            },
+            "quote": {
+              "type": "string"
+            },
+            "receipts": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 1,
+        "type": "array"
+      }
+    },
+    "type": "object"
+  }
+}
