@@ -5,6 +5,7 @@ import the facade (no import cycle)."""
 
 from datetime import datetime, timedelta, timezone
 
+import diary_consent  # #1483 (ADR-142 tier 2): the conversation-allude projection + prompt block
 from ai_context import build_experiment_phase_context, format_experiment_phase_context
 from constants import EXPERIMENT_BASELINE_WEIGHT_LBS
 from digest_utils import d2f, safe_float
@@ -150,6 +151,38 @@ def gather_chronicle_data(*, _g):
     except Exception as e:
         logger.warning(f"Field notes query: {e}")
 
+    # --- Conversation references (#1483, ADR-142 theme-referenceable tier) ---
+    # Coach check-in conversations from the covered week, projected to SANCTIONED
+    # fields ONLY (diary_consent.conversation_reference) BEFORE they enter the
+    # gather: the verbatim CHECKIN#/LEARNING# text (Matthew-private, ADR-141)
+    # never reaches the packet builder, so Elena cannot quote what she never saw
+    # — she "wasn't in the room", structurally.
+    conversation_refs = []
+    try:
+        import persona_registry
+        from boto3.dynamodb.conditions import Key
+        from phase_filter import with_phase_filter
+
+        for pid in persona_registry.OPERATIONAL_COACH_IDS:
+            resp = table.query(
+                **with_phase_filter(
+                    {
+                        "KeyConditionExpression": Key("pk").eq(f"COACH#{pid}") & Key("sk").begins_with("LEARNING#"),
+                        "ScanIndexForward": False,
+                        "Limit": 15,
+                    }
+                )
+            )
+            for it in resp.get("Items", []):
+                if (it.get("channel") or "data") != "conversation":
+                    continue
+                ref = diary_consent.conversation_reference(d2f(it))
+                if ref and start <= ref["date"] <= end:
+                    conversation_refs.append(ref)
+        logger.info(f"Conversation references (allude tier): {len(conversation_refs)}")
+    except Exception as e:
+        logger.warning(f"Conversation references gather: {e}")
+
     # --- Narrative arc + experiment arc (the cross-week throughline) — for the
     # "previously on" recap. Both are already-summarized prose artifacts (never raw
     # vitals), so they ground a recap without re-introducing the fabrication frontier.
@@ -197,6 +230,7 @@ def gather_chronicle_data(*, _g):
         "experiment_arc": experiment_arc,
         "profile": profile,
         "field_notes": field_notes,
+        "conversation_refs": conversation_refs,
         "dates": {"start": start, "end": end},
     }
 
@@ -483,6 +517,15 @@ def build_data_packet(data):
     if not data["journal_entries"]:
         packet.append("No journal entries this week.")
     packet.append("")
+
+    # --- Private conversations (#1483, ADR-142 tier 2 — allude only) ---
+    # The block re-projects every item through diary_consent.conversation_reference,
+    # so even a raw LEARNING# row handed in here renders as sanctioned fields only
+    # (date, coarse theme, read delta). Empty week → no block at all.
+    conv_block = diary_consent.conversation_prompt_block(data.get("conversation_refs") or [])
+    if conv_block:
+        packet.append(conv_block)
+        packet.append("")
 
     # --- State of Mind ---
     # Aggregate fields are prefixed som_* on the apple_health record; top labels /

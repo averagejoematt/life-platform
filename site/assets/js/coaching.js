@@ -648,6 +648,22 @@ async function renderByCoach(read, id) {
   if (tr.hit_rate_pct != null || (tr.recent || []).length) {
     h += `<p class="bc-track label">track record: ${tr.hit_rate_pct != null ? esc(tr.hit_rate_pct) + "% hit-rate " + esc(tr.n_note || "") : "accruing"}</p>`;
   }
+  // 3.2) CONVERSATIONS WITH MATTHEW (#1483, ADR-142 theme-referenceable tier) — the
+  // coach ALLUDES to private check-in conversations. The payload carries ONLY the
+  // sanctioned fields (date, coarse laundered theme, read direction): the words
+  // exchanged never crossed the wire, so nothing rendered here can quote them.
+  const convRefs = (((coach.conversations || {}).references) || []).filter((c) => c && c.date);
+  if (convRefs.length) {
+    const convTheme = { anxiety_stress: "stress and worry", health_body: "the body — training, sleep, food", relationships: "relationships", work_ambition: "work and ambition", gratitude: "gratitude", personal_growth: "habits and growth", reflection: "reflection" };
+    const convMove = { up: "it firmed up my read", down: "I've walked my read back a step", hold: "my read held" };
+    h += `<section class="bc-conv"><p class="dx-kicker label">conversations with matthew · off the record</p>` +
+      `<ul class="ce-trail">${convRefs.slice(0, 5).map((c) => {
+        const about = convTheme[c.theme] ? ` — we talked about ${esc(convTheme[c.theme])}` : "";
+        return `<li class="ce-item"><span class="ce-date label">${esc(String(c.date).slice(0, 10))}</span>` +
+          `<p class="ce-say">Matthew and I talked${about}; ${esc(convMove[c.direction] || convMove.hold)}.</p></li>`;
+      }).join("")}</ul>` +
+      `<p class="bc-conv-note label">What was said stays between us — the record shows only that we talked, the theme, and how it moved my read.</p></section>`;
+  }
   // 3.5) THE EVOLVING READ — prefer the dated STANCE# trail (how the coach's read of
   //      Matthew actually moved, week to week), falling back to recent dated commentary.
   const sh = (coach.stance_history || []).filter((s) => s && (s.how_my_read_changed || s.headline_read));
