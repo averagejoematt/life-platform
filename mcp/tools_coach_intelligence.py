@@ -359,12 +359,33 @@ try:
     # Shared, bundled modules (#781) — staged at zip root in the Lambda.
     import coach_corrections as _cc
     import coach_dossier as _cd
+    import dispute_docket as _dd  # #1794: DOCKET_PK — docket rows live off-coach
 except ImportError:  # pragma: no cover — local/test path
     if not TYPE_CHECKING:  # the dual-name import trips mypy's "source found twice"
-        from lambdas import coach_corrections as _cc, coach_dossier as _cd
+        from lambdas import coach_corrections as _cc, coach_dossier as _cd, dispute_docket as _dd
 
 _DOSSIER_PREFIXES = ("COMMITMENT#", "LEARNING#", "QUALITY#")
 _DOSSIER_SINGLETONS = ("RELATIONSHIP#state",)
+
+# #1794 — which public-dossier section (if any) actually applies a correction to
+# a given record class. QUALITY# is viewable (see _DOSSIER_PREFIXES above) but
+# `_dossier_block` never renders it, so a retract/correct against it would log
+# a ledger row nothing downstream ever reads — the success message must say so
+# rather than falsely claim the public dossier changed.
+_RETRACTABLE_EXACT = {"RELATIONSHIP#state": "relationship"}
+_RETRACTABLE_PREFIXES = {"COMMITMENT#": "commitment", "LEARNING#": "learning", "OPEN#": "docket position"}
+
+
+def _dossier_record_class(record_sk):
+    """Human label for the dossier section a record_sk actually renders in, or
+    None when that record class is never applied to the public dossier."""
+    sk = str(record_sk or "")
+    if sk in _RETRACTABLE_EXACT:
+        return _RETRACTABLE_EXACT[sk]
+    for prefix, label in _RETRACTABLE_PREFIXES.items():
+        if sk.startswith(prefix):
+            return label
+    return None
 
 
 def _dossier_coach_pk(coach_id):
@@ -393,12 +414,17 @@ def tool_audit_coach_dossier(args):
             return {"error": "record_sk required — the exact sk of the memory record (from action=view)"}
         if not note:
             return {"error": "note required — say WHY this record is retracted / what the correction is (it is logged verbatim)"}
+        # #1794: docket-arm records (sk OPEN#...) live at ENSEMBLE#docket, not the
+        # coach's own COACH#{bare}_coach partition — checking existence at coach_pk
+        # was dead code for that record class (always "no record"). Route the
+        # existence check to wherever the record actually lives.
+        lookup_pk = _dd.DOCKET_PK if record_sk.startswith("OPEN#") else coach_pk
         try:
-            existing = table.get_item(Key={"pk": coach_pk, "sk": record_sk}).get("Item")
+            existing = table.get_item(Key={"pk": lookup_pk, "sk": record_sk}).get("Item")
         except Exception as ex:
             return {"error": f"could not verify record {record_sk}: {ex}"}
         if not existing:
-            return {"error": f"no record at {coach_pk} / {record_sk} — retract/correct must reference a real memory row"}
+            return {"error": f"no record at {lookup_pk} / {record_sk} — retract/correct must reference a real memory row"}
         try:
             correction_sk = _cc.write_correction(
                 table,
@@ -408,20 +434,25 @@ def tool_audit_coach_dossier(args):
             )
         except Exception as ex:
             return {"error": f"correction write failed (nothing was changed): {ex}"}
+        # #1794: the success message must not claim an effect the read side can't
+        # produce — only claim the public dossier changed for a record class
+        # `_dossier_block` actually applies corrections to.
+        record_class = _dossier_record_class(record_sk)
+        if record_class:
+            effect = (
+                f"The public dossier now omits this {record_class} record and counts the retraction."
+                if action == "retract"
+                else f"The public dossier renders your dated correction under the original {record_class} line."
+            )
+        else:
+            effect = "This record class is not rendered on the public dossier, so there is nothing there to omit or annotate — the correction is logged to the ledger only."
         return {
             "success": True,
             "action": action,
             "coach_id": bare,
             "record_sk": record_sk,
             "correction_sk": correction_sk,
-            "note": (
-                "Logged to the corrections ledger — the memory record itself was NOT modified. "
-                + (
-                    "The public dossier now omits this record and counts the retraction."
-                    if action == "retract"
-                    else "The public dossier renders your dated correction under the original line."
-                )
-            ),
+            "note": ("Logged to the corrections ledger — the memory record itself was NOT modified. " + effect),
         }
 
     if action != "view":

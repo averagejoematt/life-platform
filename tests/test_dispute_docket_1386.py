@@ -176,6 +176,44 @@ class TestAC1MachineCheckableGate:
         assert len(result["skipped"]) == 1
         assert not any(pk == dd.DOCKET_PK for pk, _ in fake_table.store)
 
+    def test_template_placeholder_coach_ids_are_dropped_not_docketed(self, fake_table):
+        # #1797: coach_ensemble_digest's own output-schema spec shows placeholder
+        # ids ("coach_a"/"coach_b") as its example — a model echoing the template
+        # must not be able to open a real docket between coaches that don't exist.
+        result = dd.open_from_disagreements(
+            [
+                {
+                    "topic": "placeholder echo",
+                    "coaches": ["coach_a", "coach_b"],
+                    "positions": {"coach_a": "x", "coach_b": "y"},
+                    "resolution_criterion": _criterion(sides={"coach_a": True, "coach_b": False}),
+                }
+            ],
+            OPEN_DATE,
+        )
+        assert result["opened"] == []
+        assert len(result["skipped"]) == 1
+        assert "non-member" in result["skipped"][0]["reason"]
+        assert not any(pk == dd.DOCKET_PK for pk, _ in fake_table.store)
+
+    def test_display_name_coach_id_is_dropped_not_docketed(self, fake_table):
+        # A bare/display name ("Sleep Coach") instead of the canonical id is the
+        # same failure class — membership, not just placeholder-echo, is the gate.
+        result = dd.open_from_disagreements(
+            [
+                {
+                    "topic": "display name echo",
+                    "coaches": ["Sleep Coach", "training_coach"],
+                    "positions": {"Sleep Coach": "x", "training_coach": "y"},
+                    "resolution_criterion": _criterion(sides={"Sleep Coach": True, "training_coach": False}),
+                }
+            ],
+            OPEN_DATE,
+        )
+        assert result["opened"] == []
+        assert len(result["skipped"]) == 1
+        assert not any(pk == dd.DOCKET_PK for pk, _ in fake_table.store)
+
     def test_checkable_divergence_opens_with_frozen_stakes(self, fake_table):
         result = dd.open_from_disagreements(
             [
@@ -418,6 +456,50 @@ class TestAC4PublicSurface:
         assert entry["stakes"]["training_coach"]["brier"] == 0.31
         assert entry["resolution_date"] == "2026-08-03"
         assert entry["claims"]["training_coach"]
+
+    def test_docket_privacy_violation_is_withheld_wholesale_and_counted(self, api):
+        # #1795: the same standing content-absolute filter the coach dossier
+        # applies to `find_dossier_violations` — reused here, not forked — must
+        # withhold an entry whose claim trips it. Genotype pattern reused
+        # verbatim from tests/test_coach_dossier.py's own seeded-violation
+        # vocabulary (PRE-13 / DATA_GOVERNANCE: no genotype strings publicly).
+        import json
+
+        sac, t = api
+        item = _open_docket_item()
+        item["claims"]["physical_coach"] = "the rs429358 variant explains the lipid response"
+        t.put_item(Item=item)
+        body = self._body(sac.handle_coach_docket({}))
+        assert body["open"] == []
+        assert body["counts"]["open"] == 0
+        assert body["withheld"] == 1
+        assert "rs429358" not in json.dumps(body)
+
+    def test_docket_resolved_concession_violation_is_withheld_and_counted(self, api):
+        # Same fail-closed floor on the RESOLVED side — a violating concession
+        # (also LLM/coach-authored verbatim text) must not slip through just
+        # because it's on the winner/loser branch instead of the open claim.
+        import json
+
+        sac, t = api
+        item = _open_docket_item()
+        item.update(
+            {
+                "pk": dd.DOCKET_PK,
+                "sk": "RESOLVED#2026-08-03#physical_coach__training_coach#weight-trajectory",
+                "status": "resolved",
+                "winner": "physical_coach",
+                "loser": "training_coach",
+                "resolved_date": "2026-08-03",
+                "verdict": {"winner": "physical_coach", "loser": "training_coach", "actual_value": 241.2},
+                "concession": "CONCESSION — the rs429358 variant explains the lipid response",
+            }
+        )
+        t.put_item(Item=item)
+        body = self._body(sac.handle_coach_docket({}))
+        assert body["resolved"] == []
+        assert body["withheld"] == 1
+        assert "rs429358" not in json.dumps(body)
 
     def test_lost_disputes_render_in_the_same_shape_as_wins(self, api, monkeypatch):
         sac, t = api

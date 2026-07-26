@@ -229,6 +229,15 @@ def test_relationship_entry_dated_and_projected():
     assert entry["first_interaction_date"] == "2026-06-22"
 
 
+def test_relationship_entry_carries_a_record_id():
+    # #1794: without a record_id, apply_corrections has nothing to match a
+    # retraction against — RELATIONSHIP#state must carry one like every other
+    # dossier record class.
+    entry, status = cd.relationship_entry({"sk": "RELATIONSHIP#state", "updated_at": "2026-07-25T04:00:00+00:00"})
+    assert status == cd.OK
+    assert entry["record_id"] == "RELATIONSHIP#state"
+
+
 def test_docket_entry_takes_this_coachs_side_both_id_forms():
     row = {
         "sk": "OPEN#glucose|sleep#late-eating",
@@ -308,6 +317,16 @@ def test_apply_corrections_violating_note_is_withheld_but_dated():
     assert n["note"] is None and n["note_withheld"] is True and n["date"]
 
 
+def test_apply_corrections_retracts_the_relationship_singleton():
+    # #1794: this used to be structurally impossible — relationship_entry had no
+    # record_id, so apply_corrections could never match a RELATIONSHIP#state
+    # retraction against it.
+    entry, _ = cd.relationship_entry({"sk": "RELATIONSHIP#state", "updated_at": "2026-07-20T00:00:00+00:00"})
+    kept, retracted = cd.apply_corrections([entry], cd.dossier_corrections([_ledger_row("RELATIONSHIP#state", "retract")], "sleep_coach"))
+    assert retracted == 1
+    assert kept == []
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # AC4 — honest zero-state
 # ══════════════════════════════════════════════════════════════════════════════
@@ -342,8 +361,13 @@ def _cond_parts(cond):
     return expr["values"][1], None
 
 
-def _seeded_table():
+def _seeded_table(corrections_rows=None, corrections_error=False):
+    """`corrections_rows` overrides the default single commitment-retract ledger
+    row (#1794/#1796 tests exercise other correction shapes); `corrections_error`
+    makes the corrections-partition query raise, to pin the #1796 fail-closed path."""
     coach_pk = "COACH#sleep_coach"
+    if corrections_rows is None:
+        corrections_rows = [_ledger_row("COMMITMENT#commit_20260720_stale", "retract")]
     rows = {
         (coach_pk, "COMMITMENT#"): [
             {
@@ -382,9 +406,7 @@ def _seeded_table():
             },
             _conversation_learning() | {"pk": coach_pk},  # ADR-141: must NOT appear
         ],
-        ("USER#matthew#SOURCE#coach_corrections", None): [
-            _ledger_row("COMMITMENT#commit_20260720_stale", "retract"),
-        ],
+        ("USER#matthew#SOURCE#coach_corrections", None): corrections_rows,
         ("ENSEMBLE#docket", "OPEN#"): [
             {
                 "pk": "ENSEMBLE#docket",
@@ -402,6 +424,8 @@ def _seeded_table():
 
     def _hook(table, **kw):
         pk, sk = _cond_parts(kw["KeyConditionExpression"])
+        if corrections_error and pk == "USER#matthew#SOURCE#coach_corrections":
+            raise RuntimeError("simulated DDB outage reading the corrections ledger")
         for (rpk, rsk), items in rows.items():
             if rpk == pk and (rsk is None or (sk or "").startswith(rsk) or (rsk or "").startswith(sk or "")):
                 return {"Items": [dict(i) for i in items]}
@@ -428,8 +452,8 @@ def _seeded_table():
     return FakeDdbTable(query_hook=_hook, get_item_hook=_get_hook)
 
 
-def _dossier_via_api(monkeypatch):
-    monkeypatch.setattr(api, "table", _seeded_table())
+def _dossier_via_api(monkeypatch, **seed_kwargs):
+    monkeypatch.setattr(api, "table", _seeded_table(**seed_kwargs))
     resp = api.handle_coach({"rawPath": "/api/coach/sleep_coach"})
     assert resp["statusCode"] == 200
     return json.loads(resp["body"])["dossier"]
@@ -468,6 +492,32 @@ def test_site_dossier_honors_retraction_and_counts_it(monkeypatch):
     blob = json.dumps(d)
     assert "stale commitment Matthew retracted" not in blob
     assert d["retracted"] == 1
+    assert d["degraded"] is False
+
+
+def test_site_dossier_honors_relationship_retraction_and_counts_it(monkeypatch):
+    # #1794: RELATIONSHIP#state now round-trips through apply_corrections like
+    # every other record class — a retraction actually removes it publicly.
+    d = _dossier_via_api(monkeypatch, corrections_rows=[_ledger_row("RELATIONSHIP#state", "retract")])
+    assert d["relationship"] is None
+    assert d["retracted"] == 1
+    # commitments are untouched by this retraction — 2 render (the vice one is
+    # withheld by the privacy filter, unaffected by which ledger row is present)
+    assert d["commitment_counts"]["held"] == 2
+
+
+def test_site_dossier_corrections_read_error_fails_closed(monkeypatch):
+    # #1796: a corrections-read error must WITHHOLD every section corrections
+    # apply to (honest-empty) rather than republish them uncorrected with
+    # retracted=0 — and the payload must disclose the degradation.
+    d = _dossier_via_api(monkeypatch, corrections_error=True)
+    assert d["commitments"] == []
+    assert d["learnings"] == []
+    assert d["docket_positions"] == []
+    assert d["relationship"] is None
+    assert d["retracted"] == 0
+    assert d["degraded"] is True
+    assert "corrections ledger could not be read" in d["disclosure"]
 
 
 def test_site_dossier_zero_state_is_honest(monkeypatch):
@@ -538,3 +588,52 @@ def test_mcp_retract_requires_existing_record_and_note(monkeypatch):
     assert "note required" in no_note["error"]
     bad_coach = tci.tool_audit_coach_dossier({"coach_id": "nonsense", "action": "view"})
     assert "coach_id required" in bad_coach["error"]
+
+
+def test_mcp_retract_routes_docket_arm_existence_check_to_ensemble_docket(monkeypatch):
+    # #1794: docket rows live at pk=ENSEMBLE#docket, NOT the coach's own
+    # COACH#{bare}_coach partition — before the fix, this existence check always
+    # missed (dead code: retract could never succeed for a docket position).
+    docket_row = {
+        "pk": "ENSEMBLE#docket",
+        "sk": "OPEN#glucose|sleep#late-eating",
+        "topic": "late eating vs sleep quality",
+        "coach_a": "glucose",
+        "coach_b": "sleep",
+        "claims": {"glucose": "claim a", "sleep": "claim b"},
+    }
+    fake = FakeDdbTable(rows=[docket_row])
+    tci = _mcp(monkeypatch, fake)
+    out = tci.tool_audit_coach_dossier(
+        {"coach_id": "sleep", "action": "retract", "record_sk": docket_row["sk"], "note": "resolved by other means"}
+    )
+    assert out.get("success") is True, out
+    assert "docket position" in out["note"]
+    assert len(fake.puts) == 1  # only the ledger write — the docket row itself is never touched
+    assert fake.store[("ENSEMBLE#docket", docket_row["sk"])] == docket_row
+
+
+def test_mcp_retract_message_names_the_retractable_record_class():
+    assert tci_module_class("COMMITMENT#commit_x") == "commitment"
+    assert tci_module_class("LEARNING#2026-07-18#a") == "learning"
+    assert tci_module_class("RELATIONSHIP#state") == "relationship"
+    assert tci_module_class("OPEN#a__b#topic") == "docket position"
+    assert tci_module_class("QUALITY#2026-07-20") is None  # viewable, never rendered publicly
+
+
+def tci_module_class(record_sk):
+    import mcp.tools_coach_intelligence as tci
+
+    return tci._dossier_record_class(record_sk)
+
+
+def test_mcp_retract_message_is_honest_when_record_class_is_not_public(monkeypatch):
+    # QUALITY# is in the MCP's private-view allowlist but `_dossier_block` never
+    # renders it — the success message must not claim the public dossier changed.
+    quality_row = {"pk": "COACH#sleep_coach", "sk": "QUALITY#2026-07-20", "score": 0.8}
+    fake = FakeDdbTable(rows=[quality_row])
+    tci = _mcp(monkeypatch, fake)
+    out = tci.tool_audit_coach_dossier({"coach_id": "sleep", "action": "retract", "record_sk": quality_row["sk"], "note": "n/a"})
+    assert out.get("success") is True, out
+    assert "not rendered on the public dossier" in out["note"]
+    assert "omits" not in out["note"]

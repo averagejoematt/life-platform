@@ -338,7 +338,19 @@ def open_docket(topic, coach_a, coach_b, claims, normalized, open_date_str, sour
 def open_from_disagreements(disagreements, open_date_str):
     """Scan the digest's active disagreements; open a docket for every one whose
     criterion survives the deterministic gate. Non-resolvable disagreements stay
-    narrative — logged, never docketed (AC1). Fail-soft per entry."""
+    narrative — logged, never docketed (AC1). Fail-soft per entry.
+
+    #1797 — the ONE identity gate: `coaches` (and `criterion.sides`) are read
+    straight from the LLM digest, and the ensemble digest's own output schema
+    shows placeholder ids in its spec example — a model echoing the template
+    (or writing a display name instead of the canonical id) would otherwise
+    open a real docket between coaches that don't exist. Both ids in the pair
+    are membership-checked against the house roster (`ALL_COACH_IDS`, defined
+    once in coach_ensemble_digest and imported here rather than re-declared)
+    BEFORE `validate_criterion` ever runs — "LLM proposes, code admits" has to
+    gate identity too, not just the criterion shape."""
+    from coach.coach_ensemble_digest import ALL_COACH_IDS
+
     opened, skipped = [], []
     for d in disagreements or []:
         topic = d.get("topic", "unnamed")
@@ -354,6 +366,10 @@ def open_from_disagreements(disagreements, open_date_str):
             pair = named if len(named) == 2 else coaches[:2]
         else:
             pair = coaches[:2]
+        non_members = [c for c in pair if c not in ALL_COACH_IDS]
+        if non_members:
+            skipped.append({"topic": topic, "reason": f"non-member coach id(s) {non_members!r} — dropped (not in ALL_COACH_IDS)"})
+            continue
         ok, reason, normalized = validate_criterion(criterion, pair[0], pair[1], open_date_str)
         if not ok:
             skipped.append({"topic": topic, "reason": reason})
