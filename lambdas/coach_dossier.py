@@ -339,7 +339,7 @@ def apply_corrections(entries: list, corrections: list):
 
     Returns (kept_entries, retracted_count).
     """
-    by_sk = {}
+    by_sk: dict = {}
     for c in corrections or []:
         by_sk.setdefault(c.get("record_sk"), []).append(c)
     kept, retracted = [], 0

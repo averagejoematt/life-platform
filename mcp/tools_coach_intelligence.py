@@ -5,6 +5,7 @@ Coach Intelligence MCP tools — query coach threads, predictions, disagreements
 import logging
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING
 
 import calibration_core  # #538: shared Brier + reliability scorer (layer module)
 from boto3.dynamodb.conditions import Key
@@ -359,7 +360,8 @@ try:
     import coach_corrections as _cc
     import coach_dossier as _cd
 except ImportError:  # pragma: no cover — local/test path
-    from lambdas import coach_corrections as _cc, coach_dossier as _cd
+    if not TYPE_CHECKING:  # the dual-name import trips mypy's "source found twice"
+        from lambdas import coach_corrections as _cc, coach_dossier as _cd
 
 _DOSSIER_PREFIXES = ("COMMITMENT#", "LEARNING#", "QUALITY#")
 _DOSSIER_SINGLETONS = ("RELATIONSHIP#state",)
