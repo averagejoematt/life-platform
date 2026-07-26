@@ -1,10 +1,13 @@
 # The Org Chart of One Human and N Agents
 
-> **Status:** full draft for Matthew's edit pass (R21 story #740, epic #723).
-> Every number and quote below is receipt-backed against the repo as of 2026-07-06;
-> receipts are inline in parentheses. Two claims are flagged `[CONFIRM]` where the
-> source is self-report rather than an independent count. A venue shortlist and the
-> outline follow the draft.
+> **Status:** full draft for Matthew's edit pass (R21 story #740, epic #723) —
+> edit pass complete, approved as-is. Every number and quote below is
+> receipt-backed against the repo as of 2026-07-06; receipts are inline in
+> parentheses. Two claims are flagged `[CONFIRM]` where the source is
+> self-report rather than an independent count. A venue shortlist and the
+> outline follow the draft. **Ready-to-paste submission copy for each venue
+> (HN title, CFP abstracts, pitch text) is in
+> `docs/content/CAREER_ARTIFACT_SUBMISSION_KIT.md` (#741).**
 
 ---
 
