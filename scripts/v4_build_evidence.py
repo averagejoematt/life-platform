@@ -651,7 +651,7 @@ EDITORIAL = {
         "</ul>"
         '<p class="rd-prose">Down is not red. A low day is sparse and quiet — the palette never turns to a warning colour, it simply doesn\'t light. The only colours are the ember (earned) and the ink tokens (structure); the mark themes with the page and adds nothing outside the design system.</p></section>'
         '<section class="rd-sec"><h2 class="rd-h">The wall</h2>'
-        '<p class="rd-prose">Line every day up and you get <a href="/data/wall/">the wall</a> — every attempt, every day, as its own mark. The living attempt glows where it earned it; sealed past attempts show honest low-data marks, because the day-by-day vitality of a wiped cycle is not something the platform will invent. You can watch one attempt die and the next begin.</p></section>'
+        '<p class="rd-prose">Line every day up and you get <a href="/data/wall/">the wall</a> — every attempt, every day, as its own mark. The living attempt glows where it earned it; sealed attempts render date-only marks — their real metrics stay in the archive, just not displayed for a sealed cycle, so a dashed mark there is a display choice, never a claim the data is gone. A staged attempt (its genesis hasn\'t arrived yet) draws no marks at all. You can watch one attempt die, the next begin, and the next-next wait.</p></section>'
         '<p class="correlative">One life, marked in code, one day at a time. <span class="confidence conf-low">deterministic · earned-only</span></p>'
     ),
     "methodology": (

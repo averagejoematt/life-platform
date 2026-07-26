@@ -1293,17 +1293,24 @@ def handle_pulse() -> dict:
             ).get("Items", [])
             if _yd_ah and _yd_ah[0].get("weight_lbs"):
                 _yd_wt = float(_yd_ah[0]["weight_lbs"])
-        if w_val and _yd_wt:
+        # #1813: the "current" value for each signal is the latest FINALIZED record
+        # (resolve_vitals/w_eff_date), which can be one or more days stale \u2014 the
+        # normal state during a sync lag or genesis week. When that record's date IS
+        # yesterday_pt, the query above for "yesterday" returns the SAME record the
+        # current value came from: the delta is structurally 0, a claimed measurement
+        # that never happened (ADR-104). Suppress the delta in that case instead of
+        # publishing a fabricated "no change."
+        if w_val and _yd_wt and w_eff_date != yesterday_pt:
             d = round(w_val - _yd_wt, 1)
             arrow = "\u2191" if d > 0 else "\u2193" if d < 0 else "\u2192"
             since_yesterday.append({"signal": "weight", "text": f"Weight {arrow}{abs(d):.1f} lbs", "delta": d})
             glyphs["scale"]["delta_1d"] = d
-        if recovery and _yd_whoop and _yd_whoop.get("recovery_score"):
+        if recovery and _yd_whoop and _yd_whoop.get("recovery_score") and _vr.get("recovery_as_of") != yesterday_pt:
             d = round(recovery - float(_yd_whoop["recovery_score"]))
             arrow = "\u2191" if d > 0 else "\u2193" if d < 0 else "\u2192"
             since_yesterday.append({"signal": "recovery", "text": f"Recovery {arrow}{abs(d)}%", "delta": d})
             glyphs["recovery"]["delta_1d"] = d
-        if sleep_hrs and _yd_whoop and _yd_whoop.get("sleep_duration_hours"):
+        if sleep_hrs and _yd_whoop and _yd_whoop.get("sleep_duration_hours") and _vr.get("sleep_as_of") != yesterday_pt:
             d = round(sleep_hrs - float(_yd_whoop["sleep_duration_hours"]), 1)
             arrow = "\u2191" if d > 0 else "\u2193" if d < 0 else "\u2192"
             since_yesterday.append({"signal": "sleep", "text": f"Sleep {arrow}{abs(d):.1f}h", "delta": d})
@@ -1354,6 +1361,13 @@ def handle_pulse() -> dict:
         )
         glyphs["scale"]["delta"] = None
         glyphs["scale"]["delta_label"] = None
+        # #1813: the #931 contract already nulls the journey delta/scale glyph above —
+        # it missed these two. Both are computed from whatever the LAST cycle's data
+        # happens to be (a prior-cycle whoop reading can score "low recovery" and get
+        # surfaced as a live coaching warning inside a pre-start countdown payload).
+        # Neither belongs in front of a reader being told the experiment hasn't begun.
+        since_yesterday = []
+        notable_signals = []
 
     return _ok(
         {
