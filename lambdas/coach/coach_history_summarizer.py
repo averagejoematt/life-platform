@@ -686,7 +686,13 @@ def _build_compression_message(coach_id, state):
     # #533: resolved prediction outcomes (LEARNING# records) — so the coach can
     # reference a specific call it got right or wrong, not just list pending
     # predictions. Read-only fold-in of an already-written record type.
-    learning_outcomes = state.get("learning_outcomes", [])
+    # #1481: conversation-channel learnings (written by coach_calibration from
+    # check-in answers, ADR-141) ride the same SK but render in their OWN
+    # section — Matthew's own words are a different evidence class than a
+    # graded prediction, and the compression must keep them distinguishable.
+    learning_all = state.get("learning_outcomes", [])
+    learning_outcomes = [r for r in learning_all if (r.get("channel") or "data") != "conversation"]
+    conversation_learnings = [r for r in learning_all if (r.get("channel") or "data") == "conversation"]
     if learning_outcomes:
         parts.append(f"## Prediction Outcomes ({len(learning_outcomes)} newest resolved)")
         for rec in learning_outcomes:
@@ -700,6 +706,22 @@ def _build_compression_message(coach_id, state):
         parts.append("")
     else:
         parts.append("## Prediction Outcomes: NONE")
+        parts.append("")
+
+    # #1481: what the coach learned DIRECTLY FROM MATTHEW in check-in
+    # conversations — qualitative, self-graded, channel=conversation. Distinct
+    # from the data-derived verdicts above; never part of any hit rate.
+    if conversation_learnings:
+        parts.append(
+            f"## Conversation Learnings ({len(conversation_learnings)} newest — from Matthew's own check-in answers, NOT data-derived)"
+        )
+        for rec in conversation_learnings:
+            date = rec.get("date") or str(rec.get("sk", "")).replace("LEARNING#", "").split("#")[0]
+            subdomain = rec.get("subdomain", "general")
+            direction = rec.get("confidence_direction", "hold")
+            takeaway = str(rec.get("takeaway", ""))[:200]
+            quote = str(rec.get("answer_quote", ""))[:160]
+            parts.append(f'  - [{date}] ({subdomain}, confidence {direction}) {takeaway} — grounded in his answer: "{quote}"')
         parts.append("")
 
     parts.append(
@@ -1041,12 +1063,32 @@ def _summarize_track_record(learning, confidence_records):
 
     Mirrors the hit/miss accounting site_api_coach._track_record surfaces publicly,
     so the stance's self-assessment agrees with the coach page's headline stat.
+
+    #1481 (ADR-141): conversation-channel learnings are split out — they carry
+    Matthew's own words, never a graded verdict, so they ground the stance as a
+    DISTINCT evidence class and are structurally excluded from the hit rate.
     """
     _hit = {"confirmed", "correct", "hit", "true"}
     _miss = {"refuted", "incorrect", "miss", "false"}
     confirmed = refuted = 0
     recent = []
+    conversation_recent = []
+    conversation_count = 0
     for rec in learning or []:
+        if (rec.get("channel") or "data") == "conversation":
+            conversation_count += 1
+            if len(conversation_recent) < 6:
+                conversation_recent.append(
+                    {
+                        "date": rec.get("date") or rec.get("sk", "").replace("LEARNING#", "").split("#")[0],
+                        "subdomain": rec.get("subdomain", ""),
+                        "confidence_direction": rec.get("confidence_direction", "hold"),
+                        "takeaway": str(rec.get("takeaway") or "")[:200],
+                        "his_words": str(rec.get("answer_quote") or "")[:160],
+                        "checkin_id": rec.get("checkin_id", ""),
+                    }
+                )
+            continue  # never in the verdict tally — hit rates stay data-derived
         verdict = (rec.get("verdict") or rec.get("outcome") or rec.get("result") or "").lower()
         if verdict in _hit:
             confirmed += 1
@@ -1062,9 +1104,11 @@ def _summarize_track_record(learning, confidence_records):
             )
     decided = confirmed + refuted
     confidence = {}
+    confidence_provenance = {}
     for conf in confidence_records or []:
         sub = conf.get("subdomain", conf.get("sk", "").replace("CONFIDENCE#", ""))
         confidence[sub] = round(conf.get("mean_confidence", 0.5), 3)
+        confidence_provenance[sub] = conf.get("source") or "data"
     return {
         "confirmed": confirmed,
         "refuted": refuted,
@@ -1072,6 +1116,16 @@ def _summarize_track_record(learning, confidence_records):
         "hit_rate_pct": round(100 * confirmed / decided) if decided else None,
         "recent": recent,
         "confidence": confidence,
+        "confidence_provenance": confidence_provenance,
+        "conversation_learnings": {
+            "count": conversation_count,
+            "recent": conversation_recent,
+            "note": (
+                "channel=conversation — what this coach learned from Matthew's own check-in answers "
+                "(self-graded, bounded). A different evidence class than the data-derived verdicts above; "
+                "never counted in the hit rate."
+            ),
+        },
     }
 
 
@@ -1101,10 +1155,18 @@ def _build_stance_message(coach_id, compressed, track, prior_stance):
             else None
         ),
     }
+    conversation_note = ""
+    if (track or {}).get("conversation_learnings", {}).get("count"):
+        conversation_note = (
+            "The track record's `conversation_learnings` are what you learned from Matthew's OWN WORDS in "
+            "check-in conversations (channel=conversation, ADR-141) — treat them as qualitative evidence, "
+            "distinct from your data-derived prediction verdicts, and never conflate the two.\n\n"
+        )
     return (
         f"## Coach: {meta['display_name']} ({meta['domain']})\n\n"
         "Form your CURRENT stance toward Matthew from this grounding. If there is no previous "
         'stance, "how_my_read_changed" MUST be an empty string.\n\n'
+        f"{conversation_note}"
         f"{json.dumps(grounding, indent=2, default=str)}"
     )
 

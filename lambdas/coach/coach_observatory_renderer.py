@@ -156,6 +156,33 @@ def _confidence_to_language(confidence_float):
     return "uncertain"
 
 
+def _confidence_provenance(confidence_records):
+    """#1481 (ADR-141): {source: count} across a coach's CONFIDENCE# records —
+    how much of the coach's confidence state was last moved by graded data vs
+    by check-in conversation. Absent `source` means the pre-#1481 data path."""
+    provenance = {"data": 0, "conversation": 0}
+    for rec in confidence_records or []:
+        source = rec.get("source") or "data"
+        provenance[source if source in provenance else "data"] += 1
+    return provenance
+
+
+def _tally_learning_statuses(items):
+    """#1481: (status counts, conversation_count) over LEARNING# items.
+    Conversation-channel learnings (ADR-141) are tallied separately and never
+    enter the confirmed/refuted accounting — hit rates stay data-derived."""
+    counts = {"confirmed": 0, "refuted": 0, "inconclusive": 0, "expired": 0}
+    conversation_count = 0
+    for it in items or []:
+        if (it.get("channel") or "data") == "conversation":
+            conversation_count += 1
+            continue
+        s = it.get("status", "")
+        if s in counts:
+            counts[s] += 1
+    return counts, conversation_count
+
+
 def _get_item(pk, sk):
     """Get a single DynamoDB item. Returns None if not found or on error."""
     try:
@@ -379,6 +406,7 @@ def _render_coach_card(domain, include_threads=True):
 
     # Read confidence from CONFIDENCE# records for this coach
     confidence_records = _query_begins_with(coach_pk, "CONFIDENCE#")
+    confidence_provenance = _confidence_provenance(confidence_records)  # #1481: data vs conversation
     if confidence_records:
         # Average across subdomains for a single confidence language
         conf_values = []
@@ -435,21 +463,22 @@ def _render_coach_card(domain, include_threads=True):
             **with_phase_filter(
                 {  # ADR-058
                     "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").between(f"LEARNING#{cutoff}", "LEARNING#z"),
-                    "ProjectionExpression": "#s, #p",  # phase_filter needs #p in projection too
+                    "ProjectionExpression": "#s, #p, channel",  # phase_filter needs #p in projection too; #1481: channel provenance
                     "ExpressionAttributeNames": {"#s": "status"},
                 }
             )
         )
-        counts = {"confirmed": 0, "refuted": 0, "inconclusive": 0, "expired": 0}
-        for it in tr_resp.get("Items", []):
-            s = it.get("status", "")
-            if s in counts:
-                counts[s] += 1
+        counts, conversation_count = _tally_learning_statuses(tr_resp.get("Items", []))
         decided = counts["confirmed"] + counts["refuted"]
         # Only surface the panel when something useful resolved. Daily-brief
         # consumers can render absence as "no track record yet."
         if decided > 0:
             hit_rate = round(100 * counts["confirmed"] / decided, 0)
+            summary = f"{counts['confirmed']} of {decided} predictions confirmed in last 30 days"
+            if conversation_count:
+                # #1481 (ADR-141): provenance made visible — conversation-sourced
+                # self-calibration sits NEXT TO the data-derived hit rate, never inside it.
+                summary += f" · {conversation_count} conversation-sourced learning(s), not in the hit rate"
             track_record = {
                 "window_days": 30,
                 "confirmed": counts["confirmed"],
@@ -457,7 +486,8 @@ def _render_coach_card(domain, include_threads=True):
                 "inconclusive": counts["inconclusive"],
                 "decided_count": decided,
                 "hit_rate_pct": hit_rate,
-                "summary": f"{counts['confirmed']} of {decided} predictions confirmed in last 30 days",
+                "conversation_learnings": conversation_count,
+                "summary": summary,
             }
     except Exception as e:
         logger.warning("track_record query failed for %s: %s", coach_id, e)
@@ -482,6 +512,7 @@ def _render_coach_card(domain, include_threads=True):
         "track_record": track_record,
         "cross_coach_reference": cross_coach_reference,
         "confidence_language": confidence_language,
+        "confidence_provenance": confidence_provenance,  # #1481 (ADR-141): data vs conversation
         "data_availability": data_availability,
         "journey_phase": journey_phase,
         "rapport_level": rapport_level,

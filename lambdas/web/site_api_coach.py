@@ -177,6 +177,11 @@ def _track_record(coach_id):
         )
         for it in resp.get("Items", []):
             it = _decimal_to_float(it)
+            if (it.get("channel") or "data") == "conversation":
+                # ADR-141 privacy tier: conversation learnings quote Matthew's
+                # verbatim check-in answers — Matthew-private, never rendered
+                # publicly (their status is also outside confirmed/refuted).
+                continue
             st = it.get("status")
             if st == "confirmed":
                 confirmed += 1
@@ -2009,6 +2014,10 @@ def handle_coach_timeline(event):
             )
             for l_item in learn_resp.get("Items", []):
                 l_item = _decimal_to_float(l_item)
+                if (l_item.get("channel") or "data") == "conversation":
+                    # ADR-141 privacy tier: never surface conversation-learning
+                    # text (verbatim check-in quotes) on a public timeline.
+                    continue
                 l_date = l_item.get("sk", "").replace("LEARNING#", "")
                 l_type = l_item.get("type", "stance_change")
                 milestones.append(

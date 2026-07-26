@@ -910,19 +910,27 @@ def _update_bayesian_confidence(coach_id, subdomain, update_type):
         mean_confidence = alpha / (alpha + beta_val)
         sample_size = int(alpha + beta_val - 2)
 
-        table.put_item(
-            Item={
-                "pk": pk,
-                "sk": sk,
-                "alpha": _scalar_to_decimal(alpha),
-                "beta_param": _scalar_to_decimal(beta_val),
-                "mean_confidence": _scalar_to_decimal(mean_confidence),
-                "sample_size": Decimal(str(max(0, sample_size))),
-                "subdomain": subdomain,
-                "coach_id": coach_id,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }
-        )
+        new_item = {
+            "pk": pk,
+            "sk": sk,
+            "alpha": _scalar_to_decimal(alpha),
+            "beta_param": _scalar_to_decimal(beta_val),
+            "mean_confidence": _scalar_to_decimal(mean_confidence),
+            "sample_size": Decimal(str(max(0, sample_size))),
+            "subdomain": subdomain,
+            "coach_id": coach_id,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            # #1481 (ADR-141): provenance of the LAST update — the conversation
+            # path (lambdas/coach_calibration.py) stamps "conversation" here.
+            "source": "data",
+        }
+        # #1481: carry the conversational contribution accumulators forward —
+        # this full-item put must not erase the audit split ADR-141 requires.
+        if item:
+            for carry in ("conversation_alpha", "conversation_beta"):
+                if item.get(carry) is not None:
+                    new_item[carry] = item[carry]
+        table.put_item(Item=new_item)
         logger.info(
             "Updated confidence for %s/%s: Beta(%.0f,%.0f) = %.3f (n=%d)",
             coach_id,
@@ -955,6 +963,7 @@ def _write_learning_record(coach_id, today_str, evaluation):
             "coach_id": coach_id,
             "date": today_str,
             "prediction_id": prediction_id,
+            "channel": "data",  # #1481 (ADR-141): provenance — vs channel="conversation" from coach_calibration
             "evaluation_type": evaluation.get("evaluation_type", "machine"),
             "status": evaluation.get("status", ""),
             "metric": evaluation.get("metric", ""),
