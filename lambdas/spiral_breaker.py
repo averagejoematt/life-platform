@@ -237,16 +237,25 @@ def _reason(condition, status, window_days, n, observed=None, threshold=None, de
 
 
 def _eval_low_valence(signals, cfg, today):
+    # #1826 anti-permanent-jam carve-out (the coverage_hold precedent below):
+    # State of Mind is an OPTIONAL manual capture that has been cold since
+    # 2026-04 (ADR-121) — an empty/stale/thin valence series is the absence of
+    # an optional signal, not evidence of a spiral, and treating it as
+    # SUPPRESSING jammed the celebration gate shut permanently (every sweep
+    # suppressed, return_after_gap expired unconsumed). The condition now
+    # FIRES only on actual evidence: n >= valence_min_n of fresh data with the
+    # recent mean below the personal band. Absent/cold/thin => CLEAR with the
+    # original diagnosis carried in detail for the audit trail.
     window = int(cfg["valence_baseline_days"])
     series = _clean_series(signals.get("som_daily_valence"), today - timedelta(days=window), today)
     if not series:
-        return _reason(LOW_VALENCE, NO_DATA, window, 0)
+        return _reason(LOW_VALENCE, CLEAR, window, 0, detail={"carveout_1826": NO_DATA})
     latest_day = series[-1][0]
     if (today - latest_day).days > int(cfg["valence_stale_days"]):
-        return _reason(LOW_VALENCE, STALE, window, len(series), detail={"latest": latest_day.isoformat()})
+        return _reason(LOW_VALENCE, CLEAR, window, len(series), detail={"carveout_1826": STALE, "latest": latest_day.isoformat()})
     values = [v for _, v in series]
     if len(values) < int(cfg["valence_min_n"]):
-        return _reason(LOW_VALENCE, INSUFFICIENT_BASELINE, window, len(values))
+        return _reason(LOW_VALENCE, CLEAR, window, len(values), detail={"carveout_1826": INSUFFICIENT_BASELINE})
     band = percentile(values, int(cfg["valence_percentile"]))
     recent = _mean(values[-int(cfg["valence_recent_obs"]) :])
     if band is None or recent is None:

@@ -180,24 +180,30 @@ class TestConditionsFireIndependently:
 class TestFailClosed:
     def test_empty_signals_suppress(self):
         # The #1627 AC's empty-signal fixture (genesis-week present-None class).
+        # #1826: low_valence no longer suppresses on absence (optional manual
+        # signal, permanently cold — anti-permanent-jam carve-out); the four
+        # automatic signals still fail closed.
         suppressed, reasons = is_suppressed({}, now=NOW)
         assert suppressed is True
-        assert len(reasons) == 5
+        assert len(reasons) == 4
         assert all(r["status"] == NO_DATA for r in reasons)
+        assert not any(r["condition"] == LOW_VALENCE for r in reasons)
 
     def test_none_signals_suppress(self):
         suppressed, reasons = is_suppressed(None, now=NOW)
         assert suppressed is True
-        assert len(reasons) == 5
+        assert len(reasons) == 4
 
-    def test_stale_valence_suppresses(self):
+    def test_stale_valence_is_carved_out(self):
+        # #1826: a long-dead optional signal is absence, not spiral evidence —
+        # CLEAR with the original diagnosis in detail for the audit trail.
         sig = healthy_signals()
         sig["som_daily_valence"] = {_iso(i): 0.4 for i in range(20, 60)}  # latest 20d old > 14d
         suppressed, reasons = is_suppressed(sig, now=NOW)
-        assert suppressed is True
-        (reason,) = reasons
-        assert reason["condition"] == LOW_VALENCE
-        assert reason["status"] == STALE
+        assert suppressed is False
+        report = next(c for c in evaluate(sig, now=NOW)["conditions"] if c["condition"] == LOW_VALENCE)
+        assert report["status"] == CLEAR
+        assert report["detail"]["carveout_1826"] == STALE
 
     def test_stale_habits_suppress(self):
         sig = healthy_signals()
@@ -226,16 +232,17 @@ class TestFailClosed:
         assert reason["condition"] == COVERAGE_HOLD
         assert reason["status"] == STALE
 
-    def test_thin_valence_baseline_suppresses(self):
-        # Below the floor-guard a personal band would be noise — fail closed, never
-        # fall open to a population constant (ADR-105 + #1627's fail-closed AC).
+    def test_thin_valence_baseline_is_carved_out(self):
+        # #1826: below the floor-guard the band would be noise — but a thin
+        # OPTIONAL signal is absence, not evidence; CLEAR-with-note, and the
+        # personal-band discipline still governs when it CAN fire (n >= min_n).
         sig = healthy_signals()
         sig["som_daily_valence"] = {_iso(i): 0.4 for i in range(5)}
         suppressed, reasons = is_suppressed(sig, now=NOW)
-        assert suppressed is True
-        (reason,) = reasons
-        assert reason["condition"] == LOW_VALENCE
-        assert reason["status"] == INSUFFICIENT_BASELINE
+        assert suppressed is False
+        report = next(c for c in evaluate(sig, now=NOW)["conditions"] if c["condition"] == LOW_VALENCE)
+        assert report["status"] == CLEAR
+        assert report["detail"]["carveout_1826"] == INSUFFICIENT_BASELINE
 
     def test_thin_habit_baseline_suppresses(self):
         sig = healthy_signals()
@@ -381,7 +388,7 @@ class TestRecordSuppression:
         assert envelope["message"] == SUPPRESSION_LOG_PREFIX  # the stable Logs Insights filter target
         assert envelope["emitter"] == "daily_brief"
         assert envelope["suppressed"] is True
-        assert len(envelope["reasons"]) == 5
+        assert len(envelope["reasons"]) == 4  # #1826: low_valence carved out on absence
         assert envelope["reasons"][0]["condition"] in CONDITIONS
 
     def test_never_raises_on_hostile_input(self):

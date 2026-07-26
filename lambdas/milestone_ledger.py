@@ -703,6 +703,23 @@ def collect_signals(table, user_prefix: str, phase_filter, today: str) -> dict:
     }
 
 
+def _any_signal_present(signals: dict) -> bool:
+    """#1807: is there ANY evaluable evidence in the signal set?
+
+    Genesis must never complete against nothing — an all-empty set means the
+    reads were filtered/failed, not that no rung was ever crossed.
+    """
+    s = signals or {}
+    return bool(
+        s.get("weight_series")
+        or s.get("days_tracked")
+        or s.get("tier0_streak")
+        or (s.get("character_level") or 0) > 1
+        or s.get("training_dates")
+        or s.get("waist_by_day")
+    )
+
+
 def _celebration_suppressed(table, today: str) -> bool:
     """The spiral circuit breaker gate (#1627): may the ledger announce today?
 
@@ -750,8 +767,24 @@ def sweep(
         # First-ever run: consume everything already satisfied, announce nothing
         # (no honest event date exists for a crossing that predates the ledger).
         # Baseline consumption is not celebratory, so the breaker is not consulted.
+        #
+        # #1807: baselining is a LIFETIME question against a lifetime ledger — the
+        # production path re-reads signals UNFILTERED here (phase_filter=None), so
+        # a genesis that runs right after a reset (every source freshly re-tagged
+        # phase=pilot) still sees the history it must consume. And a genesis over
+        # an EMPTY signal set is refused outright: writing the markers then would
+        # permanently record months-old facts as future fresh crossings in a
+        # write-once partition (exactly the cycle-11 incident).
+        baseline_signals = signals
+        if phase_filter is not None:
+            baseline_signals = collect_signals(table, user_prefix, None, today)
+        if not _any_signal_present(baseline_signals):
+            logging.getLogger(__name__).warning(
+                "[milestone_ledger] genesis DEFERRED — signal set empty (#1807 guard); markers not written, will retry next sweep"
+            )
+            return {"written": [], "announced": [], "genesis": False, "cooldown_active": False, "suppressed": False, "deferred": []}
         written = []
-        for rule, meas in _all_satisfied(signals, ledger["existing_ids"], today):
+        for rule, meas in _all_satisfied(baseline_signals, ledger["existing_ids"], today):
             entry = _entry(rule, meas, today, announce=False, origin=ORIGIN_BASELINE)
             if _put_once(table, user_prefix, entry, stamp):
                 written.append(entry)

@@ -415,3 +415,46 @@ def test_catalog_ids_unique_and_ladders_ordered():
     assert set(r.category for r in ml.MILESTONE_RULES) == {"weight", "streak", "days_tracked", "level"}
     assert set(ml.CATEGORY_PRIORITY) == {"process", "composition", "weight", "streak", "days_tracked", "level"}
     assert ml.CATEGORY_PRIORITY[-1] == "weight" and ml.LADDER_PRIORITY[-1] == "weight", "#1628: weight is demoted to last"
+
+
+# ── #1807: genesis must never complete against an unevaluable signal set ──────
+# The cycle-11 incident: the reset re-tagged every source to phase=pilot BEFORE
+# the first sweep, collect_signals (phase-filtered) returned nothing, and genesis
+# consumed 0 rungs while still writing both markers — leaving months-old lifetime
+# facts poised to announce as fresh crossings in a write-once partition.
+
+
+def test_1807_genesis_defers_on_empty_signal_set():
+    table = FakeTable()  # no data at all
+    result = _sweep(table, "2026-07-26")
+    assert result["genesis"] is False and result["written"] == []
+    assert _ledger_items(table) == {}, "#1807: markers must NOT be written on an empty-set genesis"
+    # Data arrives later -> genesis proceeds normally on a following sweep.
+    for i, d in enumerate(_dates("07-27", 3)):
+        table.put_item(Item=_weight_day(d, 345.0))
+    result2 = _sweep(table, "2026-07-29")
+    assert result2["genesis"] is True
+    assert ml.GENESIS_SK in _ledger_items(table)
+
+
+def test_1807_genesis_baselines_lifetime_history_not_the_filtered_view():
+    """Production path (a real phase_filter callable): baselining re-reads
+    UNFILTERED, so post-reset pilot rows still consume their rungs."""
+    table = FakeTable()
+    for d in _dates("07-20", 3):
+        table.put_item(Item=_weight_day(d, 335.0))  # pilot-era weigh-ins, sub-340
+
+    def excluding_filter(kwargs):
+        # Simulates with_phase_filter right after a reset: every row is
+        # phase=pilot, so the filtered read returns nothing.
+        out = dict(kwargs)
+        out["ExpressionAttributeValues"] = dict(out.get("ExpressionAttributeValues", {}))
+        out["ExpressionAttributeValues"][":pk"] = "FILTERED#nothing"
+        return out
+
+    result = ml.sweep(table, USER_PREFIX, excluding_filter, "2026-07-26", suppressed=False)
+    assert result["genesis"] is True
+    items = _ledger_items(table)
+    assert "MILESTONE#weight_sub_340" in items, "#1807: lifetime (unfiltered) history must drive the baseline"
+    assert items["MILESTONE#weight_sub_340"]["origin"] == "baseline"
+    assert items["MILESTONE#weight_sub_340"]["announce"] is False
