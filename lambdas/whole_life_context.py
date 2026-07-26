@@ -2,12 +2,26 @@
 whole_life_context.py — the multi-cycle chronicle archive as a 1-hour cached
 content block (#1385, epic #1080).
 
-The chronicle (Elena Voss) and "State of Matthew" now reason over the ENTIRE
-multi-cycle installment archive, not a trimmed 4-week window. The archive is
+The chronicle (Elena Voss) and "State of Matthew" reason over the whole installment
+archive that is IN SCOPE for the run, not a trimmed 4-week window. The archive is
 large and byte-stable within a run, so it rides as an Anthropic ``cache_control``
 block with a **1-hour TTL** (reads at ~0.1x, writes at ~2x) instead of inline
 uncached user text — the weekly run's several calls (first draft, the ADR-104
 regen-once, Margaret's edit pass) all reuse the one cache write.
+
+SCOPE, STATED HONESTLY (#1829). Both callers pass ADR-058's ``with_phase_filter``,
+so the query returns the PHASE-VISIBLE installments: the current experiment cycle
+plus whatever was deliberately carried forward (ADR-077 ``--keep-chronicle``).
+Installments from wiped/archived prior cycles are NOT included — after the cycle-11
+reset that was 3 of 18. That default-deny read is the sanctioned reset posture and
+is kept; what was WRONG was the label. The block used to open with "FULL MULTI-CYCLE
+ARCHIVE (every prior installment, oldest first)", handing the model a false
+completeness claim inside a 1h-cached system block — and a digit-free universal
+("across every week on record he has never…") is fabricated-by-omission that the
+number/date grounding gate cannot catch. The header is now DERIVED from the items
+actually present (count + the cycles they carry) and explicitly forbids completeness
+claims beyond them; ``archive_scope()`` gives the callers the same facts to log, so
+the real scope is visible in CloudWatch instead of a bare count.
 
 Prompt-caching invariant (see docs + the claude-api skill): caching is a prefix
 match, render order is tools → system → messages. So the archive goes in the
@@ -80,10 +94,73 @@ def _sort_key(inst: dict):
     return (_num(cycle), _num(week), str(date))
 
 
+def archive_scope(installments) -> dict:
+    """#1829: what this archive ACTUALLY contains — `{count, cycles, unlabeled}`.
+
+    `cycles` is the sorted list of distinct cycle stamps present; `unlabeled` counts
+    installments with no stamp. Callers log this (never a bare count) so a run whose
+    archive collapsed to the current cycle is visible in CloudWatch rather than silent.
+    """
+    items = [i for i in (installments or []) if isinstance(i, dict) and (i.get("content_markdown") or "").strip()]
+    cycles = set()
+    unlabeled = 0
+    for i in items:
+        raw = i.get("cycle")
+        try:
+            if raw in (None, ""):
+                raise ValueError
+            cycles.add(int(raw))
+        except (TypeError, ValueError):
+            unlabeled += 1  # missing or unparseable ⇒ counted, never guessed
+    return {"count": len(items), "cycles": sorted(cycles), "unlabeled": unlabeled}
+
+
+def _scope_phrase(scope: dict) -> str:
+    """ "cycle 11" / "cycles 10-11" / "cycle 11 + 2 unlabeled" — no invented numbers."""
+    cycles = scope.get("cycles") or []
+    if not cycles:
+        base = "no cycle stamps"
+    elif len(cycles) == 1:
+        base = f"cycle {cycles[0]}"
+    else:
+        base = "cycles " + ", ".join(str(c) for c in cycles)
+    if scope.get("unlabeled"):
+        base += f" + {scope['unlabeled']} unlabeled"
+    return base
+
+
+def archive_header(installments) -> str:
+    """The block's opening lines — DERIVED from the items present (#1829).
+
+    Two jobs: say what is here (count + cycles), and forbid the claim the old header
+    invited. The old text ("every prior installment") let a phase-filtered 3-installment
+    archive license "across every week on record he has never…" — a universal with no
+    digits, invisible to the number/date grounding gate. The scope caveat is the only
+    defense the gate cannot provide.
+    """
+    scope = archive_scope(installments)
+    plural = "s" if scope["count"] != 1 else ""
+    return (
+        f"=== THE MEASURED LIFE — INSTALLMENT ARCHIVE IN SCOPE FOR THIS RUN "
+        f"({scope['count']} installment{plural}, {_scope_phrase(scope)}; oldest first) ===\n"
+        "SCOPE — READ BEFORE MAKING ANY CLAIM ABOUT THE WHOLE HISTORY: these are the "
+        "installments currently in scope — the current experiment cycle plus any "
+        "deliberately carried forward. Installments from wiped or archived prior cycles "
+        "are NOT here, and this is NOT necessarily every installment ever written. "
+        "Reason freely across what is below; do NOT make completeness claims beyond it "
+        '("every week on record", "he has never once…", "in all the time I have been '
+        'writing this"). If you want to speak to the sweep of the archive, say it about '
+        "the installments listed here and name their date range.\n"
+    )
+
+
 def format_full_archive(installments, *, max_chars: int = DEFAULT_MAX_CHARS) -> str:
-    """Render the full multi-cycle installment archive as one plain-text block —
-    oldest first, each installment un-truncated (the whole point vs the old
-    2000-char/4-week window). Returns "" when there are no installments.
+    """Render the in-scope installment archive as one plain-text block — oldest first,
+    each installment un-truncated (the whole point vs the old 2000-char/4-week window).
+    Returns "" when there are no installments.
+
+    The header states the REAL scope (count + cycles present) and forbids completeness
+    claims beyond it (#1829) — see `archive_header`.
 
     If the total would exceed `max_chars`, keep the MOST RECENT installments and
     prepend a note that older ones were elided (callbacks lean recent; the cap only
@@ -104,7 +181,7 @@ def format_full_archive(installments, *, max_chars: int = DEFAULT_MAX_CHARS) -> 
         return f'--- {cyc_txt}Week {wk}: "{title}" ({date}) ---\n{md}'
 
     rendered = [_render(i) for i in items]
-    header = "=== THE MEASURED LIFE — FULL MULTI-CYCLE ARCHIVE (every prior installment, oldest first) ===\n"
+    header = archive_header(items)
 
     body = "\n\n".join(rendered)
     if len(header) + len(body) <= max_chars:
@@ -125,12 +202,16 @@ def format_full_archive(installments, *, max_chars: int = DEFAULT_MAX_CHARS) -> 
 
 
 def fetch_full_installment_archive(table, pk: str, *, d2f=None, phase_filter=None, limit: int = 500) -> list:
-    """Query EVERY chronicle installment for `pk` (all cycles) — fail-soft to [].
+    """Query the chronicle installments for `pk` — fail-soft to [].
 
-    `d2f` (decimals→float) is applied to the items if given; `phase_filter` is the
-    ADR-058 `with_phase_filter` wrapper (default-deny pilot data) if the caller
-    wants it. Returns a list of installment dicts (unsorted; `format_full_archive`
-    orders them).
+    `d2f` (decimals→float) is applied to the items if given. `phase_filter` is the
+    ADR-058 `with_phase_filter` wrapper: pass it (both live callers do) and the read is
+    DEFAULT-DENY — wiped prior-cycle installments are excluded, so the result is the
+    current cycle plus ADR-077 carry-forwards, NOT the whole multi-cycle history
+    (#1829: the block's header now says so instead of claiming completeness). Pass
+    `phase_filter=None` for an unfiltered read.
+
+    Returns a list of installment dicts (unsorted; `format_full_archive` orders them).
     """
     try:
         params = {

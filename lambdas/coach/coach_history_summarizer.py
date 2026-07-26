@@ -495,6 +495,19 @@ COMPRESSION_SYSTEM_PROMPT = (
 )
 
 
+def _conversational_weight(conf_record):
+    """#1787: the conversational pseudo-observation weight on one CONFIDENCE# row, via
+    the ONE shared definition in `coach_calibration` (never a second copy of the ADR-141
+    split rule). Fail-soft to 0.0 — a grounding string must never fail to render because
+    a provenance field is missing or oddly typed."""
+    try:
+        from coach_calibration import conversational_weight
+
+        return conversational_weight((conf_record or {}).get("conversation_alpha"), (conf_record or {}).get("conversation_beta"))
+    except Exception:  # noqa: BLE001 — provenance disclosure is additive, never load-bearing
+        return 0.0
+
+
 def _build_compression_message(coach_id, state):
     """Build the user message for the compression LLM call.
 
@@ -610,7 +623,14 @@ def _build_compression_message(coach_id, state):
             subdomain = conf.get("subdomain", conf.get("sk", "").replace("CONFIDENCE#", ""))
             mean = conf.get("mean_confidence", 0.5)
             sample_size = conf.get("sample_size", 0)
-            parts.append(f"  - {subdomain}: {mean:.3f} (n={sample_size})")
+            # #1787 (ADR-105 / ADR-141 §3): `n` is GRADED predictions only, and any
+            # conversational pseudo-observation weight folded into the same Beta is
+            # DISCLOSED beside it rather than hidden inside it — the same
+            # labeled-channel discipline this file already applies to LEARNING# records.
+            # Data-only rows (no conversation provenance) render exactly as before.
+            conv_w = _conversational_weight(conf)
+            n_txt = f"n={sample_size}" + (f", +{conv_w:g} conversational" if conv_w > 0 else "")
+            parts.append(f"  - {subdomain}: {mean:.3f} ({n_txt})")
         parts.append("")
     else:
         parts.append("## Confidence State: NONE (uninformed prior)")

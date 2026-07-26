@@ -913,7 +913,17 @@ def _update_bayesian_confidence(coach_id, subdomain, update_type):
             beta_val += 1
 
         mean_confidence = alpha / (alpha + beta_val)
-        sample_size = int(alpha + beta_val - 2)
+        # #1787: n = GRADED predictions only. This path increments by exactly 1 per
+        # graded outcome, but the SAME Beta also carries #1481's fractional
+        # conversational pseudo-observations — so the honest count subtracts them
+        # (ONE shared definition, `coach_calibration.graded_sample_size`, used by both
+        # writers; the conversational contribution stays disclosed in its own
+        # accumulators, carried forward below).
+        from coach_calibration import graded_sample_size
+
+        sample_size = graded_sample_size(
+            alpha, beta_val, item.get("conversation_alpha") if item else 0, item.get("conversation_beta") if item else 0
+        )
 
         from phase_taxonomy import experiment_stamp  # fail-soft provenance (#1233)
 

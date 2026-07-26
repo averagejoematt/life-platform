@@ -80,6 +80,59 @@ EVALUATION_TYPE = "conversation_calibration"
 _CHECKIN_SK_RE = re.compile(r"^CHECKIN#(\d{4}-\d{2}-\d{2})#([A-Za-z0-9]+)$")
 
 
+# ── the honest n (#1787, ADR-105 / ADR-141 §3) ───────────────────────────────
+def graded_sample_size(alpha, beta_param, conversation_alpha=0, conversation_beta=0) -> int:
+    """The CONFIDENCE# row's `sample_size`: GRADED PREDICTIONS ONLY.
+
+    Beta(alpha, beta) starts from the uninformed prior Beta(1,1), so the number of
+    observations folded in is `alpha + beta - 2`. But #1481 also folds CONVERSATIONAL
+    pseudo-observations into the same Beta at FRACTIONAL weights (0.1–1.0), which made
+    the old `int(alpha + beta - 2)` dishonest two ways (#1787):
+
+      (a) TRUNCATION — one default-weight (0.5) `up` move gives alpha=1.5/beta=1, so
+          `int(1.5 + 1 - 2)` = 0 while `mean_confidence` reads 0.6: the summarizer
+          rendered `0.600 (n=0)`, a confidence with no disclosed basis at all.
+      (b) CHANNEL CONFLATION — two weight-1.0 answers push `n` to 1, publishing a
+          conversational pseudo-observation as a GRADED prediction when zero
+          predictions had ever been graded.
+
+    ADR-141 §3 ("data vs conversation is explicit everywhere") is why the row carries
+    `conversation_alpha`/`conversation_beta` at all; subtracting them here is what makes
+    `sample_size` mean what every consumer reads it as. The conversational contribution
+    stays visible — it is still in `mean_confidence`, still in its own accumulators, and
+    the summarizer now RENDERS the split (`coach/coach_history_summarizer.py`) rather
+    than hiding it inside `n`.
+
+    Floors at 0 (never negative) and floors the fractional remainder DOWN: a half-graded
+    prediction does not exist, and rounding up would re-invent the number ADR-105 bans.
+    """
+
+    def _f(v):
+        try:
+            return float(v or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    graded = (_f(alpha) + _f(beta_param) - 2.0) - (_f(conversation_alpha) + _f(conversation_beta))
+    if graded <= 0:
+        return 0
+    return int(graded)  # floor — a fraction of a graded prediction is not one
+
+
+def conversational_weight(conversation_alpha=0, conversation_beta=0) -> float:
+    """Total conversational pseudo-observation weight on a CONFIDENCE# row (the
+    disclosed `+k conversational` term). 0.0 when the row has no conversation
+    provenance — an untouched data-only row renders exactly as it always did."""
+
+    def _f(v):
+        try:
+            return float(v or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    return max(0.0, _f(conversation_alpha) + _f(conversation_beta))
+
+
 # ── pure helpers ─────────────────────────────────────────────────────────────
 
 
@@ -300,7 +353,10 @@ def apply_conversation_calibration(
                 "alpha": _dec(alpha),
                 "beta_param": _dec(beta_val),
                 "mean_confidence": _dec(mean_after),
-                "sample_size": Decimal(str(max(0, int(alpha + beta_val - 2)))),
+                # #1787: GRADED predictions only — the conversational weight just added
+                # to alpha/beta is subtracted back out, so this n never counts a chat as
+                # a graded outcome (it stays visible via conversation_alpha/beta below).
+                "sample_size": Decimal(str(graded_sample_size(alpha, beta_val, conv_alpha, conv_beta))),
                 "subdomain": sub,
                 "coach_id": coach_id,
                 "updated_at": stamp,

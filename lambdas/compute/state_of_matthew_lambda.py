@@ -661,10 +661,16 @@ def lambda_handler(event: dict, context) -> dict:
     # state as a 1-hour cached block (build_narration_body) and its numbers join the
     # grounding allow-list (narration_gate). Fail-soft to "" (no block, gate unchanged).
     try:
-        state["archive_text"] = whole_life_context.format_full_archive(
-            whole_life_context.fetch_full_installment_archive(
-                table, f"{USER_PREFIX}chronicle", d2f=decimals_to_float, phase_filter=with_phase_filter
-            )
+        _archive_items = whole_life_context.fetch_full_installment_archive(
+            table, f"{USER_PREFIX}chronicle", d2f=decimals_to_float, phase_filter=with_phase_filter
+        )
+        state["archive_text"] = whole_life_context.format_full_archive(_archive_items)
+        # #1829: the read is ADR-058 default-deny, so log what is actually in scope
+        # (count + cycles) — the block's header states the same scope to the model.
+        _scope = whole_life_context.archive_scope(_archive_items)
+        logger.info(
+            f"[state-of-matthew] #1385 archive (phase-filtered): {_scope['count']} installment(s), "
+            f"cycles={_scope['cycles']}, unlabeled={_scope['unlabeled']}"
         )
     except Exception as _arch_e:  # noqa: BLE001 — the archive is context, never load-bearing
         logger.warning(f"[state-of-matthew] #1385 archive build skipped (non-fatal): {_arch_e}")

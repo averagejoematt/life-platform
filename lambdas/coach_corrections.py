@@ -43,6 +43,14 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
+# `normalize_coach_id` is THE shared coach-id normalizer (#1786): the ledger's writers
+# spell a coach id differently — the review-pack resolver stores the S3 archive `variant`
+# (suffixed: "mind_coach"), the dossier channel stores f"{bare}_coach", and older rows
+# carry the bare form ("mind") or no `coach` key at all — while
+# `ai_calls._run_coach_v2_pipeline` READS with the suffixed id. Comparing the raw strings
+# made the S5 injection a live no-op; both sides now normalize at the join
+# (`_item_ref_matches`). Flat sibling imports, per #781 (every root module ships together).
+from coach_checkin import normalize_coach_id
 from numeric import floats_to_decimal
 
 PK = "USER#matthew#SOURCE#coach_corrections"
@@ -225,12 +233,33 @@ def _item_ref_matches(item: dict, *, surface: Optional[str], coach: Optional[str
 
     A `None` filter is a wildcard for that axis. Scoping is what makes each coach
     see ONLY its own corrections (never the global list) — the core #1697 acceptance.
+
+    TWO id-form rules, both from #1786 (the S5 injection was a live no-op because
+    neither held — every open correction reached zero coaches):
+
+      1. **Normalized comparison.** The ledger's writers spell the coach id
+         differently (`coach_correction_resolver.build_item_ref` stores the archive
+         `variant` — "mind_coach"; `tools_coach_intelligence` stores f"{bare}_coach";
+         legacy rows carry the bare "mind") and the reader passes the suffixed
+         pipeline id. Both sides go through `normalize_coach_id`, so "mind" and
+         "mind_coach" are the SAME coach. Normalization is one-way (suffix stripped,
+         never re-added), so a non-coach `variant` on another surface still compares
+         as itself.
+      2. **A row with no coach applies to EVERY coach on its surface.** A correction
+         logged without a coach is a correction about that surface's output in
+         general ("stop citing the pre-genesis baseline"); silently addressing it to
+         nobody is the failure mode, not the safe default. Scoping is still real —
+         a row that NAMES a coach reaches only that coach.
     """
     ref = item.get("item_ref") or {}
     if surface is not None and ref.get("surface") != surface:
         return False
-    if coach is not None and ref.get("coach") != coach:
-        return False
+    if coach is not None:
+        row_coach = ref.get("coach")
+        if row_coach in (None, ""):
+            return True  # surface-wide correction — applies to every coach on this surface
+        if normalize_coach_id(str(row_coach)) != normalize_coach_id(str(coach)):
+            return False
     return True
 
 
