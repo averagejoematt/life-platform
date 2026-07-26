@@ -201,10 +201,21 @@ def conversation_context(item, channel) -> str:
 
 
 def _query_between(table, pk, sk_lo, sk_hi):
-    """Paginated Key-condition query pk + sk BETWEEN [sk_lo, sk_hi]."""
-    from boto3.dynamodb.conditions import Key
+    """Paginated Key-condition query pk + sk BETWEEN [sk_lo, sk_hi].
 
-    kwargs = {"KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(sk_lo, sk_hi)}
+    ADR-077/phase_filter.py contract: every read of platform DDB data passes
+    through with_phase_filter() — this is the SINGLE query helper for all
+    three conversational partitions plus the journal dedup corpus, so wiring
+    it here closes the gap module-wide in one place (#1790). Two of the three
+    conversational source families are EXPERIMENT_SCOPED (field_notes,
+    coach_checkin via the COACH#* rule) and the 14-day rolling lookback can
+    reach across a genesis into the wiped prior cycle; without this, a
+    tombstoned row would be enriched and its `enriched_*` fields would seed
+    new-cycle hypotheses from conversation the reset declared erased."""
+    from boto3.dynamodb.conditions import Key
+    from phase_filter import with_phase_filter
+
+    kwargs = with_phase_filter({"KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(sk_lo, sk_hi)})
     items = []
     while True:
         resp = table.query(**kwargs)
@@ -402,11 +413,21 @@ FIELD_MAPPING = {
 }
 
 
+#  ADR-077 (#1790): a defense-in-depth belt on top of the phase-filtered read —
+#  the write itself must refuse to land on a row that has since been
+#  tombstoned (a reset can run between collection and the Haiku round-trip).
+#  Mirrors singleton_visible's tombstone predicate as a DDB condition.
+_NOT_TOMBSTONED_CONDITION = "attribute_not_exists(tombstone) OR tombstone = :ce_not_tombstoned"
+_NOT_TOMBSTONED_VALUE = {":ce_not_tombstoned": False}
+
+
 def apply_enrichment(table, item, channel, enrichment, text):
     """Write the enriched_* fields IN PLACE onto the conversational record, with the
     #1577 provenance stamps: enriched_channel (AC1), enriched_scope (AC2 —
     analysis_only), enriched_content_hash (AC4), enriched_at + schema version.
-    Grounding gate runs BEFORE anything is written. Returns True when written."""
+    Grounding gate runs BEFORE anything is written. Returns True when written,
+    False when the write was refused because the row is now tombstoned
+    (ADR-077, #1790) — the caller must not count that as an enrichment."""
     if enrichment.get("causal_hints"):
         kept, dropped = _ground_causal_hints(enrichment["causal_hints"], text)
         enrichment["causal_hints"] = kept
@@ -441,24 +462,51 @@ def apply_enrichment(table, item, channel, enrichment, text):
     attr_names["#esv"] = "enriched_schema_version"
     attr_values[":esv"] = Decimal(SCHEMA_VERSION)
     update_parts.append("#esv = :esv")
+    attr_values.update(_NOT_TOMBSTONED_VALUE)
 
-    table.update_item(
-        Key={"pk": item["pk"], "sk": item["sk"]},
-        UpdateExpression="SET " + ", ".join(update_parts),
-        ExpressionAttributeNames=attr_names,
-        ExpressionAttributeValues=attr_values,
-    )
+    from botocore.exceptions import ClientError
+
+    try:
+        table.update_item(
+            Key={"pk": item["pk"], "sk": item["sk"]},
+            UpdateExpression="SET " + ", ".join(update_parts),
+            ConditionExpression=_NOT_TOMBSTONED_CONDITION,
+            ExpressionAttributeNames=attr_names,
+            ExpressionAttributeValues=attr_values,
+        )
+    except ClientError as e:
+        if e.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+            logger.info("[#1790] refused to enrich %s — tombstoned since collection (ADR-077)", item.get("sk"))
+            return False
+        raise
     return True
 
 
 def mark_deduped(table, item, reason, text):
     """Stamp an AC4-deduped record so it is never re-attempted (and the routing
-    decision is auditable). No enriched_at — the record is NOT enriched."""
-    table.update_item(
-        Key={"pk": item["pk"], "sk": item["sk"]},
-        UpdateExpression="SET enrichment_deduped_at = :ts, enrichment_dedup_reason = :r, enriched_content_hash = :h",
-        ExpressionAttributeValues={":ts": datetime.now(timezone.utc).isoformat(), ":r": str(reason), ":h": content_hash(text)},
-    )
+    decision is auditable). No enriched_at — the record is NOT enriched.
+    Refuses the write onto a since-tombstoned row (ADR-077, #1790); returns
+    False in that case so the caller doesn't count a phantom dedup."""
+    from botocore.exceptions import ClientError
+
+    try:
+        table.update_item(
+            Key={"pk": item["pk"], "sk": item["sk"]},
+            UpdateExpression="SET enrichment_deduped_at = :ts, enrichment_dedup_reason = :r, enriched_content_hash = :h",
+            ConditionExpression=_NOT_TOMBSTONED_CONDITION,
+            ExpressionAttributeValues={
+                ":ts": datetime.now(timezone.utc).isoformat(),
+                ":r": str(reason),
+                ":h": content_hash(text),
+                **_NOT_TOMBSTONED_VALUE,
+            },
+        )
+    except ClientError as e:
+        if e.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+            logger.info("[#1790] refused to mark-deduped %s — tombstoned since collection (ADR-077)", item.get("sk"))
+            return False
+        raise
+    return True
 
 
 # ── The analyzer seam (#1577 AC3) ─────────────────────────────────────────────
@@ -537,12 +585,16 @@ def run(table=None, start_date=None, end_date=None, force=False, caller=None, co
         h = content_hash(text)
         if not item.get("enriched_at"):  # an already-enriched record re-running (force/schema) keeps its slot
             if h in seen_hashes:
-                mark_deduped(table, item, "conversational_duplicate", text)
-                deduped += 1
+                if mark_deduped(table, item, "conversational_duplicate", text):
+                    deduped += 1
+                else:
+                    skipped += 1  # tombstoned since collection (ADR-077, #1790)
                 continue
             if is_duplicate_takeaway(text, journal_texts):
-                mark_deduped(table, item, "journal_duplicate", text)
-                deduped += 1
+                if mark_deduped(table, item, "journal_duplicate", text):
+                    deduped += 1
+                else:
+                    skipped += 1  # tombstoned since collection (ADR-077, #1790)
                 continue
         seen_hashes.add(h)
 
@@ -551,16 +603,18 @@ def run(table=None, start_date=None, end_date=None, force=False, caller=None, co
             if not extraction:
                 errors += 1
                 continue
-            apply_enrichment(table, item, channel, extraction, text)
-            enriched += 1
-            logger.info(
-                "[#1577] enriched %s (%s): sentiment=%s themes=%s hints=%d",
-                sk,
-                channel,
-                extraction.get("sentiment"),
-                extraction.get("themes"),
-                len(extraction.get("causal_hints") or []),
-            )
+            if apply_enrichment(table, item, channel, extraction, text):
+                enriched += 1
+                logger.info(
+                    "[#1577] enriched %s (%s): sentiment=%s themes=%s hints=%d",
+                    sk,
+                    channel,
+                    extraction.get("sentiment"),
+                    extraction.get("themes"),
+                    len(extraction.get("causal_hints") or []),
+                )
+            else:
+                skipped += 1  # tombstoned since collection (ADR-077, #1790)
         except Exception as e:  # noqa: BLE001 — one bad record must not fail the sweep
             errors += 1
             logger.error("[#1577] error enriching %s: %s", sk, e)

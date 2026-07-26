@@ -378,6 +378,18 @@ _PK_RULES: list = [
     (lambda pk, sk: pk.startswith("BROADCAST_ORIGIN#"), SYSTEM_STATE),
     (lambda pk, sk: pk.startswith("VOTES#"), SYSTEM_STATE),
     (lambda pk, sk: pk.startswith("EXPERIMENT_FOLLOWS"), SYSTEM_STATE),
+    # #1394/#1819: the cohort-strip pool (COHORT#{metric}#{week} / SUBMIT#{ip_hash}) —
+    # anonymous reader-submitted single numbers pooled into a k-anonymity histogram.
+    # SYSTEM_STATE, not EXPERIMENT_SCOPED: this is audience data about the READER
+    # population (like VOTES#/CHALLENGE_FOLLOWS above), not Matthew's own
+    # experiment-derived intelligence — a submitted number isn't invalidated by a
+    # cycle boundary the same way a derived score is, and the weekly cohort_config
+    # key can straddle a reset. The phase machinery ignores it entirely (no tag, no
+    # wipe, no filter): unclassified, this pk family raises KeyError in
+    # restart_pipeline.py's step-0 census preflight the moment the first reader
+    # submits — blocking every future reset until the fix lands (the bug this rule
+    # closes, filed adversarially before any live COHORT# row existed).
+    (lambda pk, sk: pk.startswith("COHORT#"), SYSTEM_STATE),
     # Challenge-follow interest records (site_api_social.handle_challenge_follow) —
     # reader emails awaiting a "challenge started" notification. Audience state like
     # SUBSCRIBE#/VOTES#: kept across resets, ignored by the phase machinery.
