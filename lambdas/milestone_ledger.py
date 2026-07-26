@@ -67,7 +67,27 @@ which would read as the instrument retracting its own arithmetic.
 The writer runs from daily-metrics-compute (the existing daily compute chain,
 after the achievements sweep) — no new Lambda, no new IAM surface.
 
+Window-validated process milestones + weight demoted (#1628)
+------------------------------------------------------------
+The process/composition milestones (return_after_gap, sustained_sessions,
+strength_in_deficit, zone2, rhr_hrv_trend, waist) are PURE WINDOW FUNCTIONS in
+lambdas/process_milestones.py — this module evaluates their candidates inside
+the same sweep, so they inherit write-once, the global cooldown, and genesis
+baselining. Two structural rules land with them:
+
+- **Weight never emits alone.** Weight is LAST in LADDER_PRIORITY, and a weight
+  rung is only ever written as a companion (`companion_to`) of a process or
+  composition milestone announced on the same run. A run where only weight
+  rungs are satisfied writes NOTHING — the rungs stay deferred (unconsumed)
+  until a milestone that gives the number meaning co-fires.
+- **The spiral circuit breaker (#1627) gates every announcement.** When the
+  breaker is not explicitly clear, the sweep defers instead of announcing
+  (rungs stay unconsumed; fails closed) — during a suspected downturn the
+  platform checks in, it does not congratulate.
+
 v1.0.0 — 2026-07-25 (#1626)
+v1.1.0 — 2026-07-26 (#1628): window-validated process milestones, weight
+         demoted to companion-only, spiral-breaker gate on announcements
 """
 
 from __future__ import annotations
@@ -75,6 +95,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any, NamedTuple
+
+import process_milestones  # #1628: the pure window functions (no I/O — this module remains the ONE writer)
 
 # ── DDB coordinates ───────────────────────────────────────────────────────────
 MILESTONES_SOURCE = "milestones"
@@ -118,6 +140,12 @@ class MilestoneRule(NamedTuple):
     signal: str  # key into the signals dict (count rules) / "weight_series" (weight rules)
     threshold: int
     depth: int  # position in its ladder; higher = deeper (more significant)
+    ladder: str = ""  # subsumption group; defaults to category (the pre-#1628 rungs)
+
+
+def _ladder_of(rule) -> str:
+    """Subsumption/priority group for a rung or window candidate."""
+    return getattr(rule, "ladder", "") or rule.category
 
 
 def _weight_rules() -> tuple[MilestoneRule, ...]:
@@ -168,10 +196,35 @@ MILESTONE_RULES: tuple[MilestoneRule, ...] = (
 MILESTONE_IDS: tuple[str, ...] = tuple(r.id for r in MILESTONE_RULES)
 RULES_BY_ID: dict[str, MilestoneRule] = {r.id: r for r in MILESTONE_RULES}
 
-# When rungs from several categories are eligible on the same run, exactly one
-# announces — chosen by this order. Weight first: it is the platform's flagship
-# public metric; the others are supporting ladders.
-CATEGORY_PRIORITY: tuple[str, ...] = ("weight", "streak", "days_tracked", "level")
+# When rungs from several ladders are eligible on the same run, one ladder's
+# champion announces — chosen by this order. #1628 demoted weight to LAST:
+# the milestones that predict a cycle holding are process behaviours (the
+# restart above all), and a weight number only means something next to them.
+LADDER_PRIORITY: tuple[str, ...] = (
+    "return_after_gap",  # THE highest-value one: restarting is the behaviour the experiment turns on
+    "sustained_sessions",
+    "strength_in_deficit",
+    "zone2",
+    "rhr_hrv_trend",
+    "waist",
+    "streak",
+    "days_tracked",
+    "level",
+    "weight",  # never alone — companion-only, see WEIGHT_COMPANION_CATEGORIES
+)
+
+# The categories whose milestones give a weight number meaning (#1628): a weight
+# rung may only be written alongside a champion from one of these categories.
+# Streak/days/level deliberately do NOT qualify — the issue names composition
+# and process milestones as the companions that make weight mean something.
+WEIGHT_COMPANION_CATEGORIES: tuple[str, ...] = (
+    process_milestones.CATEGORY_PROCESS,
+    process_milestones.CATEGORY_COMPOSITION,
+)
+
+# Category-level view of the same ordering (kept for consumers/tests that think
+# in categories; champion selection itself runs on LADDER_PRIORITY).
+CATEGORY_PRIORITY: tuple[str, ...] = ("process", "composition", "streak", "days_tracked", "level", "weight")
 
 
 # ── Condition evaluation ──────────────────────────────────────────────────────
@@ -189,12 +242,15 @@ def trailing_weight_mean(weight_series: list[tuple[str, float]], today: str) -> 
     vals = [float(v) for d, v in weight_series if v is not None and start <= d <= today]
     if len(vals) < WEIGHT_MIN_WEIGHINS:
         return None
+    mean = sum(vals) / len(vals)
+    sd = (sum((v - mean) ** 2 for v in vals) / (len(vals) - 1)) ** 0.5  # n >= 3 guaranteed above
     return {
         "window_start": start,
         "window_end": today,
         "window_days": WEIGHT_WINDOW_DAYS,
         "n": len(vals),
-        "mean_lbs": round(sum(vals) / len(vals), 1),
+        "mean_lbs": round(mean, 1),
+        "sd_lbs": round(sd, 2),  # ADR-105: the claim carries its spread, not just its mean
     }
 
 
@@ -220,12 +276,15 @@ def _days_between(earlier: str, later: str) -> int:
     return (datetime.strptime(later, "%Y-%m-%d") - datetime.strptime(earlier, "%Y-%m-%d")).days
 
 
-def _entry(rule: MilestoneRule, measurement: dict, today: str, *, announce: bool, origin: str, subsumed_by: str | None = None) -> dict:
+def _entry(
+    rule, measurement: dict, today: str, *, announce: bool, origin: str, subsumed_by: str | None = None, companion_to: str | None = None
+) -> dict:
     entry = {
         "sk": EVENT_SK_PREFIX + rule.id,
         "milestone_id": rule.id,
         "label": rule.label,
         "category": rule.category,
+        "ladder": _ladder_of(rule),
         "description": rule.description,
         # ADR-104: event_date is the evaluation date the crossing was CONFIRMED on
         # (the measurement window ends that day). A baseline entry has no honest
@@ -238,43 +297,84 @@ def _entry(rule: MilestoneRule, measurement: dict, today: str, *, announce: bool
     }
     if subsumed_by:
         entry["subsumed_by"] = subsumed_by
+    if companion_to:
+        # #1628: a weight rung written alongside the process/composition milestone
+        # that gives the number meaning — never written without one.
+        entry["companion_to"] = companion_to
     return entry
 
 
-def evaluate(signals: dict, existing_ids: set[str], last_event_date: str | None, today: str) -> dict:
-    """Pure decision function: what (if anything) does this run write?
-
-    Returns {"to_write": [entry, …], "cooldown_active": bool, "deferred": [id, …]}.
-    to_write holds at most ONE announced entry (plus same-ladder subsumed
-    siblings); deferred lists satisfied-but-not-written rungs (cooldown, or a
-    lower-priority category this run) — they stay unconsumed and re-evaluate later.
-    """
-    satisfied: list[tuple[MilestoneRule, dict]] = []
+def _all_satisfied(signals: dict, existing_ids: set[str], today: str) -> list[tuple[Any, dict]]:
+    """Every unconsumed rung/window-candidate whose condition holds right now."""
+    satisfied: list[tuple[Any, dict]] = []
     for rule in MILESTONE_RULES:
         if rule.id in existing_ids:
             continue  # a rung crossed is a rung consumed, forever
         ok, meas = _satisfied(rule, signals, today)
         if ok:
             satisfied.append((rule, meas))
+    for cand, meas in process_milestones.candidates(signals, today):
+        if cand.id not in existing_ids:
+            satisfied.append((cand, meas))
+    return satisfied
 
+
+def evaluate(signals: dict, existing_ids: set[str], last_event_date: str | None, today: str, suppressed: bool = False) -> dict:
+    """Pure decision function: what (if anything) does this run write?
+
+    Returns {"to_write": [entry, …], "cooldown_active": bool, "suppressed": bool,
+    "deferred": [id, …]}. to_write holds at most ONE announced champion (plus a
+    weight companion when the champion is process/composition, plus same-ladder
+    subsumed siblings); deferred lists satisfied-but-not-written rungs (cooldown,
+    breaker suppression, weight-alone, or a lower-priority ladder this run) —
+    they stay unconsumed and re-evaluate later.
+
+    Structural rule (#1628): weight rungs never emit alone. When only weight is
+    satisfied, NOTHING is written; a weight rung reaches the ledger only as a
+    companion of a same-run process/composition champion.
+    """
+    satisfied = _all_satisfied(signals, existing_ids, today)
     cooldown_active = last_event_date is not None and _days_between(last_event_date, today) < GLOBAL_COOLDOWN_DAYS
-    if cooldown_active or not satisfied:
-        return {"to_write": [], "cooldown_active": cooldown_active, "deferred": [r.id for r, _ in satisfied]}
+    if cooldown_active or suppressed or not satisfied:
+        return {
+            "to_write": [],
+            "cooldown_active": cooldown_active,
+            "suppressed": suppressed,
+            "deferred": [r.id for r, _ in satisfied],
+        }
 
-    by_category: dict[str, list[tuple[MilestoneRule, dict]]] = {}
-    for rule, meas in satisfied:
-        by_category.setdefault(rule.category, []).append((rule, meas))
+    non_weight = [(r, m) for r, m in satisfied if _ladder_of(r) != "weight"]
+    weight_sat = sorted(((r, m) for r, m in satisfied if _ladder_of(r) == "weight"), key=lambda rm: rm[0].depth, reverse=True)
 
-    category = next(c for c in CATEGORY_PRIORITY if c in by_category)
-    ladder = sorted(by_category[category], key=lambda rm: rm[0].depth, reverse=True)
-    champion, champion_meas = ladder[0]
+    if not non_weight:
+        # #1628 structural rule: a weight milestone never appears alone. The rungs
+        # stay deferred (unconsumed) until a process/composition milestone co-fires.
+        return {"to_write": [], "cooldown_active": False, "suppressed": False, "deferred": [r.id for r, _ in satisfied]}
+
+    by_ladder: dict[str, list[tuple[Any, dict]]] = {}
+    for rule, meas in non_weight:
+        by_ladder.setdefault(_ladder_of(rule), []).append((rule, meas))
+
+    champ_ladder = next((ld for ld in LADDER_PRIORITY if ld in by_ladder), sorted(by_ladder)[0])
+    ladder_entries = sorted(by_ladder[champ_ladder], key=lambda rm: rm[0].depth, reverse=True)
+    champion, champion_meas = ladder_entries[0]
     to_write = [_entry(champion, champion_meas, today, announce=True, origin=ORIGIN_CROSSING)]
-    for rule, meas in ladder[1:]:
+    for rule, meas in ladder_entries[1:]:
         # Same-ladder siblings crossed by the same motion: consumed with the same
         # event, never announced after their greater rung.
         to_write.append(_entry(rule, meas, today, announce=False, origin=ORIGIN_CROSSING, subsumed_by=champion.id))
-    deferred = [r.id for r, _ in satisfied if r.category != category]
-    return {"to_write": to_write, "cooldown_active": False, "deferred": deferred}
+
+    if weight_sat and champion.category in WEIGHT_COMPANION_CATEGORIES:
+        # The deepest satisfied weight rung rides along as the companion; its
+        # shallower siblings are consumed by the same motion (ladder subsumption).
+        w_champion, w_meas = weight_sat[0]
+        to_write.append(_entry(w_champion, w_meas, today, announce=True, origin=ORIGIN_CROSSING, companion_to=champion.id))
+        for rule, meas in weight_sat[1:]:
+            to_write.append(_entry(rule, meas, today, announce=False, origin=ORIGIN_CROSSING, subsumed_by=w_champion.id))
+
+    written_ids = {e["milestone_id"] for e in to_write}
+    deferred = [r.id for r, _ in satisfied if r.id not in written_ids]
+    return {"to_write": to_write, "cooldown_active": False, "suppressed": False, "deferred": deferred}
 
 
 # ── DDB I/O ───────────────────────────────────────────────────────────────────
@@ -379,22 +479,36 @@ def collect_signals(table, user_prefix: str, phase_filter, today: str) -> dict:
                 return items
             kwargs = dict(kwargs, ExclusiveStartKey=last)
 
-    end = datetime.strptime(today, "%Y-%m-%d")
-    weight_start = (end - timedelta(days=WEIGHT_WINDOW_DAYS - 1)).strftime("%Y-%m-%d")
-    habit_start = (end - timedelta(days=364)).strftime("%Y-%m-%d")
+    def _range(source: str, start: str, include_subrecords: bool = False) -> list[dict]:
+        # `~` sorts after any `#`-suffixed sub-record key, so an inclusive end of
+        # DATE#{today}~ also captures DATE#{today}#WORKOUT#… items.
+        end_key = f"DATE#{today}~" if include_subrecords else f"DATE#{today}"
+        return _query_all(
+            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
+            ExpressionAttributeValues={":pk": user_prefix + source, ":s": f"DATE#{start}", ":e": end_key},
+        )
 
-    weights = _query_all(
-        KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-        ExpressionAttributeValues={":pk": user_prefix + "withings", ":s": f"DATE#{weight_start}", ":e": f"DATE#{today}"},
-    )
-    habits = _query_all(
-        KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-        ExpressionAttributeValues={":pk": user_prefix + "habit_scores", ":s": f"DATE#{habit_start}", ":e": f"DATE#{today}"},
-    )
+    end = datetime.strptime(today, "%Y-%m-%d")
+
+    def _back(days: int) -> str:
+        return (end - timedelta(days=days)).strftime("%Y-%m-%d")
+
+    weights = _range("withings", _back(WEIGHT_WINDOW_DAYS - 1))
+    habits = _range("habit_scores", _back(364))
     chars = _query_all(
         KeyConditionExpression="pk = :pk AND begins_with(sk, :sk)",
         ExpressionAttributeValues={":pk": user_prefix + "character_sheet", ":sk": "DATE#"},
     )
+
+    # #1628 window-milestone inputs. The training lookback covers the deepest
+    # sustained_sessions rung; the others use their own definition windows.
+    training_lookback = max(process_milestones.SUSTAIN_RUNG_WEEKS) * 7
+    hevy = _range("hevy", _back(training_lookback), include_subrecords=True)
+    strava = _range("strava", _back(training_lookback))
+    garmin = _range("garmin", _back(process_milestones.ZONE2_WINDOW_DAYS - 1))
+    whoop = _range("whoop", _back(2 * process_milestones.TREND_WINDOW_DAYS - 1), include_subrecords=True)
+    macro = _range("macrofactor", _back(process_milestones.STRENGTH_WINDOW_DAYS - 1))
+    measurements = _range("measurements", _back(process_milestones.WAIST_WINDOW_DAYS - 1))
 
     def _f(v):
         try:
@@ -416,19 +530,123 @@ def collect_signals(table, user_prefix: str, phase_filter, today: str) -> dict:
     chars_sorted = sorted(chars, key=lambda i: str(i.get("sk") or ""))
     character_level = int(_f((chars_sorted[-1] if chars_sorted else {}).get("character_level")) or 1)
 
+    # Training days + strength volume: hevy workout sub-records (DATE#d#WORKOUT#id)
+    # union strava activity days (the spiral_breaker convention).
+    training_days: set[str] = set()
+    strength_volume_by_day: dict[str, float] = {}
+    for item in hevy:
+        sk = str(item.get("sk") or "")
+        if sk.startswith("DATE#") and "#WORKOUT#" in sk:
+            day = sk[5:15]
+            training_days.add(day)
+            vol = _f(item.get("total_volume_kg"))
+            if vol is not None:
+                strength_volume_by_day[day] = strength_volume_by_day.get(day, 0.0) + vol
+
+    # Zone 2 minutes: garmin daily zone2_minutes + strava total_zone2_seconds.
+    zone2_by_day: dict[str, float] = {}
+    for item in garmin:
+        sk = str(item.get("sk") or "")
+        z2 = _f(item.get("zone2_minutes")) or _f(item.get("time_in_zone_2_minutes"))
+        if sk.startswith("DATE#") and len(sk) == 15 and z2 is not None:
+            zone2_by_day[sk[5:15]] = zone2_by_day.get(sk[5:15], 0.0) + z2
+    for item in strava:
+        sk = str(item.get("sk") or "")
+        if not sk.startswith("DATE#"):
+            continue
+        day = sk[5:15]
+        training_days.add(day)
+        z2s = _f(item.get("total_zone2_seconds"))
+        if z2s is not None:
+            zone2_by_day[day] = zone2_by_day.get(day, 0.0) + z2s / 60.0
+
+    # RHR / HRV: whoop daily records (skip interleaved #WORKOUT# sub-records).
+    rhr_by_day: dict[str, float] = {}
+    hrv_by_day: dict[str, float] = {}
+    for item in whoop:
+        sk = str(item.get("sk") or "")
+        if not sk.startswith("DATE#") or "#WORKOUT#" in sk:
+            continue
+        rhr = _f(item.get("resting_heart_rate"))
+        hrv = _f(item.get("hrv"))
+        if rhr is not None:
+            rhr_by_day[sk[5:15]] = rhr
+        if hrv is not None:
+            hrv_by_day[sk[5:15]] = hrv
+
+    # Intake / expenditure: MacroFactor daily records.
+    calories_by_day: dict[str, float] = {}
+    expenditure_by_day: dict[str, float] = {}
+    for item in macro:
+        sk = str(item.get("sk") or "")
+        if not sk.startswith("DATE#") or len(sk) != 15:
+            continue
+        cal = _f(item.get("total_calories_kcal"))
+        exp = _f(item.get("expenditure_kcal")) or _f(item.get("tdee_kcal"))
+        if cal is not None:
+            calories_by_day[sk[5:15]] = cal
+        if exp is not None:
+            expenditure_by_day[sk[5:15]] = exp
+
+    # Waist: navel tape measurements.
+    waist_by_day: dict[str, float] = {}
+    for item in measurements:
+        sk = str(item.get("sk") or "")
+        waist = _f(item.get("waist_navel_in"))
+        if sk.startswith("DATE#") and len(sk) == 15 and waist is not None:
+            waist_by_day[sk[5:15]] = waist
+
     return {
         "weight_series": weight_series,
         "tier0_streak": tier0_streak,
         "days_tracked": len(habits_sorted),
         "character_level": character_level,
+        # #1628 window-milestone signal families (pure inputs to process_milestones)
+        "training_dates": sorted(training_days),
+        "strength_volume_by_day": strength_volume_by_day,
+        "zone2_minutes_by_day": zone2_by_day,
+        "rhr_by_day": rhr_by_day,
+        "hrv_by_day": hrv_by_day,
+        "calories_by_day": calories_by_day,
+        "expenditure_by_day": expenditure_by_day,
+        "waist_by_day": waist_by_day,
     }
 
 
-def sweep(table, user_prefix: str, phase_filter, today: str, stamp: dict | None = None, signals: dict | None = None) -> dict:
+def _celebration_suppressed(table, today: str) -> bool:
+    """The spiral circuit breaker gate (#1627): may the ledger announce today?
+
+    Fails closed — if the breaker (or its data) is unavailable, we defer rather
+    than celebrate. Deferral costs nothing here: a suppressed rung stays
+    UNCONSUMED and simply re-evaluates on a later sweep, provided its window
+    condition still holds then.
+    """
+    try:
+        import spiral_breaker
+
+        allowed, _verdict = spiral_breaker.check_celebration_allowed("milestone_announcements", now=today, table=table)
+        return not allowed
+    except Exception:  # noqa: BLE001 — any breaker failure means "not explicitly clear" -> suppress
+        return True
+
+
+def sweep(
+    table,
+    user_prefix: str,
+    phase_filter,
+    today: str,
+    stamp: dict | None = None,
+    signals: dict | None = None,
+    suppressed: bool | None = None,
+) -> dict:
     """One writer pass. Idempotent; never mutates or deletes an existing entry.
 
+    `suppressed=None` (the production default) consults the spiral circuit
+    breaker (#1627) live; pass an explicit bool to inject the verdict (tests,
+    or a caller that already ran the breaker this invocation).
+
     Returns {"written": [entry, …], "announced": [entry, …], "genesis": bool,
-    "cooldown_active": bool, "deferred": [id, …]}.
+    "cooldown_active": bool, "suppressed": bool, "deferred": [id, …]}.
     """
     ledger = read_ledger(table, user_prefix)
     if signals is None:
@@ -437,22 +655,25 @@ def sweep(table, user_prefix: str, phase_filter, today: str, stamp: dict | None 
     if not ledger["has_genesis"]:
         # First-ever run: consume everything already satisfied, announce nothing
         # (no honest event date exists for a crossing that predates the ledger).
+        # Baseline consumption is not celebratory, so the breaker is not consulted.
         written = []
-        for rule in MILESTONE_RULES:
-            ok, meas = _satisfied(rule, signals, today)
-            if ok and rule.id not in ledger["existing_ids"]:
-                entry = _entry(rule, meas, today, announce=False, origin=ORIGIN_BASELINE)
-                if _put_once(table, user_prefix, entry, stamp):
-                    written.append(entry)
+        for rule, meas in _all_satisfied(signals, ledger["existing_ids"], today):
+            entry = _entry(rule, meas, today, announce=False, origin=ORIGIN_BASELINE)
+            if _put_once(table, user_prefix, entry, stamp):
+                written.append(entry)
         _put_once(table, user_prefix, {"sk": GENESIS_SK, "genesis_date": today, "recorded_at": today}, stamp)
-        return {"written": written, "announced": [], "genesis": True, "cooldown_active": False, "deferred": []}
+        return {"written": written, "announced": [], "genesis": True, "cooldown_active": False, "suppressed": False, "deferred": []}
 
-    result = evaluate(signals, ledger["existing_ids"], ledger["last_event_date"], today)
+    if suppressed is None:
+        suppressed = _celebration_suppressed(table, today)
+
+    result = evaluate(signals, ledger["existing_ids"], ledger["last_event_date"], today, suppressed=suppressed)
     written = [e for e in result["to_write"] if _put_once(table, user_prefix, e, stamp)]
     return {
         "written": written,
         "announced": [e for e in written if e["announce"]],
         "genesis": False,
         "cooldown_active": result["cooldown_active"],
+        "suppressed": result["suppressed"],
         "deferred": result["deferred"],
     }

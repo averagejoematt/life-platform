@@ -36,6 +36,9 @@ v1.0.0 — 2026-03-07
 v1.1.0 — 2026-03-09: Sick day support — grade='sick', streaks preserved
 v1.2.0 — 2026-07-21: #1624 achievement first-earn sweep (durable badge earn dates)
 v1.3.0 — 2026-07-25: #1626 milestone event ledger sweep (write-once MILESTONE# rungs)
+v1.4.0 — 2026-07-26: #1628 window-validated process milestones ride the same sweep
+         (weight companion-only, spiral-breaker gate — logic in milestone_ledger/
+         process_milestones; this Lambda only logs the suppression outcome)
 """
 
 import logging
@@ -236,6 +239,10 @@ def sweep_milestone_ledger() -> int:
             )
         if result["cooldown_active"] and result["deferred"]:
             logger.info("[milestones] Global cooldown active — deferred: %s", result["deferred"])
+        if result.get("suppressed") and result["deferred"]:
+            # #1627/#1628: the spiral breaker held the announcements — rungs stay
+            # unconsumed; during a suspected downturn we check in, not congratulate.
+            logger.info("[milestones] Spiral breaker suppressed announcements — deferred: %s", result["deferred"])
         return len(result["announced"])
     except Exception as e:  # noqa: BLE001 — fail-soft: the milestone ledger never fails the metrics run
         logger.error("[milestones] Milestone sweep failed (non-fatal): %s", e)
