@@ -894,6 +894,11 @@ def _update_bayesian_confidence(coach_id, subdomain, update_type):
     try:
         resp = table.get_item(Key={"pk": pk, "sk": sk})
         item = resp.get("Item")
+        if item and item.get("tombstone"):
+            # ADR-077: a tombstoned CONFIDENCE# row is a prior cycle's archive —
+            # inheriting its Beta counts would contaminate the new cycle, and the
+            # full-item put below would resurrect it. Start fresh instead.
+            item = None
 
         if item:
             alpha = float(item.get("alpha", 1))
@@ -910,7 +915,10 @@ def _update_bayesian_confidence(coach_id, subdomain, update_type):
         mean_confidence = alpha / (alpha + beta_val)
         sample_size = int(alpha + beta_val - 2)
 
+        from phase_taxonomy import experiment_stamp  # fail-soft provenance (#1233)
+
         new_item = {
+            **experiment_stamp(),
             "pk": pk,
             "sk": sk,
             "alpha": _scalar_to_decimal(alpha),

@@ -271,6 +271,11 @@ def apply_conversation_calibration(
         except Exception as e:  # noqa: BLE001
             logger.warning("[coach_calibration] confidence read failed for %s/%s: %s", pk, conf_sk, e)
             item = {}
+        if item.get("tombstone"):
+            # ADR-077: a tombstoned CONFIDENCE# row is a prior cycle's archive —
+            # never inherit its accumulators into the new cycle. Start from the
+            # uninformed prior; the LEARNING# audit trail keeps the history.
+            item = {}
         alpha = float(item.get("alpha", 1) or 1)
         beta_val = float(item.get("beta_param", 1) or 1)
         conv_alpha = float(item.get("conversation_alpha", 0) or 0)
@@ -285,8 +290,11 @@ def apply_conversation_calibration(
             conv_beta += w
         mean_after = alpha / (alpha + beta_val)
 
+        from phase_taxonomy import experiment_stamp  # fail-soft provenance (#1233)
+
         table.put_item(
             Item={
+                **experiment_stamp(),
                 "pk": pk,
                 "sk": conf_sk,
                 "alpha": _dec(alpha),

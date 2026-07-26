@@ -428,3 +428,55 @@ def test_cap_probe_failure_refuses_the_write():
     )
     assert "error" in out and "refusing" in out["error"]
     assert fake.store == {} or not any("LEARNING#" in str(k) for k in fake.store)  # nothing written
+
+
+# ── ADR-077 reset safety: tombstoned CONFIDENCE# rows never resurrect ─────────
+
+
+def test_conversation_calibration_never_inherits_a_tombstoned_confidence_row():
+    """Post-reset P3 (#1481 review): the wipe tombstones CONFIDENCE# rows in
+    place (interpretation B). The next conversation calibration must start from
+    the uninformed prior — NOT inherit the prior cycle's Beta accumulators —
+    and the fresh row it writes must not carry the tombstone forward."""
+    from decimal import Decimal
+
+    tombstoned = {
+        "pk": cc.checkin_pk("sleep"),
+        "sk": "CONFIDENCE#sleep_quality",
+        "alpha": Decimal("40"),
+        "beta_param": Decimal("10"),
+        "conversation_alpha": Decimal("3"),
+        "conversation_beta": Decimal("1"),
+        "tombstone": True,
+        "tombstoned_reason": "experiment_restart_2026-07-27",
+    }
+    table = _fake_table([_answered_item(), tombstoned])
+    out = _apply(table, direction="down")
+    assert out["status"] == "saved"
+    conf = table.store[(cc.checkin_pk("sleep"), "CONFIDENCE#sleep_quality")]
+    # fresh prior Beta(1,1) + one bounded down move — not 40/10
+    assert float(conf["alpha"]) == 1.0 and float(conf["beta_param"]) == 1.5
+    assert float(conf["conversation_alpha"]) == 0.0
+    assert "tombstone" not in conf and "tombstoned_reason" not in conf
+    assert out["confidence"]["mean_before"] == 0.5
+
+
+def test_evaluator_never_inherits_a_tombstoned_confidence_row(monkeypatch):
+    """Same ADR-077 guard on the data path (#1233 provenance included)."""
+    from decimal import Decimal
+
+    tombstoned = {
+        "pk": "COACH#sleep_coach",
+        "sk": "CONFIDENCE#sleep_quality",
+        "alpha": Decimal("40"),
+        "beta_param": Decimal("10"),
+        "conversation_alpha": Decimal("3"),
+        "tombstone": True,
+    }
+    fake = FakeDdbTable(rows=[tombstoned])
+    monkeypatch.setattr(cpe, "table", fake)
+    cpe._update_bayesian_confidence("sleep_coach", "sleep_quality", "success")
+    written = fake.puts[-1]
+    assert float(written["alpha"]) == 2.0 and float(written["beta_param"]) == 1.0
+    assert "conversation_alpha" not in written  # prior cycle's split not carried
+    assert "tombstone" not in written
