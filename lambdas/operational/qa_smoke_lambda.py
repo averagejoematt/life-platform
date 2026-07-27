@@ -179,7 +179,13 @@ def check_s3_freshness():
     # while the buddy surface is dormant; last written 2026-03-09). Kept visible so it
     # can be returned to.
     FILES = [
-        ("dashboard/matthew/data.json", "Dashboard JSON", 4, False),
+        # data.json's ONLY writer is the daily-brief (cron 17:00 UTC, 1x/day) — a
+        # 4h max-age was stale-by-design for ~20h of every day and only looked
+        # green because the nightly qa-smoke cron lands a few hours after the
+        # brief. CI smoke invokes at arbitrary times inherited a guaranteed FAIL
+        # (the 2026-07-27 16:15Z firing rolled back 98 functions on it). 26h =
+        # red only when the daily writer actually missed a cycle.
+        ("dashboard/matthew/data.json", "Dashboard JSON", 26, False),
         ("dashboard/matthew/clinical.json", "Clinical JSON", 26, True),
     ]
 
