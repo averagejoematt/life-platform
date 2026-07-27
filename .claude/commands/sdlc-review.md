@@ -144,7 +144,9 @@ findings_refuted}}`) — this file is the comparability mechanism for the next r
 - File via the `issue-filer` agent per ADR-099: one epic per lens with ≥3 confirmed findings,
   scored stories (score line, Now/Next/Later by tercile), `area:*` mapping (most SDLC findings
   → `area:claude-workflow`, `area:infra`, `area:security`, or `area:docs`), privacy discipline
-  regardless of repo visibility. Update the month's `BACKLOG_MANIFEST_*.json`. Any QA-scorecard
+  regardless of repo visibility. Idempotency is the `review:*` label, reconciled via
+  `gh issue list --label review:<slug> --state all` before filing (no manifest — ADR-099's
+  2026-07-18 amendment ¶2). Any QA-scorecard
   axis that regressed, or sits ≥2 quarters short of target with no evidence of movement, files
   a story the same way (`type:story`, `area:claude-workflow`, `review:qa-strategy-<date>`,
   linked to epic #1425) — see the checklist in Phase 3.

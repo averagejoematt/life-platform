@@ -39,6 +39,10 @@ v1.3.0 — 2026-07-25: #1626 milestone event ledger sweep (write-once MILESTONE#
 v1.4.0 — 2026-07-26: #1628 window-validated process milestones ride the same sweep
          (weight companion-only, spiral-breaker gate — logic in milestone_ledger/
          process_milestones; this Lambda only logs the suppression outcome)
+v1.5.0 — 2026-07-27: #1843 diary_sessions — video-diary/solo-recording session count
+         per date, so the correlation + hypothesis engines can test whether the diary
+         itself is an intervention (measurement reactivity) rather than a neutral
+         instrument. 0 is an honest absence, always written, never omitted.
 """
 
 import logging
@@ -49,6 +53,7 @@ from decimal import Decimal
 
 import achievement_rules  # #1624: the ONE place badge thresholds live (shared with site_api_vitals)
 import boto3
+import flourishing  # #1843: entry_channel() — single source of truth for video_diary/solo_recording provenance
 import milestone_ledger  # #1626: the durable MILESTONE# event ledger (write-once, global cooldown)
 import personal_baselines  # #543: percentile bands from Matthew's own distribution (ADR-105 r4)
 import phase_taxonomy  # ADR-077/#1233: write-time provenance stamp for the first-earn ledger
@@ -262,6 +267,26 @@ def fetch_journal_entries(date_str):
     except Exception as e:
         logger.warning(f"fetch_journal_entries({date_str}) failed: {e}")
         return []
+
+
+# #1843: diary channels the video-diary/solo-recording flag counts. The video diary
+# is not a neutral instrument — it is plausibly a treatment (Hawthorne effect, and
+# the subject explicitly hopes it is one) — so recording days need to be visible to
+# the correlation/hypothesis engines as a candidate variable, not silently folded
+# into "journal happened." Uses flourishing.entry_channel() (the single source of
+# truth, #1572/#1573) rather than reading the `channel` field directly, so rows
+# written before the channel stamp still classify correctly via the Template fallback.
+_DIARY_CHANNELS = frozenset({flourishing.CHANNEL_VIDEO_DIARY, flourishing.CHANNEL_SOLO_RECORDING})
+
+
+def compute_diary_sessions(journal_entries):
+    """#1843 AC1: video-diary/solo-recording session count for one date.
+
+    Purely a count over that date's already-fetched journal entries — no new query,
+    no new write path. 0 is an honest absence (he didn't record that day), not a
+    gap; the caller always stores this field, never omits it when a day is scored.
+    """
+    return sum(1 for e in (journal_entries or []) if flourishing.entry_channel(e) in _DIARY_CHANNELS)
 
 
 # ==============================================================================
@@ -580,6 +605,7 @@ def store_computed_metrics(
     weight_traj=None,
     vitals=None,
     readiness_components=None,
+    diary_sessions=None,
 ):
     """Write computed_metrics record — primary output of this Lambda."""
     item = {
@@ -594,6 +620,14 @@ def store_computed_metrics(
         "computed_at": datetime.now(timezone.utc).isoformat(),
         "algo_version": ALGO_VERSION,
     }
+    # #1843 AC1: diary-day intervention flag — video-diary/solo-recording session
+    # count. Written whenever the caller passes a count, INCLUDING 0 (an honest
+    # absence, never a gap), so "diary_sessions" in item is a reliable presence
+    # test for the correlation/hypothesis engines. Only skipped when the caller
+    # passes None (the sick-day path writes a separate minimal record and never
+    # calls this function at all).
+    if diary_sessions is not None:
+        item["diary_sessions"] = Decimal(str(int(diary_sessions)))
     if day_grade_score is not None:
         item["day_grade_score"] = _to_dec(day_grade_score)
     if readiness_score is not None:
@@ -937,6 +971,7 @@ def assemble_data(yesterday_str, profile):
     habitify = fetch_date("habitify", yesterday_str)
     whoop_today = fetch_date("whoop", today.isoformat())
     journal_entries = fetch_journal_entries(yesterday_str)
+    diary_sessions = compute_diary_sessions(journal_entries)  # #1843 AC1
 
     # Dedup Strava multi-device activities
     if strava and strava.get("activities"):
@@ -1052,6 +1087,7 @@ def assemble_data(yesterday_str, profile):
         "habitify": habitify,
         "habitify_7d": habitify_7d,
         "journal_entries": journal_entries,
+        "diary_sessions": diary_sessions,  # #1843: honest int, 0 when no diary session that day
         "hrv": {
             "hrv_7d": hrv_7d_avg,
             "hrv_30d": hrv_30d_avg,
@@ -1237,6 +1273,7 @@ def lambda_handler(event, context):
         atl=data.get("atl"),
         weight_traj=data.get("weight_traj"),
         readiness_components=readiness_components,
+        diary_sessions=data.get("diary_sessions"),
         vitals={
             "recovery_pct": data.get("recovery_pct"),
             "hrv_ms": data.get("hrv_ms"),

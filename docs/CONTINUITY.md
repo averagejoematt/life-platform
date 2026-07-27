@@ -199,12 +199,26 @@ archive. Conventions:
   epic. Milestones express horizon: **Now / Next / Later**.
 - A shipping PR carries `Fixes #N` so merge closes the story.
 - Seed a session from: `gh issue list --label type:story --milestone Now --state open`.
-- Label taxonomy in use (`gh label list`): `type:epic|story` · `area:site-ux|ai|growth|
-  data|infra|security|docs|claude-workflow` · routing labels `model:opus|sonnet|fable`
+- Label taxonomy in use (`gh label list` — this census must match the live output, not
+  drift into an intended state): `type:epic|story|bug|chore` (#1864 — `type:bug` a
+  defect in shipped behavior, `type:chore` maintenance with no user-visible outcome,
+  distinct from `type:story` product/feature work) · `area:site-ux|ai|growth|data|
+  infra|security|docs|claude-workflow` · routing labels `model:opus|sonnet|fable`
   (which class of model/effort the work needs) · wedge labels `wedge:build-in-public|
   transformation-gated` · remediation-agent labels `auto-fix-safe` / `needs-review`
   (ADR-064/065) · `parity-debt` (backfill ↔ live drift) · `parked-register` (the one
-  gated/won't-do register issue) · plus GitHub defaults (`bug`, `documentation`, …).
+  gated/won't-do register issue) · **severity** `prio:P0|P1|P2|P3` (#1864 — mirrors the
+  score line's `P<n>` prefix so label and score line can never disagree; `prio:P0` is
+  the PM-override class ADR-099 already sanctions, "a live reader-facing defect
+  outranks the effort denominator" — not a fifth severity tier) · **readiness**
+  `gate:owner` (blocked on a human-only act — an AWS console click, a judgment only
+  Matthew can make) vs `blocked:dep` (blocked on another issue landing first) — the two
+  are not synonyms, an issue can carry either, both, or neither · `review:*` (12 dated
+  idempotency labels, one per filed review batch — e.g. `review:sdlc-2026-07-18`,
+  `review:pm-backlog-2026-07-27` — reconciled via `gh issue list --label review:<slug>
+  --state all` before refiling, per the 2026-07-18 ADR-099 amendment; not a manifest
+  file) · `auto-filed` (opened by an advisory scheduled workflow on failure, #1447;
+  auto-closes on recovery) · plus GitHub defaults (`bug`, `documentation`, …).
 
 ## 7. Day-1 reading order for a human successor
 

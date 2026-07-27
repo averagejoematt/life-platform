@@ -1025,6 +1025,33 @@ Note: since notion Lambda v1.2.0, property extraction is **dynamic** — `extrac
 | `enriched_emotional_depth` | number | 1-5 emotional depth rating (1=very surface/avoidant, 5=deep processing) |
 | `defense_enriched_at` | string | ISO timestamp of defense enrichment |
 
+**Vocal metrics fields (#1842, `channel` = `video_diary` / `solo_recording` only):**
+
+Deterministically computed from the session's local-Whisper SRT — pure timestamp/token
+arithmetic, no LLM involvement (ADR-105: deterministic computation before any LLM
+verdict). Written by `scripts/backfill_vocal_metrics.py` (a local script, not a Lambda —
+the SRT lives only in the private studio tree and the Notion upload path never carries
+it; see that script's docstring), which computes them via `lambdas/vocal_metrics.py`
+(full metric definitions — WPM formula, pause threshold, exact filler-word list — live
+in that module's docstring, the authoritative spec). ABSENT (field not written) on any
+entry with no SRT — never zeroed or defaulted (ADR-104). `mean_pause_s` is additionally
+absent (not `0`) when a session has zero qualifying pauses.
+
+| Field | Type | Description |
+|-------|------|--------------|
+| `vocal_wpm` | number | Words per minute over the full transcript span (first-cue-start to last-cue-end) — deliberately INCLUDES intra-cue pause time in the denominator, since hesitation is part of the signal, not noise to average out |
+| `vocal_mean_pause_s` | number | Mean duration (seconds) of pauses ≥ 0.5s between cues; absent (not present) if there were no qualifying pauses |
+| `vocal_pauses_per_min` | number | Count of pauses ≥ 0.5s / (duration_s / 60) |
+| `vocal_fillers_per_min` | number | Count of filler tokens (`um`, `umm`, `uh`, `uhh`, `erm` — case-insensitive whole-word match) / (duration_s / 60) |
+| `vocal_duration_s` | number | Transcript-covered span in seconds: last cue end − first cue start |
+| `vocal_word_count` | number | Total whitespace/punctuation-tokenized word count across all cues |
+| `vocal_metrics_computed_at` | string | ISO timestamp the backfill script wrote this reading |
+
+Exploratory-flag floor (AC3): `lambdas/vocal_metrics.MIN_N_FOR_VOCAL_STATS` (20 entries)
++ `vocal_metrics_state(n)` reuse the `eyeball_calibration.py` empty/low_n/reported
+convention. No narrative surface reads vocal metrics yet as of #1842 — the helper is
+there for the eventual consumer (most likely the correlation engine) to gate on.
+
 ### labs (blood work / biomarkers)
 
 **SOT for:** biochemical/labs domain

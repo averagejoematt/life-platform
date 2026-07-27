@@ -161,6 +161,12 @@ SPEC_METRICS = frozenset(
         "journal_stress",
         "sleep_onset_min",
         "bed_temp_f",
+        "habit_pct",  # #1843: Habitify tier-0/1 completion ratio (0-1) — the outcome
+        # metric for the diary-intervention hypothesis; wasn't wired into this
+        # vocabulary before even though habitify was already fetched by gather_data.
+        "diary_day",  # #1843: 1.0 if a video-diary/solo-recording session happened
+        # that date (computed_metrics.diary_sessions >= 1), else 0.0. Absent (not 0)
+        # on any date computed before #1843 shipped — an honest "not yet measured".
     }
 )
 VALID_SPEC_OPS = frozenset({">=", "<=", "median_split"})
@@ -204,7 +210,18 @@ def gather_data(days=LOOKBACK_DAYS):
     end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     start_date = (datetime.now(timezone.utc) - timedelta(days=days - 1)).strftime("%Y-%m-%d")
 
-    sources = ["whoop", "garmin", "macrofactor", "apple_health", "withings", "strava", "notion", "habitify", "eightsleep"]
+    sources = [
+        "whoop",
+        "garmin",
+        "macrofactor",
+        "apple_health",
+        "withings",
+        "strava",
+        "notion",
+        "habitify",
+        "eightsleep",
+        "computed_metrics",  # #1843: diary_sessions lives here (daily-metrics-compute)
+    ]
 
     data = {}
     for source in sources:
@@ -403,6 +420,25 @@ def build_data_narrative(data):
         if es:
             row["sleep_onset_min"] = safe_float(es, "time_to_sleep_min")
             row["bed_temp_f"] = safe_float(es, "bed_temp_f")
+
+        # #1843: Habitify tier-0/1 completion ratio — mirrors weekly_correlation's
+        # habit_pct calc (0-1 fraction) so the same concept means the same number
+        # on both engines.
+        hab = next((i for i in data.get("habitify", []) if i.get("date") == date), {})
+        if hab:
+            habits = hab.get("habits", {})
+            total = len(habits)
+            if total > 0:
+                row["habit_pct"] = sum(1 for v in habits.values() if v) / total
+
+        # #1843: diary-day flag, from the daily-metrics-compute diary_sessions count.
+        # Only set when the field is present (post-#1843 dates) — safe_float returns
+        # 0.0, not None, for an honest 0-session day, so that day still counts as a
+        # comparison day rather than dropping out.
+        cm = next((i for i in data.get("computed_metrics", []) if i.get("date") == date), {})
+        diary_sessions = safe_float(cm, "diary_sessions") if cm else None
+        if diary_sessions is not None:
+            row["diary_day"] = 1.0 if diary_sessions >= 1 else 0.0
 
         # Filter None values
         row = {k: v for k, v in row.items() if v is not None}
@@ -1279,6 +1315,99 @@ def run_time_affluence_weekly(force=False):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# #1843 — THE ONE PRE-REGISTERED DIARY-INTERVENTION HYPOTHESIS
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Fixed, never regenerated — a structural question about the platform's own
+# instrument, not a pattern mined from a data window. Idempotency keys off this id.
+DIARY_INTERVENTION_HYPOTHESIS_ID = "hyp_diary_days_habit_adherence"
+
+
+def seed_diary_intervention_hypothesis(all_hypotheses):
+    """#1843 AC3: register ONE hypothesis testing whether the video diary is itself
+    an intervention (measurement reactivity / the Hawthorne effect he explicitly
+    hopes for) rather than a neutral instrument — diary-recorded days vs
+    non-recorded days on same-day habit adherence.
+
+    Registered directly in code, not via the LLM generation path (generate_hypotheses):
+    this is a fixed structural question the platform should always be able to test,
+    not a candidate the weekly generator might or might not notice in 14 days of
+    data. Idempotent — checks DIARY_INTERVENTION_HYPOTHESIS_ID against every existing
+    hypothesis (any status, so a resolved/archived one is never re-created) and
+    no-ops once registered. Still runs through validate_hypothesis (defense in
+    depth against a typo breaking the test_spec, not a second set of rules) — but
+    WITHOUT the fuzzy duplicate-text check, which is a similarity heuristic for the
+    LLM path and must never be able to block a specific pre-registered id. Never
+    fatal to the hypothesis run.
+    """
+    try:
+        if any(h.get("hypothesis_id") == DIARY_INTERVENTION_HYPOTHESIS_ID for h in all_hypotheses):
+            return {"registered": False, "reason": "already_registered"}
+
+        hyp = {
+            "hypothesis_id": DIARY_INTERVENTION_HYPOTHESIS_ID,
+            "hypothesis": (
+                "Recording a video-diary or solo-recording session on a given day is associated with "
+                "different same-day habit adherence — the diary may be measurement reactivity (a Hawthorne "
+                "effect he explicitly hopes for), not a neutral instrument."
+            ),
+            "domains": ["journal", "habits"],
+            "evidence": (
+                "Pre-registered by design (#1843), not mined from an observed pattern: nothing before this "
+                "let the platform distinguish diary-recorded days from non-recorded days, so the diary's own "
+                "effect on adherence was invisible. This hypothesis exists to test for reactivity, not because "
+                "a signal was already seen in the data."
+            ),
+            "confirmation_criteria": (
+                "Same-day habit adherence (habit_pct) differs by at least 5 points between diary-recorded and "
+                "non-recorded days over a 30-day monitoring window, with the deterministic test's 95% CI "
+                "excluding 0 in the predicted direction."
+            ),
+            "test_spec": {
+                "condition_metric": "diary_day",
+                "condition_op": ">=",
+                "condition_threshold": 1,
+                "outcome_metric": "habit_pct",
+                "direction": "higher",
+                "min_effect": 0.05,
+                "lag_days": 0,
+            },
+            "monitoring_window_days": 30,
+            "confidence": "low",
+            "confidence_reason": (
+                "Structural/pre-registered, not data-mined — no prior observation backs a higher confidence "
+                "yet, and recording isn't randomized so even a confirmed verdict stays correlative, never causal."
+            ),
+            "actionable_if_confirmed": (
+                "If diary days show materially higher adherence, the recording session is worth treating as a "
+                "deliberate light-touch nudge, not only a reflective exercise."
+            ),
+            # AC3: explicit correlative-only + n-flagged framing, on top of the
+            # deterministic check's own n_condition/n_comparison/CI stamp (ADR-105) —
+            # every consumer of this record sees the caveat even before a first check.
+            "correlative_only": True,
+            "n_caveat": (
+                f"Deterministic per-arm n is stamped on every check ({MIN_DAYS_PER_ARM}+ days/arm floor before "
+                "a verdict is possible) — read the arm counts alongside any verdict, never the verdict alone."
+            ),
+        }
+
+        # No existing_texts: the fuzzy duplicate-overlap heuristic is for the LLM
+        # generation path, never a gate on a specific pre-registered id.
+        is_valid, issues = validate_hypothesis(hyp, existing_texts=None)
+        if not is_valid:
+            logger.error(f"[#1843] diary-intervention hypothesis failed validation: {issues}")
+            return {"registered": False, "reason": f"validation_failed: {issues}"}
+
+        store_hypothesis(hyp)
+        logger.info(f"[#1843] Registered pre-registered hypothesis: {DIARY_INTERVENTION_HYPOTHESIS_ID}")
+        return {"registered": True, "hypothesis_id": DIARY_INTERVENTION_HYPOTHESIS_ID}
+    except Exception as e:
+        logger.warning(f"[#1843] seed_diary_intervention_hypothesis failed (non-fatal): {e}")
+        return {"registered": False, "reason": f"error: {e}"}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # MAIN HANDLER
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -1332,6 +1461,15 @@ def lambda_handler(event, context):
                     write_calibration_row(hyp, stats, resolution)
                     resolutions += 1
             logger.info(f"Hypothesis checks: {updates_made} updated, {resolutions} resolved -> calibration ledger")
+
+        # 3.5. #1843 AC3: the one pre-registered diary-intervention hypothesis.
+        # Seeded directly (never LLM-generated), idempotent, never fatal. Runs after
+        # the check step (so it is never evaluated the same run it's created — same
+        # convention as generated hypotheses) and before generation (so it counts
+        # against the pending cap like any other hypothesis).
+        diary_hypothesis_result = seed_diary_intervention_hypothesis(all_hypotheses)
+        if diary_hypothesis_result.get("registered"):
+            pending_count += 1  # newly-seeded hypothesis starts "pending" — counts against the cap below
 
         # 4. Generate new hypotheses if room exists AND data is sufficient
         new_hypotheses_stored = 0
@@ -1407,6 +1545,7 @@ def lambda_handler(event, context):
             "data_sufficient": is_sufficient,
             "effect_refit": effect_refit,  # #1411 quarterly fit outcome
             "time_affluence": time_affluence,  # #1408 weekly proxy + edge outcome
+            "diary_intervention_hypothesis": diary_hypothesis_result,  # #1843 AC3
         }
         logger.info(f"Complete: {summary}")
         return {"statusCode": 200, "body": json.dumps(summary)}

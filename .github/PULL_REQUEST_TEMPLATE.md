@@ -9,6 +9,8 @@ checkbox went unused in 0/20 merged PRs); this one keeps only what every PR need
 
 <!-- 1–3 sentences: what changed and the reason. -->
 
+Outcome: <!-- one sentence: who is better off and how (the closing-comment verdict starts here) -->
+
 Fixes #<!-- issue number -->
 
 ## Checklist
