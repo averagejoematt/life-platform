@@ -61,6 +61,11 @@ on:
         required: false
         type: boolean
         default: false
+      drill_smoke:
+        description: '#1345 DR drill: inject a synthetic qa-smoke FAIL so the smoke→rollback path fires for real (controlled window only)'
+        required: false
+        type: boolean
+        default: false
 
 # V2 P4.14 (2026-05-17): prevent concurrent deploys racing on the same branch.
 # cancel-in-progress=false because a deploy mid-flight should complete.
@@ -769,9 +774,18 @@ jobs:
             exit 0
           fi
 
+          # #1345 DR drill: a `drill_smoke=true` dispatch injects a synthetic,
+          # clearly-labeled qa-smoke FAIL so the rollback net fires for real.
+          # Push runs and normal dispatches send the usual empty payload.
+          SMOKE_PAYLOAD='{}'
+          if [ "${{ inputs.drill_smoke }}" = "true" ]; then
+            echo "::warning::#1345 DR DRILL — injecting synthetic_fail; the smoke FAIL and rollback below are the drill, not a defect"
+            SMOKE_PAYLOAD='{"synthetic_fail": true}'
+          fi
+
           aws lambda invoke \
             --function-name life-platform-qa-smoke \
-            --payload '{}' \
+            --payload "$SMOKE_PAYLOAD" \
             --region ${{ env.AWS_REGION }} \
             --cli-binary-format raw-in-base64-out \
             /tmp/smoke.json

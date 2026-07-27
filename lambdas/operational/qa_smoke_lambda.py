@@ -1027,6 +1027,19 @@ def lambda_handler(event, context):
             Check("blog:links", "Blog Links").pause("Blog — paused (chronicle now lives at /story/ in v4); will return if revived")
         )
 
+        # #1345 DR-drill hook: an explicit {"synthetic_fail": true} invoke payload
+        # injects ONE clearly-labeled synthetic FAIL so the CI smoke→rollback path can
+        # be proven by an actual firing in a controlled window (ci-cd.yml passes it
+        # only on a `drill_smoke=true` workflow_dispatch). Scheduled/normal invokes
+        # carry no flag = zero effect. Self-cleaning: the rollback the drill triggers
+        # reverts qa-smoke to its previous zip.
+        if isinstance(event, dict) and event.get("synthetic_fail") is True:
+            all_checks.append(
+                Check("drill:synthetic", "DR Drill").fail(
+                    "SYNTHETIC failure (synthetic_fail invoke flag) — #1345 rollback drill, NOT a real defect"
+                )
+            )
+
         html = build_report_html(all_checks, run_time_str)
 
         fails = [c for c in all_checks if c.passed is False]
