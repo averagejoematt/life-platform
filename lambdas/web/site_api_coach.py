@@ -1459,6 +1459,17 @@ def handle_journal_quotes(event):
         # an absent/unknown grounding value never serves either.
         if i.get("grounding") != "verified":
             continue
+        # #1804: re-run the FULL taboo gate against the CURRENT vocabulary on every
+        # serve — guard_version is stamped at mark time but nothing enforced it
+        # retroactively, so a mark made before the taboo vocabulary widened (e.g.
+        # the beverage-noun family / edible additions) would otherwise keep
+        # serving forever even after the gate would refuse to mark it today.
+        # Fail-closed, same pattern as the grounding check above: withhold, never
+        # mangle. jq.find_mark_violations is the FULL vocabulary (privacy_guard's
+        # vice/real-name set plus substance_extra/family/private-event/age) —
+        # strictly wider than _public_decision_note's narrower scrub below.
+        if jq.find_mark_violations(i.get("quote")):
+            continue
         screened = _public_decision_note(i.get("quote"))
         if not screened:
             continue  # all-or-nothing: a quote that wouldn't survive intact isn't shown

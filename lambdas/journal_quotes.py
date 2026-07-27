@@ -50,6 +50,11 @@ MAX_QUOTES_PER_DAY = 2  # the "0–2 lines per close" nomination cap, enforced a
 MAX_QUOTE_CHARS = 500
 PUBLIC_LABEL = "from the journal, in his words"
 
+# #1806: the only 3 legitimate channel values (matches the video_diary/solo_recording
+# transcript-channel labels used elsewhere in mcp/tools_journal.py). Free text beyond
+# this set must never reach DDB or the public API — callers coerce to "journal".
+CHANNELS = ("journal", "video_diary", "solo_recording")
+
 # ── The mark-time taboo vocabulary (ELENA_PREQUEL_BRIEF "abstract / omit") ────
 # Substances: privacy_guard.VICE_KEYWORDS is the enforced base (superset invariant
 # tested), plus the alcohol family — deliberately soft at serve time for nutrition
@@ -193,7 +198,10 @@ def shape_public(item):
         "date": d,
         "quote": str(item.get("quote") or ""),
         "marked_at": item.get("marked_at"),
-        "channel": item.get("channel") or "journal",
+        # #1806 defense-in-depth: rows written before the mark-time allowlist fix
+        # may still carry a legacy out-of-enum value — coerce here too so the
+        # public surface never serves free text as "channel".
+        "channel": item.get("channel") if item.get("channel") in CHANNELS else "journal",
         "label": PUBLIC_LABEL,
         "receipts": f"/cockpit/?date={d}" if d else "/cockpit/",
     }

@@ -24,6 +24,7 @@ Usage:
 """
 import argparse
 import json
+import re
 import sys
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -38,6 +39,34 @@ from lambdas.constants import EXPERIMENT_START_DATE
 
 REGION = "us-west-2"
 S3_BUCKET = "matthew-life-platform"
+
+REDIRECTS_MAP_PATH = REPO_ROOT / "redirects.map"
+
+
+def register_permalink_redirect(old_path: str, new_path: str, apply: bool) -> bool:
+    """Idempotently append `old_path -> new_path` to redirects.map (#1805): a
+    tombstoned public permalink must 301 at the edge, not serve its raw JSON
+    tombstone marker at HTTP 200. No-op on dry-run or if already present.
+    NOTE: editing redirects.map alone does not change live behavior — the
+    v4-redirects CloudFront Function body is a separately generated+published
+    artifact (deploy/v4_cutover.sh's generation step, deploy/generated/
+    v4_redirects_function.js) that only Matthew re-publishes (console/CLI);
+    nothing here touches CloudFront.
+    """
+    if not apply:
+        return False
+    try:
+        text = REDIRECTS_MAP_PATH.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return False
+    if any(line.startswith(f"{old_path}\t") for line in text.splitlines()):
+        return False
+    if not text.endswith("\n"):
+        text += "\n"
+    text += f"{old_path}\t{new_path}\n"
+    REDIRECTS_MAP_PATH.write_text(text, encoding="utf-8")
+    return True
+
 
 # Each entry: (prefix, archive_prefix, index_key). index_key=None → no index page
 # to rewrite for that prefix (the archive step still runs).
@@ -413,6 +442,18 @@ def main():
             if did:
                 archived_count += 1
                 print(f"    {('would archive' if not args.apply else 'archived')}: {src} → {dest}")
+                # #1805: a freshly-tombstoned journal week-NN permalink must 301 at
+                # the edge — otherwise it serves its raw JSON tombstone marker at
+                # HTTP 200 (live orphans: #1803/#1804/#1805/#1806's #1805 case,
+                # week-04/05/06). Only the journal week-NN prefix has a public
+                # permalink shape worth redirecting.
+                if prefix == "generated/journal/posts/":
+                    m = re.search(r"week-(\d+)/index\.html$", src)
+                    if m:
+                        seq = int(m.group(1))
+                        added = register_permalink_redirect(f"/journal/posts/week-{seq:02d}/", "/story/journal/", args.apply)
+                        if added:
+                            print(f"      + redirects.map: /journal/posts/week-{seq:02d}/ → /story/journal/")
             else:
                 skipped_count += 1
 
