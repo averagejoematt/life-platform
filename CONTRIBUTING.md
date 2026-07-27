@@ -45,7 +45,7 @@ Run the **targeted** test for what you touched during iteration; run the full su
 
 ## Where things are decided
 
-- **Backlog** — GitHub Issues (ADR-099): epics (`type:epic`) + ranked stories (`type:story`) on Now/Next/Later milestones. A shipping PR carries `Fixes #N`.
+- **Backlog** — GitHub Issues (ADR-099): epics (`type:epic`) + ranked stories (`type:story`) on Now/Next/Later milestones. Seed a session from `python3 scripts/backlog_next.py` (ranked by each issue's own stored score). A shipping PR carries `Fixes #N`.
 - **Decisions become ADRs** in [`docs/DECISIONS.md`](docs/DECISIONS.md) (ADR-001…).
 - **CI gates** (`.github/workflows/ci-cd.yml`): black + ruff (enforced) → tests → plan → deploy (production-approval) → smoke → auto-rollback.
 
