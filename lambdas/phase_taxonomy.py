@@ -268,6 +268,15 @@ SOURCE_CLASS: dict[str, str] = {
     # /api/diary_reactions query, so it tags + tombstones + cycle-stamps at restart. NB the
     # SOURCE ENTRY it reacts to (notion) is RAW_TIMESERIES and is kept forever — the human's
     # words survive the reset; only the machine's reaction to them resets with the run.
+    "diary_claims": EXPERIMENT_SCOPED,  # #1841: the on-tape claims ledger — falsifiable claims the
+    # SUBJECT made on camera, code-admitted by diary_claims.admit_claim and graded by the same daily
+    # coach-prediction-evaluator as every coach prediction (sk PREDICTION#<stated_date>#<slug>).
+    # EXPERIMENT_SCOPED for the same reason predictions are: a claim is a forecast about THIS run's
+    # cycle ("if I get through the next 30, 60 days"), its grade-by date is anchored to this
+    # experiment's calendar, and its verdict is only meaningful against this cycle's data. A restart
+    # cycle-stamps and tombstones it so cycle N's on-tape record stays navigable in the archive. NB
+    # the SOURCE ENTRY the claim points at (notion) is RAW_TIMESERIES and is kept forever — his words
+    # survive the reset; only the ledger's forecast bookkeeping resets with the run.
     "ai_analysis": EXPERIMENT_SCOPED,
     "decisions": EXPERIMENT_SCOPED,
     "rewards": EXPERIMENT_SCOPED,

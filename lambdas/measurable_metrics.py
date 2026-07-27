@@ -47,6 +47,54 @@ METRIC_SOURCES = {
 # on the fly are valid extensions of any base key.
 MEASURABLE_METRICS = frozenset(METRIC_SOURCES)
 
+# Aggregate suffixes the evaluator computes on the fly over a base metric.
+AGG_SUFFIXES = ("_7day_avg", "_14day_avg", "_30day_avg")
+
+# Metric → the subdomain name used for window enforcement. Every value here MUST be a key
+# of `coach_prediction_evaluator.SUBDOMAIN_TO_DOMAIN`, or the prediction silently falls to
+# the conservative "training" default and its window is clamped to 21 days (#813). Lives
+# HERE, next to METRIC_SOURCES, for the same reason METRIC_SOURCES does: it is derived
+# from the metric identity, and a second copy is a drift bug waiting to happen.
+# `dispute_docket._METRIC_SUBDOMAIN` is still a separate copy pending its own collapse
+# onto this one — tests/test_diary_claims_1841.py pins the two identical meanwhile.
+METRIC_SUBDOMAIN = {
+    "weight_lbs": "weight",
+    "body_fat_pct": "body_fat",
+    "sleep_duration_hours": "sleep",
+    "sleep_score": "sleep",
+    "deep_pct": "sleep",
+    "rem_pct": "sleep",
+    "hrv": "hrv",
+    "recovery_score": "recovery",
+    "resting_heart_rate": "recovery",
+    "blood_glucose_avg": "glucose",
+    "blood_glucose_std_dev": "glucose",
+    "total_calories_kcal": "calories",
+    "total_protein_g": "protein",
+    "steps": "training",
+}
+
+
+def base_metric(metric_key):
+    """Strip a supported aggregate suffix down to the base metric key."""
+    for suffix in AGG_SUFFIXES:
+        if str(metric_key).endswith(suffix):
+            return str(metric_key)[: -len(suffix)]
+    return str(metric_key)
+
+
+def metric_is_resolvable(metric_key):
+    """True only when the evaluator's own metric machinery can resolve this key."""
+    if not metric_key or not isinstance(metric_key, str):
+        return False
+    return base_metric(metric_key) in METRIC_SOURCES
+
+
+def metric_subdomain(metric_key):
+    """The window-enforcement subdomain for a metric ('general' when unmapped)."""
+    return METRIC_SUBDOMAIN.get(base_metric(metric_key), "general")
+
+
 # Substring → measurable-metric mapping for normalizing prose-y metric hints. Checked
 # in declared order — first match wins, so multi-word/specific patterns come BEFORE
 # single-word ones (e.g. "hours of sleep needed for recovery" must hit sleep before

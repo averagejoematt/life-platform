@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 import calibration_core  # #538: shared Brier + reliability scorer (layer module)
 from boto3.dynamodb.conditions import Key
 
+from mcp.config import USER_PREFIX
 from mcp.core import decimal_to_float, table
 
 logger = logging.getLogger(__name__)
@@ -129,6 +130,57 @@ def tool_get_predictions(args):
         except Exception:
             pass
 
+    # #1841: the subject's OWN on-tape diary claims are prediction-store records too —
+    # same shape, same statuses, graded by the same daily evaluator — so they belong in
+    # the one ledger rather than a parallel surface nobody reads (AC4). They are tagged
+    # claimant="matthew" / source="video_diary" and carry no coach_id, so a coach filter
+    # excludes them and no coach hit-rate can absorb them. This is the PRIVATE surface:
+    # site_api_coach still reads COACH# partitions only, so a diary claim never reaches
+    # the public /api/predictions or /api/calibration.
+    if not coach_filter:
+        try:
+            from mcp.core import _apply_phase_filter
+
+            resp = table.query(
+                **_apply_phase_filter(
+                    {
+                        "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}diary_claims") & Key("sk").begins_with("PREDICTION#"),
+                        "ScanIndexForward": False,
+                        "Limit": 50,
+                    }
+                )
+            )
+            for item in resp.get("Items", []):
+                rec = decimal_to_float(item)
+                if status_filter and rec.get("status", "pending") != status_filter:
+                    continue
+                evaluation = rec.get("evaluation") or {}
+                all_predictions.append(
+                    {
+                        "coach_id": None,
+                        "coach_name": "Matthew (on tape)",
+                        "claimant": rec.get("claimant", "matthew"),
+                        "source": rec.get("source"),
+                        "source_sk": rec.get("source_sk"),
+                        "prediction_id": rec.get("prediction_id"),
+                        "date": rec.get("created_date"),
+                        "claim": rec.get("claim_natural", ""),
+                        "criterion": rec.get("criterion", ""),
+                        "confidence": rec.get("confidence", "medium"),
+                        "status": rec.get("status", "pending"),
+                        "subdomain": rec.get("subdomain", ""),
+                        "metric": evaluation.get("metric"),
+                        "eval_type": evaluation.get("type"),
+                        "window_days": evaluation.get("evaluation_window_days"),
+                        "grade_by": rec.get("grade_by"),
+                        "outcome": rec.get("outcome"),
+                        "outcome_date": rec.get("outcome_date"),
+                        "outcome_notes": rec.get("outcome_notes"),
+                    }
+                )
+        except Exception:
+            pass
+
     # Sort by date descending
     all_predictions.sort(key=lambda p: p.get("date") or "", reverse=True)
 
@@ -139,7 +191,10 @@ def tool_get_predictions(args):
     return {
         "total": len(all_predictions),
         "summary": dict(summary),
-        "store": "COACH#/PREDICTION# (canonical, evaluator-graded — same store the public site reads)",
+        "store": (
+            "COACH#/PREDICTION# (canonical, evaluator-graded — same store the public site reads), "
+            "plus the subject's own on-tape diary claims (#1841, claimant='matthew', PRIVATE — not on the public site)"
+        ),
         "predictions": all_predictions[:limit],
     }
 

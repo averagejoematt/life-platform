@@ -470,3 +470,191 @@ def tool_mark_journal_quote(args):
         # a different key on any byte drift from the frozen text.
         "revoke": f"mark_journal_quote(action='unmark', date='{date}', sk='{sk}') any time — consent is revocable; keep this sk.",
     }
+
+
+# ── The on-tape claims ledger (#1841) ────────────────────────────────────────────
+#
+# The diary was a pipe INTO enrichment and never a loop: entries were full of implicit
+# forecasts and not one of them entered the prediction machinery. This tool is the loop's
+# hinge. The /vlog interviewer PROPOSES 0-3 falsifiable claims at the route-the-takeaways
+# close and takes consent per claim; `lambdas/diary_claims.admit_claim` — pure, deterministic,
+# ADR-105 — is the only thing that can ADMIT one. Admitted claims are written in the
+# canonical PREDICTION# record shape and graded by the same daily coach-prediction-evaluator
+# as every coach prediction. Nothing here grades, and nothing here calls an LLM.
+
+
+def _claims_pk():
+    import diary_claims as dc  # bundled shared module (#781) — the pure gate
+
+    return f"{USER_PREFIX}{dc.SOURCE_NAME}"
+
+
+def _claims_phase_stamp():
+    """ADR-058 phase/cycle stamp, fail-soft (the coach_diary_reaction._stamp pattern)."""
+    try:
+        import phase_taxonomy
+
+        return phase_taxonomy.experiment_stamp()
+    except Exception:
+        try:
+            from constants import EXPERIMENT_PHASE_CURRENT
+
+            return {"phase": EXPERIMENT_PHASE_CURRENT}
+        except Exception:
+            return {"phase": "experiment"}
+
+
+def _read_claims():
+    """Every claim in the ledger, newest stated-date first."""
+    import diary_claims as dc
+
+    items = []
+    kwargs = {
+        "KeyConditionExpression": Key("pk").eq(_claims_pk()) & Key("sk").begins_with(dc.SK_PREFIX),
+        "ScanIndexForward": False,
+    }
+    while True:
+        resp = table.query(**kwargs)
+        items.extend(resp.get("Items", []))
+        if "LastEvaluatedKey" not in resp:
+            break
+        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+    return [decimal_to_float(i) for i in items]
+
+
+def tool_manage_diary_claims(args):
+    """The on-tape claims ledger: log consented claims, list what's due, close the loop."""
+    import diary_claims as dc  # bundled shared module (#781) — the pure gate
+    from numeric import floats_to_decimal  # #1207/D5: the ONE float->Decimal walker
+
+    action = (args.get("action") or "due").strip().lower()
+    today = (args.get("today") or datetime.now(timezone.utc).strftime("%Y-%m-%d")).strip()
+    if not _DATE_RE.match(today):
+        return {"error": "today must be YYYY-MM-DD."}
+
+    # ── due: the /vlog step-0 priming list (AC3) ─────────────────────────────────
+    if action == "due":
+        records = _read_claims()
+        due = dc.due_for_grading(records, today)
+        return {
+            "count": len(due),
+            "due": due,
+            "track_record": dc.track_record(records),
+            "how_to_use": (
+                "Call these back ON TAPE, in his own words, before asking anything new — read the claim "
+                "verbatim, then ask what he thinks happened BEFORE revealing the verdict. A claim whose "
+                "machine_verdict is 'still pending' is worth raising anyway: the deadline he named has "
+                "landed even if the evaluator's domain-minimum window has not."
+            ),
+            "then": "mark each one worked with action='called_back' so it stops resurfacing next session.",
+        }
+
+    # ── list: the whole ledger + track record (AC4) ──────────────────────────────
+    if action == "list":
+        records = _read_claims()
+        status_filter = (args.get("status") or "").strip().lower() or None
+        rows = [r for r in records if not status_filter or r.get("status") == status_filter]
+        return {
+            "count": len(rows),
+            "track_record": dc.track_record(records),
+            "store": "USER#matthew#SOURCE#diary_claims / PREDICTION# — graded by the same evaluator as coach predictions",
+            "claims": [
+                {
+                    "claim_id": r.get("claim_id"),
+                    "sk": r.get("sk"),
+                    "stated_date": r.get("stated_date"),
+                    "claim": r.get("claim_natural"),
+                    "criterion": r.get("criterion"),
+                    "grade_by": r.get("grade_by"),
+                    "confidence": r.get("confidence"),
+                    "status": r.get("status"),
+                    "outcome": r.get("outcome"),
+                    "outcome_date": r.get("outcome_date"),
+                    "source_sk": r.get("source_sk"),
+                    "called_back_at": r.get("called_back_at"),
+                }
+                for r in rows
+            ],
+        }
+
+    # ── called_back: close the on-tape loop ──────────────────────────────────────
+    if action == "called_back":
+        sk = str(args.get("sk") or "")
+        if not sk.startswith(dc.SK_PREFIX):
+            return {"error": f"sk is required and must start with {dc.SK_PREFIX} — use the sk from action='due'."}
+        resp = table.update_item(
+            Key={"pk": _claims_pk(), "sk": sk},
+            UpdateExpression="SET called_back_at = :t",
+            ConditionExpression="attribute_exists(sk)",
+            ExpressionAttributeValues={":t": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")},
+            ReturnValues="ALL_NEW",
+        )
+        return {"status": "called_back", "sk": sk, "claim": (resp.get("Attributes") or {}).get("claim_natural")}
+
+    if action != "log":
+        return {"error": f"Unknown action '{action}'.", "valid_actions": ["due", "log", "list", "called_back"]}
+
+    # ── log: LLM proposed, CODE admits (AC1/AC2) ─────────────────────────────────
+    stated_date = str(args.get("date") or "").strip()
+    source_sk = str(args.get("source_sk") or "").strip()
+    candidates = args.get("claims")
+    if not isinstance(candidates, list):
+        return {"error": "claims must be a list of 0-3 candidate claim objects."}
+    if len(candidates) > dc.MAX_CLAIMS_PER_SESSION:
+        return {
+            "error": f"refused: {len(candidates)} claims offered, the cap is {dc.MAX_CLAIMS_PER_SESSION} per session. "
+            "A close that mines a diary for forecasts is content extraction, not an interview."
+        }
+
+    # The entry pointer must name a REAL video-diary entry. A claim pointing at nothing is
+    # uncitable on tape, and #1568's lesson is that a write which cannot be grounded is a
+    # write that should not happen. Absent ingestion is reported honestly, not guessed past.
+    entry_resp = table.query(
+        KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}notion") & Key("sk").eq(source_sk),
+    )
+    if not entry_resp.get("Items"):
+        return {
+            "error": f"refused: no journal entry at sk {source_sk!r} (ADR-104 grounding).",
+            "why": "Notion ingestion is hourly — right after a session the entry may not be in DDB yet.",
+            "fix": "Re-run the close once the entry has ingested; nothing is written in the meantime.",
+        }
+
+    stamp = _claims_phase_stamp()
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    admitted, refused = [], []
+    for candidate in candidates:
+        ok, reason, normalized = dc.admit_claim(candidate, stated_date, source_sk)
+        if not ok:
+            refused.append({"claim": (candidate or {}).get("claim") if isinstance(candidate, dict) else None, "reason": reason})
+            continue
+        record = dc.build_claim_record(normalized, stated_date, source_sk, now_iso)
+        # boto3 rejects native float — the ONE canonical walker (#1207/D5), never a fork.
+        table.put_item(
+            Item=floats_to_decimal(
+                # literal (orphan-gate greppable); == _claims_pk()
+                {**stamp, **record, "pk": "USER#matthew#SOURCE#diary_claims"}
+            )
+        )
+        admitted.append(
+            {
+                "claim_id": record["claim_id"],
+                "sk": record["sk"],
+                "claim": record["claim_natural"],
+                "criterion": record["criterion"],
+                "grade_by": record["grade_by"],
+                "eval_type": record["evaluation"]["type"],
+                "metric": record["metric"],
+            }
+        )
+
+    return {
+        "status": "logged" if admitted else "nothing_admitted",
+        "admitted": admitted,
+        "refused": refused,
+        "contract": (
+            "The interviewer proposes; this gate admits. A refusal is not a failure to hide — say it on tape "
+            "('that one isn't gradable, and here's why') and move on (ADR-105)."
+        ),
+        "graded_by": "the daily coach-prediction-evaluator, on the same code and the same statuses as every coach prediction",
+        "privacy": "private by default — no public surface reads this partition.",
+    }

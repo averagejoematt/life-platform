@@ -63,7 +63,7 @@ theme per the #740 shortlist):**
 > Most "AI agent org" talks are about capability — what the model can do.
 > This one is about org design — what it takes to make an org of mortal,
 > memory-wiped AI sessions *not fall over* in production. I run a live AWS
-> platform (94 Lambdas, 9 CDK stacks, ~64 MCP tools) with one human and N
+> platform (99 Lambdas, 9 CDK stacks, ~76 MCP tools) with one human and N
 > Claude sessions as the entire engineering team. The talk walks through the
 > five pieces that actually mattered: the handover ritual that survives
 > total session amnesia, a deterministic (not LLM) merge gate that holds the
