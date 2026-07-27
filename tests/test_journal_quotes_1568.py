@@ -23,7 +23,7 @@ from __future__ import annotations
 import os
 import re
 import sys
-from datetime import date
+from datetime import date, datetime
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
@@ -299,7 +299,11 @@ def test_endpoint_withholds_a_quote_the_filter_would_alter(coach_module):
 
 def test_endpoint_featured_respects_the_weekly_cap(coach_module):
     sc, ft = coach_module
-    today = date.today()
+    # The handler features by the PACIFIC week (datetime.now(PT) in site_api_coach);
+    # a naive date.today() is the UTC date on CI runners, which sits one week ahead
+    # every Sunday 17:00–24:00 PT — the quotes land in next week's bucket and
+    # featured comes back None (first fired the night before genesis, run 30229507611).
+    today = datetime.now(sc.PT).date()
     monday, _sunday = jq.week_bounds(today)
     d = monday.strftime("%Y-%m-%d")
     ft.put_item(
