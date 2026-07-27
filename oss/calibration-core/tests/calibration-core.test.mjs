@@ -5,7 +5,7 @@
 // grader — and is compared with assert.deepStrictEqual, i.e. EXACTLY. If this
 // file ever needs a tolerance, the extraction has failed.
 //
-//   node --test oss/calibration-core/tests/
+//   node --test          (from oss/calibration-core/ — the runner discovers this file)
 //
 // Dynamic `await import()`, not a static specifier: the module is loaded and
 // executed for real, so a syntax-clean-but-broken port cannot pass.

@@ -263,7 +263,7 @@ Run the parity suites:
 
 ```bash
 python3 -m pytest tests/ -v        # Python vs. the fixture
-node --test tests/                 # JS vs. the same fixture
+node --test                       # JS vs. the same fixture (run from this directory)
 ```
 
 ---
