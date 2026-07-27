@@ -40,6 +40,7 @@ from web.site_api_common import (
     CORS_HEADERS,
     PT,
     S3_REGION,
+    STATUS_CACHE_TTL,
     USER_ID,
     USER_PREFIX,
     _decimal_to_float,
@@ -1849,7 +1850,16 @@ def handle_broadcast() -> dict:
 
 # The self-cert Replicator aggregate lives under a VOTES#* pk, so it is already covered
 # by the site_api role's LeadingKeys (VOTES#*) — no IAM change. The per-IP dedup rows
-# ride the shared VOTES#rate_limit partition (exactly like predict-week), REPL# prefixed.
+# ride the shared VOTES#rate_limit partition, REPL# prefixed.
+#
+# UNLIKE predict-week's PRED#{ip_hash}#{week}#{metric} rows, REPL# rows carry NO ttl
+# (#1825). Predict-week's dedup is intentionally a per-week RATE LIMIT (the TTL window
+# is disclosed in its own provenance: "the active window only"); the Replicator rung's
+# published provenance instead promises a ONE-TIME EVER cert — "deduped per source", no
+# window qualifier. An 8-day TTL row previously made that dedup reset every 8 days, so
+# the same source could keep re-certifying and inflating the monotonic cert_count
+# counter forever (VOTES# is SYSTEM_STATE — no reset ever corrects it either). Dropping
+# the ttl makes the dedup row (and therefore the count) actually match what's published.
 _LADDER_REPLICATOR_PK = "VOTES#ladder_replicator"
 # The Contributor rung wires to the EXISTING findings moderation path: when Matthew
 # verifies + publishes a reader-submitted finding, that path appends it to this single
@@ -2009,10 +2019,13 @@ def _handle_replicate_certify(event: dict) -> dict:
     Kit run, bumping the public Replicator rung count.
 
     SELF-CERTIFIED by design (#1393): no proof is required and none is stored — the
-    reader asserts they ran a kit. Deduped per source (one cert per IP, 8-day TTL row on
-    the shared VOTES#rate_limit partition) so a double-tap / retry can't inflate the
-    count. No PII: only an ip_hash (already the site's dedup primitive) and an aggregate
-    counter. ZERO moderation load — nothing lands in a review queue."""
+    reader asserts they ran a kit. Deduped per source, PERMANENTLY (one cert per IP,
+    ever — a no-ttl row on the shared VOTES#rate_limit partition, #1825) so a
+    double-tap / retry / return-visit-after-the-old-8-day-window can't inflate the
+    count; the published provenance says "deduped per source" with no window
+    qualifier, so the dedup itself must not expire. No PII: only an ip_hash (already
+    the site's dedup primitive) and an aggregate counter. ZERO moderation load —
+    nothing lands in a review queue."""
     source_ip = extract_client_ip(event)
     ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
     now_epoch = int(datetime.now(timezone.utc).timestamp())
@@ -2022,14 +2035,16 @@ def _handle_replicate_certify(event: dict) -> dict:
                 "pk": "VOTES#rate_limit",
                 "sk": f"REPL#{ip_hash}",
                 "voted_at": now_epoch,
-                "ttl": now_epoch + 8 * 86400,
+                # No ttl (#1825) — unlike the rate-limit-style dedup rows elsewhere in
+                # this module, this one must never expire: the published provenance
+                # promises a one-time-ever cert, not a rolling window.
             },
             ConditionExpression="attribute_not_exists(pk)",
         )
     except Exception as e:
         if "ConditionalCheckFailedException" in str(e):
-            # Idempotent: already counted this source in the window. Report success so
-            # the reader's own rung still resolves, but do NOT double-count.
+            # Idempotent: already counted this source. Report success so the reader's
+            # own rung still resolves, but do NOT double-count.
             return {
                 "statusCode": 200,
                 "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
@@ -2071,7 +2086,8 @@ COHORT_PK_PREFIX = "COHORT#"  # the cohort partition family — NEVER a USER#…
 COHORT_K_FLOOR = 5  # k-anonymity: the strip stays hidden until n ≥ this (a HARD gate, not copy)
 COHORT_SUBMIT_WINDOW = 604800  # 1 submission per IP per week (7 days), DDB-backed
 COHORT_HIST_BINS = 12  # inline-SVG histogram resolution across the metric's axis
-_cohort_config_cache = None
+_cohort_config_cache: dict = {}
+_cohort_config_cache_ts = 0.0
 
 
 def _cohort_partition(metric_id: str, week: str) -> str:
@@ -2094,10 +2110,22 @@ def _load_cohort_config() -> dict | None:
 
     Absent/malformed → None, which both handlers treat as "no active cohort week"
     (the strip self-hides; submissions 404) — never a fabricated metric.
+
+    Cached for STATUS_CACHE_TTL seconds (matches handle_status's pattern), and
+    ONLY once a load actually returns a config — a miss/error is never cached
+    (#1821: the prior "cache forever, including the miss" pattern held a warm
+    container on `{"active": false}` until recycle, and at week rollover let
+    different containers disagree for their whole remaining lifetime about
+    which week's partition to write/read, splitting submissions across a dead
+    week and a live one).
     """
-    global _cohort_config_cache
-    if _cohort_config_cache is None:
+    global _cohort_config_cache, _cohort_config_cache_ts
+    import time as _time
+
+    now_ts = _time.time()
+    if not _cohort_config_cache or now_ts - _cohort_config_cache_ts >= STATUS_CACHE_TTL:
         _cohort_config_cache = _load_s3_json("site/config/cohort_week.json", "cohort_week") or {}
+        _cohort_config_cache_ts = now_ts
     cfg = _cohort_config_cache
     if not cfg or not cfg.get("metric_id") or not cfg.get("week"):
         return None

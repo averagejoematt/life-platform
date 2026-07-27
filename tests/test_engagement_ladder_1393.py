@@ -125,14 +125,29 @@ def test_replicate_certify_writes_aggregate_and_stores_no_pii(monkeypatch):
     assert len(ft.puts) == 1
     item = ft.puts[0]["Item"]
     assert item["pk"] == "VOTES#rate_limit" and item["sk"].startswith("REPL#")
-    assert "ttl" in item
+    # #1825: NO ttl — unlike the rate-limit-style dedup rows elsewhere in this module,
+    # the Replicator dedup must be PERMANENT (published provenance says "deduped per
+    # source", no window). An expiring row let the same source re-certify and inflate
+    # the monotonic cert_count every 8 days indefinitely.
+    assert "ttl" not in item
     # NO PII: no email / identity / raw ip in the stored row
-    assert set(item) <= {"pk", "sk", "voted_at", "ttl"}
+    assert set(item) <= {"pk", "sk", "voted_at"}
     assert "9.9.9.9" not in item["sk"]  # the raw IP is hashed, never stored
 
     # aggregate counter bumped on the VOTES#ladder_replicator partition
     assert len(ft.updates) == 1
     assert ft.updates[0]["Key"]["pk"] == "VOTES#ladder_replicator"
+
+
+def test_replicate_certify_dedup_never_expires(monkeypatch):
+    """#1825 regression: the dedup row carries no ttl attribute at all, so DynamoDB's
+    TTL sweep can never reap it and a source can never re-inflate cert_count by simply
+    waiting out a window (the previous 8-day TTL let this happen)."""
+    ft = _FakeTable()
+    monkeypatch.setattr(social, "table", ft)
+    social._handle_replicate_certify(_event())
+    item = ft.puts[0]["Item"]
+    assert "ttl" not in item
 
 
 def test_replicate_certify_is_idempotent_per_source(monkeypatch):

@@ -153,3 +153,62 @@ def test_submit_404_when_no_active_week(monkeypatch):
     monkeypatch.setattr(se, "_load_cohort_config", lambda: None)
     resp = se._handle_cohort_submit(_submit_event(58))
     assert resp["statusCode"] == 404
+
+
+# ── 5. Config cache invalidation (#1821) ─────────────────────────────────────────
+# The bug: `_load_cohort_config` cached into a module global with `if cache is None`
+# and stored `... or {}` on failure, so a MISS (or a transient S3 error) was cached
+# identically to a hit for the container's entire remaining lifetime — the one config
+# designed to rotate weekly. These tests exercise the real `_load_cohort_config`
+# (not monkeypatched away) against a fake `_load_s3_json`.
+def _reset_cohort_cache(monkeypatch):
+    monkeypatch.setattr(se, "_cohort_config_cache", {})
+    monkeypatch.setattr(se, "_cohort_config_cache_ts", 0.0)
+
+
+def test_cached_miss_is_not_sticky(monkeypatch):
+    """A miss (no S3 object / malformed config) must NEVER be cached — the very next
+    call re-fetches, so publishing a week's config takes effect immediately rather
+    than waiting out a TTL or a container recycle."""
+    _reset_cohort_cache(monkeypatch)
+    calls = {"n": 0}
+
+    def _fake_load(key, cache_name):
+        calls["n"] += 1
+        return {}  # simulates "no object yet" / S3 error — _load_s3_json's own contract
+
+    monkeypatch.setattr(se, "_load_s3_json", _fake_load)
+    assert se._load_cohort_config() is None
+    assert se._load_cohort_config() is None
+    assert calls["n"] == 2, "a miss must re-fetch on every call, never cache"
+
+
+def test_hit_is_cached_within_ttl_then_refetched_after(monkeypatch):
+    """A successful load IS cached (avoids hammering S3 on every request), but only
+    for STATUS_CACHE_TTL seconds — bounding how long a warm container can serve a
+    stale/rolled-over week after a new cohort_week.json is published."""
+    _reset_cohort_cache(monkeypatch)
+    calls = {"n": 0}
+
+    def _fake_load(key, cache_name):
+        calls["n"] += 1
+        return dict(_CFG)
+
+    monkeypatch.setattr(se, "_load_s3_json", _fake_load)
+
+    import time as _time
+
+    t0 = 1_000_000.0
+    monkeypatch.setattr(_time, "time", lambda: t0)
+    assert se._load_cohort_config() is not None
+    assert calls["n"] == 1
+
+    # Still within TTL — served from cache, no re-fetch.
+    monkeypatch.setattr(_time, "time", lambda: t0 + se.STATUS_CACHE_TTL - 1)
+    assert se._load_cohort_config() is not None
+    assert calls["n"] == 1
+
+    # TTL elapsed — re-fetches, so a rolled-over week is picked up bounded by TTL.
+    monkeypatch.setattr(_time, "time", lambda: t0 + se.STATUS_CACHE_TTL + 1)
+    assert se._load_cohort_config() is not None
+    assert calls["n"] == 2
