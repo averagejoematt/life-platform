@@ -86,6 +86,7 @@ LIVE_FAMILIES = [
     ("USER#matthew#SOURCE#macrofactor_workouts", "DATE#2021-04-12"),
     ("USER#matthew#SOURCE#measurements", "DATE#2026-03-29"),
     ("USER#matthew#SOURCE#notion", "DATE#2023-12-19#journal#journal#1"),
+    ("USER#matthew#SOURCE#diary_claims", "PREDICTION#2026-07-26#under-300-by-halloween-a1b2c3d4"),  # #1841 on-tape claims ledger
     ("USER#matthew#SOURCE#youtube", "DATE#2026-07-20#dQw4w9WgXcQ"),  # #1669 inbound social — suffixed sk
     ("BROADCAST_ORIGIN#youtube", "POST#dQw4w9WgXcQ"),  # #1670 outbound-broadcast ledger — SYSTEM_STATE
     ("USER#matthew#SOURCE#nutrition_review", "DATE#2026-02-28"),

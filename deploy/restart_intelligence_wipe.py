@@ -149,6 +149,14 @@ PARTITIONS = [
     # from the phase-filtered /api/diary_reactions read. The diary ENTRIES themselves are
     # untouched (SOURCE#notion is RAW_TIMESERIES — the human's words are kept forever).
     ("diary_reactions", "pregenesis", {}),
+    # #1841: the on-tape claims ledger — falsifiable claims the SUBJECT made on camera,
+    # sk PREDICTION#<stated_date>#<slug>. "pregenesis" like every other forecast record:
+    # a claim's grade-by date is anchored to the cycle it was made in, so a pre-genesis
+    # claim's verdict is meaningless against post-genesis data, while post-genesis claims
+    # accumulate from Day 1. The diary ENTRY each claim points at is untouched
+    # (SOURCE#notion is RAW_TIMESERIES — his words are kept forever; only the forecast
+    # bookkeeping resets).
+    ("diary_claims", "pregenesis", {}),
 ]
 
 # Full-pk entries OUTSIDE the USER#matthew#SOURCE# namespace. The original tagger

@@ -56,6 +56,14 @@ USER_ID = os.environ.get("USER_ID", "matthew")
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 ALGO_VERSION = "1.0"
 
+# #1841 — the on-tape claims ledger. Claims the SUBJECT made on camera are written in the
+# canonical PREDICTION# record shape (diary_claims.build_claim_record) into their own
+# partition, so grading them costs ONE extra partition on this scan rather than a second
+# grader that would drift from this one. They carry `coach_id: ""`, which the existing
+# `if bayesian_update and coach_id` guard below already honours — a claim of Matthew's
+# must never move a coach's Bayesian confidence or write to a coach's LEARNING# trail.
+DIARY_CLAIMS_PK = f"{USER_PREFIX}diary_claims"
+
 # Coach IDs — exhaustive list of all coaches that can issue predictions
 COACH_IDS = [
     "sleep_coach",
@@ -289,15 +297,20 @@ def _fetch_predictions():
     in EVALUABLE_STATUSES — plus the #813 reclaim: 'inconclusive' records
     terminalized by the removed duplicate grader get one real grading pass.
     Skips qualitative evaluation types.
+
+    #1841: the subject's own on-tape diary claims live in DIARY_CLAIMS_PK under the same
+    PREDICTION# sk prefix and the same record shape, so they ride this identical scan and
+    are graded by identical code — one grader for every forecast on the platform.
     """
     predictions = []
     reclaimed = 0
-    for coach_id in COACH_IDS:
+    partitions = [f"COACH#{coach_id}" for coach_id in COACH_IDS] + [DIARY_CLAIMS_PK]
+    for partition_pk in partitions:
         try:
             kwargs = {
                 "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
                 "ExpressionAttributeValues": {
-                    ":pk": f"COACH#{coach_id}",
+                    ":pk": partition_pk,
                     ":prefix": "PREDICTION#",
                 },
             }
@@ -318,7 +331,7 @@ def _fetch_predictions():
                     break
                 kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
         except Exception as e:
-            logger.warning("Failed to fetch predictions for %s: %s", coach_id, e)
+            logger.warning("Failed to fetch predictions for %s: %s", partition_pk, e)
     logger.info("Total evaluable predictions fetched: %d (%d reclaimed from the duplicate grader, #813)", len(predictions), reclaimed)
     return predictions
 
@@ -968,7 +981,16 @@ def _write_learning_record(coach_id, today_str, evaluation):
 
     These records build an audit trail of what the coach got right and wrong,
     enabling downstream analysis of prediction calibration.
+
+    #1841: coach_id is empty for the subject's own on-tape diary claims. Writing one
+    would land a LEARNING# row on a `COACH#` partition with no coach — a phantom that
+    every track-record and hit-rate surface reading `COACH#` would then count. The claim's
+    own record already carries its graded outcome, so there is nothing to lose by
+    skipping, and a coach's calibration to corrupt by not.
     """
+    if not coach_id:
+        return
+
     prediction_id = evaluation.get("prediction_id", "unknown")
     slug = _slugify(f"{prediction_id}-{evaluation.get('status', 'eval')}")
     pk = f"COACH#{coach_id}"

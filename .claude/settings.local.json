@@ -289,7 +289,10 @@
       "mcp__claude_ai_Notion__notion-update-data-source",
       "mcp__claude_ai_Notion__notion-create-pages",
       "Bash(bash -n _scripts/overlay.sh)",
-      "Bash(kill -0 13967)"
+      "Bash(kill -0 13967)",
+      "Bash(set -o pipefail)",
+      "Bash(python3 -m pytest tests/test_wiki_checkers.py -q -p no:cacheprovider)",
+      "Bash(gh pr *)"
     ]
   },
   "enableAllProjectMcpServers": true,

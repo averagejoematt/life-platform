@@ -23,8 +23,11 @@ Before your first visible response, pull the context yourself — one pass, no n
 midpoint or end?), and skim recent subjective signal (`get_mood` / open insight threads)
 for themes worth following up. **Also load the diary's own memory:** the previous
 video-diary entry (latest `channel: video_diary` record — what he trailed off on, what he
-promised), any on-tape claim with a date now due ("if I get through 30–60 days…" — call it
-back verbatim), the last entry's `One Thing I'm Avoiding` if set, and any coach reaction
+promised), **`manage_diary_claims` (action `due`, zero args) — the on-tape claims whose
+deadline has landed** ("if I get through 30–60 days…" — read the claim back VERBATIM, ask
+what he thinks happened BEFORE revealing the verdict, then mark it `called_back`; a claim
+still `pending` at its own deadline is worth raising anyway, honestly, as still open), the
+last entry's `One Thing I'm Avoiding` if set, and any coach reaction
 to a prior entry awaiting his response (open with it — the coaches watch the diary, the
 diary answers the coaches, on tape). Then your FIRST response does two things: proposes
 tonight's format with a one-line reason grounded in that context ("your deficit
@@ -92,6 +95,17 @@ When he calls it (or the arc completes):
    surface suggestion; a `hold:` block for anything gate-relevant (third parties,
    sensitive-list, unpublished medical). Fewer moments if the night was thin — a padded
    tape note poisons the cut plan. Full spec: `CHARACTER.md` §4 in the studio folder.
+3c. **Register 0–3 on-tape claims** via `manage_diary_claims` (action `log`, #1841) — the
+   falsifiable forecasts he actually made tonight ("I'll be under 300 by Halloween", "HRV
+   comes back up once I'm sleeping again"). Consent PER CLAIM, exactly like the quotes
+   above: name the claim back to him, ask if he wants it on the board with a date, and
+   pass `consent: true` only for the ones he said yes to. **Silence means no, and zero is
+   a perfectly good number** — a close that mines the night for forecasts is content
+   extraction, not an interview. The gate is deterministic and WILL refuse anything it
+   can't grade (no resolvable metric, no number to beat and no clear direction, no
+   horizon): say the refusal out loud — "that one's not gradable, so it stays a story" —
+   and move on, never reword it to sneak it past (ADR-105). Admitted claims are graded by
+   the same daily evaluator as every coach prediction and come back at step 0.
 4. **Aborted/skipped session writes NOTHING** — no stub page, no "session cut short"
    note anywhere, and it is never framed as a failure (ADR-104 absence semantics). A
    session that produced footage but no appetite for routing still gets the Notion page

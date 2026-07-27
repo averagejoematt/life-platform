@@ -133,8 +133,19 @@ class TestGetPredictionsBehavior:
         import mcp.tools_coach_intelligence as tci
 
         _, pks = self._run(monkeypatch, {})
-        assert len(pks) == len(tci.COACH_IDS)
-        assert all(pk.startswith("COACH#") and pk.endswith("_coach") for pk in pks)
+        coach_pks = [pk for pk in pks if pk.startswith("COACH#")]
+        assert len(coach_pks) == len(tci.COACH_IDS)
+        assert all(pk.endswith("_coach") for pk in coach_pks)
+        # #1841: ONE additional partition — the subject's own on-tape diary claims. They
+        # are prediction-store records in the same shape, graded by the same evaluator, so
+        # they belong in the one ledger. Still no legacy `coach_thread` store (the #726
+        # contract): every non-COACH# pk here must be exactly the claims partition.
+        assert set(pks) - set(coach_pks) == {"USER#matthew#SOURCE#diary_claims"}
+
+    def test_diary_claims_excluded_when_a_coach_is_named(self, monkeypatch):
+        """A coach filter asks for THAT coach's record — a claim of Matthew's is not it."""
+        _, pks = self._run(monkeypatch, {"coach_id": "sleep"})
+        assert pks == ["COACH#sleep_coach"]
 
 
 class TestVoidSplitRule:
