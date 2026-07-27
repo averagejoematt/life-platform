@@ -178,7 +178,11 @@ def list_corrections(
 
     items: list = []
     kwargs = {"KeyConditionExpression": Key("pk").eq(PK), "ScanIndexForward": False}
-    while True:
+    # Hard page bound: at ~1MB/page this is ~100MB of corrections — far beyond a
+    # human-speed ledger. Guarantees termination even against a pathological table
+    # (a blanket MagicMock's truthy LastEvaluatedKey looped this forever and OOM-killed
+    # CI runners — #1847/#1849).
+    for _ in range(100):
         resp = table.query(**kwargs)
         for i in resp.get("Items", []):
             if status is not None and i.get("status") != status:

@@ -211,6 +211,11 @@ def test_lambda_handler_sends_and_records(monkeypatch):
     ses = MagicMock()
     ses.send_email.side_effect = lambda **kw: sent.update(kw)
     table = MagicMock()
+    # A DDB-shaped query response, NOT a bare MagicMock: list_corrections (#1796)
+    # paginates on resp.get("LastEvaluatedKey"), and a MagicMock's .get() is truthy
+    # forever — the loop never terminated and the accumulating mock-call history
+    # OOM-killed CI runners (#1847/#1849).
+    table.query.return_value = {"Items": []}
     fake_boto3 = MagicMock()
     fake_boto3.client.return_value = ses
     fake_boto3.resource.return_value.Table.return_value = table

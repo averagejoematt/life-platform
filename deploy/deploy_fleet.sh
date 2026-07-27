@@ -50,6 +50,23 @@ echo "── 3. Fleet update ──"
 UPDATED=0; SKIPPED=0; FAILED=0
 declare -a UPDATED_FNS=()
 
+# #1848: keep the per-function rollback artifact store honest on FLEET deploys too.
+# rollback_lambda.sh (and the CI auto-rollback job) redeploy deploys/<fn>/previous.zip;
+# before this, only deploy_lambda.sh single-function deploys rotated those artifacts,
+# so after a fleet deploy the store pointed at arbitrarily stale zips — the 2026-07-26
+# auto-rollback reverted 50 functions to pre-wave code because of exactly that.
+# Server-side S3 copies only; called AFTER a successful update so latest.zip == live.
+seed_artifacts() {
+  local FN="$1" SRC_KEY="$2"
+  local LATEST="deploys/${FN}/latest.zip"
+  if aws s3 ls "s3://$BUCKET/$LATEST" --region "$DEFAULT_REGION" >/dev/null 2>&1; then
+    aws s3 cp "s3://$BUCKET/$LATEST" "s3://$BUCKET/deploys/${FN}/previous.zip" \
+      --region "$DEFAULT_REGION" --no-cli-pager >/dev/null
+  fi
+  aws s3 cp "s3://$BUCKET/$SRC_KEY" "s3://$BUCKET/$LATEST" \
+    --region "$DEFAULT_REGION" --no-cli-pager >/dev/null
+}
+
 # Unique (function, region) pairs from the map; region defaults to us-west-2.
 while IFS=$'\t' read -r FUNC REGION NOT_DEPLOYED; do
   [ -n "$FUNC" ] || continue
@@ -72,12 +89,12 @@ while IFS=$'\t' read -r FUNC REGION NOT_DEPLOYED; do
   if [ "$REGION" = "$DEFAULT_REGION" ]; then
     aws lambda update-function-code --function-name "$FUNC" --region "$REGION" \
       --s3-bucket "$BUCKET" --s3-key "$KEY_TREE" --no-cli-pager >/dev/null \
-      && { echo "  ✅ $FUNC"; UPDATED=$((UPDATED+1)); UPDATED_FNS+=("$FUNC:$REGION"); } \
+      && { echo "  ✅ $FUNC"; UPDATED=$((UPDATED+1)); UPDATED_FNS+=("$FUNC:$REGION"); seed_artifacts "$FUNC" "$KEY_TREE"; } \
       || { echo "  ❌ $FUNC"; FAILED=$((FAILED+1)); }
   else
     aws lambda update-function-code --function-name "$FUNC" --region "$REGION" \
       --zip-file "fileb://$ZIP_TREE" --no-cli-pager >/dev/null \
-      && { echo "  ✅ $FUNC ($REGION)"; UPDATED=$((UPDATED+1)); UPDATED_FNS+=("$FUNC:$REGION"); } \
+      && { echo "  ✅ $FUNC ($REGION)"; UPDATED=$((UPDATED+1)); UPDATED_FNS+=("$FUNC:$REGION"); seed_artifacts "$FUNC" "$KEY_TREE"; } \
       || { echo "  ❌ $FUNC ($REGION)"; FAILED=$((FAILED+1)); }
   fi
 done < <(jq -r '.lambdas | to_entries[] | [.value.function, (.value.region // "us-west-2"), ((.value.not_deployed // false)|tostring)] | @tsv' "$LAMBDA_MAP" | sort -u)
@@ -87,7 +104,7 @@ for FN in life-platform-mcp life-platform-mcp-warmer; do
   if [ "$DRY_RUN" = "--dry-run" ]; then echo "  ✓ would update $FN (mcp bundle)"; continue; fi
   aws lambda update-function-code --function-name "$FN" --region "$DEFAULT_REGION" \
     --s3-bucket "$BUCKET" --s3-key "$KEY_MCP" --no-cli-pager >/dev/null \
-    && { echo "  ✅ $FN"; UPDATED=$((UPDATED+1)); UPDATED_FNS+=("$FN:$DEFAULT_REGION"); } \
+    && { echo "  ✅ $FN"; UPDATED=$((UPDATED+1)); UPDATED_FNS+=("$FN:$DEFAULT_REGION"); seed_artifacts "$FN" "$KEY_MCP"; } \
     || { echo "  ❌ $FN"; FAILED=$((FAILED+1)); }
 done
 
