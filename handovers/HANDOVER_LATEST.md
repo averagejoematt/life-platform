@@ -1,109 +1,134 @@
-# HANDOVER — fable paydown + deep-sweep P1s + 12-PR merge wave + fleet deploy — 2026-07-26 (session 3: afternoon/night)
+# HANDOVER — CI-trust repair + sweep-P3 paydown + genesis Day-1 + the rollback net's first real firings — 2026-07-26/27 (overnight-spanning session)
 
-> Instruction thread: **solo fable session, owned main** — Day-1 duties (deferred: it was
-> still Sunday, genesis is Monday), FULL fable paydown (model:fable → zero-workable),
-> delegated paydown on sonnet/opus worktree-implementers, quota-permitting extras.
-> Standing approval: all merges, Deploy-gate approvals, deploys incl. deploy_all; CDK via
-> Matthew's `!`. Mid-session Matthew's parallel read-only sweep landed **46 verified
-> issues (#1786–#1831)** — their P1/P2s jumped the queue per the driving prompt. A THIRD
-> session (Diary Studio, evening) ran concurrently in this same checkout and pushed the
-> wave mid-flight (see gotchas).
+> Instruction thread: **solo fable session, owned main** — four workstreams in order:
+> (1) Day-1 morning duties, (2) CI-trust repair (#1847/#1849/#1848 + the #1345 drill)
+> BEFORE any merge wave, (3) the 21 open sweep-P3s delegated in clusters, (4) queue if
+> headroom. Standing approval: all merges, Deploy-gate approvals, deploys incl.
+> deploy_all; CDK via Matthew's `!`. The session started Sunday evening (genesis eve),
+> the laptop slept overnight mid-queue, and it resumed into genesis morning — the wrap
+> covers both halves.
 
-## What shipped — all merged AND fleet-deployed (deploy_all green at 898e566f; qa-smoke fix at 39f01e88)
+## The headline: the record was wrong, twice, and the rollback net came alive
 
-**Fable builds (direct to main):**
-- **#1623 milestone digest** — `milestone-digest` lambda live (Email stack), DIGEST# cursor
-  in the CROSS_PHASE ledger partition via milestone_ledger (single-writer held), first-run
-  baseline semantics, breaker-gated, ≥10-day send floor. ARMED: the `life-platform/digest`
-  secret existed (07:40) — **1 recipient, no reply_to yet (owner: top up to 5-8 + reply_to)**.
-- **#1333 paging** — ADR-143 + `life-platform-paging` topic + guard-tested ≤5 P1 set
-  (budget-tier-3, pipeline-dead ≥8, DDB/S3 canary legs); Matthew's SMS subscribed via
-  `wire_paging_phone.sh`. LIVE end-to-end.
-- **#1666** — ADR-144 + `docs/PROPORTIONALITY.md` (the ADR-103 ledger, legible: posture +
-  rent + demote trigger per row).
-- **#1571 /vlog** — mode + CHAT_MODES row + studio kit in private S3 `config/studio/`;
-  AC4 phone test owner-gated (evening session then extended the mode further).
-- **#1425 QA epic CLOSED** (all 30 children were already shipped) · **#1114 parked at the
-  ADR-106 gate** (option round = PR #1768 + review sheet; superseded #1512 closed).
-- **Backlog truth pass:** 7 epics closed (#1425/#1476/#1687/#1356/#1357/#1358/#1363),
-  40 → 29 open model:fable, every survivor carries a what-unblocks-it line.
+1. **The 07-26 "rollback non-fire" actually reverted 50 of 99 lambdas** (incl. MCP,
+   withings-ingestion, chronicle, cost-governor). The wrap had read the FIRST interleaved
+   per-function summary ("0 succeeded, 1 failed"); the job's final tally read **50/49**.
+   The fleet ran mixed-version 00:12→01:33Z on genesis eve. Repaired same-hour by a full
+   fleet redeploy once found; INCIDENT_LOG P2 correction row + memory
+   `reference_rollback_partial_fires_mixed_fleet`.
+2. **#1847+#1849 were ONE bug and the filed theory was wrong.** Runs died at the same
+   test: #1796's `LastEvaluatedKey` pagination never terminates against a blanket
+   MagicMock table — memory balloons (16GB observed) until the hosted runner OOM-kills
+   ("runner has received a shutdown signal"). The 16s approval correlation was
+   coincidence. Fix: DDB-shaped mock + 100-page hard bound (fc18f0c2). **Suite:
+   45min+/never-completing → ~2.5 min (7,632 passed).** Durations budget note in
+   TESTING.md. Memory `reference_magicmock_pagination_oom_runner_shutdown`.
+3. **The seeded rollback net fired its FIRST true mass firing** (07-27 16:16Z):
+   a deploy_all smoke FAIL → **98/99 clean reverts** through the #1848-seeded artifacts
+   (1 fail: email-subscriber, us-east-1 — script region-hardcoded). Machinery perfect;
+   the signal was another honest-check-wrong-threshold: qa-smoke's dashboard freshness
+   used a 4h window against a 1x-daily (17:00 UTC brief) writer. Window fixed 4h→26h
+   (b79469ff), fleet restored via deploy_all on tip — **final run: Deploy+Smoke+visual-QA
+   all green, rollback skipped; all 24 live integration tests pass locally** (the run's
+   I1/I2/I5 red = runner-side STS OIDC ETIMEDOUT, not the platform).
 
-**Sweep P1/P2 fixes (the #1786–#1831 set):**
-- **#1793** nudge phase filters (fired live same day — hot-deployed within the hour) ·
-  **#1807** genesis hardening (unfiltered lifetime baseline + refuse-empty) + Matthew ran
-  the one-shot: **27 rungs re-baselined** (weight_sub_340→260, 11 dated returns, level/days)
-  · **#1826** breaker un-jam (low-valence absence = CLEAR-with-note, evidence-only firing)
-  · **#1811/#1812** live lead-in prose (vet round 2, verified byte-level on the live page)
-  · **#1802** unmark proves its delete (sk = the revoke handle).
-- **Delegated cluster PRs, all merged + deployed:** #1832 (#1782 push-run FPs), #1833
-  (#1029 read-only status tool; issue stays open — 3/5 items owner-only), #1834 (#1756
-  diary trigger, inline in journal-enrichment), #1835 (#1831 smoke oracle — statusCode≥400
-  + body failed/all_pass now FAIL), #1836 (#1788/#1790/#1819 tombstone siblings), #1837
-  (#1786 S5 injection id-join fix + #1787/#1827/#1828/#1829), #1838 (#1822/#1818/#1820/
-  #1813/#1815/#1824 Day-1 site honesty), #1839 (#1794–#1797 dossier/docket privacy),
-  plus #1783 (#1650 handovers→session-archive), #1784 (#1781 CFN IAM triage), #1785
-  (#741 submission kit), #1753, #1759 (Dependabot actions).
-- **#1738 TTS bake-off:** no code needed (3.1 = env var); 3 renders parked private
-  (`session-artifacts/issue-1738-tts-bakeoff/`); tags don't leak (6/6 refuted); pick is
-  Matthew's ear — #1739–41 parked on it.
+## What shipped — all merged AND live (fleet uniform on 3ef67571-era code, 17:05Z stamps)
 
-**Infra now live:** all 9 CDK stacks current (Matthew ran the deploys; Compute needed one
-retry — Events::Rule "Internal Failure" transient). site-api + site fully deployed and
-visual-QA green (one real catch: staged-card contrast, fixed as 898e566f).
+**CI-trust (direct to main):** fc18f0c2 (OOM fix + fleet-deploy artifact seeding),
+5d36b4a9 (rollback three-way tally + mixed-version warning), f64c75b0 (journal
+featured-week PT-clock time bomb — failed every Sunday 17-24 PT on UTC runners),
+39f01e88-class graces extended (dashboard-ahead + absent-character-sheet WARN in the
+shared pre-start/Day-1 window), b79469ff (26h freshness), 964cf9cc (concurrency group
+v2→v3 — the phantom stuck queue recurred), 82552827 (#1345 drill_smoke dispatch hook).
+#1847/#1849 CLOSED; #1848 CLOSED (core proven; residuals → **#1859**).
+
+**Sweep-P3 paydown: 21/21 closed** via 7 reconcile-ritual squash-merges (each round:
+sync-literals-on-branch → linearize → merge; combined suite green every round):
+- PR #1853 docket/dossier (#1798 pair-scoped keys, #1799 split pagination, #1800 PII
+  screen, #1801 deterministic throttle) · PR #1852 journal/chronicle (#1803 cover sk,
+  #1804 guard_version re-screen, #1805 tombstone redirects, #1806 channel enum) ·
+  PR #1851 milestones (#1808 Mifflin-fallback disclosure, #1809 vacuous garmin zone-2
+  extractor + SCHEMA.md truth, #1810 return-date honesty) · PR #1850 ops (#1816 region
+  summary, #1817 STACK_FILE_REGION parity test) · PR #1855 privacy/AI (#1789 ADR-141 §4
+  takeaway carve-out + deterministic screen; #1830 Horizons grounding gate) · PR #1856
+  coach (#1791 correction cycle-provenance, #1792 observatory beta_param) · PR #1854 site
+  (#1821 cohort cache TTL, #1823 theme-river wired into sync_site_to_s3, #1825 replicator
+  permanent dedup). Plus **#1814** fixed directly (ADR-058 phase stamps on
+  habit/day-grade writers, both copies; leaked 07-25/26 rows backfilled + re-stamped
+  after the reverted brief clobbered them once).
+
+**#1708 shipped (PR #1857) → epic #1686 CLOSED** — prescription reactions enrich the
+journal via the existing #1577 sweep (channel provenance, no second pipeline) + a
+deterministic reaction ledger calibrates future Horizons picks (counts/rates + n, no LLM
+numbers, private-by-default, fail-closed publishability door with no caller yet).
+
+**Genesis Day-1 (all verified live):** day_n=1/pre_start-gone flip ✓ · **real weigh-in
+321.09 lbs superseded the 317.61 override honestly** (DDB profile + S3 configs + regenerated
+constants + game-page/home rebakes; the FROZEN prereg deliberately keeps 317.61 — frozen
+artifacts don't get rewritten, claims grade against real data) · restart_verify 11/13
+(character sheet computes tomorrow; graced) · 17:00 brief SENT (the #1694 baseline-freshness
+gate correctly flagged the reverted coach citing stale numbers — advisory; heals now the
+fleet has 321.09) · milestone first sweep **baseline-quiet** (re-baselined ledger held; the
+≤5-recipient warning is the standing owner task) · first nudge quiet-honest · ai_validator
+fail-closed an empty coach output.
 
 ## Verified
-- Each cluster PR ran the full suite green in its worktree (7380/7392/7457/7497 passed);
-  combined tree passed every merge-gate batch + 6-dir black/ruff + 128 JS tests; CI test
-  lanes on the final shas were superseded-cancelled, not red. deploy_all: Deploy ✅,
-  I1/I2/I5 ✅, visual-QA ✅; smoke red = the NEW oracle correctly catching qa-smoke's
-  pre-genesis weight-null (checker fixed + hot-deployed, 39f01e88); rollback non-fire
-  benign (no previous.zip → fleet stayed on the wanted code) → #1848.
-- Live probes: paging alarms OK + SMS subscribed; milestone-digest invoke → armed,
-  genesis cursor, 0 mailed; /journal week-02 byte-verified; ledger partition = 2 markers
-  + 27 baselines.
+Combined suite after every merge round; final tree 7,632 passed / 172s + black/ruff 6-dir
+clean. deploy_all-4 (30286473574): Deploy ✓ Smoke ✓ visual-QA ✓ rollback skipped; 24/24
+live integration tests pass locally (i3/i9/i13/i16 had been mixed-fleet symptoms). Fleet
+LastModified uniform 16:57–17:05Z. CloudFront v4-redirects updated+published (function
+LIVE-stage test returns 301) — but see the CDK item below.
 
-## Gotchas hit (durable → memory)
-- **`git add -A` swept a concurrent agent's mid-work edits into pushed main** (d26f2a74;
-  agent self-reported; repaired via checkout^ + clean PR merge) →
-  `reference_git_add_a_sweeps_concurrent_agent_edits`.
-- **The evening session pushed this session's unpushed wave** from the shared checkout —
-  the #1838 API-before-frontend race opened; closed by deploying site-api before the
-  in-flight site-deploy's QA ran. Three sessions, one checkout = the push is anyone's.
-- **`pytest | tail` eats the exit code** — two "green" suite runs weren't (pipefail or
-  read the tail text, never trust exit 0 through a pipe).
-- The full suite went ~176s → 45+ min CPU-bound after the wave, only ~1% in (→ #1847).
-- CI deploy-critical lane catches what local runs mask: I4 try/except, KNOWN_SECRETS ×2,
-  heartbeat exemption, untyped-handler ratchet — new-lambda checklist is real.
+## Gotchas (durable → memory, already written)
+- Rollback per-function summaries interleave — read the JOB tally + sweep LastModified.
+- "Runner shutdown signal" = check the LAST test printed for a mock-fed OOM before
+  believing an event correlation.
+- Freshness windows must encode the WRITER's cadence, not the checker's cron position
+  (weight-null, dashboard-4h — same family, two firings).
+- The concurrency-group phantom queue recurred (v3 salt now); a push supersedes any
+  PENDING run — dispatch deploy_all only when nothing else will push, and expect a
+  laptop sleep to freeze watchers mid-chain.
+- The reverted brief's put_item clobbered backfilled phase stamps once — re-stamped;
+  self-healing now #1814 code is fleet-wide.
 
 ## Wrap gates
-**Build beat:** `2026-07-26-sweep-day-the-oracle-catches` (46-issue sweep ingested, 4 P1s
-dead same-day, and the rebuilt rollback oracle's first live fire caught the QA checker
-lying about honest zero-state).
-**Docs:** PROPORTIONALITY.md (new) + DECISIONS.md (ADR-143/144 + ADR-103 pointer) +
-CHAT_MODES.md + doc-sync auto-literals at every commit; wiki checkers green.
-**Decisions:** ADR-143 (paging posture) + ADR-144 (proportionality) filed.
-**Main:** red — decoded: 39f01e88's run is green on EVERY gate (Deploy, Smoke on the
-fixed checker, I1/I2/I5, visual QA) except its Unit-Tests job, which was CANCELLED by a
-runner shutdown 16s after the Deploy-gate approval — the 3rd identical cancellation today
-(→ #1849; amplified by the #1847 slow suite keeping tests in-flight at approval time).
-Production is healthy and current; the red is a CI-shape artifact.
-**Incidents:** 2 rows — (P3) d26f2a74 add-A contamination (caught same session, repaired,
-no data loss); (P4/false-positive-class) deploy_all smoke red + rollback non-fire
-(checker wrong for pre-genesis; fleet healthy; #1847/#1848 filed).
+**Build beat:** `2026-07-27-the-net-fires` (see beats.json).
+**Docs:** TESTING.md (durations budget), INCIDENT_LOG.md (P2 correction + P3 first-firing
+rows), docs/engines/CHARACTER.md (Day-1 baseline re-verify stamp), SCHEMA.md (via #1851),
+DECISIONS.md (ADR-141 §4 amendment via #1855); wiki checkers green at commit.
+**Decisions:** ADR-141 §4 amendment filed (in PR #1855) — no new ADR needed; the
+freshness-window and rollback-tally changes are implementation posture, recorded in
+INCIDENT_LOG + CONVENTIONS-adjacent memory.
+**Main:** red — deploy_all-4's I1/I2/I5 job hit runner-side STS OIDC ETIMEDOUT (8 retries,
+45 min); every deploy-bearing gate green and the same integration suite passes locally
+24/24; production healthy + current.
+**Incidents:** 2 rows added — (P2) the 07-26 partial-rollback record correction (50/99
+reverted, mixed fleet ~1h20m); (P3) the net's first true mass firing (98/99 clean reverts
+on the 4h-window false positive).
 **Stash/hooks:** clean.
 **Labels:** OK.
 
 ## Residual / next picks
-- **Monday Day-1 (genesis!):** `restart_verify.py` + flip check (day_n=1, pre_start gone) +
-  real weigh-in supersedes the 317.61 override + 17:00 UTC brief + first cron billing run
-  (evidence on #1613) + MILESTONE# first sweep (now correctly baselined; breaker un-jammed;
-  new code IS deployed) + first nudge/docket/calibration watches — not-work — standing
-  owner ritual.
-- #1847 slow suite (durations hunt) + #1848 rollback previous.zip seeding + #1849 approval-cancels-tests (clears the main-red shape) — filed, sonnet.
-- Sweep Next-milestone P3s — the 24 open `review:deep-quality-2026-07-26` issues (#1789, #1791, #1792, #1798–#1806, #1808–#1810, #1814, #1816, #1817, #1821, #1823, #1825, #1830) — next paydown lane.
-- Owner asks, no urgency: digest recipients+reply_to (#1623 note above) · #1738 TTS listen
-  · #1571 AC4 phone test · #1114 pick on PR #1768 · Dependabot #1778/#1779/#1780 verdicts
-  posted (need coordinated steps, not plain merges).
-- #1653 packaging move (opus, blast-radius-max) deliberately NOT started — not-work —
-  needs a quiet solo session by design.
-- Podcast chain #1739–#1741 — gated on the #1738 owner listen.
+- **Owner, one line each:** `bash deploy/cdk_deploy.sh LifePlatformWeb` (activates the
+  `/journal/posts/week-*` redirect association — until then the 3 tombstone URLs still
+  200; #1805 comment has detail) — not-work — owner-run CDK per standing rule.
+- **#1858** IAM: cycle-read grant for read_cycle callers (digest logged AccessDenied,
+  fail-softed correctly); needs role_policies + CDK deploy.
+- **#1859** rollback-net residuals: us-east-1 revert + empty matrix on push-fleet runs.
+- **#1345** left open for the owner's call: does the real 98/99 firing satisfy the drill
+  AC, or should the quarterly ritual still run the synthetic (`drill_smoke=true` dispatch
+  after a qa-smoke-only touch commit — hook is live)?
+- Day-2 watches: first character sheet (computes tomorrow for today), first docket/dossier
+  writes, first calibration write, youtube first capture, #1840 AC4 diary stamp, Wednesday
+  remediation cron (Monday's 14:45Z never fired — GitHub schedule drift; shadow mode) —
+  not-work — standing owner/next-session ritual.
+- Queue if next session has headroom: diary-360 in order **#1841** → **#1842**/**#1843** →
+  **#1844** → **#1845**/**#1846** (opus) · **#1396** calibration artifact (opus) ·
+  **#1402** Broadcast (opus, gated on #1619 Phase-0 — check first) · **#1653** packaging
+  (opus, LAST-merge-of-a-quiet-day, solo wave by design).
+- Owner asks, no urgency: digest recipients 1→5-8 + reply_to (**#1623** note; the WARN
+  fired live today) · **#1738** TTS listen · **#1571** AC4 phone test · **#1114** pick on
+  PR #1768 · Dependabot **#1778**/**#1779**/**#1780** verdicts posted — not-work — each
+  needs Matthew's coordinated step.
+- Budget: tier 1 at session close (July temp ceiling $115; internal/dev AI paused) —
+  not-work — governor behaving as designed, self-resolves 08-01.

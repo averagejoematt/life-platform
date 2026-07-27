@@ -1820,6 +1820,49 @@
         }
       ],
       "why_it_mattered": "Tomorrow is genesis. Every one of the four P1s was a lie the instrument would have told in its first real week — a nudge built on dead-cycle intelligence, a months-old weight milestone announced as fresh news in early August, celebrations suppressed forever with no visible reason, and a flagship article contradicting the registered plan on Day 1. The whole point of a reset-eve sweep is that honesty bugs are cheapest to kill before the first real data arrives."
+    },
+    {
+      "id": "2026-07-27-the-net-fires",
+      "date": "2026-07-27",
+      "title": "Genesis day: the rollback net fires for real — 98 clean reverts on a wrong signal — and the suite that couldn't finish runs in 2.5 minutes",
+      "shipped": "The overnight-spanning session repaired the pipeline's word before trusting it with anything: the mystery 'runner shutdown' that had been blamed on a deploy-approval race turned out to be one test feeding a mock DynamoDB table to a new pagination loop — memory ballooned past 16GB until GitHub killed the runner, and the full suite went from never-completing (45+ minutes) to 2.5 minutes with 7,632 tests passing once the loop got a hard page bound. Then the record correction: the previous night's 'rollback non-fire' had actually reverted 50 of 99 lambdas to stale code — the fleet ran mixed-version into genesis eve until a full redeploy restored it. With rollback artifacts finally seeded for every function, the net fired its first true mass firing on Day 1 morning: 98 of 99 functions cleanly reverted in 18 minutes. The machinery was perfect; the signal was a freshness check whose 4-hour window was tuned to where the checker runs, not how often the writer writes. Window fixed, fleet restored, all 24 live integration tests green. Along the way: all 21 remaining deep-review findings fixed and merged in seven PRs, the prescription feedback loop closed its epic, and the experiment's baseline was superseded by the real genesis-morning weigh-in — 321.09 lbs, honestly, everywhere except the frozen pre-registration, which keeps the number that was true when it was frozen.",
+      "gotcha": "Rollback job logs interleave one 'Rollback complete' summary per function — the session that read the FIRST one recorded a benign non-fire while the job's final tally said 50 reverted. The correction only surfaced because the next session pulled the whole log instead of trusting the record.",
+      "honest_miss": "The mixed-version fleet ran unnoticed for over an hour on genesis eve, and the Day-1 morning brief shipped with a coach citing the superseded baseline (the advisory freshness gate flagged it in the log, but advisory means it shipped anyway). Also: two of the day's deploy attempts were eaten by GitHub superseding pending runs, and a third by a recurring phantom queue — four fleet deploys to land what one should have.",
+      "prs": [
+        {
+          "label": "PR #1850",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1850"
+        },
+        {
+          "label": "PR #1851",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1851"
+        },
+        {
+          "label": "PR #1852",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1852"
+        },
+        {
+          "label": "PR #1853",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1853"
+        },
+        {
+          "label": "PR #1854",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1854"
+        },
+        {
+          "label": "PR #1855",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1855"
+        },
+        {
+          "label": "PR #1856",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1856"
+        },
+        {
+          "label": "PR #1857",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1857"
+        }
+      ],
+      "why_it_mattered": "A detect-and-revert safety story is documentation until it fires. Today it fired — imperfectly triggered, perfectly executed — and every imperfection it exposed (the misread tally, the checker-shaped threshold, the unseeded artifacts) is now a fixed thing with a test or a ledger row, not a latent assumption. The experiment itself starts on the same honesty: the baseline is the number the scale said on Day 1, not the placeholder."
     }
   ]
 }
