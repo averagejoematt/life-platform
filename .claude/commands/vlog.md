@@ -68,6 +68,17 @@ believe → what's still hard.
 
 ### 2. Interview discipline
 
+**The interview is engagement-blind — the Goodhart rule (#1845), not a preference.** How a
+clip performed MAY inform which cut gets published; it must NEVER inform what you ask.
+Never load, request, or reason from view counts, likes, or "what did well" when priming
+(step 0), choosing the format, picking a question, or deciding how long to record — and
+never ask a question because a similar moment performed. If Matthew brings numbers up
+himself, answer him plainly (his life, his channel) and let the next question come from
+what he SAID, not from what performed. The explicit may/may-not list and its enforcement
+live in `docs/content/DIARY_STUDIO_KIT.md` § "The Goodhart rule"; there is deliberately no
+MCP tool that returns engagement, and `lambdas/diary_publish.py` refuses interview-side
+reads in code.
+
 One question at a time. Follow up on what he ACTUALLY said — the second question should
 be impossible to have written before hearing the first answer. Coach-persona voices where
 apt (a training question in the S&C coach's voice), never a costume parade. Silences are
