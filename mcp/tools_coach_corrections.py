@@ -22,11 +22,12 @@ from mcp.config import logger, table as _table_ref
 
 try:
     # Shared, bundled modules (#781) — staged at zip root in the Lambda.
+    import coach_checkin
     import coach_correction_resolver as ccr
     import coach_corrections
 except ImportError:  # pragma: no cover — the MCP bundle always ships lambdas/ at root
     if not TYPE_CHECKING:
-        from lambdas import coach_correction_resolver as ccr, coach_corrections
+        from lambdas import coach_checkin, coach_correction_resolver as ccr, coach_corrections
 
 
 def tool_log_coach_correction(args):
@@ -64,7 +65,11 @@ def tool_log_coach_correction(args):
     normalized_class = requested_class if requested_class in coach_corrections.ERROR_CLASSES else "other"
 
     try:
-        sk = coach_corrections.write_correction(_table_ref, item_ref, correction_text, requested_class)
+        # #1791: stamp the correction with the CURRENT experiment cycle at write
+        # time (fail-soft None — coach_checkin.read_cycle() — same convention as
+        # CHECKIN# rows) so the injected prompt block can flag it once a reset
+        # supersedes the cycle it was logged in.
+        sk = coach_corrections.write_correction(_table_ref, item_ref, correction_text, requested_class, cycle=coach_checkin.read_cycle())
     except Exception as e:  # noqa: BLE001 — a lost correction must be loud (user feedback)
         logger.warning(f"[#1690] correction write failed for #{resolution['n']}: {e}")
         return {"error": f"correction could not be saved — please retry ({e})"}

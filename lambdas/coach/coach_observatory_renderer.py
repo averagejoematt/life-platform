@@ -167,6 +167,40 @@ def _confidence_provenance(confidence_records):
     return provenance
 
 
+def _record_mean_confidence(rec):
+    """One CONFIDENCE# row's mean confidence, or None if it can't be derived (#1792).
+
+    Preference order — deliberately mirrors every OTHER consumer of this ledger
+    (`coach_prediction_evaluator.py`/`coach_calibration.py`'s own summarizer reads,
+    `dispute_docket.py`):
+      1. `mean_confidence` — the precomputed value the writers store alongside
+         alpha/beta_param (`coach_prediction_evaluator.py:936`,
+         `coach_calibration.py:355`). Reusing it means this renderer can never
+         drift from what every other reader displays.
+      2. `alpha / (alpha + beta_param)` — both writers' REAL field name. A
+         `direction='down'` calibration increments `beta_param`; reading it is
+         what lets a down-calibration actually lower the displayed confidence.
+      3. `alpha / (alpha + beta)` — legacy fallback for any pre-rename seed that
+         used the old `beta` key (never written by current code).
+    Every path defaults `alpha`/beta to the uninformed Beta(1,1) prior when a
+    component is truly absent — an honest neutral, not a silent guess.
+    """
+    mean_conf = rec.get("mean_confidence")
+    if mean_conf is not None:
+        try:
+            return float(mean_conf)
+        except (TypeError, ValueError):
+            pass
+    alpha = rec.get("alpha", 1)
+    beta_val = rec.get("beta_param", rec.get("beta", 1))
+    if alpha is None or beta_val is None:
+        return None
+    try:
+        return float(alpha) / (float(alpha) + float(beta_val))
+    except (TypeError, ValueError, ZeroDivisionError):
+        return None
+
+
 def _tally_learning_statuses(items):
     """#1481: (status counts, conversation_count) over LEARNING# items.
     Conversation-channel learnings (ADR-141) are tallied separately and never
@@ -408,17 +442,11 @@ def _render_coach_card(domain, include_threads=True):
     confidence_records = _query_begins_with(coach_pk, "CONFIDENCE#")
     confidence_provenance = _confidence_provenance(confidence_records)  # #1481: data vs conversation
     if confidence_records:
-        # Average across subdomains for a single confidence language
-        conf_values = []
-        for rec in confidence_records:
-            alpha = rec.get("alpha", 1)
-            beta_val = rec.get("beta", 1)
-            if alpha is not None and beta_val is not None:
-                try:
-                    mean_conf = float(alpha) / (float(alpha) + float(beta_val))
-                    conf_values.append(mean_conf)
-                except (TypeError, ValueError, ZeroDivisionError):
-                    pass
+        # Average across subdomains for a single confidence language. #1792: read
+        # via _record_mean_confidence — the writers emit `beta_param` (never bare
+        # `beta`), so a naive `rec.get("beta", 1)` here silently substituted the
+        # default 1 for every real row and made down-calibrations invisible.
+        conf_values = [mc for mc in (_record_mean_confidence(rec) for rec in confidence_records) if mc is not None]
         if conf_values:
             avg_conf = sum(conf_values) / len(conf_values)
             confidence_language = _confidence_to_language(avg_conf)

@@ -84,6 +84,24 @@ def test_item_ref_none_becomes_empty_dict():
     assert item["item_ref"] == {}
 
 
+# ── #1791: cycle stamp on write ──────────────────────────────────────────────
+def test_build_correction_item_stores_cycle_when_given():
+    item = cc.build_correction_item({}, "x", "other", cycle=10)
+    assert item["cycle"] == 10
+
+
+def test_build_correction_item_omits_cycle_when_not_given():
+    # Honest-absent, not a fabricated 0/None literal — matches the pre-#1791 shape.
+    item = cc.build_correction_item({}, "x", "other")
+    assert "cycle" not in item
+
+
+def test_write_correction_passes_cycle_through(table):
+    sk = cc.write_correction(table, {}, "x", "other", cycle=11)
+    got = cc.get_correction(table, sk)
+    assert got["cycle"] == 11
+
+
 def test_error_classes_tuple_has_other_fallback():
     assert "other" in cc.ERROR_CLASSES
     assert cc.ERROR_CLASSES == (
@@ -286,6 +304,71 @@ def test_render_corrections_block_tags_class_and_lists_text():
     assert "DO NOT REPEAT" in block
     assert "[stale-baseline] 315 lbs is stale" in block
     assert "[ungrounded-behavioral]" in block
+
+
+# ── #1791: date/cycle provenance stamp + reset-awareness ────────────────────
+def test_render_corrections_block_stamps_date_and_cycle():
+    row = cc.build_correction_item(
+        {}, "the baseline is stale", "stale-baseline", now=datetime(2026, 7, 22, 12, tzinfo=timezone.utc), cycle=10
+    )
+    block = cc.render_corrections_block([row])
+    assert "(logged 2026-07-22, cycle 10)" in block
+    assert "the baseline is stale" in block
+
+
+def test_render_corrections_block_omits_stamp_pieces_it_does_not_have():
+    # No created_at, no cycle -> no parenthetical at all (never fabricated).
+    block = cc.render_corrections_block([{"error_class": "other", "correction_text": "x"}])
+    assert "(" not in block.split("\n")[1]  # the rendered row, not the header
+
+
+def _row_line(block):
+    """The rendered correction line (not the explanatory header) — line 1."""
+    return block.split("\n")[1]
+
+
+def test_render_corrections_block_flags_prior_cycle_when_superseded():
+    row = cc.build_correction_item({}, "baseline is 315 lbs", "stale-baseline", now=datetime(2026, 7, 20, tzinfo=timezone.utc), cycle=10)
+    stale = cc.render_corrections_block([row], current_cycle=11)
+    assert "PRIOR CYCLE" in _row_line(stale)
+    assert "re-verify" in _row_line(stale).lower()
+
+    # Same row, but the current cycle HASN'T moved on from it -> no flag on the row.
+    current = cc.render_corrections_block([row], current_cycle=10)
+    assert "PRIOR CYCLE" not in _row_line(current)
+
+
+def test_render_corrections_block_never_flags_when_cycle_unknown():
+    # A row with no cycle stamp (pre-#1791, or an SSM-unreachable write) is never
+    # flagged stale — absence of provenance isn't evidence of staleness.
+    row = cc.build_correction_item({}, "x", "other", now=datetime(2026, 7, 20, tzinfo=timezone.utc))
+    assert "PRIOR CYCLE" not in _row_line(cc.render_corrections_block([row], current_cycle=11))
+
+
+def test_corrections_prompt_block_passes_current_cycle_through_to_render(table):
+    sk = cc.write_correction(table, {"surface": "coach_brief"}, "315 lbs is stale", "stale-baseline", cycle=9)
+    got = cc.get_correction(table, sk)
+    got["status"] = "open"
+    t2 = FakeDdbTable(rows=[got])
+    block = cc.corrections_prompt_block(t2, surface="coach_brief", current_cycle=11)
+    assert "PRIOR CYCLE" in _row_line(block)
+    assert "cycle 9" in _row_line(block)
+
+
+# ── #1791: the review-on-reset primitive ─────────────────────────────────────
+def test_stale_cycle_corrections_flags_only_older_cycles():
+    rows = [
+        cc.build_correction_item({}, "old", "other", correction_id="aaaaaaaa", cycle=9),
+        cc.build_correction_item({}, "current", "other", correction_id="bbbbbbbb", cycle=11),
+        cc.build_correction_item({}, "no-cycle", "other", correction_id="cccccccc"),
+    ]
+    stale = cc.stale_cycle_corrections(rows, current_cycle=11)
+    assert [r["correction_id"] for r in stale] == ["aaaaaaaa"]
+
+
+def test_stale_cycle_corrections_empty_when_current_cycle_unknown():
+    rows = [cc.build_correction_item({}, "x", "other", cycle=9)]
+    assert cc.stale_cycle_corrections(rows, current_cycle=None) == []
 
 
 def test_corrections_prompt_block_end_to_end_scopes_and_renders():

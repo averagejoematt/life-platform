@@ -356,6 +356,63 @@ def test_observatory_tally_excludes_conversation_from_verdicts():
     assert conv == 1
 
 
+# ── #1792: observatory confidence must read the REAL writer field-shape ──────
+# Both CONFIDENCE# writers (`coach_prediction_evaluator._update_bayesian_confidence`,
+# `coach_calibration.py`) emit `alpha`/`beta_param`/`mean_confidence` — never a bare
+# `beta` key. The renderer used to read `rec.get("beta", 1)`, which silently
+# substituted the Beta(1,1) default for every real row (a `direction='down'` outcome
+# increments ONLY beta_param, so it never moved the displayed language at all).
+
+
+def test_record_mean_confidence_prefers_precomputed_mean_confidence():
+    from decimal import Decimal
+
+    # When mean_confidence IS stored (every current writer), it wins outright —
+    # matching every other consumer (summarizer, dispute_docket) byte-for-byte,
+    # even if alpha/beta_param would compute something slightly different.
+    rec = {"alpha": 1, "beta_param": 7, "mean_confidence": Decimal("0.111")}
+    assert abs(cobs._record_mean_confidence(rec) - 0.111) < 1e-9
+
+
+def test_record_mean_confidence_falls_back_to_beta_param_when_unstored():
+    # No mean_confidence stamped (older row shape) -> alpha / (alpha + beta_param).
+    assert abs(cobs._record_mean_confidence({"alpha": 1, "beta_param": 7}) - 0.125) < 1e-9
+
+
+def test_record_mean_confidence_falls_back_to_legacy_beta_key():
+    # A genuine pre-rename seed carrying the old `beta` key (never written by
+    # current code) still resolves rather than defaulting to 1.
+    assert abs(cobs._record_mean_confidence({"alpha": 3, "beta": 1}) - 0.75) < 1e-9
+
+
+def test_record_mean_confidence_returns_none_when_alpha_missing():
+    assert cobs._record_mean_confidence({"alpha": None, "beta_param": 7}) is None
+
+
+def test_record_mean_confidence_uninformed_prior_when_nothing_stored():
+    # Genuinely empty row -> Beta(1,1), an honest neutral, not a fabricated guess.
+    assert cobs._record_mean_confidence({}) == 0.5
+
+
+def test_down_calibration_writer_row_is_read_correctly_by_observatory(monkeypatch):
+    """End-to-end writer -> renderer contract: a `direction='down'`/'failure'
+    outcome — which increments ONLY beta_param — must actually lower the value
+    the observatory renderer computes, not silently substitute 0.5 forever."""
+    fake = FakeDdbTable()
+    monkeypatch.setattr(cpe, "table", fake)
+    cpe._update_bayesian_confidence("sleep_coach", "sleep_quality", "failure")
+    cpe._update_bayesian_confidence("sleep_coach", "sleep_quality", "failure")
+    cpe._update_bayesian_confidence("sleep_coach", "sleep_quality", "failure")
+    written = fake.puts[-1]
+    assert "beta_param" in written  # confirms the writer's real field-shape
+    assert "beta" not in written
+    mean_conf = cobs._record_mean_confidence(written)
+    # alpha=1, beta_param=4 after 3 failures -> mean 0.2 — well below the buggy
+    # 0.5-default the old `rec.get("beta", 1)` read would have produced.
+    assert abs(mean_conf - 0.2) < 1e-9
+    assert mean_conf < 0.5
+
+
 # ── data-path provenance stamps + accumulator carry-forward ─────────────────
 
 

@@ -357,12 +357,13 @@ def tool_evaluate_prediction(args):
 
 try:
     # Shared, bundled modules (#781) — staged at zip root in the Lambda.
+    import coach_checkin as _ck  # #1791: read_cycle() — cycle-stamps the correction below
     import coach_corrections as _cc
     import coach_dossier as _cd
     import dispute_docket as _dd  # #1794: DOCKET_PK — docket rows live off-coach
 except ImportError:  # pragma: no cover — local/test path
     if not TYPE_CHECKING:  # the dual-name import trips mypy's "source found twice"
-        from lambdas import coach_corrections as _cc, coach_dossier as _cd, dispute_docket as _dd
+        from lambdas import coach_checkin as _ck, coach_corrections as _cc, coach_dossier as _cd, dispute_docket as _dd
 
 _DOSSIER_PREFIXES = ("COMMITMENT#", "LEARNING#", "QUALITY#")
 _DOSSIER_SINGLETONS = ("RELATIONSHIP#state",)
@@ -431,6 +432,7 @@ def tool_audit_coach_dossier(args):
                 {"surface": _cd.CORRECTION_SURFACE, "coach": f"{bare}_coach", "record_sk": record_sk, "action": action},
                 note,
                 "other",  # dossier corrections aren't review-pack error classes
+                cycle=_ck.read_cycle(),  # #1791: cycle-stamp at write time (fail-soft None)
             )
         except Exception as ex:
             return {"error": f"correction write failed (nothing was changed): {ex}"}
