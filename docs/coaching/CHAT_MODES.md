@@ -153,6 +153,7 @@ of re-deriving it:
 | Evening drinks count | `log_evening_intake` | PRIVATE (`#1405`) — 0-4 tap, no free text. Defaults to the Pacific evening; idempotent (re-log updates, returns `previous_count`). Drinks-only by decision — ADR-137. |
 | Journal entry (Morning/Evening/Weekly Reflection/Stressor/Health Event) | Notion connector (`notion-create-pages`) | **Not** an MCP write — Notion is the sole journal SOT (dual-SOT rejected, see the 2026-07-18 chat-journey session notes). Use the expanded date-key syntax from the section above. |
 | Night-before training session | `manage_hevy_routine` (`draft_custom` → `dry_run` → `commit`) | Never pass `title` — it's auto-rendered. |
+| A falsifiable claim he made on camera | `manage_diary_claims` (`action='log'`) | `/vlog` only (#1841). 0–3 per session, consent PER CLAIM (`consent: true`), silence means no. The gate is deterministic — it refuses anything without a resolvable metric, a horizon, and either a threshold+condition or a clear direction; say the refusal out loud, never reword to get past it (ADR-105). Graded by the same daily evaluator as coach predictions; due claims come back at `/vlog` step 0 via `action='due'`. PRIVATE. |
 
 Each command file below states which rows of this table it uses; none should invent a
 write path not on this list.

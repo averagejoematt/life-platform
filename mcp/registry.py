@@ -43,7 +43,7 @@ from mcp.tools_hevy import tool_get_workout_detail, tool_get_workouts
 
 # ADR-066 (2026-05-31): Hevy routine write-loop fat tool.
 from mcp.tools_hevy_routine import tool_manage_hevy_routine
-from mcp.tools_journal import tool_get_flourishing_trend, tool_get_mood, tool_mark_journal_quote
+from mcp.tools_journal import tool_get_flourishing_trend, tool_get_mood, tool_manage_diary_claims, tool_mark_journal_quote
 from mcp.tools_labs import tool_get_freshness_status, tool_get_labs
 from mcp.tools_lifestyle import (
     tool_create_experiment,
@@ -1475,6 +1475,56 @@ TOOLS = {
                         "#1806: any other value is coerced to 'journal' server-side.",
                     },
                     "sk": {"type": "string", "description": "Exact record sk (from list) — alternative selector for unmark."},
+                },
+                "required": [],
+            },
+        },
+    },
+    # ── #1841: the on-tape claims ledger (diary → prediction machinery → diary) ──────
+    "manage_diary_claims": {
+        "fn": tool_manage_diary_claims,
+        "schema": {
+            "name": "manage_diary_claims",
+            "description": (
+                "#1841: the on-tape claims ledger — the diary's half of the prediction machinery. "
+                "action='due' (default, ZERO args) is a /vlog STEP-0 call: the claims whose stated deadline has "
+                "landed, to be called back ON TAPE in his own words before anything new is asked. "
+                "action='log' registers claims at the route-the-takeaways close: propose 0-3 falsifiable claims "
+                "he actually made this session, take his explicit yes PER CLAIM (consent=true per claim, silence "
+                "means no, never auto), and pass them with the entry's source_sk. The gate is deterministic and "
+                "will REFUSE anything not falsifiable — the metric must resolve through measurable_metrics, and "
+                "the claim needs either a number to beat (threshold + condition) or an unambiguous direction plus "
+                "an integer horizon_days (14-365). Say refusals out loud rather than retrying them (ADR-105). "
+                "Admitted claims are graded by the same daily evaluator as every coach prediction; nothing here "
+                "grades and nothing here calls an LLM. action='list' shows the ledger + track record; "
+                "action='called_back' marks a due claim worked so it stops resurfacing. "
+                "PRIVATE — no public surface reads this partition."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "enum": ["due", "log", "list", "called_back"],
+                        "description": "due (default) = claims past their stated deadline; log = register consented claims; "
+                        "list = the whole ledger; called_back = mark one worked on tape.",
+                    },
+                    "date": {"type": "string", "description": "The session's day (YYYY-MM-DD). Required for log."},
+                    "source_sk": {
+                        "type": "string",
+                        "description": "The video-diary entry's sk (DATE#<date>#journal#video_diary#<suffix>). Required for log — "
+                        "the claim must point at the entry it came from, and the entry must already be ingested.",
+                    },
+                    "claims": {
+                        "type": "array",
+                        "description": "0-3 candidate claims. Each: {claim (his words), consent (MUST be exactly true, per claim), "
+                        "metric, horizon_days (int, 14-365), and EITHER threshold+condition (gt|gte|lt|lte|eq) OR direction "
+                        "(up|down); optional confidence (low|medium|high) and quote (the verbatim line he said it in).",
+                        "items": {"type": "object"},
+                    },
+                    "status": {"type": "string", "description": "Optional status filter for action='list'."},
+                    "sk": {"type": "string", "description": "The claim's sk (from action='due'). Required for called_back."},
+                    "today": {"type": "string", "description": "Override today's date (YYYY-MM-DD) — testing only."},
                 },
                 "required": [],
             },

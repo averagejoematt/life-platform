@@ -4,7 +4,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
-**Last updated:** 2026-07-27 (v8.6.0 — 75 MCP tools, 20 data sources, 99 Lambdas, 12 cached tools)
+**Last updated:** 2026-07-27 (v8.6.0 — 76 MCP tools, 20 data sources, 99 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -158,6 +158,7 @@ Every pk/sk family in the `life-platform` table, derived from code (writers = `p
 | `…SOURCE#protocols` / `PROTOCOL#<id>` | protocol registry | MCP `create/update/retire_protocol` | site_api_data, `list_protocols` | ✓ |
 | `…SOURCE#field_notes` / `WEEK#<iso-week>` | weekly field notes | `intelligence/field_notes_lambda.py` | chronicle, `get_field_notes` | ✓ |
 | `…SOURCE#diary_reactions` / `DATE#<d>#<channel>#<entry_uid>` | one short coach reaction per **V3-consented** Video Diary / Solo Recording entry (#1574): `coach_id`/`coach_name`, `reaction`, `tone`, `theme` (the 8-way laundered public theme), `tier` (`allude`\|`quote`), `entry_date`, `entry_uid`, optional owner-cleared `quote`. The private entry NEVER lands here — `lambdas/diary_consent.py` reduces it to a leak-proof public context before generation. `entry_uid` = the #476/E-6 stable page suffix, so two same-day recordings on one channel keep separate rows (#1756 fixed the collision) | `coach/coach_diary_reaction.py::store_reaction`, triggered inline per enriched entry by `ingestion/journal_enrichment_lambda.py` (#1756 — consent- + budget-gated, idempotent, fail-open) | `/api/diary_reactions` → lab-notes | n/v (fires on the first consented diary entry) |
+| `…SOURCE#diary_claims` / `PREDICTION#<stated_date>#<slug>` | **the on-tape claims ledger** (#1841) — falsifiable claims the SUBJECT made on camera, in the canonical `PREDICTION#` record shape. **PRIVATE** (`visibility: "private"`) — no public surface reads this partition. Full field table in the "on-tape claims ledger" section below | MCP `manage_diary_claims` (`action='log'`) via `lambdas/diary_claims.py::admit_claim` — the deterministic gate; **graded** by `coach/coach_prediction_evaluator.py` (same scan, same code, same statuses as coach predictions) | MCP `manage_diary_claims` (`due`/`list`), `get_predictions` | n/v (fires on the first consented on-tape claim) |
 | `…SOURCE#discovery_annotations` / — | discovery annotations | MCP `annotate_discovery` | `get_discovery_annotations` | n/v |
 | `…SOURCE#ledger` / `TOTALS#current`, `LEDGER#<id>`, `LIFETIME#aggregate`, `CYCLE_TOTALS#<n>` | accountability ledger; `LIFETIME#`/`CYCLE_TOTALS#` written at reset by `deploy/restart_ledger_reset.py` (ADR-072/077 dec F) | MCP `log_ledger_entry`; reset tool | `web/site_api_data.py` | ✓ |
 | `…SOURCE#ai_analysis` / `EXPERT#<name>` | expert-lens analyses | `intelligence/ai_expert_analyzer_lambda.py` | chronicle, site_api_intelligence | ✓ |
@@ -2429,6 +2430,54 @@ Signals are diffed against `last_interaction_date` so repeat runs never double-c
 | `evaluated` | boolean | Whether this prediction has been scored |
 | `accuracy_score` | number | Prediction accuracy (null until evaluated) |
 | `evaluated_at` | string | ISO timestamp of evaluation (null until evaluated) |
+
+---
+
+### On-tape claims ledger — `USER#matthew#SOURCE#diary_claims` (#1841)
+
+The subject's OWN falsifiable claims, extracted at the `/vlog` route-the-takeaways close.
+Same record shape as `PREDICTION#` above — deliberately, because that is what lets the
+existing daily `coach-prediction-evaluator` grade them by adding ONE partition to its scan
+instead of growing a second grader that would drift.
+
+**pk:** `USER#matthew#SOURCE#diary_claims` · **sk:** `PREDICTION#{stated_date}#{slug}`
+(`slug` = hard-truncated claim text + an 8-char sha256 of it, so the sk is also the
+idempotency handle — re-logging the same claim on the same day overwrites, never duplicates).
+
+**The split (ADR-105):** the `/vlog` interviewer PROPOSES candidates and takes consent per
+claim; `lambdas/diary_claims.py::admit_claim` ADMITS. Admission requires a metric that
+resolves through `measurable_metrics.METRIC_SOURCES`, an integer `horizon_days` in
+[14, 365], and a gradable spec — `machine` (numeric threshold + `gt|gte|lt|lte|eq`) or
+`directional` (an unambiguous direction). `qualitative` is **never** admitted: the evaluator
+skips that type, so admitting one would seed a row that can never be graded. There is no
+Bedrock call in this path and therefore no `budget_guard` feature.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `claim_id` / `prediction_id` | string | `{stated_date}#{slug}` — same value under both names; `prediction_id` is what every prediction surface projects |
+| `record_type` | string | `diary_claim` |
+| `coach_id` | string | **Always `""`** — a claim is the subject's, not a coach's. The evaluator's `if bayesian_update and coach_id` guard and the `_write_learning_record` early-return both key on this, so a claim can never move a coach's Bayesian confidence or land a row on a `COACH#` partition |
+| `claimant` | string | `matthew` |
+| `source` | string | `video_diary` (the only admitted channel in #1841; widening is one entry in `diary_claims.VALID_CLAIM_SOURCES`) |
+| `source_pk` / `source_sk` | string | Pointer to the diary entry the claim came from — `USER#matthew#SOURCE#notion` / `DATE#<d>#journal#video_diary#<suffix>`. Validated at admission against a real ingested entry; a dangling pointer is refused |
+| `created_date` / `stated_date` | string | YYYY-MM-DD he said it. `created_date` is the evaluator's window anchor; `stated_date` is the same value under the diary's name |
+| `claim_natural` | string | The claim in his words (≤400 chars) |
+| `quote` | string | Optional verbatim line he said it in. **Private** — never a publishable quote (that is `mark_journal_quote`'s consent channel, separately) |
+| `criterion` | string | The deterministic restatement, e.g. `weight_lbs < 300 by 2026-10-31` |
+| `metric` | string | An allowlisted `measurable_metrics` key |
+| `subdomain` | string | From `measurable_metrics.metric_subdomain` — drives the evaluator's domain-minimum window |
+| `evaluation` | map | `{type: machine\|directional, metric, condition, threshold, evaluation_window_days}` — the spec the evaluator reads. Directional specs carry `threshold: null` by construction (C-3/#813) |
+| `horizon_days` | number | Stated horizon, 14–365 |
+| `grade_by` | string | **Frozen at admission** = `stated_date + horizon_days`. This is the claim's own deadline — the date the diary calls it back on tape. The evaluator additionally floors its window per domain (`DOMAIN_MIN_WINDOWS`), so a short-horizon claim can still be `pending` at `grade_by`; that is reported honestly, not hidden |
+| `confidence` | number | 0.0–1.0. Word→float map is IDENTICAL to `coach_state_updater._parse_confidence` so a pooled Brier score stays meaningful |
+| `confidence_stated` | string | The word he actually used (`low`/`medium`/`high`/`unknown`) |
+| `status` | string | `pending` → `confirmed` \| `refuted` \| `inconclusive` \| `expired`. Same vocabulary, same grader as coach predictions |
+| `outcome`, `outcome_date`, `outcome_notes` | string | Written by the evaluator only. **Absent until graded** (ADR-104 honest absence — never written as null) |
+| `called_back_at` | string | ISO ts the claim was worked on tape (`action='called_back'`). Set = it stops appearing in the `due` list |
+| `consent` / `consent_at` | bool / string | Explicit per-claim consent. `admit_claim` refuses anything where `consent is not True` — never inferred, silence means no |
+| `visibility` | string | `private` — no public surface reads this partition. Publishing would need an explicit `diary_consent.py` marker, deliberately not wired |
+| `schema_version` | number | 1 |
+| `phase` / `cycle` | string / number | ADR-058 stamp (`phase_taxonomy.experiment_stamp`). Class `experiment_scoped` — a claim's grade-by date is anchored to the cycle it was made in |
 
 **LEARNING#{date} fields:**
 
