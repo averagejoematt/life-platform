@@ -79,9 +79,8 @@ diff deploys — which also means **CI's Deploy job never ran today: the day's l
 changes are stranded on main, undeployed** (MCP bundle + diary_claims, coach-prediction-
 evaluator, daily-metrics-compute, weekly-correlation-compute, hypothesis-engine,
 youtube-social-ingestion). Nothing is broken — the live fleet runs yesterday's verified
-code; the new features are dormant until deployed. **Sequence: Matthew runs the CDK
-one-liner → Plan clears → dispatch `deploy_all=true` + approve → fleet current.**
-Site + site-api are NOT stranded (deployed today, live current).
+code; the new features are dormant until deployed. **RESOLVED same evening — see the Main line: CDK deploy ran, deploy_all-2 green,
+fleet current 22:14Z.** Site + site-api were never stranded.
 
 ## Gotchas (durable → memory, written)
 - **An undeployed IAM merge strands every subsequent CI deploy** — R8-ST6 diffs against
@@ -103,8 +102,13 @@ Site + site-api are NOT stranded (deployed today, live current).
 uplevel/CLAUDE/CONTRIBUTING rewire, DIARY_STUDIO_KIT new); wrap adds none beyond.
 **Decisions:** ADR-099 amendment filed (#1865, PR #1876) + the #1324-addendum correction
 (#1871); no further ADR needed — remaining choices were implementation posture.
-**Main:** red — R8-ST6 IAM-review gate only (code-green; every test/lint gate green;
-clears on the owner CDK deploy below).
+**Main:** green (ea4a57f5) — POST-WRAP UPDATE: Matthew ran the CDK one-liner (stacks
+UPDATE_COMPLETE 21:44/21:45Z, ExperimentCycleRead grant verified live on the
+milestone-digest role); deploy_all take 2 then went green end-to-end (Deploy+Smoke+
+I1/I2/I5+visual-QA; rollback skipped) after take 1 was caught pre-deploy by CI's
+--strict engine-doc drift gate (three re-verify stamps for #1843's additive changes,
+ea4a57f5 — NB local check_doc_index runs advisory, CI runs --strict). Fleet uniform
+22:09–22:14Z incl. us-east-1; the day's features are LIVE.
 **Incidents:** 1 row added — budget governor tier 1→2 (by-design band crossing under the
 ADR-133 July window; ensemble/reader AI paused; self-resolves 08-01).
 **Closures:** #1858 #1859 #1841 #1842 #1843 #1844 #1845 #1846 #1864 #1865 #1866 #1867
@@ -123,10 +127,9 @@ one-line tolerance widen is noted for #1872.
 **Labels:** OK.
 
 ## Residual / next picks
-- **Owner, one line (LOAD-BEARING — unblocks the whole deploy chain):**
-  `bash deploy/cdk_deploy.sh LifePlatformCompute LifePlatformEmail`
-  then tell the session (or next session) to dispatch `deploy_all=true` + approve —
-  not-work — IAM deploys are Matthew's hard boundary.
+- ~~Owner CDK one-liner~~ **DONE post-wrap** (21:44Z) + deploy_all-2 green — the
+  deploy chain is closed; #1858's last AC (a cycle-stamped digest write) proves itself
+  on tomorrow's 17:15Z run — not-work — passive watch.
 - **Owner, when ready:** publish the OSS repo (one-liner in PR #1874 body) — not-work —
   creating a public repo is Matthew's call · studio-side `PUBLISH_LOG.md` entry column
   (#1845's kit doc has the paste-in) — not-work — file lives outside the repo.
