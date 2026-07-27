@@ -1,6 +1,6 @@
 # CONVENTIONS — the load-bearing reflexes
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-20
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-27
 
 The single canonical home for the hard-won operational reflexes that keep a deploy
 from silently regressing production. Each one was learned from a real incident. When
@@ -456,7 +456,9 @@ read that section for the incident narrative and the exact mechanics.
 | A handover residual/next-picks bullet names real work with no issue number | Residual-queue gate (#1340), step (e4) | `scripts/check_residual_queue.py` |
 | A stale `git stash` entry or a dead pre-commit hook survives across sessions | Stash + hook hygiene gate (#1326), step (e5) | `deploy/session_postflight.py` |
 | An open `type:story` issue carries no `model:*` label (label-routing query silently skips it) | Label-completeness gate (#1349), step (e6) | `scripts/check_story_labels.py` |
-| A filed issue skips the ADR-099 contract (no milestone, score line, `## Outcome`, acceptance boxes or epic link) | Filing-contract linter (#1867), step (e6) — advisory until #1872 flips it | `scripts/check_backlog_hygiene.py` |
+| A filed issue skips the ADR-099 contract (no milestone, score line, `## Outcome`, acceptance boxes or epic link) | Filing-contract linter (#1867/#1870), step (e7) — advisory exit until #1872 flips it | `scripts/check_backlog_hygiene.py` |
+| An issue closed this session leaves no outcome verdict (53 of the last 60 closures had zero comments) | Closure-comment gate (#1870), step (e8) | `.claude/commands/wrap.md` step (e8); contract in ADR-099's amendment ¶3 |
+| `Now` sits at zero actionable stories, or a `Later` issue ages past 60d with nobody calling promote-or-close | Now-refill + `Later` sweep (#1870), step (e9) | `scripts/backlog_next.py`; `.claude/commands/wrap.md` step (e9) |
 | A memory topic file exists un-indexed from `MEMORY.md`/`project_shipped_archive.md` | Orphan/broken-link gate (#1259), step (c) | inline bash loop, `.claude/commands/wrap.md` step (c) |
 | A `MEMORY.md` index correction didn't carry through to the topic file's body | Body-follows-index gate (#1342), step (c) | `scripts/check_memory_body_facts.py` |
 

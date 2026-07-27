@@ -268,7 +268,17 @@ check that must print nothing.
 - If `gh` isn't authenticated/reachable from this session, the script fails open (prints
   a skip note, exits 0) — note that in the handover rather than silently skipping the
   check.
-- **Also run the full filing-contract linter — ADVISORY, does not gate the wrap (#1867):**
+- This gate is the `model:*` rule alone. The rest of the ADR-099 filing contract is
+  (e7)'s, which already absorbs this rule — both run until #1872 deletes this one.
+
+### (e7) Backlog-hygiene gate — a wrap gate, same shape as (d)/(e)/(e2)/(e3)/(e4)/(e5)/(e6) (#1870)
+
+The ADR-099 filing contract is only real if something re-reads it after filing. #1863
+measured the gap: (e6)'s `model:*` rule was the ONLY validation a filed issue ever got, so
+#1858 and #1859 — filed mid-session on 2026-07-27 with no milestone, no score line and no
+`## Outcome` — were invisible to every ranked query and nothing noticed.
+
+- Run:
   ```bash
   python3 scripts/check_backlog_hygiene.py --advisory
   ```
@@ -276,11 +286,87 @@ check that must print nothing.
   `area:*` / `model:*`, `prio:*` + a milestone on work issues, a `## Outcome` naming a
   sanctioned audience, 3–5 `## Acceptance` boxes, the canonical `**Score:**` line whose
   `→ <milestone>` matches the real one, the `**Epic:**` link, epic `## Stories` coverage,
-  `Now`-queue liveness, and stale `Later` issues. **It always exits 0 for now** — the
-  corpus is known-dirty and #1868's backfill burns the list down; #1872 flips the default
-  to `--blocking` and deletes `check_story_labels.py` (whose `model:*` rule this linter
-  already absorbs — both run until then). Fix what this session filed; don't chase the
-  backlog's historical debt at wrap time.
+  `Now`-queue liveness, and stale `Later` issues.
+- **It always exits 0 for now** — the corpus is known-dirty and #1868's backfill burns the
+  list down; **#1872** flips the default to `--blocking` and deletes `check_story_labels.py`
+  (whose `model:*` rule this linter already absorbs). **The exit code is the provisional
+  half; the gate shape is not** — a printed violator on an issue this session filed,
+  touched or closed may not be left unfixed. Fix those before closing this step; don't
+  chase the backlog's historical debt at wrap time — #1868 owns that.
+- If `gh` isn't authenticated/reachable from this session, the linter fails open (prints a
+  skip note, exits 0) — note that in the handover rather than silently skipping the check.
+- Its `now_liveness` and `later_staleness` findings are not defects — they are (e9)'s
+  input. Carry them there rather than fixing them here.
+
+### (e8) Closure-comment gate — a wrap gate, same shape as (d)/(e)/(e2)/(e3)/(e4)/(e5)/(e6)/(e7) (#1870)
+
+Every issue closed this session gets an outcome verdict, or the wrap is incomplete —
+**silent omission is not an outcome.** #1863 measured the hole: **53 of the last 60 closed
+issues have zero comments**, and the ownership gap is structural — `issue-filer.md` never
+closes issues, `worktree-implementer.md` may not touch them, and `Fixes #N` closes
+silently. ADR-099's amended closure contract names the owner: **the session that merges the
+PR, enforced at `/wrap`** — the only actor holding the diff and the live evidence at the
+same moment. This is the ADR-105 loop finally closed on a product forecast, not just a
+health one.
+
+- List what closed this session, then comment on each:
+  ```bash
+  gh issue list -R averagejoematt/life-platform --state closed \
+    --search "closed:>=$(date -u +%F)" --json number,title,stateReason
+  gh issue comment <N> --body "$(cat <<'EOF'
+  **Shipped:** <what changed> · PR #N · <live evidence>
+  **Outcome:** <realized|partial|not-realized> — <did the ## Outcome sentence come true?>
+  EOF
+  )"
+  ```
+  Those two lines are the contract's shape verbatim (ADR-099 amendment ¶3) — don't
+  re-invent them.
+- `not-realized` and `partial` are legitimate, expected verdicts; recording one honestly is
+  the entire point. **Under ADR-104, a `realized` verdict you did not actually verify is
+  the specific failure this contract exists to prevent** — if the live evidence isn't in
+  hand, write `partial` with what's missing. A blank comment is better than a fabricated one.
+- A `not planned` close gets the **same two lines** with a one-clause reason (e.g.
+  `**Shipped:** nothing — superseded by #1866` / `**Outcome:** not-realized — the outcome
+  is now #1866's`).
+- **Do not backfill older closures.** The amendment settled it: closed stories are
+  going-forward-only, because reconstructing them would be AI guesswork presented as
+  record. #1873 owns the ~23 closed epics.
+- The handover carries one line either way: `**Closures:** #N, #M commented` or
+  `**Closures:** none — no issues closed this session`.
+
+### (e9) Now-refill + `Later` sweep — a wrap gate, same shape as (d)/(e)/(e2)–(e8) (#1870)
+
+ADR-099's own maintenance rule (3) — "a monthly ~10-minute triage sweep closes-or-demotes
+stale issues" — had **no implementation anywhere in the repo** until this step. The
+measured cost: `Later` held 33 open issues with **0 of the last 30 closures** coming from
+it, while `Now` sat at zero actionable work (all 3 open `Now` stories carried
+`gate:owner`) and nothing said so. A monthly sweep nobody ever ran becomes per-session
+upkeep the wrap can't skip.
+
+- **Refill `Now`.** (e7)'s `now_liveness` finding is the trigger: if `Now` holds fewer than
+  3 actionable (non-`gate:owner`, non-`blocked:*`) stories, promote the top-scored
+  actionable `Next` stories until it does:
+  ```bash
+  python3 scripts/backlog_next.py --milestone Next
+  gh issue edit <N> --milestone Now
+  ```
+  Promote **by the printed rank** — the stored ADR-099 score line is the selector, never a
+  fresh re-scoring (that habit is the headline finding #1863 fixed). If nothing on `Next`
+  is actionable either, say so; an empty queue reported is honest, an empty queue unsaid
+  is the failure.
+- **Sweep `Later`.** The stale list is (e7)'s `later_staleness` output:
+  ```bash
+  python3 scripts/check_backlog_hygiene.py --advisory --rule later_staleness
+  ```
+  Every printed issue gets an **explicit promote-or-close call this session** — promote it
+  (`gh issue edit <N> --milestone Next`) if it still matters, or close it (`gh issue close
+  <N> --reason "not planned"`, plus its (e8) comment) if it doesn't. "Keep it on `Later`"
+  is a legitimate third call, but only when stated out loud with a one-clause reason —
+  never by silence. An aged `Later` issue is a triage signal, never a defect: this rule can
+  never fail the gate, even after #1872.
+- The handover carries one line either way: `**Backlog:** Now <n> actionable (promoted
+  #N, #M); Later sweep — <calls made>` or `**Backlog:** Now live at <n>; no stale Later
+  issues`.
 
 ### (f) Commit the wrap
 
@@ -327,3 +413,14 @@ session — status block, handover, build beat (9 R22 smalls #836–#845)`).
   must never land only in a workflow file or a commit message.
 - **Model: label completeness, no silent skips (#1349).** `scripts/check_story_labels.py`
   must print `OK` before the wrap commit; a violator gets fixed (labeled), not deferred.
+- **Filing-contract violators get fixed, not deferred (#1870).**
+  `scripts/check_backlog_hygiene.py --advisory` runs at every wrap (step (e7)); a printed
+  violator on an issue this session filed, touched or closed may not be left unfixed. The
+  advisory exit code is provisional (#1872 flips it) — the gate shape is not.
+- **Outcome verdict on every closure, never silence (#1870).** Step (e8): each issue closed
+  this session carries the ADR-099 closure comment (`**Shipped:** …` + `**Outcome:**
+  <realized|partial|not-realized> — …`), a `not planned` close included. A fabricated
+  `realized` is worse than a blank comment (ADR-104).
+- **The queue is refilled or its depth is reported, never silence (#1870).** Step (e9):
+  `Now` below 3 actionable stories gets promotions from `Next` by stored rank, and every
+  `Later` issue untouched >60d gets an explicit promote-or-close call in the handover.

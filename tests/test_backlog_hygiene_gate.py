@@ -106,6 +106,68 @@ def test_wrap_says_the_linter_is_advisory_and_names_the_flip_issue():
     assert "#1872" in section, "the wrap step must name what flips it blocking, or it reads as a permanent no-op"
 
 
+# ── the three #1870 wrap steps: gate (e7), closure comment (e8), queue upkeep (e9) ──
+def _wrap_step(letter: str) -> str:
+    """The body of one lettered wrap step, up to the next `### (` heading."""
+    wrap = WRAP.read_text(encoding="utf-8")
+    marker = f"### ({letter})"
+    assert marker in wrap, f"#1870: wrap.md has no {marker} step"
+    return wrap.split(marker, 1)[1].split("### (", 1)[0]
+
+
+def test_wrap_e7_is_the_hygiene_gate_in_the_established_shape():
+    """#1870 AC1: the #1867 advisory line is formalized into its own (e7) gate slot —
+    same 'same shape as (d)/(e)/(e2)...' lettering every other wrap gate carries."""
+    section = _wrap_step("e7")
+    assert "same shape as" in section.splitlines()[0], "(e7) must declare the established gate shape in its heading"
+    assert "check_backlog_hygiene.py --advisory" in section
+    assert "may not be left unfixed" in section, "#1870: the wrap discipline is that a printed violator gets fixed"
+    assert "#1872" in section, "(e7) must name the issue that flips the exit code, or it reads as a permanent no-op"
+
+
+def test_wrap_e8_carries_the_adr099_closure_contract_verbatim():
+    """#1870 AC2: the closure comment is ADR-099's amendment ¶3, quoted — not re-invented."""
+    section = _wrap_step("e8")
+    assert "**Shipped:** <what changed> · PR #N · <live evidence>" in section
+    assert "**Outcome:** <realized|partial|not-realized> — <did the ## Outcome sentence come true?>" in section
+    assert "not planned" in section, "a `not planned` close gets the same comment with a one-clause reason"
+    assert "gh issue comment" in section, "the step must name the command, not merely describe the duty"
+    # the ADR is the single source of the contract's shape — the two must not drift apart
+    adr = (ROOT / "docs" / "DECISIONS.md").read_text(encoding="utf-8")
+    assert "**Shipped:** <what changed> · PR #N · <live evidence>" in adr
+
+
+def test_wrap_e9_refills_now_and_sweeps_later():
+    """#1870 AC3+AC4: one step, two halves — the Now refill (via the ranker) and the
+    `Later` promote-or-close call (via the linter's later_staleness rule)."""
+    section = _wrap_step("e9")
+    assert "backlog_next.py --milestone Next" in section, "the refill must promote by the stored rank, not a fresh re-score"
+    assert "--rule later_staleness" in section, "the Later sweep's input is the linter's own staleness rule"
+    assert f"{hy.NOW_LIVENESS_MIN} actionable" in section or f"fewer than\n  {hy.NOW_LIVENESS_MIN}" in section
+    assert "promote-or-close" in section
+    assert "**Backlog:**" in section, "#1870: the promotion has to be noted in the handover"
+
+
+def test_wrap_guardrails_register_all_three_1870_steps():
+    """The guardrails list is the wrap's own contract restatement — a step absent from it
+    is a step a hurried session can skip silently."""
+    guardrails = WRAP.read_text(encoding="utf-8").split("## Guardrails", 1)[1]
+    assert guardrails.count("#1870") >= 3, "each of (e7)/(e8)/(e9) needs its own guardrail bullet"
+    for phrase in ("check_backlog_hygiene.py", "closure comment", "promote-or-close"):
+        assert phrase in guardrails, f"#1870: the guardrails list never mentions {phrase!r}"
+
+
+def test_conventions_gate_registry_routes_all_three_1870_steps():
+    """AC1 says 'registered in both files' — the §9 registry is the routing index a
+    session reads to answer 'which gate owns this defect class?'."""
+    registry = (ROOT / "docs" / "CONVENTIONS.md").read_text(encoding="utf-8")
+    section = registry.split("## 9. Gate registry", 1)[1].split("## Facts that drift", 1)[0]
+    for step in ("step (e7)", "step (e8)", "step (e9)"):
+        assert step in section, f"#1870: the gate registry has no row pointing at {step}"
+    assert "step (e6) — advisory" not in section, "#1870: the filing-contract row still points at the old (e6) slot"
+    assert "backlog_next.py" in section
+
+
 # ── one contract surface: the linter compiles no grammar of its own ─────────────
 def test_linter_imports_the_shared_contract_and_compiles_no_regex():
     """The failure this guards: a second copy of the grammar drifting from the ranker's.
