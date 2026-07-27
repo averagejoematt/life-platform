@@ -890,6 +890,94 @@ def check_redirect_spotcheck():
 
 
 # ---------------------------------------------------------------------------
+# CHECK 12 — Notion Template schema drift (#1840)
+# ---------------------------------------------------------------------------
+# #1572/#1573 shipped Video Diary + Solo Recording template support in
+# notion_lambda.py's TEMPLATE_SK, but the live Notion Journal database's
+# `Template` select property never got the matching options added — the
+# Notion API silently rejected any page carrying those values, so both
+# channels were unreachable from the moment the code shipped, and NOTHING
+# caught it: the "unknown template" fallback (notion_lambda.parse_page) only
+# logs when a template string IS present-but-unrecognized; here the value
+# could never be set on a page at all, so even that never fired. This check
+# reads the LIVE Notion schema nightly and asserts every non-fallback
+# TEMPLATE_SK entry is a real option on the live select property — the same
+# class of drift can never again ship inert without a loud, red qa-smoke
+# result the next morning.
+#
+# Fail-open, honestly: a Notion API problem (auth failure, outage, network)
+# reports as a WARN ("skipped"), never a false green (.ok()) and never a
+# .fail() that pages someone for an unrelated Notion outage. Only an actual
+# schema/code mismatch — confirmed against a successfully-fetched live
+# schema — is a .fail().
+
+NOTION_SECRET_NAME = os.environ.get("NOTION_SECRET_NAME", "life-platform/ingestion-keys")
+# Matches lambdas/ingestion/notion_lambda.py's pinned NOTION_VERSION — keep in sync;
+# a version bump there should be mirrored here or this check reads a different API shape.
+NOTION_API_VERSION = "2022-06-28"
+
+
+def check_notion_template_schema():
+    check = Check("notion:template_schema", "Notion Schema")
+
+    try:
+        from ingestion.notion_lambda import TEMPLATE_SK
+    except ImportError as e:
+        return [check.warn(f"Cannot import TEMPLATE_SK from notion_lambda — skipping: {e}")]
+
+    expected = set(TEMPLATE_SK) - {"journal"}  # "journal" is the synthetic fallback, not a real select option
+
+    sm = boto3.client("secretsmanager", region_name=REGION)
+    try:
+        try:
+            from secret_cache import get_secret_json
+
+            secret = get_secret_json(NOTION_SECRET_NAME, sm)
+        except ImportError:
+            secret = json.loads(sm.get_secret_value(SecretId=NOTION_SECRET_NAME)["SecretString"])
+    except Exception as e:
+        return [check.warn(f"Cannot fetch Notion secret {NOTION_SECRET_NAME} — skipping: {e}")]
+
+    api_key = secret.get("notion_api_key") or secret.get("api_key")
+    database_id = secret.get("notion_database_id") or secret.get("database_id")
+    if not api_key or not database_id:
+        return [check.warn("Notion secret missing api_key/database_id — skipping")]
+
+    req = urllib.request.Request(
+        f"https://api.notion.com/v1/databases/{database_id}",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Notion-Version": NOTION_API_VERSION,
+            "User-Agent": "life-platform-qa-smoke",
+        },
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            db = json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        return [check.warn(f"Notion API {e.code} fetching database schema — skipping (fail-open): {e.reason}")]
+    except Exception as e:
+        return [check.warn(f"Notion API unreachable — skipping (fail-open): {e}")]
+
+    template_prop = (db.get("properties") or {}).get("Template") or {}
+    live_options = {opt.get("name") for opt in template_prop.get("select", {}).get("options", []) if opt.get("name")}
+
+    if not live_options:
+        return [check.warn("Live Notion database has no 'Template' select property (or no options) — skipping")]
+
+    missing = expected - live_options
+    if missing:
+        check.fail(
+            f"Live Notion 'Template' select is missing option(s) the code depends on: {sorted(missing)} "
+            f"— TEMPLATE_SK/code shipped ahead of the live Notion schema (see #1840). Live options: {sorted(live_options)}"
+        )
+    else:
+        check.ok(f"all {len(expected)} non-fallback TEMPLATE_SK option(s) present in the live Notion schema")
+    return [check]
+
+
+# ---------------------------------------------------------------------------
 # #1445: EMF summary metrics — emitted on EVERY run, including all-green
 # ---------------------------------------------------------------------------
 # Before this, qa-smoke only spoke by SENDING AN EMAIL, and only on a real
@@ -1028,6 +1116,7 @@ def lambda_handler(event, context):
         all_checks += check_hero_weight_arithmetic()  # #1225: home hero stat row reconciles + trend-honest
         all_checks += check_receipt_replay()  # #1373: progression-receipt drift alarm (deterministic replay)
         all_checks += check_redirect_spotcheck()  # #1430: weekly legacy-redirect sample, rotates over redirects.map
+        all_checks += check_notion_template_schema()  # #1840: code TEMPLATE_SK vs live Notion schema drift gate
         # blog moved to /story/ in v4 — shown paused (not failed) so it's not forgotten.
         all_checks.append(
             Check("blog:links", "Blog Links").pause("Blog — paused (chronicle now lives at /story/ in v4); will return if revived")
