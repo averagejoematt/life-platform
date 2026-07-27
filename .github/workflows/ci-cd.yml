@@ -1027,7 +1027,7 @@ jobs:
   rollback-on-smoke-failure:
     name: Auto-rollback (smoke failure)
     runs-on: ubuntu-latest
-    needs: [reconcile, plan, deploy, smoke-test]   # #1173: reconcile listed to read build_sha
+    needs: [reconcile, plan, deploy, smoke-test]   # #1173: reconcile listed to read build_sha; plan for fleet_changed (#1859)
     # `always() &&` is REQUIRED: a job whose dependency (smoke-test) failed is
     # skipped by default unless its `if` contains a status-check function — so
     # without always() this rollback never actually fires (#418/ADR-117 fix; the
@@ -1049,10 +1049,33 @@ jobs:
         run: |
           MATRIX='${{ needs.plan.outputs.deploy_matrix }}'
           MCP_CHANGED='${{ needs.plan.outputs.mcp_changed }}'
-          COUNT=$(echo "$MATRIX" | jq 'length')
+          FLEET_CHANGED='${{ needs.plan.outputs.fleet_changed }}'
 
           echo "⚠️  Smoke test failed after successful deploy — initiating auto-rollback"
           echo ""
+
+          # #1859 gap 2: on fleet_changed=true the Deploy job's "Fleet deploy" step
+          # runs deploy/deploy_fleet.sh, which redeploys and re-seeds
+          # deploys/<fn>/previous.zip for EVERY mapped function (+ both MCP
+          # functions, fc18f0c2) — NOT just whatever deploy_matrix happens to hold.
+          # deploy_matrix is built from the file-diff loop keyed on per-function
+          # source paths, so a push that only touches an unmapped shared module
+          # (the fleet trigger) leaves it "[]"; the tally below was silently 0/0/0
+          # (observed twice 2026-07-27, ~01:37Z/~02:27Z) even though the fleet was
+          # actually redeployed. Rebuild the candidate list straight from
+          # ci/lambda_map.json — the same source deploy_fleet.sh iterates — so a
+          # push-triggered fleet deploy's smoke failure produces a REAL rollback
+          # attempt across the functions that were actually touched.
+          FLEET_FALLBACK="false"
+          if [ "$FLEET_CHANGED" = "true" ]; then
+            FLEET_FALLBACK="true"
+            echo "ℹ️  fleet_changed=true — deploy_fleet.sh redeployed the whole map; reverting from ${{ env.LAMBDA_MAP }} rather than trusting deploy_matrix (fleet-push rollback path, #1859)"
+            MATRIX=$(jq -c '[.lambdas | to_entries[] | select((.value.not_deployed // false) | not) | {function: .value.function}]
+                       + [{function:"life-platform-mcp"}, {function:"life-platform-mcp-warmer"}]
+                       | unique_by(.function)' "${{ env.LAMBDA_MAP }}")
+          fi
+          COUNT=$(echo "$MATRIX" | jq 'length')
+          echo "   $COUNT function(s) to roll back"
 
           ROLLED_BACK=0
           MISSING=0
@@ -1074,8 +1097,9 @@ jobs:
             esac
           done
 
-          # Roll back MCP if it was deployed
-          if [ "$MCP_CHANGED" = "true" ]; then
+          # Roll back MCP if it was deployed standalone (the fleet fallback above
+          # already covers both MCP functions — deploy_fleet.sh always updates them).
+          if [ "$MCP_CHANGED" = "true" ] && [ "$FLEET_FALLBACK" = "false" ]; then
             echo "→ Rolling back life-platform-mcp..."
             RC=0
             bash deploy/rollback_lambda.sh "life-platform-mcp" || RC=$?
