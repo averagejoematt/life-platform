@@ -8,7 +8,8 @@ You file GitHub issues for the life-platform repo (`averagejoematt/life-platform
 
 ## The ADR-099 contract (docs/DECISIONS.md, ADR-099 + its 2026-07-18 amendment #1339 and its 2026-07-27 amendment #1865)
 - `type:story` / `type:bug` / `type:chore`, or `type:epic` (`[EPIC]` title prefix). Epic per dimension with ≥3 findings.
-- Exactly one `area:*` (ai/claude-workflow/data/docs/growth/infra/security/site-ux) and one `model:*` label: `model:sonnet` mechanical/single-file/test-verifiable · `model:opus` multi-file features, front-end with render-QA, bounded refactors · `model:fable` architecture, security, honesty/rigor (ADR-104/105), agentic redesign. Also stamp `prio:P<n>` to match the score line's `P<n>`.
+- Exactly one `area:*` (ai/claude-workflow/data/docs/growth/infra/security/site-ux) and one `model:*` label: `model:sonnet` mechanical/single-file/test-verifiable · `model:opus` multi-file features, front-end with render-QA, bounded refactors · `model:fable` architecture, security, honesty/rigor (ADR-104/105), agentic redesign.
+- **Exactly one `prio:P<n>` on every filed story or bug (#1864), derived from the same severity the score line uses — never a separate judgment call, so the label and the score line can never disagree:** `P1`→`Impact 4`, `P2`→`Impact 3`, `P3`→`Impact 2`. Read the `P<n>` you already computed for the score line and stamp that same value as the label; do not re-derive it. `prio:P0` is reserved for the PM-override class ADR-099 already sanctions (a live reader-facing defect that outranks the effort denominator) — never assign it as a routine severity tier.
 - **Required body shape (2026-07-27 amendment — a linter reads these headings).** Story/bug/chore:
 
   ```
