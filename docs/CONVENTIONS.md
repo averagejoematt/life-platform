@@ -456,6 +456,7 @@ read that section for the incident narrative and the exact mechanics.
 | A handover residual/next-picks bullet names real work with no issue number | Residual-queue gate (#1340), step (e4) | `scripts/check_residual_queue.py` |
 | A stale `git stash` entry or a dead pre-commit hook survives across sessions | Stash + hook hygiene gate (#1326), step (e5) | `deploy/session_postflight.py` |
 | An open `type:story` issue carries no `model:*` label (label-routing query silently skips it) | Label-completeness gate (#1349), step (e6) | `scripts/check_story_labels.py` |
+| A filed issue skips the ADR-099 contract (no milestone, score line, `## Outcome`, acceptance boxes or epic link) | Filing-contract linter (#1867), step (e6) — advisory until #1872 flips it | `scripts/check_backlog_hygiene.py` |
 | A memory topic file exists un-indexed from `MEMORY.md`/`project_shipped_archive.md` | Orphan/broken-link gate (#1259), step (c) | inline bash loop, `.claude/commands/wrap.md` step (c) |
 | A `MEMORY.md` index correction didn't carry through to the topic file's body | Body-follows-index gate (#1342), step (c) | `scripts/check_memory_body_facts.py` |
 

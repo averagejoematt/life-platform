@@ -14,6 +14,11 @@ ONE CONTRACT, TWO CONSUMERS
   looks like, the backlog silently splits into "passes lint" and "is
   rankable". Sharing this module is what prevents that.
 
+  The rule holds for every grammar the contract has, not just the score line:
+  #1867 needed the `**Epic:**` link and the epic `## Stories` roster parsed, and
+  they were added HERE (parse_epic_link / story_refs) rather than compiled inside
+  the linter — one contract surface, no second copy to drift.
+
 THE CANONICAL SCORE LINE (ADR-099 amendment 2026-07-27, #1865)
 
     **Score:** P2 · Impact 3 × Confidence 1.0 / Effort S(1) = 3.00 → Now
@@ -74,6 +79,21 @@ LEGACY_OUTCOME_INLINE_RE = re.compile(r"^\*\*outcome_if_fixed[:.]?\*\*[:.]?[ \t]
 ACCEPTANCE_HEADING_RE = re.compile(r"^#{2,}[ \t]*Acceptance\b", re.IGNORECASE)
 CHECKBOX_RE = re.compile(r"^[ \t]*[-*][ \t]+\[(?P<mark>[ xX])\][ \t]*(?P<text>.*)$")
 
+STORIES_HEADING_RE = re.compile(r"^#{2,}[ \t]*Stories\b", re.IGNORECASE)
+ISSUE_REF_RE = re.compile(r"#(?P<number>\d+)")
+
+# The epic-link line, required on every story/bug/chore by the amendment:
+#   **Epic:** #1863            — or —   **Epic:** none — stands alone because …
+# A silently absent line is a contract violation; an explicit `none` is not, which
+# is why the "none" arm parses rather than failing. The reason text is captured but
+# NOT required here: "did the author actually give a reason" is a value rule, and
+# #1867's linter is where value rules are enforced and reported.
+EPIC_LINE_RE = re.compile(
+    r"^\*\*Epic:\*\*[ \t]+" r"(?:#(?P<number>\d+)|(?P<none>none)\b[ \t]*(?:[—–:-][ \t]*(?P<reason>.*))?)" r"(?:[ \t].*)?$",
+    re.IGNORECASE,
+)
+EPIC_LINE_PREFIX_RE = re.compile(r"^\*\*Epic:\*\*", re.IGNORECASE)
+
 ANY_HEADING_RE = re.compile(r"^#{1,6}[ \t]")
 
 # Now first — the tiebreak direction, and the fall-through order.
@@ -95,6 +115,15 @@ class Score(NamedTuple):
     effort_points: int
     value: float  # the stored rank — impact * confidence / effort_points
     milestone: str  # "Now" | "Next" | "Later"
+    raw: str  # the source line, verbatim
+
+
+class EpicLink(NamedTuple):
+    """A parsed `**Epic:**` line. Exactly one of `number` / `is_none` is meaningful."""
+
+    number: Optional[int]  # the epic issue number, for the `#N` form
+    is_none: bool  # True for the explicit `none — <reason>` form
+    reason: Optional[str]  # the stated reason, for the `none` form
     raw: str  # the source line, verbatim
 
 
@@ -205,6 +234,55 @@ def acceptance_items(body: Optional[str]) -> List[Tuple[bool, str]]:
         if m:
             items.append((m.group("mark").lower() == "x", m.group("text").strip()))
     return items
+
+
+def find_epic_line(body: Optional[str]) -> Optional[str]:
+    """The first line claiming to be the epic link — well-formed or not.
+
+    Same split as find_score_line/parse_score_line: "absent" and "present but
+    malformed" are different facts, and a linter has to be able to say which.
+    """
+    for line in normalize(body).splitlines():
+        stripped = line.strip()
+        if EPIC_LINE_PREFIX_RE.match(stripped):
+            return stripped
+    return None
+
+
+def parse_epic_link(body: Optional[str]) -> Optional[EpicLink]:
+    """Parse the canonical `**Epic:** #N` / `**Epic:** none — <reason>` line, or None."""
+    for line in normalize(body).splitlines():
+        stripped = line.strip()
+        m = EPIC_LINE_RE.match(stripped)
+        if not m:
+            continue
+        number = m.group("number")
+        reason = (m.group("reason") or "").strip() or None
+        return EpicLink(
+            number=int(number) if number else None,
+            is_none=bool(m.group("none")),
+            reason=reason,
+            raw=stripped,
+        )
+    return None
+
+
+def story_refs(body: Optional[str]) -> List[int]:
+    """Issue numbers listed as checkboxes under an epic's `## Stories` heading.
+
+    Section-scoped for the same reason acceptance_items() is: an epic body cites
+    plenty of issue numbers in prose (the evidence table, the design constraints),
+    and only the task list is the roster that makes epic progress computable.
+    """
+    refs: List[int] = []
+    for line in _section_lines(body, STORIES_HEADING_RE):
+        m = CHECKBOX_RE.match(line)
+        if not m:
+            continue
+        ref = ISSUE_REF_RE.search(m.group("text"))
+        if ref:
+            refs.append(int(ref.group("number")))
+    return refs
 
 
 def label_names(issue: Dict[str, Any]) -> List[str]:

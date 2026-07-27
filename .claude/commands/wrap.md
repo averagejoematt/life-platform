@@ -268,6 +268,19 @@ check that must print nothing.
 - If `gh` isn't authenticated/reachable from this session, the script fails open (prints
   a skip note, exits 0) — note that in the handover rather than silently skipping the
   check.
+- **Also run the full filing-contract linter — ADVISORY, does not gate the wrap (#1867):**
+  ```bash
+  python3 scripts/check_backlog_hygiene.py --advisory
+  ```
+  It lints the whole open corpus against the ADR-099 amendment (#1865): one `type:*` /
+  `area:*` / `model:*`, `prio:*` + a milestone on work issues, a `## Outcome` naming a
+  sanctioned audience, 3–5 `## Acceptance` boxes, the canonical `**Score:**` line whose
+  `→ <milestone>` matches the real one, the `**Epic:**` link, epic `## Stories` coverage,
+  `Now`-queue liveness, and stale `Later` issues. **It always exits 0 for now** — the
+  corpus is known-dirty and #1868's backfill burns the list down; #1872 flips the default
+  to `--blocking` and deletes `check_story_labels.py` (whose `model:*` rule this linter
+  already absorbs — both run until then). Fix what this session filed; don't chase the
+  backlog's historical debt at wrap time.
 
 ### (f) Commit the wrap
 
