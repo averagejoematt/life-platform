@@ -416,6 +416,32 @@ _CURATED = [
         },
     },
     {
+        # #1846: the consent-gated diary shelf — one card per Video Diary / Solo
+        # Recording entry Matthew explicitly cleared, carrying only the lines he
+        # marked publishable. LIVE-DATA (/api/diary_shelf, site_api_diary.py), so
+        # the #1704 order holds: site-api must be deployed BEFORE this page's
+        # site/** merge lands or the api_deps smoke leg 404s and auto-rollback
+        # fires. The mount always resolves to real content — cards, an honest
+        # "nothing published yet" line, or the fetch-failed line — so the visual
+        # check is not_empty regardless of how much (if anything) is consented.
+        "path": "/story/diary/",
+        "name": "Story · the diary shelf (#1846)",
+        "tier": 3,
+        "content_class": "live-data",
+        "api_deps": ["/api/diary_shelf"],
+        "js_modules": ["diary_shelf.js"],
+        "visual": {
+            "wait_for": "[data-diary-shelf]",
+            "checks": [
+                {
+                    "selector": "[data-diary-shelf]",
+                    "not_empty": True,
+                    "desc": "diary shelf rendered (cards or the honest nothing-published line)",
+                },
+            ],
+        },
+    },
+    {
         "path": "/data/",
         "name": "Data hub",
         "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)

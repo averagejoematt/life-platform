@@ -133,6 +133,7 @@ from web.site_api_data import (
     handle_vice_streaks,
     handle_what_changed,
 )
+from web.site_api_diary import handle_diary_shelf  # #1846 — the consent-gated diary shelf (/story/diary/)
 from web.site_api_fingerprint import handle_fingerprint, handle_wall  # #1379 — the Daily Fingerprint + the Wall
 
 # P1.1 Phase B step 3 (2026-05-26): status + pulse handlers extracted.
@@ -739,6 +740,11 @@ def lambda_handler(event, context):
     # polarity inverted (the coach reacts to the human). Optional ?date=, ?limit=.
     if path == "/api/diary_reactions":
         return handle_diary_reactions(event)
+    # #1846: the consent-gated diary shelf on /story — one card per entry Matthew
+    # cleared, carrying only the lines he marked. Unconsented entries are invisible
+    # (counted in `withheld`, never rendered as a redacted row).
+    if path == "/api/diary_shelf":
+        return handle_diary_shelf(event)
     # #1568 (ADR-142): consent-per-line verbatim journal pull-quotes — "from the
     # journal, in his words". Only explicitly-marked lines; honest-empty otherwise.
     if path == "/api/journal_quotes":

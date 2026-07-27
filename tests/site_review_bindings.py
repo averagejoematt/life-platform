@@ -220,6 +220,17 @@ PAGE_BINDINGS = [
         "story_intent": "what the journal has been ABOUT, over time — the enriched themes of the writing as a monochrome river; honest-empty until the attempt accrues entries (#1381)",
         "endpoints": [{"url": "/data/theme_river.json", "role": "primary", "metrics": []}],  # build-time baked static artifact
     },
+    {
+        # #1846: the consent-gated diary shelf — the spoken counterpart of "in my own
+        # words" (5), so narrative_order 5.2 seats it right beside the written channel
+        # and ahead of the attempts ledger (5.5). Live endpoint, unlike theme-river.
+        "path": "/story/diary/",
+        "name": "Story · the diary shelf",
+        "door": "story",
+        "narrative_order": 5.2,
+        "story_intent": "the spoken diary, only where he cleared it — dated cards with the day-mark and the lines he marked publishable; unconsented entries are invisible but counted, so the reader sees the shape of what is held back (#1846)",
+        "endpoints": [{"url": "/api/diary_shelf", "role": "primary", "metrics": []}],
+    },
     # #1427: three more /story/ pages joined visual_qa.PAGES.
     {
         "path": "/story/build/",
