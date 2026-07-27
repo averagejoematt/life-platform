@@ -271,9 +271,16 @@ def render_page() -> str:
 
 def build_artifact(live: bool) -> dict:
     """The theme-river artifact. --live reads the notion journal partition over the
-    attempt window; otherwise the honest empty (n=0) baseline."""
+    attempt window; otherwise the honest empty (n=0) baseline.
+
+    Clamps end = max(start, today) (#1823) — a pre-genesis run (today <
+    EXPERIMENT_START, e.g. the countdown window ahead of a reset's genesis date)
+    would otherwise emit an inverted window (end before start), which
+    tr.build_river()/list_enriched_entries() were never designed to see.
+    """
     today = date.today().isoformat()
     start = EXPERIMENT_START
+    end = max(start, today)
     entries: list[dict] = []
     model = None
     schema_version = None
@@ -281,9 +288,9 @@ def build_artifact(live: bool) -> dict:
         import boto3
 
         table = boto3.resource("dynamodb", region_name="us-west-2").Table("life-platform")
-        entries = tr.list_enriched_entries(table, start, today)
+        entries = tr.list_enriched_entries(table, start, end)
         model, schema_version = tr.latest_provenance(table)
-    return tr.build_river(entries, start, today, model=model, schema_version=schema_version)
+    return tr.build_river(entries, start, end, model=model, schema_version=schema_version)
 
 
 def main() -> int:

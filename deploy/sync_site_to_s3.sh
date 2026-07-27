@@ -90,6 +90,14 @@ if [ "${1:-}" != "--dry-run" ]; then
   python3 "$(dirname "$0")/../scripts/v4_build_data_sources.py" || echo "  ⚠️  data_sources build skipped — keeping existing site/data/data_sources.json"
   # #544: /method/registry/ is GENERATED from lambdas/methods_registry.py — never hand-edit.
   python3 "$(dirname "$0")/../scripts/v4_build_methods.py" || echo "  ⚠️  methods registry build skipped — keeping existing site/method/registry/index.html"
+  # #1823: theme_river.json + /story/theme-river/ are GENERATED from the live journal
+  # enrichment partition (lambdas/theme_river.py) — previously a hand-run script wired
+  # into NO deploy path, so the artifact could go stale for an entire experiment cycle
+  # and (worse) falsely assert n=0 once fresh entries existed. Regenerate on every
+  # deploy like its v4_build_* siblings; --live reads the partition when AWS creds are
+  # present and best-effort keeps the existing artifact otherwise (matches the cockpit/
+  # home "proof" build steps above).
+  python3 "$(dirname "$0")/../scripts/v4_build_theme_river.py" --live || echo "  ⚠️  theme river build skipped (offline?) — keeping existing site/data/theme_river.json"
   # #586/ADR-106: portrait_data.js is GENERATED from config/portraits/ (signed recipes
   # only) — never hand-edit. Validation failure BLOCKS the sync (a bad recipe must not ship).
   python3 "$(dirname "$0")/../scripts/v4_build_portraits.py"
