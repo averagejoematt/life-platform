@@ -75,7 +75,10 @@ concurrency:
   # with 0 jobs forever, surviving cancellation of every visible member and an
   # empty group. Salting the group name routes new runs to a fresh queue. Same
   # concurrency protection; cancel-in-progress stays false so a mid-flight deploy completes.
-  group: ${{ github.workflow }}-${{ github.ref }}-v2
+  # -v3 (2026-07-27): the v2 group wedged the same way (run 30233540531 pending,
+  # 0 jobs, 20+ min, genesis eve) after two supersede-cancellations in quick
+  # succession — same fix, fresh queue.
+  group: ${{ github.workflow }}-${{ github.ref }}-v3
   cancel-in-progress: false
 
 env:
