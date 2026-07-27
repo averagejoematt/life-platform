@@ -41,7 +41,7 @@
   },
   "/api/replicate_certify": {
     "category": "write-path",
-    "reason": "POST-only — #1393 engagement-ladder Replicator self-cert; deduped per source, increments the VOTES#ladder_replicator aggregate counter (write)"
+    "reason": "POST-only \u2014 #1393 engagement-ladder Replicator self-cert; deduped per source, increments the VOTES#ladder_replicator aggregate counter (write)"
   },
   "/api/ritual_log": {
     "category": "write-path",
@@ -54,5 +54,9 @@
   "/api/verify_subscriber": {
     "category": "requires-path-param",
     "reason": "requires ?email= \u2014 a real subscriber address; probing an arbitrary address would leak that address's subscription status (privacy), and there is no safe synthetic value"
+  },
+  "/api/diary_shelf": {
+    "category": "capture-failed",
+    "reason": "#1846 \u2014 ships in the same PR as the endpoint, so no live snapshot can exist until site-api is deployed. Capture it post-deploy with `python3 deploy/capture_api_schemas.py` and delete this entry."
   }
 }
