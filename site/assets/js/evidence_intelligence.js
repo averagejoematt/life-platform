@@ -311,6 +311,15 @@ function _calStatFigs(s) {
 // per-coach Brier, the reliability curve (stated confidence vs. what came true), and
 // the hypothesis engine's own ledger. The honesty moat, made legible.
 //
+// #1396: the scorer behind this page is published as a standalone MIT package
+// (oss/calibration-core) with a paste-your-own-ledger tool at /method/grade-your-coach/.
+// Surfaced from BOTH the zero state and the scored state — the offer to check the
+// engine is most useful precisely when there is nothing of Matthew's to look at.
+const _OPEN_ARTIFACT_LINE =
+  '<p class="rd-archive">The scorer on this page is open source. Same Brier, same reliability curve, same skill-vs-base-rate, ' +
+  'pinned to the same test vectors: <a href="/method/grade-your-coach/">grade your own LLM coach</a> — paste any forecaster\'s ' +
+  'predictions and outcomes and get this scorecard, computed in your browser.</p>';
+
 // #1376: career (every cycle, the CROSS_PHASE calibration ledger + every
 // archived PREDICTION#) beside this season (current cycle only) — sports-card
 // pattern. A reset wipes the SEASON view honestly to zero; it must never wipe
@@ -323,7 +332,7 @@ export function renderCalibration(d) {
   const cycle = d && d.cycle;
   // True zero state: nothing has ever graded, this cycle or any before it.
   if (!(p.n > 0) && !(life.n > 0))
-    return empty("No graded forecasts yet — the calibration ledger restarts at each genesis. Coaches log forward predictions with a stated confidence; a deterministic evaluator scores each against measured outcomes as its target date passes. Brier scores and the reliability curve fill in as the first calls come due — the platform grading its own predictions, in public.");
+    return empty("No graded forecasts yet — the calibration ledger restarts at each genesis. Coaches log forward predictions with a stated confidence; a deterministic evaluator scores each against measured outcomes as its target date passes. Brier scores and the reliability curve fill in as the first calls come due — the platform grading its own predictions, in public.") + _OPEN_ARTIFACT_LINE;
 
   const seasonBody = p.n > 0
     ? _calStatFigs(p)
@@ -363,7 +372,7 @@ export function renderCalibration(d) {
     `<table class="rd-tbl"><thead><tr><th>coach</th><th>season</th><th>career</th><th>Brier</th><th>hit rate</th><th>calibration</th></tr></thead><tbody>${cRows}</tbody></table>`,
   );
   const hypLine = hyp && hyp.n > 0 ? note(`Hypothesis engine: ${hyp.n} resolved this season (career ${(hyp.lifetime && hyp.lifetime.n) || hyp.n}), Brier ${fmt(hyp.brier)}${hyp.calibration && hyp.calibration !== "insufficient_data" ? " (" + ttl(String(hyp.calibration).replace(/_/g, " ")) + ")" : ""}.`) : "";
-  return pair + relTbl + board + hypLine + note(d.disclosure || "Self-graded against the platform's own data — Brier 0 is perfect, 0.25 is the always-say-50% baseline, lower is better.");
+  return pair + relTbl + board + hypLine + note(d.disclosure || "Self-graded against the platform's own data — Brier 0 is perfect, 0.25 is the always-say-50% baseline, lower is better.") + _OPEN_ARTIFACT_LINE;
 }
 
 export function renderPredictions(d) {

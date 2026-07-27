@@ -1,0 +1,789 @@
+{
+  "name": "Matthew's public coach prediction ledger",
+  "provenance": {
+    "synthetic": false,
+    "source_url": "https://averagejoematt.com/api/predictions?limit=200&status=all",
+    "fetched_at": "2026-07-27T19:30:03.116804+00:00",
+    "cycle": 11,
+    "subject": "averagejoematt.com — an N=1 self-experiment. Eight named AI coaches each log forward calls with a stated confidence; a deterministic evaluator grades each one against measured data as its target date passes.",
+    "scope": "Exactly what the public /api/predictions endpoint serves — nothing private, nothing added. The endpoint returns the CURRENT experiment cycle only; calls from earlier cycles are counted in the published career totals but their individual rows are not public, so they are not in this file.",
+    "honest_note": "This snapshot was taken on day 1 of cycle 11 (genesis 2026-07-27). Every call in it is still PENDING — none has come due yet. Scoring it therefore reports n=0 and 'insufficient_data', which is the correct answer, not a broken one. Load the worked example to see a filled-in scorecard.",
+    "reader_note": "This snapshot was taken on day 1 of cycle 11 (genesis 2026-07-27). Every call in it is still PENDING — none has come due yet. Scoring it therefore reports n=0 and 'insufficient_data', which is the correct answer, not a broken one. Load the worked example to see a filled-in scorecard."
+  },
+  "published_scorecard": {
+    "note": "What averagejoematt.com/method/calibration published at the moment of this snapshot, produced by the same grader this package extracts. Season = the current cycle; career = every cycle, including the archived rows that are not individually public.",
+    "source_url": "https://averagejoematt.com/api/calibration",
+    "generated_at": "2026-07-27T19:30:03.915075+00:00",
+    "season": {
+      "n": 0,
+      "confirmed": 0,
+      "refuted": 0,
+      "accuracy_pct": null,
+      "brier": null,
+      "brier_skill": null,
+      "skilled": null,
+      "reliability_bins": [],
+      "calibration": "insufficient_data",
+      "label": "nascent",
+      "score": 30
+    },
+    "career": {
+      "n": 50,
+      "confirmed": 23,
+      "refuted": 27,
+      "accuracy_pct": 46.0,
+      "brier": 0.2059,
+      "brier_skill": 0.1711,
+      "skilled": true,
+      "reliability_bins": [
+        {
+          "lo": 0.5,
+          "hi": 0.6,
+          "n": 26,
+          "mean_confidence": 0.502,
+          "observed_rate": 0.154
+        },
+        {
+          "lo": 0.6,
+          "hi": 0.7,
+          "n": 1,
+          "mean_confidence": 0.65,
+          "observed_rate": 0.0
+        },
+        {
+          "lo": 0.8,
+          "hi": 0.9,
+          "n": 23,
+          "mean_confidence": 0.8,
+          "observed_rate": 0.826
+        }
+      ],
+      "calibration": "over-confident",
+      "label": "developing",
+      "score": 50
+    }
+  },
+  "columns": [
+    "date",
+    "forecaster",
+    "claim",
+    "confidence",
+    "outcome"
+  ],
+  "rows": [
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Lisa Park",
+      "claim": "REM percentages will either drift downward toward typical population ranges or hold elevated consistently over 7-10 nights, which will clarify whether current elevation reflects sleep debt rebound or individual phenotype.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Lisa Park",
+      "claim": "Over the first 14 days, nightly HRV readings will trend upward toward the 50 ms biomarker target as the body adapts to the fixed 9:00 PM–4:30 AM sleep schedule combined with the Week 1 reduced-volume, no-failure-sets ramp discipline that limits acute physiological stress.",
+      "confidence": 0.2,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Lisa Park",
+      "claim": "One night of strong sleep architecture does not unwind accumulated physiological stress; the system may have produced good sleep structure while still carrying a debt load.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Lisa Park",
+      "claim": "If the efficiency gap is caused by circadian mismatch between committed sleep window and actual biological timing, the efficiency number would be a predictable consequence rather than a mystery.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Lisa Park",
+      "claim": "If natural sleep pressure doesn't build until significantly later than 9:00 PM, the 79.55% efficiency loss reflects time in bed accumulating before sleep drive peaks, producing prolonged wakefulness at sleep onset.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Lisa Park",
+      "claim": "If elevated deep and REM percentages reflect rebound sleep from accumulated deprivation, those percentages will normalize toward more typical ranges over the next seven to ten nights as the debt clears.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Lisa Park",
+      "claim": "Efficiency improvement (79.55% to 93.81%) and recovery score recovery (29 to 60) could reflect genuine consolidation or could be two noisy data points",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Lisa Park",
+      "claim": "During the first 7 days, nightly time-in-bed will consistently reach the 7.5-hour target window defined by the 9:00 PM bedtime and 4:30 AM wake time, meaning the wearable will log at least 7.5 hours in bed on at least 6 of the 7 nights.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Lisa Park",
+      "claim": "Deep and REM percentages moving back toward typical ranges (15–25% and 20–25% respectively) is consistent with regression to mean after a high-debt rebound night",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Marcus Webb",
+      "claim": "Three days of logged meals with timestamps and energy ratings will reveal whether the 2-4 PM crash has a nutritional signal or is driven by something else.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Marcus Webb",
+      "claim": "The 2-4 PM energy crash has a nutritional signal underneath it that can be detected via energy logging and CGM data.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Marcus Webb",
+      "claim": "Subject's protein targets will remain hittable if the mechanism is deliberate meal architecture, but will fail under stress (travel, busy periods, three bad days) if the mechanism is manual tracking discipline.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Marcus Webb",
+      "claim": "Protein adherence appears better than coach's baseline prediction for week one.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Marcus Webb",
+      "claim": "Logged daily protein intake will meet or exceed the 170 g protein floor on at least 5 out of 7 days during the first two weeks (Days 1-14), given that hitting 170 g within a 1500 kcal budget requires protein to constitute approximately 45% of total calories, which demands deliberate food selection that a coached subject beginning a structured plan is expected to execute consistently from the outset.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Marcus Webb",
+      "claim": "If the subject has built a system around lunch protein, it will compound positively over time. If he's manually optimizing daily, it will eventually fatigue.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Marcus Webb",
+      "claim": "If the 2–4 PM crash is glucose-driven, it will correlate with postprandial glucose response visible in CGM trace.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Marcus Webb",
+      "claim": "If sleep efficiency remains flat through end of next week, meal timing (late-window protein, carb timing) will be the primary nutritional driver",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Marcus Webb",
+      "claim": "If meal architecture is accidental rather than intentional, it will fail under schedule disruption (travel, bad weeks, consecutive friction days)",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Marcus Webb",
+      "claim": "If CGM trace is flat during crash times, the explanation shifts to meal spacing, calorie density, or other non-glucose factors.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Marcus Webb",
+      "claim": "Energy crashes correlate with preceding meal composition",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Marcus Webb",
+      "claim": "Daily calorie intake will remain at or below the 1500 kcal target on at least 5 out of 7 days during the first week (Days 1-7), as the structured eating window of 11:30am-7:30pm mechanically limits consumption opportunity to an 8-hour period, making adherence to the calorie ceiling highly probable from day one.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Marcus Webb",
+      "claim": "Current meal consistency may degrade under schedule pressure if it is habit-based rather than system-based.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Marcus Webb",
+      "claim": "Afternoon energy crash (2–4 PM) will correlate with meal timing and glucose patterns once CGM baseline matures",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Sarah Chen",
+      "claim": "Over the first 14 days, weekly Zone 2 cardio minutes will trend upward from a sub-150-minute starting point toward the 150-min/week target, given that Week 1 is explicitly reduced volume and Zone 2 is governed by RPE for the first 2 weeks — meaning total Zone 2 minutes logged in Week 2 will be higher than those logged in Week 1.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Sarah Chen",
+      "claim": "Once 3-5 sessions of logged movement data are provided, the coach will be able to build a training structure; without it, no structure can be responsibly prescribed.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Sarah Chen",
+      "claim": "During the first 14 days, daily walking will consistently meet the 3-mile minimum on all 5 post-work weekdays per week, as the ramp discipline explicitly schedules walking after work daily and caps intensity — making adherence to this volume target verifiable via GPS/wearable distance logs.",
+      "confidence": 0.85,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Sarah Chen",
+      "claim": "By approximately August 9th, with 2-3 weeks of stacked recovery and HRV data, the coach will be able to interpret whether the current recovery score of 29 and HRV of 23.27 represent floor, ceiling, or regression-to-mean artifact.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Nathan Reeves",
+      "claim": "Whether the 9:00 PM bedtime holds or slips first under competing demands will reveal more about what's genuinely authored versus agreed-to than almost any other trackable metric.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Nathan Reeves",
+      "claim": "Whether the 9:00 PM bedtime commitment holds or slips under competing demands will reveal more about goal ownership than other variables over the next two weeks.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Nathan Reeves",
+      "claim": "The distinction between intrinsic and extrinsic resistance will determine whether the subject's current friction consolidates or erodes over the next eleven months.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Nathan Reeves",
+      "claim": "The 9 PM bedtime will be either the first commitment to slip or the first to hold, and whichever outcome occurs will signal whether the goal is genuinely owned or borrowed.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Nathan Reeves",
+      "claim": "The 9:00 PM bedtime target will be met or beaten on at least 5 of the first 14 nights, as the externally imposed 4:30 AM wake time creates a strong behavioral anchor that reinforces early sleep onset during the initial compliance-high period of the plan.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Nathan Reeves",
+      "claim": "If the structure isn't genuinely owned, adding pressure to metrics will accelerate erosion of ownership rather than consolidate it.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Nathan Reeves",
+      "claim": "If the bedtime commitment is genuinely owned, inconvenience will be experienced as friction; if borrowed, inconvenience will become a reason to renegotiate.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Nathan Reeves",
+      "claim": "Goals that are hard but authentically owned consolidate over time; goals that are hard and borrowed erode over time.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Nathan Reeves",
+      "claim": "Genuinely authored commitments tend to be the last to slip under pressure, while inherited commitments tend to be the first to go.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Nathan Reeves",
+      "claim": "Adherence to the 11:30am-7:30pm eating window will be logged as fully compliant on at least 6 out of the first 7 days, reflecting the high behavioral tractability of a fixed time-restricted window during the novelty-motivation phase of a new structured plan.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Victor Reyes",
+      "claim": "Weight will trend downward over the first 14 days as a consistency signal for whether the caloric deficit holds when active tracking resumes after a gap.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Victor Reyes",
+      "claim": "Weight plateau when tracking resumes would indicate the deficit does not hold without active monitoring, signaling a structural problem rather than a behavioral one.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Victor Reyes",
+      "claim": "Recovery suppression combined with caloric deficit and daily step load creates an environment where lean mass catabolism accelerates.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Victor Reyes",
+      "claim": "If weight is trending downward by Day 14, the caloric deficit is working independent of behavioral compliance effect.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Victor Reyes",
+      "claim": "If weight is flat by Day 14, that indicates the tracking itself is doing structural work that the deficit alone is not doing.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Victor Reyes",
+      "claim": "If the caloric deficit is metabolically inefficient or the subject is running glycogen-depleted, the body will be forced toward protein catabolism to compensate.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Victor Reyes",
+      "claim": "If recovery suppression, postprandial glucose variance consistent with glycogen depletion, and protein adherence below 190g converge, then the current walking volume is extracting energy from lean mass.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Victor Reyes",
+      "claim": "If recovery stays suppressed for another week and postprandial glucose variance and midday protein slipping converge, lean mass catabolism will accelerate.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Victor Reyes",
+      "claim": "If recovery score is low because of sleep debt, the lever is sleep quality; if it is low because activity load is generating systemic stress that sleep is not resolving, that changes how daily walking volume should be calibrated.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Victor Reyes",
+      "claim": "Daily protein intake will consistently meet or exceed the 170 g protein floor across all 14 days of the first two weeks, as logged in the nutrition record, given that 170 g protein within a 1500 kcal eating window of 11:30am–7:30pm is a fixed structural floor of the plan rather than an optional target.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Victor Reyes",
+      "claim": "Body weight will trend downward from the stated start weight of 317.61 lbs over the first 14 days, driven by the 1500 kcal/day caloric target combined with daily ~3-mile walking and 5 gym days/week of strength training in the Foundation phase.",
+      "confidence": 0.85,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Victor Reyes",
+      "claim": "A single recovery score of 29 carries significant regression-to-mean risk and cannot be used to distinguish between sleep debt rebound versus genuine systemic stress.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Amara Patel",
+      "claim": "Three to five clean morning fasting readings will allow separation of hepatic glucose output from postprandial carryover and provide mechanistic foundation for contextualizing the full glucose trace.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Amara Patel",
+      "claim": "Reduced visceral adiposity is beginning to lower free fatty acid competition at the glucose transporter, improving insulin sensitivity",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Amara Patel",
+      "claim": "Once meal timestamps are synchronized with glucose readings, postprandial response patterns will reveal whether visceral adiposity is driving free fatty acid competition with glucose uptake.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Amara Patel",
+      "claim": "Once meal logs are synchronized to CGM timestamps and fasting insulin is drawn, the coach will be able to determine whether the clean glucose trace reflects efficient insulin sensitivity or compensatory beta-cell load.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Amara Patel",
+      "claim": "Once fasting insulin draw is obtained and HOMA-IR calculated, the dynamic CGM trace will be properly contextualized to distinguish efficient insulin sensitivity from compensatory beta-cell load.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Amara Patel",
+      "claim": "Once CGM trace is synchronized with meal logs, the mechanistic chain from visceral adiposity to free fatty acid competition with glucose uptake to suppressed GLUT4 translocation will be observable in the postprandial response patterns.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Amara Patel",
+      "claim": "HOMA-IR calculation using fasting insulin draw will characterize insulin sensitivity and provide mechanistic instrument for interpretation.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Amara Patel",
+      "claim": "Daily fiber intake logs will trend upward toward the 25 g minimum floor over the first 14 days as the subject calibrates food choices to the 1500 kcal/day target, with logged fiber values increasing across the two-week window.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Amara Patel",
+      "claim": "Adherence to the 11:30am–7:30pm eating window (an 8-hour daily feeding window) will be maintained on at least 5 out of 7 days per week during the first 14 days, as logged meal timestamps will consistently fall within that window, reflecting an early metabolic discipline signal.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. James Okafor",
+      "claim": "When fasting labs are obtained, insulin sensitivity will be the central metabolic finding and likely show subclinical insulin resistance given current weight and lack of structured strength training.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. James Okafor",
+      "claim": "The recovery score mismatch and afternoon energy crashes are more likely driven by nutritional deficiencies or sleep consolidation issues than by training load.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. James Okafor",
+      "claim": "Subclinical insulin resistance has meaningful pretest probability at current weight without structured strength training in place",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. James Okafor",
+      "claim": "Resting heart rate (RHR) will trend downward over the first 14 days, consistent with the plan's daily walking (~3 miles) and 150 min/week Zone 2 target combined with 7.5 h nightly sleep (bed 9:00 PM, wake 4:30 AM), moving in the direction of the stated 55 bpm biomarker target.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. James Okafor",
+      "claim": "Probability of low-normal Vitamin D or depleted ferritin is non-trivial given current weight, likely sun exposure history, and energy patterns already in record",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. James Okafor",
+      "claim": "HRV will trend upward over the first 14 days, driven by the plan's ramp discipline (week 1 reduced volume, no failure sets, no PRs before day 21) and consistent 7.5 h sleep target, moving in the direction of the stated 50 ms biomarker goal.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. James Okafor",
+      "claim": "By the time fasting glucose climbs out of normal range, insulin has typically been compensating for years",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Henning Brandt",
+      "claim": "Over the first 14 days, daily caloric log entries will be present for at least 12 of 14 days, establishing a ≥85% adherence rate in the nutrition tracking record — the minimum data density required for any meaningful N=1 trend analysis of the 1500 kcal/day target.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Henning Brandt",
+      "claim": "If 14 consecutive days of meal timing, protein quantity, and training-type descriptors are logged alongside passive streams, confounder checks can be run to determine whether the observed recovery cluster (HRV, RHR, recovery score) is meaningfully correlated or unanchored.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-27",
+      "forecaster": "Dr. Henning Brandt",
+      "claim": "Across the first 14 days, the daily step count log will show an upward trend from Day 1 to Day 14, reflecting progressive accumulation toward the stated ~6,000–7,000 steps/day minimum as the daily 3-mile walking protocol becomes consistent — providing the first within-subject slope estimate for movement compliance in this N=1 dataset.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Lisa Park",
+      "claim": "Recovery score and HRV readings are capturing accumulated physiological stress or metabolic state that one night of good-looking architecture has not yet unwound.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Lisa Park",
+      "claim": "If the high deep sleep and REM percentages hold across multiple nights, they would suggest a fairly robust slow-wave and consolidation capacity.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Lisa Park",
+      "claim": "If elevated deep and REM percentages hold elevated over the next week, this indicates an individual baseline architecture rather than rebound.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Lisa Park",
+      "claim": "If deep sleep and REM percentages normalize downward over the next week toward typical adult ranges (deep 15–25%, REM 20–25%), the rebound interpretation is supported.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Lisa Park",
+      "claim": "After 7 to 10 more nights of data, will be able to determine whether elevated deep and REM percentages reflect a genuinely robust individual phenotype or simply acute rebound from sleep debt.",
+      "confidence": 0.4,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Marcus Webb",
+      "claim": "Protein target will likely be missed due to soft lunch composition, with most protein deferred to dinner.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Marcus Webb",
+      "claim": "Once glucose logs start coming in, energy crashes and cognitive fog patterns will correlate with glucose response data.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Marcus Webb",
+      "claim": "Energy crash between 2-4 PM correlates with lunch composition and glucose response.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Marcus Webb",
+      "claim": "Calorie ceiling adherence will be difficult to assess without food log data.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Sarah Chen",
+      "claim": "Zone 2 volume trajectory will hold if movement logging protocol is established; cannot be verified if logging remains quiet",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Sarah Chen",
+      "claim": "Subject will hit three miles on five or more weekdays over the first 14 days",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Sarah Chen",
+      "claim": "Recovery score interpretation will become meaningful once 2-3 weeks of stacked data is available",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Sarah Chen",
+      "claim": "After 2-3 weeks of HRV data collection, a meaningful baseline trend will emerge that allows for recovery conclusions.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Sarah Chen",
+      "claim": "A meaningful HRV baseline trend will emerge around August 9th after 2-3 weeks of data collection",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Nathan Reeves",
+      "claim": "When friction shows up, which commitments feel like the subject's own versus which feel negotiable will become clearer.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Nathan Reeves",
+      "claim": "The coaching process will reshape who the subject is becoming over the next twelve months, and the direction of that change (improvement vs. disciplined misery) can be detected early enough to intervene.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Nathan Reeves",
+      "claim": "Over the next two weeks, one of the two experiences (genuine ownership versus borrowed obligation) will become more visible than the other.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Nathan Reeves",
+      "claim": "Once tracking and data collection begin, it will become very difficult to accurately remember what the internal psychological state was like before the experiment started.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Victor Reyes",
+      "claim": "Structural integrity of joints and connective tissue will take longer to rebuild than muscle over a 12-month timeline",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Victor Reyes",
+      "claim": "Meaningful changes in body composition that shift long-term metabolic health and functional capacity resolve in quarters, not weeks, over the 12-month timeline.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Victor Reyes",
+      "claim": "If body is under-recovering while in caloric deficit, daily movement will be subsidized by lean mass catabolism rather than fat oxidation",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Victor Reyes",
+      "claim": "DEXA at 90-day mark will show whether lean mass is being preserved through the deficit",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Victor Reyes",
+      "claim": "Compensation patterns that develop over the next 6 months without proper baseline understanding could become load-bearing and difficult to reverse",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Amara Patel",
+      "claim": "Over the next 1-2 weeks, the accumulation of glucose logs with dietary context will reveal actionable signal about meal-specific glucose response patterns.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Amara Patel",
+      "claim": "Over days and weeks, CGM data will reveal the mechanism of how the body converts meals into glucose and where the metabolic system runs efficiently versus where it strains.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Amara Patel",
+      "claim": "Multiple true morning CGM readings (before first meal, before coffee) will distinguish between fasting-state hepatic output and postprandial carryover as the source of the 103.1 average.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Amara Patel",
+      "claim": "If the 103.1 mg/dL average reflects true fasting-state hepatic glucose output, it would situate the subject in the upper-normal range where visceral adiposity's free fatty acid competition with glucose uptake is plausible but not yet confirmed.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Amara Patel",
+      "claim": "7 to 14 days of accumulated CGM data will begin to reveal a characteristic glucose phenotype",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. James Okafor",
+      "claim": "Lipid panel values will move significantly over the next twelve months given planned fat loss from current weight of 317.6 lbs.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. James Okafor",
+      "claim": "Insulin sensitivity will be the primary metabolic story to watch and interpret over time given current weight and training status",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Henning Brandt",
+      "claim": "Protein adequacy at 190g/day will correlate with improved sleep architecture, specifically slow-wave sleep percentage.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Henning Brandt",
+      "claim": "Once behavioral connective tissue is established, cross-domain patterns between CGM glucose profile and next-morning recovery scores will emerge",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Henning Brandt",
+      "claim": "Days where protein intake reaches 190g will associate with improved deep or REM sleep architecture",
+      "confidence": 0.5,
+      "outcome": "pending"
+    },
+    {
+      "date": "2026-07-26",
+      "forecaster": "Dr. Henning Brandt",
+      "claim": "Best-scored recovery mornings will show a different nocturnal glucose profile than lower-scored recovery mornings.",
+      "confidence": 0.5,
+      "outcome": "pending"
+    }
+  ]
+}

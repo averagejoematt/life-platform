@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en" data-door="method">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Grade your own LLM coach — The Method — averagejoematt</title>
+  <meta name="description" content="Your wearable&#x27;s AI coach makes predictions. Does it publish whether they came true? Paste its calls and outcomes here and get the same scorecard mine get — Brier score, reliability curve, skill versus the base rate. Computed in your browser; nothing is uploaded.">
+  <link rel="canonical" href="https://averagejoematt.com/method/grade-your-coach/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="averagejoematt">
+  <meta property="og:url" content="https://averagejoematt.com/method/grade-your-coach/">
+  <meta property="og:title" content="Grade your own LLM coach — The Method — averagejoematt">
+  <meta property="og:description" content="Your wearable&#x27;s AI coach makes predictions. Does it publish whether they came true? Paste its calls and outcomes here and get the same scorecard mine get — Brier score, reliability curve, skill versus the base rate. Computed in your browser; nothing is uploaded.">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-home.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Grade your own LLM coach — The Method — averagejoematt">
+  <meta name="twitter:description" content="Your wearable&#x27;s AI coach makes predictions. Does it publish whether they came true? Paste its calls and outcomes here and get the same scorecard mine get — Brier score, reliability curve, skill versus the base rate. Computed in your browser; nothing is uploaded.">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4EFE4">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E0C08">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="icon" type="image/svg+xml" href="/assets/marks/favicon-dark.svg">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="preload" href="/assets/fonts/v4/pxiTypc9vsFDm051Uf6KVwgkfoSxQ0GsQv8ToedPibnr0SZe1ZuWi3g.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/assets/fonts/v4/6NU58FyLNQOQZAnv9ZwNjucMHVn85Ni7emAe9lKqZTnbB-gzTK0K1ChjeveQ7ZXk8g.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/assets/fonts/v4/-F63fjptAgt5VM-kVkqdyU8n1i8q131nj-o.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/assets/css/fonts.css">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/evidence.css">
+  
+<style>
+.gyc-wrap { max-width: var(--container); margin-inline: auto; padding: 0 var(--gutter) var(--sp-9); }
+.gyc-cols { display: grid; gap: var(--sp-5); margin-top: var(--sp-5); min-width: 0; align-items: start; }
+@media (min-width: 900px) { .gyc-cols { grid-template-columns: minmax(0, 4fr) minmax(0, 6fr); } }
+.gyc-pane { border: var(--border-hair); border-radius: var(--radius); padding: var(--sp-5); background: var(--surface-raised); min-width: 0; }
+.gyc-pane h2 { margin: 0 0 var(--sp-3); font-family: var(--font-serif); font-size: var(--fs-h3); color: var(--ink); }
+#gyc-input { width: 100%; min-height: 15rem; resize: vertical; box-sizing: border-box; padding: var(--sp-3);
+  font-family: var(--font-mono); font-size: var(--fs-small); line-height: var(--lh-relaxed);
+  color: var(--ink); background: var(--surface-sunken); border: var(--border-hair); border-radius: var(--radius); }
+.gyc-btns { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-3); }
+.gyc-btn { font-family: var(--font-mono); font-size: var(--fs-label); text-transform: uppercase; letter-spacing: var(--tracking-label);
+  padding: var(--sp-2) var(--sp-3); border: var(--border-hair); border-radius: var(--radius); background: transparent; color: var(--ink-muted); cursor: pointer; }
+.gyc-btn:hover, .gyc-btn:focus-visible { color: var(--ink); border-color: var(--ink-muted); }
+.gyc-prov { margin-top: var(--sp-3); font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-faint); line-height: var(--lh-relaxed);
+  overflow-wrap: anywhere; word-break: break-word; }
+.gyc-card { border: var(--border-hair); border-radius: var(--radius); padding: var(--sp-5); background: var(--surface-raised); min-width: 0; }
+.gyc-empty { color: var(--ink-muted); line-height: var(--lh-relaxed); }
+.gyc-figs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); }
+@media (min-width: 620px) { .gyc-figs { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.gyc-figs > .gyc-fig { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gyc-fig-v { font-family: var(--font-mono); font-size: var(--fs-h3); color: var(--ink); }
+/* "skill vs base rate" is the only label that wraps to two lines, which pushed its
+   sub-line a row below the other three and left the block ragged. Row tracks on the
+   .gyc-fig itself do NOT fix that — each fig is its own grid, so siblings share no
+   tracks. Reserving two label lines everywhere does, in every browser. (`subgrid` on
+   .gyc-figs would be the tidier answer once its floor is safely below the site's.) */
+.gyc-fig-l { color: var(--ink-faint); min-height: 2.6em; min-height: 2lh; }
+.gyc-fig-s { font-size: var(--fs-small); color: var(--ink-muted); line-height: var(--lh-relaxed); }
+.gyc-verdict { margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: var(--border-hair); }
+.gyc-verdict-h { margin: 0; font-family: var(--font-serif); font-size: var(--fs-h3); color: var(--ink); text-transform: capitalize; }
+.gyc-verdict-b { margin: var(--sp-2) 0 0; color: var(--ink-muted); line-height: var(--lh-relaxed); }
+.gyc-label { margin: var(--sp-3) 0 0; color: var(--ink-faint); }
+/* Chart ABOVE table, never beside it. A side-by-side grid here sat inside the
+   already-narrow right pane, so its minmax(0, 1fr) table track collapsed to as
+   little as 53px and clipped the `calls` column at every width — the one column
+   the copy leans on. Stacked, the table always gets the full pane width and
+   fits without scrolling at every breakpoint. */
+.gyc-chartwrap { display: grid; gap: var(--sp-4); margin-top: var(--sp-5); min-width: 0; }
+.gyc-chart { position: relative; min-width: 0; max-width: 340px; }
+@media (min-width: 900px) { .gyc-chart { max-width: 400px; } }
+.gyc-svg { width: 100%; height: auto; display: block; }
+.gyc-plot { fill: var(--surface-sunken); stroke: var(--rule); stroke-width: 1; }
+.gyc-ideal { stroke: var(--ink-faint); stroke-width: 1; stroke-dasharray: 4 4; }
+.gyc-curve { stroke: var(--ink-muted); stroke-width: 1.5; }
+.gyc-dot { fill: var(--accent, var(--ink)); fill-opacity: 0.75; }
+.gyc-ax { margin: var(--sp-2) 0 0; color: var(--ink-faint); }
+.gyc-ax-y { margin-top: 0; }
+.gyc-axnote { margin-top: var(--sp-3); font-size: var(--fs-small); color: var(--ink-muted); line-height: var(--lh-relaxed); }
+/* Belt-and-braces scroller for the >820px case. Below 820px the shared .rd-tbl
+   primitive (evidence.css #1008) already turns the table into its own scroller —
+   do NOT pin a min-width here, that re-inflates the block past this wrapper and
+   re-creates the clip this is meant to prevent. */
+.gyc-tblwrap { overflow-x: auto; max-width: 100%; }
+.gyc-tblwrap:focus-visible { outline: 2px solid var(--ink-muted); outline-offset: 2px; }
+.gyc-tbl th, .gyc-tbl td { white-space: nowrap; }
+.gyc-notes { margin-top: var(--sp-4); padding-top: var(--sp-4); border-top: var(--border-hair); font-size: var(--fs-small); color: var(--ink-muted); line-height: var(--lh-relaxed); }
+.gyc-rejects { margin: var(--sp-2) 0 0; padding-left: var(--sp-4); }
+.gyc-scroll { overflow-x: auto; }
+</style>
+
+  <script>(function(){try{var t=localStorage.getItem("ajm-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+  <script>(function(){try{if(!("IntersectionObserver" in window))return;if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;document.documentElement.classList.add("mo");window.__moFail=setTimeout(function(){document.documentElement.classList.remove("mo");},2600);}catch(e){}})();</script>
+</head>
+<body>
+  <a class="skip" href="#gyc">Skip to the tool</a>
+  <header class="ev-top"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">averagejoematt</span> <span class="brand-door label">method</span></a><nav class="doors" aria-label="Doors"><a href="/cockpit/" title="Today&#x27;s live instrument — your daily numbers, read back to you"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-cockpit"></use></svg>the cockpit</a><a href="/data/" title="Every source the platform reads — trends now and over time" aria-current="page"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-data"></use></svg>the data</a><a href="/coaching/" title="The AI team &amp; their arguments — stances, track records, disagreements"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-coaching"></use></svg>the coaching</a><a href="/protocols/" title="The levers — supplements, experiments, challenges, discoveries"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-protocols"></use></svg>the protocols</a><a href="/story/" title="The writing &amp; the why — chronicle, journal, timeline, about"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-story"></use></svg>the story</a><button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button></nav></header>
+  <main id="gyc">
+    <div class="page-hero">
+      <p class="ph-kicker label">the method &middot; the open artifact</p>
+      <h1 class="ph-title">Grade your own LLM coach</h1>
+      <p class="ph-promise">Every wearable now ships an AI coach, and every one of them tells you what will happen. None of them publishes whether it was right. This page is the scorer that does &mdash; the <em>same</em> one that grades my eight coaches in public, running here in your browser. Paste what your coach predicted and what actually happened, and find out whether its confidence was ever worth anything.</p>
+      <nav class="loop-ribbon" aria-label="Where this sits in the loop"><a href="/cockpit/">Now</a><span class="lr-sep" aria-hidden="true">&middot;</span><a href="/data/">Data</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/coaching/">Coaching</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/protocols/">Protocols</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/story/">Story</a><span class="lr-arrow" aria-hidden="true">&#8635;</span></nav>
+    </div>
+    <div class="gyc-wrap">
+      <div class="gyc-cols">
+        <section class="gyc-pane">
+          <h2>Paste the ledger</h2>
+          <p class="rd-prose">One forecast per line: <strong>the confidence it stated</strong>, then <strong>what actually happened</strong>. CSV or tab-separated, header optional. Confidence can be <code>0.8</code>, <code>80%</code> or a word (<code>low</code>, <code>medium</code>, <code>high</code>); outcomes can be <code>confirmed</code>/<code>refuted</code>, <code>yes</code>/<code>no</code>, <code>1</code>/<code>0</code>, or <code>pending</code> for calls that have not come due.</p>
+          <label class="label" for="gyc-input">your ledger</label>
+          <textarea id="gyc-input" spellcheck="false" aria-describedby="gyc-privacy" placeholder="confidence,outcome&#10;0.8,confirmed&#10;0.9,refuted&#10;high,yes&#10;0.6,pending"></textarea>
+          <div class="gyc-btns">
+            <button type="button" class="gyc-btn" id="gyc-grade">Grade it</button>
+            <button type="button" class="gyc-btn" id="gyc-demo-example">Load the worked example</button>
+            <button type="button" class="gyc-btn" id="gyc-demo-matthew">Load my public ledger</button>
+            <button type="button" class="gyc-btn" id="gyc-clear">Clear</button>
+          </div>
+          <p class="gyc-prov" id="gyc-prov"></p>
+          <p class="gyc-prov" id="gyc-privacy"><strong>Nothing is uploaded.</strong> The scoring runs entirely in this page &mdash; there is no endpoint behind it, no request carrying your text, and nothing stored. Close the tab and it is gone.</p>
+        </section>
+        <section class="gyc-pane">
+          <h2>The scorecard</h2>
+          <div id="gyc-readout" class="gyc-scroll"></div>
+        </section>
+      </div>
+
+      <section class="rd-sec">
+        <h2 class="rd-h">What the numbers mean</h2>
+        <p class="rd-prose"><strong>Brier score</strong> is the mean squared error of the stated probabilities: <code>mean((p &minus; y)&sup2;)</code>. Zero is perfect. <strong>0.25 is the always-say-50% baseline</strong> &mdash; the score you get by refusing to commit. Lower is better.</p>
+        <p class="rd-prose"><strong>Skill versus the base rate</strong> is the honest question underneath: does the stated confidence beat simply guessing the observed average every single time? A coach that predicts "you'll sleep badly" on a week where you slept badly 80% of the time has a great hit rate and no skill at all. Negative skill means it did <em>worse</em> than that trivial baseline.</p>
+        <p class="rd-prose"><strong>The reliability curve</strong> asks whether 80% actually means 80%. Each dot is a confidence band, sized by how many calls landed in it; on the diagonal is honest, below it is over-confident.</p>
+        <p class="rd-prose"><strong>Calibrated and skilled are different claims, and the second gates the first.</strong> A forecaster whose confidences line up but whose skill is at or below zero reads <em>not yet skillful</em> here &mdash; reliability is never allowed to dress up a forecaster that lost to the base rate. Fewer than five resolved calls and the tool says <em>insufficient data</em> rather than inventing a verdict.</p>
+        <p class="rd-prose">Rows whose outcome is not yet known are counted and excluded, never guessed. Rows that cannot be read are listed back to you rather than quietly scored at 0.5 &mdash; a defaulted confidence would put a claim on the scorecard that nobody made.</p>
+      </section>
+
+      <section class="rd-sec">
+        <h2 class="rd-h">Take the scorer, not just the answer</h2>
+        <p class="rd-prose">The engine on this page is a standalone, MIT-licensed package: one Python file, one JavaScript file, zero dependencies, no network. It is the <em>same</em> code that produces <a href="/method/calibration/">my own calibration scoreboard</a> &mdash; extracted rather than reimplemented, and held to that by a shared test-vector suite that three implementations (the deployed Python grader, the package, and the browser port running right now) must reproduce <em>exactly</em>, not approximately.</p>
+        <p class="rd-prose">The package README documents the ledger schema and every grading rule in full, so a third party can reproduce a scorecard independently &mdash; in a spreadsheet if they want &mdash; and check this page rather than trust it. Source: <code>oss/calibration-core/</code>.</p>
+        <p class="rd-prose">The demo ledgers are honest about themselves. <strong>My public ledger</strong> is a verbatim snapshot of the already-public <code>/api/predictions</code> surface, with its provenance stamped in the file; it was captured on day 1 of a fresh experiment cycle, so every call in it is still pending and it scores <em>insufficient data</em> &mdash; which is the correct answer, not a broken one. <strong>The worked example</strong> is explicitly synthetic and labelled as such: an illustrative wearable-coach ledger that exists so the page has something to render before you paste your own.</p>
+      </section>
+
+      <p class="correlative">Generated by <code>scripts/v4_build_grade_your_coach.py</code>. The scorer is <code>oss/calibration-core/</code>, vendored to <code>/assets/js/calibration-core.js</code> and pinned to the platform grader by <code>tests/test_calibration_core_parity.py</code>. <span class="confidence conf-low">client-side &middot; nothing uploaded</span></p>
+    </div>
+  </main>
+  <aside class="loop-forward" aria-label="Continue the loop"><p class="lf-next"><span class="label">next on the loop</span> <a href="/coaching/">the coaching</a> — See what the AI team makes of it</p><p class="lf-return"><span class="label">or come back</span> <a href="/subscribe/">follow by email</a> for the next entry</p></aside><footer class="site-foot"><nav class="site-foot-cols" aria-label="Site map"><div class="sf-col"><p class="sf-h label">The Story</p><a href="/story/chronicle/">Chronicle</a><a href="/story/panel/">Podcast</a><a href="/story/journal/">In my own words</a><a href="/story/timeline/">Timeline</a><a href="/story/attempts/">The attempts</a><a href="/story/agents/">The agents</a><a href="/story/about/">About</a></div><div class="sf-col"><p class="sf-h label">The Data</p><a href="/data/">All topics</a><a href="/method/ask/">Ask the data</a><a href="/data/labs/">Labs</a><a href="/data/training/">Training</a><a href="/data/sleep/">Sleep</a><a href="/data/ledger/">The ledger</a></div><div class="sf-col"><p class="sf-h label">The Protocols</p><a href="/protocols/">All protocols</a><a href="/protocols/supplements/">Supplements</a><a href="/protocols/experiments/">Experiments</a><a href="/protocols/challenges/">Challenges</a></div><div class="sf-col"><p class="sf-h label">The Coaching</p><a href="/coaching/">The Read</a><a href="/coaching/by-coach/">By Coach</a><a href="/coaching/scorecard/">Scorecard</a><a href="/coaching/team/">The Team</a><a href="/coaching/lab-notes/">AI lab notes</a></div><div class="sf-col"><p class="sf-h label">The Technology</p><a href="/method/">The machine</a><a href="/story/build/">Build log</a><a href="/method/platform/">The platform</a><a href="/method/pipeline/">Pipeline status</a><a href="/method/cost/">Cost</a><a href="/gear/">The gear</a></div><div class="sf-col"><p class="sf-h label">Follow &amp; context</p><a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a><a href="https://bsky.app/profile/averagejoematt.bsky.social" target="_blank" rel="me noopener">Bluesky</a><a href="https://x.com/averagejoematt_" target="_blank" rel="me noopener">X</a><a href="https://www.instagram.com/averagejoematt/" target="_blank" rel="me noopener">Instagram</a><a href="https://www.reddit.com/user/averagejoematt/" target="_blank" rel="me noopener">Reddit</a><a href="https://www.youtube.com/@averagejoematt" target="_blank" rel="me noopener">YouTube</a><a href="https://www.tiktok.com/@averagejoematt" target="_blank" rel="me noopener">TikTok</a><a href="/story/about/">About</a><a href="/privacy/">Privacy</a></div></nav><p class="sf-base label"><span>averagejoematt</span><a href="/">← home</a></p><script type="module" src="/assets/js/attribution.js"></script></footer>
+  <script src="/assets/js/motion.js" defer></script>
+  <script type="module" src="/assets/js/grade_your_coach.js"></script>
+</body>
+</html>

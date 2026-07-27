@@ -514,6 +514,27 @@ _CURATED = [
             ],
         },
     },
+    {
+        # #1396: "grade your own LLM coach" — the calibration engine as an open artifact
+        # (GENERATED — scripts/v4_build_grade_your_coach.py). Paste predictions+outcomes,
+        # get the same scorecard the platform's coaches get. Computation is ENTIRELY
+        # client-side (grade_your_coach.js -> calibration-core.js, a vendored copy of
+        # oss/calibration-core/), so there is no /api endpoint and no autodeploy race; the
+        # demo ledgers are a STATIC generated artifact (/data/calibration_demo.json).
+        "path": "/method/grade-your-coach/",
+        "name": "Method · grade your own LLM coach",
+        "tier": 3,
+        "content_class": "generated",
+        "api_deps": [],
+        "js_modules": ["grade_your_coach.js", "calibration-core.js"],
+        "visual": {
+            "wait_for": "[data-readout]",
+            "checks": [
+                {"selector": "[data-readout]", "not_empty": True, "desc": "scorecard readout rendered (scored or honest empty state)"},
+                {"selector": "#gyc-input", "min_count": 1, "desc": "the paste box is present"},
+            ],
+        },
+    },
     # ── Coaching door (promoted 2026-06-20) ──────────────────────────────────
     {
         "path": "/coaching/",
