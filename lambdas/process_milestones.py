@@ -25,8 +25,16 @@ The set, ranked (this order is the ledger's LADDER_PRIORITY):
 3. **strength_in_deficit** — strength volume maintained while in a caloric
    deficit (the composition proof that the right mass is being lost). Requires
    BOTH signals present with sufficient n; missing either yields NO milestone —
-   never a partial claim (ADR-104).
+   never a partial claim (ADR-104). Expenditure falls back to a Mifflin-St Jeor
+   body-weight estimate (`mifflin_tdee_estimate`) on days MacroFactor's measured
+   expenditure_kcal/tdee_kcal is absent — that field is written only by the rare
+   daily-summary CSV variant, so requiring it alone left the milestone data-starved
+   to 4 of 124 days (#1808, 2026-07-26 review); the measurement discloses the
+   measured/estimated split.
 4. **zone2_accumulation** — Zone 2 minutes accumulated over a 4-week window.
+   Measurement discloses the per-source (garmin/strava) day coverage — Garmin's
+   all-day extractor has produced zero minutes on any live record to date, so
+   this has so far always read as Strava-only (#1809).
 5. **rhr_hrv_trend** — 30-day RHR down AND HRV up versus the previous 30 days,
    each beyond the standard error of its own difference (threshold derived from
    personal variance, ADR-105 rule 4 — not a hand-set population constant).
@@ -87,6 +95,17 @@ STRENGTH_MIN_SESSION_DAYS_PER_HALF = 3  # …and in EACH half, so "maintained" c
 STRENGTH_MAINTAIN_RATIO = 0.90  # second-half volume >= 90% of first-half volume = maintained
 DEFICIT_MIN_DAYS = 14  # days with BOTH intake and expenditure logged
 DEFICIT_MIN_KCAL = 200.0  # mean daily (expenditure - intake) must be at least this
+
+# Mifflin-St Jeor fallback profile constants (#1808) — the SAME body-weight-only
+# estimate the public deficit_sustainability endpoint already uses when MacroFactor's
+# measured expenditure_kcal/tdee_kcal is absent (lambdas/web/site_api_nutrition.py:
+# _mifflin_tdee). Duplicated here rather than imported: process_milestones is
+# deliberately I/O- and dependency-free (module docstring), and the web/ package
+# bundles separately from the compute path this module runs in. Keep the two in
+# sync if the profile (height/age/activity) ever changes.
+_MIFFLIN_HEIGHT_CM = 182.88  # 183 cm profile height
+_MIFFLIN_AGE_YEARS = 35
+_MIFFLIN_ACTIVITY_FACTOR = 1.55
 
 # ── zone2_accumulation ────────────────────────────────────────────────────────
 ZONE2_WINDOW_DAYS = 28
@@ -325,7 +344,30 @@ def sustained_sessions(training_dates, today):
     return out
 
 
-def strength_in_deficit(strength_volume_by_day, calories_by_day, expenditure_by_day, today):
+def mifflin_tdee_estimate(weight_lbs):
+    """Profile-derived TDEE estimate from body weight alone (Mifflin-St Jeor x an
+    activity factor) — the #1808 fallback for days MacroFactor's MEASURED
+    expenditure_kcal/tdee_kcal is absent. That field is written only by the (rare)
+    daily-summary CSV upload variant; the routine per-meal upload path never writes
+    it, which left it present on 4 of 124 MacroFactor days as of the 2026-07-26
+    review — data-starving strength_in_deficit to unreachable under normal upload
+    habits. Withings weigh-ins are comparatively abundant, so falling back to this
+    estimate on days lacking a measured figure makes the milestone reachable without
+    fabricating anything: callers must label it 'estimate_mifflin' (never conflated
+    with the measured 'macrofactor_adaptive' figure, ADR-104) and disclose the
+    measured/estimated split in the emitted measurement (ADR-105 rule 1).
+    Returns None for non-positive or unparsable weight.
+    """
+    try:
+        wkg = float(weight_lbs) * 0.453592
+    except (TypeError, ValueError):
+        return None
+    if wkg <= 0:
+        return None
+    return round((10 * wkg + 6.25 * _MIFFLIN_HEIGHT_CM - 5 * _MIFFLIN_AGE_YEARS + 5) * _MIFFLIN_ACTIVITY_FACTOR)
+
+
+def strength_in_deficit(strength_volume_by_day, calories_by_day, expenditure_by_day, today, expenditure_source_by_day=None):
     """Strength volume maintained while in a caloric deficit — BOTH signals or nothing.
 
     Strength: session-day volume over STRENGTH_WINDOW_DAYS; needs
@@ -334,6 +376,13 @@ def strength_in_deficit(strength_volume_by_day, calories_by_day, expenditure_by_
     Deficit: mean daily (expenditure - intake) >= DEFICIT_MIN_KCAL over >= DEFICIT_MIN_DAYS
     days where BOTH numbers were logged. If either signal is missing or thin the
     function returns None — never a partial claim (ADR-104).
+
+    `expenditure_by_day` may blend MacroFactor's measured figure with the
+    mifflin_tdee_estimate fallback (#1808, populated by milestone_ledger.collect_signals);
+    `expenditure_source_by_day` (optional, {date: "macrofactor_adaptive"|"estimate_mifflin"})
+    lets the emitted measurement disclose how many of the counted deficit days were
+    measured vs. estimated — days absent from the map default to measured (the
+    pre-#1808 assumption, preserved for callers that don't track provenance).
     """
     today = _coerce_today(today)
     start = today - timedelta(days=STRENGTH_WINDOW_DAYS - 1)
@@ -351,7 +400,8 @@ def strength_in_deficit(strength_volume_by_day, calories_by_day, expenditure_by_
 
     intake = dict(_series_in_window(calories_by_day, start, today))
     expend = dict(_series_in_window(expenditure_by_day, start, today))
-    balances = [expend[d] - intake[d] for d in sorted(set(intake) & set(expend)) if intake[d] > 0 and expend[d] > 0]
+    deficit_days = sorted(d for d in set(intake) & set(expend) if intake[d] > 0 and expend[d] > 0)
+    balances = [expend[d] - intake[d] for d in deficit_days]
     if len(balances) < DEFICIT_MIN_DAYS:
         return None  # deficit signal absent or too thin — no milestone (ADR-104)
     mean_deficit = _mean(balances)
@@ -359,6 +409,13 @@ def strength_in_deficit(strength_volume_by_day, calories_by_day, expenditure_by_
         return None  # not in a deficit
     sd = _sd(balances) or 0.0
     sem = sd / math.sqrt(len(balances))
+
+    # #1808: disclose how much of the deficit evidence is MacroFactor's measured
+    # figure vs. the mifflin_tdee_estimate fallback — days absent from the source
+    # map (a caller that didn't track provenance) default to measured.
+    src = expenditure_source_by_day or {}
+    n_estimated = sum(1 for d in deficit_days if src.get(d.isoformat()) == "estimate_mifflin")
+    n_measured = len(deficit_days) - n_estimated
 
     milestone = WindowMilestone(
         id=f"strength_in_deficit_{STRENGTH_WINDOW_DAYS // 7}w",
@@ -380,22 +437,36 @@ def strength_in_deficit(strength_volume_by_day, calories_by_day, expenditure_by_
         "maintain_ratio_threshold": STRENGTH_MAINTAIN_RATIO,
         "mean_deficit_kcal": round(mean_deficit, 1),
         "deficit_threshold_kcal": DEFICIT_MIN_KCAL,
+        # #1808: measured (MacroFactor adaptive) vs. estimated (Mifflin-St Jeor
+        # fallback) split of the deficit_days evidence — never silently blended
+        # without disclosure (ADR-104/105).
+        "expenditure_measured_days": n_measured,
+        "expenditure_estimated_days": n_estimated,
         "uncertainty": {"type": "sem", "deficit_sd_kcal": round(sd, 1), "deficit_sem_kcal": round(sem, 1)},
     }
     return milestone, measurement
 
 
-def zone2_accumulation(zone2_minutes_by_day, today):
+def zone2_accumulation(zone2_minutes_by_day, today, zone2_source_by_day=None):
     """Total Zone 2 minutes accumulated over ZONE2_WINDOW_DAYS. Rung ladder.
 
     A sum can only be UNDER-counted by missing days, so thin coverage is
     conservative rather than dishonest — the measurement still records how many
-    days actually carried data. Returns [(WindowMilestone, measurement), …].
+    days actually carried data. `zone2_source_by_day` (optional, #1809,
+    {date: "garmin"|"strava"}) discloses which provider each in-window day's
+    minutes came from — Garmin's all-day heartRateZones extractor has produced
+    zero minutes on every live record to date, so this has so far always read as
+    Strava-only coverage; the split is measured live, never hardcoded, so it
+    self-corrects the day Garmin's leg starts populating. Returns
+    [(WindowMilestone, measurement), …].
     """
     today = _coerce_today(today)
     start = today - timedelta(days=ZONE2_WINDOW_DAYS - 1)
     series = _series_in_window(zone2_minutes_by_day, start, today)
     total = sum(v for _, v in series)
+    src = zone2_source_by_day or {}
+    garmin_days = sum(1 for d, _ in series if src.get(d.isoformat()) == "garmin")
+    strava_days = sum(1 for d, _ in series if src.get(d.isoformat()) == "strava")
     out = []
     for depth, rung in enumerate(ZONE2_RUNG_MINUTES):
         if total < rung:
@@ -413,6 +484,9 @@ def zone2_accumulation(zone2_minutes_by_day, today):
             "n": len(series),  # days carrying Zone 2 data in the window
             "total_minutes": round(total, 1),
             "threshold_minutes": rung,
+            # #1809: per-source day counts — honest single-source coverage instead
+            # of an implied (and currently false) two-source claim.
+            "source_coverage": {"garmin_days": garmin_days, "strava_days": strava_days},
             "uncertainty": {"type": "sum_undercount_only", "coverage_days": len(series)},
         }
         out.append((milestone, measurement))
@@ -543,11 +617,12 @@ def candidates(signals, today):
         signals.get("calories_by_day"),
         signals.get("expenditure_by_day"),
         today,
+        signals.get("expenditure_source_by_day"),
     )
     if sid:
         out.append(sid)
 
-    out.extend(zone2_accumulation(signals.get("zone2_minutes_by_day"), today))
+    out.extend(zone2_accumulation(signals.get("zone2_minutes_by_day"), today, signals.get("zone2_source_by_day")))
 
     trend = rhr_hrv_trend(signals.get("rhr_by_day"), signals.get("hrv_by_day"), today)
     if trend:

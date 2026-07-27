@@ -759,6 +759,19 @@ def extract_sleep(api, date_str: str) -> dict:
 
 
 def extract_hr_zones(api, date_str: str) -> dict:
+    """Daily HR-zone seconds (hr_zone_0..N_seconds) + the zone2_minutes convenience
+    field, from Garmin's per-day heartRateZones.
+
+    #1809 (2026-07-26 review): this extractor is wired and has run on every daily
+    ingestion for years, but a full-partition scan found `heartRateZones` has
+    never returned data — hr_zone_*_seconds/zone2_minutes are present on 0 of 1461
+    live garmin records. Both the "API returned no zones" and "API call raised"
+    paths now log at WARNING (were bare `logger.info`, so this failure mode was
+    invisible in CloudWatch) so a persistently-empty leg is finally visible for
+    investigation, rather than silently degrading zone2_accumulation to
+    Strava-only coverage forever. Not a functional change to what's written —
+    still returns {} on failure, never fabricates zone data.
+    """
     result = {}
     try:
         data = api.get_heart_rates(date_str)
@@ -774,8 +787,14 @@ def extract_hr_zones(api, date_str: str) -> dict:
                 result["zone2_minutes"] = round(z2 / 60, 1)
         if result:
             logger.info(f"HR zones: zone2={result.get('zone2_minutes')}min total_zones={len([k for k in result if 'zone' in k])}")
+        else:
+            # #1809: surfaced from logger.info — an empty-but-non-exceptional
+            # response is exactly the persistent failure mode the review found.
+            logger.warning(f"HR zones: get_heart_rates({date_str}) returned no usable heartRateZones — zone2_minutes not written")
     except Exception as e:
-        logger.info(f"Warning: HR zones extraction failed: {e}")
+        # #1809: surfaced from logger.info — this swallowed exception is the other
+        # half of the silent-failure path the review found.
+        logger.warning(f"HR zones extraction failed for {date_str}: {e}")
     return result
 
 

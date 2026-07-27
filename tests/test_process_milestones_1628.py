@@ -514,3 +514,175 @@ def test_zone2_takes_per_day_max_of_garmin_and_strava_not_sum():
     assert z2["2026-07-20"] == 40.0  # max, not 80
     assert z2["2026-07-21"] == 25.0
     assert z2["2026-07-22"] == 30.0
+
+
+# ── #1808: strength_in_deficit's Mifflin fallback (2026-07-26 deep-quality review) ──
+
+
+def test_mifflin_tdee_estimate_is_a_positive_reasonable_number():
+    """Sanity: the fallback formula returns something in a plausible daily-kcal
+    range for an adult body weight, and refuses non-positive/unparsable weight."""
+    est = pm.mifflin_tdee_estimate(200.0)
+    assert est is not None and 1500 < est < 4000
+    assert pm.mifflin_tdee_estimate(0) is None
+    assert pm.mifflin_tdee_estimate(None) is None
+    assert pm.mifflin_tdee_estimate("not-a-number") is None
+
+
+def test_strength_in_deficit_discloses_measured_vs_estimated_expenditure_days():
+    """#1808: expenditure_source_by_day lets the emission disclose how many
+    deficit days were MacroFactor's measured figure vs. the Mifflin-St Jeor
+    fallback — never silently blended (ADR-104/105)."""
+    volume, calories, expenditure = _strength_fixture()
+    today = "2026-05-01"
+    t = date.fromisoformat(today)
+    start = t - timedelta(days=pm.STRENGTH_WINDOW_DAYS - 1)
+    days = [_iso(start + timedelta(days=i)) for i in range(pm.STRENGTH_WINDOW_DAYS)]
+    # First half measured, second half estimated (arbitrary split covering both).
+    source = {d: ("macrofactor_adaptive" if i < pm.STRENGTH_WINDOW_DAYS // 2 else "estimate_mifflin") for i, d in enumerate(days)}
+
+    fired = pm.strength_in_deficit(volume, calories, expenditure, today, source)
+    assert fired is not None
+    _, meas = fired
+    assert meas["expenditure_measured_days"] + meas["expenditure_estimated_days"] == meas["n_deficit_days"]
+    assert meas["expenditure_estimated_days"] > 0 and meas["expenditure_measured_days"] > 0
+
+    # No source map at all -> every day defaults to measured (pre-#1808 assumption,
+    # preserved for callers that don't track provenance).
+    fired_no_src = pm.strength_in_deficit(volume, calories, expenditure, today)
+    _, meas_no_src = fired_no_src
+    assert meas_no_src["expenditure_estimated_days"] == 0
+    assert meas_no_src["expenditure_measured_days"] == meas_no_src["n_deficit_days"]
+
+
+def test_strength_in_deficit_fires_using_only_mifflin_estimated_expenditure():
+    """#1808's actual reachability claim: with NO measured MacroFactor expenditure
+    at all — only intake + a Mifflin estimate — the milestone still fires,
+    entirely disclosed as estimated. Before this fix the milestone required
+    expenditure_kcal/tdee_kcal directly, which the routine per-meal upload path
+    never writes (present on 4 of 124 live MacroFactor days, 2026-07-26 review)."""
+    volume, calories, _ = _strength_fixture()
+    today = "2026-05-01"
+    t = date.fromisoformat(today)
+    start = t - timedelta(days=pm.STRENGTH_WINDOW_DAYS - 1)
+    days = [_iso(start + timedelta(days=i)) for i in range(pm.STRENGTH_WINDOW_DAYS)]
+    # A body weight light enough that the Mifflin estimate clears DEFICIT_MIN_KCAL
+    # over MacroFactor's flat 2200 kcal/day intake in the fixture.
+    expenditure = {d: pm.mifflin_tdee_estimate(150.0) for d in days}
+    source = {d: "estimate_mifflin" for d in days}
+
+    fired = pm.strength_in_deficit(volume, calories, expenditure, today, source)
+    assert fired is not None, "the Mifflin fallback should make strength_in_deficit reachable with zero measured expenditure"
+    _, meas = fired
+    assert meas["expenditure_measured_days"] == 0
+    assert meas["expenditure_estimated_days"] == meas["n_deficit_days"] == pm.STRENGTH_WINDOW_DAYS
+
+
+def test_collect_signals_falls_back_to_mifflin_estimate_when_macrofactor_expenditure_absent():
+    """#1808 end-to-end: MacroFactor records carry calories but never
+    expenditure_kcal/tdee_kcal (the routine per-meal upload path) — same-day
+    Withings weigh-ins let collect_signals fill expenditure_by_day with a
+    labeled Mifflin estimate instead of leaving strength_in_deficit unreachable."""
+    table = FakeTable()
+    today = "2026-05-01"
+    t = date.fromisoformat(today)
+    start = t - timedelta(days=pm.STRENGTH_WINDOW_DAYS - 1)
+    for i in range(pm.STRENGTH_WINDOW_DAYS):
+        d = _iso(start + timedelta(days=i))
+        table.put_item(Item={"pk": USER_PREFIX + "macrofactor", "sk": f"DATE#{d}", "total_calories_kcal": 2200.0})
+        table.put_item(Item=_weight_day(d, 200.0))
+
+    signals = ml.collect_signals(table, USER_PREFIX, None, today)
+    assert signals["expenditure_by_day"], "no expenditure signal reached collect_signals output"
+    assert len(signals["expenditure_by_day"]) == pm.STRENGTH_WINDOW_DAYS
+    assert all(v == "estimate_mifflin" for v in signals["expenditure_source_by_day"].values())
+
+    # A day with a MEASURED figure is never overwritten by the estimate.
+    measured_day = _iso(start)
+    table.put_item(
+        Item={
+            "pk": USER_PREFIX + "macrofactor",
+            "sk": f"DATE#{measured_day}",
+            "total_calories_kcal": 2200.0,
+            "expenditure_kcal": 2900.0,
+        }
+    )
+    signals2 = ml.collect_signals(table, USER_PREFIX, None, today)
+    assert signals2["expenditure_by_day"][measured_day] == 2900.0
+    assert signals2["expenditure_source_by_day"][measured_day] == "macrofactor_adaptive"
+
+
+# ── #1809: zone2's source_coverage disclosure (2026-07-26 deep-quality review) ──
+
+
+def test_zone2_accumulation_discloses_source_coverage():
+    today = "2026-05-01"
+    t = date.fromisoformat(today)
+    by_day = {_iso(t - timedelta(days=i)): 30.0 for i in range(21)}  # 630 minutes, all strava
+    source = {_iso(t - timedelta(days=i)): "strava" for i in range(21)}
+    fired = pm.zone2_accumulation(by_day, today, source)
+    assert fired  # rungs 300/600 satisfied, same fixture as test_zone2_accumulation_rungs
+    for _, meas in fired:
+        assert meas["source_coverage"] == {"garmin_days": 0, "strava_days": 21}
+
+    # No source map -> honest zeros, never a fabricated split.
+    fired_no_src = pm.zone2_accumulation(by_day, today)
+    for _, meas in fired_no_src:
+        assert meas["source_coverage"] == {"garmin_days": 0, "strava_days": 0}
+
+
+def test_collect_signals_discloses_zone2_source_by_day():
+    """#1809: extends test_zone2_takes_per_day_max_of_garmin_and_strava_not_sum —
+    collect_signals must also expose WHICH source won the per-day max(), not just
+    the merged minutes, so the milestone measurement can disclose real coverage
+    instead of implying (currently falsely) that garmin ever contributes."""
+    table = FakeTable()
+    table.put_item(Item={"pk": "USER#matthew#SOURCE#garmin", "sk": "DATE#2026-07-20", "zone2_minutes": 40})
+    table.put_item(Item={"pk": "USER#matthew#SOURCE#strava", "sk": "DATE#2026-07-20", "total_zone2_seconds": 2400})
+    table.put_item(Item={"pk": "USER#matthew#SOURCE#garmin", "sk": "DATE#2026-07-21", "zone2_minutes": 25})
+    table.put_item(Item={"pk": "USER#matthew#SOURCE#strava", "sk": "DATE#2026-07-22", "total_zone2_seconds": 1800})
+
+    signals = ml.collect_signals(table, "USER#matthew#SOURCE#", None, "2026-07-23")
+    src = signals["zone2_source_by_day"]
+    assert src["2026-07-20"] == "garmin"  # tied minutes -> garmin wins the >= comparison
+    assert src["2026-07-21"] == "garmin"
+    assert src["2026-07-22"] == "strava"
+
+
+# ── #1810: return_after_gap's event_date is the true return date ─────────────
+
+
+def test_return_after_gap_event_date_is_the_true_return_date_not_the_confirmation_date():
+    """#1810: reproduces the finding's exact repro — a return on 2026-08-12
+    confirmed on 2026-09-20 (39 days later, inside the 45-day emit window via
+    breaker/cooldown suppression) must stamp event_date from the true return
+    date, not the write/confirmation date read_announced_events sorts and
+    filters by. recorded_at (the write date) is untouched."""
+    signals = {"training_dates": ["2026-08-01", "2026-08-12"]}
+    result = ml.evaluate(signals, set(), None, "2026-09-20")
+    assert len(result["to_write"]) == 1
+    entry = result["to_write"][0]
+    assert entry["milestone_id"] == "return_after_gap_2026-08-12"
+    assert entry["measurement"]["return_date"] == "2026-08-12"
+    assert entry["event_date"] == "2026-08-12", "event_date drifted to the confirmation date, not the true return date"
+    assert entry["recorded_at"] == "2026-09-20"
+
+
+def test_return_after_gap_written_through_the_ledger_carries_the_true_event_date():
+    """Same claim, through the real write path (ml.sweep -> _entry -> put_item) so
+    a regression in the _entry plumbing — not just the pure evaluate() decision —
+    would be caught. read_announced_events sorts on this field."""
+    table = FakeTable()
+    # Genesis first, on a pattern that does NOT satisfy return_after_gap (a single
+    # training day — no gap to return from), so the later crossing announces as
+    # news rather than being silently consumed as baseline.
+    ml.sweep(table, USER_PREFIX, None, "2026-01-02", signals={"training_dates": ["2026-01-01"]}, suppressed=False)
+
+    signals = {"training_dates": ["2026-08-01", "2026-08-12"]}
+    r = ml.sweep(table, USER_PREFIX, None, "2026-09-20", signals=signals, suppressed=False)
+    assert [e["milestone_id"] for e in r["announced"]] == ["return_after_gap_2026-08-12"]
+    rec = _ledger_items(table)["MILESTONE#return_after_gap_2026-08-12"]
+    assert rec["event_date"] == "2026-08-12"
+    assert rec["recorded_at"] == "2026-09-20"
+    announced = ml.read_announced_events(table, USER_PREFIX)
+    assert announced[0]["event_date"] == "2026-08-12"

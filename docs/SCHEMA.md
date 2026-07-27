@@ -788,12 +788,12 @@ Note: Items can be large due to nested workout/exercise/set structure. Monitor a
 | `training_readiness_level` | string | Garmin readiness level label |
 | `sleep_duration_seconds` | number | Garmin sleep duration (supplementary to Eight Sleep) |
 | `sleep_score` | number | Garmin sleep score |
-| `hr_zone_0_seconds` | number | Daily seconds in HR Zone 0 (very light) |
-| `hr_zone_1_seconds` | number | Daily seconds in HR Zone 1 (light / Zone 2) |
-| `hr_zone_2_seconds` | number | Daily seconds in HR Zone 2 (aerobic) |
-| `hr_zone_3_seconds` | number | Daily seconds in HR Zone 3 (threshold) |
-| `hr_zone_4_seconds` | number | Daily seconds in HR Zone 4 (max) |
-| `zone2_minutes` | number | Convenience: Zone 1 seconds / 60 (longevity metric) |
+| `hr_zone_0_seconds` | number | Daily seconds in HR Zone 0 (very light) — **defined, not live**, see note below |
+| `hr_zone_1_seconds` | number | Daily seconds in HR Zone 1 (light / Zone 2) — **defined, not live**, see note below |
+| `hr_zone_2_seconds` | number | Daily seconds in HR Zone 2 (aerobic) — **defined, not live**, see note below |
+| `hr_zone_3_seconds` | number | Daily seconds in HR Zone 3 (threshold) — **defined, not live**, see note below |
+| `hr_zone_4_seconds` | number | Daily seconds in HR Zone 4 (max) — **defined, not live**, see note below |
+| `zone2_minutes` | number | Convenience: Zone 1 seconds / 60 (longevity metric) — **defined, not live**, see note below |
 | `intensity_minutes_moderate` | number | Moderate intensity minutes (WHO metric) |
 | `intensity_minutes_vigorous` | number | Vigorous intensity minutes |
 | `intensity_minutes_total` | number | mod + vig×2 (vigorous counts double per WHO) |
@@ -809,6 +809,18 @@ Note: Items can be large due to nested workout/exercise/set structure. Monitor a
 | `garmin_activity_count` | number | Number of activities in `garmin_activities` |
 
 Note: `hr_zone_{i}_seconds` covers **every** zone Garmin returns (0–5), not just 0–4 — the extractor enumerates the full `heartRateZones` array.
+
+Note (#1809, 2026-07-26 review — live truth, not aspirational): `hr_zone_*_seconds` and
+`zone2_minutes` are written by `extract_hr_zones` (`lambdas/ingestion/garmin_lambda.py`) IF
+Garmin's `get_heart_rates` response carries a non-empty `heartRateZones` array — a
+full-partition scan found it never has, on any of 1461 live garmin records. The
+extractor is wired into every daily run (not dead code) and now logs at WARNING
+(was silent at INFO) when the leg comes back empty or raises, so the persistent
+gap is finally visible for investigation rather than silently degrading zone-2
+milestones to single-source. Until that API leg is fixed, Strava's
+`total_zone2_seconds` (line above) is the sole live Zone-2 source; the milestone
+ledger's `zone2_accumulation` measurement discloses this per-day (`source_coverage`),
+computed live rather than assumed.
 
 Note (v1.5.0 sleep expansion): also written when present — `deep_sleep_seconds`, `light_sleep_seconds`, `rem_sleep_seconds`, `awake_sleep_seconds`, `unmeasurable_sleep_seconds`, `sleep_start_local`/`sleep_end_local`, `sleep_spo2_avg`/`sleep_spo2_low`, `sleep_avg_respiration`/`sleep_lowest_respiration`, `restless_moments_count`, and sleep sub-scores `sleep_score_quality`, `sleep_score_duration`, `sleep_score_deep`, `sleep_score_rem`, `sleep_score_light`, `sleep_score_awakenings`.
 
