@@ -872,6 +872,11 @@ def store_day_grade(date_str, total_score, grade, component_scores, weights, alg
         for comp, score in component_scores.items():
             if score is not None:
                 item["component_" + comp] = Decimal(str(score))
+        # ADR-058 (#1814): every write carries `phase` — an unstamped row passes the
+        # default-deny read filter as CURRENT (pre-genesis rows counted as experiment days).
+        from compute_metadata import tag_record
+
+        item = tag_record(item, source_id="day_grade")
         table.put_item(Item=item)
         logger.info("Day grade stored: " + date_str + " -> " + str(total_score) + " (" + grade + ")")
     except Exception as e:
@@ -936,6 +941,10 @@ def store_habit_scores(date_str, component_details, component_scores, vice_strea
         if sg_pcts:
             item["synergy_groups"] = json.loads(json.dumps(sg_pcts), parse_float=Decimal)
         item = {k: v for k, v in item.items() if v is not None}
+        # ADR-058 (#1814): phase-stamp — see store_day_grade above.
+        from compute_metadata import tag_record
+
+        item = tag_record(item, source_id="habit_scores")
         table.put_item(Item=item)
         logger.info("Habit scores stored: " + date_str + " T0=" + str(t0.get("done", 0)) + "/" + str(t0.get("total", 0)))
     except Exception as e:

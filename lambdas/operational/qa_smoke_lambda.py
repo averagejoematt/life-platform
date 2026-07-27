@@ -219,11 +219,27 @@ def check_score_sanity():
     except Exception as e:
         return [Check("dashboard:parse", "Score Sanity").fail(f"Cannot load dashboard/matthew/data.json: {e}")]
 
+    # Pre-start/Day-1 grace window (shared by three checks below — the 39f01e88
+    # class): before genesis, and on Day 1 before the first computes/syncs land,
+    # several zero/odd states are the HONEST state (ADR-104), not data loss.
+    # From Day 2 every one of them is a real FAIL again.
+    try:
+        from constants import EXPERIMENT_START_DATE as _genesis
+        from pacific_time import pacific_today as _pt_today
+
+        _genesis_grace = (date.fromisoformat(_pt_today()) - date.fromisoformat(_genesis)).days < 1
+    except Exception:  # noqa: BLE001 — grace derivation must never break the sweep
+        _genesis_grace = False
+
     expected_date = yesterday_str()
     actual_date = data.get("date", "")
     c = Check("dashboard:date", "Score Sanity")
     if actual_date == expected_date:
         c.ok(f"Date = {actual_date}")
+    elif actual_date and actual_date > expected_date and _genesis_grace:
+        # AHEAD of expected (e.g. a manual pre-genesis regen computed "today"
+        # early) is never data loss; self-heals at the next scheduled brief.
+        c.warn(f"Dashboard dated {actual_date}, ahead of expected {expected_date} — pre-start/Day-1 regen artifact, self-heals")
     elif actual_date:
         c.fail(f"Stale date — expected {expected_date}, got {actual_date}")
     else:
@@ -247,17 +263,10 @@ def check_score_sanity():
     grade_s = (data.get("day_grade") or {}).get("score")
     hydration = (data.get("day_grade", {}).get("components") or {}).get("hydration")
 
-    # Pre-start/Day-1 grace (2026-07-26, first live catch of the #1831 strict
-    # oracle): before genesis — and on Day 1 before the first Withings sync —
-    # a null weight IS the honest state (ADR-104), not missing data. WARN with
-    # the reason; from Day 2 a null weight is a real FAIL again.
-    try:
-        from constants import EXPERIMENT_START_DATE
-        from pacific_time import pacific_today
-
-        _weight_grace = (date.fromisoformat(pacific_today()) - date.fromisoformat(EXPERIMENT_START_DATE)).days < 1
-    except Exception:  # noqa: BLE001 — grace derivation must never break the sweep
-        _weight_grace = False
+    # Pre-start/Day-1 weight grace (2026-07-26, first live catch of the #1831
+    # strict oracle): a null weight before the first Withings sync IS the honest
+    # state — see the shared _genesis_grace derivation above.
+    _weight_grace = _genesis_grace
 
     checks += [
         _range_check("readiness", readiness, 0, 100, "%", optional=True),
@@ -291,6 +300,10 @@ def check_score_sanity():
     if lvl and tier:
         xp = cs.get("xp", 0)
         c.ok(f"Level {lvl} {tier} ({xp:,} XP)")
+    elif _genesis_grace:
+        # The reset wipes the character; the first sheet computes after genesis.
+        # Its absence tonight is the honest zero state (ADR-104).
+        c.warn("Character sheet absent — wiped at reset, first compute lands after genesis (pre-start/Day-1 grace)")
     else:
         c.fail(f"Character sheet missing — level={lvl}, tier={tier}")
     checks.append(c)

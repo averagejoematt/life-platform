@@ -729,6 +729,12 @@ def store_day_grade(date_str, total_score, grade, component_scores, weights):
         for comp, score in component_scores.items():
             if score is not None:
                 item["component_" + comp] = Decimal(str(score))
+        # ADR-058 (#1814): every write carries `phase` — an unstamped row passes the
+        # default-deny read filter as CURRENT, so a row written between the reset's
+        # tagger pass and genesis silently counted as an experiment day.
+        from compute_metadata import tag_record
+
+        item = tag_record(item, source_id="day_grade")
         # DATA-2: validate_item directly (no S3 client for compute partitions)
         try:
             from ingestion_validator import validate_item as _vi
@@ -805,6 +811,10 @@ def store_habit_scores(date_str, component_details, component_scores, vice_strea
         if sg_pcts:
             item["synergy_groups"] = _deep_dec(sg_pcts)
         item = {k: v for k, v in item.items() if v is not None}
+        # ADR-058 (#1814): phase-stamp — see store_day_grade above.
+        from compute_metadata import tag_record
+
+        item = tag_record(item, source_id="habit_scores")
         # DATA-2: validate_item for habit_scores (Item 3, R12)
         try:
             from ingestion_validator import validate_item as _vi

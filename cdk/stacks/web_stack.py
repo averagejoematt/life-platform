@@ -881,6 +881,17 @@ class WebStack(Stack):
                         min_ttl=0,
                         allowed_methods=["GET", "HEAD"],
                         cached_methods=["GET", "HEAD"],
+                        # #1805: this behavior bypasses the default behavior's v4-redirects
+                        # function, so tombstoned permalinks (week-04..06 in redirects.map)
+                        # kept serving raw tombstone JSON with a 200. The function only
+                        # rewrites exact URIs in its map — live current-cycle posts pass
+                        # through untouched.
+                        function_associations=[
+                            cloudfront.CfnDistribution.FunctionAssociationProperty(
+                                event_type="viewer-request",
+                                function_arn=f"arn:aws:cloudfront::{ACCT}:function/v4-redirects",
+                            ),
+                        ],
                     ),
                     cloudfront.CfnDistribution.CacheBehaviorProperty(
                         path_pattern="/assets/images/og-*",
