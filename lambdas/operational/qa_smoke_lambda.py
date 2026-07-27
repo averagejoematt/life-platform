@@ -19,7 +19,7 @@ import os
 import re
 import urllib.error
 import urllib.request
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -247,10 +247,22 @@ def check_score_sanity():
     grade_s = (data.get("day_grade") or {}).get("score")
     hydration = (data.get("day_grade", {}).get("components") or {}).get("hydration")
 
+    # Pre-start/Day-1 grace (2026-07-26, first live catch of the #1831 strict
+    # oracle): before genesis — and on Day 1 before the first Withings sync —
+    # a null weight IS the honest state (ADR-104), not missing data. WARN with
+    # the reason; from Day 2 a null weight is a real FAIL again.
+    try:
+        from constants import EXPERIMENT_START_DATE
+        from pacific_time import pacific_today
+
+        _weight_grace = (date.fromisoformat(pacific_today()) - date.fromisoformat(EXPERIMENT_START_DATE)).days < 1
+    except Exception:  # noqa: BLE001 — grace derivation must never break the sweep
+        _weight_grace = False
+
     checks += [
         _range_check("readiness", readiness, 0, 100, "%", optional=True),
         _range_check("sleep", sleep_s, 0, 100, "", optional=True),
-        _range_check("weight", weight, 150, 450, " lbs"),
+        _range_check("weight", weight, 150, 450, " lbs", optional=_weight_grace),
         _range_check("hrv", hrv, 5, 250, " ms", optional=True),
         _range_check("glucose", glucose, 50, 300, " mg/dL", optional=True),
     ]
