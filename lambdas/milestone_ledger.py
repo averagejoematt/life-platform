@@ -286,6 +286,18 @@ def _days_between(earlier: str, later: str) -> int:
 def _entry(
     rule, measurement: dict, today: str, *, announce: bool, origin: str, subsumed_by: str | None = None, companion_to: str | None = None
 ) -> dict:
+    # #1810: return_after_gap is the one rung whose confirmation date can drift far
+    # from the fact it reports — RETURN_EMIT_WINDOW_DAYS (45) exists precisely so a
+    # write suppressed by the spiral breaker/cooldown can land weeks after the
+    # actual return. event_date is what read_announced_events sorts/filters by, so
+    # stamping it from the true measurement.return_date (not the write date) keeps
+    # the flagship behavioural fact honestly dated — every other rung's window
+    # genuinely DOES end "today" (the ADR-104 rationale below), so this is the one
+    # deliberate divergence.
+    if origin == ORIGIN_CROSSING and _ladder_of(rule) == "return_after_gap":
+        event_date = measurement.get("return_date") or today
+    else:
+        event_date = today if origin == ORIGIN_CROSSING else None
     entry = {
         "sk": EVENT_SK_PREFIX + rule.id,
         "milestone_id": rule.id,
@@ -294,9 +306,9 @@ def _entry(
         "ladder": _ladder_of(rule),
         "description": rule.description,
         # ADR-104: event_date is the evaluation date the crossing was CONFIRMED on
-        # (the measurement window ends that day). A baseline entry has no honest
-        # event date — the crossing predates the ledger — so it carries None.
-        "event_date": today if origin == ORIGIN_CROSSING else None,
+        # (the measurement window ends that day) — except return_after_gap, which
+        # stamps the true dated return fact instead (#1810, see above).
+        "event_date": event_date,
         "announce": announce,
         "origin": origin,
         "measurement": measurement,
@@ -575,7 +587,10 @@ def collect_signals(table, user_prefix: str, phase_filter, today: str) -> dict:
     def _back(days: int) -> str:
         return (end - timedelta(days=days)).strftime("%Y-%m-%d")
 
-    weights = _range("withings", _back(WEIGHT_WINDOW_DAYS - 1))
+    # #1808: widened to also cover the strength_in_deficit window — the Mifflin
+    # expenditure fallback below needs a weigh-in on each candidate day, not just
+    # the trailing WEIGHT_WINDOW_DAYS the weight rung itself looks at.
+    weights = _range("withings", _back(max(WEIGHT_WINDOW_DAYS, process_milestones.STRENGTH_WINDOW_DAYS) - 1))
     habits = _range("habit_scores", _back(364))
     chars = _query_all(
         KeyConditionExpression="pk = :pk AND begins_with(sk, :sk)",
@@ -599,11 +614,14 @@ def collect_signals(table, user_prefix: str, phase_filter, today: str) -> dict:
             return None
 
     weight_series = []
+    weight_by_day: dict[str, float] = {}
     for w in sorted(weights, key=lambda i: str(i.get("sk") or "")):
         sk = str(w.get("sk") or "")
         val = _f(w.get("weight_lbs"))
         if sk.startswith("DATE#") and val is not None:
-            weight_series.append((sk.removeprefix("DATE#"), val))
+            day = sk.removeprefix("DATE#")
+            weight_series.append((day, val))
+            weight_by_day[day] = val
 
     habits_sorted = sorted(habits, key=lambda i: str(i.get("sk") or ""))
     latest_habit = habits_sorted[-1] if habits_sorted else {}
@@ -649,6 +667,15 @@ def collect_signals(table, user_prefix: str, phase_filter, today: str) -> dict:
     zone2_by_day: dict[str, float] = {
         day: max(garmin_z2_by_day.get(day, 0.0), strava_z2_by_day.get(day, 0.0)) for day in set(garmin_z2_by_day) | set(strava_z2_by_day)
     }
+    # #1809: which source WON the max() per day — garmin's all-day zone2_minutes/
+    # time_in_zone_2_minutes has produced zero live records to date (0/1461,
+    # 2026-07-26 review; the extractor is wired but its heartRateZones read has
+    # always come back empty), so this has so far always resolved strava. Measured
+    # live rather than hardcoded, so it self-corrects the day garmin's leg revives.
+    zone2_source_by_day: dict[str, str] = {
+        day: ("garmin" if garmin_z2_by_day.get(day, 0.0) >= strava_z2_by_day.get(day, 0.0) else "strava")
+        for day in set(garmin_z2_by_day) | set(strava_z2_by_day)
+    }
 
     # RHR / HRV: whoop daily records (skip interleaved #WORKOUT# sub-records).
     rhr_by_day: dict[str, float] = {}
@@ -667,6 +694,7 @@ def collect_signals(table, user_prefix: str, phase_filter, today: str) -> dict:
     # Intake / expenditure: MacroFactor daily records.
     calories_by_day: dict[str, float] = {}
     expenditure_by_day: dict[str, float] = {}
+    expenditure_source_by_day: dict[str, str] = {}
     for item in macro:
         sk = str(item.get("sk") or "")
         if not sk.startswith("DATE#") or len(sk) != 15:
@@ -676,7 +704,25 @@ def collect_signals(table, user_prefix: str, phase_filter, today: str) -> dict:
         if cal is not None:
             calories_by_day[sk[5:15]] = cal
         if exp is not None:
-            expenditure_by_day[sk[5:15]] = exp
+            day = sk[5:15]
+            expenditure_by_day[day] = exp
+            expenditure_source_by_day[day] = "macrofactor_adaptive"
+
+    # #1808: expenditure_kcal/tdee_kcal is written only by the rare daily-summary
+    # CSV upload variant — the routine per-meal path never writes it, which starved
+    # strength_in_deficit to 4 of 124 MacroFactor days (2026-07-26 review). Fall
+    # back to a Mifflin-St Jeor estimate from that day's Withings weigh-in (the
+    # same fallback the public deficit_sustainability endpoint already uses,
+    # site_api_nutrition._mifflin_tdee) on days lacking a measured figure —
+    # reachable, existing data, clearly labeled so it's never conflated with the
+    # measured figure (see process_milestones.strength_in_deficit's disclosure).
+    for day, w in weight_by_day.items():
+        if day in expenditure_by_day:
+            continue
+        est = process_milestones.mifflin_tdee_estimate(w)
+        if est is not None:
+            expenditure_by_day[day] = est
+            expenditure_source_by_day[day] = "estimate_mifflin"
 
     # Waist: navel tape measurements.
     waist_by_day: dict[str, float] = {}
@@ -695,10 +741,12 @@ def collect_signals(table, user_prefix: str, phase_filter, today: str) -> dict:
         "training_dates": sorted(training_days),
         "strength_volume_by_day": strength_volume_by_day,
         "zone2_minutes_by_day": zone2_by_day,
+        "zone2_source_by_day": zone2_source_by_day,  # #1809
         "rhr_by_day": rhr_by_day,
         "hrv_by_day": hrv_by_day,
         "calories_by_day": calories_by_day,
         "expenditure_by_day": expenditure_by_day,
+        "expenditure_source_by_day": expenditure_source_by_day,  # #1808
         "waist_by_day": waist_by_day,
     }
 
