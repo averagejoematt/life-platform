@@ -2991,6 +2991,87 @@ Every asset URL is now content-hashed and immutable, so an entry module pins the
 
 **Addendum (2026-07-20, #1324): `.github/PULL_REQUEST_TEMPLATE.md` and `.github/ISSUE_TEMPLATE/*` are retired — agent filing via `gh pr create`/`gh issue create` in the ADR-099 conventions above IS the intake, not a form GitHub renders.** Evidence: the PR template's "Backfill / Lambda parity check" was used in 0 of the 20 most recent merged PRs (all follow the freeform What/Why + guard-table convention instead); the issue forms' `enhancement` label saw 0 uses since the templates were added 2026-06-07, and `feature_request.md` had drifted to quoting the superseded "$75/mo enforced ceiling" (ADR-133 raised the base to $85) undetected, because `.github/` was never in `check_doc_facts.py`'s or `check_doc_tombstones.py`'s scanned surface. The Backfill/Lambda-parity checkbox's rationale (TD-14/TD-15, the HAE source-priority drift incident) is preserved in `docs/CHANGELOG.md`'s TD-14 entry and `docs/DECISIONS.md`'s TD-19 audit references, not lost with the checkbox.
 
+### ADR-099 Amendment (2026-07-27, #1865 — one canonical score line, a required body shape, and a closure contract)
+
+**Context.** The 2026-07-27 PM backlog-practice review (epic #1863) measured this ADR against the live corpus — 68 open / ~740 closed issues, every finding run rather than inferred — and found four of its rules drifted or never real:
+
+- **The score-line grammar forked four ways in the wild while this ADR sanctions two:** `T4×W4/M` (no basis in this ADR at all), `P2*1.0/L=4 = 0.75`, `P2 → Impact 3 × Confidence 1.0 / Effort S(1) = 3.0 → Now`, and `Impact 2 × Confidence 0.9 / Effort S(1) = 1.8 (Next)`. No parser reads all four, so the stored rank is unusable by a script — and `/uplevel` Phase 2 re-scores candidates from scratch instead of reading it. The scoring apparatus was written and never consumed.
+- **No body-section shape was ever specified,** so `outcome_if_fixed` — the only field that states value — appears on 27 of 68 open issues and nothing notices.
+- **No closure contract exists, and the ownership gap is structural.** 53 of the last 60 closed issues have zero comments; `.claude/agents/worktree-implementer.md` may not touch issues, `.claude/agents/issue-filer.md` never closes issues, and GitHub auto-closes on `Fixes #N`. A platform whose ADR-105 requires every health forecast graded has never graded a product one.
+- **Value is never tied to the north star.** Only 13 of 68 open issues name an audience, though `docs/PLATFORM_NORTH_STAR.md:48` defines four.
+
+**Decision.**
+
+**1. One canonical score line.** Every scored issue carries exactly this grammar, on its own line:
+
+```
+**Score:** P2 · Impact 3 × Confidence 1.0 / Effort S(1) = 3.00 → Now
+```
+
+Fields, in order and never reordered: `P<1|2|3>` priority · `Impact <1–5>` · `Confidence <0.5|0.75|1.0>` · `Effort <S(1)|M(2)|L(4)>` · `= <Impact × Confidence ÷ Effort, two decimal places>` · `→ <Now|Next|Later>`. Both sanctioned derivations render to this **one** form: the original four-component composite (`Impact = 0.35·returnability + 0.25·credibility-moat + 0.20·monetization-readiness + 0.20·durability`) and the severity→Impact form of the 2026-07-18 amendment (P1→4, P2→3, P3→2, Confidence fixed at 1.0). **Which derivation was used is not restated in the line — it is already recorded by the presence or absence of a `review:*` label** (a `review:*` issue used the severity form; anything else used the composite). The `P<n>` prefix is the finding severity for review-derived issues and its inverse map for composite-derived ones (Impact 4–5 → P1, Impact 3 → P2, Impact 1–2 → P3); it mirrors the `prio:*` label documented by #1864, so priority is filterable without parsing a body. A PM milestone override still appends ` (severity→milestone disposition, PM-set)` — unchanged from ¶1 of the 2026-07-18 amendment. **The `T×W/effort` form is retired.**
+
+**2. A required body shape.** A `type:story`, `type:bug` or `type:chore` issue body is:
+
+```
+## Problem
+<what is wrong, carrying an evidence pointer: file:line, a URL, a command and its output, or an issue/PR number>
+
+## Outcome
+<ONE sentence naming an audience and what changes for them>
+
+## Acceptance
+- [ ] 3–5 verifiable checkboxes
+
+**Score:** P2 · Impact 3 × Confidence 1.0 / Effort S(1) = 3.00 → Now
+**Epic:** #1863
+```
+
+The audience named in `## Outcome` is one of the four in `docs/PLATFORM_NORTH_STAR.md:48` — Reddit newcomers · Matthew (the N=1 subject) · Friends & family · Health / quantified-self enthusiasts — **or `operator`**, which this amendment makes a first-class fifth audience: much of this backlog serves the person or agent running the platform, and having no honest slot for that is part of what produced audience-free bodies. `**Epic:** #N` is required, or `**Epic:** none — <reason>` when the work genuinely stands alone; a silently absent line is a contract violation, an explicit `none` is not.
+
+**`## Outcome` replaces `outcome_if_fixed`.** Same job — state the value — but as a section a linter can find and a human reads first, instead of an inline key 41 of 68 open issues simply omitted. `outcome_if_fixed` is retired as a field name.
+
+A `type:epic` body is:
+
+```
+## Outcome
+<one sentence, same audience rule>
+
+## Done when
+<the conditions that close the epic, checkable>
+
+## Stories
+- [ ] #1865 — <one line> (<milestone> · <model> · <priority>)
+```
+
+**Epic↔story linkage stays the `## Stories` task list.** It gives computable epic progress through an existing writer (`scripts/file_backlog_from_manifest.py`), with zero API-shape risk. GitHub's native sub-issues API is explicitly **not** adopted.
+
+**3. A closure contract, with a named owner.** Every issue closed after this amendment carries a closing comment:
+
+```
+**Shipped:** <what changed> · PR #N · <live evidence>
+**Outcome:** <realized|partial|not-realized> — <did the ## Outcome sentence come true?>
+```
+
+**Owner: the session that merges the PR, enforced at `/wrap`.** This is the structural gap #1863 found — the filing agent never closes, the implementer agent may not touch issues, and `Fixes #N` closes silently — and the merging session is the only actor holding the diff and the live evidence at the same moment. `not-realized` and `partial` are legitimate, expected verdicts; recording one honestly is the entire point. This closes the ADR-105 inconsistency: the platform grades every health forecast and had never graded a product one. Under ADR-104, a `realized` verdict you did not actually verify is the specific failure this contract exists to prevent — a blank comment is better than a fabricated verdict.
+
+**4. The backfill decision (settled in #1863, recorded here verbatim).**
+
+| Corpus | Decision | Why |
+|---|---|---|
+| **Open issues (68)** | **Full backfill** (S5) | Precondition for flipping the linter to blocking and for the ranker to return useful rows. |
+| **Closed epics (~23)** | **Backfill closing comments** (S10) | Small n; epics are what a human reads to understand what a program achieved; evidence still in living memory + the handovers. Precedent: #1686 already closed with a real narrative comment. |
+| **Closed stories (~740)** | **Going forward only — do NOT backfill** | What a closing comment needs (what shipped, live evidence, was the predicted outcome realized) is not recoverable at scale — it lives in squashed commit messages and deleted-branch PR bodies. Reconstructing it would be AI guesswork presented as record, which ADR-104 and the "docs: current truth only" reflex forbid. A blank closed card is honest; a fabricated outcome verdict is worse than blank. Nothing queries closed stories for selection, so the payoff is ~0. The ADR states this gap plainly rather than papering over it. |
+
+S5 is #1868 (open-issue backfill); S10 is #1873 (closed-epic closing comments).
+
+**The known gap, stated plainly:** roughly 740 closed stories carry no `## Outcome` sentence and will never carry an outcome verdict. Any future attempt to compute a realized-outcome rate, a per-audience value history, or an epic's retrospective value from this repo's issue corpus is measuring **only the period after 2026-07-27**. That is a real hole in the record, deliberately left open because filling it would mean manufacturing history.
+
+**Enforcement and consumption (named as the stories that build them, none of which exist yet).** `scripts/check_backlog_hygiene.py` — the filing-contract linter over the **live issue corpus** — lands advisory in #1867, is backfilled to green by #1868, and is flipped blocking by #1872, which also deletes `scripts/check_story_labels.py` (the hygiene linter absorbs its `model:*` rule). Net script budget for the whole program is therefore **+1**, per the ADR-103/144 proportionality posture. `scripts/backlog_next.py` (#1866) is the ranked selector that finally *consumes* the score line, and #1869 rewires `/uplevel` Phase 1+2 to start from the stored rank instead of re-scoring blind. #1870 adds the `/wrap` steps: the hygiene gate, the `Now`-refill + `Later` sweep — this ADR's maintenance rule (3), which has never had an implementation anywhere in the repo — and the closure comment.
+
+**Not changed by this amendment.** `.github/ISSUE_TEMPLATE/` stays retired (#1324, `docs/_lint/tombstones.txt`) — enforcement is a linter over the live issue corpus, **never** a GitHub form, and re-adding one is a lint failure. GitHub Projects v2 stays deferred. The 12 `review:*` labels stay — sprawl is real, but they are ¶2's sanctioned idempotency mechanism and now also carry the score line's derivation. The backlog stays *worth* consulting rather than compulsory for `/uplevel`: "fresh discovery outranks backlog replay" is a deliberate call and it stands.
+
+**Regression guard.** `.claude/agents/issue-filer.md` restates this amended contract — the canonical score line, the required body shape, and the closure contract's existence and owner — extending the guard the 2026-07-18 amendment declared, so the agent contract and this ADR cannot diverge without both being edited.
+
 ## ADR-100: The budget ceiling protects readers — the public ask endpoints degrade LAST
 
 **Date:** 2026-07-03 · **Status:** Accepted · **Amends:** ADR-063
