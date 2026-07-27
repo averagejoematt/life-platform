@@ -489,11 +489,10 @@ def _dossier_block(coach_id):
 
     docket_positions = []
     try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq("ENSEMBLE#docket") & Key("sk").begins_with("OPEN#"),
-            Limit=40,
-        )
-        for it in resp.get("Items", []):
+        # #1799: phase-filter IN the query here too — tombstoned prior-cycle OPEN# rows
+        # (the reset tombstones, never deletes) must not consume this page either. The
+        # post-query singleton_visible check below stays as the belt to that suspenders.
+        for it in _docket_rows("OPEN#", 40, newest_first=False):
             if not singleton_visible(it):
                 continue
             entry, status = coach_dossier.docket_entry(_decimal_to_float(it), coach_id)
@@ -853,6 +852,44 @@ def handle_panel_ledger(event):
     )
 
 
+# Per-prefix page budgets for the two docket sub-queries (#1799) — never shared.
+DOCKET_OPEN_LIMIT = 60
+DOCKET_RESOLVED_LIMIT = 60
+_DOCKET_MAX_PAGES = 5
+
+
+def _docket_rows(prefix, limit, newest_first):
+    """One prefix-scoped page of ENSEMBLE#docket rows, phase-filtered IN the query.
+
+    #1799: OPEN# and RESOLVED# used to share ONE `Limit=80` descending page over the
+    whole partition. `RESOLVED#` sorts AFTER `OPEN#`, so descending order returns every
+    resolved row first — once ~80 resolved dockets existed the page held nothing else
+    and the endpoint reported `open: []` while each coach's dossier (which queries
+    `begins_with('OPEN#')` separately) still showed those very disputes. Worse, the
+    phase filter ran AFTER the query, so tombstoned prior-cycle rows — ENSEMBLE#docket is
+    EXPERIMENT_SCOPED and the reset tombstones rather than deletes — consumed the page
+    too, making the threshold ~80 LIFETIME rows across cycles.
+
+    Each prefix now gets its own budget, DynamoDB drops the wiped rows server-side, and
+    the loop keeps paging until the budget is filled or the partition is exhausted, so a
+    page full of tombstones can't starve the caller either.
+    """
+    rows, kwargs = [], {
+        "KeyConditionExpression": Key("pk").eq("ENSEMBLE#docket") & Key("sk").begins_with(prefix),
+        "ScanIndexForward": not newest_first,
+        "Limit": limit,
+    }
+    kwargs = with_phase_filter(kwargs)
+    for _ in range(_DOCKET_MAX_PAGES):
+        resp = table.query(**kwargs)
+        rows.extend(resp.get("Items", []))
+        lek = resp.get("LastEvaluatedKey")
+        if not lek or len(rows) >= limit:
+            break
+        kwargs["ExclusiveStartKey"] = lek
+    return rows[:limit]
+
+
 def handle_coach_docket(event):
     """GET /api/coach_docket — The Dispute Docket (#1386): standing coach
     disagreements with skin in the game.
@@ -872,15 +909,18 @@ def handle_coach_docket(event):
     coach_dossier.find_dossier_violations — reused here, not forked, so this
     public surface can't leak what the dossier is fail-closed to protect. A hit
     anywhere in an entry withholds the WHOLE entry (never a partial redaction)
-    and the payload counts it."""
+    and the payload counts it.
+
+    #1799 — OPEN# and RESOLVED# are read as TWO prefix-scoped queries with independent
+    page budgets (see `_docket_rows`). They shared one descending page before, which let
+    resolved history crowd standing disputes clean off the endpoint while the dossiers
+    kept showing them."""
     open_entries, resolved = [], []
     withheld = 0
     try:
-        items = table.query(
-            KeyConditionExpression=Key("pk").eq("ENSEMBLE#docket"),
-            ScanIndexForward=False,  # RESOLVED# sorts after OPEN#, so resolved arrive first, newest first
-            Limit=80,
-        ).get("Items", [])
+        items = _docket_rows("OPEN#", DOCKET_OPEN_LIMIT, newest_first=False) + _docket_rows(
+            "RESOLVED#", DOCKET_RESOLVED_LIMIT, newest_first=True
+        )
         for it in items:
             if not singleton_visible(it):  # ADR-058/#946: a wiped cycle's docket never serves pre-start
                 continue
