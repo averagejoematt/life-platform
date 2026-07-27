@@ -50,7 +50,7 @@ from typing import Optional
 # `ai_calls._run_coach_v2_pipeline` READS with the suffixed id. Comparing the raw strings
 # made the S5 injection a live no-op; both sides now normalize at the join
 # (`_item_ref_matches`). Flat sibling imports, per #781 (every root module ships together).
-from coach_checkin import normalize_coach_id
+from coach_checkin import normalize_coach_id, read_cycle
 from numeric import floats_to_decimal
 
 PK = "USER#matthew#SOURCE#coach_corrections"
@@ -88,6 +88,7 @@ def build_correction_item(
     *,
     now: Optional[datetime] = None,
     correction_id: Optional[str] = None,
+    cycle: Optional[int] = None,
 ) -> dict:
     """Pure: build the DDB item for one correction. No AWS calls — unit-testable
     without a table (mirrors `eval_retention.build_record` / `ai_review_pack_lambda.build_html`).
@@ -104,6 +105,13 @@ def build_correction_item(
     Float->Decimal conversion inside `item_ref` uses the shared `numeric.floats_to_decimal`
     walker (#1207) rather than a private copy — see the D5 regression guard in
     `tests/test_ddb_patterns.py`.
+
+    `cycle` (#1791): the experiment cycle (SSM `/life-platform/experiment-cycle`) active
+    when this correction was logged, same CHECKIN#-row convention as `coach_checkin.py`.
+    Stored ONLY when the caller supplies one (this function stays pure/no-AWS — the
+    caller reads it, typically via `coach_checkin.read_cycle()`, and passes it through
+    `write_correction`). Absence is honest: a pre-#1791 row, or a write that couldn't
+    reach SSM, is never guessed at.
     """
     now = now or datetime.now(timezone.utc)
     correction_id = correction_id or uuid.uuid4().hex[:_ID_LEN]
@@ -124,6 +132,8 @@ def build_correction_item(
     }
     if normalized_class != error_class:
         item["error_class_raw"] = error_class
+    if cycle is not None:
+        item["cycle"] = int(cycle)
     return item
 
 
@@ -135,14 +145,22 @@ def write_correction(
     *,
     now: Optional[datetime] = None,
     correction_id: Optional[str] = None,
+    cycle: Optional[int] = None,
 ) -> str:
     """Put one correction. Returns the `sk` (the record's id) so a caller (#1690's
     MCP tool / email parser) can echo or reference it. Raises on a DDB error — unlike
     `eval_retention.retain()`, a correction write is user-initiated feedback, not a
     best-effort side channel, so a silent failure would mean Matthew's correction is
     lost without him knowing.
+
+    `cycle` (#1791): pass-through to `build_correction_item` — the caller's job to
+    resolve (typically `coach_checkin.read_cycle()`, fail-soft None). This function
+    does NOT default it itself: a DDB write already raises on failure per the
+    docstring above, and a bonus SSM round-trip inside the one function every
+    corrections-writing caller shares would make that raise attributable to the
+    wrong dependency.
     """
-    item = build_correction_item(item_ref, correction_text, error_class, now=now, correction_id=correction_id)
+    item = build_correction_item(item_ref, correction_text, error_class, now=now, correction_id=correction_id, cycle=cycle)
     table.put_item(Item=item)
     return item["sk"]
 
@@ -304,25 +322,63 @@ def open_corrections_for(
     return scoped[: max(0, int(limit))]
 
 
-def render_corrections_block(corrections: list) -> str:
+def _provenance_stamp(item: dict, *, current_cycle: Optional[int]) -> str:
+    """#1791: the "(logged YYYY-MM-DD, cycle N)" (or subset) rendered before a
+    correction's text. Never fabricates a piece it doesn't have — a row with no
+    `created_at` (a hand-built test/legacy shape) or no `cycle` (pre-#1791, or a
+    write that couldn't reach SSM) just omits that piece, rather than guessing.
+
+    When BOTH this row's `cycle` and `current_cycle` are known and they differ,
+    appends an explicit PRIOR CYCLE flag: a reset has happened since this
+    correction was logged, so any cycle-specific number it cites (a baseline
+    weight, a genesis date) needs re-verifying rather than re-asserting forever
+    as a standing fact (the core #1791 defect).
+    """
+    created_at = item.get("created_at")
+    date_str = created_at[:10] if isinstance(created_at, str) and len(created_at) >= 10 else None
+    cycle = item.get("cycle")
+
+    parts = []
+    if date_str:
+        parts.append(f"logged {date_str}")
+    if cycle is not None:
+        parts.append(f"cycle {cycle}")
+    if not parts:
+        return ""
+
+    stamp = "(" + ", ".join(parts) + ")"
+    if cycle is not None and current_cycle is not None and int(cycle) != int(current_cycle):
+        stamp += " [PRIOR CYCLE — a reset has happened since; re-verify any cited number before treating it as current]"
+    return stamp
+
+
+def render_corrections_block(corrections: list, *, current_cycle: Optional[int] = None) -> str:
     """Pure: render scoped, bounded, newest-first corrections into a compact
     "PRIOR CORRECTIONS — DO NOT REPEAT" prompt block.
 
     Empty input -> "" (no block, no padded placeholder — honest-when-empty, the
     same convention as the journal-signals / presence blocks). Each line carries
-    the error-CLASS tag so the model suppresses the class, not just the one line.
+    the error-CLASS tag so the model suppresses the class, not just the one line,
+    plus (#1791) a provenance stamp — WHEN it was logged and, if known, which
+    experiment cycle — so a correction can no longer read as a fact that has
+    always been true and always will be. `current_cycle` (typically
+    `coach_checkin.read_cycle()`) lets a row from a superseded cycle carry an
+    explicit re-verify flag instead of silently re-asserting forever.
     """
     if not corrections:
         return ""
     lines = [
         "PRIOR CORRECTIONS — DO NOT REPEAT (Matthew corrected these exact error classes in past reviews of YOUR"
-        " output; do not reproduce any of them in this generation — treat each as a standing constraint, not a"
-        " one-off):",
+        " output; do not reproduce any of them in this generation. Treat each as a standing constraint on the "
+        "error PATTERN — but a line flagged PRIOR CYCLE was logged before a subsequent experiment reset, so "
+        "verify any specific number it cites is still current before repeating it):",
     ]
     for c in corrections:
         cls = c.get("error_class", "other")
         txt = (c.get("correction_text") or "").strip()
-        lines.append(f"- [{cls}] {txt}" if txt else f"- [{cls}]")
+        stamp = _provenance_stamp(c, current_cycle=current_cycle)
+        prefix = f"- [{cls}] {stamp}".rstrip() if stamp else f"- [{cls}]"
+        lines.append(f"{prefix} {txt}" if txt else prefix)
     return "\n".join(lines)
 
 
@@ -332,7 +388,46 @@ def corrections_prompt_block(
     surface: Optional[str] = None,
     coach: Optional[str] = None,
     limit: int = PROMPT_MEMORY_MAX_PER_COACH,
+    current_cycle: Optional[int] = None,
 ) -> str:
     """Convenience: fetch (open, scoped, newest-first, bounded) + render in one
-    call. Returns "" when there is nothing to inject for this coach/surface."""
-    return render_corrections_block(open_corrections_for(table, surface=surface, coach=coach, limit=limit))
+    call. Returns "" when there is nothing to inject for this coach/surface.
+
+    `current_cycle` (#1791) defaults to `coach_checkin.read_cycle()` (cached per
+    warm container, fail-soft None) so the rendered block can flag any open
+    correction logged before the most recent experiment reset. Pass it explicitly
+    to avoid the SSM read (e.g. from a caller that already resolved it).
+    """
+    if current_cycle is None:
+        current_cycle = read_cycle()
+    opened = open_corrections_for(table, surface=surface, coach=coach, limit=limit)
+    return render_corrections_block(opened, current_cycle=current_cycle)
+
+
+# ── #1791 — the review-on-reset primitive ─────────────────────────────────────
+# The rendered PRIOR-CYCLE flag (above) keeps a stale number from silently
+# re-asserting itself INSIDE a coach's prompt. This is the companion read for a
+# human- or ops-facing surface (a future review-pack section, or an ad-hoc MCP
+# query) to actually clear the backlog: which still-open corrections were logged
+# before the current cycle and may need a manual `update_status` / re-date. Not
+# wired into any scheduled job by this story — `correction_promotion.py` stays
+# strictly read-only per its own docstring, and a write-side "supersede on
+# reset" step is a bigger, separate change; this is the reusable building block.
+def stale_cycle_corrections(corrections: list, *, current_cycle: Optional[int]) -> list:
+    """Pure: the subset of (typically open, `list_corrections`-shaped) `corrections`
+    stamped with a `cycle` strictly OLDER than `current_cycle` — i.e. logged before
+    the most recent experiment reset.
+
+    A correction with no `cycle` (pre-#1791, or a write that couldn't reach SSM) is
+    NEVER flagged — absence of provenance is not evidence of staleness, it's just
+    missing data. `current_cycle=None` -> [] (nothing can be judged stale without a
+    reference point to compare against).
+    """
+    if current_cycle is None:
+        return []
+    out = []
+    for c in corrections:
+        cyc = c.get("cycle")
+        if cyc is not None and int(cyc) < int(current_cycle):
+            out.append(c)
+    return out
