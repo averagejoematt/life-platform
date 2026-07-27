@@ -146,7 +146,22 @@ def main() -> int:
     if args.json:
         print(json.dumps({"checked": len(specs), "drift": drift, "unparseable": unparseable}, indent=2))
     else:
-        print(f"Checked {len(specs)} CDK-defined Lambdas in {REGION}.")
+        # Honest scope: specs now span 2 regions (STACK_FILE_REGION, #1816) — a bare
+        # "in {REGION}" claim using only the module-level default silently implied
+        # single-region coverage even after web_stack's us-east-1 Lambdas joined the
+        # spec set. Summarize the ACTUAL per-region breakdown instead.
+        region_counts: dict[str, int] = {}
+        for s in specs:
+            r = s.get("region", REGION)
+            region_counts[r] = region_counts.get(r, 0) + 1
+        if not specs:
+            print("Checked 0 CDK-defined Lambdas.")
+        elif len(region_counts) == 1:
+            (only_region,) = region_counts
+            print(f"Checked {len(specs)} CDK-defined Lambdas in {only_region}.")
+        else:
+            breakdown = ", ".join(f"{count} {region}" for region, count in sorted(region_counts.items(), key=lambda kv: (-kv[1], kv[0])))
+            print(f"Checked {len(specs)} CDK-defined Lambdas ({breakdown}).")
         if unparseable:
             print(f"\n(informational) {len(unparseable)} non-literal config(s), not compared:")
             for u in unparseable:
