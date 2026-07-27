@@ -204,6 +204,12 @@ def test_demo_datasets_carry_provenance_and_no_private_surface():
             assert str(prov.get("source_url", "")).startswith(
                 "https://averagejoematt.com/api/"
             ), f"{name}: a non-synthetic demo dataset must cite the public endpoint it came from"
+        # `why`/`honest_note` are written for a developer reading the package (they may
+        # name sibling files); `reader_note` is what the hosted tool shows a reader, so
+        # it must exist and must not leak a build-internal filename onto the page.
+        reader_note = prov.get("reader_note")
+        assert reader_note, f"{name}: provenance needs a reader_note — the tool page renders it verbatim"
+        assert ".json" not in reader_note, f"{name}: reader_note must not quote a filename at readers"
         blob = json.dumps(payload).lower()
         for forbidden in ("chronological_age", "date_of_birth", "birthdate"):
             assert forbidden not in blob, f"{name}: demo dataset must never carry {forbidden}"

@@ -38,12 +38,13 @@
 .gyc-btn { font-family: var(--font-mono); font-size: var(--fs-label); text-transform: uppercase; letter-spacing: var(--tracking-label);
   padding: var(--sp-2) var(--sp-3); border: var(--border-hair); border-radius: var(--radius); background: transparent; color: var(--ink-muted); cursor: pointer; }
 .gyc-btn:hover, .gyc-btn:focus-visible { color: var(--ink); border-color: var(--ink-muted); }
-.gyc-prov { margin-top: var(--sp-3); font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-faint); line-height: var(--lh-relaxed); }
+.gyc-prov { margin-top: var(--sp-3); font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-faint); line-height: var(--lh-relaxed);
+  overflow-wrap: anywhere; word-break: break-word; }
 .gyc-card { border: var(--border-hair); border-radius: var(--radius); padding: var(--sp-5); background: var(--surface-raised); min-width: 0; }
 .gyc-empty { color: var(--ink-muted); line-height: var(--lh-relaxed); }
 .gyc-figs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); }
 @media (min-width: 620px) { .gyc-figs { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.gyc-fig { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gyc-figs > .gyc-fig { display: grid; grid-template-rows: auto auto 1fr; gap: 2px; min-width: 0; align-content: start; }
 .gyc-fig-v { font-family: var(--font-mono); font-size: var(--fs-h3); color: var(--ink); }
 .gyc-fig-l { color: var(--ink-faint); }
 .gyc-fig-s { font-size: var(--fs-small); color: var(--ink-muted); line-height: var(--lh-relaxed); }
@@ -62,7 +63,10 @@
 .gyc-ax { margin: var(--sp-2) 0 0; color: var(--ink-faint); }
 .gyc-ax-y { margin-top: 0; }
 .gyc-axnote { margin-top: var(--sp-3); font-size: var(--fs-small); color: var(--ink-muted); line-height: var(--lh-relaxed); }
-.gyc-tbl { width: 100%; }
+.gyc-tblwrap { overflow-x: auto; max-width: 100%; }
+.gyc-tblwrap:focus-visible { outline: 2px solid var(--ink-muted); outline-offset: 2px; }
+.gyc-tbl { width: 100%; min-width: 17rem; }
+.gyc-tbl th, .gyc-tbl td { white-space: nowrap; }
 .gyc-notes { margin-top: var(--sp-4); padding-top: var(--sp-4); border-top: var(--border-hair); font-size: var(--fs-small); color: var(--ink-muted); line-height: var(--lh-relaxed); }
 .gyc-rejects { margin: var(--sp-2) 0 0; padding-left: var(--sp-4); }
 .gyc-scroll { overflow-x: auto; }

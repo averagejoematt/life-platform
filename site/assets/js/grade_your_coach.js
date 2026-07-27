@@ -57,9 +57,14 @@ function num(v, dp) {
 function reliabilitySvg(bins) {
   const W = 320;
   const H = 320;
-  const PAD = 8;
-  const x = (p) => PAD + p * (W - 2 * PAD);
-  const y = (p) => H - PAD - p * (H - 2 * PAD);
+  const FRAME = 3; // the plot rectangle
+  // The plotting area is inset from the frame by more than the largest dot
+  // radius, so a band at observed_rate 0 or 1 draws a dot that sits fully
+  // INSIDE the frame rather than straddling it — those are exactly the bands a
+  // reader most needs to see whole.
+  const INSET = 14;
+  const x = (p) => INSET + p * (W - 2 * INSET);
+  const y = (p) => H - INSET - p * (H - 2 * INSET);
   const maxN = bins.reduce((m, b) => Math.max(m, b.n), 1);
 
   const pts = bins.map((b) => [x(b.mean_confidence), y(b.observed_rate), b]);
@@ -75,7 +80,7 @@ function reliabilitySvg(bins) {
   return (
     `<svg class="gyc-svg" viewBox="0 0 ${W} ${H}" role="img" preserveAspectRatio="xMidYMid meet" ` +
     `aria-label="Reliability curve: stated confidence on the horizontal axis against how often those forecasts came true on the vertical axis. The diagonal is perfect calibration.">` +
-    `<rect class="gyc-plot" x="${PAD}" y="${PAD}" width="${W - 2 * PAD}" height="${H - 2 * PAD}" rx="4"/>` +
+    `<rect class="gyc-plot" x="${FRAME}" y="${FRAME}" width="${W - 2 * FRAME}" height="${H - 2 * FRAME}" rx="4"/>` +
     `<line class="gyc-ideal" x1="${x(0)}" y1="${y(0)}" x2="${x(1)}" y2="${y(1)}"/>` +
     path +
     dots +
@@ -94,8 +99,9 @@ function binsTable(bins) {
     )
     .join("");
   return (
-    `<table class="rd-tbl gyc-tbl"><thead><tr><th>confidence band</th><th>said</th><th>happened</th><th>n</th></tr></thead>` +
-    `<tbody>${rows}</tbody></table>`
+    `<div class="gyc-tblwrap" tabindex="0" role="group" aria-label="Reliability bins, scrollable">` +
+    `<table class="rd-tbl gyc-tbl"><thead><tr><th>band</th><th>said</th><th>happened</th><th>calls</th></tr></thead>` +
+    `<tbody>${rows}</tbody></table></div>`
   );
 }
 
@@ -104,7 +110,9 @@ function statBlock(label, value, sub) {
 }
 
 function renderScorecard(s, parsed) {
-  const skillTxt = s.brier_skill === null ? "undefined" : num(s.brier_skill, 4);
+  // An em dash, not the literal string "undefined" — the sub-line carries the
+  // meaning, and a stray "undefined" in the headline slot reads as a crash.
+  const skillTxt = s.brier_skill === null ? "\u2014" : num(s.brier_skill, 4);
   const skillSub =
     s.skilled === null
       ? "undefined — too few calls, or every outcome identical. Unknown, not unskilled."
@@ -139,7 +147,14 @@ function renderScorecard(s, parsed) {
 
   const bookkeeping = [];
   if (parsed.unresolved) bookkeeping.push(`${parsed.unresolved} row${parsed.unresolved === 1 ? "" : "s"} not yet resolved — counted, not guessed at, and excluded from every number above.`);
-  if (parsed.notes.length) bookkeeping.push(`${parsed.notes.length} confidence value${parsed.notes.length === 1 ? "" : "s"} above 1 were read as percentages.`);
+  if (parsed.notes.length) {
+    const lines = parsed.notes.map((n) => n.line).join(", ");
+    bookkeeping.push(
+      parsed.notes.length === 1
+        ? `Line ${lines}: a confidence above 1 was read as a percentage.`
+        : `Lines ${lines}: confidences above 1 were read as percentages.`,
+    );
+  }
   if (parsed.rejected.length) {
     const list = parsed.rejected
       .slice(0, 8)

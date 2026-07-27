@@ -7,7 +7,8 @@
     "cycle": 11,
     "subject": "averagejoematt.com — an N=1 self-experiment. Eight named AI coaches each log forward calls with a stated confidence; a deterministic evaluator grades each one against measured data as its target date passes.",
     "scope": "Exactly what the public /api/predictions endpoint serves — nothing private, nothing added. The endpoint returns the CURRENT experiment cycle only; calls from earlier cycles are counted in the published career totals but their individual rows are not public, so they are not in this file.",
-    "honest_note": "This snapshot was taken on day 1 of cycle 11 (genesis 2026-07-27). Every call in it is still PENDING — none has come due yet. Scoring it therefore reports n=0 and 'insufficient_data', which is the correct answer, not a broken one. Load the worked example to see a filled-in scorecard."
+    "honest_note": "This snapshot was taken on day 1 of cycle 11 (genesis 2026-07-27). Every call in it is still PENDING — none has come due yet. Scoring it therefore reports n=0 and 'insufficient_data', which is the correct answer, not a broken one. Load the worked example to see a filled-in scorecard.",
+    "reader_note": "This snapshot was taken on day 1 of cycle 11 (genesis 2026-07-27). Every call in it is still PENDING — none has come due yet. Scoring it therefore reports n=0 and 'insufficient_data', which is the correct answer, not a broken one. Load the worked example to see a filled-in scorecard."
   },
   "published_scorecard": {
     "note": "What averagejoematt.com/method/calibration published at the moment of this snapshot, produced by the same grader this package extracts. Season = the current cycle; career = every cycle, including the archived rows that are not individually public.",

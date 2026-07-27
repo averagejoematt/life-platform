@@ -416,7 +416,7 @@
   },
   "example": {
     "name": "Worked example — a generic LLM wearable coach",
-    "provenance_line": "SYNTHETIC — not real data and not anyone's real coach. An illustrative ledger, written by hand for the tool's walkthrough. It is NOT anyone's real coach and NOT Matthew's data — it exists so a first-time visitor can see a filled-in scorecard before pasting their own. The real ledger in this directory is matthew_public_ledger.json. It is here so the page has something to render before you paste your own.",
+    "provenance_line": "SYNTHETIC — not real data and not anyone's real coach. An illustrative wearable-coach ledger of 32 calls, written by hand so this page has something to render before you paste your own. It also happens to be the failure mode worth understanding: confident, and worse than guessing the base rate.",
     "rows": [
       {
         "confidence": 0.9,
