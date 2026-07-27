@@ -48,7 +48,7 @@ standing subsystem names what it costs, what it earns, and what would demote it.
 | Freshness / ingest-liveness / reconciliation detectors | Load-bearing | CI, attention | The silent-failure coverage class (the 44-day-Garmin lesson) |
 | Character engine + sheet | Load-bearing | $, mind | Public flagship page |
 | Deploy guardrails (clobber guard, postflight, drift checks, one-bundle rule) | Load-bearing | CI | Each earned by a real incident (see CONVENTIONS.md) |
-| Weekly Panel podcast pipeline | Load-bearing (STORY) | $, surface | Live no-touch pipeline (ADR-135); #1737 performance epic in flight |
+| Weekly Panel podcast pipeline | Load-bearing (STORY) | $, surface | Live no-touch pipeline (ADR-135); #1737 performance epic in flight. **Dated re-check: TTS/dialogue-vendor landscape due 2026-10-27, owner Matthew** (ADR-087 amendment 2026-07-27 / #1741 — the previous monitor trigger carried no date and went two months unnoticed; record the result even when nothing changed) |
 | Reading pillar (2 GSIs, tools, page) | Load-bearing (small) | mind | The owner's real instrument |
 | MCP server (75 tools post-#395 prune) | Load-bearing | surface, mind | The instrument itself; tool removals ride the MCP_TOOL_AUDIT ratchet |
 | Conversation channel (chat-journey ADR-141/142, journal quotes, intake) | Load-bearing | $, mind | The fourth ingestion surface; consent machinery is the fence |
