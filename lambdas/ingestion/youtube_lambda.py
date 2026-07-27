@@ -49,6 +49,7 @@ except ImportError:  # pragma: no cover — layer-module fallback
     urlopen_with_retry = urllib.request.urlopen
 
 import broadcast_sensitivity_gate as gate  # #1673: the fail-closed auto-publish sensitivity gate
+import diary_publish  # #1845: the cut->entry->engagement join
 import social_provenance as prov  # #1670: the membrane
 
 # ── Config ───────────────────────────────────────────────────────────────────────
@@ -263,15 +264,42 @@ def _sensitivity_for(entry: dict) -> dict:
         return {gate.STATUS_ATTR: gate.SENSITIVITY_HELD, gate.REASON_ATTR: f"gate error: {e}"}
 
 
+def _diary_stamp(entry: dict, table) -> dict:
+    """#1845: stamp diary provenance when this video is a published diary cut.
+
+    ``scripts/sync_diary_publications.py`` writes one ``DIARY_PUBLISH#youtube`` /
+    ``POST#{video_id}`` row per published cut, carrying session slug, cut id, surface and
+    (when the session was routed to Notion) the source entry's sk. Stamping those
+    ``diary_*`` fields here is what makes the engagement this feed carries joinable back
+    to the diary entry that produced it — the outbound half of the loop (#1845 AC2).
+
+    Fail-open: a lookup error means "diary origin unknown", never a broken ingest.
+
+    Known, deliberate consequence: a cut whose description links back to
+    averagejoematt.com is classified ``origin: platform`` by the #1670 self-backlink
+    signal and therefore excluded from the S4 voice feed. That stays fail-closed here —
+    surfacing diary cuts publicly is a consent decision (ADR-142), not an ingest one — but
+    the diary stamp is applied either way, so the join works regardless of origin.
+    """
+    try:
+        publication = diary_publish.lookup_publication(table, CHANNEL, entry["video_id"])
+        return diary_publish.publication_stamp(publication)
+    except Exception as e:  # noqa: BLE001 — provenance is never allowed to break ingestion
+        logger.warning(f"diary publication lookup failed for {entry.get('video_id')}: {e}")
+        return {}
+
+
 def transform(raw, date_str):
     """Map the day's parsed videos to framework DDB records (one per video).
 
     Each record sets ``sk_suffix=#{video_id}`` → sk=``DATE#{date}#{video_id}``, stamps
-    ``channel`` + ``origin`` provenance (#1670), and — for human-origin posts — the #1673
-    ``sensitivity_status`` auto-publish verdict. ``source``/``sk_suffix`` are consumed by
-    the framework; everything else persists.
+    ``channel`` + ``origin`` provenance (#1670), the ``diary_*`` publication provenance
+    when the video is a published diary cut (#1845), and — for human-origin posts — the
+    #1673 ``sensitivity_status`` auto-publish verdict. ``source``/``sk_suffix`` are
+    consumed by the framework; everything else persists.
     """
     records = []
+    diary_table = _ledger_table()  # one handle for the whole day-batch
     for entry in raw.get("entries", []):
         _archive_post_raw(entry, date_str)
         origin = _origin_for(entry)
@@ -290,6 +318,9 @@ def transform(raw, date_str):
             "published_at": entry.get("published", ""),
             "author": entry.get("author", ""),
         }
+        # #1845: diary provenance (session slug / cut id / surface / source entry sk),
+        # stamped before the sensitivity verdict so the join survives either origin.
+        record.update(_diary_stamp(entry, diary_table))
         # #1673: classify origin:human posts before they can appear in the S4 feed. A
         # platform echo (#1670) is never displayed, so it needs no sensitivity verdict.
         if origin == prov.ORIGIN_HUMAN:

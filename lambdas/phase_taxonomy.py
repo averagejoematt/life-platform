@@ -393,6 +393,15 @@ _PK_RULES: list = [
     # platform-authored in cycle N+1) and is never run intelligence — so SYSTEM_STATE:
     # the phase machinery ignores it entirely (no tag, no wipe, no filter), like SUBSCRIBE#.
     (lambda pk, sk: pk.startswith("BROADCAST_ORIGIN#"), SYSTEM_STATE),
+    # #1845: the diary-publication ledger (DIARY_PUBLISH#{channel} / POST#{post_id}) —
+    # which cut of which session went to which surface, and the entry it came from.
+    # SYSTEM_STATE for the same reason as BROADCAST_ORIGIN# above: publication is
+    # historical fact, not run intelligence. A cut published in cycle 11 was still
+    # published in cycle 12, and wiping the ledger at a reset would orphan the inbound
+    # posts already stamped with its provenance. Distinct partition from
+    # BROADCAST_ORIGIN# on purpose — a diary cut is Matthew on camera, published by
+    # hand, NOT a platform-authored syndication echo (see lambdas/diary_publish.py).
+    (lambda pk, sk: pk.startswith("DIARY_PUBLISH#"), SYSTEM_STATE),
     (lambda pk, sk: pk.startswith("VOTES#"), SYSTEM_STATE),
     (lambda pk, sk: pk.startswith("EXPERIMENT_FOLLOWS"), SYSTEM_STATE),
     # #1394/#1819: the cohort-strip pool (COHORT#{metric}#{week} / SUBMIT#{ip_hash}) —

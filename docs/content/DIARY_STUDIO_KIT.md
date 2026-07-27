@@ -169,6 +169,113 @@ hypothesis path as everything above, and surfaces distinctly in `get_mood`
 (per-day `channels` + `channel_note`) and `get_flourishing_trend`
 (`channels_present`) as `solo_recording`.
 
+## The Goodhart rule — engagement may pick cuts, never questions (#1845)
+
+**Standing policy. This is the load-bearing rule of the whole diary surface, and it is
+not negotiable per-session.**
+
+> Engagement metrics **MAY inform which cut gets published**.
+> They **MUST NEVER reach the interviewer's priming, question selection, format choice,
+> or capture protocol.**
+
+**Why.** The diary is an instrument, and the platform now derives real numbers from it —
+enrichment themes, flourishing channels, vocal biomarkers (#1842), the diary-day
+intervention test (#1843), the spoken-vs-typed divergence prereg (#1844), the on-tape
+claims ledger (#1841). Every one of those reads the tape as evidence about Matthew's
+life. The moment a question is chosen because a similar moment performed well, the tape
+becomes evidence about the audience instead — and nothing downstream can detect the
+substitution after the fact, because the contamination arrives as ordinary-looking
+sentences. Selection pressure on the **output** (which of the things he already said gets
+clipped) leaves the instrument intact. Selection pressure on the **input** destroys it.
+That asymmetry is the entire rule.
+
+**Explicitly, what engagement data may and may not influence:**
+
+| Engagement MAY inform | Why it's safe |
+|---|---|
+| `cut_selection` — which already-recorded moment gets clipped and published next | The moment already happened, unprompted; picking among finished takes cannot change what was said |
+| `surface_choice` — which surface (reel/short/yt) an already-chosen cut is rendered for | Format of the artifact, not of the interview |
+| `publish_timing` — when an already-chosen cut goes out | Distribution, not capture |
+| `ops_report` — counting what was published and what happened to it, for Matthew's own review | Reading the record is not steering it |
+
+| Engagement MUST NEVER inform | What it would corrupt |
+|---|---|
+| `interview_priming` — the context loaded before a session (`/vlog` step 0) | The interviewer would arrive already pointed at what performs |
+| `question_selection` — which questions get asked, or which follow-up is pursued | The answers stop being evidence about his life |
+| `format_choice` — which diary format is proposed (daily/weekly/debrief/retro/team/vent/micro) | Format choice IS a question about what the night is for |
+| `capture_protocol` — how, when, or how long a session is recorded | Reactivity becomes audience-shaped, which #1843 is trying to measure |
+| `coach_context` — anything a coach persona sees | Coaches feed the interview; contamination arrives one hop later |
+| `prompt_context` — any LLM prompt that shapes what Matthew is asked | The general case of all of the above |
+
+**How it is enforced (structural, not aspirational).** The rule lives in code as well as
+here — `lambdas/diary_publish.py`:
+
+- `engagement_by_entry()` is the only reader of joined engagement data, and it **requires**
+  a declared `purpose=`, checked against `ENGAGEMENT_MAY_INFORM` / `ENGAGEMENT_MUST_NEVER_INFORM`
+  (the two tables above are those two dicts). Anything unlisted is refused **fail-closed** —
+  a genuinely new output-side use has to be argued for and added, never assumed benign.
+- A forbidden purpose raises `GoodhartViolation` rather than returning empty, so the
+  refusal reads as a design error and not as "no data yet."
+- `tests/test_diary_publish_1845.py` asserts that **nothing under `mcp/` or
+  `lambdas/coach/` imports the module at all**. The interviewer's context comes from MCP
+  tools, so "no tool the interviewer can call can reach engagement" is enforced by import
+  graph: a future PR that wires one in fails CI instead of quietly winning the argument.
+- No MCP tool exposes publication engagement. That absence is deliberate and is the
+  guardrail's main load-bearing surface — adding one would need this rule amended first.
+
+**In the room.** If Matthew asks on camera how a clip did, answer him — it's his life and
+his channel. Just don't let the answer choose the next question. The `/vlog` skill carries
+the same instruction at the top of its interview discipline section.
+
+## Publishing a cut — the log format the platform reads (#1845)
+
+The studio's `PUBLISH_LOG.md` is the loop's only entry point: what got published, from
+which session, and which entry it came from. Six columns, header-driven (the platform
+parses by column NAME, so extra columns are safe):
+
+```
+| date | session | cut | surface | link | entry |
+|---|---|---|---|---|---|
+| 2026-07-27 | 2026-07-26_retro_day-zero | 2026-07-26_day00_cut01_reel_more-day-ones.mp4 | reel | https://youtu.be/… | <notion page url or —> |
+```
+
+The `entry` column is the addition: the Notion page URL of the diary entry the cut came
+from (`SESSION.md`'s `notion:` line). It is what turns "a clip did well" into "this
+*truth* resonated" — the platform derives the entry's exact sort key from the page id, the
+same way the ingestion Lambda does. Leave it `—` when the session wasn't routed; the
+platform then resolves the entry by date, and only when that date has exactly one
+recording (two takes in a day is legal, and guessing between them would attach engagement
+to the wrong entry).
+
+**Owner follow-up (Matthew-side, one edit):** the studio folder is deliberately outside
+this repo, so add the `entry` column to `~/Documents/Claude/vlog/PUBLISH_LOG.md`'s header
+and note it in `STUDIO.md` §Job 4. The five-column log still parses (the entry pointer is
+simply absent), so nothing breaks before you do.
+
+Then, after posting:
+
+```bash
+# Dry run — parse, validate, print what would be written, touch nothing:
+python3 scripts/sync_diary_publications.py ~/Documents/Claude/vlog/PUBLISH_LOG.md
+# Write the publication rows:
+python3 scripts/sync_diary_publications.py ~/Documents/Claude/vlog/PUBLISH_LOG.md --apply
+# Check the log and the ledger still agree:
+python3 scripts/sync_diary_publications.py ~/Documents/Claude/vlog/PUBLISH_LOG.md --verify
+```
+
+Each admitted row becomes one `DIARY_PUBLISH#{channel}` / `POST#{post_id}` row —
+provenance only, never a word of tape. From then on `youtube-data-ingestion` stamps every
+matching inbound post with `diary_session_slug` / `diary_cut_id` / `diary_surface` /
+`diary_entry_sk`, and the engagement that feed carries is joinable back to the entry that
+produced it. The gate refuses (loudly, naming the cell to fix) any row whose cut filename
+doesn't follow `STUDIO.md` §2b or whose filename and surface column disagree.
+
+**What engagement actually exists today:** `views`, and only when YouTube's keyless RSS
+feed bothers to include it — the feed frequently omits statistics entirely, and likes,
+comments and watch time need the YouTube Data API, which is not wired. Absent stays
+absent (ADR-104): a cut with no reported views contributes nothing to a rollup and is
+never counted as zero, and every rollup carries its own n.
+
 ## Honest-numbers note (ADR-104/105)
 
 A video diary introduces **no new numeric signal** into character scoring — it
