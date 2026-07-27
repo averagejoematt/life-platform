@@ -689,8 +689,23 @@ def compute_character_sheet() -> list[iam.PolicyStatement]:
 
 
 def compute_daily_metrics() -> list[iam.PolicyStatement]:
-    """Daily metrics: DDB read+write, KMS."""
-    return _compute_base(needs_kms=True)
+    """Daily metrics: DDB read+write, KMS.
+
+    #1858: + ssm:GetParameter on experiment-cycle — phase_taxonomy.experiment_stamp()
+    (ADR-077 write-time provenance on this Lambda's EXPERIMENT_SCOPED writes) calls
+    coach_checkin.read_cycle(), which was un-granted here and fail-softing to no
+    cycle stamp (AccessDeniedException, caught and logged, never blocking the write).
+    """
+    return _compute_base(
+        needs_kms=True,
+        extra_statements=[
+            iam.PolicyStatement(
+                sid="ExperimentCycleRead",
+                actions=["ssm:GetParameter"],
+                resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle"],
+            ),
+        ],
+    )
 
 
 def compute_scenario_explorer() -> list[iam.PolicyStatement]:
@@ -877,8 +892,26 @@ def compute_failure_pattern() -> list[iam.PolicyStatement]:
 
 
 def compute_coach_computation() -> list[iam.PolicyStatement]:
-    """Coach computation engine: reads all source partitions + COACH# predictions, writes COACH#computation results to DDB, reads S3 config."""
-    return _compute_base(needs_kms=True, needs_s3_config=True)
+    """Coach computation engine: reads all source partitions + COACH# predictions, writes COACH#computation results to DDB, reads S3 config.
+
+    Shared with coach-observatory-renderer (read-only DDB + S3 — see compute_stack.py).
+
+    #1858: + ssm:GetParameter on experiment-cycle — phase_taxonomy.experiment_stamp()
+    (ADR-077 write-time provenance on this Lambda's COACH# writes) calls
+    coach_checkin.read_cycle(), which was un-granted here and fail-softing to no
+    cycle stamp (AccessDeniedException, caught and logged, never blocking the write).
+    """
+    return _compute_base(
+        needs_kms=True,
+        needs_s3_config=True,
+        extra_statements=[
+            iam.PolicyStatement(
+                sid="ExperimentCycleRead",
+                actions=["ssm:GetParameter"],
+                resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle"],
+            ),
+        ],
+    )
 
 
 def compute_voice_fidelity_harness() -> list[iam.PolicyStatement]:
@@ -910,6 +943,12 @@ def compute_coach_prediction_evaluator() -> list[iam.PolicyStatement]:
     gauge never landed a single datapoint, and grading-stalled sat in ALARM on
     missing-data-breaching and could never clear. Mirrors the identical grant
     compute_coach_state_updater already carries. PutMetricData only accepts "*".
+
+    #1858: + ssm:GetParameter on experiment-cycle — phase_taxonomy.experiment_stamp()
+    and dispute_docket.resolve_due() (the mid-week docket resolution this Lambda
+    fires) both call coach_checkin.read_cycle(), which was un-granted here and
+    fail-softing to no cycle stamp (AccessDeniedException, caught and logged,
+    never blocking the write).
     """
     return _compute_base(
         needs_kms=True,
@@ -919,6 +958,11 @@ def compute_coach_prediction_evaluator() -> list[iam.PolicyStatement]:
                 sid="BudgetTierRead",
                 actions=["ssm:GetParameter"],
                 resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/budget-tier"],
+            ),
+            iam.PolicyStatement(
+                sid="ExperimentCycleRead",
+                actions=["ssm:GetParameter"],
+                resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle"],
             ),
             iam.PolicyStatement(
                 sid="InvokeStanceRefresh",
@@ -935,8 +979,28 @@ def compute_coach_prediction_evaluator() -> list[iam.PolicyStatement]:
 
 
 def compute_coach_orchestrator() -> list[iam.PolicyStatement]:
-    """Coach narrative orchestrator: reads COACH#/ENSEMBLE#/NARRATIVE# partitions from DDB, reads S3 voice specs, uses ai-keys for Haiku LLM, writes briefs to DDB."""
-    return _compute_base(needs_kms=True, needs_ai_keys=True, needs_s3_config=True)
+    """Coach narrative orchestrator: reads COACH#/ENSEMBLE#/NARRATIVE# partitions from DDB, reads S3 voice specs, uses ai-keys for Haiku LLM, writes briefs to DDB.
+
+    Shared with coach-ensemble-digest and coach-history-summarizer (same permissions — see compute_stack.py).
+
+    #1858: + ssm:GetParameter on experiment-cycle — phase_taxonomy.experiment_stamp()
+    (coach-history-summarizer's writer, ADR-077) and dispute_docket.open_from_disagreements()
+    (coach-ensemble-digest's docket-open path) both call coach_checkin.read_cycle(),
+    which was un-granted here and fail-softing to no cycle stamp (AccessDeniedException,
+    caught and logged, never blocking the write).
+    """
+    return _compute_base(
+        needs_kms=True,
+        needs_ai_keys=True,
+        needs_s3_config=True,
+        extra_statements=[
+            iam.PolicyStatement(
+                sid="ExperimentCycleRead",
+                actions=["ssm:GetParameter"],
+                resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle"],
+            ),
+        ],
+    )
 
 
 def compute_coach_state_updater() -> list[iam.PolicyStatement]:
@@ -946,6 +1010,13 @@ def compute_coach_state_updater() -> list[iam.PolicyStatement]:
     AnthropicInputTokens / AnthropicOutputTokens per coach for cost tracking. Pre-fix
     every emit failed with AccessDenied (non-fatal — caught as WARNING) which made
     downstream alarms (ai-tokens-daily-brief-daily) inaccurate.
+
+    Shared with coach-quality-gate (same permissions — see compute_stack.py).
+
+    #1858: + ssm:GetParameter on experiment-cycle — phase_taxonomy.experiment_stamp()
+    (ADR-077 write-time provenance on this Lambda's COACH# state writes) calls
+    coach_checkin.read_cycle(), which was un-granted here and fail-softing to no
+    cycle stamp (AccessDeniedException, caught and logged, never blocking the write).
     """
     return _compute_base(
         needs_kms=True,
@@ -956,7 +1027,12 @@ def compute_coach_state_updater() -> list[iam.PolicyStatement]:
                 sid="CloudWatchMetrics",
                 actions=["cloudwatch:PutMetricData"],
                 resources=["*"],
-            )
+            ),
+            iam.PolicyStatement(
+                sid="ExperimentCycleRead",
+                actions=["ssm:GetParameter"],
+                resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle"],
+            ),
         ],
     )
 
@@ -1028,6 +1104,13 @@ def email_daily_brief() -> list[iam.PolicyStatement]:
     site/public_stats.json written via site_writer.py for averagejoematt.com.
     Coach Intelligence: invokes coach-computation-engine, coach-narrative-orchestrator, coach-state-updater.
     #1441: the coach_brief qa_archive writes (generated/qa_archive/text/*) ride the existing generated/* grant.
+
+    #1858: + ssm:GetParameter on experiment-cycle — ai_calls._coach_corrections_block()
+    (S5 #1697 prompt-memory injection into each per-coach V2 pipeline run) calls
+    coach_corrections.corrections_prompt_block(), which defaults to
+    coach_checkin.read_cycle() when no cycle is passed in. Un-granted here, it was
+    fail-softing to no PRIOR-CYCLE flag on any injected correction line
+    (AccessDeniedException, caught and logged, never blocking the brief).
     """
     return _email_base(
         needs_s3_write=["dashboard/*", "buddy/*", "site/*", "generated/*"],
@@ -1036,6 +1119,11 @@ def email_daily_brief() -> list[iam.PolicyStatement]:
                 sid="CloudWatchMetrics",
                 actions=["cloudwatch:PutMetricData"],
                 resources=["*"],
+            ),
+            iam.PolicyStatement(
+                sid="ExperimentCycleRead",
+                actions=["ssm:GetParameter"],
+                resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle"],
             ),
             iam.PolicyStatement(
                 sid="CoachIntelligenceInvoke",
@@ -1088,8 +1176,25 @@ def email_nutrition_review() -> list[iam.PolicyStatement]:
 
 def email_milestone_digest() -> list[iam.PolicyStatement]:
     """Milestone digest (#1623): DDB read/write (ledger + digest cursor), SES,
-    plus the operator-configured recipient list at life-platform/digest."""
-    return _email_base(extra_secrets=["life-platform/digest"])
+    plus the operator-configured recipient list at life-platform/digest.
+
+    #1858: + ssm:GetParameter on experiment-cycle — phase_taxonomy.experiment_stamp()
+    (ADR-077 write-time provenance) calls coach_checkin.read_cycle(), which was
+    un-granted here and fail-softing to no cycle stamp — observed live 2026-07-27
+    17:15Z: `[coach_checkin] cycle read failed (AccessDeniedException) — writing
+    without cycle stamp`. The fail-soft was correct behavior (ADR-104); this closes
+    the underlying IAM gap so the stamp actually lands.
+    """
+    return _email_base(
+        extra_secrets=["life-platform/digest"],
+        extra_statements=[
+            iam.PolicyStatement(
+                sid="ExperimentCycleRead",
+                actions=["ssm:GetParameter"],
+                resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle"],
+            ),
+        ],
+    )
 
 
 def email_chronicle_podcast() -> list[iam.PolicyStatement]:

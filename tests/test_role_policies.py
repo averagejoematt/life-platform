@@ -233,6 +233,77 @@ def test_r7_no_duplicate_sids(fn_name):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# #1858 — read_cycle() callers must carry ssm:GetParameter on experiment-cycle
+# ══════════════════════════════════════════════════════════════════════════════
+# Audit (issue #1858): coach_checkin.read_cycle() is fail-soft (ADR-104 honest
+# absence) — a missing grant never breaks a write, it just silently drops the
+# cycle stamp. #1791 widened the read_cycle() caller set (corrections writers)
+# without a matching IAM sweep; milestone-digest was observed live 2026-07-27
+# logging AccessDeniedException on this exact param. The full caller -> function
+# -> role map, traced by following every direct + transitive call chain into
+# coach_checkin.read_cycle() (phase_taxonomy.experiment_stamp(), dispute_docket's
+# docket-open/resolve path, coach_corrections.corrections_prompt_block()'s
+# default-cycle read, and the direct MCP/site-api call sites):
+#
+#   Lambda function            -> role_policies function          -> had grant already?
+#   milestone-digest           -> email_milestone_digest           NO  (this PR)
+#   daily-brief                -> email_daily_brief                NO  (this PR)
+#   daily-metrics-compute      -> compute_daily_metrics             NO  (this PR)
+#   coach-computation-engine   -> compute_coach_computation         NO  (this PR)
+#     (shared: coach-observatory-renderer)
+#   coach-prediction-evaluator -> compute_coach_prediction_evaluator NO (this PR)
+#   coach-ensemble-digest      -> compute_coach_orchestrator        NO  (this PR)
+#   coach-history-summarizer   -> compute_coach_orchestrator        NO  (this PR, shared)
+#   coach-state-updater        -> compute_coach_state_updater       NO  (this PR)
+#     (shared: coach-quality-gate)
+#   journal-enrichment         -> ingestion_journal_enrichment      YES (#1756)
+#   coach-nudge                -> email_coach_nudge                 YES (pre-existing)
+#   life-platform-site-api     -> site_api                          YES (#1371)
+#   life-platform-mcp          -> mcp_server                        YES (#915)
+EXPERIMENT_CYCLE_PARAM_ARN = f"arn:aws:ssm:{rp.REGION}:{rp.ACCT}:parameter/life-platform/experiment-cycle"
+
+READ_CYCLE_CALLER_FUNCTIONS = {
+    "compute_daily_metrics",
+    "compute_coach_computation",
+    "compute_coach_prediction_evaluator",
+    "compute_coach_orchestrator",
+    "compute_coach_state_updater",
+    "email_daily_brief",
+    "email_milestone_digest",
+    "ingestion_journal_enrichment",
+    "email_coach_nudge",
+    "site_api",
+    "mcp_server",
+}
+
+
+@pytest.mark.parametrize("fn_name", sorted(READ_CYCLE_CALLER_FUNCTIONS))
+def test_r8_read_cycle_callers_have_experiment_cycle_grant(fn_name):
+    """R8 (#1858): every audited read_cycle() caller carries a read-only grant
+    scoped to exactly the /life-platform/experiment-cycle parameter ARN — the
+    same ssm:GetParameter-only, single-ARN shape already established for
+    /life-platform/budget-tier, never GetParameters/GetParametersByPath, never
+    a wildcard resource."""
+    stmts = ALL_FUNCTIONS[fn_name]()
+    matches = [s for s in stmts if EXPERIMENT_CYCLE_PARAM_ARN in s.resources]
+    assert matches, (
+        f"{fn_name}(): no ssm:GetParameter statement grants {EXPERIMENT_CYCLE_PARAM_ARN!r}. "
+        f"coach_checkin.read_cycle() fail-softs to no cycle stamp (AccessDeniedException, #1858)."
+    )
+    for s in matches:
+        actions = {a.lower() for a in s.actions}
+        assert actions == {"ssm:getparameter"}, (
+            f"{fn_name}(): experiment-cycle statement (sid={s.sid!r}) has actions "
+            f"{sorted(s.actions)} — expected exactly ['ssm:GetParameter'] (read-only, "
+            f"matching the budget-tier precedent)."
+        )
+        assert "*" not in s.resources, (
+            f"{fn_name}(): experiment-cycle statement (sid={s.sid!r}) resources include "
+            f"a wildcard — must be scoped to the single parameter ARN only, no wildcards."
+        )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Standalone runner
 # ══════════════════════════════════════════════════════════════════════════════
 
