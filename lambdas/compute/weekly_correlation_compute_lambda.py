@@ -20,6 +20,9 @@ Correlation pairs computed:
   Cross-domain (#1406, lagged, the fulfillment↔physiology boundary)
                     values_lived today → protocol adherence tomorrow,
                     glucose variability (%CV) today → mood valence tomorrow
+  Diary-as-intervention (#1843, cross-sectional)
+                    video-diary/solo-recording session count vs same-day habit
+                    adherence — is the diary itself measurement reactivity?
 
 Schedule: cron(30 18 ? * SUN *) — Sunday 11:30 AM PT (30 min before hypothesis engine)
 
@@ -28,6 +31,11 @@ v1.1.0 — 2026-07-19 (#1406) two literature-motivated lagged cross-domain edges
          values_lived→next-day adherence + glucose-variability→next-day mood. Both
          ride the existing n_eff + BH-FDR pipeline; nulls publish honestly. The
          values_lived edge is stamped SDT-sensitive (autonomy-supportive framing only).
+v1.2.0 — 2026-07-27 (#1843) diary_sessions (video-diary/solo-recording count, read
+         from computed_metrics) wired as a candidate variable + one cross-sectional
+         pair against habit_pct — the diary may be a Hawthorne-effect treatment, not
+         a neutral instrument; correlative only, same n/interpretation gating as
+         every other pair.
 """
 
 import logging
@@ -279,6 +287,10 @@ def assemble_daily_series(start_date, end_date):
         metrics["day_grade"] = safe_float(cm, "day_grade_score")
         metrics["readiness"] = safe_float(cm, "readiness_score")
         metrics["tier0_streak"] = safe_float(cm, "tier0_streak")
+        # #1843: video-diary/solo-recording session count — the diary-as-intervention
+        # candidate variable. safe_float only returns None when the key is absent
+        # (pre-#1843 days), so 0 (an honest no-session day) survives as 0.0.
+        metrics["diary_sessions"] = safe_float(cm, "diary_sessions")
 
         # ── Habits ────────────────────────────────────────────────────────
         if hab:
@@ -358,6 +370,12 @@ CORRELATION_PAIRS = [
     # BH-FDR pipeline as every other pair; a null is a published finding.
     ("values_lived_count", "habit_pct", "values_lived_predicts_next_day_adherence", 1),
     ("glucose_cv", "mood_valence", "glucose_variability_predicts_next_day_mood", 1),
+    # #1843: is the video diary itself an intervention (Hawthorne effect), not a
+    # neutral instrument? Same-day cross-sectional — does habit adherence differ on
+    # days he records vs days he doesn't. Correlative only: recording isn't
+    # randomized, so a positive read here is a candidate for the effect, not proof
+    # of one (ADR-105 n/interpretation gating applies same as every other pair).
+    ("diary_sessions", "habit_pct", "diary_day_vs_habit_pct", 0),
 ]
 
 # AC#4 (#1406): SDT autonomy-support guardrail. The values_lived→adherence edge
@@ -406,6 +424,9 @@ EXPECTED_DIRECTIONS = {
     # #1406 cross-domain edges
     "values_lived_predicts_next_day_adherence": "positive",  # values-in-action today → better adherence tomorrow
     "glucose_variability_predicts_next_day_mood": "negative",  # more glycemic swing → lower mood valence next day
+    # #1843: the subject's own stated hope (Hawthorne effect helps) — a domain prior
+    # to check the observed direction against, not an assumption baked into the read.
+    "diary_day_vs_habit_pct": "positive",  # recording a diary session → higher same-day habit adherence
 }
 
 
