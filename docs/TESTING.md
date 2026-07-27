@@ -35,6 +35,15 @@ python3 -m pytest tests/test_shared_modules.py::test_retry_utils_backoff -v
 
 # Show top-N slowest (find perf regressions)
 python3 -m pytest tests/ --durations=20
+# Duration budget (#1847): the full offline suite runs in ~2.5 min locally
+# (7,544 tests, 2026-07-26); the slowest single test is ~18s. If a run blows
+# past ~5 min, something regressed — profile with --durations before merging.
+# CI's Unit-Tests job warns at 480s via scripts/coverage_gap_warn.py (#1349).
+# Known failure shape: a test that hangs SILENTLY while memory climbs is a
+# mock-fed infinite loop (e.g. DDB pagination on a truthy MagicMock
+# LastEvaluatedKey, #1847/#1849) — it OOM-kills CI runners with
+# "runner has received a shutdown signal", which reads as a mystery
+# cancellation, not as the test's fault.
 
 # Coverage (requires pytest-cov)
 python3 -m pytest tests/ -m 'not integration' \

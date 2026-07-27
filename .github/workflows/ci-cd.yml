@@ -1038,40 +1038,50 @@ jobs:
           echo ""
 
           ROLLED_BACK=0
+          MISSING=0
           FAILED=0
 
-          # Roll back individual Lambdas
+          # Roll back individual Lambdas. rollback_lambda.sh exit codes (#1848):
+          # 0 = reverted, 2 = no previous.zip (function LEFT ON CURRENT CODE — report,
+          # don't fail), else = attempted and broke (manual intervention).
           for row in $(echo "$MATRIX" | jq -r '.[] | @base64'); do
             FUNC=$(echo "$row" | base64 -d | jq -r '.function')
             echo "→ Rolling back $FUNC..."
-            if bash deploy/rollback_lambda.sh "$FUNC"; then
-              ROLLED_BACK=$((ROLLED_BACK + 1))
-            else
-              echo "  ❌ Rollback failed for $FUNC — manual intervention required"
-              FAILED=$((FAILED + 1))
-            fi
+            RC=0
+            bash deploy/rollback_lambda.sh "$FUNC" || RC=$?
+            case "$RC" in
+              0) ROLLED_BACK=$((ROLLED_BACK + 1)) ;;
+              2) MISSING=$((MISSING + 1)) ;;
+              *) echo "  ❌ Rollback failed for $FUNC — manual intervention required"
+                 FAILED=$((FAILED + 1)) ;;
+            esac
           done
 
           # Roll back MCP if it was deployed
           if [ "$MCP_CHANGED" = "true" ]; then
             echo "→ Rolling back life-platform-mcp..."
-            if bash deploy/rollback_lambda.sh "life-platform-mcp"; then
-              ROLLED_BACK=$((ROLLED_BACK + 1))
-            else
-              echo "  ❌ MCP rollback failed — manual intervention required"
-              FAILED=$((FAILED + 1))
-            fi
+            RC=0
+            bash deploy/rollback_lambda.sh "life-platform-mcp" || RC=$?
+            case "$RC" in
+              0) ROLLED_BACK=$((ROLLED_BACK + 1)) ;;
+              2) MISSING=$((MISSING + 1)) ;;
+              *) echo "  ❌ MCP rollback failed — manual intervention required"
+                 FAILED=$((FAILED + 1)) ;;
+            esac
           fi
 
           echo ""
-          echo "═══ Rollback complete: $ROLLED_BACK succeeded, $FAILED failed ═══"
+          echo "═══ Rollback complete: $ROLLED_BACK reverted, $MISSING no-artifact (left on current code), $FAILED failed ═══"
 
+          if [ "$MISSING" -gt 0 ]; then
+            echo "::warning::$MISSING function(s) had no previous.zip and stayed on the just-deployed code — the fleet is MIXED-VERSION if any reverted. Verify before trusting either state."
+          fi
           if [ "$FAILED" -gt 0 ]; then
             echo "::error::$FAILED Lambda(s) could not be rolled back — manual redeploy required"
             exit 1
           fi
 
-          echo "✅ All Lambdas rolled back. Investigate smoke test failure before re-deploying."
+          echo "✅ Rollback pass finished. Investigate smoke test failure before re-deploying."
 
       # #418/ADR-117: every rollback event must produce a notification (no silent
       # revert). (#749/actionlint: the old shared-layer runbook branch here keyed on

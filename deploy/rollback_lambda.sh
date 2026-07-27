@@ -38,11 +38,12 @@ rollback_one() {
     echo "🔄 Rolling back: $FUNCTION_NAME"
 
     # ── Check previous artifact exists ──
+    # Distinct exit class (#1848): "no artifact" means the function is LEFT ON ITS
+    # CURRENT CODE — different from a rollback that was attempted and broke.
     if ! aws s3 ls "s3://$BUCKET/$S3_PREVIOUS" --region "$REGION" > /dev/null 2>&1; then
-        echo "  ❌ No previous artifact found at s3://$BUCKET/$S3_PREVIOUS"
-        echo "     (Was this function ever deployed via deploy_lambda.sh?)"
+        echo "  ⤳ No previous artifact at s3://$BUCKET/$S3_PREVIOUS — left on current code"
         rm -rf "$WORK_DIR"
-        return 1
+        return 2
     fi
 
     # ── Verify function exists ──
@@ -98,23 +99,31 @@ rollback_one() {
 
 FAILED=0
 ROLLED_BACK=0
+MISSING=0
 
 for func in "$@"; do
-    if rollback_one "$func"; then
-        ROLLED_BACK=$((ROLLED_BACK + 1))
-    else
-        FAILED=$((FAILED + 1))
-    fi
+    RC=0
+    rollback_one "$func" || RC=$?
+    case "$RC" in
+        0) ROLLED_BACK=$((ROLLED_BACK + 1)) ;;
+        2) MISSING=$((MISSING + 1)) ;;
+        *) FAILED=$((FAILED + 1)) ;;
+    esac
 done
 
 echo ""
 echo "════════════════════════════════════"
-echo "Rollback complete: $ROLLED_BACK succeeded, $FAILED failed"
+echo "Rollback complete: $ROLLED_BACK succeeded, $MISSING no-artifact (left as-is), $FAILED failed"
 echo "════════════════════════════════════"
 
 if [ "$FAILED" -gt 0 ]; then
     echo "❌ Some rollbacks failed — check output above"
     exit 1
+fi
+if [ "$MISSING" -gt 0 ] && [ "$ROLLED_BACK" -eq 0 ]; then
+    # Nothing was actually reverted — signal the no-artifact class distinctly so
+    # callers (the CI auto-rollback job) can report it truthfully.
+    exit 2
 fi
 echo "✅ All rollbacks complete"
 echo ""
