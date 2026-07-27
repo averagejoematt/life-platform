@@ -167,11 +167,18 @@ def check_live_code_drift(stack_names, region=REGION, timeout=120):
     `status == "drift"` means at least one function's live `Code` has diverged
     from the stack's template — the exact scenario a blind `cdk deploy` would
     silently clobber."""
-    cfn = _cfn_client(region)
+    # Per-stack region (#1816 class): LifePlatformWeb lives in us-east-1 — a single
+    # default-region client reported it "does not exist" (fail-open 🟡, seen live on
+    # the 2026-07-27 owner deploy). drift_sentinel.STACKS is the guarded map (#1817).
+    try:
+        from drift_sentinel import STACKS as _STACK_REGIONS
+    except Exception:  # noqa: BLE001 — fall back to the single-region behavior
+        _STACK_REGIONS = {}
     out = {}
     saw_code_drift = False
     saw_error = False
     for name in stack_names:
+        cfn = _cfn_client(_STACK_REGIONS.get(name, region))
         try:
             det_id = cfn.detect_stack_drift(StackName=name)["StackDriftDetectionId"]
             status = _poll_drift(cfn, det_id, timeout=timeout)
