@@ -101,9 +101,14 @@ STYLE = """
 .gyc-empty { color: var(--ink-muted); line-height: var(--lh-relaxed); }
 .gyc-figs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); }
 @media (min-width: 620px) { .gyc-figs { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.gyc-figs > .gyc-fig { display: grid; grid-template-rows: auto auto 1fr; gap: 2px; min-width: 0; align-content: start; }
+.gyc-figs > .gyc-fig { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .gyc-fig-v { font-family: var(--font-mono); font-size: var(--fs-h3); color: var(--ink); }
-.gyc-fig-l { color: var(--ink-faint); }
+/* "skill vs base rate" is the only label that wraps to two lines, which pushed its
+   sub-line a row below the other three and left the block ragged. Row tracks on the
+   .gyc-fig itself do NOT fix that — each fig is its own grid, so siblings share no
+   tracks. Reserving two label lines everywhere does, in every browser. (`subgrid` on
+   .gyc-figs would be the tidier answer once its floor is safely below the site's.) */
+.gyc-fig-l { color: var(--ink-faint); min-height: 2.6em; min-height: 2lh; }
 .gyc-fig-s { font-size: var(--fs-small); color: var(--ink-muted); line-height: var(--lh-relaxed); }
 .gyc-verdict { margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: var(--border-hair); }
 .gyc-verdict-h { margin: 0; font-family: var(--font-serif); font-size: var(--fs-h3); color: var(--ink); text-transform: capitalize; }
@@ -116,6 +121,7 @@ STYLE = """
    fits without scrolling at every breakpoint. */
 .gyc-chartwrap { display: grid; gap: var(--sp-4); margin-top: var(--sp-5); min-width: 0; }
 .gyc-chart { position: relative; min-width: 0; max-width: 340px; }
+@media (min-width: 900px) { .gyc-chart { max-width: 400px; } }
 .gyc-svg { width: 100%; height: auto; display: block; }
 .gyc-plot { fill: var(--surface-sunken); stroke: var(--rule); stroke-width: 1; }
 .gyc-ideal { stroke: var(--ink-faint); stroke-width: 1; stroke-dasharray: 4 4; }
