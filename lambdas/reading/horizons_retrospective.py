@@ -5,13 +5,24 @@ The week AFTER a pick, the **Mind coach** writes a grounded, public retrospectiv
 hook for the public ``/data/horizons/`` feed. It is coach voice ABOUT A MEDIA PICK —
 never Matthew's private reactions to it (those are S4 scope and stay private).
 
-Three load-bearing constraints, all enforced here and all unit-testable offline:
+Four load-bearing constraints, all enforced here and all unit-testable offline:
 
-  1. **GROUNDED (ADR-104).** The prompt is built ONLY from the stored pick's own
-     fields (title / source / format / pitch / rationale_tag / url / week). No outside
-     facts, no fabricated claims, no invented outcomes — the coach reflects on the pick
-     it *actually made*, not on what Matthew did with it (which the coach does not know
+  1. **GROUNDED (ADR-104), on BOTH sides.**
+     *Input side:* the prompt is built ONLY from the stored pick's own fields (title /
+     source / format / pitch / rationale_tag / url / week). No outside facts, no
+     fabricated claims, no invented outcomes — the coach reflects on the pick it
+     *actually made*, not on what Matthew did with it (which the coach does not know
      and must not pretend to). ``build_body`` never reads anything but the pick dict.
+     *Output side (#1830):* input-side grounding plus a prompt instruction is exactly
+     the posture ADR-104 rejected platform-wide — "prompt rules are hopes, code gates
+     are guarantees". So the generated text also crosses
+     ``grounded_generation.grounding_findings`` (the allow-list number gate + the
+     #1242 date gate) against the numbers/dates the model was actually given, with
+     one ``regen_once`` corrective rewrite. Anything still ungrounded is HELD —
+     the same deterministic bar the chronicle, the coach briefs, ask/board_ask and
+     State of Matthew already meet. Honest residual, recorded: a NON-numeric
+     fabrication ("a landmark essay") is not deterministically detectable and stays
+     covered by the prompt rule alone — ADR-104's stated residual on every surface.
 
   2. **BUDGET-GATED (ADR-062/125).** A retrospective is a reader-NARRATIVE surface →
      ``budget_guard`` band 2 (feature ``"horizons_retrospective"``, pauses at tier 2,
@@ -37,10 +48,23 @@ from datetime import datetime, timezone
 
 import broadcast_sensitivity_gate as gate
 
+# The ADR-104 grounded-generation harness (#1830). FAIL-CLOSED, unlike the fail-soft
+# import shims elsewhere in the codebase: this is a public reader surface, so if the
+# gate module is missing from the bundle we withhold the retrospective rather than
+# publish an ungated one. `generate()` reads `_gg is None` and HOLDS.
+try:
+    import grounded_generation as _gg
+except ImportError:  # pragma: no cover — environment-dependent; withhold, never pass through
+    _gg = None
+
 # ── Retrospective status seam (what the public feed keys on) ──────────────────────
 STATUS_PUBLISHED = "published"  # cleared the gate → visible on /data/horizons/
-STATUS_HELD = "held"  # sensitivity gate did not clear → withheld, fail-closed
+STATUS_HELD = "held"  # a gate did not clear → withheld, fail-closed
 STATUS_PAUSED = "paused"  # budget band 2 paused → no retrospective this run (transient)
+
+# The `categories` marker a grounding hold carries, so the review surface can tell a
+# fabrication hold from a privacy/sensitivity hold at a glance.
+CATEGORY_UNGROUNDED = "ungrounded"
 
 # Budget feature name — reader-NARRATIVE band (tier 2), registered in
 # budget_guard._FEATURE_CUTOFF next to coach_narrative / state_of_matthew.
@@ -140,6 +164,44 @@ def _default_offtopic_classifier(text: str):
     return gate.OfftopicResult(True, 1.0)
 
 
+def _grounding_gate(pick: dict, text: str, invoke) -> tuple:
+    """ADR-104 deterministic grounding + one corrective rewrite (#1830).
+
+    Returns ``(best_text, findings)`` — a non-empty ``findings`` means the caller must
+    HOLD. Fail-closed: if the harness is unavailable or itself raises, the retrospective
+    is held with a synthetic finding, never published ungated.
+
+    The allow-list is built from ``_grounding_facts(pick)`` ALONE — literally what the
+    model was given — not from the whole pick record. A number living only in the pick's
+    ``verification`` blob or an unrendered field was never shown to the model, so
+    counting it as "grounded" would quietly widen the gate.
+    """
+    if _gg is None:  # pragma: no cover — environment-dependent
+        return text, [{"type": "gate_unavailable", "detail": "grounded_generation is not available in this bundle"}]
+    try:
+        facts_block = _grounding_facts(pick)
+        allowed = _gg.allowed_numbers(facts_block)
+        # An EMPTY date allow-list is meaningful, not a no-op: it means "no calendar
+        # date is legitimate here", which is true of a pick whose facts carry none.
+        allowed_date_set = _gg.allowed_dates(facts_block)
+
+        def _findings_fn(candidate):
+            return _gg.grounding_findings(candidate, facts=None, allowed=allowed, allowed_dates=allowed_date_set)
+
+        def _regen_fn(correction):
+            body = build_body(pick)
+            body["messages"] = list(body["messages"]) + [
+                {"role": "assistant", "content": text},
+                {"role": "user", "content": correction},
+            ]
+            return _extract_text(invoke(body))
+
+        best, findings, _corrected = _gg.regen_once(text, _findings_fn, _regen_fn)
+        return best, findings
+    except Exception as e:  # noqa: BLE001 — a broken gate withholds; it never waves text through
+        return text, [{"type": "gate_error", "detail": f"grounding gate failed ({type(e).__name__})"}]
+
+
 def generate(pick: dict, *, invoker=None, offtopic_classifier=None) -> dict:
     """Generate + gate the retrospective for one stored pick. NEVER raises.
 
@@ -151,7 +213,13 @@ def generate(pick: dict, *, invoker=None, offtopic_classifier=None) -> dict:
     Order (ADR-105 — cheapest gate first, deterministic before publish):
       1. budget band 2 — if paused, stop before spending a token.
       2. Bedrock (grounded body) → text; an empty/failed generation HOLDS.
-      3. broadcast_sensitivity_gate — only a ``cleared`` verdict publishes.
+      3. broadcast_sensitivity_gate on the DRAFT — privacy/PII outranks grounding, so a
+         leaking draft is held AS a privacy hold and never spends a corrective rewrite
+         trying to make a leak better-grounded.
+      4. grounding gate (#1830) — allow-list numbers/dates + one regen; still
+         ungrounded ⇒ HOLD.
+      5. broadcast_sensitivity_gate AGAIN, iff step 4 rewrote the text — the stamp must
+         describe the bytes that actually publish, never a discarded draft.
     """
     now = _now_iso()
 
@@ -175,20 +243,42 @@ def generate(pick: dict, *, invoker=None, offtopic_classifier=None) -> dict:
     if not text:
         return {"status": STATUS_HELD, "reason": "empty generation", "generatedAt": now}
 
-    # 3. Fail-closed sensitivity gate (#1673) — stamp the AI text before it can publish.
-    verdict = gate.classify_sensitivity(text, offtopic_classifier=offtopic_classifier or _default_offtopic_classifier)
+    # 3. Fail-closed sensitivity gate (#1673) on the draft — a privacy hold is reported
+    #    as a privacy hold, never masked by the grounding verdict underneath it.
+    classifier = offtopic_classifier or _default_offtopic_classifier
+
+    def _sensitivity_hold(v):
+        return {"status": STATUS_HELD, "reason": v.reason, "categories": list(v.categories), "generatedAt": now}
+
+    verdict = gate.classify_sensitivity(text, offtopic_classifier=classifier)
     if not verdict.cleared:
+        return _sensitivity_hold(verdict)
+
+    # 4. Fail-closed grounding gate (#1830, ADR-104) — one corrective rewrite, then hold.
+    draft = text
+    text, findings = _grounding_gate(pick, text, invoke)
+    if findings:
+        details = [str(f.get("detail") or f.get("type")) for f in findings]
         return {
             "status": STATUS_HELD,
-            "reason": verdict.reason,
-            "categories": list(verdict.categories),
+            "reason": "ungrounded: " + "; ".join(details[:3]),
+            "categories": [CATEGORY_UNGROUNDED],
+            "grounding_findings": details,
             "generatedAt": now,
         }
+
+    # 5. Re-stamp iff the corrective rewrite changed the bytes — the published text, and
+    #    only the published text, is what the sensitivity verdict may vouch for.
+    if text != draft:
+        verdict = gate.classify_sensitivity(text, offtopic_classifier=classifier)
+        if not verdict.cleared:
+            return _sensitivity_hold(verdict)
 
     return {
         "status": STATUS_PUBLISHED,
         "text": text,
         "curator": CURATOR,
         "sensitivity_status": gate.SENSITIVITY_CLEARED,
+        "grounded": True,  # cleared the deterministic allow-list gate (#1830), not just the prompt rule
         "generatedAt": now,
     }

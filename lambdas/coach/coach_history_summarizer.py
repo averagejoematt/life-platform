@@ -186,6 +186,37 @@ except ImportError:  # pragma: no cover — environment-dependent
         return "" if text is None else str(text)
 
 
+# ADR-141 §4 carve-out screen (#1789). BOTH prompts this module builds serve
+# publicly downstream (COMPRESSED#latest feeds the stance; STANCE#latest prose is
+# rendered by lambdas/web/site_api_coach.py), so a channel=conversation
+# `takeaway` — LLM-authored from Matthew's verbatim answer — must clear the
+# deterministic content-absolutes screen before it can enter either one.
+# FAIL-CLOSED, unlike the fail-open grounding/untrusted-text shims above: if the
+# screen is missing from the bundle we withhold the takeaway, we do not ship it
+# unscreened. Privacy gates fail closed; quality gates fail open.
+try:
+    from coach_calibration import TAKEAWAY_WITHHELD_MARKER, public_prompt_takeaway as _public_prompt_takeaway
+except ImportError:  # pragma: no cover — environment-dependent; withhold, never pass through
+    TAKEAWAY_WITHHELD_MARKER = "[takeaway withheld — ADR-141 §4 privacy screen]"
+    _public_prompt_takeaway = None
+
+
+def _screened_takeaway(rec):
+    """The prompt-ready takeaway for one conversation LEARNING# row (ADR-141 §4).
+
+    Returns the screened text, or the withheld marker when the screen refuses,
+    the screen is unavailable, or anything at all goes wrong. Raw `takeaway`
+    text has exactly one route into a publicly-served prompt: through here.
+    """
+    if _public_prompt_takeaway is None:
+        return TAKEAWAY_WITHHELD_MARKER
+    try:
+        return _public_prompt_takeaway(rec)
+    except Exception as e:  # noqa: BLE001 — a screen failure withholds, never passes through
+        logger.warning("ADR-141 takeaway screen failed (%s) — withholding", e)
+        return TAKEAWAY_WITHHELD_MARKER
+
+
 def _emit_failure_metric():
     """Emit API failure metric to CloudWatch (non-fatal)."""
     try:
@@ -739,13 +770,17 @@ def _build_compression_message(coach_id, state):
             date = rec.get("date") or str(rec.get("sk", "")).replace("LEARNING#", "").split("#")[0]
             subdomain = rec.get("subdomain", "general")
             direction = rec.get("confidence_direction", "hold")
-            takeaway = str(rec.get("takeaway", ""))[:200]
-            # ADR-141 §4 hardening (2026-07-26 review): the verbatim answer_quote is
-            # Matthew-private and this prompt's output (COMPRESSED#/STANCE#) feeds
-            # public surfaces through numeric-only gates — so the quote never enters
-            # the prompt at all (leakage structurally impossible, the ADR-142 pattern).
-            # The takeaway + checkin_id pointer suffice; the quote stays in the
-            # private LEARNING# row for Matthew's own audit.
+            # ADR-141 §4 (2026-07-26 hardening, corrected + completed by #1789):
+            # this prompt's output (COMPRESSED#/STANCE#) feeds PUBLIC surfaces, so
+            #   * `answer_quote` — Matthew's verbatim words — never enters the prompt
+            #     at all. THAT leakage class is structurally impossible; the quote
+            #     stays in the private LEARNING# row for Matthew's own audit.
+            #   * `takeaway` — the coach's own synthesis — rides the §3 grounding
+            #     carve-out, but only through the deterministic screen. The original
+            #     hardening comment claimed "numeric-only gates" made the whole class
+            #     safe; they inspect digits, not semantics, so the takeaway's only
+            #     barrier was the generating model's discretion. Now it is code.
+            takeaway = _screened_takeaway(rec)
             checkin_ref = rec.get("checkin_id", "")
             parts.append(f"  - [{date}] ({subdomain}, confidence {direction}) {takeaway} (checkin {checkin_ref})")
         parts.append("")
@@ -1111,10 +1146,12 @@ def _summarize_track_record(learning, confidence_records):
                         "date": rec.get("date") or rec.get("sk", "").replace("LEARNING#", "").split("#")[0],
                         "subdomain": rec.get("subdomain", ""),
                         "confidence_direction": rec.get("confidence_direction", "hold"),
-                        "takeaway": str(rec.get("takeaway") or "")[:200],
-                        # ADR-141 §4 hardening: no verbatim answer text in the stance
-                        # grounding message — STANCE# prose serves publicly behind
-                        # numeric-only gates. checkin_id is the pointer for audit.
+                        # ADR-141 §4 (#1789): no verbatim answer text in the stance
+                        # grounding message — STANCE# prose serves publicly — and the
+                        # coach's own takeaway crosses only through the deterministic
+                        # screen (the numeric gates downstream read digits, not
+                        # semantics). checkin_id is the pointer for audit.
+                        "takeaway": _screened_takeaway(rec),
                         "checkin_id": rec.get("checkin_id", ""),
                     }
                 )

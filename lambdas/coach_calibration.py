@@ -39,9 +39,26 @@ learnings in, distinguished from data verdicts), mcp get_coach_track_record
 The ADR-108 quality gate consumes these transitively: gate inputs are coach
 outputs generated FROM the compressed state this feeds.
 
-Privacy (ADR-141): `answer_quote`/`takeaway` quote Matthew's verbatim check-in
-answers — Matthew-private tier. Public surfaces (lambdas/web/site_api_coach.py)
-must never render channel=conversation learning text; they filter explicitly.
+Privacy (ADR-141 §4, as amended 2026-07-26 by #1789 — read the carve-out, not
+just the tier):
+
+  * `answer_quote` — Matthew's VERBATIM words. Matthew-private, no exceptions,
+    no carve-out. It never enters any prompt whose output serves publicly and
+    never enters a public render path.
+  * `takeaway` — the coach's own LLM-authored synthesis of what it learned. Also
+    Matthew-private for RENDER (no public surface ever prints it verbatim), but
+    §3 deliberately designs it INTO the STANCE#/COMPRESSED# grounding, whose
+    prose does serve publicly. That is the sanctioned carve-out, and it is
+    conditioned on the deterministic screen below.
+
+`screen_takeaway_for_public_prompt()` is that screen (#1789): a takeaway may
+cross into a publicly-served prompt only after clearing the house content
+absolutes (`coach_dossier.find_dossier_violations` — substances, real names,
+family specifics, private events, chronological age, genotype strings, PII).
+Fail-closed: a hit, a malformed input, or an unavailable screen all WITHHOLD.
+Public RENDER surfaces (lambdas/web/site_api_coach.py, lambdas/coach_dossier.py)
+still exclude channel=conversation text wholesale — the screen is the extra
+barrier on the one sanctioned prompt path, never a licence to render.
 """
 
 from __future__ import annotations
@@ -195,6 +212,72 @@ def calibration_learning_sk(checkin_sk, subdomain) -> Optional[str]:
     if not prefix or not sub:
         return None
     return f"{prefix}{sub}"
+
+
+# ── the ADR-141 §4 carve-out screen (#1789) ──────────────────────────────────
+# The §4 privacy tier and the §3 grounding design pulled in opposite directions:
+# §4 called `takeaway` Matthew-private, §3 folds it into the STANCE#/COMPRESSED#
+# prompts whose prose serves publicly. The 2026-07-26 hardening removed
+# `answer_quote` from both prompts and claimed leakage was then "structurally
+# impossible" — true for the verbatim quote, NOT for the takeaway, whose only
+# barrier was the generating model's discretion. Prompt discretion is not a gate
+# (ADR-104); this is the code gate that makes the carve-out honest.
+#
+# Vocabulary is REUSED, never forked: `coach_dossier.find_dossier_violations`
+# already composes journal_quotes' taboo list (which itself builds on
+# privacy_guard's vice/real-name sets) + the genotype absolutes + the
+# broadcast_sensitivity_gate PII detector. One list, three consumers.
+TAKEAWAY_WITHHELD_MARKER = "[takeaway withheld — ADR-141 §4 privacy screen]"
+
+# What a publicly-served prompt may see of a takeaway (the pre-existing render
+# budget in coach_history_summarizer, made a named constant so both call sites
+# and the screen agree).
+PUBLIC_PROMPT_TAKEAWAY_CHARS = 200
+
+
+def screen_takeaway_for_public_prompt(takeaway, *, max_chars=PUBLIC_PROMPT_TAKEAWAY_CHARS) -> tuple:
+    """Screen one conversation learning's `takeaway` for a PUBLICLY-SERVED prompt.
+
+    Returns ``(safe_text, violations)``:
+      * ``(str, [])``   — cleared; the truncated text may enter the prompt.
+      * ``(None, [...])`` — WITHHELD. The caller substitutes
+        :data:`TAKEAWAY_WITHHELD_MARKER` (an honest absence, ADR-104) and the
+        content never reaches the model.
+
+    Fail-closed in every direction:
+      * any content-absolute hit          → withheld
+      * empty / non-string takeaway       → withheld (nothing to say, say nothing)
+      * the screen module cannot be imported or raises → withheld
+
+    The FULL stored takeaway is screened, not the truncated form — a violation
+    past character `max_chars` still withholds the whole line, so truncation can
+    never launder a hit out of view.
+    """
+    text = str(takeaway or "").strip()
+    if not text:
+        return None, [("empty", "")]
+    try:
+        import coach_dossier  # the house content-absolutes screen (#1387/#1800)
+
+        hits = coach_dossier.find_dossier_violations(text)
+    except Exception as e:  # noqa: BLE001 — an unavailable/broken screen withholds
+        logger.warning("[coach_calibration] takeaway screen unavailable (%s) — withholding", e)
+        return None, [("screen_unavailable", type(e).__name__)]
+    if hits:
+        # Log the CATEGORIES only — echoing the matched text would defeat the screen.
+        logger.info("[coach_calibration] takeaway withheld from public prompt: %s", sorted({h[0] for h in hits}))
+        return None, hits
+    return text[:max_chars], []
+
+
+def public_prompt_takeaway(record, *, max_chars=PUBLIC_PROMPT_TAKEAWAY_CHARS) -> str:
+    """Prompt-ready takeaway for one LEARNING# record: screened text or the marker.
+
+    The one-liner both publicly-served prompt builders call, so neither can
+    accidentally interpolate a raw `takeaway` again.
+    """
+    safe, _violations = screen_takeaway_for_public_prompt((record or {}).get("takeaway"), max_chars=max_chars)
+    return safe if safe is not None else TAKEAWAY_WITHHELD_MARKER
 
 
 def _dec(val) -> Decimal:
