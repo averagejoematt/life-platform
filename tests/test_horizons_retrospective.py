@@ -9,6 +9,10 @@ no network, no Bedrock):
        fabricated when paused.
   AC1  it is SENSITIVITY-GATED (#1673, fail-closed) — PII / vice / a generation failure
        all HOLD; only a gate-cleared retrospective publishes.
+  #1830 it is DETERMINISTICALLY GROUNDING-GATED (ADR-104) — the output's numbers and
+       dates must appear in what the model was actually given, with one regen_once
+       corrective rewrite; anything still ungrounded HOLDS. Prompt text is no longer
+       the only factual defense.
   AC2  the /api/horizons feed projects public-safe cards reverse-chron and shows the
        retrospective ONLY when it published (honest empty/"note coming" state otherwise).
   AC3  storage: set_horizon_retrospective attaches a published verdict's prose to the pick
@@ -129,6 +133,120 @@ def test_empty_generation_is_held(monkeypatch):
     monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
     out = hr.generate(_pick(), invoker=lambda b: {"content": [{"type": "text", "text": "   "}]})
     assert out["status"] == hr.STATUS_HELD
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #1830 — DETERMINISTIC GROUNDING GATE (ADR-104), fail-closed
+#
+# The filed repro: a generation citing "47-minute runtime and 3,200 citations" —
+# two numbers absent from the pick — used to return status=published, verbatim.
+# ══════════════════════════════════════════════════════════════════════════════
+@pytest.fixture()
+def tier0(monkeypatch):
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
+
+
+def test_the_filed_repro_is_now_held_not_published(tier0):
+    out = hr.generate(
+        _pick(),
+        invoker=_clean_invoker("I picked this for its 47-minute runtime and 3,200 citations — the definitive case for rest."),
+    )
+    assert out["status"] == hr.STATUS_HELD
+    assert "text" not in out  # nothing ungrounded ever carries prose forward
+    assert out["categories"] == [hr.CATEGORY_UNGROUNDED]
+    assert any("47" in f for f in out["grounding_findings"])
+    assert any("3200" in f or "3,200" in f for f in out["grounding_findings"])
+
+
+def test_a_number_present_in_the_pick_is_grounded_and_publishes(tier0):
+    pick = _pick(pitch="a 12-week reframe of rest as active recovery")
+    out = hr.generate(pick, invoker=_clean_invoker("I sent this because the 12-week arc matches your training block."))
+    assert out["status"] == hr.STATUS_PUBLISHED
+    assert out["grounded"] is True
+
+
+def test_an_invented_calendar_date_is_held(tier0):
+    out = hr.generate(_pick(), invoker=_clean_invoker("I sent it on 2019-03-04, right when rest became the theme."))
+    assert out["status"] == hr.STATUS_HELD
+    assert out["categories"] == [hr.CATEGORY_UNGROUNDED]
+
+
+def test_regen_once_rescues_a_fixable_draft(tier0):
+    """One corrective rewrite, kept only because it is strictly better (the house harness)."""
+    calls = {"n": 0}
+    fabricated = "I picked this for its 47-minute runtime and 3,200 citations."
+    corrected = "I picked this because it makes the case for rest as a skill, not a reward."
+
+    def _invoker(body):
+        calls["n"] += 1
+        return {"content": [{"type": "text", "text": fabricated if calls["n"] == 1 else corrected}]}
+
+    out = hr.generate(_pick(), invoker=_invoker)
+    assert calls["n"] == 2, "the gate must attempt exactly one corrective rewrite"
+    assert out["status"] == hr.STATUS_PUBLISHED
+    assert out["text"] == corrected
+
+
+def test_a_rewrite_that_does_not_improve_still_holds(tier0):
+    """regen_once never regresses — and an un-fixed draft must not publish."""
+    out = hr.generate(_pick(), invoker=_clean_invoker("Its 47-minute runtime and 3,200 citations are the point."))
+    assert out["status"] == hr.STATUS_HELD
+
+
+def test_the_allow_list_is_what_the_model_saw_not_the_whole_pick_record(tier0):
+    """A number living only in an unrendered field was never shown to the model —
+    counting it as grounded would quietly widen the gate."""
+    pick = _pick(verification={"verified": True, "status": 200, "checked_bytes": 8675309})
+    assert "8675309" not in hr._grounding_facts(pick)
+    out = hr.generate(pick, invoker=_clean_invoker("This piece runs to 8675309 words of argument."))
+    assert out["status"] == hr.STATUS_HELD
+
+
+def test_a_broken_grounding_gate_withholds_rather_than_publishes_ungated(tier0, monkeypatch):
+    """Fail-closed: this is a public reader surface, so an unavailable gate HOLDS."""
+    monkeypatch.setattr(hr, "_gg", None)
+    out = hr.generate(_pick(), invoker=_clean_invoker())
+    assert out["status"] == hr.STATUS_HELD
+    assert "text" not in out
+    assert out["categories"] == [hr.CATEGORY_UNGROUNDED]
+
+
+def test_a_raising_grounding_gate_withholds(tier0, monkeypatch):
+    import grounded_generation
+
+    def _boom(*_a, **_kw):
+        raise RuntimeError("gate exploded")
+
+    monkeypatch.setattr(grounded_generation, "allowed_numbers", _boom)
+    out = hr.generate(_pick(), invoker=_clean_invoker())
+    assert out["status"] == hr.STATUS_HELD and "text" not in out
+
+
+def test_a_corrective_rewrite_is_re_screened_by_the_sensitivity_gate(tier0):
+    """The grounding gate can REWRITE the text; the sensitivity stamp must describe the
+    bytes that actually publish, never the discarded draft."""
+    calls = {"n": 0}
+
+    def _invoker(body):
+        calls["n"] += 1
+        # draft 1: ungrounded but clean · rewrite: numerically grounded but leaks an email
+        text = "Its 47-minute runtime is the point." if calls["n"] == 1 else "Reach the author at ada@example.com about rest as a skill."
+        return {"content": [{"type": "text", "text": text}]}
+
+    out = hr.generate(_pick(), invoker=_invoker)
+    assert calls["n"] == 2
+    assert out["status"] == hr.STATUS_HELD
+    assert gate.CATEGORY_PII in out["categories"], "the rewritten text must be re-screened"
+
+
+def test_a_privacy_hold_is_reported_as_privacy_not_masked_as_ungrounded(tier0):
+    """A leaking draft carries ungrounded digits too (415/555/1212). The verdict must
+    name the privacy category — a PII hold reported as 'ungrounded' would be triaged
+    as a quality bug."""
+    out = hr.generate(_pick(), invoker=_clean_invoker("reach me at 415-555-1212 about the weed protocol"))
+    assert out["status"] == hr.STATUS_HELD
+    assert set(out["categories"]) & {gate.CATEGORY_PII, gate.CATEGORY_MARIJUANA}
+    assert hr.CATEGORY_UNGROUNDED not in out["categories"]
 
 
 # ══════════════════════════════════════════════════════════════════════════════

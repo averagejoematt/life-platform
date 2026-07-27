@@ -400,8 +400,10 @@ def tool_archive_horizon(args=None):
     """Archive a prior Horizons pick with the Mind coach's retrospective (#1707, S3).
 
     The week AFTER a pick, the coach writes a grounded, public "why I recommended it /
-    what I hoped it'd do" reflection. GROUNDED (ADR-104 — built only from the stored
-    pick), BUDGET-GATED (reader-narrative band 2), and passed through the #1673
+    what I hoped it'd do" reflection. GROUNDED on both sides (ADR-104 — the prompt is
+    built only from the stored pick, AND the output crosses the deterministic
+    allow-list number/date gate with one corrective rewrite, #1830), BUDGET-GATED
+    (reader-narrative band 2), and passed through the #1673
     fail-closed sensitivity gate before it can publish. Only a gate-CLEARED retrospective
     becomes reader-visible on /data/horizons/; a held/paused verdict stores its status
     (never prose). draft → dry_run → commit: writes only on explicit dry_run=false.
