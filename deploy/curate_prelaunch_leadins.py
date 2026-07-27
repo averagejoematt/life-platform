@@ -256,6 +256,11 @@ def main():
             dest = archive_and_tombstone_page(s3, key, seq, args.apply, now_iso)
             print(f"  {'tombstoned' if args.apply else 'would tombstone'}: {key} → archived to {dest}")
             paths.append(f"/journal/posts/week-{seq:02d}/*")
+            # #1805: a freshly-tombstoned permalink must 301 at the edge, not serve
+            # its raw JSON tombstone marker at HTTP 200 (live orphans: week-04/05/06).
+            added = handler.register_permalink_redirect(f"/journal/posts/week-{seq:02d}/", "/story/journal/", args.apply)
+            if added:
+                print(f"    + redirects.map: /journal/posts/week-{seq:02d}/ → /story/journal/")
         if args.apply and paths and not args.no_invalidate:
             invalidate(paths)
 

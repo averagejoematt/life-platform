@@ -919,7 +919,11 @@ def lambda_handler(event: dict, context) -> dict:
         all_installments = [d2f(i) for i in resp.get("Items", [])]
     except Exception as e:
         logger.warning(f"Failed to query all installments: {e}")
-        all_installments = [{"title": title, "week_number": week_num, "date": date_str}]
+        # #1803: sk must be set so chronicle_render.publish_to_journal's sk-based
+        # "is this the post being published right now" match (ac753774) can find
+        # this synthesized placeholder — otherwise the freshly-fetched cover image
+        # never lands in this post's posts.json manifest entry.
+        all_installments = [{"title": title, "week_number": week_num, "date": date_str, "sk": f"DATE#{date_str}"}]
 
     # Ensure new installment is in the list (not yet stored at this point)
     if not any(i.get("date") == date_str for i in all_installments):
@@ -929,6 +933,8 @@ def lambda_handler(event: dict, context) -> dict:
                 "title": title,
                 "week_number": week_num,
                 "date": date_str,
+                # #1803: same sk-identity requirement as the exception-fallback above.
+                "sk": f"DATE#{date_str}",
                 "stats_line": stats_line,
                 "word_count": len(raw_installment.split()),
                 "content_markdown": truncate_at_word(raw_installment, 300),  # #1224: excerpt-source preview, word boundary

@@ -22,7 +22,11 @@ Pure module (no AWS), layer-deployed. No external deps.
 import re
 
 # Bump when the banned sets below change; publish paths refuse drafts stamped older.
-GUARD_VERSION = "2026-06-28"
+# 2026-07-26 (#1804): the vocabulary genuinely widened on this date (journal_quotes'
+# SUBSTANCE_EXTRA gained the beverage-noun family, VICE_KEYWORDS gained edible/
+# edibles per AUDIT PRIV-01) without the version ever being bumped — bumping it now
+# so guard_version-stamped records from before this date correctly read as stale.
+GUARD_VERSION = "2026-07-26"
 
 # Vices/substances — never public. Must be a SUPERSET of config/content_filter.json
 # `blocked_vice_keywords` (enforced by test_privacy_guard); this deterministic gate

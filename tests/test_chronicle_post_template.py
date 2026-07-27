@@ -134,3 +134,77 @@ def test_ac4_subscribe_cta_present(monkeypatch):
 def test_post_key_is_sequential_week_path(monkeypatch):
     key, _html = _render(monkeypatch)
     assert key == "generated/journal/posts/week-02/index.html"
+
+
+# ── #1803: the cover image must land in posts.json on a FIRST-EVER publish ────
+# Root cause: wednesday_chronicle_lambda synthesizes a placeholder dict for
+# all_installments when the installment isn't in DDB yet (first publish of a new
+# date). publish_to_journal's manifest loop decides "is this the post being
+# published right now" (and therefore gets the freshly-fetched cur_image) via
+# sk == f"DATE#{date_str}" (ac753774, tie-safe same-date ordering). The
+# synthesized dict never set sk, so the freshly-fetched image never reached the
+# manifest even though the post's own HTML/og:image rendered it fine.
+
+
+def _publish_and_get_manifest_entry(monkeypatch, installments, cur_image, date_str="2026-07-01"):
+    """Call publish_to_journal like _render does, but return the parsed posts.json
+    manifest entry for date_str instead of the HTML (#1803 needs the manifest,
+    not the post page, since the bug is manifest-only)."""
+    import json as _json
+
+    import editorial_image
+
+    monkeypatch.setattr(chron, "s3", _NoS3())
+    monkeypatch.setattr(editorial_image, "enabled", lambda: True)
+    monkeypatch.setattr(editorial_image, "fetch_and_store", lambda *a, **k: cur_image)
+    _post_key, _html, posts_json_str = chron.publish_to_journal(
+        title="The weight of a steady week",
+        stats_line="Weight 298 lb · Recovery 64% · 5 workouts",
+        body_html=_BODY,
+        week_num=1,
+        date_str=date_str,
+        all_installments=installments,
+        write_to_s3=False,
+    )
+    manifest = _json.loads(posts_json_str)
+    return next(p for p in manifest["posts"] if p["date"] == date_str)
+
+
+def test_1803_cover_image_lands_on_first_ever_publish_with_sk_set(monkeypatch):
+    """The FIXED shape: the synthesized installment carries sk (as
+    wednesday_chronicle_lambda now stamps it) — the manifest entry for that date
+    must carry the freshly-fetched cover, not an empty image_url."""
+    cover = {"image_url": "https://averagejoematt.com/generated/editorial/chronicle/week-01.jpg", "image_credit": "Unsplash / Y"}
+    installment = {
+        "title": "The weight of a steady week",
+        "week_number": 1,
+        "date": "2026-07-01",
+        "sk": "DATE#2026-07-01",  # the #1803 fix
+        "stats_line": "Weight 298 lb",
+        "word_count": 10,
+        "content_markdown": "It was a quiet week.",
+        "has_board_interview": False,
+    }
+    entry = _publish_and_get_manifest_entry(monkeypatch, [installment], cover)
+    assert entry["image_url"] == cover["image_url"]
+    assert entry["image_credit"] == cover["image_credit"]
+
+
+def test_1803_missing_sk_reproduces_the_pre_fix_bug(monkeypatch):
+    """Regression pin: WITHOUT sk (the pre-fix synthesized shape), the manifest
+    entry's image_url stays empty even though a fresh cover was fetched — this
+    reproduces the exact #1803 bug and guards against silently re-dropping the
+    sk stamp from wednesday_chronicle_lambda's synthesis dicts."""
+    cover = {"image_url": "https://averagejoematt.com/generated/editorial/chronicle/week-01.jpg", "image_credit": "Unsplash / Y"}
+    installment = {
+        "title": "The weight of a steady week",
+        "week_number": 1,
+        "date": "2026-07-01",
+        # no "sk" key — the pre-fix shape
+        "stats_line": "Weight 298 lb",
+        "word_count": 10,
+        "content_markdown": "It was a quiet week.",
+        "has_board_interview": False,
+    }
+    entry = _publish_and_get_manifest_entry(monkeypatch, [installment], cover)
+    assert entry["image_url"] == ""

@@ -1470,7 +1470,9 @@ TOOLS = {
                     },
                     "channel": {
                         "type": "string",
-                        "description": "Capture channel the line came from (journal | video_diary | solo_recording). Default journal.",
+                        "enum": ["journal", "video_diary", "solo_recording"],
+                        "description": "Capture channel the line came from (journal | video_diary | solo_recording). Default journal. "
+                        "#1806: any other value is coerced to 'journal' server-side.",
                     },
                     "sk": {"type": "string", "description": "Exact record sk (from list) — alternative selector for unmark."},
                 },

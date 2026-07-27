@@ -481,3 +481,56 @@ def test_journal_post_ref_tie_safe_with_sk(monkeypatch):
     # date-only callers keep the legacy first-occurrence behavior
     seq_c, _, _ = cr.journal_post_ref("2026-07-11", insts, 0, _g=_g)
     assert seq_c == 2
+
+
+# ── #1805: tombstoned journal permalinks must 301 at the edge, never serve their
+# raw JSON tombstone marker at HTTP 200. register_permalink_redirect keeps
+# redirects.map (the source of truth for the CloudFront edge function) in sync
+# with every future archive-and-tombstone, hermetically — never touches the real
+# repo redirects.map or CloudFront. ─────────────────────────────────────────────
+
+
+def test_register_permalink_redirect_appends_when_absent(tmp_path, monkeypatch):
+    rmap = tmp_path / "redirects.map"
+    rmap.write_text("/about/\t/story/about/\n", encoding="utf-8")
+    monkeypatch.setattr(handler, "REDIRECTS_MAP_PATH", rmap)
+    added = handler.register_permalink_redirect("/journal/posts/week-04/", "/story/journal/", apply=True)
+    assert added is True
+    text = rmap.read_text(encoding="utf-8")
+    assert "/journal/posts/week-04/\t/story/journal/\n" in text
+    assert text.startswith("/about/\t/story/about/\n")  # existing content untouched
+
+
+def test_register_permalink_redirect_noop_when_already_present(tmp_path, monkeypatch):
+    rmap = tmp_path / "redirects.map"
+    rmap.write_text("/journal/posts/week-04/\t/story/journal/\n", encoding="utf-8")
+    monkeypatch.setattr(handler, "REDIRECTS_MAP_PATH", rmap)
+    before = rmap.read_text(encoding="utf-8")
+    added = handler.register_permalink_redirect("/journal/posts/week-04/", "/story/journal/", apply=True)
+    assert added is False
+    assert rmap.read_text(encoding="utf-8") == before  # untouched, not duplicated
+
+
+def test_register_permalink_redirect_noop_on_dry_run(tmp_path, monkeypatch):
+    rmap = tmp_path / "redirects.map"
+    rmap.write_text("/about/\t/story/about/\n", encoding="utf-8")
+    monkeypatch.setattr(handler, "REDIRECTS_MAP_PATH", rmap)
+    added = handler.register_permalink_redirect("/journal/posts/week-05/", "/story/journal/", apply=False)
+    assert added is False
+    assert rmap.read_text(encoding="utf-8") == "/about/\t/story/about/\n"  # untouched
+
+
+def test_register_permalink_redirect_handles_missing_file(tmp_path, monkeypatch):
+    rmap = tmp_path / "does_not_exist.map"
+    monkeypatch.setattr(handler, "REDIRECTS_MAP_PATH", rmap)
+    added = handler.register_permalink_redirect("/journal/posts/week-04/", "/story/journal/", apply=True)
+    assert added is False  # fail-soft, no crash
+    assert not rmap.exists()
+
+
+def test_curate_prelaunch_leadins_reuses_the_same_helper():
+    """curate_prelaunch_leadins imports restart_chronicle_handler as `handler` and
+    must call the SAME register_permalink_redirect (not a parallel copy) so the
+    two call sites (#1805 step 2a/2b) never drift."""
+    assert curate.handler is handler
+    assert curate.handler.register_permalink_redirect is handler.register_permalink_redirect

@@ -288,6 +288,7 @@ def _quotes_pk():
 def tool_mark_journal_quote(args):
     """Mark / unmark / list explicitly-publishable verbatim journal lines."""
     import journal_quotes as jq  # bundled shared module (#781) — the pure gate
+    import privacy_guard  # #1804: guard_version staleness — is_stale_draft/GUARD_VERSION
 
     action = (args.get("action") or "mark").strip().lower()
     if action == "list":
@@ -342,6 +343,13 @@ def tool_mark_journal_quote(args):
                     "quote": i.get("quote"),
                     "marked_at": i.get("marked_at"),
                     "grounding": i.get("grounding"),
+                    # #1804: guard_version is stamped at mark time but was never read
+                    # anywhere — surface staleness here (Matthew's private review
+                    # surface) so he can see which marks pre-date the current taboo
+                    # vocabulary. Informational only: list never withholds on this;
+                    # the actual fail-closed re-screen runs at the public serve path
+                    # (handle_journal_quotes in site_api_coach.py).
+                    "guard_stale": privacy_guard.is_stale_draft(i.get("guard_version")),
                 }
                 for i in items
             ],
@@ -432,6 +440,13 @@ def tool_mark_journal_quote(args):
     # would rotate the home slot mid-week. Preserve the original timestamp.
     _prior = next((e for e in existing if e.get("sk") == sk), None)
     marked_at = (_prior or {}).get("marked_at") or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # #1806: allowlist, not just strip/default-on-falsy — ANY value outside the
+    # 3-value enum (including a string carrying taboo content, or a caller typo)
+    # silently collapses to "journal" before it's ever written to DDB. Coercion,
+    # not refusal: channel is metadata, not the marked content itself, so a bad
+    # channel must never torpedo an otherwise-good, taboo-clean quote mark.
+    _channel = (args.get("channel") or "journal").strip().lower()
+    channel = _channel if _channel in jq.CHANNELS else "journal"
     table.put_item(
         Item={
             "pk": "USER#matthew#SOURCE#journal_quotes",  # literal (orphan-gate greppable); == _quotes_pk()
@@ -439,9 +454,9 @@ def tool_mark_journal_quote(args):
             "date": date,
             "quote": quote,
             "marked_at": marked_at,
-            "channel": (args.get("channel") or "journal").strip() or "journal",
+            "channel": channel,
             "grounding": grounding,
-            "guard_version": __import__("privacy_guard").GUARD_VERSION,
+            "guard_version": privacy_guard.GUARD_VERSION,
         }
     )
     return {

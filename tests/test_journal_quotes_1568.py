@@ -499,3 +499,119 @@ def test_1802_mark_advertises_sk_as_the_revoke_handle(fake_table):
     out = tj.tool_mark_journal_quote({"date": "2026-07-25", "quote": CLEAN_LINE, "approved": True})
     assert out.get("status") == "marked"
     assert f"sk='{out['sk']}'" in out["revoke"]
+
+
+# ── #1804: guard_version staleness is retroactively enforced at SERVE time ────
+# guard_version was stamped at mark time but nothing ever read it, so the taboo
+# gate never re-applied after the vocabulary widened. handle_journal_quotes now
+# re-runs jq.find_mark_violations (the FULL vocabulary) on every serve — this
+# catches marks that predate a widening even though they cleared the narrower
+# _scrub_blocked_terms filter, which never covered the alcohol-beverage family.
+
+
+def test_1804_clean_quote_still_serves_normally(coach_module):
+    """No regression: a genuinely clean, verified quote keeps serving."""
+    sc, ft = coach_module
+    ft.put_item(
+        Item={
+            "pk": QUOTES_PK,
+            "sk": jq.quote_sk("2026-07-21", CLEAN_LINE),
+            "date": "2026-07-21",
+            "quote": CLEAN_LINE,
+            "marked_at": "2026-07-21T20:00:00Z",
+            "grounding": "verified",
+            "guard_version": "2026-06-28",
+        }
+    )
+    body = _body(sc.handle_journal_quotes({"queryStringParameters": None}))
+    assert body["count"] == 1
+    assert body["quotes"][0]["quote"] == CLEAN_LINE
+
+
+def test_1804_serve_withholds_a_verified_quote_only_the_widened_gate_catches(coach_module):
+    """A stored quote clean under the OLD narrow _scrub_blocked_terms list (it
+    only blocks marijuana/porn-family terms, never the alcohol-beverage family)
+    but caught by jq.find_mark_violations (SUBSTANCE_EXTRA) must be withheld at
+    serve time — proving the re-screen is retroactive, not just mark-time."""
+    sc, ft = coach_module
+    beer_quote = "We split a bottle of wine and just talked for hours."
+    assert jq.find_mark_violations(beer_quote)  # sanity: the wide gate catches it
+    ft.put_item(
+        Item={
+            "pk": QUOTES_PK,
+            "sk": jq.quote_sk("2026-07-21", beer_quote),
+            "date": "2026-07-21",
+            "quote": beer_quote,
+            "marked_at": "2026-07-21T20:00:00Z",
+            "grounding": "verified",
+            "guard_version": "2026-06-28",  # stamped BEFORE the family was widened
+        }
+    )
+    body = _body(sc.handle_journal_quotes({"queryStringParameters": None}))
+    assert body["quotes"] == [] and body["featured"] is None
+
+
+def test_1804_guard_version_bumped_and_stale_check_is_true_for_old_stamp():
+    assert privacy_guard.GUARD_VERSION == "2026-07-26"
+    assert privacy_guard.is_stale_draft("2026-06-28") is True
+    assert privacy_guard.is_stale_draft(privacy_guard.GUARD_VERSION) is False
+
+
+def test_1804_new_marks_stamp_the_current_guard_version(fake_table):
+    out = tj.tool_mark_journal_quote({"date": "2026-07-25", "quote": CLEAN_LINE, "approved": True})
+    assert out.get("status") == "marked"
+    assert fake_table.store[(QUOTES_PK, out["sk"])]["guard_version"] == privacy_guard.GUARD_VERSION
+
+
+def test_1804_list_surfaces_guard_staleness_informationally(fake_table):
+    """list is Matthew's private review surface — it must show guard_stale but
+    never withhold (unlike the public serve path)."""
+    fake_table.put_item(
+        Item={
+            "pk": QUOTES_PK,
+            "sk": jq.quote_sk("2026-07-20", "An old marked line from before the widening."),
+            "date": "2026-07-20",
+            "quote": "An old marked line from before the widening.",
+            "marked_at": "2026-07-20T20:00:00Z",
+            "grounding": "verified",
+            "guard_version": "2026-06-28",
+        }
+    )
+    out = tj.tool_mark_journal_quote({"action": "list"})
+    assert len(out["quotes"]) == 1
+    assert out["quotes"][0]["guard_stale"] is True
+
+
+# ── #1806: channel is allowlisted, never free text, fail-closed to "journal" ──
+
+
+def test_1806_video_diary_channel_survives_mark_and_serve_unchanged(fake_table):
+    out = tj.tool_mark_journal_quote({"date": "2026-07-25", "quote": CLEAN_LINE, "approved": True, "channel": "video_diary"})
+    assert out.get("status") == "marked"
+    assert fake_table.store[(QUOTES_PK, out["sk"])]["channel"] == "video_diary"
+    shaped = jq.shape_public(fake_table.store[(QUOTES_PK, out["sk"])])
+    assert shaped["channel"] == "video_diary"
+
+
+@pytest.mark.parametrize("bad_channel", ["<script>alert(1)</script>", "beer o'clock", "  ", "SOLO_RECORDING "])
+def test_1806_unknown_or_malicious_channel_coerces_to_journal(fake_table, bad_channel):
+    out = tj.tool_mark_journal_quote({"date": "2026-07-25", "quote": CLEAN_LINE, "approved": True, "channel": bad_channel})
+    assert out.get("status") == "marked"
+    stored_channel = fake_table.store[(QUOTES_PK, out["sk"])]["channel"]
+    assert stored_channel in jq.CHANNELS
+    if bad_channel.strip().lower() not in jq.CHANNELS:
+        assert stored_channel == "journal"
+
+
+def test_1806_shape_public_coerces_legacy_out_of_enum_channel_to_journal():
+    """Defense-in-depth for rows written BEFORE the mark-time allowlist fix
+    (simulated pre-fix legacy data with a raw free-text channel value)."""
+    shaped = jq.shape_public({"date": "2026-07-21", "quote": CLEAN_LINE, "marked_at": "x", "channel": "some-legacy-garbage"})
+    assert shaped["channel"] == "journal"
+
+
+def test_1806_registry_schema_enums_the_channel_property():
+    from mcp import registry
+
+    schema = registry.TOOLS["mark_journal_quote"]["schema"]["inputSchema"]
+    assert schema["properties"]["channel"].get("enum") == ["journal", "video_diary", "solo_recording"]
