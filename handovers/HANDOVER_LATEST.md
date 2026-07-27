@@ -1,134 +1,154 @@
-# HANDOVER — CI-trust repair + sweep-P3 paydown + genesis Day-1 + the rollback net's first real firings — 2026-07-26/27 (overnight-spanning session)
+# HANDOVER — Day-1 continuation + diary-360 chain complete + the backlog PM upgrade lands — 2026-07-27 (day session)
 
-> Instruction thread: **solo fable session, owned main** — four workstreams in order:
-> (1) Day-1 morning duties, (2) CI-trust repair (#1847/#1849/#1848 + the #1345 drill)
-> BEFORE any merge wave, (3) the 21 open sweep-P3s delegated in clusters, (4) queue if
-> headroom. Standing approval: all merges, Deploy-gate approvals, deploys incl.
-> deploy_all; CDK via Matthew's `!`. The session started Sunday evening (genesis eve),
-> the laptop slept overnight mid-queue, and it resumed into genesis morning — the wrap
-> covers both halves.
+> Instruction thread: **solo fable session, owned main** — (1) Day-1 experiment watches,
+> (2) infra pair #1858/#1859, (3) queue paydown (diary-360 chain, #1396, gate checks on
+> #1655/#1543/#1402), (4) #1653 only-if-quiet. Standing approval: all merges, Deploy-gate
+> approvals, deploys incl. deploy_all; CDK via Matthew's `!`. **Mid-session Matthew added
+> epic #1863 (backlog PM upgrade)** — worked #1865→#1866→#1869 + the #1864→#1871 docs
+> lane + #1867/#1868/#1870, leaving only the two Later stories. #1653 was explicitly
+> dropped (not a quiet day). Sub-issues question: ratified `## Stories` task lists over
+> `gh --parent` (task lists already give computable progress; a second linkage mechanism
+> would drift; door stays open as a cheap later chore).
 
-## The headline: the record was wrong, twice, and the rollback net came alive
+## The headline: 14 PRs + a 64-issue corpus surgery, and the backlog now ranks itself
 
-1. **The 07-26 "rollback non-fire" actually reverted 50 of 99 lambdas** (incl. MCP,
-   withings-ingestion, chronicle, cost-governor). The wrap had read the FIRST interleaved
-   per-function summary ("0 succeeded, 1 failed"); the job's final tally read **50/49**.
-   The fleet ran mixed-version 00:12→01:33Z on genesis eve. Repaired same-hour by a full
-   fleet redeploy once found; INCIDENT_LOG P2 correction row + memory
-   `reference_rollback_partial_fires_mixed_fleet`.
-2. **#1847+#1849 were ONE bug and the filed theory was wrong.** Runs died at the same
-   test: #1796's `LastEvaluatedKey` pagination never terminates against a blanket
-   MagicMock table — memory balloons (16GB observed) until the hosted runner OOM-kills
-   ("runner has received a shutdown signal"). The 16s approval correlation was
-   coincidence. Fix: DDB-shaped mock + 100-page hard bound (fc18f0c2). **Suite:
-   45min+/never-completing → ~2.5 min (7,632 passed).** Durations budget note in
-   TESTING.md. Memory `reference_magicmock_pagination_oom_runner_shutdown`.
-3. **The seeded rollback net fired its FIRST true mass firing** (07-27 16:16Z):
-   a deploy_all smoke FAIL → **98/99 clean reverts** through the #1848-seeded artifacts
-   (1 fail: email-subscriber, us-east-1 — script region-hardcoded). Machinery perfect;
-   the signal was another honest-check-wrong-threshold: qa-smoke's dashboard freshness
-   used a 4h window against a 1x-daily (17:00 UTC brief) writer. Window fixed 4h→26h
-   (b79469ff), fleet restored via deploy_all on tip — **final run: Deploy+Smoke+visual-QA
-   all green, rollback skipped; all 24 live integration tests pass locally** (the run's
-   I1/I2/I5 red = runner-side STS OIDC ETIMEDOUT, not the platform).
+**Main-green repair, zero deploys:** the wrap's decoded red (deploy_all-4 I1/I2/I5,
+runner-side STS OIDC ETIMEDOUT) cleared via `gh run rerun --failed` — transient confirmed,
+no fleet cycle spent.
 
-## What shipped — all merged AND live (fleet uniform on 3ef67571-era code, 17:05Z stamps)
-
-**CI-trust (direct to main):** fc18f0c2 (OOM fix + fleet-deploy artifact seeding),
-5d36b4a9 (rollback three-way tally + mixed-version warning), f64c75b0 (journal
-featured-week PT-clock time bomb — failed every Sunday 17-24 PT on UTC runners),
-39f01e88-class graces extended (dashboard-ahead + absent-character-sheet WARN in the
-shared pre-start/Day-1 window), b79469ff (26h freshness), 964cf9cc (concurrency group
-v2→v3 — the phantom stuck queue recurred), 82552827 (#1345 drill_smoke dispatch hook).
-#1847/#1849 CLOSED; #1848 CLOSED (core proven; residuals → **#1859**).
-
-**Sweep-P3 paydown: 21/21 closed** via 7 reconcile-ritual squash-merges (each round:
-sync-literals-on-branch → linearize → merge; combined suite green every round):
-- PR #1853 docket/dossier (#1798 pair-scoped keys, #1799 split pagination, #1800 PII
-  screen, #1801 deterministic throttle) · PR #1852 journal/chronicle (#1803 cover sk,
-  #1804 guard_version re-screen, #1805 tombstone redirects, #1806 channel enum) ·
-  PR #1851 milestones (#1808 Mifflin-fallback disclosure, #1809 vacuous garmin zone-2
-  extractor + SCHEMA.md truth, #1810 return-date honesty) · PR #1850 ops (#1816 region
-  summary, #1817 STACK_FILE_REGION parity test) · PR #1855 privacy/AI (#1789 ADR-141 §4
-  takeaway carve-out + deterministic screen; #1830 Horizons grounding gate) · PR #1856
-  coach (#1791 correction cycle-provenance, #1792 observatory beta_param) · PR #1854 site
-  (#1821 cohort cache TTL, #1823 theme-river wired into sync_site_to_s3, #1825 replicator
-  permanent dedup). Plus **#1814** fixed directly (ADR-058 phase stamps on
-  habit/day-grade writers, both copies; leaked 07-25/26 rows backfilled + re-stamped
-  after the reverted brief clobbered them once).
-
-**#1708 shipped (PR #1857) → epic #1686 CLOSED** — prescription reactions enrich the
-journal via the existing #1577 sweep (channel provenance, no second pipeline) + a
-deterministic reaction ledger calibrates future Horizons picks (counts/rates + n, no LLM
-numbers, private-by-default, fail-closed publishability door with no caller yet).
-
-**Genesis Day-1 (all verified live):** day_n=1/pre_start-gone flip ✓ · **real weigh-in
-321.09 lbs superseded the 317.61 override honestly** (DDB profile + S3 configs + regenerated
-constants + game-page/home rebakes; the FROZEN prereg deliberately keeps 317.61 — frozen
-artifacts don't get rewritten, claims grade against real data) · restart_verify 11/13
-(character sheet computes tomorrow; graced) · 17:00 brief SENT (the #1694 baseline-freshness
-gate correctly flagged the reverted coach citing stale numbers — advisory; heals now the
-fleet has 321.09) · milestone first sweep **baseline-quiet** (re-baselined ledger held; the
-≤5-recipient warning is the standing owner task) · first nudge quiet-honest · ai_validator
-fail-closed an empty coach output.
+**Shipped — every PR verified on-branch, squash-merged locally, full suite green each
+round (suite grew 7,632 → 8,141 tests):**
+- **#1858** (PR #1860, c9b0c28f) — IAM cycle-read audit: 7 roles granted scoped
+  `ssm:GetParameter` on experiment-cycle (milestone-digest was the observed AccessDenied;
+  site-api-ai/insight-email-parser verified correctly excluded — their paths never invoke
+  `read_cycle()`). **NEEDS Matthew's CDK one-liner** (below).
+- **#1859** (PR #1862, 55547f4a) — rollback-net residuals: per-function region from
+  lambda_map (email-subscriber us-east-1 revert now resolves; S3 stays pinned us-west-2),
+  fleet-push rollback rebuilds its matrix from lambda_map (was 0/0/0 twice on 07-27).
+  Tally semantics fc18f0c2/5d36b4a9 preserved byte-identical.
+- **Diary-360 chain COMPLETE (#1841–#1846):** claims ledger (PR #1861 — LLM-proposes/
+  code-admits into the ONE prediction grader, consent is-True fail-closed) · vocal
+  biomarkers (PR #1875 — pure SRT→6 metrics, SET-only guarded writes, driver-side mypy
+  union-attr fix on the branch) · diary-day intervention variable (PR #1877 — explicit-0
+  daily count + one idempotent code-registered hypothesis) · channel-divergence prereg
+  (PR #1882 — **sealed + published + SHA-verified live** at
+  /experiments/prereg/spoken-vs-typed-divergence_2026-07-27.json) · cut→engagement loop
+  (PR #1885 — GoodhartViolation fail-closed purpose enum + **import-graph test: nothing
+  under mcp/ or lambdas/coach/ may import engagement** — the interviewer is
+  engagement-blind by CI-enforced construction) · consent-gated diary shelf (PR #1886 —
+  `/story/diary/` + `/api/diary_shelf`, **deploy order honored**: site-api deployed and
+  verified live BEFORE the site push; serving the honest empty state, withheld:1).
+- **#1396** (PR #1874, 0c934047) — calibration engine as an open artifact:
+  `oss/calibration-core/` (MIT, zero deps, Python↔JS bit-parity incl. CPython banker's
+  rounding in BigInt) + `/method/grade-your-coach/` live (site-deploy + visual-QA green).
+  **OSS repo publication = owner one-liner in PR #1874's body.**
+- **Epic #1863 backlog PM upgrade — Now+Next COMPLETE:** ADR-099 amendment (PR #1876 —
+  canonical score line, body shapes, closure contract, backfill decision recorded
+  verbatim) · label census + prio derivation (PR #1878) · doc-drift repair + PR-template
+  Outcome line (PR #1879) · `backlog_next.py` + shared `backlog_contract.py` (PR #1880 —
+  verified live) · /uplevel rewired onto the stored rank (PR #1881 — "fresh discovery
+  outranks backlog replay" preserved verbatim) · hygiene linter advisory (PR #1883 —
+  231-violation honest baseline) · wrap gates (e7)/(e8)/(e9) (PR #1884) · **#1868 corpus
+  backfill (no PR — 60 issue bodies, 226→1 violations, zero information destroyed by
+  programmatic check, 32 authored-at-backfill Outcome lines provenance-stamped in-body)**.
+  Remaining: **#1872** (blocking flip, Later — deliberately settling per ADR-108 pattern)
+  + **#1873** (closed-epic comments, Later).
 
 ## Verified
-Combined suite after every merge round; final tree 7,632 passed / 172s + black/ruff 6-dir
-clean. deploy_all-4 (30286473574): Deploy ✓ Smoke ✓ visual-QA ✓ rollback skipped; 24/24
-live integration tests pass locally (i3/i9/i13/i16 had been mixed-fleet symptoms). Fleet
-LastModified uniform 16:57–17:05Z. CloudFront v4-redirects updated+published (function
-LIVE-stage test returns 301) — but see the CDK item below.
+Full suite after every merge round (final 8,141 passed / ~2.5m) + 6-dir black/ruff each
+round. Site deploys ×2 green incl. visual-QA (calibration page, diary shelf). site-api
+deployed direct + `/api/diary_shelf` verified live pre-push. Prereg SHA matches live.
+`backlog_next.py`/`check_backlog_hygiene.py` exercised live at wrap. Day-1 watches all
+healthy (below).
 
-## Gotchas (durable → memory, already written)
-- Rollback per-function summaries interleave — read the JOB tally + sweep LastModified.
-- "Runner shutdown signal" = check the LAST test printed for a mock-fed OOM before
-  believing an event correlation.
-- Freshness windows must encode the WRITER's cadence, not the checker's cron position
-  (weight-null, dashboard-4h — same family, two firings).
-- The concurrency-group phantom queue recurred (v3 salt now); a push supersedes any
-  PENDING run — dispatch deploy_all only when nothing else will push, and expect a
-  laptop sleep to freeze watchers mid-chain.
-- The reverted brief's put_item clobbered backfilled phase stamps once — re-stamped;
-  self-healing now #1814 code is fleet-wide.
+## Day-1 watches (WS1) — verified live
+Docket honest-empty (`/api/coach_docket` live; ensemble digest LLM correctly
+paused-by-tier-2, deterministic fallback, 0 disagreements → no opens possible — expected)
+· dossier's first real render through #1853's pair-scoped keys + PII screen (6
+commitments, 0 withheld, not degraded) · #1840 AC4 both halves (`channel: video_diary`
+stamped; diary reaction fail-closed private, nothing leaked; conversational lane honestly
+paused_by_budget) · coach-nudge hourly quiet-honest · youtube poller healthy, no upload
+yet · **remediation cron DID fire 16:48Z** (~2h schedule drift, not a second miss).
+Pending (event-gated): evening intake 03:00Z, first calibration write (nothing resolved
+yet — 0 evaluable predictions on Day 1), youtube first capture, Tuesday's first character
+sheet + brief citing 321.09 without the advisory.
+
+## Deploy state — the ONE load-bearing dependency
+**Main is code-green but Plan reds by design (R8-ST6)** on every push until the #1858 IAM
+diff deploys — which also means **CI's Deploy job never ran today: the day's lambda
+changes are stranded on main, undeployed** (MCP bundle + diary_claims, coach-prediction-
+evaluator, daily-metrics-compute, weekly-correlation-compute, hypothesis-engine,
+youtube-social-ingestion). Nothing is broken — the live fleet runs yesterday's verified
+code; the new features are dormant until deployed. **Sequence: Matthew runs the CDK
+one-liner → Plan clears → dispatch `deploy_all=true` + approve → fleet current.**
+Site + site-api are NOT stranded (deployed today, live current).
+
+## Gotchas (durable → memory, written)
+- **An undeployed IAM merge strands every subsequent CI deploy** — R8-ST6 diffs against
+  the DEPLOYED stacks, so Plan reds on all later pushes and Deploy never runs. Land IAM
+  merges adjacent to their CDK deploy, or accept a stranded-deploy window closed by
+  deploy_all after the gate clears.
+- **Never run the wholesale `capture_api_schemas.py` against a freshly-reset platform** —
+  it rewrites all ~118 baselines from live shapes; Day-1-empty responses would codify
+  reset-era shapes. The `/api/diary_shelf` exemption deliberately stands until data
+  stabilizes (stated deviation from PR #1886's post-merge note).
+- `git add -u` swept `.claude/settings.local.json` into the #1861 commit (benign
+  permission lines; explicit-path staging reaffirmed) · stale `cdk/_bundle_staging/` reds
+  local 6-dir ruff (git-ignored; rm -rf) · zsh doesn't word-split unquoted vars (a
+  conflict-resolution loop passed a two-file list as one pathspec).
 
 ## Wrap gates
-**Build beat:** `2026-07-27-the-net-fires` (see beats.json).
-**Docs:** TESTING.md (durations budget), INCIDENT_LOG.md (P2 correction + P3 first-firing
-rows), docs/engines/CHARACTER.md (Day-1 baseline re-verify stamp), SCHEMA.md (via #1851),
-DECISIONS.md (ADR-141 §4 amendment via #1855); wiki checkers green at commit.
-**Decisions:** ADR-141 §4 amendment filed (in PR #1855) — no new ADR needed; the
-freshness-window and rollback-tally changes are implementation posture, recorded in
-INCIDENT_LOG + CONVENTIONS-adjacent memory.
-**Main:** red — deploy_all-4's I1/I2/I5 job hit runner-side STS OIDC ETIMEDOUT (8 retries,
-45 min); every deploy-bearing gate green and the same integration suite passes locally
-24/24; production healthy + current.
-**Incidents:** 2 rows added — (P2) the 07-26 partial-rollback record correction (50/99
-reverted, mixed fleet ~1h20m); (P3) the net's first true mass firing (98/99 clean reverts
-on the 4h-window false positive).
+**Build beat:** `2026-07-27-grade-your-own-coach` (see beats.json).
+**Docs:** carried in-PR (SCHEMA ×3, DECISIONS ×2, CONVENTIONS ×2, CONTINUITY, TESTING,
+uplevel/CLAUDE/CONTRIBUTING rewire, DIARY_STUDIO_KIT new); wrap adds none beyond.
+**Decisions:** ADR-099 amendment filed (#1865, PR #1876) + the #1324-addendum correction
+(#1871); no further ADR needed — remaining choices were implementation posture.
+**Main:** red — R8-ST6 IAM-review gate only (code-green; every test/lint gate green;
+clears on the owner CDK deploy below).
+**Incidents:** 1 row added — budget governor tier 1→2 (by-design band crossing under the
+ADR-133 July window; ensemble/reader AI paused; self-resolves 08-01).
+**Closures:** #1858 #1859 #1841 #1842 #1843 #1844 #1845 #1846 #1864 #1865 #1866 #1867
+#1868 #1869 #1870 #1871 #1396 all carry the (e8) Shipped/Outcome comment (partial where
+live evidence awaits the stranded deploy or an owner step — never an unverified
+"realized"). Scope = this session's closures only; the overnight session's same-UTC-day
+closures predate the contract and stay per the going-forward rule.
+**Backlog:** Now 2 actionable stories + 1 chore (promoted #1741, #1840, #1653 by stored
+rank; their score-line milestones parity-updated). Next is exhausted — #1114 is
+owner-gated in practice (pick on PR #1768). Triage labels added per body evidence: #1187
+gate:owner, #1739/#1740 blocked:dep. No stale Later issues (oldest touched 9d ago).
+`now_liveness` still prints 1 — honest structural shortfall, reported not hidden. The 2
+`score_line_canonical` advisories (#1677/#1679) are float-tolerance artifacts — a
+one-line tolerance widen is noted for #1872.
 **Stash/hooks:** clean.
 **Labels:** OK.
 
 ## Residual / next picks
-- **Owner, one line each:** `bash deploy/cdk_deploy.sh LifePlatformWeb` (activates the
-  `/journal/posts/week-*` redirect association — until then the 3 tombstone URLs still
-  200; #1805 comment has detail) — not-work — owner-run CDK per standing rule.
-- **#1858** IAM: cycle-read grant for read_cycle callers (digest logged AccessDenied,
-  fail-softed correctly); needs role_policies + CDK deploy.
-- **#1859** rollback-net residuals: us-east-1 revert + empty matrix on push-fleet runs.
-- **#1345** left open for the owner's call: does the real 98/99 firing satisfy the drill
-  AC, or should the quarterly ritual still run the synthetic (`drill_smoke=true` dispatch
-  after a qa-smoke-only touch commit — hook is live)?
-- Day-2 watches: first character sheet (computes tomorrow for today), first docket/dossier
-  writes, first calibration write, youtube first capture, #1840 AC4 diary stamp, Wednesday
-  remediation cron (Monday's 14:45Z never fired — GitHub schedule drift; shadow mode) —
-  not-work — standing owner/next-session ritual.
-- Queue if next session has headroom: diary-360 in order **#1841** → **#1842**/**#1843** →
-  **#1844** → **#1845**/**#1846** (opus) · **#1396** calibration artifact (opus) ·
-  **#1402** Broadcast (opus, gated on #1619 Phase-0 — check first) · **#1653** packaging
-  (opus, LAST-merge-of-a-quiet-day, solo wave by design).
-- Owner asks, no urgency: digest recipients 1→5-8 + reply_to (**#1623** note; the WARN
-  fired live today) · **#1738** TTS listen · **#1571** AC4 phone test · **#1114** pick on
-  PR #1768 · Dependabot **#1778**/**#1779**/**#1780** verdicts posted — not-work — each
-  needs Matthew's coordinated step.
-- Budget: tier 1 at session close (July temp ceiling $115; internal/dev AI paused) —
-  not-work — governor behaving as designed, self-resolves 08-01.
+- **Owner, one line (LOAD-BEARING — unblocks the whole deploy chain):**
+  `bash deploy/cdk_deploy.sh LifePlatformCompute LifePlatformEmail`
+  then tell the session (or next session) to dispatch `deploy_all=true` + approve —
+  not-work — IAM deploys are Matthew's hard boundary.
+- **Owner, when ready:** publish the OSS repo (one-liner in PR #1874 body) — not-work —
+  creating a public repo is Matthew's call · studio-side `PUBLISH_LOG.md` entry column
+  (#1845's kit doc has the paste-in) — not-work — file lives outside the repo.
+- **#1872** flip hygiene linter to blocking + delete check_story_labels.py (Later — let
+  the corpus settle; also consider the 0.375 tolerance widen) · **#1873** closed-epic
+  closing comments (Later).
+- Vocal-metrics backfill first --apply run against the studio SRTs (#1842's script;
+  dry-run verified) — not-work — local run against the private studio dir, Matthew's
+  laptop session.
+- Day-2 watches: first character sheet (Tue), Tuesday brief cites 321.09 with NO
+  freshness advisory, first docket open once tier <2 or a real disagreement, first
+  calibration write, evening intake, youtube first capture, Wednesday remediation cron —
+  not-work — standing observation ritual.
+- Standing alarms (#1329 checklist): budget tier 2 until 08-01 (governor by-design; the
+  $85 AWS Budgets backstop deliberately still fires) — not-work — self-resolves; next
+  MCP key rotation 2026-10-05 — not-work — dated owner ritual. No aged remediation
+  needs-human items (Mon run was clean).
+- Queue seeds for next session: `python3 scripts/backlog_next.py` — #1741 (3.00, opus),
+  #1840 (2.00, sonnet), #1653 (0.75, chore, solo-wave-by-design).
+- Gate:owner set unchanged: #1631 #1629 #1622 #1570 #1407 #1388 #1383 #1768 #1187 +
+  digest recipients (#1623) · #1738 listen · #1571 phone test · #1114 pick · Dependabot
+  #1778/#1779/#1780 — not-work — each needs Matthew's coordinated step.
+
+Full narrative of the prior overnight session:
+`git show origin/session-archive:handovers/HANDOVER_2026-07-26_CI-trust-genesis-day1-rollback-net.md`

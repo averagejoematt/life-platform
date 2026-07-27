@@ -1863,6 +1863,37 @@
         }
       ],
       "why_it_mattered": "A detect-and-revert safety story is documentation until it fires. Today it fired — imperfectly triggered, perfectly executed — and every imperfection it exposed (the misread tally, the checker-shaped threshold, the unseeded artifacts) is now a fixed thing with a test or a ledger row, not a latent assumption. The experiment itself starts on the same honesty: the baseline is the number the scale said on Day 1, not the placeholder."
+    },
+    {
+      "id": "2026-07-27-grade-your-own-coach",
+      "date": "2026-07-27",
+      "title": "Grade your own LLM coach: the calibration engine becomes an open artifact — and the diary becomes a loop, not a pipe",
+      "shipped": "Day 1's afternoon session shipped the platform's grading math as a standalone open package: Brier score, reliability curve, and skill-vs-base-rate, extracted with zero dependencies and proven bit-identical across the deployed Python grader, the vendored copy, and a browser JavaScript port — down to reimplementing CPython's banker's rounding in BigInt because Math.round disagrees on ties. The live page (/method/grade-your-coach/) computes entirely in the browser: paste any coach's predictions and outcomes, get the same scorecard Matthew's coaches get, with his public ledger as the demo — honestly showing 'insufficient data' on day 1 of cycle 11 because every fresh prediction is still pending. The same session closed the diary-360 chain: on-tape claims now enter the same prediction grader as the coaches' (an LLM may propose a claim, only deterministic code admits it, and consent is per-claim), whisper transcripts yield deterministic vocal metrics (words per minute, pause rate, filler rate — no model anywhere), diary-days became a testable intervention variable, the spoken-vs-typed hypothesis was pre-registered and sealed before the data exists, and a consent-gated diary shelf went live showing exactly what was cleared and honestly counting what wasn't.",
+      "gotcha": "One merged-but-undeployed IAM change turned out to hold the entire deploy pipeline hostage: the safety gate that demands human review of permission changes diffs against what's deployed, not what's merged — so every later push stayed red at the planning step and six functions' worth of new code sat stranded on main while the live fleet kept running yesterday's verified code. The fix is sequencing, not code: land permission changes next to their deploy, or accept the stranded window and close it with one fleet redeploy.",
+      "honest_miss": "The open-source repo itself isn't published yet — the package sits in-tree with a one-command publication step waiting on a human decision. And the day's lambda-side features (the claims grader, the diary metrics) are dormant until that same stranded deploy chain clears: merged, tested, and not yet live.",
+      "prs": [
+        {
+          "label": "PR #1874",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1874"
+        },
+        {
+          "label": "PR #1861",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1861"
+        },
+        {
+          "label": "PR #1875",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1875"
+        },
+        {
+          "label": "PR #1882",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1882"
+        },
+        {
+          "label": "PR #1886",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1886"
+        }
+      ],
+      "why_it_mattered": "Every wearable ships an LLM coach; none publishes whether the advice worked. Opening the exact grading math — reproducible by a third party against their own coach — is the credibility moat made concrete, and pre-registering the diary's core hypothesis before the data exists is the same honesty pointed inward."
     }
   ]
 }
