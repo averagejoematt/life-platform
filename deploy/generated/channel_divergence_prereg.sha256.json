@@ -1,0 +1,12 @@
+{
+  "artifact": "channel_divergence_prereg.json",
+  "experiment_id": "spoken-vs-typed-divergence_2026-07-27",
+  "algorithm": "sha256",
+  "sha256": "57639f71362de1cb929c1dfc56d5a57251bb5e65977809a48d7c9c08420b8381",
+  "frozen_registered_at": "2026-07-27T20:00:00+00:00",
+  "stamped_at": "2026-07-27T20:24:34.073710+00:00",
+  "stamp_note": "Hash stamped at registration time.",
+  "public_artifact_url": "https://averagejoematt.com/experiments/prereg/spoken-vs-typed-divergence_2026-07-27.json",
+  "public_stamp_url": "https://averagejoematt.com/experiments/prereg/spoken-vs-typed-divergence_2026-07-27.sha256.json",
+  "verify": "curl -s https://averagejoematt.com/experiments/prereg/spoken-vs-typed-divergence_2026-07-27.json | shasum -a 256"
+}

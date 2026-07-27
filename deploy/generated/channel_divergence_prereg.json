@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "experiment_id": "spoken-vs-typed-divergence_2026-07-27",
+  "name": "Spoken vs. Typed Channel Divergence",
+  "issue": "#1844",
+  "epic_chain": ["#1841", "#1842", "#1843"],
+  "registered_at": "2026-07-27T20:00:00+00:00",
+  "note": "FROZEN pre-registration (#1844) — never edit; delete deliberately and re-register to change.",
+
+  "claim": "The working assumption behind the video-diary investment: you say different, truer things out loud than you type. Channel provenance (entry_channel(), lambdas/flourishing.py; #1572/#1573/#1840) makes this testable now that a real second channel (video_diary / solo_recording) exists alongside typed journal entries — but only credibly if the comparison is registered before a month of data accumulates (ADR-105).",
+
+  "hypothesis": {
+    "primary": "Spoken diary entries (channel=video_diary or channel=solo_recording) differ systematically from typed entries (channel=journal) in the Haiku-coded content of what gets said — specifically in theme breadth, sentiment distribution, and concreteness — because unscripted speech reduces the self-editing that typing invites.",
+    "directional": [
+      {
+        "metric": "theme_distribution",
+        "prediction": "Spoken entries show a WIDER theme distribution (more distinct enriched_themes values per entry and across the window) than typed entries.",
+        "direction": "spoken > typed",
+        "falsifiable_by": "no material difference, or typed wider, both refute this leg"
+      },
+      {
+        "metric": "sentiment_distribution",
+        "prediction": "Spoken entries skew toward a DIFFERENT enriched_sentiment mix than typed entries — no directional sign is pre-committed (the platform has no prior data on which way self-editing biases sentiment), only that the two distributions differ.",
+        "direction": "non-directional (distributional difference only)",
+        "falsifiable_by": "the two channel distributions are statistically indistinguishable"
+      },
+      {
+        "metric": "specificity",
+        "prediction": "Spoken entries carry HIGHER concrete-noun/number density than typed entries (unscripted narration reaches for specific people/places/numbers; typed entries lean more abstract/summarizing).",
+        "direction": "spoken > typed",
+        "falsifiable_by": "no material difference, or typed higher, both refute this leg"
+      }
+    ]
+  },
+
+  "why_now": "Channel provenance went live #1572 (video_diary), widened #1573 (solo_recording), and the diary-360 chain (#1841 claims ledger, #1842 vocal biomarkers, #1843 diary-day variable) just landed on main — this is the first point at which BOTH channels exist with a shared enrichment coder and enough runway to pre-register before results exist. Diary sessions started 2026-07-26; this registration lands one day later, before a single comparison-worthy window has accrued.",
+
+  "data_source": {
+    "partition": "pk USER#matthew#SOURCE#notion, sk DATE#{YYYY-MM-DD}#{...} (one item per journal entry)",
+    "channel_field": "entry_channel(entry) — lambdas/flourishing.py — prefers the entry's explicit `channel` attribute, falls back to the Notion `template` label for rows written before the channel stamp existed",
+    "channel_values": {
+      "spoken": ["video_diary", "solo_recording"],
+      "typed": ["journal"]
+    },
+    "eligibility": "an entry counts toward either group only if it carries enriched_at (i.e. it has been through journal_enrichment_lambda) — unenriched entries are excluded, not treated as zero",
+    "note": "solo_recording rows written before #1573 shipped and video_diary rows written before #1572's channel stamp classify via the template fallback in entry_channel(); this is the same fallback the rest of the platform already relies on (mcp/tools_journal.py, lambdas/flourishing.py aggregate_entries) so no new inference is introduced for this comparison"
+  },
+
+  "comparison_metrics": [
+    {
+      "id": "theme_distribution",
+      "field": "enriched_themes (list[str], per entry)",
+      "definition": "Frequency distribution of enriched_themes values, pooled per channel group over the analysis window.",
+      "comparison_method": "Chi-square (or, if any expected cell count < 5, Fisher's exact / a Monte Carlo permutation test on the pooled theme-count table) between the spoken and typed frequency tables — method choice is made at analysis time from the observed cell counts, not cherry-picked after seeing the result; both branches are declared here so neither is a post-hoc escape hatch.",
+      "descriptive_companion": "top-5 themes per channel by frequency, reported alongside the test regardless of significance (ADR-105 rule 1: every claim carries n; a null result still reports what was actually said)"
+    },
+    {
+      "id": "sentiment_distribution",
+      "field": "enriched_sentiment (categorical, per entry)",
+      "definition": "Frequency distribution of enriched_sentiment categories, pooled per channel group over the analysis window.",
+      "comparison_method": "Chi-square / Fisher's exact on the pooled sentiment-category table, same cell-count branching rule as theme_distribution."
+    },
+    {
+      "id": "specificity",
+      "field": "raw_text (per entry, the same field the enrichment coder reads)",
+      "definition": "concrete_density = (count of numeric tokens matching \\d+(\\.\\d+)? + count of capitalized non-sentence-initial tokens, as a proxy for proper/concrete nouns) / word_count × 100, computed per entry then averaged per channel group.",
+      "comparison_method": "stats_core.bootstrap_mean_diff_ci (moving-block bootstrap 95% CI on the per-entry concrete_density values, the same sanctioned mean-difference tool experiment_design.evaluate_design already uses — ADR-105's one-shared-stats-module floor) plus stats_core.cohens_d for effect size.",
+      "known_limitation": "the capitalization heuristic is a coarse proxy for concrete/proper nouns (no POS tagger in the stack); it is declared here, before analysis, precisely so it cannot be tuned after seeing which channel it favors. A stricter proxy may be substituted only via a NEW pre-registration, never a silent swap at analysis time."
+    }
+  ],
+
+  "n_floor": {
+    "per_channel": 20,
+    "channel_grouping": "spoken = video_diary + solo_recording combined; typed = journal — each group needs its own 20 enriched entries",
+    "rationale": "20 gives expected-cell-count ≥ 5 headroom for a chi-square test over a handful of theme/sentiment categories (the stats_core/experiment_design floor for a forced verdict is already MIN_POINTS_PER_ARM=5 — 20 is the target for a well-powered categorical test, not the bare minimum below which nothing runs)",
+    "absolute_floor": 5,
+    "absolute_floor_note": "below 5 per channel, no verdict is forced (mirrors experiment_design.MIN_POINTS_PER_ARM) — the analysis still runs at the trigger date/n and reports 'inconclusive: underpowered', it does not silently skip (ADR-105 rule 2: no prediction surface is write-only)"
+  },
+
+  "analysis_trigger": {
+    "rule": "run on the LATER of: (a) both channel n_floors (20/20) reached, or (b) 2026-09-24 (60 days after diary start 2026-07-26) — the later-of pattern guards against both a fast typed-only burst (n alone) and mere calendar passage without real volume (date alone)",
+    "outer_bound": "2027-01-23 (180 days after diary start) — if the n_floor still isn't met per channel by then, the analysis runs anyway on whatever n exists and is graded 'inconclusive: underpowered', never silently deferred indefinitely",
+    "diary_start_date": "2026-07-26",
+    "cadence_caveat": "diary cadence is intended to be daily but not guaranteed (per #1843's diary-day variable, a day can be skipped) — this is exactly why the trigger is n-or-date (whichever is later), not a bare calendar date"
+  },
+
+  "coder_version_gate": {
+    "coder_as_of_registration": {
+      "lambda": "lambdas/ingestion/journal_enrichment_lambda.py",
+      "model_env_default": "claude-haiku-4-5-20251001",
+      "schema_version": 2
+    },
+    "comparability_requirement": "every entry counted in either channel group must have been coded by the SAME enriched_schema_version (currently 2) — a schema bump mid-window changes what fields mean and breaks the comparison",
+    "detection_method": {
+      "schema_version_changes": "reliable and automatic: every enriched entry stamps enriched_schema_version (journal_enrichment_lambda.apply_enrichment, attribute #esv) — the analysis query groups by this field; if the window spans more than one value, entries outside the majority version are EXCLUDED from that run and the gap is reported, not silently pooled",
+      "model_swaps_without_a_schema_bump": "KNOWN GAP, stated honestly: journal_enrichment_lambda does NOT stamp the model name on the DDB item (the `model` key only appears in the outbound Bedrock request body, not in apply_enrichment's DDB writes) — a bare MODEL env-var change with no SCHEMA_VERSION bump is therefore NOT detectable from stored entries alone. At analysis time this must be checked by hand against deploy history (git log / CHANGELOG.md on lambdas/ingestion/journal_enrichment_lambda.py, restricted to the analysis window) before the comparison runs, and the check + its result are reported alongside the analysis output, not silently skipped."
+    },
+    "invalidation_rule": "if a schema_version change is found spanning the window, the analysis runs on the largest single-schema-version sub-window that still clears n_floor, and both the exclusion and its cause are stated in the published outcome; if no sub-window clears n_floor, the run is 'inconclusive: coder version drift', reported per AC4 rather than withheld"
+  },
+
+  "calibration_check": {
+    "purpose": "grade the grader (AC3): if the Haiku coder's enriched_mood does not track Matthew's own same-day self-rated mood, a channel difference in enriched_* fields could be a coder artifact rather than a real content difference — this check has to clear before the main comparison's result is read as meaningful, not after.",
+    "fields": {
+      "enriched_mood": "Haiku-coded mood_score from journal_enrichment_lambda (1-5 scale, SYSTEM_PROMPT: 'synthesized from all mood signals')",
+      "morning_mood": "Matthew's own self-rated mood, stored directly on the same USER#matthew#SOURCE#notion item (native Notion scale; NOT independently re-verified in this registration — the analysis step reads the live value range before computing anything, rather than assuming a scale here)"
+    },
+    "population": "ALL enriched days that carry both fields, pooled across every channel (this checks the coder's fidelity to self-report in general, not per-channel — the channel comparison itself is a separate, later step)",
+    "method": "stats_core.pearson_r(enriched_mood, morning_mood) with stats_core.fisher_ci for the 95% CI; minimum n = 5 (experiment_design.MIN_POINTS_PER_ARM, the same forced-verdict floor used everywhere else in the platform's N=1 statistics — no new threshold invented for this check)",
+    "threshold": "r >= 0.3 (weak-to-moderate positive association) with a 95% CI that excludes zero — clears the calibration bar",
+    "if_it_fails": "the channel-divergence result is still published (AC4: no result is withheld), but the write-up must lead with the calibration failure and downgrade the channel-comparison verdict to descriptive-only — an uncalibrated grader cannot support a directional claim about which channel is 'truer'",
+    "implementation_status": "SPECIFIED HERE, NOT IMPLEMENTED — this registration is registration only (ADR-105: the design is frozen before the data exists); the actual pearson_r/fisher_ci call is written at the analysis date, against this frozen spec, not before"
+  },
+
+  "publication": {
+    "outcome_is_graded_either_way": "per ADR-105 rule 2 (no prediction surface is write-only): 'no divergence found' and 'coder uncalibrated, inconclusive' are both publishable outcomes, exactly as much as 'divergence confirmed' — none of the three legs get a page only if they land the hoped-for direction",
+    "landing_surface": "the site's evidence/data door (/data/) — same public surface the existing #728 experiment pre-registrations link from (an experiment card + its frozen prereg artifact); no new page is built by this registration, only the frozen artifact + the deploy/CI hooks that will publish it",
+    "public_artifact_route": "generated/experiments/prereg/spoken-vs-typed-divergence_2026-07-27.json → https://averagejoematt.com/experiments/prereg/spoken-vs-typed-divergence_2026-07-27.json (same S3 namespace and CloudFront behavior #728 already serves /experiments/prereg/* from)"
+  },
+
+  "contract": "Frozen at registration, before a month of data accumulates or any analysis is run. The metrics, n floor, analysis trigger, coder-version gate, and calibration check above are what was promised; the eventual analysis is graded against this document, not against hindsight."
+}
