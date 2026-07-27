@@ -34,17 +34,19 @@ Fan out a multi-agent survey (Workflow tool; ~6–8 agents, one per lens):
   moment of boredom or confusion? What would make them come back tomorrow?
 
 Seeds come from the LIVE backlog, not a static list (ADR-099 — GitHub issues are the single
-source of truth for forward work): run the actionable-only query below (it excludes
-`gate:owner` — issues blocked on a human-only act — per ADR-099's 2026-07-18 amendment, #1339,
-so the seed set is never polluted with work no session can actually start) and treat the
-top-ranked results as candidate seeds:
+source of truth for forward work): run the ranked selector below and treat the top rows as
+candidate seeds — it's already sorted by each issue's own stored `Impact × Confidence / Effort`
+score, prints the `## Outcome` line per row, hides `gate:owner`/`blocked:*` work but counts it
+rather than silently dropping it, and falls through Now → Next → Later out loud when a
+milestone has nothing actionable (#1866, closing the failure mode ADR-099's 2026-07-18
+amendment #1339 first named):
 ```bash
-gh issue list --label type:story --milestone Now --state open --json number,title,labels --limit 30 \
-  | jq '[.[] | select(.labels | map(.name) | index("gate:owner") | not)]'
+python3 scripts/backlog_next.py
+# --milestone Next|Later|all · --model sonnet|opus|fable · --limit N · --include-blocked
 ```
-An empty result is a real, visible signal ("nothing actionable is queued in Now") rather than a
-list silently full of items no session can start — read it as a prompt to re-tier Next, not a
-bug. Agents may build on the seeds but must NOT limit themselves to them — fresh discovery
+An empty/fallen-through result is a real, visible signal ("nothing actionable is queued in Now")
+rather than a list silently full of items no session can start — read it as a prompt to re-tier,
+not a bug. Agents may build on the seeds but must NOT limit themselves to them — fresh discovery
 outranks backlog replay. When a session ships a story, the PR carries `Fixes #N`.
 
 **Then verify adversarially:** historical false-positive rate for survey findings is ~50%.
@@ -53,7 +55,13 @@ read) before it may be ranked. Discard anything that doesn't survive.
 
 ## Phase 2 — Rank and pick
 
-Score each surviving candidate:
+Start from the stored rank, don't rebuild one: backlog-seeded candidates keep the order
+`backlog_next.py` already gave them (its score, its `## Outcome` line); fresh-discovery
+candidates (found live, not in the backlog) enter unranked. Then adjust that order against the
+five axes below — they encode taste the score line can't reach — moving a candidate up or down
+from its stored position rather than replacing the position outright. State any such move in one
+clause (e.g. "#1840 moves above its 2.0 score — the schema drift it names is already shipping
+inert features").
 
 | Axis | Question |
 |---|---|
@@ -67,10 +75,10 @@ Kill on sight: decorative glow (glow is earned on live signals only), causal cla
 naming vices/substances or exposing age/genome, AI doing arithmetic (ADR-062), features bolted
 on that don't serve the loop.
 
-Present a short ranked board (top 5, one line each), **state your pick and why, and proceed** —
-don't wait for approval. Exceptions that DO pause: (a) taste-level visual identity changes —
-present options with rendered screenshots and let Matthew choose; (b) anything irreversible or
-outward-publishing.
+Present a short ranked board (top 5, one line each, flagging any move off the stored rank),
+**state your pick and why, and proceed** — don't wait for approval. Exceptions that DO pause:
+(a) taste-level visual identity changes — present options with rendered screenshots and let
+Matthew choose; (b) anything irreversible or outward-publishing.
 
 ## Phase 3 — Ship the flagship slice
 

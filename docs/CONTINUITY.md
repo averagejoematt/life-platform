@@ -198,7 +198,9 @@ archive. Conventions:
 - **Epics** carry `type:epic`; **ranked stories** carry `type:story` and link up to an
   epic. Milestones express horizon: **Now / Next / Later**.
 - A shipping PR carries `Fixes #N` so merge closes the story.
-- Seed a session from: `gh issue list --label type:story --milestone Now --state open`.
+- Seed a session from: `python3 scripts/backlog_next.py` — ranks the open corpus by each
+  issue's own stored ADR-099 score, prints its `## Outcome` line, and falls through
+  Now → Next → Later out loud when a milestone has nothing actionable (#1866).
 - Label taxonomy in use (`gh label list` — this census must match the live output, not
   drift into an intended state): `type:epic|story|bug|chore` (#1864 — `type:bug` a
   defect in shipped behavior, `type:chore` maintenance with no user-visible outcome,
