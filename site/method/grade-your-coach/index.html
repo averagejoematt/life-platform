@@ -52,9 +52,13 @@
 .gyc-verdict-h { margin: 0; font-family: var(--font-serif); font-size: var(--fs-h3); color: var(--ink); text-transform: capitalize; }
 .gyc-verdict-b { margin: var(--sp-2) 0 0; color: var(--ink-muted); line-height: var(--lh-relaxed); }
 .gyc-label { margin: var(--sp-3) 0 0; color: var(--ink-faint); }
+/* Chart ABOVE table, never beside it. A side-by-side grid here sat inside the
+   already-narrow right pane, so its minmax(0, 1fr) table track collapsed to as
+   little as 53px and clipped the `calls` column at every width — the one column
+   the copy leans on. Stacked, the table always gets the full pane width and
+   fits without scrolling at every breakpoint. */
 .gyc-chartwrap { display: grid; gap: var(--sp-4); margin-top: var(--sp-5); min-width: 0; }
-@media (min-width: 720px) { .gyc-chartwrap { grid-template-columns: minmax(0, 320px) minmax(0, 1fr); align-items: start; } }
-.gyc-chart { position: relative; min-width: 0; }
+.gyc-chart { position: relative; min-width: 0; max-width: 340px; }
 .gyc-svg { width: 100%; height: auto; display: block; }
 .gyc-plot { fill: var(--surface-sunken); stroke: var(--rule); stroke-width: 1; }
 .gyc-ideal { stroke: var(--ink-faint); stroke-width: 1; stroke-dasharray: 4 4; }
@@ -63,9 +67,12 @@
 .gyc-ax { margin: var(--sp-2) 0 0; color: var(--ink-faint); }
 .gyc-ax-y { margin-top: 0; }
 .gyc-axnote { margin-top: var(--sp-3); font-size: var(--fs-small); color: var(--ink-muted); line-height: var(--lh-relaxed); }
+/* Belt-and-braces scroller for the >820px case. Below 820px the shared .rd-tbl
+   primitive (evidence.css #1008) already turns the table into its own scroller —
+   do NOT pin a min-width here, that re-inflates the block past this wrapper and
+   re-creates the clip this is meant to prevent. */
 .gyc-tblwrap { overflow-x: auto; max-width: 100%; }
 .gyc-tblwrap:focus-visible { outline: 2px solid var(--ink-muted); outline-offset: 2px; }
-.gyc-tbl { width: 100%; min-width: 17rem; }
 .gyc-tbl th, .gyc-tbl td { white-space: nowrap; }
 .gyc-notes { margin-top: var(--sp-4); padding-top: var(--sp-4); border-top: var(--border-hair); font-size: var(--fs-small); color: var(--ink-muted); line-height: var(--lh-relaxed); }
 .gyc-rejects { margin: var(--sp-2) 0 0; padding-left: var(--sp-4); }
