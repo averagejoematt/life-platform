@@ -1,0 +1,1512 @@
+{
+  "schema": "calibration-core/test-vectors@1",
+  "issue": "https://github.com/averagejoematt/life-platform/issues/1396",
+  "note": "Shared parity fixture. `core_cases`, `confidence_cases`, `outcome_cases` and `record_cases` are generated from the deployed platform grader (lambdas/calibration_core.py) and must be reproduced EXACTLY \u2014 not within a tolerance \u2014 by the extracted Python package and the JS port. `adapter_cases` cover the paste-a-ledger input layer that only the package and the JS port have; those are generated from the package and are two-way Python <-> JS. Regenerate with scripts/gen_calibration_vectors.py.",
+  "core_cases": [
+    {
+      "id": "empty",
+      "description": "nothing resolved \u2014 every number is None, never a fabricated zero",
+      "n_bins": 10,
+      "pairs": [],
+      "expected": {
+        "n": 0,
+        "confirmed": 0,
+        "refuted": 0,
+        "accuracy_pct": null,
+        "brier": null,
+        "brier_skill": null,
+        "skilled": null,
+        "reliability_bins": [],
+        "calibration": "insufficient_data",
+        "label": "nascent",
+        "score": 30
+      }
+    },
+    {
+      "id": "single_hit",
+      "description": "one confirmed call: n<3 so the label stays nascent",
+      "n_bins": 10,
+      "pairs": [
+        [
+          0.8,
+          1
+        ]
+      ],
+      "expected": {
+        "n": 1,
+        "confirmed": 1,
+        "refuted": 0,
+        "accuracy_pct": 100.0,
+        "brier": 0.04,
+        "brier_skill": null,
+        "skilled": null,
+        "reliability_bins": [
+          {
+            "lo": 0.8,
+            "hi": 0.9,
+            "n": 1,
+            "mean_confidence": 0.8,
+            "observed_rate": 1.0
+          }
+        ],
+        "calibration": "insufficient_data",
+        "label": "nascent",
+        "score": 30
+      }
+    },
+    {
+      "id": "two_calls_degenerate_base_rate",
+      "description": "both outcomes identical \u2014 skill is undefined, not zero",
+      "n_bins": 10,
+      "pairs": [
+        [
+          0.8,
+          1
+        ],
+        [
+          0.9,
+          1
+        ]
+      ],
+      "expected": {
+        "n": 2,
+        "confirmed": 2,
+        "refuted": 0,
+        "accuracy_pct": 100.0,
+        "brier": 0.025,
+        "brier_skill": null,
+        "skilled": null,
+        "reliability_bins": [
+          {
+            "lo": 0.8,
+            "hi": 0.9,
+            "n": 1,
+            "mean_confidence": 0.8,
+            "observed_rate": 1.0
+          },
+          {
+            "lo": 0.9,
+            "hi": 1.0,
+            "n": 1,
+            "mean_confidence": 0.9,
+            "observed_rate": 1.0
+          }
+        ],
+        "calibration": "insufficient_data",
+        "label": "nascent",
+        "score": 30
+      }
+    },
+    {
+      "id": "perfect_forecaster",
+      "description": "stated 1.0/0.0 and always right \u2014 Brier 0, skill 1",
+      "n_bins": 10,
+      "pairs": [
+        [
+          1.0,
+          1
+        ],
+        [
+          1.0,
+          1
+        ],
+        [
+          0.0,
+          0
+        ],
+        [
+          0.0,
+          0
+        ],
+        [
+          1.0,
+          1
+        ],
+        [
+          0.0,
+          0
+        ]
+      ],
+      "expected": {
+        "n": 6,
+        "confirmed": 3,
+        "refuted": 3,
+        "accuracy_pct": 50.0,
+        "brier": 0.0,
+        "brier_skill": 1.0,
+        "skilled": true,
+        "reliability_bins": [
+          {
+            "lo": 0.0,
+            "hi": 0.1,
+            "n": 3,
+            "mean_confidence": 0.0,
+            "observed_rate": 0.0
+          },
+          {
+            "lo": 0.9,
+            "hi": 1.0,
+            "n": 3,
+            "mean_confidence": 1.0,
+            "observed_rate": 1.0
+          }
+        ],
+        "calibration": "well-calibrated",
+        "label": "reliable",
+        "score": 70
+      }
+    },
+    {
+      "id": "confidently_wrong",
+      "description": "the worst case \u2014 maximal confidence, always wrong",
+      "n_bins": 10,
+      "pairs": [
+        [
+          1.0,
+          0
+        ],
+        [
+          1.0,
+          0
+        ],
+        [
+          0.0,
+          1
+        ],
+        [
+          0.0,
+          1
+        ],
+        [
+          1.0,
+          0
+        ],
+        [
+          0.0,
+          1
+        ]
+      ],
+      "expected": {
+        "n": 6,
+        "confirmed": 3,
+        "refuted": 3,
+        "accuracy_pct": 50.0,
+        "brier": 1.0,
+        "brier_skill": -3.0,
+        "skilled": false,
+        "reliability_bins": [
+          {
+            "lo": 0.0,
+            "hi": 0.1,
+            "n": 3,
+            "mean_confidence": 0.0,
+            "observed_rate": 1.0
+          },
+          {
+            "lo": 0.9,
+            "hi": 1.0,
+            "n": 3,
+            "mean_confidence": 1.0,
+            "observed_rate": 0.0
+          }
+        ],
+        "calibration": "not_yet_skillful",
+        "label": "not_yet_skillful",
+        "score": 45
+      }
+    },
+    {
+      "id": "always_fifty",
+      "description": "the always-say-50% baseline \u2014 Brier 0.25 exactly",
+      "n_bins": 10,
+      "pairs": [
+        [
+          0.5,
+          1
+        ],
+        [
+          0.5,
+          0
+        ],
+        [
+          0.5,
+          1
+        ],
+        [
+          0.5,
+          0
+        ],
+        [
+          0.5,
+          1
+        ],
+        [
+          0.5,
+          0
+        ]
+      ],
+      "expected": {
+        "n": 6,
+        "confirmed": 3,
+        "refuted": 3,
+        "accuracy_pct": 50.0,
+        "brier": 0.25,
+        "brier_skill": 0.0,
+        "skilled": false,
+        "reliability_bins": [
+          {
+            "lo": 0.5,
+            "hi": 0.6,
+            "n": 6,
+            "mean_confidence": 0.5,
+            "observed_rate": 0.5
+          }
+        ],
+        "calibration": "not_yet_skillful",
+        "label": "not_yet_skillful",
+        "score": 45
+      }
+    },
+    {
+      "id": "over_confident",
+      "description": "high stated confidence, mediocre reality \u2014 the classic LLM-coach failure",
+      "n_bins": 10,
+      "pairs": [
+        [
+          0.9,
+          1
+        ],
+        [
+          0.9,
+          0
+        ],
+        [
+          0.9,
+          0
+        ],
+        [
+          0.85,
+          1
+        ],
+        [
+          0.85,
+          0
+        ],
+        [
+          0.8,
+          0
+        ],
+        [
+          0.95,
+          0
+        ],
+        [
+          0.9,
+          1
+        ]
+      ],
+      "expected": {
+        "n": 8,
+        "confirmed": 3,
+        "refuted": 5,
+        "accuracy_pct": 37.5,
+        "brier": 0.4909,
+        "brier_skill": -1.0947,
+        "skilled": false,
+        "reliability_bins": [
+          {
+            "lo": 0.8,
+            "hi": 0.9,
+            "n": 3,
+            "mean_confidence": 0.833,
+            "observed_rate": 0.333
+          },
+          {
+            "lo": 0.9,
+            "hi": 1.0,
+            "n": 5,
+            "mean_confidence": 0.91,
+            "observed_rate": 0.4
+          }
+        ],
+        "calibration": "over-confident",
+        "label": "not_yet_skillful",
+        "score": 45
+      }
+    },
+    {
+      "id": "under_confident",
+      "description": "hedged low and kept being right \u2014 under-confident, still skilled",
+      "n_bins": 10,
+      "pairs": [
+        [
+          0.2,
+          1
+        ],
+        [
+          0.2,
+          1
+        ],
+        [
+          0.3,
+          1
+        ],
+        [
+          0.2,
+          0
+        ],
+        [
+          0.25,
+          1
+        ],
+        [
+          0.3,
+          1
+        ],
+        [
+          0.2,
+          1
+        ],
+        [
+          0.15,
+          1
+        ]
+      ],
+      "expected": {
+        "n": 8,
+        "confirmed": 7,
+        "refuted": 1,
+        "accuracy_pct": 87.5,
+        "brier": 0.5281,
+        "brier_skill": -3.8286,
+        "skilled": false,
+        "reliability_bins": [
+          {
+            "lo": 0.1,
+            "hi": 0.2,
+            "n": 1,
+            "mean_confidence": 0.15,
+            "observed_rate": 1.0
+          },
+          {
+            "lo": 0.2,
+            "hi": 0.3,
+            "n": 5,
+            "mean_confidence": 0.21,
+            "observed_rate": 0.8
+          },
+          {
+            "lo": 0.3,
+            "hi": 0.4,
+            "n": 2,
+            "mean_confidence": 0.3,
+            "observed_rate": 1.0
+          }
+        ],
+        "calibration": "under-confident",
+        "label": "not_yet_skillful",
+        "score": 45
+      }
+    },
+    {
+      "id": "reliable_but_unskilled",
+      "description": "reliability without skill \u2014 must read not_yet_skillful, never well-calibrated",
+      "n_bins": 10,
+      "pairs": [
+        [
+          0.5,
+          1
+        ],
+        [
+          0.5,
+          1
+        ],
+        [
+          0.5,
+          1
+        ],
+        [
+          0.5,
+          0
+        ],
+        [
+          0.5,
+          0
+        ],
+        [
+          0.5,
+          1
+        ],
+        [
+          0.5,
+          1
+        ],
+        [
+          0.5,
+          0
+        ]
+      ],
+      "expected": {
+        "n": 8,
+        "confirmed": 5,
+        "refuted": 3,
+        "accuracy_pct": 62.5,
+        "brier": 0.25,
+        "brier_skill": -0.0667,
+        "skilled": false,
+        "reliability_bins": [
+          {
+            "lo": 0.5,
+            "hi": 0.6,
+            "n": 8,
+            "mean_confidence": 0.5,
+            "observed_rate": 0.625
+          }
+        ],
+        "calibration": "not_yet_skillful",
+        "label": "not_yet_skillful",
+        "score": 45
+      }
+    },
+    {
+      "id": "authoritative",
+      "description": "n>=12 and Brier<=0.15 \u2014 the only path to the top label",
+      "n_bins": 10,
+      "pairs": [
+        [
+          0.95,
+          1
+        ],
+        [
+          0.9,
+          1
+        ],
+        [
+          0.92,
+          1
+        ],
+        [
+          0.88,
+          1
+        ],
+        [
+          0.05,
+          0
+        ],
+        [
+          0.1,
+          0
+        ],
+        [
+          0.08,
+          0
+        ],
+        [
+          0.12,
+          0
+        ],
+        [
+          0.9,
+          1
+        ],
+        [
+          0.07,
+          0
+        ],
+        [
+          0.93,
+          1
+        ],
+        [
+          0.06,
+          0
+        ],
+        [
+          0.91,
+          1
+        ],
+        [
+          0.09,
+          0
+        ]
+      ],
+      "expected": {
+        "n": 14,
+        "confirmed": 7,
+        "refuted": 7,
+        "accuracy_pct": 50.0,
+        "brier": 0.0076,
+        "brier_skill": 0.9697,
+        "skilled": true,
+        "reliability_bins": [
+          {
+            "lo": 0.0,
+            "hi": 0.1,
+            "n": 5,
+            "mean_confidence": 0.07,
+            "observed_rate": 0.0
+          },
+          {
+            "lo": 0.1,
+            "hi": 0.2,
+            "n": 2,
+            "mean_confidence": 0.11,
+            "observed_rate": 0.0
+          },
+          {
+            "lo": 0.8,
+            "hi": 0.9,
+            "n": 1,
+            "mean_confidence": 0.88,
+            "observed_rate": 1.0
+          },
+          {
+            "lo": 0.9,
+            "hi": 1.0,
+            "n": 6,
+            "mean_confidence": 0.918,
+            "observed_rate": 1.0
+          }
+        ],
+        "calibration": "well-calibrated",
+        "label": "authoritative",
+        "score": 90
+      }
+    },
+    {
+      "id": "boundary_probabilities",
+      "description": "p==0.0 and p==1.0 must land in the first/last bin, not off the end",
+      "n_bins": 10,
+      "pairs": [
+        [
+          0.0,
+          0
+        ],
+        [
+          1.0,
+          1
+        ],
+        [
+          0.1,
+          0
+        ],
+        [
+          0.9,
+          1
+        ],
+        [
+          0.5,
+          1
+        ],
+        [
+          0.0,
+          1
+        ],
+        [
+          1.0,
+          0
+        ]
+      ],
+      "expected": {
+        "n": 7,
+        "confirmed": 4,
+        "refuted": 3,
+        "accuracy_pct": 57.1,
+        "brier": 0.3243,
+        "brier_skill": -0.3242,
+        "skilled": false,
+        "reliability_bins": [
+          {
+            "lo": 0.0,
+            "hi": 0.1,
+            "n": 2,
+            "mean_confidence": 0.0,
+            "observed_rate": 0.5
+          },
+          {
+            "lo": 0.1,
+            "hi": 0.2,
+            "n": 1,
+            "mean_confidence": 0.1,
+            "observed_rate": 0.0
+          },
+          {
+            "lo": 0.5,
+            "hi": 0.6,
+            "n": 1,
+            "mean_confidence": 0.5,
+            "observed_rate": 1.0
+          },
+          {
+            "lo": 0.9,
+            "hi": 1.0,
+            "n": 3,
+            "mean_confidence": 0.967,
+            "observed_rate": 0.667
+          }
+        ],
+        "calibration": "not_yet_skillful",
+        "label": "not_yet_skillful",
+        "score": 45
+      }
+    },
+    {
+      "id": "malformed_dropped",
+      "description": "out-of-range / non-binary / unparseable entries are dropped, never coerced",
+      "n_bins": 10,
+      "pairs": [
+        [
+          0.8,
+          1
+        ],
+        [
+          1.5,
+          1
+        ],
+        [
+          -0.2,
+          0
+        ],
+        [
+          0.4,
+          2
+        ],
+        [
+          "x",
+          1
+        ],
+        [
+          0.6,
+          0
+        ],
+        [
+          0.7,
+          1
+        ],
+        [
+          0.3,
+          0
+        ],
+        [
+          0.55,
+          1
+        ]
+      ],
+      "expected": {
+        "n": 8,
+        "confirmed": 5,
+        "refuted": 3,
+        "accuracy_pct": 62.5,
+        "brier": 0.1565,
+        "brier_skill": 0.3479,
+        "skilled": true,
+        "reliability_bins": [
+          {
+            "lo": 0.3,
+            "hi": 0.4,
+            "n": 1,
+            "mean_confidence": 0.3,
+            "observed_rate": 0.0
+          },
+          {
+            "lo": 0.5,
+            "hi": 0.6,
+            "n": 1,
+            "mean_confidence": 0.55,
+            "observed_rate": 1.0
+          },
+          {
+            "lo": 0.6,
+            "hi": 0.7,
+            "n": 1,
+            "mean_confidence": 0.6,
+            "observed_rate": 0.0
+          },
+          {
+            "lo": 0.7,
+            "hi": 0.8,
+            "n": 1,
+            "mean_confidence": 0.7,
+            "observed_rate": 1.0
+          },
+          {
+            "lo": 0.8,
+            "hi": 0.9,
+            "n": 1,
+            "mean_confidence": 0.8,
+            "observed_rate": 1.0
+          }
+        ],
+        "calibration": "well-calibrated",
+        "label": "reliable",
+        "score": 70
+      }
+    },
+    {
+      "id": "five_bins",
+      "description": "n_bins is a parameter \u2014 the same pairs must re-bin identically everywhere",
+      "n_bins": 5,
+      "pairs": [
+        [
+          0.05,
+          0
+        ],
+        [
+          0.25,
+          0
+        ],
+        [
+          0.45,
+          1
+        ],
+        [
+          0.65,
+          1
+        ],
+        [
+          0.85,
+          1
+        ],
+        [
+          0.95,
+          1
+        ],
+        [
+          0.35,
+          0
+        ],
+        [
+          0.75,
+          1
+        ]
+      ],
+      "expected": {
+        "n": 8,
+        "confirmed": 5,
+        "refuted": 3,
+        "accuracy_pct": 62.5,
+        "brier": 0.0875,
+        "brier_skill": 0.6267,
+        "skilled": true,
+        "reliability_bins": [
+          {
+            "lo": 0.0,
+            "hi": 0.2,
+            "n": 1,
+            "mean_confidence": 0.05,
+            "observed_rate": 0.0
+          },
+          {
+            "lo": 0.2,
+            "hi": 0.4,
+            "n": 2,
+            "mean_confidence": 0.3,
+            "observed_rate": 0.0
+          },
+          {
+            "lo": 0.4,
+            "hi": 0.6,
+            "n": 1,
+            "mean_confidence": 0.45,
+            "observed_rate": 1.0
+          },
+          {
+            "lo": 0.6,
+            "hi": 0.8,
+            "n": 2,
+            "mean_confidence": 0.7,
+            "observed_rate": 1.0
+          },
+          {
+            "lo": 0.8,
+            "hi": 1.0,
+            "n": 2,
+            "mean_confidence": 0.9,
+            "observed_rate": 1.0
+          }
+        ],
+        "calibration": "well-calibrated",
+        "label": "reliable",
+        "score": 70
+      }
+    },
+    {
+      "id": "rounding_sensitive",
+      "description": "means that land on a rounding tie \u2014 the half-to-even trap the JS port has to reproduce",
+      "n_bins": 10,
+      "pairs": [
+        [
+          0.125,
+          1
+        ],
+        [
+          0.125,
+          0
+        ],
+        [
+          0.375,
+          1
+        ],
+        [
+          0.375,
+          0
+        ],
+        [
+          0.6875,
+          1
+        ],
+        [
+          0.6875,
+          0
+        ],
+        [
+          0.8125,
+          1
+        ],
+        [
+          0.8125,
+          0
+        ]
+      ],
+      "expected": {
+        "n": 8,
+        "confirmed": 4,
+        "refuted": 4,
+        "accuracy_pct": 50.0,
+        "brier": 0.3223,
+        "brier_skill": -0.2891,
+        "skilled": false,
+        "reliability_bins": [
+          {
+            "lo": 0.1,
+            "hi": 0.2,
+            "n": 2,
+            "mean_confidence": 0.125,
+            "observed_rate": 0.5
+          },
+          {
+            "lo": 0.3,
+            "hi": 0.4,
+            "n": 2,
+            "mean_confidence": 0.375,
+            "observed_rate": 0.5
+          },
+          {
+            "lo": 0.6,
+            "hi": 0.7,
+            "n": 2,
+            "mean_confidence": 0.688,
+            "observed_rate": 0.5
+          },
+          {
+            "lo": 0.8,
+            "hi": 0.9,
+            "n": 2,
+            "mean_confidence": 0.812,
+            "observed_rate": 0.5
+          }
+        ],
+        "calibration": "not_yet_skillful",
+        "label": "not_yet_skillful",
+        "score": 45
+      }
+    }
+  ],
+  "confidence_cases": [
+    {
+      "input": null,
+      "expected": 0.5
+    },
+    {
+      "input": 0.4,
+      "expected": 0.4
+    },
+    {
+      "input": 0,
+      "expected": 0.0
+    },
+    {
+      "input": 1,
+      "expected": 1.0
+    },
+    {
+      "input": 2.5,
+      "expected": 1.0
+    },
+    {
+      "input": -1.0,
+      "expected": 0.0
+    },
+    {
+      "input": true,
+      "expected": 1.0
+    },
+    {
+      "input": false,
+      "expected": 0.0
+    },
+    {
+      "input": "0.4",
+      "expected": 0.4
+    },
+    {
+      "input": "40%",
+      "expected": 0.4
+    },
+    {
+      "input": " 0.7 ",
+      "expected": 0.7
+    },
+    {
+      "input": "85%",
+      "expected": 0.85
+    },
+    {
+      "input": "HIGH",
+      "expected": 0.85
+    },
+    {
+      "input": "very low",
+      "expected": 0.1
+    },
+    {
+      "input": "Medium",
+      "expected": 0.5
+    },
+    {
+      "input": "moderate",
+      "expected": 0.5
+    },
+    {
+      "input": "not a number",
+      "expected": 0.5
+    },
+    {
+      "input": "",
+      "expected": 0.5
+    },
+    {
+      "input": "1e-1",
+      "expected": 0.1
+    },
+    {
+      "input": "  ",
+      "expected": 0.5
+    },
+    {
+      "input": "nan",
+      "expected": 1.0
+    },
+    {
+      "input": "inf",
+      "expected": 1.0
+    },
+    {
+      "input": "-inf",
+      "expected": 0.0
+    },
+    {
+      "input": "0.5%",
+      "expected": 0.005
+    },
+    {
+      "input": "100%",
+      "expected": 1.0
+    }
+  ],
+  "outcome_cases": [
+    {
+      "input": "confirmed",
+      "expected": 1
+    },
+    {
+      "input": "CONFIRMED",
+      "expected": 1
+    },
+    {
+      "input": " confirming ",
+      "expected": 1
+    },
+    {
+      "input": "refuted",
+      "expected": 0
+    },
+    {
+      "input": "Refuted",
+      "expected": 0
+    },
+    {
+      "input": "pending",
+      "expected": null
+    },
+    {
+      "input": "inconclusive",
+      "expected": null
+    },
+    {
+      "input": "expired",
+      "expected": null
+    },
+    {
+      "input": "",
+      "expected": null
+    },
+    {
+      "input": null,
+      "expected": null
+    },
+    {
+      "input": 0,
+      "expected": null
+    },
+    {
+      "input": false,
+      "expected": null
+    },
+    {
+      "input": "hit",
+      "expected": null
+    }
+  ],
+  "record_cases": [
+    {
+      "id": "prediction_records/mixed_statuses",
+      "kind": "prediction_records",
+      "records": [
+        {
+          "confidence": 0.8,
+          "status": "confirmed"
+        },
+        {
+          "confidence": 0.6,
+          "status": "refuted"
+        },
+        {
+          "confidence": 0.7,
+          "status": "pending"
+        },
+        {
+          "confidence": "high",
+          "outcome": "confirmed"
+        },
+        {
+          "status": "refuted"
+        },
+        {
+          "confidence": 0.9,
+          "status": "inconclusive"
+        }
+      ],
+      "expected_pairs": [
+        [
+          0.8,
+          1
+        ],
+        [
+          0.6,
+          0
+        ],
+        [
+          0.85,
+          1
+        ],
+        [
+          0.5,
+          0
+        ]
+      ]
+    },
+    {
+      "id": "prediction_records/empty",
+      "kind": "prediction_records",
+      "records": [],
+      "expected_pairs": []
+    },
+    {
+      "id": "calibration_rows/word_confidence_and_forecast_rows_skipped",
+      "kind": "calibration_rows",
+      "records": [
+        {
+          "stated_confidence": "high",
+          "outcome": "confirmed"
+        },
+        {
+          "stated_confidence": "low",
+          "outcome": "refuted"
+        },
+        {
+          "stated_confidence": "medium",
+          "outcome": "pending"
+        },
+        {
+          "record_type": "forecast_resolution",
+          "confidence": 0.8,
+          "covered": true
+        },
+        {
+          "stated_confidence": 0.42,
+          "outcome": "confirming"
+        }
+      ],
+      "expected_pairs": [
+        [
+          0.85,
+          1
+        ],
+        [
+          0.2,
+          0
+        ],
+        [
+          0.42,
+          1
+        ]
+      ]
+    },
+    {
+      "id": "forecast_resolution_rows/interval_coverage",
+      "kind": "forecast_resolution_rows",
+      "records": [
+        {
+          "record_type": "forecast_resolution",
+          "confidence": 0.8,
+          "covered": true
+        },
+        {
+          "record_type": "forecast_resolution",
+          "confidence": 0.8,
+          "covered": false
+        },
+        {
+          "record_type": "forecast_resolution",
+          "confidence": 0.5
+        },
+        {
+          "stated_confidence": "high",
+          "outcome": "confirmed"
+        },
+        {
+          "record_type": "forecast_resolution",
+          "confidence": "95%",
+          "covered": true
+        }
+      ],
+      "expected_pairs": [
+        [
+          0.8,
+          1
+        ],
+        [
+          0.8,
+          0
+        ],
+        [
+          0.95,
+          1
+        ]
+      ]
+    }
+  ],
+  "adapter_cases": {
+    "ledger_text_cases": [
+      {
+        "id": "bare_csv",
+        "text": "0.8,confirmed\n0.6,refuted\n0.9,hit\n0.2,miss",
+        "expected": {
+          "pairs": [
+            [
+              0.8,
+              1
+            ],
+            [
+              0.6,
+              0
+            ],
+            [
+              0.9,
+              1
+            ],
+            [
+              0.2,
+              0
+            ]
+          ],
+          "unresolved": 0,
+          "rejected": [],
+          "notes": []
+        }
+      },
+      {
+        "id": "headered_csv",
+        "text": "date,confidence,outcome\n2026-01-01,0.8,confirmed\n2026-01-02,60%,refuted",
+        "expected": {
+          "pairs": [
+            [
+              0.8,
+              1
+            ],
+            [
+              0.6,
+              0
+            ]
+          ],
+          "unresolved": 0,
+          "rejected": [],
+          "notes": []
+        }
+      },
+      {
+        "id": "tsv",
+        "text": "confidence\toutcome\n0.75\tyes\n0.25\tno",
+        "expected": {
+          "pairs": [
+            [
+              0.75,
+              1
+            ],
+            [
+              0.25,
+              0
+            ]
+          ],
+          "unresolved": 0,
+          "rejected": [],
+          "notes": []
+        }
+      },
+      {
+        "id": "percent_and_words",
+        "text": "high,confirmed\nlow,refuted\n80,confirmed\n0.5,pending",
+        "expected": {
+          "pairs": [
+            [
+              0.85,
+              1
+            ],
+            [
+              0.2,
+              0
+            ],
+            [
+              0.8,
+              1
+            ]
+          ],
+          "unresolved": 1,
+          "rejected": [],
+          "notes": [
+            {
+              "line": 3,
+              "note": "read as a percentage"
+            }
+          ]
+        }
+      },
+      {
+        "id": "comments_and_blanks",
+        "text": "# my coach's calls\n\n0.7,yes\n\n  \n0.3,no\n",
+        "expected": {
+          "pairs": [
+            [
+              0.7,
+              1
+            ],
+            [
+              0.3,
+              0
+            ]
+          ],
+          "unresolved": 0,
+          "rejected": [],
+          "notes": []
+        }
+      },
+      {
+        "id": "rejects",
+        "text": "0.8,maybe\nbanana,confirmed\n1.5,confirmed\nonlyonefield\n,confirmed\n0.9,confirmed",
+        "expected": {
+          "pairs": [
+            [
+              0.015,
+              1
+            ],
+            [
+              0.9,
+              1
+            ]
+          ],
+          "unresolved": 0,
+          "rejected": [
+            {
+              "line": 1,
+              "raw": "0.8,maybe",
+              "reason": "unreadable outcome"
+            },
+            {
+              "line": 2,
+              "raw": "banana,confirmed",
+              "reason": "unreadable confidence"
+            },
+            {
+              "line": 4,
+              "raw": "onlyonefield",
+              "reason": "need at least two fields (confidence, outcome)"
+            },
+            {
+              "line": 5,
+              "raw": ",confirmed",
+              "reason": "empty confidence"
+            }
+          ],
+          "notes": [
+            {
+              "line": 3,
+              "note": "read as a percentage"
+            }
+          ]
+        }
+      },
+      {
+        "id": "all_unresolved",
+        "text": "0.8,pending\n0.6,tbd\n0.4,n/a",
+        "expected": {
+          "pairs": [],
+          "unresolved": 3,
+          "rejected": [],
+          "notes": []
+        }
+      },
+      {
+        "id": "quoted_fields",
+        "text": "\"0.8\",\"confirmed\"\n\"0.4\",\"refuted\"",
+        "expected": {
+          "pairs": [
+            [
+              0.8,
+              1
+            ],
+            [
+              0.4,
+              0
+            ]
+          ],
+          "unresolved": 0,
+          "rejected": [],
+          "notes": []
+        }
+      },
+      {
+        "id": "empty",
+        "text": "",
+        "expected": {
+          "pairs": [],
+          "unresolved": 0,
+          "rejected": [],
+          "notes": []
+        }
+      }
+    ],
+    "round_cases": [
+      {
+        "x": 0.125,
+        "nd": 2,
+        "expected": 0.12
+      },
+      {
+        "x": 0.135,
+        "nd": 2,
+        "expected": 0.14
+      },
+      {
+        "x": 2.675,
+        "nd": 2,
+        "expected": 2.67
+      },
+      {
+        "x": 1.005,
+        "nd": 2,
+        "expected": 1.0
+      },
+      {
+        "x": 0.15,
+        "nd": 1,
+        "expected": 0.1
+      },
+      {
+        "x": 0.25,
+        "nd": 1,
+        "expected": 0.2
+      },
+      {
+        "x": 0.35,
+        "nd": 1,
+        "expected": 0.3
+      },
+      {
+        "x": 2.5,
+        "nd": 1,
+        "expected": 2.5
+      },
+      {
+        "x": 0.0005,
+        "nd": 3,
+        "expected": 0.001
+      },
+      {
+        "x": 5e-05,
+        "nd": 4,
+        "expected": 0.0001
+      },
+      {
+        "x": 0.3333333333333333,
+        "nd": 4,
+        "expected": 0.3333
+      },
+      {
+        "x": 0.6666666666666666,
+        "nd": 4,
+        "expected": 0.6667
+      },
+      {
+        "x": 0.30000000000000004,
+        "nd": 4,
+        "expected": 0.3
+      },
+      {
+        "x": -0.125,
+        "nd": 2,
+        "expected": -0.12
+      },
+      {
+        "x": -2.675,
+        "nd": 2,
+        "expected": -2.67
+      },
+      {
+        "x": 14.285714285714286,
+        "nd": 1,
+        "expected": 14.3
+      },
+      {
+        "x": 0.0,
+        "nd": 4,
+        "expected": 0.0
+      },
+      {
+        "x": 1.0,
+        "nd": 2,
+        "expected": 1.0
+      },
+      {
+        "x": 0.9995,
+        "nd": 3,
+        "expected": 1.0
+      },
+      {
+        "x": 0.20585,
+        "nd": 4,
+        "expected": 0.2059
+      }
+    ]
+  }
+}

@@ -1,0 +1,305 @@
+{
+  "name": "Worked example — a generic LLM wearable coach",
+  "provenance": {
+    "synthetic": true,
+    "source_url": null,
+    "why": "An illustrative ledger, written by hand for the tool's walkthrough. It is NOT anyone's real coach and NOT Matthew's data — it exists so a first-time visitor can see a filled-in scorecard before pasting their own. The real ledger in this directory is matthew_public_ledger.json.",
+    "shape": "32 calls from a fictional wearable's LLM advisor: high stated confidence, mediocre reality — the failure mode the tool is built to expose."
+  },
+  "columns": [
+    "date",
+    "forecaster",
+    "claim",
+    "confidence",
+    "outcome"
+  ],
+  "rows": [
+    {
+      "date": "2026-03-02",
+      "forecaster": "Example LLM coach",
+      "claim": "Your recovery will be above 60% tomorrow after tonight's early bedtime.",
+      "confidence": 0.9,
+      "outcome": "confirmed"
+    },
+    {
+      "date": "2026-03-03",
+      "forecaster": "Example LLM coach",
+      "claim": "Tomorrow's HRV will be higher than today's.",
+      "confidence": 0.85,
+      "outcome": "refuted"
+    },
+    {
+      "date": "2026-03-05",
+      "forecaster": "Example LLM coach",
+      "claim": "You will hit your step goal on at least 5 of the next 7 days.",
+      "confidence": 0.8,
+      "outcome": "confirmed"
+    },
+    {
+      "date": "2026-03-06",
+      "forecaster": "Example LLM coach",
+      "claim": "Sleep latency will drop below 15 minutes this week.",
+      "confidence": 0.9,
+      "outcome": "refuted"
+    },
+    {
+      "date": "2026-03-08",
+      "forecaster": "Example LLM coach",
+      "claim": "Your resting heart rate will fall by 2bpm within two weeks.",
+      "confidence": 0.75,
+      "outcome": "refuted"
+    },
+    {
+      "date": "2026-03-09",
+      "forecaster": "Example LLM coach",
+      "claim": "Tomorrow will be a strain day above 14.",
+      "confidence": 0.85,
+      "outcome": "confirmed"
+    },
+    {
+      "date": "2026-03-11",
+      "forecaster": "Example LLM coach",
+      "claim": "You will log a workout tomorrow.",
+      "confidence": 0.95,
+      "outcome": "confirmed"
+    },
+    {
+      "date": "2026-03-12",
+      "forecaster": "Example LLM coach",
+      "claim": "Your weekly average sleep will exceed 7 hours.",
+      "confidence": 0.7,
+      "outcome": "refuted"
+    },
+    {
+      "date": "2026-03-14",
+      "forecaster": "Example LLM coach",
+      "claim": "Glucose will stay under 140 after tomorrow's lunch.",
+      "confidence": 0.6,
+      "outcome": "confirmed"
+    },
+    {
+      "date": "2026-03-15",
+      "forecaster": "Example LLM coach",
+      "claim": "You will skip Thursday's session.",
+      "confidence": 0.55,
+      "outcome": "confirmed"
+    },
+    {
+      "date": "2026-03-17",
+      "forecaster": "Example LLM coach",
+      "claim": "Recovery will be red the morning after the long run.",
+      "confidence": 0.8,
+      "outcome": "confirmed"
+    },
+    {
+      "date": "2026-03-18",
+      "forecaster": "Example LLM coach",
+      "claim": "Your protein target will be missed twice this week.",
+      "confidence": 0.65,
+      "outcome": "confirmed"
+    },
+    {
+      "date": "2026-03-20",
+      "forecaster": "Example LLM coach",
+      "claim": "Deep sleep will exceed 90 minutes tonight.",
+      "confidence": 0.5,
+      "outcome": "refuted"
+    },
+    {
+      "date": "2026-03-21",
+      "forecaster": "Example LLM coach",
+      "claim": "You will wake before your alarm tomorrow.",
+      "confidence": 0.45,
+      "outcome": "refuted"
+    },
+    {
+      "date": "2026-03-23",
+      "forecaster": "Example LLM coach",
+      "claim": "Steps will exceed 10k on Saturday.",
+      "confidence": 0.9,
+      "outcome": "refuted"
+    },
+    {
+      "date": "2026-03-24",
+      "forecaster": "Example LLM coach",
+      "claim": "Your HRV trend will be flat or down over 7 days.",
+      "confidence": 0.6,
+      "outcome": "confirmed"
+    },
+    {
+      "date": "2026-03-26",
+      "forecaster": "Example LLM coach",
+      "claim": "Caffeine after 2pm will cost you 20+ minutes of deep sleep.",
+      "confidence": 0.85,
+      "outcome": "refuted"
+    },
+    {
+      "date": "2026-03-27",
+      "forecaster": "Example LLM coach",
+      "claim": "You will report better mood on the days you train.",
+      "confidence": 0.8,
+      "outcome": "confirmed"
+    },
+    {
+      "date": "2026-03-29",
+      "forecaster": "Example LLM coach",
+      "claim": "Weight will be down week over week.",
+      "confidence": 0.7,
+      "outcome": "refuted"
+    },
+    {
+      "date": "2026-03-30",
+      "forecaster": "Example LLM coach",
+      "claim": "You will hit 3 sessions this week.",
+      "confidence": 0.75,
+      "outcome": "confirmed"
+    },
+    {
+      "date": "2026-04-01",
+      "forecaster": "Example LLM coach",
+      "claim": "Tomorrow's recovery will be your lowest of the week.",
+      "confidence": 0.4,
+      "outcome": "refuted"
+    },
+    {
+      "date": "2026-04-02",
+      "forecaster": "Example LLM coach",
+      "claim": "Your evening glucose spike will exceed 40 mg/dL.",
+      "confidence": 0.3,
+      "outcome": "refuted"
+    },
+    {
+      "date": "2026-04-04",
+      "forecaster": "Example LLM coach",
+      "claim": "You will sleep past 7am on Sunday.",
+      "confidence": 0.35,
+      "outcome": "confirmed"
+    },
+    {
+      "date": "2026-04-05",
+      "forecaster": "Example LLM coach",
+      "claim": "Resting heart rate will spike above baseline after the late meal.",
+      "confidence": 0.65,
+      "outcome": "confirmed"
+    },
+    {
+      "date": "2026-04-07",
+      "forecaster": "Example LLM coach",
+      "claim": "You will not log dinner tomorrow.",
+      "confidence": 0.5,
+      "outcome": "refuted"
+    },
+    {
+      "date": "2026-04-08",
+      "forecaster": "Example LLM coach",
+      "claim": "Strain will exceed recovery capacity twice this week.",
+      "confidence": 0.85,
+      "outcome": "confirmed"
+    },
+    {
+      "date": "2026-04-10",
+      "forecaster": "Example LLM coach",
+      "claim": "Your sleep debt will clear by Sunday.",
+      "confidence": 0.55,
+      "outcome": "refuted"
+    },
+    {
+      "date": "2026-04-11",
+      "forecaster": "Example LLM coach",
+      "claim": "You will take a rest day within 48 hours.",
+      "confidence": 0.9,
+      "outcome": "confirmed"
+    },
+    {
+      "date": "2026-04-13",
+      "forecaster": "Example LLM coach",
+      "claim": "Zone 2 minutes will exceed 90 this week.",
+      "confidence": 0.7,
+      "outcome": "refuted"
+    },
+    {
+      "date": "2026-04-14",
+      "forecaster": "Example LLM coach",
+      "claim": "Tomorrow's readiness will beat today's.",
+      "confidence": 0.5,
+      "outcome": "confirmed"
+    },
+    {
+      "date": "2026-04-16",
+      "forecaster": "Example LLM coach",
+      "claim": "Hydration will stay above target for 5 straight days.",
+      "confidence": 0.8,
+      "outcome": "refuted"
+    },
+    {
+      "date": "2026-04-17",
+      "forecaster": "Example LLM coach",
+      "claim": "You will log a PR on the main lift this month.",
+      "confidence": 0.6,
+      "outcome": "pending"
+    }
+  ],
+  "expected_scorecard": {
+    "n": 31,
+    "confirmed": 16,
+    "refuted": 15,
+    "accuracy_pct": 51.6,
+    "brier": 0.2801,
+    "brier_skill": -0.1215,
+    "skilled": false,
+    "reliability_bins": [
+      {
+        "lo": 0.3,
+        "hi": 0.4,
+        "n": 2,
+        "mean_confidence": 0.325,
+        "observed_rate": 0.5
+      },
+      {
+        "lo": 0.4,
+        "hi": 0.5,
+        "n": 2,
+        "mean_confidence": 0.425,
+        "observed_rate": 0.0
+      },
+      {
+        "lo": 0.5,
+        "hi": 0.6,
+        "n": 5,
+        "mean_confidence": 0.52,
+        "observed_rate": 0.4
+      },
+      {
+        "lo": 0.6,
+        "hi": 0.7,
+        "n": 4,
+        "mean_confidence": 0.625,
+        "observed_rate": 1.0
+      },
+      {
+        "lo": 0.7,
+        "hi": 0.8,
+        "n": 5,
+        "mean_confidence": 0.72,
+        "observed_rate": 0.2
+      },
+      {
+        "lo": 0.8,
+        "hi": 0.9,
+        "n": 8,
+        "mean_confidence": 0.825,
+        "observed_rate": 0.625
+      },
+      {
+        "lo": 0.9,
+        "hi": 1.0,
+        "n": 5,
+        "mean_confidence": 0.91,
+        "observed_rate": 0.6
+      }
+    ],
+    "calibration": "over-confident",
+    "label": "not_yet_skillful",
+    "score": 45
+  }
+}

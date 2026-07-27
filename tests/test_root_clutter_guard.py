@@ -54,6 +54,7 @@ ALLOWLIST = {
     "setup": "One-time OAuth/credential setup scripts per integration — the DR/operator toolkit.",
     "seeds": "Test/dev bootstrap data generators (kept JSON seeds) for DynamoDB state.",
     "infra": "IAM policy/trust JSON snapshots (infra/iam/) — the audit record of the GitHub-Actions OIDC roles.",
+    "oss": "Standalone MIT-licensed extractions published outward (calibration-core, #1396) — no platform imports, parity-gated against the in-platform original.",
     # --- Tooling / repo config ---
     ".github": "GitHub Actions workflows, composite actions, CODEOWNERS, dependabot — the CI/CD control plane.",
     ".claude": "Claude Code project config — agents, slash commands, settings (checked-in harness config).",

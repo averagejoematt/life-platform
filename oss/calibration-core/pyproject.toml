@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "calibration-core"
+version = "1.0.0"
+description = "Grade a forecaster — human or LLM — against what actually happened. Brier score, reliability curve, skill vs. the base rate."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+authors = [{ name = "Matthew", email = "hello@averagejoematt.com" }]
+keywords = ["calibration", "brier", "forecasting", "reliability", "llm", "evaluation", "quantified-self"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: Information Analysis",
+  "Typing :: Typed",
+]
+# Deliberately empty. The whole point is that a third party can vendor one file.
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.urls]
+Homepage = "https://averagejoematt.com/method/grade-your-coach/"
+"Live scoreboard" = "https://averagejoematt.com/method/calibration/"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+py-modules = ["calibration_core"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.black]
+line-length = 140
