@@ -13,6 +13,8 @@ Private per spec §10 / brief §6:
   - moodSnapshot, location                 (on SESSION# — mind-body + geo)
   - inputsSnapshot                         (on RECOMMENDATION# — snapshots private state)
   - tasteHypothesis, ratchetPosition, seasonBias, trustLadderMode (calibration internals)
+  - horizons                               (#1708 — the Horizons reaction ledger,
+                                            derived from his private reactions)
 
 Phase A ships and PROVES this chokepoint (the test populates every private field
 and asserts none survive projection). The Mind page that consumes it is Phase C —
@@ -60,7 +62,10 @@ PRIVATE_FIELDS: dict[str, frozenset] = {
     READING_STATE: frozenset({"retentionScore", "lastProbeAt"}),
     READING_SESSION: frozenset({"moodSnapshot", "location"}),
     RECOMMENDATION: frozenset({"inputsSnapshot"}),
-    READING_PROFILE: frozenset({"tasteHypothesis", "ratchetPosition", "seasonBias", "trustLadderMode"}),
+    # `horizons` (#1708) is the Horizons reaction ledger — derived from Matthew's
+    # private answers to the coach's weekly pick. Counts only, never verbatim text,
+    # and never public: personal feedback that feeds coach signal stays private.
+    READING_PROFILE: frozenset({"tasteHypothesis", "ratchetPosition", "seasonBias", "trustLadderMode", "horizons"}),
     RECALL: frozenset({"prompt", "intervalIndex", "nextDue", "performanceHistory", "gistScore"}),
 }
 

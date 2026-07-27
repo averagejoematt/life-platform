@@ -9,10 +9,14 @@ a lean subset of the journal-enrichment schema is extracted ONCE per conversatio
 record by Haiku, the SAME deterministic ADR-104 grounding gate verifies every causal
 hint, and the ``enriched_*`` fields are written IN PLACE onto the source record.
 
-The three conversational partitions (channel provenance stamped on every output row):
+The conversational channels (channel provenance stamped on every output row):
 
   coach_checkin      pk COACH#{coach_id}_coach          sk CHECKIN#{date}#{uuid8}
                      (status=answered only — a skip is a boundary, never data, ADR-104)
+  prescription_      pk COACH#{coach_id}_coach          sk CHECKIN#{date}#{uuid8}
+    reaction         (#1708: the SAME partition — a check-in generated_by
+                     "prescription_followup", i.e. Matthew reacting to the coach's
+                     weekly Horizons pick. Same sweep, same gate, distinct channel.)
   habit_reflection   pk USER#{u}#SOURCE#habit_causality sk HABITDAY#{date}#{slug}
                      (channel=claude_reflection rows — the #422 Claude-sourced layer)
   field_note         pk USER#{u}#SOURCE#field_notes     sk WEEK#{iso-week}
@@ -62,7 +66,14 @@ logger = logging.getLogger(__name__)
 CHANNEL_COACH_CHECKIN = "coach_checkin"
 CHANNEL_HABIT_REFLECTION = "habit_reflection"
 CHANNEL_FIELD_NOTE = "field_note"
-CHANNELS = (CHANNEL_COACH_CHECKIN, CHANNEL_HABIT_REFLECTION, CHANNEL_FIELD_NOTE)
+# #1708 (epic #1686 S4): a reaction to the coach's weekly Horizons pick arrives as a
+# CHECKIN# row too, but it is a distinct capture channel — the reader reacting to
+# something the coach sent OUTWARD, not answering a question about his own data. It
+# gets its own channel value (the same idiom as journal's video_diary /
+# solo_recording, #1572/#1840) so the Mind-pillar and coach-signal consumers can see
+# WHERE the signal came from. Same partition, same sweep, same gate: no new pipeline.
+CHANNEL_PRESCRIPTION_REACTION = "prescription_reaction"
+CHANNELS = (CHANNEL_COACH_CHECKIN, CHANNEL_HABIT_REFLECTION, CHANNEL_FIELD_NOTE, CHANNEL_PRESCRIPTION_REACTION)
 
 SCHEMA_VERSION = 1
 # Conversational answers are shorter than journal entries; the floor is words (the J-5
@@ -102,6 +113,11 @@ def enrichment_policy():
     ``conversational_enrichment_scope`` — changing the scope here without a human
     re-review of that entry (and, for any scoring promotion, personal-variance
     thresholds per ADR-105) fails tests/test_methods_registry.py.
+
+    #1708 added a FOURTH channel (``prescription_reaction`` — a reaction to the
+    weekly Horizons pick, captured on the same CHECKIN# partition). It inherits this
+    same analysis-only scope: it seeds hypothesis candidates and calibrates the
+    deterministic Horizons ledger, and it moves no scoring.
     """
     return {
         "scope": "analysis_only",
@@ -183,8 +199,31 @@ def field_note_text(item) -> str:
     return "\n".join(p for p in parts if p)
 
 
+def checkin_channel(item) -> str:
+    """The channel a CHECKIN# row belongs to (#1708).
+
+    A follow-up on the coach's weekly Horizons pick is stamped
+    ``generated_by="prescription_followup"`` by
+    ``coach_checkin.build_prescription_followup_item``; everything else on the
+    partition is an ordinary check-in. Delegates the predicate to the reading rail
+    so the marker literal lives in exactly one place.
+    """
+    try:
+        from reading import horizons_calibration
+
+        if horizons_calibration.is_prescription_reaction(item):
+            return CHANNEL_PRESCRIPTION_REACTION
+    except ImportError:  # pragma: no cover — bundled package; degrade to the base channel
+        logger.warning("[#1708] reading package unavailable — check-in channel falls back to %s", CHANNEL_COACH_CHECKIN)
+    return CHANNEL_COACH_CHECKIN
+
+
 def conversation_context(item, channel) -> str:
     """One line of situational context for the prompt (never enrichable text)."""
+    if channel == CHANNEL_PRESCRIPTION_REACTION:
+        who = item.get("coach_name") or item.get("coach_id") or "a coach"
+        week = item.get("prescription_week") or "?"
+        return f"His coach ({who}) sent him the week-{week} Horizons media pick and asked: " f'"{str(item.get("question") or "").strip()}"'
     if channel == CHANNEL_COACH_CHECKIN:
         who = item.get("coach_name") or item.get("coach_id") or "a coach"
         return f'His coach ({who}) asked: "{str(item.get("question") or "").strip()}"'
@@ -262,13 +301,14 @@ def collect_conversational_items(table, start_date, end_date, coach_ids=None):
             if not text:
                 continue
             date = _sk_date(it.get("sk"), "CHECKIN#") or (it.get("answered_at") or "")[:10]
+            channel = checkin_channel(it)  # #1708: prescription_reaction vs plain coach_checkin
             out.append(
                 {
                     "item": it,
-                    "channel": CHANNEL_COACH_CHECKIN,
+                    "channel": channel,
                     "text": text,
                     "date": date,
-                    "context": conversation_context(it, CHANNEL_COACH_CHECKIN),
+                    "context": conversation_context(it, channel),
                 }
             )
 
@@ -455,6 +495,17 @@ def apply_enrichment(table, item, channel, enrichment, text):
         "enriched_content_hash": content_hash(text),
         "enriched_at": datetime.now(timezone.utc).isoformat(),
     }
+    # #1708: a Horizons reaction carries WHICH pick it is about, so a Mind-pillar or
+    # coach-signal consumer reading the enriched row can attribute the signal without
+    # re-joining to the check-in's generation metadata.
+    if channel == CHANNEL_PRESCRIPTION_REACTION:
+        for stamp_key, source_key in (
+            ("enriched_prescription_week", "prescription_week"),
+            ("enriched_prescription_curator", "prescription_curator"),
+        ):
+            value = str(item.get(source_key) or "").strip()
+            if value:
+                stamps[stamp_key] = value
     for name, value in stamps.items():
         attr_names[f"#{name}"] = name
         attr_values[f":{name}"] = value
