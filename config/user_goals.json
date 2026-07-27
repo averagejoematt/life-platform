@@ -6,11 +6,11 @@
   "timeline": {
     "start_date": "2026-07-27",
     "end_date": "2027-07-26",
-    "start_weight_lbs": 317.61,
-    "start_weight_kg": 144.066,
-    "current_weight_lbs": 297.24,
+    "start_weight_lbs": 321.09,
+    "start_weight_kg": 145.643,
+    "current_weight_lbs": 321.09,
     "baseline_source": "withings",
-    "baseline_measurement_utc": null,
+    "baseline_measurement_utc": "2026-07-27T14:39:25+00:00",
     "note": "Initial 10\u201312 lbs is primarily water/glycogen. Real fat loss trajectory begins ~Week 3."
   },
   "targets": {
