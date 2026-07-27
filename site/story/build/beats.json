@@ -1789,6 +1789,37 @@
       "honest_miss": "The Video Diary journal template shipped its entire code path a day earlier — channel provenance, coach reactions, multi-entry keys — but nobody ever added the template option to the Notion database, so the API rejected every page and the feature was inert from birth with zero log lines. Found only by trying to file the first real entry; the drift gate that would have caught it is now issue #1840.",
       "prs": [],
       "why_it_mattered": "The diary is the story arm of the causal loop, and until today it was a camera with no pipeline behind it: nothing turned footage into a transcript the platform could read, nothing held the subject to what he said on tape, and the journal channel meant to carry it had been silently broken since it shipped. Day zero itself is the reason the plumbing matters — the entry names the exact failure mode (more day ones than day twos) that the next seven days will test, and now the system that heard him say it is built to ask him about it."
+    },
+    {
+      "id": "2026-07-26-sweep-day-the-oracle-catches",
+      "date": "2026-07-26",
+      "title": "Sweep day: 46 verified findings land, four P1s die the same afternoon, and the rebuilt rollback oracle's first live fire catches a checker lying",
+      "shipped": "A parallel review session filed 46 adversarially-verified issues against the week's merges; the four time-critical ones were dead by evening: the coach-nudge lambda was reading a wiped cycle's predictions as live facts (phase filters added and hot-deployed within the hour), the milestone ledger's genesis had consumed zero rungs against an empty post-reset signal set (a supervised one-shot re-baselined 27 lifetime rungs into the write-once ledger, evidence attached to every row), the celebration circuit-breaker had been jammed shut forever by an optional signal that's been cold since April (absence is no longer treated as spiral evidence), and the genesis-eve article's nutrition figures now defer to the pre-registration instead of contradicting it. Around that: a private milestone digest to a hand-picked few, a dedicated SMS paging channel capped at five alarms by a guard test, a one-page complexity ledger with rent and demote triggers per subsystem, and twelve PRs from parallel implementer agents merged and fleet-deployed.",
+      "gotcha": "The smoke-test oracle rebuilt today (it used to read statusCode 500 as PASS) fired for the first time on the very next deploy — and what it caught was the QA checker itself failing honest pre-genesis data: 'weight is null — expected data' the night before genesis, when no weigh-in can exist yet. The checker got a Day-1 grace window; the strictness stays.",
+      "honest_miss": "A driver-side git add -A swept a concurrent agent's half-finished edits into a pushed commit — caught only because the agent honestly reported the overlap in its PR; the files were restored and the clean, tested version merged instead. And the full test suite's runtime quietly blew up from ~3 minutes to 45+ — filed, not yet explained.",
+      "prs": [
+        {
+          "label": "PR #1836",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1836"
+        },
+        {
+          "label": "PR #1837",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1837"
+        },
+        {
+          "label": "PR #1838",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1838"
+        },
+        {
+          "label": "PR #1839",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1839"
+        },
+        {
+          "label": "PR #1835",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1835"
+        }
+      ],
+      "why_it_mattered": "Tomorrow is genesis. Every one of the four P1s was a lie the instrument would have told in its first real week — a nudge built on dead-cycle intelligence, a months-old weight milestone announced as fresh news in early August, celebrations suppressed forever with no visible reason, and a flagship article contradicting the registered plan on Day 1. The whole point of a reset-eve sweep is that honesty bugs are cheapest to kill before the first real data arrives."
     }
   ]
 }
