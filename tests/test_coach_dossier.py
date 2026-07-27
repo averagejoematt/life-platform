@@ -2,8 +2,9 @@
 
 The privacy-filter test class here is the one that BLOCKS LAUNCH (AC2): seeded
 violations of every standing content absolute — substance names, chronological-age
-leakage, genotype strings, real-person third parties — must be caught, and the
-ADR-141 §4 conversation-channel exclusion must hold structurally.
+leakage, genotype strings, real-person third parties, and PII (#1800: email / phone
+/ SSN / card, via the house `broadcast_sensitivity_gate.find_pii` detector) — must be
+caught, and the ADR-141 §4 conversation-channel exclusion must hold structurally.
 
 All offline/hermetic: coach_dossier is a pure module; the site-layer tests run
 web.site_api_coach against FakeDdbTable with a pk/sk-prefix-dispatching query hook.
@@ -53,6 +54,11 @@ SEEDED_VIOLATIONS = [
     ("real_name_surname", "ran the Huberman morning-light protocol for a week"),
     # private third parties / family specifics (journal_quotes family vocabulary)
     ("family_specific", "he skipped the session to drive my sister to the airport"),
+    # PII — #1800: email / phone / SSN / card, via broadcast_sensitivity_gate.find_pii
+    ("pii_email", "he asked me to follow up at matt@example.com after the reset"),
+    ("pii_phone", "call me at 555-867-5309 once the weigh-in lands"),
+    ("pii_ssn", "the intake form still lists 123-45-6789 in the header"),
+    ("pii_card", "the gym charge hit card 4111 1111 1111 1111 again"),
 ]
 
 
@@ -73,6 +79,39 @@ def test_privacy_filter_catches_seeded_violation(label, text):
 )
 def test_privacy_filter_passes_clean_lines(text):
     assert cd.find_dossier_violations(text) == []
+
+
+# ── #1800: the PII leg, wired to the detector the repo already trusts ──────────
+
+
+def test_pii_coverage_matches_the_house_detector():
+    """The verified gap: find_dossier_violations returned [] on a string
+    broadcast_sensitivity_gate.find_pii flagged as ['email', 'phone']."""
+    import broadcast_sensitivity_gate as bsg
+
+    text = "call me at 555-867-5309 or matt@example.com"
+    kinds = [term for cat, term in cd.find_dossier_violations(text) if cat == bsg.CATEGORY_PII]
+    assert kinds == bsg.find_pii(text) == ["email", "phone"]
+    assert cd.dossier_safe(text) is False
+
+
+def test_pii_hit_never_echoes_the_contact_string():
+    """A violations list gets logged and counted — the hit reports the KIND, so the
+    detector can't be the thing that leaks the contact string."""
+    hits = cd.find_dossier_violations("reach him at matt@example.com")
+    assert ("pii", "email") in hits
+    assert "matt@example.com" not in str(hits)
+
+
+def test_pii_in_a_dossier_field_withholds_the_record_wholesale():
+    item = {
+        "sk": "COMMITMENT#commit_pii",
+        "created_date": "2026-07-23",
+        "commitment_natural": "text the accountability partner at 555-867-5309 every Sunday",
+        "status": "pending",
+    }
+    entry, status = cd.commitment_entry(item)
+    assert entry is None and status == cd.WITHHELD
 
 
 def test_violating_commitment_is_withheld_wholesale():
@@ -361,10 +400,12 @@ def _cond_parts(cond):
     return expr["values"][1], None
 
 
-def _seeded_table(corrections_rows=None, corrections_error=False):
+def _seeded_table(corrections_rows=None, corrections_error=False, extra_commitments=None):
     """`corrections_rows` overrides the default single commitment-retract ledger
     row (#1794/#1796 tests exercise other correction shapes); `corrections_error`
-    makes the corrections-partition query raise, to pin the #1796 fail-closed path."""
+    makes the corrections-partition query raise, to pin the #1796 fail-closed path;
+    `extra_commitments` appends rows (#1800's PII case) without disturbing the
+    counts every other test in this file asserts against the default seed."""
     coach_pk = "COACH#sleep_coach"
     if corrections_rows is None:
         corrections_rows = [_ledger_row("COMMITMENT#commit_20260720_stale", "retract")]
@@ -421,6 +462,7 @@ def _seeded_table(corrections_rows=None, corrections_error=False):
             }
         ],
     }
+    rows[(coach_pk, "COMMITMENT#")].extend(extra_commitments or [])
 
     def _hook(table, **kw):
         pk, sk = _cond_parts(kw["KeyConditionExpression"])
@@ -477,6 +519,26 @@ def test_site_dossier_withholds_seeded_violation_and_counts_it(monkeypatch):
     blob = json.dumps(d)
     assert "cannabis" not in blob
     assert d["withheld"] >= 1
+
+
+def test_site_dossier_withholds_a_pii_carrying_record_and_counts_it(monkeypatch):
+    # #1800 end to end: a contact string in a COACH# free-text field used to reach
+    # the public coach page untouched. It is now withheld wholesale and disclosed.
+    d = _dossier_via_api(
+        monkeypatch,
+        extra_commitments=[
+            {
+                "pk": "COACH#sleep_coach",
+                "sk": "COMMITMENT#commit_20260723_pii",
+                "created_date": "2026-07-23",
+                "commitment_natural": "text the accountability partner at 555-867-5309 every Sunday",
+                "status": "pending",
+            }
+        ],
+    )
+    blob = json.dumps(d)
+    assert "555-867-5309" not in blob
+    assert d["withheld"] >= 2  # the seeded vice row + this one
 
 
 def test_site_dossier_excludes_conversation_learnings_structurally(monkeypatch):

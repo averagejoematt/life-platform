@@ -16,9 +16,12 @@ Three hard rules, in order:
    `privacy_guard.VICE_KEYWORDS` / the banned real-name sets) already enforces the
    standing content absolutes — substances, real-person third parties, family
    specifics, private events, and chronological-age leakage (PhenoAge Option A:
-   bio-age is public, chronological age NEVER). This module adds the one absolute
-   that vocabulary doesn't carry: genotype strings (rs-ids, gene names, allele
-   notation — PRE-13 / data-publication review). A record that hits ANY category is
+   bio-age is public, chronological age NEVER). Two absolutes that vocabulary doesn't
+   carry are added on top, both reused rather than forked: genotype strings (rs-ids,
+   gene names, allele notation — PRE-13 / data-publication review) and PII — email /
+   phone / SSN / card, via `broadcast_sensitivity_gate.find_pii`, the same
+   deterministic offline detector the broadcast auto-publish gate is fail-closed on
+   (#1800). A record that hits ANY category is
    WITHHELD WHOLESALE and counted — fail-closed, never partially rendered, never
    silently dropped (the public payload discloses the withheld count).
    NB the age patterns cannot distinguish biological from chronological age; a
@@ -59,6 +62,7 @@ from __future__ import annotations
 import re
 from typing import Callable, Iterable, Optional
 
+import broadcast_sensitivity_gate  # the house PII detector (#1673) — reused, not forked
 import journal_quotes  # the house taboo gate (#1568/ADR-142) — reused, not forked
 
 # The item_ref.surface marker that scopes a #1689 corrections-ledger row to the
@@ -89,10 +93,24 @@ def is_conversation_channel(item: dict) -> bool:
 def find_dossier_violations(text) -> list:
     """Every content-absolute hit in `text` as (category, term). Empty list = clean.
 
-    Reuses `journal_quotes.find_mark_violations` (substances / real names / family /
-    private events / chronological age) and adds the genotype patterns. Unlike the
-    mark gate, EMPTY text is clean here — an absent optional field is "nothing to
-    render", not a violation.
+    Three vocabularies, all REUSED rather than forked:
+      * `journal_quotes.find_mark_violations` — substances / real names / family /
+        private events / chronological age;
+      * the genotype patterns above (PRE-13 — the one absolute that vocabulary lacks);
+      * `broadcast_sensitivity_gate.find_pii` — email / phone / SSN / card (#1800).
+
+    #1800: the PII leg was missing. The module claimed to enforce "the standing content
+    absolutes", but a COACH# free-text field carrying a contact string (a
+    commitment_natural, an outcome_notes, a docket claim, a RELATIONSHIP context_summary)
+    crossed to the public coach page untouched — even though the repo already ships a
+    deterministic, offline, fail-closed PII detector and DATA_GOVERNANCE.md classifies
+    contact strings as never-Tier-0-public. `deploy/pii_surface_guard.py` covers only the
+    static site/ surface, not this API payload. The module's own conservative reasoning
+    ("a false positive only withholds a dossier line") applies identically here, so PII
+    withholds wholesale exactly like a genotype hit.
+
+    Unlike the mark gate, EMPTY text is clean here — an absent optional field is
+    "nothing to render", not a violation.
     """
     if text is None or not str(text).strip():
         return []
@@ -102,6 +120,9 @@ def find_dossier_violations(text) -> list:
         m = pat.search(text)
         if m:
             hits.append(("genotype", m.group(0)))
+    # The term is the PII KIND, never the matched string — a violations list is logged
+    # and counted, and echoing the contact string into a log would defeat the point.
+    hits.extend((broadcast_sensitivity_gate.CATEGORY_PII, kind) for kind in broadcast_sensitivity_gate.find_pii(text))
     return hits
 
 

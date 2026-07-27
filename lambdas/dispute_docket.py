@@ -6,7 +6,7 @@ coaches' recorded stances diverge on a criterion the platform can grade
 DETERMINISTICALLY, a standing docket entry opens:
 
   pk ENSEMBLE#docket
-  sk OPEN#{pair}#{topic_slug}                     (pair = sorted "a__b")
+  sk OPEN#{pair}#{subdomain}                      (pair = sorted "a__b")
   sk RESOLVED#{resolved_date}#{pair}#{topic_slug}
 
 Open path — LLM proposes, CODE admits (ADR-105 posture):
@@ -23,9 +23,23 @@ Open path — LLM proposes, CODE admits (ADR-105 posture):
   Bayesian CONFIDENCE# mean for the metric's subdomain — is frozen at open.
 
 Throttle (replaces the retired weekly cap, AC5): ONE open docket per
-coach-pair per topic — a conditional put on the OPEN# sort key. A pair can
+coach-pair per SUBDOMAIN — a conditional put on the OPEN# sort key. A pair can
 have many simultaneous dockets, but never two open dockets about the same
-topic; a topic re-enters the docket only after the standing one resolves.
+subdomain; a subdomain re-enters the docket only after the standing one
+resolves.
+
+#1801 — the throttle key is DETERMINISTIC, never LLM prose. It used to be
+`_slugify(topic)`, i.e. the ensemble digest's own free-text wording, so the
+same dispute re-described the next day ("sleep debt" → "sleep debt vs training
+load" → "the sleep-debt question") slugified differently and opened a PARALLEL
+standing docket for the same pair — empirically proven on the sibling
+ENSEMBLE#disagreements partition, which accumulated near-duplicate clusters
+under exactly this dedup. The key is now `pair_key` + `metric_subdomain(metric)`
+— both derived from code-admitted values (the pair is roster-checked, the metric
+must live in measurable_metrics.METRIC_SOURCES), so rephrasing cannot open a
+second docket, and `_slugify`'s 60-char truncation can no longer make two
+genuinely different topics collide either. `MAX_OPENS_PER_RUN` bounds the cost
+of one digest run the way inter_coach_dialogue's MAX_AIRINGS_PER_RUN does.
 
 Resolution — CODE ONLY, no LLM anywhere in the verdict path (AC2, ADR-105):
   `resolve_due()` runs in coach_prediction_evaluator's daily deterministic
@@ -77,6 +91,11 @@ MAX_HORIZON_DAYS = 90
 # Missing data on the resolution date: leave the docket open this many days,
 # then void it honestly rather than let it dangle forever.
 NO_DATA_GRACE_DAYS = 7
+# Cost bound on ONE digest run (#1801) — mirrors inter_coach_dialogue's
+# MAX_AIRINGS_PER_RUN. Every open runs build_stake twice (two paginated
+# PREDICTION# scans), so an LLM that suddenly reports a dozen "disagreements"
+# must not be able to turn one run into a dozen scan pairs.
+MAX_OPENS_PER_RUN = 2
 
 # Metric → CONFIDENCE#{subdomain} mapping (the evaluator's SUBDOMAIN_TO_DOMAIN
 # covers every value here — pinned by tests/test_dispute_docket_1386.py).
@@ -133,6 +152,32 @@ def metric_is_resolvable(metric_key):
 
 def metric_subdomain(metric_key):
     return _METRIC_SUBDOMAIN.get(base_metric(metric_key), "general")
+
+
+def open_sk(coach_a, coach_b, metric_key):
+    """The docket's throttle key — deterministic end to end (#1801).
+
+    Derived ONLY from code-admitted values: the roster-checked coach pair and the
+    metric's subdomain (the metric itself must be in measurable_metrics.METRIC_SOURCES
+    before `validate_criterion` returns ok). No LLM prose reaches this key.
+    """
+    return f"OPEN#{pair_key(coach_a, coach_b)}#{metric_subdomain(metric_key)}"
+
+
+def docket_ref_key(docket):
+    """The collision-free identity of ONE docket, for its derived track-record rows (#1798).
+
+    The throttle admits at most one OPEN# docket per (pair, subdomain), so pair+subdomain
+    uniquely names a live docket; the topic slug rides along so the sort key stays
+    human-readable. Before #1798 the derived LEARNING#/PREDICTION# sort keys carried the
+    topic slug ALONE — so a coach holding two same-topic dockets against two different
+    opponents wrote both outcomes to one key and the unconditional put_item silently
+    destroyed the first (a win and a loss rendering as exactly one graded row).
+    """
+    docket = docket or {}
+    pair = docket.get("pair_key") or pair_key(docket.get("coach_a", ""), docket.get("coach_b", ""))
+    parts = [pair, str(docket.get("subdomain") or "general"), str(docket.get("topic_slug") or "")]
+    return "-".join(p for p in parts if p)
 
 
 def validate_criterion(criterion, coach_a, coach_b, open_date_str):
@@ -232,6 +277,63 @@ def _stamped(item):
         return item
 
 
+def _docket_row_stands(item):
+    """True when a row already occupying an OPEN# key is a LIVE docket — i.e. the
+    throttle should bite.
+
+    ADR-077: the restart wipe TOMBSTONES ENSEMBLE#docket rows, it does not delete them.
+    Under #1801's key that matters: the throttle space is now finite (pair × subdomain),
+    so a wiped prior-cycle row parked on a key would block that pair from ever docketing
+    that subdomain again. A tombstoned / prior-phase row is therefore treated as absent
+    and replaced — it is already invisible to every reader through the phase filter.
+
+    Fail-safe direction is "don't clobber": if the filter can't be consulted, the row
+    counts as standing.
+    """
+    if not item:
+        return False
+    try:
+        from phase_filter import singleton_visible
+
+        return bool(singleton_visible(item))
+    except Exception as e:
+        logger.warning("phase filter unavailable during the docket throttle check: %s", e)
+        return True
+
+
+# How many times a derived write may disambiguate a sort-key collision before it
+# gives up loudly. Unreachable once the keys are pair-scoped (#1798) — this is the
+# belt to that suspenders, so a future key change can never resurrect a SILENT
+# overwrite of a graded outcome (ADR-104: no silent data loss).
+_MAX_SK_DISAMBIGUATION = 5
+
+
+def _put_unique(item, what):
+    """put_item that can never silently overwrite an existing row.
+
+    Every derived record the resolution path writes (the LEARNING# track-record row,
+    the graded PREDICTION# row, the RESOLVED# docket entry) is a NEW fact about a
+    specific docket — none of them is ever a legitimate update of another docket's
+    fact. The write is therefore conditional; on the (post-#1798, unreachable)
+    collision it disambiguates with a numeric suffix and LOGS it, rather than
+    destroying the row already there.
+    """
+    base_sk = item["sk"]
+    for attempt in range(_MAX_SK_DISAMBIGUATION):
+        candidate = base_sk if attempt == 0 else f"{base_sk}-{attempt + 1}"
+        try:
+            table.put_item(
+                Item=floats_to_decimal(_stamped({**item, "sk": candidate})),
+                ConditionExpression="attribute_not_exists(pk) AND attribute_not_exists(sk)",
+            )
+            return candidate
+        except ClientError as e:
+            if e.response.get("Error", {}).get("Code") != "ConditionalCheckFailedException":
+                raise
+            logger.warning("%s sort key %s already exists — disambiguating rather than overwriting", what, candidate)
+    raise RuntimeError(f"{what}: could not find a free sort key for {base_sk!r} after {_MAX_SK_DISAMBIGUATION} attempts")
+
+
 # ── stakes (frozen at open) ───────────────────────────────────────────────────
 
 
@@ -291,11 +393,24 @@ def build_stake(coach_id, subdomain):
 
 def open_docket(topic, coach_a, coach_b, claims, normalized, open_date_str, source_sk=None):
     """Open ONE standing docket entry. The conditional put IS the throttle:
-    one open docket per coach-pair per topic (AC5). Returns a result dict."""
+    one open docket per coach-pair per SUBDOMAIN (AC5, re-keyed by #1801).
+    Returns a result dict."""
     a, b = sorted((coach_a, coach_b))
     slug = _slugify(topic)
-    sk = f"OPEN#{pair_key(a, b)}#{slug}"
     subdomain = metric_subdomain(normalized["metric"])
+    sk = open_sk(a, b, normalized["metric"])
+    # The conditional put below stays the AUTHORITATIVE (race-safe) throttle; this read
+    # is a cheap fast path so a rephrased topic no longer pays for two build_stake scans
+    # just to be rejected (#1801's cost half) — and it is where a TOMBSTONED prior-cycle
+    # row gets cleared out of a now-finite key space (see _docket_row_stands).
+    existing = None
+    try:
+        existing = table.get_item(Key={"pk": DOCKET_PK, "sk": sk}).get("Item")
+    except Exception as e:  # a read hiccup must never block the write path
+        logger.warning("docket pre-check read failed for %s: %s", sk, e)
+    if _docket_row_stands(existing):
+        return {"opened": False, "reason": "throttled — an open docket already stands for this pair+subdomain", "sk": sk}
+    replacing_stale = existing is not None
     now = datetime.now(timezone.utc)
     item = {
         "pk": DOCKET_PK,
@@ -306,6 +421,7 @@ def open_docket(topic, coach_a, coach_b, claims, normalized, open_date_str, sour
         "topic_slug": slug,
         "coach_a": a,
         "coach_b": b,
+        "pair_key": pair_key(a, b),
         "claims": {a: str(claims.get(a, "")), b: str(claims.get(b, ""))},
         "criterion": {
             "metric": normalized["metric"],
@@ -322,14 +438,16 @@ def open_docket(topic, coach_a, coach_b, claims, normalized, open_date_str, sour
     }
     if source_sk:
         item["source_sk"] = source_sk
+    put_kwargs = {"Item": floats_to_decimal(_stamped(item))}
+    if replacing_stale:
+        logger.info("docket key %s held a wiped prior-cycle row — replacing it", sk)
+    else:
+        put_kwargs["ConditionExpression"] = "attribute_not_exists(pk) AND attribute_not_exists(sk)"
     try:
-        table.put_item(
-            Item=floats_to_decimal(_stamped(item)),
-            ConditionExpression="attribute_not_exists(pk) AND attribute_not_exists(sk)",
-        )
+        table.put_item(**put_kwargs)
     except ClientError as e:
         if e.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
-            return {"opened": False, "reason": "throttled — an open docket already stands for this pair+topic", "sk": sk}
+            return {"opened": False, "reason": "throttled — an open docket already stands for this pair+subdomain", "sk": sk}
         raise
     logger.info("docket OPENED %s (%s vs %s, resolves %s)", sk, a, b, normalized["resolution_date"])
     return {"opened": True, "sk": sk, "resolution_date": normalized["resolution_date"]}
@@ -354,6 +472,9 @@ def open_from_disagreements(disagreements, open_date_str):
     opened, skipped = [], []
     for d in disagreements or []:
         topic = d.get("topic", "unnamed")
+        if len(opened) >= MAX_OPENS_PER_RUN:
+            skipped.append({"topic": topic, "reason": f"per-run cap reached ({MAX_OPENS_PER_RUN} opens) — deferred to the next run"})
+            continue
         coaches = [c for c in (d.get("coaches") or []) if c]
         criterion = d.get("resolution_criterion")
         if len(coaches) < 2:
@@ -398,11 +519,17 @@ def open_from_disagreements(disagreements, open_date_str):
 def _write_docket_learning(coach_id, today_str, docket, outcome, concession=None):
     """LEARNING# row on the coach's own partition — the track-record trail both
     the public _track_record and the stance grounding read. channel='data':
-    data-derived, publicly renderable (NOT ADR-141 conversation-private)."""
+    data-derived, publicly renderable (NOT ADR-141 conversation-private).
+
+    #1798: the sort key is PAIR-SCOPED (docket_ref_key), matching the OPEN#/RESOLVED#
+    rows. Keyed on date+topic-slug alone, a coach who held two same-topic dockets
+    against two different opponents wrote both verdicts to one key — the unconditional
+    put_item destroyed the first, so a win and a loss surfaced as a single graded row on
+    the public hit rate. The write is conditional now too (_put_unique)."""
     slug = docket["topic_slug"]
     item = {
         "pk": f"COACH#{coach_id}",
-        "sk": f"LEARNING#{today_str}#docket-{slug}",
+        "sk": f"LEARNING#{today_str}#docket-{docket_ref_key(docket)}",
         "coach_id": coach_id,
         "date": today_str,
         "channel": "data",
@@ -423,20 +550,25 @@ def _write_docket_learning(coach_id, today_str, docket, outcome, concession=None
     }
     if concession:
         item["concession"] = concession
-    table.put_item(Item=floats_to_decimal(_stamped(item)))
+    _put_unique(item, "docket LEARNING#")
 
 
 def _write_docket_prediction(coach_id, docket, outcome, actual, today_str):
     """A resolved PREDICTION# record — the docket position enters the coach's
     Brier scoreboard through calibration_core like every other graded call.
     Written ALREADY RESOLVED (status confirmed/refuted), so the evaluator's
-    pending/confirming fetch never re-grades it."""
-    slug = docket["topic_slug"]
+    pending/confirming fetch never re-grades it.
+
+    #1798: pair-scoped like the LEARNING# row above — two same-day, same-topic dockets
+    against different opponents used to write one PREDICTION# key, silently dropping a
+    graded outcome out of the public Brier scoreboard."""
+    ref = docket_ref_key(docket)
     stake = (docket.get("stakes") or {}).get(coach_id) or {}
+    prediction_id = f"docket-{ref}-{docket.get('opened_date', today_str)}"
     item = {
         "pk": f"COACH#{coach_id}",
-        "sk": f"PREDICTION#docket-{slug}-{docket.get('opened_date', today_str)}",
-        "prediction_id": f"docket-{slug}-{docket.get('opened_date', today_str)}",
+        "sk": f"PREDICTION#{prediction_id}",
+        "prediction_id": prediction_id,
         "coach_id": coach_id,
         "source": "dispute_docket",
         "claim_natural": (docket.get("claims") or {}).get(coach_id, ""),
@@ -451,7 +583,7 @@ def _write_docket_prediction(coach_id, docket, outcome, actual, today_str):
         "created_at": docket.get("opened_at", ""),
         "resolved_at": datetime.now(timezone.utc).isoformat(),
     }
-    table.put_item(Item=floats_to_decimal(_stamped(item)))
+    _put_unique(item, "docket PREDICTION#")
 
 
 def _finalize(open_item, today_str, verdict):
@@ -467,7 +599,7 @@ def _finalize(open_item, today_str, verdict):
         "resolved_at": datetime.now(timezone.utc).isoformat(),
         **verdict,
     }
-    table.put_item(Item=floats_to_decimal(_stamped(resolved)))
+    resolved_sk = _put_unique(resolved, "docket RESOLVED#")
     table.delete_item(Key={"pk": DOCKET_PK, "sk": open_item["sk"]})
     return resolved_sk
 
