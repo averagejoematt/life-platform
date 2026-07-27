@@ -105,8 +105,15 @@ def _public_horizon_card(pick: dict) -> dict:
 
     Only the reader-safe pick facts + the coach's retrospective (ONLY when the #1673
     gate cleared it, i.e. retrospectiveStatus == "published") leave this module. Any
-    field not named here — including S4's future private reactions — is unreachable BY
-    CONSTRUCTION, the same architectural posture as reading_visibility.project_public.
+    field not named here is unreachable BY CONSTRUCTION, the same architectural posture
+    as reading_visibility.project_public.
+
+    S4 (#1708) has now landed and this card deliberately carries NOTHING from it: not
+    Matthew's reaction, not the derived calibration ledger. Personal feedback that only
+    feeds coach signal stays private. Should a reaction ever be surfaced here, the ONLY
+    sanctioned door is `reading.horizons_calibration.is_publishable_reaction` — a
+    positive match on an explicit owner consent tier AND a CLEARED #1673 sensitivity
+    verdict (the Social Membrane's auto-publish posture), fail-closed by construction.
     """
     p = pick or {}
     card = {

@@ -279,23 +279,51 @@ def _iso_week(d=None) -> str:
     return f"{year}-W{week:02d}"
 
 
+def _horizons_calibration():
+    """The #1708 reaction ledger, or an honest empty state. Fail-soft: the picks are
+    readable even if the profile item is missing."""
+    try:
+        return reading_store.get_horizons_calibration()
+    except Exception as e:  # noqa: BLE001 — calibration is context, never load-bearing for a read
+        logger.info("[#1708] horizons calibration unavailable (%s)", type(e).__name__)
+        return None
+
+
+_CALIBRATION_HOW_TO_USE = (
+    "How Matthew reacted to past picks, as DETERMINISTIC COUNTS (no model verdict). Read it before "
+    "curating the next pick: engagement_rate is only meaningful at or above signal.min_n — below that "
+    "it is data, not a preference. A null rate means no reactions yet, never a zero. His reactions "
+    "themselves are private and never appear here or on any public surface."
+)
+
+
 def tool_get_horizons(args):
     """Horizons — the weekly coach-curated media pick that broadens horizons.
-    Returns the current pick + the past picks (newest first). Honest empty state
-    before the first pick is curated."""
+    Returns the current pick + the past picks (newest first) + the #1708 reaction
+    calibration the next pick should be informed by. Honest empty state before the
+    first pick is curated."""
     args = args or {}
     limit = int(args.get("limit", 26))
     picks = reading_store.horizon_picks(limit=limit)
+    calibration = _horizons_calibration()
     current = picks[0] if picks else None
     if not current:
         return {
             "current": None,
             "past": [],
             "count": 0,
+            "calibration": calibration,
             "note": "No Horizons pick yet — the Mind coach curates one weekly (curate_horizon).",
             "as_of": _today(),
         }
-    return {"current": current, "past": picks[1:], "count": len(picks), "as_of": _today()}
+    return {
+        "current": current,
+        "past": picks[1:],
+        "count": len(picks),
+        "calibration": calibration,
+        "calibration_how_to_use": _CALIBRATION_HOW_TO_USE,
+        "as_of": _today(),
+    }
 
 
 def tool_curate_horizon(args=None):
@@ -359,7 +387,12 @@ def tool_curate_horizon(args=None):
         plan["follow_up"] = dict(follow_up)
 
     if dry_run:
-        return _preview("curate_horizon", plan)
+        # #1708: the reaction ledger rides the preview so the coach can calibrate the
+        # pick BEFORE committing it — that is what "future picks calibrate" means here.
+        preview = _preview("curate_horizon", plan)
+        preview["calibration"] = _horizons_calibration()
+        preview["calibration_how_to_use"] = _CALIBRATION_HOW_TO_USE
+        return preview
 
     checkin_item = None
     if follow_up:

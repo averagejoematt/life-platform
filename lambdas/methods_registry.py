@@ -456,10 +456,12 @@ REGISTRY = {
         "Conversational enrichment signals — analysis-only scope",
         conversation_enrichment.enrichment_policy,
         "Provenance",
-        "scope = analysis_only (v1, #1577): LLM-coded signals from coach check-in answers, habit reflections, and "
-        "field-note responses seed HYPO_CANDIDATE# rows (channel-tagged) and are visible as enriched context, but "
-        "they do NOT enter character or flourishing scoring. Absence of conversation is 'no data', never a zero "
-        "(ADR-104). Dedup vs the journal (AC4): content-hash equality, or a ≥40-char normalized containment match.",
+        "scope = analysis_only (v1, #1577): LLM-coded signals from coach check-in answers, habit reflections, "
+        "field-note responses and — since #1708 — reactions to the coach's weekly Horizons pick "
+        "(channel prescription_reaction) seed HYPO_CANDIDATE# rows (channel-tagged) and are visible as enriched "
+        "context, but they do NOT enter character or flourishing scoring. Absence of conversation is 'no data', "
+        "never a zero (ADR-104). Dedup vs the journal (AC4): content-hash equality, or a ≥40-char normalized "
+        "containment match.",
         "Rolling 14-day sweep on the daily 6:30 AM enrichment cadence; each record is coded once "
         "(re-coded only on a schema bump or explicit force).",
         "These numbers are a language model's (Haiku) reading of short conversational prose — never sensor data, and "
@@ -468,8 +470,9 @@ REGISTRY = {
         "plus a human re-review of this entry — the fingerprint below trips if the policy function changes without "
         "that review. Causal hints survive only the deterministic verbatim-quote grounding gate (ADR-104). "
         "Enrichment pauses at budget tier 1 (internal band, ADR-125); paused windows are visible as unenriched "
-        "records, never fabricated.",
-        "0fab2eb65070",
+        "records, never fabricated. The #1708 prescription_reaction channel inherits this scope unchanged: it "
+        "calibrates the DETERMINISTIC Horizons reaction ledger (counts only, no model verdict) and moves no scoring.",
+        "16d92a931f58",
         min_n=None,
         used_by=(
             "journal_analyzer_lambda HYPO_CANDIDATE# aggregation (channel provenance on every quote) → the weekly "

@@ -57,6 +57,42 @@ MANUAL_SOURCE_COACH = {
 _SKIP_ACK = "Skip logged — always a valid answer, zero penalty. The coaches treat a decline as a boundary, not a gap."
 
 
+# ── #1708 (epic #1686 S4): the Horizons feedback loop ────────────────────────
+
+
+def _reaction_sensitivity_attrs(answer):
+    """The #1673 fail-closed verdict to stamp on a stored Horizons reaction.
+
+    Fail-SOFT on the import (a missing gate module simply stamps nothing) but
+    fail-CLOSED on the outcome: `horizons_calibration.is_publishable_reaction` is a
+    POSITIVE match on a cleared verdict, so an unstamped reaction is not publishable
+    either. Recording the answer must never fail because of the gate.
+    """
+    try:
+        from reading import horizons_calibration
+
+        return horizons_calibration.sensitivity_attrs_for_reaction(answer)
+    except Exception as e:  # noqa: BLE001 — the stamp is advisory; the absence is safe
+        logger.warning(f"[#1708] sensitivity stamp unavailable ({type(e).__name__}: {e}) — reaction stays unpublishable")
+        return {}
+
+
+def _refresh_horizons_calibration():
+    """Recompute the deterministic Horizons reaction ledger after a reaction lands.
+
+    Fail-soft: a calibration failure must never lose Matthew's verbatim answer (which
+    is already committed by the time this runs). Returns a compact summary or None.
+    """
+    try:
+        from reading import horizons_calibration
+
+        cal = horizons_calibration.refresh(_table_ref)
+        return {"n_picks": cal.get("n_picks"), "n_reactions": cal.get("n_reactions"), "confidence": cal.get("confidence")}
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[#1708] horizons calibration refresh failed (non-fatal): {type(e).__name__}: {e}")
+        return None
+
+
 # ── live-context snapshot (what generation grounds itself in) ────────────────
 
 
@@ -297,6 +333,16 @@ def tool_log_coach_checkin(args):
         update_parts.append("tags = :tags")
         expr_values[":tags"] = tags
 
+    # #1708 (epic #1686 S4): a reaction to the coach's weekly Horizons pick is stamped
+    # with the #1673 fail-closed sensitivity verdict AT CAPTURE, exactly as the Social
+    # Membrane stamps an inbound post. Deterministic + offline (no classifier wired ⇒
+    # HELD), so a personal reaction can never become auto-publishable by default.
+    is_prescription = str(existing.get("generated_by") or "") == "prescription_followup"
+    if is_prescription and answer:
+        for attr, value in _reaction_sensitivity_attrs(answer).items():
+            update_parts.append(f"{attr} = :{attr}")
+            expr_values[f":{attr}"] = value
+
     _table_ref.update_item(
         Key={"pk": found_pk, "sk": checkin_id},
         UpdateExpression="SET " + ", ".join(update_parts),
@@ -305,9 +351,17 @@ def tool_log_coach_checkin(args):
     )
 
     coach_name = existing.get("coach_name") or COACH_NAMES.get(existing.get("coach_id"), existing.get("coach_id"))
+    # #1708: a reaction to a Horizons pick immediately recalibrates the deterministic
+    # ledger the curating coach reads before the NEXT pick. A skip recalibrates too —
+    # an unanswered pick is real signal about the pick, not about Matthew (ADR-104).
+    calibration = _refresh_horizons_calibration() if is_prescription else None
+
     if status == cc.STATUS_SKIPPED:
-        return {"status": "saved", "outcome": "skipped", "coach_name": coach_name, "checkin_id": checkin_id, "message": _SKIP_ACK}
-    return {
+        out = {"status": "saved", "outcome": "skipped", "coach_name": coach_name, "checkin_id": checkin_id, "message": _SKIP_ACK}
+        if calibration:
+            out["horizons_calibration"] = calibration
+        return out
+    result = {
         "status": "saved",
         "outcome": "answered",
         "coach_name": coach_name,
@@ -321,6 +375,13 @@ def tool_log_coach_checkin(args):
             "max 2) so the coach re-grades its own confidence from the conversation — bounded, never required."
         ),
     }
+    if calibration:
+        result["horizons_calibration"] = calibration
+        result["message"] += (
+            " This one reacted to a Horizons pick, so it also recalibrated the coach's picking ledger "
+            "(and the 6:30 AM enrichment pass will code it as a prescription_reaction signal)."
+        )
+    return result
 
 
 def tool_log_coach_calibration(args):

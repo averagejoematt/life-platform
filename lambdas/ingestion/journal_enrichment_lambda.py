@@ -443,6 +443,28 @@ def _run_conversational(event, start_date, end_date, force):
     )
 
 
+def _refresh_horizons_calibration():
+    """#1708 (epic #1686 S4): recompute the Horizons reaction ledger.
+
+    Runs AFTER the conversational sweep so a reaction enriched in THIS pass
+    contributes its coded sentiment to the ledger the same morning. Deterministic —
+    counts over stored rows, zero LLM calls (ADR-105) — and bounded: one GetItem per
+    pick that actually surfaced a follow-up. No second pipeline: it rides this
+    Lambda's existing 6:30 AM PT cadence, exactly like the conversational sweep.
+
+    Returns the summary dict, or an error dict — a calibration failure must never
+    fail journal enrichment.
+    """
+    from reading import horizons_calibration
+
+    calibration = horizons_calibration.refresh(table)
+    return {
+        "n_picks": calibration.get("n_picks"),
+        "n_reactions": calibration.get("n_reactions"),
+        "confidence": calibration.get("confidence"),
+    }
+
+
 def lambda_handler(event: dict, context) -> dict:
     try:
         """
@@ -594,6 +616,16 @@ def lambda_handler(event: dict, context) -> dict:
             logger.error(f"conversational enrichment failed (non-fatal): {ce}")
             conversational = {"status": "error", "error": str(ce)}
 
+        # #1708: the Horizons feedback loop — deterministic recompute of the reaction
+        # ledger AFTER the sweep, so this morning's coded sentiment is already in it.
+        # Fail-soft: calibration must never fail enrichment.
+        horizons_calibration = {}
+        try:
+            horizons_calibration = _refresh_horizons_calibration()
+        except Exception as he:
+            logger.error(f"horizons calibration failed (non-fatal): {he}")
+            horizons_calibration = {"status": "error", "error": str(he)}
+
         summary = {
             "entries_found": len(entries),
             "enriched": enriched,
@@ -602,6 +634,7 @@ def lambda_handler(event: dict, context) -> dict:
             "diary_reactions": diary_reactions,  # #1756
             "flourishing_rows": flourishing_rows,
             "conversational": conversational,
+            "horizons_calibration": horizons_calibration,  # #1708
             "date_range": f"{start_date} → {end_date}",
         }
         logger.info(f"Complete: {summary}")

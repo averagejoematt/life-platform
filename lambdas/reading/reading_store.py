@@ -225,6 +225,31 @@ def put_profile(profile: dict) -> dict:
     return item
 
 
+def put_horizons_calibration(calibration: dict) -> dict:
+    """Merge the Horizons reaction ledger onto the reading profile (#1708, S4).
+
+    The calibration state the reading rail already owns is READING#PROFILE/CURRENT,
+    so the Horizons ledger lives there under the `horizons` attribute — one more
+    field on one existing item, no new partition and no new GSI. PRIVATE: it is
+    derived from Matthew's reactions and is registered in
+    `reading_visibility.PRIVATE_FIELDS[READING_PROFILE]` so it can never reach the
+    public projection (which allowlists only `wheelDistribution`).
+    """
+    from reading import horizons_calibration as hc
+
+    profile = _get(rk.profile_key()) or {}
+    profile = {k: v for k, v in profile.items() if k not in ("pk", "sk")}
+    profile[hc.PROFILE_FIELD] = calibration
+    return put_profile(profile)
+
+
+def get_horizons_calibration() -> dict | None:
+    """The stored Horizons reaction ledger, or None before the first refresh."""
+    from reading import horizons_calibration as hc
+
+    return (get_profile() or {}).get(hc.PROFILE_FIELD)
+
+
 def put_horizon_pick(pick: dict, *, now: str | None = None) -> dict:
     """Write/overwrite the Horizons weekly pick for `pick['week']` (#1705).
 

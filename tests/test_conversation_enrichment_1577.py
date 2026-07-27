@@ -247,7 +247,9 @@ class TestAnalysisOnlyScope:
         assert pol["moves_character_scoring"] is False
         assert pol["moves_flourishing_scoring"] is False
         assert pol["seeds_hypothesis_candidates"] is True
-        assert sorted(pol["channels"]) == ["coach_checkin", "field_note", "habit_reflection"]
+        # #1708 added the 4th channel (a reaction to the weekly Horizons pick) under the
+        # SAME analysis-only scope — same partition, same sweep, same gate.
+        assert sorted(pol["channels"]) == ["coach_checkin", "field_note", "habit_reflection", "prescription_reaction"]
 
     def test_methods_registry_entry_says_so_and_fingerprint_matches(self):
         import methods_registry as mr
