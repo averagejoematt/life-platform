@@ -1,6 +1,6 @@
 # Scoring Engine — the Day Grade
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-26 (post-#970 — scoring_engine deliberately KEPT its typed safe_float; formulas unchanged. 2026-07-13: docstring reword only, now that the shared layer is retired by #781 — no logic change. 2026-07-26 re-verify: only #1656 mypy type-annotation churn in `scoring_engine.py`/`daily_metrics_compute_lambda.py` since; documented formulas unchanged)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-27 (post-#970 — scoring_engine deliberately KEPT its typed safe_float; formulas unchanged. 2026-07-13: docstring reword only, now that the shared layer is retired by #781 — no logic change. 2026-07-26 re-verify: only #1656 mypy type-annotation churn in `scoring_engine.py`/`daily_metrics_compute_lambda.py` since; documented formulas unchanged. 2026-07-27 re-verify: #1843 added the `diary_sessions` computed field to daily_metrics_compute — additive storage only; the documented scoring formulas are untouched)
 > **Sources of truth:** `lambdas/scoring_engine.py`, `lambdas/compute/daily_metrics_compute_lambda.py`, profile record `USER#matthew / PROFILE#v1` (`day_grade_weights`)
 
 ## Purpose
