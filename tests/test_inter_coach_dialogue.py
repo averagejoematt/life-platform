@@ -19,6 +19,7 @@ os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "FAKE")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
 import inter_coach_dialogue_lambda as icd  # noqa: E402
+from bundle_stubs import stub_bundled_module
 
 
 def _topic(slug, coaches, cycle_count=1, positions=None, status=None, last_aired=None):
@@ -127,7 +128,7 @@ class TestGatedTurn:
                 text = "Recovery hit 87 yesterday." if len(calls) == 1 else "Recovery held steady."
                 return {"content": [{"type": "text", "text": text}]}
 
-        monkeypatch.setitem(sys.modules, "bedrock_client", _BR)
+        stub_bundled_module(monkeypatch, "ai.bedrock_client", _BR)
         text, left = icd.generate_gated_turn("sys prompt", "user prompt", ["no numbers here"])
         assert text == "Recovery held steady."
         assert left == []
@@ -142,6 +143,6 @@ class TestGatedTurn:
                 calls.append(body)
                 return {"content": [{"type": "text", "text": "Sleep first, then load."}]}
 
-        monkeypatch.setitem(sys.modules, "bedrock_client", _BR)
+        stub_bundled_module(monkeypatch, "ai.bedrock_client", _BR)
         text, left = icd.generate_gated_turn("s", "u", [])
         assert text and left == [] and len(calls) == 1

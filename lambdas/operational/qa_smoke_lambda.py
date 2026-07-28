@@ -23,11 +23,11 @@ from datetime import date, datetime, timedelta, timezone
 
 import boto3
 from boto3.dynamodb.conditions import Key
-from mcp_url import resolve_mcp_url  # SEC-02 #780: discover the URL at runtime, not a committed env var
+from common.mcp_url import resolve_mcp_url  # SEC-02 #780: discover the URL at runtime, not a committed env var
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("qa-smoke")
 except ImportError:
@@ -38,7 +38,7 @@ except ImportError:
 # dashboard validates *yesterday*, which is pre-genesis and legitimately has no
 # day-grade. A missing grade for a pre-experiment date is expected, not a fault.
 try:
-    from constants import EXPERIMENT_START_DATE
+    from common.constants import EXPERIMENT_START_DATE
 except ImportError:
     EXPERIMENT_START_DATE = None
 
@@ -130,7 +130,7 @@ def check_ddb_freshness():
     # (API 402)" for two weeks; the phantom "journal" partition was checked
     # instead of notion). Tier semantics unchanged: REQUIRED missing = FAIL,
     # OPTIONAL missing = warn, PAUSED = ⏸ never a fault.
-    from source_registry import qa_optional, qa_paused, qa_required
+    from ingestion.source_registry import qa_optional, qa_paused, qa_required
 
     REQUIRED = qa_required()
     OPTIONAL = qa_optional()
@@ -230,8 +230,8 @@ def check_score_sanity():
     # several zero/odd states are the HONEST state (ADR-104), not data loss.
     # From Day 2 every one of them is a real FAIL again.
     try:
-        from constants import EXPERIMENT_START_DATE as _genesis
-        from pacific_time import pacific_today as _pt_today
+        from common.constants import EXPERIMENT_START_DATE as _genesis
+        from common.pacific_time import pacific_today as _pt_today
 
         _genesis_grace = (date.fromisoformat(_pt_today()) - date.fromisoformat(_genesis)).days < 1
     except Exception:  # noqa: BLE001 — grace derivation must never break the sweep
@@ -581,7 +581,7 @@ def _fetch_reader_truth_surfaces():
     browser innerText the CI pass sees); API payloads go in as raw JSON text.
     Every failure is a warning string, never an exception (fail-soft).
     """
-    import reader_truth_qa
+    from operational import reader_truth_qa
 
     surfaces, warnings = [], []
     for path, name in READER_TRUTH_SURFACES + READER_TRUTH_APIS:
@@ -602,8 +602,9 @@ def check_reader_truth():
 
     # Budget gate — internal QA pauses first (ADR-125). Explicit ⏸, never silent.
     try:
-        import budget_guard
-        import reader_truth_qa
+        from ai import budget_guard
+
+        from operational import reader_truth_qa
 
         if not budget_guard.allow(reader_truth_qa.BUDGET_FEATURE):
             tier = budget_guard.current_tier()
@@ -620,7 +621,7 @@ def check_reader_truth():
         logger.warning("reader-truth budget gate degraded: %s", e)
 
     try:
-        import reader_truth_qa
+        from operational import reader_truth_qa
 
         surfaces, fetch_warnings = _fetch_reader_truth_surfaces()
         for w in fetch_warnings:
@@ -629,7 +630,7 @@ def check_reader_truth():
             checks.append(verdict.warn("no surfaces fetched — Reader Truth skipped this run (fail-soft)"))
             return checks
 
-        import bedrock_client
+        from ai import bedrock_client
 
         findings, errors = reader_truth_qa.assess_prose(surfaces, bedrock_client.invoke)
         phase = reader_truth_qa.phase_context()
@@ -689,8 +690,7 @@ def check_receipt_replay():
     """
     c = Check("character:receipt_replay", "Character Receipts")
     try:
-        import character_engine
-        import progression_receipts as pr
+        from health import character_engine, progression_receipts as pr
 
         resp = table.query(
             KeyConditionExpression=Key("pk").eq(USER_PREFIX + "character_receipt") & Key("sk").begins_with("DATE#"),
@@ -708,7 +708,7 @@ def check_receipt_replay():
         # #1412: replay against the SAME effective config the nightly compute
         # hashed into the receipt (personal-variance targets overlaid) — the raw
         # S3 config alone would read as permanent unlabeled config drift.
-        import personal_baselines
+        from health import personal_baselines
 
         config = personal_baselines.effective_character_config(config, table, USER_PREFIX)
         drifted, mismatched = [], []
@@ -866,7 +866,7 @@ def check_redirect_spotcheck():
         return [check.pause(f"redirect spot-check runs Mondays — skipped ({now.strftime('%A')} PT); rotates over ~1 month")]
 
     try:
-        import redirect_spotcheck
+        from operational import redirect_spotcheck
 
         iso_week = now.isocalendar()[1]
         result = redirect_spotcheck.run_spotcheck(SITE_BASE_URL, iso_week)
@@ -930,7 +930,7 @@ def check_notion_template_schema():
     sm = boto3.client("secretsmanager", region_name=REGION)
     try:
         try:
-            from secret_cache import get_secret_json
+            from common.secret_cache import get_secret_json
 
             secret = get_secret_json(NOTION_SECRET_NAME, sm)
         except ImportError:

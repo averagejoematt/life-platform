@@ -9,9 +9,9 @@ No AWS — a fake table records every write/delete/query.
 import json
 import os
 
-import meal_projection as mp  # conftest puts lambdas/ on sys.path
 import pytest
 from fakes import FakeDdbTable
+from health import meal_projection as mp  # conftest puts lambdas/ on sys.path
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "food_log_2026-06-15_18.json")
 USER = "matthew"
@@ -44,7 +44,7 @@ def days():
 
 
 def _groups(days, date):
-    from meal_grouper import group_day
+    from health.meal_grouper import group_day
 
     return group_day(days[date]["food_log"])
 

@@ -22,8 +22,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
 
-import milestone_ledger as ml  # noqa: E402
-import process_milestones as pm  # noqa: E402
+from health import (
+    milestone_ledger as ml,  # noqa: E402
+    process_milestones as pm,  # noqa: E402
+)
 
 USER_PREFIX = "USER#matthew#SOURCE#"
 LEDGER_PK = USER_PREFIX + "milestones"
@@ -399,10 +401,10 @@ def test_default_sweep_consults_the_breaker_and_fails_closed():
 
 
 def test_breaker_registry_marks_milestones_wired():
-    import spiral_breaker
+    from coach import spiral_breaker
 
     spec = spiral_breaker.CELEBRATORY_EMITTERS["milestone_announcements"]
-    assert spec["wired"] is True and spec["path"] == "lambdas/milestone_ledger.py"
+    assert spec["wired"] is True and spec["path"] == "lambdas/health/milestone_ledger.py"
 
 
 def test_process_milestones_write_through_ledger_write_once():

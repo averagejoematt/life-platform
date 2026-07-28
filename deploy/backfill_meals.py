@@ -29,7 +29,7 @@ from boto3.dynamodb.conditions import Key
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
-import meal_projection as mp  # noqa: E402  (imports meal_grouper transitively)
+from health import meal_projection as mp  # noqa: E402  (imports meal_grouper transitively)
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE = os.environ.get("TABLE_NAME", "life-platform")

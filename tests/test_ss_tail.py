@@ -22,7 +22,7 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "emails"))
 
-import editorial_image as ei  # noqa: E402
+from content import editorial_image as ei  # noqa: E402
 
 # ── SS-11: editorial-image guardrail ─────────────────────────────────────────
 

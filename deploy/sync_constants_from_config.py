@@ -19,7 +19,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = REPO_ROOT / "config" / "user_goals.json"
-CONSTANTS_PATH = REPO_ROOT / "lambdas" / "constants.py"
+CONSTANTS_PATH = REPO_ROOT / "lambdas" / "common" / "constants.py"
 
 
 def derive_dow(date_str: str) -> str:

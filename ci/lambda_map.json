@@ -1,38 +1,6 @@
 {
   "_comment": "Lambda source file \u2192 AWS function name mapping for CI/CD. Used by .github/workflows/ci-cd.yml",
-  "_updated": "2026-03-28 v4.3.1",
-  "acwr_compute": {
-    "lambdas/acwr_compute_lambda.py": {
-      "function": "acwr-compute",
-      "handler": "acwr_compute_lambda.lambda_handler",
-      "note": "BS-09: Whoop strain ACWR. Runs 9:55 AM PT daily. Writes to computed_metrics partition.",
-      "stack": "LifePlatformCompute"
-    }
-  },
-  "chronicle_email_sender": {
-    "lambdas/chronicle_email_sender_lambda.py": {
-      "function": "chronicle-email-sender",
-      "handler": "chronicle_email_sender_lambda.lambda_handler",
-      "note": "BS-03: Delivers Chronicle installment to confirmed subscribers. Wed 8:10 AM PT. Viktor guard: no-op if no installment this week.",
-      "stack": "LifePlatformEmail"
-    }
-  },
-  "circadian_compliance": {
-    "lambdas/circadian_compliance_lambda.py": {
-      "function": "circadian-compliance",
-      "handler": "circadian_compliance_lambda.lambda_handler",
-      "note": "BS-SL2: Circadian Compliance Score \u2014 pre-sleep behavioral score (0-100). Runs 7:00 PM PT daily. Writes to circadian partition. Surfaces in Evening Nudge.",
-      "stack": "LifePlatformCompute"
-    }
-  },
-  "email_subscriber": {
-    "lambdas/email_subscriber_lambda.py": {
-      "function": "email-subscriber",
-      "handler": "email_subscriber_lambda.lambda_handler",
-      "note": "BS-03: subscribe/confirm/unsubscribe. DDB subscribers partition. SES double opt-in. No Function URL \u2014 wired to API Gateway /api/subscribe.",
-      "stack": "LifePlatformOperational"
-    }
-  },
+  "_updated": "2026-07-28 (#1653): removed 4 orphan top-level sections left by the 2026-05-25 subpackage reorg (acwr_compute, chronicle_email_sender, circadian_compliance, email_subscriber). They pointed at lambdas/<name>.py paths that no longer existed and carried FLAT handler strings (e.g. 'acwr_compute_lambda.lambda_handler') that live no longer matches ('compute.acwr_compute_lambda.lambda_handler'). Nothing read them \u2014 CI validates only the .lambdas section via jq '.lambdas | keys[]' \u2014 so they were dead JSON, but a reader or a future script could have believed the stale handlers. Their notes/stack were migrated into the real .lambdas entries below.",
   "lambda_edge": {
     "_comment": "Lambda@Edge functions \u2014 deployed in us-east-1, manually managed outside CDK. NOT auto-deployed via CI/CD pipeline. Metrics aggregated to us-east-1 per AWS requirement.",
     "functions": {
@@ -42,10 +10,6 @@
         "note": "Manually deployed \u2014 NOT CDK-managed. Lambda@Edge requires us-east-1 and cannot be deployed from us-west-2 CDK stacks. Secret: life-platform/cf-auth (must exist in us-east-1). Alarm: life-platform-cf-auth-errors (us-east-1 CloudWatch).",
         "protects": "dash.averagejoematt.com",
         "region": "us-east-1"
-      },
-      "lambdas/site_api_lambda.py": {
-        "function": "life-platform-site-api",
-        "note": "CDK-managed (LifePlatformWeb stack). Read-only public API for averagejoematt.com. Reserved concurrency=20."
       }
     }
   },
@@ -91,7 +55,9 @@
       "_cdk_only_reason": "Imports persona_registry + voice_fidelity_core (bundled/layer siblings) \u2014 single-file hot-deploy risks stripping/staling them before the layer catches up."
     },
     "lambdas/compute/acwr_compute_lambda.py": {
-      "function": "acwr-compute"
+      "function": "acwr-compute",
+      "note": "BS-09: Whoop strain ACWR. Runs 9:55 AM PT daily. Writes to computed_metrics partition.",
+      "stack": "LifePlatformCompute"
     },
     "lambdas/compute/adaptive_mode_lambda.py": {
       "function": "adaptive-mode-compute"
@@ -100,7 +66,9 @@
       "function": "character-sheet-compute"
     },
     "lambdas/compute/circadian_compliance_lambda.py": {
-      "function": "circadian-compliance"
+      "function": "circadian-compliance",
+      "note": "BS-SL2: Circadian Compliance Score — pre-sleep behavioral score (0-100). Runs 7:00 PM PT daily. Writes to circadian partition. Surfaces in Evening Nudge.",
+      "stack": "LifePlatformCompute"
     },
     "lambdas/compute/coach_daily_reflection_lambda.py": {
       "function": "coach-daily-reflection"
@@ -165,7 +133,9 @@
       "function": "chronicle-approve"
     },
     "lambdas/emails/chronicle_email_sender_lambda.py": {
-      "function": "chronicle-email-sender"
+      "function": "chronicle-email-sender",
+      "note": "BS-03: Delivers Chronicle installment to confirmed subscribers. Wed 8:10 AM PT. Viktor guard: no-op if no installment this week.",
+      "stack": "LifePlatformEmail"
     },
     "lambdas/emails/chronicle_podcast_lambda.py": {
       "function": "chronicle-podcast"
@@ -357,7 +327,9 @@
     },
     "lambdas/web/email_subscriber_lambda.py": {
       "function": "email-subscriber",
-      "region": "us-east-1"
+      "region": "us-east-1",
+      "note": "BS-03: subscribe/confirm/unsubscribe. DDB subscribers partition. SES double opt-in. No Function URL — wired to API Gateway /api/subscribe.",
+      "stack": "LifePlatformWeb"
     },
     "lambdas/web/og_image_lambda.py": {
       "function": "og-image-generator"
@@ -368,7 +340,9 @@
     "lambdas/web/site_api_lambda.py": {
       "_cdk_only_reason": "Has sibling imports (web.site_api_*, hevy_common, etc.) that deploy_lambda.sh doesn't bundle. Single-file hot-deploy would break Runtime.ImportModuleError at next invoke. Only `cdk deploy` ships the full Code.from_asset('../lambdas') bundle correctly.",
       "cdk_only": true,
-      "function": "life-platform-site-api"
+      "function": "life-platform-site-api",
+      "note": "Read-only public API for averagejoematt.com. Reserved concurrency=20 (verified live 2026-07-28). Migrated here in #1653 from a misfiled entry under `lambda_edge.functions` — site-api is not a Lambda@Edge function; that entry also still named the LifePlatformWeb stack, which #793 superseded.",
+      "stack": "LifePlatformServe"
     },
     "lambdas/web/site_stats_refresh_lambda.py": {
       "function": "site-stats-refresh"
@@ -383,7 +357,6 @@
       "function": "coach-nudge"
     }
   },
-  "lambdas/emails/chronicle_podcast_lambda.py": "chronicle-podcast",
   "mcp": {
     "_comment": "MCP server is special \u2014 requires full mcp/ package; lives at project root not lambdas/",
     "function": "life-platform-mcp",
@@ -399,38 +372,34 @@
     "_comment": "Files that are part of the repo but not directly deployable Lambdas (Layer modules or utilities). V2 P0.8: 17 layer-resident shared modules added 2026-05-17.",
     "files": [
       "lambdas/ingestion/hevy_webhook_lambda.py",
-      "lambdas/ingestion_validator.py",
-      "lambdas/item_size_guard.py",
-      "lambdas/sick_day_checker.py",
-      "lambdas/digest_utils.py",
-      "lambdas/output_writers.py",
-      "lambdas/html_builder.py",
-      "lambdas/ai_calls.py",
-      "lambdas/ai_summaries.py",
-      "lambdas/ai_context.py",
-      "lambdas/scoring_engine.py",
-      "lambdas/board_loader.py",
-      "lambdas/insight_writer.py",
-      "lambdas/acwr_compute_lambda.py",
-      "lambdas/circadian_compliance_lambda.py",
-      "lambdas/email_subscriber_lambda.py",
-      "lambdas/site_api_ai_lambda.py",
-      "lambdas/auth_breaker.py",
-      "lambdas/compute_metadata.py",
-      "lambdas/http_retry.py",
-      "lambdas/intelligence_common.py",
-      "lambdas/numeric.py",
-      "lambdas/platform_logger.py",
-      "lambdas/rate_limiter.py",
-      "lambdas/request_validator.py",
-      "lambdas/retry_utils.py",
-      "lambdas/secret_cache.py",
-      "lambdas/site_writer.py",
-      "lambdas/character_engine.py",
-      "lambdas/genome_coaching.py",
-      "lambdas/ai_output_validator.py",
-      "lambdas/labs_coaching.py",
-      "lambdas/ingestion_framework.py"
+      "lambdas/ingestion/ingestion_validator.py",
+      "lambdas/common/item_size_guard.py",
+      "lambdas/health/sick_day_checker.py",
+      "lambdas/common/digest_utils.py",
+      "lambdas/content/output_writers.py",
+      "lambdas/content/html_builder.py",
+      "lambdas/ai/ai_calls.py",
+      "lambdas/ai/ai_summaries.py",
+      "lambdas/ai/ai_context.py",
+      "lambdas/health/scoring_engine.py",
+      "lambdas/coach/board_loader.py",
+      "lambdas/content/insight_writer.py",
+      "lambdas/common/auth_breaker.py",
+      "lambdas/common/compute_metadata.py",
+      "lambdas/common/http_retry.py",
+      "lambdas/intelligence/intelligence_common.py",
+      "lambdas/common/numeric.py",
+      "lambdas/common/platform_logger.py",
+      "lambdas/common/rate_limiter.py",
+      "lambdas/common/request_validator.py",
+      "lambdas/common/retry_utils.py",
+      "lambdas/common/secret_cache.py",
+      "lambdas/content/site_writer.py",
+      "lambdas/health/character_engine.py",
+      "lambdas/health/genome_coaching.py",
+      "lambdas/ai/ai_output_validator.py",
+      "lambdas/health/labs_coaching.py",
+      "lambdas/ingestion/ingestion_framework.py"
     ]
   },
   "_retired_sleep_reconciler": {

@@ -82,10 +82,10 @@ grade privately." No claim text crosses without its own marker.
 import re
 from datetime import datetime
 
-import diary_consent
-import journal_quotes as jq
 from boto3.dynamodb.conditions import Key
-from coach_dossier import find_dossier_violations
+from coach.coach_dossier import find_dossier_violations
+from content import journal_quotes as jq
+from privacy import diary_consent
 
 from web.fingerprint import build_mark, mark_to_svg
 from web.site_api_coach import _public_decision_note

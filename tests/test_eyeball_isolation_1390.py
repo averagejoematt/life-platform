@@ -24,8 +24,8 @@ ROOT = Path(__file__).resolve().parent.parent
 _LAMBDAS = ROOT / "lambdas"
 sys.path.insert(0, str(_LAMBDAS))
 
-import budget_guard  # noqa: E402
-import eyeball_calibration as ec  # noqa: E402
+from ai import budget_guard  # noqa: E402
+from experiment import eyeball_calibration as ec  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fakes import FakeDdbTable  # noqa: E402
@@ -38,9 +38,9 @@ _NUTRITION_PK_TOKENS = ("SOURCE#macrofactor", "SOURCE#nutrition")
 # the coach deterministic-payload builder. The eyeball literal must appear in none of them.
 _NUTRITION_WRITE_PATHS = [
     _LAMBDAS / "ingestion" / "macrofactor_lambda.py",
-    _LAMBDAS / "meal_projection.py",
+    _LAMBDAS / "health" / "meal_projection.py",
 ]
-_COACH_PAYLOAD_BUILDER = _LAMBDAS / "coach_register.py"
+_COACH_PAYLOAD_BUILDER = _LAMBDAS / "coach" / "coach_register.py"
 
 _EYEBALL_TOKENS = ("eyeball_estimate", "EYEBALL_PK", "eyeball_calibration")
 
@@ -55,7 +55,7 @@ def test_nutrition_and_coach_paths_never_name_eyeball(path):
 
 # ── STATIC direction 2: eyeball module names no nutrition partition ──────────────
 def test_eyeball_module_names_no_nutrition_partition():
-    text = (_LAMBDAS / "eyeball_calibration.py").read_text(encoding="utf-8")
+    text = (_LAMBDAS / "experiment" / "eyeball_calibration.py").read_text(encoding="utf-8")
     for token in _NUTRITION_PK_TOKENS:
         # allow the token inside a comment ONLY as a documented truth-field name; but the
         # partition strings themselves must never appear (the module reads truth passed in,
@@ -66,7 +66,7 @@ def test_eyeball_module_names_no_nutrition_partition():
 def test_eyeball_module_writes_only_its_own_pk_statically():
     """AST: every string constant in eyeball_calibration.py that carries a SOURCE# token
     names ONLY the eyeball source."""
-    tree = ast.parse((_LAMBDAS / "eyeball_calibration.py").read_text(encoding="utf-8"))
+    tree = ast.parse((_LAMBDAS / "experiment" / "eyeball_calibration.py").read_text(encoding="utf-8"))
     for node in ast.walk(tree):
         if isinstance(node, ast.Constant) and isinstance(node.value, str) and "SOURCE#" in node.value:
             assert "SOURCE#eyeball_estimate" in node.value, f"unexpected SOURCE partition literal: {node.value!r}"

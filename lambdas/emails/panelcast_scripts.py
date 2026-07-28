@@ -29,7 +29,7 @@ try:  # bundle stages lambdas/ at the zip root; tests add lambdas/emails/ to sys
 except ImportError:
     from panelcast_qa import _QA_MAX_WORDS_PER_TURN
 
-from ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
+from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
 
 # Shared writer directive — make the SCRIPT genuinely conversational so the voice has
 # something human to perform (Gemini reads what's written; banter must be on the page).

@@ -134,7 +134,7 @@ def reaction_sk(entry_date, channel=None, uid=""):
 def route_coach(entry):
     """The coach that reacts to this entry — deterministic, from the public theme.
     Never inference; mind_coach is the default. Returns a coach_id."""
-    from diary_consent import public_theme
+    from privacy.diary_consent import public_theme
 
     return DIARY_THEME_COACH.get(public_theme(entry), DEFAULT_COACH)
 
@@ -184,7 +184,7 @@ def build_reaction_prompt(coach_id, ctx):
 
 
 def _default_generate_fn(system, user):
-    from ai_calls import call_anthropic
+    from ai.ai_calls import call_anthropic
 
     return call_anthropic(user, max_tokens=_MAX_TOKENS, system=system)
 
@@ -193,7 +193,7 @@ def _default_ground_fn(label, draft, allow_sources):
     """ADR-104 number allow-list gate in DETECTION-ONLY mode — a no-op regen so it
     never spends a second generation call (the reaction carries no numeric facts to
     correct; the real leak boundary is diary_consent). Fail-soft."""
-    from ai_calls import _ground_legacy_output
+    from ai.ai_calls import _ground_legacy_output
 
     return _ground_legacy_output(label, draft, lambda _note: draft, *allow_sources)
 
@@ -201,7 +201,7 @@ def _default_ground_fn(label, draft, allow_sources):
 def _default_quality_gate_fn(lambda_client, coach_id, text, brief):
     """ADR-108 regenerate-or-hold with max_regenerations=0 (hold, don't re-generate —
     honours the one-call-max AC). Returns (text|None, report)."""
-    from ai_calls import _enforce_quality_gate
+    from ai.ai_calls import _enforce_quality_gate
 
     return _enforce_quality_gate(lambda_client, coach_id, text, brief, lambda _note: text, max_regenerations=0)
 
@@ -230,7 +230,7 @@ def generate_diary_reaction(
     if not allow(BUDGET_FEATURE):
         return None
 
-    from diary_consent import public_context
+    from privacy.diary_consent import public_context
 
     ctx = public_context(entry)
     if ctx is None:
@@ -283,7 +283,7 @@ def generate_diary_reaction(
 
 
 def _default_budget_allow(feature):
-    import budget_guard
+    from ai import budget_guard
 
     return budget_guard.allow(feature)
 
@@ -300,7 +300,7 @@ def _stamp():
     """The ADR-058/#1233 write-time provenance stamp (phase + cycle), fail-soft.
     A missing stamp must never block the write, so this degrades to phase-only."""
     try:
-        from phase_taxonomy import experiment_stamp
+        from experiment.phase_taxonomy import experiment_stamp
 
         stamp = experiment_stamp()
         if stamp.get("phase"):
@@ -308,7 +308,7 @@ def _stamp():
     except Exception:  # noqa: BLE001 — provenance never breaks a write
         pass
     try:
-        from constants import EXPERIMENT_PHASE_CURRENT
+        from common.constants import EXPERIMENT_PHASE_CURRENT
 
         return {"phase": EXPERIMENT_PHASE_CURRENT}
     except Exception:  # noqa: BLE001
@@ -371,7 +371,7 @@ def maybe_react(entry, *, table_=None, lambda_client=None, force=False, **genera
         if str(entry.get("channel") or "").strip().lower() not in DIARY_CHANNELS:
             return {"reacted": False, "reason": "not_diary"}
 
-        from diary_consent import TIER_PRIVATE, resolve_consent
+        from privacy.diary_consent import TIER_PRIVATE, resolve_consent
 
         if resolve_consent(entry) == TIER_PRIVATE:
             return {"reacted": False, "reason": "private"}

@@ -9,7 +9,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 
-from engagement_core import (  # noqa: E402
+from content.engagement_core import (  # noqa: E402
     DARK,
     LIGHT,
     PRESENT,
@@ -199,7 +199,7 @@ def test_genesis_day1_with_a_log_reads_present():
 def test_no_cross_genesis_return_beat():
     # First log after genesis, previous log pre-genesis: a fresh start — never
     # "just returned after ~17 days quiet" on cycle-5 Day 1.
-    from engagement_core import presence_prompt_block
+    from content.engagement_core import presence_prompt_block
 
     cd = {k: list(v) for k, v in _CYCLE4_TAIL.items()}
     cd["macrofactor"] = ["2026-07-12"] + cd["macrofactor"]
@@ -226,7 +226,7 @@ def test_gap_accrues_from_genesis_not_prior_cycle():
 def test_pre_genesis_compute_day_is_quiet_about_the_archive():
     # Launch eve (T−1): the countdown, not the wiped cycle's stall — present/none,
     # so the ack gate never arms off cycle-4 silence.
-    from engagement_core import presence_ack_required, presence_prompt_block
+    from content.engagement_core import presence_ack_required, presence_prompt_block
 
     sig = compute_presence("2026-07-11", _CYCLE4_TAIL, wearable_latest=_wearables_flowing(), experiment_start=GENESIS)
     assert sig["presence_class"] == PRESENT

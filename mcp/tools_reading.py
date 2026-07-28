@@ -44,7 +44,7 @@ def _coach_checkin_module():
     import importlib
 
     try:
-        return importlib.import_module("coach_checkin")
+        return importlib.import_module("coach.coach_checkin")
     except ImportError:  # pragma: no cover — package-layout fallback
         return importlib.import_module("lambdas.coach_checkin")
 

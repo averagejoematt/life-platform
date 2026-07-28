@@ -17,7 +17,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
-from client_ip import extract_client_ip  # noqa: E402
+from common.client_ip import extract_client_ip  # noqa: E402
 
 
 def _ev(headers=None, source_ip=None, identity_ip=None):

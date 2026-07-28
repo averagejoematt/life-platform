@@ -56,7 +56,7 @@ tier-2/3 degradation fired as designed (Jun 15–18).
 
 ## Budget guardrails (automated, ENFORCING)
 
-Three layers — `lambdas/budget_guard.py`, `lambdas/operational/cost_governor_lambda.py`:
+Three layers — `lambdas/ai/budget_guard.py`, `lambdas/operational/cost_governor_lambda.py`:
 
 1. **AWS Budget** (`life-platform-monthly-75`, CDK CoreStack — name historical): one $85
    budget, email notifications at **50/70/85/100% (actual + 100% forecast)** →
@@ -264,5 +264,5 @@ Sources: `aws ce get-cost-and-usage` Mar–Jul grouped by SERVICE; SSM
 The feature-by-tier degradation ladder (tier 0–3, bands ≈73/87/97% of the effective
 ceiling, audience-ordered per ADR-125 — internal AI pauses first, the daily brief is
 protected longest) is specified once in `CLAUDE.md` §"AI Inference (Bedrock + Budget
-Guard)" and implemented in `lambdas/budget_guard.py` (tests: `test_budget_guard_ladder.py`).
+Guard)" and implemented in `lambdas/ai/budget_guard.py` (tests: `test_budget_guard_ladder.py`).
 Check the live tier: `aws ssm get-parameter --name /life-platform/budget-tier --query Parameter.Value --output text`.

@@ -17,7 +17,7 @@
 | Smoke (post-deploy) | `tests/smoke_test_site.sh` + `qa-smoke` Lambda | ~30s | Yes, after each deploy |
 | Manual | Browser checks, MCP tool dispatch | Variable | No |
 
-**Total tests:** 6313 `def test_` functions (auto-synced by `deploy/sync_doc_metadata.py`; do not hand-edit this number).
+**Total tests:** 6319 `def test_` functions (auto-synced by `deploy/sync_doc_metadata.py`; do not hand-edit this number).
 
 ---
 
@@ -121,7 +121,7 @@ there is no layer version to keep consistent). The surviving invariant:
 The **inverted-testing** fix: `visual_ai_qa.py` checks that pages *render*; this
 checks that the coach/insight AI *content* obeys the honesty standard the platform
 sells. Offline + **gating** in CI (no AWS, no inference). The deterministic engine
-is `lambdas/er03_gate.py` (`er03_check`) — the same gate the coach daily-reflection
+is `lambdas/experiment/er03_gate.py` (`er03_check`) — the same gate the coach daily-reflection
 batch and The Panel enforce at publish time. Two parts:
 - **Labelled corpus** (`tests/fixtures/ai_inputs/faithfulness_cases.json`) of
   `(input → output)` pairs — good outputs must PASS; planted-bad outputs must FAIL
@@ -170,7 +170,7 @@ for the plane below it:
 2. **Faithfulness harness** (plane 2) — section 11 above: an offline labelled corpus
    proves the gate still catches the four failure classes, wiring-guarded so a
    refactor can't drop it.
-3. **Generation-time archive** (plane 3, D2 / #1441) — `lambdas/qa_archive.py` copies
+3. **Generation-time archive** (plane 3, D2 / #1441) — `lambdas/common/qa_archive.py` copies
    every gate-passed generation to `generated/qa_archive/` (text + daily screenshots,
    90-day retention) so any past generation is reconstructable, not screenshot
    archaeology.

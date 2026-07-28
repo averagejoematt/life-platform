@@ -96,7 +96,7 @@ def score_gist(prompt: str, answer: str, *, caller=None) -> dict:
     }
     try:
         if caller is None:
-            from retry_utils import call_anthropic_raw  # lazy — layer module, runtime only
+            from common.retry_utils import call_anthropic_raw  # lazy — layer module, runtime only
 
             req = urllib.request.Request(
                 ANTHROPIC_API,

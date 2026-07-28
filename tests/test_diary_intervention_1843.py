@@ -39,8 +39,8 @@ with mock.patch("boto3.resource"), mock.patch("boto3.client"):
     import daily_metrics_compute_lambda as dmc  # noqa: E402
     import hypothesis_engine_lambda as eng  # noqa: E402
 
-import compute_metadata  # noqa: E402
 import weekly_correlation_compute_lambda as wc  # noqa: E402
+from common import compute_metadata  # noqa: E402
 
 # ══════════════════════════════════════════════════════════════════════════════
 # AC1 — compute_diary_sessions() + store_computed_metrics()

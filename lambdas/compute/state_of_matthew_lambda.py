@@ -45,17 +45,17 @@ import re
 from datetime import datetime, timedelta, timezone
 
 import boto3
-import calibration_core  # #538: shared Brier + reliability scorer (layer module)
-import whole_life_context  # #1385: full multi-cycle archive as a 1-hour cached block
-from ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
+from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
+from ai.grounded_generation import allowed_numbers, grounding_findings  # ADR-104 gate
 from boto3.dynamodb.conditions import Key
-from er03_gate import BANNED_CAUSAL  # reuse the platform's one causal-language list
-from grounded_generation import allowed_numbers, grounding_findings  # ADR-104 gate
-from numeric import decimals_to_float, floats_to_decimal  # bundled shared module: float<->Decimal
-from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from common.numeric import decimals_to_float, floats_to_decimal  # bundled shared module: float<->Decimal
+from experiment import calibration_core  # #538: shared Brier + reliability scorer (layer module)
+from experiment.er03_gate import BANNED_CAUSAL  # reuse the platform's one causal-language list
+from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from health import whole_life_context  # #1385: full multi-cycle archive as a 1-hour cached block
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("state-of-matthew")
 except ImportError:
@@ -298,7 +298,7 @@ def gather_presence_section(signal: dict | None) -> dict | None:
     if not signal:
         return None
     try:
-        from engagement_core import severity_of
+        from content.engagement_core import severity_of
 
         severity = severity_of(signal)
     except ImportError:  # pragma: no cover — bundle always ships engagement_core
@@ -441,7 +441,7 @@ def narrate(state: dict) -> dict:
     on a tier pause, a Bedrock error, or a failed ADR-104 grounding check. Never
     regenerates: this is the platform's ONE weekly call, not two."""
     try:
-        from budget_guard import allow
+        from ai.budget_guard import allow
 
         if not allow(BUDGET_FEATURE):
             return {"narrative": deterministic_fallback_narrative(state), "narrated": False, "model": None, "reason": "budget_tier"}
@@ -450,7 +450,7 @@ def narrate(state: dict) -> dict:
 
     body = build_narration_body(state)
     try:
-        import bedrock_client
+        from ai import bedrock_client
 
         resp = bedrock_client.invoke(body, model_name=MODEL)
         content = resp.get("content") or []
@@ -468,7 +468,7 @@ def narrate(state: dict) -> dict:
     ack_finding = None
     if state.get("presence"):
         try:
-            from engagement_core import presence_ack_finding
+            from content.engagement_core import presence_ack_finding
 
             ack_finding = presence_ack_finding(text, state["presence"])
         except ImportError:  # pragma: no cover — bundle always ships engagement_core
@@ -481,7 +481,7 @@ def narrate(state: dict) -> dict:
     if findings or causal_hits:
         logger.warning(f"[state-of-matthew] ADR-104 grounding gate failed (findings={findings}, causal={causal_hits}) — falling back")
         try:  # #812/#744: a fired gate is labeled eval data — retain the pair (fail-soft)
-            import eval_retention
+            from experiment import eval_retention
 
             eval_retention.retain(
                 "state_of_matthew",
@@ -524,7 +524,7 @@ def build_summary_item(state: dict, narration: dict, today_str: str) -> dict:
         ),
     }
     try:
-        from compute_metadata import tag_record
+        from common.compute_metadata import tag_record
 
         item = tag_record(item, source_id="state_of_matthew")
     except ImportError:
@@ -688,7 +688,7 @@ def lambda_handler(event: dict, context) -> dict:
     # publishes (AI-narrated or the deterministic fallback — both are what the
     # reader sees; `narrated` in meta tells them apart). Fail-soft inside the module.
     try:
-        import qa_archive
+        from common import qa_archive
 
         qa_archive.archive_text(
             "state_of_matthew",

@@ -10,8 +10,8 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
-import training_notes_llm as tnl  # noqa: E402
-from training_notes import TAXONOMY, note_hash  # noqa: E402
+from training import training_notes_llm as tnl  # noqa: E402
+from training.training_notes import TAXONOMY, note_hash  # noqa: E402
 
 
 class FakeTable:
@@ -80,7 +80,7 @@ def test_cap_raises_capexceeded(monkeypatch):
 
 def test_cap_breach_degrades_in_extractor(monkeypatch):
     # End-to-end: a capped llm_fn → extract_signals catches → degraded, deterministic kept.
-    from training_notes import extract_signals
+    from training.training_notes import extract_signals
 
     t = FakeTable()
     t.put_item({"pk": tnl._USAGE_PK, "sk": f"MONTH#{tnl._month()}", "calls": 999})

@@ -12,7 +12,7 @@ site_api_common (identical binding semantics to the pre-split facade).
 from datetime import datetime, timedelta, timezone
 
 from boto3.dynamodb.conditions import Key
-from phase_filter import with_phase_filter  # ADR-058
+from experiment.phase_filter import with_phase_filter  # ADR-058
 
 from web.site_api_common import (
     USER_PREFIX,
@@ -32,7 +32,7 @@ def _physical_cadences() -> dict:
     source_registry and the handler's own DEXA recheck interval — never hand-typed
     in the front-end.
     """
-    from source_registry import SOURCE_REGISTRY  # shared module (bundled, #781)
+    from ingestion.source_registry import SOURCE_REGISTRY  # shared module (bundled, #781)
 
     w = SOURCE_REGISTRY.get("withings", {})
     expected = w.get("expected_days")

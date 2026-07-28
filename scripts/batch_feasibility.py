@@ -35,8 +35,8 @@ import sys
 from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lambdas"))
-from bedrock_batch import BATCH_DISCOUNT, MIN_RECORDS_PER_JOB  # noqa: E402
-from bedrock_client import _PRICES, estimate_cost_usd  # noqa: E402
+from ai.bedrock_batch import BATCH_DISCOUNT, MIN_RECORDS_PER_JOB  # noqa: E402
+from ai.bedrock_client import _PRICES, estimate_cost_usd  # noqa: E402
 
 NAMESPACE = "LifePlatform/AI"
 REGION = os.environ.get("AWS_REGION", "us-west-2")

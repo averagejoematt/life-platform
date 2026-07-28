@@ -11,7 +11,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
-import quarter_utils  # noqa: E402
+from common import quarter_utils  # noqa: E402
 
 
 def test_quarter_key_maps_month_to_quarter():

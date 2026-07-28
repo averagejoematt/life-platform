@@ -56,13 +56,13 @@ def test_flags_the_lambda_whose_zip_is_missing_a_root_module(monkeypatch):
         monkeypatch,
         {
             "life-platform-coherence-sentinel": _zip_bytes(
-                ["operational/coherence_sentinel_lambda.py", "coherence_invariants.py", "canonical_facts.py"]
+                ["operational/coherence_sentinel_lambda.py", "experiment/coherence_invariants.py", "experiment/canonical_facts.py"]
             ),
             "ai-expert-analyzer": _zip_bytes(["intelligence/ai_expert_analyzer_lambda.py"]),  # missing canonical_facts.py
         },
     )
     problems = dict(sp.check_asset_completeness())
-    assert "ai-expert-analyzer" in problems and "canonical_facts.py" in problems["ai-expert-analyzer"]
+    assert "ai-expert-analyzer" in problems and "experiment/canonical_facts.py" in problems["ai-expert-analyzer"]
     assert "life-platform-coherence-sentinel" not in problems
 
 
@@ -71,9 +71,9 @@ def test_all_complete_returns_empty(monkeypatch):
         monkeypatch,
         {
             "life-platform-coherence-sentinel": _zip_bytes(
-                ["operational/coherence_sentinel_lambda.py", "coherence_invariants.py", "canonical_facts.py"]
+                ["operational/coherence_sentinel_lambda.py", "experiment/coherence_invariants.py", "experiment/canonical_facts.py"]
             ),
-            "ai-expert-analyzer": _zip_bytes(["intelligence/ai_expert_analyzer_lambda.py", "canonical_facts.py"]),
+            "ai-expert-analyzer": _zip_bytes(["intelligence/ai_expert_analyzer_lambda.py", "experiment/canonical_facts.py"]),
         },
     )
     assert sp.check_asset_completeness() == []

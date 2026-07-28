@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import coach_register as cr  # noqa: E402
+from coach import coach_register as cr  # noqa: E402
 from v4_chrome import doors_nav, site_footer  # noqa: E402
 from v4_kit import loop_ribbon  # noqa: E402
 

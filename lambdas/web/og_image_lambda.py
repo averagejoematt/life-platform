@@ -21,7 +21,7 @@ import boto3
 # 16 top-level sources) on the platform's most-distributed surface — og-home.png ships on
 # 72 pages' share previews. Reading the registry length makes the number self-correcting:
 # it can never drift from the source of truth (source_registry.SOURCE_REGISTRY).
-from source_registry import SOURCE_REGISTRY
+from ingestion.source_registry import SOURCE_REGISTRY
 
 # #595 (ADR-114): the shared card engine is the single place brand cards are drawn.
 # The daily page cards delegate their chrome to it so every off-site card — daily,

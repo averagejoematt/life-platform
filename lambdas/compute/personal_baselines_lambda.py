@@ -48,10 +48,10 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
-import personal_baselines
+from health import personal_baselines
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("personal-baselines-compute")
 except ImportError:
@@ -70,14 +70,14 @@ dynamodb = boto3.resource("dynamodb", region_name=_REGION)
 table = dynamodb.Table(TABLE_NAME)
 
 
-from digest_utils import d2f as _d2f  # shared bundled helpers (#970)
+from common.digest_utils import d2f as _d2f  # shared bundled helpers (#970)
 
 
 def _fetch_source(source, start, end):
     """Query one source's DATE# records in [start, end]. include_pilot=True: the
     personal distribution is physiological, not experiment-scoped (mirrors ACWR, ADR-058).
     """
-    from phase_filter import with_phase_filter
+    from experiment.phase_filter import with_phase_filter
 
     records = []
     kwargs = with_phase_filter(

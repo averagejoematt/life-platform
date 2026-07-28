@@ -13,8 +13,8 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pytest
-import routine_title as rt
-from routine_ir import ExerciseBlock, RoutineSpec, Set
+from training import routine_title as rt
+from training.routine_ir import ExerciseBlock, RoutineSpec, Set
 
 
 def _ir(archetype="upper", variant="ideal", target_date="2026-06-15", rationale=None) -> RoutineSpec:

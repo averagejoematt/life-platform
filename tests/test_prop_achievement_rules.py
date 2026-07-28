@@ -22,7 +22,7 @@ from hypothesis import given, settings, strategies as st
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
-import achievement_rules as ar  # noqa: E402
+from health import achievement_rules as ar  # noqa: E402
 
 # gte-driven numeric signals (higher => more earned) and the one lt signal
 # (current_weight: lower => more earned).

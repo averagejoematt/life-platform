@@ -16,6 +16,7 @@ single-voice narration. Cost: Chirp 3: HD is free under 1M chars/mo; Bedrock
 Haiku script-gen is pennies.
 """
 
+import importlib
 import json
 import os
 import re
@@ -23,16 +24,16 @@ import urllib.parse
 from datetime import datetime, timezone
 
 import boto3
-import er03_gate
-import google_tts
-import persona_registry
-from ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
+from ai import google_tts
+from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
 from boto3.dynamodb.conditions import Key
-from constants import EXPERIMENT_START_DATE  # ADR-058/077 — current-cycle genesis anchor
-from phase_filter import with_phase_filter
+from coach import persona_registry
+from common.constants import EXPERIMENT_START_DATE  # ADR-058/077 — current-cycle genesis anchor
+from experiment import er03_gate
+from experiment.phase_filter import with_phase_filter
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("coach-panel-podcast")
 except ImportError:
@@ -181,7 +182,7 @@ def _elena_host_state() -> str:
 
 
 def _build_script(week, title, chronicle_text, coach_id, coach_out, coach_name) -> list:
-    import bedrock_client
+    from ai import bedrock_client
 
     coach_block = ""
     if coach_out:
@@ -311,7 +312,7 @@ def _publish_episode_audio(week, wav_audio: bytes) -> dict:
     encoding, the synthesized audio ident (intro jingle + fade-under + outro reprise,
     #1179/#1082) is mixed in at the raw-PCM stage — the ONE hook covering both episode 0
     and the weekly path. duration comes from the WAV header AFTER the mix (ident adds ~9s)."""
-    import audio_encode
+    from ai import audio_encode
 
     try:  # #1179: mix the audio ident; mix_into_wav is fully fail-open (speech-only on error)
         from emails import panelcast_ident
@@ -711,7 +712,7 @@ def _pscripts_deps() -> dict:
     """Clients + helpers the extracted script builders need (resolved at call time so
     monkeypatched globals — e.g. panel._intro_guest / bedrock_client.invoke — take effect)."""
     return {
-        "invoke": __import__("bedrock_client").invoke,
+        "invoke": importlib.import_module("ai.bedrock_client").invoke,
         "logger": logger,
         "intro_guest": _intro_guest,
         "episode_angle": _episode_angle,
@@ -782,9 +783,8 @@ def _run_intro(dry_run: bool = False) -> dict:
         # The intro path's per-line gates, applied to #1170 repair-generated lines too.
         return not _HALLUCINATION_RE.search(line) and er03_gate.er03_check(line, allowed_numbers=allowed, n=None)[0]
 
-    import bedrock_client
+    from ai import bedrock_client  # #1170/#1171/#1172 bounded convergence: _QA_MAX_ATTEMPTS generations, each with a
 
-    # #1170/#1171/#1172 bounded convergence: _QA_MAX_ATTEMPTS generations, each with a
     # deterministic seam-repair pass + up to MAX_REVISIONS judge-feedback revisions (the
     # weekly path's self-correcting mechanism, ported here — today's 15 blind re-rolls
     # never told the writer WHY it failed). After every repair/revision the FULL
@@ -894,7 +894,7 @@ def _run_intro(dry_run: bool = False) -> dict:
         }
 
     # Single-pass conversation via Gemini (Elena + Eli genuinely talking).
-    import gemini_tts
+    from ai import gemini_tts
 
     label_turns = [{"speaker": label_of.get(t["speaker"], "Elena"), "line": t["line"]} for t in turns]
     audio = gemini_tts.synthesize_dialogue(label_turns, INTRO_GEMINI_VOICES, INTRO_STYLE)
@@ -1041,7 +1041,7 @@ def _gather_week(post: dict, state: dict) -> dict:
     # quiet, the panel must not review a normal week over an incomplete window.
     presence_note = ""
     try:
-        from engagement_core import presence_prompt_block
+        from content.engagement_core import presence_prompt_block
 
         sig = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#engagement_state", "sk": "STATE#current"}).get("Item") or {}
         presence_note = presence_prompt_block(sig)
@@ -1071,7 +1071,7 @@ def _is_current_crisis(text: str) -> bool:
     narrative merely REFERENCING past hardship/grief as backstory (safe to proceed). The pre-write
     regex trips on both, so a strong week was being held just for naming the backstory (e.g. a
     mother who died years ago). Fail-CLOSED: any error or non-CONTEXT answer → treat as crisis."""
-    import bedrock_client
+    from ai import bedrock_client
 
     try:
         system = (
@@ -1125,7 +1125,7 @@ def _psv2_deps() -> dict:
         "bucket": S3_BUCKET,
         "user_id": USER_ID,
         "writer_model": WRITER_MODEL,
-        "invoke": __import__("bedrock_client").invoke,
+        "invoke": importlib.import_module("ai.bedrock_client").invoke,
         "extract_json": _extract_json,
         "elena_host_state": _elena_host_state,
         "episode_angle": _episode_angle,
@@ -1151,7 +1151,7 @@ def _write_show_memory(week, title, pull_quote, guest_id, guest_name, open_bet) 
 
 def _editor_review(turns: list, bible: dict) -> dict:
     """Haiku judge — semantic quality + safety floor the lexical gate can't see."""
-    import bedrock_client
+    from ai import bedrock_client
 
     script = "\n".join(f"{t.get('speaker')}: {t.get('line')}" for t in turns)
     system = (
@@ -1536,7 +1536,7 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
     dry_run=True runs the full decision pipeline (gather → write → editor → gate)
     but synthesizes NO audio and writes NOTHING (no S3/DDB/SNS/metric) — it returns
     what the live run would do. The pre-flight tool for every Friday / post-reset."""
-    import gemini_tts
+    from ai import gemini_tts
 
     post = _select_week_post()
     week = post["week"]
@@ -1573,9 +1573,8 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
 
     guest_id = (beats.get("guest") or {}).get("id") or persona_registry.OPERATIONAL_COACH_IDS[0]
     guest_name = (beats.get("guest") or {}).get("name", "Coach")
-    import bedrock_client
+    from ai import bedrock_client  # #914: the presence note is part of the writer's source material, so its real
 
-    # #914: the presence note is part of the writer's source material, so its real
     # gap-day count is an allowed number (a spoken "eleven days quiet" must pass).
     # #1086: likewise the phase block — a spoken "day three, week one" must pass.
     allowed = er03_gate.numbers_in(
@@ -1748,7 +1747,7 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
     # default OFF). Reuse this week's prior image if present; else fetch once. Never blocks.
     _cover = {}
     try:
-        import editorial_image
+        from content import editorial_image
 
         if editorial_image.enabled():
             _prev = next((e for e in existing if e.get("week") == week and e.get("image_url")), None)
@@ -1833,7 +1832,7 @@ def lambda_handler(event, context):
     dry_run = bool(event.get("dry_run"))
 
     try:
-        from budget_guard import current_tier
+        from ai.budget_guard import current_tier
 
         tier = current_tier()
         if tier >= SKIP_TIER:

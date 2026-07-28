@@ -59,13 +59,13 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
-import personal_baselines  # #543: percentile bands from Matthew's own distribution (ADR-105 r4)
-import stats_core  # bundled shared module (#529/#535): effective-n so drift significance isn't inflated by autocorrelation
-from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from common import stats_core  # bundled shared module (#529/#535): effective-n so drift significance isn't inflated by autocorrelation
+from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from health import personal_baselines  # #543: percentile bands from Matthew's own distribution (ADR-105 r4)
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("daily-insight-compute")
 except ImportError:
@@ -115,7 +115,7 @@ DECISION_FATIGUE_HABIT_THRESHOLD = float(os.environ.get("DECISION_FATIGUE_HABIT_
 # ==============================================================================
 
 
-from digest_utils import d2f, safe_float  # shared bundled helpers (#970)
+from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
 
 
 def fetch_date(source, date_str):
@@ -147,7 +147,7 @@ def fetch_range(source, start, end):
 
 
 def fetch_profile():
-    from intelligence_common import fetch_profile as _shared_fetch_profile
+    from intelligence.intelligence_common import fetch_profile as _shared_fetch_profile
 
     return _shared_fetch_profile(table, USER_ID)
 
@@ -556,7 +556,7 @@ Return ONLY a JSON array, no preamble:
     )
     try:
         # Phase 3.4 (2026-05-16): retry via retry_utils (4 attempts, 5/15/45s).
-        from retry_utils import call_anthropic_raw
+        from common.retry_utils import call_anthropic_raw
 
         resp = call_anthropic_raw(req, timeout=25)
         raw = resp["content"][0]["text"].strip()
@@ -2023,7 +2023,7 @@ def store_computed_insights(yesterday_str, payload):
     item = {k: v for k, v in item.items() if v is not None}
     # DATA-2: validate_item for computed_insights (Item 3, R12)
     try:
-        from ingestion_validator import validate_item as _vi
+        from ingestion.ingestion_validator import validate_item as _vi
 
         _vr = _vi("computed_insights", item, yesterday_str)
         if _vr.should_skip_ddb:
@@ -2037,7 +2037,7 @@ def store_computed_insights(yesterday_str, payload):
         logger.warning("[DATA-2] computed_insights validate_item failed (proceeding): %s", ve)
     # Phase 3.3 (2026-05-16): tag with run_id + computed_at.
     try:
-        from compute_metadata import tag_record
+        from common.compute_metadata import tag_record
 
         item = tag_record(item, source_id="computed_insights")
     except ImportError:

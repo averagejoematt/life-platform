@@ -34,6 +34,8 @@ import os
 import sys
 from unittest.mock import MagicMock
 
+from bundle_stubs import stub_bundled_module
+
 os.environ.setdefault("TABLE_NAME", "life-platform")
 os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
 os.environ.setdefault("USER_ID", "matthew")
@@ -274,7 +276,7 @@ def _wire(ai, monkeypatch, table):
             txt = CORRECTED_TEXT if "QUALITY GATE FEEDBACK" in last else FLAGGED_TEXT
             return {"content": [{"type": "text", "text": txt}], "usage": {}}
 
-    monkeypatch.setitem(sys.modules, "bedrock_client", _FakeBedrock)
+    stub_bundled_module(monkeypatch, "ai.bedrock_client", _FakeBedrock)
 
 
 def _post(body, ip="203.0.113.9"):

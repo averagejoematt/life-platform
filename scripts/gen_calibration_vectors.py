@@ -33,7 +33,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 
-import calibration_core as platform_core  # noqa: E402  (the deployed grader)
+from experiment import calibration_core as platform_core  # noqa: E402  (the deployed grader)
 
 OSS_MODULE_PATH = os.path.join(ROOT, "oss", "calibration-core", "src", "calibration_core.py")
 VECTORS_PATH = os.path.join(ROOT, "oss", "calibration-core", "vectors", "calibration_vectors.json")

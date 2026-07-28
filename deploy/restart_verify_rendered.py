@@ -29,7 +29,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from lambdas.constants import EXPERIMENT_START_DATE
+from lambdas.common.constants import EXPERIMENT_START_DATE
 
 BASE = "https://averagejoematt.com"
 

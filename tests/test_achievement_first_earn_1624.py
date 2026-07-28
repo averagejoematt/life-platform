@@ -18,7 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
 
-import achievement_rules as ar  # noqa: E402
+from health import achievement_rules as ar  # noqa: E402
 
 USER_PREFIX = "USER#matthew#SOURCE#"
 
@@ -279,7 +279,7 @@ def test_catalog_is_complete_and_unique():
 
 def test_achievements_partition_is_registered_in_the_phase_taxonomy():
     """ADR-077: a new partition must be classified deliberately, not defaulted."""
-    import phase_taxonomy
+    from experiment import phase_taxonomy
 
     assert phase_taxonomy.SOURCE_CLASS["achievements"] == phase_taxonomy.EXPERIMENT_SCOPED
     assert phase_taxonomy.classify(USER_PREFIX + "achievements", "BADGE#lost_10") == phase_taxonomy.EXPERIMENT_SCOPED

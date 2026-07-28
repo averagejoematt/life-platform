@@ -33,7 +33,7 @@ to specific functions (`cdk/stacks/constants.py` holds the pinned ARNs;
 |---|---|---|---|---|
 | `pillow-layer` | Pillow (PIL) | OG share-card image generator (HP-13), visual-QA render | **HPND** (MIT/BSD-style permissive) | None. Permissive; server-side use only. |
 | `garth-layer` | `garth==0.4.47`, `garminconnect==0.2.23` | `garmin-data-ingestion` (OAuth + intervals) | **MIT** | None. |
-| `lameenc-layer` | `lameenc` (LAME MP3 encoder wheel, #1018) | `coach-panel-podcast` → `lambdas/audio_encode.py` (WAV→MP3 compression) | Wrapper permissive; **statically links LGPL-2.1 LAME** | **None today** — see §1.1. |
+| `lameenc-layer` | `lameenc` (LAME MP3 encoder wheel, #1018) | `coach-panel-podcast` → `lambdas/ai/audio_encode.py` (WAV→MP3 compression) | Wrapper permissive; **statically links LGPL-2.1 LAME** | **None today** — see §1.1. |
 
 ### 1.1 The one copyleft edge — lameenc / LAME (stated as a non-issue)
 

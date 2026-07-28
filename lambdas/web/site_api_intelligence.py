@@ -27,10 +27,10 @@ from decimal import Decimal  # noqa: F401
 from typing import Any
 
 import boto3  # noqa: F401 — handlers may instantiate clients
-import experiment_gates  # #1371: arming thresholds served to zero-states — same objects the engines enforce
-import stats_core  # #1240: sanctioned stats implementation (ADR-105) — handle_correlations
 from boto3.dynamodb.conditions import Key
-from phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1197
+from common import stats_core  # #1240: sanctioned stats implementation (ADR-105) — handle_correlations
+from experiment import experiment_gates  # #1371: arming thresholds served to zero-states — same objects the engines enforce
+from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1197
 
 from web.site_api_common import (
     DDB_REGION,
@@ -2489,7 +2489,7 @@ def handle_wrong() -> dict:
             "note": "The first quarterly effect fit has not run yet — every cross-pillar effect currently wears its authored-prior badge.",
         }
         try:
-            import effect_fitter
+            from experiment import effect_fitter
 
             latest_fit = effect_fitter.load_latest_fit(table, USER_ID)
             if latest_fit:

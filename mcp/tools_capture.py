@@ -65,8 +65,7 @@ from mcp.tools_reading import tool_get_due_recalls
 
 try:
     # Shared, bundled modules (#781) — staged at zip root in the Lambda.
-    import coach_checkin as cc
-    import intake_response as ir
+    from coach import coach_checkin as cc, intake_response as ir
 except ImportError:  # pragma: no cover — MCP bundle always ships lambdas/ at root
     if not TYPE_CHECKING:
         from lambdas import coach_checkin as cc, intake_response as ir
@@ -122,10 +121,10 @@ def _evening_intake_section():
     # reported logged_tonight=False for the very evening being logged (and the
     # signed-link write path keys by PT, pacific_time.py's documented bug class).
     try:
-        from pacific_time import pacific_now
+        from common.pacific_time import pacific_now
     except ImportError:  # pragma: no cover — MCP bundle always ships lambdas/ at root
         if not TYPE_CHECKING:
-            from lambdas.pacific_time import pacific_now
+            from lambdas.common.pacific_time import pacific_now
     tonight = pacific_now().date()
     by_date = ir.fetch_intake_by_date(table, window_days=_INTAKE_ARMING_WINDOW_DAYS, today=tonight)
     nonzero = sum(1 for c in by_date.values() if c > 0)
@@ -158,10 +157,10 @@ def _suggested_rituals_section(freshness_result):
     journal-dark trigger; an 'unavailable' freshness result passes None so that
     trigger simply proposes nothing (the other triggers are unaffected)."""
     try:  # 'today' is the PACIFIC calendar day, same as the evening-intake section (#1484).
-        from pacific_time import pacific_now
+        from common.pacific_time import pacific_now
     except ImportError:  # pragma: no cover — MCP bundle always ships lambdas/ at root
         if not TYPE_CHECKING:
-            from lambdas.pacific_time import pacific_now
+            from lambdas.common.pacific_time import pacific_now
     today = pacific_now().date()
     usable = freshness_result if isinstance(freshness_result, dict) and freshness_result.get("status") != "unavailable" else None
     return build_suggested_rituals(today, usable)

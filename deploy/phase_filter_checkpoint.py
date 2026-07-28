@@ -50,9 +50,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "lambdas"))
 
-import phase_taxonomy as taxonomy  # noqa: E402  (ADR-077 registry)
+from experiment import phase_taxonomy as taxonomy  # noqa: E402  (ADR-077 registry)
 
-from lambdas.constants import EXPERIMENT_START_DATE  # noqa: E402
+from lambdas.common.constants import EXPERIMENT_START_DATE  # noqa: E402
 
 CHECKPOINT_SCHEDULE_DAYS = (30, 60, 90)
 VALID_VERDICTS = ("keep-as-is", "widen-read-paths", "adjust-taxonomy")

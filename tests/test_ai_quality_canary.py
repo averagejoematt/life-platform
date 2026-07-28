@@ -166,7 +166,7 @@ def test_transport_failure_alarms():
 
 
 def test_judge_calls_bedrock_invoke_with_a_valid_body_dict(monkeypatch):
-    import bedrock_client
+    from ai import bedrock_client
 
     captured = {}
 
@@ -190,7 +190,7 @@ def test_judge_calls_bedrock_invoke_with_a_valid_body_dict(monkeypatch):
 
 
 def test_judge_failure_is_observable_via_metric(monkeypatch):
-    import bedrock_client
+    from ai import bedrock_client
 
     def broken_invoke(*args, **kwargs):
         raise TypeError("invoke() got an unexpected keyword argument 'messages'")
@@ -222,7 +222,7 @@ def test_persona_names_derive_from_canonical_registry():
 
 
 def test_judge_prompt_states_persona_contract_not_anonymity(monkeypatch):
-    import bedrock_client
+    from ai import bedrock_client
 
     captured = {}
 
@@ -252,7 +252,7 @@ def test_judge_does_not_flag_sanctioned_persona_name(monkeypatch):
     # that names a sanctioned persona must not be judged a violation. We drive the
     # judge with a stub bedrock that honors the prompt (returns coherent w/o a
     # persona-name note), proving the CONTRACT the prompt now carries.
-    import bedrock_client
+    from ai import bedrock_client
 
     def contract_aware_invoke(body, model_name=None):
         prompt = body["messages"][0]["content"]

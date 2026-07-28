@@ -5,7 +5,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 
-import privacy_guard as pg  # noqa: E402
+from privacy import privacy_guard as pg  # noqa: E402
 
 
 def test_clean_text_passes():

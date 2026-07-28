@@ -25,7 +25,7 @@ Pause here and share Phase 0 output. The §13 parameters are **locked** (GAP_MIN
 
 **Session 1 — canonical vocab + pure grouper + fixtures (NO AWS, NO MCP).**
 - `config/food_vocabulary.json` — canonical-token alias map (seed from Phase 0; e.g. all onion variants → `onion`).
-- `lambdas/meal_grouper.py` (pure functions over an entries list):
+- `lambdas/health/meal_grouper.py` (pure functions over an entries list):
   - `normalize(entries)` → canonical tokens (reads the alias map).
   - `segment(entries)` → meal-bucket if present (Phase 0), else `segment_by_time_gap(gap=GAP_MIN)`. **Extract/reuse the gap helper that `get_glucose_meal_response` already uses — single source of truth for gap segmentation; do not reimplement.**
   - `detect_cores(cluster)` → count distinct **anchor-SETS** present (sets so chicken+shrimp = one core).
@@ -34,7 +34,7 @@ Pause here and share Phase 0 output. The §13 parameters are **locked** (GAP_MIN
   - `classify_singleton(item)` → snack vs whole-meal by kcal + composite-name heuristic, NOT item count.
   - `group_day(entries)` → orchestrates; resolves ambiguity toward fewest, most-confident meals; below `CONF_MIN` (0.7) → **`uncategorized`** (counted in daily totals, excluded from meal analytics / the public view), never a named "Mixed meal" card.
   - `assert_conservation(meals, raw_totals)` → raises if macros don't reconcile.
-- `lambdas/meal_templates_seed.py` — seed templates from Phase 0 (centroids: anchor-sets + modifiers + match_rule).
+- `lambdas/health/meal_templates_seed.py` — seed templates from Phase 0 (centroids: anchor-sets + modifiers + match_rule).
 - `tests/fixtures/food_log_2026-06-15..18.json` — the 4 real days (15/16/17 clean, 18 collision).
 - `tests/test_meal_grouper.py` — must assert:
   - 6/18 19:46 blob splits into Turkey Tacos + Protein Yogurt Dessert + Grilled Chicken Plate (or chicken attaches as a side — pick per template config and assert the chosen behaviour).

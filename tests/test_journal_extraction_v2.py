@@ -138,8 +138,8 @@ def test_analyzer_key_fetch_gone():
 
 
 def test_call_anthropic_raw_accepts_dict_and_legacy_request(monkeypatch):
-    import bedrock_client
-    import retry_utils
+    from ai import bedrock_client
+    from common import retry_utils
 
     seen = []
 

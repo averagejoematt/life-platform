@@ -55,7 +55,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from source_registry import catalog_entries  # noqa: E402 — the authoritative device list
+from ingestion.source_registry import catalog_entries  # noqa: E402 — the authoritative device list
 from v4_chrome import doors_nav, site_footer  # noqa: E402 — shared doors nav + footer (#1009)
 from v4_kit import loop_ribbon  # noqa: E402 — shared .loop-ribbon (#578)
 

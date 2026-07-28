@@ -30,8 +30,10 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas", "compute"))
 
-import character_engine as ce  # noqa: E402
-import personal_baselines as pb  # noqa: E402
+from health import (
+    character_engine as ce,  # noqa: E402
+    personal_baselines as pb,  # noqa: E402
+)
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _CONFIG_PATH = os.path.join(_ROOT, "config", "character_sheet.json")

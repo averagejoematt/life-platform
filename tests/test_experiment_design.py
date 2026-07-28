@@ -12,7 +12,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
-import experiment_design as ed  # noqa: E402
+from experiment import experiment_design as ed  # noqa: E402
 
 
 def _design(**over):

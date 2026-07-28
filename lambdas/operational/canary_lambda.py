@@ -44,11 +44,11 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import boto3
-from mcp_url import resolve_mcp_url  # SEC-02 #780: discover the URL at runtime, not a committed env var
+from common.mcp_url import resolve_mcp_url  # SEC-02 #780: discover the URL at runtime, not a committed env var
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("canary")
 except ImportError:
@@ -319,7 +319,7 @@ def check_anthropic(canary_ts: str) -> tuple[bool, str, float]:
     t0 = time.monotonic()
     try:
         import botocore.exceptions as _bce
-        from bedrock_client import invoke as _bedrock_invoke
+        from ai.bedrock_client import invoke as _bedrock_invoke
     except Exception as e:
         return None, f"bedrock_client import failed — skipping: {e}", 0.0
 

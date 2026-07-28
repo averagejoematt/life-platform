@@ -19,7 +19,7 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "web"))
 
-import budget_guard  # noqa: E402
+from ai import budget_guard  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
 from web import site_api_coach as api  # noqa: E402
 

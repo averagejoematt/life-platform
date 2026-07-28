@@ -50,7 +50,7 @@ def test_ground_truth_genesis_matches_constants_py():
 
     chk = _load()
     genesis = chk._ground_truth_genesis()
-    constants = (ROOT / "lambdas" / "constants.py").read_text(encoding="utf-8")
+    constants = (ROOT / "lambdas" / "common" / "constants.py").read_text(encoding="utf-8")
     m = re.search(r'EXPERIMENT_START_DATE\s*=\s*"(\d{4}-\d{2}-\d{2})"', constants)
     assert m, "EXPERIMENT_START_DATE literal not found in lambdas/constants.py"
     assert genesis == m.group(1)

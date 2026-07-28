@@ -110,13 +110,13 @@ import boto3
 # Python from the day's readings (never an LLM). Fail-soft — if an older bundle
 # lacks the module we simply omit the two derived fields rather than break ingest.
 try:
-    import glycemic
+    from health import glycemic
 except ImportError:
     glycemic = None
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("health-auto-export")
 except ImportError:
@@ -127,7 +127,7 @@ except ImportError:
 # ingestion_validator via its CDK asset (from_asset("../lambdas")), but if an older
 # build lacks validate_fields we skip validation rather than break ingestion.
 try:
-    from ingestion_validator import validate_fields
+    from ingestion.ingestion_validator import validate_fields
 except ImportError:
     validate_fields = None
 
@@ -1006,7 +1006,7 @@ def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_gua
     # #482/X-6: stamp phase like the framework does (if_not_exists — never
     # overwrite an explicit tag from the reset sweep or an admin backfill).
     try:
-        from ingestion_framework import phase_for_date as _pfd
+        from ingestion.ingestion_framework import phase_for_date as _pfd
 
         set_parts.append("#ph = if_not_exists(#ph, :ph)")
         names["#ph"] = "phase"

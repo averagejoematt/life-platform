@@ -105,7 +105,7 @@ def sample_workout_lbs():
 
 
 def test_normalize_workout_kg_pk_sk(sample_workout_kg):
-    from hevy_common import normalize_workout
+    from training.hevy_common import normalize_workout
 
     rec = normalize_workout(sample_workout_kg)
     assert rec["pk"] == "USER#matthew#SOURCE#hevy"
@@ -118,7 +118,7 @@ def test_normalize_workout_kg_pk_sk(sample_workout_kg):
 
 def test_normalize_workout_kg_volume(sample_workout_kg):
     """Total volume = sum(weight_kg * reps) across all sets."""
-    from hevy_common import normalize_workout
+    from training.hevy_common import normalize_workout
 
     rec = normalize_workout(sample_workout_kg)
     expected = (60 * 5) + (70 * 5) + (80 * 5) + (25 * 10) + (25 * 10)
@@ -129,7 +129,7 @@ def test_normalize_workout_kg_volume(sample_workout_kg):
 
 def test_normalize_workout_lbs_converts_to_kg(sample_workout_lbs):
     """When unit=lbs, all weights normalize to kg."""
-    from hevy_common import normalize_workout
+    from training.hevy_common import normalize_workout
 
     rec = normalize_workout(sample_workout_lbs)
     assert rec["original_unit"] == "lbs"
@@ -143,7 +143,7 @@ def test_normalize_workout_lbs_converts_to_kg(sample_workout_lbs):
 
 
 def test_normalize_workout_duration(sample_workout_kg):
-    from hevy_common import normalize_workout
+    from training.hevy_common import normalize_workout
 
     rec = normalize_workout(sample_workout_kg)
     # 17:30 → 18:25 = 55 minutes = 3300s
@@ -156,7 +156,7 @@ def test_normalize_workout_raw_ref_points_at_s3(sample_workout_kg, monkeypatch):
     # so in the full suite the value the import captured depends on which module ran
     # first — this passed in isolation but failed in-suite. Pin the bucket so the path
     # contract is asserted deterministically regardless of suite order.
-    import hevy_common
+    from training import hevy_common
 
     monkeypatch.setattr(hevy_common, "BUCKET", "matthew-life-platform")
     rec = hevy_common.normalize_workout(sample_workout_kg)
@@ -164,7 +164,7 @@ def test_normalize_workout_raw_ref_points_at_s3(sample_workout_kg, monkeypatch):
 
 
 def test_normalize_workout_missing_id_raises():
-    from hevy_common import normalize_workout
+    from training.hevy_common import normalize_workout
 
     with pytest.raises(ValueError, match="missing workout id"):
         normalize_workout({"workout": {"title": "no id"}})
@@ -172,7 +172,7 @@ def test_normalize_workout_missing_id_raises():
 
 def test_normalize_workout_top_level_id_accepted():
     """Hevy may return the workout at top level (not wrapped in 'workout')."""
-    from hevy_common import normalize_workout
+    from training.hevy_common import normalize_workout
 
     rec = normalize_workout(
         {
@@ -190,10 +190,10 @@ def test_normalize_workout_top_level_id_accepted():
 
 def test_verify_signature_direct_match(monkeypatch):
     """Direct-string-match path (Hevy's simplest auth mechanism)."""
-    from hevy_common import verify_webhook_signature
+    from training.hevy_common import verify_webhook_signature
 
     monkeypatch.setattr(
-        "hevy_common.load_secret",
+        "training.hevy_common.load_secret",
         lambda: {"api_key": "irrelevant", "webhook_secret": "shared-bearer-token-xyz"},
     )
     assert verify_webhook_signature(b"any body", "shared-bearer-token-xyz") is True
@@ -205,10 +205,10 @@ def test_verify_signature_hmac_match(monkeypatch):
     import hashlib
     import hmac as _hmac
 
-    from hevy_common import verify_webhook_signature
+    from training.hevy_common import verify_webhook_signature
 
     monkeypatch.setattr(
-        "hevy_common.load_secret",
+        "training.hevy_common.load_secret",
         lambda: {"api_key": "irrelevant", "webhook_secret": "k"},
     )
     body = b'{"workoutId":"wkt_abc"}'

@@ -45,7 +45,7 @@ os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("EMAIL_RECIPIENT", "test@example.com")
 os.environ.setdefault("EMAIL_SENDER", "noreply@example.com")
 
-import ai_calls  # noqa: E402
+from ai import ai_calls  # noqa: E402
 
 # Far-past fixture dates on purpose (see module docstring).
 PROFILE = {

@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas", "coach"))
 
 import coach_state_updater as su  # noqa: E402
-import relationship_engine as re_  # noqa: E402
+from coach import relationship_engine as re_  # noqa: E402
 
 NO_SIGNALS = {
     "kept_commitments": 0,

@@ -32,11 +32,11 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
-from phase_filter import with_phase_filter  # ADR-058
+from experiment.phase_filter import with_phase_filter  # ADR-058
 
 # ── Structured logger ────────────────────────────────────────────────────────
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("coach-computation-engine")
 except ImportError:
@@ -52,7 +52,7 @@ S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 ALGO_VERSION = "1.0"
 LOOKBACK_DAYS = 30
-from constants import EXPERIMENT_START_DATE as EXPERIMENT_START  # ADR-058
+from common.constants import EXPERIMENT_START_DATE as EXPERIMENT_START  # ADR-058
 
 # Metrics by source for EWMA processing.
 # #813: whoop records carry NO sleep_score/deep_pct/rem_pct attributes (those live
@@ -165,7 +165,7 @@ s3 = boto3.client("s3", region_name=_REGION)
 # =============================================================================
 
 
-from numeric import (
+from common.numeric import (
     decimals_to_float as _decimal_to_float,  # noqa: E402,F401
     floats_to_decimal,  # noqa: E402  # canonical float->Decimal (#1207)
 )
@@ -664,7 +664,7 @@ def _write_results(today_str, package):
 
         # Write-time provenance (#1233): COACH#computation is EXPERIMENT_SCOPED,
         # tagger-blind — stamp phase + cycle (fail-soft, cached, never clobbers).
-        from phase_taxonomy import experiment_stamp
+        from experiment.phase_taxonomy import experiment_stamp
 
         table.put_item(Item={**experiment_stamp(), **item})
         logger.info("Wrote computation results for %s", today_str)
@@ -780,7 +780,7 @@ def _detect_arc_transition(trends, guardrails, all_data, today_str):
     # tagger-blind, but its `phase` attribute is the narrative-arc STATE (not the
     # taxonomy phase) — stamp cycle ONLY (include_phase=False) so the arc semantic
     # is preserved. Fail-soft, cached; the item's own keys win.
-    from phase_taxonomy import experiment_stamp
+    from experiment.phase_taxonomy import experiment_stamp
 
     _arc_stamp = experiment_stamp(include_phase=False)
     try:

@@ -76,7 +76,7 @@ never ask a question because a similar moment performed. If Matthew brings numbe
 himself, answer him plainly (his life, his channel) and let the next question come from
 what he SAID, not from what performed. The explicit may/may-not list and its enforcement
 live in `docs/content/DIARY_STUDIO_KIT.md` § "The Goodhart rule"; there is deliberately no
-MCP tool that returns engagement, and `lambdas/diary_publish.py` refuses interview-side
+MCP tool that returns engagement, and `lambdas/privacy/diary_publish.py` refuses interview-side
 reads in code.
 
 One question at a time. Follow up on what he ACTUALLY said — the second question should

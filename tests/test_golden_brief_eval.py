@@ -127,7 +127,12 @@ def test_judge_failure_is_soft(monkeypatch):
     real_import = builtins.__import__
 
     def _boom(name, *a, **k):
-        if name == "bedrock_client":
+        # #1653: the harness now does `from ai import bedrock_client`, so __import__
+        # is called with name="ai" and fromlist=("bedrock_client",) — never with the
+        # bare module name. Match both spellings so this stays a real offline
+        # simulation rather than a no-op that silently lets the judge run.
+        fromlist = k.get("fromlist") or (a[2] if len(a) > 2 else ()) or ()
+        if name in ("bedrock_client", "ai.bedrock_client") or (name == "ai" and "bedrock_client" in fromlist):
             raise ImportError("simulated offline")
         return real_import(name, *a, **k)
 

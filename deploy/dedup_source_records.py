@@ -48,7 +48,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "lambdas"))
 
-import phase_taxonomy as taxonomy  # noqa: E402  (ADR-077 registry — the class guard)
+from experiment import phase_taxonomy as taxonomy  # noqa: E402  (ADR-077 registry — the class guard)
 
 REGION = "us-west-2"
 TABLE = "life-platform"

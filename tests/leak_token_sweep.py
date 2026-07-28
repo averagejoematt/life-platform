@@ -42,7 +42,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from lambdas.constants import EXPERIMENT_START_DATE  # noqa: E402
+from lambdas.common.constants import EXPERIMENT_START_DATE  # noqa: E402
 
 # JSON endpoints to fetch and inspect for stale fields. cycle_compare must show
 # the NEW cycle; the two feed indexes must not carry prior-cycle entries.

@@ -54,16 +54,15 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 
 import boto3
-import qa_archive
+from common import qa_archive  # #1691 (epic #1687): re-run the baseline-freshness gate over each archived
 
-# #1691 (epic #1687): re-run the baseline-freshness gate over each archived
 # coach_brief's TEXT so a stale-baseline/stale-phase brief surfaces a visible flag
 # to the human reader — even for historical entries (re-running over the archived
 # text, not trusting generation-time meta). Both shared modules ship in every
 # bundle (#781); import fail-soft so the email never dies on a missing module.
 try:
-    import grounded_generation as _gg
-    from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE
+    from ai import grounded_generation as _gg
+    from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE
 except Exception:  # pragma: no cover — bundle-dependent; the flag simply degrades off
     _gg = None
     EXPERIMENT_BASELINE_WEIGHT_LBS = None
@@ -72,7 +71,7 @@ except Exception:  # pragma: no cover — bundle-dependent; the flag simply degr
 # #1688 (epic #1687): the Hybrid ranker + tagger. Bundled (#781); import fail-soft so
 # a missing module degrades the pack to the legacy flat rendering rather than dying.
 try:
-    import review_pack_ranker as _ranker
+    from content import review_pack_ranker as _ranker
 except Exception:  # pragma: no cover — bundle-dependent; ranking simply degrades off
     _ranker = None
 
@@ -82,7 +81,7 @@ except Exception:  # pragma: no cover — bundle-dependent; ranking simply degra
 # (ADR-104/105; promotion is a human-authored gate PR). Bundled (#781); import
 # fail-soft so a missing module degrades the section off rather than dying.
 try:
-    import correction_promotion as _promo
+    from coach import correction_promotion as _promo
 except Exception:  # pragma: no cover — bundle-dependent; proposals simply degrade off
     _promo = None
 

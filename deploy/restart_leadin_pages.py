@@ -49,7 +49,7 @@ import boto3
 
 # Import the genesis anchor from the same generated constants the lambdas use.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lambdas"))
-from constants import EXPERIMENT_PHASE_CURRENT, EXPERIMENT_START_DATE  # noqa: E402
+from common.constants import EXPERIMENT_PHASE_CURRENT, EXPERIMENT_START_DATE  # noqa: E402
 
 REGION = "us-west-2"
 TABLE_NAME = "life-platform"

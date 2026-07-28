@@ -295,9 +295,14 @@ def build_bundle():
         ("digest_utils.py", "Shared digest utilities"),
     ]
 
+    # Resolve by basename anywhere under lambdas/ rather than assuming a flat root.
+    # These are illustrative samples, not a registry, and the `.exists()` guard below
+    # fails SILENTLY — so every past reorg quietly dropped samples from the bundle
+    # (daily_brief_lambda.py has been at emails/ since the 2026-05-25 reorg and had
+    # stopped appearing). rglob keeps this list correct across the #1653 slices too.
     for filename, description in samples:
-        filepath = LAMBDAS_DIR / filename
-        if filepath.exists():
+        filepath = next(iter(sorted(LAMBDAS_DIR.rglob(filename))), None)
+        if filepath is not None and filepath.exists():
             sections.append(f"### {filename} — {description}\n```python\n")
             sections.append(read_file(filepath, max_lines=MAX_CODE_LINES))
             sections.append("```\n\n")

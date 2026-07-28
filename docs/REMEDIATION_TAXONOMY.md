@@ -150,7 +150,7 @@ These NEVER include arbitrary AWS writes — only the three above.
 
 ## Hard denylist (never auto-merge, never auto-edit; always PR + review)
 
-`lambdas/bedrock_client.py`, `lambdas/budget_guard.py`, anything under `auth`,
+`lambdas/ai/bedrock_client.py`, `lambdas/ai/budget_guard.py`, anything under `auth`,
 `deploy/setup_github_oidc.sh`, `deploy/*deploy*.sh`, `.github/workflows/remediation-agent.yml`
 (the agent's own workflow), `cdk/app.py`, anything matching `*secret*`/`*credential*`,
 and any change that adds/removes an IAM **principal** or widens a resource to `*`.

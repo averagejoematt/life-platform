@@ -37,7 +37,7 @@ from datetime import datetime, timedelta, timezone
 import boto3
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("between-chronicle")
 except ImportError:
@@ -73,15 +73,15 @@ table = dynamodb.Table(TABLE_NAME)
 ses = boto3.client("sesv2", region_name=REGION)
 
 
-from digest_utils import d2f as _d2f  # shared bundled helpers (#970)
-from phase_filter import singleton_visible  # ADR-058 / #946 / #1200: honor restart tombstones on PERSONA reads
+from common.digest_utils import d2f as _d2f  # shared bundled helpers (#970)
+from experiment.phase_filter import singleton_visible  # ADR-058 / #946 / #1200: honor restart tombstones on PERSONA reads
 
 
 def _scrub(text: str) -> str:
     """Fail-soft privacy scrub — the sources are already public-gated, this is
     defense-in-depth on anything narrative."""
     try:
-        import privacy_guard
+        from privacy import privacy_guard
 
         out, _n = privacy_guard.scrub(str(text))
         return out

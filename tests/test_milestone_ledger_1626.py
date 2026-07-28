@@ -27,7 +27,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
 
-import milestone_ledger as ml  # noqa: E402
+from health import milestone_ledger as ml  # noqa: E402
 
 USER_PREFIX = "USER#matthew#SOURCE#"
 LEDGER_PK = USER_PREFIX + "milestones"
@@ -339,7 +339,7 @@ def test_partition_is_registered_cross_phase():
     """The reset behaviour is a recorded decision: SOURCE#milestones survives
     every experiment reset (a dated past fact stays true in cycle N+1 — wiping
     it would re-fire consumed rungs, the exact defect #1626 removes)."""
-    import phase_taxonomy
+    from experiment import phase_taxonomy
 
     assert phase_taxonomy.SOURCE_CLASS["milestones"] == phase_taxonomy.CROSS_PHASE
     cls = phase_taxonomy.classify(LEDGER_PK, "MILESTONE#weight_sub_250")

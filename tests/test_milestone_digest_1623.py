@@ -30,7 +30,7 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "tests"))
 
 import emails.milestone_digest_lambda as shell  # noqa: E402
-import spiral_breaker  # noqa: E402
+from coach import spiral_breaker  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
 
 PK = "USER#matthew#SOURCE#milestones"

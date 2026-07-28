@@ -38,7 +38,7 @@ os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("EMAIL_RECIPIENT", "test@example.com")
 os.environ.setdefault("EMAIL_SENDER", "noreply@example.com")
 
-import budget_guard  # noqa: E402
+from ai import budget_guard  # noqa: E402
 
 _PIPELINE_KWARGS = dict(
     data={"date": "2026-07-06", "journal_entries": [{"text": "quiet day"}]},

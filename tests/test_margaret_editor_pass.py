@@ -24,12 +24,12 @@ import sys
 LAMBDAS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas")
 sys.path.insert(0, os.path.abspath(LAMBDAS_DIR))
 
-import margaret_editor_pass as mep  # noqa: E402
-from grounded_generation import allowed_numbers as _allowed_numbers  # noqa: E402
+from ai import margaret_editor_pass as mep  # noqa: E402
+from ai.grounded_generation import allowed_numbers as _allowed_numbers  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CHRONICLE_SRC = open(os.path.join(ROOT, "lambdas/emails/wednesday_chronicle_lambda.py")).read()
-BUDGET_SRC = open(os.path.join(ROOT, "lambdas/budget_guard.py")).read()
+BUDGET_SRC = open(os.path.join(ROOT, "lambdas/ai/budget_guard.py")).read()
 # #781: the shared layer is retired — the full-tree bundle ships every module.
 
 SAMPLE_INSTALLMENT = (
@@ -146,7 +146,7 @@ def test_apply_revision_rejects_degenerate_truncation():
 def test_apply_revision_rejects_fabricated_numbers():
     # SAMPLE_INSTALLMENT's real numbers (240.1, 71, 12, 8) form the allow-list;
     # a revision inventing a new one must be rejected, original kept.
-    from grounded_generation import allowed_numbers
+    from ai.grounded_generation import allowed_numbers
 
     allowed = allowed_numbers(SAMPLE_INSTALLMENT)
     fabricated = SAMPLE_INSTALLMENT.replace("240.1 lbs", "196.4 lbs")  # invented, not in allow-list
@@ -388,7 +388,7 @@ def test_bundle_carries_the_new_module():
     # #781: the full-tree bundle ships every lambdas/*.py module automatically;
     # this guards against the module being deleted/renamed out from under
     # wednesday_chronicle_lambda's import.
-    assert os.path.isfile(os.path.join(ROOT, "lambdas", "margaret_editor_pass.py"))
+    assert os.path.isfile(os.path.join(ROOT, "lambdas", "ai", "margaret_editor_pass.py"))
 
 
 # ── M9: budget_guard tier-1 pause ─────────────────────────────────────────────

@@ -28,11 +28,11 @@ import secrets as _secrets
 from datetime import datetime, timezone
 
 import boto3
-import digest_utils  # shared query_range implementations (#970)
-import privacy_guard  # deterministic real-name + vice gate (layer module)
-from constants import EXPERIMENT_START_DATE  # ADR-058
-from phase_filter import singleton_visible  # ADR-058 / #946 (query paths get the phase filter via digest_utils, #970)
-from text_utils import truncate_at_word  # #1224: word-boundary excerpt truncation (no mid-word cut)
+from common import digest_utils  # shared query_range implementations (#970)
+from common.constants import EXPERIMENT_START_DATE  # ADR-058
+from common.text_utils import truncate_at_word  # #1224: word-boundary excerpt truncation (no mid-word cut)
+from experiment.phase_filter import singleton_visible  # ADR-058 / #946 (query paths get the phase filter via digest_utils, #970)
+from privacy import privacy_guard  # deterministic real-name + vice gate (layer module)
 
 # OBS-1: Structured logger (wired below after optional imports)
 _logger_std = logging.getLogger()
@@ -65,14 +65,14 @@ secrets = boto3.client("secretsmanager", region_name=REGION)
 
 # Board of Directors config loader
 try:
-    import board_loader
+    from coach import board_loader
 
     _HAS_BOARD_LOADER = True
 except ImportError:
     _HAS_BOARD_LOADER = False
 
 try:
-    import insight_writer
+    from content import insight_writer
 
     insight_writer.init(table, USER_ID)
     _HAS_INSIGHT_WRITER = True
@@ -81,7 +81,7 @@ except ImportError:
 
 # AI-3: Output validation
 try:
-    from ai_output_validator import AIOutputType, validate_ai_output
+    from ai.ai_output_validator import AIOutputType, validate_ai_output
 
     _HAS_AI_VALIDATOR = True
 except ImportError:
@@ -89,7 +89,7 @@ except ImportError:
 
 # BS-05: Confidence badge
 try:
-    from digest_utils import _confidence_badge, compute_confidence
+    from common.digest_utils import _confidence_badge, compute_confidence
 
     _HAS_CONFIDENCE = True
 except ImportError:
@@ -101,7 +101,7 @@ except ImportError:
 
 # #405: the per-chronicle share kit (email-stack module — text/JSON only, no Pillow/AI).
 try:
-    import chronicle_share_kit
+    from content import chronicle_share_kit
 
     _HAS_SHARE_KIT = True
 except ImportError:
@@ -110,7 +110,7 @@ except ImportError:
 
 # OBS-1: Structured logger
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("wednesday-chronicle")
 except ImportError:
@@ -125,7 +125,7 @@ except ImportError:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-from digest_utils import d2f  # shared bundled helpers (#970)
+from common.digest_utils import d2f  # shared bundled helpers (#970)
 
 # ── #1654 god-module split: the handler logic lives in cohesive sibling modules
 # under lambdas/emails/; this file is the thin facade. Each moved helper reads the
@@ -156,7 +156,7 @@ def query_range_list(source, start_date, end_date):
 
 
 def fetch_profile():
-    from intelligence_common import fetch_profile as _shared_fetch_profile
+    from intelligence.intelligence_common import fetch_profile as _shared_fetch_profile
 
     return _shared_fetch_profile(table, USER_ID)
 
@@ -518,7 +518,7 @@ def _margaret_haiku_call(system, user):
     critique and Elena's Haiku-tier revision. Kept to Haiku per the #548
     +2-calls/week budget (Elena's own Sonnet voice is reserved for the
     weekly draft itself)."""
-    import retry_utils
+    from common import retry_utils
 
     return retry_utils.call_anthropic_api(
         prompt=user,
@@ -539,7 +539,7 @@ def _run_margaret_edit_pass(raw_installment, week_num, date_str, elena_prompt, a
     (budget pause, bad JSON, a rejected revision) simply returns Elena's draft
     untouched."""
     try:
-        from budget_guard import allow as _budget_allow
+        from ai.budget_guard import allow as _budget_allow
 
         if not _budget_allow("chronicle_editor"):
             logger.info("[margaret] budget tier pauses the editor pass — keeping Elena's draft as-is")
@@ -548,7 +548,7 @@ def _run_margaret_edit_pass(raw_installment, week_num, date_str, elena_prompt, a
         pass
 
     try:
-        import margaret_editor_pass as _mep
+        from ai import margaret_editor_pass as _mep
 
         config = board_loader.load_board(s3, S3_BUCKET) if _HAS_BOARD_LOADER else None
         narrator = _mep.build_narrator(config)
@@ -607,7 +607,7 @@ def lambda_handler(event: dict, context) -> dict:
     # Budget guardrail: skip this week's chronicle when the budget guard pauses it
     # (weekly, non-essential, subscriber-facing) — no Bedrock spend, clean no-op.
     try:
-        from budget_guard import allow
+        from ai.budget_guard import allow
 
         # Chronicle is weekly flagship content (~$1/wk of Bedrock) and the Friday Panel
         # podcast's ONLY input — so it must survive tier 1 and only pause at tier 2,
@@ -644,7 +644,7 @@ def lambda_handler(event: dict, context) -> dict:
     _presence_sig = {}
     _presence_block_txt = ""
     try:
-        from engagement_core import presence_prompt_block as _ppb
+        from content.engagement_core import presence_prompt_block as _ppb
 
         _presence_sig = _load_engagement_signal()
         _presence_block_txt = _ppb(_presence_sig)
@@ -741,8 +741,8 @@ def lambda_handler(event: dict, context) -> dict:
     # The SAME text feeds the grounding allow-list below so a real dated callback
     # passes while a fabricated one is still caught (#1242 / ADR-104).
     try:
-        import whole_life_context
-        from phase_filter import with_phase_filter as _wpf
+        from experiment.phase_filter import with_phase_filter as _wpf
+        from health import whole_life_context
 
         _archive_items = whole_life_context.fetch_full_installment_archive(
             table, f"USER#{USER_ID}#SOURCE#chronicle", d2f=d2f, phase_filter=_wpf
@@ -779,7 +779,7 @@ def lambda_handler(event: dict, context) -> dict:
     # finding degrades to the best draft instead of going dark.
     _allowed = None
     try:
-        import grounded_generation as _gg
+        from ai import grounded_generation as _gg
 
         # #1385: fold the whole-life archive into the allow-list source — Elena was
         # shown it, so its numbers/dates are grounded vocabulary, not fabrications.
@@ -795,7 +795,7 @@ def lambda_handler(event: dict, context) -> dict:
         if _corrected or _residual:
             # #812/#744: a fired chronicle gate is labeled eval data — retain the pair.
             try:
-                import eval_retention
+                from experiment import eval_retention
 
                 eval_retention.retain(
                     "chronicle",
@@ -824,7 +824,7 @@ def lambda_handler(event: dict, context) -> dict:
     # logging stall is regenerated once, then HELD — no chronicle beats a dishonest
     # one. Deterministic anchor check, no LLM judge.
     try:
-        from engagement_core import enforce_presence_acknowledgment as _epa, presence_ack_required as _par
+        from content.engagement_core import enforce_presence_acknowledgment as _epa, presence_ack_required as _par
 
         if _presence_sig and _par(_presence_sig) and raw_installment:
             raw_installment, _ack_finding = _epa(
@@ -861,7 +861,7 @@ def lambda_handler(event: dict, context) -> dict:
     # chokepoint (bedrock_client.structured_output_config) is ready to make the shape
     # model-guaranteed once deploy-time prose parity is confirmed (see PR POST-MERGE).
     try:
-        import chronicle_schema
+        from content import chronicle_schema
 
         _envelope = chronicle_schema.installment_from_stats(title, chronicle_schema.parse_stats_line(stats_line), body_md)
         _schema_errs = chronicle_schema.validate_installment(_envelope)
@@ -902,7 +902,7 @@ def lambda_handler(event: dict, context) -> dict:
     all_installments = []
     try:
         # ADR-058: phase=pilot hidden by default.
-        from phase_filter import with_phase_filter
+        from experiment.phase_filter import with_phase_filter
 
         resp = table.query(
             **with_phase_filter(

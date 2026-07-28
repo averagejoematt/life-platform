@@ -98,7 +98,7 @@ NOT git-tracked and is a separate step from the commit in (f).
   closing (c).** `check_doc_facts.py` guards the repo doc surface for stale genesis/
   date/stack-name literals but structurally can't see this dir (it's outside git) — this
   is the wrap-time equivalent for the memory bodies, checked against the same ground
-  truth (`lambdas/constants.py`):
+  truth (`lambdas/common/constants.py`):
   ```bash
   python3 scripts/check_memory_body_facts.py
   ```

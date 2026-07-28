@@ -16,7 +16,7 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "emails"))
 
-import chronicle_share_kit as k  # noqa: E402
+from content import chronicle_share_kit as k  # noqa: E402
 
 _STATS = "Weight: 300.8 lbs | Week Grade: avg 57 | T0 Streak: 0 days"
 _MD = (

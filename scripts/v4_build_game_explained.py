@@ -36,7 +36,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import character_engine as ce  # noqa: E402
+from health import character_engine as ce  # noqa: E402
 from v4_chrome import (
     doors_nav,
     head_chrome,

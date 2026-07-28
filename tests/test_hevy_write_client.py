@@ -6,9 +6,9 @@ import io
 import json
 from unittest.mock import patch
 
-import hevy_write_client as wc
 import pytest
-from hevy_write_client import HevyAuthError, HevyConflict, HevyRetryable
+from training import hevy_write_client as wc
+from training.hevy_write_client import HevyAuthError, HevyConflict, HevyRetryable
 
 
 @pytest.fixture(autouse=True)
@@ -202,7 +202,7 @@ def test_post_does_not_retry_on_5xx_at_transport_level(monkeypatch):
     (only one underlying urlopen call), unlike a GET 5xx which is."""
     import urllib.error
 
-    import http_retry
+    from common import http_retry
 
     monkeypatch.setattr(http_retry, "_BACKOFF_DELAYS", [0, 0])  # no sleeping in tests
     calls = {"n": 0}
@@ -221,7 +221,7 @@ def test_get_still_retries_on_5xx_at_transport_level(monkeypatch):
     """Same transport-level check for a GET: the shared policy still retries."""
     import urllib.error
 
-    import http_retry
+    from common import http_retry
 
     monkeypatch.setattr(http_retry, "_BACKOFF_DELAYS", [0, 0])
     calls = {"n": 0}

@@ -50,7 +50,7 @@ sys.path.insert(0, str(REPO_ROOT / "lambdas"))
 
 import genesis_prereg_stamp  # noqa: E402  (#1378 — the content-hash seal on the freeze)
 import restart_leadin_pages as leadin  # noqa: E402  (render/manifest machinery — reused, not copied)
-from constants import EXPERIMENT_START_DATE  # noqa: E402
+from common.constants import EXPERIMENT_START_DATE  # noqa: E402
 
 REGION = "us-west-2"
 TABLE_NAME = "life-platform"

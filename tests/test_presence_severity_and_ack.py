@@ -24,7 +24,7 @@ os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 
-import engagement_core as ec  # noqa: E402
+from content import engagement_core as ec  # noqa: E402
 
 TODAY = "2026-06-30"
 
@@ -151,7 +151,7 @@ def test_compute_and_store_engagement_is_genesis_clamped(monkeypatch):
     # defense-in-depth behind the query floor).
     from datetime import date as _date, timedelta as _td
 
-    from constants import EXPERIMENT_START_DATE
+    from common.constants import EXPERIMENT_START_DATE
 
     # Anchor everything to the live genesis so future resets can't time-bomb this.
     day1 = EXPERIMENT_START_DATE
@@ -484,7 +484,7 @@ def test_week_behavioral_presence_bad_week_key():
 
 
 def test_facts_block_scale_dark_forces_past_tense_rate():
-    import grounded_generation as gg
+    from ai import grounded_generation as gg
 
     facts = {
         "latest_weight": 296.2,
@@ -501,7 +501,7 @@ def test_facts_block_scale_dark_forces_past_tense_rate():
 
 
 def test_facts_block_fresh_scale_has_no_dark_warning():
-    import grounded_generation as gg
+    from ai import grounded_generation as gg
 
     facts = {"latest_weight": 296.2, "weekly_rate_lbs": -1.8, "last_weighin_date": "2026-06-29", "days_since_weighin": 1}
     blk = gg.authoritative_facts_block(facts)
@@ -510,7 +510,7 @@ def test_facts_block_fresh_scale_has_no_dark_warning():
 
 
 def test_facts_block_provisional_rate_is_labeled():
-    import grounded_generation as gg
+    from ai import grounded_generation as gg
 
     blk = gg.authoritative_facts_block({"weekly_rate_lbs": -7.3, "rate_provisional": True})
     assert "PROVISIONAL" in blk
@@ -519,7 +519,7 @@ def test_facts_block_provisional_rate_is_labeled():
 
 
 def test_facts_block_unchanged_without_recency_keys():
-    import grounded_generation as gg
+    from ai import grounded_generation as gg
 
     blk = gg.authoritative_facts_block({"latest_weight": 296.2, "weekly_rate_lbs": -1.8})
     assert "Last weigh-in" not in blk and "SCALE DARK" not in blk and "PROVISIONAL" not in blk

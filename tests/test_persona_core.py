@@ -22,7 +22,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
-import persona_core  # noqa: E402
+from coach import persona_core  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AI_SRC = open(os.path.join(ROOT, "lambdas/web/site_api_ai_lambda.py")).read()
@@ -162,7 +162,7 @@ def test_summarizer_meta_is_registry_derived():
 
 
 def test_registry_meta_resolves_canonical_names():
-    import persona_registry
+    from coach import persona_registry
 
     reg = persona_registry.load_registry(force_refresh=True)
     assert reg["personas"]["nutrition_coach"]["name"] == "Dr. Marcus Webb"

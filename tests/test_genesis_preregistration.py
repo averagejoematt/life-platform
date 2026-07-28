@@ -99,7 +99,7 @@ def test_prediction_records_match_api_read_shape():
         assert ev["type"] in ("directional", "qualitative")
         assert isinstance(ev["evaluation_window_days"], int) and ev["evaluation_window_days"] >= 7
         if ev["type"] == "directional":
-            from measurable_metrics import MEASURABLE_METRICS
+            from experiment.measurable_metrics import MEASURABLE_METRICS
 
             base = ev["metric"]
             for suffix in ("_7day_avg", "_14day_avg", "_30day_avg"):

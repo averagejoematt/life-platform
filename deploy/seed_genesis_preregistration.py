@@ -58,8 +58,8 @@ sys.path.insert(0, str(REPO_ROOT / "lambdas" / "compute"))
 sys.path.insert(0, str(REPO_ROOT / "deploy"))
 
 import genesis_prereg_stamp  # noqa: E402  (#1378 — the content-hash seal on the freeze)
-from constants import EXPERIMENT_START_DATE  # noqa: E402
-from measurable_metrics import MEASURABLE_METRICS, infer_direction, normalize_metric_hint  # noqa: E402
+from common.constants import EXPERIMENT_START_DATE  # noqa: E402
+from experiment.measurable_metrics import MEASURABLE_METRICS, infer_direction, normalize_metric_hint  # noqa: E402
 
 REGION = "us-west-2"
 TABLE_NAME = "life-platform"
@@ -326,8 +326,8 @@ def _parse_json_array(text: str):
 def generate_predictions_via_bedrock(goals):
     """One Haiku call per coach through the ADR-062 chokepoint. Returns the frozen-file
     coaches dict. Falls back per-coach to FALLBACK_PREDICTIONS on failure."""
-    import budget_guard
-    from retry_utils import AI_MODEL, call_anthropic_api
+    from ai import budget_guard
+    from common.retry_utils import AI_MODEL, call_anthropic_api
 
     if not budget_guard.allow("coach_narrative"):
         raise SystemExit(

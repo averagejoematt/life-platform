@@ -37,9 +37,9 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import boto3
-import training_load  # shared TSS-like load model (layer module, #490) — basis_note
-from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
-from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from training import training_load  # shared TSS-like load model (layer module, #490) — basis_note
 
 _logger_std = logging.getLogger()
 _logger_std.setLevel(logging.INFO)
@@ -65,7 +65,7 @@ _TODOIST_BASE = "https://api.todoist.com/api/v1"
 
 # Optional shared modules (bundled in zip)
 try:
-    import board_loader
+    from coach import board_loader
 
     _HAS_BOARD_LOADER = True
 except ImportError:
@@ -73,7 +73,7 @@ except ImportError:
     logger.warning("board_loader not found — using fallback Board prompt")
 
 try:
-    import insight_writer
+    from content import insight_writer
 
     insight_writer.init(table, USER_ID)
     _HAS_INSIGHT_WRITER = True
@@ -82,7 +82,7 @@ except ImportError:
 
 # AI-3: Output validation
 try:
-    from ai_output_validator import AIOutputType, validate_ai_output
+    from ai.ai_output_validator import AIOutputType, validate_ai_output
 
     _HAS_AI_VALIDATOR = True
 except ImportError:
@@ -90,7 +90,7 @@ except ImportError:
 
 # OBS-1: Structured logger
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("monday-compass")
 except ImportError:
@@ -147,11 +147,11 @@ _PILLAR_WEIGHTS = {
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-from digest_utils import d2f, safe_float  # shared bundled helpers (#970)
+from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
 
 
 def fetch_profile():
-    from intelligence_common import fetch_profile as _shared_fetch_profile
+    from intelligence.intelligence_common import fetch_profile as _shared_fetch_profile
 
     return _shared_fetch_profile(table, USER_ID)
 
@@ -533,7 +533,7 @@ def _fallback_board_context(week_state):
 
 def call_anthropic(system_prompt, user_message, max_tokens=3000):
     # Delegates to retry_utils for exponential backoff + CloudWatch metrics (P1.8/P1.9)
-    import retry_utils
+    from common import retry_utils
 
     return retry_utils.call_anthropic_api(
         prompt=user_message,
@@ -550,7 +550,7 @@ def _presence_block() -> str:
     (daily_brief_lambda.py Phase 2), so a dark stretch is never planned over as
     a normal week. Empty when Matthew is present. Fail-soft."""
     try:
-        from engagement_core import presence_prompt_block
+        from content.engagement_core import presence_prompt_block
 
         sig = table.get_item(Key={"pk": USER_PREFIX + "engagement_state", "sk": "STATE#current"}).get("Item") or {}
         block = presence_prompt_block(sig)

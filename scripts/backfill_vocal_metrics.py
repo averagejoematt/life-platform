@@ -67,7 +67,7 @@ from pathlib import Path
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_ROOT, "lambdas"))
 
-import vocal_metrics  # noqa: E402
+from health import vocal_metrics  # noqa: E402
 
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 REGION = os.environ.get("AWS_REGION", "us-west-2")

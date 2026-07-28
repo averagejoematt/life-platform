@@ -28,7 +28,7 @@ def _phase_context_block():
     + today (PT). Fail-soft to "" only on an import/runtime error — the bundle
     always ships ai_context, and tests pin the block's presence in every prompt."""
     try:
-        from ai_context import build_experiment_phase_context, format_experiment_phase_context
+        from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context
 
         return format_experiment_phase_context(build_experiment_phase_context())
     except Exception as e:  # noqa: BLE001 — grounding must never hard-fail generation

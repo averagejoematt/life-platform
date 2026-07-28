@@ -31,10 +31,10 @@ import urllib.parse
 from datetime import datetime, timedelta, timezone
 
 import boto3
-from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("chronicle-email-sender")
 except ImportError:
@@ -66,7 +66,7 @@ _s3 = boto3.client("s3", region_name=REGION)
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-from digest_utils import d2f as _d2f  # shared bundled helpers (#970)
+from common.digest_utils import d2f as _d2f  # shared bundled helpers (#970)
 
 
 def _get_this_weeks_installment() -> dict | None:

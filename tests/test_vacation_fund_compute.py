@@ -15,7 +15,7 @@ touches boto3); every test drives real records -> asserted miles/USD.
 from decimal import Decimal
 
 import pytest
-import vacation_fund as vf
+from content import vacation_fund as vf
 
 
 @pytest.fixture

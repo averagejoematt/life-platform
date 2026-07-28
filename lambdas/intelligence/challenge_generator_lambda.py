@@ -37,11 +37,11 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import boto3
-import digest_utils  # shared query_range implementations (#970)
-from numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
+from common import digest_utils  # shared query_range implementations (#970)
+from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("challenge-generator")
 except ImportError:
@@ -49,7 +49,7 @@ except ImportError:
     logger.setLevel(logging.INFO)
 
 try:
-    from ai_output_validator import AIOutputType, validate_ai_output
+    from ai.ai_output_validator import AIOutputType, validate_ai_output
 
     _HAS_AI_VALIDATOR = True
 except ImportError:
@@ -81,7 +81,7 @@ LOOKBACK_DAYS = 14
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-from digest_utils import d2f  # shared bundled helpers (#970)
+from common.digest_utils import d2f  # shared bundled helpers (#970)
 
 
 def query_range(source, start_date, end_date):
@@ -334,7 +334,7 @@ def _phase_context_block():
     on an import/runtime error — the bundle always ships ai_context, and
     tests/test_phase_context_coverage.py pins the block's presence."""
     try:
-        from ai_context import build_experiment_phase_context, format_experiment_phase_context
+        from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context
 
         return format_experiment_phase_context(build_experiment_phase_context())
     except Exception as e:  # noqa: BLE001 — grounding must never hard-fail generation
@@ -399,7 +399,7 @@ def generate_challenges(context):
 
     # ADR-062 (2026-05-27): route through retry_utils.call_anthropic_raw (Bedrock).
     try:
-        from retry_utils import call_anthropic_raw
+        from common.retry_utils import call_anthropic_raw
 
         resp = call_anthropic_raw(req)
         raw = resp["content"][0]["text"].strip()

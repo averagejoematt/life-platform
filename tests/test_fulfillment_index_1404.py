@@ -29,7 +29,7 @@ sys.path.insert(0, _REPO)
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "web"))
 
-import fulfillment_index as fi  # noqa: E402
+from health import fulfillment_index as fi  # noqa: E402
 
 ALL_ADOPTED = {name: True for name in fi.CHANNEL_NAMES}
 

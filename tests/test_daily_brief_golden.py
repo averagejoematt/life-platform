@@ -170,7 +170,7 @@ def _normalize(html: str) -> str:
 
 @pytest.mark.parametrize("scenario", sorted(SCENARIOS))
 def test_daily_brief_golden_snapshot(scenario):
-    from html_builder import build_html
+    from content.html_builder import build_html
 
     kwargs, golden_name = SCENARIOS[scenario]
     html = build_html(**kwargs)

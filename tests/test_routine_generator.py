@@ -6,8 +6,8 @@ import json
 import os
 
 import pytest
-import routine_generator as rg
-from routine_generator import GeneratorInputs, generate_routines
+from training import routine_generator as rg
+from training.routine_generator import GeneratorInputs, generate_routines
 
 CONFIG = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "config"))
 
@@ -125,7 +125,7 @@ def test_exercise_notes_populated_from_history_index(monkeypatch):
             },
         ],
     }
-    import exercise_history
+    from training import exercise_history
 
     monkeypatch.setattr(exercise_history, "load_recent_history", lambda lookback_days=180, today=None: fake_index)
     routines = generate_routines(_green_inputs("2026-06-01"))
@@ -154,7 +154,7 @@ def test_exercise_notes_off_mode_yields_empty_notes(monkeypatch, tmp_path):
     (cfg_dir / "training_week.json").write_text(json.dumps(week))
     monkeypatch.setattr(rg, "CONFIG_DIR", str(cfg_dir))
 
-    import exercise_history
+    from training import exercise_history
 
     called = {"loaded": False}
 
@@ -175,7 +175,7 @@ def test_exercise_notes_off_mode_yields_empty_notes(monkeypatch, tmp_path):
 
 def test_emit_branch_model_folds_variants_into_primary():
     """The scheduled path emits ONE branched routine, not a separate ideal/floor pair."""
-    from routine_generator import emit_branch_model
+    from training.routine_generator import emit_branch_model
 
     routines = generate_routines(_green_inputs("2026-06-01"))  # ideal + floor
     primary = emit_branch_model(routines)
@@ -192,7 +192,7 @@ def test_emit_branch_model_folds_variants_into_primary():
 
 
 def test_emit_branch_model_includes_re_entry_when_present():
-    from routine_generator import emit_branch_model
+    from training.routine_generator import emit_branch_model
 
     inputs = _green_inputs("2026-06-01")
     inputs.days_since_last_workout = 8
@@ -203,13 +203,13 @@ def test_emit_branch_model_includes_re_entry_when_present():
 
 
 def test_emit_branch_model_none_on_empty():
-    from routine_generator import emit_branch_model
+    from training.routine_generator import emit_branch_model
 
     assert emit_branch_model([]) is None
 
 
 def test_emit_branch_model_branch_carries_its_own_exercises():
-    from routine_generator import emit_branch_model
+    from training.routine_generator import emit_branch_model
 
     routines = generate_routines(_green_inputs("2026-06-01"))
     primary = emit_branch_model(routines)

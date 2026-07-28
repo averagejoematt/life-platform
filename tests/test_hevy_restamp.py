@@ -9,7 +9,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pytest
-from routine_ir import RoutineBranch, RoutineSpec
+from training.routine_ir import RoutineBranch, RoutineSpec
 
 
 @pytest.fixture
@@ -125,7 +125,7 @@ def test_restamp_never_removes_a_branch(restamp):
 
 
 def test_restamp_never_touches_set_content(restamp):
-    from routine_ir import ExerciseBlock, Set
+    from training.routine_ir import ExerciseBlock, Set
 
     branches = [
         RoutineBranch(label="as-written", recommended=True, order=0),
@@ -202,17 +202,17 @@ def test_applies_and_repushes_on_change(restamp):
         branches=_branches(),
     )
 
-    import hevy_write_client as wc
+    from training import hevy_write_client as wc
 
     fake_resp = {"routine": {"id": "hevy-1", "updated_at": "2026-06-01T13:00:00Z"}}
     with patch.object(restamp, "_ssm_get", side_effect=_enabled_ssm()):
         with patch.object(restamp, "_find_pushed_routine", return_value=ir):
             with patch.object(restamp, "_latest_recovery_score", return_value=20):  # red → easier
                 with patch.object(wc, "update_routine_with_guard", return_value=fake_resp) as push:
-                    with patch("routine_repo.put_versioned"):
-                        with patch("hevy_template_cache.resolve_movement", return_value="TID"):
-                            with patch("routine_title.build_title_context", return_value=None):
-                                with patch("routine_title.format_why_note", return_value="why"):
+                    with patch("training.routine_repo.put_versioned"):
+                        with patch("training.hevy_template_cache.resolve_movement", return_value="TID"):
+                            with patch("training.routine_title.build_title_context", return_value=None):
+                                with patch("training.routine_title.format_why_note", return_value="why"):
                                     result = restamp.lambda_handler({"target_date": "2026-06-01"}, None)
     assert result["status"] == "ok"
     assert result["recommended"] == "easier"
@@ -227,7 +227,7 @@ def test_restamp_repush_body_carries_new_recommended_branch_exercises(restamp):
     PUT to Hevy carries the NEW recommended branch's own exercises — proving
     the overnight re-stamp changes what the reader's Hevy app shows, not just
     which line is starred in the notes."""
-    from routine_ir import ExerciseBlock, Set
+    from training.routine_ir import ExerciseBlock, Set
 
     branches = [
         RoutineBranch(
@@ -254,7 +254,7 @@ def test_restamp_repush_body_carries_new_recommended_branch_exercises(restamp):
         branches=branches,
     )
 
-    import hevy_write_client as wc
+    from training import hevy_write_client as wc
 
     fake_resp = {"routine": {"id": "hevy-1", "updated_at": "2026-06-01T13:00:00Z"}}
     template_ids = {"bench": "T1", "machine_press": "T2"}
@@ -262,10 +262,10 @@ def test_restamp_repush_body_carries_new_recommended_branch_exercises(restamp):
         with patch.object(restamp, "_find_pushed_routine", return_value=ir):
             with patch.object(restamp, "_latest_recovery_score", return_value=20):  # red -> easier
                 with patch.object(wc, "update_routine_with_guard", return_value=fake_resp) as push:
-                    with patch("routine_repo.put_versioned"):
-                        with patch("hevy_template_cache.resolve_movement", side_effect=lambda k: template_ids[k]):
-                            with patch("routine_title.build_title_context", return_value=None):
-                                with patch("routine_title.format_why_note", return_value="why"):
+                    with patch("training.routine_repo.put_versioned"):
+                        with patch("training.hevy_template_cache.resolve_movement", side_effect=lambda k: template_ids[k]):
+                            with patch("training.routine_title.build_title_context", return_value=None):
+                                with patch("training.routine_title.format_why_note", return_value="why"):
                                     result = restamp.lambda_handler({"target_date": "2026-06-01"}, None)
 
     assert result["status"] == "ok"
@@ -287,15 +287,15 @@ def test_conflict_fails_open(restamp):
         hevy_updated_at="2026-06-01T10:00:00Z",
         branches=_branches(),
     )
-    import hevy_write_client as wc
+    from training import hevy_write_client as wc
 
     with patch.object(restamp, "_ssm_get", side_effect=_enabled_ssm()):
         with patch.object(restamp, "_find_pushed_routine", return_value=ir):
             with patch.object(restamp, "_latest_recovery_score", return_value=20):
                 with patch.object(wc, "update_routine_with_guard", side_effect=wc.HevyConflict("edited in-app")):
-                    with patch("hevy_template_cache.resolve_movement", return_value="TID"):
-                        with patch("routine_title.build_title_context", return_value=None):
-                            with patch("routine_title.format_why_note", return_value="why"):
+                    with patch("training.hevy_template_cache.resolve_movement", return_value="TID"):
+                        with patch("training.routine_title.build_title_context", return_value=None):
+                            with patch("training.routine_title.format_why_note", return_value="why"):
                                 result = restamp.lambda_handler({"target_date": "2026-06-01"}, None)
     assert result["status"] == "noop"
     assert result["reason"] == "in-app-edit-conflict"

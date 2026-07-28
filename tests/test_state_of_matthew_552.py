@@ -28,9 +28,11 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "compute"))
 
-import bedrock_client  # noqa: E402
-import budget_guard  # noqa: E402
 import state_of_matthew_lambda as eng  # noqa: E402
+from ai import (
+    bedrock_client,  # noqa: E402
+    budget_guard,  # noqa: E402
+)
 from fakes import FakeDdbTable  # noqa: E402
 
 # ─────────────────────────────────────────────────────────────────────────────

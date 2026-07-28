@@ -30,13 +30,15 @@ from datetime import datetime
 from decimal import Decimal  # noqa: F401
 
 import boto3
-import calibration_core  # #538: the ONE prediction-calibration scorer (Brier + reliability)
-import coach_corrections  # #1689 ledger — reused by the dossier retract/correct path (#1387)
-import coach_dossier  # #1387: the verbatim, privacy-filtered dossier projection (bundled module)
-import coach_traits  # #1113: authored trait scores for the immersive bios (bundled module)
-import diary_consent  # #1483 (ADR-142 tier 2): the conversation-allude projection (bundled module)
 from boto3.dynamodb.conditions import Key
-from phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
+from coach import (
+    coach_corrections,  # #1689 ledger — reused by the dossier retract/correct path (#1387)
+    coach_dossier,  # #1387: the verbatim, privacy-filtered dossier projection (bundled module)
+    coach_traits,  # #1113: authored trait scores for the immersive bios (bundled module)
+)
+from experiment import calibration_core  # #538: the ONE prediction-calibration scorer (Brier + reliability)
+from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
+from privacy import diary_consent  # #1483 (ADR-142 tier 2): the conversation-allude projection (bundled module)
 
 # CC-00/CC-09 modules — bundled into the site-api code package like every other
 # lambdas/ module (#781: one bundle, no separate layer, so there's no deploy-race
@@ -44,8 +46,7 @@ from phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 # partial deploy can't break the whole handler — the coaches endpoints just serve
 # shaped-empty 200s if these modules are ever unavailable.
 try:
-    import coach_stance
-    import persona_registry
+    from coach import coach_stance, persona_registry
 
     _COACH_MODULES = True
 except Exception:  # pragma: no cover - defensive guard, not expected in practice post-#781
@@ -68,7 +69,7 @@ from web.site_api_common import (
 )
 
 try:
-    from constants import EXPERIMENT_BASELINE_WEIGHT_LBS
+    from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS
 except Exception:  # pragma: no cover - constants.py ships in every bundle (#781); defensive only
     EXPERIMENT_BASELINE_WEIGHT_LBS = 306.87
 
@@ -98,7 +99,7 @@ def _regeneration_paused(feature: str) -> bool:
     manufacture a false disclosure banner.
     """
     try:
-        from budget_guard import allow
+        from ai.budget_guard import allow
 
         return not allow(feature)
     except Exception:
@@ -115,7 +116,7 @@ def _current_cycle():
     contract phase_taxonomy.experiment_stamp relies on) — a missing param/grant
     must never break the calibration/predictions surfaces, only omit the label."""
     try:
-        from coach_checkin import read_cycle
+        from coach.coach_checkin import read_cycle
 
         return read_cycle()
     except Exception:
@@ -1430,7 +1431,7 @@ def handle_journal_quotes(event):
     all-or-nothing at serve time (_public_decision_note — the #1569 rule): a
     quote the content filter would alter at all is withheld, never mangled.
     """
-    import journal_quotes as jq
+    from content import journal_quotes as jq
 
     qs = event.get("queryStringParameters") or {}
     try:

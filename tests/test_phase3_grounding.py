@@ -11,8 +11,8 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 
-import ai_summaries  # noqa: E402
-import ingestion_validator as iv  # noqa: E402
+from ai import ai_summaries  # noqa: E402
+from ingestion import ingestion_validator as iv  # noqa: E402
 
 # ── Day-selection: the narrative must read primary_whoop, not always-yesterday ──
 

@@ -30,9 +30,11 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
-import bedrock_client as bc  # noqa: E402
 import boto3  # noqa: E402
-import semantic_recall as sr  # noqa: E402
+from ai import (
+    bedrock_client as bc,  # noqa: E402
+    semantic_recall as sr,  # noqa: E402
+)
 from boto3.dynamodb.conditions import Key  # noqa: E402
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
@@ -87,7 +89,7 @@ def published_post_links(installments) -> dict:
     memory is the point) but is cited by DATE alone — an honest absence beats a link to
     some other week's page.
     """
-    from phase_filter import singleton_visible
+    from experiment.phase_filter import singleton_visible
 
     keys = sorted((i.get("date", ""), str(i.get("sk", ""))) for i in installments if singleton_visible(i) and i.get("date"))
     return {key: f"/journal/posts/week-{n + 1:02d}/" for n, key in enumerate(keys)}

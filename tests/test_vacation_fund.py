@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-import vacation_fund as vf
+from content import vacation_fund as vf
 
 
 def _fake_query(mapping):

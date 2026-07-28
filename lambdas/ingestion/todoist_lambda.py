@@ -32,7 +32,7 @@ from datetime import datetime, timezone
 
 # OBS-1 logger
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("todoist")
 except ImportError:
@@ -40,12 +40,12 @@ except ImportError:
     logger.setLevel(logging.INFO)
 
 try:
-    from http_retry import urlopen_with_retry
+    from common.http_retry import urlopen_with_retry
 except ImportError:  # pragma: no cover — layer-module fallback (local tooling)
     urlopen_with_retry = urllib.request.urlopen
 
 # Framework (bundled in the lambdas/ tree)
-from ingestion_framework import IngestionConfig, run_ingestion
+from ingestion.ingestion_framework import IngestionConfig, run_ingestion
 
 SECRET_NAME = os.environ.get("SECRET_NAME", "life-platform/ingestion-keys")
 USER_ID = os.environ.get("USER_ID", "matthew")

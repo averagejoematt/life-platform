@@ -47,7 +47,7 @@ from web.site_api_common import (
 )
 
 try:  # layer module; import defensively so a missing layer can't 500 the route
-    import privacy_guard
+    from privacy import privacy_guard
 except Exception:  # noqa: BLE001
     privacy_guard = None
 

@@ -37,13 +37,13 @@ import re
 from datetime import datetime, timezone
 
 import boto3
-import google_tts
+from ai import google_tts
+from ai.grounded_generation import allowed_numbers, grounding_findings  # ADR-104 gate
 from boto3.dynamodb.conditions import Key
-from er03_gate import BANNED_CAUSAL  # the platform's one banned-causal-connective list
-from grounded_generation import allowed_numbers, grounding_findings  # ADR-104 gate
+from experiment.er03_gate import BANNED_CAUSAL  # the platform's one banned-causal-connective list
 
 try:
-    from numeric import decimals_to_float
+    from common.numeric import decimals_to_float
 except ImportError:  # pragma: no cover — numeric is always bundled in prod
 
     def decimals_to_float(x):
@@ -51,7 +51,7 @@ except ImportError:  # pragma: no cover — numeric is always bundled in prod
 
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("daily-debrief")
 except ImportError:
@@ -155,7 +155,7 @@ def _presence_block() -> str:
     (daily_brief_lambda.py Phase 2), so a dark stretch is never narrated as a
     normal day over the silence. Empty when Matthew is present. Fail-soft."""
     try:
-        from engagement_core import presence_prompt_block
+        from content.engagement_core import presence_prompt_block
 
         sig = table.get_item(Key={"pk": USER_PREFIX + "engagement_state", "sk": "STATE#current"}).get("Item") or {}
         block = presence_prompt_block(sig)
@@ -255,7 +255,7 @@ def narrate(facts: dict, presence_block: str = "") -> dict:
     quiet-stretch steering block; its numbers (e.g. the gap length) were handed to
     the model, so they join the grounding allow-list — honest, never fabricated."""
     try:
-        from budget_guard import allow
+        from ai.budget_guard import allow
 
         if not allow(BUDGET_FEATURE):
             return {"narrative": deterministic_fallback_narrative(facts), "narrated": False, "model": None, "reason": "budget_tier"}
@@ -263,7 +263,7 @@ def narrate(facts: dict, presence_block: str = "") -> dict:
         pass  # fail-open: a missing module must never take the debrief down
 
     try:
-        import bedrock_client
+        from ai import bedrock_client
 
         resp = bedrock_client.invoke(build_narration_body(facts, presence_block), model_name=MODEL)
         text = "".join(p.get("text", "") for p in (resp.get("content") or []) if isinstance(p, dict)).strip()

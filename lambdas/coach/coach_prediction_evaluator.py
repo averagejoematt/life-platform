@@ -37,11 +37,11 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
-from phase_filter import with_phase_filter  # ADR-058
+from experiment.phase_filter import with_phase_filter  # ADR-058
 
 # ── Structured logger ────────────────────────────────────────────────────────
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("coach-prediction-evaluator")
 except ImportError:
@@ -81,7 +81,7 @@ COACH_IDS = [
 # drift silently broke prediction grading. Single source now; MEASURABLE_METRICS is
 # DERIVED from this map, so the extractor's allowlist and the evaluator's source-map
 # cannot diverge. See lambdas/measurable_metrics.py.
-from measurable_metrics import METRIC_SOURCES, infer_direction  # noqa: E402
+from experiment.measurable_metrics import METRIC_SOURCES, infer_direction  # noqa: E402
 
 # Domain-appropriate minimum evaluation windows (days).
 # Predictions with shorter windows are clamped to these minimums.
@@ -206,7 +206,7 @@ _NEVER_DECIDED_DAYS = 999
 # =============================================================================
 
 
-from numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
+from common.numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
 
 
 def _scalar_to_decimal(val):
@@ -932,13 +932,13 @@ def _update_bayesian_confidence(coach_id, subdomain, update_type):
         # (ONE shared definition, `coach_calibration.graded_sample_size`, used by both
         # writers; the conversational contribution stays disclosed in its own
         # accumulators, carried forward below).
-        from coach_calibration import graded_sample_size
+        from coach.coach_calibration import graded_sample_size
 
         sample_size = graded_sample_size(
             alpha, beta_val, item.get("conversation_alpha") if item else 0, item.get("conversation_beta") if item else 0
         )
 
-        from phase_taxonomy import experiment_stamp  # fail-soft provenance (#1233)
+        from experiment.phase_taxonomy import experiment_stamp  # fail-soft provenance (#1233)
 
         new_item = {
             **experiment_stamp(),
@@ -1228,9 +1228,9 @@ def _evaluate_all(predictions, today_str):
 
 STANCE_EVENT_REFRESH_DAILY_CAP = 2  # epic #526 Budget: "Capped Haiku calls (≤2/day platform-wide)"
 
-from ai_context import _WEIGHT_MILESTONES  # noqa: E402 — the one canonical list (see ai_context._build_milestone_context)
-from budget_guard import allow as _budget_allow  # noqa: E402
-from sick_day_checker import check_sick_day  # noqa: E402
+from ai.ai_context import _WEIGHT_MILESTONES  # noqa: E402 — the one canonical list (see ai_context._build_milestone_context)
+from ai.budget_guard import allow as _budget_allow  # noqa: E402
+from health.sick_day_checker import check_sick_day  # noqa: E402
 
 # physical_coach owns both sick-day onset and weight-milestone crossings (see
 # the docstring above); mind_coach owns vice-streak relapses.
@@ -1572,7 +1572,7 @@ def lambda_handler(event: dict, context) -> dict:
         # error must never sink prediction evaluation.
         docket_stats = {}
         try:
-            import dispute_docket
+            from coach import dispute_docket
 
             docket_stats = dispute_docket.resolve_due(today_str)
         except Exception as e:

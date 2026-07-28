@@ -43,7 +43,7 @@ _LEAN_STRIP = {"activities", "sport_types", "pk", "sk", "ingested_at", "source"}
 # #498 (X-10): derived from the registry — every partition-bearing registry source
 # plus the non-ingestion partitions (labs/dexa/genome/…). Gains hevy, measurements,
 # and food_delivery, which the hand-rolled list had silently omitted.
-from source_registry import mcp_source_ids
+from ingestion.source_registry import mcp_source_ids
 
 SOURCES = mcp_source_ids()
 

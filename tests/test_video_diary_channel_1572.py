@@ -35,8 +35,8 @@ os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("AWS_REGION", "us-west-2")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
-import flourishing as fl  # noqa: E402
 import notion_lambda as nl  # noqa: E402
+from health import flourishing as fl  # noqa: E402
 
 
 def _select(name):

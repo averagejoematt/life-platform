@@ -4,12 +4,12 @@ Mirrors tests/test_bedrock_client.py's monkeypatch+MagicMock convention (no moto
 """
 
 import json
-import sys
 import types
 from unittest.mock import MagicMock
 
-import bedrock_client as bc
 import pytest
+from ai import bedrock_client as bc
+from bundle_stubs import stub_bundled_module
 
 
 @pytest.fixture(autouse=True)
@@ -23,7 +23,7 @@ def _hermetic(monkeypatch):
         pass
 
     stub.BudgetExceeded = _BE
-    monkeypatch.setitem(sys.modules, "budget_guard", stub)
+    stub_bundled_module(monkeypatch, "ai.budget_guard", stub)
     monkeypatch.delenv("BEDROCK_SHADOW_MODE", raising=False)
     yield
 
@@ -62,7 +62,7 @@ def test_embed_text_tier3_blocks(monkeypatch):
         pass
 
     stub.BudgetExceeded = _BE
-    monkeypatch.setitem(sys.modules, "budget_guard", stub)
+    stub_bundled_module(monkeypatch, "ai.budget_guard", stub)
     fc = _fake_titan_client([0.1])
     monkeypatch.setattr(bc, "_client", lambda: fc)
     with pytest.raises(_BE):

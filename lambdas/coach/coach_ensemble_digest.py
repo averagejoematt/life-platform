@@ -30,11 +30,11 @@ import urllib.request
 from datetime import datetime, timezone
 
 import boto3
-from phase_filter import with_phase_filter  # ADR-058
+from experiment.phase_filter import with_phase_filter  # ADR-058
 
 # Structured logger
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("coach-ensemble-digest")
 except ImportError:
@@ -88,7 +88,7 @@ secrets = boto3.client("secretsmanager", region_name=REGION)
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-from numeric import (
+from common.numeric import (
     decimals_to_float as _decimal_to_float,  # noqa: E402,F401
     floats_to_decimal,  # noqa: E402  # canonical float->Decimal (#1207)
 )
@@ -103,7 +103,7 @@ def _slugify(text):
 
 
 # Canonical emitter lives in the layer — local copy removed 2026-06-12.
-from retry_utils import _emit_token_metrics  # noqa: E402,F401
+from common.retry_utils import _emit_token_metrics  # noqa: E402,F401
 
 
 def _emit_failure_metric():
@@ -160,7 +160,7 @@ def _call_haiku(system, user_message, max_tokens=6000, temperature=0.2):
     # backed by Bedrock (was urllib → api.anthropic.com). Handles backoff +
     # token metrics + failure metric. `req` is still built above; the body is
     # extracted and forwarded to bedrock_client.invoke().
-    from retry_utils import call_anthropic_raw
+    from common.retry_utils import call_anthropic_raw
 
     resp = call_anthropic_raw(req)
     text = resp["content"][0]["text"].strip()
@@ -209,7 +209,7 @@ def _put_item(item):
     provenance (phase + cycle, #1233). experiment_stamp() is fail-soft and cached;
     the item's own keys win, so it never clobbers or breaks the write.
     """
-    from phase_taxonomy import experiment_stamp
+    from experiment.phase_taxonomy import experiment_stamp
 
     try:
         table.put_item(Item=floats_to_decimal({**experiment_stamp(), **item}))
@@ -373,7 +373,7 @@ def _ensemble_system_prompt():
     #1386) so the docket criteria the LLM may propose and the criteria code can
     grade cannot diverge."""
     try:
-        from measurable_metrics import METRIC_SOURCES
+        from experiment.measurable_metrics import METRIC_SOURCES
 
         keys = ", ".join(sorted(METRIC_SOURCES))
     except Exception:
@@ -705,7 +705,7 @@ def lambda_handler(event, context):
 
     try:
         # Budget guardrail: at Tier ≥ 1 skip the LLM and use the default digest.
-        from budget_guard import allow as _budget_allow
+        from ai.budget_guard import allow as _budget_allow
 
         if not _budget_allow("ensemble"):
             raise RuntimeError("ensemble digest AI paused by budget tier — using fallback")
@@ -754,7 +754,7 @@ def lambda_handler(event, context):
         # gate; non-resolvable disagreements stay narrative. Fail-soft — a
         # docket error must never sink the digest.
         try:
-            import dispute_docket
+            from coach import dispute_docket
 
             docket_stats = dispute_docket.open_from_disagreements(disagreements, cycle_date)
             digest["docket"] = {

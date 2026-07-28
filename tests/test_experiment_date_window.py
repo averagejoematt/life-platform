@@ -69,7 +69,7 @@ def test_clamp_today_helper():
 def test_vacation_fund_query_range_guards_future_genesis():
     """vacation_fund._query_range (layer) returns [] when start > end — no DynamoDB
     ValidationException — instead of 500'ing /api/vacation_fund on a future genesis."""
-    import vacation_fund as V
+    from content import vacation_fund as V
 
     future = (datetime.now(timezone.utc) + timedelta(days=3)).strftime("%Y-%m-%d")
     # start (future) > end (today): guard must short-circuit before any AWS call

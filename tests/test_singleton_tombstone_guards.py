@@ -24,10 +24,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 import coach_computation_engine as eng  # noqa: E402
 import coach_narrative_orchestrator as orch  # noqa: E402
 import elena_state_updater as elena  # noqa: E402
-import phase_taxonomy  # noqa: E402
 from ai_expert_analyzer_lambda import _load_engagement_signal  # noqa: E402
-from constants import EXPERIMENT_START_DATE  # noqa: E402
-from phase_filter import singleton_visible  # noqa: E402
+from common.constants import EXPERIMENT_START_DATE  # noqa: E402
+from experiment import phase_taxonomy  # noqa: E402
+from experiment.phase_filter import singleton_visible  # noqa: E402
 from web import (
     site_api_coach as capi,  # noqa: E402
     site_api_intelligence as capi_intel,  # noqa: E402  # #1240: forecast/scenarios/state_of_matthew moved here from site_api_data

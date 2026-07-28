@@ -194,7 +194,7 @@ def _wire_handler(monkeypatch, state):
         orch, "_call_haiku", lambda **k: {"coach_id": state.get("_coach_id", "mind_coach"), "generation_brief": {"narrative_beat": "x"}}
     )
     monkeypatch.setattr(orch, "_cache_brief", lambda *a, **k: None)
-    import budget_guard
+    from ai import budget_guard
 
     monkeypatch.setattr(budget_guard, "allow", lambda feature: True)
 
@@ -266,19 +266,19 @@ def test_build_user_message_hides_for_sleep_coach(monkeypatch):
 
 class TestJournalMoodPromptBlock:
     def test_absent_signal_is_a_noop(self):
-        import ai_calls as ac
+        from ai import ai_calls as ac
 
         assert ac._build_journal_mood_prompt_block(None, {"low_sentiment_protocol": {"rules": ["x"]}}) == ""
 
     def test_present_signal_renders_generic_rules(self):
-        import ai_calls as ac
+        from ai import ai_calls as ac
 
         block = ac._build_journal_mood_prompt_block({"mood_trend": {"direction": "falling"}}, {})
         assert "JOURNAL MOOD SIGNAL" in block
         assert "Never diagnose" in block
 
     def test_present_signal_includes_mind_coach_low_sentiment_protocol(self):
-        import ai_calls as ac
+        from ai import ai_calls as ac
 
         voice_spec = {
             "low_sentiment_protocol": {

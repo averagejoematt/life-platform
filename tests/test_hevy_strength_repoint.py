@@ -206,7 +206,7 @@ def test_daily_brief_fetch_hevy_workouts_query_failure_fails_soft(monkeypatch):
 def test_daily_brief_training_report_renders_with_hevy_data():
     """End-to-end: html_builder's Training Report section (which the daily
     brief feeds mf_workouts into) renders the Hevy-derived shape correctly."""
-    from html_builder import _brief_training_body
+    from content.html_builder import _brief_training_body
 
     mf_workouts = {
         "workouts": [

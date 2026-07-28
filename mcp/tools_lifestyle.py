@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from boto3.dynamodb.conditions import Key
-from numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
+from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 
 from mcp.config import EXPERIMENTS_PK, INSIGHTS_PK, S3_BUCKET, TRAVEL_PK, USER_ID, USER_PREFIX, logger, s3_client, table
 from mcp.core import decimal_to_float, parallel_query_sources, query_source
@@ -844,9 +844,8 @@ def tool_create_experiment(args):
     if not hypothesis:
         raise ValueError("hypothesis is required (e.g. 'Will improve deep sleep % by >5%')")
 
-    import experiment_design
+    from experiment import experiment_design  # #539: pre-registration — the design is validated NOW and frozen on the record.
 
-    # #539: pre-registration — the design is validated NOW and frozen on the record.
     # An invalid design rejects the creation outright (a sloppy design silently
     # accepted would be worse than none), and nothing may mutate it afterward.
     if design is not None:
@@ -1491,7 +1490,7 @@ def _run_design_analysis(existing, design, end_date):
     criterion via experiment_design (stats_core underneath). Returns the analysis
     dict (windows + stats + verdict + summary sentence), or None when the washout
     consumed the whole experiment."""
-    import experiment_design
+    from experiment import experiment_design
 
     design_f = json.loads(json.dumps(design, default=float))  # Decimals → floats for math
     windows = experiment_design.design_windows(existing.get("start_date", ""), end_date, design_f)
@@ -1598,7 +1597,7 @@ def _write_field_note_interactions(week: str, week_label: str, agreement, notes:
     for the same week overwrites rather than piling up. Fail-soft per coach: a
     write failure never affects the saved field-note response."""
     try:
-        import persona_registry
+        from coach import persona_registry
 
         coach_ids = persona_registry.OPERATIONAL_COACH_IDS
     except Exception as e:
@@ -1923,8 +1922,8 @@ def tool_log_evening_intake(args):
       `updated` + `previous_count` (via ReturnValues=UPDATED_OLD) so the flow
       can say "updated tonight's count 2 -> 1" instead of silently re-writing.
     """
-    from intake_response import PRIVATE_INTAKE_PK
-    from pacific_time import pacific_today
+    from coach.intake_response import PRIVATE_INTAKE_PK
+    from common.pacific_time import pacific_today
 
     try:
         count = int(args.get("count"))
@@ -1965,7 +1964,7 @@ def tool_get_intake_response(args):
     evenings exist. ADR-105 throughout — below the floors it reports arming
     progress, never an early verdict.
     """
-    from intake_response import compute_intake_response
+    from coach.intake_response import compute_intake_response
 
     window_days = int(args.get("window_days") or 180)
     window_days = max(30, min(730, window_days))

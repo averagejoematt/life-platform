@@ -30,14 +30,14 @@ import boto3
 from boto3.dynamodb.conditions import Key
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("coherence-sentinel")
 except ImportError:
     logger = logging.getLogger("coherence-sentinel")
     logger.setLevel(logging.INFO)
 
-import coherence_invariants as ci  # bundled shared module (pure cores)
+from experiment import coherence_invariants as ci  # bundled shared module (pure cores)
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE = os.environ.get("TABLE_NAME", "life-platform")
@@ -81,7 +81,7 @@ V2_COACHES = [
 ]
 
 try:
-    from phase_filter import with_phase_filter
+    from experiment.phase_filter import with_phase_filter
 except ImportError:  # pragma: no cover
 
     def with_phase_filter(kwargs, include_pilot=False):
@@ -94,7 +94,7 @@ def _today():
 
 def _decimal(o):
     try:
-        from numeric import decimals_to_float
+        from common.numeric import decimals_to_float
 
         return decimals_to_float(o)
     except Exception:  # pragma: no cover
@@ -177,7 +177,7 @@ def _gather_facts_and_narratives():
     Fail-soft to the 4 invariant-required fields if the module isn't importable."""
     cm = _latest("computed_metrics")
     try:
-        from canonical_facts import build_canonical_facts
+        from experiment.canonical_facts import build_canonical_facts
 
         facts = {k: v for k, v in build_canonical_facts(cm).items() if k != "as_of"}
     except Exception:  # noqa: BLE001 — bundled module; degrade to the core 4
@@ -267,7 +267,7 @@ def _experiment_age_days():
     read as the handle_predictions degenerate-payload outage. Fail-soft: a
     missing genesis just disables the gate (original ungated behavior)."""
     try:
-        import constants
+        from common import constants
 
         genesis = constants.EXPERIMENT_START_DATE
     except Exception:  # noqa: BLE001
@@ -316,7 +316,7 @@ def _gather_experiment_continuity():
     pre-reset leak (a high week number resurfacing) or a misconfigured genesis. Fail-soft."""
     genesis = None
     try:
-        import constants
+        from common import constants
 
         genesis = constants.EXPERIMENT_START_DATE
     except Exception:  # noqa: BLE001
@@ -346,7 +346,7 @@ def _semantic_pass(facts, narratives):
     """A Haiku read on whether the served narratives cohere with the facts —
     the content analogue of the visual AI-QA. Budget-gated; fail-soft."""
     try:
-        import budget_guard
+        from ai import budget_guard
 
         if not budget_guard.allow("coherence_semantic"):
             return None
@@ -355,7 +355,7 @@ def _semantic_pass(facts, narratives):
     if not narratives:
         return None
     try:
-        import bedrock_client
+        from ai import bedrock_client
 
         facts_line = "; ".join(f"{k}={v}" for k, v in facts.items() if v is not None)
         joined = "\n\n".join(n[:600] for n in narratives[:8])

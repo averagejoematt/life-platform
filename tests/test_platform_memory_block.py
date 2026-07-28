@@ -38,11 +38,11 @@ sys.path.insert(0, _REPO)
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "tests"))
 
-import persona_registry  # noqa: E402
-import phase_taxonomy  # noqa: E402
-import platform_memory as pm  # noqa: E402
+from ai import platform_memory as pm  # noqa: E402
+from ai.grounded_generation import allowed_numbers  # noqa: E402
+from coach import persona_registry  # noqa: E402
+from experiment import phase_taxonomy  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
-from grounded_generation import allowed_numbers  # noqa: E402
 
 import mcp.tools_memory as tm  # noqa: E402
 
@@ -338,7 +338,7 @@ def test_ai_calls_injects_memory_block_above_few_shot_block():
     the ADR-104 allow-list."""
     import inspect
 
-    import ai_calls
+    from ai import ai_calls
 
     src = inspect.getsource(ai_calls._run_coach_v2_pipeline)
     assert "platform_memory_block" in src, "coach prompt assembly no longer injects platform memory (#1482)"

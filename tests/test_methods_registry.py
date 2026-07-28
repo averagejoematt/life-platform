@@ -21,7 +21,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
-import methods_registry as mr  # noqa: E402
+from experiment import methods_registry as mr  # noqa: E402
 
 REQUIRED_FIELDS = {
     "id",
@@ -81,8 +81,8 @@ class TestFingerprintDriftGate:
     def test_fingerprint_actually_changes_on_edit(self):
         # Sanity check that _fingerprint isn't a no-op (e.g. always returning the same
         # constant) — hash two different-but-real functions and confirm they differ.
-        import calibration_core
-        import stats_core
+        from common import stats_core
+        from experiment import calibration_core
 
         fp_a = mr._fingerprint(stats_core.pearson_r)
         fp_b = mr._fingerprint(stats_core.brier_score)

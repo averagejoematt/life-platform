@@ -17,7 +17,7 @@ from datetime import date, timedelta
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 
-import theme_river as tr  # noqa: E402
+from content import theme_river as tr  # noqa: E402
 
 # A fixed 3-week window with case/whitespace variants, an intra-entry duplicate,
 # an SK-only entry, an out-of-window entry, and a themeless day — all of which the

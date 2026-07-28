@@ -122,7 +122,7 @@ def should_skip_for_budget(tier: int) -> bool:
 
 def _import_bedrock():
     try:
-        import bedrock_client
+        from ai import bedrock_client
 
         return bedrock_client
     except Exception as e:  # pragma: no cover — exercised for real only in CI

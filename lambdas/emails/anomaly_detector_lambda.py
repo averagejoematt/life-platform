@@ -75,7 +75,7 @@ _logger_std.setLevel(logging.INFO)
 
 # AI-3: Output validation
 try:
-    from ai_output_validator import AIOutputType, validate_ai_output
+    from ai.ai_output_validator import AIOutputType, validate_ai_output
 
     _HAS_AI_VALIDATOR = True
 except ImportError:
@@ -83,7 +83,7 @@ except ImportError:
 
 # OBS-1: Structured logger
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("anomaly-detector")
 except ImportError:
@@ -162,7 +162,7 @@ METRICS = [
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-from digest_utils import d2f, safe_float  # shared bundled helpers (#970)
+from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
 
 # ── Travel awareness (v2.1.0) ─────────────────────────────────────────────────
 TRAVEL_PK = f"USER#{USER_ID}#SOURCE#travel"
@@ -198,7 +198,7 @@ def fetch_date(source, date_str):
 def fetch_range(source, start, end):
     try:
         # ADR-058: phase=pilot hidden by default.
-        from phase_filter import with_phase_filter
+        from experiment.phase_filter import with_phase_filter
 
         r = table.query(
             **with_phase_filter(
@@ -436,7 +436,7 @@ def call_anthropic_with_retry(req, timeout=30, max_attempts=None, backoff_s=None
     Also emits per-Lambda CloudWatch token + failure metrics.
     Signature kept for callers; max_attempts/backoff_s args ignored.
     """
-    from retry_utils import call_anthropic_raw
+    from common.retry_utils import call_anthropic_raw
 
     return call_anthropic_raw(req, timeout=timeout)
 
@@ -499,7 +499,7 @@ def _check_sustained_streaks(yesterday_str, today_flagged):
         start_6d = (yest_dt - timedelta(days=6)).isoformat()
 
         pk = f"USER#{USER_ID}#SOURCE#anomalies"
-        from phase_filter import with_phase_filter
+        from experiment.phase_filter import with_phase_filter
 
         resp = table.query(
             **with_phase_filter(
@@ -928,7 +928,7 @@ def lambda_handler(event, context):
 
     # ── Sick day check (v2.2.0) ──
     try:
-        from sick_day_checker import check_sick_day as _check_sick_anomaly
+        from health.sick_day_checker import check_sick_day as _check_sick_anomaly
 
         _sick_rec_anomaly = _check_sick_anomaly(table, USER_ID, yesterday)
     except ImportError:

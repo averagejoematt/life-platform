@@ -28,8 +28,8 @@ from urllib.request import urlopen
 # from the repo root, so put lambdas/ on sys.path — the same pattern the other lambdas-
 # importing scripts use (e.g. scripts/publish_board_answer.py).
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lambdas"))
-from text_utils import truncate_at_word  # noqa: E402
-from utm import with_utm  # noqa: E402  — the ONE canonical outbound UTM tagger (#1621)
+from common.text_utils import truncate_at_word  # noqa: E402
+from common.utm import with_utm  # noqa: E402  — the ONE canonical outbound UTM tagger (#1621)
 
 # /journal/posts.json is the live genesis-anchored chronicle feed (served from
 # generated/journal/posts.json on S3).  The old /chronicle/posts.json was a

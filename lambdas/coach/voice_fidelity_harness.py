@@ -41,11 +41,12 @@ import os
 from datetime import datetime, timezone
 
 import boto3
-import persona_registry
-import voice_fidelity_core as vfc
+from ai import voice_fidelity_core as vfc
 from boto3.dynamodb.conditions import Key
-from numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
-from phase_filter import with_phase_filter  # ADR-058 (harmless no-op here: these records never set `phase`)
+from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
+from experiment.phase_filter import with_phase_filter  # ADR-058 (harmless no-op here: these records never set `phase`)
+
+from coach import persona_registry
 
 logger = logging.getLogger("voice-fidelity-harness")
 logger.setLevel(logging.INFO)
@@ -155,7 +156,7 @@ def _parse_vote(text, valid_ids):
 
 
 def _classify_once(candidates, passage, temperature):
-    import bedrock_client
+    from ai import bedrock_client
 
     valid_ids = {c["coach_id"] for c in candidates}
     body = {
@@ -228,7 +229,7 @@ def lambda_handler(event, context=None):
     # Tier gate: a monthly luxury metric — first thing paused (same cutoff as the
     # inter-coach dispute). Fail-open: an SSM blip must not silently starve the run.
     try:
-        from budget_guard import current_tier
+        from ai.budget_guard import current_tier
 
         tier = current_tier()
         if tier >= 1:

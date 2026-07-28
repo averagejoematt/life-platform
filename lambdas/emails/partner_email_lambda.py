@@ -32,13 +32,13 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
 import boto3
-import digest_utils  # shared query_range implementations (#970)
-from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
-from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from common import digest_utils  # shared query_range implementations (#970)
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("partner-weekly")
 except ImportError:
@@ -77,7 +77,7 @@ secrets = boto3.client("secretsmanager", region_name=_REGION)
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-from digest_utils import d2f, safe_float  # shared bundled helpers (#970)
+from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
 
 
 def avg(vals):
@@ -115,7 +115,7 @@ def query_journal_range(start_date, end_date):
 
 
 def fetch_profile():
-    from intelligence_common import fetch_profile as _shared_fetch_profile
+    from intelligence.intelligence_common import fetch_profile as _shared_fetch_profile
 
     return _shared_fetch_profile(table, USER_ID)
 
@@ -490,7 +490,7 @@ def build_commentary(data):
     )
 
     try:
-        from retry_utils import call_anthropic_raw
+        from common.retry_utils import call_anthropic_raw
 
         resp = call_anthropic_raw(req, timeout=45)
         text = resp["content"][0]["text"]
@@ -500,7 +500,7 @@ def build_commentary(data):
         # ADR-062: layer not attached — fall back to bedrock_client directly
         # (bundled in /var/task via Code.from_asset, so it imports without the layer).
         logger.warning("retry_utils unavailable — direct bedrock_client fallback")
-        from bedrock_client import invoke as _bedrock_invoke
+        from ai.bedrock_client import invoke as _bedrock_invoke
 
         resp = _bedrock_invoke(json.loads(payload))
         return resp["content"][0]["text"]
@@ -796,7 +796,7 @@ def lambda_handler(event, context):
         logger.info("Commentary length: %s chars", len(commentary))
         # AI-3: validate output before rendering
         try:
-            from ai_output_validator import AIOutputType, validate_ai_output
+            from ai.ai_output_validator import AIOutputType, validate_ai_output
 
             _val = validate_ai_output(commentary, AIOutputType.WEEKLY_DIGEST)
             if _val.was_replaced:

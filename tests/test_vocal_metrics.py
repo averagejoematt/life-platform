@@ -18,7 +18,7 @@ import sys
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_ROOT, "lambdas"))
 
-import vocal_metrics as vm  # noqa: E402
+from health import vocal_metrics as vm  # noqa: E402
 
 # ── Synthetic fixture (invented dialogue) ──────────────────────────────────────────────
 # Cue 1: 00:00.000 -> 10.000   "This is a simple test of the vocal biomarkers feature"

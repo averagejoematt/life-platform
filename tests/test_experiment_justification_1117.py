@@ -24,7 +24,7 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _ROOT)
 sys.path.insert(0, os.path.join(_ROOT, "lambdas"))
 
-import experiment_design as ed  # noqa: E402
+from experiment import experiment_design as ed  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
 
 import mcp.tools_lifestyle as tl  # noqa: E402

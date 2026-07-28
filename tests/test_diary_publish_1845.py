@@ -40,7 +40,7 @@ sys.path.insert(0, os.path.join(_ROOT, "lambdas"))
 sys.path.insert(0, os.path.join(_ROOT, "lambdas", "ingestion"))
 sys.path.insert(0, os.path.join(_ROOT, "scripts"))
 
-import diary_publish as dp  # noqa: E402
+from privacy import diary_publish as dp  # noqa: E402
 
 NOW = "2026-07-27T18:00:00+00:00"
 NOTION_URL = "https://www.notion.so/Video-Diary-retro-2026-07-26-1f2e3d4c5b6a7988990a1b2c3d4e5f60"
@@ -455,14 +455,14 @@ class TestPlatformNorms:
     def test_the_ledger_is_classified_system_state(self):
         """Publication is historical fact, not run intelligence — it survives a reset, and
         an unclassified pk family would block every future reset at the census preflight."""
-        import phase_taxonomy as pt
+        from experiment import phase_taxonomy as pt
 
         assert pt.classify("DIARY_PUBLISH#youtube", "POST#ZZZZZZZZZZZ") == pt.SYSTEM_STATE
 
     def test_the_ledger_is_a_separate_partition_from_the_broadcast_membrane(self):
         """A diary cut is Matthew on camera, published by hand — NOT a platform-authored
         syndication echo. Conflating the two would exclude his own voice from his own feed."""
-        import social_provenance as prov
+        from privacy import social_provenance as prov
 
         assert dp.PUBLISH_PK_PREFIX != "BROADCAST_ORIGIN#"
         assert prov.broadcast_ledger_key("youtube", "Z")["pk"] != dp.publish_key("youtube", "Z")["pk"]
@@ -474,7 +474,7 @@ class TestPlatformNorms:
         introduce a call this story does not need (ADR-103/105)."""
         import ast
 
-        with open(os.path.join(_ROOT, "lambdas", "diary_publish.py"), encoding="utf-8") as fh:
+        with open(os.path.join(_ROOT, "lambdas", "privacy", "diary_publish.py"), encoding="utf-8") as fh:
             tree = ast.parse(fh.read())
         imported = set()
         for node in ast.walk(tree):

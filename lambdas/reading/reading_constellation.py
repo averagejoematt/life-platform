@@ -68,7 +68,7 @@ def extract_ideas(book_title: str, source_text: str, *, caller=None) -> list:
     }
     try:
         if caller is None:
-            from retry_utils import call_anthropic_raw  # lazy — layer module, runtime only
+            from common.retry_utils import call_anthropic_raw  # lazy — layer module, runtime only
 
             req = urllib.request.Request(
                 ANTHROPIC_API,

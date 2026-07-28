@@ -42,7 +42,7 @@ for _k, _v in {
 }.items():
     os.environ.setdefault(_k, _v)
 
-import http_retry  # noqa: E402
+from common import http_retry  # noqa: E402
 from ingestion import todoist_lambda, weather_lambda, whoop_lambda, withings_lambda  # noqa: E402
 
 

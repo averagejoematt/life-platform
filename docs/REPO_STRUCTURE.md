@@ -9,7 +9,7 @@ The canonical top-level layout. Read this before adding a new file so things lan
 ### Active — the running system
 | Dir | Purpose |
 |---|---|
-| `lambdas/` | All Lambda source, by stack: `ingestion/ compute/ email/ web/ operational/ intelligence/` + shared modules at the root (`ai_calls.py`, `bedrock_client.py`, `constants.py`, …) — bundled into every function (#781). |
+| `lambdas/` | All Lambda source, fully packaged by domain (ADR-146, #1653 — no loose modules at the root): handlers in `ingestion/ compute/ emails/ web/ operational/ intelligence/ reading/`, shared engine code in `common/ ai/ experiment/ coach/ health/ training/ content/ privacy/`. The whole tree is bundled into every function (#781), staged at the zip root — so runtime imports read `from common import constants`. |
 | `mcp/` | MCP server — 76 tools across `tools_*.py` domain modules, wired in `registry.py`. |
 | `cdk/` | Infrastructure-as-code — 9 CDK stacks (`stacks/*.py`), entry `app.py`. **The only way infra changes.** |
 | `deploy/` | Build/deploy scripts — `build_bundle.py`, `deploy_lambda.sh`, `deploy_fleet.sh`, `deploy_site_api.sh`, `sync_site_to_s3.sh`, `restart_pipeline.py`, `sync_doc_metadata.py`, smoke tests, `lib/`. |
@@ -43,6 +43,7 @@ Run `make clean` to reclaim local build/cache cruft (chiefly `cdk/cdk.out`, ~6 G
 
 ## Where does X go?
 - **New Lambda** → `lambdas/<category>/<name>_lambda.py` → register in `ci/lambda_map.json` → define in the right `cdk/stacks/*.py` via `create_platform_lambda`.
+- **New shared module** → `lambdas/<domain>/<name>.py`, never the `lambdas/` root — `tests/test_lambdas_packaging_guard.py` fails the build on a loose root module (ADR-146). If it is covered by the mypy gate, add its package to `CLEAN_DIRS` (or the file to `CLEAN_FILES`) in `tests/mypy_clean_set.py` in the same PR; those globs are non-recursive.
 - **New MCP tool** → `mcp/tools_<domain>.py` → wire into `mcp/registry.py` (and `tests/test_wiring_coverage.py` will enforce it).
 - **Infra / IAM / schedule change** → `cdk/stacks/` only — never the AWS console.
 - **One-shot data fix** → `patches/patch_<desc>.py` (keep it; it's the audit trail).

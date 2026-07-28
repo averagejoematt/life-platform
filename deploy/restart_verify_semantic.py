@@ -55,9 +55,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "lambdas"))
 
-import phase_taxonomy as taxonomy  # noqa: E402
+from experiment import phase_taxonomy as taxonomy  # noqa: E402
 
-from lambdas.constants import EXPERIMENT_START_DATE  # noqa: E402
+from lambdas.common.constants import EXPERIMENT_START_DATE  # noqa: E402
 
 BASE = "https://averagejoematt.com"
 REGION = "us-west-2"

@@ -42,8 +42,8 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas", "web"))
 
 import circadian_compliance_lambda as cc  # noqa: E402
 import field_notes_lambda as fnl  # noqa: E402
-import ingestion_framework as inf  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
+from ingestion import ingestion_framework as inf  # noqa: E402
 from web import site_api_coach as coach_api  # noqa: E402
 
 _PT = ZoneInfo("America/Los_Angeles")

@@ -28,11 +28,13 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal  # noqa: F401
 from typing import Any
 
-import achievement_rules  # #1624: the ONE place badge thresholds live (shared with daily-metrics-compute)
 import boto3  # #1240: S3/DDB clients used by handle_labs / handle_glucose / handle_genome_risks
-import weight_trend  # shared weekly-rate + projection (layer module)
 from boto3.dynamodb.conditions import Key
-from phase_filter import with_phase_filter  # ADR-058 — used by handle_timeline
+from experiment.phase_filter import with_phase_filter  # ADR-058 — used by handle_timeline
+from health import (
+    achievement_rules,  # #1624: the ONE place badge thresholds live (shared with daily-metrics-compute)
+    weight_trend,  # shared weekly-rate + projection (layer module)
+)
 
 from web import vitals_resolver  # #1369: the ONE current-vitals truth
 from web.site_api_common import (
@@ -654,7 +656,7 @@ def handle_character_config() -> dict:
     # derived where the floor cleared, authored + "population prior, n<30"
     # labeled where not — with per-target provenance {method, window, n}.
     try:
-        import personal_baselines as _pb
+        from health import personal_baselines as _pb
 
         cfg = _pb.effective_character_config(cfg, table, USER_PREFIX)
     except Exception as e:
@@ -684,7 +686,7 @@ def handle_character_config() -> dict:
     # (the merge itself can never invent "fitted": that only comes from a
     # stored fit record). Keys stay explicitly whitelisted.
     try:
-        import effect_fitter
+        from experiment import effect_fitter
 
         effect_fitter.merge_fit_into_config(cfg, effect_fitter.load_latest_fit(table, USER_ID))
     except Exception as e:
@@ -770,15 +772,14 @@ def handle_character_receipt(date: str | None = None, verify: bool = False) -> d
     if verify:
         try:
             import boto3 as _boto3
-            import character_engine as _ce
-            import progression_receipts as _pr
+            from health import character_engine as _ce, progression_receipts as _pr
 
             bucket = os.environ.get("S3_BUCKET", "matthew-life-platform")
             s3 = _boto3.client("s3", region_name=S3_REGION)
             cfg = json.loads(s3.get_object(Bucket=bucket, Key=f"config/{USER_ID}/character_sheet.json")["Body"].read())
             # #1412: verify against the SAME effective config the compute hashed
             # into the receipt (personal-variance targets overlaid).
-            import personal_baselines as _pb
+            from health import personal_baselines as _pb
 
             cfg = _pb.effective_character_config(cfg, table, USER_PREFIX)
             body["replay"] = _pr.replay(item, cfg, engine=_ce)

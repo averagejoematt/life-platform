@@ -379,8 +379,8 @@ def test_reconcile_does_not_flag_deduped_gps_drop_twin():
 
 from types import SimpleNamespace  # noqa: E402
 
-import ingestion_framework as framework  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
+from ingestion import ingestion_framework as framework  # noqa: E402
 
 
 def _FakeTable(present_dates):
@@ -403,7 +403,7 @@ def _days_ago(n):
     # Pacific, matching the framework: day selection moved UTC → PT (truth audit
     # 2026-07-10, the Eight Sleep double-stamp) — a UTC-seeded expectation here is
     # off by one for the 7 hours a day the calendars disagree.
-    from pacific_time import pacific_now
+    from common.pacific_time import pacific_now
 
     return (pacific_now().date() - __import__("datetime").timedelta(days=n)).strftime("%Y-%m-%d")
 

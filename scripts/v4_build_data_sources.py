@@ -18,7 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
 
-from source_registry import catalog_entries  # noqa: E402
+from ingestion.source_registry import catalog_entries  # noqa: E402
 
 # Non-pipeline partitions that belong in the public catalogue: clinical truths
 # (episodic, no cron) and the one archive. These aren't SOURCE_REGISTRY entries

@@ -42,10 +42,11 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "coach"))
 
 import coach_prediction_evaluator as evaluator  # noqa: E402
-import dispute_docket as dd  # noqa: E402
 import pytest  # noqa: E402
 from boto3.dynamodb.conditions import AttributeBase  # noqa: E402
 from botocore.exceptions import ClientError  # noqa: E402
+from bundle_stubs import stub_bundled_module
+from coach import dispute_docket as dd  # noqa: E402
 
 # ── FakeTable: evaluates real Key conditions + honors the conditional put ────
 
@@ -304,7 +305,7 @@ def resolved_run(fake_table, monkeypatch):
     confidence_updates = []
     monkeypatch.setattr(evaluator, "_resolve_metric_value", lambda metric, cache, end: 241.2)
     monkeypatch.setattr(evaluator, "_update_bayesian_confidence", lambda cid, sub, kind: confidence_updates.append((cid, sub, kind)))
-    monkeypatch.setitem(sys.modules, "bedrock_client", _PoisonedBedrock())
+    stub_bundled_module(monkeypatch, "ai.bedrock_client", _PoisonedBedrock())
     summary = dd.resolve_due("2026-08-03")
     return fake_table, summary, confidence_updates
 
@@ -334,7 +335,7 @@ class TestAC2DeterministicResolution:
         assert win and win[0]["status"] == "confirmed" and win[0]["channel"] == "data"
         assert loss and loss[0]["status"] == "refuted" and loss[0]["record_type"] == "docket_concession"
         # resolved PREDICTION# rows feed the Brier scoreboard (calibration_core)
-        import calibration_core
+        from experiment import calibration_core
 
         for cid, outcome in (("physical_coach", 1), ("training_coach", 0)):
             preds = [v for (pk, sk), v in table.store.items() if pk == f"COACH#{cid}" and sk.startswith("PREDICTION#docket-")]
@@ -368,7 +369,7 @@ class TestAC2DeterministicResolution:
         assert voided[0]["verdict"]["outcome"] == "void_no_data"
 
     def test_verdict_module_never_imports_an_llm(self):
-        src = open(os.path.join(_REPO, "lambdas", "dispute_docket.py")).read()
+        src = open(os.path.join(_REPO, "lambdas", "coach", "dispute_docket.py")).read()
         for forbidden in ("bedrock_client", "ai_calls", "invoke_model", "anthropic"):
             assert forbidden not in src, f"dispute_docket.py references {forbidden!r} — the verdict path must stay LLM-free"
 
@@ -416,7 +417,7 @@ class TestAC3ConcessionMemory:
         its numbers (242, 241.2) is grounded; an invented number still isn't."""
         table, _s, _c = resolved_run
         import coach_history_summarizer as chs
-        from grounded_generation import allowed_numbers, grounding_findings
+        from ai.grounded_generation import allowed_numbers, grounding_findings
 
         loss_rows = [v for (pk, sk), v in table.store.items() if pk == "COACH#training_coach" and sk.startswith("LEARNING#")]
         track = chs._summarize_track_record(loss_rows, [])
@@ -591,7 +592,7 @@ class TestAC5ThrottleReplacesWeeklyCap:
             )
         monkeypatch.setattr(icd, "table", t)
         monkeypatch.setattr(icd, "load_influence_weights", lambda: {})
-        import budget_guard
+        from ai import budget_guard
 
         monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
         aired = []
@@ -608,7 +609,7 @@ class TestAC5ThrottleReplacesWeeklyCap:
 
 class TestPartitionRegistry:
     def test_docket_partition_is_experiment_scoped(self):
-        import phase_taxonomy as taxonomy
+        from experiment import phase_taxonomy as taxonomy
 
         assert taxonomy.classify("ENSEMBLE#docket", "OPEN#a__b#topic") == taxonomy.EXPERIMENT_SCOPED
 
@@ -717,7 +718,7 @@ class TestDerivedKeysArePairScoped1798:
 
     def test_the_public_brier_scores_both_outcomes(self, two_dockets_resolved):
         """The end of the wire: calibration_core must see a win AND a loss, not one row."""
-        import calibration_core
+        from experiment import calibration_core
 
         rows = self._rows(two_dockets_resolved, "physical_coach", "PREDICTION#")
         summary = calibration_core.score_pairs(calibration_core.pairs_from_prediction_records(rows))

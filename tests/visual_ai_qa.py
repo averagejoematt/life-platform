@@ -95,7 +95,7 @@ def _import_bedrock():
         lam = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lambdas")
         if lam not in sys.path:
             sys.path.insert(0, lam)
-        import bedrock_client  # noqa: E402
+        from ai import bedrock_client  # noqa: E402
 
         return bedrock_client
     except Exception as e:  # pragma: no cover
@@ -179,12 +179,12 @@ def assess_results(results):
         return {"status": "unavailable", "detail": "bedrock_client unavailable"}
 
     try:
-        import budget_guard  # lambdas/ is on sys.path after _import_bedrock()
+        from ai import budget_guard  # lambdas/ is on sys.path after _import_bedrock()
 
         if not budget_guard.allow(_BUDGET_FEATURE):
             tier = budget_guard.current_tier()
             try:
-                import reader_truth_qa
+                from operational import reader_truth_qa
 
                 reader_truth_qa.emit_budget_pause_metric("visual_ai_qa", tier)
             except Exception:
@@ -253,7 +253,7 @@ def assess_reader_truth(results):
             r.setdefault("warnings", []).append("Reader-truth QA skipped — bedrock_client unavailable")
         return {"status": "unavailable", "detail": "bedrock_client unavailable"}
     try:
-        import reader_truth_qa  # lambdas/ is on sys.path after _import_bedrock()
+        from operational import reader_truth_qa  # lambdas/ is on sys.path after _import_bedrock()
     except Exception as e:  # pragma: no cover
         print(f"  ⚠ Reader-truth QA unavailable — could not import reader_truth_qa: {e}")
         for r in results:
@@ -264,7 +264,7 @@ def assess_reader_truth(results):
     # #1440: emit the QAPausedByBudget metric + tag every warning SKIPPED-BY-BUDGET
     # (not just "skipped") so a paused run can never be mistaken for a clean one.
     try:
-        import budget_guard
+        from ai import budget_guard
 
         if not budget_guard.allow(reader_truth_qa.BUDGET_FEATURE):
             tier = budget_guard.current_tier()

@@ -36,9 +36,11 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas", "ingestion"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "intelligence"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "compute"))
 
-import budget_guard  # noqa: E402
-import conversation_enrichment as ce  # noqa: E402
 import journal_analyzer_lambda as jal  # noqa: E402
+from ai import (
+    budget_guard,  # noqa: E402
+    conversation_enrichment as ce,  # noqa: E402
+)
 from botocore.exceptions import ClientError  # noqa: E402
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -252,7 +254,7 @@ class TestAnalysisOnlyScope:
         assert sorted(pol["channels"]) == ["coach_checkin", "field_note", "habit_reflection", "prescription_reaction"]
 
     def test_methods_registry_entry_says_so_and_fingerprint_matches(self):
-        import methods_registry as mr
+        from experiment import methods_registry as mr
 
         entry = mr.get_stat("conversational_enrichment_scope")
         assert entry is not None, "#1577 AC2: the Methods Registry must carry the analysis-only declaration"
@@ -267,7 +269,7 @@ class TestAnalysisOnlyScope:
         flourishing row (None), never a zero row — and conversational records are
         NOT part of that projection (it aggregates only what it is handed from the
         notion journal partition)."""
-        import flourishing
+        from health import flourishing
 
         assert flourishing.aggregate_entries([]) is None
         assert flourishing.aggregate_entries([{"answer": "x"}]) is None  # unenriched → no data

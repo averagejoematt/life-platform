@@ -34,7 +34,7 @@ import boto3
 from boto3.dynamodb.conditions import Key
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("whoop")
 except ImportError:
@@ -42,11 +42,11 @@ except ImportError:
     logger.setLevel(logging.INFO)
 
 try:
-    from http_retry import urlopen_with_retry
+    from common.http_retry import urlopen_with_retry
 except ImportError:  # pragma: no cover — layer-module fallback (local tooling)
     urlopen_with_retry = urllib.request.urlopen
 
-from ingestion_framework import IngestionConfig, run_ingestion
+from ingestion.ingestion_framework import IngestionConfig, run_ingestion
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 USER_ID = os.environ.get("USER_ID", "matthew")
@@ -609,7 +609,7 @@ def _reconcile(event: dict, context) -> dict:
     try:
         secrets_client = boto3.client("secretsmanager", region_name=REGION)
         try:
-            from secret_cache import get_secret_json
+            from common.secret_cache import get_secret_json
 
             secret_data = get_secret_json(SECRET_NAME, secrets_client)
         except ImportError:

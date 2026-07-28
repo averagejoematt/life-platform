@@ -37,12 +37,12 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import theme_river as tr  # noqa: E402
+from content import theme_river as tr  # noqa: E402
 from v4_chrome import doors_nav, site_footer  # noqa: E402
 from v4_kit import loop_ribbon  # noqa: E402
 
 try:
-    import constants as _constants  # noqa: E402
+    from common import constants as _constants  # noqa: E402
 
     EXPERIMENT_START = _constants.EXPERIMENT_START_DATE
 except Exception:  # pragma: no cover — constants always import in-repo

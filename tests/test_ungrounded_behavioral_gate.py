@@ -19,7 +19,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 
-import grounded_generation as gg  # noqa: E402
+from ai import grounded_generation as gg  # noqa: E402
 
 
 def _types(findings):

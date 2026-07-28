@@ -19,9 +19,9 @@ os.environ.setdefault("AWS_REGION", "us-west-2")
 os.environ.setdefault("S3_BUCKET", "matthew-life-platform")  # mcp.config requires these at import
 os.environ.setdefault("USER_ID", "matthew")
 
-import coach_checkin as cc  # noqa: E402
 import pytest  # noqa: E402
 from boto3.dynamodb.conditions import Key  # noqa: E402
+from coach import coach_checkin as cc  # noqa: E402
 from reading import horizons_garden, horizons_verify, reading_keys as rk, reading_store as rs  # noqa: E402
 from reading_fakes import FakeTable  # noqa: E402
 

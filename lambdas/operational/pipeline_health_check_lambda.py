@@ -25,7 +25,7 @@ from datetime import datetime, timezone
 import boto3
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("pipeline-health-check")
 except ImportError:
@@ -71,7 +71,7 @@ PIPELINES = [
 # #466/#467), otherwise it sits at 'unknown' forever and the listing fakes coverage.
 # #498 (X-10): derived from the registry's active_api facet — this was one of the
 # two hand-rolled copies of "which pulls must attempt daily".
-from source_registry import active_api_source_ids, best_effort_source_ids
+from ingestion.source_registry import active_api_source_ids, best_effort_source_ids
 
 ACTIVE_API_SOURCES = active_api_source_ids()
 
@@ -88,7 +88,7 @@ BEST_EFFORT_SOURCES = best_effort_source_ids()
 SOURCE_MAX_GAP_MINUTES = {}
 
 try:
-    from ingest_health import SYSTEM_PK, evaluate_source_health
+    from ingestion.ingest_health import SYSTEM_PK, evaluate_source_health
 
     _INGEST_HEALTH_AVAILABLE = True
 except ImportError:  # pragma: no cover - layer-module fallback
@@ -97,7 +97,7 @@ except ImportError:  # pragma: no cover - layer-module fallback
 # DI-1.1: source-state legibility. A deliberately-paused source's healthcheck "ok"
 # must NOT be reported as healthy (that masks a missing cron) nor alarmed as broken.
 try:
-    from source_state import is_paused
+    from ingestion.source_state import is_paused
 
     _SOURCE_STATE_AVAILABLE = True
 except ImportError:  # pragma: no cover - layer not yet rebuilt → old behaviour

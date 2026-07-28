@@ -26,14 +26,14 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("withings")
 except ImportError:
     logger = logging.getLogger("withings")
     logger.setLevel(logging.INFO)
 
-from ingestion_framework import IngestionConfig, run_ingestion
+from ingestion.ingestion_framework import IngestionConfig, run_ingestion
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 USER_ID = os.environ.get("USER_ID", "matthew")
@@ -81,7 +81,7 @@ def _post_form(url: str, params: dict) -> dict:
     data = urllib.parse.urlencode(params).encode()
     req = urllib.request.Request(url, data=data, method="POST")
     req.add_header("Content-Type", "application/x-www-form-urlencoded")
-    from http_retry import urlopen_with_retry
+    from common.http_retry import urlopen_with_retry
 
     with urlopen_with_retry(req, timeout=30) as resp:
         return json.loads(resp.read())
@@ -137,7 +137,7 @@ def _withings_get(secret: dict, url: str, params: dict) -> tuple[dict, dict]:
     data = urllib.parse.urlencode(params).encode()
     req = urllib.request.Request(url, data=data, method="POST", headers={"Authorization": f"Bearer {secret['access_token']}"})
     req.add_header("Content-Type", "application/x-www-form-urlencoded")
-    from http_retry import urlopen_with_retry
+    from common.http_retry import urlopen_with_retry
 
     with urlopen_with_retry(req, timeout=30) as resp:
         result = json.loads(resp.read())

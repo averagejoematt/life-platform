@@ -201,7 +201,7 @@ def test_ac2_channels_match_the_live_entry_channel_enum():
     for channel values — the registered comparison groups must match it exactly, not
     a stale or invented enum."""
     sys.path.insert(0, str(REPO_ROOT / "lambdas"))
-    import flourishing
+    from health import flourishing
 
     f = _frozen()
     groups = f["data_source"]["channel_values"]

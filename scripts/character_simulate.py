@@ -27,9 +27,9 @@ sys.path.insert(0, str(REPO_ROOT / "lambdas" / "compute"))
 os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
 os.environ.setdefault("AWS_REGION", "us-west-2")
 
-import character_engine  # noqa: E402
 import character_sheet_lambda as csl  # noqa: E402
-from constants import EXPERIMENT_START_DATE  # noqa: E402
+from common.constants import EXPERIMENT_START_DATE  # noqa: E402
+from health import character_engine  # noqa: E402
 
 PILLARS = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
 

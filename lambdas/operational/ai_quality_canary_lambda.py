@@ -40,7 +40,7 @@ import boto3
 from boto3.dynamodb.conditions import Key
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("ai-quality-canary")
 except ImportError:  # pragma: no cover
@@ -264,7 +264,7 @@ def _canonical_facts() -> dict:
     on (canonical_facts.build_canonical_facts over the latest computed_metrics).
     Empty dict on any failure → grounded-digits check degrades to skipped."""
     try:
-        from canonical_facts import build_canonical_facts
+        from experiment.canonical_facts import build_canonical_facts
 
         resp = table.query(
             KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}computed_metrics"),
@@ -284,7 +284,7 @@ def _origin_secret() -> str:
     string when unreadable — the probe then goes out headerless and the BLIND
     classification names the transport loudly instead of a silent 403."""
     try:
-        from secret_cache import get_secret
+        from common.secret_cache import get_secret
 
         return (get_secret(ORIGIN_SECRET_NAME, _secrets) or "").strip()
     except Exception as e:  # noqa: BLE001
@@ -416,7 +416,7 @@ def _persona_names():
     Empty list on any failure → the judge prompt still states the vendor/model
     contract, just without the explicit roster to anchor on. Fail-soft."""
     try:
-        import persona_registry
+        from coach import persona_registry
 
         reg = persona_registry.personas(_s3, LOG_BUCKET)
         names = {(p.get("name") or "").strip() for p in reg.values() if p.get("name")}
@@ -472,7 +472,7 @@ def _judge(transcript, persona_names=None):
     positive this fixes. The sanctioned roster is derived from the canonical
     persona registry (`_persona_names`) so it can't drift from the source."""
     try:
-        import bedrock_client
+        from ai import bedrock_client
     except ImportError:
         return None
     if persona_names is None:
@@ -516,7 +516,7 @@ def _budget_paused() -> bool:
     a defect. Fail-open (treat as not-paused) so a budget-read glitch can't
     silence the canary."""
     try:
-        from budget_guard import allow
+        from ai.budget_guard import allow
 
         return not allow("website_ai")
     except Exception:  # noqa: BLE001

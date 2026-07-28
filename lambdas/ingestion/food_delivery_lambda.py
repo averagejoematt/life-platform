@@ -23,7 +23,7 @@ def _phase_for(date_str):
     """#482/X-6: standalone writer stamps phase on DATE#-keyed records like the
     framework does, so a re-import can't surface pre-genesis data as current."""
     try:
-        from ingestion_framework import phase_for_date
+        from ingestion.ingestion_framework import phase_for_date
 
         return phase_for_date(date_str)
     except ImportError:  # pragma: no cover — layer unavailable locally

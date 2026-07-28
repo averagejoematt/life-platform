@@ -39,8 +39,8 @@ LEDGER_TOKENS = ("private_intake", "intake_count", "intake_response")
 
 
 def test_ledger_is_registered_everywhere_private():
-    from phase_taxonomy import RAW_TIMESERIES, SOURCE_CLASS
-    from ritual_link import PRIVATE_RITUAL_METRICS, RITUAL_METRICS
+    from content.ritual_link import PRIVATE_RITUAL_METRICS, RITUAL_METRICS
+    from experiment.phase_taxonomy import RAW_TIMESERIES, SOURCE_CLASS
 
     assert SOURCE_CLASS.get("private_intake") == RAW_TIMESERIES
     assert "intake_count" in RITUAL_METRICS
@@ -101,7 +101,7 @@ def test_web_modules_never_read_or_serve_the_ledger():
 
 def test_generated_artifact_writers_never_name_the_ledger():
     writers = [
-        _REPO / "lambdas" / "site_writer.py",
+        _REPO / "lambdas" / "content" / "site_writer.py",
         _REPO / "lambdas" / "web" / "og_image_lambda.py",
         _REPO / "lambdas" / "web" / "site_stats_refresh_lambda.py",
     ]

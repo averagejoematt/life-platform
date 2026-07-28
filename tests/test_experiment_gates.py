@@ -33,7 +33,7 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "web"))
 
-import experiment_gates  # noqa: E402
+from experiment import experiment_gates  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
 
 
@@ -146,7 +146,7 @@ def _freshness_with(monkeypatch, latest_date, record_extra=None):
     monkeypatch.setattr(sad, "table", fake)
     monkeypatch.setattr(sad, "_FRESHNESS_SOURCES", {"testsrc": {"label": "Test Source", "desc": "d", "category": "Body"}})
     monkeypatch.setattr(sad, "_FRESHNESS_PAUSED", {})
-    import coach_checkin
+    from coach import coach_checkin
 
     monkeypatch.setattr(coach_checkin, "read_cycle", lambda ssm_client=None: 8)
     return sad
@@ -203,7 +203,7 @@ def _pctx(days_in):
 
 
 def test_early_phase_block_carries_reset_no_scold_clause():
-    from ai_context import format_experiment_phase_context
+    from ai.ai_context import format_experiment_phase_context
 
     block = format_experiment_phase_context(_pctx(days_in=1))
     assert "RESET-MANUFACTURED GAPS ARE NOT LAPSES" in block
@@ -211,7 +211,7 @@ def test_early_phase_block_carries_reset_no_scold_clause():
 
 
 def test_post_early_phase_block_omits_reset_clause():
-    from ai_context import format_experiment_phase_context
+    from ai.ai_context import format_experiment_phase_context
 
     block = format_experiment_phase_context(_pctx(days_in=20))
     assert "RESET-MANUFACTURED" not in block

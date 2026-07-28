@@ -25,8 +25,10 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "web"))
 
-import coach_corrections  # noqa: E402
-import coach_dossier as cd  # noqa: E402
+from coach import (
+    coach_corrections,  # noqa: E402
+    coach_dossier as cd,  # noqa: E402
+)
 from fakes import FakeDdbTable  # noqa: E402
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -87,7 +89,7 @@ def test_privacy_filter_passes_clean_lines(text):
 def test_pii_coverage_matches_the_house_detector():
     """The verified gap: find_dossier_violations returned [] on a string
     broadcast_sensitivity_gate.find_pii flagged as ['email', 'phone']."""
-    import broadcast_sensitivity_gate as bsg
+    from privacy import broadcast_sensitivity_gate as bsg
 
     text = "call me at 555-867-5309 or matt@example.com"
     kinds = [term for cat, term in cd.find_dossier_violations(text) if cat == bsg.CATEGORY_PII]

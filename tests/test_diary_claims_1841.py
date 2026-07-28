@@ -30,8 +30,8 @@ sys.path.insert(0, _ROOT)
 sys.path.insert(0, os.path.join(_ROOT, "lambdas"))
 sys.path.insert(0, os.path.join(_ROOT, "lambdas", "coach"))
 
-import diary_claims as dc  # noqa: E402
-import measurable_metrics as mm  # noqa: E402
+from experiment import measurable_metrics as mm  # noqa: E402
+from privacy import diary_claims as dc  # noqa: E402
 
 SESSION_DATE = "2026-07-26"
 SOURCE_SK = "DATE#2026-07-26#journal#video_diary#a1b2c3d4e5f6"
@@ -408,7 +408,7 @@ class TestEvaluatorWiring:
 
 class TestRegistration:
     def test_partition_is_phase_classified_and_wiped(self):
-        import phase_taxonomy as pt
+        from experiment import phase_taxonomy as pt
 
         assert pt.classify("USER#matthew#SOURCE#diary_claims", "PREDICTION#2026-07-26#x") == pt.EXPERIMENT_SCOPED
         sys.path.insert(0, os.path.join(_ROOT, "deploy"))
@@ -420,7 +420,7 @@ class TestRegistration:
         """`dispute_docket` still carries its own copy of this map pending its collapse
         onto measurable_metrics. Until then, pin them identical — a silent divergence
         would give the same metric two different evaluation windows."""
-        import dispute_docket as dd
+        from coach import dispute_docket as dd
 
         assert dd._METRIC_SUBDOMAIN == mm.METRIC_SUBDOMAIN
 

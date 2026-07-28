@@ -39,7 +39,7 @@ stop. The rest of this doc is the operational path.
 ## 1. The mental model — four id name-spaces, one registry (read this or you will trip)
 
 A single coach is referred to by **four different strings**, and the whole point of the CC-00
-work (`config/personas.json` + `lambdas/persona_registry.py`) was to make them provably
+work (`config/personas.json` + `lambdas/coach/persona_registry.py`) was to make them provably
 reconcile so that a coach's public byline is *provably* the coach that authored the data.
 
 | Name-space | Example (training coach) | Where it's the key | Rule (enforced by `test_persona_registry.py`) |
@@ -59,10 +59,10 @@ reconcile so that a coach's public byline is *provably* the coach that authored 
 >
 > **`docs/BOARDS.md` §"Coach Intelligence" is stale on this** — it still lists the *pre-CC-00*
 > engine ids (`dr_johansson`, `fitness_coach`, `body_comp_coach`, …). Those names are dead. The
-> live source of truth is `config/personas.json` + `lambdas/persona_registry.py`. Do not copy ids
+> live source of truth is `config/personas.json` + `lambdas/coach/persona_registry.py`. Do not copy ids
 > out of BOARDS.md.
 
-**The loader** (`lambdas/persona_registry.py`) is the read API both the compute engine and the
+**The loader** (`lambdas/coach/persona_registry.py`) is the read API both the compute engine and the
 site-api go through: `by_coach_config_key()`, `by_engine_id()`, `by_short_id()`, `display_name()`,
 `tts_voice()`, `operational_personas()`, `board_personas()`. It prefers S3
 (`config/personas.json`) and falls back to the bundled repo file. **`config/personas.json` is not
@@ -139,7 +139,7 @@ resolves here.
 
 ---
 
-## 4. The canonical constant — `lambdas/persona_registry.py`
+## 4. The canonical constant — `lambdas/coach/persona_registry.py`
 
 `OPERATIONAL_COACH_IDS` is hard-coded (so compute lambdas import the id list without an S3
 round-trip at module load). Add your id **in the same display order** as `personas.json`:
@@ -181,7 +181,7 @@ The personality/voice config the narrative pipeline reads. Copy an existing one
 ### 5b. Stance ladder — `config/coaches/reading_coach_stance.json`
 
 The hand-authored stage ladder (`config/coaches/<coach>_stance.json`), resolved by
-`lambdas/coach_stance.py` as the **silent fallback** for the coach page's "read of him" when the
+`lambdas/coach/coach_stance.py` as the **silent fallback** for the coach page's "read of him" when the
 evidence-derived `STANCE#` record isn't available. Shape: `coach`, `band_metric`, and a
 `stage_ladder[]` of rungs, each `{stage_id, entry{metric,min,max}, headline, read_of_him,
 cares_most[], cares_less_right_now[], plan, graduation_gate, watches[]}`. Bands must tile the
@@ -203,7 +203,7 @@ whitelist (add the signal there if it's novel; `tests/test_coach_stance.py` enfo
 - `lambdas/coach/coach_computation_engine.py` → `COACH_IDS`
 - `lambdas/coach/coach_prediction_evaluator.py` → `COACH_IDS`
 - `lambdas/coach/coach_narrative_orchestrator.py` → `ALL_COACH_IDS`
-- `lambdas/intelligence_common.py` → `COACH_IDS_ALL` (short ids)
+- `lambdas/intelligence/intelligence_common.py` → `COACH_IDS_ALL` (short ids)
 
 **But several other lambdas keep their OWN coach-id list that the test does NOT catch.** These
 are the ones that will silently drop your coach from a surface if you forget them. Grep before you
@@ -231,14 +231,14 @@ new code.
 Beyond the id lists, several files carry **one entry (or function) per coach** that you must add
 by hand. None of these iterate the registry; all silently omit your coach if forgotten.
 
-- **`lambdas/ai_calls.py`** — a thin per-coach entry wrapper `call_<coach>_coach_v2(data, profile,
+- **`lambdas/ai/ai_calls.py`** — a thin per-coach entry wrapper `call_<coach>_coach_v2(data, profile,
   api_key)` (the existing 8 are `call_sleep_coach_v2` … `call_explorer_coach_v2`) plus the
   `_build_<domain>_data` builder it depends on. The pipeline *core* (`_run_coach_v2_pipeline`,
   `_enforce_quality_gate`) is coach-generic — but the wrapper + data builder are per-coach and
   **must** be added. (This is the one place §9's "you don't touch the gates" does not extend to.)
 - **`lambdas/emails/daily_brief_lambda.py`** — add the `"<coach>_coach_v2_text": ""` default and
   the `("<short>", ai_calls.call_<coach>_coach_v2, "<Label>")` wiring tuple.
-- **`lambdas/html_builder.py`** — add the `<coach>_coach_v2_text` parameter and the coach's
+- **`lambdas/content/html_builder.py`** — add the `<coach>_coach_v2_text` parameter and the coach's
   display row, which **hard-codes the display name and hex color** (e.g. glucose `#2dd4bf`,
   explorer `#e879f9`). Keep the color equal to the persona's `color` in `personas.json`.
 - **`lambdas/web/site_api_ai_lambda.py`** — add the coach's `{"name", "title", "lens"}` dict entry
@@ -392,5 +392,5 @@ lists — that's the grep's job.
 - **ADRs:** ADR-040 (fictional advisors) · ADR-047 (coach intelligence: stateless→stateful) ·
   ADR-055 (prediction loop closure) · ADR-104 (grounded generation) · ADR-106 (coach portraits) ·
   ADR-108 (coach quality gate).
-- **Source of truth for the id contract:** `config/personas.json`, `lambdas/persona_registry.py`,
+- **Source of truth for the id contract:** `config/personas.json`, `lambdas/coach/persona_registry.py`,
   `tests/test_persona_registry.py`.

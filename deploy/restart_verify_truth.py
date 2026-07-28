@@ -70,7 +70,7 @@ def fetch_surfaces(base_url: str = BASE) -> tuple[list[dict], list[str]]:
     the same static-HTML approximation the nightly hook uses); API payloads go
     in as raw JSON text. Every failure is a warning string, never an exception.
     """
-    import reader_truth_qa
+    from operational import reader_truth_qa
 
     surfaces, warnings = [], []
     for path, name in SURFACES:
@@ -123,7 +123,7 @@ def main() -> int:
     ap.add_argument("--today", help="phase-anchor override YYYY-MM-DD (default: today PT; the phase itself comes from constants.py)")
     args = ap.parse_args()
 
-    import reader_truth_qa
+    from operational import reader_truth_qa
 
     phase = reader_truth_qa.phase_context(args.today)
     day_label = f"{phase['days_until_start']}d pre-start" if phase["pre_start"] else f"Day {phase['day_n']}"
@@ -133,7 +133,7 @@ def main() -> int:
     # a paused budget must not block a reset, but it must be visible that the
     # truth layer did NOT run.
     try:
-        import budget_guard
+        from ai import budget_guard
 
         if not budget_guard.allow(reader_truth_qa.BUDGET_FEATURE):
             tier = budget_guard.current_tier()
@@ -145,7 +145,7 @@ def main() -> int:
         pass  # fail-open, same posture as the guard itself
 
     try:
-        import bedrock_client
+        from ai import bedrock_client
     except Exception as e:
         print(f"  ⏸ SKIP — bedrock_client unavailable ({str(e)[:120]}). The truth layer did NOT run this reset.")
         write_report(SKIP, [f"bedrock_client unavailable: {str(e)[:200]}"], day_label)

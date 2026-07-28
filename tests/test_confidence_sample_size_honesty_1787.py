@@ -42,9 +42,11 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "coach"))
 sys.path.insert(0, os.path.join(_REPO, "tests"))
 
-import coach_calibration as ccal  # noqa: E402
-import coach_checkin as cc  # noqa: E402
 import coach_history_summarizer as chs  # noqa: E402
+from coach import (
+    coach_calibration as ccal,  # noqa: E402
+    coach_checkin as cc,  # noqa: E402
+)
 from test_coach_calibration_1481 import _answered_item, _fake_table  # noqa: E402 — reuse the #1481 harness
 
 CONF_SK = "CONFIDENCE#sleep_quality"

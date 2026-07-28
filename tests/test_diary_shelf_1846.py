@@ -41,8 +41,8 @@ os.environ.setdefault("AWS_ACCESS_KEY_ID", "FAKE")
 os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "FAKE")
 
 import content_policy_scan as cps  # noqa: E402
-import journal_quotes as jq  # noqa: E402
 import pytest  # noqa: E402
+from content import journal_quotes as jq  # noqa: E402
 
 NOTION_PK = "USER#matthew#SOURCE#notion"
 QUOTES_PK = "USER#matthew#SOURCE#journal_quotes"

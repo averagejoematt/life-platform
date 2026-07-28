@@ -32,17 +32,17 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
-import privacy_guard  # deterministic real-name + vice scrub (layer module)
-from ai_context import (
+from ai.ai_context import (
     board_grounding_receipts,
     build_experiment_phase_context,
     format_experiment_phase_context,
     wrap_untrusted_reader_text,
 )  # R22-SEC-04 (#811): delimit untrusted reader text; #743: reader-facing receipts; #1086: mandatory phase block
 from boto3.dynamodb.conditions import Key
-from constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
-from phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1085
-from source_registry import public_board_sources, public_paused_sources  # #387: derived source count
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1085
+from ingestion.source_registry import public_board_sources, public_paused_sources  # #387: derived source count
+from privacy import privacy_guard  # deterministic real-name + vice scrub (layer module)
 
 from web import board_quality_gate as _bqg  # #968: ADR-108 quality gate on the board (see the block comment near the #546 section)
 from web.site_api_common import (
@@ -160,7 +160,7 @@ MAX_FOLLOWUPS = 3  # ≤ 3 follow-ups per session (cost + focus bound)
 _SESSION_TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 
 try:
-    from rate_limiter import check_rate_limit as _ddb_rate_check
+    from common.rate_limiter import check_rate_limit as _ddb_rate_check
 
     _RATE_LIMITER_READY = True
 except ImportError:
@@ -215,7 +215,7 @@ def _ai_paused_response():
     readers degrade LAST), return a friendly HTTP-200 'paused' payload the
     frontend renders calmly; else None. Fail-open."""
     try:
-        from budget_guard import allow
+        from ai.budget_guard import allow
 
         if not allow("website_ai"):
             return {
@@ -428,7 +428,7 @@ def _ask_fetch_computed_reads() -> dict:
     # Canonical daily facts (computed_metrics → the same numbers coaches ground
     # on): weight trend rate + the protein trio the vitals block doesn't carry.
     try:
-        from canonical_facts import build_canonical_facts
+        from experiment.canonical_facts import build_canonical_facts
 
         facts = build_canonical_facts(_latest_item("computed_metrics") or {})
         if facts.get("weekly_rate_lbs") is not None:
@@ -728,7 +728,7 @@ def _coach_voice_core(pid: str) -> str:
     Deterministic per spec, so the system block stays byte-stable for the prompt
     cache. "" fail-soft: a missing spec keeps the roster-only block (pre-#531)."""
     try:
-        import persona_core
+        from coach import persona_core
 
         return persona_core.persona_block(pid, s3_client=_s3_client(), bucket=S3_BUCKET)
     except Exception as e:
@@ -904,7 +904,7 @@ def board_grounding_findings(system_text: str, message_text: str, answer_text: s
     follow-ups) its own prior answers. Extracted so the #812 golden-surface eval
     harness replays fixtures through the ACTUAL gate path, not a re-implementation.
     Returns grounded_generation findings ([] = grounded)."""
-    import grounded_generation as _gg
+    from ai import grounded_generation as _gg
 
     allowed = _gg.allowed_numbers(system_text, message_text, prior_answers or None)
     return _gg.grounding_findings(answer_text, allowed=allowed)
@@ -914,7 +914,7 @@ def _retain_board_flag(pid: str, verdict: str, draft: str, final: str, findings:
     """#812/#744: persist a fired board gate (draft + findings + disposition) as
     eval data for the harvest loop. Fail-soft — never affects the reader path."""
     try:
-        import eval_retention
+        from experiment import eval_retention
 
         eval_retention.retain("board_ask", verdict, draft=draft, final=final, findings=findings, extra={"persona": pid, **(extra or {})})
     except Exception:  # noqa: BLE001 — retention is never load-bearing
@@ -933,7 +933,7 @@ def _write_board_interaction(pid: str, question: str, answer: str, grounded: boo
     (initial ask + follow-up turn) come through here with the final answer the
     reader saw, so one call covers the whole surface."""
     try:
-        import qa_archive
+        from common import qa_archive
 
         qa_archive.archive_text("board_ask", answer, variant=pid, meta={"question": question[:500], "grounded": grounded})
     except Exception as e:  # noqa: BLE001 — the archive is never load-bearing
@@ -1076,7 +1076,7 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
     # Phase 2.2: centralized request envelope validation (Body size cap +
     # injection pattern detection + param format checks). Returns 4xx on abuse.
     try:
-        from request_validator import validate_envelope
+        from common.request_validator import validate_envelope
 
         path = event.get("rawPath") or event.get("path", "/")
         method = (event.get("requestContext", {}).get("http", {}).get("method") or event.get("httpMethod", "POST")).upper()
@@ -1217,7 +1217,7 @@ def _handle_ask(event: dict) -> dict:
         )
 
         # ADR-062 (2026-05-27): Bedrock invoke_model (was urllib → api.anthropic.com).
-        from bedrock_client import invoke as _bedrock_invoke
+        from ai.bedrock_client import invoke as _bedrock_invoke
 
         result = _bedrock_invoke(json.loads(req_body))
 
@@ -1231,7 +1231,7 @@ def _handle_ask(event: dict) -> dict:
         # the question, prior turns). One corrective regen; if numbers still
         # can't be grounded, say so honestly instead of serving them.
         try:
-            import grounded_generation as _gg
+            from ai import grounded_generation as _gg
 
             _allowed = _gg.allowed_numbers(system_prompt, question, [a_ for _, a_ in history])
 
@@ -1418,7 +1418,7 @@ def _handle_explain(event: dict) -> dict:
 
     payload_txt = _shrink_for_prompt(payload)
     try:
-        from constants import EXPERIMENT_START_DATE
+        from common.constants import EXPERIMENT_START_DATE
 
         _day_n = (datetime.now(timezone.utc).date() - datetime.strptime(EXPERIMENT_START_DATE, "%Y-%m-%d").date()).days + 1
         day_ctx = f"Experiment day {_day_n} (restarted {EXPERIMENT_START_DATE}) — a young record is short by design."
@@ -1432,7 +1432,7 @@ def _handle_explain(event: dict) -> dict:
         "Explain what this page is showing right now, in 3-4 plain sentences."
     )
     try:
-        from bedrock_client import invoke as _bedrock_invoke
+        from ai.bedrock_client import invoke as _bedrock_invoke
 
         result = _bedrock_invoke(
             {
@@ -1447,7 +1447,7 @@ def _handle_explain(event: dict) -> dict:
 
         # ADR-104 fail-closed gate: every number must exist in the fetched JSON.
         try:
-            import grounded_generation as _gg
+            from ai import grounded_generation as _gg
 
             _allowed = _gg.allowed_numbers(payload_txt, day_ctx)
             if _gg.grounding_findings(explanation, allowed=_allowed):
@@ -1612,7 +1612,7 @@ def _handle_board_ask(event: dict) -> dict:
             # unavailable" for that persona. bedrock_client is bundled in
             # /var/task via Code.from_asset, so it imports even though site-api-ai
             # runs without the shared layer.
-            from bedrock_client import invoke as _bedrock_invoke
+            from ai.bedrock_client import invoke as _bedrock_invoke
 
             result = _bedrock_invoke(json.loads(req_body))
             # V2 follow-up: emit per-persona token metrics (was dark)
@@ -1626,7 +1626,7 @@ def _handle_board_ask(event: dict) -> dict:
             # a fabricated figure served to a reader.
             _grounded = True
             try:
-                import grounded_generation as _gg
+                from ai import grounded_generation as _gg
 
                 _gf = board_grounding_findings(_sys_txt, user_msg, _txt)
                 if _gf:
@@ -1823,7 +1823,7 @@ def _handle_board_followup(body: dict, ip_hash: str) -> dict:
     )
 
     _sys_txt = _coach_system(persona)
-    from bedrock_client import invoke as _bedrock_invoke
+    from ai.bedrock_client import invoke as _bedrock_invoke
 
     try:
         result = _bedrock_invoke(
@@ -1846,7 +1846,7 @@ def _handle_board_followup(body: dict, ip_hash: str) -> dict:
     # and the prior answers so referencing an earlier number is legitimate.
     _grounded = True
     try:
-        import grounded_generation as _gg
+        from ai import grounded_generation as _gg
 
         _msg_text = " ".join(m["content"] for m in messages if isinstance(m.get("content"), str))
         _gf = board_grounding_findings(_sys_txt, _msg_text, _txt, prior_answers=prior_answers)

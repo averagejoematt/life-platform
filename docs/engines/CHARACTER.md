@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-27 (Day-1 re-verify: the only `config/character_sheet.json` change since 07-26 is the baseline block — the real genesis weigh-in 321.09 lbs superseding the 317.61 override; pillar weights/ema_lambda/leveling knobs and every formula untouched. Prior: #1590 re-verify — line refs + version stamps re-derived against live source; formulas unchanged since #1403; 07-26: only #1656/#1709/#1713 mypy churn in `character_engine.py`)
 > Math audit + 420-day simulation verdicts: [CHARACTER_MATH_AUDIT_2026-07.md](CHARACTER_MATH_AUDIT_2026-07.md) (epic #956).
-> **Sources of truth:** `lambdas/character_engine.py` (v1.8.0 — v1.7.0 #1373 progression receipts, v1.6.1 #1125 level-up drivers, v1.6.0 #965 source wiring; #1412 personal-baselines targets and #1411 fitted-not-authored badges shipped without an engine version bump), `lambdas/compute/character_sheet_lambda.py`, `config/character_sheet.json` (v1.6.0, deployed to `s3://…/config/matthew/character_sheet.json`)
+> **Sources of truth:** `lambdas/health/character_engine.py` (v1.8.0 — v1.7.0 #1373 progression receipts, v1.6.1 #1125 level-up drivers, v1.6.0 #965 source wiring; #1412 personal-baselines targets and #1411 fitted-not-authored badges shipped without an engine version bump), `lambdas/compute/character_sheet_lambda.py`, `config/character_sheet.json` (v1.6.0, deployed to `s3://…/config/matthew/character_sheet.json`)
 
 ## Purpose
 
@@ -65,7 +65,7 @@ component each — all **day-count** metrics so volume gaming buys nothing:
   phase filter).
 - **flourishing → mind `values_alignment`** (weight .10, measured — #1403): distinct
   values-in-action the journal-enrichment pass evidenced today (`SOURCE#flourishing`
-  row, `lambdas/flourishing.py`): none-on-a-journaled-day = 20 (a real low — the LLM
+  row, `lambdas/health/flourishing.py`): none-on-a-journaled-day = 20 (a real low — the LLM
   read the prose and found none), 1 = 60, 2 = 80, 3+ = 100; no row = None
   (uninstrumented, ADR-104). Rebalance: t1_habit_compliance and journal_consistency
   each .15 → .10 (mind weights still sum 1.0). The row is also the PRIMARY
@@ -193,4 +193,4 @@ reset. Per-pillar output carries raw_score, level_score, level, tier, xp_total/x
 **Regression harness:** `python3 scripts/character_sim_year.py` (5 scenarios × 420 days
 against the real engine) + `tests/test_character_math_v2.py` — rerun both after any retune.
 
-> **Verified against `lambdas/character_engine.py` (v1.8.0) + `config/character_sheet.json` (v1.6.0) @ git `fab48cbd` on 2026-07-20 (#1590).**
+> **Verified against `lambdas/health/character_engine.py` (v1.8.0) + `config/character_sheet.json` (v1.6.0) @ git `fab48cbd` on 2026-07-20 (#1590).**

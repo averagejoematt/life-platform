@@ -18,7 +18,7 @@ import importlib
 import json
 
 import pytest
-import whole_life_context as wlc
+from health import whole_life_context as wlc
 
 # ── AC2: cached-block wiring (the primitive) ────────────────────────────────
 
@@ -66,7 +66,7 @@ def test_format_full_archive_empty():
 
 def test_chronicle_call_anthropic_sends_archive_as_cached_block(monkeypatch):
     import chronicle_prompt
-    import retry_utils
+    from common import retry_utils
 
     captured = {}
 
@@ -87,7 +87,7 @@ def test_chronicle_call_anthropic_sends_archive_as_cached_block(monkeypatch):
 
 def test_chronicle_call_anthropic_no_archive_is_plain_string(monkeypatch):
     import chronicle_prompt
-    import retry_utils
+    from common import retry_utils
 
     captured = {}
     monkeypatch.setattr(retry_utils, "call_anthropic_api", lambda **kw: captured.update(kw) or "x")
@@ -169,15 +169,15 @@ def test_fabricated_dated_callback_is_caught_even_with_whole_life_context():
 
 
 def test_bedrock_structured_output_config_shape():
-    import bedrock_client
-    import chronicle_schema
+    from ai import bedrock_client
+    from content import chronicle_schema
 
     cfg = bedrock_client.structured_output_config(chronicle_schema.INSTALLMENT_SCHEMA)
     assert cfg == {"format": {"type": "json_schema", "schema": chronicle_schema.INSTALLMENT_SCHEMA}}
 
 
 def test_invoke_forwards_output_config_and_strips_model(monkeypatch):
-    import bedrock_client
+    from ai import bedrock_client
 
     captured = {}
 
@@ -210,7 +210,7 @@ def test_invoke_forwards_output_config_and_strips_model(monkeypatch):
 
 
 def test_installment_schema_validates_good_and_rejects_bad():
-    import chronicle_schema
+    from content import chronicle_schema
 
     good = {"title": "The week it clicked", "weight_lbs": 209.4, "week_grade": 71.0, "t0_streak_days": 12, "body_markdown": "..."}
     assert chronicle_schema.validate_installment(good) == []
@@ -226,7 +226,7 @@ def test_installment_schema_validates_good_and_rejects_bad():
 
 
 def test_parse_stats_line_feeds_schema_validation():
-    import chronicle_schema
+    from content import chronicle_schema
 
     stats = "[Weight: 209.4 lbs | Week Grade: avg 71 | T0 Streak: 12 days]"
     envelope = chronicle_schema.installment_from_stats("A title", chronicle_schema.parse_stats_line(stats), "body")
@@ -244,9 +244,8 @@ def test_parse_stats_line_feeds_schema_validation():
 
 def test_state_of_matthew_still_budget_gated(monkeypatch):
     som = importlib.import_module("state_of_matthew_lambda")
-    import budget_guard
+    from ai import budget_guard  # This surface pauses at tier 2 alongside the other reader narratives (ADR-125).
 
-    # This surface pauses at tier 2 alongside the other reader narratives (ADR-125).
     assert som.BUDGET_FEATURE == "state_of_matthew"
 
     monkeypatch.setattr(budget_guard, "allow", lambda feature: False)  # simulate the pause

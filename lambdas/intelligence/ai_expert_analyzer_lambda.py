@@ -49,7 +49,7 @@ logger.setLevel(logging.INFO)
 
 # Intelligence Layer V2: shared preamble utilities
 try:
-    from intelligence_common import (
+    from intelligence.intelligence_common import (
         apply_movement_honesty_guard,
         build_coach_preamble,
         build_data_inventory,
@@ -68,7 +68,7 @@ except ImportError:
 
 # Phase-3 grounding backstop: deviation + HRV-unit checks against the shared facts.
 try:
-    import ai_output_validator as _aiv
+    from ai import ai_output_validator as _aiv
 
     _HAS_AI_VALIDATOR = True
 except ImportError:
@@ -76,7 +76,7 @@ except ImportError:
 
 # #531: shared persona core — one voice-spec rendering across brief/board/observatory.
 try:
-    import persona_core as _persona_core
+    from coach import persona_core as _persona_core
 except ImportError:  # pragma: no cover — environment-dependent
     _persona_core = None
     logger.warning("persona_core not available — expert prompts keep persona-dict voice only")
@@ -115,7 +115,7 @@ def _get_api_key():
     return _api_key_cache
 
 
-from numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
+from common.numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
 
 
 def _query_source(source, start_date, end_date):
@@ -135,7 +135,7 @@ def _latest_item(source):
     return items[0] if items else None
 
 
-from constants import EXPERIMENT_START_DATE as EXPERIMENT_START  # ADR-058
+from common.constants import EXPERIMENT_START_DATE as EXPERIMENT_START  # ADR-058
 
 _CANON_FACTS_CACHE = {}
 
@@ -157,7 +157,7 @@ def _load_canonical_facts():
         # ONE schema (canonical_facts.build_canonical_facts) that the Coherence Sentinel
         # also reads — so the value a coach is grounded on is exactly the value the
         # Sentinel checks the narrative against. No more per-site dict construction.
-        from canonical_facts import build_canonical_facts
+        from experiment.canonical_facts import build_canonical_facts
 
         _cm = _latest_item("computed_metrics") or {}
         facts = build_canonical_facts(_cm)
@@ -198,7 +198,7 @@ except ImportError:  # pragma: no cover — flat sys.path (tests)
 # ADR-104: the shared grounded-generation harness — the regen-once keep-if-improved
 # flow moved there (one implementation for every surface), plus the allow-list
 # number gate that catches fabricated trends ("from 58 to 64" with no 58 anywhere).
-import grounded_generation as _gg
+from ai import grounded_generation as _gg
 
 
 def _latest_date(items):
@@ -243,7 +243,7 @@ def _read_movement_ingest_health(sources=("strava", "garmin")):
     """
     out = {}
     try:
-        from ingest_health import SYSTEM_PK, evaluate_source_health, ingest_health_sk
+        from ingestion.ingest_health import SYSTEM_PK, evaluate_source_health, ingest_health_sk
     except Exception as e:  # ingest_health absent from the bundle → conservative fallback
         logger.warning("ingest_health unavailable; movement guard falls back to records-only: %s", e)
         return out
@@ -349,7 +349,7 @@ def gather_data_for_expert(expert_key):
         # the training-stimulus read is built off Hevy first, then Strava for aerobic/NEAT,
         # never off steps. Strava is paused (402) and Garmin rate-limited, so a Strava-only
         # read collapses to "all rest days" and produces a false under-training verdict.
-        from source_state import has_rate_limit_marker, resolve_source_state
+        from ingestion.source_state import has_rate_limit_marker, resolve_source_state
 
         hevy_items = _query_source("hevy", d30, today)
         activities = _query_source("strava", d30, today)
@@ -785,7 +785,7 @@ experiment" — these are periodic lab draws over time.
             # Builder's Paradox: inject into mind coach prompt
             if expert_key == "mind":
                 try:
-                    from intelligence_common import compute_builders_paradox_score
+                    from intelligence.intelligence_common import compute_builders_paradox_score
 
                     bp = compute_builders_paradox_score(days=7)
                     bp_block = (
@@ -922,7 +922,7 @@ def _load_engagement_signal():
     keep injecting the OLD cycle's presence severity into every expert prompt
     until adaptive_mode's next daily run rewrites it."""
     try:
-        from phase_filter import singleton_visible
+        from experiment.phase_filter import singleton_visible
 
         resp = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#engagement_state", "sk": "STATE#current"})
         item = resp.get("Item")
@@ -946,7 +946,7 @@ def _presence_block():
     (pure, shared by every narrative surface) — this wrapper keeps the
     STATE#current read local and the two injection points below unchanged."""
     try:
-        from engagement_core import presence_prompt_block
+        from content.engagement_core import presence_prompt_block
     except ImportError:  # pragma: no cover — bundle always ships engagement_core
         return ""
     return presence_prompt_block(_load_engagement_signal())
@@ -1115,7 +1115,7 @@ def generate_and_cache(expert_key, shared_system=None):
 
     # Phase 3.4 (2026-05-16): retry via retry_utils (4 attempts, 5/15/45s).
     try:
-        from retry_utils import call_anthropic_raw
+        from common.retry_utils import call_anthropic_raw
 
         result = call_anthropic_raw(req, timeout=60)
     except urllib.error.HTTPError as e:
@@ -1175,7 +1175,7 @@ def generate_and_cache(expert_key, shared_system=None):
     # Intelligence Validator V2.1 Mode B: post-generation quality check with inline correction
     if _HAS_INTELLIGENCE_COMMON:
         try:
-            from intelligence_common import validate_coach_output, write_quality_results
+            from intelligence.intelligence_common import validate_coach_output, write_quality_results
 
             _inventory = build_data_inventory()
             _maturity = build_data_maturity(_inventory)
@@ -1220,7 +1220,7 @@ def generate_and_cache(expert_key, shared_system=None):
                     # Phase 3.4 + CRIT-AI-01 (2026-05-16): correction call now retries via
                     # retry_utils (was raw urlopen, no retry — caused silent quality failures
                     # when Anthropic was briefly unavailable mid-observatory).
-                    from retry_utils import call_anthropic_raw
+                    from common.retry_utils import call_anthropic_raw
 
                     corr_result = call_anthropic_raw(corr_req, timeout=60)
                     corrected_text = "".join(b["text"] for b in corr_result.get("content", []) if b.get("type") == "text")
@@ -1300,7 +1300,7 @@ def generate_and_cache(expert_key, shared_system=None):
                 return _gg.grounding_findings(_t, facts=_facts, allowed=_allowed)
 
             def _regen(_correction):
-                from retry_utils import call_anthropic_raw
+                from common.retry_utils import call_anthropic_raw
 
                 _fix_req = urllib.request.Request(
                     "https://api.anthropic.com/v1/messages",
@@ -1465,7 +1465,7 @@ def generate_synthesis(all_coach_outputs):
     # and fail-closed to yesterday's stale record (the /cockpit/ "collapsed to one session/week"
     # bug). Parse LENIENTLY (strip fences, extract the outermost object, drop trailing commas),
     # and if even that fails, regex-extract weekly_priority so a FRESH record always lands.
-    from retry_utils import call_anthropic_raw
+    from common.retry_utils import call_anthropic_raw
 
     def _parse_synthesis(text):
         import re
@@ -1555,7 +1555,7 @@ def _week_behavioral_presence(iso_week):
     except (TypeError, ValueError):
         return None
     try:
-        from engagement_core import channel_counts_as_logged as _cal
+        from content.engagement_core import channel_counts_as_logged as _cal
     except ImportError:  # pragma: no cover — bundle always ships engagement_core
 
         def _cal(_src, _it):
@@ -1591,7 +1591,7 @@ def generate_experiment_arc():
     fn_pk = f"{USER_PREFIX}field_notes"
     # ADR-058: hide pre-genesis pilot weeks (phase=pilot) so the arc only synthesizes
     # the CURRENT experiment's run — matching what the Experiment view's week list shows.
-    from phase_filter import with_phase_filter
+    from experiment.phase_filter import with_phase_filter
 
     try:
         resp = table.query(
@@ -1669,7 +1669,7 @@ def generate_experiment_arc():
             headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
         )
 
-    from retry_utils import call_anthropic_raw
+    from common.retry_utils import call_anthropic_raw
 
     def _parse(text):
         import re
@@ -1744,7 +1744,7 @@ def generate_month_rollup():
     empty state — ADR-104, never a fabricated rollup).
     """
     fn_pk = f"{USER_PREFIX}field_notes"
-    from phase_filter import with_phase_filter
+    from experiment.phase_filter import with_phase_filter
 
     try:
         resp = table.query(
@@ -1818,7 +1818,7 @@ def generate_month_rollup():
             headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
         )
 
-    from retry_utils import call_anthropic_raw
+    from common.retry_utils import call_anthropic_raw
 
     def _parse(text):
         import re

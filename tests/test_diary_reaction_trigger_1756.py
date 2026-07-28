@@ -275,7 +275,7 @@ def test_diary_reactions_partition_is_registered_and_wiped():
     (the wipe's coverage assertion refuses to run otherwise — a silent zero-write reset)."""
     import importlib.util
 
-    import phase_taxonomy as pt
+    from experiment import phase_taxonomy as pt
 
     assert pt.classify("USER#matthew#SOURCE#diary_reactions", "DATE#2026-07-25#video_diary#abc") == pt.EXPERIMENT_SCOPED
 

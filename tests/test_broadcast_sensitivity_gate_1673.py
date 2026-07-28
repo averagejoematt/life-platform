@@ -23,8 +23,10 @@ os.environ.setdefault("AWS_REGION", "us-west-2")
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
-import broadcast_sensitivity_gate as gate  # noqa: E402
-import privacy_guard  # noqa: E402
+from privacy import (
+    broadcast_sensitivity_gate as gate,  # noqa: E402
+    privacy_guard,  # noqa: E402
+)
 
 
 # ── Injectable classifiers (the module is AWS-free; these stand in for Bedrock) ──────
@@ -199,7 +201,7 @@ def test_vice_policy_is_sourced_from_privacy_guard():
 
 # ── The production Bedrock classifier is fail-closed at the budget seam ───────────────
 def test_bedrock_classifier_holds_when_budget_paused(monkeypatch):
-    import budget_guard
+    from ai import budget_guard
 
     monkeypatch.setattr(budget_guard, "allow", lambda feature: False)
     res = gate.bedrock_offtopic_classifier("any text")

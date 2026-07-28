@@ -89,7 +89,7 @@ def _ensure_folder(title: str) -> str | None:
     """Find-or-create a Hevy routine folder by title; return its id (or None on
     failure, so commit can proceed unfoldered rather than erroring). Hevy folders
     are a flat list; folder_id is set-on-create only."""
-    import hevy_write_client as wc
+    from training import hevy_write_client as wc
 
     try:
         folders = wc.list_folders()
@@ -119,8 +119,8 @@ def _make_resolver():
     mis-map. A title miss raises MovementUnmappable loudly rather than pushing the
     wrong exercise.
     """
-    import hevy_write_client as wc
-    from hevy_template_cache import MovementUnmappable, reconcile_custom, resolve_movement
+    from training import hevy_write_client as wc
+    from training.hevy_template_cache import MovementUnmappable, reconcile_custom, resolve_movement
 
     def _resolve(movement_key: str) -> str:
         # ADR-069 (template index): keys of the form "tmpl:<id>" are already
@@ -137,7 +137,7 @@ def _make_resolver():
 
 
 def _generator_inputs(args: dict[str, Any]):
-    from routine_generator import GeneratorInputs
+    from training.routine_generator import GeneratorInputs
 
     return GeneratorInputs(
         target_date=args.get("target_date") or datetime.now(timezone.utc).date().isoformat(),
@@ -276,8 +276,8 @@ def _apply_recovery_adaptation(ir: Any, ctx: dict[str, Any], inputs_current_thro
 
 
 def _action_draft(args: dict[str, Any]) -> dict[str, Any]:
-    from routine_generator import generate_routines
-    from routine_repo import put_versioned
+    from training.routine_generator import generate_routines
+    from training.routine_repo import put_versioned
 
     target_date = args.get("target_date") or datetime.now(timezone.utc).date().isoformat()
 
@@ -326,7 +326,7 @@ def _action_draft(args: dict[str, Any]) -> dict[str, Any]:
 
 
 def _catalog_movements() -> dict[str, Any]:
-    from routine_generator import _load_json
+    from training.routine_generator import _load_json
 
     return (_load_json("movement_catalog.json") or {}).get("movements", {})
 
@@ -347,7 +347,7 @@ def _template_index() -> dict[str, Any]:
     Returns {} if the index is absent — resolution then falls back to a live
     Hevy lookup.
     """
-    from routine_generator import _load_json
+    from training.routine_generator import _load_json
 
     try:
         return (_load_json("hevy_template_index.json") or {}).get("templates", {})
@@ -362,7 +362,7 @@ def _live_template_id_by_title(name: str) -> str | None:
     Hevy after the index was last built). Exact normalized-title match only —
     never a fuzzy guess, to avoid silently pushing the wrong exercise.
     """
-    import hevy_write_client as wc
+    from training import hevy_write_client as wc
 
     target = _normalize_title(name)
     page = 1
@@ -589,7 +589,7 @@ def _create_template_for(ex: dict[str, Any], title: str) -> tuple[str, dict[str,
     eventual consistency). A real validation failure (bad enum) surfaces because
     the title never appears in the list.
     """
-    import hevy_write_client as wc
+    from training import hevy_write_client as wc
 
     meta = {
         "title": title,
@@ -647,7 +647,7 @@ def _index_suggestions(name: str, limit: int = 8) -> list[str]:
 def _coerce_sets(raw_sets: list[dict[str, Any]] | None) -> list:
     """Build IR Set objects from a caller spec. lbs -> kg (Hevy stores kg);
     `count` repeats a set N times (ergonomic for '15 lb x 15 (x3)')."""
-    from routine_ir import Set
+    from training.routine_ir import Set
 
     sets: list = []
     for s in raw_sets or []:
@@ -681,9 +681,9 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
     the caller; the platform does not compute them. The resulting draft IR is
     identical in shape to a generator draft, so dry_run/commit work unchanged.
     """
-    from routine_generator import _new_routine_id, _now_iso
-    from routine_ir import ExerciseBlock, RoutineSpec
-    from routine_repo import put_versioned
+    from training.routine_generator import _new_routine_id, _now_iso
+    from training.routine_ir import ExerciseBlock, RoutineSpec
+    from training.routine_repo import put_versioned
 
     raw_exercises = args.get("exercises")
     if not isinstance(raw_exercises, list) or not raw_exercises:
@@ -771,7 +771,7 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
 
     warnings: list[str] = []
     try:
-        from routine_generator import _load_json
+        from training.routine_generator import _load_json
 
         ceiling = (_load_json("training_week.json") or {}).get("session_set_ceiling")
         if ceiling and total_sets > int(ceiling):
@@ -856,7 +856,7 @@ def _resolve_title_inputs(ir: Any) -> tuple[dict[str, Any] | None, str]:
     (stored on the IR at draft time) — when set, we return a None context so the
     compiler keeps the caller's literal title, and we log a warning. force_title
     is off by default; the rendered convention is always the normal path."""
-    from routine_title import build_title_context, format_why_note
+    from training.routine_title import build_title_context, format_why_note
 
     why = format_why_note(ir)
     if (getattr(ir, "inputs_snapshot", None) or {}).get("force_title"):
@@ -877,7 +877,7 @@ def _validate_ir_for_hevy(ir: Any) -> dict[str, Any]:
                       so Matthew sees what will actually be sent.
       - warnings    → non-blocking (e.g. control chars stripped from a note).
     """
-    from hevy_compiler import HEVY_SET_TYPES, normalize_set_type, sanitize_note
+    from training.hevy_compiler import HEVY_SET_TYPES, normalize_set_type, sanitize_note
 
     errors: list[str] = []
     corrections: list[str] = []
@@ -904,8 +904,8 @@ def _action_dry_run(args: dict[str, Any]) -> dict[str, Any]:
     routine_id = args.get("routine_id")
     if not routine_id:
         return mcp_error("dry_run requires routine_id", error_code="MISSING_ARG")
-    from hevy_compiler import to_create_body
-    from routine_repo import get_current
+    from training.hevy_compiler import to_create_body
+    from training.routine_repo import get_current
 
     ir = get_current(routine_id)
     if not ir:
@@ -949,9 +949,9 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
             "commit requires explicit routine_id — no inferred intent",
             error_code="MISSING_ARG",
         )
-    import hevy_write_client as wc
-    from hevy_compiler import from_hevy_response, to_create_body, to_update_body
-    from routine_repo import get_current, put_versioned, upsert_id_map
+    from training import hevy_write_client as wc
+    from training.hevy_compiler import from_hevy_response, to_create_body, to_update_body
+    from training.routine_repo import get_current, put_versioned, upsert_id_map
 
     ir = get_current(routine_id)
     if not ir:
@@ -1048,7 +1048,7 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
 
 
 def _action_list(args: dict[str, Any]) -> dict[str, Any]:
-    from routine_repo import list_by_date_range
+    from training.routine_repo import list_by_date_range
 
     start = args.get("start_date") or args.get("date") or "2026-05-31"
     end = args.get("end_date") or args.get("date") or start
@@ -1075,8 +1075,8 @@ def _action_get(args: dict[str, Any]) -> dict[str, Any]:
     routine_id = args.get("routine_id")
     if not routine_id:
         return mcp_error("get requires routine_id", error_code="MISSING_ARG")
-    from routine_ir import serialize
-    from routine_repo import get_current
+    from training.routine_ir import serialize
+    from training.routine_repo import get_current
 
     ir = get_current(routine_id)
     if not ir:
@@ -1091,10 +1091,10 @@ def _action_archive(args: dict[str, Any]) -> dict[str, Any]:
             "archive requires explicit routine_id — no inferred intent",
             error_code="MISSING_ARG",
         )
-    import hevy_write_client as wc
-    from hevy_compiler import to_update_body
-    from hevy_template_cache import resolve_movement
-    from routine_repo import get_current, put_versioned
+    from training import hevy_write_client as wc
+    from training.hevy_compiler import to_update_body
+    from training.hevy_template_cache import resolve_movement
+    from training.routine_repo import get_current, put_versioned
 
     ir = get_current(routine_id)
     if not ir:
@@ -1135,8 +1135,8 @@ def _action_archive(args: dict[str, Any]) -> dict[str, Any]:
 
 
 def _action_floor(args: dict[str, Any]) -> dict[str, Any]:
-    from routine_generator import generate_routines
-    from routine_repo import put_versioned
+    from training.routine_generator import generate_routines
+    from training.routine_repo import put_versioned
 
     inputs = _generator_inputs(args)
     routines = generate_routines(inputs)
@@ -1148,8 +1148,8 @@ def _action_floor(args: dict[str, Any]) -> dict[str, Any]:
 
 
 def _action_re_entry(args: dict[str, Any]) -> dict[str, Any]:
-    from routine_generator import GeneratorInputs, generate_routines
-    from routine_repo import put_versioned
+    from training.routine_generator import GeneratorInputs, generate_routines
+    from training.routine_repo import put_versioned
 
     base = _generator_inputs(args)
     inputs = GeneratorInputs(
@@ -1174,9 +1174,9 @@ def _action_adherence(args: dict[str, Any]) -> dict[str, Any]:
     routine_id = args.get("routine_id")
     if not routine_id:
         return mcp_error("adherence requires routine_id", error_code="MISSING_ARG")
-    import hevy_write_client as wc
-    from adherence_calc import calculate_adherence
-    from routine_repo import get_current
+    from health.adherence_calc import calculate_adherence
+    from training import hevy_write_client as wc
+    from training.routine_repo import get_current
 
     ir = get_current(routine_id)
     if not ir:

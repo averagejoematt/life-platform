@@ -29,6 +29,8 @@ import os
 import re
 import sys
 
+from bundle_stubs import stub_bundled_module
+
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
 AI_SRC = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas/web/site_api_ai_lambda.py")).read()
@@ -50,7 +52,7 @@ FULL_CTX = {
 
 
 def _ctx_mod():
-    import ai_context
+    from ai import ai_context
 
     return ai_context
 
@@ -231,7 +233,7 @@ def _wire(ai, monkeypatch, table, bedrock_text="Steady progress — keep the rou
             txt = bedrock_text(req) if callable(bedrock_text) else bedrock_text
             return {"content": [{"type": "text", "text": txt}], "usage": {}}
 
-    monkeypatch.setitem(sys.modules, "bedrock_client", _FakeBedrock)
+    stub_bundled_module(monkeypatch, "ai.bedrock_client", _FakeBedrock)
     return captured
 
 

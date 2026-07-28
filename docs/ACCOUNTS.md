@@ -1,7 +1,7 @@
 # External Accounts Inventory — what a successor needs to keep the platform alive
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-26 (#1029 — added a pointer to `scripts/check_reentry_hardening.py`; the two ⚠️ estate rows below remain open, owner action)
-> **Sources of truth:** `lambdas/source_registry.py` (data sources) · `docs/SECRETS_MAP.md` (credential locations) · `aws route53 list-hosted-zones` + `whois averagejoematt.com` (domain facts) · `aws ses list-identities` (email identities)
+> **Sources of truth:** `lambdas/ingestion/source_registry.py` (data sources) · `docs/SECRETS_MAP.md` (credential locations) · `aws route53 list-hosted-zones` + `whois averagejoematt.com` (domain facts) · `aws ses list-identities` (email identities)
 
 Every external account/service the platform depends on, what it's for, where its
 credential lives, and how to recover access. **No secret values and no account
@@ -35,14 +35,14 @@ Human AWS access procedure: `docs/AWS_ACCESS.md`.
 | **Notion** | Journal ingestion (integration token) | `life-platform/ingestion-keys` (notion fields) — a dedicated `life-platform/notion` also exists (see `docs/SECRETS_MAP.md` for its status) | Notion login (password manager) → Settings → Integrations → regenerate token |
 | **Dropbox** (OAuth app) | MacroFactor nutrition export poll (`dropbox-poll`) | `life-platform/ingestion-keys` (dropbox fields) — the dedicated secret was deleted 2026-05 | Dropbox login (password manager) → re-auth the app if refresh token expires |
 | **MacroFactor** (iOS app) | Nutrition logging — no API; data flows out via its Dropbox export | No credential platform-side (rides on Dropbox above) | App Store account on Matthew's phone; re-point its export at the Dropbox folder |
-| **Anthropic** | **Runtime inference is AWS Bedrock via IAM (ADR-062) — no Anthropic account is needed to keep AI features alive.** Legacy direct-API keys still exist: `life-platform/ai-keys` (fallback path in `lambdas/intelligence_common.py`) + `life-platform/site-api-ai-key` (R17-04 isolated) | Secrets Manager (both) — `docs/SECRETS_MAP.md` | Anthropic Console login (password manager) — only needed to rotate/revoke the legacy keys |
-| **Google Cloud** | Text-to-speech for podcasts (Chirp + Gemini TTS, `lambdas/google_tts.py` / `gemini_tts.py`) | `life-platform/google-tts` (API key) | GCP Console login (password manager) → regenerate the TTS API key in the project |
+| **Anthropic** | **Runtime inference is AWS Bedrock via IAM (ADR-062) — no Anthropic account is needed to keep AI features alive.** Legacy direct-API keys still exist: `life-platform/ai-keys` (fallback path in `lambdas/intelligence/intelligence_common.py`) + `life-platform/site-api-ai-key` (R17-04 isolated) | Secrets Manager (both) — `docs/SECRETS_MAP.md` | Anthropic Console login (password manager) — only needed to rotate/revoke the legacy keys |
+| **Google Cloud** | Text-to-speech for podcasts (Chirp + Gemini TTS, `lambdas/ai/google_tts.py` / `gemini_tts.py`) | `life-platform/google-tts` (API key) | GCP Console login (password manager) → regenerate the TTS API key in the project |
 | **Email — AWS SES** | Daily brief + digests. Domain identities verified in SES us-west-2 (checked 2026-07-10): `mattsusername.com`, `aws.mattsusername.com` — note: **not** averagejoematt.com | No separate account — SES is IAM inside the AWS account. DNS records (DKIM etc.) live in the mattsusername.com zone — see `docs/MANAGED_WHERE_LEDGER.md` | Recover AWS (row 1). If identities are lost, re-verify the domain in SES + re-add DKIM records |
-| **Pexels** | Stock editorial images (`lambdas/editorial_image.py`) | `life-platform/pexels` (API key) | Pexels account login (password manager) → regenerate API key (free tier) |
+| **Pexels** | Stock editorial images (`lambdas/content/editorial_image.py`) | `life-platform/pexels` (API key) | Pexels account login (password manager) → regenerate API key (free tier) |
 | **Open-Meteo** (weather) | Seattle daily weather ingestion (`lambdas/ingestion/weather_lambda.py`) | **None — free API, no key, no account** (verified in source 2026-07-10) | Nothing to recover |
 
 Sources with **no external account at all** (for completeness, from
-`lambdas/source_registry.py`): Function Health labs (manual PDF ingest), DEXA /
+`lambdas/ingestion/source_registry.py`): Function Health labs (manual PDF ingest), DEXA /
 genome / measurements / supplements / food-delivery (manual entry paths).
 
 ---

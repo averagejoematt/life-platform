@@ -41,11 +41,11 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 
 import boto3
-import digest_utils  # shared query_range implementations (#970)
-from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common import digest_utils  # shared query_range implementations (#970)
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 
 # ── Shared digest utilities (digest_utils.py) ───────────────────────────────
-from digest_utils import (
+from common.digest_utils import (
     _normalize_whoop_sleep,
     avg,
     compute_banister_from_dict,  # #490: shared TSS-like Banister
@@ -56,7 +56,7 @@ from digest_utils import (
     fmt_num,
     safe_float,
 )
-from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # ── AWS clients ───────────────────────────────────────────────────────────────
 _REGION = os.environ.get("AWS_REGION", "us-west-2")
@@ -72,7 +72,7 @@ secrets = boto3.client("secretsmanager", region_name=_REGION)
 
 # IC-15/16: Insight Ledger — progressive context + insight persistence
 try:
-    import insight_writer
+    from content import insight_writer
 
     insight_writer.init(table, USER_ID)
     _HAS_INSIGHT_WRITER = True
@@ -81,7 +81,7 @@ except ImportError:
 
 # AI-3: Output validation
 try:
-    from ai_output_validator import AIOutputType, validate_ai_output
+    from ai.ai_output_validator import AIOutputType, validate_ai_output
 
     _HAS_AI_VALIDATOR = True
 except ImportError:
@@ -89,7 +89,7 @@ except ImportError:
 
 # OBS-1: Structured logger
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("weekly-digest")
 except ImportError:
@@ -108,7 +108,7 @@ except ImportError:
 
 
 def fetch_profile():
-    from intelligence_common import fetch_profile as _shared_fetch_profile
+    from intelligence.intelligence_common import fetch_profile as _shared_fetch_profile
 
     return _shared_fetch_profile(table, USER_ID)
 
@@ -729,7 +729,7 @@ def compute_sleep_debt(whoop_dict, target_hrs=7.5):
 def fetch_stale_insights(days_threshold=7):
     try:
         # ADR-058: phase=pilot hidden by default.
-        from phase_filter import with_phase_filter
+        from experiment.phase_filter import with_phase_filter
 
         r = table.query(
             **with_phase_filter(
@@ -1152,7 +1152,7 @@ Be honest. Be a coach, not a cheerleader."""
 
 def call_anthropic_with_retry(req, timeout=55, max_attempts=None, backoff_s=None):
     # Delegates to retry_utils for exponential backoff + CloudWatch metrics (P1.8/P1.9)
-    import retry_utils
+    from common import retry_utils
 
     return retry_utils.call_anthropic_raw(req, timeout=timeout)
 
@@ -1163,7 +1163,7 @@ def _presence_block() -> str:
     (daily_brief_lambda.py Phase 2), so a dark stretch is never narrated as a
     normal week over the silence. Empty when Matthew is present. Fail-soft."""
     try:
-        from engagement_core import presence_prompt_block
+        from content.engagement_core import presence_prompt_block
 
         sig = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#engagement_state", "sk": "STATE#current"}).get("Item") or {}
         block = presence_prompt_block(sig)

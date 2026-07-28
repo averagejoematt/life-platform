@@ -35,7 +35,7 @@ import pytest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 
-import calibration_core as platform_core  # noqa: E402  — the deployed grader
+from experiment import calibration_core as platform_core  # noqa: E402  — the deployed grader
 
 OSS_DIR = os.path.join(ROOT, "oss", "calibration-core")
 OSS_PY = os.path.join(OSS_DIR, "src", "calibration_core.py")

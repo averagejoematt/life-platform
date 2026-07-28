@@ -11,7 +11,7 @@ Covers the load-bearing acceptance criteria:
 import json
 
 import pytest
-import semantic_recall as sr
+from ai import semantic_recall as sr
 from fakes import FakeDdbTable
 
 
@@ -224,7 +224,7 @@ def test_resolved_precedent_dates():
 
 # ── grounded_generation composition (AC2 end-to-end shape) ───────────────────
 def test_findings_compose_with_grounded_generation():
-    import grounded_generation as gg
+    from ai import grounded_generation as gg
 
     resolved = [{"date": "2026-04-06"}]
     text = "Recovery is fine. This resembles the week of 2026-01-15."

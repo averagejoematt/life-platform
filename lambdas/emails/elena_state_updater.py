@@ -41,10 +41,10 @@ from datetime import datetime, timezone
 
 import boto3
 from boto3.dynamodb.conditions import Key
-from phase_filter import singleton_visible  # #946: hide reset-tombstoned persona state
+from experiment.phase_filter import singleton_visible  # #946: hide reset-tombstoned persona state
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("elena-state-updater")
 except ImportError:
@@ -198,7 +198,7 @@ def _call_haiku(system, user_message, max_tokens=2500, temperature=0.2):
         },
         method="POST",
     )
-    from retry_utils import call_anthropic_raw
+    from common.retry_utils import call_anthropic_raw
 
     resp = call_anthropic_raw(req)
     text = resp["content"][0]["text"].strip()
@@ -467,7 +467,7 @@ def lambda_handler(event, context):
 
         # Budget: pauses with the other narrative features (tier >= 1).
         try:
-            import budget_guard
+            from ai import budget_guard
 
             if not budget_guard.allow("coach_narrative"):
                 logger.info("[elena-state] budget tier pauses narrative extraction — skipping")

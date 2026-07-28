@@ -143,7 +143,7 @@ def test_receipt_falls_back_to_85_never_75_on_ssm_failure(monkeypatch):
 
 # ── 2. bedrock_client message carries no literal figure ───────────────────────
 def test_bedrock_budget_message_has_no_dollar_literal():
-    src = (_REPO / "lambdas" / "bedrock_client.py").read_text(encoding="utf-8")
+    src = (_REPO / "lambdas" / "ai" / "bedrock_client.py").read_text(encoding="utf-8")
     assert "BudgetExceeded(" in src
     # the tier-3 message line must not carry a hardcoded dollar ceiling.
     assert "$75" not in src.split("BudgetExceeded(", 1)[1].split(")", 1)[0]

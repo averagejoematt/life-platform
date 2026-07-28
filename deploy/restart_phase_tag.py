@@ -41,9 +41,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "lambdas"))
 
-import phase_taxonomy as taxonomy  # ADR-077: registry decides what's taggable
+from experiment import phase_taxonomy as taxonomy  # ADR-077: registry decides what's taggable
 
-from lambdas.constants import (
+from lambdas.common.constants import (
     EXPERIMENT_PHASE_CURRENT,
     EXPERIMENT_PHASE_PRIOR,
     EXPERIMENT_START_DATE,

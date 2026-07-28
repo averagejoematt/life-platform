@@ -17,7 +17,7 @@ before any large fan-out.
 
 Read, in order: `docs/PLATFORM_NORTH_STAR.md`, `docs/SITE_MAP_AND_INTENT.md`,
 `docs/DESIGN_SYSTEM_V5.md`, `docs/ARCHITECTURE.md`, `docs/SCHEMA.md`, `docs/BOARDS.md`,
-`lambdas/source_registry.py`, the character engine + gamification model, and the ADRs that
+`lambdas/ingestion/source_registry.py`, the character engine + gamification model, and the ADRs that
 define our integrity posture: **ADR-104 (honest numbers everywhere), ADR-105 (the rigor bar),
 ADR-103 (complexity-posture ledger)**. Also skim the open backlog
 (`gh issue list --label type:story --state open`) so ideas that already exist get upgraded,

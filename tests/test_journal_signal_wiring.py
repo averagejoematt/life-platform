@@ -21,7 +21,7 @@ os.environ.setdefault("USER_ID", "matthew")
 
 from decimal import Decimal  # noqa: E402
 
-from ai_context import _build_mind_data  # noqa: E402
+from ai.ai_context import _build_mind_data  # noqa: E402
 from ingestion.journal_enrichment_lambda import edited_since_enrichment  # noqa: E402
 from ingestion.notion_lambda import preserve_enrichment  # noqa: E402
 

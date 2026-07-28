@@ -57,7 +57,7 @@ from boto3.dynamodb.conditions import Key
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("journal-enrichment")
 except ImportError:
@@ -199,7 +199,7 @@ def call_haiku(raw_text, date, template, structured_scores):
     }
 
     # Phase 3.4 (2026-05-16): retry via retry_utils (4 attempts, 5/15/45s).
-    from retry_utils import call_anthropic_raw
+    from common.retry_utils import call_anthropic_raw
 
     result = call_anthropic_raw(body, timeout=30)
 
@@ -410,7 +410,7 @@ def _write_flourishing_rows(entries) -> int:
     """#1403: group the queried entries by date and upsert one SOURCE#flourishing
     row per day that has enrichment. Pure projection over stored fields —
     idempotent, no LLM calls, raw entries untouched."""
-    from flourishing import write_flourishing_row
+    from health.flourishing import write_flourishing_row
 
     by_date: dict[str, list] = {}
     for item in entries:
@@ -432,7 +432,7 @@ def _run_conversational(event, start_date, end_date, force):
     are weekly, check-ins land on Matthew's schedule). Budget-gated inside the
     module (band-1 ``conversation_enrichment``); a paused run reports
     ``paused_by_budget`` explicitly, never silent."""
-    import conversation_enrichment
+    from ai import conversation_enrichment
 
     explicit = bool(event.get("full_sync") or "date" in event or ("start" in event and "end" in event))
     return conversation_enrichment.run(

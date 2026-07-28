@@ -14,7 +14,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 from boto3.dynamodb.conditions import Key
-from phase_filter import with_phase_filter  # ADR-058
+from experiment.phase_filter import with_phase_filter  # ADR-058
 
 from web.site_api_common import (
     CORS_HEADERS,
@@ -852,7 +852,7 @@ def benchmark_trends(*, _g) -> dict:
     table = _g["table"]
     try:
         # ADR-058: phase=pilot hidden by default; pre-genesis benchmarks won't leak.
-        from phase_filter import with_phase_filter
+        from experiment.phase_filter import with_phase_filter
 
         resp = table.query(
             **with_phase_filter(

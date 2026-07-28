@@ -17,8 +17,8 @@ sent.
 import json
 
 import pytest
-import retry_utils
 from botocore.exceptions import ClientError
+from common import retry_utils
 
 
 class _RecordingCW:
@@ -60,7 +60,7 @@ def _no_sleep(monkeypatch):
 def _patch_invoke(monkeypatch, side_effect):
     """Monkeypatch bedrock_client.invoke — the real retry wrapper imports it by
     name inside the call, so patching the attribute is what production would see."""
-    import bedrock_client
+    from ai import bedrock_client
 
     calls = {"n": 0, "bodies": []}
 

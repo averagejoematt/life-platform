@@ -112,7 +112,7 @@ def test_canonical_matches_constants_and_config():
     canon = pipeline.load_canonical_plan_figures()
     goals = json.loads((REPO_ROOT / "config" / "user_goals.json").read_text())
     nutrition = goals["targets"]["nutrition"]
-    import constants  # lambdas/ on sys.path
+    from common import constants  # lambdas/ on sys.path
 
     assert canon["start_weight_lbs"] == float(constants.EXPERIMENT_BASELINE_WEIGHT_LBS)
     assert canon["daily_calories"] == int(nutrition["daily_calories_target"])

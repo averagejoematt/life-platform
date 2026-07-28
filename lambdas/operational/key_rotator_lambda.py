@@ -19,7 +19,7 @@ import boto3
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("key-rotator")
 except ImportError:

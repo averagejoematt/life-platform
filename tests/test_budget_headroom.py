@@ -25,7 +25,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
-import budget_guard  # noqa: E402
+from ai import budget_guard  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -225,7 +225,7 @@ def test_format_none_and_malformed_are_empty():
 
 
 def test_brief_footer_renders_line_when_present():
-    from html_builder import _brief_footer
+    from content.html_builder import _brief_footer
 
     line = budget_guard.format_headroom_line(TIER1_INCIDENT)
     html = _brief_footer("", False, {}, "2026-07-06", budget_headroom_line=line)
@@ -233,7 +233,7 @@ def test_brief_footer_renders_line_when_present():
 
 
 def test_brief_footer_omits_line_by_default():
-    from html_builder import _brief_footer
+    from content.html_builder import _brief_footer
 
     html = _brief_footer("", False, {}, "2026-07-06")
     assert "Budget: tier" not in html

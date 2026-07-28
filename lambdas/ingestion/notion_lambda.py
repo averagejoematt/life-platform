@@ -61,7 +61,7 @@ from boto3.dynamodb.conditions import Key  # #476/E-6: deletion-reconcile query
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("notion")
 except ImportError:
@@ -74,7 +74,7 @@ USER_ID = os.environ.get("USER_ID", "matthew")
 
 # V2 P2.4 (2026-05-17): OAuth circuit breaker for non-framework Lambdas.
 try:
-    from auth_breaker import check_breaker, clear_failure, looks_like_auth_failure, mark_failure
+    from common.auth_breaker import check_breaker, clear_failure, looks_like_auth_failure, mark_failure
 
     _HAS_AUTH_BREAKER = True
 except ImportError:
@@ -84,8 +84,8 @@ except ImportError:
 # framework, so without this it can never leave 'unknown' in pipeline_health_check
 # — a silently de-scheduled cron would go permanently undetected.
 try:
-    from ingest_health import classify_error
-    from ingestion_framework import record_ingest_health
+    from ingestion.ingest_health import classify_error
+    from ingestion.ingestion_framework import record_ingest_health
 
     _INGEST_HEALTH_AVAILABLE = True
 except ImportError:  # pragma: no cover — layer-module fallback
@@ -106,7 +106,7 @@ def _stamp_phase(item: dict, date_str: str) -> None:
     if "phase" in item:
         return
     try:
-        from ingestion_framework import phase_for_date
+        from ingestion.ingestion_framework import phase_for_date
 
         item["phase"] = phase_for_date(date_str)
     except ImportError:  # pragma: no cover — layer unavailable locally
@@ -181,7 +181,7 @@ def notion_post(endpoint, api_key, body=None):
     )
     try:
         # Phase 3.5 (2026-05-16): retry on transient 429/5xx.
-        from http_retry import urlopen_with_retry
+        from common.http_retry import urlopen_with_retry
 
         with urlopen_with_retry(req, timeout=30) as resp:
             return json.loads(resp.read().decode())
@@ -205,7 +205,7 @@ def notion_get(endpoint, api_key):
     )
     try:
         # Phase 3.5 (2026-05-16): retry on transient 429/5xx.
-        from http_retry import urlopen_with_retry
+        from common.http_retry import urlopen_with_retry
 
         with urlopen_with_retry(req, timeout=30) as resp:
             return json.loads(resp.read().decode())
@@ -530,7 +530,7 @@ def parse_page(page, api_key=None):
     # isn't on the bundle path.
     _fallback_channel = {"Video Diary": "video_diary", "Solo Recording": "solo_recording"}
     try:
-        from flourishing import entry_channel
+        from health.flourishing import entry_channel
 
         item["channel"] = entry_channel(item)
     except ImportError:  # pragma: no cover — bundle-path fallback
@@ -689,7 +689,7 @@ def write_entries(entries_by_date):
                     item["schema_version"] = 1
                     # DATA-2: Validate before write
                     try:
-                        from ingestion_validator import validate_item as _validate_item
+                        from ingestion.ingestion_validator import validate_item as _validate_item
 
                         _vr = _validate_item("notion", item, date_str)
                         if _vr.should_skip_ddb:
@@ -723,7 +723,7 @@ def write_entries(entries_by_date):
                 item["schema_version"] = 1
                 # DATA-2: Validate before write
                 try:
-                    from ingestion_validator import validate_item as _validate_item
+                    from ingestion.ingestion_validator import validate_item as _validate_item
 
                     _vr = _validate_item("notion", item, date_str)
                     if _vr.should_skip_ddb:

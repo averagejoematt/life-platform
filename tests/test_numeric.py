@@ -9,7 +9,7 @@ from boto3.dynamodb.types import TypeSerializer
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 
-import numeric as n  # noqa: E402
+from common import numeric as n  # noqa: E402
 
 
 def test_float_to_decimal():
@@ -126,5 +126,5 @@ def test_shim_imports():
         with open(path) as f:
             src = f.read()
         assert (
-            "from numeric import floats_to_decimal" in src
+            "from common.numeric import floats_to_decimal" in src
         ), f"{module_name} missing the Phase 4.2 shim — should re-export from numeric module"

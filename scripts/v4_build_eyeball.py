@@ -29,7 +29,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import eyeball_calibration as ec  # noqa: E402
+from experiment import eyeball_calibration as ec  # noqa: E402
 from v4_chrome import doors_nav, site_footer  # noqa: E402
 from v4_kit import loop_ribbon  # noqa: E402
 
@@ -225,7 +225,7 @@ def build_artifact(live: bool) -> dict:
         table = boto3.resource("dynamodb", region_name="us-west-2").Table("life-platform")
         grades = ec.list_grades(table)
         # Decimal -> float for JSON (the artifact carries only aggregate error, never raw macros).
-        from numeric import decimals_to_float
+        from common.numeric import decimals_to_float
 
         grades = decimals_to_float(grades)
     return ec.build_reliability_artifact(grades)

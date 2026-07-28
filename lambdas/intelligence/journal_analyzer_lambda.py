@@ -58,8 +58,8 @@ table = dynamodb.Table(TABLE_NAME)
 
 # J-8 (#504): cache writes must carry a phase attribute — an unstamped record
 # passes with_phase_filter forever and survives experiment resets untagged.
-from constants import EXPERIMENT_PHASE_CURRENT  # noqa: E402
-from numeric import (
+from common.constants import EXPERIMENT_PHASE_CURRENT  # noqa: E402
+from common.numeric import (
     decimals_to_float as _decimal_to_float,  # noqa: E402
     floats_to_decimal,  # noqa: E402  # canonical float->Decimal (#1207)
 )
@@ -396,7 +396,7 @@ def lambda_handler(event, context):
         start_date = (datetime.now(timezone.utc) - timedelta(days=WINDOW_DAYS)).strftime("%Y-%m-%d")
 
         # ADR-058: registry aggregation is cycle-honest — pilot rows stay hidden.
-        from phase_filter import with_phase_filter
+        from experiment.phase_filter import with_phase_filter
 
         kwargs = {
             "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}notion")
@@ -437,7 +437,7 @@ def lambda_handler(event, context):
         # unavailability must never break journal aggregation.
         conv_dated = []
         try:
-            import conversation_enrichment
+            from ai import conversation_enrichment
 
             conv_dated = conversation_enrichment.enriched_conversational_records(table, start_date, today)
         except Exception as ce:

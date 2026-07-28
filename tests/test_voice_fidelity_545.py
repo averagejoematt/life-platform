@@ -19,8 +19,9 @@ os.environ.setdefault("AWS_ACCESS_KEY_ID", "FAKE")
 os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "FAKE")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
-import voice_fidelity_core as vfc  # noqa: E402
 import voice_fidelity_harness as vfh  # noqa: E402
+from ai import voice_fidelity_core as vfc  # noqa: E402
+from bundle_stubs import stub_bundled_module
 
 # ══════════════════════════════════════════════════════════════════════════════
 # voice_fidelity_core — pure scorer
@@ -208,7 +209,7 @@ class TestRunPanel:
                 calls.append(body)
                 return {"content": [{"type": "text", "text": '{"guess": "sleep_coach", "confidence": 0.6}'}]}
 
-        monkeypatch.setitem(sys.modules, "bedrock_client", _BR)
+        stub_bundled_module(monkeypatch, "ai.bedrock_client", _BR)
         votes = vfh._run_panel(self.CANDIDATES, "a passage")
         assert len(calls) == 3
         assert len(votes) == 3
@@ -226,7 +227,7 @@ class TestRunPanel:
                     raise RuntimeError("throttled")
                 return {"content": [{"type": "text", "text": '{"guess": "training_coach", "confidence": 0.5}'}]}
 
-        monkeypatch.setitem(sys.modules, "bedrock_client", _BR)
+        stub_bundled_module(monkeypatch, "ai.bedrock_client", _BR)
         votes = vfh._run_panel(self.CANDIDATES, "a passage")
         assert len(votes) == 2
 
@@ -236,7 +237,7 @@ class TestRunPanel:
             def invoke(body, model_name=None):
                 return {"content": [{"type": "text", "text": "garbage"}]}
 
-        monkeypatch.setitem(sys.modules, "bedrock_client", _BR)
+        stub_bundled_module(monkeypatch, "ai.bedrock_client", _BR)
         assert vfh._run_panel(self.CANDIDATES, "a passage") == []
 
 
@@ -275,12 +276,12 @@ class TestLoadCumulativeJudgments:
 
 class TestLambdaHandler:
     def _clean_tier(self, monkeypatch):
-        import budget_guard
+        from ai import budget_guard
 
         monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
 
     def test_budget_gate_skips(self, monkeypatch):
-        import budget_guard
+        from ai import budget_guard
 
         monkeypatch.setattr(budget_guard, "current_tier", lambda: 1)
         result = vfh.lambda_handler({}, None)

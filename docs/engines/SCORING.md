@@ -1,12 +1,12 @@
 # Scoring Engine — the Day Grade
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-27 (post-#970 — scoring_engine deliberately KEPT its typed safe_float; formulas unchanged. 2026-07-13: docstring reword only, now that the shared layer is retired by #781 — no logic change. 2026-07-26 re-verify: only #1656 mypy type-annotation churn in `scoring_engine.py`/`daily_metrics_compute_lambda.py` since; documented formulas unchanged. 2026-07-27 re-verify: #1843 added the `diary_sessions` computed field to daily_metrics_compute — additive storage only; the documented scoring formulas are untouched)
-> **Sources of truth:** `lambdas/scoring_engine.py`, `lambdas/compute/daily_metrics_compute_lambda.py`, profile record `USER#matthew / PROFILE#v1` (`day_grade_weights`)
+> **Sources of truth:** `lambdas/health/scoring_engine.py`, `lambdas/compute/daily_metrics_compute_lambda.py`, profile record `USER#matthew / PROFILE#v1` (`day_grade_weights`)
 
 ## Purpose
 
 Computes the daily letter grade (A+…F) shown in the daily brief and the cockpit. Pure functions
-(no AWS calls) in `lambdas/scoring_engine.py`; invoked by `daily_brief_lambda.py` and
+(no AWS calls) in `lambdas/health/scoring_engine.py`; invoked by `daily_brief_lambda.py` and
 `daily_metrics_compute_lambda.py`, which persist the result.
 
 ## Inputs
@@ -85,4 +85,4 @@ All targets/weights live on the profile record (`PROFILE#v1`): `day_grade_weight
 `calorie_penalty_threshold_pct`, `protein_target_g`, `protein_floor_g`, `fat_target_g`,
 `carb_target_g`, `step_target`, `water_target_ml`, `habit_registry`, `mvp_habits`. No env vars.
 
-> **Verified against `lambdas/scoring_engine.py` @ git 4d132ec7 on 2026-07-10.**
+> **Verified against `lambdas/health/scoring_engine.py` @ git 4d132ec7 on 2026-07-10.**

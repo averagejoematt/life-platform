@@ -33,11 +33,11 @@ import re
 from datetime import datetime, timezone
 
 import boto3
-import google_tts
-import persona_registry
+from ai import google_tts
+from coach import persona_registry
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("chronicle-podcast")
 except ImportError:

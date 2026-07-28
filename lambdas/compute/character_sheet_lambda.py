@@ -34,14 +34,16 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
-import character_engine
-import personal_baselines  # #1412: personal-variance targets overlay (ADR-105 rule 4)
-from constants import EXPERIMENT_PHASE_CURRENT, EXPERIMENT_START_DATE  # ADR-058
-from phase_filter import singleton_visible, with_phase_filter  # ADR-058: default-deny pilot data / #946
+from common.constants import EXPERIMENT_PHASE_CURRENT, EXPERIMENT_START_DATE  # ADR-058
+from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058: default-deny pilot data / #946
+from health import (
+    character_engine,
+    personal_baselines,  # #1412: personal-variance targets overlay (ADR-105 rule 4)
+)
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("character-sheet-compute")
 except ImportError:
@@ -68,7 +70,7 @@ s3 = boto3.client("s3", region_name=_REGION)
 # ==============================================================================
 
 
-from digest_utils import d2f  # shared bundled helpers (#970)
+from common.digest_utils import d2f  # shared bundled helpers (#970)
 
 
 def fetch_date(source, date_str):
@@ -394,7 +396,7 @@ def assemble_data(yesterday_str):
     # a 7-day apple_health window, via the weight_trend layer module (the same
     # helper vitals/journey use, so no surface can disagree on "current weight").
     try:
-        import weight_trend
+        from health import weight_trend
 
         _ah_7d_start = (dt - timedelta(days=6)).strftime("%Y-%m-%d")
         _ah_7d = fetch_range("apple_health", _ah_7d_start, yesterday_str)
@@ -669,7 +671,7 @@ def write_progression_receipt(record, config, data, history_records, challenge_i
     ReceiptReplayMismatch EMF metric (the #1373 drift alarm's write-time leg).
     """
     try:
-        import progression_receipts as pr
+        from health import progression_receipts as pr
 
         input_rows = collect_input_rows(data, history_records, challenge_items)
         receipt = pr.build_receipt(record, config, input_rows=input_rows)
@@ -744,7 +746,7 @@ def lambda_handler(event, context):
     # copy the previous day's character sheet record verbatim (no gain, no
     # penalty), mark it sick_day=True, and return early.
     try:
-        from sick_day_checker import check_sick_day as _check_sick
+        from health.sick_day_checker import check_sick_day as _check_sick
 
         _sick_rec = _check_sick(table, USER_ID, yesterday_str)
     except ImportError:
@@ -780,7 +782,7 @@ def lambda_handler(event, context):
                 return obj
 
             # Phase 3.3 (2026-05-16): tag with run_id + computed_at for double-run observability.
-            from compute_metadata import tag_record
+            from common.compute_metadata import tag_record
 
             _tagged = tag_record({k: _dec(v) for k, v in _frozen.items() if v is not None}, source_id="character_sheet")
             table.put_item(Item=_tagged)
@@ -821,7 +823,7 @@ def lambda_handler(event, context):
     # so every active effect the engine emits wears its earned badge (fitted with
     # n_eff + CI, or "authored prior — not yet confirmed"). load_latest_fit never
     # raises — an absent/unreadable fit degrades to the honest authored default.
-    import effect_fitter
+    from experiment import effect_fitter
 
     latest_fit = effect_fitter.load_latest_fit(table, USER_ID)
     effect_fitter.merge_fit_into_config(config, latest_fit)
@@ -893,7 +895,7 @@ def lambda_handler(event, context):
     # validate_item before store_character_sheet, which adds pk/sk and Decimal-converts.
     # We validate a lightweight proxy item — only the fields the schema checks.
     try:
-        from ingestion_validator import validate_item as _vi
+        from ingestion.ingestion_validator import validate_item as _vi
 
         _val_proxy = {
             "pk": USER_PREFIX + "character_sheet",
@@ -935,7 +937,7 @@ def lambda_handler(event, context):
     # site_writer: write character_stats.json to S3 for averagejoematt.com
     # Non-fatal — failure here never breaks character sheet compute
     try:
-        from site_writer import write_character_stats
+        from content.site_writer import write_character_stats
 
         PILLAR_EMOJI_MAP = {
             "sleep": "😴",

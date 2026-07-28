@@ -5,7 +5,7 @@ Reads facade state via `_g`."""
 from datetime import datetime, timedelta
 
 from boto3.dynamodb.conditions import Key
-from phase_filter import with_phase_filter
+from experiment.phase_filter import with_phase_filter
 
 from web.site_api_common import PT, USER_PREFIX, _decimal_to_float, _ok, logger
 
@@ -104,7 +104,7 @@ def fulfillment_index(*, _g) -> dict:
     # Facade state injected via `_g` (the delegator's globals()) — same module the test patched.
     _experiment_date = _g["_experiment_date"]
     table = _g["table"]
-    import fulfillment_index as fi
+    from health import fulfillment_index as fi
 
     today = datetime.now(PT).strftime("%Y-%m-%d")
     window_start = _experiment_date(90)
@@ -223,9 +223,9 @@ def character_calibration(*, _g) -> dict:
     # Facade state injected via `_g` (the delegator's globals()) — same module the test patched.
     EXPERIMENT_START = _g["EXPERIMENT_START"]
     _query_source = _g["_query_source"]
-    from experiment_gates import FELT_CALIBRATION_CI_MIN_WEEKS, FELT_CALIBRATION_MIN_WEEKS, felt_calibration_gates
-    from ritual_link import PROBE_PILLAR_MAP
-    from stats_core import effective_sample_size, fisher_ci, pearson_r
+    from common.stats_core import effective_sample_size, fisher_ci, pearson_r
+    from content.ritual_link import PROBE_PILLAR_MAP
+    from experiment.experiment_gates import FELT_CALIBRATION_CI_MIN_WEEKS, FELT_CALIBRATION_MIN_WEEKS, felt_calibration_gates
 
     today = datetime.now(PT).strftime("%Y-%m-%d")
     probes = _query_source("felt_probe", EXPERIMENT_START, today)

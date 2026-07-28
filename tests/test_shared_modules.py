@@ -62,7 +62,7 @@ def approx(v, rel=1e-3):
 # ======================================================================
 print("\n-- ai_output_validator ------------------------------------------")
 
-from ai_output_validator import (
+from ai.ai_output_validator import (
     AIOutputType,
     _fallback_for_type,
     validate_ai_output,
@@ -203,7 +203,7 @@ _run("validate_json: all keys present -> passes", test_validate_json_ok)
 # ======================================================================
 print("\n-- platform_logger ----------------------------------------------")
 
-from platform_logger import PlatformLogger, StructuredFormatter, get_logger
+from common.platform_logger import PlatformLogger, StructuredFormatter, get_logger
 
 
 def test_get_logger_type():
@@ -290,7 +290,7 @@ _run("convenience helpers don't raise", test_helpers_no_raise)
 # ======================================================================
 print("\n-- sick_day_checker ---------------------------------------------")
 
-from sick_day_checker import (
+from health.sick_day_checker import (
     check_sick_day,
     delete_sick_day,
     get_sick_days_range,
@@ -376,7 +376,7 @@ _run("delete_sick_day: calls delete_item with right key", test_delete_sick_day)
 # ======================================================================
 print("\n-- digest_utils -------------------------------------------------")
 
-from digest_utils import (
+from common.digest_utils import (
     _normalize_whoop_sleep,
     avg,
     compute_banister_from_dict,
@@ -561,7 +561,7 @@ _run("banister: 30 days training -> CTL > 0", test_banister_with_training)
 # ======================================================================
 print("\n-- ingestion_validator ------------------------------------------")
 
-from ingestion_validator import ValidationResult, list_supported_sources, validate_item
+from ingestion.ingestion_validator import ValidationResult, list_supported_sources, validate_item
 
 
 def test_validate_whoop_ok():
@@ -635,7 +635,7 @@ print("\n-- call_anthropic middleware -------------------------------------")
 
 import inspect
 
-from ai_calls import _AI_VALIDATOR_AVAILABLE, call_anthropic
+from ai.ai_calls import _AI_VALIDATOR_AVAILABLE, call_anthropic
 
 
 def test_call_anthropic_has_output_type_param():
@@ -661,7 +661,7 @@ def test_ai_output_type_importable():
 
 def test_bod_caller_passes_output_type():
     """call_board_of_directors must pass output_type=AIOutputType.BOD_COACHING to call_anthropic."""
-    src_path = os.path.join(LAMBDAS_DIR, "ai_calls.py")
+    src_path = os.path.join(LAMBDAS_DIR, "ai", "ai_calls.py")
     with open(src_path) as f:
         src = f.read()
     # Check that the BoD final call_anthropic includes BOD_COACHING
@@ -673,7 +673,7 @@ def test_bod_caller_passes_output_type():
 
 def test_journal_caller_passes_output_type():
     """call_journal_coach must pass output_type=AIOutputType.JOURNAL_COACH."""
-    src_path = os.path.join(LAMBDAS_DIR, "ai_calls.py")
+    src_path = os.path.join(LAMBDAS_DIR, "ai", "ai_calls.py")
     with open(src_path) as f:
         src = f.read()
     assert "JOURNAL_COACH" in src, "call_journal_coach must pass output_type=AIOutputType.JOURNAL_COACH"
@@ -748,7 +748,7 @@ class _FakePagingTable:
 def test_query_range_paginates_and_returns_dict_by_date():
     """query_range must follow LastEvaluatedKey — the pre-#970 hypothesis_engine
     copy silently truncated at DynamoDB's 1MB page."""
-    import digest_utils
+    from common import digest_utils
 
     pages = [
         {
@@ -775,7 +775,7 @@ def test_query_range_paginates_and_returns_dict_by_date():
 def test_query_range_applies_phase_filter_and_bounds():
     """Every platform DDB read is phase-scoped (ADR-058); dict form uses the plain
     end bound, list form extends it with the '~' suffix for per-workout sks (#485)."""
-    import digest_utils
+    from common import digest_utils
 
     table = _FakePagingTable([{"Items": []}])
     digest_utils.query_range(table, "whoop", "2026-01-01", "2026-01-07")
@@ -792,7 +792,7 @@ def test_query_range_applies_phase_filter_and_bounds():
 
 def test_query_range_list_paginates_and_preserves_duplicates():
     """List form keeps two records sharing one date (two-a-day workouts) and paginates."""
-    import digest_utils
+    from common import digest_utils
 
     pages = [
         {

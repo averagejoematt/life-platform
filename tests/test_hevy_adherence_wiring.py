@@ -7,10 +7,10 @@ test_adherence_calc.py; this file is the wiring around it."""
 
 from __future__ import annotations
 
-import adherence_calc
-import routine_repo
-from pacific_time import pacific_date_of
-from routine_ir import ExerciseBlock, RoutineSpec, Set
+from common.pacific_time import pacific_date_of
+from health import adherence_calc
+from training import routine_repo
+from training.routine_ir import ExerciseBlock, RoutineSpec, Set
 
 
 def _ir(routine_id="r-1", date="2026-06-01", movements=("db_bench_press_flat", "lat_pulldown")) -> RoutineSpec:

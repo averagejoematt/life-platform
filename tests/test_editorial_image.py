@@ -11,7 +11,7 @@ from unittest import mock
 
 import pytest
 
-_MOD_PATH = Path(__file__).resolve().parents[1] / "lambdas" / "editorial_image.py"
+_MOD_PATH = Path(__file__).resolve().parents[1] / "lambdas" / "content" / "editorial_image.py"
 
 
 def _load():

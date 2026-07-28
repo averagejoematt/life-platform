@@ -33,8 +33,10 @@ sys.path.insert(0, os.path.join(REPO, "lambdas", "emails"))
 sys.path.insert(0, HERE)
 
 import ai_review_pack_lambda as arp  # noqa: E402
-import coach_corrections as cc  # noqa: E402
-import correction_promotion as cp  # noqa: E402
+from coach import (
+    coach_corrections as cc,  # noqa: E402
+    correction_promotion as cp,  # noqa: E402
+)
 from fakes import FakeDdbTable  # noqa: E402
 
 

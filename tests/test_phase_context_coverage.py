@@ -47,12 +47,15 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "emails"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "compute"))
 
-import ai_calls  # noqa: E402
-import ai_context  # noqa: E402
-import bedrock_client  # noqa: E402
 import pytest  # noqa: E402
 import state_of_matthew_lambda as som  # noqa: E402
 import wednesday_chronicle_lambda as chron  # noqa: E402
+from ai import (
+    ai_calls,  # noqa: E402
+    ai_context,  # noqa: E402
+    bedrock_client,  # noqa: E402
+)
+from bundle_stubs import stub_bundled_module
 from emails import (
     coach_panel_podcast_lambda as panel,  # noqa: E402
     podcast_script_v2 as psv2,  # noqa: E402
@@ -383,7 +386,7 @@ class TestEveryNarrativePromptBuilderCarriesTheBlock:
                 captured["reqs"].append(req)
                 return {"content": [{"type": "text", "text": "Steady progress — keep the routine consistent."}], "usage": {}}
 
-        monkeypatch.setitem(sys.modules, "bedrock_client", _FakeBedrock)
+        stub_bundled_module(monkeypatch, "ai.bedrock_client", _FakeBedrock)
 
         event = {
             "rawPath": "/api/board_ask",
@@ -409,7 +412,7 @@ class TestEveryNarrativePromptBuilderCarriesTheBlock:
 # ─────────────────────────────────────────────────────────────────────────────
 
 NARRATIVE_BUILDER_FILES = [
-    "lambdas/ai_calls.py",
+    "lambdas/ai/ai_calls.py",
     "lambdas/compute/state_of_matthew_lambda.py",
     "lambdas/emails/chronicle_data.py",  # #1654 — build_data_packet (the phase-context injector) split out here
     "lambdas/emails/coach_panel_podcast_lambda.py",

@@ -32,11 +32,11 @@ import logging
 import os
 
 import boto3
-import milestone_ledger
-import spiral_breaker  # noqa: F401 — registered celebratory emitter (#1627); used via check_celebration_allowed
-from pacific_time import pacific_today
-from phase_taxonomy import experiment_stamp
-from secret_cache import get_secret_json
+from coach import spiral_breaker  # noqa: F401 — registered celebratory emitter (#1627); used via check_celebration_allowed
+from common.pacific_time import pacific_today
+from common.secret_cache import get_secret_json
+from experiment.phase_taxonomy import experiment_stamp
+from health import milestone_ledger
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)

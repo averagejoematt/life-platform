@@ -16,7 +16,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 
-import stats_core  # noqa: E402
+from common import stats_core  # noqa: E402
 
 # ── Anscombe's quartet I (published r = 0.81642) ─────────────────────────────
 ANSCOMBE_X = [10, 8, 13, 9, 11, 14, 6, 4, 12, 7, 5]

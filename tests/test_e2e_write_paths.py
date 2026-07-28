@@ -321,7 +321,7 @@ SUB_EMAIL = "e2e-test-subscriber@harness.e2e-invalid"
 class Harness:
     def __init__(self, monkeypatch):
         import boto3 as _boto3
-        import rate_limiter
+        from common import rate_limiter
         from web import email_subscriber_lambda as sub, site_api_lambda as api, site_api_social as social
 
         self.api, self.social, self.sub = api, social, sub

@@ -6,7 +6,7 @@ facade's injectable/monkeypatched state via `_g["<name>"]` — same object the t
 from datetime import datetime, timezone
 
 from boto3.dynamodb.conditions import Key
-from phase_filter import with_phase_filter
+from experiment.phase_filter import with_phase_filter
 
 from web.site_api_common import USER_PREFIX, _decimal_to_float, _error, _ok, logger
 
@@ -114,7 +114,7 @@ def source_freshness(*, _g) -> dict:
     sources = []
     summary = {"fresh": 0, "stale": 0, "paused": 0, "total": 0}
     try:
-        from coach_checkin import read_cycle
+        from coach.coach_checkin import read_cycle
 
         current_cycle = read_cycle()
     except Exception:

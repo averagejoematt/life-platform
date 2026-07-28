@@ -77,7 +77,7 @@ def _get_mood_trend(args):
     if not items:
         return {"trend": [], "error": "No journal entries found for this period."}
 
-    from flourishing import entry_channel  # #1572 channel provenance
+    from health.flourishing import entry_channel  # #1572 channel provenance
 
     # Build daily scores (prefer enriched, fall back to structured)
     daily = {}  # date -> {mood, energy, stress, themes, sentiment, channels}
@@ -228,7 +228,7 @@ def tool_get_flourishing_trend(args):
     LLM-coded projection of journal enrichment (values/gratitude/flow/growth/
     ownership/social). Every number is a language model's reading of prose, and
     the payload says so (provenance per ADR-104)."""
-    from flourishing import SIGNALS, ema_series, provenance_line
+    from health.flourishing import SIGNALS, ema_series, provenance_line
 
     days = max(7, min(365, int(args.get("days") or 90)))
     span = max(3, min(60, int(args.get("ema_span") or 14)))
@@ -287,8 +287,8 @@ def _quotes_pk():
 
 def tool_mark_journal_quote(args):
     """Mark / unmark / list explicitly-publishable verbatim journal lines."""
-    import journal_quotes as jq  # bundled shared module (#781) — the pure gate
-    import privacy_guard  # #1804: guard_version staleness — is_stale_draft/GUARD_VERSION
+    from content import journal_quotes as jq  # bundled shared module (#781) — the pure gate
+    from privacy import privacy_guard  # #1804: guard_version staleness — is_stale_draft/GUARD_VERSION
 
     action = (args.get("action") or "mark").strip().lower()
     if action == "list":
@@ -484,7 +484,7 @@ def tool_mark_journal_quote(args):
 
 
 def _claims_pk():
-    import diary_claims as dc  # bundled shared module (#781) — the pure gate
+    from privacy import diary_claims as dc  # bundled shared module (#781) — the pure gate
 
     return f"{USER_PREFIX}{dc.SOURCE_NAME}"
 
@@ -492,12 +492,12 @@ def _claims_pk():
 def _claims_phase_stamp():
     """ADR-058 phase/cycle stamp, fail-soft (the coach_diary_reaction._stamp pattern)."""
     try:
-        import phase_taxonomy
+        from experiment import phase_taxonomy
 
         return phase_taxonomy.experiment_stamp()
     except Exception:
         try:
-            from constants import EXPERIMENT_PHASE_CURRENT
+            from common.constants import EXPERIMENT_PHASE_CURRENT
 
             return {"phase": EXPERIMENT_PHASE_CURRENT}
         except Exception:
@@ -506,7 +506,7 @@ def _claims_phase_stamp():
 
 def _read_claims():
     """Every claim in the ledger, newest stated-date first."""
-    import diary_claims as dc
+    from privacy import diary_claims as dc
 
     items = []
     kwargs = {
@@ -524,8 +524,8 @@ def _read_claims():
 
 def tool_manage_diary_claims(args):
     """The on-tape claims ledger: log consented claims, list what's due, close the loop."""
-    import diary_claims as dc  # bundled shared module (#781) — the pure gate
-    from numeric import floats_to_decimal  # #1207/D5: the ONE float->Decimal walker
+    from common.numeric import floats_to_decimal  # #1207/D5: the ONE float->Decimal walker
+    from privacy import diary_claims as dc  # bundled shared module (#781) — the pure gate
 
     action = (args.get("action") or "due").strip().lower()
     today = (args.get("today") or datetime.now(timezone.utc).strftime("%Y-%m-%d")).strip()

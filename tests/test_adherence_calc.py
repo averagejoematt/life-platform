@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from adherence_calc import calculate_adherence
-from routine_ir import ExerciseBlock, RoutineSpec, Set
+from health.adherence_calc import calculate_adherence
+from training.routine_ir import ExerciseBlock, RoutineSpec, Set
 
 
 def _ir() -> RoutineSpec:

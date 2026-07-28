@@ -20,10 +20,10 @@ import os
 from datetime import datetime, timezone
 
 import boto3
-import er03_gate
-import persona_registry
 from boto3.dynamodb.conditions import Key
-from phase_filter import with_phase_filter
+from coach import persona_registry
+from experiment import er03_gate
+from experiment.phase_filter import with_phase_filter
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -92,7 +92,7 @@ def _voice(s3, coach_config_key):
 
 
 def _generate(persona, voice_rules, example, facts, stricter=False):
-    import bedrock_client
+    from ai import bedrock_client
 
     sys_block = f"{_SYSTEM_RULES}\n\nYour voice rules: {voice_rules}" + (f"\n\nA sample in your voice:\n{example}" if example else "")
     if stricter:
@@ -122,7 +122,7 @@ def _generate(persona, voice_rules, example, facts, stricter=False):
 def lambda_handler(event, context):
     # PG-10: budget self-skip — never run when spend is elevated.
     try:
-        from budget_guard import current_tier
+        from ai.budget_guard import current_tier
 
         tier = current_tier()
         if tier >= SKIP_TIER:

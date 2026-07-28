@@ -35,14 +35,12 @@ from mcp.tools_coach_intelligence import COACH_IDS, COACH_NAMES
 
 try:
     # Shared, bundled modules (#781) — staged at zip root in the Lambda.
-    import coach_calibration as ccal
-    import coach_checkin as cc
-    import persona_registry
-    from source_registry import DEFAULT_STALE_HOURS, manual_capture_sources
+    from coach import coach_calibration as ccal, coach_checkin as cc, persona_registry
+    from ingestion.source_registry import DEFAULT_STALE_HOURS, manual_capture_sources
 except ImportError:  # pragma: no cover — MCP bundle always ships lambdas/ at root
     if not TYPE_CHECKING:
         from lambdas import coach_calibration as ccal, coach_checkin as cc, persona_registry
-        from lambdas.source_registry import DEFAULT_STALE_HOURS, manual_capture_sources
+        from lambdas.ingestion.source_registry import DEFAULT_STALE_HOURS, manual_capture_sources
 
 # Manual-capture source → the coach whose domain that channel informs. Sources
 # without a mapping still appear in the snapshot but never drive coach choice.

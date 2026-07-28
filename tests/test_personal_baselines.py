@@ -16,8 +16,8 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas", "compute"))
 
-import personal_baselines as pb  # noqa: E402
-import stats_core  # noqa: E402
+from common import stats_core  # noqa: E402
+from health import personal_baselines as pb  # noqa: E402
 
 
 # ── percentile ───────────────────────────────────────────────────────────────

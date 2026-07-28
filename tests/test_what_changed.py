@@ -22,8 +22,8 @@ os.environ.setdefault("AWS_REGION", "us-west-2")
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas", "compute"))
 
-import phase_taxonomy  # noqa: E402
 import weekly_correlation_compute_lambda as wc  # noqa: E402
+from experiment import phase_taxonomy  # noqa: E402
 
 
 def _series(end="2026-06-30", cur_val=60.0, prior_val=50.0, key="recovery_score", days=15):

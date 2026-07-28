@@ -7,12 +7,12 @@ import json
 import re
 from datetime import datetime, timezone
 
-from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE
-from text_utils import truncate_at_word
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE
+from common.text_utils import truncate_at_word
 
 # BS-05 confidence helpers (bundled digest_utils) — same optional-import shape as the facade.
 try:
-    from digest_utils import _confidence_badge, compute_confidence
+    from common.digest_utils import _confidence_badge, compute_confidence
 
     _HAS_CONFIDENCE = True
 except ImportError:
@@ -318,7 +318,7 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     _prior_imgs = {}
     cur_image = {}
     try:
-        import editorial_image
+        from content import editorial_image
 
         if editorial_image.enabled():
             try:

@@ -12,8 +12,10 @@ site_api_common (identical binding semantics to the pre-split facade).
 import os
 from datetime import datetime, timedelta, timezone
 
-import digest_utils  # bundled shared module — compute_confidence tiering (ADR-105)
-import stats_core  # bundled shared module (#529): the one sanctioned stats implementation
+from common import (
+    digest_utils,  # bundled shared module — compute_confidence tiering (ADR-105)
+    stats_core,  # bundled shared module (#529): the one sanctioned stats implementation
+)
 
 from web.site_api_common import (
     _get_profile,
@@ -669,7 +671,7 @@ def nutrition_overview(*, _g) -> dict:
     _nut_stalled = False
     if latest_date:
         try:
-            from source_registry import DEFAULT_STALE_HOURS, stale_hours_overrides
+            from ingestion.source_registry import DEFAULT_STALE_HOURS, stale_hours_overrides
 
             _nut_lag_days = max(0, (datetime.strptime(today, "%Y-%m-%d") - datetime.strptime(latest_date, "%Y-%m-%d")).days)
             _mf_stale_hours = stale_hours_overrides().get("macrofactor") or DEFAULT_STALE_HOURS

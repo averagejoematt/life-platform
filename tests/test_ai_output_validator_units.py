@@ -5,7 +5,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 
-import ai_output_validator as v  # noqa: E402
+from ai import ai_output_validator as v  # noqa: E402
 
 _LONG = " and the recovery trend held steady through the week with no concerning signals at all."
 

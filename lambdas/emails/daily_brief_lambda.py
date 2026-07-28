@@ -114,7 +114,7 @@ def _emit_module_load_failure(module_name: str) -> None:
 
 # Board of Directors config loader
 try:
-    import board_loader
+    from coach import board_loader
 
     _HAS_BOARD_LOADER = True
 except ImportError:
@@ -126,7 +126,7 @@ except ImportError:
 
 # Insight Ledger (IC-15)
 try:
-    import insight_writer
+    from content import insight_writer
 
     insight_writer.init(table, USER_ID)
     _HAS_INSIGHT_WRITER = True
@@ -138,7 +138,7 @@ except ImportError:
 
 # AI-3: Output Validator — validates coaching text before delivery
 try:
-    from ai_output_validator import validate_daily_brief_outputs
+    from ai.ai_output_validator import validate_daily_brief_outputs
 
     _HAS_AI_VALIDATOR = True
 except ImportError:
@@ -149,7 +149,7 @@ except ImportError:
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("daily-brief")
 except ImportError:
@@ -158,14 +158,11 @@ except ImportError:
     logger = _log.getLogger("daily-brief")
     logger.setLevel(_log.INFO)
 
-import ai_calls
-
-# -- Extracted module imports ---------------------------------------------------
-import html_builder
-import output_writers
-import training_load  # shared TSS-like load model + Banister core (layer module, #490)
-from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
-from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from ai import ai_calls  # -- Extracted module imports ---------------------------------------------------
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from content import html_builder, output_writers
+from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
 # ai_calls can be init'd at import time (no dependency on locally-defined functions)
 ai_calls.init(
@@ -182,7 +179,7 @@ ai_calls.init(
 # ==============================================================================
 
 
-from digest_utils import d2f, safe_float  # shared bundled helpers (#970)
+from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
 
 
 def avg(vals):
@@ -367,7 +364,7 @@ def fetch_social_posts(start, end):
 
 
 def fetch_profile():
-    from intelligence_common import fetch_profile as _shared_fetch_profile
+    from intelligence.intelligence_common import fetch_profile as _shared_fetch_profile
 
     return _shared_fetch_profile(table, USER_ID)
 
@@ -766,7 +763,7 @@ def compute_tsb(strava_60d, today):
 # AST-level check confirmed zero logic divergence. One implementation, one
 # place for the next scoring change.
 # ==============================================================================
-from scoring_engine import (  # noqa: E402,F401
+from health.scoring_engine import (  # noqa: E402,F401
     COMPONENT_SCORERS,
     compute_day_grade,
     grade_colour,
@@ -874,7 +871,7 @@ def store_day_grade(date_str, total_score, grade, component_scores, weights, alg
                 item["component_" + comp] = Decimal(str(score))
         # ADR-058 (#1814): every write carries `phase` — an unstamped row passes the
         # default-deny read filter as CURRENT (pre-genesis rows counted as experiment days).
-        from compute_metadata import tag_record
+        from common.compute_metadata import tag_record
 
         item = tag_record(item, source_id="day_grade")
         table.put_item(Item=item)
@@ -942,7 +939,7 @@ def store_habit_scores(date_str, component_details, component_scores, vice_strea
             item["synergy_groups"] = json.loads(json.dumps(sg_pcts), parse_float=Decimal)
         item = {k: v for k, v in item.items() if v is not None}
         # ADR-058 (#1814): phase-stamp — see store_day_grade above.
-        from compute_metadata import tag_record
+        from common.compute_metadata import tag_record
 
         item = tag_record(item, source_id="habit_scores")
         table.put_item(Item=item)
@@ -1195,7 +1192,7 @@ def _daily_brief_ai_allowed() -> bool:
     (budget_guard.current_tier() itself fails open to tier 0).
     """
     try:
-        import budget_guard
+        from ai import budget_guard
 
         if not budget_guard.allow("daily_brief_ai"):
             logger.info("[budget] daily_brief_ai paused by budget tier — falling back to the data-only brief")
@@ -1448,7 +1445,7 @@ def lambda_handler(event, context):
     # If today's subject date was a sick/rest day, send a brief recovery
     # summary instead of the full brief. Skip scoring, habits, and coaching.
     try:
-        from sick_day_checker import check_sick_day as _check_sick_brief
+        from health.sick_day_checker import check_sick_day as _check_sick_brief
 
         _sick_brief_rec = _check_sick_brief(table, USER_ID, yesterday)
     except ImportError:
@@ -1743,7 +1740,7 @@ def lambda_handler(event, context):
     _labs_ctx = ""
     _genome_ctx = ""
     try:
-        from labs_coaching import build_labs_coaching_context
+        from health.labs_coaching import build_labs_coaching_context
 
         _labs_ctx = build_labs_coaching_context(table, USER_PREFIX)
         if _labs_ctx:
@@ -1751,7 +1748,7 @@ def lambda_handler(event, context):
     except Exception as _lc_e:
         logger.warning(f"Phase 4: Labs coaching failed (non-fatal): {_lc_e}")
     try:
-        from genome_coaching import build_genome_coaching_context
+        from health.genome_coaching import build_genome_coaching_context
 
         _genome_ctx = build_genome_coaching_context(table, USER_PREFIX)
         if _genome_ctx:
@@ -1767,7 +1764,7 @@ def lambda_handler(event, context):
     # injects it into all 4 brief AI calls. Empty when Matthew is present. Fail-soft.
     data["presence_block"] = ""
     try:
-        from engagement_core import presence_prompt_block
+        from content.engagement_core import presence_prompt_block
 
         _pres_sig = table.get_item(Key={"pk": USER_PREFIX + "engagement_state", "sk": "STATE#current"}).get("Item") or {}
         data["presence_block"] = presence_prompt_block(_pres_sig)
@@ -1905,7 +1902,7 @@ def lambda_handler(event, context):
                 yesterday,
             )
             if _whr_habit_7d:
-                from html_builder import _compute_weekly_habit_review
+                from content.html_builder import _compute_weekly_habit_review
 
                 _weekly_habit_review = _compute_weekly_habit_review(_whr_habit_7d, profile)
                 logger.info("S2-T1-10: Weekly Habit Review computed for Sunday brief")
@@ -1918,7 +1915,7 @@ def lambda_handler(event, context):
     # Non-fatal — a failure here must never block the brief.
     _vacation_fund = None
     try:
-        from vacation_fund import compute_vacation_fund
+        from content.vacation_fund import compute_vacation_fund
 
         _vacation_fund = compute_vacation_fund()
     except Exception as _vf_err:
@@ -1931,7 +1928,7 @@ def lambda_handler(event, context):
     # Fail-soft: missing/stale/malformed breakdown → the line is simply absent.
     _budget_headroom_line = None
     try:
-        import budget_guard
+        from ai import budget_guard
 
         _budget_headroom_line = budget_guard.format_headroom_line(budget_guard.read_breakdown()) or None
     except Exception as _bh_err:
@@ -1941,7 +1938,7 @@ def lambda_handler(event, context):
     # progress). Fail-soft — the brief must send even if the read breaks.
     _intake_line = None
     try:
-        import intake_response
+        from coach import intake_response
 
         _intake_line = intake_response.brief_line(intake_response.compute_intake_response(table))
     except Exception as _ir_err:
@@ -2154,7 +2151,7 @@ def lambda_handler(event, context):
     # Non-fatal — failure here never breaks the Daily Brief
     if not demo_mode:
         try:
-            from site_writer import write_public_stats
+            from content.site_writer import write_public_stats
             from web.site_api_common import PLATFORM_STATS  # #1369: the ONE counts home
             from web.vitals_resolver import resolve_vitals  # #1369: the ONE vitals truth
 
@@ -2432,7 +2429,7 @@ def lambda_handler(event, context):
 
             # PULSE-A1: Write pulse.json to S3 + DynamoDB for /api/pulse endpoint
             try:
-                from site_writer import write_pulse_json
+                from content.site_writer import write_pulse_json
 
                 _journal_pulse = {
                     "entries": len(data.get("journal_entries") or []),

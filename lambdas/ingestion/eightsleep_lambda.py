@@ -87,7 +87,7 @@ import boto3
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("eightsleep")
 except ImportError:
@@ -179,7 +179,7 @@ def _cached_secret(client, secret_id):
 # ── Serialisation ──────────────────────────────────────────────────────────────
 # Phase 4.2 (2026-05-16): canonical impl in lambdas/numeric.py.
 try:
-    from numeric import floats_to_decimal  # noqa: F401
+    from common.numeric import floats_to_decimal  # noqa: F401
 except ImportError:
 
     def floats_to_decimal(obj):
@@ -232,7 +232,7 @@ def login(email: str, password: str, client_id: str = None, client_secret: str =
         method="POST",
     )
     # Phase 3.5 (2026-05-16): retry on transient 429/5xx.
-    from http_retry import urlopen_with_retry
+    from common.http_retry import urlopen_with_retry
 
     with urlopen_with_retry(req, timeout=30) as resp:
         data = json.loads(resp.read())
@@ -262,7 +262,7 @@ def ensure_user_id(secret: dict) -> dict:
         headers={"Authorization": f"Bearer {secret['access_token']}"},
     )
     # Phase 3.5 (2026-05-16): retry on transient 429/5xx.
-    from http_retry import urlopen_with_retry
+    from common.http_retry import urlopen_with_retry
 
     with urlopen_with_retry(req, timeout=30) as resp:
         data = json.loads(resp.read())
@@ -288,7 +288,7 @@ def api_get(path: str, access_token: str, params: dict = None) -> dict:
     # Phase 3.5 (2026-05-16): retry on transient 429/5xx.
     # Note: http_retry wraps the response and hides .headers — detect gzip via
     # magic bytes (1f 8b) instead of relying on the Content-Encoding header.
-    from http_retry import urlopen_with_retry
+    from common.http_retry import urlopen_with_retry
 
     with urlopen_with_retry(req, timeout=30) as resp:
         raw = resp.read()
@@ -526,7 +526,7 @@ def parse_trends_for_date(
 # P4.1 SIMP-2 framework migration (2026-05-17)
 # ══════════════════════════════════════════════════════════════════════════════
 
-from ingestion_framework import IngestionConfig, run_ingestion
+from ingestion.ingestion_framework import IngestionConfig, run_ingestion
 
 _secret_cache_simp2 = {"secret": None}
 

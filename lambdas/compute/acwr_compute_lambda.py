@@ -61,10 +61,10 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
-import stats_core  # #543: the sanctioned EWMA (stats_core.ewma_series), ADR-105
+from common import stats_core  # #543: the sanctioned EWMA (stats_core.ewma_series), ADR-105
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("acwr-compute")
 except ImportError:
@@ -102,7 +102,7 @@ table = dynamodb.Table(TABLE_NAME)
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-from digest_utils import d2f as _d2f  # shared bundled helpers (#970)
+from common.digest_utils import d2f as _d2f  # shared bundled helpers (#970)
 
 
 def _fetch_range(source: str, start: str, end: str) -> list:
@@ -111,7 +111,7 @@ def _fetch_range(source: str, start: str, end: str) -> list:
     # trailing 28d regardless of experiment phase; filtering pilot workouts
     # causes false ACWR spikes for ~3 weeks after any restart (owner decision
     # 2026-06-06). include_pilot=True is a deliberate no-op annotation.
-    from phase_filter import with_phase_filter
+    from experiment.phase_filter import with_phase_filter
 
     records = []
     kwargs = with_phase_filter(

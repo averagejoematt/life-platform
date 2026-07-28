@@ -37,7 +37,7 @@ os.environ.setdefault("EMAIL_SENDER", "qa@example.com")
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
 import qa_smoke_lambda as qa  # noqa: E402
-import secret_cache  # noqa: E402
+from common import secret_cache  # noqa: E402
 
 NOTION_SECRET = {"notion_api_key": "secret_fake_key", "notion_database_id": "d86e0aaa-1379-42cc-94db-8ef56efb45ac"}
 

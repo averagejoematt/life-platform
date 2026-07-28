@@ -19,7 +19,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import boto3
-from constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 
 _logger_std = logging.getLogger()
 _logger_std.setLevel(logging.INFO)
@@ -40,14 +40,14 @@ S3_BUCKET = os.environ["S3_BUCKET"]
 
 # Board of Directors config loader
 try:
-    import board_loader
+    from coach import board_loader
 
     _HAS_BOARD_LOADER = True
 except ImportError:
     _HAS_BOARD_LOADER = False
 
 try:
-    import insight_writer
+    from content import insight_writer
 
     insight_writer.init(table, USER_ID)
     _HAS_INSIGHT_WRITER = True
@@ -56,7 +56,7 @@ except ImportError:
 
 # AI-3: Output validation
 try:
-    from ai_output_validator import AIOutputType, validate_ai_output
+    from ai.ai_output_validator import AIOutputType, validate_ai_output
 
     _HAS_AI_VALIDATOR = True
 except ImportError:
@@ -64,7 +64,7 @@ except ImportError:
 
 # OBS-1: Structured logger
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("monthly-digest")
 except ImportError:
@@ -74,7 +74,7 @@ except ImportError:
     logger.setLevel(_log.INFO)
 
 # ── Shared digest utilities ────────────────────────────────────────────
-from digest_utils import (
+from common.digest_utils import (
     avg,
     compute_banister_from_list,
     d2f,
@@ -107,7 +107,7 @@ CALORIE_TARGET = 1800
 def fetch_range(source, start, end):
     try:
         # ADR-058: phase=pilot hidden by default.
-        from phase_filter import with_phase_filter
+        from experiment.phase_filter import with_phase_filter
 
         r = table.query(
             **with_phase_filter(
@@ -491,7 +491,7 @@ Be honest. A month of data deserves a month's worth of insight."""
 
 def call_anthropic_with_retry(req, timeout=55, max_attempts=None, backoff_s=None):
     # Delegates to retry_utils for exponential backoff + CloudWatch metrics (P1.8/P1.9)
-    import retry_utils
+    from common import retry_utils
 
     return retry_utils.call_anthropic_raw(req, timeout=timeout)
 
@@ -502,7 +502,7 @@ def _presence_block() -> str:
     (daily_brief_lambda.py Phase 2), so a dark stretch is never narrated as a
     normal month over the silence. Empty when Matthew is present. Fail-soft."""
     try:
-        from engagement_core import presence_prompt_block
+        from content.engagement_core import presence_prompt_block
 
         sig = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#engagement_state", "sk": "STATE#current"}).get("Item") or {}
         block = presence_prompt_block(sig)
@@ -616,7 +616,7 @@ def gather_all():
         cs_pk = f"USER#{USER_ID}#SOURCE#character_sheet"
 
         def _cs_fetch(s, e):
-            from phase_filter import with_phase_filter
+            from experiment.phase_filter import with_phase_filter
 
             resp = table.query(
                 **with_phase_filter(

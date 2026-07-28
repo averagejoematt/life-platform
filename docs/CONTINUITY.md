@@ -105,7 +105,7 @@ Records are plain DDB items: `category`, `date`, `stored_at`, plus arbitrary
 content fields (floats stored as `Decimal`).
 
 **Categories** are enumerated in two places: `mcp/tools_memory.py::VALID_CATEGORIES`
-(what the MCP tools accept) and `lambdas/phase_taxonomy.py` — which also decides reset
+(what the MCP tools accept) and `lambdas/experiment/phase_taxonomy.py` — which also decides reset
 semantics (ADR-077): `MEMORY_DURABLE_CATEGORIES` (e.g. `baseline_snapshot`) survive an
 experiment restart; `MEMORY_SCOPED_CATEGORIES` (e.g. `failure_pattern`/`failure_patterns`
 — both spellings exist, `weekly_plate`, `what_worked`, `hypothesis_monitoring`, …) are

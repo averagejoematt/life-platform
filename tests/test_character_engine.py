@@ -25,7 +25,7 @@ import sys
 LAMBDAS_DIR = os.path.join(os.path.dirname(__file__), "..", "lambdas")
 sys.path.insert(0, os.path.abspath(LAMBDAS_DIR))
 
-from character_engine import (
+from health.character_engine import (
     ENGINE_VERSION,
     _body_comp_score,
     _compute_lab_score,
@@ -770,7 +770,7 @@ def test_state_of_mind_valence_reads_som_avg_valence():
     (HealthKit -1..+1). The Mind pillar must read that field (the old code read a
     non-existent `valence`/`average_valence` key → always None even with real data)
     and map it to 0..100, while honest absence stays None (ADR-104)."""
-    from character_engine import compute_mind_raw
+    from health.character_engine import compute_mind_raw
 
     cfg = {"pillars": {"mind": {"components": {"state_of_mind_valence": {"weight": 1.0}}}}}
 

@@ -135,7 +135,7 @@ def _qa_review(turns: list, rubric: str, ground_truth: str = "") -> tuple:
     episode HOLDs instead of publishing unreviewed — judge failure means silence, not a
     broken episode. (Was fail-open pre-#1122; the wk0 prologue shipped with a
     conversational hole partly because nothing hard-blocked on QA.)"""
-    import bedrock_client
+    from ai import bedrock_client
 
     script = "\n".join(f"{t.get('speaker')}: {t.get('line')}" for t in turns)
     system = (
@@ -262,7 +262,7 @@ def _craft_judge(turns: list, rubric: str, model: str = None) -> tuple:
     item. A judge that must cite evidence can't wave compliance through. FAIL-CLOSED
     (ADR-087/108): a judge/infra error returns a failure so the episode HOLDs, matching the
     Haiku judge's posture. Reuses the bedrock_client.invoke + budget-guard path exactly."""
-    import bedrock_client
+    from ai import bedrock_client
 
     m = model or CRAFT_MODEL
     script = "\n".join(f"{t.get('speaker')}: {t.get('line')}" for t in turns)

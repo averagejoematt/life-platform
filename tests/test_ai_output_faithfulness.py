@@ -24,10 +24,11 @@ intentionally deferred — see docs/specs/ER_EXTERNAL_REVIEW_RIGOR_2026-06-09.md
 import json
 import os
 
+import pytest
+
 # er03_gate lives in lambdas/ (shipped in the layer). The test runner puts lambdas/
 # on sys.path via conftest; import directly.
-import er03_gate
-import pytest
+from experiment import er03_gate
 
 # #416 / ADR-117: deploy-critical lane (AI-output faithfulness gate — er03_gate wiring
 # + anti-fabrication corpus; a reader-facing honesty contract the running system enforces).

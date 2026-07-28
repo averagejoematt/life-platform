@@ -34,7 +34,7 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "web"))
 
-from phase_filter import with_phase_filter  # noqa: E402
+from experiment.phase_filter import with_phase_filter  # noqa: E402
 from web import site_api_data as sad  # noqa: E402
 
 # A source whose ONLY DATE# record predates the current cycle and is tagged

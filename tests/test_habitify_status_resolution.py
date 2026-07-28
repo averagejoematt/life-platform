@@ -24,11 +24,11 @@ sys.path.insert(0, os.path.join(ROOT, "lambdas", "ingestion"))
 # the full suite runs in alphabetical order.
 import types
 
-if "ingestion_framework" not in sys.modules:
+if "ingestion.ingestion_framework" not in sys.modules:
     fake = types.ModuleType("ingestion_framework")
     fake.IngestionConfig = lambda **kw: kw
     fake.run_ingestion = lambda *a, **kw: {}
-    sys.modules["ingestion_framework"] = fake
+    sys.modules["ingestion.ingestion_framework"] = fake
 
 from habitify_lambda import transform
 

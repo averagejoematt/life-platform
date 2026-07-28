@@ -27,14 +27,14 @@ from datetime import datetime, timedelta, timezone
 import boto3
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("strava")
 except ImportError:
     logger = logging.getLogger("strava")
     logger.setLevel(logging.INFO)
 
-from ingestion_framework import IngestionConfig, run_ingestion
+from ingestion.ingestion_framework import IngestionConfig, run_ingestion
 
 SECRET_NAME = os.environ.get("SECRET_NAME", "life-platform/strava")
 REGION = os.environ.get("AWS_REGION", "us-west-2")
@@ -59,7 +59,7 @@ def _refresh_oauth(secret: dict) -> dict:
         }
     ).encode()
     req = urllib.request.Request("https://www.strava.com/oauth/token", data=data, method="POST")
-    from http_retry import urlopen_with_retry
+    from common.http_retry import urlopen_with_retry
 
     with urlopen_with_retry(req, timeout=30) as resp:
         result = json.loads(resp.read())
@@ -74,7 +74,7 @@ def _strava_get(url: str, secret: dict) -> tuple:
     if datetime.now(timezone.utc).timestamp() >= secret.get("expires_at", 0) - 300:
         secret = _refresh_oauth(secret)
     req = urllib.request.Request(url, headers={"Authorization": f"Bearer {secret['access_token']}"})
-    from http_retry import urlopen_with_retry
+    from common.http_retry import urlopen_with_retry
 
     with urlopen_with_retry(req, timeout=30) as resp:
         return json.loads(resp.read()), secret
@@ -429,7 +429,7 @@ def _reconcile(event: dict, context) -> dict:
         table = dynamodb.Table(os.environ.get("TABLE_NAME", "life-platform"))
         secrets_client = boto3.client("secretsmanager", region_name=REGION)
         try:
-            from secret_cache import get_secret_json
+            from common.secret_cache import get_secret_json
 
             secret_data = get_secret_json(SECRET_NAME, secrets_client)
         except ImportError:

@@ -1037,7 +1037,7 @@ def test_i16_recent_ingest_records_exist():
     boto3 = _get_boto3()
 
     sys.path.insert(0, os.path.join(ROOT, "lambdas"))
-    from constants import EXPERIMENT_START_DATE
+    from common.constants import EXPERIMENT_START_DATE
 
     genesis = datetime.strptime(EXPERIMENT_START_DATE, "%Y-%m-%d").date()
     today = datetime.now(timezone.utc).date()
@@ -1092,7 +1092,7 @@ def test_i17_character_sheet_recent_record():
     boto3 = _get_boto3()
 
     sys.path.insert(0, os.path.join(ROOT, "lambdas"))
-    from constants import EXPERIMENT_START_DATE
+    from common.constants import EXPERIMENT_START_DATE
 
     genesis = datetime.strptime(EXPERIMENT_START_DATE, "%Y-%m-%d").date()
     today = datetime.now(timezone.utc).date()
@@ -1141,7 +1141,7 @@ def test_i18_daily_brief_recently_invoked():
     boto3 = _get_boto3()
 
     sys.path.insert(0, os.path.join(ROOT, "lambdas"))
-    from constants import EXPERIMENT_START_DATE
+    from common.constants import EXPERIMENT_START_DATE
 
     genesis = datetime.strptime(EXPERIMENT_START_DATE, "%Y-%m-%d").date()
     today = datetime.now(timezone.utc).date()
@@ -1179,7 +1179,7 @@ def test_i19_site_api_journey_contract():
     import urllib.request
 
     sys.path.insert(0, os.path.join(ROOT, "lambdas"))
-    from constants import EXPERIMENT_START_DATE
+    from common.constants import EXPERIMENT_START_DATE
 
     try:
         req = urllib.request.Request(
@@ -1225,7 +1225,7 @@ def test_i20_pre_genesis_records_are_phase_tagged():
     boto3 = _get_boto3()
 
     sys.path.insert(0, os.path.join(ROOT, "lambdas"))
-    from constants import EXPERIMENT_START_DATE
+    from common.constants import EXPERIMENT_START_DATE
 
     ddb = boto3.client("dynamodb", region_name=REGION)
     # Pick three partitions known to have pre-genesis history.
@@ -1287,7 +1287,7 @@ def test_i21_ddb_profile_matches_constants():
     boto3 = _get_boto3()
 
     sys.path.insert(0, os.path.join(ROOT, "lambdas"))
-    from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE
+    from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE
 
     ddb = boto3.client("dynamodb", region_name=REGION)
     resp = ddb.get_item(

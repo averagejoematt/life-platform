@@ -45,14 +45,16 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
-import digest_utils  # shared query_range implementations (#970)
-import experiment_gates  # #1371: the ONE registry of arming thresholds
-import glycemic  # #1406: deterministic glycemic-variability features (CV, no LLM)
-import stats_core  # bundled shared module (#529): the one sanctioned stats implementation
+from common import (
+    digest_utils,  # shared query_range implementations (#970)
+    stats_core,  # bundled shared module (#529): the one sanctioned stats implementation
+)
+from experiment import experiment_gates  # #1371: the ONE registry of arming thresholds
+from health import glycemic  # #1406: deterministic glycemic-variability features (CV, no LLM)
 
 # OBS-1: Structured logger
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("weekly-correlation-compute")
 except ImportError:
@@ -104,7 +106,7 @@ def fetch_range(source, start_date, end_date):
         return []
 
 
-from digest_utils import safe_float  # shared bundled helpers (#970)
+from common.digest_utils import safe_float  # shared bundled helpers (#970)
 
 # ==============================================================================
 # PEARSON CORRELATION (math lives in stats_core — #529/ADR-105; only the
@@ -568,7 +570,7 @@ def store_correlations(week_key, correlations, start_date, end_date, computed_at
     }
     # V2 P2.6 (2026-05-19): tag with run_id + computed_at
     try:
-        from compute_metadata import tag_record
+        from common.compute_metadata import tag_record
 
         item = tag_record(item, source_id="weekly_correlations")
     except ImportError:
@@ -1026,7 +1028,7 @@ def store_what_changed(week_key, deltas, newly_unlocked, first_sig, end_date, co
         "computed_at": computed_at,
     }
     try:
-        from compute_metadata import tag_record
+        from common.compute_metadata import tag_record
 
         snap = tag_record(snap, source_id="what_changed")
     except ImportError:

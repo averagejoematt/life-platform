@@ -45,18 +45,18 @@ from urllib.request import Request
 import boto3
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("habitify")
 except ImportError:
     logger = logging.getLogger("habitify")
     logger.setLevel(logging.INFO)
 
-from ingestion_framework import IngestionConfig, run_ingestion
+from ingestion.ingestion_framework import IngestionConfig, run_ingestion
 
 # #422: bounded, verbatim clip of a habit note (shared conventions module, bundled #781).
 try:
-    from habit_causality import clip_note
+    from experiment.habit_causality import clip_note
 except ImportError:  # pragma: no cover — the bundle always ships lambdas/ at root
 
     def clip_note(text, _max=500):
@@ -126,7 +126,7 @@ def api_get(endpoint, api_key, params=None):
         url = f"{url}?{urlencode(params)}"
     req = Request(url, headers={"Authorization": api_key, "User-Agent": "LifePlatform/1.0"})
     try:
-        from http_retry import urlopen_with_retry
+        from common.http_retry import urlopen_with_retry
 
         with urlopen_with_retry(req, timeout=30) as resp:
             body = json.loads(resp.read().decode())

@@ -30,11 +30,13 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "compute"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "emails"))
 
-import character_engine as ce  # noqa: E402
 import daily_metrics_compute_lambda as dmc  # noqa: E402
 import hypothesis_engine_lambda as hyp  # noqa: E402
-import weight_trend  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
+from health import (
+    character_engine as ce,  # noqa: E402
+    weight_trend,  # noqa: E402
+)
 
 # #581: evidence.js split into a router + per-family evidence_*.js modules — concatenate
 # the whole graph so a moved renderer (e.g. renderPhysical/renderResults) still gets found.
@@ -361,7 +363,7 @@ def test_qa_smoke_strava_is_optional_not_paused():
     src = open(os.path.join(_REPO, "lambdas/operational/qa_smoke_lambda.py")).read()
     assert '("strava", "Strava — paused' not in src
     sys.path.insert(0, os.path.join(_REPO, "lambdas"))
-    import source_registry as reg
+    from ingestion import source_registry as reg
 
     assert reg.SOURCE_REGISTRY["strava"].get("qa_tier") == "optional"
     assert not reg.SOURCE_REGISTRY["strava"].get("paused")

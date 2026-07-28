@@ -51,20 +51,22 @@ import time
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-import achievement_rules  # #1624: the ONE place badge thresholds live (shared with site_api_vitals)
 import boto3
-import flourishing  # #1843: entry_channel() — single source of truth for video_diary/solo_recording provenance
-import milestone_ledger  # #1626: the durable MILESTONE# event ledger (write-once, global cooldown)
-import personal_baselines  # #543: percentile bands from Matthew's own distribution (ADR-105 r4)
-import phase_taxonomy  # ADR-077/#1233: write-time provenance stamp for the first-earn ledger
-import scoring_engine
-import training_load  # shared TSS-like load model + Banister core (layer module, #490)
-import weight_trend  # shared weekly-rate + projection (layer module)
-from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from experiment import phase_taxonomy  # ADR-077/#1233: write-time provenance stamp for the first-earn ledger
+from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from health import (
+    achievement_rules,  # #1624: the ONE place badge thresholds live (shared with site_api_vitals)
+    flourishing,  # #1843: entry_channel() — single source of truth for video_diary/solo_recording provenance
+    milestone_ledger,  # #1626: the durable MILESTONE# event ledger (write-once, global cooldown)
+    personal_baselines,  # #543: percentile bands from Matthew's own distribution (ADR-105 r4)
+    scoring_engine,
+    weight_trend,  # shared weekly-rate + projection (layer module)
+)
+from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("daily-metrics-compute")
 except ImportError:
@@ -90,7 +92,7 @@ table = dynamodb.Table(TABLE_NAME)
 # ==============================================================================
 
 
-from digest_utils import d2f, safe_float  # shared bundled helpers (#970)
+from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
 
 
 def latest_weight_lbs(records):
@@ -145,7 +147,7 @@ def fetch_range(source, start, end):
 
 
 def fetch_profile():
-    from intelligence_common import fetch_profile as _shared_fetch_profile
+    from intelligence.intelligence_common import fetch_profile as _shared_fetch_profile
 
     return _shared_fetch_profile(table, USER_ID)
 
@@ -177,7 +179,7 @@ def sweep_achievement_first_earns(profile: dict) -> int:
         window_start = (datetime.now(timezone.utc) - timedelta(days=365)).strftime("%Y-%m-%d")
         start_weight = float(profile.get("journey_start_weight_lbs") or profile.get("start_weight_lbs") or 0) or None
         if start_weight is None:
-            from constants import EXPERIMENT_BASELINE_WEIGHT_LBS
+            from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS
 
             start_weight = float(EXPERIMENT_BASELINE_WEIGHT_LBS)
 
@@ -711,7 +713,7 @@ def store_computed_metrics(
     # DATA-2: Use validate_item directly (no S3 client — compute partitions don't archive
     # to S3 on failure; they log and skip. validate_and_write requires s3_client != None.)
     try:
-        from ingestion_validator import validate_item as _vi
+        from ingestion.ingestion_validator import validate_item as _vi
 
         _vr = _vi("computed_metrics", item, date_str)
         if _vr.should_skip_ddb:
@@ -725,7 +727,7 @@ def store_computed_metrics(
         logger.warning("[DATA-2] validate_item failed (proceeding with write): %s", ve)
     # Phase 3.3 (2026-05-16): tag with run_id + computed_at.
     try:
-        from compute_metadata import tag_record
+        from common.compute_metadata import tag_record
 
         item = tag_record(item, source_id="computed_metrics")
     except ImportError:
@@ -766,12 +768,12 @@ def store_day_grade(date_str, total_score, grade, component_scores, weights):
         # ADR-058 (#1814): every write carries `phase` — an unstamped row passes the
         # default-deny read filter as CURRENT, so a row written between the reset's
         # tagger pass and genesis silently counted as an experiment day.
-        from compute_metadata import tag_record
+        from common.compute_metadata import tag_record
 
         item = tag_record(item, source_id="day_grade")
         # DATA-2: validate_item directly (no S3 client for compute partitions)
         try:
-            from ingestion_validator import validate_item as _vi
+            from ingestion.ingestion_validator import validate_item as _vi
 
             _vr = _vi("day_grade", item, date_str)
             if _vr.should_skip_ddb:
@@ -846,12 +848,12 @@ def store_habit_scores(date_str, component_details, component_scores, vice_strea
             item["synergy_groups"] = _deep_dec(sg_pcts)
         item = {k: v for k, v in item.items() if v is not None}
         # ADR-058 (#1814): phase-stamp — see store_day_grade above.
-        from compute_metadata import tag_record
+        from common.compute_metadata import tag_record
 
         item = tag_record(item, source_id="habit_scores")
         # DATA-2: validate_item for habit_scores (Item 3, R12)
         try:
-            from ingestion_validator import validate_item as _vi
+            from ingestion.ingestion_validator import validate_item as _vi
 
             _vr = _vi("habit_scores", item, date_str)
             if _vr.should_skip_ddb:
@@ -1163,7 +1165,7 @@ def lambda_handler(event, context):
     #   - Streak timers preserved from previous day (not broken, not advanced)
     #   - Anomaly alerts will be suppressed separately by anomaly_detector
     try:
-        from sick_day_checker import check_sick_day as _check_sick
+        from health.sick_day_checker import check_sick_day as _check_sick
 
         _sick_rec = _check_sick(table, USER_ID, yesterday_str)
     except ImportError:

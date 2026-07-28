@@ -11,8 +11,8 @@ All checks are deterministic; every test passes an explicit health_context so no
 DynamoDB autoload is involved (and conftest pins AI_VALIDATOR_AUTOLOAD=off).
 """
 
-import ai_output_validator as v
-from ai_output_validator import AIOutputType, validate_ai_output
+from ai import ai_output_validator as v
+from ai.ai_output_validator import AIOutputType, validate_ai_output
 
 # ── BLOCK tier ───────────────────────────────────────────────────────────────
 

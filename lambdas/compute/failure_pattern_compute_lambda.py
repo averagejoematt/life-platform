@@ -30,10 +30,10 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import boto3
-from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("failure-pattern-compute")
 except ImportError:
@@ -382,7 +382,7 @@ def _write_pattern_memory(patterns, today):
         }
         # V2 P2.6 (2026-05-19): tag with run_id + computed_at
         try:
-            from compute_metadata import tag_record
+            from common.compute_metadata import tag_record
 
             item = tag_record(item, source_id="failure_patterns")
         except ImportError:

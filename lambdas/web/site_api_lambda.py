@@ -50,10 +50,10 @@ from decimal import Decimal  # noqa: F401 — kept for backward-compat with hand
 # third-party
 import boto3  # noqa: F401 — kept for handlers that create clients
 from boto3.dynamodb.conditions import Key
+from common.text_utils import truncate_at_word  # #1224: word-boundary summary truncation (no mid-word cut)
 
 # bundled shared module
-from phase_filter import with_phase_filter  # noqa: F401 — used by handlers below
-from text_utils import truncate_at_word  # #1224: word-boundary summary truncation (no mid-word cut)
+from experiment.phase_filter import with_phase_filter  # noqa: F401 — used by handlers below
 
 from web.site_api_agents import handle_agent_activity
 from web.site_api_autonomic import (
@@ -300,7 +300,7 @@ def handle_vacation_fund() -> dict:
     """GET /api/vacation_fund — workout miles since experiment start → USD fund.
     Read-only; delegates the math to the shared vacation_fund layer module."""
     try:
-        from vacation_fund import compute_vacation_fund
+        from content.vacation_fund import compute_vacation_fund
 
         payload = compute_vacation_fund()
         # PRE-START (#948, the #939 contract): a staged FUTURE genesis inverts the
@@ -330,7 +330,7 @@ def handle_methods() -> dict:
     same source, two surfaces. Long cache TTL since the registry only changes on deploy.
     """
     try:
-        from methods_registry import list_categories, list_stats
+        from experiment.methods_registry import list_categories, list_stats
 
         return _ok(
             {
@@ -567,7 +567,7 @@ def lambda_handler(event, context):
     # Catches oversized bodies, injection patterns, malformed user_id/date/source
     # before any handler runs. Returns 4xx for obvious abuse; legit traffic unaffected.
     try:
-        from request_validator import validate_envelope
+        from common.request_validator import validate_envelope
 
         validate_envelope(event, path=path, method=method)
     except ImportError:

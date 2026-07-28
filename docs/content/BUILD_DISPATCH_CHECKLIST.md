@@ -64,7 +64,7 @@ fact.
    it on every push — but run it locally before committing:
    `python3 scripts/content_policy_scan.py`. The standing rules apply: no
    blocked vice terms, no banned real names, no genome identifiers, no private
-   data (see `lambdas/privacy_guard.py` for the authoritative lists).
+   data (see `lambdas/privacy/privacy_guard.py` for the authoritative lists).
 3. **Numbers must be real.** Any figure in a beat must come from the handover /
    PR / measured output it narrates — the same honest-numbers bar as the rest
    of the platform (ADR-104).

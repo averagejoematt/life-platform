@@ -37,7 +37,7 @@ approval to start.
 ### 2. Run it as a MEETING, not a monologue
 
 The eight operational coaches (sleep, training, nutrition, mind, physical, glucose,
-labs, explorer — `lambdas/persona_registry.py::OPERATIONAL_COACH_IDS`) attend; only the
+labs, explorer — `lambdas/coach/persona_registry.py::OPERATIONAL_COACH_IDS`) attend; only the
 3-5 whose domains the agenda actually touches speak. Voice rules:
 
 - Each speaking coach reads from THEIR data and THEIR track record. A coach whose recent

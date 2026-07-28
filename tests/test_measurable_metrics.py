@@ -13,7 +13,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas", "coach"))
 
-import measurable_metrics as mm  # noqa: E402
+from experiment import measurable_metrics as mm  # noqa: E402
 
 
 def test_allowlist_is_derived_from_sources_cannot_drift():

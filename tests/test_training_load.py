@@ -16,7 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "lambdas"))
 
-import training_load as tl  # noqa: E402
+from training import training_load as tl  # noqa: E402
 
 
 def _walk_day(d, minutes, avg_hr=None):

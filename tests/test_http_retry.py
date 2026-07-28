@@ -22,7 +22,7 @@ import pytest
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 
-import http_retry as hr  # noqa: E402
+from common import http_retry as hr  # noqa: E402
 
 
 def _fake_ok_response(body=b'{"ok":true}'):

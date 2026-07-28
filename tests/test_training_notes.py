@@ -11,7 +11,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
-from training_notes import (  # noqa: E402
+from training.training_notes import (  # noqa: E402
     NOTES_SOURCE,
     SOURCE_LABEL,
     TAXONOMY,
@@ -154,7 +154,7 @@ def test_empty_workout_zero_records():
 
 # ── compute_deviation: pure pushed-vs-performed diff (§14.1) ──
 def test_compute_deviation_set_delta_added_removed():
-    from training_notes import compute_deviation
+    from training.training_notes import compute_deviation
 
     pushed = [{"template_id": "A", "name": "Squat", "sets": [1, 2, 3]}, {"template_id": "B", "name": "Bench", "sets": [1, 2]}]
     performed = [{"template_id": "A", "name": "Squat", "sets": [1, 2, 3, 4]}, {"template_id": "C", "name": "Row", "sets": [1, 2, 3]}]
@@ -174,7 +174,7 @@ class _FakeTable:
 
 
 def test_writer_never_touches_raw_partition_and_is_idempotent():
-    from training_notes import write_workout_notes
+    from training.training_notes import write_workout_notes
 
     t = _FakeTable()
     exs = [{"template_id": "E53CCBE5", "name": "Standing Calf Raise", "notes": STANDING_CALF}]

@@ -39,7 +39,7 @@ import os
 from datetime import datetime, timezone
 from typing import Any
 
-from hevy_common import (
+from training.hevy_common import (
     INITIAL_SINCE,
     SOURCE,
     USER_ID,
@@ -59,15 +59,15 @@ from hevy_common import (
 # watches a metric that never exists. Optional import — ingestion never breaks
 # if the layer module is absent.
 try:
-    from ingest_health import classify_error
-    from ingestion_framework import record_ingest_health
+    from ingestion.ingest_health import classify_error
+    from ingestion.ingestion_framework import record_ingest_health
 
     _INGEST_HEALTH_AVAILABLE = True
 except ImportError:  # pragma: no cover — layer-module fallback
     _INGEST_HEALTH_AVAILABLE = False
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("hevy-backfill")
 except ImportError:
@@ -89,8 +89,8 @@ def _derive_training_notes(rec: dict) -> None:
         exercises = rec.get("exercises") or []
         if not any((e.get("notes") or "").strip() for e in exercises):
             return
-        import training_notes as tn
-        from training_notes_llm import make_llm_fn
+        from training import training_notes as tn
+        from training.training_notes_llm import make_llm_fn
 
         llm_fn = make_llm_fn(_table)
         res = tn.write_workout_notes(_table, rec["date"], rec.get("workout_uid", ""), exercises, llm_fn=llm_fn)
@@ -110,7 +110,7 @@ def _attach_adherence(rec: dict, raw_workout: dict) -> None:
     Hevy item (its per-exercise template ids survive; the normalized rec renames them),
     so the Hevy-schema knowledge stays inside adherence_calc, not in this lambda."""
     try:
-        import adherence_calc
+        from health import adherence_calc
 
         adh = adherence_calc.derive_adherence(raw_workout)
         if adh:

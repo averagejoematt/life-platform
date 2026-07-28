@@ -25,12 +25,13 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import boto3
-from phase_filter import with_phase_filter  # ADR-058
-from relationship_engine import compute_relationship_update  # #536
+from experiment.phase_filter import with_phase_filter  # ADR-058
+
+from coach.relationship_engine import compute_relationship_update  # #536
 
 # Structured logger
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("coach-state-updater")
 except ImportError:
@@ -74,7 +75,7 @@ secrets = boto3.client("secretsmanager", region_name=REGION)
 # and never graded (the v7.15.0 504-inconclusive bug; the Coherence Sentinel's
 # prediction_health invariant exists for exactly this). They now live in ONE place,
 # DERIVED so they cannot diverge. See lambdas/measurable_metrics.py.
-from measurable_metrics import (
+from experiment.measurable_metrics import (
     MEASURABLE_METRICS,  # noqa: E402,F401
     METRIC_SOURCES,  # noqa: E402
     infer_direction as _infer_direction,  # noqa: E402  (#813: shared with the evaluator)
@@ -216,13 +217,13 @@ STALENESS_THRESHOLD = 3
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-from numeric import (
+from common.numeric import (
     decimals_to_float as _decimal_to_float,  # noqa: E402,F401
     floats_to_decimal,  # noqa: E402  # canonical float->Decimal (#1207)
 )
 
 # Canonical emitter lives in the layer — local copy removed 2026-06-12.
-from retry_utils import _emit_token_metrics  # noqa: E402,F401
+from common.retry_utils import _emit_token_metrics  # noqa: E402,F401
 
 
 def _emit_failure_metric():
@@ -314,7 +315,7 @@ def _call_haiku(system, user_message, max_tokens=3000, temperature=0.1):
     )
 
     # ADR-062 (2026-05-27): route through retry_utils.call_anthropic_raw (Bedrock).
-    from retry_utils import call_anthropic_raw
+    from common.retry_utils import call_anthropic_raw
 
     resp = call_anthropic_raw(req)
     text = resp["content"][0]["text"].strip()
@@ -364,7 +365,7 @@ def _put_item(item):
     this tagger-blind partition. experiment_stamp() is fail-soft and cached, and the
     item's own keys win, so it never clobbers or breaks the write.
     """
-    from phase_taxonomy import experiment_stamp
+    from experiment.phase_taxonomy import experiment_stamp
 
     try:
         table.put_item(Item=floats_to_decimal({**experiment_stamp(), **item}))

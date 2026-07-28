@@ -32,13 +32,13 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import boto3
-import budget_guard
-import coach_nudge_engine as engine
+from ai import budget_guard
+from ai.grounded_generation import allowed_dates, allowed_numbers, grounding_findings
 from boto3.dynamodb.conditions import Key
-from coach_checkin import read_cycle
-from grounded_generation import allowed_dates, allowed_numbers, grounding_findings
-from pacific_time import PACIFIC
-from persona_registry import OPERATIONAL_COACH_IDS
+from coach import coach_nudge_engine as engine
+from coach.coach_checkin import read_cycle
+from coach.persona_registry import OPERATIONAL_COACH_IDS
+from common.pacific_time import PACIFIC
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -90,7 +90,7 @@ def _lambda_client():
 def _coach_name(coach_id: str) -> str:
     """Display name from the persona registry, fail-soft to a derived name."""
     try:
-        from persona_registry import by_engine_id
+        from coach.persona_registry import by_engine_id
 
         _persona_id, persona = by_engine_id(coach_id)
         if persona and persona.get("name"):
@@ -114,7 +114,7 @@ def _item_exists(pk: str, sk: str) -> bool:
 def _active_nutrition_experiments() -> list:
     """Names of active experiments whose tags intersect the nutrition domain."""
     try:
-        from phase_filter import with_phase_filter
+        from experiment.phase_filter import with_phase_filter
 
         resp = _table().query(
             **with_phase_filter(
@@ -142,7 +142,7 @@ def _acwr_readings() -> tuple:
         # #1793: computed_metrics is EXPERIMENT_SCOPED — without the phase filter,
         # the first reads after a reset return tombstoned dead-cycle rows and an
         # ACWR nudge presents a discarded cycle's training load as today's fact.
-        from phase_filter import with_phase_filter
+        from experiment.phase_filter import with_phase_filter
 
         resp = _table().query(
             **with_phase_filter(
@@ -196,7 +196,7 @@ def _verdicts_resolving_tomorrow(tomorrow_pt: str) -> list:
             # #1793: COACH#/PREDICTION# is EXPERIMENT_SCOPED — unfiltered, a wiped
             # cycle's ~348 pending predictions keep "resolving tomorrow" for weeks
             # after a reset, burning the daily nudge cap on dead intelligence.
-            from phase_filter import with_phase_filter
+            from experiment.phase_filter import with_phase_filter
 
             resp = _table().query(
                 **with_phase_filter(
@@ -346,7 +346,7 @@ def _reserve_day(date_pt: str, firing: dict) -> bool:
 def _phrase(firing: dict, coach_name: str) -> str:
     """Haiku phrases ONLY the trigger payload (ADR-062 chokepoint via ai_calls).
     Returns '' on any failure — the caller blocks silently."""
-    from ai_calls import AI_MODEL_HAIKU, call_anthropic
+    from ai.ai_calls import AI_MODEL_HAIKU, call_anthropic
 
     system, user = engine.build_phrasing_prompt(coach_name, firing)
     try:
@@ -374,7 +374,7 @@ def _gate(copy_text: str, firing: dict, coach_name: str) -> list:
         return findings  # deterministic gates failed — skip the quality-gate invoke
 
     try:
-        from ai_calls import _enforce_quality_gate
+        from ai.ai_calls import _enforce_quality_gate
 
         brief = f"proactive {firing['trigger_type']} nudge from {coach_name} phrasing only the deterministic trigger payload"
         final, report = _enforce_quality_gate(

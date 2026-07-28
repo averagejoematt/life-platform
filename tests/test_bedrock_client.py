@@ -22,7 +22,8 @@ from unittest.mock import MagicMock
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 
-import bedrock_client as bc  # noqa: E402
+from ai import bedrock_client as bc  # noqa: E402
+from bundle_stubs import stub_bundled_module
 
 
 def test_fable_and_opus48_map_to_us_profiles():
@@ -47,7 +48,7 @@ def _invoke_and_capture(monkeypatch, body, model_name):
     stub = types.ModuleType("budget_guard")
     stub.BudgetExceeded = RuntimeError
     stub.current_tier = lambda: 0
-    monkeypatch.setitem(sys.modules, "budget_guard", stub)
+    stub_bundled_module(monkeypatch, "ai.budget_guard", stub)
 
     fake_client = MagicMock()
     fake_client.invoke_model.return_value = {"body": MagicMock(read=lambda: b'{"content": []}')}

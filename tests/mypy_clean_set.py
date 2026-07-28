@@ -32,24 +32,66 @@ ROOT = Path(__file__).resolve().parent.parent
 # (``except ImportError: from lambdas import X``) are guarded behind
 # ``if not TYPE_CHECKING:`` so mypy sees one canonical module name (no
 # "source file found twice") while runtime behavior is unchanged.
-CLEAN_DIRS = ["lambdas", "lambdas/web", "mcp"]
+#
+# #1653 packaging: each domain subpackage carved out of the flat root is added here
+# in the SAME slice that creates it. These globs are non-recursive, so omitting the
+# new directory would silently shrink the clean surface — a module would leave the
+# mypy gate merely by being moved, which is exactly the ratchet regression this file
+# exists to prevent. Moving code must never reduce coverage.
+CLEAN_DIRS = [
+    "lambdas",
+    "lambdas/ai",
+    "lambdas/coach",
+    "lambdas/common",
+    "lambdas/content",
+    "lambdas/experiment",
+    "lambdas/health",
+    "lambdas/privacy",
+    "lambdas/training",
+    "lambdas/web",
+    "mcp",
+]
+
+# Individual modules that belong to the clean surface but whose DIRECTORY does not.
+#
+# #1653's last slice moved eight shared modules into ingestion/, operational/ and
+# intelligence/ — subpackages that have never been in the clean set (they still carry
+# the unresolved cross-Lambda flat-copy imports named above, a later ratchet step that
+# #1656 deliberately deferred). Adding those three directories to CLEAN_DIRS to keep
+# the eight covered would have dragged in ~40 unrelated pre-existing modules and 39
+# pre-existing errors — scope this refactor has no business taking on, and debt it
+# would have looked like it created.
+#
+# Dropping them instead would have quietly shrunk the gate, which is the exact
+# regression the CLEAN_DIRS note above exists to prevent. So they are listed
+# individually: moving a module changes neither its coverage nor its neighbours'.
+CLEAN_FILES = [
+    "lambdas/ingestion/ingest_health.py",
+    "lambdas/ingestion/ingestion_framework.py",
+    "lambdas/ingestion/ingestion_validator.py",
+    "lambdas/ingestion/source_registry.py",
+    "lambdas/ingestion/source_state.py",
+    "lambdas/intelligence/intelligence_common.py",
+    "lambdas/operational/reader_truth_qa.py",
+    "lambdas/operational/redirect_spotcheck.py",
+]
 
 # Modules that do NOT yet pass under mypy.ini. Each MUST carry a reason. This
 # denylist only shrinks. Paths are repo-root-relative.
 DIRTY = {
     # 3rd-party module with no stubs / unresolved sibling-Lambda imports
     # (import-not-found). Would need an ignore_missing_imports section.
-    "lambdas/audio_encode.py",  # imports lameenc (no type stubs)
-    "lambdas/coach_correction_resolver.py",  # imports ai_review_pack_lambda (sibling lambda, unresolved from root)
+    "lambdas/ai/audio_encode.py",  # imports lameenc (no type stubs)
+    "lambdas/coach/coach_correction_resolver.py",  # imports ai_review_pack_lambda (sibling lambda, unresolved from root)
     # residual disabled-code / structural violations (need a dedicated pass):
-    "lambdas/broadcast_sensitivity_gate.py",  # union-attr
-    "lambdas/html_builder.py",  # misc
-    "lambdas/meal_projection.py",  # misc
-    "lambdas/training_notes.py",  # misc + var-annotated
+    "lambdas/privacy/broadcast_sensitivity_gate.py",  # union-attr
+    "lambdas/content/html_builder.py",  # misc
+    "lambdas/health/meal_projection.py",  # misc
+    "lambdas/training/training_notes.py",  # misc + var-annotated
     # platform_logger's Logger subclass narrows msg: object -> str on every
     # level method (LSP-violating override x6). Widely imported; fixing it is a
     # shared-layer change tracked separately (see #419 / this file's history).
-    "lambdas/platform_logger.py",  # override (x6)
+    "lambdas/common/platform_logger.py",  # override (x6)
     # The 3,000-line endpoint handlers — explicitly OUT of scope (var-annotated
     # + misc + call-overload); the next ratchet step, not attempted here.
     "lambdas/web/site_api_data.py",
@@ -68,17 +110,17 @@ DIRTY = {
 # glob logic silently dropping them). Budget/auth/inference core + the split AI
 # modules + the tier-2 serving helpers.
 CORE = [
-    "lambdas/secret_cache.py",
-    "lambdas/retry_utils.py",
-    "lambdas/phase_filter.py",
-    "lambdas/constants.py",
-    "lambdas/bedrock_client.py",
-    "lambdas/scoring_engine.py",
-    "lambdas/character_engine.py",
-    "lambdas/intelligence_common.py",
-    "lambdas/ai_calls.py",
-    "lambdas/ai_context.py",
-    "lambdas/ai_summaries.py",
+    "lambdas/common/secret_cache.py",
+    "lambdas/common/retry_utils.py",
+    "lambdas/experiment/phase_filter.py",
+    "lambdas/common/constants.py",
+    "lambdas/ai/bedrock_client.py",
+    "lambdas/health/scoring_engine.py",
+    "lambdas/health/character_engine.py",
+    "lambdas/intelligence/intelligence_common.py",
+    "lambdas/ai/ai_calls.py",
+    "lambdas/ai/ai_context.py",
+    "lambdas/ai/ai_summaries.py",
     "lambdas/web/site_api_common.py",
     "lambdas/web/site_api_coach.py",
     "lambdas/web/site_api_intelligence.py",
@@ -104,6 +146,9 @@ def clean_modules() -> list[str]:
                 continue
             if rel in DIRTY:
                 continue
+            paths.add(rel)
+    for rel in CLEAN_FILES:
+        if rel not in DIRTY and (ROOT / rel).is_file():
             paths.add(rel)
     return sorted(paths)
 

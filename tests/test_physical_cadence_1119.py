@@ -23,7 +23,7 @@ import sys
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
-from source_registry import SOURCE_REGISTRY  # noqa: E402
+from ingestion.source_registry import SOURCE_REGISTRY  # noqa: E402
 from web import site_api_observatory as obs  # noqa: E402
 
 EV_BODY = open(os.path.join(_REPO, "site", "assets", "js", "evidence_body.js")).read()

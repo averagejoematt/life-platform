@@ -34,14 +34,14 @@ import os
 from datetime import datetime, timezone
 
 import boto3
-import calibration_core
-import grounded_generation
-import memoir_gate
-import persona_registry
-import quarter_utils
+from ai import grounded_generation
 from boto3.dynamodb.conditions import Key
-from numeric import decimals_to_float, floats_to_decimal
-from phase_filter import with_phase_filter
+from coach import persona_registry
+from common import quarter_utils
+from common.numeric import decimals_to_float, floats_to_decimal
+from experiment import calibration_core
+from experiment.phase_filter import with_phase_filter
+from privacy import memoir_gate
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -228,7 +228,7 @@ def _render_facts_for_prompt(facts):
 
 
 def _call_model(persona, voice_rules, example, facts_text, quarter, extra_system=""):
-    import bedrock_client
+    from ai import bedrock_client
 
     sys_block = f"{_SYSTEM_RULES}\n\nYour voice rules: {voice_rules}"
     if example:
@@ -298,7 +298,7 @@ def _generate_memoir(persona, voice_rules, example, facts, quarter):
 
     ok, reasons2 = gate_check(text, facts)
     try:  # #812/#744: a fired memoir gate is labeled eval data — retain the pair (fail-soft)
-        import eval_retention
+        from experiment import eval_retention
 
         eval_retention.retain(
             "memoir",
@@ -334,7 +334,7 @@ def _write_memoir_record(table, coach_id, quarter, text, facts):
     # #1441: generation-time archive — the gate-passed memoir text that the site
     # artifact publishes, to generated/qa_archive/. Fail-soft inside the module.
     try:
-        import qa_archive
+        from common import qa_archive
 
         qa_archive.archive_text("memoir", text, variant=coach_id, meta={"quarter": quarter})
     except Exception as qa_e:  # noqa: BLE001 — the archive is never load-bearing
@@ -360,7 +360,7 @@ def _latest_memoir(table, coach_id):
 
 def lambda_handler(event: dict, context) -> dict:
     try:
-        from budget_guard import allow as _budget_allow
+        from ai.budget_guard import allow as _budget_allow
 
         if not _budget_allow(FEATURE):
             logger.info("[coach_memoir] budget tier pauses %s — skipping", FEATURE)

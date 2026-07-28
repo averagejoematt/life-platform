@@ -78,8 +78,8 @@ import boto3
 # CloudFront header / env var can't break subscriptions. Always importable: every
 # deploy path ships the full-tree bundle (#781), so web/site_api_common.py is
 # guaranteed present alongside this module.
-from client_ip import extract_client_ip  # #1221 — the ONE edge-observed client-IP helper
-from utm import (
+from common.client_ip import extract_client_ip  # #1221 — the ONE edge-observed client-IP helper
+from common.utm import (
     normalize as _utm_normalize,  # #1621 — shared with the outbound link tagger
     referrer_host as _referrer_host,
 )
@@ -87,7 +87,7 @@ from utm import (
 from web.site_api_common import SITE_API_ORIGIN_SECRET
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("email-subscriber")
 except ImportError:

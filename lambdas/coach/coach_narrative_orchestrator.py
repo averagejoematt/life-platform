@@ -37,12 +37,12 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import boto3
-from constants import EXPERIMENT_START_DATE  # ADR-058
-from phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
+from common.constants import EXPERIMENT_START_DATE  # ADR-058
+from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 
 # Structured logger
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("coach-narrative-orchestrator")
 except ImportError:
@@ -141,13 +141,13 @@ secrets = boto3.client("secretsmanager", region_name=REGION)
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-from numeric import (
+from common.numeric import (
     decimals_to_float as _decimal_to_float,  # noqa: E402,F401
     floats_to_decimal,  # noqa: E402  # canonical float->Decimal (#1207)
 )
 
 # Canonical emitter lives in the layer — local copy removed 2026-06-12.
-from retry_utils import _emit_token_metrics  # noqa: E402,F401
+from common.retry_utils import _emit_token_metrics  # noqa: E402,F401
 
 
 def _emit_failure_metric():
@@ -192,7 +192,7 @@ def _track_record_block(coach_id: str) -> str:
         recs = [x for x in r.get("Items", []) if not x.get("tombstone")]
         if not recs:
             return "Nothing resolved yet this cycle. Make calls; they will be scored."
-        counts = {}
+        counts: dict[str, int] = {}
         for x in recs:
             st = str(x.get("status", "unknown"))
             counts[st] = counts.get(st, 0) + 1
@@ -238,7 +238,7 @@ def _call_haiku(system, user_message, max_tokens=6000, temperature=0.3):
     )
 
     # ADR-062 (2026-05-27): route through retry_utils.call_anthropic_raw (Bedrock).
-    from retry_utils import call_anthropic_raw
+    from common.retry_utils import call_anthropic_raw
 
     resp = call_anthropic_raw(req)
     text = resp["content"][0]["text"].strip()
@@ -642,22 +642,22 @@ def _gather_journal_mood_signal():
     emotions_all, themes_all = [], []
     social_qualities = []
     quote, quote_date = None, None
-    for e in entries:
-        mood = e.get("enriched_mood")
+    for entry in entries:
+        mood = entry.get("enriched_mood")
         if mood is not None:
             moods.append(float(mood))
-        stress = e.get("enriched_stress")
+        stress = entry.get("enriched_stress")
         if stress is not None:
             stresses.append(float(stress))
-        emotions_all.extend(e.get("enriched_emotions") or [])
-        themes_all.extend(e.get("enriched_themes") or [])
-        social_quality = e.get("enriched_social_quality")
+        emotions_all.extend(entry.get("enriched_emotions") or [])
+        themes_all.extend(entry.get("enriched_themes") or [])
+        social_quality = entry.get("enriched_social_quality")
         if social_quality:
             social_qualities.append(social_quality)
         # Latest notable quote wins — most recent texture, not a historical one.
-        notable = e.get("enriched_notable_quote")
+        notable = entry.get("enriched_notable_quote")
         if notable:
-            quote, quote_date = notable, _entry_date(e)
+            quote, quote_date = notable, _entry_date(entry)
 
     if len(moods) < JOURNAL_MOOD_MIN_ENTRIES and len(stresses) < JOURNAL_MOOD_MIN_ENTRIES:
         return None
@@ -725,7 +725,7 @@ def _journal_mood_for_brief(signal):
 
     quote = signal.get("notable_quote")
     if quote:
-        from privacy_guard import find_violations
+        from privacy.privacy_guard import find_violations
 
         if not find_violations(quote):
             out["notable_quote"] = quote
@@ -789,7 +789,7 @@ def _engagement_for_brief(signal):
     # #914: severity travels with the signal (derived for pre-ladder records) so
     # generation + the acknowledgment gate key off one field.
     try:
-        from engagement_core import severity_of as _severity_of
+        from content.engagement_core import severity_of as _severity_of
 
         severity = _severity_of(signal)
     except ImportError:  # pragma: no cover — bundle always ships engagement_core
@@ -1164,7 +1164,7 @@ def lambda_handler(event, context):
     try:
         # Budget guardrail: at Tier ≥ 1 skip the LLM and fall back to the cached/
         # default brief, so the coach pipeline keeps running with zero Bedrock spend.
-        from budget_guard import allow as _budget_allow
+        from ai.budget_guard import allow as _budget_allow
 
         if not _budget_allow("coach_narrative"):
             raise RuntimeError("coach narrative AI paused by budget tier — using fallback")

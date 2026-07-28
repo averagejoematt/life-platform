@@ -181,7 +181,7 @@ def test_tier_semantics_cover_exactly_the_governor_tiers():
 
 
 def test_staleness_bound_matches_budget_guard():
-    import budget_guard
+    from ai import budget_guard
 
     assert (
         sai._BREAKDOWN_MAX_AGE_S == budget_guard._BREAKDOWN_MAX_AGE_S

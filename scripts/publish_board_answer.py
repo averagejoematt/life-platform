@@ -35,7 +35,7 @@ from datetime import date, datetime, timezone
 import boto3
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
-import privacy_guard  # noqa: E402 — fail-closed publish gate (#397)
+from privacy import privacy_guard  # noqa: E402 — fail-closed publish gate (#397)
 
 BUCKET = "matthew-life-platform"
 REGION = "us-west-2"

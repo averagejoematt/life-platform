@@ -58,7 +58,7 @@ from typing import Any
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_ROOT, "lambdas"))
 
-import diary_publish  # noqa: E402
+from privacy import diary_publish  # noqa: E402
 
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 REGION = os.environ.get("AWS_REGION", "us-west-2")

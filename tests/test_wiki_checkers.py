@@ -273,7 +273,7 @@ def test_experiment_anchor_ground_truth_is_discovered():
     not a stale literal — proves the fact the anchor gate polices is live."""
     facts = _load("scripts/check_doc_facts.py")
     truth = facts._ground_truth()
-    constants = (ROOT / "lambdas" / "constants.py").read_text(encoding="utf-8")
+    constants = (ROOT / "lambdas" / "common" / "constants.py").read_text(encoding="utf-8")
     m = re.search(r'EXPERIMENT_START_DATE\s*=\s*"(\d{4}-\d{2}-\d{2})"', constants)
     assert m, "EXPERIMENT_START_DATE literal not found in lambdas/constants.py"
     assert truth["experiment_genesis"] == m.group(1)
@@ -386,7 +386,7 @@ def test_og_source_count_ground_truth_is_the_registry():
     scan polices is live and self-correcting."""
     facts = _load("scripts/check_doc_facts.py")
     truth = facts._registry_source_count()
-    src = (ROOT / "lambdas" / "source_registry.py").read_text(encoding="utf-8")
+    src = (ROOT / "lambdas" / "ingestion" / "source_registry.py").read_text(encoding="utf-8")
     tree = ast.parse(src)
     counted = None
     for node in ast.walk(tree):
@@ -564,7 +564,7 @@ def test_governor_cadence_surface_includes_the_1254_files_and_beyond():
     surface = {str(p.relative_to(ROOT)) for p in facts._scan_governor_surface()}
     for expected in (
         "lambdas/operational/cost_governor_lambda.py",  # #1254 file 1
-        "lambdas/budget_guard.py",  # #1254 file 2
+        "lambdas/ai/budget_guard.py",  # #1254 file 2
         "site/method/cost/index.html",  # #1254 file 3
         "docs/RUNBOOK.md",  # #1347: found beyond the 3 enumerated files
         "docs/ARCHITECTURE.md",  # #1347: found beyond the 3 enumerated files

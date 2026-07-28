@@ -56,7 +56,7 @@ def _get_api_key():
     return _api_key_cache
 
 
-from numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
+from common.numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
 
 
 def get_iso_week(dt=None):
@@ -81,7 +81,7 @@ def genesis_week_label(iso_week):
     anything before is Prologue. Mirrors the chronicle's genesis week numbering.
     """
     try:
-        from constants import EXPERIMENT_START_DATE
+        from common.constants import EXPERIMENT_START_DATE
 
         genesis = datetime.strptime(EXPERIMENT_START_DATE, "%Y-%m-%d")
         monday = datetime.fromisocalendar(int(iso_week[:4]), int(iso_week[6:]), 1)
@@ -323,7 +323,7 @@ def _call_notes_model(prompt, api_key):
         },
     )
     # Phase 3.4 (2026-05-16): retry via retry_utils (4 attempts, 5/15/45s).
-    from retry_utils import call_anthropic_raw
+    from common.retry_utils import call_anthropic_raw
 
     result = call_anthropic_raw(req, timeout=60)
     text = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text").strip()
@@ -350,7 +350,7 @@ def note_contradiction_hits(analysis, metrics_record):
     except ImportError:  # pragma: no cover — flat sys.path (tests / bundle root)
         from grounding_guard import hard_canonical_contradictions
 
-    from canonical_facts import build_canonical_facts
+    from experiment.canonical_facts import build_canonical_facts
 
     facts = {k: v for k, v in build_canonical_facts(metrics_record).items() if k != "as_of"}
     hits = []
@@ -432,7 +432,7 @@ def generate_field_notes(iso_week):
         except Exception as e:  # noqa: BLE001 — regen is best-effort
             logger.warning(f"[grounding] rewrite failed ({type(e).__name__}) — keeping the original")
         try:  # #812/#744: a fired note gate is labeled eval data — retain the pair (fail-soft)
-            import eval_retention
+            from experiment import eval_retention
 
             eval_retention.retain(
                 "field_notes",
@@ -468,7 +468,7 @@ def generate_field_notes(iso_week):
     # WEEK# record carries them (the reader-facing surface renders these), to
     # generated/qa_archive/. Fail-soft inside the module.
     try:
-        import qa_archive
+        from common import qa_archive
 
         note_fields = {k: item[k] for k in ("ai_present", "ai_tone", "ai_cautionary", "ai_affirming") if item.get(k)}
         qa_archive.archive_text("field_notes", json.dumps(note_fields), meta={"week": iso_week})

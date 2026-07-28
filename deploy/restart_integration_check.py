@@ -340,7 +340,7 @@ def _latest_date_row(table, source):
 
 
 def leg_ingestion(report, args):
-    import lambdas.source_registry as sr
+    import lambdas.ingestion.source_registry as sr
 
     lam, table = _clients()
     registry = sr.SOURCE_REGISTRY
@@ -546,7 +546,7 @@ def leg_serving(report, args):
 def leg_ops(report, args):
     import boto3
 
-    import lambdas.source_registry as sr
+    import lambdas.ingestion.source_registry as sr
 
     sqs = boto3.client("sqs", region_name=REGION)
     try:

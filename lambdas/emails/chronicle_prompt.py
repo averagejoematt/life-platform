@@ -159,16 +159,15 @@ Write in clean paragraphs. No bullet points. No numbered lists. No headers withi
 
 def call_anthropic(system_prompt, user_message, archive_text=None):
     # Delegates to retry_utils for exponential backoff + CloudWatch metrics (P1.8/P1.9)
-    import retry_utils
+    from common import retry_utils  # #1385: the full multi-cycle archive rides as a 1-hour cached content block in
 
-    # #1385: the full multi-cycle archive rides as a 1-hour cached content block in
     # the system (after the persona prompt, before the volatile weekly data packet in
     # the user turn) — the run's several calls (first draft, regen-once, Margaret pass)
     # reuse the one cache write at ~0.1x reads. retry_utils passes a pre-built block
     # list straight through (its own cache_control is preserved).
     system = system_prompt
     if archive_text:
-        import whole_life_context
+        from health import whole_life_context
 
         system = whole_life_context.with_cached_archive(system_prompt, archive_text)
 
@@ -203,7 +202,7 @@ def installment_grounding_findings(elena_prompt, user_message, text, archive_tex
     in the archive she saw; a fabricated one is still caught because it appears
     nowhere in prompt + data packet + archive. Widening the window without widening
     the allow-list would false-flag every legitimate callback."""
-    import grounded_generation as _gg
+    from ai import grounded_generation as _gg
 
     findings = _gg.grounding_findings(
         text,

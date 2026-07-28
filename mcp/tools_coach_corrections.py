@@ -22,9 +22,7 @@ from mcp.config import logger, table as _table_ref
 
 try:
     # Shared, bundled modules (#781) — staged at zip root in the Lambda.
-    import coach_checkin
-    import coach_correction_resolver as ccr
-    import coach_corrections
+    from coach import coach_checkin, coach_correction_resolver as ccr, coach_corrections
 except ImportError:  # pragma: no cover — the MCP bundle always ships lambdas/ at root
     if not TYPE_CHECKING:
         from lambdas import coach_checkin, coach_correction_resolver as ccr, coach_corrections

@@ -779,7 +779,7 @@ def _auto_discover_restart_url_counts() -> tuple[int, int] | None:
     restart_pipeline.py's hard verify gate (step 12, restart_verify_rendered.py)
     actually fetches — the source of truth behind the "40-URL v4 surface
     (33 pages + 7 JSON endpoints)" class of inline doc counts (CLAUDE.md restart
-    section, RUNBOOK step 14). AST (not import) so no lambdas.constants import or
+    section, RUNBOOK step 14). AST (not import) so no lambdas.common.constants import or
     sys.path side effects run at discovery time.
 
     Returns None (manual PLATFORM_FACTS fallback) if either list is missing,
@@ -842,11 +842,11 @@ def _auto_discover_experiment_genesis() -> str | None:
     #781). This is the value that must appear in the CLAUDE.md restart-section
     "(currently <genesis>, cycle N)" anchor and SCHEMA.md's phase-taxonomy note; both
     drifted a full reset behind (cycle 5 / 2026-07-12) after the cycle-6 re-anchor.
-    AST (not import) so no lambdas.constants import or sys.path side effects run at
+    AST (not import) so no lambdas.common.constants import or sys.path side effects run at
     discovery time — consistent with the other discoverers. Returns None (manual
     fallback) if the literal is missing, non-string, or not an ISO date.
     """
-    path = ROOT / "lambdas" / "constants.py"
+    path = ROOT / "lambdas" / "common" / "constants.py"
     if not path.exists():
         return None
     try:

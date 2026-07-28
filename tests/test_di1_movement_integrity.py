@@ -204,7 +204,7 @@ import importlib.util  # noqa: E402
 _IC_SPEC = importlib.util.find_spec("intelligence_common")
 _IC_OK = _IC_SPEC is not None
 if _IC_OK:
-    import intelligence_common as ic  # noqa: E402
+    from intelligence import intelligence_common as ic  # noqa: E402
 
 
 @pytest.mark.skipif(not _IC_OK, reason="intelligence_common (shared layer) unavailable")
@@ -259,7 +259,7 @@ def test_coach_guard_noop_when_no_undertraining_assertion():
 
 _SS_OK = importlib.util.find_spec("source_state") is not None
 if _SS_OK:
-    import source_state as ss  # noqa: E402
+    from ingestion import source_state as ss  # noqa: E402
 
 TODAY = "2026-06-19"
 

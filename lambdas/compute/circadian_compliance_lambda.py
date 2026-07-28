@@ -37,10 +37,10 @@ from zoneinfo import ZoneInfo
 _PT = ZoneInfo("America/Los_Angeles")
 
 import boto3
-from pacific_time import pacific_today
+from common.pacific_time import pacific_today
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("circadian-compliance")
 except ImportError:
@@ -87,7 +87,7 @@ def _to_dec(val):
         return None
 
 
-from digest_utils import d2f  # shared bundled helpers (#970)
+from common.digest_utils import d2f  # shared bundled helpers (#970)
 
 
 def fetch_source_date(source, date_str):
@@ -103,7 +103,7 @@ def fetch_range(source, start, end):
     # ADR-058: physiological continuity — the circadian baseline needs the
     # actual sleep rhythm history, not just the post-restart week (owner
     # decision 2026-06-06). include_pilot=True is a deliberate no-op annotation.
-    from phase_filter import with_phase_filter
+    from experiment.phase_filter import with_phase_filter
 
     try:
         records, kwargs = [], with_phase_filter(
@@ -470,7 +470,7 @@ def store_circadian_score(result):
     item["components"] = components_enc
     # V2 P2.6 (2026-05-19): tag with run_id + computed_at
     try:
-        from compute_metadata import tag_record
+        from common.compute_metadata import tag_record
 
         item = tag_record(item, source_id="circadian")
     except ImportError:

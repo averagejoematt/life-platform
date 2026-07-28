@@ -27,7 +27,7 @@ os.environ.setdefault("AWS_ACCESS_KEY_ID", "FAKE")
 os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "FAKE")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
-import source_registry as reg  # noqa: E402
+from ingestion import source_registry as reg  # noqa: E402
 
 
 def test_pipeline_health_check_derives():
@@ -78,7 +78,7 @@ def test_mcp_config_derives():
 
 
 def test_data_export_derives_from_taxonomy():
-    from phase_taxonomy import SOURCE_CLASS, SYSTEM_STATE
+    from experiment.phase_taxonomy import SOURCE_CLASS, SYSTEM_STATE
 
     sys.path.insert(0, os.path.join(ROOT, "lambdas", "operational"))
     import data_export_lambda as dx
@@ -138,7 +138,7 @@ def test_engagement_channels_derive_from_registry_914():
     (MANUAL_CHANNELS + CHANNEL_STALE_DAYS) — now a projection of the registry's
     engagement_channel facet, withings joins as the 'measurement' channel, and
     the habitify presence predicate is registry-named + resolvable."""
-    import engagement_core as ec
+    from content import engagement_core as ec
 
     channels = reg.engagement_channels()
     assert ec.MANUAL_CHANNELS == {k: v["label"] for k, v in channels.items()}

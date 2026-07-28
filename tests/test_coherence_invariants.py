@@ -12,7 +12,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 
-import coherence_invariants as ci  # noqa: E402
+from experiment import coherence_invariants as ci  # noqa: E402
 
 
 class TestPredictionHealth:

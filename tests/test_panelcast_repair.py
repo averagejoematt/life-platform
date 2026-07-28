@@ -400,7 +400,7 @@ def test_exhaustion_email_skips_without_recipient_and_fails_open_on_error():
 
 
 def test_intro_repaired_script_that_still_fails_judge_holds(monkeypatch):
-    import bedrock_client
+    from ai import bedrock_client
 
     monkeypatch.setattr(panel, "_load_bible", lambda: {"characters": {"matthew": "an ordinary, technical, curious person"}})
     # Seeded generation: Elena names herself in line 1 (no cold-open prepend), with a
@@ -503,7 +503,7 @@ def _weekly_harness(monkeypatch, judge):
     # this budget/exhaustion harness stays about the Haiku judge it parametrizes.
     monkeypatch.setattr(panel._craft, "punch_up_script", lambda turns, *a, **k: (turns, False))
     monkeypatch.setattr(panel, "_craft_judge", lambda turns, rubric, model=None: (True, [], []))
-    import bedrock_client
+    from ai import bedrock_client
 
     monkeypatch.setattr(
         bedrock_client, "invoke", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no bedrock call expected — script alternates"))

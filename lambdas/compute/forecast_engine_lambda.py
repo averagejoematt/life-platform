@@ -34,12 +34,12 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
-import stats_core
-from numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
-from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from common import stats_core
+from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
+from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("forecast-engine")
 except ImportError:
@@ -82,7 +82,7 @@ dynamodb = boto3.resource("dynamodb", region_name=_REGION)
 table = dynamodb.Table(TABLE_NAME)
 
 
-from digest_utils import d2f  # shared bundled helpers (#970)
+from common.digest_utils import d2f  # shared bundled helpers (#970)
 
 
 def fetch_series(source, field, start, end):
@@ -312,7 +312,7 @@ def lambda_handler(event: dict, context) -> dict:
         "coverage": coverage,
     }
     try:
-        from compute_metadata import tag_record
+        from common.compute_metadata import tag_record
 
         summary = tag_record(summary, source_id="forecast")
     except ImportError:

@@ -29,9 +29,9 @@ sys.path.insert(0, str(REPO_ROOT / "lambdas" / "compute"))
 
 os.environ.setdefault("S3_BUCKET", "test-bucket")
 
-import character_engine  # noqa: E402
 import character_sheet_lambda as csl  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
+from health import character_engine  # noqa: E402
 
 DATE = "2026-06-20"
 NOTION_PK = "USER#matthew#SOURCE#notion"

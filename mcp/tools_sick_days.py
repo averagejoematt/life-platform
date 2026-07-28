@@ -28,7 +28,7 @@ from mcp.config import USER_ID, logger, table
 SICK_DAYS_PK = f"USER#{USER_ID}#SOURCE#sick_days"
 
 
-from digest_utils import d2f as _d2f  # shared bundled helpers (#970)
+from common.digest_utils import d2f as _d2f  # shared bundled helpers (#970)
 
 # ── Tool: log_sick_day ────────────────────────────────────────────────────────
 

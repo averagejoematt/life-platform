@@ -42,11 +42,11 @@ import urllib.request
 from datetime import datetime, timezone
 
 import boto3
-from phase_filter import with_phase_filter  # ADR-058
+from experiment.phase_filter import with_phase_filter  # ADR-058
 
 # Structured logger
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("coach-history-summarizer")
 except ImportError:
@@ -81,7 +81,7 @@ ALL_COACH_IDS = [
 # to live here had drifted to the RETIRED cast, so every COMPRESSED#/STANCE#
 # record carried the wrong byline. One registry, no local copies.
 try:
-    import persona_registry as _persona_registry
+    from coach import persona_registry as _persona_registry
 except ImportError:  # pragma: no cover — environment-dependent
     _persona_registry = None
 
@@ -158,20 +158,20 @@ secrets = boto3.client("secretsmanager", region_name=REGION)
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-from numeric import (
+from common.numeric import (
     decimals_to_float as _decimal_to_float,  # noqa: E402,F401
     floats_to_decimal,  # noqa: E402  # canonical float->Decimal (#1207)
 )
 
 # Canonical emitter lives in the layer — local copy removed 2026-06-12.
-from retry_utils import _emit_token_metrics  # noqa: E402,F401
+from common.retry_utils import _emit_token_metrics  # noqa: E402,F401
 
 # #534: the STANCE# writer joins ADR-104's grounded-generation gate (the named
 # fast-follow from ADR-104's honest residual — "the STANCE# writer gate is a
 # named fast-follow"). Fails open (gate becomes a no-op) if the shared module
 # is somehow missing from the bundle/layer — never blocks stance generation.
 try:
-    from grounded_generation import allowed_numbers, grounding_findings, regen_once
+    from ai.grounded_generation import allowed_numbers, grounding_findings, regen_once
 except ImportError:  # pragma: no cover — environment-dependent
     allowed_numbers = grounding_findings = regen_once = None
 
@@ -179,7 +179,7 @@ except ImportError:  # pragma: no cover — environment-dependent
 # questions (INTERACTION#) — delimit that untrusted text as data. Fail-soft to a
 # local no-op if the shared module is somehow missing from the bundle.
 try:
-    from ai_context import wrap_untrusted_reader_text
+    from ai.ai_context import wrap_untrusted_reader_text
 except ImportError:  # pragma: no cover — environment-dependent
 
     def wrap_untrusted_reader_text(text):
@@ -195,7 +195,7 @@ except ImportError:  # pragma: no cover — environment-dependent
 # screen is missing from the bundle we withhold the takeaway, we do not ship it
 # unscreened. Privacy gates fail closed; quality gates fail open.
 try:
-    from coach_calibration import TAKEAWAY_WITHHELD_MARKER, public_prompt_takeaway as _public_prompt_takeaway
+    from coach.coach_calibration import TAKEAWAY_WITHHELD_MARKER, public_prompt_takeaway as _public_prompt_takeaway
 except ImportError:  # pragma: no cover — environment-dependent; withhold, never pass through
     TAKEAWAY_WITHHELD_MARKER = "[takeaway withheld — ADR-141 §4 privacy screen]"
     _public_prompt_takeaway = None
@@ -268,7 +268,7 @@ def _call_haiku(system, user_message, max_tokens=1500, temperature=0.2):
     )
 
     # ADR-062 (2026-05-27): route through retry_utils.call_anthropic_raw (Bedrock).
-    from retry_utils import call_anthropic_raw
+    from common.retry_utils import call_anthropic_raw
 
     resp = call_anthropic_raw(req)
     text = resp["content"][0]["text"].strip()
@@ -317,7 +317,7 @@ def _put_item(item):
     write-time provenance (phase + cycle, #1233). experiment_stamp() is fail-soft
     and cached; the item's own keys win, so it never clobbers or breaks the write.
     """
-    from phase_taxonomy import experiment_stamp
+    from experiment.phase_taxonomy import experiment_stamp
 
     try:
         table.put_item(Item=floats_to_decimal({**experiment_stamp(), **item}))
@@ -532,7 +532,7 @@ def _conversational_weight(conf_record):
     split rule). Fail-soft to 0.0 — a grounding string must never fail to render because
     a provenance field is missing or oddly typed."""
     try:
-        from coach_calibration import conversational_weight
+        from coach.coach_calibration import conversational_weight
 
         return conversational_weight((conf_record or {}).get("conversation_alpha"), (conf_record or {}).get("conversation_beta"))
     except Exception:  # noqa: BLE001 — provenance disclosure is additive, never load-bearing
@@ -1498,7 +1498,7 @@ def _handle_event_stance_refresh(event):
     # already checked before invoking, but this Lambda runs async and the
     # tier can move between that check and this run.
     try:
-        from budget_guard import allow as _budget_allow
+        from ai.budget_guard import allow as _budget_allow
 
         if not _budget_allow("coach_narrative"):
             logger.info("[event-stance] %s skipped — budget tier paused coach narratives", coach_id)

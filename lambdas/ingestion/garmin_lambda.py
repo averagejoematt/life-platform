@@ -73,7 +73,7 @@ import boto3
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("garmin")
 except ImportError:
@@ -99,7 +99,7 @@ table = dynamodb.Table(DYNAMODB_TABLE)
 # ── Serialisation ──────────────────────────────────────────────────────────────
 # Phase 4.2 (2026-05-16): canonical impl in lambdas/numeric.py.
 try:
-    from numeric import floats_to_decimal  # noqa: F401
+    from common.numeric import floats_to_decimal  # noqa: F401
 except ImportError:
 
     def floats_to_decimal(obj):
@@ -938,7 +938,7 @@ def extract_activities(api, date_str: str) -> dict:
 # P4.1 SIMP-2 framework migration (2026-05-17)
 # ══════════════════════════════════════════════════════════════════════════════
 
-from ingestion_framework import IngestionConfig, run_ingestion
+from ingestion.ingestion_framework import IngestionConfig, run_ingestion
 
 # Cache the garth-backed api client across the gap-fill loop within one
 # invocation. Re-creating it per-day would hit the OAuth refresh endpoint

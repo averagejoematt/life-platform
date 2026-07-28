@@ -23,10 +23,10 @@ import urllib.parse
 from datetime import datetime, timedelta, timezone
 
 import boto3
-from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("weekly-signal")
 except ImportError:
@@ -67,7 +67,7 @@ BOARD_ROTATION = [
 ]
 
 
-from digest_utils import d2f as _d2f  # shared bundled helpers (#970)
+from common.digest_utils import d2f as _d2f  # shared bundled helpers (#970)
 
 
 def _s3_json(key):

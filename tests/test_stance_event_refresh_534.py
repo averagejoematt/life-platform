@@ -384,7 +384,7 @@ class TestEventStanceRefreshDispatch:
         assert out["statusCode"] == 400
 
     def test_budget_tier_paused_skips_without_calling_run_stance(self, monkeypatch):
-        import budget_guard
+        from ai import budget_guard
 
         monkeypatch.setattr(budget_guard, "allow", lambda feature: False)
         called = []
@@ -394,7 +394,7 @@ class TestEventStanceRefreshDispatch:
         assert called == []
 
     def test_missing_compressed_baseline_skips(self, monkeypatch):
-        import budget_guard
+        from ai import budget_guard
 
         monkeypatch.setattr(budget_guard, "allow", lambda feature: True)
         monkeypatch.setattr(chs, "_get_item", lambda pk, sk: None)
@@ -402,7 +402,7 @@ class TestEventStanceRefreshDispatch:
         assert out["skipped"] == "no_compressed_baseline"
 
     def test_fallback_compressed_baseline_skips(self, monkeypatch):
-        import budget_guard
+        from ai import budget_guard
 
         monkeypatch.setattr(budget_guard, "allow", lambda feature: True)
         monkeypatch.setattr(chs, "_get_item", lambda pk, sk: {"_fallback": True})
@@ -410,7 +410,7 @@ class TestEventStanceRefreshDispatch:
         assert out["skipped"] == "no_compressed_baseline"
 
     def test_happy_path_calls_run_stance_with_event_trigger(self, monkeypatch):
-        import budget_guard
+        from ai import budget_guard
 
         monkeypatch.setattr(budget_guard, "allow", lambda feature: True)
         monkeypatch.setattr(chs, "_get_item", lambda pk, sk: {"summary": "compressed history"})

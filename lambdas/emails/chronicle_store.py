@@ -91,7 +91,7 @@ def store_installment(
         # the draft/preview and direct-publish paths land here) to
         # generated/qa_archive/. Fail-soft inside the module.
         try:
-            import qa_archive
+            from common import qa_archive
 
             qa_archive.archive_text(
                 "chronicle",

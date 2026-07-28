@@ -33,8 +33,8 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "emails"))
 
-import grounded_generation as gg  # noqa: E402
 import wednesday_chronicle_lambda as chron  # noqa: E402
+from ai import grounded_generation as gg  # noqa: E402
 
 # The exact falsehood from the issue's evidence pointer (content_markdown of the
 # status=draft record). 2026-07-13 was a MONDAY, 2026-07-14 a TUESDAY.

@@ -23,7 +23,8 @@ from unittest.mock import MagicMock
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 
-import bedrock_client as bc  # noqa: E402
+from ai import bedrock_client as bc  # noqa: E402
+from bundle_stubs import stub_bundled_module
 
 # ── estimate_cost_usd (pure) ─────────────────────────────────────────────────
 
@@ -133,7 +134,7 @@ def _stub_budget(monkeypatch):
     stub = types.ModuleType("budget_guard")
     stub.BudgetExceeded = RuntimeError
     stub.current_tier = lambda: 0
-    monkeypatch.setitem(sys.modules, "budget_guard", stub)
+    stub_bundled_module(monkeypatch, "ai.budget_guard", stub)
 
 
 def test_invoke_meters_on_return_path(monkeypatch):

@@ -41,7 +41,7 @@ from pathlib import Path
 
 SITE = "https://averagejoematt.com"
 SNAPSHOT = Path(__file__).resolve().parent / "proof_snapshot.json"
-CONSTANTS_PY = Path(__file__).resolve().parent.parent / "lambdas" / "constants.py"
+CONSTANTS_PY = Path(__file__).resolve().parent.parent / "lambdas" / "common" / "constants.py"
 
 
 def _today() -> str:

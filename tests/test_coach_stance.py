@@ -18,8 +18,10 @@ import sys
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
-import coach_stance  # noqa: E402
-import persona_registry  # noqa: E402
+from coach import (
+    coach_stance,  # noqa: E402
+    persona_registry,  # noqa: E402
+)
 
 REQUIRED_STAGE_FIELDS = [
     "stage_id",

@@ -138,7 +138,7 @@ def _split_harness_ready(records_by_surface, harness_surfaces):
 
 
 def harvest(days, out_path):
-    import eval_retention
+    from experiment import eval_retention
 
     records_by_surface = {s: eval_retention.fetch(s, since_days=days) for s in eval_retention.SURFACES}
     n_records = sum(len(v) for v in records_by_surface.values())

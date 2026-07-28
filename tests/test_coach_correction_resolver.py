@@ -23,7 +23,7 @@ os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "testing")
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
-import coach_correction_resolver as ccr  # noqa: E402
+from coach import coach_correction_resolver as ccr  # noqa: E402
 
 
 def _entry(surface, variant, date, key):
@@ -156,7 +156,7 @@ def test_resolve_empty_week_reported():
 
 # ── numbered_for_week delegates to the real ranker (stable numbering) ────────
 def test_numbered_for_week_uses_real_ranker(monkeypatch):
-    import review_pack_ranker
+    from content import review_pack_ranker
 
     surface_order = review_pack_ranker.DEFAULT_SURFACE_ORDER
     by_surface = {

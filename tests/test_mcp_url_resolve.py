@@ -18,8 +18,8 @@ if LAMBDAS not in sys.path:
 
 def _fresh_module():
     """Reimport with a clean module-level cache each time."""
-    sys.modules.pop("mcp_url", None)
-    return importlib.import_module("mcp_url")
+    sys.modules.pop("common.mcp_url", None)
+    return importlib.import_module("common.mcp_url")
 
 
 def test_env_override_wins(monkeypatch):
@@ -65,5 +65,5 @@ def test_url_not_hardcoded_in_repo_source():
     The old host is dead post-rotation; this guards against re-introducing ANY
     concrete `*.lambda-url.*.on.aws` MCP host in the resolver itself.
     """
-    src = open(os.path.join(LAMBDAS, "mcp_url.py")).read()
+    src = open(os.path.join(LAMBDAS, "common", "mcp_url.py")).read()
     assert ".lambda-url." not in src, "mcp_url.py must not hardcode a Function URL host"

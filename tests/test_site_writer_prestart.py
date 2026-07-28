@@ -19,7 +19,7 @@ import sys
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
-import site_writer  # noqa: E402
+from content import site_writer  # noqa: E402
 
 
 class _S3Cap:

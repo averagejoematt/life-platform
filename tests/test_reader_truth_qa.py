@@ -33,10 +33,10 @@ if _TESTS_DIR not in sys.path:
     sys.path.insert(0, _TESTS_DIR)  # for `import visual_ai_qa`
 
 import boto3  # noqa: E402
-import budget_guard  # noqa: E402  (lambdas/ on sys.path via conftest)
-import reader_truth_qa as rtq  # noqa: E402
 import visual_ai_qa  # noqa: E402
-from constants import EXPERIMENT_START_DATE  # noqa: E402
+from ai import budget_guard  # noqa: E402  (lambdas/ on sys.path via conftest)
+from common.constants import EXPERIMENT_START_DATE  # noqa: E402
+from operational import reader_truth_qa as rtq  # noqa: E402
 
 _START = date.fromisoformat(EXPERIMENT_START_DATE)
 _DAY_1 = _START.isoformat()
@@ -301,8 +301,8 @@ def test_harness_budget_skip_returns_explicit_status_and_emits_metric(tmp_path, 
 
 # ── nightly qa_smoke check (#1096) ────────────────────────────────────────────
 
-import bedrock_client  # noqa: E402
 import qa_smoke_lambda  # noqa: E402
+from ai import bedrock_client  # noqa: E402
 
 
 def _patch_smoke(monkeypatch, payload=None, tier=0, surfaces=None, fetch_warnings=None, invoke=None):
@@ -476,7 +476,7 @@ def test_no_vitals_quote_is_not_flagged():
 
 # ── #1224: word-boundary truncation helper + the mid-word reader-truth guard ───
 
-import text_utils  # noqa: E402  (lambdas/ on sys.path via conftest)
+from common import text_utils  # noqa: E402  (lambdas/ on sys.path via conftest)
 
 # A source longer than the 300-char excerpt budget, ending on real prose. The
 # generator's `content_markdown[:300]` cut lands inside "data" → "…before any dat",

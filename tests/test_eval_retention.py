@@ -17,8 +17,8 @@ os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "testing")
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
-import eval_retention as er  # noqa: E402
 import pytest  # noqa: E402
+from experiment import eval_retention as er  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
 
 

@@ -26,7 +26,7 @@ os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "testing")
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 
-import ai_calls  # noqa: E402
+from ai import ai_calls  # noqa: E402
 
 
 def _lambda_client_returning(*reports):
@@ -246,7 +246,7 @@ class TestRetainCoachBriefFlag:
     report's own vocabulary, fail-soft on any error."""
 
     def test_translates_report_findings_and_calls_retain(self, monkeypatch):
-        import eval_retention
+        from experiment import eval_retention
 
         retained = {}
 
@@ -272,7 +272,7 @@ class TestRetainCoachBriefFlag:
         assert retained["extra"] == {"coach_id": "sleep_coach", "score": 62}
 
     def test_never_raises_on_retention_failure(self, monkeypatch):
-        import eval_retention
+        from experiment import eval_retention
 
         def _boom(*a, **kw):
             raise RuntimeError("simulated DDB outage")

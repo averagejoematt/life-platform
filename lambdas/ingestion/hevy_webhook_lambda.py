@@ -25,7 +25,7 @@ import json
 import logging
 from typing import Any
 
-from hevy_common import (
+from training.hevy_common import (
     HevyAPIError,
     archive_raw,
     fetch_workout,
@@ -35,7 +35,7 @@ from hevy_common import (
 )
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("hevy-webhook")
 except ImportError:
@@ -148,7 +148,7 @@ def lambda_handler(event: dict, context: Any) -> dict:
         archive_raw(workout_id, raw)
         record = normalize_workout(raw)
         try:  # #412 pushed-vs-performed adherence, embedded pre-write (guarded, non-fatal)
-            import adherence_calc
+            from health import adherence_calc
 
             _adh = adherence_calc.derive_adherence(raw.get("workout") or raw)
             if _adh:

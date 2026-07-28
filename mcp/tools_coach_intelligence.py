@@ -7,8 +7,8 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING
 
-import calibration_core  # #538: shared Brier + reliability scorer (layer module)
 from boto3.dynamodb.conditions import Key
+from experiment import calibration_core  # #538: shared Brier + reliability scorer (layer module)
 
 from mcp.config import USER_PREFIX
 from mcp.core import decimal_to_float, table
@@ -412,10 +412,12 @@ def tool_evaluate_prediction(args):
 
 try:
     # Shared, bundled modules (#781) — staged at zip root in the Lambda.
-    import coach_checkin as _ck  # #1791: read_cycle() — cycle-stamps the correction below
-    import coach_corrections as _cc
-    import coach_dossier as _cd
-    import dispute_docket as _dd  # #1794: DOCKET_PK — docket rows live off-coach
+    from coach import (
+        coach_checkin as _ck,  # #1791: read_cycle() — cycle-stamps the correction below
+        coach_corrections as _cc,
+        coach_dossier as _cd,
+        dispute_docket as _dd,  # #1794: DOCKET_PK — docket rows live off-coach
+    )
 except ImportError:  # pragma: no cover — local/test path
     if not TYPE_CHECKING:  # the dual-name import trips mypy's "source found twice"
         from lambdas import coach_checkin as _ck, coach_corrections as _cc, coach_dossier as _cd, dispute_docket as _dd

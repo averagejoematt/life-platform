@@ -37,10 +37,12 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "ingestion"))
 
 import habitify_lambda as hab  # noqa: E402
-import ingestion_framework as fw  # noqa: E402
-import ingestion_validator as iv  # noqa: E402
 import measurements_ingestion_lambda as meas  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
+from ingestion import (
+    ingestion_framework as fw,  # noqa: E402
+    ingestion_validator as iv,  # noqa: E402
+)
 
 _INGESTION_STACK_SRC = open(os.path.join(_REPO, "cdk/stacks/ingestion_stack.py")).read()
 
@@ -231,7 +233,7 @@ def test_eightsleep_401_relogin_persists_token(monkeypatch):
 def test_framework_writeback_failure_is_loud():
     """A-9: the writeback block retries once and ERRORs (never a shrugged-off
     warning) — source pin on the exact behavior, since the block lives mid-run_ingestion."""
-    src = open(os.path.join(_REPO, "lambdas/ingestion_framework.py")).read()
+    src = open(os.path.join(_REPO, "lambdas/ingestion/ingestion_framework.py")).read()
     assert "Secret writeback FAILED twice" in src
     assert 'logger.warning(f"Secret writeback failed (non-fatal): {e}")' not in src
 
@@ -327,7 +329,7 @@ def test_measurements_records_stamp_phase(monkeypatch):
     # ingestion_framework.EXPERIMENT_START_DATE, so a reset moving genesis past
     # 2026-07-01 (the cycle-5 future-staged genesis did) silently flips the
     # expected stamp. Pinning keeps the test about the boundary, not the calendar.
-    import ingestion_framework
+    from ingestion import ingestion_framework
 
     monkeypatch.setattr(ingestion_framework, "EXPERIMENT_START_DATE", "2026-06-08")
     fake_table, _ = _run_measurements(monkeypatch, _CSV_TWO_SESSIONS)
