@@ -67,7 +67,7 @@ USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 # #498 (X-10): source rows derive from the registry's expected_days facet.
 # Computed partitions stay local — they are compute-lambda OUTPUTS, not sources;
 # their expected cadence is the compute schedule, not an ingestion property.
-from source_registry import reconciliation_sources
+from ingestion.source_registry import reconciliation_sources
 
 COMPUTED_PARTITIONS = [
     ("day_grade", 7, "Computed by daily-metrics-compute"),

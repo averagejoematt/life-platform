@@ -479,7 +479,7 @@ def write_normalized(record: dict) -> None:
     the upsert itself is idempotent).
     """
     try:
-        from ingestion_framework import _phase_for_date
+        from ingestion.ingestion_framework import _phase_for_date
 
         record["phase"] = _phase_for_date(record["date"])
     except ImportError:

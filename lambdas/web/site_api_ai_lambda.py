@@ -41,8 +41,8 @@ from ai.ai_context import (
 from boto3.dynamodb.conditions import Key
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1085
+from ingestion.source_registry import public_board_sources, public_paused_sources  # #387: derived source count
 from privacy import privacy_guard  # deterministic real-name + vice scrub (layer module)
-from source_registry import public_board_sources, public_paused_sources  # #387: derived source count
 
 from web import board_quality_gate as _bqg  # #968: ADR-108 quality gate on the board (see the block comment near the #546 section)
 from web.site_api_common import (

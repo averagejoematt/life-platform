@@ -5,7 +5,7 @@ Extracts the 80% shared code across 13 ingestion Lambdas into a single reusable
 framework. Source-specific logic (API calls, schema mapping) provided as callbacks.
 
 USAGE:
-    from ingestion_framework import IngestionConfig, run_ingestion
+    from ingestion.ingestion_framework import IngestionConfig, run_ingestion
 
     config = IngestionConfig(
         source_name="whoop",
@@ -89,7 +89,7 @@ except ImportError:
 # for weeks" (the 44-day-outage class). Optional import — ingestion never breaks if
 # the layer module is absent.
 try:
-    from ingest_health import SYSTEM_PK as _INGEST_SYSTEM_PK, classify_error, emf_metric_line, ingest_health_sk, update_outcome
+    from ingestion.ingest_health import SYSTEM_PK as _INGEST_SYSTEM_PK, classify_error, emf_metric_line, ingest_health_sk, update_outcome
 
     _INGEST_HEALTH_AVAILABLE = True
 except ImportError:  # pragma: no cover - layer-module fallback
@@ -438,7 +438,7 @@ def _store_item(table, s3, config, item, date_str, logger):
     """
     # DATA-2: Validate before write
     try:
-        from ingestion_validator import validate_item as _validate_item
+        from ingestion.ingestion_validator import validate_item as _validate_item
 
         vr = _validate_item(config.source_name, item, date_str)
         if vr.should_skip_ddb:

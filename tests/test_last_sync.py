@@ -25,7 +25,7 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
 from fakes import FakeDdbTable  # noqa: E402
-from source_registry import public_board_sources, public_paused_sources, stale_hours_overrides  # noqa: E402
+from ingestion.source_registry import public_board_sources, public_paused_sources, stale_hours_overrides  # noqa: E402
 from web import site_api_data as sad  # noqa: E402
 
 COCKPIT_JS = open(os.path.join(_REPO, "site/assets/js/cockpit.js")).read()

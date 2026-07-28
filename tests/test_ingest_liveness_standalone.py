@@ -177,7 +177,7 @@ def test_dropbox_healthy_skip_and_failure_record_sentinel(monkeypatch):
 def test_framework_breaker_delegates_to_auth_breaker(monkeypatch):
     """#467 (X-13): the framework's breaker hooks must go through auth_breaker so
     the SIMP-2 sources emit IngestAuthHealthy like notion/dropbox do."""
-    import ingestion_framework as fw
+    from ingestion import ingestion_framework as fw
 
     assert fw._HAS_AUTH_BREAKER_MODULE is True
 
@@ -206,8 +206,8 @@ def test_record_ingest_health_writes_sentinel_and_streak():
     import logging
     from datetime import datetime, timezone
 
-    from ingest_health import evaluate_source_health, ingest_health_sk
-    from ingestion_framework import record_ingest_health
+    from ingestion.ingest_health import evaluate_source_health, ingest_health_sk
+    from ingestion.ingestion_framework import record_ingest_health
 
     class _Table:
         def __init__(self):

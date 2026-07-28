@@ -27,7 +27,7 @@ os.environ.setdefault("AWS_ACCESS_KEY_ID", "FAKE")
 os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "FAKE")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
-import source_registry as reg  # noqa: E402
+from ingestion import source_registry as reg  # noqa: E402
 
 
 def test_pipeline_health_check_derives():

@@ -31,7 +31,7 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas", "emails"))
 
 import evening_nudge_lambda as nudge  # noqa: E402
 import freshness_checker_lambda as checker  # noqa: E402
-import source_registry as reg  # noqa: E402
+from ingestion import source_registry as reg  # noqa: E402
 from web import site_api_data as sad  # noqa: E402
 
 # ── 1. Facets ────────────────────────────────────────────────────────────────

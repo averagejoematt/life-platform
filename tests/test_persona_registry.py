@@ -155,7 +155,7 @@ def test_engine_and_evaluator_and_orchestrator_match_operational():
 
 def test_intelligence_common_short_ids_match():
     canonical_short = set(persona_registry.OPERATIONAL_SHORT_IDS)
-    short_ids = set(_ast_list_const("lambdas/intelligence_common.py", "COACH_IDS_ALL"))
+    short_ids = set(_ast_list_const("lambdas/intelligence/intelligence_common.py", "COACH_IDS_ALL"))
     assert short_ids == canonical_short, (
         f"intelligence_common.COACH_IDS_ALL diverges: " f"extra={short_ids - canonical_short}, missing={canonical_short - short_ids}"
     )

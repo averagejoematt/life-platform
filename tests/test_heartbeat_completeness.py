@@ -519,7 +519,7 @@ def test_alarm_claims_reference_real_alarms():
 
 
 def test_ingest_liveness_claims_are_registry_backed():
-    from source_registry import active_api_source_ids
+    from ingestion.source_registry import active_api_source_ids
 
     active = set(active_api_source_ids())
     names = cdk_alarm_names()

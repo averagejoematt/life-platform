@@ -44,15 +44,25 @@ EXPECTED_REDIRECT_CODES = (301, 308)  # CloudFront function emits 301; 308 toler
 
 
 def _redirects_map_candidates():
-    """Search order for redirects.map. In the bundled lambdas/ tree the file
-    is staged alongside this module (deploy/build_bundle.py); locally it
-    lives at the repo root."""
+    """Search order for redirects.map.
+
+    deploy/build_bundle.py stages the file at the BUNDLE ROOT. That used to be
+    "alongside this module" and the repo copy was exactly one level up — both
+    assumptions were "this module lives at lambdas/ root", which #1653 ended by
+    moving it into operational/. Every level from here to the repo root is walked
+    instead, so the bundle copy (one up) and the repo copy (two up) both resolve
+    and no future move can break it again.
+    """
     here = os.path.dirname(os.path.abspath(__file__))
-    return [
-        os.environ.get("REDIRECTS_MAP_PATH"),
-        os.path.join(here, "redirects.map"),  # bundled: staged at the tree root, alongside this module
-        os.path.join(os.path.dirname(here), "redirects.map"),  # repo: lambdas/../redirects.map
-    ]
+    candidates = [os.environ.get("REDIRECTS_MAP_PATH")]
+    probe = here
+    for _ in range(5):
+        candidates.append(os.path.join(probe, "redirects.map"))
+        parent = os.path.dirname(probe)
+        if parent == probe:
+            break
+        probe = parent
+    return candidates
 
 
 def load_redirects_map(path=None):

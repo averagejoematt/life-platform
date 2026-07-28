@@ -671,7 +671,7 @@ def nutrition_overview(*, _g) -> dict:
     _nut_stalled = False
     if latest_date:
         try:
-            from source_registry import DEFAULT_STALE_HOURS, stale_hours_overrides
+            from ingestion.source_registry import DEFAULT_STALE_HOURS, stale_hours_overrides
 
             _nut_lag_days = max(0, (datetime.strptime(today, "%Y-%m-%d") - datetime.strptime(latest_date, "%Y-%m-%d")).days)
             _mf_stale_hours = stale_hours_overrides().get("macrofactor") or DEFAULT_STALE_HOURS

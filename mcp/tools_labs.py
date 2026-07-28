@@ -493,11 +493,11 @@ def tool_get_freshness_status(args):
     # #392: derive from the canonical registry (bundled lambdas/ tree) instead of a third
     # hand-rolled mirror — this one had drifted worst (food_delivery still 90d,
     # the pre-triage masking value; hevy missing entirely).
-    from source_registry import DEFAULT_STALE_HOURS, mcp_sources, stale_hours_overrides
+    from ingestion.source_registry import DEFAULT_STALE_HOURS, mcp_sources, stale_hours_overrides
 
     # DI-1.1: legible source-state (live/paused/rate_limited/stale) so a deliberately-off
     # source (Strava) or a rate-limited one (Garmin) is never mistaken for silent breakage.
-    from source_state import has_rate_limit_marker, resolve_source_state
+    from ingestion.source_state import has_rate_limit_marker, resolve_source_state
 
     SOURCES = mcp_sources()
     SOURCE_STALE_HOURS = stale_hours_overrides(SOURCES)

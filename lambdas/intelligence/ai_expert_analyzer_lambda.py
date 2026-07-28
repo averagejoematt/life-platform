@@ -49,7 +49,7 @@ logger.setLevel(logging.INFO)
 
 # Intelligence Layer V2: shared preamble utilities
 try:
-    from intelligence_common import (
+    from intelligence.intelligence_common import (
         apply_movement_honesty_guard,
         build_coach_preamble,
         build_data_inventory,
@@ -243,7 +243,7 @@ def _read_movement_ingest_health(sources=("strava", "garmin")):
     """
     out = {}
     try:
-        from ingest_health import SYSTEM_PK, evaluate_source_health, ingest_health_sk
+        from ingestion.ingest_health import SYSTEM_PK, evaluate_source_health, ingest_health_sk
     except Exception as e:  # ingest_health absent from the bundle → conservative fallback
         logger.warning("ingest_health unavailable; movement guard falls back to records-only: %s", e)
         return out
@@ -349,7 +349,7 @@ def gather_data_for_expert(expert_key):
         # the training-stimulus read is built off Hevy first, then Strava for aerobic/NEAT,
         # never off steps. Strava is paused (402) and Garmin rate-limited, so a Strava-only
         # read collapses to "all rest days" and produces a false under-training verdict.
-        from source_state import has_rate_limit_marker, resolve_source_state
+        from ingestion.source_state import has_rate_limit_marker, resolve_source_state
 
         hevy_items = _query_source("hevy", d30, today)
         activities = _query_source("strava", d30, today)
@@ -785,7 +785,7 @@ experiment" — these are periodic lab draws over time.
             # Builder's Paradox: inject into mind coach prompt
             if expert_key == "mind":
                 try:
-                    from intelligence_common import compute_builders_paradox_score
+                    from intelligence.intelligence_common import compute_builders_paradox_score
 
                     bp = compute_builders_paradox_score(days=7)
                     bp_block = (
@@ -1175,7 +1175,7 @@ def generate_and_cache(expert_key, shared_system=None):
     # Intelligence Validator V2.1 Mode B: post-generation quality check with inline correction
     if _HAS_INTELLIGENCE_COMMON:
         try:
-            from intelligence_common import validate_coach_output, write_quality_results
+            from intelligence.intelligence_common import validate_coach_output, write_quality_results
 
             _inventory = build_data_inventory()
             _maturity = build_data_maturity(_inventory)

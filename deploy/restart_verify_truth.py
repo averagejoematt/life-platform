@@ -70,7 +70,7 @@ def fetch_surfaces(base_url: str = BASE) -> tuple[list[dict], list[str]]:
     the same static-HTML approximation the nightly hook uses); API payloads go
     in as raw JSON text. Every failure is a warning string, never an exception.
     """
-    import reader_truth_qa
+    from operational import reader_truth_qa
 
     surfaces, warnings = [], []
     for path, name in SURFACES:
@@ -123,7 +123,7 @@ def main() -> int:
     ap.add_argument("--today", help="phase-anchor override YYYY-MM-DD (default: today PT; the phase itself comes from constants.py)")
     args = ap.parse_args()
 
-    import reader_truth_qa
+    from operational import reader_truth_qa
 
     phase = reader_truth_qa.phase_context(args.today)
     day_label = f"{phase['days_until_start']}d pre-start" if phase["pre_start"] else f"Day {phase['day_n']}"

@@ -99,7 +99,7 @@ BASELINE = {
     "lambdas/web/site_api_social.py": "1829 lines",
     "lambdas/ingestion/health_auto_export_lambda.py": "1772 lines",
     "deploy/sync_doc_metadata.py": "1754 lines",
-    "lambdas/intelligence_common.py": "1597 lines",
+    "lambdas/intelligence/intelligence_common.py": "1597 lines",
     "lambdas/coach/coach_prediction_evaluator.py": "1543 lines",
     "lambdas/coach/coach_history_summarizer.py": "1458 lines",
     "lambdas/compute/hypothesis_engine_lambda.py": "1396 lines",

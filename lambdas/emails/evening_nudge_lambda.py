@@ -28,7 +28,7 @@ from datetime import datetime
 import boto3
 from common.pacific_time import pacific_today
 from content.ritual_link import sign_ritual_token
-from source_registry import manual_capture_sources
+from ingestion.source_registry import manual_capture_sources
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)

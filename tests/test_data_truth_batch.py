@@ -363,7 +363,7 @@ def test_qa_smoke_strava_is_optional_not_paused():
     src = open(os.path.join(_REPO, "lambdas/operational/qa_smoke_lambda.py")).read()
     assert '("strava", "Strava — paused' not in src
     sys.path.insert(0, os.path.join(_REPO, "lambdas"))
-    import source_registry as reg
+    from ingestion import source_registry as reg
 
     assert reg.SOURCE_REGISTRY["strava"].get("qa_tier") == "optional"
     assert not reg.SOURCE_REGISTRY["strava"].get("paused")

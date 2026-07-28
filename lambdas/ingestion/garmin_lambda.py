@@ -938,7 +938,7 @@ def extract_activities(api, date_str: str) -> dict:
 # P4.1 SIMP-2 framework migration (2026-05-17)
 # ══════════════════════════════════════════════════════════════════════════════
 
-from ingestion_framework import IngestionConfig, run_ingestion
+from ingestion.ingestion_framework import IngestionConfig, run_ingestion
 
 # Cache the garth-backed api client across the gap-fill loop within one
 # invocation. Re-creating it per-day would hit the OAuth refresh endpoint

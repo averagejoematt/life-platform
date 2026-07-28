@@ -52,6 +52,30 @@ CLEAN_DIRS = [
     "mcp",
 ]
 
+# Individual modules that belong to the clean surface but whose DIRECTORY does not.
+#
+# #1653's last slice moved eight shared modules into ingestion/, operational/ and
+# intelligence/ — subpackages that have never been in the clean set (they still carry
+# the unresolved cross-Lambda flat-copy imports named above, a later ratchet step that
+# #1656 deliberately deferred). Adding those three directories to CLEAN_DIRS to keep
+# the eight covered would have dragged in ~40 unrelated pre-existing modules and 39
+# pre-existing errors — scope this refactor has no business taking on, and debt it
+# would have looked like it created.
+#
+# Dropping them instead would have quietly shrunk the gate, which is the exact
+# regression the CLEAN_DIRS note above exists to prevent. So they are listed
+# individually: moving a module changes neither its coverage nor its neighbours'.
+CLEAN_FILES = [
+    "lambdas/ingestion/ingest_health.py",
+    "lambdas/ingestion/ingestion_framework.py",
+    "lambdas/ingestion/ingestion_validator.py",
+    "lambdas/ingestion/source_registry.py",
+    "lambdas/ingestion/source_state.py",
+    "lambdas/intelligence/intelligence_common.py",
+    "lambdas/operational/reader_truth_qa.py",
+    "lambdas/operational/redirect_spotcheck.py",
+]
+
 # Modules that do NOT yet pass under mypy.ini. Each MUST carry a reason. This
 # denylist only shrinks. Paths are repo-root-relative.
 DIRTY = {
@@ -93,7 +117,7 @@ CORE = [
     "lambdas/ai/bedrock_client.py",
     "lambdas/health/scoring_engine.py",
     "lambdas/health/character_engine.py",
-    "lambdas/intelligence_common.py",
+    "lambdas/intelligence/intelligence_common.py",
     "lambdas/ai/ai_calls.py",
     "lambdas/ai/ai_context.py",
     "lambdas/ai/ai_summaries.py",
@@ -122,6 +146,9 @@ def clean_modules() -> list[str]:
                 continue
             if rel in DIRTY:
                 continue
+            paths.add(rel)
+    for rel in CLEAN_FILES:
+        if rel not in DIRTY and (ROOT / rel).is_file():
             paths.add(rel)
     return sorted(paths)
 

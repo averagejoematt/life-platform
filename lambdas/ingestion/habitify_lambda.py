@@ -52,7 +52,7 @@ except ImportError:
     logger = logging.getLogger("habitify")
     logger.setLevel(logging.INFO)
 
-from ingestion_framework import IngestionConfig, run_ingestion
+from ingestion.ingestion_framework import IngestionConfig, run_ingestion
 
 # #422: bounded, verbatim clip of a habit note (shared conventions module, bundled #781).
 try:

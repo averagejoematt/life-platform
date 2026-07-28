@@ -184,7 +184,7 @@ def assess_results(results):
         if not budget_guard.allow(_BUDGET_FEATURE):
             tier = budget_guard.current_tier()
             try:
-                import reader_truth_qa
+                from operational import reader_truth_qa
 
                 reader_truth_qa.emit_budget_pause_metric("visual_ai_qa", tier)
             except Exception:
@@ -253,7 +253,7 @@ def assess_reader_truth(results):
             r.setdefault("warnings", []).append("Reader-truth QA skipped — bedrock_client unavailable")
         return {"status": "unavailable", "detail": "bedrock_client unavailable"}
     try:
-        import reader_truth_qa  # lambdas/ is on sys.path after _import_bedrock()
+        from operational import reader_truth_qa  # lambdas/ is on sys.path after _import_bedrock()
     except Exception as e:  # pragma: no cover
         print(f"  ⚠ Reader-truth QA unavailable — could not import reader_truth_qa: {e}")
         for r in results:

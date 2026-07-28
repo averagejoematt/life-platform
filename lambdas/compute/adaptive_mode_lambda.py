@@ -88,7 +88,7 @@ def store_adaptive_mode(date_str, result):
     }
     # DATA-2: validate_item for adaptive_mode (Item 3, R12)
     try:
-        from ingestion_validator import validate_item as _vi
+        from ingestion.ingestion_validator import validate_item as _vi
 
         _vr = _vi("adaptive_mode", item, date_str)
         if _vr.should_skip_ddb:

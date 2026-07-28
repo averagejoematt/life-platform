@@ -25,13 +25,13 @@ os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 
-import intelligence_common as ic  # noqa: E402
+from intelligence import intelligence_common as ic  # noqa: E402
 
 TODAY = "2026-07-05"
 
 
 class TestStampIdentity:
-    @patch("intelligence_common.read_coach_thread", return_value=[])
+    @patch("intelligence.intelligence_common.read_coach_thread", return_value=[])
     def test_code_stamps_id_and_strips_model_authored_metadata(self, _r):
         # A hostile LLM output: a past-dated 2024 id AND a past target_date.
         out = ic.stamp_thread_predictions(
@@ -54,7 +54,7 @@ class TestStampIdentity:
         assert rec["prediction_id"] != "pred_20240101_bogus"
         assert rec["semantic_key"] == "hrv_will_rise"
 
-    @patch("intelligence_common.read_coach_thread", return_value=[])
+    @patch("intelligence.intelligence_common.read_coach_thread", return_value=[])
     def test_wrong_date_is_repaired_to_strictly_future(self, _r):
         out = ic.stamp_thread_predictions(
             "sleep",
@@ -64,7 +64,7 @@ class TestStampIdentity:
         # the model's 2020 date is discarded; code stamps a strictly-future one
         assert out[0]["target_date"] > TODAY
 
-    @patch("intelligence_common.read_coach_thread", return_value=[])
+    @patch("intelligence.intelligence_common.read_coach_thread", return_value=[])
     def test_metric_bearing_claim_is_never_ungradeable_by_construction(self, _r):
         out = ic.stamp_thread_predictions(
             "sleep",
@@ -78,7 +78,7 @@ class TestStampIdentity:
 
 
 class TestTimeframeMapping:
-    @patch("intelligence_common.read_coach_thread", return_value=[])
+    @patch("intelligence.intelligence_common.read_coach_thread", return_value=[])
     def test_timeframe_windows(self, _r):
         cases = {
             "in 2 weeks": "2026-07-19",  # +14d
@@ -92,7 +92,7 @@ class TestTimeframeMapping:
 
 
 class TestDedup:
-    @patch("intelligence_common.read_coach_thread", return_value=[])
+    @patch("intelligence.intelligence_common.read_coach_thread", return_value=[])
     def test_within_batch_dedup_by_semantic_key(self, _r):
         out = ic.stamp_thread_predictions(
             "sleep",
@@ -120,7 +120,7 @@ class TestDedup:
                 ]
             }
         ]
-        with patch("intelligence_common.read_coach_thread", return_value=prior):
+        with patch("intelligence.intelligence_common.read_coach_thread", return_value=prior):
             out = ic.stamp_thread_predictions(
                 "sleep",
                 [{"text": "HRV will improve", "confidence": "medium", "metric": "hrv"}],
@@ -148,14 +148,14 @@ class TestDedup:
                 ]
             }
         ]
-        with patch("intelligence_common.read_coach_thread", return_value=prior):
+        with patch("intelligence.intelligence_common.read_coach_thread", return_value=prior):
             out = ic.stamp_thread_predictions("sleep", [{"text": "HRV will improve", "metric": "hrv"}], today=TODAY)
         # fresh stamp, not the resolved record's id
         assert out[0]["prediction_id"] == "pred_20260705_hrv_will_improve"
 
 
 class TestSkips:
-    @patch("intelligence_common.read_coach_thread", return_value=[])
+    @patch("intelligence.intelligence_common.read_coach_thread", return_value=[])
     def test_empty_or_slugless_text_skipped(self, _r):
         out = ic.stamp_thread_predictions("sleep", [{"text": ""}, {"text": "   "}, {"confidence": "high"}], today=TODAY)
         assert out == []

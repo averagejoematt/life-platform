@@ -59,8 +59,8 @@ from training.hevy_common import (
 # watches a metric that never exists. Optional import — ingestion never breaks
 # if the layer module is absent.
 try:
-    from ingest_health import classify_error
-    from ingestion_framework import record_ingest_health
+    from ingestion.ingest_health import classify_error
+    from ingestion.ingestion_framework import record_ingest_health
 
     _INGEST_HEALTH_AVAILABLE = True
 except ImportError:  # pragma: no cover — layer-module fallback

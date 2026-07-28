@@ -32,7 +32,8 @@ from decimal import Decimal
 
 import boto3
 from common.pacific_time import pacific_date_of
-from ingestion_framework import IngestionConfig, run_ingestion
+
+from ingestion.ingestion_framework import IngestionConfig, run_ingestion
 
 try:
     from common.platform_logger import get_logger

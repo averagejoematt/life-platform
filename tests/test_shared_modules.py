@@ -561,7 +561,7 @@ _run("banister: 30 days training -> CTL > 0", test_banister_with_training)
 # ======================================================================
 print("\n-- ingestion_validator ------------------------------------------")
 
-from ingestion_validator import ValidationResult, list_supported_sources, validate_item
+from ingestion.ingestion_validator import ValidationResult, list_supported_sources, validate_item
 
 
 def test_validate_whoop_ok():

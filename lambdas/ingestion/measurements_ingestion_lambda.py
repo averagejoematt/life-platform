@@ -171,7 +171,7 @@ def _existing_session_dates() -> set[str]:
 def _phase_for(date_str: str) -> str:
     """#482/X-6: standalone writer stamps phase like the framework does."""
     try:
-        from ingestion_framework import phase_for_date
+        from ingestion.ingestion_framework import phase_for_date
 
         return phase_for_date(date_str)
     except ImportError:  # pragma: no cover — layer unavailable locally

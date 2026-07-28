@@ -895,7 +895,7 @@ def lambda_handler(event, context):
     # validate_item before store_character_sheet, which adds pk/sk and Decimal-converts.
     # We validate a lightweight proxy item — only the fields the schema checks.
     try:
-        from ingestion_validator import validate_item as _vi
+        from ingestion.ingestion_validator import validate_item as _vi
 
         _val_proxy = {
             "pk": USER_PREFIX + "character_sheet",

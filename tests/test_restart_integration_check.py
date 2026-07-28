@@ -106,14 +106,14 @@ def test_source_fn_map_matches_real_registry():
     """The hand-carried SOURCE_FN map must never name a source the registry
     dropped (the reverse — registry sources without a map entry — is an honest
     skip row at runtime, not an error)."""
-    import lambdas.source_registry as sr
+    import lambdas.ingestion.source_registry as sr
 
     unknown = set(ric.SOURCE_FN) - set(sr.SOURCE_REGISTRY)
     assert unknown == set(), f"SOURCE_FN names sources absent from SOURCE_REGISTRY: {unknown}"
 
 
 def test_real_registry_plan_pauses_garmin_and_probes_whoop():
-    import lambdas.source_registry as sr
+    import lambdas.ingestion.source_registry as sr
 
     plan = ric.build_ingestion_plan(sr.SOURCE_REGISTRY)
     assert plan["whoop"] == ("probe", "whoop-data-ingestion")

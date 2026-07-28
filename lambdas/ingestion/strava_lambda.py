@@ -34,7 +34,7 @@ except ImportError:
     logger = logging.getLogger("strava")
     logger.setLevel(logging.INFO)
 
-from ingestion_framework import IngestionConfig, run_ingestion
+from ingestion.ingestion_framework import IngestionConfig, run_ingestion
 
 SECRET_NAME = os.environ.get("SECRET_NAME", "life-platform/strava")
 REGION = os.environ.get("AWS_REGION", "us-west-2")

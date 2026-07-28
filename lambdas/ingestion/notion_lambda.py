@@ -84,8 +84,8 @@ except ImportError:
 # framework, so without this it can never leave 'unknown' in pipeline_health_check
 # — a silently de-scheduled cron would go permanently undetected.
 try:
-    from ingest_health import classify_error
-    from ingestion_framework import record_ingest_health
+    from ingestion.ingest_health import classify_error
+    from ingestion.ingestion_framework import record_ingest_health
 
     _INGEST_HEALTH_AVAILABLE = True
 except ImportError:  # pragma: no cover — layer-module fallback
@@ -106,7 +106,7 @@ def _stamp_phase(item: dict, date_str: str) -> None:
     if "phase" in item:
         return
     try:
-        from ingestion_framework import phase_for_date
+        from ingestion.ingestion_framework import phase_for_date
 
         item["phase"] = phase_for_date(date_str)
     except ImportError:  # pragma: no cover — layer unavailable locally
@@ -689,7 +689,7 @@ def write_entries(entries_by_date):
                     item["schema_version"] = 1
                     # DATA-2: Validate before write
                     try:
-                        from ingestion_validator import validate_item as _validate_item
+                        from ingestion.ingestion_validator import validate_item as _validate_item
 
                         _vr = _validate_item("notion", item, date_str)
                         if _vr.should_skip_ddb:
@@ -723,7 +723,7 @@ def write_entries(entries_by_date):
                 item["schema_version"] = 1
                 # DATA-2: Validate before write
                 try:
-                    from ingestion_validator import validate_item as _validate_item
+                    from ingestion.ingestion_validator import validate_item as _validate_item
 
                     _vr = _validate_item("notion", item, date_str)
                     if _vr.should_skip_ddb:

@@ -526,7 +526,7 @@ def parse_trends_for_date(
 # P4.1 SIMP-2 framework migration (2026-05-17)
 # ══════════════════════════════════════════════════════════════════════════════
 
-from ingestion_framework import IngestionConfig, run_ingestion
+from ingestion.ingestion_framework import IngestionConfig, run_ingestion
 
 _secret_cache_simp2 = {"secret": None}
 

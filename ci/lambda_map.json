@@ -372,7 +372,7 @@
     "_comment": "Files that are part of the repo but not directly deployable Lambdas (Layer modules or utilities). V2 P0.8: 17 layer-resident shared modules added 2026-05-17.",
     "files": [
       "lambdas/ingestion/hevy_webhook_lambda.py",
-      "lambdas/ingestion_validator.py",
+      "lambdas/ingestion/ingestion_validator.py",
       "lambdas/common/item_size_guard.py",
       "lambdas/health/sick_day_checker.py",
       "lambdas/common/digest_utils.py",
@@ -387,7 +387,7 @@
       "lambdas/common/auth_breaker.py",
       "lambdas/common/compute_metadata.py",
       "lambdas/common/http_retry.py",
-      "lambdas/intelligence_common.py",
+      "lambdas/intelligence/intelligence_common.py",
       "lambdas/common/numeric.py",
       "lambdas/common/platform_logger.py",
       "lambdas/common/rate_limiter.py",
@@ -399,7 +399,7 @@
       "lambdas/health/genome_coaching.py",
       "lambdas/ai/ai_output_validator.py",
       "lambdas/health/labs_coaching.py",
-      "lambdas/ingestion_framework.py"
+      "lambdas/ingestion/ingestion_framework.py"
     ]
   },
   "_retired_sleep_reconciler": {

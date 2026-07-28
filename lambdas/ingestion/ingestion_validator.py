@@ -7,7 +7,7 @@ for audit. Critical validation failures skip DDB write entirely.
 
 USAGE:
 
-    from ingestion_validator import validate_item, validate_and_write
+    from ingestion.ingestion_validator import validate_item, validate_and_write
 
     result = validate_item("whoop", item, date_str="2026-03-08")
     if result.should_skip_ddb:

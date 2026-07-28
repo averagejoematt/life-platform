@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 
 class TestDataMaturity:
     def test_orientation_phase(self):
-        from intelligence_common import build_data_maturity
+        from intelligence.intelligence_common import build_data_maturity
 
         inventory = {"whoop": {"exists": True, "records": 3, "days_of_data": 3}}
         maturity = build_data_maturity(inventory)
@@ -32,28 +32,28 @@ class TestDataMaturity:
         assert maturity["sleep"]["days"] == 3
 
     def test_emerging_phase(self):
-        from intelligence_common import build_data_maturity
+        from intelligence.intelligence_common import build_data_maturity
 
         inventory = {"whoop": {"exists": True, "records": 15, "days_of_data": 15}}
         maturity = build_data_maturity(inventory)
         assert maturity["sleep"]["phase"] == "emerging"
 
     def test_established_phase(self):
-        from intelligence_common import build_data_maturity
+        from intelligence.intelligence_common import build_data_maturity
 
         inventory = {"whoop": {"exists": True, "records": 45, "days_of_data": 45}}
         maturity = build_data_maturity(inventory)
         assert maturity["sleep"]["phase"] == "established"
 
     def test_training_orientation_zero_workouts(self):
-        from intelligence_common import build_data_maturity
+        from intelligence.intelligence_common import build_data_maturity
 
         inventory = {"strava": {"exists": False, "records": 0, "days_of_data": 0}}
         maturity = build_data_maturity(inventory)
         assert maturity["training"]["phase"] == "orientation"
 
     def test_labs_uses_correct_source(self):
-        from intelligence_common import build_data_maturity
+        from intelligence.intelligence_common import build_data_maturity
 
         # Labs should check 'labs' source, not 'whoop'
         inventory = {
@@ -69,7 +69,7 @@ class TestDataMaturity:
 
 class TestValidator:
     def test_catches_null_claim_when_data_exists(self):
-        from intelligence_common import validate_coach_output
+        from intelligence.intelligence_common import validate_coach_output
 
         inventory = {"dexa": {"exists": True, "records": 2, "latest": "2026-03-15"}}
         maturity = {"physical": {"phase": "emerging", "days": 10}}
@@ -80,7 +80,7 @@ class TestValidator:
         assert any("dexa" in f["detail"].lower() or "body composition" in f["detail"].lower() for f in errors)
 
     def test_catches_stale_action(self):
-        from intelligence_common import validate_coach_output
+        from intelligence.intelligence_common import validate_coach_output
 
         inventory = {"dexa": {"exists": True, "records": 1, "latest": "2026-03-15"}}
         maturity = {"physical": {"phase": "emerging", "days": 10}}
@@ -90,7 +90,7 @@ class TestValidator:
         assert len(stale) > 0
 
     def test_no_false_positive_when_data_missing(self):
-        from intelligence_common import validate_coach_output
+        from intelligence.intelligence_common import validate_coach_output
 
         inventory = {"dexa": {"exists": False, "records": 0}}
         maturity = {"physical": {"phase": "orientation", "days": 3}}
@@ -100,7 +100,7 @@ class TestValidator:
         assert len(errors) == 0
 
     def test_overconfidence_in_orientation(self):
-        from intelligence_common import validate_coach_output
+        from intelligence.intelligence_common import validate_coach_output
 
         inventory = {}
         maturity = {"glucose": {"phase": "orientation", "days": 2, "unit": "days"}}
@@ -115,7 +115,7 @@ class TestValidator:
 
 class TestCoachPreamble:
     def test_first_person_directive(self):
-        from intelligence_common import build_coach_preamble
+        from intelligence.intelligence_common import build_coach_preamble
 
         goals = {"targets": {}, "coach_briefing": "Test briefing", "known_constraints": []}
         inventory = {}
@@ -125,7 +125,7 @@ class TestCoachPreamble:
         assert "Dr. Lisa Park" in result
 
     def test_null_targets_shown_correctly(self):
-        from intelligence_common import build_coach_preamble
+        from intelligence.intelligence_common import build_coach_preamble
 
         goals = {"targets": {"weight": {"goal_lbs": None}}, "coach_briefing": "", "known_constraints": []}
         inventory = {}
@@ -138,7 +138,7 @@ class TestCoachPreamble:
 
 
 class TestCredibility:
-    @patch("intelligence_common.read_coach_thread")
+    @patch("intelligence.intelligence_common.read_coach_thread")
     def test_nascent_with_few_predictions(self, mock_read):
         mock_read.return_value = [
             {
@@ -148,17 +148,17 @@ class TestCredibility:
                 ]
             }
         ]
-        from intelligence_common import compute_credibility
+        from intelligence.intelligence_common import compute_credibility
 
         result = compute_credibility("glucose")
         assert result["label"] == "nascent"
 
-    @patch("intelligence_common.read_coach_thread")
+    @patch("intelligence.intelligence_common.read_coach_thread")
     def test_reliable_with_good_track_record(self, mock_read):
         preds = [{"status": "confirmed", "confidence": "high"} for _ in range(8)]
         preds += [{"status": "refuted", "confidence": "medium"} for _ in range(3)]
         mock_read.return_value = [{"predictions": preds}]
-        from intelligence_common import compute_credibility
+        from intelligence.intelligence_common import compute_credibility
 
         result = compute_credibility("glucose")
         assert result["label"] == "reliable"

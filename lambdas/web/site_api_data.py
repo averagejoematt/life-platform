@@ -37,7 +37,7 @@ from datetime import datetime, timezone
 import boto3
 from boto3.dynamodb.conditions import Key
 from experiment import habit_causality
-from source_registry import (  # #392: canonical source classification (bundled lambdas/ tree)
+from ingestion.source_registry import (  # #392: canonical source classification (bundled lambdas/ tree)
     DEFAULT_STALE_HOURS as _FRESHNESS_DEFAULT_STALE_HOURS,
     engagement_channels,
     manual_capture_sources,

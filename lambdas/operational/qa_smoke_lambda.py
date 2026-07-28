@@ -130,7 +130,7 @@ def check_ddb_freshness():
     # (API 402)" for two weeks; the phantom "journal" partition was checked
     # instead of notion). Tier semantics unchanged: REQUIRED missing = FAIL,
     # OPTIONAL missing = warn, PAUSED = ⏸ never a fault.
-    from source_registry import qa_optional, qa_paused, qa_required
+    from ingestion.source_registry import qa_optional, qa_paused, qa_required
 
     REQUIRED = qa_required()
     OPTIONAL = qa_optional()
@@ -581,7 +581,7 @@ def _fetch_reader_truth_surfaces():
     browser innerText the CI pass sees); API payloads go in as raw JSON text.
     Every failure is a warning string, never an exception (fail-soft).
     """
-    import reader_truth_qa
+    from operational import reader_truth_qa
 
     surfaces, warnings = [], []
     for path, name in READER_TRUTH_SURFACES + READER_TRUTH_APIS:
@@ -602,8 +602,9 @@ def check_reader_truth():
 
     # Budget gate — internal QA pauses first (ADR-125). Explicit ⏸, never silent.
     try:
-        import reader_truth_qa
         from ai import budget_guard
+
+        from operational import reader_truth_qa
 
         if not budget_guard.allow(reader_truth_qa.BUDGET_FEATURE):
             tier = budget_guard.current_tier()
@@ -620,7 +621,7 @@ def check_reader_truth():
         logger.warning("reader-truth budget gate degraded: %s", e)
 
     try:
-        import reader_truth_qa
+        from operational import reader_truth_qa
 
         surfaces, fetch_warnings = _fetch_reader_truth_surfaces()
         for w in fetch_warnings:
@@ -865,7 +866,7 @@ def check_redirect_spotcheck():
         return [check.pause(f"redirect spot-check runs Mondays — skipped ({now.strftime('%A')} PT); rotates over ~1 month")]
 
     try:
-        import redirect_spotcheck
+        from operational import redirect_spotcheck
 
         iso_week = now.isocalendar()[1]
         result = redirect_spotcheck.run_spotcheck(SITE_BASE_URL, iso_week)

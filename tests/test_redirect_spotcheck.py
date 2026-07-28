@@ -34,7 +34,7 @@ os.environ.setdefault("EMAIL_SENDER", "qa@example.com")
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
-import redirect_spotcheck as rs  # noqa: E402
+from operational import redirect_spotcheck as rs  # noqa: E402
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -251,7 +251,7 @@ def test_check_redirect_spotcheck_pauses_on_non_monday(monkeypatch):
 def test_check_redirect_spotcheck_runs_and_fails_on_monday_with_a_broken_redirect(monkeypatch):
     monkeypatch.setattr(qa, "pt_now", lambda: _FixedNow(weekday=0, iso_week=11))
 
-    import redirect_spotcheck as rs_mod
+    from operational import redirect_spotcheck as rs_mod
 
     def _fake_run_spotcheck(base_url, iso_week, **kwargs):
         assert iso_week == 11
@@ -267,7 +267,7 @@ def test_check_redirect_spotcheck_runs_and_fails_on_monday_with_a_broken_redirec
 def test_check_redirect_spotcheck_runs_and_passes_clean_on_monday(monkeypatch):
     monkeypatch.setattr(qa, "pt_now", lambda: _FixedNow(weekday=0, iso_week=11))
 
-    import redirect_spotcheck as rs_mod
+    from operational import redirect_spotcheck as rs_mod
 
     def _fake_run_spotcheck(base_url, iso_week, **kwargs):
         return {"bucket": 1, "n_buckets": 5, "n_total": 84, "n_sampled": 17, "sampled": [], "failures": [], "errors": []}
@@ -281,7 +281,7 @@ def test_check_redirect_spotcheck_runs_and_passes_clean_on_monday(monkeypatch):
 def test_check_redirect_spotcheck_missing_map_is_warn_not_fail(monkeypatch):
     monkeypatch.setattr(qa, "pt_now", lambda: _FixedNow(weekday=0, iso_week=11))
 
-    import redirect_spotcheck as rs_mod
+    from operational import redirect_spotcheck as rs_mod
 
     def _raise_missing(base_url, iso_week, **kwargs):
         raise FileNotFoundError("redirects.map not found")

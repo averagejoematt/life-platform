@@ -651,7 +651,7 @@ def lambda_handler(event, context):
 
     # DATA-2: import validator once for the batch
     try:
-        from ingestion_validator import validate_item as _validate_item
+        from ingestion.ingestion_validator import validate_item as _validate_item
 
         _use_validator = True
     except ImportError:
@@ -659,7 +659,7 @@ def lambda_handler(event, context):
 
     # #482/X-6: standalone writer stamps phase like the framework does.
     try:
-        from ingestion_framework import phase_for_date as _pfd
+        from ingestion.ingestion_framework import phase_for_date as _pfd
     except ImportError:  # pragma: no cover — layer unavailable locally
         _pfd = None
 

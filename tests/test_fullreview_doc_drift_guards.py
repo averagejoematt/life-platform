@@ -58,7 +58,7 @@ def test_remediation_cadence_is_mon_wed_fri():
 def test_raw_layout_date_tree_entries_have_filename_facet():
     import importlib.util
 
-    spec = importlib.util.spec_from_file_location("_srcreg", ROOT / "lambdas" / "source_registry.py")
+    spec = importlib.util.spec_from_file_location("_srcreg", ROOT / "lambdas" / "ingestion" / "source_registry.py")
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     missing = [k for k, v in m.raw_layouts().items() if v.get("scheme") == "date-tree" and "filename" not in v]

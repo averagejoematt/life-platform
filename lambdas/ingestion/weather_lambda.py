@@ -16,7 +16,7 @@ import json
 import os
 import urllib.request
 
-from ingestion_framework import IngestionConfig, run_ingestion
+from ingestion.ingestion_framework import IngestionConfig, run_ingestion
 
 try:
     from common.platform_logger import get_logger

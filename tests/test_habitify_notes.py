@@ -15,11 +15,11 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "ingestion"))
 
-if "ingestion_framework" not in sys.modules:
+if "ingestion.ingestion_framework" not in sys.modules:
     fake = types.ModuleType("ingestion_framework")
     fake.IngestionConfig = lambda **kw: kw
     fake.run_ingestion = lambda *a, **kw: {}
-    sys.modules["ingestion_framework"] = fake
+    sys.modules["ingestion.ingestion_framework"] = fake
 
 import habitify_lambda as hl  # noqa: E402
 

@@ -379,8 +379,8 @@ def test_reconcile_does_not_flag_deduped_gps_drop_twin():
 
 from types import SimpleNamespace  # noqa: E402
 
-import ingestion_framework as framework  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
+from ingestion import ingestion_framework as framework  # noqa: E402
 
 
 def _FakeTable(present_dates):

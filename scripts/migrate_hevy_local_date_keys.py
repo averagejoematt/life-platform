@@ -61,7 +61,7 @@ def _phase_for(date_str: str, fallback: str | None) -> str | None:
     cross the genesis boundary). Falls back to the record's existing phase if
     the framework module is unavailable."""
     try:
-        from ingestion_framework import _phase_for_date
+        from ingestion.ingestion_framework import _phase_for_date
 
         return _phase_for_date(date_str)
     except Exception:  # noqa: BLE001 — keep the stored phase rather than guess

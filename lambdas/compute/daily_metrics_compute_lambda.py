@@ -147,7 +147,7 @@ def fetch_range(source, start, end):
 
 
 def fetch_profile():
-    from intelligence_common import fetch_profile as _shared_fetch_profile
+    from intelligence.intelligence_common import fetch_profile as _shared_fetch_profile
 
     return _shared_fetch_profile(table, USER_ID)
 
@@ -713,7 +713,7 @@ def store_computed_metrics(
     # DATA-2: Use validate_item directly (no S3 client — compute partitions don't archive
     # to S3 on failure; they log and skip. validate_and_write requires s3_client != None.)
     try:
-        from ingestion_validator import validate_item as _vi
+        from ingestion.ingestion_validator import validate_item as _vi
 
         _vr = _vi("computed_metrics", item, date_str)
         if _vr.should_skip_ddb:
@@ -773,7 +773,7 @@ def store_day_grade(date_str, total_score, grade, component_scores, weights):
         item = tag_record(item, source_id="day_grade")
         # DATA-2: validate_item directly (no S3 client for compute partitions)
         try:
-            from ingestion_validator import validate_item as _vi
+            from ingestion.ingestion_validator import validate_item as _vi
 
             _vr = _vi("day_grade", item, date_str)
             if _vr.should_skip_ddb:
@@ -853,7 +853,7 @@ def store_habit_scores(date_str, component_details, component_scores, vice_strea
         item = tag_record(item, source_id="habit_scores")
         # DATA-2: validate_item for habit_scores (Item 3, R12)
         try:
-            from ingestion_validator import validate_item as _vi
+            from ingestion.ingestion_validator import validate_item as _vi
 
             _vr = _vi("habit_scores", item, date_str)
             if _vr.should_skip_ddb:

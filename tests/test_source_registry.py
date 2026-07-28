@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "emails"))
 
 import freshness_checker_lambda as checker  # noqa: E402
-import source_registry as reg  # noqa: E402
+from ingestion import source_registry as reg  # noqa: E402
 
 
 def _stale(*keys):

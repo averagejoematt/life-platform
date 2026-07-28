@@ -386,7 +386,7 @@ def test_og_source_count_ground_truth_is_the_registry():
     scan polices is live and self-correcting."""
     facts = _load("scripts/check_doc_facts.py")
     truth = facts._registry_source_count()
-    src = (ROOT / "lambdas" / "source_registry.py").read_text(encoding="utf-8")
+    src = (ROOT / "lambdas" / "ingestion" / "source_registry.py").read_text(encoding="utf-8")
     tree = ast.parse(src)
     counted = None
     for node in ast.walk(tree):

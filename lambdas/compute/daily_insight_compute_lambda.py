@@ -147,7 +147,7 @@ def fetch_range(source, start, end):
 
 
 def fetch_profile():
-    from intelligence_common import fetch_profile as _shared_fetch_profile
+    from intelligence.intelligence_common import fetch_profile as _shared_fetch_profile
 
     return _shared_fetch_profile(table, USER_ID)
 
@@ -2023,7 +2023,7 @@ def store_computed_insights(yesterday_str, payload):
     item = {k: v for k, v in item.items() if v is not None}
     # DATA-2: validate_item for computed_insights (Item 3, R12)
     try:
-        from ingestion_validator import validate_item as _vi
+        from ingestion.ingestion_validator import validate_item as _vi
 
         _vr = _vi("computed_insights", item, yesterday_str)
         if _vr.should_skip_ddb:

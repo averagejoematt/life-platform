@@ -33,10 +33,10 @@ if _TESTS_DIR not in sys.path:
     sys.path.insert(0, _TESTS_DIR)  # for `import visual_ai_qa`
 
 import boto3  # noqa: E402
-import reader_truth_qa as rtq  # noqa: E402
 import visual_ai_qa  # noqa: E402
 from ai import budget_guard  # noqa: E402  (lambdas/ on sys.path via conftest)
 from common.constants import EXPERIMENT_START_DATE  # noqa: E402
+from operational import reader_truth_qa as rtq  # noqa: E402
 
 _START = date.fromisoformat(EXPERIMENT_START_DATE)
 _DAY_1 = _START.isoformat()

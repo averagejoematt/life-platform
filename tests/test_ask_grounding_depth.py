@@ -98,7 +98,7 @@ def test_prompt_rules_forbid_arithmetic_and_asking_reader():
 
 def test_source_count_is_derived_not_hardcoded():
     ai = _ai()
-    import source_registry as reg
+    from ingestion import source_registry as reg
 
     assert "19 data sources" not in AI_SRC  # the drifted literal is gone
     assert "~19 sources" not in AI_SRC

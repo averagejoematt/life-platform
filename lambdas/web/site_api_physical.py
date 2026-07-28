@@ -32,7 +32,7 @@ def _physical_cadences() -> dict:
     source_registry and the handler's own DEXA recheck interval — never hand-typed
     in the front-end.
     """
-    from source_registry import SOURCE_REGISTRY  # shared module (bundled, #781)
+    from ingestion.source_registry import SOURCE_REGISTRY  # shared module (bundled, #781)
 
     w = SOURCE_REGISTRY.get("withings", {})
     expected = w.get("expected_days")

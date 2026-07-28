@@ -53,8 +53,8 @@ except ImportError:
 # framework, so without this it can never leave 'unknown' in pipeline_health_check
 # — a silently de-scheduled cron would go permanently undetected.
 try:
-    from ingest_health import classify_error
-    from ingestion_framework import record_ingest_health
+    from ingestion.ingest_health import classify_error
+    from ingestion.ingestion_framework import record_ingest_health
 
     _INGEST_HEALTH_AVAILABLE = True
 except ImportError:  # pragma: no cover — layer-module fallback

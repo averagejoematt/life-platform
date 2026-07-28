@@ -33,7 +33,7 @@ DELETED_SYMBOLS = {
 
 # Modules the symbols were deleted from.
 TARGET_MODULES = [
-    os.path.join(REPO_ROOT, "lambdas", "intelligence_common.py"),
+    os.path.join(REPO_ROOT, "lambdas", "intelligence", "intelligence_common.py"),
     os.path.join(REPO_ROOT, "lambdas", "health", "character_engine.py"),
 ]
 

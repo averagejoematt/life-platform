@@ -46,7 +46,7 @@ try:
 except ImportError:  # pragma: no cover — layer-module fallback (local tooling)
     urlopen_with_retry = urllib.request.urlopen
 
-from ingestion_framework import IngestionConfig, run_ingestion
+from ingestion.ingestion_framework import IngestionConfig, run_ingestion
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 USER_ID = os.environ.get("USER_ID", "matthew")

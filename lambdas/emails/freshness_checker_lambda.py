@@ -42,7 +42,7 @@ cw = boto3.client("cloudwatch", region_name=REGION)
 # used to be hand-mirrored here + site_api_data + tools_labs and drifted —
 # withings/strava read as infrastructure, so a quiet logging stretch paged.
 # Per-source rationale (thresholds, pause reasons) lives in source_registry.py.
-from source_registry import behavioral_source_keys, checker_sources, stale_hours_overrides
+from ingestion.source_registry import behavioral_source_keys, checker_sources, stale_hours_overrides
 
 SOURCES = checker_sources()
 SOURCE_STALE_HOURS = stale_hours_overrides(SOURCES)
@@ -71,7 +71,7 @@ AH_ACTIVITY_WINDOW_DAYS = int(os.environ.get("AH_ACTIVITY_WINDOW_DAYS", "7"))
 # (a sensor-session lapse reports, it never pages). Lookback below covers the widest.
 # #746: the list now lives in the canonical source_registry (apple_health.hae_datatypes)
 # so every source threshold sits in one place; this is an alias, not a second copy.
-from source_registry import hae_datatype_thresholds  # noqa: E402
+from ingestion.source_registry import hae_datatype_thresholds  # noqa: E402
 
 HAE_DATATYPES = hae_datatype_thresholds()
 # Longest lookback needed to find a still-present-but-slow datatype (cap the scan).

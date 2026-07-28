@@ -386,7 +386,7 @@ def _cron_hits(files, cdk_map: dict) -> list[str]:
 # does). The correct card writes an f-string `{n} data sources` — no numeric literal — so a
 # fixed card is clean; only a hardcoded digit next to "data sources" trips.
 OG_DIR = ROOT / "lambdas" / "web"
-SOURCE_REGISTRY_PATH = ROOT / "lambdas" / "source_registry.py"
+SOURCE_REGISTRY_PATH = ROOT / "lambdas" / "ingestion" / "source_registry.py"
 OG_SOURCE_COUNT = re.compile(r"(?<![\w.])(\d+)\s+data sources?\b")
 
 

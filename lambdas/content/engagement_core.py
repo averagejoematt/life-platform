@@ -43,7 +43,7 @@ from datetime import date, datetime, timedelta
 # NB: the loud rung has no constant to import — dark itself begins at
 # ENGAGEMENT_SEVERITY_LOUD_DARK_DAYS (=5, see _classify's `primary_gap >= 5`),
 # so dark→loud is definitional; only the alarm escalations need thresholds here.
-from source_registry import (
+from ingestion.source_registry import (
     ENGAGEMENT_SEVERITY_ALARM_CHANNEL_QUIET_DAYS,
     ENGAGEMENT_SEVERITY_ALARM_DARK_DAYS,
     ENGAGEMENT_SEVERITY_ALARM_QUIET_CHANNELS,

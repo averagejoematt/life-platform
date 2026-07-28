@@ -26,7 +26,7 @@ os.environ.setdefault("SECRET_NAME", "life-platform/ingestion-keys")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
 import health_auto_export_lambda as hae  # noqa: E402
-from ingestion_validator import validate_fields  # noqa: E402
+from ingestion.ingestion_validator import validate_fields  # noqa: E402
 
 # ── X-3: validate_fields ──────────────────────────────────────────────────────
 

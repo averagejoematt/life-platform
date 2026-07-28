@@ -52,7 +52,7 @@ except ImportError:  # pragma: no cover — minimal bundles
     logger = logging.getLogger("spiral-breaker")
 
 try:  # thresholds live next to the facet they threshold — imported, never copied (#498)
-    from source_registry import DEFAULT_STALE_HOURS, hae_datatype_thresholds
+    from ingestion.source_registry import DEFAULT_STALE_HOURS, hae_datatype_thresholds
 
     _SOM_STALE_DAYS = next(
         (int(d.get("stale_days") or 14) for d in hae_datatype_thresholds() if d.get("key") == "state_of_mind"),
