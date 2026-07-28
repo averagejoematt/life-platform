@@ -1,6 +1,6 @@
 # Coach Stance Engine + the Coach Quality Gate
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-26 (#1590 re-verify — line refs re-derived against live source; stance/gate logic, the 8-coach roster, and the ADR-108 fire-rate figure all confirmed unchanged since #390/#1138. 2026-07-26 re-verify: #1656 mypy churn in `coach_stance.py` + additive `structured_output_config` in `ai_calls.py` (#1385) since; stance/gate logic unchanged)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-28 (#1653 packaging re-verify — `coach_stance.py` moved to `lambdas/coach/` and `ai_calls.py` to `lambdas/ai/`; `coach_history_summarizer.py`/`coach_quality_gate.py` had imports rewritten only. Stance/gate logic, the 8-coach roster and every threshold are untouched. The two affected line citations DID drift by +1 from the import block and are corrected here (`ai_calls.py`:1214→1215, `coach_stance.py`:23-69→24-70); the other three were re-derived and are unchanged. Prior verify 2026-07-26: #1590 re-verify — line refs re-derived against live source; stance/gate logic, the 8-coach roster, and the ADR-108 fire-rate figure all confirmed unchanged since #390/#1138. 2026-07-26 re-verify: #1656 mypy churn in `coach_stance.py` + additive `structured_output_config` in `ai_calls.py` (#1385) since; stance/gate logic unchanged)
 > **Sources of truth:** `lambdas/coach/coach_history_summarizer.py` (stance engine, :940-1360), `lambdas/coach/coach_stance.py` (stage-ladder fallback), `lambdas/ai/ai_calls.py` (`_enforce_quality_gate`, :1356-1423), `lambdas/coach/coach_quality_gate.py`
 
 ## Purpose
@@ -65,7 +65,7 @@ while not passed and attempts < 1:           # _QUALITY_GATE_MAX_REGENERATIONS =
     regenerate with a corrective note built from the report's findings
     re-score
 if still not passed: return (None, report)   # HOLD — nothing published this cycle
-# …and since #966 the caller turns that None into a CoachHold sentinel (ai_calls.py:1214):
+# …and since #966 the caller turns that None into a CoachHold sentinel (ai_calls.py:1215):
 # a deliberate hold is TERMINAL for the domain — the daily brief no longer publishes the
 # ungated legacy narrative in the held draft's place (only infra-error Nones fall back).
 ```
@@ -80,7 +80,7 @@ verdicts over 30 days (ADR-108).
 
 - `config/coaches/<coach>_stance.json` — the hand-authored stage ladders (fallback), S3-first
   with local-repo fallback, 5-min cache; `watches` entries restricted to the `KNOWN_SIGNALS`
-  vocabulary (coach_stance.py:23-69, test-enforced).
+  vocabulary (coach_stance.py:24-70, test-enforced).
 - `config/personas.json` — canonical coach names/domains (#531; no local copies).
 - Env: `AI_MODEL_HAIKU`, `TABLE_NAME`, `S3_BUCKET`. Prompt-window bounds are module constants
   (coach_history_summarizer.py:118-134).
