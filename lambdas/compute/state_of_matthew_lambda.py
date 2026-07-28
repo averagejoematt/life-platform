@@ -45,7 +45,6 @@ import re
 from datetime import datetime, timedelta, timezone
 
 import boto3
-import whole_life_context  # #1385: full multi-cycle archive as a 1-hour cached block
 from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
 from ai.grounded_generation import allowed_numbers, grounding_findings  # ADR-104 gate
 from boto3.dynamodb.conditions import Key
@@ -53,6 +52,7 @@ from common.numeric import decimals_to_float, floats_to_decimal  # bundled share
 from experiment import calibration_core  # #538: shared Brier + reliability scorer (layer module)
 from experiment.er03_gate import BANNED_CAUSAL  # reuse the platform's one causal-language list
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from health import whole_life_context  # #1385: full multi-cycle archive as a 1-hour cached block
 
 try:
     from common.platform_logger import get_logger

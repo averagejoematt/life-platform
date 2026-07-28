@@ -741,8 +741,8 @@ def lambda_handler(event: dict, context) -> dict:
     # The SAME text feeds the grounding allow-list below so a real dated callback
     # passes while a fabricated one is still caught (#1242 / ADR-104).
     try:
-        import whole_life_context
         from experiment.phase_filter import with_phase_filter as _wpf
+        from health import whole_life_context
 
         _archive_items = whole_life_context.fetch_full_installment_archive(
             table, f"USER#{USER_ID}#SOURCE#chronicle", d2f=d2f, phase_filter=_wpf

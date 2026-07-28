@@ -40,7 +40,7 @@ follow-up (tracked on #1627 / epic #1619).
 
 from datetime import date, datetime, timedelta
 
-from personal_baselines import percentile
+from health.personal_baselines import percentile
 
 try:  # structured JSON logging (logger-discipline gate: never print() in lambdas/)
     from common.platform_logger import get_logger
@@ -134,7 +134,7 @@ CELEBRATORY_EMITTERS = {
     "og_share_cards": {"path": "lambdas/og_image_lambda.mjs", "wired": False},
     # #1628: milestone_ledger.sweep routes announcements through check_celebration_allowed
     # (fail-closed; suppressed rungs stay unconsumed and re-evaluate later).
-    "milestone_announcements": {"path": "lambdas/milestone_ledger.py", "wired": True},
+    "milestone_announcements": {"path": "lambdas/health/milestone_ledger.py", "wired": True},
     # #1623: the private milestone digest — no celebratory note to the named
     # humans during a suspected downturn (fail-closed; event stays pending).
     "milestone_digest": {"path": "lambdas/emails/milestone_digest_lambda.py", "wired": True},

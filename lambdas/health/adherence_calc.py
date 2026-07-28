@@ -27,14 +27,14 @@ import os
 from datetime import datetime, timezone
 from typing import Any
 
+from common.repo_config import config_dir
 from routine_ir import RoutineSpec
 
 logger = logging.getLogger("adherence_calc")
 
-CONFIG_DIR = os.environ.get(
-    "TRAINING_CONFIG_DIR",
-    os.path.join(os.path.dirname(__file__), "..", "config"),
-)
+# Depth-independent default — see common.repo_config (#1653). The literal
+# `dirname(__file__)/../config` assumed this module sat directly under the repo root.
+CONFIG_DIR = os.environ.get("TRAINING_CONFIG_DIR", config_dir())
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 S3_CONFIG_PREFIX = os.environ.get("TRAINING_CONFIG_S3_PREFIX", "config/")
 

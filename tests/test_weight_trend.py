@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 
-import weight_trend as wt  # noqa: E402
+from health import weight_trend as wt  # noqa: E402
 
 REF = datetime(2026, 6, 27, tzinfo=timezone.utc)
 

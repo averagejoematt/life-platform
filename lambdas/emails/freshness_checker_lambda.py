@@ -462,7 +462,7 @@ def lambda_handler(event, context):
     window_start = now.date() - timedelta(days=SICK_SUPPRESS_DAYS)
     _sick_suppress = False
     try:
-        from sick_day_checker import get_sick_days_range
+        from health.sick_day_checker import get_sick_days_range
 
         sick_records = get_sick_days_range(
             table,

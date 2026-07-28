@@ -21,7 +21,9 @@ import hashlib
 import json
 import os
 
-from meal_templates_seed import ALGO_VERSION, KNOWN_ANCHOR_SETS, get_seed_templates
+from common.repo_config import config_path
+
+from health.meal_templates_seed import ALGO_VERSION, KNOWN_ANCHOR_SETS, get_seed_templates
 
 GAP_MIN = 15
 CONF_MIN = 0.7
@@ -39,13 +41,21 @@ BASE_CAN_ANCHOR = {"oats"}
 
 # ── vocabulary ───────────────────────────────────────────────────────────────
 def _vocab_candidates():
-    """Search order for food_vocabulary.json. In the bundled lambdas/ tree the file is
-    staged alongside this module; locally it lives in repo config/."""
+    """Search order for food_vocabulary.json.
+
+    deploy/build_bundle.py stages the file at the BUNDLE ROOT. That used to mean
+    "alongside this module", because this module sat at the root too — #1653 moved
+    it into lambdas/health/, so the root copy is now one level UP, and the old
+    `../config` repo fallback pointed at lambdas/config/, which does not exist.
+    Both historical candidates are kept (a flat bundle still resolves on the first
+    one) with the package-aware paths added after them.
+    """
     here = os.path.dirname(os.path.abspath(__file__))
     return [
         os.environ.get("FOOD_VOCAB_PATH"),
-        os.path.join(here, "food_vocabulary.json"),  # layer: alongside the module
-        os.path.join(os.path.dirname(here), "config", "food_vocabulary.json"),  # repo: ../config
+        os.path.join(here, "food_vocabulary.json"),  # flat bundle: alongside the module
+        os.path.join(os.path.dirname(here), "food_vocabulary.json"),  # bundle root, from inside a package
+        config_path("food_vocabulary.json"),  # repo: config/ (depth-independent)
     ]
 
 

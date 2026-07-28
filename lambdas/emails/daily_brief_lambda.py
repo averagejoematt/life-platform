@@ -764,7 +764,7 @@ def compute_tsb(strava_60d, today):
 # AST-level check confirmed zero logic divergence. One implementation, one
 # place for the next scoring change.
 # ==============================================================================
-from scoring_engine import (  # noqa: E402,F401
+from health.scoring_engine import (  # noqa: E402,F401
     COMPONENT_SCORERS,
     compute_day_grade,
     grade_colour,
@@ -1446,7 +1446,7 @@ def lambda_handler(event, context):
     # If today's subject date was a sick/rest day, send a brief recovery
     # summary instead of the full brief. Skip scoring, habits, and coaching.
     try:
-        from sick_day_checker import check_sick_day as _check_sick_brief
+        from health.sick_day_checker import check_sick_day as _check_sick_brief
 
         _sick_brief_rec = _check_sick_brief(table, USER_ID, yesterday)
     except ImportError:
@@ -1741,7 +1741,7 @@ def lambda_handler(event, context):
     _labs_ctx = ""
     _genome_ctx = ""
     try:
-        from labs_coaching import build_labs_coaching_context
+        from health.labs_coaching import build_labs_coaching_context
 
         _labs_ctx = build_labs_coaching_context(table, USER_PREFIX)
         if _labs_ctx:
@@ -1749,7 +1749,7 @@ def lambda_handler(event, context):
     except Exception as _lc_e:
         logger.warning(f"Phase 4: Labs coaching failed (non-fatal): {_lc_e}")
     try:
-        from genome_coaching import build_genome_coaching_context
+        from health.genome_coaching import build_genome_coaching_context
 
         _genome_ctx = build_genome_coaching_context(table, USER_PREFIX)
         if _genome_ctx:

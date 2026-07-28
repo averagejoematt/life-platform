@@ -84,7 +84,7 @@ def test_load_bearing_config_values_render():
     nd = leveling["neglect_decay"]
     assert gx.num(nd["rate"]) in page and gx.num(nd["n_grace_days"]) in page
     # versions: the page must state the engine + config it was generated from
-    import character_engine as ce
+    from health import character_engine as ce
 
     assert f"engine v{ce.ENGINE_VERSION}" in page
     assert f'config v{config["_meta"]["version"]}' in page

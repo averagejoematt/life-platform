@@ -77,7 +77,7 @@ def _get_mood_trend(args):
     if not items:
         return {"trend": [], "error": "No journal entries found for this period."}
 
-    from flourishing import entry_channel  # #1572 channel provenance
+    from health.flourishing import entry_channel  # #1572 channel provenance
 
     # Build daily scores (prefer enriched, fall back to structured)
     daily = {}  # date -> {mood, energy, stress, themes, sentiment, channels}
@@ -228,7 +228,7 @@ def tool_get_flourishing_trend(args):
     LLM-coded projection of journal enrichment (values/gratitude/flow/growth/
     ownership/social). Every number is a language model's reading of prose, and
     the payload says so (provenance per ADR-104)."""
-    from flourishing import SIGNALS, ema_series, provenance_line
+    from health.flourishing import SIGNALS, ema_series, provenance_line
 
     days = max(7, min(365, int(args.get("days") or 90)))
     span = max(3, min(60, int(args.get("ema_span") or 14)))

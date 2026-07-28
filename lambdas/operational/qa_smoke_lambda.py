@@ -689,8 +689,7 @@ def check_receipt_replay():
     """
     c = Check("character:receipt_replay", "Character Receipts")
     try:
-        import character_engine
-        import progression_receipts as pr
+        from health import character_engine, progression_receipts as pr
 
         resp = table.query(
             KeyConditionExpression=Key("pk").eq(USER_PREFIX + "character_receipt") & Key("sk").begins_with("DATE#"),
@@ -708,7 +707,7 @@ def check_receipt_replay():
         # #1412: replay against the SAME effective config the nightly compute
         # hashed into the receipt (personal-variance targets overlaid) — the raw
         # S3 config alone would read as permanent unlabeled config drift.
-        import personal_baselines
+        from health import personal_baselines
 
         config = personal_baselines.effective_character_config(config, table, USER_PREFIX)
         drifted, mismatched = [], []

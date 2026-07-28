@@ -530,7 +530,7 @@ def parse_page(page, api_key=None):
     # isn't on the bundle path.
     _fallback_channel = {"Video Diary": "video_diary", "Solo Recording": "solo_recording"}
     try:
-        from flourishing import entry_channel
+        from health.flourishing import entry_channel
 
         item["channel"] = entry_channel(item)
     except ImportError:  # pragma: no cover — bundle-path fallback

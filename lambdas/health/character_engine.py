@@ -10,7 +10,7 @@ Config: s3://{bucket}/config/character_sheet.json
 DynamoDB: USER#matthew#SOURCE#character_sheet / DATE#YYYY-MM-DD
 
 Usage:
-    from character_engine import load_character_config, compute_character_sheet
+    from health.character_engine import load_character_config, compute_character_sheet
 
 v1.0.0 — 2026-03-02
 v1.1.0 — 2026-03-30  (Statistical review: F-01 through F-15)
@@ -762,7 +762,7 @@ def compute_mind_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[floa
     # reading_practice; a journaled day with zero values evidenced is a REAL low
     # (20), a day with no flourishing row is uninstrumented (None) — ADR-104.
     if "values_alignment" in components:
-        from flourishing import values_alignment_score
+        from health.flourishing import values_alignment_score
 
         flourishing = data.get("flourishing") or {}
         scores["values_alignment"] = values_alignment_score(
@@ -772,7 +772,7 @@ def compute_mind_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[floa
 
     raw, details = _weighted_pillar_score(scores, components)
     if "values_alignment" in components and (data.get("flourishing") or {}).get("enrichment_model"):
-        from flourishing import provenance_line
+        from health.flourishing import provenance_line
 
         details["_flourishing_provenance"] = provenance_line((data.get("flourishing") or {}).get("enrichment_model"))
     return raw, details
@@ -875,7 +875,7 @@ def compute_relationships_raw(data: dict[str, Any], config: dict[str, Any]) -> t
     # #1403 provenance: when the social input came from the flourishing row, say
     # so — these are LLM-coded readings of prose, never sensor data (ADR-104).
     if _safe_float(flourishing, "social_quality_score") is not None:
-        from flourishing import provenance_line
+        from health.flourishing import provenance_line
 
         details["_flourishing_provenance"] = provenance_line(flourishing.get("enrichment_model"))
     return raw, details

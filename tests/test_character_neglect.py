@@ -26,7 +26,7 @@ import sys
 LAMBDAS_DIR = os.path.join(os.path.dirname(__file__), "..", "lambdas")
 sys.path.insert(0, os.path.abspath(LAMBDAS_DIR))
 
-from character_engine import (
+from health.character_engine import (
     _behavioral_weight_share,
     _compute_xp,
     compute_character_mood,

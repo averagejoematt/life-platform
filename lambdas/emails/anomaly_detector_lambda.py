@@ -928,7 +928,7 @@ def lambda_handler(event, context):
 
     # ── Sick day check (v2.2.0) ──
     try:
-        from sick_day_checker import check_sick_day as _check_sick_anomaly
+        from health.sick_day_checker import check_sick_day as _check_sick_anomaly
 
         _sick_rec_anomaly = _check_sick_anomaly(table, USER_ID, yesterday)
     except ImportError:

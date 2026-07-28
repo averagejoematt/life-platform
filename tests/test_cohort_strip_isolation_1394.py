@@ -40,7 +40,7 @@ _PIPELINE_FILES = [
     "lambdas/common/stats_core.py",
     "lambdas/experiment/calibration_core.py",
     "lambdas/experiment/eyeball_calibration.py",
-    "lambdas/character_engine.py",
+    "lambdas/health/character_engine.py",
     "lambdas/insight_writer.py",
     "lambdas/experiment/measurable_metrics.py",
     "lambdas/compute/character_sheet_lambda.py",

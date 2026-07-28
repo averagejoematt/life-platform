@@ -30,7 +30,7 @@ import sys
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
-import whole_life_context as wlc  # noqa: E402
+from health import whole_life_context as wlc  # noqa: E402
 
 
 def _inst(date, *, cycle, week, body="body text"):

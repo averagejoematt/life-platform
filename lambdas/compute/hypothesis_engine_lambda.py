@@ -1238,7 +1238,7 @@ def refit_cross_pillar_effects(force=False):
         if not force and not effect_fitter.refit_due(latest):
             return {"ran": False, "reason": "not_due", "last_fit": (latest or {}).get("sk")}
 
-        import character_engine
+        from health import character_engine
 
         config = character_engine.load_character_config(s3, S3_BUCKET)
         if not config:
@@ -1268,7 +1268,7 @@ def run_time_affluence_weekly(force=False):
     window, tests edge-week affluence -> next-week adherence with n_eff + BH-FDR
     (stats_core, no LLM — ADR-105), and persists PROXY#/EDGE# rows. Absence is
     coverage-flagged, never zeroed (ADR-104). Never fatal to the hypothesis run."""
-    import time_affluence as ta
+    from health import time_affluence as ta
 
     try:
         end = datetime.now(timezone.utc).date()

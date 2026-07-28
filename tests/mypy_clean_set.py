@@ -38,7 +38,7 @@ ROOT = Path(__file__).resolve().parent.parent
 # new directory would silently shrink the clean surface — a module would leave the
 # mypy gate merely by being moved, which is exactly the ratchet regression this file
 # exists to prevent. Moving code must never reduce coverage.
-CLEAN_DIRS = ["lambdas", "lambdas/ai", "lambdas/coach", "lambdas/common", "lambdas/experiment", "lambdas/web", "mcp"]
+CLEAN_DIRS = ["lambdas", "lambdas/ai", "lambdas/coach", "lambdas/common", "lambdas/experiment", "lambdas/health", "lambdas/web", "mcp"]
 
 # Modules that do NOT yet pass under mypy.ini. Each MUST carry a reason. This
 # denylist only shrinks. Paths are repo-root-relative.
@@ -50,7 +50,7 @@ DIRTY = {
     # residual disabled-code / structural violations (need a dedicated pass):
     "lambdas/broadcast_sensitivity_gate.py",  # union-attr
     "lambdas/html_builder.py",  # misc
-    "lambdas/meal_projection.py",  # misc
+    "lambdas/health/meal_projection.py",  # misc
     "lambdas/training_notes.py",  # misc + var-annotated
     # platform_logger's Logger subclass narrows msg: object -> str on every
     # level method (LSP-violating override x6). Widely imported; fixing it is a
@@ -79,8 +79,8 @@ CORE = [
     "lambdas/experiment/phase_filter.py",
     "lambdas/common/constants.py",
     "lambdas/ai/bedrock_client.py",
-    "lambdas/scoring_engine.py",
-    "lambdas/character_engine.py",
+    "lambdas/health/scoring_engine.py",
+    "lambdas/health/character_engine.py",
     "lambdas/intelligence_common.py",
     "lambdas/ai/ai_calls.py",
     "lambdas/ai/ai_context.py",

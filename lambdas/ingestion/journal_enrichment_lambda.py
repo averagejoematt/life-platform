@@ -410,7 +410,7 @@ def _write_flourishing_rows(entries) -> int:
     """#1403: group the queried entries by date and upsert one SOURCE#flourishing
     row per day that has enrichment. Pure projection over stored fields —
     idempotent, no LLM calls, raw entries untouched."""
-    from flourishing import write_flourishing_row
+    from health.flourishing import write_flourishing_row
 
     by_date: dict[str, list] = {}
     for item in entries:

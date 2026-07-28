@@ -11,7 +11,7 @@ import sys
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
-import glycemic  # noqa: E402
+from health import glycemic  # noqa: E402
 
 # ── The canonical hand-worked day ─────────────────────────────────────────────
 # readings = [100, 120, 90, 160, 80]  (mg/dL, time-ordered)

@@ -148,7 +148,7 @@ def lambda_handler(event: dict, context: Any) -> dict:
         archive_raw(workout_id, raw)
         record = normalize_workout(raw)
         try:  # #412 pushed-vs-performed adherence, embedded pre-write (guarded, non-fatal)
-            import adherence_calc
+            from health import adherence_calc
 
             _adh = adherence_calc.derive_adherence(raw.get("workout") or raw)
             if _adh:

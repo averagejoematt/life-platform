@@ -37,8 +37,7 @@ os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
 # reporting 0 collected tests — which would silently hide the problem.
 _core_import_err = None
 try:
-    import character_engine as ce
-    import scoring_engine as se
+    from health import character_engine as ce, scoring_engine as se
 except ImportError as _e:
     _core_import_err = _e
     se = None  # type: ignore

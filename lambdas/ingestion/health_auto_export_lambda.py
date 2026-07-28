@@ -110,7 +110,7 @@ import boto3
 # Python from the day's readings (never an LLM). Fail-soft — if an older bundle
 # lacks the module we simply omit the two derived fields rather than break ingest.
 try:
-    import glycemic
+    from health import glycemic
 except ImportError:
     glycemic = None
 

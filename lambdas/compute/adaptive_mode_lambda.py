@@ -450,7 +450,7 @@ def compute_and_store_engagement():
 
     sick_days = set()
     try:
-        from sick_day_checker import get_sick_days_range
+        from health.sick_day_checker import get_sick_days_range
 
         base = datetime.strptime(today, "%Y-%m-%d").date()
         recs = get_sick_days_range(table, USER_ID, (base - timedelta(days=35)).isoformat(), today) or []

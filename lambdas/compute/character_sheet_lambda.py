@@ -34,10 +34,12 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
-import character_engine
-import personal_baselines  # #1412: personal-variance targets overlay (ADR-105 rule 4)
 from common.constants import EXPERIMENT_PHASE_CURRENT, EXPERIMENT_START_DATE  # ADR-058
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058: default-deny pilot data / #946
+from health import (
+    character_engine,
+    personal_baselines,  # #1412: personal-variance targets overlay (ADR-105 rule 4)
+)
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -394,7 +396,7 @@ def assemble_data(yesterday_str):
     # a 7-day apple_health window, via the weight_trend layer module (the same
     # helper vitals/journey use, so no surface can disagree on "current weight").
     try:
-        import weight_trend
+        from health import weight_trend
 
         _ah_7d_start = (dt - timedelta(days=6)).strftime("%Y-%m-%d")
         _ah_7d = fetch_range("apple_health", _ah_7d_start, yesterday_str)
@@ -669,7 +671,7 @@ def write_progression_receipt(record, config, data, history_records, challenge_i
     ReceiptReplayMismatch EMF metric (the #1373 drift alarm's write-time leg).
     """
     try:
-        import progression_receipts as pr
+        from health import progression_receipts as pr
 
         input_rows = collect_input_rows(data, history_records, challenge_items)
         receipt = pr.build_receipt(record, config, input_rows=input_rows)
@@ -744,7 +746,7 @@ def lambda_handler(event, context):
     # copy the previous day's character sheet record verbatim (no gain, no
     # penalty), mark it sick_day=True, and return early.
     try:
-        from sick_day_checker import check_sick_day as _check_sick
+        from health.sick_day_checker import check_sick_day as _check_sick
 
         _sick_rec = _check_sick(table, USER_ID, yesterday_str)
     except ImportError:

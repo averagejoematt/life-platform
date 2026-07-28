@@ -19,7 +19,9 @@ regression where either channel drifts back to building its own package.
 """
 
 import ast
+import json
 import os
+import subprocess
 import sys
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -149,3 +151,41 @@ def test_no_stale_site_api_sole_ownership_claims():
     for path, text in haystacks.items():
         for phrase in banned_phrases:
             assert phrase not in text, f"{path} still contains the stale sole-ownership claim: {phrase!r}"
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 5. Module-relative data files still resolve once modules live in packages (#1653)
+# ══════════════════════════════════════════════════════════════════════════
+
+
+def test_staged_bundle_resolves_module_relative_data_files(tmp_path):
+    """build_bundle stages food_vocabulary.json and redirects.map at the BUNDLE ROOT
+    because the modules that read them "look alongside their own module first".
+
+    That phrasing was only true while those modules sat at the root themselves. #1653
+    moved meal_grouper into health/ and redirect_spotcheck into operational/, so
+    "alongside the module" is now a subdirectory and the root copy is one level up.
+    Nothing in the unit suite exercises this: the repo checkout has a real config/
+    directory to fall back on, so the loaders resolve locally and stay green while
+    the BUNDLE — the only layout that matters in production — would come up empty.
+
+    So this test drives the loaders from a staged bundle with the repo tree off
+    sys.path entirely, which is the one arrangement that can catch it.
+    """
+    out = build_bundle.stage_tree(str(tmp_path / "stage"))
+    probe = (
+        "import os, json, sys\n"
+        "from health import meal_grouper as mg\n"
+        "cands = [c for c in mg._vocab_candidates() if c]\n"
+        "hit = next((c for c in cands if os.path.isfile(c)), None)\n"
+        "vocab = mg.load_vocab()\n"
+        "print(json.dumps({'hit': hit, 'n': len(vocab) if hasattr(vocab, '__len__') else 0}))\n"
+    )
+    env = dict(os.environ, PYTHONPATH=out, AWS_DEFAULT_REGION="us-west-2", S3_BUCKET="probe")
+    env.pop("FOOD_VOCAB_PATH", None)
+    r = subprocess.run([sys.executable, "-c", probe], cwd=str(tmp_path), capture_output=True, text=True, env=env)
+    assert r.returncode == 0, f"probe failed inside the staged bundle:\n{r.stderr[-2000:]}"
+    payload = json.loads(r.stdout.strip().splitlines()[-1])
+    assert payload["hit"], "meal_grouper found NO food_vocabulary.json inside the staged bundle — the vocab would be empty in production"
+    assert payload["hit"].startswith(out), f"resolved outside the bundle ({payload['hit']}) — the probe leaked the repo tree onto sys.path"
+    assert payload["n"] > 0, "food_vocabulary.json resolved but parsed empty"

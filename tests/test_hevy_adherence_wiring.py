@@ -7,9 +7,9 @@ test_adherence_calc.py; this file is the wiring around it."""
 
 from __future__ import annotations
 
-import adherence_calc
 import routine_repo
 from common.pacific_time import pacific_date_of
+from health import adherence_calc
 from routine_ir import ExerciseBlock, RoutineSpec, Set
 
 

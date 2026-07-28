@@ -22,7 +22,7 @@ _REPO = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO / "lambdas"))
 sys.path.insert(0, str(_REPO))
 
-import flourishing as fl  # noqa: E402
+from health import flourishing as fl  # noqa: E402
 
 
 def _entry(**kw):
@@ -119,7 +119,7 @@ def test_values_alignment_mapping():
 
 
 def test_relationships_prefers_flourishing_row_over_entry_fallback():
-    import character_engine as ce
+    from health import character_engine as ce
 
     cfg = {"pillars": {"relationships": {"components": {"social_interaction_frequency": {"weight": 1.0}}}}}
     data = {
@@ -134,7 +134,7 @@ def test_relationships_prefers_flourishing_row_over_entry_fallback():
 
 
 def test_relationships_fallback_still_works_without_row():
-    import character_engine as ce
+    from health import character_engine as ce
 
     cfg = {"pillars": {"relationships": {"components": {"social_interaction_frequency": {"weight": 1.0}}}}}
     data = {"journal_entries": [{"enriched_social_quality": "deep"}], "journal": {}}
@@ -144,7 +144,7 @@ def test_relationships_fallback_still_works_without_row():
 
 
 def test_mind_values_alignment_component_config_gated():
-    import character_engine as ce
+    from health import character_engine as ce
 
     cfg_with = {"pillars": {"mind": {"components": {"values_alignment": {"weight": 1.0}}}}}
     data = {"flourishing": {"values_lived_count": 2, "enrichment_model": "claude-haiku-4-5"}}

@@ -266,7 +266,7 @@ def replay(receipt: dict, config: dict, engine=None) -> dict:
     tampered receipt — the alarm case.
     """
     if engine is None:
-        import character_engine as engine  # bundled module (#781)
+        from health import character_engine as engine  # bundled module (#781)
 
     receipt = _norm(receipt)
     transitions = receipt.get("transitions") or {}

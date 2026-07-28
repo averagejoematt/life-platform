@@ -9,7 +9,7 @@ exactly those behaviours.
 from decimal import Decimal
 
 import pytest
-import time_affluence as ta
+from health import time_affluence as ta
 
 # ── week bucketing ───────────────────────────────────────────────────────────
 

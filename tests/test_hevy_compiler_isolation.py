@@ -27,7 +27,7 @@ _ALLOWED_FILES = {
     os.path.join(ROOT, "tests", "test_hevy_restamp.py"),
     os.path.join(ROOT, "tests", "test_tools_hevy_routine.py"),
     # adherence_calc reads template ids from Hevy responses — read-only, allowed.
-    os.path.join(ROOT, "lambdas", "adherence_calc.py"),
+    os.path.join(ROOT, "lambdas", "health", "adherence_calc.py"),
     # MCP tool delegates to compiler; it only PASSES the IR through, doesn't
     # construct wire bodies. Still excluded from the scan because a key match
     # is acceptable in a docstring there.

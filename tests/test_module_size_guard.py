@@ -87,7 +87,7 @@ BASELINE = {
     "lambdas/compute/daily_insight_compute_lambda.py": "2335 lines",
     "lambdas/emails/weekly_digest_lambda.py": "2195 lines",
     "lambdas/ai/ai_calls.py": "2164 lines",
-    "lambdas/character_engine.py": "2112 lines",
+    "lambdas/health/character_engine.py": "2112 lines",
     "mcp/registry.py": "2103 lines",
     "lambdas/html_builder.py": "2038 lines",
     "lambdas/intelligence/ai_expert_analyzer_lambda.py": "1972 lines",

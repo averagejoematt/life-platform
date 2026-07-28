@@ -36,7 +36,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]  # #957: repo-relative — a worktree run must simulate ITS OWN engine, not main's
 sys.path.insert(0, str(REPO / "lambdas"))
 
-import character_engine as ce  # noqa: E402
+from health import character_engine as ce  # noqa: E402
 
 CONFIG = json.loads((REPO / "config" / "character_sheet.json").read_text())
 PILLARS = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]

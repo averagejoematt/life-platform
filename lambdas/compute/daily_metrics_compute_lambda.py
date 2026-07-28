@@ -51,16 +51,18 @@ import time
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-import achievement_rules  # #1624: the ONE place badge thresholds live (shared with site_api_vitals)
 import boto3
-import flourishing  # #1843: entry_channel() — single source of truth for video_diary/solo_recording provenance
-import milestone_ledger  # #1626: the durable MILESTONE# event ledger (write-once, global cooldown)
-import personal_baselines  # #543: percentile bands from Matthew's own distribution (ADR-105 r4)
-import scoring_engine
 import training_load  # shared TSS-like load model + Banister core (layer module, #490)
-import weight_trend  # shared weekly-rate + projection (layer module)
 from experiment import phase_taxonomy  # ADR-077/#1233: write-time provenance stamp for the first-earn ledger
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from health import (
+    achievement_rules,  # #1624: the ONE place badge thresholds live (shared with site_api_vitals)
+    flourishing,  # #1843: entry_channel() — single source of truth for video_diary/solo_recording provenance
+    milestone_ledger,  # #1626: the durable MILESTONE# event ledger (write-once, global cooldown)
+    personal_baselines,  # #543: percentile bands from Matthew's own distribution (ADR-105 r4)
+    scoring_engine,
+    weight_trend,  # shared weekly-rate + projection (layer module)
+)
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -1163,7 +1165,7 @@ def lambda_handler(event, context):
     #   - Streak timers preserved from previous day (not broken, not advanced)
     #   - Anomaly alerts will be suppressed separately by anomaly_detector
     try:
-        from sick_day_checker import check_sick_day as _check_sick
+        from health.sick_day_checker import check_sick_day as _check_sick
 
         _sick_rec = _check_sick(table, USER_ID, yesterday_str)
     except ImportError:

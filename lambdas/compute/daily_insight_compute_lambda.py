@@ -59,9 +59,9 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
-import personal_baselines  # #543: percentile bands from Matthew's own distribution (ADR-105 r4)
 from common import stats_core  # bundled shared module (#529/#535): effective-n so drift significance isn't inflated by autocorrelation
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from health import personal_baselines  # #543: percentile bands from Matthew's own distribution (ADR-105 r4)
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:

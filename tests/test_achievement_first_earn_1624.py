@@ -18,7 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
 
-import achievement_rules as ar  # noqa: E402
+from health import achievement_rules as ar  # noqa: E402
 
 USER_PREFIX = "USER#matthew#SOURCE#"
 

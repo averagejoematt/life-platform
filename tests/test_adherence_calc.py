@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from adherence_calc import calculate_adherence
+from health.adherence_calc import calculate_adherence
 from routine_ir import ExerciseBlock, RoutineSpec, Set
 
 

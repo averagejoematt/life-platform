@@ -167,7 +167,7 @@ def call_anthropic(system_prompt, user_message, archive_text=None):
     # list straight through (its own cache_control is preserved).
     system = system_prompt
     if archive_text:
-        import whole_life_context
+        from health import whole_life_context
 
         system = whole_life_context.with_cached_archive(system_prompt, archive_text)
 

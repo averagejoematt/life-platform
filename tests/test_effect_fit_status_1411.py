@@ -36,11 +36,11 @@ os.environ.setdefault("AWS_REGION", "us-west-2")
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
-import character_engine  # noqa: E402
 from experiment import (
     effect_fitter,  # noqa: E402
     phase_taxonomy as pt,  # noqa: E402
 )
+from health import character_engine  # noqa: E402
 from web import site_api_intelligence as intel  # noqa: E402
 
 CONFIG_PATH = os.path.join(_REPO, "config", "character_sheet.json")
@@ -278,7 +278,7 @@ class TestFitRecord:
         it must not roll the progression-receipt config_hash — otherwise every
         replay against the pristine S3 config reads as spurious config_drift
         and each quarterly fit fakes a mechanical config change."""
-        import progression_receipts as pr
+        from health import progression_receipts as pr
 
         cfg = _one_effect_config()
         cfg["cross_pillar_effects"][0]["fit_status"] = "authored-prior"

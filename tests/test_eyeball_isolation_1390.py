@@ -38,7 +38,7 @@ _NUTRITION_PK_TOKENS = ("SOURCE#macrofactor", "SOURCE#nutrition")
 # the coach deterministic-payload builder. The eyeball literal must appear in none of them.
 _NUTRITION_WRITE_PATHS = [
     _LAMBDAS / "ingestion" / "macrofactor_lambda.py",
-    _LAMBDAS / "meal_projection.py",
+    _LAMBDAS / "health" / "meal_projection.py",
 ]
 _COACH_PAYLOAD_BUILDER = _LAMBDAS / "coach" / "coach_register.py"
 

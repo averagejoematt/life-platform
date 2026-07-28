@@ -110,7 +110,7 @@ def _attach_adherence(rec: dict, raw_workout: dict) -> None:
     Hevy item (its per-exercise template ids survive; the normalized rec renames them),
     so the Hevy-schema knowledge stays inside adherence_calc, not in this lambda."""
     try:
-        import adherence_calc
+        from health import adherence_calc
 
         adh = adherence_calc.derive_adherence(raw_workout)
         if adh:

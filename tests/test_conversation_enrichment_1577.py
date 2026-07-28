@@ -269,7 +269,7 @@ class TestAnalysisOnlyScope:
         flourishing row (None), never a zero row — and conversational records are
         NOT part of that projection (it aggregates only what it is handed from the
         notion journal partition)."""
-        import flourishing
+        from health import flourishing
 
         assert flourishing.aggregate_entries([]) is None
         assert flourishing.aggregate_entries([{"answer": "x"}]) is None  # unenriched → no data

@@ -27,7 +27,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
 
-import milestone_ledger as ml  # noqa: E402
+from health import milestone_ledger as ml  # noqa: E402
 
 USER_PREFIX = "USER#matthew#SOURCE#"
 LEDGER_PK = USER_PREFIX + "milestones"

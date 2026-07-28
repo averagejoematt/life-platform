@@ -97,7 +97,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any, NamedTuple
 
-import process_milestones  # #1628: the pure window functions (no I/O — this module remains the ONE writer)
+from health import process_milestones  # #1628: the pure window functions (no I/O — this module remains the ONE writer)
 
 # ── DDB coordinates ───────────────────────────────────────────────────────────
 MILESTONES_SOURCE = "milestones"

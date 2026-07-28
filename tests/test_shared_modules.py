@@ -290,7 +290,7 @@ _run("convenience helpers don't raise", test_helpers_no_raise)
 # ======================================================================
 print("\n-- sick_day_checker ---------------------------------------------")
 
-from sick_day_checker import (
+from health.sick_day_checker import (
     check_sick_day,
     delete_sick_day,
     get_sick_days_range,

@@ -15,8 +15,9 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 from boto3.dynamodb.conditions import Key
-from meal_grouper import group_day
-from meal_templates_seed import ALGO_VERSION
+
+from health.meal_grouper import group_day
+from health.meal_templates_seed import ALGO_VERSION
 
 MEALS_SOURCE = "macrofactor_meals"
 RAW_SOURCE = "macrofactor"  # never written — provenance guard target

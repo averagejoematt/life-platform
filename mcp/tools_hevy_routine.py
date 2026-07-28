@@ -1175,7 +1175,7 @@ def _action_adherence(args: dict[str, Any]) -> dict[str, Any]:
     if not routine_id:
         return mcp_error("adherence requires routine_id", error_code="MISSING_ARG")
     import hevy_write_client as wc
-    from adherence_calc import calculate_adherence
+    from health.adherence_calc import calculate_adherence
     from routine_repo import get_current
 
     ir = get_current(routine_id)

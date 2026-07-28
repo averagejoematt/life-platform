@@ -34,7 +34,7 @@ DELETED_SYMBOLS = {
 # Modules the symbols were deleted from.
 TARGET_MODULES = [
     os.path.join(REPO_ROOT, "lambdas", "intelligence_common.py"),
-    os.path.join(REPO_ROOT, "lambdas", "character_engine.py"),
+    os.path.join(REPO_ROOT, "lambdas", "health", "character_engine.py"),
 ]
 
 # Directories whose code ships in every bundle (#781) -- the "live" surface.

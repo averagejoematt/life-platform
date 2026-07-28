@@ -23,8 +23,8 @@ import sys
 LAMBDAS_DIR = os.path.join(os.path.dirname(__file__), "..", "lambdas")
 sys.path.insert(0, os.path.abspath(LAMBDAS_DIR))
 
-import character_engine as ce
-from character_engine import (
+from health import character_engine as ce
+from health.character_engine import (
     _compute_xp,
     _evaluate_condition,
     _roll_xp_buffer,

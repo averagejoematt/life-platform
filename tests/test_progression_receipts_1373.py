@@ -27,9 +27,11 @@ from decimal import Decimal
 LAMBDAS_DIR = os.path.join(os.path.dirname(__file__), "..", "lambdas")
 sys.path.insert(0, os.path.abspath(LAMBDAS_DIR))
 
-import character_engine as ce  # noqa: E402
-import progression_receipts as pr  # noqa: E402
 from common.numeric import floats_to_decimal  # noqa: E402
+from health import (
+    character_engine as ce,  # noqa: E402
+    progression_receipts as pr,  # noqa: E402
+)
 from test_character_math_v2 import V2_CONFIG  # noqa: E402 — the engine-test config fixture
 
 PILLARS = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]

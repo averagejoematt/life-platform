@@ -18,7 +18,7 @@ import importlib
 import json
 
 import pytest
-import whole_life_context as wlc
+from health import whole_life_context as wlc
 
 # ── AC2: cached-block wiring (the primitive) ────────────────────────────────
 

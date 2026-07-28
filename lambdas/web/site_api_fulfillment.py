@@ -104,7 +104,7 @@ def fulfillment_index(*, _g) -> dict:
     # Facade state injected via `_g` (the delegator's globals()) — same module the test patched.
     _experiment_date = _g["_experiment_date"]
     table = _g["table"]
-    import fulfillment_index as fi
+    from health import fulfillment_index as fi
 
     today = datetime.now(PT).strftime("%Y-%m-%d")
     window_start = _experiment_date(90)

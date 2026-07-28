@@ -48,7 +48,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
-import personal_baselines
+from health import personal_baselines
 
 try:
     from common.platform_logger import get_logger
