@@ -203,7 +203,7 @@ def _latest_recovery_score() -> float | None:
 def _find_pushed_routine(target_date: str):
     """The pushed, branch-carrying routine for target_date, or None. Never raises."""
     try:
-        import routine_repo as repo
+        from training import routine_repo as repo
 
         candidates = repo.list_by_date_range(target_date, target_date)
         pushed = [r for r in candidates if getattr(r, "hevy_routine_id", None) and getattr(r, "branches", None)]
@@ -254,11 +254,10 @@ def lambda_handler(event, context):
 
         # Re-compile + re-push. A conflict (in-app edit) fails open: leave the
         # last routine, do not clobber.
-        import hevy_write_client as wc
-        import routine_repo as repo
-        from hevy_compiler import from_hevy_response, to_update_body
-        from hevy_template_cache import resolve_movement
-        from routine_title import build_title_context, format_why_note
+        from training import hevy_write_client as wc, routine_repo as repo
+        from training.hevy_compiler import from_hevy_response, to_update_body
+        from training.hevy_template_cache import resolve_movement
+        from training.routine_title import build_title_context, format_why_note
 
         try:
             title_ctx = build_title_context(ir)

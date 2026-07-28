@@ -25,7 +25,7 @@ import json
 import logging
 from typing import Any
 
-from hevy_common import (
+from training.hevy_common import (
     HevyAPIError,
     archive_raw,
     fetch_workout,

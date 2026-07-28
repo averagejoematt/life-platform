@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from routine_ir import ExerciseBlock, RoutineBranch, RoutineSpec, Set
+from training.routine_ir import ExerciseBlock, RoutineBranch, RoutineSpec, Set
 
 
 def _primary_exercises(ir: RoutineSpec) -> list[ExerciseBlock]:
@@ -180,7 +180,7 @@ def _resolve_title(ir: RoutineSpec, title_context: dict[str, Any] | None) -> str
     """
     if title_context is None:
         return (ir.title or f"{ir.archetype}-{ir.target_date}")[:60]
-    from routine_title import format_title
+    from training.routine_title import format_title
 
     return format_title(ir, title_context)
 

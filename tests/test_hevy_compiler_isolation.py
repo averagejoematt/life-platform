@@ -14,8 +14,8 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 # Modules permitted to know the Hevy wire schema. Everyone else is hands-off.
 _ALLOWED_FILES = {
-    os.path.join(ROOT, "lambdas", "hevy_compiler.py"),
-    os.path.join(ROOT, "lambdas", "hevy_write_client.py"),
+    os.path.join(ROOT, "lambdas", "training", "hevy_compiler.py"),
+    os.path.join(ROOT, "lambdas", "training", "hevy_write_client.py"),
     # tests + the compiler-isolation test itself reference the key intentionally
     os.path.join(ROOT, "tests", "test_hevy_compiler.py"),
     os.path.join(ROOT, "tests", "test_hevy_compiler_isolation.py"),
@@ -35,7 +35,7 @@ _ALLOWED_FILES = {
     # Pre-existing read-side helper (SPEC_HEVY_AND_NUTRITION_BRIDGE 2026-05-25)
     # that normalizes inbound Hevy workout payloads — a different concern from
     # the routine-write schema this isolation rule guards. Grandfathered.
-    os.path.join(ROOT, "lambdas", "hevy_common.py"),
+    os.path.join(ROOT, "lambdas", "training", "hevy_common.py"),
     os.path.join(ROOT, "tests", "test_hevy_common.py"),
 }
 

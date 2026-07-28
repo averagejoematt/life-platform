@@ -46,6 +46,7 @@ CLEAN_DIRS = [
     "lambdas/content",
     "lambdas/experiment",
     "lambdas/health",
+    "lambdas/training",
     "lambdas/web",
     "mcp",
 ]
@@ -61,7 +62,7 @@ DIRTY = {
     "lambdas/broadcast_sensitivity_gate.py",  # union-attr
     "lambdas/content/html_builder.py",  # misc
     "lambdas/health/meal_projection.py",  # misc
-    "lambdas/training_notes.py",  # misc + var-annotated
+    "lambdas/training/training_notes.py",  # misc + var-annotated
     # platform_logger's Logger subclass narrows msg: object -> str on every
     # level method (LSP-violating override x6). Widely imported; fixing it is a
     # shared-layer change tracked separately (see #419 / this file's history).

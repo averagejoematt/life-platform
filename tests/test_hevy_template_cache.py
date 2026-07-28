@@ -5,9 +5,9 @@ from __future__ import annotations
 import time
 from unittest.mock import patch
 
-import hevy_template_cache as tc
 import pytest
-from hevy_template_cache import MovementUnmappable
+from training import hevy_template_cache as tc
+from training.hevy_template_cache import MovementUnmappable
 
 _CATALOG = {
     "movements": {

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from hevy_compiler import (
+from training.hevy_compiler import (
     HEVY_SET_TYPES,
     MovementUnmappable,
     from_hevy_response,
@@ -13,7 +13,7 @@ from hevy_compiler import (
     to_create_body,
     to_update_body,
 )
-from routine_ir import ExerciseBlock, RoutineBranch, RoutineSpec, Set
+from training.routine_ir import ExerciseBlock, RoutineBranch, RoutineSpec, Set
 
 
 def _ir() -> RoutineSpec:

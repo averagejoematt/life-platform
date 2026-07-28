@@ -13,9 +13,9 @@ from datetime import date
 from decimal import Decimal
 from unittest.mock import patch
 
-import exercise_history as eh
 import pytest
 from fakes import FakeDdbTable
+from training import exercise_history as eh
 
 
 @pytest.fixture(autouse=True)

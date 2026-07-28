@@ -34,12 +34,13 @@ from typing import Any
 import boto3
 from boto3.dynamodb.conditions import Key
 from common.constants import EXPERIMENT_START_DATE
-from routine_ir import RoutineSpec
+from common.repo_config import config_dir
 
-CONFIG_DIR = os.environ.get(
-    "TRAINING_CONFIG_DIR",
-    os.path.join(os.path.dirname(__file__), "..", "config"),
-)
+from training.routine_ir import RoutineSpec
+
+# Depth-independent default — see common.repo_config (#1653). The literal
+# `dirname(__file__)/../config` assumed this module sat directly under the repo root.
+CONFIG_DIR = os.environ.get("TRAINING_CONFIG_DIR", config_dir())
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 S3_CONFIG_PREFIX = os.environ.get("TRAINING_CONFIG_S3_PREFIX", "config/")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")

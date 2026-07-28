@@ -630,7 +630,7 @@ def tool_get_freshness_status(args):
     # Notes present but no derived records (or all degraded) = the extractor went dark.
     training_notes_health = None
     try:
-        from training_notes import training_notes_health as _tnh
+        from training.training_notes import training_notes_health as _tnh
 
         training_notes_health = _tnh(table)
     except Exception as _e:  # noqa: BLE001

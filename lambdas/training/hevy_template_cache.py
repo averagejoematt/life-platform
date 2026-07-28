@@ -20,6 +20,7 @@ import time
 from typing import Any
 
 import boto3
+from common.repo_config import config_path
 
 logger = logging.getLogger("hevy_template_cache")
 
@@ -60,7 +61,7 @@ def _load_catalog() -> dict[str, Any]:
             _mem_cache["_catalog"] = _read_s3_json(CATALOG_KEY)
         except Exception as e:
             logger.warning(f"S3 catalog read failed ({e}); falling back to bundled copy")
-            with open(os.path.join(os.path.dirname(__file__), "..", "config", "movement_catalog.json")) as f:
+            with open(config_path("movement_catalog.json")) as f:
                 _mem_cache["_catalog"] = json.load(f)
     return _mem_cache["_catalog"]
 

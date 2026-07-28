@@ -106,7 +106,7 @@ def _workout_item(wid: str, date: str, **extra) -> dict:
 
 @pytest.fixture
 def hevy_common():
-    import hevy_common as hc
+    from training import hevy_common as hc
 
     return hc
 

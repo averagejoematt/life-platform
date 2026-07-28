@@ -23,8 +23,8 @@ Contents:
 from datetime import datetime, timezone
 from decimal import Decimal
 
-import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PURE SCALAR HELPERS

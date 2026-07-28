@@ -68,7 +68,7 @@ def test_force_overrides_all_gates(cron_module, monkeypatch):
         "_ssm_get",
         side_effect=_ssm_returns({"/life-platform/pause-mode": "paused", "/life-platform/hevy/cron_enabled": "false"}),
     ):
-        with patch("routine_generator.generate_routines", return_value=[]), patch("routine_repo.put_versioned"):
+        with patch("training.routine_generator.generate_routines", return_value=[]), patch("training.routine_repo.put_versioned"):
             result = cron_module.lambda_handler({"force": True, "target_date": "2026-06-01"}, None)
     assert result["status"] == "ok"
     assert result["routines"] == []
@@ -76,7 +76,7 @@ def test_force_overrides_all_gates(cron_module, monkeypatch):
 
 def _ideal_floor_pair():
     """A minimal ideal + floor variant pair with pushable exercises (#417)."""
-    from routine_ir import ExerciseBlock, RoutineSpec, Set
+    from training.routine_ir import ExerciseBlock, RoutineSpec, Set
 
     def _mk(variant, rid):
         return RoutineSpec(
@@ -98,7 +98,7 @@ def _ideal_floor_pair():
 def test_cron_pushes_branch_model_not_ideal_floor_pair(cron_module):
     """#417 TR-04: the scheduled path pushes ONE branched routine, folding the floor
     into a branch instead of dropping it."""
-    import hevy_write_client as wc
+    from training import hevy_write_client as wc
 
     captured = {}
 
@@ -111,11 +111,11 @@ def test_cron_pushes_branch_model_not_ideal_floor_pair(cron_module):
         "_ssm_get",
         side_effect=_ssm_returns({"/life-platform/pause-mode": "active", "/life-platform/hevy/cron_enabled": "true"}),
     ):
-        with patch("routine_generator.generate_routines", return_value=_ideal_floor_pair()):
-            with patch("routine_repo.put_versioned"), patch("routine_repo.upsert_id_map"):
-                with patch("hevy_template_cache.resolve_movement", return_value="TID"):
-                    with patch("routine_title.build_title_context", return_value=None):
-                        with patch("routine_title.format_why_note", return_value="Programmed."):
+        with patch("training.routine_generator.generate_routines", return_value=_ideal_floor_pair()):
+            with patch("training.routine_repo.put_versioned"), patch("training.routine_repo.upsert_id_map"):
+                with patch("training.hevy_template_cache.resolve_movement", return_value="TID"):
+                    with patch("training.routine_title.build_title_context", return_value=None):
+                        with patch("training.routine_title.format_why_note", return_value="Programmed."):
                             with patch.object(wc, "create_routine", side_effect=_fake_create):
                                 result = cron_module.lambda_handler({"target_date": "2026-06-01"}, None)
 

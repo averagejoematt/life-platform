@@ -39,7 +39,7 @@ import os
 from datetime import datetime, timezone
 from typing import Any
 
-from hevy_common import (
+from training.hevy_common import (
     INITIAL_SINCE,
     SOURCE,
     USER_ID,
@@ -89,8 +89,8 @@ def _derive_training_notes(rec: dict) -> None:
         exercises = rec.get("exercises") or []
         if not any((e.get("notes") or "").strip() for e in exercises):
             return
-        import training_notes as tn
-        from training_notes_llm import make_llm_fn
+        from training import training_notes as tn
+        from training.training_notes_llm import make_llm_fn
 
         llm_fn = make_llm_fn(_table)
         res = tn.write_workout_notes(_table, rec["date"], rec.get("workout_uid", ""), exercises, llm_fn=llm_fn)

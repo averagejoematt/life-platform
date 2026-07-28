@@ -22,7 +22,8 @@ import logging
 import os
 
 import boto3
-from routine_ir import RoutineSpec, deserialize, serialize
+
+from training.routine_ir import RoutineSpec, deserialize, serialize
 
 logger = logging.getLogger("routine_repo")
 

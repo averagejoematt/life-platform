@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from routine_ir import ExerciseBlock, RoutineSpec, Set
+from training.routine_ir import ExerciseBlock, RoutineSpec, Set
 
 # The MCP package depends on boto3 + config at import time; conftest sets the
 # path. Importing the tool module is enough.
@@ -48,11 +48,11 @@ def test_dry_run_does_not_call_write_client():
         exercises=[ExerciseBlock(movement_key="db_bench_press_flat", sets=[Set(reps=10)])],
     )
     with (
-        patch("routine_repo.get_current", return_value=ir),
-        patch("hevy_template_cache.resolve_movement", return_value="55E6546B"),
-        patch("routine_title.build_title_context", return_value=_TITLE_CTX),
-        patch("hevy_write_client.create_routine") as create_mock,
-        patch("hevy_write_client.update_routine_with_guard") as update_mock,
+        patch("training.routine_repo.get_current", return_value=ir),
+        patch("training.hevy_template_cache.resolve_movement", return_value="55E6546B"),
+        patch("training.routine_title.build_title_context", return_value=_TITLE_CTX),
+        patch("training.hevy_write_client.create_routine") as create_mock,
+        patch("training.hevy_write_client.update_routine_with_guard") as update_mock,
     ):
         result = t.tool_manage_hevy_routine({"action": "dry_run", "routine_id": "r-1"})
     create_mock.assert_not_called()
@@ -72,13 +72,13 @@ def test_archive_calls_update_not_delete():
         exercises=[ExerciseBlock(movement_key="db_bench_press_flat", sets=[Set(reps=10)])],
     )
     with (
-        patch("routine_repo.get_current", return_value=ir),
-        patch("routine_repo.put_versioned"),
-        patch("hevy_template_cache.resolve_movement", return_value="55E6546B"),
-        patch("hevy_write_client.list_folders", return_value={"routine_folders": []}),
-        patch("hevy_write_client.create_folder", return_value={"routine_folder": {"id": 99}}),
+        patch("training.routine_repo.get_current", return_value=ir),
+        patch("training.routine_repo.put_versioned"),
+        patch("training.hevy_template_cache.resolve_movement", return_value="55E6546B"),
+        patch("training.hevy_write_client.list_folders", return_value={"routine_folders": []}),
+        patch("training.hevy_write_client.create_folder", return_value={"routine_folder": {"id": 99}}),
         patch(
-            "hevy_write_client.update_routine_with_guard",
+            "training.hevy_write_client.update_routine_with_guard",
             return_value={"routine": {"id": "abc12345", "updated_at": "2026-05-31T12:00:00Z"}},
         ) as upd,
     ):
@@ -90,7 +90,7 @@ def test_archive_calls_update_not_delete():
 
 def test_commit_handles_orphan_created():
     """When Hevy 400s but the routine was actually created, link the id and return a warning."""
-    import hevy_write_client as wc
+    from training import hevy_write_client as wc
 
     ir = RoutineSpec(
         routine_id="r-orphan",
@@ -111,15 +111,15 @@ def test_commit_handles_orphan_created():
         body='{"error":"x"}',
     )
     with (
-        patch("routine_repo.get_current", return_value=ir),
-        patch("routine_repo.put_versioned", side_effect=fake_put),
-        patch("routine_repo.upsert_id_map") as upsert_mock,
-        patch("hevy_template_cache.resolve_movement", return_value="55E6546B"),
+        patch("training.routine_repo.get_current", return_value=ir),
+        patch("training.routine_repo.put_versioned", side_effect=fake_put),
+        patch("training.routine_repo.upsert_id_map") as upsert_mock,
+        patch("training.hevy_template_cache.resolve_movement", return_value="55E6546B"),
         patch(
-            "routine_title.build_title_context",
+            "training.routine_title.build_title_context",
             return_value={"phase": "Foundation", "type_count_in_phase": 1, "all_time_count": 1, "experiment_started": "2026-06-01"},
         ),
-        patch("hevy_write_client.create_routine", side_effect=orphan_exc),
+        patch("training.hevy_write_client.create_routine", side_effect=orphan_exc),
     ):
         result = t.tool_manage_hevy_routine({"action": "commit", "routine_id": "r-orphan"})
     assert "HEVY_ORPHAN_CREATED" in str(result)
@@ -174,7 +174,7 @@ def test_draft_custom_builds_ir_lb_to_kg_count_and_supersets():
             {"movement_key": "cable_tricep_pushdown", "superset_id": 1, "sets": [{"weight_lbs": 60, "reps": 12, "count": 3}]},
         ],
     }
-    with patch("routine_repo.put_versioned", side_effect=fake_put):
+    with patch("training.routine_repo.put_versioned", side_effect=fake_put):
         out = t.tool_manage_hevy_routine(args)
 
     assert out["status"] == "drafted_custom"
@@ -218,7 +218,7 @@ def test_draft_custom_resolves_arbitrary_exercise_via_index():
     # Both movements are deliberately NOT in the curated catalog, so resolution
     # must fall through to the index (curated keys would short-circuit at step 2).
     fake_index = {"burpee": {"id": "BB792A36", "title": "Burpee"}, "mountain climber": {"id": "F49E31D6", "title": "Mountain Climber"}}
-    with patch("routine_repo.put_versioned", side_effect=fake_put), patch.object(t, "_template_index", return_value=fake_index):
+    with patch("training.routine_repo.put_versioned", side_effect=fake_put), patch.object(t, "_template_index", return_value=fake_index):
         out = t.tool_manage_hevy_routine(
             {
                 "action": "draft_custom",
@@ -275,9 +275,9 @@ def test_draft_custom_auto_creates_missing_exercise():
 
     # live lookup MISSES during resolution, then HITS on the post-create reconcile
     with (
-        patch("routine_repo.put_versioned", side_effect=fake_put),
+        patch("training.routine_repo.put_versioned", side_effect=fake_put),
         patch.object(t, "_template_index", return_value={}),
-        patch("hevy_write_client.create_template", side_effect=fake_create),
+        patch("training.hevy_write_client.create_template", side_effect=fake_create),
         patch.object(t, "_live_template_id_by_title", side_effect=[None, "NEWID123"]),
     ):
         out = t.tool_manage_hevy_routine(
@@ -309,7 +309,7 @@ def test_draft_custom_does_not_create_from_bare_movement_key():
     """A bare unresolved movement_key (no human title) is treated as a likely typo —
     never auto-created — even with create_missing on."""
     with (
-        patch("hevy_write_client.create_template") as create_mock,
+        patch("training.hevy_write_client.create_template") as create_mock,
         patch.object(t, "_template_index", return_value={}),
         patch.object(t, "_live_template_id_by_title", return_value=None),
     ):
@@ -334,7 +334,7 @@ def test_infer_exercise_type_from_set_shape():
 def test_dry_run_falls_back_to_reconcile_by_title():
     """A movement without a template-id hint resolves via the live Hevy
     template list (reconcile_custom), not a loud failure."""
-    from hevy_template_cache import MovementUnmappable
+    from training.hevy_template_cache import MovementUnmappable
 
     ir = RoutineSpec(
         routine_id="r-custom",
@@ -344,11 +344,11 @@ def test_dry_run_falls_back_to_reconcile_by_title():
         exercises=[ExerciseBlock(movement_key="barbell_bench_press", sets=[Set(weight_kg=70.3, reps=5)])],
     )
     with (
-        patch("routine_repo.get_current", return_value=ir),
-        patch("hevy_template_cache.resolve_movement", side_effect=MovementUnmappable("no hint")),
-        patch("hevy_template_cache.reconcile_custom", return_value="79D0BB3A") as rec,
-        patch("routine_title.build_title_context", return_value=_TITLE_CTX),
-        patch("hevy_write_client.list_templates"),
+        patch("training.routine_repo.get_current", return_value=ir),
+        patch("training.hevy_template_cache.resolve_movement", side_effect=MovementUnmappable("no hint")),
+        patch("training.hevy_template_cache.reconcile_custom", return_value="79D0BB3A") as rec,
+        patch("training.routine_title.build_title_context", return_value=_TITLE_CTX),
+        patch("training.hevy_write_client.list_templates"),
     ):
         out = t.tool_manage_hevy_routine({"action": "dry_run", "routine_id": "r-custom"})
     assert out["status"] == "preview"
@@ -366,9 +366,9 @@ def test_archive_local_only_when_never_pushed():
         exercises=[],
     )
     with (
-        patch("routine_repo.get_current", return_value=ir),
-        patch("routine_repo.put_versioned"),
-        patch("hevy_write_client.list_folders") as folders_mock,
+        patch("training.routine_repo.get_current", return_value=ir),
+        patch("training.routine_repo.put_versioned"),
+        patch("training.hevy_write_client.list_folders") as folders_mock,
     ):
         result = t.tool_manage_hevy_routine({"action": "archive", "routine_id": "r-2"})
     folders_mock.assert_not_called()

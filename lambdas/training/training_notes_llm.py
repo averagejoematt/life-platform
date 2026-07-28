@@ -135,7 +135,7 @@ def make_llm_fn(table, monthly_cap: int = DEFAULT_MONTHLY_CAP):
     """
 
     def _fn(note_text, taxonomy):
-        from training_notes import note_hash as _nh
+        from training.training_notes import note_hash as _nh
 
         h = _nh(note_text)
         cached = cache_get(table, h)

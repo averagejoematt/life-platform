@@ -5,8 +5,8 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
-import routine_repo as repo
-from routine_ir import ExerciseBlock, RoutineSpec, Set
+from training import routine_repo as repo
+from training.routine_ir import ExerciseBlock, RoutineSpec, Set
 
 
 def _ir(version: int = 1) -> RoutineSpec:

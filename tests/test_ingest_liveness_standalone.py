@@ -93,7 +93,7 @@ def test_clean_run_records_success_sentinel(monkeypatch):
 
 def test_fatal_api_error_records_failure_and_raises(monkeypatch):
     hb = _load_backfill()
-    from hevy_common import HevyAPIError
+    from training.hevy_common import HevyAPIError
 
     _quiet_pipeline(monkeypatch, hb)
 

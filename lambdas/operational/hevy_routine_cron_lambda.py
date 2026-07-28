@@ -96,7 +96,7 @@ def _gather_inputs(target_date: str, add_load_enabled: bool) -> "GeneratorInputs
     safely without a live tools_strength/get_muscle_volume integration. Phase 2
     swaps the placeholders for direct DDB reads.
     """
-    from routine_generator import GeneratorInputs
+    from training.routine_generator import GeneratorInputs
 
     return GeneratorInputs(
         target_date=target_date,
@@ -127,12 +127,11 @@ def lambda_handler(event, context):
         target_date = _target_date_for_event(event or {})
         inputs = _gather_inputs(target_date, gates["add_load_enabled"])
 
-        import hevy_write_client as wc
-        import routine_repo as repo
-        from hevy_compiler import to_create_body
-        from hevy_template_cache import resolve_movement
-        from routine_generator import emit_branch_model, generate_routines
-        from routine_title import build_title_context, format_why_note
+        from training import hevy_write_client as wc, routine_repo as repo
+        from training.hevy_compiler import to_create_body
+        from training.hevy_template_cache import resolve_movement
+        from training.routine_generator import emit_branch_model, generate_routines
+        from training.routine_title import build_title_context, format_why_note
 
         routines = generate_routines(inputs)
         # #417 (TR-04): fold the generated variants (ideal + floor + optional
@@ -162,7 +161,7 @@ def lambda_handler(event, context):
                 why = format_why_note(ir)
                 body = to_create_body(ir, resolve_movement, title_context=title_ctx, why_note=why)
                 resp = wc.create_routine(body)
-                from hevy_compiler import from_hevy_response
+                from training.hevy_compiler import from_hevy_response
 
                 parsed = from_hevy_response(resp)
                 ir.hevy_routine_id = parsed["hevy_routine_id"]

@@ -34,7 +34,8 @@ from typing import Any
 import boto3
 from common.http_retry import urlopen_with_retry
 from common.secret_cache import get_secret_json
-from hevy_compiler import MovementUnmappable  # noqa: F401  re-export
+
+from training.hevy_compiler import MovementUnmappable  # noqa: F401  re-export
 
 logger = logging.getLogger("hevy_write_client")
 

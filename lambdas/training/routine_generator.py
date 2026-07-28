@@ -28,14 +28,15 @@ import uuid
 from datetime import date
 from typing import Any
 
-from routine_ir import ExerciseBlock, RoutineBranch, RoutineSpec, Set
+from common.repo_config import config_dir
+
+from training.routine_ir import ExerciseBlock, RoutineBranch, RoutineSpec, Set
 
 logger = logging.getLogger("routine_generator")
 
-CONFIG_DIR = os.environ.get(
-    "TRAINING_CONFIG_DIR",
-    os.path.join(os.path.dirname(__file__), "..", "config"),
-)
+# Depth-independent default — see common.repo_config (#1653). The literal
+# `dirname(__file__)/../config` assumed this module sat directly under the repo root.
+CONFIG_DIR = os.environ.get("TRAINING_CONFIG_DIR", config_dir())
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 S3_CONFIG_PREFIX = os.environ.get("TRAINING_CONFIG_S3_PREFIX", "config/")
 
@@ -211,7 +212,7 @@ def _build_exercise_note(
     pre-loaded history_index; render_history_cue formats the facts. AI
     comment hook is wired but currently always None — see ADR-068.
     """
-    from exercise_history import history_facts, pick_note, render_history_cue
+    from training.exercise_history import history_facts, pick_note, render_history_cue
 
     template_id = catalog.get("movements", {}).get(movement_key, {}).get("hevy_template_id_hint")
     facts = history_facts(template_id, history_index)
@@ -281,7 +282,7 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
     history_index: dict[str, list] = {}
     if notes_mode != "off":
         try:
-            from exercise_history import load_recent_history
+            from training.exercise_history import load_recent_history
 
             history_index = load_recent_history(
                 lookback_days=int(week_cfg.get("exercise_notes_lookback_days", 180)),

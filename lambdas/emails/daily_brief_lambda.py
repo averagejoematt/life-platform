@@ -158,11 +158,11 @@ except ImportError:
     logger = _log.getLogger("daily-brief")
     logger.setLevel(_log.INFO)
 
-import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 from ai import ai_calls  # -- Extracted module imports ---------------------------------------------------
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from content import html_builder, output_writers
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
 # ai_calls can be init'd at import time (no dependency on locally-defined functions)
 ai_calls.init(

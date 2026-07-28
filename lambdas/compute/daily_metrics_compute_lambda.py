@@ -52,7 +52,6 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
-import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 from experiment import phase_taxonomy  # ADR-077/#1233: write-time provenance stamp for the first-earn ledger
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 from health import (
@@ -63,6 +62,7 @@ from health import (
     scoring_engine,
     weight_trend,  # shared weekly-rate + projection (layer module)
 )
+from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:

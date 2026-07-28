@@ -6,9 +6,9 @@ import io
 import json
 from unittest.mock import patch
 
-import hevy_write_client as wc
 import pytest
-from hevy_write_client import HevyAuthError, HevyConflict, HevyRetryable
+from training import hevy_write_client as wc
+from training.hevy_write_client import HevyAuthError, HevyConflict, HevyRetryable
 
 
 @pytest.fixture(autouse=True)

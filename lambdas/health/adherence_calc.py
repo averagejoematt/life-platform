@@ -28,7 +28,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from common.repo_config import config_dir
-from routine_ir import RoutineSpec
+from training.routine_ir import RoutineSpec
 
 logger = logging.getLogger("adherence_calc")
 
@@ -189,8 +189,8 @@ def derive_adherence(raw_workout: dict[str, Any]) -> dict[str, Any] | None:
     ad_hoc / ambiguous deliberately omit every pct / movement field so nothing downstream
     can render a fabricated number (ADR-104)."""
     try:
-        import routine_repo
         from common.pacific_time import pacific_date_of
+        from training import routine_repo
 
         performed = raw_workout or {}
         pac_date = pacific_date_of(performed.get("start_time"))

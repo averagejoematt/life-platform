@@ -19,7 +19,7 @@ import types
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 
-import routine_title as rt  # noqa: E402
+from training import routine_title as rt  # noqa: E402
 
 # ── resolve_archetype ────────────────────────────────────────────────────────
 

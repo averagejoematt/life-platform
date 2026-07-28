@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from routine_ir import (
+from training.routine_ir import (
     IR_SCHEMA_VERSION,
     ExerciseBlock,
     RoutineBranch,
