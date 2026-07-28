@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 restart_character_rebuild.py — ADR-058: Rebuild character sheets from
-EXPERIMENT_START_DATE → today. Reads genesis from lambdas/constants.py.
+EXPERIMENT_START_DATE → today. Reads genesis from lambdas/common/constants.py.
 
 Spec §6:
   1. Tombstone S3 compute_state cache files older than genesis (if any)

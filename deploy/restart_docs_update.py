@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 restart_docs_update.py — ADR-058: Generate docs reflecting the experiment
-restart. Reads genesis from lambdas/constants.py.
+restart. Reads genesis from lambdas/common/constants.py.
 
 Touches:
   1. docs/DECISIONS.md           — appends ADR-058 (if not already present)
@@ -57,7 +57,7 @@ challenges, experiments, chronicle, public site) anchors to it.
 
 ### Implementation
 - **Config-driven constants** — `config/user_goals.json` is the canonical source of
-  truth. `lambdas/constants.py` is regenerated from it via
+  truth. `lambdas/common/constants.py` is regenerated from it via
   `deploy/sync_constants_from_config.py`.
 - **DDB phase tagging** — `restart_phase_tag.py` marks every record under
   `USER#matthew#SOURCE#*` with `phase=pilot` (sk date < genesis) or
@@ -100,7 +100,7 @@ CHANGELOG_MARKER = f"## [Restart {EXPERIMENT_START_DATE}]"
 CHANGELOG_ENTRY = f"""{CHANGELOG_MARKER} — {TODAY}
 
 ### Added
-- `lambdas/constants.py` — runtime constants (genesis date, baseline weight). Generated from `config/user_goals.json` via `deploy/sync_constants_from_config.py`.
+- `lambdas/common/constants.py` — runtime constants (genesis date, baseline weight). Generated from `config/user_goals.json` via `deploy/sync_constants_from_config.py`.
 - `lambdas/phase_filter.py` — `with_phase_filter()` helper. Wired into `site_api._query_source`, `mcp.core.query_source`, and all 13 queries in `intelligence_common.py`.
 - 6 restart scripts under `deploy/`: `restart_phase_tag.py`, `restart_intelligence_wipe.py`, `restart_character_rebuild.py`, `restart_chronicle_handler.py`, `restart_site_copy_sync.py`, `restart_pipeline.py`.
 
@@ -174,7 +174,7 @@ python3 deploy/restart_pipeline.py --genesis YYYY-MM-DD --apply
 ```
 
 The pipeline runs (in order, each idempotent):
-1. `sync_constants_from_config.py` — regenerates `lambdas/constants.py`
+1. `sync_constants_from_config.py` — regenerates `lambdas/common/constants.py`
 2. `cdk deploy LifePlatformCore LifePlatformCompute LifePlatformEmail` (full-tree bundles carry the new constants — #781)
 3. `restart_phase_tag.py --apply` — flips DDB phase tags relative to the new genesis
 4. `restart_intelligence_wipe.py --apply` — tombstones any newly pre-genesis records

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 restart_site_copy_sync.py — ADR-058: Regenerate site copy from current genesis
-+ baseline. Reads from lambdas/constants.py.
++ baseline. Reads from lambdas/common/constants.py.
 
 Touches:
   1. site/assets/js/site_constants.js
@@ -220,7 +220,7 @@ def rewrite_html_files(apply: bool) -> list[str]:
 
 def rewrite_js_files(apply: bool, old_genesis: str) -> list[str]:
     """Sweep site/ JS for hardcoded ISO literals of the OUTGOING genesis (passed
-    by the pipeline as --old-genesis, snapshotted from lambdas/constants.py
+    by the pipeline as --old-genesis, snapshotted from lambdas/common/constants.py
     BEFORE the constants regen) and rewrite them to the NEW genesis literal.
 
     History (2026-07-10 clean-sweep audit): this sweep was hardcoded to the
@@ -460,7 +460,7 @@ def main():
         "--old-genesis",
         default="2026-04-01",
         help="The OUTGOING genesis (YYYY-MM-DD) whose literals get swept out of site JS/HTML. "
-        "The pipeline snapshots this from lambdas/constants.py before the constants regen. "
+        "The pipeline snapshots this from lambdas/common/constants.py before the constants regen. "
         "Default is the cycle-1 launch date for back-compat with manual runs.",
     )
     parser.add_argument("--skip-cloudfront", action="store_true", help="Skip CloudFront invalidation step")

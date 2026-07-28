@@ -249,7 +249,7 @@ def query_pre_genesis_experiment_rows(table, source: str, genesis: str) -> list[
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--offline", action="store_true", help="skip the live-site checks (honest SKIP, not a pass) — DDB check still runs")
-    ap.add_argument("--genesis", default=EXPERIMENT_START_DATE, help="override genesis (default: lambdas/constants.py)")
+    ap.add_argument("--genesis", default=EXPERIMENT_START_DATE, help="override genesis (default: lambdas/common/constants.py)")
     args = ap.parse_args()
 
     genesis = args.genesis

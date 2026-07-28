@@ -1913,6 +1913,25 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/1888"
         }
       ]
+    },
+    {
+      "id": "2026-07-28-the-tree-that-hid-eight-live-bedrock-calls",
+      "date": "2026-07-28",
+      "title": "Tidying 132 files exposed a test suite that had been quietly calling a real AI — and paying for it",
+      "shipped": "The Lambda source tree was half-organised: 132 loose Python files sitting at the root next to twelve real folders, so opening the directory told you nothing about how the system is built. All 132 moved into nine domain packages — infrastructure, inference, the experiment apparatus, coaching, health, training, content, privacy — which meant rewriting 1,570 import statements across 499 files and redeploying all 99 Lambda functions. That part is housekeeping. What it turned up is the story.",
+      "gotcha": "Eight tests were supposed to fake the AI so they'd run free and offline. Moving a file changed how Python resolves one kind of import, and the fakes silently stopped applying — those tests had started making REAL calls to the inference API. They only failed because the CI machine has no credentials; on a machine that did, they'd have passed while billing for every run and testing nothing. Worse, it depended on test ORDER: run that file alone and it was genuinely green. Three more failures hid the same way — config loaders that quietly returned empty instead of erroring, and two data files the deployed bundle could no longer find while everything looked fine locally. The regular test suite caught none of it, because the test setup deliberately makes imports more forgiving than production is. The fix was a check that assembles the real deployment package and imports every module the way the server actually would.",
+      "honest_miss": "The tidy-up itself broke the build. A documentation gate that only runs in CI — never locally — noticed that five engine documents claimed to be verified against source files that had just moved, and it was right to. Fixing it properly meant re-checking the line numbers those documents cite, and two of them had genuinely drifted; simply bumping the dates would have turned the gate green while it pointed at the wrong code. Separately: of 99 functions redeployed, only 17 have actually started up on the new layout so far. The other 82 run on daily or weekly schedules, so their first real test is still ahead.",
+      "why_it_mattered": "A refactor that changes no behaviour is usually the least interesting kind of work. This one was worth it for a different reason: moving code is a stress test for every assumption that was never written down — where a file sits, what a test is really exercising, whether a safety check is checking anything. Four separate safeguards turned out to be quietly not working, and every one of them failed silently rather than loudly. The tree is tidier now. The more useful outcome is knowing which guards were asleep.",
+      "prs": [
+        {
+          "label": "PR #1899",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1899"
+        },
+        {
+          "label": "PR #1900",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1900"
+        }
+      ]
     }
   ]
 }

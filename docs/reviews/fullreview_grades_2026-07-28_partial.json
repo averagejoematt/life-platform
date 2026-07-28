@@ -1,0 +1,551 @@
+{
+  "date": "2026-07-28",
+  "status": "PARTIAL \u2014 banked mid-flight, awaiting Fable delta review on/after 2026-08-02",
+  "run_id": "wf_7a5a8333-cdd",
+  "model": "Fable 5 (all panel agents). Orchestrator transcription only; no other model graded, adjusted, or verified any finding.",
+  "halt_reason": "Fable usage credits exhausted mid-panel. Matthew directed that no other model complete or re-judge the panel, since the ritual's value is Fable independently grading work produced by other models.",
+  "method": "17-lens panel, one grader agent per lens + adversarial finding-verifier per lens (lean-REFUTED), read-only contract. Reached 14/17 graders and 12/17 verifiers.",
+  "ground_truth": {
+    "experiment_day": 1,
+    "cycle": 11,
+    "genesis": "2026-07-27",
+    "live_build": "6acd301",
+    "main_head": "6acd3013",
+    "main_status": "green",
+    "budget_tier": 2,
+    "budget_note": "tier 2 standing by design until 08-01; July temp ceiling $115 base / $135 surge (ADR-133 amendment) auto-reverts 2026-08-01",
+    "remediation_mode": "shadow",
+    "repo_visibility": "public since 2026-07-20"
+  },
+  "totals": {
+    "lenses_graded": 14,
+    "lenses_verified": 12,
+    "lenses_not_graded": 3,
+    "findings_raw": 72,
+    "findings_high_sev": 13,
+    "verdicts_returned": 63,
+    "confirmed": 46,
+    "adjusted": 17,
+    "refuted": 0,
+    "unverified": 9
+  },
+  "anomaly_flag": "0 REFUTED of 63 (100% survival) vs the 2026-07-16 baseline 17 REFUTED of 89 (81% survival). Either evidence discipline improved materially or this run's verifiers were insufficiently adversarial. The delta run MUST re-test a ~10-finding sample with an explicitly lean-REFUTED brief before these are treated as settled.",
+  "delta_run_owes": [
+    "Grade the 3 missing lenses from scratch: security (never graded since the repo went public 2026-07-20), data-architect, growth.",
+    "Verify the 9 orphaned findings: cto (4), observability (5).",
+    "Re-test a ~10-finding sample of the 63 survivors to test the 0-refutation anomaly.",
+    "Diff grades mechanically vs this file, separating platform change from Day-1-vs-Day-N observability (qs and narrative most need this).",
+    "File only after the above; nothing from this run was filed."
+  ],
+  "nothing_filed": true,
+  "report": "docs/reviews/FULLREVIEW_2026-07-28_PARTIAL.md",
+  "lenses": {
+    "cto": {
+      "area": "Architecture & ops",
+      "grade": "B+",
+      "grade_2026_07_16": "B+",
+      "status": "graded_unverified",
+      "rubric_anchors": {
+        "A": "Every resilience/ops claim in ARCHITECTURE.md reproduces against live CDK + AWS state; liveness sensors are capability-verified (not just IAM-parity-verified) after deploy; no alarm sits in ALARM unexplained beyond ~72h; the ADR-103 ledger rows match live subsystem state \u2014 all inside the solo-operator $85/mo envelope with no added standing machinery.",
+        "C": "The core pipeline (ingest\u2192DLQ\u2192digest, S3/DDB protection, per-lambda roles) works, but one or more monitoring paths are silently dead, the canonical architecture doc materially misdescribes live behavior (crons, stack ownership, quotas), and stale alarms/ledger rows accumulate with no reconcile loop.",
+        "F": "Async paths without DLQ/alarm coverage, shared over-privileged IAM roles, S3/DDB unprotected against operator error, or documentation wrong enough that an incident responder acting on it would make things worse."
+      },
+      "rubric_anchors_source": "2026-07-16 baseline, re-applied verbatim (never silently redefined)",
+      "findings_total": 4,
+      "findings_by_sev": {
+        "high": 1,
+        "medium": 3,
+        "low": 0
+      },
+      "fix_class": {
+        "A": 2,
+        "B": 2
+      },
+      "path_to_A": [
+        "Fix the canary's grounding universe: the grounded-digits check must compare against the same grounding payload site-api-ai serves (or a full-vitals canonical_facts), with a precision fixture in tests/ asserting true-number answers never alarm \u2014 corrects an existing load-bearing sensor, no new machinery.",
+        "One PR that fixes the six verified ARCHITECTURE.md drift instances AND extends scripts/check_doc_facts.py with: budget-tier-semantics diff against budget_guard.FEATURES, doc-named-lambda-exists-in-CDK check, and auto-discovered (or unstamped) secret_count \u2014 completing the guard the 07-16 path-to-A asked for (ADR-103 frame: deploy-guardrail class, earned by three recurrences of this exact class).",
+        "Reclassify chronic optional/timing qa warns out of the alarmed WarnCount metric (or derive the threshold from the metric's measured baseline per ADR-105); leave the 24h Maximum window untouched \u2014 makes qa-smoke-warnings red mean something again.",
+        "Add a 72h-alarm reconcile line to the /wrap gates: every alarm in ALARM must cite an incident row or issue #, or the wrap reports the shortfall honestly \u2014 attention-rent only, zero standing infra.",
+        "At the 08-01 ceiling auto-revert, verify tier recomputes against $85 and the qa-paused-by-budget + tier-2 pauses lift cleanly (one-time check, calendar-anchored \u2014 the dated-trigger discipline the PROPORTIONALITY ledger already models)."
+      ],
+      "coverage": "NOT examined: per-lambda DLQ wiring across all 105 live functions (verified the shared DLQ empty + digest drain only); us-east-1 alarm set (web stack) beyond stack existence; IAM policy simulation of any role (read role_policies.py source + trusted the drift-guarded deploys, stacks last updated 07-26/27); the #1859 us-east-1 rollback machinery and the 2026-03-30 PITR drill were not exercised; EventBridge cron-by-cron doc diff limited to daily-brief/anomaly (the two internal contradictions) \u2014 I did not re-verify the full compute/email cron table; CloudTrail data-event delivery; the exact cause of qa-smoke FailCount=2 on 07-24..26 (inferred to be the Notion schema drift fixed by PR #1888, not log-verified); the 99-doc vs 105-live Lambda count delta was not enumerated function-by-function; cost lens dollars beyond the single MTD figure ($88.32) used to sanity-check the governor.",
+      "findings_confirmed": null,
+      "note": "graded but never adversarially verified \u2014 treat findings as first-pass only"
+    },
+    "principal": {
+      "area": "Code health",
+      "grade": "A-",
+      "grade_2026_07_16": "A-",
+      "status": "graded_and_verified",
+      "rubric_anchors": {
+        "A": "Full offline suite green and fast with creds blanked; every stated quality gate (coverage floor, mypy tier set, deploy-critical lane, format gates) matches measured reality within a small tolerance; no unreferenced code shipping in the every-bundle shared modules; exactly one canonical implementation per platform invariant (float\u2192Decimal, Pacific-date, ISO parse); golden tests pinned against the known wall-clock defect class.",
+        "C": "Suite green but the gates are partly decorative \u2014 coverage floor drifted far below actual so backsliding is possible, gate comments/config contradict enforcement status, hundreds of dead lines ship in every Lambda bundle, and invariant helpers are forked with divergent edge-case semantics.",
+        "F": "Red main tolerated or gates disabled to get green; tests mirror implementation so defects cannot fail them; no coverage or type gate at all; wall-clock time bombs in fixtures with no encoded lesson."
+      },
+      "rubric_anchors_source": "2026-07-16 baseline, re-applied verbatim (never silently redefined)",
+      "findings_total": 4,
+      "findings_by_sev": {
+        "high": 0,
+        "medium": 1,
+        "low": 3
+      },
+      "fix_class": {
+        "A": 3,
+        "B": 1
+      },
+      "path_to_A": [
+        "Single-source the CI gate toolchain pins: install from requirements-dev.txt (or a constraints file) in ci-lint.yml/ci-test.yml, or add a pin-parity guard test in the test_coverage_floor_ratchet.py family asserting workflow pip-install literals equal requirements-dev pins (and that pytest/pytest-cov are pinned at all); fix the stale CQ-01 pointer ('ci-cd.yml' -> ci-lint.yml) and pyproject's 'ruff 0.14.0' header comment in the same PR \u2014 ADR-103: one offline test, zero runtime cost",
+        "Finish invariant canonicalization for the remaining 2 of 3 rubric invariants: parse_iso_utc() in pacific_time.py with tzinfo-backfill semantics, repoint whoop_lambda._parse_iso + site_api_freshness._parse_iso_ts and the 7 inline Pacific-today derivations, and extend the proven D5 structural-guard pattern (tests/test_ddb_patterns.py) to cover both \u2014 pacific_time.py already ships in every bundle (#781), so this is pure consolidation",
+        "Make the engine-doc --strict gate reproducible pre-merge: default the local check_doc_index invocation to --strict (or pre-push hook), converting the memory-reflex mitigation into structure so the 07-27 double main-red class cannot recur",
+        "Act on the standing suite-duration warning: pytest --durations=25, trim or parallelize the outliers or deliberately raise the 480s budget with rationale, and add a wrap-gate rule that any standing ::warning:: on green main gets triaged within a session",
+        "When the next test wave lands, ratchet the coverage floor 47->~50 through the existing three-literal + RATCHET_FLOOR mechanism (measured 54.62% leaves headroom; the gap-warn threshold is 10pts so the system will self-remind at ~57%) \u2014 keep the ratchet cadence alive rather than waiting for the #1658 70% end-state"
+      ],
+      "coverage": "NOT examined: mypy itself was not executed (not installed locally; I would not mutate the environment) \u2014 I verified the clean-set single-sourcing structurally (ci-lint.yml:82 reads tests/mypy_clean_set.py, so list drift is impossible) but did not reproduce the type-check verdict, and the 2.1.0-vs-2.3.0 behavioral delta is asserted from version divergence, not a differential run. Coverage was measured from the green main CI run log (54.62%), not locally (pytest-cov absent). Of the 262 test files touched since 07-16, only a heuristic wall-clock scan (hardcoded-2026-date + unmocked now() co-occurrence) was run, not a full read; mutation-level assertion strength and flake detection (single local run) were not assessed. The 77 local skip reasons were not individually re-audited this run (counts consistent with the baseline's audited creds/playwright classes). cdk/ stack-code health, tests/js/ (site JS tests), the creds-gated integration suite (by design), deployed-bundle byte content vs repo, and the MCP tool-count drift check were not covered. The baseline's unverified suspicion of Python 3.14-local vs 3.12-CI masked discrepancies remains unhunted (suite green on both). Prior-cycle leak hunting (the #1194 class) has no direct surface in this lens; nothing suspicious appeared in test/gate land.",
+      "findings_confirmed": 2,
+      "findings_adjusted": 2,
+      "findings_refuted": 0,
+      "verifier_grade_impact": "All four findings survive in substance (2 confirmed, 2 adjusted on root-cause/framing only), and since they are uniformly low/medium-severity tooling-hygiene gaps with existing partial guards rather than production defects, they still support the proposed A- grade."
+    },
+    "aiq": {
+      "area": "AI content integrity \u2014 grounded generation (ADR-104), rigor bar (ADR-105), phase/day-awareness, hallucination surface, tombstone read semantics, coach quality gate (ADR-108), tier-2 pause honesty",
+      "grade": "B",
+      "grade_2026_07_16": "B+",
+      "status": "graded_and_verified",
+      "rubric_anchors": {
+        "A": "Every reader-facing AI narrative passes a deterministic grounding gate with the audience-correct fail mode (fail-closed public, keep-best internal), every prompt carries the phase/day truth, a reset leaves zero wiped-cycle narrative reachable on any live endpoint, and live spot-checks find no number, date, or verdict a Day-4 reader couldn't trace to real data.",
+        "C": "The grounding harness exists and covers the flagship surfaces, but coverage is convention rather than structure \u2014 at least one live surface serves stale, ungated, or mischaracterized AI content and no test or gate would catch it.",
+        "F": "Models receive raw data and ship unchecked numbers or claims to readers, or a reset/budget state silently narrates wiped or fabricated history as current with no tombstone semantics at all."
+      },
+      "rubric_anchors_source": "2026-07-16 baseline, re-applied verbatim (never silently redefined)",
+      "findings_total": 6,
+      "findings_by_sev": {
+        "high": 1,
+        "medium": 2,
+        "low": 3
+      },
+      "fix_class": {
+        "A": 5,
+        "B": 1
+      },
+      "path_to_A": [
+        "Extend baseline_freshness_findings with a day-span class (normalize spelled-out numbers; match 'N days/weeks of/into the experiment' against expected_day) and wire generation_date_iso/start_date_iso into the expert analyzer's grounding closure \u2014 pure-harness extension, no new standing machinery (ADR-103 clean)",
+        "Add a deterministic prediction-outcome-claim gate: outcome-framed self-references ('prediction miss', 'I was right/wrong') must resolve to an evaluated (non-pending) prediction supplied in the generation brief; wire through regen_once on coach V2 and the analyzer",
+        "Promote the #1691/#1699 advisory gates to regenerate-or-hold on the reader-facing coach path \u2014 the promotion hook is already documented in code (ai_calls.py:2027-2030) and the ADR-108 hold shape is already built",
+        "Make gate coverage structural: a wiring-coverage-style registry test binding each reader-facing AI surface to its required gate classes (freshness, behavioral, dates), so a new surface cannot ship half-gated",
+        "Close the residual tombstone-blind seeds: singleton_visible on the analyzer's prior-analysis get_item + a nightly qa-smoke sweep for stamp-less rows on tagger-blind COACH#/ENSEMBLE# partitions"
+      ],
+      "coverage": "Examined: grounded_generation.py in full + its property tests, ai_calls coach V2 pipeline (grounding, quality gate, freshness/behavioral advisory gates, qa_archive), coach_quality_gate enforcement path, ai_expert_analyzer context assembly, coach_narrative_orchestrator reads, phase_filter/phase_taxonomy/tombstone semantics, and live endpoints (state_of_matthew, coaches, coach_analysis, coaching-dashboard, weekly_priority, ai_analysis, pulse_history, observatory_week, receipts) plus direct DDB queries of COACH#/ai_analysis partitions. NOT examined: actual email-send content (daily brief/debrief/wednesday chronicle), the podcast/panelcast QA gates, live POST behavior of /api/ask and /api/board_ask (read-only contract \u2014 no POSTs made), memoir/field-notes/horizons live pages, the /story/ chronicle static pages in depth, OG-image text, MCP tool outputs, inter-coach dialogue and diary-reaction surfaces, state_of_matthew generation code, and CloudWatch gate-fire telemetry. No Lambda was invoked and no writes performed.",
+      "findings_confirmed": 3,
+      "findings_adjusted": 3,
+      "findings_refuted": 0,
+      "verifier_grade_impact": "All six findings survive (four confirmed outright, two with corrected root causes, and finding 4 upgraded from latent to an active Day-1 prior-cycle leak feeding finding 0), so the surviving set fully supports the proposed B \u2014 arguably with more force than the original write-up, since the dominant historical defect class (#1194 tombstone leak-through) recurred live on Day 1."
+    },
+    "cpo": {
+      "area": "Product & narrative arc (CPO lens)",
+      "grade": "B+",
+      "grade_2026_07_16": "B+",
+      "status": "graded_and_verified",
+      "rubric_anchors": {
+        "A": "Every door's first screen states its loop role; every live engagement hook (predict-the-week, ask-the-board, chronicle/podcast cadence) is demonstrably alive-or-honestly-absent on ANY day of a cycle including Day 4 of a fresh reset; a shared bare URL lands on the page; each of the 4 audiences finds its surface within one click of Home; the early-cycle state reads as a deliberate season premiere (day counter, pre-registration, prequels, cycle-vs-cycle context).",
+        "C": "Doors render and the loop is taught, but one or more engagement hooks silently serve stale or dead-cycle content, shared links 404, or the fresh-cycle state depends on the reader's forgiveness to not read as broken \u2014 returnability exists on paper but not on the calendar.",
+        "F": "The early-cycle site reads as broken or dishonest: blank doors, no day counter or pre-registration, hooks dead or fabricating (gains hidden, dead weeks presented as live, chronicle inventing content beyond the logged data)."
+      },
+      "rubric_anchors_source": "2026-07-16 baseline, re-applied verbatim (never silently redefined)",
+      "findings_total": 5,
+      "findings_by_sev": {
+        "high": 1,
+        "medium": 3,
+        "low": 1
+      },
+      "fix_class": {
+        "A": 4,
+        "B": 1
+      },
+      "path_to_A": [
+        "Wire narrative invalidation into the baseline-supersede flow + qa_smoke deterministic baseline-figure check, and sanction one-shot correction regens under the tier pause (ADR-104 honesty spend; extends existing restart+qa_smoke machinery \u2014 finding 1)",
+        "Plumb regeneration_paused into /api/coaching-dashboard and stop hardcoding false at coaching.js:500, with a tier-mocked unit test (finding 2, S)",
+        "Seed a genesis-week predict-the-week challenge from restart_pipeline + restart_verify assertion, completing the lifecycle the 07-16 review specified (finding 3)",
+        "Ship the cron-derived cadence line on chronicle/podcast lists, honest-pending when the budget guard pauses generation (finding 4, S)",
+        "Add Day-N/cycle-boundary framing to the per-coach narrative prompt enforced by board_quality_gate's early-cycle rule (finding 5, S)"
+      ],
+      "coverage": "Not examined: ask-the-board POST path (exercising it invokes Bedrock \u2014 read-only contract; verified only that coaching.js:1007/1101 wires /api/board_ask and rate limiting exists), actual browser-rendered JS states (no Playwright run \u2014 all JS-rendered conclusions inferred from code + live API payloads), the subscribe/email funnel and digest content, /data subpages beyond the door, by-coach deep pages as rendered, mobile/responsive behavior, off-site channels (Bluesky/X/YouTube links untested), the semantics of /api/predictions 'current' showing 102 pending on Day 1 (observed, not verified \u2014 flagged in lens notes), and the OG share-card images. Market comparison was a single WebSearch, not a systematic competitive scan.",
+      "findings_confirmed": 3,
+      "findings_adjusted": 2,
+      "findings_refuted": 0,
+      "verifier_grade_impact": "All five findings survive on symptoms (3 confirmed, 2 adjusted on root cause), including the high-severity superseded-baseline contradiction live on the coaching door plus the dark flagship hook and missing paused disclosure \u2014 a set fully consistent with the proposed B+ (sound machinery, real Day-1 honesty/framing gaps)."
+    },
+    "designer": {
+      "area": "Design system",
+      "grade": "A-",
+      "grade_2026_07_16": "A-",
+      "status": "graded_and_verified",
+      "rubric_anchors": {
+        "A": "Every live surface draws color/type/spacing from tokens.css; the 11px type floor holds when MEASURED (including SVG text under render scale) at 390 and 1280; single-ember discipline and the breakpoint set are enforced by a gate that sweeps all sheets; Day-N-sparse states are visibly designed and honest.",
+        "C": "The kit and tokens exist and most pages use them, but flagship charts ship sub-floor text, several off-palette raw-hex accents render live, and the token gate covers only a minority of sheets so drift accumulates unpoliced.",
+        "F": "No token discipline: decorative glow, red-for-down direction encoding, emoji marks, per-page ad-hoc type and colors; empty states are blank, broken, or dressed up to hide sparseness."
+      },
+      "rubric_anchors_source": "2026-07-16 baseline, re-applied verbatim (never silently redefined)",
+      "findings_total": 3,
+      "findings_by_sev": {
+        "high": 0,
+        "medium": 2,
+        "low": 1
+      },
+      "fix_class": {
+        "A": 2,
+        "B": 1
+      },
+      "path_to_A": [
+        "Extend scripts/check_css_tokens.py to sweep builder-emitted <style> CSS (the 10 v4_build_*.py STYLE blocks or built non-legacy HTML), fixing the five rogue breakpoints (560/620/640/720/900 \u2192 sanctioned by-job neighbors) and the 64px journal drop cap in the same PR \u2014 ADR-103-clean: extends the existing offline gate, zero standing cost",
+        "Tokenize the five grandfathered status-color families to one \u00a74-compliant outcome grammar (confirmed/won \u2192 ember; refuted/lost \u2192 muted ink, as .cr-refuted and .vice-broke already do) and delete their hex-ok sanctions so the existing gate owns them",
+        "Require deferral-style sanctions to carry an open-issue ref, enforced by the sanction parser with a planted-violation test",
+        "File the tokenization issue the hex-ok comments promised (or land the fix directly) so nothing in the design system defers work outside the ADR-099 backlog"
+      ],
+      "coverage": "Examined: DESIGN_SYSTEM_V5.md in full; all 8 site/assets/css sheets via targeted greps (hex, fs-ok/hex-ok, glow/box-shadow additions since 07-16 via git diff); scripts/check_css_tokens.py + tests/test_css_tokens.py (ran: 5 passed) + tests/test_paper_ramp_contrast.py (ran: 3 passed); all 10 CSS-emitting builder scripts scanned for hex/font-size/breakpoints; live renders via Playwright (read-only) of /, /cockpit/, /coaching/, /data/character/, /story/diary/, /protocols/, /data/ at 390x844 AND 1280x900 with measured getScreenCTM SVG-text effective sizes (zero sub-floor at both widths \u2014 prior finding 1 verified fixed live) and horizontal-overflow checks (none); live curls of /version.json (6acd301 == main), /api/journey, /api/predictions, /method/grade-your-coach/, /story/diary/, /data/character/; inline <style> audit of the 4 non-legacy hand/build-authored pages (404, gear, privacy, journal essay). Day-1 empty states verified designed and honest on 5 surfaces; hunt-order probe clean (attempt #11, 11 season beads, DAY 1 consistent, character priors labeled 'AUTHORED PRIOR \u2014 NOT YET CONFIRMED'). NOT examined: /mind/, /subscribe/, /story/ subpages beyond the diary shelf, chronicle post bodies, /gear/ rendered, OG share cards, email templates; no light-vs-dark visual pass (relied on the passing paper-ramp contrast test + prior run's 19 measured ratios); no tap-target audit rerun (gating in CI); no VoiceOver/keyboard session; the design_sync_bundle.py hexes were not audited (export tool, not a live page).",
+      "findings_confirmed": 3,
+      "findings_adjusted": 0,
+      "findings_refuted": 0,
+      "verifier_grade_impact": "All three findings survive intact (two medium, one low \u2014 a real gate blind spot with live drift plus untracked grandfathered off-grammar colors, all cleanly fixable), which is consistent with the proposed A-: a strong, mostly-policed design system with one structural coverage gap and a sanction-hygiene debt."
+    },
+    "dataviz": {
+      "area": "Charts & instruments",
+      "grade": "B+",
+      "grade_2026_07_16": "A-",
+      "status": "graded_and_verified",
+      "rubric_anchors": {
+        "A": "Every visual encoding is proportional and honest at any n (lengths/areas never anchored to arbitrary floors), every statistical claim carries visible-and-reachable n/CI on touch and keyboard, low-n charts refuse or degrade with explicit copy, and the live site renders zero contradictory encodings on any surface.",
+        "C": "Charts render and mostly caption honestly, but multiple encodings exaggerate (truncated-baseline bar lengths, area fills over min-max axes), some correlations ship without visible n, or the hover/tap readouts are dead on a class of charts.",
+        "F": "Truncated axes or area lies presented as trends, correlations framed causally or shipped with no n at all, fabricated confidence bands, or n=4 data drawn as a confident trend line with no caveat."
+      },
+      "rubric_anchors_source": "2026-07-16 baseline, re-applied verbatim (never silently redefined)",
+      "findings_total": 3,
+      "findings_by_sev": {
+        "high": 1,
+        "medium": 2,
+        "low": 0
+      },
+      "fix_class": {
+        "A": 3,
+        "B": 0
+      },
+      "path_to_A": [
+        "Honor the tombstone in site_api_ledger.what_changed(): serve the already-written honest_null shape when tombstone=true, and gate the home 'this month' copy on computed_at recency (S, no new infra).",
+        "Resolve pillar_coupling's semantic under ADR-077 and encode it: either phase-filter the character_sheet read so constellation edges rebuild from genesis, or sanction the cross-reset window explicitly with a served spans_reset flag the figcaption renders as 'measured before this cycle began' (S\u2013M).",
+        "Fix the observatory_week prev-window clamp to yield an EMPTY prior week when it predates genesis (engaging the existing ADR-104 branch) and map delta==0 to trend 'flat' across all six domains (S).",
+        "Add ONE tombstone sweep pytest for lambdas/web/*: stub a tombstoned record into every EXPERIMENT_SCOPED partition each handler reads and assert nothing tombstoned is returned \u2014 converts the per-module convention (which missed the ledger module twice) into a structural gate; offline, zero standing cost, ADR-103-clean.",
+        "Add a first-week-of-cycle lifecycle case to tests/test_pre_start_contract_sweep.py (anchor==genesis and genesis+2d) so reset-boundary honesty is tested at BOTH lifecycle edges, not just pre-start."
+      ],
+      "coverage": "Verified this run: live payloads for /api/journey_waveform, /api/journey, /api/pulse, /api/pillar_coupling, /api/correlations, /api/observatory_week (sleep), /api/vitals, /api/what_changed, /api/cycle_compare, /api/discoveries, /api/sleep_correlations; DDB ground truth for what_changed and character_sheet tombstones; full reads of story.js waveform/constellation/homePulse/cycleBeat, cockpit.js week view, site_api_rollups.py sleep branch, site_api_ledger.py, site_api_intelligence.py coupling handler, restart_intelligence_wipe.py registry+main loop, svgtype.js floors, tests/test_wave_render_guard.py header; confirmed the shipped story.js on CDN carries the unlocked-line renderer and the live home HTML has its mount. NOT examined this run: no browser render pass or screenshots (code+payload verification only \u2014 rendered-px SVG floors delegated to the visual_qa arbiter); charts.js primitives not re-audited line-by-line (relied on the 07-16 full 905-line pass plus spot checks of consumers); the 5 non-sleep observatory_week domain branches read only at the shared-clamp level; OG image cards, /data/ topic pages beyond the endpoints above, evidence_* modules, cockpit daily view internals, and calibration surfaces not re-inspected; AI explain behavior under budget tier 2 not exercised live; the weekly-correlation-compute writer itself (why nothing wrote after 07-04) not traced.",
+      "findings_confirmed": 3,
+      "findings_adjusted": 0,
+      "findings_refuted": 0,
+      "verifier_grade_impact": "All three findings survive adversarial verification with independent live+code reproduction \u2014 a high-severity front-page prior-cycle leak (the exact #1194 recurrence class) plus two medium honesty defects fully support the proposed B+ and would make anything higher indefensible."
+    },
+    "qs": {
+      "area": "Scientific credibility",
+      "grade": "C+",
+      "grade_2026_07_16": "B+",
+      "status": "graded_and_verified",
+      "rubric_anchors": {
+        "A": "Every public claim is correlative and carries a real, resolvable citation; every protocol lever states the data it targets and the hypothesis that spawned it; every pre-registered bet is either graded or explicitly voided ON THE RECORD across resets; thresholds derive from personal variance or are labelled population constants; every 'how it holds up' surface is either live or honestly retired.",
+        "C": "The methodology pages state the right posture (correlative-only, pre-registration, calibration) but spot-checks find fabricated-looking citations, pre-registered bets that silently vanish at reset, or dead credibility surfaces a skeptic can trip on.",
+        "F": "Causal claims stated as fact, invented or search-URL citations presented as studies, calibration numbers that misrepresent the actual record, or magic-number thresholds presented as personalized."
+      },
+      "rubric_anchors_source": "2026-07-16 baseline, re-applied verbatim (never silently redefined)",
+      "findings_total": 9,
+      "findings_by_sev": {
+        "high": 2,
+        "medium": 4,
+        "low": 3
+      },
+      "fix_class": {
+        "A": 7,
+        "B": 2
+      },
+      "path_to_A": [
+        "Citation-resolution gate + full sweep: land an offline pytest that resolves every PMID in config/supplement_registry.json and config/experiment_library.json against a checked-in id\u2192title fixture and asserts token overlap with the claimed title/summary, then fix all 21 verified mismatches (relabel as 'open question \u2014 no direct study found' where no real paper exists). Zero standing cost, no new infra \u2014 ADR-103 clean; this is the single highest-leverage repair because 'click the citation' is the cheapest test a skeptic runs.",
+        "Publish the void denominator: add `voided:{n, by_cycle}` to /api/calibration and one rendered line on the Career card naming the 273 bets voided at resets. One payload field + one line of JS; it converts the platform's biggest survivorship hole into its most convincing honesty artifact.",
+        "Close the grade-or-void loop permanently: one-time reconcile of the 39 orphaned open hypotheses into cycle-stamped voided_at_reset rows, plus a post-void invariant assertion in restart_pipeline (open + tombstoned + unvoided == 0) that fails the apply run \u2014 the process fix, not the instance fix.",
+        "Make pre-registration structural, not attended: default seed_genesis_preregistration ON in restart_pipeline (with an explicit --no-preregistration escape) and add the sealed artifact + SHA-stamp fetch to restart_verify's pass criteria; then link the current seal from /method/calibration and /method/predictions so the strongest artifact stops being URL-guess-only.",
+        "Hedge-or-cite sweep of the supplement science bullets (widen the #1217 guard from prevalence percentages to unhedged efficacy verbs) and render target_provenance on the character sheet, so the personal-variance bands (n=342) are visibly distinguished from authored commitments."
+      ],
+      "coverage": "Examined: live /api/supplements, /api/experiments, /api/calibration, /api/hypotheses, /api/discoveries, /api/correlations, /api/forecast, /api/vitals, /api/character_config, /api/cycle_compare, /api/benchmark_trends; all 58 unique supplement PMIDs + 6 active-experiment PMIDs resolved against NCBI eutils; DDB partitions SOURCE#calibration (296 rows), SOURCE#hypotheses (46 rows), PREDICTION# scan (2330 rows, 68 cycle-11 pending); the cycle-11 and channel-divergence prereg seals verified byte-for-byte (local SHA == live artifact SHA == published stamp); s3 ls of generated/experiments/prereg/; deploy/restart_pipeline.py void path; tests/test_supplement_registry.py; site/assets/js/evidence_intelligence.js, evidence_discovery.js, evidence_character.js; grading-stalled alarm + coach-prediction-evaluator log streams. NOT examined: the daily brief / email copy (17:00 UTC brief has not fired for Day 1), chronicle and Elena narrative text, coach dossier prompts and the ai_calls quality gate, MCP tool output text, /method/grade-your-coach's claimed Python\u2194JS bit-parity (I did not run the test vectors), the labs/PhenoAge/biology surfaces, statistical internals (FDR correction, EWMA forecast model, Brier binning code) beyond their served outputs, the ~40 PMIDs whose titles were topically plausible (checked at title level only \u2014 I did not read abstracts to confirm the specific quantitative claims), /api/protocols (empty on Day 1, not evaluable), the diary claims-ledger grading path (#1841, first compute pending), and any rendered-page visual verification (I read the JS renderers, not screenshots).",
+      "findings_confirmed": 6,
+      "findings_adjusted": 3,
+      "findings_refuted": 0,
+      "verifier_grade_impact": "Yes \u2014 the surviving set still supports C+ and arguably no better: two high-severity credibility defects fully reproduce (18 fabricated PMID\u2192claim mappings live on /api/supplements plus a fabricated citation with an invented effect-size summary on the active tongkat-ali protocol, and a public 'Career \u00b7 every cycle' denominator that hides 273 voided pre-registered bets), backed by three medium findings (39 orphaned ungraded hypotheses, 3-of-6 cycles with no sealed prereg, the seal unlinked from every page), with only the hedging finding and the zone-2 dedupe claim materially downgraded."
+    },
+    "narrative": {
+      "area": "Voice & immersion (Narrative editor)",
+      "grade": "B-",
+      "grade_2026_07_16": "B",
+      "status": "graded_and_verified",
+      "rubric_anchors": {
+        "A": "Every live narrative surface tells one coherent cycle-6 story \u2014 reset seams are invisible to a binge reader, restored prequels are internally reconciled, each coach is distinguishable blind (and the voice-fidelity scoreboard has evidence), and no page contradicts another page's account of the same week.",
+        "C": "Page-by-page prose is competent but cross-surface continuity breaks survive a reset \u2014 stale prior-cycle narratives render on live doors, restored posts contradict each other on plan facts, or coach attributions add no voice \u2014 so an attentive reader catches the machinery mis-telling the story.",
+        "F": "Personas are interchangeable or the narrator voice is absent, wiped-cycle narratives dominate live pages as if current, or narrative copy contradicts the platform's own data (hype over honesty, unearned glow)."
+      },
+      "rubric_anchors_source": "2026-07-16 baseline, re-applied verbatim (never silently redefined)",
+      "findings_total": 8,
+      "findings_by_sev": {
+        "high": 3,
+        "medium": 3,
+        "low": 2
+      },
+      "fix_class": {
+        "A": 7,
+        "B": 1
+      },
+      "path_to_A": [
+        "Add the deterministic zero-data verdict check to the existing ADR-108 blocking quality gate (ai_calls._enforce_quality_gate): no graded-outcome vocabulary when the domain's current-cycle observation count is 0 \u2014 regenerate-or-hold; tombstone the surviving pre-genesis coach singletons (STANCE#latest, OUTPUT#2026-07-26) and the false lunch_protein_prediction_miss thread (ADR-103: extends live machinery, no new standing cost)",
+        "One cast, one canon: a persona-registry consistency unit test over every owner/byline/coach_name literal in configs and hardcodes; fix the three violations it finds today (Attia\u2192Patel and Rodriguez\u2192Reeves in character_sheet.json, Nakamura\u2192Marsh in integrator_prompts.py + site_api_coach.py) and regenerate /method/game/ + the coaching noscript",
+        "Plan-literal reconciliation in the restart pipeline's sync step: sweep protein/kcal/step literals in maintained configs (board_of_directors.json, character_sheet.json) against user_goals.json + the sealed prereg at every reset \u2014 kills the 190g-vs-170g contradiction at the root, deterministic and free",
+        "Append the editor's-note reconciliation to Prologue Part III (the Part I pattern): the real Day-1 scale read 321.09 superseding the 317.61 working number, waypoints re-anchored \u2014 and make the baseline-supersede step of restart_pipeline emit this note automatically on any frozen artifact quoting the superseded literal",
+        "Land the reader_truth_qa as-of/night-scope rule (proposed 07-16, never shipped): narrative sleep/recovery figures must name their night and match that night's stored vitals \u2014 extends an existing nightly deterministic QA layer, zero AI cost"
+      ],
+      "coverage": "NOT examined: email narrative surfaces (daily brief, digests, Monday compass \u2014 no live email inspected); podcast script/audio content (epic #1737 territory); Elena's pending chronicle drafts for the coming Wednesday (chronicle generation tier-2 paused); the /data/ topic-page editorial and /story/timeline//attempts//about in depth (skimmed hub level only); by-coach detail pages for 6 of 9 coaches (sampled nutrition, mind, sleep in full); OG share-card copy; MCP tool prose; board_ask live generation (write endpoint \u2014 skipped under read-only + cost discipline); voice-fidelity scoreboard evidence (n=0 post-reset by design); the legacy tree (excluded by design). AWS reads were limited to the nutrition coach's COACH# partition \u2014 other coaches' STANCE/THREAD partitions likely carry the same pre-genesis-singleton pattern (mechanism verified for nutrition only; the sleep coach thread 'Recovery score improved from 29% to 60%' also narrates cross-seam continuity I did not fully trace).",
+      "findings_confirmed": 7,
+      "findings_adjusted": 1,
+      "findings_refuted": 0,
+      "verifier_grade_impact": "All eight findings survive (seven confirmed, one adjusted-but-alive), including three high-severity Day-1 continuity/cast leaks on public surfaces plus a live fabricated-verdict pipeline \u2014 the surviving set fully supports the proposed B-, and arguably makes B- generous rather than harsh."
+    },
+    "security": {
+      "area": "Exposure",
+      "grade": null,
+      "grade_2026_07_16": "A-",
+      "status": "not_graded",
+      "rubric_anchors": {
+        "A": "Live public JSON exposes zero chronological age / birth year / genome identifiers / vice-substance names (verified by curl+grep, not docs); sensitive S3 prefixes (raw/config/uploads/dashboard) return 403/404 publicly; no live secret or PII in tracked repo files or recent history; the MCP OAuth consent+PKCE gate and DDB-backed per-IP rate limits are provably enforced with no spoofable trust boundary; every Lambda has its own least-privilege role with Resource:* only on actions that cannot be resource-scoped.",
+        "C": "Privacy absolutes hold on the sampled live endpoints but one enforcement boundary is bypassable (e.g. spoofable client-IP so rate limits don't actually bind) or a known-inversion residual is unmitigated, OR an over-broad IAM wildcard / publicly readable sensitive prefix exists without a compensating control.",
+        "F": "Any live public endpoint returns chronological age, a genome identifier, or a named vice/substance; a live credential is committed to the repo; /token or /authorize mints a bearer without consent; or raw health data is publicly fetchable."
+      },
+      "rubric_anchors_source": "2026-07-16 baseline, re-applied verbatim (never silently redefined)"
+    },
+    "a11y": {
+      "area": "Accessibility",
+      "grade": "A-",
+      "grade_2026_07_16": "A-",
+      "status": "graded_and_verified",
+      "rubric_anchors": {
+        "A": "WCAG AA holds on every live page in BOTH themes (verified by an automated token-contrast check, not hand-written comments); every interactive widget is keyboard-operable with visible focus; data charts are named to AT; reduced-motion is honored; tap targets meet the 44px floor site-wide with a gating audit.",
+        "C": "Landmarks/headings/skip links are mostly right and most widgets are keyboard-reachable, but multiple AA contrast failures exist in at least one theme, some custom widgets (charts, tabs, popovers) are mouse-only or unnamed to screen readers, and there is no regression guard so fixes decay.",
+        "F": "Div-soup interactive UI (no focus styles, no keyboard path), data charts silent to screen readers, contrast failures on body text, no skip links, animation ignores prefers-reduced-motion."
+      },
+      "rubric_anchors_source": "2026-07-16 baseline, re-applied verbatim (never silently redefined)",
+      "findings_total": 4,
+      "findings_by_sev": {
+        "high": 1,
+        "medium": 2,
+        "low": 1
+      },
+      "fix_class": {
+        "A": 3,
+        "B": 1
+      },
+      "path_to_A": [
+        "Fix cockpit.css:94 \u2014 replace the .scope-deep opacity:0.6 de-emphasis with full-opacity --ink-faint (already quieter than active ink, AA in both themes: 5.97:1 dark / 4.88:1 light), and fold the four cockpit landmark orphans (.hero-instruments etc.) into the same PR. One page, one PR, S effort.",
+        "Shrink the a11y debt ledger in one reviewed PR (`python3 tests/visual_qa.py --update-baseline` over the full surface) \u2014 restores real serious/critical gating on ~64 pages that are currently exempt; keep or defer the /data/character/ and /data/badges/ entries until the cycle fills (their cleanliness is partly Day-1 emptiness). Zero standing cost.",
+        "Give the axe audit a light-theme dimension: alternate the weekly full-surface run's color_scheme by week parity (or add a light pass over the 6 tier-1 doors at deploy). Same runner, one parameter \u2014 ADR-103 justification: no new system, an existing gate gains the missing half of its domain.",
+        "Add a consumer for the per-run 'a11y fixed vs baseline \u2014 shrink the ledger' warnings (weekly visual-qa report triage or the /wrap warning check) so ledger drift in either direction becomes an action item within a week instead of sitting unactioned for 9+ days.",
+        "After steps 1-2, re-run the full-surface sweep in both themes and confirm zero serious/critical entries remain in the ledger for non-reset-scoped pages \u2014 at that point the rubric's A bar (AA on every live page in both themes, gated) is met with the machinery already built."
+      ],
+      "coverage": "NOT examined: no assistive-technology session (VoiceOver/NVDA) and no full manual keyboard walkthrough \u2014 keyboard/focus claims rest on code inspection (:focus-visible rules, wireTabList, popover focus traps verified in source, not driven live). Axe was run live on 15 of ~88 pages (7 in both themes, 8 more dark-only, chosen to cover the heaviest baseline entries plus the two pages shipped 07-27); the remaining ~73 pages are covered only by the CI sweep's own history. The interactive write flows (subscribe, votes, ask-the-board, predict-the-week) were not keyboard-tested this run. WebKit/iOS a11y behavior not exercised (the weekly webkit-mobile-qa workflow exists but was not re-verified). The diary shelf's card renderer was code-reviewed only \u2014 the live shelf is honestly empty on Day 1 (0 published entries, 1 withheld), so prosody/quote cards could not be observed rendered. Email templates and OG share cards were not audited. Reduced-motion was verified by grep + code read (motion.js/portraits.js early-exits, 30 CSS gates), not by a forced-preference browser pass.",
+      "findings_confirmed": 2,
+      "findings_adjusted": 2,
+      "findings_refuted": 0,
+      "verifier_grade_impact": "All four findings survive in substance (two confirmed verbatim, two adjusted on root-cause/magnitude details only), so the surviving set \u2014 one real high-severity flagship-page AA failure absorbed by the baseline, plus three narrow guard-coverage gaps in otherwise strong #1433/token/landmark machinery \u2014 still supports the proposed A-."
+    },
+    "reader": {
+      "area": "First-contact comprehension (cold Reddit reader, live site, desktop 1280 + mobile 390)",
+      "grade": "B",
+      "grade_2026_07_16": "B+",
+      "status": "graded_and_verified",
+      "rubric_anchors": {
+        "A": "A stranger from Reddit gets what/who/why in one screen on every door, every platform term is glossed inline where it first appears, every visible number is self-consistent and date-scoped, and a 4-day-old experiment reads as deliberately young rather than empty or broken.",
+        "C": "The pages render and the premise is findable, but unexplained jargon, contradictory or stale numbers, or broken-looking text force the reader to do reconciliation work before they can trust the site.",
+        "F": "A first-time reader cannot tell what the site is or whether it is alive \u2014 blank regions, raw template bindings, dead data, or a story surface that looks abandoned."
+      },
+      "rubric_anchors_source": "2026-07-16 baseline, re-applied verbatim (never silently redefined)",
+      "findings_total": 7,
+      "findings_by_sev": {
+        "high": 2,
+        "medium": 3,
+        "low": 2
+      },
+      "fix_class": {
+        "A": 6,
+        "B": 1
+      },
+      "path_to_A": [
+        "Date-scope every number a coach cites: pass each reading's own date into ai_expert_analyzer_lambda's fact block, require 'last weigh-in <date>' phrasing when the reading is not from the data-day, and add a qa_smoke reconciliation check (coach-cited weight vs /api/vitals \u00b10.5 lb or date-qualified) \u2014 permanently closes the #787/#1226/#1194 coach-vitals class using the existing nightly QA layer, no new standing machinery (ADR-103: extends qa_smoke, rent already paid).",
+        "Register the what_changed/newly-unlocked artifact as experiment_scoped in lambdas/phase_taxonomy.py (so the existing coverage assertion owns it at every future reset) and gate the home ribbon on computed_at >= genesis in story.js \u2014 reuses ADR-077 machinery, zero new cost.",
+        "Fix the analyzer's labs fact extraction to read the record's real schema (out_of_range list / total_biomarkers) with a fixture unit test \u2014 kills the public 'zero results' false alarm at the source.",
+        "Fix the hero zero-delta copy branch in story.js:354/380 ('holding even since the start') with a three-branch template unit test \u2014 removes the one 'site looks broken' moment in the first screen.",
+        "Unify the brief-line label: carry the cockpit's honest 'yesterday's read' kicker to coaching and home (or strip deictics at generation) so 'Day 1' and 'tomorrow's experiment start' can never co-occur."
+      ],
+      "coverage": "Rendered the LIVE site (build 6acd301 verified via /version.json == main HEAD) with Playwright, service workers blocked, real JS executed, full scroll-through before capture, at 1280x900 and 390x844 \u2014 all six target pages (/, /now/, /data/, /coaching/, /protocols/, /story/). Checked: console errors (zero on all 12 renders), page errors (zero), horizontal overflow (zero px at 390), raw mustache/undefined/NaN (none), empty data-binds (home: 3, all hidden or non-text; /now/: 25, verified all inactive-tab/hidden empty-states except benign tick elements). Cross-checked live APIs (vitals, labs, what_changed, coaching-dashboard, coach_team) and DDB ground truth (withings Jul 20-27, whoop Jul 25-27, labs 2026-04-03). NOT examined: story-door sub-tabs beyond Chronicle (Podcast/In-my-own-words/Timeline/Broadcast/About), /data/ topics beyond the default weight view, /coaching/ By-Coach/Scorecard/Team/lab-notes tab contents, /protocols/ Experiments/Challenges/Discoveries tabs, deep pages (/method/, /story/diary/, full chronicle pieces), the subscribe flow, ask-the-data and board_ask POST paths, OG share cards, dark mode, tablet widths, and the coaching-cards viewport crop (the region was verified via text dump + API + noscript HTML instead).",
+      "findings_confirmed": 6,
+      "findings_adjusted": 1,
+      "findings_refuted": 0,
+      "verifier_grade_impact": "Six of seven findings survive intact (five confirmed, one adjusted but still a genuine high-sev tombstone-leak) including two high-severity honest-numbers defects on public doors on Day 1, so the proposed B remains well supported."
+    },
+    "observability": {
+      "area": "observability \u2014 Telemetry & alerting",
+      "grade": "B+",
+      "grade_2026_07_16": "B",
+      "status": "graded_unverified",
+      "rubric_anchors": {
+        "A": "Every alarm state is honest (red = a real, actionable condition; nothing permanently red or structurally unclearable), every watchdog's producer is verified actually emitting (not just designed to), and the remediation/drift loop demonstrably closes or explicitly hands off every signal it sees \u2014 all within the $85 ceiling, urgent-vs-digest split intact, solo operator paged for what matters and only that.",
+        "C": "The alarm inventory is well-designed on paper but one or more watchdog producers are dead (IAM/emission failures swallowed as warnings), red alarms sit unactioned for a week-plus, or the self-healing loop completes triage only intermittently while reporting green \u2014 governance expressed but not achieved.",
+        "F": "Alarms missing or routed to nowhere (no live SNS subscription), DLQ pileup or a dead ingestion source discoverable only by manual audit, budget hard-stop silent, log groups unbounded \u2014 the operator learns about failures from the website being wrong."
+      },
+      "rubric_anchors_source": "2026-07-16 baseline, re-applied verbatim (never silently redefined)",
+      "findings_total": 5,
+      "findings_by_sev": {
+        "high": 1,
+        "medium": 2,
+        "low": 2
+      },
+      "fix_class": {
+        "A": 2,
+        "B": 3
+      },
+      "path_to_A": [
+        "Close the merged-but-undeployed IAM gap: teach the remediation agent's ack loop that an ack whose conclusion names a pending CDK deploy must verify deployed-vs-merged state each run and escalate needs-human with an age counter after 48h (it already reads cfn drift and writes the ack ledger \u2014 this is a classifier rule, no new infra; ADR-103: modifies existing agent, zero standing cost) [S]",
+        "Recalibrate qa-smoke-warnings to its real distribution per ADR-105: alarm on FailCount>0 plus WarnCount above a rolling personal baseline (or a warn-streak of NEW warning keys), and triage the 4 chronic 'optional no record' warnings into phase-aware suppression so a warning-free night is actually achievable [S]",
+        "Add an ack-age ratchet + by-design suppression: 3rd consecutive ack renewal auto-escalates to needs-human; dated by-design reds (qa-paused-by-budget until 08-01) get a suppression window keyed to the SSM budget tier instead of standing red \u2014 target: the alarm board is all-green on a healthy day so one new red is unmissable [M]",
+        "Make genesis a first-class alarm event: restart_pipeline stamps a dated genesis window consulted by the token alarms and the staleness emitter (digest-only during the window), and restart_verify asserts no urgent page fired for a predicted condition [S]",
+        "Add a Source dimension to auth_breaker.py's IngestAuthHealthy emission and extend per-source auth alarm coverage to the OAuth sources currently covered only by the aggregate (garmin, todoist, notion), so the urgent page names the culprit and the 'duplicate' classification becomes true [S]"
+      ],
+      "coverage": "NOT examined this run: SES delivery of the digest/urgent emails to the actual inbox (verified the digest lambda runs daily and both digest-death alarms route to urgent, not that mail lands); us-east-1 alarm SNS routing (enumerated the 6 alarms \u2014 all OK \u2014 but did not verify their actions have live subscriptions); post-deploy verification that the 07-27 CDK run actually cleared the canary IAM gap and the 6-stack cfn drift (next canary run is Wed 07-29 and running drift detection is a mutation \u2014 both are asserted-pending, not proven-fixed); MCP EMF telemetry depth and the coherence sentinel's current warning content; cost_governor tier math (took tier=2 as given per shared context); the fresh-eyes workflow's downstream consumption; per-threshold ADR-105 calibration of the duration/latency alarms beyond the two token alarms and qa-smoke-warnings.",
+      "findings_confirmed": null,
+      "note": "graded but never adversarially verified \u2014 treat findings as first-pass only"
+    },
+    "cost": {
+      "area": "Cost engineering",
+      "grade": "B+",
+      "grade_2026_07_16": "B+",
+      "status": "graded_and_verified",
+      "rubric_anchors": {
+        "A": "The ADR-063/133 ceiling is enforced at the bedrock_client chokepoint with the ADR-125 audience-ordered ladder, the projection math has no double-count or de-escalation traps, every public and operator-facing cost number (ceiling, monthly total, tier labels) matches the live governor state per ADR-104, and per-feature AI cost is visible on a live public receipt.",
+        "C": "A hard stop exists somewhere but the tier labels, public cost numbers, and the actual degradation ladder disagree with each other; or the projection has a known over/under-count failure mode; or the operator cannot attribute AI spend per feature.",
+        "F": "No near-real-time enforcement (AWS Budgets alone with its 24-48h Bedrock lag), reader traffic can spend unbounded through the public AI endpoints, or the public cost claims are fabricated rather than derived from metering."
+      },
+      "rubric_anchors_source": "2026-07-16 baseline, re-applied verbatim (never silently redefined)",
+      "findings_total": 5,
+      "findings_by_sev": {
+        "high": 0,
+        "medium": 1,
+        "low": 4
+      },
+      "fix_class": {
+        "A": 5,
+        "B": 0
+      },
+      "path_to_A": [
+        "Migrate /api/status's cost block to the budget-breakdown SSM param (kills the $15 fabrication AND the duplicate daily Cost Explorer call \u2014 negative ADR-103 rent), or delete the block and point legacy at /api/receipts.",
+        "Enforce receipt<->governor price-table parity by test (including cache_read/cache_write keys), price cache tokens and Titan honestly on /api/inference_receipt, and make the 'same math' note true or amend it.",
+        "Parameterize _alert_surge on the active ceiling pair and pin it with a temp-window-dated unit test in test_cost_governor.py.",
+        "Persist the active (base, surge) ceiling pair in the governor's breakdown payload so no consumer ever hardcodes a base-ceiling dollar again; _ADR133_BASE_CEILING_USD demotes to fail-closed fallback.",
+        "Sweep the two stale cost comments (CDK cadence, memoir tier band) in the next literal-reconciliation pass."
+      ],
+      "coverage": "Examined: cost_governor_lambda.py end-to-end (projection math, tier bands, temp window, surge, alerts, breakdown), budget_guard.py (full ladder + headroom), bedrock_client tier-3 chokepoint (grep-verified BudgetExceeded at both invoke paths), CDK env wiring (OBSERVE_MODE=false, no MONTHLY_CEILING_USD override), live SSM tier/breakdown/surge params, AWS Budgets actuals ($85 limit, $85.844 actual \u2014 the deliberate overrun-signals design confirmed live), live /api/receipts + /api/inference_receipt + /api/status + /api/state_of_matthew payloads, CloudWatch MTD cache-token counts for sonnet, Bedrock/first-party price verification via the claude-api skill, and test-file inventory (10 budget/cost test files exist). NOT examined: the daily brief email's rendered headroom line; the coaching page's tier-2 paused copy beyond state_of_matthew (my /api/coach_commentary and /api/chronicle probes 404'd \u2014 likely wrong endpoint names, so tier-2 degradation quality on those two surfaces is verified only in code (allow('coach_narrative') present at 4+ call sites), not live; Day-1 wipe also confounds paused-vs-empty there); the /method/cost/ and /method/receipts front-end JS rendering (API payloads only); the Friday Panel SKIP_TIER=2 lockstep; monitoring_stack budget alarms; contents (not just names) of the 10 test files; per-service non-AI CE breakdown.",
+      "findings_confirmed": 5,
+      "findings_adjusted": 0,
+      "findings_refuted": 0,
+      "verifier_grade_impact": "All five findings survive with independent reproduction (one medium public-API fabricated-budget defect plus four low honesty/labeling drifts around an otherwise sound governor), which is consistent with the proposed B+ \u2014 real but small-effort transparency defects, nothing severe enough to drop below it and too many public-surface inaccuracies to go higher."
+    },
+    "data": {
+      "area": "Data modeling",
+      "grade": null,
+      "grade_2026_07_16": "B+",
+      "status": "not_graded",
+      "rubric_anchors": {
+        "A": "Live DynamoDB items, docs/SCHEMA.md, and the phase-taxonomy registry are mutually consistent under spot-sampling; exactly the 2 sanctioned GSIs (ADR-097) exist; the reset machinery is provably total AND idempotent (a double reset preserves each record's original cycle provenance); raw-S3 layouts match their source_registry raw_layout facets including filename scheme.",
+        "C": "The schema doc is mostly accurate and GSI count holds, but the reset/provenance machinery drifts from its stated contract in live data (wrong cycle stamps, claimed write-time stamping absent), or new pk families can silently escape the taxonomy's totality guarantee.",
+        "F": "Undocumented GSIs or partitions in live; float writes crashing or silently failing DDB persistence; tombstoned records from a prior cycle leaking into current-cycle reads; or archive records destroyed/overwritten with no way to reconstruct provenance."
+      },
+      "rubric_anchors_source": "2026-07-16 baseline, re-applied verbatim (never silently redefined)"
+    },
+    "integrations": {
+      "area": "Ingestion health",
+      "grade": "B+",
+      "grade_2026_07_16": "B+",
+      "status": "graded_and_verified",
+      "rubric_anchors": {
+        "A": "Every source's declared cadence/threshold matches its live EventBridge rule with a written derivation (the #471 Todoist standard); the public board and the operator checker tell the same cross-reset-honest story (real last_update + 'dark N days'); a dead OAuth token pages within ~one cadence via alarms that are green because they work, not because they can't fire; dead sources are disclosed everywhere they surface \u2014 all with no machinery beyond the one canonical registry.",
+        "C": "Cadences and thresholds are mostly honest, but at least one public surface omits or misstates staleness (e.g. a real lapse rendered as 'no data' with no duration), or a dead source appears live on a reader-facing surface, or token death is only noticed by a daily human glance rather than an alarm.",
+        "F": "Registry facets contradict the live rules (thresholds impossible for the cadence), staleness is silently hidden or fabricated on the public board, dead sources are presented as flowing, and there is no alarm path for a dead token."
+      },
+      "rubric_anchors_source": "2026-07-16 baseline, re-applied verbatim (never silently redefined)",
+      "findings_total": 4,
+      "findings_by_sev": {
+        "high": 0,
+        "medium": 2,
+        "low": 2
+      },
+      "fix_class": {
+        "A": 3,
+        "B": 1
+      },
+      "path_to_A": [
+        "Make HAE per-datatype darkness duration unbounded: paginate check_apple_health_datatypes until each datatype resolves a true last-seen (cap ~400d) or maintain an O(1) last-seen mark at ingest \u2014 BP then reads 'dark 109 days' instead of a null. ADR-103: extends an existing 1x-daily checker, no new machinery.",
+        "Derive carried_from_cycle as a pure function of the record's date against the CYCLE_GENESES ledger already in site_api_data.py (delete the doomed DDB `cycle` read); add a restart_verify assertion that the Day-1 board shows a numbered chip on >=1 carried source \u2014 closes both root causes including hevy's sub-record shape.",
+        "Pointerize CLAUDE.md's ingestion-cadence bullet to source_registry's method/paused facets and sync-derive the scheduled-lambda count (extend the existing check_doc_facts/sync_doc_metadata gate with a planted-violation test).",
+        "Document ingest-auth-unhealthy-24h's <=24h clear lag in its AlarmDescription + RUNBOOK triage entry (optionally 4x6h eval periods for faster clears at zero cost) so a red alarm on a verified-clean fleet is legible rather than fatigue-training.",
+        "Tie the youtube freshness-facet flip (freshness/monitored/active_api in source_registry.py:492-525) to the first-video landing as an explicit checklist line under epic #1668, so an actually-live source can't run invisible to every freshness/liveness surface \u2014 the flip is currently an unforced manual memory."
+      ],
+      "coverage": "NOT examined: qa_smoke's actual Day-1 nightly output and required-tier verdicts (code paths read, run output not pulled); data_reconciliation's Monday gap sweep; dropbox poller / MacroFactor CSV transport live health (macrofactor dark 34d is disclosed behavioral, transport unprobed); notion/eightsleep/habitify/withings lambda internals; the strava/whoop provider-reconcile diff logic itself (alarms OK, algorithm unread); MCP tool_get_freshness_status live output (read-only contract bars invoking the MCP lambda \u2014 verified only that it derives from the same registry, source_registry.py:9); HAE webhook auth + end-to-end dedup behavior (water/caffeine reading-level dedup map read at health_auto_export_lambda.py:651-820, not exercised); interior-gap detector correctness (alarm OK, algorithm skimmed); whether Whoop's 07-27 recovery was a manual re-auth or vendor-side transient; the freshness checker's WARNING_HOURS tier and sick-day suppression behavior under real sick records; alert-digest email rendering of the incident.",
+      "findings_confirmed": 3,
+      "findings_adjusted": 1,
+      "findings_refuted": 0,
+      "verifier_grade_impact": "All four findings survive (three fully confirmed with independent reproductions, one adjusted only on its count-evidence framing while its core doc defect stands), so the surviving set \u2014 two real medium ingestion-surface defects plus two low doc/process gaps \u2014 comfortably supports the proposed B+ grade."
+    },
+    "devex": {
+      "area": "Build & ship ergonomics (AI-agent development) \u2014 DevEx/SDLC lens",
+      "grade": "A-",
+      "grade_2026_07_16": "A-",
+      "status": "graded_and_verified",
+      "rubric_anchors": {
+        "A": "Every load-bearing claim an agent reads in its first 5 minutes (CLAUDE.md, CONVENTIONS, the /deploy skill) is either machine-synced or provably current; all deploy paths verifiably stage through one bundle; the fast deploy-critical lane runs green offline in seconds; incident classes are encoded in gates/agents rather than relying on agent memory; drift gates cover process/ownership/date facts, not just counts.",
+        "C": "The one-bundle rule and CI gates exist and mostly work, but agent-facing docs carry multiple contradictions an agent must resolve by reading source (stale ship paths, wrong stack owners, dead command signatures), the doc-sync gates cover only what they were hand-taught, and a fresh agent's first deploy requires tribal knowledge from memory topics to avoid a known incident class.",
+        "F": "Deploy paths diverge (some functions ship partial bundles), CLAUDE.md commands fail or silently do the wrong thing, CI pins drift from local tooling so local-green \u2260 CI-green, and the handover/memory system has rotted into an unindexed pile \u2014 a fresh agent's first change is more likely to regress production than to land."
+      },
+      "rubric_anchors_source": "2026-07-16 baseline, re-applied verbatim (never silently redefined)",
+      "findings_total": 5,
+      "findings_by_sev": {
+        "high": 0,
+        "medium": 3,
+        "low": 2
+      },
+      "fix_class": {
+        "A": 5,
+        "B": 0
+      },
+      "path_to_A": [
+        "Regenerate (or retire) the /deploy skill's function\u2192source table from ci/lambda_map.json via the existing sync_doc_metadata/pre-commit machinery, with a parity test proven RED on today's tree (it would flag the dead apple-health row and the wrong weather row) \u2014 kills the hand-table drift class at its root (ADR-103: extends existing sync gates, no new standing infra).",
+        "Fix CONVENTIONS \u00a74's two pin-discovery greps to cover .github/workflows/*.yml (the #1655 reusable workflows), then deliberately resolve the mypy 2.1.0/2.3.0 CI-vs-dev split and fold a lint-pin parity assertion into the existing pinned-both-directions check.",
+        "Align check_doc_index local default with CI: make --strict the default (advisory opt-in), update the \u00a78 quoted command and the pre-commit/wrap references \u2014 converts the 2026-07-27 deploy_all-2 take-1 incident from a memory note into a structural local==CI guarantee.",
+        "Extend check_doc_tombstones.py's candidate set to deploy/*.sh and .github/workflows/*.yml (broad shared-layer rule already exists), prove RED pre-fix per the \u00a78a ritual, and fix the ~5 flagged retired-layer claims in the same PR.",
+        "Replace MEMORY.md's hand-typed raw-S3-path literal with a pointer to lambdas/source_registry.py's raw_layout facet (#1256), honoring the memory index's own no-duplicated-rule header."
+      ],
+      "coverage": "INSPECTED with reproduced evidence: docs/CONVENTIONS.md in full; ci-cd.yml structure + ci-lint.yml gates/pins/if-always ordering (matches \u00a74's documented order); one-bundle integrity across all four paths (deploy_lambda.sh:100, deploy_fleet.sh:35-36, deploy_site_api.sh:21, deploy_mcp_split.sh:33, cdk lambda_helpers.py:66-75) + tests/test_deploy_bundle_paths.py run (6 passed); deploy-critical lane run offline with FAKE creds (1376 passed, 43 skipped in 6.8s); all three doc gates run locally (sync_doc_metadata --check PASS, check_doc_facts PASS with 113 docs+298 source files scanned, check_doc_index PASS); backlog_next.py run (Now=#1653 only, matches handover) + check_backlog_hygiene.py run (advisory mode, 1 violation + 2 advisories \u2014 consistent with #1868/#1872 state); every deploy.md mapping row cross-checked against ci/lambda_map.json programmatically + one live AWS read (apple-health-ingestion ResourceNotFound); prior-run findings 1-4 re-verified as FIXED with gates (genesis in check_doc_facts #1235, deploy.md site mode/stack owner corrected, CLAUDE.md command signatures corrected); MCP tool count re-discovered (76, matches CLAUDE.md); pre-commit hook installed in this clone. NOT EXAMINED: smoke_test_site.sh internals; site-deploy.yml full text; the remediation-agent workflow; the reconcile job's generator whitelist correctness; docs-ci.yml beyond the --strict grep; the full 8k-test suite (critical lane only); .claude/agents contracts (verified exemplary last run, unre-checked); skills other than /deploy (wrap/uplevel/qa taken on faith); live fleet config drift (no lambda config listing beyond the one GetFunction); the session-archive branch integrity; restart_pipeline's doc-sync step internals.",
+      "findings_confirmed": 3,
+      "findings_adjusted": 2,
+      "findings_refuted": 0,
+      "verifier_grade_impact": "All five findings survive (3 CONFIRMED, 2 ADJUSTED on secondary details only \u2014 the core defects stand), and the mix of three medium/two low all-effort-S doc/gate-drift issues with no live-pipeline breakage is consistent with the proposed A- grade."
+    },
+    "growth": {
+      "area": "Community & commercialization",
+      "grade": null,
+      "grade_2026_07_16": "B+",
+      "status": "not_graded",
+      "rubric_anchors": {
+        "A": "Every shareable page emits a current, data-driven OG card; the subscribe flow is double-opt-in, canary-tested, AND its conversion (attempts \u2192 confirms \u2192 list size) is visible in the weekly traffic digest; subscribers get a fixed cadence that matches the promise copy on /subscribe/; engagement hooks (predict, board-ask, votes) work on Day 1 of a fresh cycle and are discoverable from the pages newcomers land on; commercial option value (list, RSS, gear, podcast) is real and measured with zero dishonest monetization.",
+        "C": "Capture and email machinery works end-to-end but the funnel is unmeasured (signups can silently die in pending state), share surfaces ship a generic or stale card, and engagement hooks exist in code but are not reachable or not functional on Day 1 of a cycle.",
+        "F": "The funnel is broken or dishonest: subscribe silently fails or is single-opt-in spam, share cards present wrong/stale numbers as current, engagement endpoints 500, or monetization (undisclosed affiliates, paywalled 'proof') contradicts the proof-not-promises posture."
+      },
+      "rubric_anchors_source": "2026-07-16 baseline, re-applied verbatim (never silently redefined)"
+    }
+  }
+}

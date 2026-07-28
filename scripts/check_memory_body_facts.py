@@ -17,7 +17,7 @@ THE FIX
   Same class of check as `check_doc_facts.py`'s GENESIS_ANCHOR / CEILING_LITERAL rules,
   applied to the memory dir instead of the repo doc surface: scan each topic-file BODY for
   (1) a categorical "always use <date>" genesis directive that disagrees with the live
-  `EXPERIMENT_START_DATE` (`lambdas/constants.py`, via `check_doc_facts._ground_truth()` —
+  `EXPERIMENT_START_DATE` (`lambdas/common/constants.py`, via `check_doc_facts._ground_truth()` —
   the same single source), and (2) a small registry of known-retired stack-ownership
   literals. `/wrap` step (c) runs this every session (see `.claude/commands/wrap.md`) — the
   memory dir is outside git, so this is a manually-invoked reflex, not a CI job. The pytest

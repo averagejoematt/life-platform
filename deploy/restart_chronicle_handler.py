@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 restart_chronicle_handler.py — ADR-058: Chronicle hide + archive for the
-experiment restart. Reads genesis from lambdas/constants.py.
+experiment restart. Reads genesis from lambdas/common/constants.py.
 
 Per spec §7 + Matthew's D decision:
   - All chronicle DDB records: already tombstoned + hidden=true via §5 wipe

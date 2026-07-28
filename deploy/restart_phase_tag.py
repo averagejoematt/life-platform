@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 restart_phase_tag.py — ADR-058: Phase-tag DDB records relative to the current
-EXPERIMENT_START_DATE (from lambdas/constants.py, sourced from config/user_goals.json).
+EXPERIMENT_START_DATE (from lambdas/common/constants.py, sourced from config/user_goals.json).
 
 Adds a `phase` attribute to every item under USER#matthew#SOURCE#*:
   - phase = "pilot"      if the item's date dimension < EXPERIMENT_START_DATE

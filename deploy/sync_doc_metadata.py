@@ -838,7 +838,7 @@ def _auto_discover_experiment_genesis() -> str | None:
     """The current experiment anchor date, e.g. "2026-07-13" (#1235).
 
     AST-reads the module-level `EXPERIMENT_START_DATE = "YYYY-MM-DD"` literal in
-    lambdas/constants.py — the single source of truth the whole fleet ships (ADR-058,
+    lambdas/common/constants.py — the single source of truth the whole fleet ships (ADR-058,
     #781). This is the value that must appear in the CLAUDE.md restart-section
     "(currently <genesis>, cycle N)" anchor and SCHEMA.md's phase-taxonomy note; both
     drifted a full reset behind (cycle 5 / 2026-07-12) after the cycle-6 re-anchor.
@@ -1215,7 +1215,7 @@ def _apply_auto_discovered(facts: dict) -> dict:
         if facts.get("experiment_genesis") != experiment_genesis:
             print(
                 f"  [auto] experiment_genesis: {facts.get('experiment_genesis')} → {experiment_genesis} "
-                "(EXPERIMENT_START_DATE in lambdas/constants.py, #1235)"
+                "(EXPERIMENT_START_DATE in lambdas/common/constants.py, #1235)"
             )
         facts["experiment_genesis"] = experiment_genesis
 
@@ -1264,7 +1264,7 @@ PLATFORM_FACTS = {
     "restart_endpoint_count": 7,  # fallback: len(JSON_ENDPOINTS) in deploy/restart_verify_rendered.py (#973)
     "restart_url_count": 40,  # derived: restart_page_count + restart_endpoint_count (always recomputed)
     "hypothesis_cadence": "Sun 19:00 UTC",  # fallback: hypothesis-engine schedule cron in cdk/stacks/compute_stack.py (#973)
-    "experiment_genesis": "2026-07-13",  # fallback: EXPERIMENT_START_DATE in lambdas/constants.py (#1235)
+    "experiment_genesis": "2026-07-13",  # fallback: EXPERIMENT_START_DATE in lambdas/common/constants.py (#1235)
     "experiment_cycle": 6,  # fallback: max key of CYCLE_GENESES in lambdas/web/site_api_data.py (#1235)
     # Secret state
     "api_keys_status": "PERMANENTLY DELETED 2026-03-14",

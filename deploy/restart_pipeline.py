@@ -23,7 +23,7 @@ Steps (each can be skipped with --skip-<name>):
     2. write config/user_goals.json + config/character_sheet.json
     2b. --close-cycle (default ON): append the new genesis to CYCLE_GENESES
         in lambdas/web/site_api_data.py (drives /api/cycle_compare + /api/timeline)
-    3. regenerate lambdas/constants.py via sync_constants_from_config.py
+    3. regenerate lambdas/common/constants.py via sync_constants_from_config.py
     4. cdk deploy --all (full-tree bundles carry constants + CYCLE_GENESES)
     5. restart_phase_tag.py
     6. restart_intelligence_wipe.py   (stamps the CLOSING cycle onto the archive;
@@ -159,12 +159,12 @@ that ties them together (genesis, cycle, baseline, pipeline report).
 
 
 def snapshot_outgoing_genesis() -> str:
-    """Read the OUTGOING genesis from lambdas/constants.py by text (not import —
+    """Read the OUTGOING genesis from lambdas/common/constants.py by text (not import —
     the file is regenerated mid-pipeline and module caching would lie). This is
     the literal the site JS/HTML sweep + the rendered-surface verifier hunt for."""
     m = re.search(r"EXPERIMENT_START_DATE\s*=\s*[\"'](\d{4}-\d{2}-\d{2})[\"']", LAMBDA_CONSTANTS.read_text())
     if not m:
-        raise RuntimeError("Could not parse EXPERIMENT_START_DATE from lambdas/constants.py")
+        raise RuntimeError("Could not parse EXPERIMENT_START_DATE from lambdas/common/constants.py")
     return m.group(1)
 
 
@@ -667,7 +667,7 @@ def extract_plan_figures(text: str) -> dict:
 
 
 def load_canonical_plan_figures() -> dict:
-    """The current cycle's AUTHORITATIVE plan numbers: start weight from lambdas/constants.py
+    """The current cycle's AUTHORITATIVE plan numbers: start weight from lambdas/common/constants.py
     (the generated genesis anchor), calorie target + protein floor from config/user_goals.json
     (the source constants.py is generated from). Pure/offline — reads committed files only."""
     from common import constants as _constants  # lambdas/ is on sys.path (line 96)

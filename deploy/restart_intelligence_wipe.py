@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 restart_intelligence_wipe.py — ADR-058: Intelligence-layer wipe for the
-experiment restart. Reads genesis from lambdas/constants.py.
+experiment restart. Reads genesis from lambdas/common/constants.py.
 
 Interpretation B (preserve content): uses UpdateItem to ADD a tombstone flag
 to each target record. Original content stays intact under the flag. Read

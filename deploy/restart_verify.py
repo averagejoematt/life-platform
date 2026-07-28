@@ -4,9 +4,9 @@ restart_verify.py — Post-pivot health check. Run this Monday morning (or any
 time) to confirm the restart pipeline produced a healthy, consistent state.
 
 Checks (each pass/fail):
-  1. lambdas/constants.py genesis matches config/user_goals.json
+  1. lambdas/common/constants.py genesis matches config/user_goals.json
   2. No function references the retired shared layer (#781)
-  3. DDB PROFILE#v1 matches lambdas/constants.py baseline
+  3. DDB PROFILE#v1 matches lambdas/common/constants.py baseline
   4. Live /api/journey returns started_date == genesis
   5. Live /api/journey returns start_weight == baseline (rounded)
   6. day_n(today) is >= 1 (we are at or past genesis)

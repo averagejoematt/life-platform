@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-sync_constants_from_config.py — Regenerates lambdas/constants.py from the
+sync_constants_from_config.py — Regenerates lambdas/common/constants.py from the
 canonical config (config/user_goals.json). ADR-058.
 
 The restart pipeline calls this whenever the genesis date or baseline weight

@@ -56,7 +56,7 @@ def _ground_truth() -> dict:
         "data_sources": facts.get("data_sources"),
         "test_count": facts.get("test_count") or m._count_test_functions(),
         # #1235: the experiment anchor — genesis date (str) + cycle number (int). Same
-        # single-source discovery: EXPERIMENT_START_DATE in lambdas/constants.py and
+        # single-source discovery: EXPERIMENT_START_DATE in lambdas/common/constants.py and
         # max(CYCLE_GENESES) in lambdas/web/site_api_data.py, surfaced through the sync tool.
         "experiment_genesis": facts.get("experiment_genesis"),
         "experiment_cycle": facts.get("experiment_cycle"),
@@ -242,7 +242,7 @@ def _source_hits(files) -> list[str]:
 # (SCHEMA.md phase taxonomy). Both drift the instant a reset re-anchors the experiment —
 # exactly this defect: CLAUDE.md said cycle 5 / 2026-07-12 three days into cycle 6 /
 # 2026-07-13, with no gate targeting the line. Ground truth: EXPERIMENT_START_DATE
-# (lambdas/constants.py) + max(CYCLE_GENESES) (lambdas/web/site_api_data.py), both surfaced
+# (lambdas/common/constants.py) + max(CYCLE_GENESES) (lambdas/web/site_api_data.py), both surfaced
 # through sync_doc_metadata's discoverers (the ONE source, same as every fact above).
 #
 # PRECISION: the date/cycle are bound to the word "currently" (the current-anchor frame),
