@@ -61,7 +61,7 @@ from boto3.dynamodb.conditions import Key  # #476/E-6: deletion-reconcile query
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("notion")
 except ImportError:
@@ -74,7 +74,7 @@ USER_ID = os.environ.get("USER_ID", "matthew")
 
 # V2 P2.4 (2026-05-17): OAuth circuit breaker for non-framework Lambdas.
 try:
-    from auth_breaker import check_breaker, clear_failure, looks_like_auth_failure, mark_failure
+    from common.auth_breaker import check_breaker, clear_failure, looks_like_auth_failure, mark_failure
 
     _HAS_AUTH_BREAKER = True
 except ImportError:
@@ -181,7 +181,7 @@ def notion_post(endpoint, api_key, body=None):
     )
     try:
         # Phase 3.5 (2026-05-16): retry on transient 429/5xx.
-        from http_retry import urlopen_with_retry
+        from common.http_retry import urlopen_with_retry
 
         with urlopen_with_retry(req, timeout=30) as resp:
             return json.loads(resp.read().decode())
@@ -205,7 +205,7 @@ def notion_get(endpoint, api_key):
     )
     try:
         # Phase 3.5 (2026-05-16): retry on transient 429/5xx.
-        from http_retry import urlopen_with_retry
+        from common.http_retry import urlopen_with_retry
 
         with urlopen_with_retry(req, timeout=30) as resp:
             return json.loads(resp.read().decode())

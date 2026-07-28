@@ -54,16 +54,15 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 
 import boto3
-import qa_archive
+from common import qa_archive  # #1691 (epic #1687): re-run the baseline-freshness gate over each archived
 
-# #1691 (epic #1687): re-run the baseline-freshness gate over each archived
 # coach_brief's TEXT so a stale-baseline/stale-phase brief surfaces a visible flag
 # to the human reader — even for historical entries (re-running over the archived
 # text, not trusting generation-time meta). Both shared modules ship in every
 # bundle (#781); import fail-soft so the email never dies on a missing module.
 try:
     import grounded_generation as _gg
-    from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE
+    from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE
 except Exception:  # pragma: no cover — bundle-dependent; the flag simply degrades off
     _gg = None
     EXPERIMENT_BASELINE_WEIGHT_LBS = None

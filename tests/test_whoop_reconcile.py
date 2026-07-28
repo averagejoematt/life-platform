@@ -47,7 +47,7 @@ def _run_reconcile(monkeypatch, sleeps, workouts, stored_sks, stored_workout_sta
     # refresh + no secret writeback happens in the test.
     monkeypatch.setattr(whoop, "authenticate", lambda sd: dict(sd))
 
-    import secret_cache
+    from common import secret_cache
 
     monkeypatch.setattr(
         secret_cache,

@@ -57,7 +57,7 @@ from boto3.dynamodb.conditions import Key
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("journal-enrichment")
 except ImportError:
@@ -199,7 +199,7 @@ def call_haiku(raw_text, date, template, structured_scores):
     }
 
     # Phase 3.4 (2026-05-16): retry via retry_utils (4 attempts, 5/15/45s).
-    from retry_utils import call_anthropic_raw
+    from common.retry_utils import call_anthropic_raw
 
     result = call_anthropic_raw(body, timeout=30)
 

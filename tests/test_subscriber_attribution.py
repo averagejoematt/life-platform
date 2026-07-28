@@ -20,7 +20,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
-from utm import normalize, referrer_host, with_utm  # noqa: E402
+from common.utm import normalize, referrer_host, with_utm  # noqa: E402
 
 
 def _build(**kwargs):

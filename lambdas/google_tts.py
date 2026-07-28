@@ -19,7 +19,7 @@ import urllib.error
 import urllib.request
 
 import boto3
-from secret_cache import get_secret_json
+from common.secret_cache import get_secret_json
 
 SECRET_NAME = os.environ.get("GOOGLE_TTS_SECRET", "life-platform/google-tts")
 ENDPOINT = "https://texttospeech.googleapis.com/v1/text:synthesize"

@@ -28,11 +28,11 @@ import secrets as _secrets
 from datetime import datetime, timezone
 
 import boto3
-import digest_utils  # shared query_range implementations (#970)
 import privacy_guard  # deterministic real-name + vice gate (layer module)
-from constants import EXPERIMENT_START_DATE  # ADR-058
+from common import digest_utils  # shared query_range implementations (#970)
+from common.constants import EXPERIMENT_START_DATE  # ADR-058
+from common.text_utils import truncate_at_word  # #1224: word-boundary excerpt truncation (no mid-word cut)
 from phase_filter import singleton_visible  # ADR-058 / #946 (query paths get the phase filter via digest_utils, #970)
-from text_utils import truncate_at_word  # #1224: word-boundary excerpt truncation (no mid-word cut)
 
 # OBS-1: Structured logger (wired below after optional imports)
 _logger_std = logging.getLogger()
@@ -89,7 +89,7 @@ except ImportError:
 
 # BS-05: Confidence badge
 try:
-    from digest_utils import _confidence_badge, compute_confidence
+    from common.digest_utils import _confidence_badge, compute_confidence
 
     _HAS_CONFIDENCE = True
 except ImportError:
@@ -110,7 +110,7 @@ except ImportError:
 
 # OBS-1: Structured logger
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("wednesday-chronicle")
 except ImportError:
@@ -125,7 +125,7 @@ except ImportError:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-from digest_utils import d2f  # shared bundled helpers (#970)
+from common.digest_utils import d2f  # shared bundled helpers (#970)
 
 # ── #1654 god-module split: the handler logic lives in cohesive sibling modules
 # under lambdas/emails/; this file is the thin facade. Each moved helper reads the
@@ -518,7 +518,7 @@ def _margaret_haiku_call(system, user):
     critique and Elena's Haiku-tier revision. Kept to Haiku per the #548
     +2-calls/week budget (Elena's own Sonnet voice is reserved for the
     weekly draft itself)."""
-    import retry_utils
+    from common import retry_utils
 
     return retry_utils.call_anthropic_api(
         prompt=user,

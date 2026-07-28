@@ -19,7 +19,7 @@ import urllib.request
 from ingestion_framework import IngestionConfig, run_ingestion
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("weather-ingestion")
 except ImportError:
@@ -28,7 +28,7 @@ except ImportError:
     logger = logging.getLogger("weather-ingestion")
 
 try:
-    from http_retry import urlopen_with_retry
+    from common.http_retry import urlopen_with_retry
 except ImportError:  # pragma: no cover — layer-module fallback (local tooling)
     urlopen_with_retry = urllib.request.urlopen
 

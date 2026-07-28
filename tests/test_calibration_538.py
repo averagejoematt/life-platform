@@ -11,7 +11,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 
 import calibration_core as cc  # noqa: E402
-import stats_core as sc  # noqa: E402
+from common import stats_core as sc  # noqa: E402
 
 
 class TestBrierPrimitives:

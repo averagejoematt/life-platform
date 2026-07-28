@@ -223,9 +223,9 @@ def character_calibration(*, _g) -> dict:
     # Facade state injected via `_g` (the delegator's globals()) — same module the test patched.
     EXPERIMENT_START = _g["EXPERIMENT_START"]
     _query_source = _g["_query_source"]
+    from common.stats_core import effective_sample_size, fisher_ci, pearson_r
     from experiment_gates import FELT_CALIBRATION_CI_MIN_WEEKS, FELT_CALIBRATION_MIN_WEEKS, felt_calibration_gates
     from ritual_link import PROBE_PILLAR_MAP
-    from stats_core import effective_sample_size, fisher_ci, pearson_r
 
     today = datetime.now(PT).strftime("%Y-%m-%d")
     probes = _query_source("felt_probe", EXPERIMENT_START, today)

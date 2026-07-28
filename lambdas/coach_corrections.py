@@ -51,7 +51,7 @@ from typing import Optional
 # made the S5 injection a live no-op; both sides now normalize at the join
 # (`_item_ref_matches`). Flat sibling imports, per #781 (every root module ships together).
 from coach_checkin import normalize_coach_id, read_cycle
-from numeric import floats_to_decimal
+from common.numeric import floats_to_decimal
 
 PK = "USER#matthew#SOURCE#coach_corrections"
 SK_PREFIX = "CORRECTION#"

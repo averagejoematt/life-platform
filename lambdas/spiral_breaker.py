@@ -43,7 +43,7 @@ from datetime import date, datetime, timedelta
 from personal_baselines import percentile
 
 try:  # structured JSON logging (logger-discipline gate: never print() in lambdas/)
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("spiral-breaker")
 except ImportError:  # pragma: no cover — minimal bundles
@@ -544,7 +544,7 @@ def gather_signals(now=None, table=None):
     core fails closed on its absence. Decimal-safe (everything is cast via float on read).
     """
     if now is None:
-        from pacific_time import pacific_today
+        from common.pacific_time import pacific_today
 
         now = pacific_today()
     today = _coerce_now(now)

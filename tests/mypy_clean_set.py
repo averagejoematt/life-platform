@@ -32,7 +32,13 @@ ROOT = Path(__file__).resolve().parent.parent
 # (``except ImportError: from lambdas import X``) are guarded behind
 # ``if not TYPE_CHECKING:`` so mypy sees one canonical module name (no
 # "source file found twice") while runtime behavior is unchanged.
-CLEAN_DIRS = ["lambdas", "lambdas/web", "mcp"]
+#
+# #1653 packaging: each domain subpackage carved out of the flat root is added here
+# in the SAME slice that creates it. These globs are non-recursive, so omitting the
+# new directory would silently shrink the clean surface — a module would leave the
+# mypy gate merely by being moved, which is exactly the ratchet regression this file
+# exists to prevent. Moving code must never reduce coverage.
+CLEAN_DIRS = ["lambdas", "lambdas/common", "lambdas/web", "mcp"]
 
 # Modules that do NOT yet pass under mypy.ini. Each MUST carry a reason. This
 # denylist only shrinks. Paths are repo-root-relative.
@@ -49,7 +55,7 @@ DIRTY = {
     # platform_logger's Logger subclass narrows msg: object -> str on every
     # level method (LSP-violating override x6). Widely imported; fixing it is a
     # shared-layer change tracked separately (see #419 / this file's history).
-    "lambdas/platform_logger.py",  # override (x6)
+    "lambdas/common/platform_logger.py",  # override (x6)
     # The 3,000-line endpoint handlers — explicitly OUT of scope (var-annotated
     # + misc + call-overload); the next ratchet step, not attempted here.
     "lambdas/web/site_api_data.py",
@@ -68,10 +74,10 @@ DIRTY = {
 # glob logic silently dropping them). Budget/auth/inference core + the split AI
 # modules + the tier-2 serving helpers.
 CORE = [
-    "lambdas/secret_cache.py",
-    "lambdas/retry_utils.py",
+    "lambdas/common/secret_cache.py",
+    "lambdas/common/retry_utils.py",
     "lambdas/phase_filter.py",
-    "lambdas/constants.py",
+    "lambdas/common/constants.py",
     "lambdas/bedrock_client.py",
     "lambdas/scoring_engine.py",
     "lambdas/character_engine.py",

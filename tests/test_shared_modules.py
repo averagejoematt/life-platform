@@ -203,7 +203,7 @@ _run("validate_json: all keys present -> passes", test_validate_json_ok)
 # ======================================================================
 print("\n-- platform_logger ----------------------------------------------")
 
-from platform_logger import PlatformLogger, StructuredFormatter, get_logger
+from common.platform_logger import PlatformLogger, StructuredFormatter, get_logger
 
 
 def test_get_logger_type():
@@ -376,7 +376,7 @@ _run("delete_sick_day: calls delete_item with right key", test_delete_sick_day)
 # ======================================================================
 print("\n-- digest_utils -------------------------------------------------")
 
-from digest_utils import (
+from common.digest_utils import (
     _normalize_whoop_sleep,
     avg,
     compute_banister_from_dict,
@@ -748,7 +748,7 @@ class _FakePagingTable:
 def test_query_range_paginates_and_returns_dict_by_date():
     """query_range must follow LastEvaluatedKey — the pre-#970 hypothesis_engine
     copy silently truncated at DynamoDB's 1MB page."""
-    import digest_utils
+    from common import digest_utils
 
     pages = [
         {
@@ -775,7 +775,7 @@ def test_query_range_paginates_and_returns_dict_by_date():
 def test_query_range_applies_phase_filter_and_bounds():
     """Every platform DDB read is phase-scoped (ADR-058); dict form uses the plain
     end bound, list form extends it with the '~' suffix for per-workout sks (#485)."""
-    import digest_utils
+    from common import digest_utils
 
     table = _FakePagingTable([{"Items": []}])
     digest_utils.query_range(table, "whoop", "2026-01-01", "2026-01-07")
@@ -792,7 +792,7 @@ def test_query_range_applies_phase_filter_and_bounds():
 
 def test_query_range_list_paginates_and_preserves_duplicates():
     """List form keeps two records sharing one date (two-a-day workouts) and paginates."""
-    import digest_utils
+    from common import digest_utils
 
     pages = [
         {

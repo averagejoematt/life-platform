@@ -18,7 +18,7 @@ import os
 from datetime import date, datetime, timedelta, timezone
 
 import boto3
-from constants import EXPERIMENT_START_DATE  # ADR-058
+from common.constants import EXPERIMENT_START_DATE  # ADR-058
 
 from web.vitals_resolver import resolve_vitals  # #1369: the ONE current-vitals truth
 

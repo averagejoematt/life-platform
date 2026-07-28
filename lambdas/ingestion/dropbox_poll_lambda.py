@@ -30,7 +30,7 @@ import boto3
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("dropbox-poll")
 except ImportError:
@@ -43,7 +43,7 @@ USER_ID = os.environ.get("USER_ID", "matthew")
 
 # V2 P2.4 (2026-05-17): OAuth circuit breaker for non-framework Lambdas.
 try:
-    from auth_breaker import check_breaker, clear_failure, looks_like_auth_failure, mark_failure
+    from common.auth_breaker import check_breaker, clear_failure, looks_like_auth_failure, mark_failure
 
     _HAS_AUTH_BREAKER = True
 except ImportError:
@@ -122,7 +122,7 @@ def refresh_access_token(app_key, app_secret, refresh_token):
     )
 
     # L-04 (2026-06-06): retry on transient 429/5xx via bundled retry_utils module.
-    from http_retry import urlopen_with_retry
+    from common.http_retry import urlopen_with_retry
 
     try:
         with urlopen_with_retry(req, timeout=15) as resp:
@@ -154,7 +154,7 @@ def list_folder(access_token, folder_path="/life-platform"):
     )
 
     # L-04 (2026-06-06): retry on transient 429/5xx via bundled retry_utils module.
-    from http_retry import urlopen_with_retry
+    from common.http_retry import urlopen_with_retry
 
     try:
         with urlopen_with_retry(req, timeout=30) as resp:
@@ -204,7 +204,7 @@ def download_file(access_token, path):
     req.data = b""  # Force POST without urllib adding form content-type
 
     # L-04 (2026-06-06): retry on transient 429/5xx via bundled retry_utils module.
-    from http_retry import urlopen_with_retry
+    from common.http_retry import urlopen_with_retry
 
     with urlopen_with_retry(req, timeout=60) as resp:
         return resp.read()
@@ -229,7 +229,7 @@ def move_file(access_token, from_path, to_path):
         },
     )
     # L-04 (2026-06-06): retry on transient 429/5xx via bundled retry_utils module.
-    from http_retry import urlopen_with_retry
+    from common.http_retry import urlopen_with_retry
 
     try:
         with urlopen_with_retry(req, timeout=15):
@@ -253,7 +253,7 @@ def delete_file(access_token, path):
         },
     )
     # L-04 (2026-06-06): retry on transient 429/5xx via bundled retry_utils module.
-    from http_retry import urlopen_with_retry
+    from common.http_retry import urlopen_with_retry
 
     try:
         with urlopen_with_retry(req, timeout=15):

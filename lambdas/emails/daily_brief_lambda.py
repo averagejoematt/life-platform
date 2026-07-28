@@ -149,7 +149,7 @@ except ImportError:
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("daily-brief")
 except ImportError:
@@ -164,7 +164,7 @@ import ai_calls
 import html_builder
 import output_writers
 import training_load  # shared TSS-like load model + Banister core (layer module, #490)
-from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # ai_calls can be init'd at import time (no dependency on locally-defined functions)
@@ -182,7 +182,7 @@ ai_calls.init(
 # ==============================================================================
 
 
-from digest_utils import d2f, safe_float  # shared bundled helpers (#970)
+from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
 
 
 def avg(vals):
@@ -874,7 +874,7 @@ def store_day_grade(date_str, total_score, grade, component_scores, weights, alg
                 item["component_" + comp] = Decimal(str(score))
         # ADR-058 (#1814): every write carries `phase` — an unstamped row passes the
         # default-deny read filter as CURRENT (pre-genesis rows counted as experiment days).
-        from compute_metadata import tag_record
+        from common.compute_metadata import tag_record
 
         item = tag_record(item, source_id="day_grade")
         table.put_item(Item=item)
@@ -942,7 +942,7 @@ def store_habit_scores(date_str, component_details, component_scores, vice_strea
             item["synergy_groups"] = json.loads(json.dumps(sg_pcts), parse_float=Decimal)
         item = {k: v for k, v in item.items() if v is not None}
         # ADR-058 (#1814): phase-stamp — see store_day_grade above.
-        from compute_metadata import tag_record
+        from common.compute_metadata import tag_record
 
         item = tag_record(item, source_id="habit_scores")
         table.put_item(Item=item)

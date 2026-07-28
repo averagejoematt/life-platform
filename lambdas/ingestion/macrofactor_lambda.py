@@ -26,7 +26,7 @@ import boto3
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("macrofactor")
 except ImportError:
@@ -110,7 +110,7 @@ COL_TO_FIELD = dict(NUTRIENT_COLUMNS)
 
 # Phase 4.2 (2026-05-16): canonical impl in lambdas/numeric.py.
 try:
-    from numeric import floats_to_decimal  # noqa: F401
+    from common.numeric import floats_to_decimal  # noqa: F401
 except ImportError:
 
     def floats_to_decimal(obj):
@@ -642,7 +642,7 @@ def lambda_handler(event, context):
 
     # REL-3: import safe_put_item once for the whole batch
     try:
-        from item_size_guard import safe_put_item as _safe_put
+        from common.item_size_guard import safe_put_item as _safe_put
 
         _use_safe_put = True
     except ImportError:

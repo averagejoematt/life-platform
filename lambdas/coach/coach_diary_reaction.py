@@ -308,7 +308,7 @@ def _stamp():
     except Exception:  # noqa: BLE001 — provenance never breaks a write
         pass
     try:
-        from constants import EXPERIMENT_PHASE_CURRENT
+        from common.constants import EXPERIMENT_PHASE_CURRENT
 
         return {"phase": EXPERIMENT_PHASE_CURRENT}
     except Exception:  # noqa: BLE001

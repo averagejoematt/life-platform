@@ -26,7 +26,7 @@ import coach_narrative_orchestrator as orch  # noqa: E402
 import elena_state_updater as elena  # noqa: E402
 import phase_taxonomy  # noqa: E402
 from ai_expert_analyzer_lambda import _load_engagement_signal  # noqa: E402
-from constants import EXPERIMENT_START_DATE  # noqa: E402
+from common.constants import EXPERIMENT_START_DATE  # noqa: E402
 from phase_filter import singleton_visible  # noqa: E402
 from web import (
     site_api_coach as capi,  # noqa: E402

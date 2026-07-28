@@ -69,7 +69,7 @@ from datetime import date, datetime, timedelta, timezone
 import boto3
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("cost-governor")
 except ImportError:

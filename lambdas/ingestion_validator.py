@@ -631,7 +631,7 @@ def validate_and_write(table, s3_client, bucket: str, source: str, item: dict, d
 
     if use_safe_put:
         try:
-            from item_size_guard import safe_put_item
+            from common.item_size_guard import safe_put_item
 
             safe_put_item(table, item, source=source, date_str=date_str)
         except ImportError:

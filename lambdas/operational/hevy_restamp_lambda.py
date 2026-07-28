@@ -45,7 +45,7 @@ from typing import Any
 import boto3
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("hevy-restamp")
 except ImportError:

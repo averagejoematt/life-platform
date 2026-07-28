@@ -28,11 +28,11 @@ import google_tts
 import persona_registry
 from ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
 from boto3.dynamodb.conditions import Key
-from constants import EXPERIMENT_START_DATE  # ADR-058/077 — current-cycle genesis anchor
+from common.constants import EXPERIMENT_START_DATE  # ADR-058/077 — current-cycle genesis anchor
 from phase_filter import with_phase_filter
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("coach-panel-podcast")
 except ImportError:

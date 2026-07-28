@@ -51,7 +51,7 @@ import boto3
 import personal_baselines
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("personal-baselines-compute")
 except ImportError:
@@ -70,7 +70,7 @@ dynamodb = boto3.resource("dynamodb", region_name=_REGION)
 table = dynamodb.Table(TABLE_NAME)
 
 
-from digest_utils import d2f as _d2f  # shared bundled helpers (#970)
+from common.digest_utils import d2f as _d2f  # shared bundled helpers (#970)
 
 
 def _fetch_source(source, start, end):

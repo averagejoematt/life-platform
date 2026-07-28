@@ -132,9 +132,8 @@ def test_evening_intake_tonight_is_the_pacific_day(monkeypatch):
     evening being logged (the pacific_time.py documented bug class)."""
     from datetime import date, datetime as dt
 
-    import pacific_time
+    from common import pacific_time  # 2026-07-17 20:30 PT == 2026-07-18 03:30 UTC — the dates diverge on purpose.
 
-    # 2026-07-17 20:30 PT == 2026-07-18 03:30 UTC — the dates diverge on purpose.
     monkeypatch.setattr(pacific_time, "pacific_now", lambda: dt(2026, 7, 17, 20, 30, tzinfo=pacific_time.PACIFIC))
     seen = {}
 

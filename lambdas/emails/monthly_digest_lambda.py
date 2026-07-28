@@ -19,7 +19,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import boto3
-from constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 
 _logger_std = logging.getLogger()
 _logger_std.setLevel(logging.INFO)
@@ -64,7 +64,7 @@ except ImportError:
 
 # OBS-1: Structured logger
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("monthly-digest")
 except ImportError:
@@ -74,7 +74,7 @@ except ImportError:
     logger.setLevel(_log.INFO)
 
 # ── Shared digest utilities ────────────────────────────────────────────
-from digest_utils import (
+from common.digest_utils import (
     avg,
     compute_banister_from_list,
     d2f,
@@ -491,7 +491,7 @@ Be honest. A month of data deserves a month's worth of insight."""
 
 def call_anthropic_with_retry(req, timeout=55, max_attempts=None, backoff_s=None):
     # Delegates to retry_utils for exponential backoff + CloudWatch metrics (P1.8/P1.9)
-    import retry_utils
+    from common import retry_utils
 
     return retry_utils.call_anthropic_raw(req, timeout=timeout)
 

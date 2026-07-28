@@ -82,7 +82,7 @@ class TestFingerprintDriftGate:
         # Sanity check that _fingerprint isn't a no-op (e.g. always returning the same
         # constant) — hash two different-but-real functions and confirm they differ.
         import calibration_core
-        import stats_core
+        from common import stats_core
 
         fp_a = mr._fingerprint(stats_core.pearson_r)
         fp_b = mr._fingerprint(stats_core.brier_score)

@@ -49,15 +49,15 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 import boto3
-from numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
+from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 
 try:
-    from http_retry import urlopen_with_retry
+    from common.http_retry import urlopen_with_retry
 except ImportError:  # pragma: no cover — layer-module fallback (local tooling)
     urlopen_with_retry = urllib.request.urlopen
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("hevy")
 except ImportError:
@@ -69,7 +69,7 @@ except ImportError:
 # start_date_local). pacific_time is the canonical helper; the inline zoneinfo
 # fallback keeps local tooling working without the shared bundle on sys.path.
 try:
-    from pacific_time import PACIFIC
+    from common.pacific_time import PACIFIC
 except ImportError:  # pragma: no cover — layer-module fallback (local tooling)
     from zoneinfo import ZoneInfo
 
@@ -105,7 +105,7 @@ def load_secret() -> dict[str, str]:
     if _secret_cache is not None:
         return _secret_cache
     try:
-        from secret_cache import get_secret_json
+        from common.secret_cache import get_secret_json
 
         _secret_cache = get_secret_json(SECRET_NAME, _secrets)
     except ImportError:

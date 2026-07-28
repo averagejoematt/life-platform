@@ -34,7 +34,7 @@ from phase_filter import with_phase_filter  # ADR-058
 
 # Structured logger
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("coach-ensemble-digest")
 except ImportError:
@@ -88,7 +88,7 @@ secrets = boto3.client("secretsmanager", region_name=REGION)
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-from numeric import (
+from common.numeric import (
     decimals_to_float as _decimal_to_float,  # noqa: E402,F401
     floats_to_decimal,  # noqa: E402  # canonical float->Decimal (#1207)
 )
@@ -103,7 +103,7 @@ def _slugify(text):
 
 
 # Canonical emitter lives in the layer — local copy removed 2026-06-12.
-from retry_utils import _emit_token_metrics  # noqa: E402,F401
+from common.retry_utils import _emit_token_metrics  # noqa: E402,F401
 
 
 def _emit_failure_metric():
@@ -160,7 +160,7 @@ def _call_haiku(system, user_message, max_tokens=6000, temperature=0.2):
     # backed by Bedrock (was urllib → api.anthropic.com). Handles backoff +
     # token metrics + failure metric. `req` is still built above; the body is
     # extracted and forwarded to bedrock_client.invoke().
-    from retry_utils import call_anthropic_raw
+    from common.retry_utils import call_anthropic_raw
 
     resp = call_anthropic_raw(req)
     text = resp["content"][0]["text"].strip()

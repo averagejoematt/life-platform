@@ -374,7 +374,7 @@ def test_d5_no_forked_floats_to_decimal():
     Callers must `from numeric import floats_to_decimal` — not fork a private copy.
     This is the regression guard for the ~10 divergent forks consolidated in #1207.
     """
-    numeric_path = os.path.abspath(os.path.join(LAMBDAS_DIR, "numeric.py"))
+    numeric_path = os.path.abspath(os.path.join(LAMBDAS_DIR, "common", "numeric.py"))
     offenders = []
     for path in _iter_python_sources():
         if os.path.abspath(path) == numeric_path:

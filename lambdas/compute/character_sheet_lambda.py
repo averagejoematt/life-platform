@@ -36,12 +36,12 @@ from decimal import Decimal
 import boto3
 import character_engine
 import personal_baselines  # #1412: personal-variance targets overlay (ADR-105 rule 4)
-from constants import EXPERIMENT_PHASE_CURRENT, EXPERIMENT_START_DATE  # ADR-058
+from common.constants import EXPERIMENT_PHASE_CURRENT, EXPERIMENT_START_DATE  # ADR-058
 from phase_filter import singleton_visible, with_phase_filter  # ADR-058: default-deny pilot data / #946
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("character-sheet-compute")
 except ImportError:
@@ -68,7 +68,7 @@ s3 = boto3.client("s3", region_name=_REGION)
 # ==============================================================================
 
 
-from digest_utils import d2f  # shared bundled helpers (#970)
+from common.digest_utils import d2f  # shared bundled helpers (#970)
 
 
 def fetch_date(source, date_str):
@@ -780,7 +780,7 @@ def lambda_handler(event, context):
                 return obj
 
             # Phase 3.3 (2026-05-16): tag with run_id + computed_at for double-run observability.
-            from compute_metadata import tag_record
+            from common.compute_metadata import tag_record
 
             _tagged = tag_record({k: _dec(v) for k, v in _frozen.items() if v is not None}, source_id="character_sheet")
             table.put_item(Item=_tagged)

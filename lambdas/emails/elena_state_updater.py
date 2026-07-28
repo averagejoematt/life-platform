@@ -44,7 +44,7 @@ from boto3.dynamodb.conditions import Key
 from phase_filter import singleton_visible  # #946: hide reset-tombstoned persona state
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("elena-state-updater")
 except ImportError:
@@ -198,7 +198,7 @@ def _call_haiku(system, user_message, max_tokens=2500, temperature=0.2):
         },
         method="POST",
     )
-    from retry_utils import call_anthropic_raw
+    from common.retry_utils import call_anthropic_raw
 
     resp = call_anthropic_raw(req)
     text = resp["content"][0]["text"].strip()

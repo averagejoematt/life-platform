@@ -12,10 +12,10 @@ Exports:
 
 from datetime import datetime
 
-from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 
 try:
-    from digest_utils import compute_confidence
+    from common.digest_utils import compute_confidence
 
     _HAS_CONFIDENCE = True
 except ImportError:
@@ -30,7 +30,7 @@ except ImportError:
 # ==============================================================================
 
 
-from digest_utils import safe_float  # shared bundled helpers (#970; the local d2f copy was unused)
+from common.digest_utils import safe_float  # shared bundled helpers (#970; the local d2f copy was unused)
 
 
 def avg(vals):

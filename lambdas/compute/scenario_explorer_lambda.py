@@ -30,11 +30,11 @@ import os
 from datetime import datetime, timezone
 
 import boto3
-import stats_core
-from numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
+from common import stats_core
+from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("scenario-explorer")
 except ImportError:
@@ -203,7 +203,7 @@ def lambda_handler(event: dict, context) -> dict:
 
         payload = build_payload(rows_by_date, today_str)
         try:
-            from compute_metadata import tag_record
+            from common.compute_metadata import tag_record
 
             payload = tag_record(payload, source_id="scenarios")
         except ImportError:

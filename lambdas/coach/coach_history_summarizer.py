@@ -46,7 +46,7 @@ from phase_filter import with_phase_filter  # ADR-058
 
 # Structured logger
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("coach-history-summarizer")
 except ImportError:
@@ -158,13 +158,13 @@ secrets = boto3.client("secretsmanager", region_name=REGION)
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-from numeric import (
+from common.numeric import (
     decimals_to_float as _decimal_to_float,  # noqa: E402,F401
     floats_to_decimal,  # noqa: E402  # canonical float->Decimal (#1207)
 )
 
 # Canonical emitter lives in the layer — local copy removed 2026-06-12.
-from retry_utils import _emit_token_metrics  # noqa: E402,F401
+from common.retry_utils import _emit_token_metrics  # noqa: E402,F401
 
 # #534: the STANCE# writer joins ADR-104's grounded-generation gate (the named
 # fast-follow from ADR-104's honest residual — "the STANCE# writer gate is a
@@ -268,7 +268,7 @@ def _call_haiku(system, user_message, max_tokens=1500, temperature=0.2):
     )
 
     # ADR-062 (2026-05-27): route through retry_utils.call_anthropic_raw (Bedrock).
-    from retry_utils import call_anthropic_raw
+    from common.retry_utils import call_anthropic_raw
 
     resp = call_anthropic_raw(req)
     text = resp["content"][0]["text"].strip()

@@ -23,7 +23,7 @@ from decimal import Decimal, InvalidOperation
 import boto3
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("measurements-ingestion")
 except ImportError:

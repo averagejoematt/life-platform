@@ -37,12 +37,12 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import boto3
-from constants import EXPERIMENT_START_DATE  # ADR-058
+from common.constants import EXPERIMENT_START_DATE  # ADR-058
 from phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 
 # Structured logger
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("coach-narrative-orchestrator")
 except ImportError:
@@ -141,13 +141,13 @@ secrets = boto3.client("secretsmanager", region_name=REGION)
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-from numeric import (
+from common.numeric import (
     decimals_to_float as _decimal_to_float,  # noqa: E402,F401
     floats_to_decimal,  # noqa: E402  # canonical float->Decimal (#1207)
 )
 
 # Canonical emitter lives in the layer — local copy removed 2026-06-12.
-from retry_utils import _emit_token_metrics  # noqa: E402,F401
+from common.retry_utils import _emit_token_metrics  # noqa: E402,F401
 
 
 def _emit_failure_metric():
@@ -238,7 +238,7 @@ def _call_haiku(system, user_message, max_tokens=6000, temperature=0.3):
     )
 
     # ADR-062 (2026-05-27): route through retry_utils.call_anthropic_raw (Bedrock).
-    from retry_utils import call_anthropic_raw
+    from common.retry_utils import call_anthropic_raw
 
     resp = call_anthropic_raw(req)
     text = resp["content"][0]["text"].strip()

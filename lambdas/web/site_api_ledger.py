@@ -4,8 +4,8 @@ site_api_data.py (#1654): ledger / what_changed / discoveries. Reads facade stat
 import json
 import os
 
-import stats_core
 from boto3.dynamodb.conditions import Key
+from common import stats_core
 from phase_filter import with_phase_filter
 
 from web.site_api_common import S3_REGION, USER_PREFIX, _decimal_to_float, _ok, logger

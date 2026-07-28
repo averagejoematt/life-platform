@@ -25,7 +25,7 @@ from unittest.mock import MagicMock
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 
-import rate_limiter as rl  # noqa: E402
+from common import rate_limiter as rl  # noqa: E402
 from web.site_api_ai_lambda import BOARD_RATE_LIMIT  # noqa: E402 — a REAL configured production limit (5/hr)
 
 

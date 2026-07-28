@@ -32,13 +32,13 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
 import boto3
-import digest_utils  # shared query_range implementations (#970)
-from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common import digest_utils  # shared query_range implementations (#970)
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("partner-weekly")
 except ImportError:
@@ -77,7 +77,7 @@ secrets = boto3.client("secretsmanager", region_name=_REGION)
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-from digest_utils import d2f, safe_float  # shared bundled helpers (#970)
+from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
 
 
 def avg(vals):
@@ -490,7 +490,7 @@ def build_commentary(data):
     )
 
     try:
-        from retry_utils import call_anthropic_raw
+        from common.retry_utils import call_anthropic_raw
 
         resp = call_anthropic_raw(req, timeout=45)
         text = resp["content"][0]["text"]

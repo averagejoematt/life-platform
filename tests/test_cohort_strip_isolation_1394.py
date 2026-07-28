@@ -37,7 +37,7 @@ import site_api_social as se  # noqa: E402
 # Matthew's statistics + calibration surfaces. Every one queries HIS OWN
 # `USER#…#SOURCE#…` partitions — none may ever reach into the cohort family.
 _PIPELINE_FILES = [
-    "lambdas/stats_core.py",
+    "lambdas/common/stats_core.py",
     "lambdas/calibration_core.py",
     "lambdas/eyeball_calibration.py",
     "lambdas/character_engine.py",

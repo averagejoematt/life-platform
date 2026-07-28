@@ -31,11 +31,11 @@ import xml.etree.ElementTree as ET
 from decimal import Decimal
 
 import boto3
+from common.pacific_time import pacific_date_of
 from ingestion_framework import IngestionConfig, run_ingestion
-from pacific_time import pacific_date_of
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("youtube-ingestion")
 except ImportError:  # pragma: no cover — layer-module fallback (local tooling)
@@ -44,7 +44,7 @@ except ImportError:  # pragma: no cover — layer-module fallback (local tooling
     logger = logging.getLogger("youtube-ingestion")
 
 try:
-    from http_retry import urlopen_with_retry
+    from common.http_retry import urlopen_with_retry
 except ImportError:  # pragma: no cover — layer-module fallback
     urlopen_with_retry = urllib.request.urlopen
 
@@ -109,7 +109,7 @@ def authenticate(secret_data):
         try:
             client = boto3.client("secretsmanager", region_name=os.environ.get("AWS_REGION", "us-west-2"))
             try:
-                from secret_cache import get_secret_json
+                from common.secret_cache import get_secret_json
 
                 secret = get_secret_json(SECRET_ID, client)
             except ImportError:

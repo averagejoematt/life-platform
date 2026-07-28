@@ -32,7 +32,7 @@ from datetime import datetime, timezone
 
 # OBS-1 logger
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("todoist")
 except ImportError:
@@ -40,7 +40,7 @@ except ImportError:
     logger.setLevel(logging.INFO)
 
 try:
-    from http_retry import urlopen_with_retry
+    from common.http_retry import urlopen_with_retry
 except ImportError:  # pragma: no cover — layer-module fallback (local tooling)
     urlopen_with_retry = urllib.request.urlopen
 

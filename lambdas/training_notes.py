@@ -128,7 +128,7 @@ _LEVEL_RE = re.compile(r"\b(?:level|lvl|l)\s*(\d{1,3})\b", re.IGNORECASE)
 _LOAD_RE = re.compile(r"\b(\d{1,4}(?:\.\d+)?)\s*(lbs?|kg|kilos?|pounds?)\b", re.IGNORECASE)
 
 try:
-    from numeric import floats_to_decimal
+    from common.numeric import floats_to_decimal
 except ImportError:  # pragma: no cover - layer always provides numeric
 
     def floats_to_decimal(obj):

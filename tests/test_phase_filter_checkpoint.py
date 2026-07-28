@@ -34,7 +34,7 @@ def isolated_audit_trail(tmp_path, monkeypatch):
 
 
 def test_genesis_date_matches_constants():
-    from lambdas.constants import EXPERIMENT_START_DATE
+    from lambdas.common.constants import EXPERIMENT_START_DATE
 
     assert pfc.genesis_date() == date.fromisoformat(EXPERIMENT_START_DATE)
 

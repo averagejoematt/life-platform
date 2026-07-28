@@ -15,7 +15,7 @@ otherwise returns the original).
 v1.0.0 — 2026-05-23 (ADR-058)
 """
 
-from constants import EXPERIMENT_PHASE_CURRENT
+from common.constants import EXPERIMENT_PHASE_CURRENT
 
 PHASE_FILTER_EXPRESSION = "(#phase = :phase_experiment OR attribute_not_exists(#phase))"
 PHASE_FILTER_NAMES = {"#phase": "phase"}

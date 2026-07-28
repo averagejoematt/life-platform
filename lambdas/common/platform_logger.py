@@ -7,7 +7,7 @@ Logs Insights can query, filter, and alarm on.
 
 USAGE (replaces `logger = logging.getLogger(); logger.setLevel(logging.INFO)`):
 
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
     logger = get_logger("daily-brief")           # source name = lambda function name
     logger.info("Sending email", subject=subject, grade=grade)
     logger.warning("Stale data", source="whoop", age_hours=4.2)

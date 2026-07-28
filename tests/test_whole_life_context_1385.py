@@ -66,7 +66,7 @@ def test_format_full_archive_empty():
 
 def test_chronicle_call_anthropic_sends_archive_as_cached_block(monkeypatch):
     import chronicle_prompt
-    import retry_utils
+    from common import retry_utils
 
     captured = {}
 
@@ -87,7 +87,7 @@ def test_chronicle_call_anthropic_sends_archive_as_cached_block(monkeypatch):
 
 def test_chronicle_call_anthropic_no_archive_is_plain_string(monkeypatch):
     import chronicle_prompt
-    import retry_utils
+    from common import retry_utils
 
     captured = {}
     monkeypatch.setattr(retry_utils, "call_anthropic_api", lambda **kw: captured.update(kw) or "x")

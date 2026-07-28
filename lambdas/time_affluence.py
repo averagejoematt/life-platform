@@ -37,9 +37,7 @@ import statistics
 from datetime import datetime, timedelta
 from decimal import Decimal
 
-import stats_core
-
-# ── Construction constants (documented in docs/methods/TIME_AFFLUENCE_PROXY.md) ──
+from common import stats_core  # ── Construction constants (documented in docs/methods/TIME_AFFLUENCE_PROXY.md) ──
 
 PROXY_WINDOW_WEEKS = 12  # rolling window: weekly proxies + the lagged edge test
 COMPONENT_COVERAGE_FLOOR = 0.5  # a week needs >= half its components to emit a number

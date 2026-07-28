@@ -7,7 +7,7 @@ Lighter than retry_utils.py — no CloudWatch metric emission, no Anthropic-
 specific response parsing. Just retry on 429/5xx with exponential backoff.
 
 Usage:
-    from http_retry import urlopen_with_retry
+    from common.http_retry import urlopen_with_retry
     with urlopen_with_retry(req, timeout=30) as resp:
         data = json.loads(resp.read())
 

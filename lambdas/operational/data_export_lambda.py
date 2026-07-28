@@ -30,7 +30,7 @@ from boto3.dynamodb.conditions import Key
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("data-export")
 except ImportError:

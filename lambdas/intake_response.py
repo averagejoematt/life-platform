@@ -22,8 +22,8 @@ tests/test_intake_privacy_contract.py enforces the boundary in both directions.
 import logging
 from datetime import datetime, timedelta, timezone
 
-import stats_core
 from boto3.dynamodb.conditions import Key
+from common import stats_core
 
 logger = logging.getLogger()
 

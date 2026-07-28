@@ -33,7 +33,7 @@ from phase_filter import with_phase_filter  # ADR-058
 
 # ── Structured logger ────────────────────────────────────────────────────────
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("coach-observatory-renderer")
 except ImportError:
@@ -48,7 +48,7 @@ REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
 
-from constants import EXPERIMENT_START_DATE as EXPERIMENT_START  # ADR-058
+from common.constants import EXPERIMENT_START_DATE as EXPERIMENT_START  # ADR-058
 
 # AWS clients
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
@@ -138,7 +138,7 @@ DOMAIN_SOURCE_MAP = {
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-from numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
+from common.numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
 
 
 def _confidence_to_language(confidence_float):

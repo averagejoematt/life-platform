@@ -190,7 +190,7 @@ def derive_adherence(raw_workout: dict[str, Any]) -> dict[str, Any] | None:
     can render a fabricated number (ADR-104)."""
     try:
         import routine_repo
-        from pacific_time import pacific_date_of
+        from common.pacific_time import pacific_date_of
 
         performed = raw_workout or {}
         pac_date = pacific_date_of(performed.get("start_time"))

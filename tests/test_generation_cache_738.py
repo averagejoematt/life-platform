@@ -18,7 +18,7 @@ from decimal import Decimal
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
-import generation_cache as gc  # noqa: E402
+from common import generation_cache as gc  # noqa: E402
 
 # ── fingerprint stability ─────────────────────────────────────────────────────
 

@@ -38,7 +38,7 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 import training_load  # shared TSS-like load model (layer module, #490) — basis_note
-from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 _logger_std = logging.getLogger()
@@ -90,7 +90,7 @@ except ImportError:
 
 # OBS-1: Structured logger
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("monday-compass")
 except ImportError:
@@ -147,7 +147,7 @@ _PILLAR_WEIGHTS = {
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-from digest_utils import d2f, safe_float  # shared bundled helpers (#970)
+from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
 
 
 def fetch_profile():
@@ -533,7 +533,7 @@ def _fallback_board_context(week_state):
 
 def call_anthropic(system_prompt, user_message, max_tokens=3000):
     # Delegates to retry_utils for exponential backoff + CloudWatch metrics (P1.8/P1.9)
-    import retry_utils
+    from common import retry_utils
 
     return retry_utils.call_anthropic_api(
         prompt=user_message,

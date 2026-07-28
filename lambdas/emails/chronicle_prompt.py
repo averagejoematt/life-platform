@@ -159,9 +159,8 @@ Write in clean paragraphs. No bullet points. No numbered lists. No headers withi
 
 def call_anthropic(system_prompt, user_message, archive_text=None):
     # Delegates to retry_utils for exponential backoff + CloudWatch metrics (P1.8/P1.9)
-    import retry_utils
+    from common import retry_utils  # #1385: the full multi-cycle archive rides as a 1-hour cached content block in
 
-    # #1385: the full multi-cycle archive rides as a 1-hour cached content block in
     # the system (after the persona prompt, before the volatile weekly data packet in
     # the user turn) — the run's several calls (first draft, regen-once, Margaret pass)
     # reuse the one cache write at ~0.1x reads. retry_utils passes a pre-built block

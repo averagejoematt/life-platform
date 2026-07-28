@@ -23,11 +23,11 @@ from datetime import date, datetime, timedelta, timezone
 
 import boto3
 from boto3.dynamodb.conditions import Key
-from mcp_url import resolve_mcp_url  # SEC-02 #780: discover the URL at runtime, not a committed env var
+from common.mcp_url import resolve_mcp_url  # SEC-02 #780: discover the URL at runtime, not a committed env var
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("qa-smoke")
 except ImportError:
@@ -38,7 +38,7 @@ except ImportError:
 # dashboard validates *yesterday*, which is pre-genesis and legitimately has no
 # day-grade. A missing grade for a pre-experiment date is expected, not a fault.
 try:
-    from constants import EXPERIMENT_START_DATE
+    from common.constants import EXPERIMENT_START_DATE
 except ImportError:
     EXPERIMENT_START_DATE = None
 
@@ -230,8 +230,8 @@ def check_score_sanity():
     # several zero/odd states are the HONEST state (ADR-104), not data loss.
     # From Day 2 every one of them is a real FAIL again.
     try:
-        from constants import EXPERIMENT_START_DATE as _genesis
-        from pacific_time import pacific_today as _pt_today
+        from common.constants import EXPERIMENT_START_DATE as _genesis
+        from common.pacific_time import pacific_today as _pt_today
 
         _genesis_grace = (date.fromisoformat(_pt_today()) - date.fromisoformat(_genesis)).days < 1
     except Exception:  # noqa: BLE001 — grace derivation must never break the sweep
@@ -930,7 +930,7 @@ def check_notion_template_schema():
     sm = boto3.client("secretsmanager", region_name=REGION)
     try:
         try:
-            from secret_cache import get_secret_json
+            from common.secret_cache import get_secret_json
 
             secret = get_secret_json(NOTION_SECRET_NAME, sm)
         except ImportError:

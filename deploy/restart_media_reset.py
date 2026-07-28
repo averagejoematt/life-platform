@@ -50,7 +50,7 @@ sys.path.insert(0, str(REPO_ROOT / "deploy"))
 
 from restart_chronicle_handler import resolve_calendar  # noqa: E402 — the pre-launch calendar (single source)
 
-from lambdas.constants import EXPERIMENT_START_DATE
+from lambdas.common.constants import EXPERIMENT_START_DATE
 
 REGION = "us-west-2"
 S3_BUCKET = "matthew-life-platform"

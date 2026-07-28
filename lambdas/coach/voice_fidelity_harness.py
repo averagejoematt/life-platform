@@ -44,7 +44,7 @@ import boto3
 import persona_registry
 import voice_fidelity_core as vfc
 from boto3.dynamodb.conditions import Key
-from numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
+from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 from phase_filter import with_phase_filter  # ADR-058 (harmless no-op here: these records never set `phase`)
 
 logger = logging.getLogger("voice-fidelity-harness")

@@ -28,8 +28,8 @@ from typing import Any
 
 import boto3  # noqa: F401 — handlers may instantiate clients
 import experiment_gates  # #1371: arming thresholds served to zero-states — same objects the engines enforce
-import stats_core  # #1240: sanctioned stats implementation (ADR-105) — handle_correlations
 from boto3.dynamodb.conditions import Key
+from common import stats_core  # #1240: sanctioned stats implementation (ADR-105) — handle_correlations
 from phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1197
 
 from web.site_api_common import (

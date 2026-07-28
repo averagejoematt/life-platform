@@ -370,7 +370,7 @@ def generate_questions(coach_id, coach_name, coach_bio, snapshot, n, caller=None
     body = build_generation_prompt(coach_id, coach_name, coach_bio, snapshot, n)
     try:
         if caller is None:
-            from retry_utils import call_anthropic_raw  # lazy — bundled module, runtime only
+            from common.retry_utils import call_anthropic_raw  # lazy — bundled module, runtime only
 
             result = call_anthropic_raw(body, timeout=30)
         else:

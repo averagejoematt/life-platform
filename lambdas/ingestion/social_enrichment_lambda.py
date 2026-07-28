@@ -56,7 +56,7 @@ import social_signals  # #1671: the deterministic coach router
 from boto3.dynamodb.conditions import Key
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("social-enrichment")
 except ImportError:  # pragma: no cover — layer-module fallback (local tooling)
@@ -150,7 +150,7 @@ def call_haiku(text, channel, date):
         "system": [{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
         "messages": [{"role": "user", "content": user_content}],
     }
-    from retry_utils import call_anthropic_raw
+    from common.retry_utils import call_anthropic_raw
 
     result = call_anthropic_raw(body, timeout=30)
 

@@ -56,7 +56,7 @@ def _get_api_key():
     return _api_key_cache
 
 
-from numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
+from common.numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
 
 
 def get_iso_week(dt=None):
@@ -81,7 +81,7 @@ def genesis_week_label(iso_week):
     anything before is Prologue. Mirrors the chronicle's genesis week numbering.
     """
     try:
-        from constants import EXPERIMENT_START_DATE
+        from common.constants import EXPERIMENT_START_DATE
 
         genesis = datetime.strptime(EXPERIMENT_START_DATE, "%Y-%m-%d")
         monday = datetime.fromisocalendar(int(iso_week[:4]), int(iso_week[6:]), 1)
@@ -323,7 +323,7 @@ def _call_notes_model(prompt, api_key):
         },
     )
     # Phase 3.4 (2026-05-16): retry via retry_utils (4 attempts, 5/15/45s).
-    from retry_utils import call_anthropic_raw
+    from common.retry_utils import call_anthropic_raw
 
     result = call_anthropic_raw(req, timeout=60)
     text = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text").strip()
@@ -468,7 +468,7 @@ def generate_field_notes(iso_week):
     # WEEK# record carries them (the reader-facing surface renders these), to
     # generated/qa_archive/. Fail-soft inside the module.
     try:
-        import qa_archive
+        from common import qa_archive
 
         note_fields = {k: item[k] for k in ("ai_present", "ai_tone", "ai_cautionary", "ai_affirming") if item.get(k)}
         qa_archive.archive_text("field_notes", json.dumps(note_fields), meta={"week": iso_week})

@@ -151,7 +151,7 @@ def test_compute_and_store_engagement_is_genesis_clamped(monkeypatch):
     # defense-in-depth behind the query floor).
     from datetime import date as _date, timedelta as _td
 
-    from constants import EXPERIMENT_START_DATE
+    from common.constants import EXPERIMENT_START_DATE
 
     # Anchor everything to the live genesis so future resets can't time-bomb this.
     day1 = EXPERIMENT_START_DATE

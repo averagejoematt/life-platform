@@ -67,7 +67,7 @@ except ImportError:  # pragma: no cover — layer-module fallback
     _INGEST_HEALTH_AVAILABLE = False
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("hevy-backfill")
 except ImportError:

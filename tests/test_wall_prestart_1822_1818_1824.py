@@ -59,7 +59,7 @@ def test_day_number_one_on_genesis_day():
 
 def test_day_number_matches_canonical_day_n():
     """Cross-check against the platform's canonical counter directly."""
-    import constants
+    from common import constants
 
     today = _iso(_today_pt())
     genesis = _iso(_today_pt() + timedelta(days=3))

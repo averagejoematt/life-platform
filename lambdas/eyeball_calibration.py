@@ -42,7 +42,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from numeric import floats_to_decimal
+from common.numeric import floats_to_decimal
 
 # ── The dedicated partition. NEVER the nutrition partition. ───────────────────
 # Written as ONE full literal (not an f-string fragment) so an auditor — and the AST

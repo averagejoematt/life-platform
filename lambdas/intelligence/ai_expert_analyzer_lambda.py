@@ -115,7 +115,7 @@ def _get_api_key():
     return _api_key_cache
 
 
-from numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
+from common.numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
 
 
 def _query_source(source, start_date, end_date):
@@ -135,7 +135,7 @@ def _latest_item(source):
     return items[0] if items else None
 
 
-from constants import EXPERIMENT_START_DATE as EXPERIMENT_START  # ADR-058
+from common.constants import EXPERIMENT_START_DATE as EXPERIMENT_START  # ADR-058
 
 _CANON_FACTS_CACHE = {}
 
@@ -1115,7 +1115,7 @@ def generate_and_cache(expert_key, shared_system=None):
 
     # Phase 3.4 (2026-05-16): retry via retry_utils (4 attempts, 5/15/45s).
     try:
-        from retry_utils import call_anthropic_raw
+        from common.retry_utils import call_anthropic_raw
 
         result = call_anthropic_raw(req, timeout=60)
     except urllib.error.HTTPError as e:
@@ -1220,7 +1220,7 @@ def generate_and_cache(expert_key, shared_system=None):
                     # Phase 3.4 + CRIT-AI-01 (2026-05-16): correction call now retries via
                     # retry_utils (was raw urlopen, no retry — caused silent quality failures
                     # when Anthropic was briefly unavailable mid-observatory).
-                    from retry_utils import call_anthropic_raw
+                    from common.retry_utils import call_anthropic_raw
 
                     corr_result = call_anthropic_raw(corr_req, timeout=60)
                     corrected_text = "".join(b["text"] for b in corr_result.get("content", []) if b.get("type") == "text")
@@ -1300,7 +1300,7 @@ def generate_and_cache(expert_key, shared_system=None):
                 return _gg.grounding_findings(_t, facts=_facts, allowed=_allowed)
 
             def _regen(_correction):
-                from retry_utils import call_anthropic_raw
+                from common.retry_utils import call_anthropic_raw
 
                 _fix_req = urllib.request.Request(
                     "https://api.anthropic.com/v1/messages",
@@ -1465,7 +1465,7 @@ def generate_synthesis(all_coach_outputs):
     # and fail-closed to yesterday's stale record (the /cockpit/ "collapsed to one session/week"
     # bug). Parse LENIENTLY (strip fences, extract the outermost object, drop trailing commas),
     # and if even that fails, regex-extract weekly_priority so a FRESH record always lands.
-    from retry_utils import call_anthropic_raw
+    from common.retry_utils import call_anthropic_raw
 
     def _parse_synthesis(text):
         import re
@@ -1669,7 +1669,7 @@ def generate_experiment_arc():
             headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
         )
 
-    from retry_utils import call_anthropic_raw
+    from common.retry_utils import call_anthropic_raw
 
     def _parse(text):
         import re
@@ -1818,7 +1818,7 @@ def generate_month_rollup():
             headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
         )
 
-    from retry_utils import call_anthropic_raw
+    from common.retry_utils import call_anthropic_raw
 
     def _parse(text):
         import re

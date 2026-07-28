@@ -5,7 +5,7 @@ wednesday_chronicle_lambda.py (#1654). Facade state via the `_g` hand-off."""
 import json
 from datetime import datetime, timezone
 
-from constants import EXPERIMENT_START_DATE
+from common.constants import EXPERIMENT_START_DATE
 
 # ══════════════════════════════════════════════════════════════════════════════
 # "PREVIOUSLY ON" RECAP (backend serial phase 3) — Elena's cold-open catch-up

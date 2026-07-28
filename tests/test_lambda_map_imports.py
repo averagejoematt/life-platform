@@ -428,11 +428,11 @@ def test_synthetic_import_inside_generic_exception_handler_is_still_checked(tmp_
 
 def test_synthetic_real_sibling_module_resolves(tmp_path):
     """Sanity check against false positives: a handler importing a module that IS
-    in the bundle (using a real one, stats_core) must resolve cleanly."""
+    in the bundle (using a real one, common.stats_core) must resolve cleanly."""
     full = _write(
         tmp_path,
         "good_handler.py",
-        "import stats_core\n\n\ndef lambda_handler(event, context):\n    return {}\n",
+        "import common.stats_core\n\n\ndef lambda_handler(event, context):\n    return {}\n",
     )
     bad = unresolved_imports(full, "lambdas/good_handler.py", TREE_MODULES)
     assert bad == []
@@ -451,15 +451,15 @@ def test_synthetic_cdk_only_with_no_sibling_dependency_is_flagged_as_stale(tmp_p
 
 
 def test_synthetic_cdk_only_with_real_sibling_dependency_is_not_flagged(tmp_path):
-    """Counterpart: a handler that genuinely imports a bundled sibling (stats_core)
+    """Counterpart: a handler that genuinely imports a bundled sibling (common.stats_core)
     DOES have a reason to justify a cdk_only annotation."""
     full = _write(
         tmp_path,
         "real_deps_handler.py",
-        "import stats_core\n\n\ndef lambda_handler(event, context):\n    return {}\n",
+        "import common.stats_core\n\n\ndef lambda_handler(event, context):\n    return {}\n",
     )
     deps = _sibling_bundle_deps(full, "lambdas/real_deps_handler.py", TREE_MODULES)
-    assert deps == {"stats_core"}
+    assert deps == {"common.stats_core"}
 
 
 # ── Standalone runner ──────────────────────────────────────────────────────────────

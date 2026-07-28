@@ -61,7 +61,7 @@ def main():
     if args.genesis:
         genesis = args.genesis
     else:
-        from lambdas.constants import EXPERIMENT_START_DATE
+        from lambdas.common.constants import EXPERIMENT_START_DATE
 
         genesis = EXPERIMENT_START_DATE
 

@@ -45,7 +45,7 @@ from urllib.request import Request
 import boto3
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("habitify")
 except ImportError:
@@ -126,7 +126,7 @@ def api_get(endpoint, api_key, params=None):
         url = f"{url}?{urlencode(params)}"
     req = Request(url, headers={"Authorization": api_key, "User-Agent": "LifePlatform/1.0"})
     try:
-        from http_retry import urlopen_with_retry
+        from common.http_retry import urlopen_with_retry
 
         with urlopen_with_retry(req, timeout=30) as resp:
             body = json.loads(resp.read().decode())

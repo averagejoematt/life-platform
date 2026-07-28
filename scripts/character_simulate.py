@@ -29,7 +29,7 @@ os.environ.setdefault("AWS_REGION", "us-west-2")
 
 import character_engine  # noqa: E402
 import character_sheet_lambda as csl  # noqa: E402
-from constants import EXPERIMENT_START_DATE  # noqa: E402
+from common.constants import EXPERIMENT_START_DATE  # noqa: E402
 
 PILLARS = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
 

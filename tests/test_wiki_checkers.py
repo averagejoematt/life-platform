@@ -273,7 +273,7 @@ def test_experiment_anchor_ground_truth_is_discovered():
     not a stale literal — proves the fact the anchor gate polices is live."""
     facts = _load("scripts/check_doc_facts.py")
     truth = facts._ground_truth()
-    constants = (ROOT / "lambdas" / "constants.py").read_text(encoding="utf-8")
+    constants = (ROOT / "lambdas" / "common" / "constants.py").read_text(encoding="utf-8")
     m = re.search(r'EXPERIMENT_START_DATE\s*=\s*"(\d{4}-\d{2}-\d{2})"', constants)
     assert m, "EXPERIMENT_START_DATE literal not found in lambdas/constants.py"
     assert truth["experiment_genesis"] == m.group(1)

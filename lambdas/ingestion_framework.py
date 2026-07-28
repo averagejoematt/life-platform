@@ -63,7 +63,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 import boto3
-from numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
+from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 
 # Truth audit 2026-07-10 (EIGHTSLEEP UTC double-stamp): platform data is keyed by the
 # PACIFIC calendar day, but the framework derived "today" in UTC — after 5 PM PT the
@@ -71,14 +71,14 @@ from numeric import floats_to_decimal  # bundled shared module: canonical float-
 # like Eight Sleep wrote the same night under two DATE# keys. All day-selection here
 # goes through pacific_time (the single source of truth for the platform's "today");
 # instant TIMESTAMPS (fetched_at/ingested_at) stay UTC ISO on purpose.
-from pacific_time import pacific_now, pacific_today
+from common.pacific_time import pacific_now, pacific_today
 
 # ADR-058 (2026-05-25): tag every DDB write with phase=pilot|experiment so the
 # read-path phase_filter can default-deny pre-genesis data. Without this, every
 # ingestion run leaves untagged records that need a periodic
 # `restart_phase_tag.py --apply` sweep.
 try:
-    from constants import EXPERIMENT_PHASE_CURRENT, EXPERIMENT_START_DATE
+    from common.constants import EXPERIMENT_PHASE_CURRENT, EXPERIMENT_START_DATE
 except ImportError:
     EXPERIMENT_START_DATE = "2026-05-25"
     EXPERIMENT_PHASE_CURRENT = "experiment"
@@ -126,7 +126,7 @@ _AUTH_FAIL_TTL_SECONDS = 24 * 3600  # 24 hours
 # the monitoring-stack comment claimed. Marker schema (SK, TTL, fields) is identical,
 # so delegation is drop-in. Fallback copies keep local tooling importable.
 try:
-    from auth_breaker import (
+    from common.auth_breaker import (
         check_breaker as _ab_check_breaker,
         clear_failure as _ab_clear_failure,
         looks_like_auth_failure as _ab_looks_like_auth_failure,
@@ -330,7 +330,7 @@ class IngestionConfig:
 def _init_logger(source_name):
     """Try to use platform_logger (OBS-1), fall back to print."""
     try:
-        from platform_logger import get_logger
+        from common.platform_logger import get_logger
 
         return get_logger(source_name)
     except ImportError:
@@ -458,7 +458,7 @@ def _store_item(table, s3, config, item, date_str, logger):
     # REL-3: Item size guard (optional, for large-item sources)
     if config.enable_item_size_guard:
         try:
-            from item_size_guard import safe_put_item
+            from common.item_size_guard import safe_put_item
 
             safe_put_item(table, item, source=config.source_name, date_str=date_str)
             return True
@@ -558,7 +558,7 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn, event, co
     if config.secret_id and secrets_client:
         try:
             try:
-                from secret_cache import get_secret_json
+                from common.secret_cache import get_secret_json
 
                 secret_data = get_secret_json(config.secret_id, secrets_client)
             except ImportError:

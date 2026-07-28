@@ -31,7 +31,7 @@ import inspect
 import bsts_lite
 import calibration_core
 import conversation_enrichment
-import stats_core
+from common import stats_core
 
 
 def _fingerprint(fn):
@@ -51,7 +51,11 @@ def _entry(id_, name, fn, category, formula, window, limitations, recorded_finge
     return {
         "id": id_,
         "name": name,
-        "module": fn.__module__,
+        # Bare module name, not the dotted path. site/assets/js/provenance_popover.js
+        # renders this as `${entry.module}.py::${entry.function}`, so the packaging move
+        # in #1653 would otherwise have turned a correct "stats_core.py::pearson_r" into
+        # a nonexistent "common.stats_core.py::pearson_r" on the public methods page.
+        "module": fn.__module__.rsplit(".", 1)[-1],
         "function": fn.__name__,
         "category": category,
         "formula": formula,
@@ -73,7 +77,7 @@ def _entry(id_, name, fn, category, formula, window, limitations, recorded_finge
 SOURCE_MODULES = {
     "stats_core": {
         "title": "stats_core.py",
-        "path": "lambdas/stats_core.py",
+        "path": "lambdas/common/stats_core.py",
         "description": (
             "The one sanctioned statistics module (ADR-105, story #529) — pure, stdlib-only, "
             "deterministic. Replaced three divergent Pearson-r implementations and two p-value "

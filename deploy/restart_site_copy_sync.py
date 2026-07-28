@@ -36,7 +36,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from lambdas.constants import (
+from lambdas.common.constants import (
     EXPERIMENT_BASELINE_WEIGHT_LBS,
     EXPERIMENT_GOAL_WEIGHT_LBS,
     EXPERIMENT_START_DATE,

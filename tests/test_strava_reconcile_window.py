@@ -40,7 +40,7 @@ def _run_reconcile(monkeypatch, api_activities, stored_by_local_date):
     monkeypatch.setattr(strava, "boto3", fake_boto3)
     monkeypatch.setattr(strava, "authenticate", lambda sd: sd)
 
-    import secret_cache
+    from common import secret_cache
 
     monkeypatch.setattr(secret_cache, "get_secret_json", lambda sid, client: {"access_token": "t"})
     monkeypatch.setattr(strava, "_fetch_stored_activities", fake_stored)

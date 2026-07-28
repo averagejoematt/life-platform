@@ -24,7 +24,7 @@ import boto3
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("adaptive-mode-compute")
 except ImportError:
@@ -102,7 +102,7 @@ def store_adaptive_mode(date_str, result):
         logger.warning("[DATA-2] adaptive_mode validate_item failed (proceeding): %s", ve)
     # Phase 3.3 (2026-05-16): tag with run_id + computed_at.
     try:
-        from compute_metadata import tag_record
+        from common.compute_metadata import tag_record
 
         item = tag_record(item, source_id="adaptive_mode")
     except ImportError:
@@ -292,7 +292,7 @@ def _engagement_reference_today():
     """The real 'now' Pacific day — engagement is measured from now, not from the
     yesterday that adaptive_mode scores. Falls back to UTC if pacific_time absent."""
     try:
-        from pacific_time import pacific_today
+        from common.pacific_time import pacific_today
 
         return pacific_today()
     except Exception:
@@ -381,8 +381,8 @@ def _weight_series(today, window_days=60):
 def store_engagement_state(today, signal):
     """Write the presence record: DATE#{today} (history) + STATE#current (cheap
     read for the orchestrator + site-api, like STANCE#latest)."""
-    from compute_metadata import tag_record
-    from numeric import floats_to_decimal
+    from common.compute_metadata import tag_record
+    from common.numeric import floats_to_decimal
 
     base = {
         "pk": f"USER#{USER_ID}#SOURCE#engagement_state",
@@ -427,7 +427,7 @@ def compute_and_store_engagement():
     # import failure degrades to the unclamped (pre-#955) behaviour.
     experiment_start = None
     try:
-        from constants import EXPERIMENT_START_DATE
+        from common.constants import EXPERIMENT_START_DATE
 
         experiment_start = EXPERIMENT_START_DATE
     except Exception as e:

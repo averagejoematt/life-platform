@@ -73,7 +73,7 @@ import boto3
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("garmin")
 except ImportError:
@@ -99,7 +99,7 @@ table = dynamodb.Table(DYNAMODB_TABLE)
 # ── Serialisation ──────────────────────────────────────────────────────────────
 # Phase 4.2 (2026-05-16): canonical impl in lambdas/numeric.py.
 try:
-    from numeric import floats_to_decimal  # noqa: F401
+    from common.numeric import floats_to_decimal  # noqa: F401
 except ImportError:
 
     def floats_to_decimal(obj):

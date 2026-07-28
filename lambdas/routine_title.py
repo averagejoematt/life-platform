@@ -33,7 +33,7 @@ from typing import Any
 
 import boto3
 from boto3.dynamodb.conditions import Key
-from constants import EXPERIMENT_START_DATE
+from common.constants import EXPERIMENT_START_DATE
 from routine_ir import RoutineSpec
 
 CONFIG_DIR = os.environ.get(

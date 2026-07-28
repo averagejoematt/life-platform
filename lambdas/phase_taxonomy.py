@@ -80,7 +80,7 @@ def experiment_stamp(ssm_client=None, include_phase: bool = True) -> dict:
     """
     stamp: dict = {}
     if include_phase:
-        from constants import EXPERIMENT_PHASE_CURRENT
+        from common.constants import EXPERIMENT_PHASE_CURRENT
 
         stamp["phase"] = EXPERIMENT_PHASE_CURRENT
     try:

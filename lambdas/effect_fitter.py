@@ -42,8 +42,8 @@ from decimal import Decimal
 from typing import Any, Optional
 
 from boto3.dynamodb.conditions import Key
-from numeric import floats_to_decimal  # bundled shared module (#1207)
-from stats_core import (
+from common.numeric import floats_to_decimal  # bundled shared module (#1207)
+from common.stats_core import (
     bh_fdr,
     effective_sample_size,
     moving_block_bootstrap_ci,

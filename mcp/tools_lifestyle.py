@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from boto3.dynamodb.conditions import Key
-from numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
+from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 
 from mcp.config import EXPERIMENTS_PK, INSIGHTS_PK, S3_BUCKET, TRAVEL_PK, USER_ID, USER_PREFIX, logger, s3_client, table
 from mcp.core import decimal_to_float, parallel_query_sources, query_source
@@ -1923,8 +1923,8 @@ def tool_log_evening_intake(args):
       `updated` + `previous_count` (via ReturnValues=UPDATED_OLD) so the flow
       can say "updated tonight's count 2 -> 1" instead of silently re-writing.
     """
+    from common.pacific_time import pacific_today
     from intake_response import PRIVATE_INTAKE_PK
-    from pacific_time import pacific_today
 
     try:
         count = int(args.get("count"))

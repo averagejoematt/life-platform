@@ -18,7 +18,7 @@ DDB TTL on the `ttl` attribute (must be enabled on the table) auto-purges
 buckets after they're irrelevant. We set ttl = bucket_end + 1h grace.
 
 Usage:
-    from rate_limiter import check_rate_limit
+    from common.rate_limiter import check_rate_limit
     allowed, remaining, retry_after = check_rate_limit(
         table, endpoint="ask", ip_hash=h, limit=5, window_seconds=3600
     )
@@ -31,7 +31,7 @@ import time
 from typing import Tuple
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     _logger = get_logger("rate-limiter")
 except ImportError:

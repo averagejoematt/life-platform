@@ -35,7 +35,7 @@ from hevy_common import (
 )
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("hevy-webhook")
 except ImportError:

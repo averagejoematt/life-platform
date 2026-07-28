@@ -7,8 +7,8 @@ from datetime import datetime, timedelta, timezone
 
 import diary_consent  # #1483 (ADR-142 tier 2): the conversation-allude projection + prompt block
 from ai_context import build_experiment_phase_context, format_experiment_phase_context
-from constants import EXPERIMENT_BASELINE_WEIGHT_LBS
-from digest_utils import d2f, safe_float
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS
+from common.digest_utils import d2f, safe_float
 from phase_filter import singleton_visible
 
 

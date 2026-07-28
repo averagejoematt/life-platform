@@ -21,8 +21,8 @@ from typing import Any
 import boto3
 import calibration_core  # #538: the shared prediction-calibration scorer (Brier + reliability)
 from boto3.dynamodb.conditions import Key
+from common.text_utils import truncate_at_word  # #1224: word-boundary summary truncation (no mid-word cut)
 from phase_filter import with_phase_filter  # ADR-058
-from text_utils import truncate_at_word  # #1224: word-boundary summary truncation (no mid-word cut)
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ table = dynamodb.Table(TABLE_NAME)
 s3 = boto3.client("s3", region_name="us-west-2")
 
 
-from numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
+from common.numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
 
 # ══════════════════════════════════════════════════════════════════════════════
 # DATA INVENTORY
@@ -283,7 +283,7 @@ def load_goals_config() -> dict:
         return _goals_cache
     except Exception as e:
         logger.warning("Failed to load goals config: %s — using defaults", e)
-        from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+        from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 
         return {
             "mission": "12-month body recomposition for longevity",
@@ -1510,7 +1510,7 @@ Rules:
         )
 
         # Phase 3.4 (2026-05-16): retry via retry_utils (4 attempts, 5/15/45s).
-        from retry_utils import call_anthropic_raw
+        from common.retry_utils import call_anthropic_raw
 
         result = call_anthropic_raw(req, timeout=30)
 

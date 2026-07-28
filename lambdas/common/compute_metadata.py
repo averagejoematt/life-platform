@@ -17,7 +17,7 @@ Why not full idempotency? Compute Lambdas are intentionally re-runnable
 The OBSERVABILITY value is the win; full enforcement is overkill.
 
 Usage:
-    from compute_metadata import tag_record
+    from common.compute_metadata import tag_record
     record = tag_record(record, source_id="character_sheet")
     table.put_item(Item=record)
 """
@@ -85,7 +85,7 @@ def _infer_phase_from_record(record: dict) -> str:
     phase constant (typically "experiment").
     """
     try:
-        from constants import EXPERIMENT_PHASE_CURRENT, EXPERIMENT_START_DATE
+        from common.constants import EXPERIMENT_PHASE_CURRENT, EXPERIMENT_START_DATE
     except ImportError:
         return "experiment"  # Layer not loaded (local test) — safe default
     sk = record.get("sk", "")

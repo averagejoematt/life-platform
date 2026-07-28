@@ -24,7 +24,7 @@ from datetime import datetime, timezone
 SICK_DAYS_SOURCE = "sick_days"
 
 
-from digest_utils import d2f as _d2f  # shared bundled helpers (#970)
+from common.digest_utils import d2f as _d2f  # shared bundled helpers (#970)
 
 
 def check_sick_day(table, user_id, date_str):

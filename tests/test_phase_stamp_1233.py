@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas", "coa
 
 import coach_checkin  # noqa: E402
 import phase_taxonomy as pt  # noqa: E402
-from constants import EXPERIMENT_PHASE_CURRENT  # noqa: E402
+from common.constants import EXPERIMENT_PHASE_CURRENT  # noqa: E402
 
 # ── the shared helper ─────────────────────────────────────────────────────────
 

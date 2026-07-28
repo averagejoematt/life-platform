@@ -67,7 +67,7 @@ from ai_summaries import (  # noqa: F401
     build_food_summary,
     build_workout_summary,
 )
-from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 
 # AI-3 middleware: lazy import of output validator (transparent fail-safe)
 try:
@@ -1860,7 +1860,7 @@ Write your {domain_label} coaching section now."""
         _cache_tbl = None
         _brief_fp = None
         try:
-            import generation_cache as _gen_cache
+            from common import generation_cache as _gen_cache
 
             _cache_tbl = boto3.resource("dynamodb", region_name="us-west-2").Table(os.environ.get("TABLE_NAME", "life-platform"))
             # #1697: fingerprint over user_message_full so a newly-logged (or
@@ -2082,7 +2082,7 @@ Write your {domain_label} coaching section now."""
         # the state updater (i.e. what the brief + site publish) lands in
         # generated/qa_archive/ keyed by date+surface. Fail-soft inside the module.
         try:
-            import qa_archive
+            from common import qa_archive
 
             _qa_meta = {"output_type": output_type, "generation_date": _gen_date}
             if _freshness_findings:

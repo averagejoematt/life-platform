@@ -41,7 +41,7 @@ from phase_filter import with_phase_filter  # ADR-058
 
 # ── Structured logger ────────────────────────────────────────────────────────
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("coach-prediction-evaluator")
 except ImportError:
@@ -206,7 +206,7 @@ _NEVER_DECIDED_DAYS = 999
 # =============================================================================
 
 
-from numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
+from common.numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
 
 
 def _scalar_to_decimal(val):

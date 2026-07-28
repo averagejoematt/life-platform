@@ -17,8 +17,8 @@ sent.
 import json
 
 import pytest
-import retry_utils
 from botocore.exceptions import ClientError
+from common import retry_utils
 
 
 class _RecordingCW:

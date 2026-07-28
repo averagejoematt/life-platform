@@ -50,7 +50,7 @@ sys.path.insert(0, str(REPO_ROOT / "lambdas"))
 
 import restart_chronicle_handler as handler  # noqa: E402  (the curated calendar)
 import restart_leadin_pages as leadin  # noqa: E402  (page/manifest rebuild — reused, not copied)
-from constants import EXPERIMENT_START_DATE  # noqa: E402
+from common.constants import EXPERIMENT_START_DATE  # noqa: E402
 
 REGION = "us-west-2"
 TABLE_NAME = "life-platform"

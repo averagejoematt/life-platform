@@ -52,8 +52,8 @@ from mcp.core import query_source
 
 try:
     # Bundled shared modules (#781) — staged at the zip root in the Lambda.
-    import constants as _const
     import personal_baselines as _pb
+    from common import constants as _const
 except ImportError:  # pragma: no cover — the MCP bundle always ships lambdas/ at root
     if not TYPE_CHECKING:
         from lambdas import constants as _const, personal_baselines as _pb

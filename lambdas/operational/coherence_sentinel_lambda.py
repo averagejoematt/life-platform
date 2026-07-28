@@ -30,7 +30,7 @@ import boto3
 from boto3.dynamodb.conditions import Key
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("coherence-sentinel")
 except ImportError:
@@ -94,7 +94,7 @@ def _today():
 
 def _decimal(o):
     try:
-        from numeric import decimals_to_float
+        from common.numeric import decimals_to_float
 
         return decimals_to_float(o)
     except Exception:  # pragma: no cover
@@ -267,7 +267,7 @@ def _experiment_age_days():
     read as the handle_predictions degenerate-payload outage. Fail-soft: a
     missing genesis just disables the gate (original ungated behavior)."""
     try:
-        import constants
+        from common import constants
 
         genesis = constants.EXPERIMENT_START_DATE
     except Exception:  # noqa: BLE001
@@ -316,7 +316,7 @@ def _gather_experiment_continuity():
     pre-reset leak (a high week number resurfacing) or a misconfigured genesis. Fail-soft."""
     genesis = None
     try:
-        import constants
+        from common import constants
 
         genesis = constants.EXPERIMENT_START_DATE
     except Exception:  # noqa: BLE001

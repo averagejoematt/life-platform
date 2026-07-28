@@ -497,7 +497,7 @@ def _claims_phase_stamp():
         return phase_taxonomy.experiment_stamp()
     except Exception:
         try:
-            from constants import EXPERIMENT_PHASE_CURRENT
+            from common.constants import EXPERIMENT_PHASE_CURRENT
 
             return {"phase": EXPERIMENT_PHASE_CURRENT}
         except Exception:
@@ -525,7 +525,7 @@ def _read_claims():
 def tool_manage_diary_claims(args):
     """The on-tape claims ledger: log consented claims, list what's due, close the loop."""
     import diary_claims as dc  # bundled shared module (#781) — the pure gate
-    from numeric import floats_to_decimal  # #1207/D5: the ONE float->Decimal walker
+    from common.numeric import floats_to_decimal  # #1207/D5: the ONE float->Decimal walker
 
     action = (args.get("action") or "due").strip().lower()
     today = (args.get("today") or datetime.now(timezone.utc).strftime("%Y-%m-%d")).strip()

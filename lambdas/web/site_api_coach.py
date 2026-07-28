@@ -68,7 +68,7 @@ from web.site_api_common import (
 )
 
 try:
-    from constants import EXPERIMENT_BASELINE_WEIGHT_LBS
+    from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS
 except Exception:  # pragma: no cover - constants.py ships in every bundle (#781); defensive only
     EXPERIMENT_BASELINE_WEIGHT_LBS = 306.87
 

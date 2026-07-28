@@ -17,7 +17,7 @@ os.environ.setdefault("AWS_REGION", "us-west-2")
 os.environ.setdefault("S3_BUCKET", "matthew-life-platform")  # mcp.config requires these at import
 os.environ.setdefault("USER_ID", "matthew")
 
-import pacific_time  # noqa: E402  (lambdas/ on sys.path via conftest)
+from common import pacific_time  # noqa: E402  (lambdas/ on sys.path via conftest)
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -79,7 +79,7 @@ def _read(rel):
 
 def test_circadian_handler_uses_pacific_today():
     src = _read("lambdas/compute/circadian_compliance_lambda.py")
-    assert "from pacific_time import pacific_today" in src
+    assert "from common.pacific_time import pacific_today" in src
     assert 'today_str = event.get("date") or pacific_today()' in src
     # the buggy UTC default must be gone from the handler date derivation:
     assert 'event.get("date") or datetime.now(timezone.utc)' not in src
@@ -87,7 +87,7 @@ def test_circadian_handler_uses_pacific_today():
 
 def test_evening_nudge_handler_uses_pacific_today():
     src = _read("lambdas/emails/evening_nudge_lambda.py")
-    assert "from pacific_time import pacific_today" in src
+    assert "from common.pacific_time import pacific_today" in src
     assert "today = pacific_today()" in src
     assert "datetime.now(timezone.utc).strftime" not in src
 

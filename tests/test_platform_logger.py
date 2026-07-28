@@ -23,7 +23,7 @@ if LAMBDAS not in sys.path:
 
 _import_err = None
 try:
-    import platform_logger as pl
+    from common import platform_logger as pl
 except ImportError as _e:
     _import_err = _e
     pl = None  # type: ignore

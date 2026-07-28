@@ -33,7 +33,7 @@ sys.path.insert(0, str(REPO_ROOT / "lambdas" / "compute"))
 os.environ.setdefault("S3_BUCKET", "test-bucket")
 
 import character_sheet_lambda as csl  # noqa: E402
-from constants import EXPERIMENT_PHASE_CURRENT, EXPERIMENT_START_DATE  # noqa: E402
+from common.constants import EXPERIMENT_PHASE_CURRENT, EXPERIMENT_START_DATE  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
 
 CHAR_PK = "USER#matthew#SOURCE#character_sheet"

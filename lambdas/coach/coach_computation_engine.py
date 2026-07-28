@@ -36,7 +36,7 @@ from phase_filter import with_phase_filter  # ADR-058
 
 # ── Structured logger ────────────────────────────────────────────────────────
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("coach-computation-engine")
 except ImportError:
@@ -52,7 +52,7 @@ S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 ALGO_VERSION = "1.0"
 LOOKBACK_DAYS = 30
-from constants import EXPERIMENT_START_DATE as EXPERIMENT_START  # ADR-058
+from common.constants import EXPERIMENT_START_DATE as EXPERIMENT_START  # ADR-058
 
 # Metrics by source for EWMA processing.
 # #813: whoop records carry NO sleep_score/deep_pct/rem_pct attributes (those live
@@ -165,7 +165,7 @@ s3 = boto3.client("s3", region_name=_REGION)
 # =============================================================================
 
 
-from numeric import (
+from common.numeric import (
     decimals_to_float as _decimal_to_float,  # noqa: E402,F401
     floats_to_decimal,  # noqa: E402  # canonical float->Decimal (#1207)
 )

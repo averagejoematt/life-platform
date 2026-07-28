@@ -83,7 +83,7 @@ except ImportError:
 
 # OBS-1: Structured logger
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("anomaly-detector")
 except ImportError:
@@ -162,7 +162,7 @@ METRICS = [
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-from digest_utils import d2f, safe_float  # shared bundled helpers (#970)
+from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
 
 # ── Travel awareness (v2.1.0) ─────────────────────────────────────────────────
 TRAVEL_PK = f"USER#{USER_ID}#SOURCE#travel"
@@ -436,7 +436,7 @@ def call_anthropic_with_retry(req, timeout=30, max_attempts=None, backoff_s=None
     Also emits per-Lambda CloudWatch token + failure metrics.
     Signature kept for callers; max_attempts/backoff_s args ignored.
     """
-    from retry_utils import call_anthropic_raw
+    from common.retry_utils import call_anthropic_raw
 
     return call_anthropic_raw(req, timeout=timeout)
 

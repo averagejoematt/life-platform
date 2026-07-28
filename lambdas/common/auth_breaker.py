@@ -16,7 +16,7 @@ already enabled — Phase 1.7).
 
 Usage in an existing Lambda:
 
-    from auth_breaker import check_breaker, mark_failure, clear_failure, looks_like_auth_failure
+    from common.auth_breaker import check_breaker, mark_failure, clear_failure, looks_like_auth_failure
 
     def lambda_handler(event, context):
         marker = check_breaker(table, source_name="whoop", user_id=USER_ID, logger=logger)

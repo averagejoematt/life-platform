@@ -225,7 +225,7 @@ def build_artifact(live: bool) -> dict:
         table = boto3.resource("dynamodb", region_name="us-west-2").Table("life-platform")
         grades = ec.list_grades(table)
         # Decimal -> float for JSON (the artifact carries only aggregate error, never raw macros).
-        from numeric import decimals_to_float
+        from common.numeric import decimals_to_float
 
         grades = decimals_to_float(grades)
     return ec.build_reliability_artifact(grades)

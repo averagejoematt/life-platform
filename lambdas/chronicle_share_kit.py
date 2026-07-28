@@ -28,7 +28,7 @@ it is trivially unit-testable and safe to call on both the publish and approve p
 import re
 from datetime import datetime, timezone
 
-from utm import with_utm  # #1621 — the ONE canonical outbound UTM tagger
+from common.utm import with_utm  # #1621 — the ONE canonical outbound UTM tagger
 
 SITE_BASE = "https://averagejoematt.com"
 # The single channel the kit is shaped for (one manual paste; automated posting is

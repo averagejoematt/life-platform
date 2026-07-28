@@ -10,7 +10,7 @@ Catches broad threats without requiring per-endpoint schemas:
   - Malformed user_id / date / source values
 
 Usage:
-    from request_validator import validate_envelope, ValidationError
+    from common.request_validator import validate_envelope, ValidationError
     try:
         validate_envelope(event, path=path, method=method)
     except ValidationError as e:

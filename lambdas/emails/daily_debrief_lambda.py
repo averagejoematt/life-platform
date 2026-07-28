@@ -43,7 +43,7 @@ from er03_gate import BANNED_CAUSAL  # the platform's one banned-causal-connecti
 from grounded_generation import allowed_numbers, grounding_findings  # ADR-104 gate
 
 try:
-    from numeric import decimals_to_float
+    from common.numeric import decimals_to_float
 except ImportError:  # pragma: no cover — numeric is always bundled in prod
 
     def decimals_to_float(x):
@@ -51,7 +51,7 @@ except ImportError:  # pragma: no cover — numeric is always bundled in prod
 
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("daily-debrief")
 except ImportError:

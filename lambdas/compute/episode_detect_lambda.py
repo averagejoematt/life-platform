@@ -34,7 +34,7 @@ from decimal import Decimal
 import boto3
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("episode-detect")
 except ImportError:

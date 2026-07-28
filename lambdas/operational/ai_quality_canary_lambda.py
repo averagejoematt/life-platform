@@ -40,7 +40,7 @@ import boto3
 from boto3.dynamodb.conditions import Key
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("ai-quality-canary")
 except ImportError:  # pragma: no cover
@@ -284,7 +284,7 @@ def _origin_secret() -> str:
     string when unreadable — the probe then goes out headerless and the BLIND
     classification names the transport loudly instead of a silent 403."""
     try:
-        from secret_cache import get_secret
+        from common.secret_cache import get_secret
 
         return (get_secret(ORIGIN_SECRET_NAME, _secrets) or "").strip()
     except Exception as e:  # noqa: BLE001

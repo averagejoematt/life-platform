@@ -330,12 +330,12 @@ def store_receipt(table_resource: Any, pk: str, receipt: dict) -> dict:
     builds it as USER_PREFIX + "character_receipt" so the partition has a
     statically-resolvable writer for the orphan gate). Floats convert via the
     canonical helper at FULL precision — see module docstring."""
-    from numeric import floats_to_decimal  # bundled shared module (#1207)
+    from common.numeric import floats_to_decimal  # bundled shared module (#1207)
 
     item = {"pk": pk, "sk": "DATE#" + receipt["date"]}
     item.update(floats_to_decimal(_norm(receipt)))
     try:
-        from compute_metadata import tag_record
+        from common.compute_metadata import tag_record
 
         item = tag_record(item, source_id="character_receipt")
     except ImportError:

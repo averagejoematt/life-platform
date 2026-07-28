@@ -121,7 +121,7 @@ def enrich_book(meta: dict, *, caller=None) -> dict:
     }
     try:
         if caller is None:
-            from retry_utils import call_anthropic_raw  # lazy — layer module, only at runtime
+            from common.retry_utils import call_anthropic_raw  # lazy — layer module, only at runtime
 
             req = urllib.request.Request(
                 ANTHROPIC_API,

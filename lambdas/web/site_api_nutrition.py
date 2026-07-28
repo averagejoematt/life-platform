@@ -12,8 +12,10 @@ site_api_common (identical binding semantics to the pre-split facade).
 import os
 from datetime import datetime, timedelta, timezone
 
-import digest_utils  # bundled shared module — compute_confidence tiering (ADR-105)
-import stats_core  # bundled shared module (#529): the one sanctioned stats implementation
+from common import (
+    digest_utils,  # bundled shared module — compute_confidence tiering (ADR-105)
+    stats_core,  # bundled shared module (#529): the one sanctioned stats implementation
+)
 
 from web.site_api_common import (
     _get_profile,

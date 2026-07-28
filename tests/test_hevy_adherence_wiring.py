@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import adherence_calc
 import routine_repo
-from pacific_time import pacific_date_of
+from common.pacific_time import pacific_date_of
 from routine_ir import ExerciseBlock, RoutineSpec, Set
 
 

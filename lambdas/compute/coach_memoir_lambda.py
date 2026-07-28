@@ -38,9 +38,9 @@ import calibration_core
 import grounded_generation
 import memoir_gate
 import persona_registry
-import quarter_utils
 from boto3.dynamodb.conditions import Key
-from numeric import decimals_to_float, floats_to_decimal
+from common import quarter_utils
+from common.numeric import decimals_to_float, floats_to_decimal
 from phase_filter import with_phase_filter
 
 logger = logging.getLogger()
@@ -334,7 +334,7 @@ def _write_memoir_record(table, coach_id, quarter, text, facts):
     # #1441: generation-time archive — the gate-passed memoir text that the site
     # artifact publishes, to generated/qa_archive/. Fail-soft inside the module.
     try:
-        import qa_archive
+        from common import qa_archive
 
         qa_archive.archive_text("memoir", text, variant=coach_id, meta={"quarter": quarter})
     except Exception as qa_e:  # noqa: BLE001 — the archive is never load-bearing

@@ -18,12 +18,12 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 import training_load  # shared TSS-like load model + Banister core (layer module, #490)
-from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("dashboard-refresh")
 except ImportError:
@@ -50,7 +50,7 @@ s3 = boto3.client("s3", region_name=_REGION)
 # ==============================================================================
 
 
-from digest_utils import d2f, safe_float  # shared bundled helpers (#970)
+from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
 
 
 def fetch_date(source, date_str):

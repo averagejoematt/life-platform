@@ -98,7 +98,7 @@ def daily_training_load(strava_60d, hevy_60d, today=None):
     # under the duration proxy they would double-count, so dedup here for every
     # caller. Lazy import: digest_utils imports this module at top level.
     try:
-        from digest_utils import dedup_activities
+        from common.digest_utils import dedup_activities
     except ImportError:  # pragma: no cover — digest_utils ships in the same layer
 
         def dedup_activities(acts):

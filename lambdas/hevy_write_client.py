@@ -32,9 +32,9 @@ import urllib.request
 from typing import Any
 
 import boto3
+from common.http_retry import urlopen_with_retry
+from common.secret_cache import get_secret_json
 from hevy_compiler import MovementUnmappable  # noqa: F401  re-export
-from http_retry import urlopen_with_retry
-from secret_cache import get_secret_json
 
 logger = logging.getLogger("hevy_write_client")
 

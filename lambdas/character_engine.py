@@ -30,8 +30,8 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
-from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
-from numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 
 logger = logging.getLogger(__name__)
 
@@ -2090,7 +2090,7 @@ def store_character_sheet(table_resource: Any, user_prefix: str, record: dict[st
     if record.get("date", "") < EXPERIMENT_START_DATE:
         item["phase"] = "pilot"
     try:
-        from compute_metadata import tag_record
+        from common.compute_metadata import tag_record
 
         item = tag_record(item, source_id="character_sheet")
     except ImportError:

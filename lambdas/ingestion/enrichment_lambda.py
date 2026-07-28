@@ -34,7 +34,7 @@ from boto3.dynamodb.conditions import Key
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("enrichment")
 except ImportError:
@@ -53,11 +53,11 @@ table = dynamodb.Table(DYNAMODB_TABLE)
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
-from digest_utils import d2f as decimal_to_float  # shared bundled helpers (#970)
+from common.digest_utils import d2f as decimal_to_float  # shared bundled helpers (#970)
 
 # Phase 4.2 (2026-05-16): canonical impl in lambdas/numeric.py.
 try:
-    from numeric import floats_to_decimal  # noqa: F401
+    from common.numeric import floats_to_decimal  # noqa: F401
 except ImportError:
 
     def floats_to_decimal(obj):

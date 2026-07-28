@@ -41,11 +41,11 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 
 import boto3
-import digest_utils  # shared query_range implementations (#970)
-from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common import digest_utils  # shared query_range implementations (#970)
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 
 # ── Shared digest utilities (digest_utils.py) ───────────────────────────────
-from digest_utils import (
+from common.digest_utils import (
     _normalize_whoop_sleep,
     avg,
     compute_banister_from_dict,  # #490: shared TSS-like Banister
@@ -89,7 +89,7 @@ except ImportError:
 
 # OBS-1: Structured logger
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("weekly-digest")
 except ImportError:
@@ -1152,7 +1152,7 @@ Be honest. Be a coach, not a cheerleader."""
 
 def call_anthropic_with_retry(req, timeout=55, max_attempts=None, backoff_s=None):
     # Delegates to retry_utils for exponential backoff + CloudWatch metrics (P1.8/P1.9)
-    import retry_utils
+    from common import retry_utils
 
     return retry_utils.call_anthropic_raw(req, timeout=timeout)
 

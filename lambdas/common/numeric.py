@@ -10,7 +10,7 @@ eliminates the bug-fix-in-N-places risk.
 Ships inside every function bundle (deploy/build_bundle.py, #781). Lambdas
 that previously defined their own local helper import this instead:
 
-    from numeric import floats_to_decimal
+    from common.numeric import floats_to_decimal
 
 NaN/Inf handling (#1207): a non-finite float can NEVER be written to
 DynamoDB — boto3's TypeSerializer raises "TypeError: Infinity and NaN not

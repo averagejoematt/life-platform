@@ -20,7 +20,7 @@ import json
 import logging
 import os
 
-import digest_utils  # shared query_range implementations (#970)
+from common import digest_utils  # shared query_range implementations (#970)
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -28,7 +28,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
-from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 _logger_std = logging.getLogger()
@@ -77,7 +77,7 @@ except ImportError:
 
 # OBS-1: Structured logger
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("nutrition-review")
 except ImportError:
@@ -92,7 +92,7 @@ except ImportError:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-from digest_utils import d2f, safe_float  # shared bundled helpers (#970)
+from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
 
 
 def query_range(source, start_date, end_date):
@@ -582,7 +582,7 @@ def build_user_message(data):
 
 def call_anthropic(system_prompt, user_message):
     # Delegates to retry_utils for exponential backoff + CloudWatch metrics (P1.8/P1.9)
-    import retry_utils
+    from common import retry_utils
 
     return retry_utils.call_anthropic_api(
         prompt=user_message,

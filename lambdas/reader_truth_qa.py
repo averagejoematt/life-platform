@@ -106,7 +106,7 @@ def phase_context(today_iso=None):
     `today_iso` is injectable for tests (derive fixtures from EXPERIMENT_START_DATE,
     never wall-clock literals); default is today in the site's Pacific timezone.
     """
-    from constants import EXPERIMENT_START_DATE, day_n
+    from common.constants import EXPERIMENT_START_DATE, day_n
 
     if today_iso is None:
         from zoneinfo import ZoneInfo

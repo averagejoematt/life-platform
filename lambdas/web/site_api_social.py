@@ -33,7 +33,7 @@ from decimal import Decimal
 import boto3
 import social_provenance  # #1670 membrane — the origin:human predicate for the broadcast feed (#1672)
 from boto3.dynamodb.conditions import Key
-from client_ip import extract_client_ip  # #1221 — the ONE edge-observed client-IP helper
+from common.client_ip import extract_client_ip  # #1221 — the ONE edge-observed client-IP helper
 from phase_filter import with_phase_filter  # ADR-058
 
 from web.site_api_common import (
@@ -57,7 +57,7 @@ from web.site_api_common import (
 # the shared rate_limiter module is unavailable. The site_api role already
 # permits UpdateItem on the RATE#* partition (no IAM change needed).
 try:
-    from rate_limiter import check_rate_limit as _ddb_rate_check
+    from common.rate_limiter import check_rate_limit as _ddb_rate_check
 
     _RATE_LIMITER_READY = True
 except Exception:  # pragma: no cover — import guard

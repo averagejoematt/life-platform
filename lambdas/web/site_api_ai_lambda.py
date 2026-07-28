@@ -40,7 +40,7 @@ from ai_context import (
     wrap_untrusted_reader_text,
 )  # R22-SEC-04 (#811): delimit untrusted reader text; #743: reader-facing receipts; #1086: mandatory phase block
 from boto3.dynamodb.conditions import Key
-from constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 from phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1085
 from source_registry import public_board_sources, public_paused_sources  # #387: derived source count
 
@@ -160,7 +160,7 @@ MAX_FOLLOWUPS = 3  # ≤ 3 follow-ups per session (cost + focus bound)
 _SESSION_TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 
 try:
-    from rate_limiter import check_rate_limit as _ddb_rate_check
+    from common.rate_limiter import check_rate_limit as _ddb_rate_check
 
     _RATE_LIMITER_READY = True
 except ImportError:
@@ -933,7 +933,7 @@ def _write_board_interaction(pid: str, question: str, answer: str, grounded: boo
     (initial ask + follow-up turn) come through here with the final answer the
     reader saw, so one call covers the whole surface."""
     try:
-        import qa_archive
+        from common import qa_archive
 
         qa_archive.archive_text("board_ask", answer, variant=pid, meta={"question": question[:500], "grounded": grounded})
     except Exception as e:  # noqa: BLE001 — the archive is never load-bearing
@@ -1076,7 +1076,7 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
     # Phase 2.2: centralized request envelope validation (Body size cap +
     # injection pattern detection + param format checks). Returns 4xx on abuse.
     try:
-        from request_validator import validate_envelope
+        from common.request_validator import validate_envelope
 
         path = event.get("rawPath") or event.get("path", "/")
         method = (event.get("requestContext", {}).get("http", {}).get("method") or event.get("httpMethod", "POST")).upper()
@@ -1418,7 +1418,7 @@ def _handle_explain(event: dict) -> dict:
 
     payload_txt = _shrink_for_prompt(payload)
     try:
-        from constants import EXPERIMENT_START_DATE
+        from common.constants import EXPERIMENT_START_DATE
 
         _day_n = (datetime.now(timezone.utc).date() - datetime.strptime(EXPERIMENT_START_DATE, "%Y-%m-%d").date()).days + 1
         day_ctx = f"Experiment day {_day_n} (restarted {EXPERIMENT_START_DATE}) — a young record is short by design."

@@ -20,7 +20,7 @@ import json
 import re
 from datetime import datetime, timedelta, timezone
 
-from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 
 # ==============================================================================
 # MODULE STATE (set by init())
@@ -74,7 +74,7 @@ def _safe_float(rec, field, default=None):
     return default
 
 
-from digest_utils import d2f as _d2f  # shared bundled helpers (#970)
+from common.digest_utils import d2f as _d2f  # shared bundled helpers (#970)
 
 
 def _get_current_phase(profile, current_weight_lbs):

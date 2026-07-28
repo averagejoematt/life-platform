@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 
 import boto3
 from boto3.dynamodb.conditions import Key
-from numeric import decimals_to_float, floats_to_decimal
+from common.numeric import decimals_to_float, floats_to_decimal
 
 from reading import reading_keys as rk
 

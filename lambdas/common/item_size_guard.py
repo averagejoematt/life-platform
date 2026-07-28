@@ -5,7 +5,7 @@ Shared utility. Imported by at-risk ingestion Lambdas (strava, macrofactor,
 apple_health, health_auto_export) before calling table.put_item().
 
 Usage:
-    from item_size_guard import safe_put_item
+    from common.item_size_guard import safe_put_item
 
     safe_put_item(table, item, source="strava", date_str="2026-03-08")
 

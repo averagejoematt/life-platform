@@ -36,7 +36,7 @@ import boto3  # noqa: E402
 import budget_guard  # noqa: E402  (lambdas/ on sys.path via conftest)
 import reader_truth_qa as rtq  # noqa: E402
 import visual_ai_qa  # noqa: E402
-from constants import EXPERIMENT_START_DATE  # noqa: E402
+from common.constants import EXPERIMENT_START_DATE  # noqa: E402
 
 _START = date.fromisoformat(EXPERIMENT_START_DATE)
 _DAY_1 = _START.isoformat()
@@ -476,7 +476,7 @@ def test_no_vitals_quote_is_not_flagged():
 
 # ── #1224: word-boundary truncation helper + the mid-word reader-truth guard ───
 
-import text_utils  # noqa: E402  (lambdas/ on sys.path via conftest)
+from common import text_utils  # noqa: E402  (lambdas/ on sys.path via conftest)
 
 # A source longer than the 300-char excerpt budget, ending on real prose. The
 # generator's `content_markdown[:300]` cut lands inside "data" → "…before any dat",

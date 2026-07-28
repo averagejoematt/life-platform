@@ -36,7 +36,7 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas", "emails"))
 
 import between_chronicle_lambda as bc  # noqa: E402
 import wednesday_chronicle_lambda as chron  # noqa: E402
-from constants import EXPERIMENT_START_DATE  # noqa: E402
+from common.constants import EXPERIMENT_START_DATE  # noqa: E402
 
 GENESIS = date.fromisoformat(EXPERIMENT_START_DATE)
 PRE_GENESIS = (GENESIS - timedelta(days=7)).isoformat()

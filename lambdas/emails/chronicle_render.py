@@ -7,12 +7,12 @@ import json
 import re
 from datetime import datetime, timezone
 
-from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE
-from text_utils import truncate_at_word
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE
+from common.text_utils import truncate_at_word
 
 # BS-05 confidence helpers (bundled digest_utils) — same optional-import shape as the facade.
 try:
-    from digest_utils import _confidence_badge, compute_confidence
+    from common.digest_utils import _confidence_badge, compute_confidence
 
     _HAS_CONFIDENCE = True
 except ImportError:

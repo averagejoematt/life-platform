@@ -27,9 +27,8 @@ import math
 import random
 from datetime import datetime, timedelta
 
-import stats_core
+from common import stats_core  # The criterion metric universe: slug → where the daily value lives. Slugs are what
 
-# The criterion metric universe: slug → where the daily value lives. Slugs are what
 # a design names; source/field are what the closing analysis queries. Whoop sleep
 # aliases (sleep_score, deep_pct, …) exist after normalize_whoop_sleep — the caller
 # normalizes whoop rows before extracting.

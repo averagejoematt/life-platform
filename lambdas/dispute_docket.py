@@ -69,7 +69,7 @@ from datetime import datetime, timedelta, timezone
 import boto3
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
-from numeric import decimals_to_float, floats_to_decimal  # the ONE canonical walker pair (#1207)
+from common.numeric import decimals_to_float, floats_to_decimal  # the ONE canonical walker pair (#1207)
 
 logger = logging.getLogger("dispute-docket")
 logger.setLevel(logging.INFO)

@@ -578,7 +578,7 @@ def enriched_conversational_records(table, start_date, end_date, coach_ids=None)
 
 
 def _call_haiku(body):
-    from retry_utils import call_anthropic_raw  # lazy — bundled module, runtime only
+    from common.retry_utils import call_anthropic_raw  # lazy — bundled module, runtime only
 
     return call_anthropic_raw(body, timeout=30)
 

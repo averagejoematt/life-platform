@@ -12,9 +12,8 @@ handle) fetch the records and pass them in; this module only extracts the
 the math testable and identical everywhere it's surfaced.
 """
 
-import stats_core
+from common import stats_core  # Hypothesis rows (and older coach thread predictions) state confidence as a WORD.
 
-# Hypothesis rows (and older coach thread predictions) state confidence as a WORD.
 # One map so a word confidence scores on the same [0,1] axis as the coach engine's
 # numeric confidence (mirrors coach_state_updater._parse_confidence).
 WORD_CONFIDENCE = {

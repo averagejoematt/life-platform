@@ -49,13 +49,13 @@ import calibration_core  # #538: shared Brier + reliability scorer (layer module
 import whole_life_context  # #1385: full multi-cycle archive as a 1-hour cached block
 from ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
 from boto3.dynamodb.conditions import Key
+from common.numeric import decimals_to_float, floats_to_decimal  # bundled shared module: float<->Decimal
 from er03_gate import BANNED_CAUSAL  # reuse the platform's one causal-language list
 from grounded_generation import allowed_numbers, grounding_findings  # ADR-104 gate
-from numeric import decimals_to_float, floats_to_decimal  # bundled shared module: float<->Decimal
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("state-of-matthew")
 except ImportError:
@@ -524,7 +524,7 @@ def build_summary_item(state: dict, narration: dict, today_str: str) -> dict:
         ),
     }
     try:
-        from compute_metadata import tag_record
+        from common.compute_metadata import tag_record
 
         item = tag_record(item, source_id="state_of_matthew")
     except ImportError:
@@ -688,7 +688,7 @@ def lambda_handler(event: dict, context) -> dict:
     # publishes (AI-narrated or the deterministic fallback — both are what the
     # reader sees; `narrated` in meta tells them apart). Fail-soft inside the module.
     try:
-        import qa_archive
+        from common import qa_archive
 
         qa_archive.archive_text(
             "state_of_matthew",

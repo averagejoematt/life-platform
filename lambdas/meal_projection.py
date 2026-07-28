@@ -22,7 +22,7 @@ MEALS_SOURCE = "macrofactor_meals"
 RAW_SOURCE = "macrofactor"  # never written — provenance guard target
 
 try:
-    from numeric import floats_to_decimal
+    from common.numeric import floats_to_decimal
 except ImportError:  # pragma: no cover - layer always provides numeric
 
     def floats_to_decimal(obj):

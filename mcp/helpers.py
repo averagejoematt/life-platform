@@ -6,7 +6,7 @@ import math
 from collections import defaultdict
 from datetime import datetime
 
-import stats_core  # bundled shared module (#529): the one sanctioned stats implementation
+from common import stats_core  # bundled shared module (#529): the one sanctioned stats implementation
 
 from mcp.core import get_profile, get_sot, query_source
 
@@ -132,7 +132,7 @@ def correlation_report(specs, min_n=5, confidence=0.90):
       computable r (others are omitted, exactly like the old `if r_val is not None`).
     """
     try:
-        import digest_utils  # bundled shared module — compute_confidence tiering (HIGH/MEDIUM/LOW)
+        from common import digest_utils  # bundled shared module — compute_confidence tiering (HIGH/MEDIUM/LOW)
     except Exception:  # pragma: no cover - layer always present in prod
         digest_utils = None
 

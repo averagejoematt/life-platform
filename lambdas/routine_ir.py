@@ -106,7 +106,7 @@ class RoutineSpec:
     schema_version: int = IR_SCHEMA_VERSION
 
 
-from numeric import (
+from common.numeric import (
     decimals_to_float as _decimal_to_float,  # noqa: E402,F401
     floats_to_decimal,  # noqa: E402  # canonical float->Decimal (#1207)
 )

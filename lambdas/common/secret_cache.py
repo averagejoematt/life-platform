@@ -8,7 +8,7 @@ reducing Secrets Manager costs by ~90%.
 Cache TTL: 15 minutes (secrets rarely change mid-execution).
 
 Usage:
-    from secret_cache import get_secret
+    from common.secret_cache import get_secret
     value = get_secret("life-platform/whoop", secretsmanager_client)
     # Returns cached SecretString on warm invocations
 

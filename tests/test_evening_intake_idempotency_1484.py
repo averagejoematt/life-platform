@@ -36,7 +36,7 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _REPO)
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
-import pacific_time  # noqa: E402
+from common import pacific_time  # noqa: E402
 from intake_response import PRIVATE_INTAKE_PK  # noqa: E402
 
 import mcp.tools_lifestyle as tl  # noqa: E402

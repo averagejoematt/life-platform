@@ -26,7 +26,7 @@ import os
 from datetime import datetime
 
 import boto3
-from pacific_time import pacific_today
+from common.pacific_time import pacific_today
 from ritual_link import sign_ritual_token
 from source_registry import manual_capture_sources
 
@@ -79,7 +79,7 @@ RITUAL_METRIC_TITLES = {
 }
 
 
-from digest_utils import d2f as _d2f  # shared bundled helpers (#970)
+from common.digest_utils import d2f as _d2f  # shared bundled helpers (#970)
 
 
 def _fetch_date(source: str, date_str: str) -> dict | None:

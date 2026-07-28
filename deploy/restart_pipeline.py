@@ -114,7 +114,7 @@ LAYER_NAME = "life-platform-shared-utils"
 USER_GOALS = REPO_ROOT / "config" / "user_goals.json"
 CHAR_SHEET = REPO_ROOT / "config" / "character_sheet.json"
 CDK_CONSTANTS = REPO_ROOT / "cdk" / "stacks" / "constants.py"
-LAMBDA_CONSTANTS = REPO_ROOT / "lambdas" / "constants.py"
+LAMBDA_CONSTANTS = REPO_ROOT / "lambdas" / "common" / "constants.py"
 SITE_API_DATA = REPO_ROOT / "lambdas" / "web" / "site_api_data.py"
 RESET_LOG = REPO_ROOT / "docs" / "restart" / "RESET_LOG.md"
 SSM_CYCLE_PARAM = "/life-platform/experiment-cycle"
@@ -670,7 +670,7 @@ def load_canonical_plan_figures() -> dict:
     """The current cycle's AUTHORITATIVE plan numbers: start weight from lambdas/constants.py
     (the generated genesis anchor), calorie target + protein floor from config/user_goals.json
     (the source constants.py is generated from). Pure/offline — reads committed files only."""
-    import constants as _constants  # lambdas/ is on sys.path (line 96)
+    from common import constants as _constants  # lambdas/ is on sys.path (line 96)
 
     goals = json.loads(USER_GOALS.read_text())
     nutrition = goals.get("targets", {}).get("nutrition", {})

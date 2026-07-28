@@ -37,7 +37,7 @@ import google_tts
 import persona_registry
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("chronicle-podcast")
 except ImportError:

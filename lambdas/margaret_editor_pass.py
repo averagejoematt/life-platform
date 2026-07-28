@@ -49,7 +49,7 @@ import logging
 import re
 
 try:
-    from platform_logger import get_logger
+    from common.platform_logger import get_logger
 
     logger = get_logger("margaret-editor-pass")
 except ImportError:  # pragma: no cover
