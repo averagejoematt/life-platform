@@ -1145,8 +1145,8 @@ def _social_posts_by_route(data):
     if not isinstance(posts, list):
         return buckets
     try:
-        import social_provenance as _prov
         from content.social_signals import coach_route_of
+        from privacy import social_provenance as _prov
     except Exception:  # pragma: no cover — social membrane modules absent
         return buckets
     for p in posts:

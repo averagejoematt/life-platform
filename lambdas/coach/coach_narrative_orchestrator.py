@@ -725,7 +725,7 @@ def _journal_mood_for_brief(signal):
 
     quote = signal.get("notable_quote")
     if quote:
-        from privacy_guard import find_violations
+        from privacy.privacy_guard import find_violations
 
         if not find_violations(quote):
             out["notable_quote"] = quote

@@ -28,11 +28,11 @@ import secrets as _secrets
 from datetime import datetime, timezone
 
 import boto3
-import privacy_guard  # deterministic real-name + vice gate (layer module)
 from common import digest_utils  # shared query_range implementations (#970)
 from common.constants import EXPERIMENT_START_DATE  # ADR-058
 from common.text_utils import truncate_at_word  # #1224: word-boundary excerpt truncation (no mid-word cut)
 from experiment.phase_filter import singleton_visible  # ADR-058 / #946 (query paths get the phase filter via digest_utils, #970)
+from privacy import privacy_guard  # deterministic real-name + vice gate (layer module)
 
 # OBS-1: Structured logger (wired below after optional imports)
 _logger_std = logging.getLogger()

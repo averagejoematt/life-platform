@@ -30,8 +30,8 @@ sys.path.insert(0, _ROOT)
 sys.path.insert(0, os.path.join(_ROOT, "lambdas"))
 sys.path.insert(0, os.path.join(_ROOT, "lambdas", "coach"))
 
-import diary_claims as dc  # noqa: E402
 from experiment import measurable_metrics as mm  # noqa: E402
+from privacy import diary_claims as dc  # noqa: E402
 
 SESSION_DATE = "2026-07-26"
 SOURCE_SK = "DATE#2026-07-26#journal#video_diary#a1b2c3d4e5f6"

@@ -287,8 +287,8 @@ def _quotes_pk():
 
 def tool_mark_journal_quote(args):
     """Mark / unmark / list explicitly-publishable verbatim journal lines."""
-    import privacy_guard  # #1804: guard_version staleness — is_stale_draft/GUARD_VERSION
     from content import journal_quotes as jq  # bundled shared module (#781) — the pure gate
+    from privacy import privacy_guard  # #1804: guard_version staleness — is_stale_draft/GUARD_VERSION
 
     action = (args.get("action") or "mark").strip().lower()
     if action == "list":
@@ -484,7 +484,7 @@ def tool_mark_journal_quote(args):
 
 
 def _claims_pk():
-    import diary_claims as dc  # bundled shared module (#781) — the pure gate
+    from privacy import diary_claims as dc  # bundled shared module (#781) — the pure gate
 
     return f"{USER_PREFIX}{dc.SOURCE_NAME}"
 
@@ -506,7 +506,7 @@ def _claims_phase_stamp():
 
 def _read_claims():
     """Every claim in the ledger, newest stated-date first."""
-    import diary_claims as dc
+    from privacy import diary_claims as dc
 
     items = []
     kwargs = {
@@ -524,8 +524,8 @@ def _read_claims():
 
 def tool_manage_diary_claims(args):
     """The on-tape claims ledger: log consented claims, list what's due, close the loop."""
-    import diary_claims as dc  # bundled shared module (#781) — the pure gate
     from common.numeric import floats_to_decimal  # #1207/D5: the ONE float->Decimal walker
+    from privacy import diary_claims as dc  # bundled shared module (#781) — the pure gate
 
     action = (args.get("action") or "due").strip().lower()
     today = (args.get("today") or datetime.now(timezone.utc).strftime("%Y-%m-%d")).strip()

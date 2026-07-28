@@ -48,9 +48,11 @@ try:
 except ImportError:  # pragma: no cover — layer-module fallback
     urlopen_with_retry = urllib.request.urlopen
 
-import broadcast_sensitivity_gate as gate  # #1673: the fail-closed auto-publish sensitivity gate
-import diary_publish  # #1845: the cut->entry->engagement join
-import social_provenance as prov  # #1670: the membrane
+from privacy import (
+    broadcast_sensitivity_gate as gate,  # #1673: the fail-closed auto-publish sensitivity gate
+    diary_publish,  # #1845: the cut->entry->engagement join
+    social_provenance as prov,  # #1670: the membrane
+)
 
 # ── Config ───────────────────────────────────────────────────────────────────────
 SOURCE = "youtube"

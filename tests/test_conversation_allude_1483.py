@@ -36,9 +36,9 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "web"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "emails"))
 
-import diary_consent  # noqa: E402
 from emails import chronicle_data  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
+from privacy import diary_consent  # noqa: E402
 from web import site_api_coach as api  # noqa: E402
 
 # ── the adversarial conversation record (ADR-141 LEARNING# shape) ────────────

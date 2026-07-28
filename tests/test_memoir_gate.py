@@ -9,7 +9,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
-import memoir_gate  # noqa: E402
+from privacy import memoir_gate  # noqa: E402
 
 _CONFIRMED = {"date": "2026-08-01", "status": "confirmed", "subdomain": "sleep_quality", "metric": "deep_sleep_pct", "reason": "held"}
 _REFUTED = {"date": "2026-08-10", "status": "refuted", "subdomain": "recovery", "metric": "hrv_ms", "reason": "reversed"}

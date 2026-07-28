@@ -23,8 +23,10 @@ os.environ.setdefault("AWS_REGION", "us-west-2")
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
-import broadcast_sensitivity_gate as gate  # noqa: E402
-import privacy_guard  # noqa: E402
+from privacy import (
+    broadcast_sensitivity_gate as gate,  # noqa: E402
+    privacy_guard,  # noqa: E402
+)
 
 
 # ── Injectable classifiers (the module is AWS-free; these stand in for Bedrock) ──────

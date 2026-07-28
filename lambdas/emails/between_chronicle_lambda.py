@@ -81,7 +81,7 @@ def _scrub(text: str) -> str:
     """Fail-soft privacy scrub — the sources are already public-gated, this is
     defense-in-depth on anything narrative."""
     try:
-        import privacy_guard
+        from privacy import privacy_guard
 
         out, _n = privacy_guard.scrub(str(text))
         return out

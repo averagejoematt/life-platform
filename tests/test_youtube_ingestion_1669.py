@@ -20,8 +20,8 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "ingestion"))
 
-import social_provenance as prov  # noqa: E402
 import youtube_lambda as yt  # noqa: E402
+from privacy import social_provenance as prov  # noqa: E402
 
 # A fixture channel feed: two videos on 2026-07-20 PT (one plain/human, one that links
 # back to averagejoematt.com → a platform echo), one on 2026-07-19 PT.

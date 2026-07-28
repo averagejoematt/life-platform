@@ -26,7 +26,7 @@ import boto3
 from boto3.dynamodb.conditions import Key
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
-import privacy_guard as pg  # noqa: E402
+from privacy import privacy_guard as pg  # noqa: E402
 
 TABLE = os.environ.get("LIFE_PLATFORM_TABLE", "life-platform")
 REGION = os.environ.get("AWS_REGION", "us-west-2")

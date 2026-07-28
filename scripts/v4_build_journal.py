@@ -50,8 +50,8 @@ _REPO = _HERE.parent
 sys.path.insert(0, str(_HERE))
 sys.path.insert(0, str(_REPO / "lambdas"))
 
-import privacy_guard  # noqa: E402  — the fail-closed publish gate (ADR-104)
 import v4_chrome  # noqa: E402  — the single-source doors nav / footer / loop-forward
+from privacy import privacy_guard  # noqa: E402  — the fail-closed publish gate (ADR-104)
 
 BLOG_SRC = _REPO / "site" / "journal" / "blog.json"
 ESSAYS_DIR = _REPO / "site" / "journal" / "essays"

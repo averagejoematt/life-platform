@@ -358,7 +358,7 @@ def sensitivity_attrs_for_reaction(answer: str) -> dict:
     Fail-soft: if the gate module is unavailable the caller simply stamps nothing,
     which is *also* not publishable (``is_publishable_reaction`` is a positive match).
     """
-    import broadcast_sensitivity_gate as gate
+    from privacy import broadcast_sensitivity_gate as gate
 
     return gate.classify_and_stamp(answer or "")
 
@@ -375,8 +375,7 @@ def is_publishable_reaction(checkin: dict | None) -> bool:
     if not is_prescription_reaction(it):
         return False
     try:
-        import broadcast_sensitivity_gate as gate
-        import diary_consent
+        from privacy import broadcast_sensitivity_gate as gate, diary_consent
     except ImportError:  # pragma: no cover — bundled modules; absence is fail-closed
         return False
     consent = str(it.get(diary_consent.CONSENT_FIELD) or "").strip().lower()

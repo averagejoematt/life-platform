@@ -331,7 +331,7 @@ def _deterministic_ok(text, allowed_numbers):
         except ImportError:  # pragma: no cover
             pass
     try:
-        import privacy_guard
+        from privacy import privacy_guard
 
         if not privacy_guard.is_clean(text):
             return False, "privacy_violation"

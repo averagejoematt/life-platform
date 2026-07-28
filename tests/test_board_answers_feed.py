@@ -57,7 +57,7 @@ def test_publish_gate_passes_clean_entry():
 
 
 def test_publish_gate_blocks_vice_terms_fail_closed():
-    import privacy_guard
+    from privacy import privacy_guard
 
     pba = _publish_mod()
     bad = {
@@ -70,7 +70,7 @@ def test_publish_gate_blocks_vice_terms_fail_closed():
 
 
 def test_publish_gate_blocks_banned_names_in_answers():
-    import privacy_guard
+    from privacy import privacy_guard
 
     pba = _publish_mod()
     bad = {

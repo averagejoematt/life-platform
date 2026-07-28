@@ -16,7 +16,7 @@ os.environ.setdefault("AWS_REGION", "us-west-2")
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
-import social_provenance as prov  # noqa: E402
+from privacy import social_provenance as prov  # noqa: E402
 
 
 # ── A faithful mini-ledger table (get_item / put_item by exact key) ──────────────

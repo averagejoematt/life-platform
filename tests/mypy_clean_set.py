@@ -46,6 +46,7 @@ CLEAN_DIRS = [
     "lambdas/content",
     "lambdas/experiment",
     "lambdas/health",
+    "lambdas/privacy",
     "lambdas/training",
     "lambdas/web",
     "mcp",
@@ -59,7 +60,7 @@ DIRTY = {
     "lambdas/ai/audio_encode.py",  # imports lameenc (no type stubs)
     "lambdas/coach/coach_correction_resolver.py",  # imports ai_review_pack_lambda (sibling lambda, unresolved from root)
     # residual disabled-code / structural violations (need a dedicated pass):
-    "lambdas/broadcast_sensitivity_gate.py",  # union-attr
+    "lambdas/privacy/broadcast_sensitivity_gate.py",  # union-attr
     "lambdas/content/html_builder.py",  # misc
     "lambdas/health/meal_projection.py",  # misc
     "lambdas/training/training_notes.py",  # misc + var-annotated

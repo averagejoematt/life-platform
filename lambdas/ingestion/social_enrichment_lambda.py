@@ -51,9 +51,9 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
-import social_provenance as prov  # #1670: the membrane (origin gate)
 from boto3.dynamodb.conditions import Key
 from content import social_signals  # #1671: the deterministic coach router
+from privacy import social_provenance as prov  # #1670: the membrane (origin gate)
 
 try:
     from common.platform_logger import get_logger

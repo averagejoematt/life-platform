@@ -62,8 +62,8 @@ from __future__ import annotations
 import re
 from typing import Callable, Iterable, Optional
 
-import broadcast_sensitivity_gate  # the house PII detector (#1673) — reused, not forked
 from content import journal_quotes  # the house taboo gate (#1568/ADR-142) — reused, not forked
+from privacy import broadcast_sensitivity_gate  # the house PII detector (#1673) — reused, not forked
 
 # The item_ref.surface marker that scopes a #1689 corrections-ledger row to the
 # dossier. Shared between the read side (here) and the write side (the MCP tool).

@@ -134,7 +134,7 @@ def reaction_sk(entry_date, channel=None, uid=""):
 def route_coach(entry):
     """The coach that reacts to this entry — deterministic, from the public theme.
     Never inference; mind_coach is the default. Returns a coach_id."""
-    from diary_consent import public_theme
+    from privacy.diary_consent import public_theme
 
     return DIARY_THEME_COACH.get(public_theme(entry), DEFAULT_COACH)
 
@@ -230,7 +230,7 @@ def generate_diary_reaction(
     if not allow(BUDGET_FEATURE):
         return None
 
-    from diary_consent import public_context
+    from privacy.diary_consent import public_context
 
     ctx = public_context(entry)
     if ctx is None:
@@ -371,7 +371,7 @@ def maybe_react(entry, *, table_=None, lambda_client=None, force=False, **genera
         if str(entry.get("channel") or "").strip().lower() not in DIARY_CHANNELS:
             return {"reacted": False, "reason": "not_diary"}
 
-        from diary_consent import TIER_PRIVATE, resolve_consent
+        from privacy.diary_consent import TIER_PRIVATE, resolve_consent
 
         if resolve_consent(entry) == TIER_PRIVATE:
             return {"reacted": False, "reason": "private"}

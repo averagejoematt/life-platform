@@ -28,9 +28,9 @@ os.environ.setdefault("AWS_REGION", "us-west-2")
 os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
 os.environ.setdefault("USER_ID", "matthew")
 
-import broadcast_sensitivity_gate as gate  # noqa: E402
 import pytest  # noqa: E402
 from ai import budget_guard  # noqa: E402
+from privacy import broadcast_sensitivity_gate as gate  # noqa: E402
 from reading import horizons_retrospective as hr, reading_store as rs  # noqa: E402
 from reading_fakes import FakeTable  # noqa: E402
 from web import site_api_reading as sar  # noqa: E402

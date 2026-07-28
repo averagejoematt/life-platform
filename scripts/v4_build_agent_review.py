@@ -58,7 +58,7 @@ from v4_chrome import doors_nav, head_chrome, loop_forward, site_footer  # noqa:
 from v4_kit import loop_ribbon  # noqa: E402 — shared .loop-ribbon (#578)
 
 try:  # best-effort defence-in-depth on free text (the allowlist is the HARD control)
-    import privacy_guard  # noqa: E402
+    from privacy import privacy_guard  # noqa: E402
 except Exception:  # noqa: BLE001
     privacy_guard = None
 

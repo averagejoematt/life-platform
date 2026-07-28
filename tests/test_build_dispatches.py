@@ -41,7 +41,7 @@ def test_beat_receipts_point_at_the_repo():
 
 def test_beats_pass_the_privacy_gate():
     """Same fail-closed bar as every other published surface (#354/ADR-104)."""
-    import privacy_guard
+    from privacy import privacy_guard
 
     for b in _beats()["beats"]:
         for key in ("title", "shipped", "why_it_mattered", "gotcha", "honest_miss"):

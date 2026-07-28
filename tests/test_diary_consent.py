@@ -13,7 +13,7 @@ import sys
 _LAMBDAS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas")
 sys.path.insert(0, _LAMBDAS)
 
-import diary_consent as dc  # noqa: E402
+from privacy import diary_consent as dc  # noqa: E402
 
 # A deliberately sensitive raw entry — every distinctive token here is a canary: if any
 # of them ever appears in a public context, the leak boundary is broken.

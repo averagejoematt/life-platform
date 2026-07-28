@@ -49,9 +49,8 @@ from __future__ import annotations
 import re
 from collections import namedtuple
 
-import privacy_guard
+from privacy import privacy_guard  # ── Verdict seam constants (the stable contract #1672 consumes) ────────────────────
 
-# ── Verdict seam constants (the stable contract #1672 consumes) ────────────────────
 STATUS_ATTR = "sensitivity_status"
 REASON_ATTR = "sensitivity_reason"
 CATEGORIES_ATTR = "sensitivity_categories"

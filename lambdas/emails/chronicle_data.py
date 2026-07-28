@@ -5,11 +5,11 @@ import the facade (no import cycle)."""
 
 from datetime import datetime, timedelta, timezone
 
-import diary_consent  # #1483 (ADR-142 tier 2): the conversation-allude projection + prompt block
 from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS
 from common.digest_utils import d2f, safe_float
 from experiment.phase_filter import singleton_visible
+from privacy import diary_consent  # #1483 (ADR-142 tier 2): the conversation-allude projection + prompt block
 
 
 def gather_chronicle_data(*, _g):

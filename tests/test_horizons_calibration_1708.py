@@ -393,8 +393,7 @@ def test_the_public_horizons_card_carries_nothing_from_s4(fake_table):
 
 def test_a_reaction_is_not_publishable_by_default():
     """Fail-closed on EVERY missing precondition — the Social Membrane posture."""
-    import broadcast_sensitivity_gate as gate
-    import diary_consent
+    from privacy import broadcast_sensitivity_gate as gate, diary_consent
 
     answered = _reaction(answer=LONG_ANSWER, status="answered")
     assert hc.is_publishable_reaction(answered) is False  # no consent, no verdict
@@ -413,7 +412,7 @@ def test_a_reaction_is_not_publishable_by_default():
 
 
 def test_capture_stamps_a_held_verdict_deterministically():
-    import broadcast_sensitivity_gate as gate
+    from privacy import broadcast_sensitivity_gate as gate
 
     attrs = hc.sensitivity_attrs_for_reaction(LONG_ANSWER)
     assert attrs[gate.STATUS_ATTR] == gate.SENSITIVITY_HELD  # no classifier wired ⇒ cannot vouch ⇒ hold
@@ -423,7 +422,7 @@ def test_capture_stamps_a_held_verdict_deterministically():
 
 
 def test_the_stamp_lands_on_the_stored_reaction(fake_table, monkeypatch):
-    import broadcast_sensitivity_gate as gate
+    from privacy import broadcast_sensitivity_gate as gate
 
     monkeypatch.setattr(horizons_verify, "_urllib_fetch", _ok_fetch)
     curated = tr.tool_curate_horizon(

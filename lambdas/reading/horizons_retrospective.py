@@ -46,7 +46,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-import broadcast_sensitivity_gate as gate
+from privacy import broadcast_sensitivity_gate as gate
 
 # The ADR-104 grounded-generation harness (#1830). FAIL-CLOSED, unlike the fail-soft
 # import shims elsewhere in the codebase: this is a public reader surface, so if the

@@ -42,7 +42,7 @@ import hashlib
 import re
 from datetime import date as _date, datetime, timedelta
 
-import privacy_guard  # the deterministic substance/real-name base set (ADR-104)
+from privacy import privacy_guard  # the deterministic substance/real-name base set (ADR-104)
 
 SOURCE = "journal_quotes"
 SK_PREFIX = "QUOTE#"
