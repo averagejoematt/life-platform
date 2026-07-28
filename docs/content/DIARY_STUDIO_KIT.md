@@ -60,7 +60,7 @@ When a diary entry lands, the relevant coach (routed by the entry's enriched the
 public **lab-notes** surface (`/coaching/lab-notes/`) beside a V3-consented sliver of
 the entry — the coaches responding to the human, not just the sensors. Producer:
 `lambdas/coach/coach_diary_reaction.py`; served by `/api/diary_reactions`; the private
-entry is reduced to a leak-proof public context by `lambdas/diary_consent.py` BEFORE
+entry is reduced to a leak-proof public context by `lambdas/privacy/diary_consent.py` BEFORE
 anything is generated or stored.
 
 **A diary entry is PRIVATE by default — nothing crosses to the public reaction unless
@@ -208,7 +208,7 @@ That asymmetry is the entire rule.
 | `prompt_context` — any LLM prompt that shapes what Matthew is asked | The general case of all of the above |
 
 **How it is enforced (structural, not aspirational).** The rule lives in code as well as
-here — `lambdas/diary_publish.py`:
+here — `lambdas/privacy/diary_publish.py`:
 
 - `engagement_by_entry()` is the only reader of joined engagement data, and it **requires**
   a declared `purpose=`, checked against `ENGAGEMENT_MAY_INFORM` / `ENGAGEMENT_MUST_NEVER_INFORM`

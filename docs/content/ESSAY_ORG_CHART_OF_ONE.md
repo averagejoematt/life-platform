@@ -81,7 +81,7 @@ month-end cost, and degrades AI features in tiers as the projection climbs — a
 after the one month we breached the ceiling ($79.80 in June 2026, caused by my own
 dev sessions, not by
 readers), the degradation *order* was inverted so that reader-facing AI is the last
-thing sacrificed (`lambdas/budget_guard.py`: "readers degrade LAST"). The postmortem
+thing sacrificed (`lambdas/ai/budget_guard.py`: "readers degrade LAST"). The postmortem
 conclusion wasn't "spend less"; it was "the org was protecting the wrong stakeholder."
 
 And the one gate that never moved: production deploys require a human click. The
@@ -209,8 +209,8 @@ I've come to think, the most transferable thing the whole experiment will produc
 ## Receipt index (for the edit pass)
 
 - Automerge gate constants + docstring — `remediation/automerge.py` (:7-24, :52-80)
-- Number-gate + 11/112 baseline — ADR-104, `docs/DECISIONS.md`; `lambdas/grounded_generation.py`
-- Budget tiers, readers-last, June $79.80 — `lambdas/budget_guard.py`; ADR-100
+- Number-gate + 11/112 baseline — ADR-104, `docs/DECISIONS.md`; `lambdas/ai/grounded_generation.py`
+- Budget tiers, readers-last, June $79.80 — `lambdas/ai/budget_guard.py`; ADR-100
 - CI chain + gating visual/vision QA — `.github/workflows/ci-cd.yml`; ADR-076
 - Handover corpus — `handovers/` (~75 files + archive); wrap convention #365 in `CLAUDE.md`
 - Squash-stomp postmortem — `handovers/HANDOVER_2026-07-05_590-constellation.md:37-46`; revert PR #707; competing PRs #703/#704

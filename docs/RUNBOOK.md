@@ -587,7 +587,7 @@ aws dynamodb update-continuous-backups \
 
 ## Rate-Limiter Live Probe (#1439)
 
-`lambdas/rate_limiter.py` (the DynamoDB-backed per-IP rate limiter) has deterministic
+`lambdas/common/rate_limiter.py` (the DynamoDB-backed per-IP rate limiter) has deterministic
 unit coverage in `tests/test_rate_limiter.py` (429 threshold, TTL/window reset,
 fail-open/fail-closed). A separate **live probe**, `deploy/probe_rate_limiter.py`,
 verifies the real deployed path end-to-end (Lambda → DynamoDB → CloudFront → response)
@@ -1115,7 +1115,7 @@ aws lambda invoke --function-name withings-data-ingestion --payload '{}' /tmp/te
 ### Platform Wiring (the steps most often missed)
 - [ ] **SOURCES list**: Add source name to `SOURCES` list in `mcp/config.py`
 - [ ] **Freshness checker**: Add source to monitored list in `lambdas/freshness_checker_lambda.py`
-- [ ] **Ingestion validator**: Add source schema to `_SCHEMAS` dict in `lambdas/ingestion_validator.py`. Update docstring count.
+- [ ] **Ingestion validator**: Add source schema to `_SCHEMAS` dict in `lambdas/ingestion/ingestion_validator.py`. Update docstring count.
 - [ ] **MCP tools**: Add `mcp/tools_<source>.py` with at least one tool. Register in `mcp/registry.py`. Run `python3 -m pytest tests/test_mcp_registry.py -v` before deploying MCP.
 - [ ] **Cache warmer** (if new tools are expensive >1s): Add warm step to `mcp/warmer.py`
 - [ ] **SLO-2**: Update monitored source count in `docs/SLOs.md`
@@ -1345,7 +1345,7 @@ nonzero aborts the run and prints what already ran; `--continue-on-error` is the
 1. Fetch the Withings reading for the target date (or fail / use the override)
 2. Write `config/user_goals.json` + `config/character_sheet.json`; with `--close-cycle`
    (default ON) append the new genesis to `CYCLE_GENESES` in `lambdas/web/site_api_data.py`
-3. `sync_constants_from_config.py` — regenerates `lambdas/constants.py`
+3. `sync_constants_from_config.py` — regenerates `lambdas/common/constants.py`
 4. `cdk deploy --all` (#781: constants + `CYCLE_GENESES` ship in every bundle — no layer step; `--skip-deploy` if you just deployed)
 5. `restart_phase_tag.py --apply` — flips DDB phase tags relative to the new genesis
 6. `restart_intelligence_wipe.py --apply` — tombstones newly pre-genesis records, stamping the
@@ -1425,7 +1425,7 @@ an omission):
 - The git commit of regenerated files (constants, configs, `CYCLE_GENESES`, `RESET_LOG.md`) — from MAIN.
 
 **Resume gotcha (`--old-genesis`):** the orchestrator snapshots the outgoing genesis from
-`lambdas/constants.py` BEFORE regenerating it — but a **resumed** run (e.g. re-running with
+`lambdas/common/constants.py` BEFORE regenerating it — but a **resumed** run (e.g. re-running with
 `--skip-deploy` after an abort) snapshots AFTER constants were already regenerated, so
 old = new and the literal sweep + verifier silently no-op. When resuming, pass the prior
 genesis explicitly: `python3 deploy/restart_site_copy_sync.py --apply --old-genesis <prior genesis>`
@@ -1482,7 +1482,7 @@ See ADR-058/077 in `docs/DECISIONS.md` for the design rationale.
 The monthly AWS budget — **$85 base** (ADR-133 amendment 2026-07-08; was $75), floating to **$100 in reader-traffic surge mode** (ADR-133) — is enforced by a two-component system:
 
 - **`life-platform-cost-governor`** Lambda (every 8h — `cron(0 0/8 * * ? *)`, `cdk/stacks/operational_stack.py`) — projects month-end spend, writes tier 0–3 to SSM `/life-platform/budget-tier`.
-- **`lambdas/budget_guard.py`** (bundled module, #781) — calling code uses `allow(feature)` to gate AI by tier.
+- **`lambdas/ai/budget_guard.py`** (bundled module, #781) — calling code uses `allow(feature)` to gate AI by tier.
 
 **Tier behavior** (priority: protect daily brief longest):
 

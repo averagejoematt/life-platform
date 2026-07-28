@@ -283,7 +283,7 @@ coach → byte-identical mark forever; a NEW coach automatically gets a unique o
   single-ember rule (persona identity only, never data encoding). Set `--coach` on a host element.
 - Classes: `.sigil` / `.sigil-lg` / `.coach-mark` / `.coach-head` in `tokens.css §13`.
 
-### 8.3 Editorial imagery — `lambdas/editorial_image.py` + the duotone treatment
+### 8.3 Editorial imagery — `lambdas/content/editorial_image.py` + the duotone treatment
 Atmospheric free-license (Pexels) cover art on the **narrative Story surfaces ONLY** (chronicle ·
 podcast · blog). **Never** on data/meal/vitals surfaces — those stay image-free to protect the
 truthfulness moat. The generators call it automatically for each new post (fail-soft, kill-switch

@@ -175,7 +175,7 @@
 
 | Tool | Key Params | Description |
 |------|-----------|-------------|
-| `write_platform_memory` | category, content, date=, overwrite=, privacy_tier=, domains=[] | Store a structured memory record in the platform_memory partition. The compounding intelligence substrate — routes durable takeaways from conversation (life events, constraints/preferences, failure patterns, episodic wins, coaching calibration) into the store that coach prompt assembly injects (#1482). Conversation-writable categories: life_context, constraints_preferences, coaching_calibration, failure_patterns, what_worked. Writes are validated against the code taxonomy (lambdas/platform_memory.py) and stamped channel=conversation + provenance=mcp. Put the human-readable core in a 'summary' field — that is what reaches coach prompts. Call list_memory_categories for the full taxonomy. |
+| `write_platform_memory` | category, content, date=, overwrite=, privacy_tier=, domains=[] | Store a structured memory record in the platform_memory partition. The compounding intelligence substrate — routes durable takeaways from conversation (life events, constraints/preferences, failure patterns, episodic wins, coaching calibration) into the store that coach prompt assembly injects (#1482). Conversation-writable categories: life_context, constraints_preferences, coaching_calibration, failure_patterns, what_worked. Writes are validated against the code taxonomy (lambdas/ai/platform_memory.py) and stamped channel=conversation + provenance=mcp. Put the human-readable core in a 'summary' field — that is what reaches coach prompts. Call list_memory_categories for the full taxonomy. |
 | `read_platform_memory` | category, days=, limit= | Retrieve recent memory records for a given category from the platform_memory partition. Use to pull coaching calibration, failure patterns, or episodic wins into context. |
 | `list_memory_categories` | days= | List all platform_memory categories that have records (counts + date ranges), plus the full sanctioned category taxonomy (#1482: descriptions, channels, privacy tiers, retention windows). Use to understand what the platform has accumulated and where a conversation takeaway should be filed. |
 | `delete_platform_memory` | category, date | Delete a specific platform_memory record by category + date. Use to correct bad memories or remove stale records. |
@@ -273,7 +273,7 @@ and hide `phase=pilot` records: `get_date_range`, `find_days`, and
 filter; the `get_daily_snapshot` dispatcher applies the same filter via
 `mcp.core._apply_phase_filter`. To access pre-genesis data, pass
 `include_pilot=True` (most tools accept this keyword via the args dict). See
-`lambdas/phase_filter.py::with_phase_filter()`.
+`lambdas/experiment/phase_filter.py::with_phase_filter()`.
 
 
 ### Phase-filter behavior (ADR-058)
@@ -288,5 +288,5 @@ phase=pilot records:
 - `get_daily_snapshot`, `get_longitudinal_summary` — dispatch to the above.
 
 To access pre-genesis data, pass `include_pilot=True`. Most tools accept this
-keyword via the args dict. See `lambdas/phase_filter.py::with_phase_filter()`
+keyword via the args dict. See `lambdas/experiment/phase_filter.py::with_phase_filter()`
 for the underlying mechanism.

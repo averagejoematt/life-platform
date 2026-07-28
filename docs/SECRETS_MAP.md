@@ -52,8 +52,8 @@ Last reconciled: **2026-07-10**. 21 active, 0 in deletion window, all under `lif
 | Whoop | `life-platform/whoop` | OAuth2 | similar pattern | `python3 setup/setup_whoop_auth.py` (localhost:3000 callback server, mirrors `fix_withings_oauth.py`; moved from `deploy/` by #935) | ✅ 2026-07-11 |
 | Eight Sleep | `life-platform/eightsleep` + `life-platform/eightsleep-client` | username/password + client credential | static | rotate manually if exposed | ✅ 2026-07-10 (two secrets — user creds + app client ID) |
 | Habitify | `life-platform/habitify` | API key | static | rotate manually if exposed | ✅ 2026-07-10 (dedicated secret, ADR-014) |
-| Hevy (read) | `life-platform/hevy` | API key | static | regenerate in Hevy app settings | ✅ 2026-07-10 — consumed by `lambdas/hevy_common.py` |
-| Hevy (write — MCP routines) | `life-platform/hevy-write` | API key | static | regenerate in Hevy app settings | ✅ 2026-07-10 — `lambdas/hevy_write_client.py` + `mcp/tools_hevy_routine.py` |
+| Hevy (read) | `life-platform/hevy` | API key | static | regenerate in Hevy app settings | ✅ 2026-07-10 — consumed by `lambdas/training/hevy_common.py` |
+| Hevy (write — MCP routines) | `life-platform/hevy-write` | API key | static | regenerate in Hevy app settings | ✅ 2026-07-10 — `lambdas/training/hevy_write_client.py` + `mcp/tools_hevy_routine.py` |
 | Todoist (ingestion) | `life-platform/ingestion-keys` (todoist field) | API key | static | rotate manually | ✅ 2026-07-10 — bundled with Notion / Dropbox / HAE webhook keys |
 | Todoist (MCP write tools) | `life-platform/todoist` | API key | static | rotate manually | ✅ 2026-07-10 |
 | Notion | `life-platform/ingestion-keys` (notion fields) — dedicated `life-platform/notion` also LIVE but idle (see Cleanup) | Integration token | static | rotate via Notion settings | ⚠️ Bundle path is authoritative for ingestion |
@@ -67,15 +67,15 @@ Last reconciled: **2026-07-10**. 21 active, 0 in deletion window, all under `lif
 
 | Purpose | Secret name | Auth pattern | Verified |
 |---|---|---|---|
-| Anthropic — legacy main pool | `life-platform/ai-keys` | API key. **Runtime inference is Bedrock/IAM (ADR-062)** — this is the direct-API fallback path (`AI_SECRET_NAME` default in `lambdas/intelligence_common.py`); still referenced by many Lambdas (`grep -lrn life-platform/ai-keys lambdas/`) | ✅ 2026-07-10 |
+| Anthropic — legacy main pool | `life-platform/ai-keys` | API key. **Runtime inference is Bedrock/IAM (ADR-062)** — this is the direct-API fallback path (`AI_SECRET_NAME` default in `lambdas/intelligence/intelligence_common.py`); still referenced by many Lambdas (`grep -lrn life-platform/ai-keys lambdas/`) | ✅ 2026-07-10 |
 | Anthropic — site-api isolated | `life-platform/site-api-ai-key` | API key, isolated per R17-04 | ✅ 2026-07-10 |
 | MCP bearer token | `life-platform/mcp-api-key` | HMAC-derived bearer; 90-day auto-rotation via `mcp-key-rotator` Lambda | ✅ 2026-07-10 |
 | GitHub workflow dispatch | `life-platform/github-dispatch-token` | Repo-scoped GitHub PAT — lets `remediation_dispatcher_lambda` trigger GitHub Actions runs (ADR-064 self-healing loop) | ✅ 2026-07-10 |
 | Subscriber link signing | `life-platform/subscriber-token-secret` | HMAC signing secret for subscriber tokens (`lambdas/web/site_api_social.py`, `site_api_ai_lambda.py`) | ✅ 2026-07-10 |
 | Ritual check-in link signing | `life-platform/ritual-token-secret` | HMAC signing secret for evening-nudge ritual tokens (`lambdas/web/site_api_social.py`, `lambdas/emails/evening_nudge_lambda.py`) | ✅ 2026-07-10 |
 | CloudFront → site-api origin verification | `life-platform/site-api-origin-secret` | Shared header secret so the site-api Function URL only serves CloudFront (`cdk/stacks/constants.py`; referenced by NAME — partial-ARN resolution breaks on `…-secret` suffixes) | ✅ 2026-07-10 |
-| Google Cloud TTS (podcasts) | `life-platform/google-tts` | API key — Chirp/Gemini TTS (`lambdas/google_tts.py`, `lambdas/gemini_tts.py`, ADR-087) | ✅ 2026-07-10 |
-| Pexels (editorial images) | `life-platform/pexels` | API key (`lambdas/editorial_image.py`) | ✅ 2026-07-10 |
+| Google Cloud TTS (podcasts) | `life-platform/google-tts` | API key — Chirp/Gemini TTS (`lambdas/ai/google_tts.py`, `lambdas/ai/gemini_tts.py`, ADR-087) | ✅ 2026-07-10 |
+| Pexels (editorial images) | `life-platform/pexels` | API key (`lambdas/content/editorial_image.py`) | ✅ 2026-07-10 |
 
 ---
 

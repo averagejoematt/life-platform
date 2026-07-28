@@ -112,27 +112,27 @@ Where multiple sources measure the same thing:
 
 ## Key-Family Catalog
 
-Every pk/sk family in the `life-platform` table, derived from code (writers = `put_item`/`update_item` call sites) and cross-checked against the ADR-077 phase registry (`lambdas/phase_taxonomy.py`). **Live?** = verified 2026-07-10 with a read-only `Query(Limit=1)`; "empty" = the query succeeded but the partition has no rows yet; "n/v" = pk contains a generated id, so existence is code-defined, not verified live. Every family below classifies via `phase_taxonomy.classify()` without raising (registry gap closed by #930/#951 — see "Registry coverage" below).
+Every pk/sk family in the `life-platform` table, derived from code (writers = `put_item`/`update_item` call sites) and cross-checked against the ADR-077 phase registry (`lambdas/experiment/phase_taxonomy.py`). **Live?** = verified 2026-07-10 with a read-only `Query(Limit=1)`; "empty" = the query succeeded but the partition has no rows yet; "n/v" = pk contains a generated id, so existence is code-defined, not verified live. Every family below classifies via `phase_taxonomy.classify()` without raising (registry gap closed by #930/#951 — see "Registry coverage" below).
 
 ### The `USER#matthew#SOURCE#<source>` backbone
 
 | family (pk / sk) | what it holds | writer | readers | phase class | live? |
 |---|---|---|---|---|---|
 | `…SOURCE#{whoop, withings, strava, garmin, apple_health, eightsleep, habitify, todoist, weather, macrofactor, macrofactor_workouts, hevy, notion}` / `DATE#<d>` (+ `DATE#<d>#WORKOUT#<id>` sub-items, `DELETE#WORKOUT#<id>` tombstones, `DATE#<d>#journal#<template>` for notion) | ingested device/app metrics | `lambdas/ingestion/*_lambda.py` (per source) | `mcp/tools_*`, `lambdas/web/site_api_*`, compute lambdas | raw_timeseries | ✓ (whoop, hevy sampled) |
-| `…SOURCE#youtube` / `DATE#<d>#<post_id>` | **inbound-social foundation (#1669/#1670, epic #1668)** — Matthew's own posts, many-per-day (`#<post_id>` suffix); each row stamps `channel` + `origin` (`human`\|`platform`) provenance, plus `diary_session_slug` / `diary_cut_id` / `diary_surface` / `diary_cut_kind` / `diary_entry_date` / `diary_entry_sk` (#1845) when the post matches a `DIARY_PUBLISH#` row — the join that makes engagement readable per diary entry | `lambdas/ingestion/youtube_lambda.py` (keyless per-channel RSS) | `lambdas/social_provenance.py` exclusion predicates (S3/S4 pending); `lambdas/diary_publish.py` engagement rollup | raw_timeseries | empty (DORMANT — awaits `life-platform/youtube` channel_id) |
+| `…SOURCE#youtube` / `DATE#<d>#<post_id>` | **inbound-social foundation (#1669/#1670, epic #1668)** — Matthew's own posts, many-per-day (`#<post_id>` suffix); each row stamps `channel` + `origin` (`human`\|`platform`) provenance, plus `diary_session_slug` / `diary_cut_id` / `diary_surface` / `diary_cut_kind` / `diary_entry_date` / `diary_entry_sk` (#1845) when the post matches a `DIARY_PUBLISH#` row — the join that makes engagement readable per diary entry | `lambdas/ingestion/youtube_lambda.py` (keyless per-channel RSS) | `lambdas/privacy/social_provenance.py` exclusion predicates (S3/S4 pending); `lambdas/privacy/diary_publish.py` engagement rollup | raw_timeseries | empty (DORMANT — awaits `life-platform/youtube` channel_id) |
 | `…SOURCE#{habit_causality, food_delivery, sick_days, measurements, state_of_mind, mood, travel, interactions, exposures, temptations}` / `DATE#<d>` (+ `#TXN#<id>`, `MONTH#`/`YEAR#`/`STREAK#current` for food_delivery) | user-logged facts (MCP log tools / HAE webhook) | `mcp/tools_lifestyle.py`, `tools_social.py`, `tools_sick_days.py`, HAE lambda | same MCP domain tools, site_api | raw_timeseries | ✓ (temptations empty) |
 | `…SOURCE#day_grade` / `DATE#<d>` | the Day-Grade series (see `docs/engines/SCORING.md`) | `daily_metrics_compute_lambda.py`, daily brief | site_api_vitals, MCP | raw_timeseries (ADR-077 dec C) | ✓ |
-| `…SOURCE#flourishing` / `DATE#<d>` | daily PERMA projection over journal enrichment (#1403): `values_lived[_count]`, `gratitude_count`, `flow`, `growth_signals_count`, `ownership_score`, `social_quality_score` + `enrichment_model`/`enrichment_schema_version` provenance per row | `journal_enrichment_lambda.py` via `lambdas/flourishing.py` (idempotent projection; `{"flourishing_only": true}` = zero-LLM backfill) | MCP `get_flourishing_trend`, `character_sheet_lambda` (Relationships primary social input, Mind `values_alignment`) | raw_timeseries (fact layer, follows notion parent) | ✓ |
-| `…SOURCE#private_intake` / `DATE#<d>` | **Matthew-PRIVATE** evening intake count (#1405): `intake_count` 0–4 + `intake_count_logged_at` + `source` (`evening_nudge_link`\|`mcp`). NEVER read by web/ or any public artifact — `tests/test_intake_privacy_contract.py` enforces both directions | signed nudge tap (`site_api_social._handle_ritual_log` write-only routing), MCP `log_evening_intake` | MCP `get_intake_response` + daily-brief line only (`lambdas/intake_response.py`) | raw_timeseries | ✓ |
+| `…SOURCE#flourishing` / `DATE#<d>` | daily PERMA projection over journal enrichment (#1403): `values_lived[_count]`, `gratitude_count`, `flow`, `growth_signals_count`, `ownership_score`, `social_quality_score` + `enrichment_model`/`enrichment_schema_version` provenance per row | `journal_enrichment_lambda.py` via `lambdas/health/flourishing.py` (idempotent projection; `{"flourishing_only": true}` = zero-LLM backfill) | MCP `get_flourishing_trend`, `character_sheet_lambda` (Relationships primary social input, Mind `values_alignment`) | raw_timeseries (fact layer, follows notion parent) | ✓ |
+| `…SOURCE#private_intake` / `DATE#<d>` | **Matthew-PRIVATE** evening intake count (#1405): `intake_count` 0–4 + `intake_count_logged_at` + `source` (`evening_nudge_link`\|`mcp`). NEVER read by web/ or any public artifact — `tests/test_intake_privacy_contract.py` enforces both directions | signed nudge tap (`site_api_social._handle_ritual_log` write-only routing), MCP `log_evening_intake` | MCP `get_intake_response` + daily-brief line only (`lambdas/coach/intake_response.py`) | raw_timeseries | ✓ |
 | `…SOURCE#felt_probe` / `DATE#<d>` | weekly felt-reality probe (#1409, Sunday one-tap ×3): `felt_vitality`/`felt_rest`/`felt_connection` 0–4 + `<metric>_logged_at` + `source`. Feeds the calibration ledger; item values NEVER served publicly (aggregates only per ADR-124 C-floor) | signed Sunday nudge tap (`site_api_social._handle_ritual_log` routing via `ritual_link.WEEKLY_PROBE_METRICS`) | `/api/character_calibration` (r + Fisher CI on n_eff vs 7-day mean pillar level_score, `experiment_gates` floors) | raw_timeseries | ✓ |
 | `…SOURCE#{labs, dexa, genome, supplements}` / `DATE#<d>` (+ `PROVIDER#<provider>#<period>` for labs) | clinical/identity truths | labs/dexa/genome upload paths, `log_supplement` | tools_labs, tools_health | cross_phase | ✓ (labs) |
 | `…SOURCE#chronicling` / `DATE#<d>#journal#…` | frozen pre-platform archive | none (frozen) | story pages | cross_phase | n/v |
 | `…SOURCE#subscribers` / `EMAIL#<sha256>` | audience identity | `web/email_subscriber_lambda.py`, `subscriber_onboarding_lambda.py` | `web/site_api_social.py` | cross_phase | ✓ |
 | `…SOURCE#calibration` / `CALIB#<date>#<id>` | hypothesis + forecast resolution ledger (the long-run scoreboard) | `hypothesis_engine_lambda.py`, `forecast_engine_lambda.py` | scorecard/site, digests | cross_phase | ✓ |
-| `…SOURCE#effect_fits` / `FIT#<date>` | quarterly cross-pillar effect fits (#1411, ADR-105): per effect `status` (`fitted`\|`authored-prior`) + `reason` (`confirmed`\|`insufficient_n`\|`null_not_excluded`\|`sign_mismatch`), lagged-pair `r`, block-bootstrap `ci_95`, BH-FDR `p_adj`, AR(1)-corrected `n_eff`, per-target rows under `effects.<name>.targets[]`, run `summary`. Written by the weekly hypothesis cron when ≥90d since the last fit (`effect_fitter.refit_due`); every run recomputes from scratch so status moves both directions. Like `calibration`, it measures the platform's priors across the whole cross-cycle history | `compute/hypothesis_engine_lambda.py::refit_cross_pillar_effects` (via `lambdas/effect_fitter.py`) | `character_sheet_lambda` (badge merge), `/api/character_config`, `/api/wrong` | cross_phase | — (first fit pending) |
+| `…SOURCE#effect_fits` / `FIT#<date>` | quarterly cross-pillar effect fits (#1411, ADR-105): per effect `status` (`fitted`\|`authored-prior`) + `reason` (`confirmed`\|`insufficient_n`\|`null_not_excluded`\|`sign_mismatch`), lagged-pair `r`, block-bootstrap `ci_95`, BH-FDR `p_adj`, AR(1)-corrected `n_eff`, per-target rows under `effects.<name>.targets[]`, run `summary`. Written by the weekly hypothesis cron when ≥90d since the last fit (`effect_fitter.refit_due`); every run recomputes from scratch so status moves both directions. Like `calibration`, it measures the platform's priors across the whole cross-cycle history | `compute/hypothesis_engine_lambda.py::refit_cross_pillar_effects` (via `lambdas/experiment/effect_fitter.py`) | `character_sheet_lambda` (badge merge), `/api/character_config`, `/api/wrong` | cross_phase | — (first fit pending) |
 | `…SOURCE#benchmarks` / — | cut-benchmarking history (BENCH-1, ADR-089) | `mcp/tools_benchmark.py` | same | cross_phase | empty |
-| `…SOURCE#coach_corrections` / `CORRECTION#<date>#<id8>` | Matthew's class-tagged corrections to weekly AI-review-pack items (#1689, epic #1687) | `lambdas/coach_corrections.py::write_correction` (no writer wired yet — #1690's MCP tool + email parser call it) | `list_corrections`/`get_correction` (#1690 channels, future prompt-memory/gate work) | cross_phase | n/v (foundation story, no live writer) |
-| `…SOURCE#recall_embeddings` / `DOC#<kind>#<date>` | semantic-recall index (#1384, epic #1080): one item per corpus doc (kind ∈ chronicle/coach_output/journal). The Titan-v2 vector rides as a base64-packed float32 **String** attribute `emb` (compact ≈1.4 KB/256-dim, sidesteps float→Decimal); each item carries its source `cycle` stamp + `artifact_pk`/`artifact_sk` (resolves the precedent to a real record) + `text_sha` (backfill idempotency) + `link`/`snippet`. **cross_phase on purpose** — cross-reset recall is the whole point, so the index survives resets and is read by a RAW query (no phase filter). NO vector DB, NO GSI (ADR-103): the small corpus loads in one Query, cosine is brute-forced in-Lambda | `deploy/backfill_recall_embeddings.py` (bulk + incremental), `bedrock_client.embed_text` | `lambdas/semantic_recall.py` (coach precedent line in `ai_calls`, chronicle recall card — deferred surface) | cross_phase | n/v (backfill is a post-merge op) |
+| `…SOURCE#coach_corrections` / `CORRECTION#<date>#<id8>` | Matthew's class-tagged corrections to weekly AI-review-pack items (#1689, epic #1687) | `lambdas/coach/coach_corrections.py::write_correction` (no writer wired yet — #1690's MCP tool + email parser call it) | `list_corrections`/`get_correction` (#1690 channels, future prompt-memory/gate work) | cross_phase | n/v (foundation story, no live writer) |
+| `…SOURCE#recall_embeddings` / `DOC#<kind>#<date>` | semantic-recall index (#1384, epic #1080): one item per corpus doc (kind ∈ chronicle/coach_output/journal). The Titan-v2 vector rides as a base64-packed float32 **String** attribute `emb` (compact ≈1.4 KB/256-dim, sidesteps float→Decimal); each item carries its source `cycle` stamp + `artifact_pk`/`artifact_sk` (resolves the precedent to a real record) + `text_sha` (backfill idempotency) + `link`/`snippet`. **cross_phase on purpose** — cross-reset recall is the whole point, so the index survives resets and is read by a RAW query (no phase filter). NO vector DB, NO GSI (ADR-103): the small corpus loads in one Query, cosine is brute-forced in-Lambda | `deploy/backfill_recall_embeddings.py` (bulk + incremental), `bedrock_client.embed_text` | `lambdas/ai/semantic_recall.py` (coach precedent line in `ai_calls`, chronicle recall card — deferred surface) | cross_phase | n/v (backfill is a post-merge op) |
 
 ### Derived intelligence (EXPERIMENT_SCOPED — tagged + tombstoned + cycle-stamped at reset)
 
@@ -142,12 +142,12 @@ Every pk/sk family in the `life-platform` table, derived from code (writers = `p
 | `…SOURCE#habit_scores` / `DATE#<d>` | tiered habit compliance detail | `compute/daily_metrics_compute_lambda.py` | tools_habits, character gather | ✓ |
 | `…SOURCE#computed_metrics` / `DATE#<d>` | day grade + readiness + TSB + baselines (see `docs/engines/READINESS.md`) | `compute/daily_metrics_compute_lambda.py` | daily brief, site_api_vitals, MCP readiness | ✓ |
 | `…SOURCE#computed_insights` / `DATE#<d>` | pre-computed daily insight | `compute/daily_insight_compute_lambda.py` | daily brief | n/v |
-| `…SOURCE#insights` / `INSIGHT#<ts>#<digest_type>` | saved insights | `lambdas/insight_writer.py`, MCP `save_insight` | site_api_intelligence, `get_insights` | ✓ |
+| `…SOURCE#insights` / `INSIGHT#<ts>#<digest_type>` | saved insights | `lambdas/content/insight_writer.py`, MCP `save_insight` | site_api_intelligence, `get_insights` | ✓ |
 | `…SOURCE#hypotheses` / `HYPOTHESIS#<ISO-ts>` | pre-registered hypotheses + deterministic verdicts (see `docs/engines/HYPOTHESIS.md`) | `compute/hypothesis_engine_lambda.py` | `/api/hypotheses`, `get_hypotheses`, challenge generator | ✓ |
 | `…SOURCE#forecast` / `FORECAST#<target>#<metric>#h<h>` (legacy `DATE#<d>` rows also live) | daily EWMA expectations (#541) | `compute/forecast_engine_lambda.py` | site_api_data, `get_predictions` | ✓ |
 | `…SOURCE#state_of_matthew` / `DATE#<d>` | weekly narrated synthesis (#552) | `compute/state_of_matthew_lambda.py` | site, brief | ✓ |
 | `…SOURCE#adaptive_mode` / `DATE#<d>` | daily adaptive coaching mode | `compute/adaptive_mode_lambda.py` | `get_adaptive_mode`, orchestrator | ✓ |
-| `…SOURCE#engagement_state` / `STATE#current`, `DATE#<d>` | presence / quiet-stretch state: `presence_class` + `severity` ladder `none\|soft\|loud\|alarm` (#914/#921) + per-channel `channel_detail.<source>.dropout_streak_days` + `experiment_window_start` (#955: manual-channel windows clamp at genesis — pre-genesis logs out-of-window, gaps anchor at genesis, `_detect_return` never crosses the boundary; wearables/weight/travel stay cross-cycle); channels are the `engagement_channel` facet in `lambdas/source_registry.py` (incl. withings `measurement`); feeds #913 neglect decay + `engagement_core.presence_prompt_block` (injected into all narrative prompts, deterministic acknowledgment gate à la ADR-108) | `compute/adaptive_mode_lambda.py` | character_sheet_lambda, narrative prompt builders (via `engagement_core`), site_api_ai | ✓ |
+| `…SOURCE#engagement_state` / `STATE#current`, `DATE#<d>` | presence / quiet-stretch state: `presence_class` + `severity` ladder `none\|soft\|loud\|alarm` (#914/#921) + per-channel `channel_detail.<source>.dropout_streak_days` + `experiment_window_start` (#955: manual-channel windows clamp at genesis — pre-genesis logs out-of-window, gaps anchor at genesis, `_detect_return` never crosses the boundary; wearables/weight/travel stay cross-cycle); channels are the `engagement_channel` facet in `lambdas/ingestion/source_registry.py` (incl. withings `measurement`); feeds #913 neglect decay + `engagement_core.presence_prompt_block` (injected into all narrative prompts, deterministic acknowledgment gate à la ADR-108) | `compute/adaptive_mode_lambda.py` | character_sheet_lambda, narrative prompt builders (via `engagement_core`), site_api_ai | ✓ |
 | `…SOURCE#{circadian, anomalies, scenarios, nutrition_review, centenarian_progress}` / `DATE#<d>` | per-domain daily/periodic computes | respective compute/email lambdas | site_api, MCP | ✓ (anomalies, scenarios) |
 | `…SOURCE#weekly_correlations` / `WEEK#<w>` | weekly cross-metric correlations | `compute/weekly_correlation_compute_lambda.py` | site_api_correlation | ✓ |
 | `…SOURCE#what_changed` / `SNAPSHOT#current`, `MONTH#<m>`, `STATE#first_seen` | SS-08 monthly delta + first-seen ledger | SS-08 compute | site_api_ai | ✓ |
@@ -157,14 +157,14 @@ Every pk/sk family in the `life-platform` table, derived from code (writers = `p
 | `…SOURCE#challenges` / `CHALLENGE#<slug>_<date>` | challenge records | `intelligence/challenge_generator_lambda.py`, MCP | site_api_social, `list_challenges` | ✓ |
 | `…SOURCE#protocols` / `PROTOCOL#<id>` | protocol registry | MCP `create/update/retire_protocol` | site_api_data, `list_protocols` | ✓ |
 | `…SOURCE#field_notes` / `WEEK#<iso-week>` | weekly field notes | `intelligence/field_notes_lambda.py` | chronicle, `get_field_notes` | ✓ |
-| `…SOURCE#diary_reactions` / `DATE#<d>#<channel>#<entry_uid>` | one short coach reaction per **V3-consented** Video Diary / Solo Recording entry (#1574): `coach_id`/`coach_name`, `reaction`, `tone`, `theme` (the 8-way laundered public theme), `tier` (`allude`\|`quote`), `entry_date`, `entry_uid`, optional owner-cleared `quote`. The private entry NEVER lands here — `lambdas/diary_consent.py` reduces it to a leak-proof public context before generation. `entry_uid` = the #476/E-6 stable page suffix, so two same-day recordings on one channel keep separate rows (#1756 fixed the collision) | `coach/coach_diary_reaction.py::store_reaction`, triggered inline per enriched entry by `ingestion/journal_enrichment_lambda.py` (#1756 — consent- + budget-gated, idempotent, fail-open) | `/api/diary_reactions` → lab-notes | n/v (fires on the first consented diary entry) |
-| `…SOURCE#diary_claims` / `PREDICTION#<stated_date>#<slug>` | **the on-tape claims ledger** (#1841) — falsifiable claims the SUBJECT made on camera, in the canonical `PREDICTION#` record shape. **PRIVATE** (`visibility: "private"`) — no public surface reads this partition. Full field table in the "on-tape claims ledger" section below | MCP `manage_diary_claims` (`action='log'`) via `lambdas/diary_claims.py::admit_claim` — the deterministic gate; **graded** by `coach/coach_prediction_evaluator.py` (same scan, same code, same statuses as coach predictions) | MCP `manage_diary_claims` (`due`/`list`), `get_predictions` | n/v (fires on the first consented on-tape claim) |
+| `…SOURCE#diary_reactions` / `DATE#<d>#<channel>#<entry_uid>` | one short coach reaction per **V3-consented** Video Diary / Solo Recording entry (#1574): `coach_id`/`coach_name`, `reaction`, `tone`, `theme` (the 8-way laundered public theme), `tier` (`allude`\|`quote`), `entry_date`, `entry_uid`, optional owner-cleared `quote`. The private entry NEVER lands here — `lambdas/privacy/diary_consent.py` reduces it to a leak-proof public context before generation. `entry_uid` = the #476/E-6 stable page suffix, so two same-day recordings on one channel keep separate rows (#1756 fixed the collision) | `coach/coach_diary_reaction.py::store_reaction`, triggered inline per enriched entry by `ingestion/journal_enrichment_lambda.py` (#1756 — consent- + budget-gated, idempotent, fail-open) | `/api/diary_reactions` → lab-notes | n/v (fires on the first consented diary entry) |
+| `…SOURCE#diary_claims` / `PREDICTION#<stated_date>#<slug>` | **the on-tape claims ledger** (#1841) — falsifiable claims the SUBJECT made on camera, in the canonical `PREDICTION#` record shape. **PRIVATE** (`visibility: "private"`) — no public surface reads this partition. Full field table in the "on-tape claims ledger" section below | MCP `manage_diary_claims` (`action='log'`) via `lambdas/privacy/diary_claims.py::admit_claim` — the deterministic gate; **graded** by `coach/coach_prediction_evaluator.py` (same scan, same code, same statuses as coach predictions) | MCP `manage_diary_claims` (`due`/`list`), `get_predictions` | n/v (fires on the first consented on-tape claim) |
 | `…SOURCE#discovery_annotations` / — | discovery annotations | MCP `annotate_discovery` | `get_discovery_annotations` | n/v |
 | `…SOURCE#ledger` / `TOTALS#current`, `LEDGER#<id>`, `LIFETIME#aggregate`, `CYCLE_TOTALS#<n>` | accountability ledger; `LIFETIME#`/`CYCLE_TOTALS#` written at reset by `deploy/restart_ledger_reset.py` (ADR-072/077 dec F) | MCP `log_ledger_entry`; reset tool | `web/site_api_data.py` | ✓ |
 | `…SOURCE#ai_analysis` / `EXPERT#<name>` | expert-lens analyses | `intelligence/ai_expert_analyzer_lambda.py` | chronicle, site_api_intelligence | ✓ |
 | `…SOURCE#decisions` / `DECISION#<ISO-ts>` | logged decisions + outcomes | `mcp/tools_decisions.py` | `get_decisions` | ✓ |
-| `…SOURCE#rewards` / `REWARD#<id>` | reward definitions | `lambdas/output_writers.py` (MCP `set_reward`) | `get_rewards` | empty |
-| `…SOURCE#platform_memory` / `MEMORY#<category>#<date>` | platform memory — **split by category**: durable categories (baseline_snapshot, re_entry, cycle_marker, cycle, life_context, constraints_preferences) are cross_phase; coach running-state categories are experiment_scoped. Canonical taxonomy = `lambdas/platform_memory.py` (#1482) | `mcp/tools_memory.py`, failure-pattern/insight/hypothesis computes | `read_platform_memory`, digests, coach prompt injection (`platform_memory_block`) | ✓ |
+| `…SOURCE#rewards` / `REWARD#<id>` | reward definitions | `lambdas/content/output_writers.py` (MCP `set_reward`) | `get_rewards` | empty |
+| `…SOURCE#platform_memory` / `MEMORY#<category>#<date>` | platform memory — **split by category**: durable categories (baseline_snapshot, re_entry, cycle_marker, cycle, life_context, constraints_preferences) are cross_phase; coach running-state categories are experiment_scoped. Canonical taxonomy = `lambdas/ai/platform_memory.py` (#1482) | `mcp/tools_memory.py`, failure-pattern/insight/hypothesis computes | `read_platform_memory`, digests, coach prompt injection (`platform_memory_block`) | ✓ |
 
 ### Coach intelligence tier (`pk COACH#<coach_id>` — all EXPERIMENT_SCOPED)
 
@@ -174,10 +174,10 @@ Every pk/sk family in the `life-platform` table, derived from code (writers = `p
 | `OUTPUT#<date>#<type>` | generated coach narratives | `coach/coach_state_updater.py` | summarizer, observatory | ✓ (partition) |
 | `THREAD#<date>#<slug>` | open coaching threads | `coach/coach_state_updater.py` | summarizer | ✓ (partition) |
 | `PREDICTION#<id>`, `LEARNING#<date>#<slug>`, `CONFIDENCE#<subdomain>`, `COMMITMENT#<id>` | predictions + graded outcomes + per-subdomain confidence | `coach/coach_prediction_evaluator.py`, `coach_checkin.py` | track-record pages, stance engine | ✓ (partition) |
-| `CHECKIN#<YYYY-MM-DD>#<uuid8>` | coach check-in loop (#917): a coach's question + Matthew's verbatim answer (field detail in [Coach Check-ins](#coach-check-ins-917)) | `mcp/tools_coach_checkin.py` (core: `lambdas/coach_checkin.py`) | check-in queue tool, `recent_checkins_block` prompt injection | ✓ (partition) |
+| `CHECKIN#<YYYY-MM-DD>#<uuid8>` | coach check-in loop (#917): a coach's question + Matthew's verbatim answer (field detail in [Coach Check-ins](#coach-check-ins-917)) | `mcp/tools_coach_checkin.py` (core: `lambdas/coach/coach_checkin.py`) | check-in queue tool, `recent_checkins_block` prompt injection | ✓ (partition) |
 | `COMPRESSED#latest`, `MEMOIR#…`, `INTERACTION#…`, `RELATIONSHIP#state`, `VOICE#state`, `BRIEF#<date>` | compressed memory, memoirs, board Q&A, relationship/voice state | summarizer, memoir lambda, site-api-ai | summarizer, site_api_coach | ✓ (partition) |
 
-**CHECKIN# phase classification is a PENDING follow-up (#917):** the rows currently inherit the COACH#\* default (experiment_scoped); the recommended class is **cross_phase** — qualitative history is exactly what ought to survive a reset (see the #917 PR body). The one-line registry addition in `lambdas/phase_taxonomy.py` is a deliberate separate change.
+**CHECKIN# phase classification is a PENDING follow-up (#917):** the rows currently inherit the COACH#\* default (experiment_scoped); the recommended class is **cross_phase** — qualitative history is exactly what ought to survive a reset (see the #917 PR body). The one-line registry addition in `lambdas/experiment/phase_taxonomy.py` is a deliberate separate change.
 
 ### Ensemble / narrative / eval families
 
@@ -189,7 +189,7 @@ Every pk/sk family in the `life-platform` table, derived from code (writers = `p
 | `ENSEMBLE#influence_graph` / — | static influence config | config seed | ensemble | system_state | n/v |
 | `NARRATIVE#arc` / `STATE#current`, `HISTORY#<date>` | season/arc narrative state | narrative updater | chronicle | experiment_scoped | ✓ |
 | `VOICEFIDELITY#<…>` / — | blind voice-fidelity scoreboard (#545) | `coach/voice_fidelity_harness.py` | scoreboard | cross_phase | empty (sampled pk) |
-| `EVALRET#<surface>` / — | retained ADR-104 gate verdict/regen pairs (#812/#744) | `lambdas/eval_retention.py` | monthly eval harvest | cross_phase | n/v |
+| `EVALRET#<surface>` / — | retained ADR-104 gate verdict/regen pairs (#812/#744) | `lambdas/experiment/eval_retention.py` | monthly eval harvest | cross_phase | n/v |
 
 ### Reading / Mind pillar (ADR-097 — all CROSS_PHASE; scheme in `lambdas/reading/reading_keys.py`)
 
@@ -211,16 +211,16 @@ Every pk/sk family in the `life-platform` table, derived from code (writers = `p
 | `VOTES#experiment_library` / `LIB#<id>`, `VOTES#challenges` / `CH#<id>`, `VOTES#predict_week`, `VOTES#rate_limit` | reader votes + vote rate buckets | `web/site_api_social.py` | same | system_state | ✓ (challenges) |
 | `EXPERIMENT_FOLLOWS` / `EMAIL#<hash>#EXP#<id>`, `CHALLENGE_FOLLOWS` / `CHFOLLOW#…` | follow-interest records | `web/site_api_social.py` | same | system_state | empty |
 | `SUBSCRIBE#rate_limit` / — | subscribe rate counters | `web/email_subscriber_lambda.py` | same | system_state | n/v |
-| `RATE#<endpoint>#<ip_hash>` / `HOUR#<bucket>` | per-IP atomic rate counters (ask/board_ask) | `lambdas/rate_limiter.py` | same | system_state (#951) | n/v |
+| `RATE#<endpoint>#<ip_hash>` / `HOUR#<bucket>` | per-IP atomic rate counters (ask/board_ask) | `lambdas/common/rate_limiter.py` | same | system_state (#951) | n/v |
 | `BOARDSESS#<token>` / — | TTL'd board Q&A follow-up sessions (#546) | `web/site_api_ai_lambda.py` | same | system_state (#951) | n/v |
 | `USER#matthew` / `PROFILE#v1` | the user profile (targets, weights, habit registry) | manual/setup | everything | cross_phase | ✓ |
 | `USER#matthew` / `SOURCE#coach_thread…` | coach conversation memory | coach modules | coach pipeline | experiment_scoped | n/v |
 | `USER#matthew` / `SOURCE#intelligence_quality…` | intelligence quality tracker | quality tracker | `get_intelligence_quality` | system_state | n/v |
 | `USER#matthew#MEMORY` / `CYCLE#<n>#<label>` | durable restart-cycle memory | restart tooling | re-entry flows | cross_phase | ✓ |
-| `USER#matthew#ROUTINE#<version>` / — | Hevy routine IR audit trail | `lambdas/routine_repo.py` | routine repo | system_state | n/v |
+| `USER#matthew#ROUTINE#<version>` / — | Hevy routine IR audit trail | `lambdas/training/routine_repo.py` | routine repo | system_state | n/v |
 | `USER#system` / `CANARY#…` etc. | ops state (canary, DLQ ledger) | operational lambdas | monitors | system_state | ✓ |
 | `PULSE` / `DATE#<d>` | site pulse cache | pulse writer | site | system_state | ✓ |
-| `BROADCAST_ORIGIN#<channel>` / `POST#<post_id>` | **the provenance membrane ledger (#1670, epic #1668)** — one row per post the platform syndicates OUT, so inbound ingestion can stamp its own echoes `origin: platform` and exclude them from the voice feed / enrichment / re-broadcast. SYSTEM_STATE (provenance is cross-phase truth — survives reset). Outbound writer (`social_provenance.record_broadcast_origin`) hooks in when #1402's syndication path lands | `lambdas/social_provenance.py` (write helper); #1402 outbound (pending) | `social_provenance.classify_origin` inbound cross-ref | system_state | empty (DORMANT) |
+| `BROADCAST_ORIGIN#<channel>` / `POST#<post_id>` | **the provenance membrane ledger (#1670, epic #1668)** — one row per post the platform syndicates OUT, so inbound ingestion can stamp its own echoes `origin: platform` and exclude them from the voice feed / enrichment / re-broadcast. SYSTEM_STATE (provenance is cross-phase truth — survives reset). Outbound writer (`social_provenance.record_broadcast_origin`) hooks in when #1402's syndication path lands | `lambdas/privacy/social_provenance.py` (write helper); #1402 outbound (pending) | `social_provenance.classify_origin` inbound cross-ref | system_state | empty (DORMANT) |
 | `DIARY_PUBLISH#<channel>` / `POST#<post_id>` | **the diary-publication ledger (#1845, epic #1668)** — one row per diary cut Matthew posts, carrying the provenance chain `session_slug` / `cut_id` / `cut_file` / `cut_kind` / `cut_rank` / `surface` / `url` / `published_date` / `entry_date` / `entry_sk` (the source `SOURCE#notion` journal row, derived by `notion_lambda.build_sk`'s own rule). Provenance ONLY — never a word of tape. Keyed by `(channel, post_id)` so inbound ingestion can stamp matching posts with `diary_*` fields and join engagement back to the entry. SYSTEM_STATE (publication is historical fact — survives reset). **Separate partition from `BROADCAST_ORIGIN#` on purpose: a diary cut is Matthew on camera, published by hand, not a platform syndication echo.** Engagement reads are Goodhart-gated (`diary_publish.engagement_by_entry(purpose=…)`) | `scripts/sync_diary_publications.py` (manual, from the studio's `PUBLISH_LOG.md`) | `lambdas/ingestion/youtube_lambda.py` stamp; `diary_publish.engagement_by_entry` | system_state | empty (DORMANT — first row lands with the first published cut) |
 | `CACHE#<…>` / — | generation/template caches | `generation_cache.py`, `hevy_template_cache.py` | same | system_state | n/v |
 | `…SOURCE#{journal_analysis, health_check, dropbox_tracker, hevy_id_map, routine_index, email_log#<type>, google_calendar, composite_scores, sleep_unified}` | caches, trackers, sent-mail archive, dead partitions | various (email_log: email lambdas; hevy_id_map: routine_repo) | various | system_state | ✓ (email_log#daily_brief) |
@@ -463,8 +463,8 @@ Note: Tier 2 fields are suffixed with `_apple` to avoid colliding with SOT field
 | `blood_glucose_min` | number | Daily minimum glucose |
 | `blood_glucose_max` | number | Daily maximum glucose |
 | `blood_glucose_std_dev` | number | Glucose variability (std deviation) |
-| `blood_glucose_cv` | number | Glycemic %CV = 100·sd/mean (Monnier; <36 = stable) — deterministic, `lambdas/glycemic.py` (#1406). Omitted on a thin/degenerate day (behavioral absence). |
-| `blood_glucose_mage` | number | Mean Amplitude of Glycemic Excursions (Service 1970) over the day's time-ordered readings, swings >1 SD only — `lambdas/glycemic.py` (#1406). Omitted on a flat day (no excursion). |
+| `blood_glucose_cv` | number | Glycemic %CV = 100·sd/mean (Monnier; <36 = stable) — deterministic, `lambdas/health/glycemic.py` (#1406). Omitted on a thin/degenerate day (behavioral absence). |
+| `blood_glucose_mage` | number | Mean Amplitude of Glycemic Excursions (Service 1970) over the day's time-ordered readings, swings >1 SD only — `lambdas/health/glycemic.py` (#1406). Omitted on a flat day (no excursion). |
 | `blood_glucose_readings_count` | number | Number of readings that day |
 | `blood_glucose_time_in_range_pct` | number | % of readings 70–180 mg/dL |
 | `blood_glucose_time_below_70_pct` | number | % of readings <70 (hypoglycemia) |
@@ -561,7 +561,7 @@ Note: Individual BP readings stored in S3 at `raw/matthew/blood_pressure/YYYY/MM
 ### hevy (strength training)
 Hevy data is stored at the workout and set level, not day-level aggregates. Access via strength-specific MCP tools (`get_exercise_history`, `get_strength_prs`, etc.) rather than `get_date_range`.
 
-**Per-workout items** (`sk = DATE#YYYY-MM-DD#WORKOUT#<id>`, from `lambdas/hevy_common.py::normalize_workout`):
+**Per-workout items** (`sk = DATE#YYYY-MM-DD#WORKOUT#<id>`, from `lambdas/training/hevy_common.py::normalize_workout`):
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -1045,7 +1045,7 @@ Deterministically computed from the session's local-Whisper SRT — pure timesta
 arithmetic, no LLM involvement (ADR-105: deterministic computation before any LLM
 verdict). Written by `scripts/backfill_vocal_metrics.py` (a local script, not a Lambda —
 the SRT lives only in the private studio tree and the Notion upload path never carries
-it; see that script's docstring), which computes them via `lambdas/vocal_metrics.py`
+it; see that script's docstring), which computes them via `lambdas/health/vocal_metrics.py`
 (full metric definitions — WPM formula, pause threshold, exact filler-word list — live
 in that module's docstring, the authoritative spec). ABSENT (field not written) on any
 entry with no SRT — never zeroed or defaulted (ADR-104). `mean_pause_s` is additionally
@@ -1344,7 +1344,7 @@ which writes directly to this partition. No app, no free text — two scalars, o
 disturbs an already-logged `mood_valence` (and vice versa), and re-tapping the same or a
 different value for the same metric+day just overwrites it (plain `SET`, no
 read-modify-write). A tap link is only valid for its exact (date, metric, value) —
-forged/tampered links are rejected via an HMAC-SHA256 token (`lambdas/ritual_link.py`,
+forged/tampered links are rejected via an HMAC-SHA256 token (`lambdas/content/ritual_link.py`,
 same pattern as the subscriber-token / chronicle-approve signed-link precedent).
 
 **Publication posture (ADR-124 — build only, no new decisions):** individual daily
@@ -1724,7 +1724,7 @@ Queried by MCP tools: `get_character_sheet`, `get_pillar_detail`, `get_level_his
 **pk:** `USER#matthew#SOURCE#character_receipt`
 **sk:** `DATE#YYYY-MM-DD`
 
-One item per character-sheet compute day — the audit-grade receipt for that day's XP/level changes, written by `compute/character_sheet_lambda.py::write_progression_receipt` immediately after the sheet stores (engine ≥ v1.7.0 captures the transitions at fire time; `store_character_sheet` strips the capture from the sheet item, so this partition is its only home). Built/replayed by the shared module `lambdas/progression_receipts.py`; served read-only by `/api/character_receipt` for the `/data/character/` drill-down. Sick-day freezes and pre-#1373 history have **no** receipt — one is never fabricated for a change with no recorded inputs (ADR-104). Numbers are stored at **full float precision** (no rounding) so a replay from the stored item feeds the engine bit-identical inputs and the digest is reproducible. Phase taxonomy: `experiment_scoped` (follows `character_sheet` — tagged + tombstoned + cycle-stamped at restart).
+One item per character-sheet compute day — the audit-grade receipt for that day's XP/level changes, written by `compute/character_sheet_lambda.py::write_progression_receipt` immediately after the sheet stores (engine ≥ v1.7.0 captures the transitions at fire time; `store_character_sheet` strips the capture from the sheet item, so this partition is its only home). Built/replayed by the shared module `lambdas/health/progression_receipts.py`; served read-only by `/api/character_receipt` for the `/data/character/` drill-down. Sick-day freezes and pre-#1373 history have **no** receipt — one is never fabricated for a change with no recorded inputs (ADR-104). Numbers are stored at **full float precision** (no rounding) so a replay from the stored item feeds the engine bit-identical inputs and the digest is reproducible. Phase taxonomy: `experiment_scoped` (follows `character_sheet` — tagged + tombstoned + cycle-stamped at restart).
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -1873,7 +1873,7 @@ Monthly "what changed" — real trailing-30d-vs-prior-30d deltas + correlations 
 
 Structured key-value memory store for compounding intelligence — computed records (insight/digest/hypothesis Lambdas write directly) **plus, since #1482, conversation-derived records** written from chat via the MCP `write_platform_memory` tool (epic #1476: conversation as the fourth ingestion channel).
 
-**The category taxonomy is CODE, not this table** — `lambdas/platform_memory.py::MEMORY_CATEGORIES` is the canonical registry (the MCP write tool rejects unregistered categories; `phase_taxonomy.py`'s durable/scoped split must agree with each category's `durable` flag — both are test-enforced). The table below is the human-readable mirror:
+**The category taxonomy is CODE, not this table** — `lambdas/ai/platform_memory.py::MEMORY_CATEGORIES` is the canonical registry (the MCP write tool rejects unregistered categories; `phase_taxonomy.py`'s durable/scoped split must agree with each category's `durable` flag — both are test-enforced). The table below is the human-readable mirror:
 
 | Category | Channels | Injection window | Privacy tier | Phase class | Purpose |
 |----------|----------|-----------------|--------------|-------------|---------|
@@ -2187,11 +2187,11 @@ skill is a property of the platform, not a cycle.
 The durable ledger for Matthew's corrections to weekly AI-review-pack items (#1594), tagged by
 **error-class**, that epic #1687 "The Coach Correction Loop" feeds into prompt-memory, deterministic
 gates, and pattern-extraction. This story (#1689) is the ledger only — storage plus a pure
-item-builder and a mockable writer/reader in `lambdas/coach_corrections.py`. The feedback CHANNELS
+item-builder and a mockable writer/reader in `lambdas/coach/coach_corrections.py`. The feedback CHANNELS
 that populate it (an MCP tool `log_coach_correction` + an email-reply parser) are #1690; the
 downstream consumers (prompt-memory injection, gate promotion) are S5/S6, all out of scope here.
 
-Taxonomy class **`CROSS_PHASE`** (`lambdas/phase_taxonomy.py`): a correction Matthew makes about a
+Taxonomy class **`CROSS_PHASE`** (`lambdas/experiment/phase_taxonomy.py`): a correction Matthew makes about a
 coach's error stays true across experiment resets — it is not a property of the current run, the
 same rationale as the `calibration` and `EVALRET#` ledgers above. Never tagged, wiped, or
 phase-filtered at restart.
@@ -2206,7 +2206,7 @@ phase-filtered at restart.
 | `status` | string | `open` (all writes start here) → `applied-to-prompt` \| `applied-to-gate`, via `update_status()` |
 | `created_at` | string | ISO-8601 UTC timestamp |
 
-**Writer/reader interface (`lambdas/coach_corrections.py`, all mockable — `table` is a boto3 Table
+**Writer/reader interface (`lambdas/coach/coach_corrections.py`, all mockable — `table` is a boto3 Table
 resource passed in, per the `ai_review_pack_lambda.record_email_send` idiom):**
 
 - `build_correction_item(item_ref, correction_text, error_class, *, now=None, correction_id=None) -> dict` — PURE, no AWS; builds the item this table documents.
@@ -2447,7 +2447,7 @@ Where `coach_id` is one of: `sleep_coach`, `nutrition_coach`, `training_coach`, 
 | `updated_at` | string | ISO timestamp |
 
 Written by `coach_state_updater.py` (`_update_relationship_state`) after every coach
-generation cycle, using the pure rule engine in `lambdas/relationship_engine.py`.
+generation cycle, using the pure rule engine in `lambdas/coach/relationship_engine.py`.
 Signals are diffed against `last_interaction_date` so repeat runs never double-count.
 
 **CONFIDENCE#{subdomain} fields:**
@@ -2486,7 +2486,7 @@ instead of growing a second grader that would drift.
 idempotency handle — re-logging the same claim on the same day overwrites, never duplicates).
 
 **The split (ADR-105):** the `/vlog` interviewer PROPOSES candidates and takes consent per
-claim; `lambdas/diary_claims.py::admit_claim` ADMITS. Admission requires a metric that
+claim; `lambdas/privacy/diary_claims.py::admit_claim` ADMITS. Admission requires a metric that
 resolves through `measurable_metrics.METRIC_SOURCES`, an integer `horizon_days` in
 [14, 365], and a gradable spec — `machine` (numeric threshold + `gt|gte|lt|lte|eq`) or
 `directional` (an unambiguous direction). `qualitative` is **never** admitted: the evaluator
@@ -2562,7 +2562,7 @@ Bedrock call in this path and therefore no `budget_guard` feature.
 **pk:** `COACH#{coach_id}_coach` (bare pk, evaluator convention — same partition family as `STANCE#`/`PREDICTION#`/`LEARNING#`; NO `USER#matthew#SOURCE#` prefix)
 **sk:** `CHECKIN#{YYYY-MM-DD}#{uuid8}`
 
-The MCP check-in loop (#917): a coach asks Matthew a qualitative question via `get_coach_checkin_queue` (returns the standing open questions, max 3; generates + stores fresh ones only when the queue is empty), and `log_coach_checkin` records his answer **verbatim** (ADR-104 — never paraphrased) or an explicit skip (always valid, zero penalty). The asking coach rotates toward the longest-dark manual engagement channel, falling back to least-recently-asked. Core logic: `lambdas/coach_checkin.py`; MCP surface: `mcp/tools_coach_checkin.py` (took the registry 62 → 64 tools).
+The MCP check-in loop (#917): a coach asks Matthew a qualitative question via `get_coach_checkin_queue` (returns the standing open questions, max 3; generates + stores fresh ones only when the queue is empty), and `log_coach_checkin` records his answer **verbatim** (ADR-104 — never paraphrased) or an explicit skip (always valid, zero penalty). The asking coach rotates toward the longest-dark manual engagement channel, falling back to least-recently-asked. Core logic: `lambdas/coach/coach_checkin.py`; MCP surface: `mcp/tools_coach_checkin.py` (took the registry 62 → 64 tools).
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -2588,7 +2588,7 @@ The MCP check-in loop (#917): a coach asks Matthew a qualitative question via `g
 **pk:** `COACH#{coach_id}_coach` (same bare partition family as above)
 **sk:** `LEARNING#{YYYY-MM-DD}#conv-{checkin_uid}-{subdomain}` — deterministic per (answer, subdomain), so a replayed `log_coach_calibration` collides with the conditional put instead of double-counting. The same write also updates `CONFIDENCE#{subdomain}` in place.
 
-After an ANSWERED check-in, the asking coach re-grades its per-subdomain confidence and records what it learned (`log_coach_calibration` → `lambdas/coach_calibration.py` — deterministic, no LLM in the write path). Bounds and provenance rules: ADR-141.
+After an ANSWERED check-in, the asking coach re-grades its per-subdomain confidence and records what it learned (`log_coach_calibration` → `lambdas/coach/coach_calibration.py` — deterministic, no LLM in the write path). Bounds and provenance rules: ADR-141.
 
 **Conversation LEARNING# fields (in addition to the shared learning shape):**
 
@@ -2798,7 +2798,7 @@ decisions, insights, challenges, experiments, character_sheet, habit_scores, cer
 platform_memory categories) additionally carry `tombstone=true`, `tombstoned_at`,
 `tombstoned_reason` after the §5 wipe. `hidden=true` on chronicle items specifically.
 
-Read-path filtering is supplied by `lambdas/phase_filter.py::with_phase_filter()`.
+Read-path filtering is supplied by `lambdas/experiment/phase_filter.py::with_phase_filter()`.
 
 ---
 
@@ -2822,7 +2822,7 @@ Hevy routine write-loop IR (system of record). Versioned, audit-replayable, inde
 | `USER#matthew#SOURCE#hevy_id_map` | `PLATFORM#<routine_id>` | `hevy_routine_id` (8-char hex) | Forward lookup. Conditional write — never overwritten. |
 | `USER#matthew#SOURCE#hevy_id_map` | `HEVY#<hevy_routine_id>` | `routine_id` | Reverse lookup, mirrors the forward write. |
 
-### Versioned-item fields (selected — full shape in `lambdas/routine_ir.py:RoutineSpec`)
+### Versioned-item fields (selected — full shape in `lambdas/training/routine_ir.py:RoutineSpec`)
 
 | Field | Type | Notes |
 |---|---|---|

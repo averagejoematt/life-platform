@@ -1,7 +1,7 @@
 {
   "_meta": {
     "purpose": "Append-only, operator-curated changelog of every change to a coach's prompt, voice spec, persona, few-shot set, or model (CC-03). Git history is the audit trail; this file is the human-readable surface rendered in each coach's Report Card (CC-02) — 'here's how this coach changed, when, why, and whether it helped.'",
-    "discipline": "Any diff to a config/coaches/<coach>.json voice block (structural_voice_rules / few_shot_examples / decision_style / anti_pattern_detection / display_name / domain) must be accompanied by a new entry here, with date >= the current tip. Enforced by tests/test_coach_tuning_logged.py. Coach-prompt edits in lambdas/ai_calls.py follow the same convention by hand (not gated automatically — too coarse to diff reliably).",
+    "discipline": "Any diff to a config/coaches/<coach>.json voice block (structural_voice_rules / few_shot_examples / decision_style / anti_pattern_detection / display_name / domain) must be accompanied by a new entry here, with date >= the current tip. Enforced by tests/test_coach_tuning_logged.py. Coach-prompt edits in lambdas/ai/ai_calls.py follow the same convention by hand (not gated automatically — too coarse to diff reliably).",
     "entry_schema": {
       "date": "YYYY-MM-DD",
       "coach": "an operational coach_config_key (persona_registry) or 'all' for cross-coach",

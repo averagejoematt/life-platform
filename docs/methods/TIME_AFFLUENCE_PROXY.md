@@ -1,7 +1,7 @@
 # The Time-Affluence Meter — a documented proxy
 
 **Issue:** #1408 (epic #718, frontier review 2026-07-18 Epic C / C6) ·
-**Code:** `lambdas/time_affluence.py` (pure math) + `lambdas/compute/hypothesis_engine_lambda.py::run_time_affluence_weekly` (weekly host) ·
+**Code:** `lambdas/health/time_affluence.py` (pure math) + `lambdas/compute/hypothesis_engine_lambda.py::run_time_affluence_weekly` (weekly host) ·
 **Partition:** `USER#matthew#SOURCE#time_affluence`
 
 ## Why this exists, and why it is a *proxy*

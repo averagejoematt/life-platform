@@ -1,7 +1,7 @@
 # Readiness Score
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-27 (#1590 re-verify — both models' weights/formulas/colour bands, the TSB Banister constants, and the device-agreement deltas cross-checked line-for-line against live source; only the personal_baselines line ref had drifted. 2026-07-26 re-verify: since 07-20 `daily_metrics_compute_lambda.py` changed only via the #1624 achievements-ledger fix — out of readiness scope, not documented here — and `mcp/tools_health.py`; the readiness weights/formulas are unchanged. 2026-07-27 re-verify: #1843 added `compute_diary_sessions` (a NEW computed_metrics field, `diary_sessions`, explicit-0) alongside — out of readiness scope; both models' weights/formulas untouched)
-> **Sources of truth:** `lambdas/compute/daily_metrics_compute_lambda.py` (`compute_readiness`, :280-316), `mcp/tools_health.py` (`tool_get_readiness_score`, :13-398), `lambdas/training_load.py`, `lambdas/personal_baselines.py` (`readiness_hrv_score`, :286-300)
+> **Sources of truth:** `lambdas/compute/daily_metrics_compute_lambda.py` (`compute_readiness`, :280-316), `mcp/tools_health.py` (`tool_get_readiness_score`, :13-398), `lambdas/training/training_load.py`, `lambdas/health/personal_baselines.py` (`readiness_hrv_score`, :286-300)
 
 ## Purpose
 
@@ -33,7 +33,7 @@ colour: green ≥ 80 · yellow ≥ 60 · red < 60
 Sleep is 25% (not 30%) deliberately, to stay aligned with the MCP model so the cross-check is a
 true drift detector (comment at :282-285).
 
-**TSB input:** Banister model in `lambdas/training_load.py` — CTL (42-day fitness), ATL (7-day
+**TSB input:** Banister model in `lambdas/training/training_load.py` — CTL (42-day fitness), ATL (7-day
 fatigue), `TSB = CTL − ATL`, over a 60-day Strava+Hevy window; loads are TSS-like points
 (100 ≈ 1 h at threshold), with a moving-time fallback for walks and a Hevy strength proxy
 calibrated to the same scale (#490).
@@ -69,4 +69,4 @@ Label bands differ from the stored colour: `GREEN ≥ 70 · YELLOW ≥ 40 · RED
 Stored: `computed_metrics` record (EXPERIMENT_SCOPED — wiped at reset). No env vars; personal
 HRV anchors come from the `personal_baselines` compute (`personal_baselines_lambda.py`).
 
-> **Verified against `lambdas/compute/daily_metrics_compute_lambda.py`, `mcp/tools_health.py`, and `lambdas/personal_baselines.py` @ git `fab48cbd` on 2026-07-20 (#1590).**
+> **Verified against `lambdas/compute/daily_metrics_compute_lambda.py`, `mcp/tools_health.py`, and `lambdas/health/personal_baselines.py` @ git `fab48cbd` on 2026-07-20 (#1590).**

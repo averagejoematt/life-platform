@@ -1,7 +1,7 @@
 # Coach Stance Engine + the Coach Quality Gate
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-26 (#1590 re-verify — line refs re-derived against live source; stance/gate logic, the 8-coach roster, and the ADR-108 fire-rate figure all confirmed unchanged since #390/#1138. 2026-07-26 re-verify: #1656 mypy churn in `coach_stance.py` + additive `structured_output_config` in `ai_calls.py` (#1385) since; stance/gate logic unchanged)
-> **Sources of truth:** `lambdas/coach/coach_history_summarizer.py` (stance engine, :940-1360), `lambdas/coach_stance.py` (stage-ladder fallback), `lambdas/ai_calls.py` (`_enforce_quality_gate`, :1356-1423), `lambdas/coach/coach_quality_gate.py`
+> **Sources of truth:** `lambdas/coach/coach_history_summarizer.py` (stance engine, :940-1360), `lambdas/coach/coach_stance.py` (stage-ladder fallback), `lambdas/ai/ai_calls.py` (`_enforce_quality_gate`, :1356-1423), `lambdas/coach/coach_quality_gate.py`
 
 ## Purpose
 
@@ -9,7 +9,7 @@ Each of the 8 coaches (`ALL_COACH_IDS`, coach_history_summarizer.py:68-77) maint
 **STANCE#** record — its evolving, evidence-derived read of Matthew in its domain: what it's
 focused on, what it has set aside, its stage read, and how the read changed. It replaced the
 hand-authored weight-band ladder as the public "read of him"; the ladder
-(`config/coaches/<coach>_stance.json`, resolved by `lambdas/coach_stance.py` — half-open
+(`config/coaches/<coach>_stance.json`, resolved by `lambdas/coach/coach_stance.py` — half-open
 `[min, max)` bands over weight or logging-consistency) remains a silent fallback in
 `site_api_coach._stance_block`.
 
@@ -85,4 +85,4 @@ verdicts over 30 days (ADR-108).
 - Env: `AI_MODEL_HAIKU`, `TABLE_NAME`, `S3_BUCKET`. Prompt-window bounds are module constants
   (coach_history_summarizer.py:118-134).
 
-> **Verified against `lambdas/coach/coach_history_summarizer.py`, `lambdas/ai_calls.py`, `lambdas/coach/coach_quality_gate.py` @ git `fab48cbd` on 2026-07-20 (#1590).**
+> **Verified against `lambdas/coach/coach_history_summarizer.py`, `lambdas/ai/ai_calls.py`, `lambdas/coach/coach_quality_gate.py` @ git `fab48cbd` on 2026-07-20 (#1590).**

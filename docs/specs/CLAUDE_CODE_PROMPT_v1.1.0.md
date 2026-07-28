@@ -10,7 +10,7 @@ Our Technical Board's statistician (Dr. Henning Brandt) led a full review of the
 
 The spec has 10 parts. Implement them in this order:
 
-### Phase 1: Engine changes (`lambdas/character_engine.py`)
+### Phase 1: Engine changes (`lambdas/health/character_engine.py`)
 
 Implement all changes from Part 1 (sections 1A through 1K):
 
@@ -75,7 +75,7 @@ Do NOT run retrocompute yet — I'll do that manually after verifying the deploy
 
 ## Important rules
 
-- `character_engine.py` lives in `lambdas/` AND in the shared Lambda layer. Edit `lambdas/character_engine.py` — the layer build script copies it.
+- `character_engine.py` lives in `lambdas/` AND in the shared Lambda layer. Edit `lambdas/health/character_engine.py` — the layer build script copies it.
 - Run `python3 -m pytest tests/test_mcp_registry.py -v` before any deploy to verify MCP registry consistency.
 - Do NOT use `--delete` flag on any S3 sync.
 - Write deploy scripts to `deploy/` — I run them in terminal.

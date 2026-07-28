@@ -83,7 +83,7 @@ python3 deploy/restart_pipeline.py --genesis 2026-06-XX --apply
 The pipeline runs (in order, each idempotent):
 
 1. Fetch Withings reading for the target date (fails clearly if absent)
-2. `sync_constants_from_config.py` — regenerate `lambdas/constants.py`
+2. `sync_constants_from_config.py` — regenerate `lambdas/common/constants.py`
 3. `update_ddb_profile()` — sync `USER#matthew PROFILE#v1`
 4. `cdk deploy --all` (#781: full-tree bundles carry the new constants — no layer)
 5. `restart_phase_tag.py --apply`
@@ -209,7 +209,7 @@ python3 deploy/restart_verify_rendered.py                    # rendered public p
 - **`restart_verify_rendered.py`** — public-surface rendered-page token-grep gate.
 - **`restart_rollback.py`** — Insurance. Two modes: `--to-genesis YYYY-MM-DD` (back to previous date) or `--full-unwind` (drop all phase tags + tombstones).
 - **`restart_pivot_when_ready.py`** — Watchdog. Polls DDB for the genesis-day Withings reading, runs the pipeline when it lands. Used by launchd.
-- **`sync_constants_from_config.py`** — Regenerates `lambdas/constants.py` from `config/user_goals.json`.
+- **`sync_constants_from_config.py`** — Regenerates `lambdas/common/constants.py` from `config/user_goals.json`.
 - **`deploy_lambda.sh`** — Single-Lambda surgical redeploy. Source-of-truth for hot fixes.
 - **`rollback_lambda.sh`** — Inverse of above.
 - **`build_bundle.py`** — Stages/zips the ONE full-tree code bundle (#781); used by every deploy path.

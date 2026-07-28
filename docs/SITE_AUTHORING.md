@@ -115,12 +115,12 @@ Generated files carry "GENERATED — never hand-edit" comments; the generators a
 | Generator (`scripts/`) | Output | Source data | Runs in every site sync? |
 |---|---|---|---|
 | `v4_build_evidence.py` | `/data/`, `/protocols/`, `/method/` app shells + per-slug shells (engine: `assets/js/evidence.js`, registry embedded as `window.__EVIDENCE_REGISTRY__`) | the PILLARS/REGISTRY in the script | No — run manually, commit output |
-| `v4_build_methods.py` | `/method/registry/index.html` | `lambdas/methods_registry.py` (ADR-105) | Yes |
+| `v4_build_methods.py` | `/method/registry/index.html` | `lambdas/experiment/methods_registry.py` (ADR-105) | Yes |
 | `v4_build_coaching.py` | `/coaching/` + per-section shells (with the board's read baked into `<noscript>`) | section list in `assets/js/coaching.js`; live coaching read | Yes |
 | `v4_build_dispatches.py` | `/story/` + per-section shells | section list in `assets/js/dispatches.js`; live chronicle state | Yes |
-| `v4_build_gear.py` | `/gear/index.html` | `lambdas/source_registry.py::catalog_entries()` + the script's GEAR dict (coverage assert) | No — run manually, commit output |
+| `v4_build_gear.py` | `/gear/index.html` | `lambdas/ingestion/source_registry.py::catalog_entries()` + the script's GEAR dict (coverage assert) | No — run manually, commit output |
 | `v4_build_cockpit_proof.py` | the `<noscript>` proof block *inside* `site/now/index.html` (sentinel comments, idempotent injection — the page itself is hand-authored) | `/api/character` via `scripts/v4_proof.py` | Yes |
-| `v4_build_data_sources.py` | `site/data/data_sources.json` | `lambdas/source_registry.py` (#498) | Yes |
+| `v4_build_data_sources.py` | `site/data/data_sources.json` | `lambdas/ingestion/source_registry.py` (#498) | Yes |
 | `v4_build_rss.py` | `site/rss.xml` | live published chronicle `posts.json` | Yes |
 | `v4_build_sitemap.py` | `site/sitemap.xml` + a `<noscript>` post-link list injected into `/story/chronicle/index.html` | the real `site/` tree + live `posts.json` | Yes |
 | `v4_build_portraits.py` | `site/assets/js/portrait_data.js` (only *signed* recipes bundle — ADR-106) | `config/portraits/*.json` | Yes — and a validation failure **blocks the sync** |

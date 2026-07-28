@@ -7,10 +7,10 @@
       "voice_specs": "config/coaches/<coach_config_key>.json",
       "board": "config/<user>/board_of_directors.json (member keys = board_persona_key)",
       "engine": "lambdas/coach/coach_computation_engine.py + coach_prediction_evaluator.py (COACH_IDS) and coach_narrative_orchestrator.py (ALL_COACH_IDS) — all must equal the operational coach ids",
-      "credibility": "lambdas/intelligence_common.py COACH_IDS_ALL — must equal the operational short_ids"
+      "credibility": "lambdas/intelligence/intelligence_common.py COACH_IDS_ALL — must equal the operational short_ids"
     },
     "enforced_by": "tests/test_persona_registry.py (no orphans either direction)",
-    "loader": "lambdas/persona_registry.py",
+    "loader": "lambdas/coach/persona_registry.py",
     "last_reviewed": "2026-06-30"
   },
   "personas": {

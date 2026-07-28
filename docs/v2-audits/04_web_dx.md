@@ -224,7 +224,7 @@ concurrency:
 **Evidence:**
 - `LEDGER_SPEC_FINAL.md` (33 KB, Mar 30) — superseded by working code
 - `LEDGER_SPEC_v02.md` (26 KB, Mar 30) — superseded by v_FINAL
-- `SPEC_CHARACTER_ENGINE_v1.1.0.md` (46 KB, Mar 30) — likely shipped; spec is now `lambdas/character_engine.py`
+- `SPEC_CHARACTER_ENGINE_v1.1.0.md` (46 KB, Mar 30) — likely shipped; spec is now `lambdas/health/character_engine.py`
 **Action:** `git mv` all three to `docs/archive/specs-pre-launch/` then update CLAUDE.md to point there. If truly dead, delete after one PR cycle.
 **Effort:** XS. **ROI:** Cleaner root; signals what's live vs. historical.
 

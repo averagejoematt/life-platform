@@ -57,7 +57,7 @@ queue before filing or shipping.
    `docs/DESIGN_SYSTEM_V5.md` → `docs/SITE_UPLEVEL_PLAYBOOK.md`, plus
    `handovers/HANDOVER_LATEST.md` and Active Work memory (no stomping in-flight work).
 2. Establish live ground truth: `/version.json` == HEAD, experiment phase
-   (`EXPERIMENT_START_DATE` in `lambdas/constants.py`, cycle from SSM) — **every grader must
+   (`EXPERIMENT_START_DATE` in `lambdas/common/constants.py`, cycle from SSM) — **every grader must
    know what day of the experiment it is**; phase-blind review misses the biggest defect class.
 3. Pull the live backlog (`gh issue list --label type:story --state open`) so findings that
    already have issues are linked, not re-filed.
@@ -66,7 +66,7 @@ queue before filing or shipping.
    - budget tier + **what that tier intentionally pauses** (a tier-paused AI surface is not a
      defect);
    - the **intentional-emptiness manifest** — post-reset, which surfaces are empty *by design*
-     per `lambdas/phase_taxonomy.py` (graders grade the machinery; data-maturity caveats are
+     per `lambdas/experiment/phase_taxonomy.py` (graders grade the machinery; data-maturity caveats are
      noted, not penalized);
    - the do-not-refile list: open issues + owner-gated/parked items from the handover.
 
