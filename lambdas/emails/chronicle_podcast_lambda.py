@@ -33,8 +33,8 @@ import re
 from datetime import datetime, timezone
 
 import boto3
-import persona_registry
 from ai import google_tts
+from coach import persona_registry
 
 try:
     from common.platform_logger import get_logger

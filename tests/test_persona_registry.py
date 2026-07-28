@@ -27,7 +27,7 @@ _LAMBDAS = os.path.join(_REPO, "lambdas")
 _CONFIG = os.path.join(_REPO, "config")
 sys.path.insert(0, _LAMBDAS)
 
-import persona_registry  # noqa: E402  (lightweight — no boto3 at import)
+from coach import persona_registry  # noqa: E402  (lightweight — no boto3 at import)
 
 VALID_TYPES = {"board", "coach", "both", "narrator", "meta"}
 

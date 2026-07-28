@@ -13,8 +13,9 @@ Consistency between this file, the JSON, and every coach id-space is enforced by
 
 import json
 import logging
-import os
 import time
+
+from common.repo_config import config_path
 
 logger = logging.getLogger(__name__)
 
@@ -47,9 +48,16 @@ _TTL_S = 300  # 5 minutes — matches board_loader
 
 
 def _local_path():
-    """Repo-relative path: lambdas/persona_registry.py -> ../config/personas.json."""
-    here = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(os.path.dirname(here), "config", "personas.json")
+    """Path to config/personas.json.
+
+    Was `dirname(dirname(__file__))/config/personas.json`, which hard-coded "this
+    module sits exactly one level under the repo root". #1653 moved it to
+    lambdas/coach/, which silently resolved to lambdas/config/personas.json — the
+    file loads fine from S3 in Lambda, so the break only showed up offline (tests
+    and scripts), where it degraded to the empty-registry fallback rather than
+    raising. See common.repo_config for why this searches upward.
+    """
+    return config_path("personas.json")
 
 
 def load_registry(s3_client=None, bucket=None, force_refresh=False):

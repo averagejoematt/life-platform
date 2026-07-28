@@ -36,11 +36,13 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "coach"))
 sys.path.insert(0, os.path.join(_REPO, "tests"))
 
-import coach_calibration as ccal  # noqa: E402
-import coach_checkin as cc  # noqa: E402
 import coach_history_summarizer as chs  # noqa: E402
 import coach_observatory_renderer as cobs  # noqa: E402
 import coach_prediction_evaluator as cpe  # noqa: E402
+from coach import (
+    coach_calibration as ccal,  # noqa: E402
+    coach_checkin as cc,  # noqa: E402
+)
 from fakes import FakeDdbTable  # noqa: E402
 
 import mcp.tools_coach_checkin as tcc  # noqa: E402

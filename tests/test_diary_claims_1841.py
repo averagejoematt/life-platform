@@ -420,7 +420,7 @@ class TestRegistration:
         """`dispute_docket` still carries its own copy of this map pending its collapse
         onto measurable_metrics. Until then, pin them identical — a silent divergence
         would give the same metric two different evaluation windows."""
-        import dispute_docket as dd
+        from coach import dispute_docket as dd
 
         assert dd._METRIC_SUBDOMAIN == mm.METRIC_SUBDOMAIN
 

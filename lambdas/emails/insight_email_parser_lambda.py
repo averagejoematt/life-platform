@@ -49,8 +49,7 @@ except ImportError:
 # missing module must never crash the (unrelated) insight-save path — it only disables
 # correction routing.
 try:
-    import coach_correction_resolver as ccr
-    import coach_corrections
+    from coach import coach_correction_resolver as ccr, coach_corrections
 except Exception:  # pragma: no cover — bundle-dependent
     ccr = None
     coach_corrections = None

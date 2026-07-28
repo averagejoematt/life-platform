@@ -43,6 +43,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
+from common.numeric import floats_to_decimal
+
 # `normalize_coach_id` is THE shared coach-id normalizer (#1786): the ledger's writers
 # spell a coach id differently — the review-pack resolver stores the S3 archive `variant`
 # (suffixed: "mind_coach"), the dossier channel stores f"{bare}_coach", and older rows
@@ -50,8 +52,7 @@ from typing import Optional
 # `ai_calls._run_coach_v2_pipeline` READS with the suffixed id. Comparing the raw strings
 # made the S5 injection a live no-op; both sides now normalize at the join
 # (`_item_ref_matches`). Flat sibling imports, per #781 (every root module ships together).
-from coach_checkin import normalize_coach_id, read_cycle
-from common.numeric import floats_to_decimal
+from coach.coach_checkin import normalize_coach_id, read_cycle
 
 PK = "USER#matthew#SOURCE#coach_corrections"
 SK_PREFIX = "CORRECTION#"

@@ -28,8 +28,8 @@ sys.path.insert(0, _REPO)
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "tests"))
 
-import coach_nudge_engine as eng  # noqa: E402
 import emails.coach_nudge_lambda as shell  # noqa: E402
+from coach import coach_nudge_engine as eng  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
 
 PT = ZoneInfo("America/Los_Angeles")
@@ -382,8 +382,8 @@ class _FixedDT(datetime):
 
 def _wire(monkeypatch, fake, *, now_utc, tier=0, copy_text=None, gate_result="pass"):
     """Stand the shell up against the fake table at a fixed instant."""
-    import coach_checkin
     from ai import ai_calls, budget_guard
+    from coach import coach_checkin
 
     _FixedDT._fixed = now_utc
     monkeypatch.setattr(shell, "datetime", _FixedDT)

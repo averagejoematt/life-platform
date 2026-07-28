@@ -27,10 +27,10 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "compute"))
 
-import persona_registry  # noqa: E402
 from ai import budget_guard  # noqa: E402
 from boto3.dynamodb.conditions import AttributeBase  # noqa: E402
 from bundle_stubs import stub_bundled_module
+from coach import persona_registry  # noqa: E402
 from compute import coach_memoir_lambda as writer  # noqa: E402
 
 # ── A real (small) DynamoDB query evaluator, not a stub — the quarter-window

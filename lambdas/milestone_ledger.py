@@ -777,7 +777,7 @@ def _celebration_suppressed(table, today: str) -> bool:
     condition still holds then.
     """
     try:
-        import spiral_breaker
+        from coach import spiral_breaker
 
         allowed, _verdict = spiral_breaker.check_celebration_allowed("milestone_announcements", now=today, table=table)
         return not allowed

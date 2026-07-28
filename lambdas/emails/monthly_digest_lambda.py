@@ -40,7 +40,7 @@ S3_BUCKET = os.environ["S3_BUCKET"]
 
 # Board of Directors config loader
 try:
-    import board_loader
+    from coach import board_loader
 
     _HAS_BOARD_LOADER = True
 except ImportError:

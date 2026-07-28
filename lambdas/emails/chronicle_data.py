@@ -159,8 +159,8 @@ def gather_chronicle_data(*, _g):
     # — she "wasn't in the room", structurally.
     conversation_refs = []
     try:
-        import persona_registry
         from boto3.dynamodb.conditions import Key
+        from coach import persona_registry
         from experiment.phase_filter import with_phase_filter
 
         for pid in persona_registry.OPERATIONAL_COACH_IDS:

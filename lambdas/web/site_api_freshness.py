@@ -114,7 +114,7 @@ def source_freshness(*, _g) -> dict:
     sources = []
     summary = {"fresh": 0, "stale": 0, "paused": 0, "total": 0}
     try:
-        from coach_checkin import read_cycle
+        from coach.coach_checkin import read_cycle
 
         current_cycle = read_cycle()
     except Exception:

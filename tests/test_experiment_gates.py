@@ -146,7 +146,7 @@ def _freshness_with(monkeypatch, latest_date, record_extra=None):
     monkeypatch.setattr(sad, "table", fake)
     monkeypatch.setattr(sad, "_FRESHNESS_SOURCES", {"testsrc": {"label": "Test Source", "desc": "d", "category": "Body"}})
     monkeypatch.setattr(sad, "_FRESHNESS_PAUSED", {})
-    import coach_checkin
+    from coach import coach_checkin
 
     monkeypatch.setattr(coach_checkin, "read_cycle", lambda ssm_client=None: 8)
     return sad

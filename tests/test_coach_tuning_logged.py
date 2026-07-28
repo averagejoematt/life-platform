@@ -25,7 +25,7 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _LOG_REL = "config/coaches/tuning_log.json"
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
-import persona_registry  # noqa: E402
+from coach import persona_registry  # noqa: E402
 
 VOICE_KEYS = {
     "structural_voice_rules",

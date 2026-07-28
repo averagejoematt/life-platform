@@ -20,8 +20,8 @@ import os
 from datetime import datetime, timezone
 
 import boto3
-import persona_registry
 from boto3.dynamodb.conditions import Key
+from coach import persona_registry
 from experiment import er03_gate
 from experiment.phase_filter import with_phase_filter
 

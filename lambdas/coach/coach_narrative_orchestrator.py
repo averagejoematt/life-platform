@@ -192,7 +192,7 @@ def _track_record_block(coach_id: str) -> str:
         recs = [x for x in r.get("Items", []) if not x.get("tombstone")]
         if not recs:
             return "Nothing resolved yet this cycle. Make calls; they will be scored."
-        counts = {}
+        counts: dict[str, int] = {}
         for x in recs:
             st = str(x.get("status", "unknown"))
             counts[st] = counts.get(st, 0) + 1
@@ -642,22 +642,22 @@ def _gather_journal_mood_signal():
     emotions_all, themes_all = [], []
     social_qualities = []
     quote, quote_date = None, None
-    for e in entries:
-        mood = e.get("enriched_mood")
+    for entry in entries:
+        mood = entry.get("enriched_mood")
         if mood is not None:
             moods.append(float(mood))
-        stress = e.get("enriched_stress")
+        stress = entry.get("enriched_stress")
         if stress is not None:
             stresses.append(float(stress))
-        emotions_all.extend(e.get("enriched_emotions") or [])
-        themes_all.extend(e.get("enriched_themes") or [])
-        social_quality = e.get("enriched_social_quality")
+        emotions_all.extend(entry.get("enriched_emotions") or [])
+        themes_all.extend(entry.get("enriched_themes") or [])
+        social_quality = entry.get("enriched_social_quality")
         if social_quality:
             social_qualities.append(social_quality)
         # Latest notable quote wins — most recent texture, not a historical one.
-        notable = e.get("enriched_notable_quote")
+        notable = entry.get("enriched_notable_quote")
         if notable:
-            quote, quote_date = notable, _entry_date(e)
+            quote, quote_date = notable, _entry_date(entry)
 
     if len(moods) < JOURNAL_MOOD_MIN_ENTRIES and len(stresses) < JOURNAL_MOOD_MIN_ENTRIES:
         return None

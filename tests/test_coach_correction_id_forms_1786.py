@@ -49,10 +49,12 @@ os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "testing")
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 
-import coach_correction_resolver as ccr  # noqa: E402
-import coach_corrections as cc  # noqa: E402
-import coach_dossier as cd  # noqa: E402
 from ai import ai_calls  # noqa: E402
+from coach import (
+    coach_correction_resolver as ccr,  # noqa: E402
+    coach_corrections as cc,  # noqa: E402
+    coach_dossier as cd,  # noqa: E402
+)
 from fakes import FakeDdbTable  # noqa: E402
 
 _AI_CALLS_SRC = os.path.join(os.path.dirname(__file__), "..", "lambdas", "ai", "ai_calls.py")

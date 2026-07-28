@@ -120,7 +120,7 @@ def build_narrator(config):
     """
     if config:
         try:
-            import board_loader
+            from coach import board_loader
 
             narrator = board_loader.build_narrator_prompt(config, narrator_id="margaret_calloway")
             if narrator:

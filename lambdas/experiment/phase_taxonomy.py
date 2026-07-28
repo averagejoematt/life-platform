@@ -84,7 +84,7 @@ def experiment_stamp(ssm_client=None, include_phase: bool = True) -> dict:
 
         stamp["phase"] = EXPERIMENT_PHASE_CURRENT
     try:
-        from coach_checkin import read_cycle  # cached, fail-soft SSM read (CHECKIN# precedent)
+        from coach.coach_checkin import read_cycle  # cached, fail-soft SSM read (CHECKIN# precedent)
 
         cycle = read_cycle(ssm_client)
         if cycle is not None:

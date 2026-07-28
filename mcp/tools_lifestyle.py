@@ -1597,7 +1597,7 @@ def _write_field_note_interactions(week: str, week_label: str, agreement, notes:
     for the same week overwrites rather than piling up. Fail-soft per coach: a
     write failure never affects the saved field-note response."""
     try:
-        import persona_registry
+        from coach import persona_registry
 
         coach_ids = persona_registry.OPERATIONAL_COACH_IDS
     except Exception as e:
@@ -1922,8 +1922,8 @@ def tool_log_evening_intake(args):
       `updated` + `previous_count` (via ReturnValues=UPDATED_OLD) so the flow
       can say "updated tonight's count 2 -> 1" instead of silently re-writing.
     """
+    from coach.intake_response import PRIVATE_INTAKE_PK
     from common.pacific_time import pacific_today
-    from intake_response import PRIVATE_INTAKE_PK
 
     try:
         count = int(args.get("count"))
@@ -1964,7 +1964,7 @@ def tool_get_intake_response(args):
     evenings exist. ADR-105 throughout — below the floors it reports arming
     progress, never an early verdict.
     """
-    from intake_response import compute_intake_response
+    from coach.intake_response import compute_intake_response
 
     window_days = int(args.get("window_days") or 180)
     window_days = max(30, min(730, window_days))

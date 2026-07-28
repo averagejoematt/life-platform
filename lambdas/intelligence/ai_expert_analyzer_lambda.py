@@ -76,7 +76,7 @@ except ImportError:
 
 # #531: shared persona core — one voice-spec rendering across brief/board/observatory.
 try:
-    import persona_core as _persona_core
+    from coach import persona_core as _persona_core
 except ImportError:  # pragma: no cover — environment-dependent
     _persona_core = None
     logger.warning("persona_core not available — expert prompts keep persona-dict voice only")

@@ -40,7 +40,7 @@ _NUTRITION_WRITE_PATHS = [
     _LAMBDAS / "ingestion" / "macrofactor_lambda.py",
     _LAMBDAS / "meal_projection.py",
 ]
-_COACH_PAYLOAD_BUILDER = _LAMBDAS / "coach_register.py"
+_COACH_PAYLOAD_BUILDER = _LAMBDAS / "coach" / "coach_register.py"
 
 _EYEBALL_TOKENS = ("eyeball_estimate", "EYEBALL_PK", "eyeball_calibration")
 

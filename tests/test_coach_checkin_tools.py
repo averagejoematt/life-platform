@@ -24,7 +24,7 @@ sys.path.insert(0, _REPO)
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "tests"))
 
-import coach_checkin as cc  # noqa: E402
+from coach import coach_checkin as cc  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
 
 import mcp.tools_coach_checkin as tcc  # noqa: E402

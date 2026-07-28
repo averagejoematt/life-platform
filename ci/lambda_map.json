@@ -382,7 +382,7 @@
       "lambdas/ai/ai_summaries.py",
       "lambdas/ai/ai_context.py",
       "lambdas/scoring_engine.py",
-      "lambdas/board_loader.py",
+      "lambdas/coach/board_loader.py",
       "lambdas/insight_writer.py",
       "lambdas/common/auth_breaker.py",
       "lambdas/common/compute_metadata.py",

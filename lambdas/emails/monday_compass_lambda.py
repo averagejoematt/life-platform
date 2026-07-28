@@ -65,7 +65,7 @@ _TODOIST_BASE = "https://api.todoist.com/api/v1"
 
 # Optional shared modules (bundled in zip)
 try:
-    import board_loader
+    from coach import board_loader
 
     _HAS_BOARD_LOADER = True
 except ImportError:

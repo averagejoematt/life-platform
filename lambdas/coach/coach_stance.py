@@ -12,9 +12,10 @@ wellbeing guardrails enforced by tests/test_coach_stance.py.
 
 import json
 import logging
-import os
 import time
 from typing import Any
+
+from common.repo_config import config_path
 
 logger = logging.getLogger(__name__)
 
@@ -74,8 +75,8 @@ _TTL_S = 300
 
 
 def _local_path(coach_id):
-    here = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(os.path.dirname(here), "config", "coaches", f"{coach_id}_stance.json")
+    # Depth-independent — see common.repo_config (#1653).
+    return config_path("coaches", f"{coach_id}_stance.json")
 
 
 def load_stance(coach_id, s3_client=None, bucket=None, force_refresh=False):

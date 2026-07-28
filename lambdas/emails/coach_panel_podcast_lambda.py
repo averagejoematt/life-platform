@@ -24,10 +24,10 @@ import urllib.parse
 from datetime import datetime, timezone
 
 import boto3
-import persona_registry
 from ai import google_tts
 from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
 from boto3.dynamodb.conditions import Key
+from coach import persona_registry
 from common.constants import EXPERIMENT_START_DATE  # ADR-058/077 — current-cycle genesis anchor
 from experiment import er03_gate
 from experiment.phase_filter import with_phase_filter

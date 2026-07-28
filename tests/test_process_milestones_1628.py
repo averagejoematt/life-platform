@@ -399,7 +399,7 @@ def test_default_sweep_consults_the_breaker_and_fails_closed():
 
 
 def test_breaker_registry_marks_milestones_wired():
-    import spiral_breaker
+    from coach import spiral_breaker
 
     spec = spiral_breaker.CELEBRATORY_EMITTERS["milestone_announcements"]
     assert spec["wired"] is True and spec["path"] == "lambdas/milestone_ledger.py"

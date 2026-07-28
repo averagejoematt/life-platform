@@ -267,7 +267,7 @@ def _query_between(table, pk, sk_lo, sk_hi):
 
 def _coach_ids():
     try:
-        from persona_registry import OPERATIONAL_SHORT_IDS
+        from coach.persona_registry import OPERATIONAL_SHORT_IDS
 
         return list(OPERATIONAL_SHORT_IDS)
     except Exception as e:  # noqa: BLE001 — collection fails soft, never hard

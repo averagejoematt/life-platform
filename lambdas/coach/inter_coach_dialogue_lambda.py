@@ -263,7 +263,7 @@ def _air_one(pick, this_week):
     topic_text = topic.get("topic", "")
 
     s3 = boto3.client("s3", region_name=REGION)
-    import persona_registry
+    from coach import persona_registry
 
     reg = persona_registry.load_registry(s3, S3_BUCKET).get("personas", {})
     pa = reg.get(a_id) or {"name": a_id}

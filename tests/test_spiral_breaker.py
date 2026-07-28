@@ -22,7 +22,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 
-from spiral_breaker import (  # noqa: E402
+from coach.spiral_breaker import (  # noqa: E402
     CELEBRATORY_EMITTERS,
     CLEAR,
     CONDITIONS,
@@ -366,7 +366,7 @@ class TestInputTolerance:
 def _capture_log_lines():
     """Attach a StringIO handler (real formatter) to the module logger — capture that is
     independent of pytest's stdout swapping, exercising the actual structured format."""
-    import spiral_breaker as sb
+    from coach import spiral_breaker as sb
 
     buf = io.StringIO()
     handler = logging.StreamHandler(buf)

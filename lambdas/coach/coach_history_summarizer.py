@@ -81,7 +81,7 @@ ALL_COACH_IDS = [
 # to live here had drifted to the RETIRED cast, so every COMPRESSED#/STANCE#
 # record carried the wrong byline. One registry, no local copies.
 try:
-    import persona_registry as _persona_registry
+    from coach import persona_registry as _persona_registry
 except ImportError:  # pragma: no cover — environment-dependent
     _persona_registry = None
 
@@ -195,7 +195,7 @@ except ImportError:  # pragma: no cover — environment-dependent
 # screen is missing from the bundle we withhold the takeaway, we do not ship it
 # unscreened. Privacy gates fail closed; quality gates fail open.
 try:
-    from coach_calibration import TAKEAWAY_WITHHELD_MARKER, public_prompt_takeaway as _public_prompt_takeaway
+    from coach.coach_calibration import TAKEAWAY_WITHHELD_MARKER, public_prompt_takeaway as _public_prompt_takeaway
 except ImportError:  # pragma: no cover — environment-dependent; withhold, never pass through
     TAKEAWAY_WITHHELD_MARKER = "[takeaway withheld — ADR-141 §4 privacy screen]"
     _public_prompt_takeaway = None
@@ -532,7 +532,7 @@ def _conversational_weight(conf_record):
     split rule). Fail-soft to 0.0 — a grounding string must never fail to render because
     a provenance field is missing or oddly typed."""
     try:
-        from coach_calibration import conversational_weight
+        from coach.coach_calibration import conversational_weight
 
         return conversational_weight((conf_record or {}).get("conversation_alpha"), (conf_record or {}).get("conversation_beta"))
     except Exception:  # noqa: BLE001 — provenance disclosure is additive, never load-bearing

@@ -65,7 +65,7 @@ secrets = boto3.client("secretsmanager", region_name=REGION)
 
 # Board of Directors config loader
 try:
-    import board_loader
+    from coach import board_loader
 
     _HAS_BOARD_LOADER = True
 except ImportError:

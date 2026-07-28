@@ -38,9 +38,9 @@ sys.path.insert(0, _REPO)
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "tests"))
 
-import persona_registry  # noqa: E402
 from ai import platform_memory as pm  # noqa: E402
 from ai.grounded_generation import allowed_numbers  # noqa: E402
+from coach import persona_registry  # noqa: E402
 from experiment import phase_taxonomy  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
 

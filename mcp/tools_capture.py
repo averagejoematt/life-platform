@@ -65,8 +65,7 @@ from mcp.tools_reading import tool_get_due_recalls
 
 try:
     # Shared, bundled modules (#781) — staged at zip root in the Lambda.
-    import coach_checkin as cc
-    import intake_response as ir
+    from coach import coach_checkin as cc, intake_response as ir
 except ImportError:  # pragma: no cover — MCP bundle always ships lambdas/ at root
     if not TYPE_CHECKING:
         from lambdas import coach_checkin as cc, intake_response as ir

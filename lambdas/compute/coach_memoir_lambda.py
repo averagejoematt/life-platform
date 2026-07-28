@@ -35,9 +35,9 @@ from datetime import datetime, timezone
 
 import boto3
 import memoir_gate
-import persona_registry
 from ai import grounded_generation
 from boto3.dynamodb.conditions import Key
+from coach import persona_registry
 from common import quarter_utils
 from common.numeric import decimals_to_float, floats_to_decimal
 from experiment import calibration_core

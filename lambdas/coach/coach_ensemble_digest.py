@@ -754,7 +754,7 @@ def lambda_handler(event, context):
         # gate; non-resolvable disagreements stay narrative. Fail-soft — a
         # docket error must never sink the digest.
         try:
-            import dispute_docket
+            from coach import dispute_docket
 
             docket_stats = dispute_docket.open_from_disagreements(disagreements, cycle_date)
             digest["docket"] = {

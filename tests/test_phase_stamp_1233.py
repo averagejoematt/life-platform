@@ -20,7 +20,7 @@ os.environ.setdefault("USER_ID", "matthew")
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas", "coach"))
 
-import coach_checkin  # noqa: E402
+from coach import coach_checkin  # noqa: E402
 from common.constants import EXPERIMENT_PHASE_CURRENT  # noqa: E402
 from experiment import phase_taxonomy as pt  # noqa: E402
 

@@ -81,7 +81,7 @@ except Exception:  # pragma: no cover — bundle-dependent; ranking simply degra
 # (ADR-104/105; promotion is a human-authored gate PR). Bundled (#781); import
 # fail-soft so a missing module degrades the section off rather than dying.
 try:
-    import correction_promotion as _promo
+    from coach import correction_promotion as _promo
 except Exception:  # pragma: no cover — bundle-dependent; proposals simply degrade off
     _promo = None
 

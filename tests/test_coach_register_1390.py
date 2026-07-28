@@ -14,7 +14,7 @@ import sys
 _LAMBDAS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas")
 sys.path.insert(0, _LAMBDAS)
 
-import coach_register as cr  # noqa: E402
+from coach import coach_register as cr  # noqa: E402
 
 # A representative deterministic fact bundle — the kind of pre-computed content a coach
 # surface would hand the phrasing layer.

@@ -257,7 +257,7 @@ def screen_takeaway_for_public_prompt(takeaway, *, max_chars=PUBLIC_PROMPT_TAKEA
     if not text:
         return None, [("empty", "")]
     try:
-        import coach_dossier  # the house content-absolutes screen (#1387/#1800)
+        from coach import coach_dossier  # the house content-absolutes screen (#1387/#1800)
 
         hits = coach_dossier.find_dossier_violations(text)
     except Exception as e:  # noqa: BLE001 — an unavailable/broken screen withholds

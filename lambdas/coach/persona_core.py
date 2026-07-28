@@ -26,8 +26,9 @@ Import paths: bundled at lambdas/ root (Code.from_asset ships the whole tree)
 
 import json
 import logging
-import os
 import time
+
+from common.repo_config import config_path
 
 logger = logging.getLogger(__name__)
 
@@ -42,9 +43,9 @@ _MAX_LIST_ITEMS = 6
 
 
 def _local_path(coach_id: str) -> str:
-    """Repo-relative fallback: lambdas/persona_core.py -> ../config/coaches/{id}.json."""
-    here = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(os.path.dirname(here), "config", "coaches", f"{coach_id}.json")
+    """Offline fallback: config/coaches/{id}.json. Depth-independent — see
+    common.repo_config (#1653)."""
+    return config_path("coaches", f"{coach_id}.json")
 
 
 def load_voice_spec(coach_id: str, s3_client=None, bucket=None, force_refresh=False):

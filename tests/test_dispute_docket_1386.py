@@ -42,11 +42,11 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "coach"))
 
 import coach_prediction_evaluator as evaluator  # noqa: E402
-import dispute_docket as dd  # noqa: E402
 import pytest  # noqa: E402
 from boto3.dynamodb.conditions import AttributeBase  # noqa: E402
 from botocore.exceptions import ClientError  # noqa: E402
 from bundle_stubs import stub_bundled_module
+from coach import dispute_docket as dd  # noqa: E402
 
 # ── FakeTable: evaluates real Key conditions + honors the conditional put ────
 
@@ -369,7 +369,7 @@ class TestAC2DeterministicResolution:
         assert voided[0]["verdict"]["outcome"] == "void_no_data"
 
     def test_verdict_module_never_imports_an_llm(self):
-        src = open(os.path.join(_REPO, "lambdas", "dispute_docket.py")).read()
+        src = open(os.path.join(_REPO, "lambdas", "coach", "dispute_docket.py")).read()
         for forbidden in ("bedrock_client", "ai_calls", "invoke_model", "anthropic"):
             assert forbidden not in src, f"dispute_docket.py references {forbidden!r} — the verdict path must stay LLM-free"
 

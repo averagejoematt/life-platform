@@ -39,7 +39,7 @@ import re
 from typing import Callable, Optional
 
 # Error-class vocabulary — the ONE source of truth (#1689). Imported, never re-listed.
-from coach_corrections import ERROR_CLASSES
+from coach.coach_corrections import ERROR_CLASSES
 
 # The deterministic stale-baseline/stale-phase gate (#1691). Bundled (#781); import
 # fail-soft so a missing module degrades the baseline heuristic off rather than

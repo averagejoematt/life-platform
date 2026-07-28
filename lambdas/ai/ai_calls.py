@@ -1471,7 +1471,7 @@ def _coach_corrections_block(coach_id, *, surface="coach_brief", table=None):
     break a coach generation. `table` is injectable for offline testing.
     """
     try:
-        import coach_corrections as _cc
+        from coach import coach_corrections as _cc
 
         if table is None:
             table = boto3.resource("dynamodb", region_name="us-west-2").Table(os.environ.get("TABLE_NAME", "life-platform"))

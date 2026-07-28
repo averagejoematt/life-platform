@@ -728,7 +728,7 @@ def _coach_voice_core(pid: str) -> str:
     Deterministic per spec, so the system block stays byte-stable for the prompt
     cache. "" fail-soft: a missing spec keeps the roster-only block (pre-#531)."""
     try:
-        import persona_core
+        from coach import persona_core
 
         return persona_core.persona_block(pid, s3_client=_s3_client(), bucket=S3_BUCKET)
     except Exception as e:

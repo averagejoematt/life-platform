@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.join(REPO, "lambdas"))
 sys.path.insert(0, os.path.join(REPO, "lambdas", "emails"))
 
 import review_pack_ranker as rpr  # noqa: E402
-from coach_corrections import ERROR_CLASSES  # noqa: E402
+from coach.coach_corrections import ERROR_CLASSES  # noqa: E402
 
 START = "2026-07-22"
 BASELINE = 321.38

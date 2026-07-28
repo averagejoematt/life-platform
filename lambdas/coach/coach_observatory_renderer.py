@@ -528,7 +528,7 @@ def _render_coach_card(domain, include_threads=True):
     # pure (coach_nudge_engine.proactivity_summary); this block only reads.
     proactivity = None
     try:
-        from coach_nudge_engine import NUDGE_SK_PREFIX, proactivity_summary
+        from coach.coach_nudge_engine import NUDGE_SK_PREFIX, proactivity_summary
 
         cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
         nudge_resp = table.query(

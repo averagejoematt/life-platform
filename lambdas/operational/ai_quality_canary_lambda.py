@@ -416,7 +416,7 @@ def _persona_names():
     Empty list on any failure → the judge prompt still states the vendor/model
     contract, just without the explicit roster to anchor on. Fail-soft."""
     try:
-        import persona_registry
+        from coach import persona_registry
 
         reg = persona_registry.personas(_s3, LOG_BUCKET)
         names = {(p.get("name") or "").strip() for p in reg.values() if p.get("name")}

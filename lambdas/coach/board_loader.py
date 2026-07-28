@@ -8,7 +8,7 @@ Config location: s3://{bucket}/config/board_of_directors.json
 Fallback: If S3 read fails, returns None so callers can use hardcoded fallback prompts.
 
 Usage:
-    from board_loader import load_board, get_feature_members, build_prompt_sections
+    from coach.board_loader import load_board, get_feature_members, build_prompt_sections
 
 v1.0.0 — 2026-03-02
 """

@@ -309,7 +309,7 @@ def build_calibration(pairs, *, now: str | None = None) -> dict:
 
 
 def _checkin_pk(coach_id: str) -> str:
-    from coach_checkin import checkin_pk
+    from coach.coach_checkin import checkin_pk
 
     return checkin_pk(coach_id)
 

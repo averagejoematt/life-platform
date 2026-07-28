@@ -26,7 +26,8 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 from experiment.phase_filter import with_phase_filter  # ADR-058
-from relationship_engine import compute_relationship_update  # #536
+
+from coach.relationship_engine import compute_relationship_update  # #536
 
 # Structured logger
 try:

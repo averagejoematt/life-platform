@@ -404,7 +404,7 @@ def recent_checkins_block(limit_days: int = 14, max_items: int = 6, table=None, 
                 os.environ.get("TABLE_NAME", "life-platform")
             )
         if coach_ids is None:
-            from persona_registry import OPERATIONAL_SHORT_IDS
+            from coach.persona_registry import OPERATIONAL_SHORT_IDS
 
             coach_ids = list(OPERATIONAL_SHORT_IDS)
         items = recent_checkins(table, coach_ids, days=max(1, int(limit_days)))

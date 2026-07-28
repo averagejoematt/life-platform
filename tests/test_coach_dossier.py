@@ -25,8 +25,10 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "web"))
 
-import coach_corrections  # noqa: E402
-import coach_dossier as cd  # noqa: E402
+from coach import (
+    coach_corrections,  # noqa: E402
+    coach_dossier as cd,  # noqa: E402
+)
 from fakes import FakeDdbTable  # noqa: E402
 
 # ══════════════════════════════════════════════════════════════════════════════

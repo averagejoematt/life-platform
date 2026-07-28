@@ -32,13 +32,13 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import boto3
-import coach_nudge_engine as engine
 from ai import budget_guard
 from ai.grounded_generation import allowed_dates, allowed_numbers, grounding_findings
 from boto3.dynamodb.conditions import Key
-from coach_checkin import read_cycle
+from coach import coach_nudge_engine as engine
+from coach.coach_checkin import read_cycle
+from coach.persona_registry import OPERATIONAL_COACH_IDS
 from common.pacific_time import PACIFIC
-from persona_registry import OPERATIONAL_COACH_IDS
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -90,7 +90,7 @@ def _lambda_client():
 def _coach_name(coach_id: str) -> str:
     """Display name from the persona registry, fail-soft to a derived name."""
     try:
-        from persona_registry import by_engine_id
+        from coach.persona_registry import by_engine_id
 
         _persona_id, persona = by_engine_id(coach_id)
         if persona and persona.get("name"):

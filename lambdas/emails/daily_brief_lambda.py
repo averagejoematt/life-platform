@@ -114,7 +114,7 @@ def _emit_module_load_failure(module_name: str) -> None:
 
 # Board of Directors config loader
 try:
-    import board_loader
+    from coach import board_loader
 
     _HAS_BOARD_LOADER = True
 except ImportError:
@@ -1939,7 +1939,7 @@ def lambda_handler(event, context):
     # progress). Fail-soft — the brief must send even if the read breaks.
     _intake_line = None
     try:
-        import intake_response
+        from coach import intake_response
 
         _intake_line = intake_response.brief_line(intake_response.compute_intake_response(table))
     except Exception as _ir_err:

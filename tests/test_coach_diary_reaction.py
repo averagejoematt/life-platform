@@ -17,10 +17,10 @@ _LAMBDAS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 sys.path.insert(0, _LAMBDAS)
 sys.path.insert(0, os.path.join(_LAMBDAS, "coach"))
 
-import coach_checkin  # noqa: E402
 import coach_diary_reaction as cdr  # noqa: E402
 import pytest  # noqa: E402
 from ai import budget_guard  # noqa: E402
+from coach import coach_checkin  # noqa: E402
 
 
 @pytest.fixture(autouse=True)

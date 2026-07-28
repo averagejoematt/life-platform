@@ -51,7 +51,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from coach_corrections import list_corrections
+from coach.coach_corrections import list_corrections
 
 # ── The #1698-locked promotion thresholds (documented in the module docstring) ──
 # A class proposes for gate-promotion when it recurred at least this many times…

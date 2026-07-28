@@ -932,7 +932,7 @@ def _update_bayesian_confidence(coach_id, subdomain, update_type):
         # (ONE shared definition, `coach_calibration.graded_sample_size`, used by both
         # writers; the conversational contribution stays disclosed in its own
         # accumulators, carried forward below).
-        from coach_calibration import graded_sample_size
+        from coach.coach_calibration import graded_sample_size
 
         sample_size = graded_sample_size(
             alpha, beta_val, item.get("conversation_alpha") if item else 0, item.get("conversation_beta") if item else 0
@@ -1572,7 +1572,7 @@ def lambda_handler(event: dict, context) -> dict:
         # error must never sink prediction evaluation.
         docket_stats = {}
         try:
-            import dispute_docket
+            from coach import dispute_docket
 
             docket_stats = dispute_docket.resolve_due(today_str)
         except Exception as e:

@@ -30,11 +30,13 @@ from datetime import datetime
 from decimal import Decimal  # noqa: F401
 
 import boto3
-import coach_corrections  # #1689 ledger — reused by the dossier retract/correct path (#1387)
-import coach_dossier  # #1387: the verbatim, privacy-filtered dossier projection (bundled module)
-import coach_traits  # #1113: authored trait scores for the immersive bios (bundled module)
 import diary_consent  # #1483 (ADR-142 tier 2): the conversation-allude projection (bundled module)
 from boto3.dynamodb.conditions import Key
+from coach import (
+    coach_corrections,  # #1689 ledger — reused by the dossier retract/correct path (#1387)
+    coach_dossier,  # #1387: the verbatim, privacy-filtered dossier projection (bundled module)
+    coach_traits,  # #1113: authored trait scores for the immersive bios (bundled module)
+)
 from experiment import calibration_core  # #538: the ONE prediction-calibration scorer (Brier + reliability)
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 
@@ -44,8 +46,7 @@ from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-
 # partial deploy can't break the whole handler — the coaches endpoints just serve
 # shaped-empty 200s if these modules are ever unavailable.
 try:
-    import coach_stance
-    import persona_registry
+    from coach import coach_stance, persona_registry
 
     _COACH_MODULES = True
 except Exception:  # pragma: no cover - defensive guard, not expected in practice post-#781
@@ -115,7 +116,7 @@ def _current_cycle():
     contract phase_taxonomy.experiment_stamp relies on) — a missing param/grant
     must never break the calibration/predictions surfaces, only omit the label."""
     try:
-        from coach_checkin import read_cycle
+        from coach.coach_checkin import read_cycle
 
         return read_cycle()
     except Exception:

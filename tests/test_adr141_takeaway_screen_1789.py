@@ -34,10 +34,12 @@ sys.path.insert(0, _REPO)
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "coach"))
 
-import coach_calibration as ccal  # noqa: E402
-import coach_dossier  # noqa: E402
 import coach_history_summarizer as chs  # noqa: E402
 import pytest  # noqa: E402
+from coach import (
+    coach_calibration as ccal,  # noqa: E402
+    coach_dossier,  # noqa: E402
+)
 
 CLEAN = "Evenings are the lever — the routine collapsed after travel."
 
