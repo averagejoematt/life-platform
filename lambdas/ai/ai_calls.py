@@ -1985,7 +1985,7 @@ Write your {domain_label} coaching section now."""
         # regenerated once, then HELD (the exact ADR-108 regenerate-or-hold shape).
         # Deterministic anchor-phrase check, no LLM judge. Fail-soft on infra.
         try:
-            import engagement_core as _ec
+            from content import engagement_core as _ec
 
             _psig = brief.get("engagement_signal") if isinstance(brief, dict) else None
             if _psig and output and _ec.presence_ack_required(_psig):

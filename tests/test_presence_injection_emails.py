@@ -39,7 +39,6 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "emails"))
 
 import daily_debrief_lambda as dd  # noqa: E402
-import engagement_core as ec  # noqa: E402
 import monday_compass_lambda as mc  # noqa: E402
 import monthly_digest_lambda as md  # noqa: E402
 import pytest  # noqa: E402
@@ -48,6 +47,7 @@ from ai import (
     bedrock_client,  # noqa: E402
     budget_guard,  # noqa: E402
 )
+from content import engagement_core as ec  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
 
 MODULES = [dd, mc, wd, md]

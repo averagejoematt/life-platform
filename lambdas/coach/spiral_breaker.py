@@ -128,7 +128,7 @@ CELEBRATORY_EMITTERS = {
     "daily_brief": {"path": "lambdas/emails/daily_brief_lambda.py", "wired": False},
     "daily_debrief": {"path": "lambdas/emails/daily_debrief_lambda.py", "wired": False},
     "wednesday_chronicle": {"path": "lambdas/emails/wednesday_chronicle_lambda.py", "wired": False},
-    "chronicle_share_kit": {"path": "lambdas/chronicle_share_kit.py", "wired": False},
+    "chronicle_share_kit": {"path": "lambdas/content/chronicle_share_kit.py", "wired": False},
     "state_of_matthew": {"path": "lambdas/compute/state_of_matthew_lambda.py", "wired": False},
     "coach_commentary": {"path": "lambdas/web/site_api_coach.py", "wired": False},
     "og_share_cards": {"path": "lambdas/og_image_lambda.mjs", "wired": False},

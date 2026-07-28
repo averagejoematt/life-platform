@@ -300,7 +300,7 @@ def handle_vacation_fund() -> dict:
     """GET /api/vacation_fund — workout miles since experiment start → USD fund.
     Read-only; delegates the math to the shared vacation_fund layer module."""
     try:
-        from vacation_fund import compute_vacation_fund
+        from content.vacation_fund import compute_vacation_fund
 
         payload = compute_vacation_fund()
         # PRE-START (#948, the #939 contract): a staged FUTURE genesis inverts the

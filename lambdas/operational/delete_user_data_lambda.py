@@ -65,7 +65,7 @@ import boto3
 # ONE bundled module (lambdas/subscriber_retention.py, imported by bare name like every
 # other bundled lambdas/ tree module per #781), so the scheduled sweep here and the attended CLI
 # (deploy/subscriber_retention_purge.py) can never drift on the window Matthew signed.
-from subscriber_retention import (
+from content.subscriber_retention import (
     RETENTION_MODE,
     RETENTION_WINDOW_DAYS,
     anonymized_item,

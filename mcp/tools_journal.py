@@ -287,8 +287,8 @@ def _quotes_pk():
 
 def tool_mark_journal_quote(args):
     """Mark / unmark / list explicitly-publishable verbatim journal lines."""
-    import journal_quotes as jq  # bundled shared module (#781) — the pure gate
     import privacy_guard  # #1804: guard_version staleness — is_stale_draft/GUARD_VERSION
+    from content import journal_quotes as jq  # bundled shared module (#781) — the pure gate
 
     action = (args.get("action") or "mark").strip().lower()
     if action == "list":

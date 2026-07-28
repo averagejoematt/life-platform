@@ -5,10 +5,10 @@ for the averagejoematt.com website.
 INTEGRATION INSTRUCTIONS:
   1. Add this file to lambdas/ in the life-platform repo
   2. In daily_brief_lambda.py, add at the end of lambda_handler:
-       from site_writer import write_public_stats
+       from content.site_writer import write_public_stats
        write_public_stats(s3_client, vitals_data, journey_data, training_data)
   3. In character_sheet_compute_lambda.py, add at the end of lambda_handler:
-       from site_writer import write_character_stats
+       from content.site_writer import write_character_stats
        write_character_stats(s3_client, character_record, pillar_records, timeline)
 
 COST WARNING: This is just two extra s3.put_object calls inside Lambdas

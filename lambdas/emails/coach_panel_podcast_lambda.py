@@ -1041,7 +1041,7 @@ def _gather_week(post: dict, state: dict) -> dict:
     # quiet, the panel must not review a normal week over an incomplete window.
     presence_note = ""
     try:
-        from engagement_core import presence_prompt_block
+        from content.engagement_core import presence_prompt_block
 
         sig = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#engagement_state", "sk": "STATE#current"}).get("Item") or {}
         presence_note = presence_prompt_block(sig)
@@ -1747,7 +1747,7 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
     # default OFF). Reuse this week's prior image if present; else fetch once. Never blocks.
     _cover = {}
     try:
-        import editorial_image
+        from content import editorial_image
 
         if editorial_image.enabled():
             _prev = next((e for e in existing if e.get("week") == week and e.get("image_url")), None)

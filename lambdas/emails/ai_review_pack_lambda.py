@@ -71,7 +71,7 @@ except Exception:  # pragma: no cover — bundle-dependent; the flag simply degr
 # #1688 (epic #1687): the Hybrid ranker + tagger. Bundled (#781); import fail-soft so
 # a missing module degrades the pack to the legacy flat rendering rather than dying.
 try:
-    import review_pack_ranker as _ranker
+    from content import review_pack_ranker as _ranker
 except Exception:  # pragma: no cover — bundle-dependent; ranking simply degrades off
     _ranker = None
 

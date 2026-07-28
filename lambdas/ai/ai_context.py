@@ -1146,7 +1146,7 @@ def _social_posts_by_route(data):
         return buckets
     try:
         import social_provenance as _prov
-        from social_signals import coach_route_of
+        from content.social_signals import coach_route_of
     except Exception:  # pragma: no cover — social membrane modules absent
         return buckets
     for p in posts:

@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
-from ritual_link import sign_ritual_token  # noqa: E402
+from content.ritual_link import sign_ritual_token  # noqa: E402
 from web import site_api_social as social  # noqa: E402
 
 SECRET = "test-ritual-secret-0123456789"

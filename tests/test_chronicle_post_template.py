@@ -51,7 +51,7 @@ class _NoS3:
 def _render(monkeypatch, cur_image=None):
     """Render the post page HTML offline. editorial_image is force-off so no fetch runs;
     cur_image lets a test inject a cover to exercise the og:image path."""
-    import editorial_image
+    from content import editorial_image
 
     monkeypatch.setattr(chron, "s3", _NoS3())
     monkeypatch.setattr(editorial_image, "enabled", lambda: bool(cur_image))
@@ -152,7 +152,7 @@ def _publish_and_get_manifest_entry(monkeypatch, installments, cur_image, date_s
     not the post page, since the bug is manifest-only)."""
     import json as _json
 
-    import editorial_image
+    from content import editorial_image
 
     monkeypatch.setattr(chron, "s3", _NoS3())
     monkeypatch.setattr(editorial_image, "enabled", lambda: True)

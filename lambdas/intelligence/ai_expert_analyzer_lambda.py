@@ -946,7 +946,7 @@ def _presence_block():
     (pure, shared by every narrative surface) — this wrapper keeps the
     STATE#current read local and the two injection points below unchanged."""
     try:
-        from engagement_core import presence_prompt_block
+        from content.engagement_core import presence_prompt_block
     except ImportError:  # pragma: no cover — bundle always ships engagement_core
         return ""
     return presence_prompt_block(_load_engagement_signal())
@@ -1555,7 +1555,7 @@ def _week_behavioral_presence(iso_week):
     except (TypeError, ValueError):
         return None
     try:
-        from engagement_core import channel_counts_as_logged as _cal
+        from content.engagement_core import channel_counts_as_logged as _cal
     except ImportError:  # pragma: no cover — bundle always ships engagement_core
 
         def _cal(_src, _it):

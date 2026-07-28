@@ -221,7 +221,7 @@ def _fund_payload(g, end, days):
 
 def test_vacation_fund_pre_start_no_inverted_window(monkeypatch):
     start = _future(monkeypatch)
-    import vacation_fund as vf
+    from content import vacation_fund as vf
 
     monkeypatch.setattr(vf, "compute_vacation_fund", lambda *a, **k: _fund_payload(start, _iso(_today_pt()), 1))
     b = _body(lam.handle_vacation_fund())
@@ -235,7 +235,7 @@ def test_vacation_fund_pre_start_no_inverted_window(monkeypatch):
 
 def test_vacation_fund_inert_when_genesis_past(monkeypatch):
     g = _past(monkeypatch)
-    import vacation_fund as vf
+    from content import vacation_fund as vf
 
     today = _iso(_today_pt())
     monkeypatch.setattr(vf, "compute_vacation_fund", lambda *a, **k: _fund_payload(g, today, 31))

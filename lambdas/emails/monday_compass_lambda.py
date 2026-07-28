@@ -73,7 +73,7 @@ except ImportError:
     logger.warning("board_loader not found — using fallback Board prompt")
 
 try:
-    import insight_writer
+    from content import insight_writer
 
     insight_writer.init(table, USER_ID)
     _HAS_INSIGHT_WRITER = True
@@ -550,7 +550,7 @@ def _presence_block() -> str:
     (daily_brief_lambda.py Phase 2), so a dark stretch is never planned over as
     a normal week. Empty when Matthew is present. Fail-soft."""
     try:
-        from engagement_core import presence_prompt_block
+        from content.engagement_core import presence_prompt_block
 
         sig = table.get_item(Key={"pk": USER_PREFIX + "engagement_state", "sk": "STATE#current"}).get("Item") or {}
         block = presence_prompt_block(sig)

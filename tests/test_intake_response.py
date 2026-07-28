@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas", "web"))
 sys.path.insert(0, _REPO)
 
 from coach import intake_response as ir  # noqa: E402
-from ritual_link import PRIVATE_INTAKE_SOURCE, PRIVATE_RITUAL_METRICS, RITUAL_METRICS, sign_ritual_token  # noqa: E402
+from content.ritual_link import PRIVATE_INTAKE_SOURCE, PRIVATE_RITUAL_METRICS, RITUAL_METRICS, sign_ritual_token  # noqa: E402
 from web import site_api_social as social  # noqa: E402
 
 SECRET = "test-ritual-secret-0123456789"

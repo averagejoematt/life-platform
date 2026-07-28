@@ -61,7 +61,7 @@ except ImportError:
     _HAS_BOARD_LOADER = False
 
 try:
-    import insight_writer
+    from content import insight_writer
 
     insight_writer.init(table, USER_ID)
     _HAS_INSIGHT_WRITER = True

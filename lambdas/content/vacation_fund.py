@@ -37,6 +37,7 @@ from typing import Any
 import boto3
 from boto3.dynamodb.conditions import Key
 from common.constants import EXPERIMENT_START_DATE
+from common.repo_config import config_dir
 
 logger = logging.getLogger("vacation_fund")
 
@@ -44,7 +45,9 @@ TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 S3_CONFIG_PREFIX = os.environ.get("CONFIG_S3_PREFIX", "config/")
-CONFIG_DIR = os.environ.get("CONFIG_DIR", os.path.join(os.path.dirname(__file__), "..", "config"))
+# Depth-independent default — see common.repo_config (#1653). The literal
+# `dirname(__file__)/../config` assumed this module sat directly under the repo root.
+CONFIG_DIR = os.environ.get("CONFIG_DIR", config_dir())
 
 _MI_PER_METER = 1.0 / 1609.34
 _MI_PER_YARD = 1.0 / 1760.0

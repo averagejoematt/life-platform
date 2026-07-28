@@ -72,7 +72,7 @@ except ImportError:
     _HAS_BOARD_LOADER = False
 
 try:
-    import insight_writer
+    from content import insight_writer
 
     insight_writer.init(table, USER_ID)
     _HAS_INSIGHT_WRITER = True
@@ -101,7 +101,7 @@ except ImportError:
 
 # #405: the per-chronicle share kit (email-stack module — text/JSON only, no Pillow/AI).
 try:
-    import chronicle_share_kit
+    from content import chronicle_share_kit
 
     _HAS_SHARE_KIT = True
 except ImportError:
@@ -644,7 +644,7 @@ def lambda_handler(event: dict, context) -> dict:
     _presence_sig = {}
     _presence_block_txt = ""
     try:
-        from engagement_core import presence_prompt_block as _ppb
+        from content.engagement_core import presence_prompt_block as _ppb
 
         _presence_sig = _load_engagement_signal()
         _presence_block_txt = _ppb(_presence_sig)
@@ -824,7 +824,7 @@ def lambda_handler(event: dict, context) -> dict:
     # logging stall is regenerated once, then HELD — no chronicle beats a dishonest
     # one. Deterministic anchor check, no LLM judge.
     try:
-        from engagement_core import enforce_presence_acknowledgment as _epa, presence_ack_required as _par
+        from content.engagement_core import enforce_presence_acknowledgment as _epa, presence_ack_required as _par
 
         if _presence_sig and _par(_presence_sig) and raw_installment:
             raw_installment, _ack_finding = _epa(
@@ -861,7 +861,7 @@ def lambda_handler(event: dict, context) -> dict:
     # chokepoint (bedrock_client.structured_output_config) is ready to make the shape
     # model-guaranteed once deploy-time prose parity is confirmed (see PR POST-MERGE).
     try:
-        import chronicle_schema
+        from content import chronicle_schema
 
         _envelope = chronicle_schema.installment_from_stats(title, chronicle_schema.parse_stats_line(stats_line), body_md)
         _schema_errs = chronicle_schema.validate_installment(_envelope)

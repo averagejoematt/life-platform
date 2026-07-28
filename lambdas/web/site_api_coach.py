@@ -1431,7 +1431,7 @@ def handle_journal_quotes(event):
     all-or-nothing at serve time (_public_decision_note — the #1569 rule): a
     quote the content filter would alter at all is withheld, never mangled.
     """
-    import journal_quotes as jq
+    from content import journal_quotes as jq
 
     qs = event.get("queryStringParameters") or {}
     try:

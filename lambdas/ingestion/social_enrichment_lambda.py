@@ -52,8 +52,8 @@ from decimal import Decimal
 
 import boto3
 import social_provenance as prov  # #1670: the membrane (origin gate)
-import social_signals  # #1671: the deterministic coach router
 from boto3.dynamodb.conditions import Key
+from content import social_signals  # #1671: the deterministic coach router
 
 try:
     from common.platform_logger import get_logger

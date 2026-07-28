@@ -27,8 +27,8 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "ingestion"))
 
 import social_enrichment_lambda as se  # noqa: E402
-import social_signals as sig  # noqa: E402
 from ai import ai_context  # noqa: E402
+from content import social_signals as sig  # noqa: E402
 
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────────

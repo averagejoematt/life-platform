@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 os.environ.setdefault("EMAIL_RECIPIENT", "test@example.com")
 os.environ.setdefault("EMAIL_SENDER", "test@example.com")
 
-import ritual_link  # noqa: E402
+from content import ritual_link  # noqa: E402
 from experiment import phase_taxonomy  # noqa: E402
 from web import site_api_data as data  # noqa: E402
 

@@ -318,7 +318,7 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     _prior_imgs = {}
     cur_image = {}
     try:
-        import editorial_image
+        from content import editorial_image
 
         if editorial_image.enabled():
             try:

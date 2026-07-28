@@ -298,7 +298,7 @@ def gather_presence_section(signal: dict | None) -> dict | None:
     if not signal:
         return None
     try:
-        from engagement_core import severity_of
+        from content.engagement_core import severity_of
 
         severity = severity_of(signal)
     except ImportError:  # pragma: no cover — bundle always ships engagement_core
@@ -468,7 +468,7 @@ def narrate(state: dict) -> dict:
     ack_finding = None
     if state.get("presence"):
         try:
-            from engagement_core import presence_ack_finding
+            from content.engagement_core import presence_ack_finding
 
             ack_finding = presence_ack_finding(text, state["presence"])
         except ImportError:  # pragma: no cover — bundle always ships engagement_core

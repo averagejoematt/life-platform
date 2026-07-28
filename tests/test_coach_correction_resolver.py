@@ -156,7 +156,7 @@ def test_resolve_empty_week_reported():
 
 # ── numbered_for_week delegates to the real ranker (stable numbering) ────────
 def test_numbered_for_week_uses_real_ranker(monkeypatch):
-    import review_pack_ranker
+    from content import review_pack_ranker
 
     surface_order = review_pack_ranker.DEFAULT_SURFACE_ORDER
     by_surface = {

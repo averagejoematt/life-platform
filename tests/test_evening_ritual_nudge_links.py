@@ -20,9 +20,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 os.environ.setdefault("EMAIL_RECIPIENT", "test@example.com")
 os.environ.setdefault("EMAIL_SENDER", "test@example.com")
 
+from content.ritual_link import verify_ritual_token  # noqa: E402
 from emails import evening_nudge_lambda as nudge  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
-from ritual_link import verify_ritual_token  # noqa: E402
 
 SECRET = "test-nudge-ritual-secret"
 

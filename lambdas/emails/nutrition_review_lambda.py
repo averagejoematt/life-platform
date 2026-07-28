@@ -60,7 +60,7 @@ except ImportError:
 
 # IC-15/16: Insight Ledger
 try:
-    import insight_writer
+    from content import insight_writer
 
     insight_writer.init(table, USER_ID)
     _HAS_INSIGHT_WRITER = True

@@ -267,20 +267,20 @@ def test_build_edge_item_decimal_and_pk():
 
 
 def test_felt_time_routes_to_time_affluence_partition():
-    from ritual_link import RITUAL_METRICS, TIME_AFFLUENCE_PROBE_METRICS, TIME_AFFLUENCE_SOURCE
+    from content.ritual_link import RITUAL_METRICS, TIME_AFFLUENCE_PROBE_METRICS, TIME_AFFLUENCE_SOURCE
 
     assert "felt_time" in RITUAL_METRICS  # a signed one-tap link can be minted for it
     assert "felt_time" in TIME_AFFLUENCE_PROBE_METRICS
     assert TIME_AFFLUENCE_SOURCE == "time_affluence"
     # it must NOT leak into the felt_probe or private sets
-    from ritual_link import PRIVATE_RITUAL_METRICS, WEEKLY_PROBE_METRICS
+    from content.ritual_link import PRIVATE_RITUAL_METRICS, WEEKLY_PROBE_METRICS
 
     assert "felt_time" not in WEEKLY_PROBE_METRICS
     assert "felt_time" not in PRIVATE_RITUAL_METRICS
 
 
 def test_time_affluence_probe_token_roundtrips():
-    from ritual_link import sign_ritual_token, verify_ritual_token
+    from content.ritual_link import sign_ritual_token, verify_ritual_token
 
     tok = sign_ritual_token("s3cr3t", "2026-07-26", "felt_time", 3)
     assert verify_ritual_token("s3cr3t", "2026-07-26", "felt_time", 3, tok)

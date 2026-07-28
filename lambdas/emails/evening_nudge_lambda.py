@@ -27,7 +27,7 @@ from datetime import datetime
 
 import boto3
 from common.pacific_time import pacific_today
-from ritual_link import sign_ritual_token
+from content.ritual_link import sign_ritual_token
 from source_registry import manual_capture_sources
 
 logger = logging.getLogger()
@@ -152,7 +152,7 @@ def _check_evening_ritual(date_str: str) -> tuple[list[str], str]:
     #1405: intake_count lives in its own Matthew-private partition (never the
     public-aggregated evening_ritual record), so it gets its own fetch.
     """
-    from ritual_link import PRIVATE_INTAKE_SOURCE
+    from content.ritual_link import PRIVATE_INTAKE_SOURCE
 
     item = _fetch_date("evening_ritual", date_str)
     connection = item.get("connection") if item else None
@@ -191,7 +191,7 @@ def _missing_felt_probe(date_str: str) -> list[str]:
     probe metric is skippable — an unanswered Sunday is a coverage gap, never a 0."""
     from datetime import datetime as _dt
 
-    from ritual_link import FELT_PROBE_SOURCE, TIME_AFFLUENCE_PROBE_METRICS, TIME_AFFLUENCE_SOURCE, WEEKLY_PROBE_METRICS
+    from content.ritual_link import FELT_PROBE_SOURCE, TIME_AFFLUENCE_PROBE_METRICS, TIME_AFFLUENCE_SOURCE, WEEKLY_PROBE_METRICS
 
     try:
         if _dt.strptime(date_str, "%Y-%m-%d").date().weekday() != 6:  # 6 = Sunday

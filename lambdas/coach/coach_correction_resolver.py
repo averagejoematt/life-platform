@@ -37,7 +37,7 @@ import logging
 import re
 from typing import Optional
 
-import review_pack_ranker
+from content import review_pack_ranker
 
 logger = logging.getLogger()
 

@@ -200,7 +200,7 @@ def test_no_hand_authored_platform_counts_outside_the_one_home():
     lambdas literals — PLATFORM_STATS (sync_doc_metadata-rewritten, pinned by
     test_platform_stats_truth) is the only home. Pre-fix: 121/26/62 + 95/19/50."""
     keys = {"mcp_tools", "data_sources", "lambdas"}
-    for rel in ("lambdas/emails/daily_brief_lambda.py", "lambdas/site_writer.py"):
+    for rel in ("lambdas/emails/daily_brief_lambda.py", "lambdas/content/site_writer.py"):
         hits = _dict_literal_int_values(os.path.join(_REPO, rel), keys)
         assert not hits, f"{rel} hand-authors platform counts: {hits} — derive from PLATFORM_STATS"
 
@@ -210,7 +210,7 @@ def test_hero_copy_source_count_is_derived():
     home, never a baked number (pre-fix: a literal "19 data sources")."""
     import re
 
-    src = open(os.path.join(_REPO, "lambdas/site_writer.py")).read()
+    src = open(os.path.join(_REPO, "lambdas/content/site_writer.py")).read()
     tree = ast.parse(src)
     baked = [
         n.value

@@ -455,7 +455,7 @@ def elevate_pain(table, item, user="matthew") -> dict:
         "Surface at the next pre-flight; confirm or dismiss before loading that movement."
     )
     try:
-        import insight_writer
+        from content import insight_writer
 
         insight_writer.init(table, user_id=user)
         rec = insight_writer.write_insight(

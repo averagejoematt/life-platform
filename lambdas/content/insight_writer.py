@@ -15,7 +15,7 @@ DynamoDB key pattern:
 Bundled alongside each Lambda handler in its zip package.
 
 Usage:
-    import insight_writer
+    from content import insight_writer
     insight_writer.init(table_resource, user_id)
 
     # After AI generation:

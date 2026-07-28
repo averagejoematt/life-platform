@@ -169,8 +169,8 @@ def test_fabricated_dated_callback_is_caught_even_with_whole_life_context():
 
 
 def test_bedrock_structured_output_config_shape():
-    import chronicle_schema
     from ai import bedrock_client
+    from content import chronicle_schema
 
     cfg = bedrock_client.structured_output_config(chronicle_schema.INSTALLMENT_SCHEMA)
     assert cfg == {"format": {"type": "json_schema", "schema": chronicle_schema.INSTALLMENT_SCHEMA}}
@@ -210,7 +210,7 @@ def test_invoke_forwards_output_config_and_strips_model(monkeypatch):
 
 
 def test_installment_schema_validates_good_and_rejects_bad():
-    import chronicle_schema
+    from content import chronicle_schema
 
     good = {"title": "The week it clicked", "weight_lbs": 209.4, "week_grade": 71.0, "t0_streak_days": 12, "body_markdown": "..."}
     assert chronicle_schema.validate_installment(good) == []
@@ -226,7 +226,7 @@ def test_installment_schema_validates_good_and_rejects_bad():
 
 
 def test_parse_stats_line_feeds_schema_validation():
-    import chronicle_schema
+    from content import chronicle_schema
 
     stats = "[Weight: 209.4 lbs | Week Grade: avg 71 | T0 Streak: 12 days]"
     envelope = chronicle_schema.installment_from_stats("A title", chronicle_schema.parse_stats_line(stats), "body")

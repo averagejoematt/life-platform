@@ -1313,7 +1313,7 @@ def _handle_ritual_log(event: dict) -> dict:
 
     Rate limit: RITUAL_LOG_RATE_LIMIT per IP per hour (DynamoDB-backed, matches nudge/checkin).
     """
-    from ritual_link import RITUAL_METRICS, RITUAL_VALUE_MAX, RITUAL_VALUE_MIN, verify_ritual_token
+    from content.ritual_link import RITUAL_METRICS, RITUAL_VALUE_MAX, RITUAL_VALUE_MIN, verify_ritual_token
 
     qs = event.get("queryStringParameters") or {}
     date_str = (qs.get("date") or "").strip()
@@ -1372,7 +1372,7 @@ def _handle_ritual_log(event: dict) -> dict:
     # never the evening_ritual record the public wellbeing aggregate reads. The
     # write path is shared (same signed link, same rate limit); only the
     # destination differs, so the public read surface structurally can't see it.
-    from ritual_link import PRIVATE_RITUAL_METRICS, TIME_AFFLUENCE_PROBE_METRICS, WEEKLY_PROBE_METRICS
+    from content.ritual_link import PRIVATE_RITUAL_METRICS, TIME_AFFLUENCE_PROBE_METRICS, WEEKLY_PROBE_METRICS
 
     try:
         table.update_item(

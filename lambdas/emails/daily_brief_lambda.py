@@ -126,7 +126,7 @@ except ImportError:
 
 # Insight Ledger (IC-15)
 try:
-    import insight_writer
+    from content import insight_writer
 
     insight_writer.init(table, USER_ID)
     _HAS_INSIGHT_WRITER = True
@@ -158,11 +158,10 @@ except ImportError:
     logger = _log.getLogger("daily-brief")
     logger.setLevel(_log.INFO)
 
-import html_builder
-import output_writers
 import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 from ai import ai_calls  # -- Extracted module imports ---------------------------------------------------
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from content import html_builder, output_writers
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # ai_calls can be init'd at import time (no dependency on locally-defined functions)
@@ -1765,7 +1764,7 @@ def lambda_handler(event, context):
     # injects it into all 4 brief AI calls. Empty when Matthew is present. Fail-soft.
     data["presence_block"] = ""
     try:
-        from engagement_core import presence_prompt_block
+        from content.engagement_core import presence_prompt_block
 
         _pres_sig = table.get_item(Key={"pk": USER_PREFIX + "engagement_state", "sk": "STATE#current"}).get("Item") or {}
         data["presence_block"] = presence_prompt_block(_pres_sig)
@@ -1903,7 +1902,7 @@ def lambda_handler(event, context):
                 yesterday,
             )
             if _whr_habit_7d:
-                from html_builder import _compute_weekly_habit_review
+                from content.html_builder import _compute_weekly_habit_review
 
                 _weekly_habit_review = _compute_weekly_habit_review(_whr_habit_7d, profile)
                 logger.info("S2-T1-10: Weekly Habit Review computed for Sunday brief")
@@ -1916,7 +1915,7 @@ def lambda_handler(event, context):
     # Non-fatal — a failure here must never block the brief.
     _vacation_fund = None
     try:
-        from vacation_fund import compute_vacation_fund
+        from content.vacation_fund import compute_vacation_fund
 
         _vacation_fund = compute_vacation_fund()
     except Exception as _vf_err:
@@ -2152,7 +2151,7 @@ def lambda_handler(event, context):
     # Non-fatal — failure here never breaks the Daily Brief
     if not demo_mode:
         try:
-            from site_writer import write_public_stats
+            from content.site_writer import write_public_stats
             from web.site_api_common import PLATFORM_STATS  # #1369: the ONE counts home
             from web.vitals_resolver import resolve_vitals  # #1369: the ONE vitals truth
 
@@ -2430,7 +2429,7 @@ def lambda_handler(event, context):
 
             # PULSE-A1: Write pulse.json to S3 + DynamoDB for /api/pulse endpoint
             try:
-                from site_writer import write_pulse_json
+                from content.site_writer import write_pulse_json
 
                 _journal_pulse = {
                     "entries": len(data.get("journal_entries") or []),

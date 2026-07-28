@@ -138,7 +138,7 @@ def test_engagement_channels_derive_from_registry_914():
     (MANUAL_CHANNELS + CHANNEL_STALE_DAYS) — now a projection of the registry's
     engagement_channel facet, withings joins as the 'measurement' channel, and
     the habitify presence predicate is registry-named + resolvable."""
-    import engagement_core as ec
+    from content import engagement_core as ec
 
     channels = reg.engagement_channels()
     assert ec.MANUAL_CHANNELS == {k: v["label"] for k, v in channels.items()}

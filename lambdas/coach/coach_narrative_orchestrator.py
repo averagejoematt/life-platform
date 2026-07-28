@@ -789,7 +789,7 @@ def _engagement_for_brief(signal):
     # #914: severity travels with the signal (derived for pre-ladder records) so
     # generation + the acknowledgment gate key off one field.
     try:
-        from engagement_core import severity_of as _severity_of
+        from content.engagement_core import severity_of as _severity_of
 
         severity = _severity_of(signal)
     except ImportError:  # pragma: no cover — bundle always ships engagement_core

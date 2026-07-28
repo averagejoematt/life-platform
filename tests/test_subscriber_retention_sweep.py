@@ -24,7 +24,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
 
-import subscriber_retention as sr  # noqa: E402
+from content import subscriber_retention as sr  # noqa: E402
 
 DOC = ROOT / "docs" / "DATA_GOVERNANCE.md"
 

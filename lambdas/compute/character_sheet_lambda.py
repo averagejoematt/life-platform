@@ -937,7 +937,7 @@ def lambda_handler(event, context):
     # site_writer: write character_stats.json to S3 for averagejoematt.com
     # Non-fatal — failure here never breaks character sheet compute
     try:
-        from site_writer import write_character_stats
+        from content.site_writer import write_character_stats
 
         PILLAR_EMOJI_MAP = {
             "sleep": "😴",

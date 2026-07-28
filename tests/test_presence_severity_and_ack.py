@@ -24,7 +24,7 @@ os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 
-import engagement_core as ec  # noqa: E402
+from content import engagement_core as ec  # noqa: E402
 
 TODAY = "2026-06-30"
 

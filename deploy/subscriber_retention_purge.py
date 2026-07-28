@@ -54,7 +54,7 @@ from boto3.dynamodb.conditions import Key
 # #1350: the signed window/mode are defined ONCE in lambdas/subscriber_retention.py so
 # this attended CLI and the scheduled sweep (delete_user_data_lambda) can't drift.
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lambdas"))
-from subscriber_retention import RETENTION_MODE, RETENTION_WINDOW_DAYS  # noqa: E402
+from content.subscriber_retention import RETENTION_MODE, RETENTION_WINDOW_DAYS  # noqa: E402
 
 TABLE_NAME = os.environ.get("TABLE_NAME", os.environ.get("LIFE_PLATFORM_TABLE", "life-platform"))
 REGION = os.environ.get("AWS_REGION", "us-west-2")

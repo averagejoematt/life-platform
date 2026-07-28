@@ -411,7 +411,7 @@ def store_engagement_state(today, signal):
 def compute_and_store_engagement():
     """Compute + persist the presence / quiet-stretch state. Fail-soft — never
     aborts the adaptive_mode run."""
-    from engagement_core import (
+    from content.engagement_core import (
         MANUAL_CHANNELS,
         WEARABLES,
         channel_counts_as_logged,
