@@ -1,157 +1,94 @@
-# HANDOVER — Day-1 continuation + diary-360 chain complete + the backlog PM upgrade lands — 2026-07-27 (day session)
+# HANDOVER — Day-1 evening: ADR-087 record repair, the 58-epic self-grading, the Notion schema gate — 2026-07-27/28 (evening session)
 
-> Instruction thread: **solo fable session, owned main** — (1) Day-1 experiment watches,
-> (2) infra pair #1858/#1859, (3) queue paydown (diary-360 chain, #1396, gate checks on
-> #1655/#1543/#1402), (4) #1653 only-if-quiet. Standing approval: all merges, Deploy-gate
-> approvals, deploys incl. deploy_all; CDK via Matthew's `!`. **Mid-session Matthew added
-> epic #1863 (backlog PM upgrade)** — worked #1865→#1866→#1869 + the #1864→#1871 docs
-> lane + #1867/#1868/#1870, leaving only the two Later stories. #1653 was explicitly
-> dropped (not a quiet day). Sub-issues question: ratified `## Stories` task lists over
-> `gh --parent` (task lists already give computable progress; a second linkage mechanism
-> would drift; door stays open as a cheap later chore).
+> Instruction thread: **solo fable session, owned main** — Day-1-evening/Day-2 watches
+> (time-aware), queue paydown by the stored rank (`backlog_next.py` seeded the session
+> for the first time), #1872 gated on a full ungroomed clean day, #1653 only-if-quiet,
+> wholesale schema capture only-if-data-stabilized. Standing approval: merges, gate
+> approvals, deploys; CDK via Matthew's `!`.
 
-## The headline: 14 PRs + a 64-issue corpus surgery, and the backlog now ranks itself
+## Shipped (all merged AND live; main GREEN at d89686a0)
 
-**Main-green repair, zero deploys:** the wrap's decoded red (deploy_all-4 I1/I2/I5,
-runner-side STS OIDC ETIMEDOUT) cleared via `gh run rerun --failed` — transient confirmed,
-no fleet cycle spent.
+- **#1741** (PR #1887, 1092c110) — **ADR-087 amendment**: the audio-ceiling claim was
+  false when written (gemini-3.1-flash-tts shipped 04-15 with inline audio tags; the ADR
+  asserted the opposite on 06-14) — superseded passages visibly marked; Podcast API
+  trigger closed permanently (deprecation quoted); ElevenLabs parked on the measured
+  seam risk (#1742); no-brackets withdrawn with the live code state stated plainly
+  (#1738 gate:owner, #1739/#1740 blocked, INTRO_SIGNOFF hack still live — deliberately);
+  monitor re-check now DATED (2026-10-27, Matthew) in PROPORTIONALITY's
+  quarterly-walked ledger + a re-check log that records null results. Every external
+  claim re-verified live, not copied forward.
+- **#1873** (no PR — corpus) — **all 58 closed epics** (not the estimated ~23) carry the
+  ADR-099 closing verdict: **43 realized / 13 partial / 2 not-recoverable / 0
+  not-realized**, partials carrying re-measured live numbers (green-main 3/30 recorded
+  as unmet in #341/#717/#1356 — honest and now very legible on the public repo;
+  flagged to Matthew, left standing), not-recoverables refusing to let a fresh number
+  impersonate an old verdict. Summary table on #1863. Epic #1863 now has ONLY #1872
+  open.
+- **#1840** (PR #1888, d89686a0) — **Notion Template-schema drift gate** in qa-smoke
+  (live TEMPLATE_SK ⊆ Template options, fail-open honest) + WARNING on the silent
+  journal-fallback + backfill posture documented (62 pre-2026-07-26 records unlabelled
+  by design, no prod write). **IAM landed ADJACENT to its CDK deploy** — Matthew ran
+  `cdk_deploy.sh LifePlatformOperational` minutes after the merge, the push run's Plan
+  passed clean (no stranded window — yesterday's lesson applied successfully), both
+  lambdas deployed, CI re-verified green end-to-end, and **the gate's first live run
+  PASSED against the real Notion schema**.
 
-**Shipped — every PR verified on-branch, squash-merged locally, full suite green each
-round (suite grew 7,632 → 8,141 tests):**
-- **#1858** (PR #1860, c9b0c28f) — IAM cycle-read audit: 7 roles granted scoped
-  `ssm:GetParameter` on experiment-cycle (milestone-digest was the observed AccessDenied;
-  site-api-ai/insight-email-parser verified correctly excluded — their paths never invoke
-  `read_cycle()`). **NEEDS Matthew's CDK one-liner** (below).
-- **#1859** (PR #1862, 55547f4a) — rollback-net residuals: per-function region from
-  lambda_map (email-subscriber us-east-1 revert now resolves; S3 stays pinned us-west-2),
-  fleet-push rollback rebuilds its matrix from lambda_map (was 0/0/0 twice on 07-27).
-  Tally semantics fc18f0c2/5d36b4a9 preserved byte-identical.
-- **Diary-360 chain COMPLETE (#1841–#1846):** claims ledger (PR #1861 — LLM-proposes/
-  code-admits into the ONE prediction grader, consent is-True fail-closed) · vocal
-  biomarkers (PR #1875 — pure SRT→6 metrics, SET-only guarded writes, driver-side mypy
-  union-attr fix on the branch) · diary-day intervention variable (PR #1877 — explicit-0
-  daily count + one idempotent code-registered hypothesis) · channel-divergence prereg
-  (PR #1882 — **sealed + published + SHA-verified live** at
-  /experiments/prereg/spoken-vs-typed-divergence_2026-07-27.json) · cut→engagement loop
-  (PR #1885 — GoodhartViolation fail-closed purpose enum + **import-graph test: nothing
-  under mcp/ or lambdas/coach/ may import engagement** — the interviewer is
-  engagement-blind by CI-enforced construction) · consent-gated diary shelf (PR #1886 —
-  `/story/diary/` + `/api/diary_shelf`, **deploy order honored**: site-api deployed and
-  verified live BEFORE the site push; serving the honest empty state, withheld:1).
-- **#1396** (PR #1874, 0c934047) — calibration engine as an open artifact:
-  `oss/calibration-core/` (MIT, zero deps, Python↔JS bit-parity incl. CPython banker's
-  rounding in BigInt) + `/method/grade-your-coach/` live (site-deploy + visual-QA green).
-  **OSS repo publication = owner one-liner in PR #1874's body.**
-- **Epic #1863 backlog PM upgrade — Now+Next COMPLETE:** ADR-099 amendment (PR #1876 —
-  canonical score line, body shapes, closure contract, backfill decision recorded
-  verbatim) · label census + prio derivation (PR #1878) · doc-drift repair + PR-template
-  Outcome line (PR #1879) · `backlog_next.py` + shared `backlog_contract.py` (PR #1880 —
-  verified live) · /uplevel rewired onto the stored rank (PR #1881 — "fresh discovery
-  outranks backlog replay" preserved verbatim) · hygiene linter advisory (PR #1883 —
-  231-violation honest baseline) · wrap gates (e7)/(e8)/(e9) (PR #1884) · **#1868 corpus
-  backfill (no PR — 60 issue bodies, 226→1 violations, zero information destroyed by
-  programmatic check, 32 authored-at-backfill Outcome lines provenance-stamped in-body)**.
-  Remaining: **#1872** (blocking flip, Later — deliberately settling per ADR-108 pattern)
-  + **#1873** (closed-epic comments, Later).
+## Watches
+**Evening-nudge fired 03:00:46Z and SENT** — first real evening of cycle 11: honest
+completeness check (Missing: Supplements/Journal/How-We-Feel/Evening-Ritual; Water
+correctly quiet). Remaining Day-2 watches (Tue crons): first character sheet ~16:30Z
+(re-run restart_verify, expect 13/13) · 17:00Z brief cites 321.09 with NO freshness
+advisory · 17:15Z milestone-digest logs a cycle-stamped write (no AccessDenied —
+#1858's last AC proving itself) · 16:40Z diary_sessions first compute · passive:
+youtube capture, docket (tier-gated), first calibration write.
 
-## Verified
-Full suite after every merge round (final 8,141 passed / ~2.5m) + 6-dir black/ruff each
-round. Site deploys ×2 green incl. visual-QA (calibration page, diary shelf). site-api
-deployed direct + `/api/diary_shelf` verified live pre-push. Prereg SHA matches live.
-`backlog_next.py`/`check_backlog_hygiene.py` exercised live at wrap. Day-1 watches all
-healthy (below).
+## Agent-ops notes (durable patterns already in memory; instances recorded here)
+- #1873's agent died mid-run on a transient API disconnect — resumed via transcript
+  (evidence base intact, zero comments lost/duplicated), then posted in batches.
+- #1840's inner worktree agent finished the work then stalled 600s in a self-invented
+  `cdk synth`; the recovery path found the commit, hand-reviewed, fixed the literal
+  drift, shipped. Its completion notification also never surfaced — a status-check
+  SendMessage flushed it.
 
-## Day-1 watches (WS1) — verified live
-Docket honest-empty (`/api/coach_docket` live; ensemble digest LLM correctly
-paused-by-tier-2, deterministic fallback, 0 disagreements → no opens possible — expected)
-· dossier's first real render through #1853's pair-scoped keys + PII screen (6
-commitments, 0 withheld, not degraded) · #1840 AC4 both halves (`channel: video_diary`
-stamped; diary reaction fail-closed private, nothing leaked; conversational lane honestly
-paused_by_budget) · coach-nudge hourly quiet-honest · youtube poller healthy, no upload
-yet · **remediation cron DID fire 16:48Z** (~2h schedule drift, not a second miss).
-Pending (event-gated): evening intake 03:00Z, first calibration write (nothing resolved
-yet — 0 evaluable predictions on Day 1), youtube first capture, Tuesday's first character
-sheet + brief citing 321.09 without the advisory.
-
-## Deploy state — the ONE load-bearing dependency
-**Main is code-green but Plan reds by design (R8-ST6)** on every push until the #1858 IAM
-diff deploys — which also means **CI's Deploy job never ran today: the day's lambda
-changes are stranded on main, undeployed** (MCP bundle + diary_claims, coach-prediction-
-evaluator, daily-metrics-compute, weekly-correlation-compute, hypothesis-engine,
-youtube-social-ingestion). Nothing is broken — the live fleet runs yesterday's verified
-code; the new features are dormant until deployed. **RESOLVED same evening — see the Main line: CDK deploy ran, deploy_all-2 green,
-fleet current 22:14Z.** Site + site-api were never stranded.
-
-## Gotchas (durable → memory, written)
-- **An undeployed IAM merge strands every subsequent CI deploy** — R8-ST6 diffs against
-  the DEPLOYED stacks, so Plan reds on all later pushes and Deploy never runs. Land IAM
-  merges adjacent to their CDK deploy, or accept a stranded-deploy window closed by
-  deploy_all after the gate clears.
-- **Never run the wholesale `capture_api_schemas.py` against a freshly-reset platform** —
-  it rewrites all ~118 baselines from live shapes; Day-1-empty responses would codify
-  reset-era shapes. The `/api/diary_shelf` exemption deliberately stands until data
-  stabilizes (stated deviation from PR #1886's post-merge note).
-- `git add -u` swept `.claude/settings.local.json` into the #1861 commit (benign
-  permission lines; explicit-path staging reaffirmed) · stale `cdk/_bundle_staging/` reds
-  local 6-dir ruff (git-ignored; rm -rf) · zsh doesn't word-split unquoted vars (a
-  conflict-resolution loop passed a two-file list as one pathspec).
+## Concurrency note
+**ADR-145 landed mid-wrap from a concurrent session** (8d9a05cc, 03:05:46Z, same
+checkout identity — video-diary public form: text + prosody cards, raw audio/video
+never, avatar gated; resolves the #1570/#1388 gate:owner posture). Not this session's
+work — its own wrap owns its record; noted here so the timeline reads correctly.
+This session's commits were staged by explicit path list throughout (shared-checkout
+discipline).
 
 ## Wrap gates
-**Build beat:** `2026-07-27-grade-your-own-coach` (see beats.json).
-**Docs:** carried in-PR (SCHEMA ×3, DECISIONS ×2, CONVENTIONS ×2, CONTINUITY, TESTING,
-uplevel/CLAUDE/CONTRIBUTING rewire, DIARY_STUDIO_KIT new); wrap adds none beyond.
-**Decisions:** ADR-099 amendment filed (#1865, PR #1876) + the #1324-addendum correction
-(#1871); no further ADR needed — remaining choices were implementation posture.
-**Main:** green (ea4a57f5) — POST-WRAP UPDATE: Matthew ran the CDK one-liner (stacks
-UPDATE_COMPLETE 21:44/21:45Z, ExperimentCycleRead grant verified live on the
-milestone-digest role); deploy_all take 2 then went green end-to-end (Deploy+Smoke+
-I1/I2/I5+visual-QA; rollback skipped) after take 1 was caught pre-deploy by CI's
---strict engine-doc drift gate (three re-verify stamps for #1843's additive changes,
-ea4a57f5 — NB local check_doc_index runs advisory, CI runs --strict). Fleet uniform
-22:09–22:14Z incl. us-east-1; the day's features are LIVE.
-**Incidents:** 1 row added — budget governor tier 1→2 (by-design band crossing under the
-ADR-133 July window; ensemble/reader AI paused; self-resolves 08-01).
-**Closures:** #1858 #1859 #1841 #1842 #1843 #1844 #1845 #1846 #1864 #1865 #1866 #1867
-#1868 #1869 #1870 #1871 #1396 all carry the (e8) Shipped/Outcome comment (partial where
-live evidence awaits the stranded deploy or an owner step — never an unverified
-"realized"). Scope = this session's closures only; the overnight session's same-UTC-day
-closures predate the contract and stay per the going-forward rule.
-**Backlog:** Now 2 actionable stories + 1 chore (promoted #1741, #1840, #1653 by stored
-rank; their score-line milestones parity-updated). Next is exhausted — #1114 is
-owner-gated in practice (pick on PR #1768). Triage labels added per body evidence: #1187
-gate:owner, #1739/#1740 blocked:dep. No stale Later issues (oldest touched 9d ago).
-`now_liveness` still prints 1 — honest structural shortfall, reported not hidden. The 2
-`score_line_canonical` advisories (#1677/#1679) are float-tolerance artifacts — a
-one-line tolerance widen is noted for #1872.
+**Build beat:** `2026-07-28-the-platform-grades-its-own-history` (see beats.json).
+**Docs:** DECISIONS (ADR-087 amendment) + PROPORTIONALITY row via PR #1887; SCHEMA
+posture note via PR #1888; wrap adds none beyond.
+**Decisions:** ADR-087 amendment filed (#1741, PR #1887); no new ADR needed.
+**Main:** green (d89686a0) — full chain incl. deploy+smoke+visual-QA on the #1840 run.
+**Incidents:** none — no rollback, no red >1h, no tier change (tier 2 standing, known).
+**Closures:** #1741, #1840, #1873 all carry the (e8) Shipped/Outcome comment.
+**Backlog:** Now = #1653 (chore) + nothing else actionable after tonight's closures;
+Next holds only owner-gated #1114 — nothing promotable; shortfall reported honestly
+(now_liveness fires by design). No stale Later issues.
 **Stash/hooks:** clean.
 **Labels:** OK.
 
 ## Residual / next picks
-- ~~Owner CDK one-liner~~ **DONE post-wrap** (21:44Z) + deploy_all-2 green — the
-  deploy chain is closed; #1858's last AC (a cycle-stamped digest write) proves itself
-  on tomorrow's 17:15Z run — not-work — passive watch.
-- **Owner, when ready:** publish the OSS repo (one-liner in PR #1874 body) — not-work —
-  creating a public repo is Matthew's call · studio-side `PUBLISH_LOG.md` entry column
-  (#1845's kit doc has the paste-in) — not-work — file lives outside the repo.
-- **#1872** flip hygiene linter to blocking + delete check_story_labels.py (Later — let
-  the corpus settle; also consider the 0.375 tolerance widen) · **#1873** closed-epic
-  closing comments (Later).
-- Vocal-metrics backfill first --apply run against the studio SRTs (#1842's script;
-  dry-run verified) — not-work — local run against the private studio dir, Matthew's
-  laptop session.
-- Day-2 watches: first character sheet (Tue), Tuesday brief cites 321.09 with NO
-  freshness advisory, first docket open once tier <2 or a real disagreement, first
-  calibration write, evening intake, youtube first capture, Wednesday remediation cron —
-  not-work — standing observation ritual.
-- Standing alarms (#1329 checklist): budget tier 2 until 08-01 (governor by-design; the
-  $85 AWS Budgets backstop deliberately still fires) — not-work — self-resolves; next
-  MCP key rotation 2026-10-05 — not-work — dated owner ritual. No aged remediation
-  needs-human items (Mon run was clean).
-- Queue seeds for next session: `python3 scripts/backlog_next.py` — #1741 (3.00, opus),
-  #1840 (2.00, sonnet), #1653 (0.75, chore, solo-wave-by-design).
-- Gate:owner set unchanged: #1631 #1629 #1622 #1570 #1407 #1388 #1383 #1768 #1187 +
-  digest recipients (#1623) · #1738 listen · #1571 phone test · #1114 pick · Dependabot
-  #1778/#1779/#1780 — not-work — each needs Matthew's coordinated step.
+- **#1653** packaging move — THE next session: solo wave by design, full-headroom
+  driver, first item off `backlog_next.py`. Deliberately not run at this session's tail.
+- **#1872** flip hygiene linter to blocking + delete check_story_labels.py — gate:
+  corpus must stay clean WITHOUT grooming for a full day (earliest 2026-07-28 evening);
+  fold the #1677/#1679 float-tolerance widen into the same PR.
+- Wholesale `capture_api_schemas.py` — only once real data stabilizes (consented diary
+  entries / resolving predictions); the /api/diary_shelf exemption stands documented —
+  not-work — timing call.
+- Day-2 watches (above) — not-work — standing observation ritual.
+- Owner asks, unchanged: OSS repo publish (PR #1874 one-liner) · vocal-metrics backfill
+  --apply (local, studio SRTs) · studio PUBLISH_LOG entry column (#1845 kit doc) ·
+  digest recipients (#1623) · #1738 listen (unblocks #1739/#1740) · #1571 phone test ·
+  #1114 pick (PR #1768) · Dependabot #1778/#1779/#1780 — not-work — each needs
+  Matthew's coordinated step.
+- Standing alarms: budget tier 2 until 08-01 (by design) · MCP key rotation 2026-10-05
+  — not-work — dated rituals. No aged remediation needs-human items.
 
-Full narrative of the prior overnight session:
-`git show origin/session-archive:handovers/HANDOVER_2026-07-26_CI-trust-genesis-day1-rollback-net.md`
+Prior session (same day): `git show
+origin/session-archive:handovers/HANDOVER_2026-07-27_diary360-backlog-PM-day1.md`

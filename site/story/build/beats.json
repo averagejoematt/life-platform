@@ -1894,6 +1894,25 @@
         }
       ],
       "why_it_mattered": "Every wearable ships an LLM coach; none publishes whether the advice worked. Opening the exact grading math — reproducible by a third party against their own coach — is the credibility moat made concrete, and pre-registering the diary's core hypothesis before the data exists is the same honesty pointed inward."
+    },
+    {
+      "id": "2026-07-28-the-platform-grades-its-own-history",
+      "date": "2026-07-28",
+      "title": "The platform grades its own history: 58 closed programs get verdicts — 43 realized, 13 partial, 2 honestly unrecoverable",
+      "shipped": "Every closed epic in the project's history — 58 of them, going back to the earliest program work — now carries a graded closing verdict: what actually shipped, with citations, and whether the outcome the program promised came true. The grading was done against evidence (closing PRs, the session-archive handovers, live URLs, fresh re-measurements), not memory: 13 programs are marked partial because a re-measured number fell short of the stated target — including the green-CI-rate goal, filed three times across three programs and recorded three times as unmet — and 2 are marked not-recoverable because no measurement was ever taken and inventing one today would be a fresh number impersonating an old verdict. The same evening, the ADR that had steered six weeks of podcast work away from a fix got its record corrected: its central claim was false on the day it was written, the vendor feature it said couldn't exist had shipped two months earlier, and the monitor that should have caught it had no re-check date — it does now. Plus a live-schema drift gate now runs nightly: the code's assumptions about an external SaaS schema are checked against the real thing, closing the class where a feature shipped dead for a month because nobody could see the mismatch.",
+      "gotcha": "The estimate said ~23 closed epics; the real count was 58 — one batch-cleanup week alone had rolled up 25. And zero verdicts could be graded 'realized' just because the stories closed: story-closure and outcome-realization turned out to be different facts in over a quarter of the programs.",
+      "honest_miss": "Zero programs graded not-realized sounds suspicious until you read the 13 partials — several are 'built but never measured', which is its own kind of miss. And ~740 closed stories deliberately get no verdicts at all: their evidence lives in squashed commits and deleted branches, and a reconstructed verdict would be worse than a blank one.",
+      "why_it_mattered": "A backlog that grades its own closed programs against what they promised — and says 'unmet' and 'unrecoverable' out loud on a public repo — is the honesty bar the whole platform claims, applied to the platform itself.",
+      "prs": [
+        {
+          "label": "PR #1887",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1887"
+        },
+        {
+          "label": "PR #1888",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1888"
+        }
+      ]
     }
   ]
 }
