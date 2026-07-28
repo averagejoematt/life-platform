@@ -300,7 +300,7 @@ def _stamp():
     """The ADR-058/#1233 write-time provenance stamp (phase + cycle), fail-soft.
     A missing stamp must never block the write, so this degrades to phase-only."""
     try:
-        from phase_taxonomy import experiment_stamp
+        from experiment.phase_taxonomy import experiment_stamp
 
         stamp = experiment_stamp()
         if stamp.get("phase"):

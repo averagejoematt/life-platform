@@ -7,8 +7,8 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING
 
-import calibration_core  # #538: shared Brier + reliability scorer (layer module)
 from boto3.dynamodb.conditions import Key
+from experiment import calibration_core  # #538: shared Brier + reliability scorer (layer module)
 
 from mcp.config import USER_PREFIX
 from mcp.core import decimal_to_float, table

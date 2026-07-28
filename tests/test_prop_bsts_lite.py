@@ -24,7 +24,7 @@ from hypothesis import given, settings, strategies as st
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
-import bsts_lite  # noqa: E402
+from experiment import bsts_lite  # noqa: E402
 
 _finite = st.floats(min_value=-1000.0, max_value=1000.0, allow_nan=False, allow_infinity=False)
 _pre_y = st.lists(_finite, min_size=3, max_size=20)

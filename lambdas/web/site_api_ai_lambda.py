@@ -41,7 +41,7 @@ from ai.ai_context import (
 )  # R22-SEC-04 (#811): delimit untrusted reader text; #743: reader-facing receipts; #1086: mandatory phase block
 from boto3.dynamodb.conditions import Key
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
-from phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1085
+from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1085
 from source_registry import public_board_sources, public_paused_sources  # #387: derived source count
 
 from web import board_quality_gate as _bqg  # #968: ADR-108 quality gate on the board (see the block comment near the #546 section)
@@ -428,7 +428,7 @@ def _ask_fetch_computed_reads() -> dict:
     # Canonical daily facts (computed_metrics → the same numbers coaches ground
     # on): weight trend rate + the protein trio the vitals block doesn't carry.
     try:
-        from canonical_facts import build_canonical_facts
+        from experiment.canonical_facts import build_canonical_facts
 
         facts = build_canonical_facts(_latest_item("computed_metrics") or {})
         if facts.get("weekly_rate_lbs") is not None:
@@ -914,7 +914,7 @@ def _retain_board_flag(pid: str, verdict: str, draft: str, final: str, findings:
     """#812/#744: persist a fired board gate (draft + findings + disposition) as
     eval data for the harvest loop. Fail-soft — never affects the reader path."""
     try:
-        import eval_retention
+        from experiment import eval_retention
 
         eval_retention.retain("board_ask", verdict, draft=draft, final=final, findings=findings, extra={"persona": pid, **(extra or {})})
     except Exception:  # noqa: BLE001 — retention is never load-bearing

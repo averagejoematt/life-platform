@@ -39,7 +39,7 @@ LEDGER_TOKENS = ("private_intake", "intake_count", "intake_response")
 
 
 def test_ledger_is_registered_everywhere_private():
-    from phase_taxonomy import RAW_TIMESERIES, SOURCE_CLASS
+    from experiment.phase_taxonomy import RAW_TIMESERIES, SOURCE_CLASS
     from ritual_link import PRIVATE_RITUAL_METRICS, RITUAL_METRICS
 
     assert SOURCE_CLASS.get("private_intake") == RAW_TIMESERIES

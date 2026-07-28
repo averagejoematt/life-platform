@@ -37,7 +37,7 @@ import boto3
 import character_engine
 import personal_baselines  # #1412: personal-variance targets overlay (ADR-105 rule 4)
 from common.constants import EXPERIMENT_PHASE_CURRENT, EXPERIMENT_START_DATE  # ADR-058
-from phase_filter import singleton_visible, with_phase_filter  # ADR-058: default-deny pilot data / #946
+from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058: default-deny pilot data / #946
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -821,7 +821,7 @@ def lambda_handler(event, context):
     # so every active effect the engine emits wears its earned badge (fitted with
     # n_eff + CI, or "authored prior — not yet confirmed"). load_latest_fit never
     # raises — an absent/unreadable fit degrades to the honest authored default.
-    import effect_fitter
+    from experiment import effect_fitter
 
     latest_fit = effect_fitter.load_latest_fit(table, USER_ID)
     effect_fitter.merge_fit_into_config(config, latest_fit)

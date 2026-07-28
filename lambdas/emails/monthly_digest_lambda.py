@@ -107,7 +107,7 @@ CALORIE_TARGET = 1800
 def fetch_range(source, start, end):
     try:
         # ADR-058: phase=pilot hidden by default.
-        from phase_filter import with_phase_filter
+        from experiment.phase_filter import with_phase_filter
 
         r = table.query(
             **with_phase_filter(
@@ -616,7 +616,7 @@ def gather_all():
         cs_pk = f"USER#{USER_ID}#SOURCE#character_sheet"
 
         def _cs_fetch(s, e):
-            from phase_filter import with_phase_filter
+            from experiment.phase_filter import with_phase_filter
 
             resp = table.query(
                 **with_phase_filter(

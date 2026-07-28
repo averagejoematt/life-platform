@@ -114,7 +114,7 @@ def _item_exists(pk: str, sk: str) -> bool:
 def _active_nutrition_experiments() -> list:
     """Names of active experiments whose tags intersect the nutrition domain."""
     try:
-        from phase_filter import with_phase_filter
+        from experiment.phase_filter import with_phase_filter
 
         resp = _table().query(
             **with_phase_filter(
@@ -142,7 +142,7 @@ def _acwr_readings() -> tuple:
         # #1793: computed_metrics is EXPERIMENT_SCOPED — without the phase filter,
         # the first reads after a reset return tombstoned dead-cycle rows and an
         # ACWR nudge presents a discarded cycle's training load as today's fact.
-        from phase_filter import with_phase_filter
+        from experiment.phase_filter import with_phase_filter
 
         resp = _table().query(
             **with_phase_filter(
@@ -196,7 +196,7 @@ def _verdicts_resolving_tomorrow(tomorrow_pt: str) -> list:
             # #1793: COACH#/PREDICTION# is EXPERIMENT_SCOPED — unfiltered, a wiped
             # cycle's ~348 pending predictions keep "resolving tomorrow" for weeks
             # after a reset, burning the daily nudge cap on dead intelligence.
-            from phase_filter import with_phase_filter
+            from experiment.phase_filter import with_phase_filter
 
             resp = _table().query(
                 **with_phase_filter(

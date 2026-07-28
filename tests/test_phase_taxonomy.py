@@ -13,7 +13,7 @@ import importlib
 
 import pytest
 
-pt = importlib.import_module("phase_taxonomy")
+pt = importlib.import_module("experiment.phase_taxonomy")
 
 # ── Full live census (pk, sk) families — coverage fixture ─────────────────────
 LIVE_FAMILIES = [

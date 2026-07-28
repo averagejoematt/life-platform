@@ -252,7 +252,7 @@ def _query_between(table, pk, sk_lo, sk_hi):
     tombstoned row would be enriched and its `enriched_*` fields would seed
     new-cycle hypotheses from conversation the reset declared erased."""
     from boto3.dynamodb.conditions import Key
-    from phase_filter import with_phase_filter
+    from experiment.phase_filter import with_phase_filter
 
     kwargs = with_phase_filter({"KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(sk_lo, sk_hi)})
     items = []

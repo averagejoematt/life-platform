@@ -426,7 +426,7 @@ def apply_conversation_calibration(
             conv_beta += w
         mean_after = alpha / (alpha + beta_val)
 
-        from phase_taxonomy import experiment_stamp  # fail-soft provenance (#1233)
+        from experiment.phase_taxonomy import experiment_stamp  # fail-soft provenance (#1233)
 
         table.put_item(
             Item={

@@ -29,7 +29,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "lambdas"))
 sys.path.insert(0, str(REPO_ROOT / "lambdas" / "intelligence"))
 
-from canonical_facts import build_canonical_facts  # noqa: E402
+from experiment.canonical_facts import build_canonical_facts  # noqa: E402
 from grounding_guard import hard_canonical_contradictions  # noqa: E402
 
 table = boto3.resource("dynamodb", region_name="us-west-2").Table("life-platform")

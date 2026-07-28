@@ -53,7 +53,7 @@ from boto3.dynamodb.conditions import Key
 from common.text_utils import truncate_at_word  # #1224: word-boundary summary truncation (no mid-word cut)
 
 # bundled shared module
-from phase_filter import with_phase_filter  # noqa: F401 — used by handlers below
+from experiment.phase_filter import with_phase_filter  # noqa: F401 — used by handlers below
 
 from web.site_api_agents import handle_agent_activity
 from web.site_api_autonomic import (
@@ -330,7 +330,7 @@ def handle_methods() -> dict:
     same source, two surfaces. Long cache TTL since the registry only changes on deploy.
     """
     try:
-        from methods_registry import list_categories, list_stats
+        from experiment.methods_registry import list_categories, list_stats
 
         return _ok(
             {

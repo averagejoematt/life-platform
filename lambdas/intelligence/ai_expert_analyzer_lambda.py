@@ -157,7 +157,7 @@ def _load_canonical_facts():
         # ONE schema (canonical_facts.build_canonical_facts) that the Coherence Sentinel
         # also reads — so the value a coach is grounded on is exactly the value the
         # Sentinel checks the narrative against. No more per-site dict construction.
-        from canonical_facts import build_canonical_facts
+        from experiment.canonical_facts import build_canonical_facts
 
         _cm = _latest_item("computed_metrics") or {}
         facts = build_canonical_facts(_cm)
@@ -922,7 +922,7 @@ def _load_engagement_signal():
     keep injecting the OLD cycle's presence severity into every expert prompt
     until adaptive_mode's next daily run rewrites it."""
     try:
-        from phase_filter import singleton_visible
+        from experiment.phase_filter import singleton_visible
 
         resp = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#engagement_state", "sk": "STATE#current"})
         item = resp.get("Item")
@@ -1591,7 +1591,7 @@ def generate_experiment_arc():
     fn_pk = f"{USER_PREFIX}field_notes"
     # ADR-058: hide pre-genesis pilot weeks (phase=pilot) so the arc only synthesizes
     # the CURRENT experiment's run — matching what the Experiment view's week list shows.
-    from phase_filter import with_phase_filter
+    from experiment.phase_filter import with_phase_filter
 
     try:
         resp = table.query(
@@ -1744,7 +1744,7 @@ def generate_month_rollup():
     empty state — ADR-104, never a fabricated rollup).
     """
     fn_pk = f"{USER_PREFIX}field_notes"
-    from phase_filter import with_phase_filter
+    from experiment.phase_filter import with_phase_filter
 
     try:
         resp = table.query(

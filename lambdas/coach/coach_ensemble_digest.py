@@ -30,7 +30,7 @@ import urllib.request
 from datetime import datetime, timezone
 
 import boto3
-from phase_filter import with_phase_filter  # ADR-058
+from experiment.phase_filter import with_phase_filter  # ADR-058
 
 # Structured logger
 try:
@@ -209,7 +209,7 @@ def _put_item(item):
     provenance (phase + cycle, #1233). experiment_stamp() is fail-soft and cached;
     the item's own keys win, so it never clobbers or breaks the write.
     """
-    from phase_taxonomy import experiment_stamp
+    from experiment.phase_taxonomy import experiment_stamp
 
     try:
         table.put_item(Item=floats_to_decimal({**experiment_stamp(), **item}))
@@ -373,7 +373,7 @@ def _ensemble_system_prompt():
     #1386) so the docket criteria the LLM may propose and the criteria code can
     grade cannot diverge."""
     try:
-        from measurable_metrics import METRIC_SOURCES
+        from experiment.measurable_metrics import METRIC_SOURCES
 
         keys = ", ".join(sorted(METRIC_SOURCES))
     except Exception:

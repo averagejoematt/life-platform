@@ -166,7 +166,7 @@ def evaluate_rewards(character_sheet):
         return []
     tier_order = ["Foundation", "Momentum", "Discipline", "Mastery", "Elite"]
     try:
-        from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+        from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
         resp = _table.query(
             **with_phase_filter(
@@ -682,7 +682,7 @@ def write_clinical_json(data, profile, yesterday):
         # Body Composition (DEXA)
         body_comp = {}
         try:
-            from phase_filter import with_phase_filter
+            from experiment.phase_filter import with_phase_filter
 
             # ADR-058 include_pilot=True: clinical archive — labs/DEXA are date-independent
             # (owner decision 2026-06-06; filtering would empty the public labs page)
@@ -716,7 +716,7 @@ def write_clinical_json(data, profile, yesterday):
         # Lab Results
         labs = {}
         try:
-            from phase_filter import with_phase_filter
+            from experiment.phase_filter import with_phase_filter
 
             # ADR-058 include_pilot=True: clinical archive — labs/DEXA are date-independent
             # (owner decision 2026-06-06; filtering would empty the public labs page)

@@ -844,9 +844,8 @@ def tool_create_experiment(args):
     if not hypothesis:
         raise ValueError("hypothesis is required (e.g. 'Will improve deep sleep % by >5%')")
 
-    import experiment_design
+    from experiment import experiment_design  # #539: pre-registration — the design is validated NOW and frozen on the record.
 
-    # #539: pre-registration — the design is validated NOW and frozen on the record.
     # An invalid design rejects the creation outright (a sloppy design silently
     # accepted would be worse than none), and nothing may mutate it afterward.
     if design is not None:
@@ -1491,7 +1490,7 @@ def _run_design_analysis(existing, design, end_date):
     criterion via experiment_design (stats_core underneath). Returns the analysis
     dict (windows + stats + verdict + summary sentence), or None when the washout
     consumed the whole experiment."""
-    import experiment_design
+    from experiment import experiment_design
 
     design_f = json.loads(json.dumps(design, default=float))  # Decimals → floats for math
     windows = experiment_design.design_windows(existing.get("start_date", ""), end_date, design_f)

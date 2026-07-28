@@ -198,7 +198,7 @@ def fetch_date(source, date_str):
 def fetch_range(source, start, end):
     try:
         # ADR-058: phase=pilot hidden by default.
-        from phase_filter import with_phase_filter
+        from experiment.phase_filter import with_phase_filter
 
         r = table.query(
             **with_phase_filter(
@@ -499,7 +499,7 @@ def _check_sustained_streaks(yesterday_str, today_flagged):
         start_6d = (yest_dt - timedelta(days=6)).isoformat()
 
         pk = f"USER#{USER_ID}#SOURCE#anomalies"
-        from phase_filter import with_phase_filter
+        from experiment.phase_filter import with_phase_filter
 
         resp = table.query(
             **with_phase_filter(

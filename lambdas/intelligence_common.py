@@ -19,10 +19,10 @@ from decimal import Decimal
 from typing import Any
 
 import boto3
-import calibration_core  # #538: the shared prediction-calibration scorer (Brier + reliability)
 from boto3.dynamodb.conditions import Key
 from common.text_utils import truncate_at_word  # #1224: word-boundary summary truncation (no mid-word cut)
-from phase_filter import with_phase_filter  # ADR-058
+from experiment import calibration_core  # #538: the shared prediction-calibration scorer (Brier + reliability)
+from experiment.phase_filter import with_phase_filter  # ADR-058
 
 logger = logging.getLogger(__name__)
 

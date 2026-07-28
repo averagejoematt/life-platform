@@ -56,11 +56,11 @@ import boto3
 import flourishing  # #1843: entry_channel() — single source of truth for video_diary/solo_recording provenance
 import milestone_ledger  # #1626: the durable MILESTONE# event ledger (write-once, global cooldown)
 import personal_baselines  # #543: percentile bands from Matthew's own distribution (ADR-105 r4)
-import phase_taxonomy  # ADR-077/#1233: write-time provenance stamp for the first-earn ledger
 import scoring_engine
 import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 import weight_trend  # shared weekly-rate + projection (layer module)
-from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from experiment import phase_taxonomy  # ADR-077/#1233: write-time provenance stamp for the first-earn ledger
+from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:

@@ -366,7 +366,7 @@ def counterfactual_analysis(design, dated_criterion, dated_controls, start_date,
     state "no_counterfactual" with a stated reason — never None-and-silent, so
     the close-path record always says WHY a declared ghost is absent.
     """
-    import bsts_lite
+    from experiment import bsts_lite
 
     cf = design.get("counterfactual") or {}
     controls = list(cf.get("controls") or [])

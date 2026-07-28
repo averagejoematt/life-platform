@@ -492,7 +492,7 @@ def _claims_pk():
 def _claims_phase_stamp():
     """ADR-058 phase/cycle stamp, fail-soft (the coach_diary_reaction._stamp pattern)."""
     try:
-        import phase_taxonomy
+        from experiment import phase_taxonomy
 
         return phase_taxonomy.experiment_stamp()
     except Exception:

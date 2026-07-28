@@ -55,7 +55,7 @@ import hashlib
 import re
 from datetime import datetime, timedelta
 
-from measurable_metrics import infer_direction, metric_is_resolvable, metric_subdomain, normalize_metric_hint
+from experiment.measurable_metrics import infer_direction, metric_is_resolvable, metric_subdomain, normalize_metric_hint
 
 # ── The store ────────────────────────────────────────────────────────────────────
 # pk `USER#{user}#SOURCE#diary_claims`; sk `PREDICTION#{stated_date}#{slug}`.

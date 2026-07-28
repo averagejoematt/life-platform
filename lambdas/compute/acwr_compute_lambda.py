@@ -111,7 +111,7 @@ def _fetch_range(source: str, start: str, end: str) -> list:
     # trailing 28d regardless of experiment phase; filtering pilot workouts
     # causes false ACWR spikes for ~3 weeks after any restart (owner decision
     # 2026-06-06). include_pilot=True is a deliberate no-op annotation.
-    from phase_filter import with_phase_filter
+    from experiment.phase_filter import with_phase_filter
 
     records = []
     kwargs = with_phase_filter(

@@ -41,7 +41,7 @@ from datetime import datetime, timezone
 
 import boto3
 from boto3.dynamodb.conditions import Key
-from phase_filter import singleton_visible  # #946: hide reset-tombstoned persona state
+from experiment.phase_filter import singleton_visible  # #946: hide reset-tombstoned persona state
 
 try:
     from common.platform_logger import get_logger

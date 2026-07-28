@@ -38,11 +38,11 @@ import site_api_social as se  # noqa: E402
 # `USER#…#SOURCE#…` partitions — none may ever reach into the cohort family.
 _PIPELINE_FILES = [
     "lambdas/common/stats_core.py",
-    "lambdas/calibration_core.py",
-    "lambdas/eyeball_calibration.py",
+    "lambdas/experiment/calibration_core.py",
+    "lambdas/experiment/eyeball_calibration.py",
     "lambdas/character_engine.py",
     "lambdas/insight_writer.py",
-    "lambdas/measurable_metrics.py",
+    "lambdas/experiment/measurable_metrics.py",
     "lambdas/compute/character_sheet_lambda.py",
     "lambdas/compute/daily_metrics_compute_lambda.py",
     "lambdas/compute/daily_insight_compute_lambda.py",

@@ -36,10 +36,10 @@ from mcp.core import decimal_to_float as _d2f
 
 try:
     # Shared, bundled module (#781) — the deterministic conventions live here.
-    from habit_causality import clip_note, parse_note, slugify_habit
+    from experiment.habit_causality import clip_note, parse_note, slugify_habit
 except ImportError:  # pragma: no cover — MCP bundle always ships lambdas/ at root
     if not TYPE_CHECKING:
-        from lambdas.habit_causality import clip_note, parse_note, slugify_habit
+        from lambdas.experiment.habit_causality import clip_note, parse_note, slugify_habit
 
 CAUSALITY_SOURCE = "habit_causality"
 HABITIFY_SOURCE = "habitify"

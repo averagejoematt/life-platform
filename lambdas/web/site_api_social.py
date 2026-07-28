@@ -34,7 +34,7 @@ import boto3
 import social_provenance  # #1670 membrane — the origin:human predicate for the broadcast feed (#1672)
 from boto3.dynamodb.conditions import Key
 from common.client_ip import extract_client_ip  # #1221 — the ONE edge-observed client-IP helper
-from phase_filter import with_phase_filter  # ADR-058
+from experiment.phase_filter import with_phase_filter  # ADR-058
 
 from web.site_api_common import (
     CORS_HEADERS,

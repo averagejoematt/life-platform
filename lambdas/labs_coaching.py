@@ -79,7 +79,7 @@ def build_labs_coaching_context(table, user_prefix):
         # ADR-058: clinical archive — lab draws are date-independent; filtering
         # pilot draws would blind the coach to the entire lab history (owner
         # decision 2026-06-06). include_pilot=True is a deliberate no-op annotation.
-        from phase_filter import with_phase_filter
+        from experiment.phase_filter import with_phase_filter
 
         # Read latest labs — try the clinical.json S3 approach used by handle_labs
         labs_pk = f"{user_prefix}labs"

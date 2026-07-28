@@ -32,7 +32,7 @@ import privacy_guard  # deterministic real-name + vice gate (layer module)
 from common import digest_utils  # shared query_range implementations (#970)
 from common.constants import EXPERIMENT_START_DATE  # ADR-058
 from common.text_utils import truncate_at_word  # #1224: word-boundary excerpt truncation (no mid-word cut)
-from phase_filter import singleton_visible  # ADR-058 / #946 (query paths get the phase filter via digest_utils, #970)
+from experiment.phase_filter import singleton_visible  # ADR-058 / #946 (query paths get the phase filter via digest_utils, #970)
 
 # OBS-1: Structured logger (wired below after optional imports)
 _logger_std = logging.getLogger()
@@ -742,7 +742,7 @@ def lambda_handler(event: dict, context) -> dict:
     # passes while a fabricated one is still caught (#1242 / ADR-104).
     try:
         import whole_life_context
-        from phase_filter import with_phase_filter as _wpf
+        from experiment.phase_filter import with_phase_filter as _wpf
 
         _archive_items = whole_life_context.fetch_full_installment_archive(
             table, f"USER#{USER_ID}#SOURCE#chronicle", d2f=d2f, phase_filter=_wpf
@@ -795,7 +795,7 @@ def lambda_handler(event: dict, context) -> dict:
         if _corrected or _residual:
             # #812/#744: a fired chronicle gate is labeled eval data — retain the pair.
             try:
-                import eval_retention
+                from experiment import eval_retention
 
                 eval_retention.retain(
                     "chronicle",
@@ -902,7 +902,7 @@ def lambda_handler(event: dict, context) -> dict:
     all_installments = []
     try:
         # ADR-058: phase=pilot hidden by default.
-        from phase_filter import with_phase_filter
+        from experiment.phase_filter import with_phase_filter
 
         resp = table.query(
             **with_phase_filter(

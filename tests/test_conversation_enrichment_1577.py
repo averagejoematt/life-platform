@@ -254,7 +254,7 @@ class TestAnalysisOnlyScope:
         assert sorted(pol["channels"]) == ["coach_checkin", "field_note", "habit_reflection", "prescription_reaction"]
 
     def test_methods_registry_entry_says_so_and_fingerprint_matches(self):
-        import methods_registry as mr
+        from experiment import methods_registry as mr
 
         entry = mr.get_stat("conversational_enrichment_scope")
         assert entry is not None, "#1577 AC2: the Methods Registry must carry the analysis-only declaration"

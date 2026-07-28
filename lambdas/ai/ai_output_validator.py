@@ -209,7 +209,7 @@ def _autoload_health_context() -> dict:
 
         import boto3 as _boto3
         from boto3.dynamodb.conditions import Key as _Key
-        from canonical_facts import build_canonical_facts as _bcf
+        from experiment.canonical_facts import build_canonical_facts as _bcf
 
         _tbl = _boto3.resource("dynamodb", region_name=_os.environ.get("AWS_REGION_OVERRIDE", "us-west-2")).Table(
             _os.environ.get("TABLE_NAME", "life-platform")

@@ -37,8 +37,10 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
 import character_engine  # noqa: E402
-import effect_fitter  # noqa: E402
-import phase_taxonomy as pt  # noqa: E402
+from experiment import (
+    effect_fitter,  # noqa: E402
+    phase_taxonomy as pt,  # noqa: E402
+)
 from web import site_api_intelligence as intel  # noqa: E402
 
 CONFIG_PATH = os.path.join(_REPO, "config", "character_sheet.json")

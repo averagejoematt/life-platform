@@ -40,7 +40,7 @@ import boto3
 from ai import google_tts
 from ai.grounded_generation import allowed_numbers, grounding_findings  # ADR-104 gate
 from boto3.dynamodb.conditions import Key
-from er03_gate import BANNED_CAUSAL  # the platform's one banned-causal-connective list
+from experiment.er03_gate import BANNED_CAUSAL  # the platform's one banned-causal-connective list
 
 try:
     from common.numeric import decimals_to_float

@@ -15,7 +15,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 
-import canonical_facts as cf  # noqa: E402
+from experiment import canonical_facts as cf  # noqa: E402
 
 _PRODUCER = os.path.join(os.path.dirname(__file__), "..", "lambdas", "compute", "daily_metrics_compute_lambda.py")
 

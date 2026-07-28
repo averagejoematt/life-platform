@@ -20,10 +20,10 @@ import os
 from datetime import datetime, timezone
 
 import boto3
-import er03_gate
 import persona_registry
 from boto3.dynamodb.conditions import Key
-from phase_filter import with_phase_filter
+from experiment import er03_gate
+from experiment.phase_filter import with_phase_filter
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)

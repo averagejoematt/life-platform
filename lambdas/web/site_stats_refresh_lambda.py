@@ -57,7 +57,7 @@ def _get_latest(table, source, days_back=2):
     start = (date.today() - timedelta(days=days_back)).isoformat()
     try:
         # ADR-058: phase=pilot hidden by default.
-        from phase_filter import with_phase_filter
+        from experiment.phase_filter import with_phase_filter
 
         resp = table.query(
             **with_phase_filter(
@@ -191,7 +191,7 @@ def lambda_handler(event, context):
     days_in = max(1, (date.today() - exp_start).days + 1) if date.today() >= exp_start else 1
     try:
         # ADR-058: phase=pilot hidden by default.
-        from phase_filter import with_phase_filter
+        from experiment.phase_filter import with_phase_filter
 
         _tr_resp = table.query(
             **with_phase_filter(

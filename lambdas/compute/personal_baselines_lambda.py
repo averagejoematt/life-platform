@@ -77,7 +77,7 @@ def _fetch_source(source, start, end):
     """Query one source's DATE# records in [start, end]. include_pilot=True: the
     personal distribution is physiological, not experiment-scoped (mirrors ACWR, ADR-058).
     """
-    from phase_filter import with_phase_filter
+    from experiment.phase_filter import with_phase_filter
 
     records = []
     kwargs = with_phase_filter(

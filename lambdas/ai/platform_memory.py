@@ -464,7 +464,7 @@ def _query_conversation_records(table, per_category_limit: int = _PER_CATEGORY_Q
     user_id = os.environ.get("USER_ID", "matthew")
     pk = f"USER#{user_id}#SOURCE#{MEMORY_SOURCE}"
     try:
-        from phase_filter import with_phase_filter  # ADR-058 — hide wiped/foreign-phase records
+        from experiment.phase_filter import with_phase_filter  # ADR-058 — hide wiped/foreign-phase records
     except Exception:  # noqa: BLE001 — filter is an enhancement, never a dependency
         with_phase_filter = None
     records, seen = [], set()

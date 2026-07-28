@@ -39,7 +39,7 @@ from datetime import datetime, timedelta, timezone
 import boto3
 import training_load  # shared TSS-like load model (layer module, #490) — basis_note
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
-from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 _logger_std = logging.getLogger()
 _logger_std.setLevel(logging.INFO)

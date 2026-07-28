@@ -45,12 +45,12 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
-import experiment_gates  # #1371: the ONE registry of arming thresholds
 import glycemic  # #1406: deterministic glycemic-variability features (CV, no LLM)
 from common import (
     digest_utils,  # shared query_range implementations (#970)
     stats_core,  # bundled shared module (#529): the one sanctioned stats implementation
 )
+from experiment import experiment_gates  # #1371: the ONE registry of arming thresholds
 
 # OBS-1: Structured logger
 try:

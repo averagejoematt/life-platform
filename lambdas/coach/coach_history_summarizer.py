@@ -42,7 +42,7 @@ import urllib.request
 from datetime import datetime, timezone
 
 import boto3
-from phase_filter import with_phase_filter  # ADR-058
+from experiment.phase_filter import with_phase_filter  # ADR-058
 
 # Structured logger
 try:
@@ -317,7 +317,7 @@ def _put_item(item):
     write-time provenance (phase + cycle, #1233). experiment_stamp() is fail-soft
     and cached; the item's own keys win, so it never clobbers or breaks the write.
     """
-    from phase_taxonomy import experiment_stamp
+    from experiment.phase_taxonomy import experiment_stamp
 
     try:
         table.put_item(Item=floats_to_decimal({**experiment_stamp(), **item}))

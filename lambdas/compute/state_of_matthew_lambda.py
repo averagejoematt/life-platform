@@ -45,14 +45,14 @@ import re
 from datetime import datetime, timedelta, timezone
 
 import boto3
-import calibration_core  # #538: shared Brier + reliability scorer (layer module)
 import whole_life_context  # #1385: full multi-cycle archive as a 1-hour cached block
 from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
 from ai.grounded_generation import allowed_numbers, grounding_findings  # ADR-104 gate
 from boto3.dynamodb.conditions import Key
 from common.numeric import decimals_to_float, floats_to_decimal  # bundled shared module: float<->Decimal
-from er03_gate import BANNED_CAUSAL  # reuse the platform's one causal-language list
-from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from experiment import calibration_core  # #538: shared Brier + reliability scorer (layer module)
+from experiment.er03_gate import BANNED_CAUSAL  # reuse the platform's one causal-language list
+from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 try:
     from common.platform_logger import get_logger
@@ -481,7 +481,7 @@ def narrate(state: dict) -> dict:
     if findings or causal_hits:
         logger.warning(f"[state-of-matthew] ADR-104 grounding gate failed (findings={findings}, causal={causal_hits}) — falling back")
         try:  # #812/#744: a fired gate is labeled eval data — retain the pair (fail-soft)
-            import eval_retention
+            from experiment import eval_retention
 
             eval_retention.retain(
                 "state_of_matthew",

@@ -74,7 +74,7 @@ ses = boto3.client("sesv2", region_name=REGION)
 
 
 from common.digest_utils import d2f as _d2f  # shared bundled helpers (#970)
-from phase_filter import singleton_visible  # ADR-058 / #946 / #1200: honor restart tombstones on PERSONA reads
+from experiment.phase_filter import singleton_visible  # ADR-058 / #946 / #1200: honor restart tombstones on PERSONA reads
 
 
 def _scrub(text: str) -> str:

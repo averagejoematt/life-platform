@@ -350,7 +350,7 @@ def note_contradiction_hits(analysis, metrics_record):
     except ImportError:  # pragma: no cover — flat sys.path (tests / bundle root)
         from grounding_guard import hard_canonical_contradictions
 
-    from canonical_facts import build_canonical_facts
+    from experiment.canonical_facts import build_canonical_facts
 
     facts = {k: v for k, v in build_canonical_facts(metrics_record).items() if k != "as_of"}
     hits = []
@@ -432,7 +432,7 @@ def generate_field_notes(iso_week):
         except Exception as e:  # noqa: BLE001 — regen is best-effort
             logger.warning(f"[grounding] rewrite failed ({type(e).__name__}) — keeping the original")
         try:  # #812/#744: a fired note gate is labeled eval data — retain the pair (fail-soft)
-            import eval_retention
+            from experiment import eval_retention
 
             eval_retention.retain(
                 "field_notes",

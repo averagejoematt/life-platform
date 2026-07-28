@@ -32,8 +32,8 @@ import boto3
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lambdas"))
 
 import milestone_ledger as ml  # noqa: E402
-import phase_taxonomy  # noqa: E402
 import process_milestones as pm  # noqa: E402
+from experiment import phase_taxonomy  # noqa: E402
 
 REGION = "us-west-2"
 TABLE = "life-platform"

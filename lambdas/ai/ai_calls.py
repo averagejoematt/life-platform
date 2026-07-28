@@ -1329,7 +1329,7 @@ def _retain_coach_brief_flag(coach_id, verdict, draft, final, report):
     only). Fail-soft: never affects the coach pipeline.
     """
     try:
-        import eval_retention
+        from experiment import eval_retention
 
         findings = []
         for v in report.get("anti_pattern_violations") or []:
@@ -1670,7 +1670,7 @@ def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
         _facts_block = ""
         try:
             from boto3.dynamodb.conditions import Key as _Key
-            from canonical_facts import build_canonical_facts as _bcf
+            from experiment.canonical_facts import build_canonical_facts as _bcf
 
             from ai import grounded_generation as _gg_mod  # bundled + layer (ADR-104)
 

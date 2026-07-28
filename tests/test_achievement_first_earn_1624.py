@@ -279,7 +279,7 @@ def test_catalog_is_complete_and_unique():
 
 def test_achievements_partition_is_registered_in_the_phase_taxonomy():
     """ADR-077: a new partition must be classified deliberately, not defaulted."""
-    import phase_taxonomy
+    from experiment import phase_taxonomy
 
     assert phase_taxonomy.SOURCE_CLASS["achievements"] == phase_taxonomy.EXPERIMENT_SCOPED
     assert phase_taxonomy.classify(USER_PREFIX + "achievements", "BADGE#lost_10") == phase_taxonomy.EXPERIMENT_SCOPED

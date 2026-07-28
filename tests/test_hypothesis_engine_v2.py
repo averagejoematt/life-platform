@@ -251,7 +251,7 @@ class TestEvidenceAndCalibration:
 
     def test_calibration_partition_is_cross_phase(self):
         # The ledger must survive resets or the calibration question is unanswerable
-        import phase_taxonomy as tax
+        from experiment import phase_taxonomy as tax
 
         assert tax.SOURCE_CLASS["calibration"] == tax.CROSS_PHASE
 

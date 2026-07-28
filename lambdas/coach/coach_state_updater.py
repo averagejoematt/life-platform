@@ -25,7 +25,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import boto3
-from phase_filter import with_phase_filter  # ADR-058
+from experiment.phase_filter import with_phase_filter  # ADR-058
 from relationship_engine import compute_relationship_update  # #536
 
 # Structured logger
@@ -74,7 +74,7 @@ secrets = boto3.client("secretsmanager", region_name=REGION)
 # and never graded (the v7.15.0 504-inconclusive bug; the Coherence Sentinel's
 # prediction_health invariant exists for exactly this). They now live in ONE place,
 # DERIVED so they cannot diverge. See lambdas/measurable_metrics.py.
-from measurable_metrics import (
+from experiment.measurable_metrics import (
     MEASURABLE_METRICS,  # noqa: E402,F401
     METRIC_SOURCES,  # noqa: E402
     infer_direction as _infer_direction,  # noqa: E402  (#813: shared with the evaluator)
@@ -364,7 +364,7 @@ def _put_item(item):
     this tagger-blind partition. experiment_stamp() is fail-soft and cached, and the
     item's own keys win, so it never clobbers or breaks the write.
     """
-    from phase_taxonomy import experiment_stamp
+    from experiment.phase_taxonomy import experiment_stamp
 
     try:
         table.put_item(Item=floats_to_decimal({**experiment_stamp(), **item}))

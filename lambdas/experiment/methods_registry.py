@@ -28,10 +28,10 @@ its entry without this module knowing anything about that UI.
 import hashlib
 import inspect
 
-import bsts_lite
-import calibration_core
 from ai import conversation_enrichment
 from common import stats_core
+
+from experiment import bsts_lite, calibration_core
 
 
 def _fingerprint(fn):
@@ -86,7 +86,7 @@ SOURCE_MODULES = {
     },
     "calibration_core": {
         "title": "calibration_core.py",
-        "path": "lambdas/calibration_core.py",
+        "path": "lambdas/experiment/calibration_core.py",
         "description": (
             "The one prediction-calibration scorer (#538, ADR-105) — grades every forecast the "
             "platform makes against what actually happened, so the public calibration scoreboard, "

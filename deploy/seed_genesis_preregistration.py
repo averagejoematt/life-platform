@@ -59,7 +59,7 @@ sys.path.insert(0, str(REPO_ROOT / "deploy"))
 
 import genesis_prereg_stamp  # noqa: E402  (#1378 — the content-hash seal on the freeze)
 from common.constants import EXPERIMENT_START_DATE  # noqa: E402
-from measurable_metrics import MEASURABLE_METRICS, infer_direction, normalize_metric_hint  # noqa: E402
+from experiment.measurable_metrics import MEASURABLE_METRICS, infer_direction, normalize_metric_hint  # noqa: E402
 
 REGION = "us-west-2"
 TABLE_NAME = "life-platform"

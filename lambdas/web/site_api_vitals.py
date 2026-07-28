@@ -32,7 +32,7 @@ import achievement_rules  # #1624: the ONE place badge thresholds live (shared w
 import boto3  # #1240: S3/DDB clients used by handle_labs / handle_glucose / handle_genome_risks
 import weight_trend  # shared weekly-rate + projection (layer module)
 from boto3.dynamodb.conditions import Key
-from phase_filter import with_phase_filter  # ADR-058 — used by handle_timeline
+from experiment.phase_filter import with_phase_filter  # ADR-058 — used by handle_timeline
 
 from web import vitals_resolver  # #1369: the ONE current-vitals truth
 from web.site_api_common import (
@@ -684,7 +684,7 @@ def handle_character_config() -> dict:
     # (the merge itself can never invent "fitted": that only comes from a
     # stored fit record). Keys stay explicitly whitelisted.
     try:
-        import effect_fitter
+        from experiment import effect_fitter
 
         effect_fitter.merge_fit_into_config(cfg, effect_fitter.load_latest_fit(table, USER_ID))
     except Exception as e:

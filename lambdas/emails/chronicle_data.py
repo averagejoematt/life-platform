@@ -9,7 +9,7 @@ import diary_consent  # #1483 (ADR-142 tier 2): the conversation-allude projecti
 from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS
 from common.digest_utils import d2f, safe_float
-from phase_filter import singleton_visible
+from experiment.phase_filter import singleton_visible
 
 
 def gather_chronicle_data(*, _g):
@@ -68,7 +68,7 @@ def gather_chronicle_data(*, _g):
     experiments = []
     try:
         # ADR-058: phase=pilot hidden by default.
-        from phase_filter import with_phase_filter
+        from experiment.phase_filter import with_phase_filter
 
         resp = table.query(
             **with_phase_filter(
@@ -102,7 +102,7 @@ def gather_chronicle_data(*, _g):
     prev_installments = []
     try:
         # ADR-058: phase=pilot hidden by default.
-        from phase_filter import with_phase_filter
+        from experiment.phase_filter import with_phase_filter
 
         resp = table.query(
             **with_phase_filter(
@@ -161,7 +161,7 @@ def gather_chronicle_data(*, _g):
     try:
         import persona_registry
         from boto3.dynamodb.conditions import Key
-        from phase_filter import with_phase_filter
+        from experiment.phase_filter import with_phase_filter
 
         for pid in persona_registry.OPERATIONAL_COACH_IDS:
             resp = table.query(

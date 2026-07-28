@@ -56,7 +56,7 @@ from common.digest_utils import (
     fmt_num,
     safe_float,
 )
-from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # ── AWS clients ───────────────────────────────────────────────────────────────
 _REGION = os.environ.get("AWS_REGION", "us-west-2")
@@ -729,7 +729,7 @@ def compute_sleep_debt(whoop_dict, target_hrs=7.5):
 def fetch_stale_insights(days_threshold=7):
     try:
         # ADR-058: phase=pilot hidden by default.
-        from phase_filter import with_phase_filter
+        from experiment.phase_filter import with_phase_filter
 
         r = table.query(
             **with_phase_filter(

@@ -33,7 +33,7 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "web"))
 
-import experiment_gates  # noqa: E402
+from experiment import experiment_gates  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
 
 

@@ -78,7 +78,7 @@ def test_mcp_config_derives():
 
 
 def test_data_export_derives_from_taxonomy():
-    from phase_taxonomy import SOURCE_CLASS, SYSTEM_STATE
+    from experiment.phase_taxonomy import SOURCE_CLASS, SYSTEM_STATE
 
     sys.path.insert(0, os.path.join(ROOT, "lambdas", "operational"))
     import data_export_lambda as dx

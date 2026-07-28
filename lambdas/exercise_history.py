@@ -100,7 +100,7 @@ def load_recent_history(
     # performances regardless of experiment phase; filtering pilot workouts
     # would make the routine generator think every lift is brand-new (owner
     # decision 2026-06-06). include_pilot=True is a deliberate no-op annotation.
-    from phase_filter import with_phase_filter
+    from experiment.phase_filter import with_phase_filter
 
     while True:
         kwargs: dict[str, Any] = with_phase_filter(

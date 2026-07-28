@@ -39,7 +39,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas", "coa
 import coach_computation_engine as engine  # noqa: E402
 import coach_prediction_evaluator as ev  # noqa: E402
 import coach_state_updater as updater  # noqa: E402
-import measurable_metrics as mm  # noqa: E402
+from experiment import measurable_metrics as mm  # noqa: E402
 from fakes import FakeDdbTable, raise_hook  # noqa: E402
 
 # ── Root cause 4a: metric → source mappings point at sources that HAVE the field ──

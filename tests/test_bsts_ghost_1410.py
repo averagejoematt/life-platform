@@ -29,8 +29,10 @@ os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
-import bsts_lite  # noqa: E402
-import experiment_design  # noqa: E402
+from experiment import (
+    bsts_lite,  # noqa: E402
+    experiment_design,  # noqa: E402
+)
 
 # Deterministic pseudo-noise: a fixed irrational-rotation sequence (no random module,
 # so the test can never flake and the fixture can never drift).
@@ -239,7 +241,7 @@ def test_summary_sentence_renders_ghost_and_refusal_verbatim():
 
 
 def test_methods_registry_fingerprint_current():
-    import methods_registry
+    from experiment import methods_registry
 
     entry = methods_registry.REGISTRY["bsts_lite_counterfactual"]
     assert (

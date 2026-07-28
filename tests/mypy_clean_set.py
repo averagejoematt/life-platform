@@ -38,7 +38,7 @@ ROOT = Path(__file__).resolve().parent.parent
 # new directory would silently shrink the clean surface — a module would leave the
 # mypy gate merely by being moved, which is exactly the ratchet regression this file
 # exists to prevent. Moving code must never reduce coverage.
-CLEAN_DIRS = ["lambdas", "lambdas/ai", "lambdas/common", "lambdas/web", "mcp"]
+CLEAN_DIRS = ["lambdas", "lambdas/ai", "lambdas/common", "lambdas/experiment", "lambdas/web", "mcp"]
 
 # Modules that do NOT yet pass under mypy.ini. Each MUST carry a reason. This
 # denylist only shrinks. Paths are repo-root-relative.
@@ -76,7 +76,7 @@ DIRTY = {
 CORE = [
     "lambdas/common/secret_cache.py",
     "lambdas/common/retry_utils.py",
-    "lambdas/phase_filter.py",
+    "lambdas/experiment/phase_filter.py",
     "lambdas/common/constants.py",
     "lambdas/ai/bedrock_client.py",
     "lambdas/scoring_engine.py",

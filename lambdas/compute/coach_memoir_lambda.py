@@ -34,14 +34,14 @@ import os
 from datetime import datetime, timezone
 
 import boto3
-import calibration_core
 import memoir_gate
 import persona_registry
 from ai import grounded_generation
 from boto3.dynamodb.conditions import Key
 from common import quarter_utils
 from common.numeric import decimals_to_float, floats_to_decimal
-from phase_filter import with_phase_filter
+from experiment import calibration_core
+from experiment.phase_filter import with_phase_filter
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -298,7 +298,7 @@ def _generate_memoir(persona, voice_rules, example, facts, quarter):
 
     ok, reasons2 = gate_check(text, facts)
     try:  # #812/#744: a fired memoir gate is labeled eval data — retain the pair (fail-soft)
-        import eval_retention
+        from experiment import eval_retention
 
         eval_retention.retain(
             "memoir",

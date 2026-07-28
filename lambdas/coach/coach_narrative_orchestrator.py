@@ -38,7 +38,7 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 from common.constants import EXPERIMENT_START_DATE  # ADR-058
-from phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
+from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 
 # Structured logger
 try:

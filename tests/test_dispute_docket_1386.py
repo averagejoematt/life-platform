@@ -335,7 +335,7 @@ class TestAC2DeterministicResolution:
         assert win and win[0]["status"] == "confirmed" and win[0]["channel"] == "data"
         assert loss and loss[0]["status"] == "refuted" and loss[0]["record_type"] == "docket_concession"
         # resolved PREDICTION# rows feed the Brier scoreboard (calibration_core)
-        import calibration_core
+        from experiment import calibration_core
 
         for cid, outcome in (("physical_coach", 1), ("training_coach", 0)):
             preds = [v for (pk, sk), v in table.store.items() if pk == f"COACH#{cid}" and sk.startswith("PREDICTION#docket-")]
@@ -609,7 +609,7 @@ class TestAC5ThrottleReplacesWeeklyCap:
 
 class TestPartitionRegistry:
     def test_docket_partition_is_experiment_scoped(self):
-        import phase_taxonomy as taxonomy
+        from experiment import phase_taxonomy as taxonomy
 
         assert taxonomy.classify("ENSEMBLE#docket", "OPEN#a__b#topic") == taxonomy.EXPERIMENT_SCOPED
 
@@ -718,7 +718,7 @@ class TestDerivedKeysArePairScoped1798:
 
     def test_the_public_brier_scores_both_outcomes(self, two_dockets_resolved):
         """The end of the wire: calibration_core must see a win AND a loss, not one row."""
-        import calibration_core
+        from experiment import calibration_core
 
         rows = self._rows(two_dockets_resolved, "physical_coach", "PREDICTION#")
         summary = calibration_core.score_pairs(calibration_core.pairs_from_prediction_records(rows))

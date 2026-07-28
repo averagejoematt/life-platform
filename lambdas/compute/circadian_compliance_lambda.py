@@ -103,7 +103,7 @@ def fetch_range(source, start, end):
     # ADR-058: physiological continuity — the circadian baseline needs the
     # actual sleep rhythm history, not just the post-restart week (owner
     # decision 2026-06-06). include_pilot=True is a deliberate no-op annotation.
-    from phase_filter import with_phase_filter
+    from experiment.phase_filter import with_phase_filter
 
     try:
         records, kwargs = [], with_phase_filter(

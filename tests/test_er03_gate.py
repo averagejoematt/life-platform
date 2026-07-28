@@ -11,7 +11,7 @@ import sys
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
-import er03_gate  # noqa: E402
+from experiment import er03_gate  # noqa: E402
 
 
 def test_clean_correlative_text_passes():

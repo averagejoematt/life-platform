@@ -37,7 +37,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
-from phase_filter import with_phase_filter  # ADR-058
+from experiment.phase_filter import with_phase_filter  # ADR-058
 
 # ── Structured logger ────────────────────────────────────────────────────────
 try:
@@ -81,7 +81,7 @@ COACH_IDS = [
 # drift silently broke prediction grading. Single source now; MEASURABLE_METRICS is
 # DERIVED from this map, so the extractor's allowlist and the evaluator's source-map
 # cannot diverge. See lambdas/measurable_metrics.py.
-from measurable_metrics import METRIC_SOURCES, infer_direction  # noqa: E402
+from experiment.measurable_metrics import METRIC_SOURCES, infer_direction  # noqa: E402
 
 # Domain-appropriate minimum evaluation windows (days).
 # Predictions with shorter windows are clamped to these minimums.
@@ -938,7 +938,7 @@ def _update_bayesian_confidence(coach_id, subdomain, update_type):
             alpha, beta_val, item.get("conversation_alpha") if item else 0, item.get("conversation_beta") if item else 0
         )
 
-        from phase_taxonomy import experiment_stamp  # fail-soft provenance (#1233)
+        from experiment.phase_taxonomy import experiment_stamp  # fail-soft provenance (#1233)
 
         new_item = {
             **experiment_stamp(),

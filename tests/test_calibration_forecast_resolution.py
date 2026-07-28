@@ -20,7 +20,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 
-import calibration_core as cc  # noqa: E402
+from experiment import calibration_core as cc  # noqa: E402
 
 
 def _forecast_resolution_row(resolved_date, metric, horizon, covered, confidence=0.80):

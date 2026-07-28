@@ -145,7 +145,7 @@ def metric_is_resolvable(metric_key):
     """True only when the evaluator's own metric machinery can resolve it."""
     if not metric_key or not isinstance(metric_key, str):
         return False
-    from measurable_metrics import METRIC_SOURCES
+    from experiment.measurable_metrics import METRIC_SOURCES
 
     return base_metric(metric_key) in METRIC_SOURCES
 
@@ -270,7 +270,7 @@ def _stamped(item):
     """Write-time experiment provenance (phase + cycle) — ENSEMBLE#docket is
     EXPERIMENT_SCOPED (phase_taxonomy). Fail-soft like the summarizer's writer."""
     try:
-        from phase_taxonomy import experiment_stamp
+        from experiment.phase_taxonomy import experiment_stamp
 
         return {**experiment_stamp(), **item}
     except Exception:
@@ -293,7 +293,7 @@ def _docket_row_stands(item):
     if not item:
         return False
     try:
-        from phase_filter import singleton_visible
+        from experiment.phase_filter import singleton_visible
 
         return bool(singleton_visible(item))
     except Exception as e:
@@ -341,7 +341,7 @@ def _domain_brier(coach_id):
     """The coach's own graded-forecast Brier — the SAME calibration_core scoring
     the public scoreboard uses, over the coach's own PREDICTION# partition."""
     try:
-        import calibration_core
+        from experiment import calibration_core
 
         items, kwargs = [], {"KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with("PREDICTION#")}
         while True:
@@ -368,7 +368,7 @@ def _confidence_at_open(coach_id, subdomain):
     here on the read (#1788). Falls back to the uninformed 0.5 prior exactly
     like the never-written case."""
     try:
-        from phase_filter import singleton_visible
+        from experiment.phase_filter import singleton_visible
 
         item = table.get_item(Key={"pk": f"COACH#{coach_id}", "sk": f"CONFIDENCE#{subdomain}"}).get("Item")
         if singleton_visible(item) and item.get("mean_confidence") is not None:

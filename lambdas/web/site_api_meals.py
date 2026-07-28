@@ -316,7 +316,7 @@ def meal_responses(*, _g) -> dict:
     table = _g["table"]
     try:
         # ADR-058: phase=pilot hidden by default.
-        from phase_filter import with_phase_filter
+        from experiment.phase_filter import with_phase_filter
 
         resp = table.query(
             **with_phase_filter(

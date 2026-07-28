@@ -6,7 +6,7 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from boto3.dynamodb.conditions import Key
-from phase_filter import with_phase_filter
+from experiment.phase_filter import with_phase_filter
 
 from web.site_api_common import (
     PT,

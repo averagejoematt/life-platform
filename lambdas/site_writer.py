@@ -186,7 +186,7 @@ def _get_latest_chronicle_headline(table_client, user_id: str) -> dict | None:
 
         today = datetime.now(timezone.utc).date()
         week_ago = (today - timedelta(days=7)).isoformat()
-        from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+        from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
         resp = table_client.query(
             **with_phase_filter(
@@ -229,7 +229,7 @@ def _get_recent_chronicles(table_client, user_id: str, count: int = 3) -> list:
 
         today = datetime.now(timezone.utc).date()
         d90 = (today - timedelta(days=90)).isoformat()
-        from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+        from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
         resp = table_client.query(
             **with_phase_filter(

@@ -30,13 +30,13 @@ from datetime import datetime
 from decimal import Decimal  # noqa: F401
 
 import boto3
-import calibration_core  # #538: the ONE prediction-calibration scorer (Brier + reliability)
 import coach_corrections  # #1689 ledger — reused by the dossier retract/correct path (#1387)
 import coach_dossier  # #1387: the verbatim, privacy-filtered dossier projection (bundled module)
 import coach_traits  # #1113: authored trait scores for the immersive bios (bundled module)
 import diary_consent  # #1483 (ADR-142 tier 2): the conversation-allude projection (bundled module)
 from boto3.dynamodb.conditions import Key
-from phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
+from experiment import calibration_core  # #538: the ONE prediction-calibration scorer (Brier + reliability)
+from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 
 # CC-00/CC-09 modules — bundled into the site-api code package like every other
 # lambdas/ module (#781: one bundle, no separate layer, so there's no deploy-race

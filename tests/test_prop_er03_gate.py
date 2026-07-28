@@ -17,7 +17,7 @@ from hypothesis import given, settings, strategies as st
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
-import er03_gate  # noqa: E402
+from experiment import er03_gate  # noqa: E402
 
 # A clean, correlative, hedge-free, number-free, non-causal base sentence that does
 # not start with "Matthew". Verified against BANNED_CAUSAL and HEDGES below.

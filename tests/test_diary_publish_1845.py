@@ -455,7 +455,7 @@ class TestPlatformNorms:
     def test_the_ledger_is_classified_system_state(self):
         """Publication is historical fact, not run intelligence — it survives a reset, and
         an unclassified pk family would block every future reset at the census preflight."""
-        import phase_taxonomy as pt
+        from experiment import phase_taxonomy as pt
 
         assert pt.classify("DIARY_PUBLISH#youtube", "POST#ZZZZZZZZZZZ") == pt.SYSTEM_STATE
 

@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def _load_taxonomy():
-    spec = importlib.util.spec_from_file_location("_phase_taxonomy", ROOT / "lambdas" / "phase_taxonomy.py")
+    spec = importlib.util.spec_from_file_location("_phase_taxonomy", ROOT / "lambdas" / "experiment" / "phase_taxonomy.py")
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     return m
@@ -25,7 +25,7 @@ def _load_taxonomy():
 
 # ── #1248: the Elena partition comment is reconciled with the actual behavior ──
 def test_persona_comment_does_not_claim_elena_was_carried():
-    src = (ROOT / "lambdas" / "phase_taxonomy.py").read_text(encoding="utf-8")
+    src = (ROOT / "lambdas" / "experiment" / "phase_taxonomy.py").read_text(encoding="utf-8")
     assert "carried Elena straight into EP0" not in src, "#1248: the false 'carried Elena' claim is back in phase_taxonomy.py"
 
 

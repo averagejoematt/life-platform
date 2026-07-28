@@ -5,7 +5,7 @@ Reads facade state via `_g`."""
 from datetime import datetime, timedelta
 
 from boto3.dynamodb.conditions import Key
-from phase_filter import with_phase_filter
+from experiment.phase_filter import with_phase_filter
 
 from web.site_api_common import PT, USER_PREFIX, _decimal_to_float, _ok, logger
 
@@ -224,7 +224,7 @@ def character_calibration(*, _g) -> dict:
     EXPERIMENT_START = _g["EXPERIMENT_START"]
     _query_source = _g["_query_source"]
     from common.stats_core import effective_sample_size, fisher_ci, pearson_r
-    from experiment_gates import FELT_CALIBRATION_CI_MIN_WEEKS, FELT_CALIBRATION_MIN_WEEKS, felt_calibration_gates
+    from experiment.experiment_gates import FELT_CALIBRATION_CI_MIN_WEEKS, FELT_CALIBRATION_MIN_WEEKS, felt_calibration_gates
     from ritual_link import PROBE_PILLAR_MAP
 
     today = datetime.now(PT).strftime("%Y-%m-%d")

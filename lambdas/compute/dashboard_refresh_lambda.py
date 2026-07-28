@@ -19,7 +19,7 @@ from datetime import datetime, timedelta, timezone
 import boto3
 import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
-from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:

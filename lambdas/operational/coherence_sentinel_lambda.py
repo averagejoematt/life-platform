@@ -37,7 +37,7 @@ except ImportError:
     logger = logging.getLogger("coherence-sentinel")
     logger.setLevel(logging.INFO)
 
-import coherence_invariants as ci  # bundled shared module (pure cores)
+from experiment import coherence_invariants as ci  # bundled shared module (pure cores)
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE = os.environ.get("TABLE_NAME", "life-platform")
@@ -81,7 +81,7 @@ V2_COACHES = [
 ]
 
 try:
-    from phase_filter import with_phase_filter
+    from experiment.phase_filter import with_phase_filter
 except ImportError:  # pragma: no cover
 
     def with_phase_filter(kwargs, include_pilot=False):
@@ -177,7 +177,7 @@ def _gather_facts_and_narratives():
     Fail-soft to the 4 invariant-required fields if the module isn't importable."""
     cm = _latest("computed_metrics")
     try:
-        from canonical_facts import build_canonical_facts
+        from experiment.canonical_facts import build_canonical_facts
 
         facts = {k: v for k, v in build_canonical_facts(cm).items() if k != "as_of"}
     except Exception:  # noqa: BLE001 — bundled module; degrade to the core 4

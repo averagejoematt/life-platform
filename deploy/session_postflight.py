@@ -67,15 +67,21 @@ def check_layer_uniformity():
     return 0, offenders
 
 
-# Bundled-asset canaries: a function that imports a root-level lambdas/*.py module,
-# and the module(s) its zip MUST therefore contain. A cdk deploy once shipped an
-# asset MISSING every root module (the silent coherence-sentinel break, 2026-06-28:
+# Bundled-asset canaries: a function that imports a shared lambdas/ module, and the
+# module(s) its zip MUST therefore contain. A cdk deploy once shipped an asset
+# MISSING every root module (the silent coherence-sentinel break, 2026-06-28:
 # ImportModuleError, but the invoke still returned 200 + it ran "green" off a stale
 # artifact). Spread across stacks (Operational + Compute) since each deploys its own
 # copy of the shared asset at its own time. See reference_cdk_asset_staging_glitch.
+#
+# Paths are matched EXACTLY against the zip namelist, so they carry the in-bundle
+# prefix. #1653 moved these two out of the flat root into experiment/; without the
+# prefix every canary would have reported a false "missing module" on the next
+# deploy, i.e. the guard would have started crying wolf about the very failure it
+# exists to detect.
 _ASSET_CANARIES = {
-    "life-platform-coherence-sentinel": ["coherence_invariants.py", "canonical_facts.py"],
-    "ai-expert-analyzer": ["canonical_facts.py"],
+    "life-platform-coherence-sentinel": ["experiment/coherence_invariants.py", "experiment/canonical_facts.py"],
+    "ai-expert-analyzer": ["experiment/canonical_facts.py"],
 }
 
 

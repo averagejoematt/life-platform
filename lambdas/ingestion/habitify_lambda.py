@@ -56,7 +56,7 @@ from ingestion_framework import IngestionConfig, run_ingestion
 
 # #422: bounded, verbatim clip of a habit note (shared conventions module, bundled #781).
 try:
-    from habit_causality import clip_note
+    from experiment.habit_causality import clip_note
 except ImportError:  # pragma: no cover — the bundle always ships lambdas/ at root
 
     def clip_note(text, _max=500):

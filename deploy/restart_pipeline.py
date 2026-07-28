@@ -104,7 +104,7 @@ sys.path.insert(0, str(REPO_ROOT / "lambdas"))
 # ADR-077 registry — the single source of truth for what each pk family means.
 # READ-ONLY here (#1233 owns phase_taxonomy.py): the census preflight classifies a
 # representative of every live pk family through classify() and never mutates it.
-import phase_taxonomy as taxonomy  # noqa: E402
+from experiment import phase_taxonomy as taxonomy  # noqa: E402
 
 REGION = "us-west-2"
 TABLE = "life-platform"

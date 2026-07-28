@@ -52,7 +52,7 @@ s3 = boto3.client("s3", region_name=REGION)
 # ops plumbing, regenerating caches, and dead partitions. The hand-rolled list
 # this replaces had silently omitted 14 partitions (engagement_state, calibration,
 # forecast, travel, mood, temptations, …) — exports were quietly incomplete.
-from phase_taxonomy import SOURCE_CLASS, SYSTEM_STATE
+from experiment.phase_taxonomy import SOURCE_CLASS, SYSTEM_STATE
 
 # Exported despite not deriving cleanly:
 # - platform_memory: category-split in the taxonomy (durable vs coach-state), but

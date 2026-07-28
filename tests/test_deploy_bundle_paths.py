@@ -112,7 +112,7 @@ def test_site_api_lambdas_use_default_shared_bundle_asset():
 def test_staged_bundle_contains_the_modules_site_api_needs(tmp_path):
     """Structural layout-equivalence check: build_bundle.stage_tree() must
     still contain web/ (site_api_lambda.py + friends), reading/ (imported by
-    web/reading endpoints), and methods_registry.py at the bundle root — the
+    web/reading endpoints), and experiment/methods_registry.py in the bundle — the
     exact set the pre-#781 deploy_site_api.sh used to hand-curate."""
     out = build_bundle.stage_tree(str(tmp_path / "stage"))
 
@@ -120,7 +120,7 @@ def test_staged_bundle_contains_the_modules_site_api_needs(tmp_path):
         os.path.join("web", "site_api_lambda.py"),
         os.path.join("web", "site_api_ai_lambda.py"),
         os.path.join("reading", "__init__.py"),
-        "methods_registry.py",
+        os.path.join("experiment", "methods_registry.py"),
     ]
     for rel in must_exist:
         full = os.path.join(out, rel)

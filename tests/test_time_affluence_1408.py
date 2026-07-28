@@ -291,7 +291,7 @@ def test_time_affluence_probe_token_roundtrips():
 
 
 def test_phase_taxonomy_classifies_time_affluence_as_raw_timeseries():
-    import phase_taxonomy as pt
+    from experiment import phase_taxonomy as pt
 
     assert pt.SOURCE_CLASS["time_affluence"] == pt.RAW_TIMESERIES
     # classify() resolves DATE#, PROXY# and EDGE# skus all to the same source class

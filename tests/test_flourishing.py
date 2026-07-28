@@ -161,7 +161,7 @@ def test_mind_values_alignment_component_config_gated():
 
 
 def test_flourishing_registered_raw_timeseries():
-    from phase_taxonomy import RAW_TIMESERIES, SOURCE_CLASS
+    from experiment.phase_taxonomy import RAW_TIMESERIES, SOURCE_CLASS
 
     assert SOURCE_CLASS.get("flourishing") == RAW_TIMESERIES
 

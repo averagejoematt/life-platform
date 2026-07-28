@@ -264,7 +264,7 @@ def _canonical_facts() -> dict:
     on (canonical_facts.build_canonical_facts over the latest computed_metrics).
     Empty dict on any failure → grounded-digits check degrades to skipped."""
     try:
-        from canonical_facts import build_canonical_facts
+        from experiment.canonical_facts import build_canonical_facts
 
         resp = table.query(
             KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}computed_metrics"),

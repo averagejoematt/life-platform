@@ -6,7 +6,7 @@ import os
 
 from boto3.dynamodb.conditions import Key
 from common import stats_core
-from phase_filter import with_phase_filter
+from experiment.phase_filter import with_phase_filter
 
 from web.site_api_common import S3_REGION, USER_PREFIX, _decimal_to_float, _ok, logger
 

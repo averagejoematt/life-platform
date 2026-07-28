@@ -396,7 +396,7 @@ def lambda_handler(event, context):
         start_date = (datetime.now(timezone.utc) - timedelta(days=WINDOW_DAYS)).strftime("%Y-%m-%d")
 
         # ADR-058: registry aggregation is cycle-honest — pilot rows stay hidden.
-        from phase_filter import with_phase_filter
+        from experiment.phase_filter import with_phase_filter
 
         kwargs = {
             "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}notion")

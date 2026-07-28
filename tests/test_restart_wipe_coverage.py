@@ -25,7 +25,7 @@ sys.modules["restart_intelligence_wipe"] = wipe
 _spec.loader.exec_module(wipe)
 
 sys.path.insert(0, str(REPO_ROOT / "lambdas"))
-import phase_taxonomy as taxonomy  # noqa: E402
+from experiment import phase_taxonomy as taxonomy  # noqa: E402
 
 
 def test_registry_coverage_assertion_passes():

@@ -25,9 +25,9 @@ REPO = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(REPO, "lambdas"))
 sys.path.insert(0, HERE)
 
-import eval_retention  # noqa: E402
 import qa_manifest  # noqa: E402
 from common import qa_archive  # noqa: E402
+from experiment import eval_retention  # noqa: E402
 
 NOW = datetime(2026, 7, 20, 14, 30, 5, tzinfo=timezone.utc)
 

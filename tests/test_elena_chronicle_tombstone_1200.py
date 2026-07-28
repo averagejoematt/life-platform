@@ -205,7 +205,7 @@ def test_persona_elena_is_experiment_scoped():
     """The read-side guard only closes the bug because the wipe actually
     tombstones PERSONA#elena — pin that classification so a taxonomy change that
     would silently reopen this bug fails here too."""
-    import phase_taxonomy as pt
+    from experiment import phase_taxonomy as pt
 
     assert pt.classify("PERSONA#elena", "THREAD#2026-07-07#x") == pt.EXPERIMENT_SCOPED
     assert pt.classify("PERSONA#elena", "STANCE#latest") == pt.EXPERIMENT_SCOPED

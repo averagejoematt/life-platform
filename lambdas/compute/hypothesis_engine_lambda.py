@@ -61,14 +61,14 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
-import experiment_gates  # #1371: the ONE registry of arming thresholds
 from common import (
     digest_utils,  # shared query_range implementations (#970)
     stats_core,  # bundled shared module (#529): effect sizes + block-bootstrap CIs for the deterministic verdict
 )
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
-from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from experiment import experiment_gates  # #1371: the ONE registry of arming thresholds
+from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -1231,7 +1231,7 @@ def refit_cross_pillar_effects(force=False):
     fixed bootstrap seed — no LLM anywhere near a verdict, ADR-105). Every run
     recomputes from scratch, so status moves in BOTH directions. Never fatal to
     the hypothesis run."""
-    import effect_fitter
+    from experiment import effect_fitter
 
     try:
         latest = effect_fitter.load_latest_fit(table, USER_ID)

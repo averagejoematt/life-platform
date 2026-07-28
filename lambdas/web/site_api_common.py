@@ -29,7 +29,7 @@ from zoneinfo import ZoneInfo
 import boto3
 from boto3.dynamodb.conditions import Key  # noqa: F401 — re-exported for downstream use
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE as EXPERIMENT_START
-from phase_filter import with_phase_filter
+from experiment.phase_filter import with_phase_filter
 
 # ── Config ─────────────────────────────────────────────────
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")

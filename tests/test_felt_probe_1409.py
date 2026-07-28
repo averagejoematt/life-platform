@@ -25,8 +25,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 os.environ.setdefault("EMAIL_RECIPIENT", "test@example.com")
 os.environ.setdefault("EMAIL_SENDER", "test@example.com")
 
-import phase_taxonomy  # noqa: E402
 import ritual_link  # noqa: E402
+from experiment import phase_taxonomy  # noqa: E402
 from web import site_api_data as data  # noqa: E402
 
 
@@ -138,7 +138,7 @@ def _corr_fixture(n, rest_from_sleep=lambda s: s):
 
 
 def test_uncalibrated_below_the_arming_floor(monkeypatch):
-    from experiment_gates import FELT_CALIBRATION_MIN_WEEKS
+    from experiment.experiment_gates import FELT_CALIBRATION_MIN_WEEKS
 
     probes, sheets = _corr_fixture(FELT_CALIBRATION_MIN_WEEKS - 2)
     body = _calibration(monkeypatch, probes, sheets)
@@ -150,7 +150,7 @@ def test_uncalibrated_below_the_arming_floor(monkeypatch):
 
 
 def test_point_estimate_without_band_between_floors(monkeypatch):
-    from experiment_gates import FELT_CALIBRATION_CI_MIN_WEEKS, FELT_CALIBRATION_MIN_WEEKS
+    from experiment.experiment_gates import FELT_CALIBRATION_CI_MIN_WEEKS, FELT_CALIBRATION_MIN_WEEKS
 
     probes, sheets = _corr_fixture(FELT_CALIBRATION_MIN_WEEKS + 1)
     assert FELT_CALIBRATION_MIN_WEEKS + 1 < FELT_CALIBRATION_CI_MIN_WEEKS
@@ -162,7 +162,7 @@ def test_point_estimate_without_band_between_floors(monkeypatch):
 
 
 def test_band_appears_at_ci_floor_and_n_eff_reported(monkeypatch):
-    from experiment_gates import FELT_CALIBRATION_CI_MIN_WEEKS
+    from experiment.experiment_gates import FELT_CALIBRATION_CI_MIN_WEEKS
 
     probes, sheets = _corr_fixture(FELT_CALIBRATION_CI_MIN_WEEKS + 2)
     body = _calibration(monkeypatch, probes, sheets)

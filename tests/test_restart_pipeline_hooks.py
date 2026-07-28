@@ -314,8 +314,7 @@ def test_void_rows_are_cross_phase_and_not_brier_scorable():
     # Ties the fix to the taxonomy + calibration coverage: the ledger row classifies
     # CROSS_PHASE (never wiped) and 'voided_at_reset' is excluded from the Brier curve.
     sys.path.insert(0, str(REPO_ROOT / "lambdas"))
-    import calibration_core
-    import phase_taxonomy
+    from experiment import calibration_core, phase_taxonomy
 
     row = pipeline.build_void_calib_item(
         "hypothesis",
