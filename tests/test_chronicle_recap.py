@@ -29,10 +29,10 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "web"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "emails"))
 
-import budget_guard  # noqa: E402
 import chronicle_approve_lambda as approve  # noqa: E402
 import phase_taxonomy  # noqa: E402
 import wednesday_chronicle_lambda as chron  # noqa: E402
+from ai import budget_guard  # noqa: E402
 from web import site_api_coach as capi  # noqa: E402
 
 PUBLISHED = [

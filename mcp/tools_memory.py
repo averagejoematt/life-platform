@@ -29,7 +29,7 @@ from mcp.core import decimal_to_float as _d2f
 
 try:
     # Shared, bundled module (#781) — staged at zip root in the Lambda.
-    import platform_memory as _pm
+    from ai import platform_memory as _pm
 except ImportError:  # pragma: no cover — MCP bundle always ships lambdas/ at root
     if not TYPE_CHECKING:
         from lambdas import platform_memory as _pm

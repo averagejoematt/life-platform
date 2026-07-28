@@ -298,7 +298,7 @@ def bedrock_offtopic_classifier(text: str) -> OfftopicResult:
       * Bedrock/parse error → the exception propagates (caught upstream → classifier_error)
     """
     try:
-        import budget_guard
+        from ai import budget_guard
 
         if not budget_guard.allow(_BUDGET_FEATURE):
             return OfftopicResult(None, 0.0)  # paused → cannot vouch → hold
@@ -307,7 +307,7 @@ def bedrock_offtopic_classifier(text: str) -> OfftopicResult:
 
     import json
 
-    import bedrock_client
+    from ai import bedrock_client
 
     body = {
         "max_tokens": 60,

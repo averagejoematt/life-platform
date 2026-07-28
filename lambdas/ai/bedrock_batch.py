@@ -40,7 +40,8 @@ import time
 import uuid
 
 import boto3
-from bedrock_client import _ADAPTIVE_SURFACE_MARKERS, _PRICES, estimate_cost_usd, resolve_model_id
+
+from ai.bedrock_client import _ADAPTIVE_SURFACE_MARKERS, _PRICES, estimate_cost_usd, resolve_model_id
 
 # Bedrock hard floor — "Minimum number of records per batch inference job" is 100
 # for every current Claude model (Haiku 4.5, Sonnet 4.6, Opus 4.x). Verified via
@@ -114,7 +115,7 @@ def batch_preflight(record_count: int, model_name: str | None = None) -> tuple[b
         )
     # Tier-3 hard stop mirrors bedrock_client.invoke(): never spend when paused.
     try:
-        from budget_guard import current_tier
+        from ai.budget_guard import current_tier
 
         if current_tier() >= 3:
             return (False, "budget tier 3 — AI paused; not submitting a batch job")

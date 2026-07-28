@@ -38,14 +38,14 @@ ROOT = Path(__file__).resolve().parent.parent
 # new directory would silently shrink the clean surface — a module would leave the
 # mypy gate merely by being moved, which is exactly the ratchet regression this file
 # exists to prevent. Moving code must never reduce coverage.
-CLEAN_DIRS = ["lambdas", "lambdas/common", "lambdas/web", "mcp"]
+CLEAN_DIRS = ["lambdas", "lambdas/ai", "lambdas/common", "lambdas/web", "mcp"]
 
 # Modules that do NOT yet pass under mypy.ini. Each MUST carry a reason. This
 # denylist only shrinks. Paths are repo-root-relative.
 DIRTY = {
     # 3rd-party module with no stubs / unresolved sibling-Lambda imports
     # (import-not-found). Would need an ignore_missing_imports section.
-    "lambdas/audio_encode.py",  # imports lameenc (no type stubs)
+    "lambdas/ai/audio_encode.py",  # imports lameenc (no type stubs)
     "lambdas/coach_correction_resolver.py",  # imports ai_review_pack_lambda (sibling lambda, unresolved from root)
     # residual disabled-code / structural violations (need a dedicated pass):
     "lambdas/broadcast_sensitivity_gate.py",  # union-attr
@@ -78,13 +78,13 @@ CORE = [
     "lambdas/common/retry_utils.py",
     "lambdas/phase_filter.py",
     "lambdas/common/constants.py",
-    "lambdas/bedrock_client.py",
+    "lambdas/ai/bedrock_client.py",
     "lambdas/scoring_engine.py",
     "lambdas/character_engine.py",
     "lambdas/intelligence_common.py",
-    "lambdas/ai_calls.py",
-    "lambdas/ai_context.py",
-    "lambdas/ai_summaries.py",
+    "lambdas/ai/ai_calls.py",
+    "lambdas/ai/ai_context.py",
+    "lambdas/ai/ai_summaries.py",
     "lambdas/web/site_api_common.py",
     "lambdas/web/site_api_coach.py",
     "lambdas/web/site_api_intelligence.py",

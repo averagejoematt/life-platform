@@ -39,7 +39,7 @@ class CapExceeded(Exception):
 
 def _haiku_call(note_text: str, taxonomy) -> list:
     """The single Bedrock chokepoint for this feature. Returns a list of raw signals."""
-    from bedrock_client import invoke
+    from ai.bedrock_client import invoke
 
     allowed = ", ".join(sorted(taxonomy))
     body = {

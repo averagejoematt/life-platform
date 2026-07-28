@@ -33,7 +33,7 @@ from decimal import Decimal
 
 import boto3
 import privacy_guard  # deterministic real-name + vice scrub (layer module)
-from ai_context import (
+from ai.ai_context import (
     board_grounding_receipts,
     build_experiment_phase_context,
     format_experiment_phase_context,
@@ -215,7 +215,7 @@ def _ai_paused_response():
     readers degrade LAST), return a friendly HTTP-200 'paused' payload the
     frontend renders calmly; else None. Fail-open."""
     try:
-        from budget_guard import allow
+        from ai.budget_guard import allow
 
         if not allow("website_ai"):
             return {
@@ -904,7 +904,7 @@ def board_grounding_findings(system_text: str, message_text: str, answer_text: s
     follow-ups) its own prior answers. Extracted so the #812 golden-surface eval
     harness replays fixtures through the ACTUAL gate path, not a re-implementation.
     Returns grounded_generation findings ([] = grounded)."""
-    import grounded_generation as _gg
+    from ai import grounded_generation as _gg
 
     allowed = _gg.allowed_numbers(system_text, message_text, prior_answers or None)
     return _gg.grounding_findings(answer_text, allowed=allowed)
@@ -1217,7 +1217,7 @@ def _handle_ask(event: dict) -> dict:
         )
 
         # ADR-062 (2026-05-27): Bedrock invoke_model (was urllib → api.anthropic.com).
-        from bedrock_client import invoke as _bedrock_invoke
+        from ai.bedrock_client import invoke as _bedrock_invoke
 
         result = _bedrock_invoke(json.loads(req_body))
 
@@ -1231,7 +1231,7 @@ def _handle_ask(event: dict) -> dict:
         # the question, prior turns). One corrective regen; if numbers still
         # can't be grounded, say so honestly instead of serving them.
         try:
-            import grounded_generation as _gg
+            from ai import grounded_generation as _gg
 
             _allowed = _gg.allowed_numbers(system_prompt, question, [a_ for _, a_ in history])
 
@@ -1432,7 +1432,7 @@ def _handle_explain(event: dict) -> dict:
         "Explain what this page is showing right now, in 3-4 plain sentences."
     )
     try:
-        from bedrock_client import invoke as _bedrock_invoke
+        from ai.bedrock_client import invoke as _bedrock_invoke
 
         result = _bedrock_invoke(
             {
@@ -1447,7 +1447,7 @@ def _handle_explain(event: dict) -> dict:
 
         # ADR-104 fail-closed gate: every number must exist in the fetched JSON.
         try:
-            import grounded_generation as _gg
+            from ai import grounded_generation as _gg
 
             _allowed = _gg.allowed_numbers(payload_txt, day_ctx)
             if _gg.grounding_findings(explanation, allowed=_allowed):
@@ -1612,7 +1612,7 @@ def _handle_board_ask(event: dict) -> dict:
             # unavailable" for that persona. bedrock_client is bundled in
             # /var/task via Code.from_asset, so it imports even though site-api-ai
             # runs without the shared layer.
-            from bedrock_client import invoke as _bedrock_invoke
+            from ai.bedrock_client import invoke as _bedrock_invoke
 
             result = _bedrock_invoke(json.loads(req_body))
             # V2 follow-up: emit per-persona token metrics (was dark)
@@ -1626,7 +1626,7 @@ def _handle_board_ask(event: dict) -> dict:
             # a fabricated figure served to a reader.
             _grounded = True
             try:
-                import grounded_generation as _gg
+                from ai import grounded_generation as _gg
 
                 _gf = board_grounding_findings(_sys_txt, user_msg, _txt)
                 if _gf:
@@ -1823,7 +1823,7 @@ def _handle_board_followup(body: dict, ip_hash: str) -> dict:
     )
 
     _sys_txt = _coach_system(persona)
-    from bedrock_client import invoke as _bedrock_invoke
+    from ai.bedrock_client import invoke as _bedrock_invoke
 
     try:
         result = _bedrock_invoke(
@@ -1846,7 +1846,7 @@ def _handle_board_followup(body: dict, ip_hash: str) -> dict:
     # and the prior answers so referencing an earlier number is legitimate.
     _grounded = True
     try:
-        import grounded_generation as _gg
+        from ai import grounded_generation as _gg
 
         _msg_text = " ".join(m["content"] for m in messages if isinstance(m.get("content"), str))
         _gf = board_grounding_findings(_sys_txt, _msg_text, _txt, prior_answers=prior_answers)

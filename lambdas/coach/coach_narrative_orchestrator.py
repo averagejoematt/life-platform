@@ -1164,7 +1164,7 @@ def lambda_handler(event, context):
     try:
         # Budget guardrail: at Tier ≥ 1 skip the LLM and fall back to the cached/
         # default brief, so the coach pipeline keeps running with zero Bedrock spend.
-        from budget_guard import allow as _budget_allow
+        from ai.budget_guard import allow as _budget_allow
 
         if not _budget_allow("coach_narrative"):
             raise RuntimeError("coach narrative AI paused by budget tier — using fallback")

@@ -37,10 +37,10 @@ import re
 from datetime import datetime, timezone
 
 import boto3
-import google_tts
+from ai import google_tts
+from ai.grounded_generation import allowed_numbers, grounding_findings  # ADR-104 gate
 from boto3.dynamodb.conditions import Key
 from er03_gate import BANNED_CAUSAL  # the platform's one banned-causal-connective list
-from grounded_generation import allowed_numbers, grounding_findings  # ADR-104 gate
 
 try:
     from common.numeric import decimals_to_float
@@ -255,7 +255,7 @@ def narrate(facts: dict, presence_block: str = "") -> dict:
     quiet-stretch steering block; its numbers (e.g. the gap length) were handed to
     the model, so they join the grounding allow-list — honest, never fabricated."""
     try:
-        from budget_guard import allow
+        from ai.budget_guard import allow
 
         if not allow(BUDGET_FEATURE):
             return {"narrative": deterministic_fallback_narrative(facts), "narrated": False, "model": None, "reason": "budget_tier"}
@@ -263,7 +263,7 @@ def narrate(facts: dict, presence_block: str = "") -> dict:
         pass  # fail-open: a missing module must never take the debrief down
 
     try:
-        import bedrock_client
+        from ai import bedrock_client
 
         resp = bedrock_client.invoke(build_narration_body(facts, presence_block), model_name=MODEL)
         text = "".join(p.get("text", "") for p in (resp.get("content") or []) if isinstance(p, dict)).strip()

@@ -229,7 +229,7 @@ def test_track_record_still_excludes_conversation_learnings(monkeypatch):
 
 
 def _chronicle_data(conversation_refs):
-    import ai_context
+    from ai import ai_context
 
     return {
         "profile": {

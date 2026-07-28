@@ -67,7 +67,7 @@ os.environ.setdefault("EMAIL_RECIPIENT", "eval@example.com")
 os.environ.setdefault("EMAIL_SENDER", "eval@example.com")
 os.environ.setdefault("AI_VALIDATOR_AUTOLOAD", "off")
 
-import grounded_generation as gg  # noqa: E402
+from ai import grounded_generation as gg  # noqa: E402
 
 FIXTURE_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "golden_surfaces")
 

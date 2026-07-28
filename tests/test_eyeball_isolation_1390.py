@@ -24,8 +24,8 @@ ROOT = Path(__file__).resolve().parent.parent
 _LAMBDAS = ROOT / "lambdas"
 sys.path.insert(0, str(_LAMBDAS))
 
-import budget_guard  # noqa: E402
 import eyeball_calibration as ec  # noqa: E402
+from ai import budget_guard  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fakes import FakeDdbTable  # noqa: E402

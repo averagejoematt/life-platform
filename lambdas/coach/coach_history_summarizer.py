@@ -171,7 +171,7 @@ from common.retry_utils import _emit_token_metrics  # noqa: E402,F401
 # named fast-follow"). Fails open (gate becomes a no-op) if the shared module
 # is somehow missing from the bundle/layer — never blocks stance generation.
 try:
-    from grounded_generation import allowed_numbers, grounding_findings, regen_once
+    from ai.grounded_generation import allowed_numbers, grounding_findings, regen_once
 except ImportError:  # pragma: no cover — environment-dependent
     allowed_numbers = grounding_findings = regen_once = None
 
@@ -179,7 +179,7 @@ except ImportError:  # pragma: no cover — environment-dependent
 # questions (INTERACTION#) — delimit that untrusted text as data. Fail-soft to a
 # local no-op if the shared module is somehow missing from the bundle.
 try:
-    from ai_context import wrap_untrusted_reader_text
+    from ai.ai_context import wrap_untrusted_reader_text
 except ImportError:  # pragma: no cover — environment-dependent
 
     def wrap_untrusted_reader_text(text):
@@ -1498,7 +1498,7 @@ def _handle_event_stance_refresh(event):
     # already checked before invoking, but this Lambda runs async and the
     # tier can move between that check and this run.
     try:
-        from budget_guard import allow as _budget_allow
+        from ai.budget_guard import allow as _budget_allow
 
         if not _budget_allow("coach_narrative"):
             logger.info("[event-stance] %s skipped — budget tier paused coach narratives", coach_id)

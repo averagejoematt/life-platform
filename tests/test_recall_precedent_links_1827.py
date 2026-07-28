@@ -37,7 +37,7 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "emails"))
 
 import chronicle_render as cr  # noqa: E402
-import semantic_recall as sr  # noqa: E402
+from ai import semantic_recall as sr  # noqa: E402
 from common.constants import EXPERIMENT_START_DATE  # noqa: E402
 
 

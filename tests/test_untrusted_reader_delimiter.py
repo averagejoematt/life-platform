@@ -32,7 +32,8 @@ os.environ.setdefault("TABLE_NAME", "life-platform")
 os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
 os.environ.setdefault("AWS_REGION", "us-west-2")
 
-from ai_context import UNTRUSTED_CLOSE, UNTRUSTED_OPEN, UNTRUSTED_PREAMBLE, wrap_untrusted_reader_text  # noqa: E402
+from ai.ai_context import UNTRUSTED_CLOSE, UNTRUSTED_OPEN, UNTRUSTED_PREAMBLE, wrap_untrusted_reader_text  # noqa: E402
+from bundle_stubs import stub_bundled_module
 from fakes import FakeDdbTable, json_safe_put_hook, make_session_update_hook  # noqa: E402
 
 
@@ -110,7 +111,7 @@ def _wire(ai, monkeypatch, table, bedrock_text="Steady progress. Keep the routin
             captured["reqs"].append(req)
             return {"content": [{"type": "text", "text": bedrock_text}], "usage": {}}
 
-    monkeypatch.setitem(sys.modules, "bedrock_client", _FakeBedrock)
+    stub_bundled_module(monkeypatch, "ai.bedrock_client", _FakeBedrock)
     return captured
 
 

@@ -199,7 +199,7 @@ def test_vice_policy_is_sourced_from_privacy_guard():
 
 # ── The production Bedrock classifier is fail-closed at the budget seam ───────────────
 def test_bedrock_classifier_holds_when_budget_paused(monkeypatch):
-    import budget_guard
+    from ai import budget_guard
 
     monkeypatch.setattr(budget_guard, "allow", lambda feature: False)
     res = gate.bedrock_offtopic_classifier("any text")

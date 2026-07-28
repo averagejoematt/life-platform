@@ -20,7 +20,8 @@ import pytest
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 
-import bedrock_batch as bb  # noqa: E402
+from ai import bedrock_batch as bb  # noqa: E402
+from bundle_stubs import stub_bundled_module
 
 
 # ── eligibility floor (the load-bearing gate today) ─────────────────────────
@@ -42,7 +43,7 @@ def test_floor_is_100():
 def test_tier3_blocks_even_above_floor(monkeypatch):
     stub = types.ModuleType("budget_guard")
     stub.current_tier = lambda: 3
-    monkeypatch.setitem(sys.modules, "budget_guard", stub)
+    stub_bundled_module(monkeypatch, "ai.budget_guard", stub)
     ok, reason = bb.batch_preflight(500, "claude-sonnet-4-6")
     assert ok is False
     assert "tier 3" in reason
@@ -51,7 +52,7 @@ def test_tier3_blocks_even_above_floor(monkeypatch):
 def test_tier0_allows_above_floor(monkeypatch):
     stub = types.ModuleType("budget_guard")
     stub.current_tier = lambda: 0
-    monkeypatch.setitem(sys.modules, "budget_guard", stub)
+    stub_bundled_module(monkeypatch, "ai.budget_guard", stub)
     ok, _ = bb.batch_preflight(500, "claude-sonnet-4-6")
     assert ok is True
 
@@ -108,7 +109,7 @@ def test_run_or_fallback_below_floor_runs_realtime():
 def test_run_or_fallback_above_floor_not_yet_enabled(monkeypatch):
     stub = types.ModuleType("budget_guard")
     stub.current_tier = lambda: 0
-    monkeypatch.setitem(sys.modules, "budget_guard", stub)
+    stub_bundled_module(monkeypatch, "ai.budget_guard", stub)
     records = [bb.build_jsonl_record(f"R{i}", {"messages": [], "max_tokens": 5}, "claude-sonnet-4-6") for i in range(150)]
     with pytest.raises(NotImplementedError):
         bb.run_or_fallback(records, "claude-sonnet-4-6", lambda mi: None)

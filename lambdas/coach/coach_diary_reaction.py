@@ -184,7 +184,7 @@ def build_reaction_prompt(coach_id, ctx):
 
 
 def _default_generate_fn(system, user):
-    from ai_calls import call_anthropic
+    from ai.ai_calls import call_anthropic
 
     return call_anthropic(user, max_tokens=_MAX_TOKENS, system=system)
 
@@ -193,7 +193,7 @@ def _default_ground_fn(label, draft, allow_sources):
     """ADR-104 number allow-list gate in DETECTION-ONLY mode — a no-op regen so it
     never spends a second generation call (the reaction carries no numeric facts to
     correct; the real leak boundary is diary_consent). Fail-soft."""
-    from ai_calls import _ground_legacy_output
+    from ai.ai_calls import _ground_legacy_output
 
     return _ground_legacy_output(label, draft, lambda _note: draft, *allow_sources)
 
@@ -201,7 +201,7 @@ def _default_ground_fn(label, draft, allow_sources):
 def _default_quality_gate_fn(lambda_client, coach_id, text, brief):
     """ADR-108 regenerate-or-hold with max_regenerations=0 (hold, don't re-generate —
     honours the one-call-max AC). Returns (text|None, report)."""
-    from ai_calls import _enforce_quality_gate
+    from ai.ai_calls import _enforce_quality_gate
 
     return _enforce_quality_gate(lambda_client, coach_id, text, brief, lambda _note: text, max_regenerations=0)
 
@@ -283,7 +283,7 @@ def generate_diary_reaction(
 
 
 def _default_budget_allow(feature):
-    import budget_guard
+    from ai import budget_guard
 
     return budget_guard.allow(feature)
 

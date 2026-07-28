@@ -52,7 +52,7 @@ for _p in (os.path.join(_REPO, "lambdas"), os.path.join(_REPO, "lambdas", "intel
 # Keep any incidental boto3 client construction hermetic (only reached under --judge/--emit).
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
-import grounded_generation as gg  # noqa: E402
+from ai import grounded_generation as gg  # noqa: E402
 
 # The tight vital-contradiction detector — import it directly so a broken import
 # is a loud harness failure (a self-test asserts it is wired), never a silently
@@ -300,7 +300,7 @@ def _run_voice_judge(golden, sample_per_coach=1):
     a single number. Never affects the verdict. Fail-soft — any Bedrock error
     returns a null score rather than failing the harness."""
     try:
-        import bedrock_client
+        from ai import bedrock_client
     except Exception as e:  # pragma: no cover
         return {"available": False, "reason": f"bedrock_client import failed: {e}"}
 

@@ -81,7 +81,7 @@ except ImportError:
 
 # AI-3: Output validation
 try:
-    from ai_output_validator import AIOutputType, validate_ai_output
+    from ai.ai_output_validator import AIOutputType, validate_ai_output
 
     _HAS_AI_VALIDATOR = True
 except ImportError:
@@ -539,7 +539,7 @@ def _run_margaret_edit_pass(raw_installment, week_num, date_str, elena_prompt, a
     (budget pause, bad JSON, a rejected revision) simply returns Elena's draft
     untouched."""
     try:
-        from budget_guard import allow as _budget_allow
+        from ai.budget_guard import allow as _budget_allow
 
         if not _budget_allow("chronicle_editor"):
             logger.info("[margaret] budget tier pauses the editor pass — keeping Elena's draft as-is")
@@ -548,7 +548,7 @@ def _run_margaret_edit_pass(raw_installment, week_num, date_str, elena_prompt, a
         pass
 
     try:
-        import margaret_editor_pass as _mep
+        from ai import margaret_editor_pass as _mep
 
         config = board_loader.load_board(s3, S3_BUCKET) if _HAS_BOARD_LOADER else None
         narrator = _mep.build_narrator(config)
@@ -607,7 +607,7 @@ def lambda_handler(event: dict, context) -> dict:
     # Budget guardrail: skip this week's chronicle when the budget guard pauses it
     # (weekly, non-essential, subscriber-facing) — no Bedrock spend, clean no-op.
     try:
-        from budget_guard import allow
+        from ai.budget_guard import allow
 
         # Chronicle is weekly flagship content (~$1/wk of Bedrock) and the Friday Panel
         # podcast's ONLY input — so it must survive tier 1 and only pause at tier 2,
@@ -779,7 +779,7 @@ def lambda_handler(event: dict, context) -> dict:
     # finding degrades to the best draft instead of going dark.
     _allowed = None
     try:
-        import grounded_generation as _gg
+        from ai import grounded_generation as _gg
 
         # #1385: fold the whole-life archive into the allow-list source — Elena was
         # shown it, so its numbers/dates are grounded vocabulary, not fabrications.

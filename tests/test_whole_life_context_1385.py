@@ -169,15 +169,15 @@ def test_fabricated_dated_callback_is_caught_even_with_whole_life_context():
 
 
 def test_bedrock_structured_output_config_shape():
-    import bedrock_client
     import chronicle_schema
+    from ai import bedrock_client
 
     cfg = bedrock_client.structured_output_config(chronicle_schema.INSTALLMENT_SCHEMA)
     assert cfg == {"format": {"type": "json_schema", "schema": chronicle_schema.INSTALLMENT_SCHEMA}}
 
 
 def test_invoke_forwards_output_config_and_strips_model(monkeypatch):
-    import bedrock_client
+    from ai import bedrock_client
 
     captured = {}
 
@@ -244,9 +244,8 @@ def test_parse_stats_line_feeds_schema_validation():
 
 def test_state_of_matthew_still_budget_gated(monkeypatch):
     som = importlib.import_module("state_of_matthew_lambda")
-    import budget_guard
+    from ai import budget_guard  # This surface pauses at tier 2 alongside the other reader narratives (ADR-125).
 
-    # This surface pauses at tier 2 alongside the other reader narratives (ADR-125).
     assert som.BUDGET_FEATURE == "state_of_matthew"
 
     monkeypatch.setattr(budget_guard, "allow", lambda feature: False)  # simulate the pause

@@ -203,7 +203,7 @@ def _pctx(days_in):
 
 
 def test_early_phase_block_carries_reset_no_scold_clause():
-    from ai_context import format_experiment_phase_context
+    from ai.ai_context import format_experiment_phase_context
 
     block = format_experiment_phase_context(_pctx(days_in=1))
     assert "RESET-MANUFACTURED GAPS ARE NOT LAPSES" in block
@@ -211,7 +211,7 @@ def test_early_phase_block_carries_reset_no_scold_clause():
 
 
 def test_post_early_phase_block_omits_reset_clause():
-    from ai_context import format_experiment_phase_context
+    from ai.ai_context import format_experiment_phase_context
 
     block = format_experiment_phase_context(_pctx(days_in=20))
     assert "RESET-MANUFACTURED" not in block

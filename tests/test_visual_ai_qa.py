@@ -23,10 +23,10 @@ if _TESTS_DIR not in sys.path:
     sys.path.insert(0, _TESTS_DIR)  # for `import visual_qa`, `import visual_ai_qa`, `import qa_manifest`
 
 import boto3  # noqa: E402
-import budget_guard  # noqa: E402  (lambdas/ on sys.path via conftest)
 import qa_manifest  # noqa: E402
 import visual_ai_qa  # noqa: E402
 import visual_qa  # noqa: E402
+from ai import budget_guard  # noqa: E402  (lambdas/ on sys.path via conftest)
 
 # ── ai_qa_targets: the pure tier filter ────────────────────────────────────────
 

@@ -319,7 +319,7 @@ def check_anthropic(canary_ts: str) -> tuple[bool, str, float]:
     t0 = time.monotonic()
     try:
         import botocore.exceptions as _bce
-        from bedrock_client import invoke as _bedrock_invoke
+        from ai.bedrock_client import invoke as _bedrock_invoke
     except Exception as e:
         return None, f"bedrock_client import failed — skipping: {e}", 0.0
 

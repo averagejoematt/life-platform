@@ -24,10 +24,11 @@ from datetime import date as _date_cls
 from typing import Any, Optional, Union
 
 import boto3
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 
 # God-module split slices 2+3: pure context/scoring + domain-data builders moved
 # to ai_context.py. Re-exported so callers + the coach functions keep working.
-from ai_context import (  # noqa: F401
+from ai.ai_context import (  # noqa: F401
     _build_acwr_coaching_context,
     _build_cross_pillar_tradeoffs,
     _build_explorer_data,
@@ -59,7 +60,7 @@ from ai_context import (  # noqa: F401
 # moved to ai_summaries.py. Re-exported here so callers (daily_brief_lambda via
 # `import ai_calls`) keep working unchanged, and so the ~90 in-module _safe_float
 # references resolve.
-from ai_summaries import (  # noqa: F401
+from ai.ai_summaries import (  # noqa: F401
     _avg,
     _safe_float,
     build_activity_summary,
@@ -67,11 +68,10 @@ from ai_summaries import (  # noqa: F401
     build_food_summary,
     build_workout_summary,
 )
-from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 
 # AI-3 middleware: lazy import of output validator (transparent fail-safe)
 try:
-    from ai_output_validator import AIOutputType, validate_ai_output as _validate_ai_output
+    from ai.ai_output_validator import AIOutputType, validate_ai_output as _validate_ai_output
 
     _AI_VALIDATOR_AVAILABLE = True
 except ImportError:
@@ -318,7 +318,8 @@ def call_anthropic(  # type: ignore[return]  # loop always returns text or the A
     # preserved via cache_control blocks in sys_block. Response shape is
     # identical to the direct API, so parsing/validation below is unchanged.
     import botocore.exceptions as _bce
-    from bedrock_client import invoke as _bedrock_invoke
+
+    from ai.bedrock_client import invoke as _bedrock_invoke
 
     max_attempts = len(_BACKOFF_DELAYS) + 1  # 4
     for attempt in range(1, max_attempts + 1):
@@ -412,7 +413,7 @@ def _ground_legacy_output(label, output, regen_fn, *allow_sources):
     if not output or not isinstance(output, str) or _is_ai_unavailable(output):
         return output
     try:
-        import grounded_generation as _gg  # bundled shared module (ADR-104)
+        from ai import grounded_generation as _gg  # bundled shared module (ADR-104)
 
         _allowed = _gg.allowed_numbers(*allow_sources)
 
@@ -1499,14 +1500,13 @@ def _semantic_recall_for_coach(coach_id, query_text, *, table=None, exclude_date
         if not (query_text or "").strip():
             return "", []
         try:
-            from budget_guard import allow as _budget_allow
+            from ai.budget_guard import allow as _budget_allow
 
             if not _budget_allow("semantic_recall"):
                 return "", []
         except ImportError:
             pass
-        import bedrock_client as _bc
-        import semantic_recall as _sr
+        from ai import bedrock_client as _bc, semantic_recall as _sr
 
         if table is None:
             table = boto3.resource("dynamodb", region_name="us-west-2").Table(os.environ.get("TABLE_NAME", "life-platform"))
@@ -1648,7 +1648,7 @@ def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
         # render unchanged.
         _memory_block = ""
         try:
-            from platform_memory import platform_memory_block as _pmb
+            from ai.platform_memory import platform_memory_block as _pmb
 
             _mb = _pmb(coach_id=coach_id)
             if _mb:
@@ -1669,9 +1669,10 @@ def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
         _canon_facts = {}
         _facts_block = ""
         try:
-            import grounded_generation as _gg_mod  # bundled + layer (ADR-104)
             from boto3.dynamodb.conditions import Key as _Key
             from canonical_facts import build_canonical_facts as _bcf
+
+            from ai import grounded_generation as _gg_mod  # bundled + layer (ADR-104)
 
             _tbl = boto3.resource("dynamodb", region_name="us-west-2").Table(os.environ.get("TABLE_NAME", "life-platform"))
             _cm = _tbl.query(
@@ -1930,7 +1931,7 @@ Write your {domain_label} coaching section now."""
                 # regen_once WITHOUT false-flagging ordinary data dates the way a blanket
                 # allowed_dates gate would. Additive, never load-bearing.
                 try:
-                    import semantic_recall as _sr_mod
+                    from ai import semantic_recall as _sr_mod
                 except Exception:  # noqa: BLE001
                     _sr_mod = None
 
@@ -2031,7 +2032,7 @@ Write your {domain_label} coaching section now."""
         _gen_date = _date_cls.today().isoformat()
         _freshness_findings = []
         try:
-            import grounded_generation as _gg_fresh
+            from ai import grounded_generation as _gg_fresh
 
             _freshness_findings = _gg_fresh.baseline_freshness_findings(
                 output or "",
@@ -2063,7 +2064,7 @@ Write your {domain_label} coaching section now."""
         # presence-ack gate above. Fail-soft: never raises into the generation path.
         _behavioral_findings = []
         try:
-            import grounded_generation as _gg_behav
+            from ai import grounded_generation as _gg_behav
 
             _avail_logs = _available_logs_for_today(data, brief, _gen_date)
             _behavioral_findings = _gg_behav.ungrounded_behavioral_findings(

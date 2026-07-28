@@ -35,7 +35,7 @@ os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
-import semantic_recall as sr  # noqa: E402
+from ai import semantic_recall as sr  # noqa: E402
 
 CHRONICLE_PK = "USER#matthew#SOURCE#chronicle"
 

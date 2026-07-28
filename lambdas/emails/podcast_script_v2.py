@@ -25,7 +25,7 @@ to v1: the show never dies to an upgrade.
 import json
 from datetime import datetime, timezone
 
-from ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
+from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
 
 # #1178: optional topical color — the caller fetches once per run into beats["zeitgeist"].
 try:

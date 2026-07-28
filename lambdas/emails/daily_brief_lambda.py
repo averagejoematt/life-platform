@@ -138,7 +138,7 @@ except ImportError:
 
 # AI-3: Output Validator — validates coaching text before delivery
 try:
-    from ai_output_validator import validate_daily_brief_outputs
+    from ai.ai_output_validator import validate_daily_brief_outputs
 
     _HAS_AI_VALIDATOR = True
 except ImportError:
@@ -158,12 +158,10 @@ except ImportError:
     logger = _log.getLogger("daily-brief")
     logger.setLevel(_log.INFO)
 
-import ai_calls
-
-# -- Extracted module imports ---------------------------------------------------
 import html_builder
 import output_writers
 import training_load  # shared TSS-like load model + Banister core (layer module, #490)
+from ai import ai_calls  # -- Extracted module imports ---------------------------------------------------
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
@@ -1195,7 +1193,7 @@ def _daily_brief_ai_allowed() -> bool:
     (budget_guard.current_tier() itself fails open to tier 0).
     """
     try:
-        import budget_guard
+        from ai import budget_guard
 
         if not budget_guard.allow("daily_brief_ai"):
             logger.info("[budget] daily_brief_ai paused by budget tier — falling back to the data-only brief")
@@ -1931,7 +1929,7 @@ def lambda_handler(event, context):
     # Fail-soft: missing/stale/malformed breakdown → the line is simply absent.
     _budget_headroom_line = None
     try:
-        import budget_guard
+        from ai import budget_guard
 
         _budget_headroom_line = budget_guard.format_headroom_line(budget_guard.read_breakdown()) or None
     except Exception as _bh_err:

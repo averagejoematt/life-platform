@@ -15,8 +15,8 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "emails"))
 
-import budget_guard  # noqa: E402
 import persona_registry  # noqa: E402
+from ai import budget_guard  # noqa: E402
 from emails import coach_panel_podcast_lambda as panel  # noqa: E402
 
 
@@ -199,7 +199,7 @@ def test_qa_review_fails_closed_on_judge_error(monkeypatch):
     # #1122: if the judge/Bedrock blows up, QA must fail CLOSED — the episode holds
     # instead of publishing unreviewed (judge failure means silence, not a broken
     # episode). Inverts the pre-#1122 fail-open behavior.
-    import bedrock_client
+    from ai import bedrock_client
 
     def _boom(*a, **k):
         raise RuntimeError("bedrock down")
@@ -261,7 +261,7 @@ def test_run_intro_holds_on_qa_fails_never_publishes(monkeypatch):
     # #1122 hard gate: a best candidate that still fails QA after all re-rolls must
     # HOLD (regenerate-or-hold, ADR-087) — never publish. Judge exception drives the
     # fail here, covering the fail-closed path end-to-end.
-    import bedrock_client
+    from ai import bedrock_client
 
     monkeypatch.setattr(panel, "_load_bible", lambda: {"characters": {"matthew": "an ordinary, technical, curious person"}})
     clean_script = [

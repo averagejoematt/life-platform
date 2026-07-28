@@ -7,7 +7,7 @@ conflicts with the user's known health context.
 
 USAGE (in ai_calls.py or any Lambda after receiving AI output):
 
-    from ai_output_validator import validate_ai_output, AIOutputType
+    from ai.ai_output_validator import validate_ai_output, AIOutputType
 
     result = validate_ai_output(
         text=bod_insight,

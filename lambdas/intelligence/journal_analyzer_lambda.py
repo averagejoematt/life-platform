@@ -437,7 +437,7 @@ def lambda_handler(event, context):
         # unavailability must never break journal aggregation.
         conv_dated = []
         try:
-            import conversation_enrichment
+            from ai import conversation_enrichment
 
             conv_dated = conversation_enrichment.enriched_conversational_records(table, start_date, today)
         except Exception as ce:

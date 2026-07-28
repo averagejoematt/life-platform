@@ -12,6 +12,8 @@ import json
 import os
 import sys
 
+from bundle_stubs import stub_bundled_module
+
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -65,7 +67,7 @@ def test_client_numbers_are_never_trusted(monkeypatch):
             captured["user"] = req["messages"][0]["content"]
             return {"content": [{"type": "text", "text": "Recovery moved 3.7 this month."}], "usage": {}}
 
-    monkeypatch.setitem(sys.modules, "bedrock_client", _FakeBedrock)
+    stub_bundled_module(monkeypatch, "ai.bedrock_client", _FakeBedrock)
     resp = ai._handle_explain(_post_event({"surface": "what_changed", "data": {"weight": 12345}}))
     assert resp["statusCode"] == 200
     assert "3.7" in captured["user"]
@@ -84,7 +86,7 @@ def test_ungrounded_numbers_fail_closed(monkeypatch):
         def invoke(req):
             return {"content": [{"type": "text", "text": "HRV climbed from 48 to 63 ms this month."}], "usage": {}}
 
-    monkeypatch.setitem(sys.modules, "bedrock_client", _FakeBedrock)
+    stub_bundled_module(monkeypatch, "ai.bedrock_client", _FakeBedrock)
     resp = ai._handle_explain(_post_event({"surface": "what_changed"}))
     body = json.loads(resp["body"])
     assert "rather not narrate numbers" in body["explanation"]

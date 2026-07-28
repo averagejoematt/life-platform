@@ -101,7 +101,7 @@ class TestPhaseContextPlacement:
         # what day/phase it is (a Day-2 challenge can't hope for a 30-day trend).
         # The canonical registry lives in tests/test_phase_context_coverage.py;
         # this pins the same contract next to the generator's own tests.
-        import ai_context
+        from ai import ai_context
 
         prompt = chg.build_generation_prompt({})
         assert ai_context.PHASE_CONTEXT_MARKER in prompt
@@ -109,6 +109,6 @@ class TestPhaseContextPlacement:
     def test_cached_system_prompt_stays_byte_stable(self):
         # COST-OPT-2: SYSTEM_PROMPT ships under cache_control — the daily-
         # changing phase block must never ride it.
-        import ai_context
+        from ai import ai_context
 
         assert ai_context.PHASE_CONTEXT_MARKER not in chg.SYSTEM_PROMPT

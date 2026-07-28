@@ -27,9 +27,10 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "compute"))
 
-import budget_guard  # noqa: E402
 import persona_registry  # noqa: E402
+from ai import budget_guard  # noqa: E402
 from boto3.dynamodb.conditions import AttributeBase  # noqa: E402
+from bundle_stubs import stub_bundled_module
 from compute import coach_memoir_lambda as writer  # noqa: E402
 
 # ── A real (small) DynamoDB query evaluator, not a stub — the quarter-window
@@ -255,7 +256,7 @@ def test_generate_prompt_carries_only_real_facts_no_invented_numbers(monkeypatch
     fake_bedrock = _RecordingBedrock(
         ["My hit rate held at 50% this quarter. My hrv_ms call on recovery didn't hold up, and I have to own that."]
     )
-    monkeypatch.setitem(sys.modules, "bedrock_client", fake_bedrock)
+    stub_bundled_module(monkeypatch, "ai.bedrock_client", fake_bedrock)
 
     persona = {"name": "Dr. Lisa Park", "board_role": "Sleep Science"}
     text, reasons = writer._generate_memoir(persona, "{}", "", facts, "2026-Q3")
@@ -282,7 +283,7 @@ def test_generate_retries_once_then_drops_on_persistent_gate_failure(monkeypatch
             "Another strong quarter — 97% again, no complaints from me.",
         ]
     )
-    monkeypatch.setitem(sys.modules, "bedrock_client", fake_bedrock)
+    stub_bundled_module(monkeypatch, "ai.bedrock_client", fake_bedrock)
 
     persona = {"name": "Dr. Lisa Park", "board_role": "Sleep Science"}
     text, reasons = writer._generate_memoir(persona, "{}", "", facts, "2026-Q3")
@@ -305,7 +306,7 @@ def test_end_to_end_quarterly_gate_regenerates_only_on_a_new_quarter(monkeypatch
 
     good_memoir = "My hit rate held at 50% this quarter. My hrv_ms call on recovery didn't hold up, and I have to own that."
     fake_bedrock = _RecordingBedrock([good_memoir])
-    monkeypatch.setitem(sys.modules, "bedrock_client", fake_bedrock)
+    stub_bundled_module(monkeypatch, "ai.bedrock_client", fake_bedrock)
 
     out1 = writer.lambda_handler({}, None)
     assert out1["quarter"] == "2026-Q3"

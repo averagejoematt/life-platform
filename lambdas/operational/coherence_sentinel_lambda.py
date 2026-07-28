@@ -346,7 +346,7 @@ def _semantic_pass(facts, narratives):
     """A Haiku read on whether the served narratives cohere with the facts —
     the content analogue of the visual AI-QA. Budget-gated; fail-soft."""
     try:
-        import budget_guard
+        from ai import budget_guard
 
         if not budget_guard.allow("coherence_semantic"):
             return None
@@ -355,7 +355,7 @@ def _semantic_pass(facts, narratives):
     if not narratives:
         return None
     try:
-        import bedrock_client
+        from ai import bedrock_client
 
         facts_line = "; ".join(f"{k}={v}" for k, v in facts.items() if v is not None)
         joined = "\n\n".join(n[:600] for n in narratives[:8])

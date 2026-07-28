@@ -61,7 +61,7 @@ from common import qa_archive  # #1691 (epic #1687): re-run the baseline-freshne
 # text, not trusting generation-time meta). Both shared modules ship in every
 # bundle (#781); import fail-soft so the email never dies on a missing module.
 try:
-    import grounded_generation as _gg
+    from ai import grounded_generation as _gg
     from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE
 except Exception:  # pragma: no cover — bundle-dependent; the flag simply degrades off
     _gg = None

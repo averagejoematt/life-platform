@@ -30,9 +30,11 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
-import bedrock_client as bc  # noqa: E402
 import boto3  # noqa: E402
-import semantic_recall as sr  # noqa: E402
+from ai import (
+    bedrock_client as bc,  # noqa: E402
+    semantic_recall as sr,  # noqa: E402
+)
 from boto3.dynamodb.conditions import Key  # noqa: E402
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")

@@ -705,7 +705,7 @@ def lambda_handler(event, context):
 
     try:
         # Budget guardrail: at Tier ≥ 1 skip the LLM and use the default digest.
-        from budget_guard import allow as _budget_allow
+        from ai.budget_guard import allow as _budget_allow
 
         if not _budget_allow("ensemble"):
             raise RuntimeError("ensemble digest AI paused by budget tier — using fallback")

@@ -234,7 +234,7 @@ def test_handler_injects_stance_into_brief(monkeypatch):
     monkeypatch.setattr(orch, "_build_user_message", lambda *a, **k: [{"type": "text", "text": "x"}])
     monkeypatch.setattr(orch, "_call_haiku", lambda **k: {"coach_id": "sleep_coach", "generation_brief": {"narrative_beat": "x"}})
     monkeypatch.setattr(orch, "_cache_brief", lambda *a, **k: None)
-    import budget_guard
+    from ai import budget_guard
 
     monkeypatch.setattr(budget_guard, "allow", lambda feature: True)
 
@@ -399,7 +399,7 @@ def test_handler_injects_protocols_into_brief(monkeypatch):
     monkeypatch.setattr(orch, "_build_user_message", lambda *a, **k: [{"type": "text", "text": "x"}])
     monkeypatch.setattr(orch, "_call_haiku", lambda **k: {"coach_id": "sleep_coach", "generation_brief": {"narrative_beat": "x"}})
     monkeypatch.setattr(orch, "_cache_brief", lambda *a, **k: None)
-    import budget_guard
+    from ai import budget_guard
 
     monkeypatch.setattr(budget_guard, "allow", lambda feature: True)
 
@@ -414,7 +414,7 @@ def test_handler_omits_protocols_when_none(monkeypatch):
     monkeypatch.setattr(orch, "_build_user_message", lambda *a, **k: [{"type": "text", "text": "x"}])
     monkeypatch.setattr(orch, "_call_haiku", lambda **k: {"coach_id": "sleep_coach", "generation_brief": {"narrative_beat": "x"}})
     monkeypatch.setattr(orch, "_cache_brief", lambda *a, **k: None)
-    import budget_guard
+    from ai import budget_guard
 
     monkeypatch.setattr(budget_guard, "allow", lambda feature: True)
 

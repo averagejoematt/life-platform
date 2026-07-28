@@ -35,9 +35,9 @@ from datetime import datetime, timezone
 
 import boto3
 import calibration_core
-import grounded_generation
 import memoir_gate
 import persona_registry
+from ai import grounded_generation
 from boto3.dynamodb.conditions import Key
 from common import quarter_utils
 from common.numeric import decimals_to_float, floats_to_decimal
@@ -228,7 +228,7 @@ def _render_facts_for_prompt(facts):
 
 
 def _call_model(persona, voice_rules, example, facts_text, quarter, extra_system=""):
-    import bedrock_client
+    from ai import bedrock_client
 
     sys_block = f"{_SYSTEM_RULES}\n\nYour voice rules: {voice_rules}"
     if example:
@@ -360,7 +360,7 @@ def _latest_memoir(table, coach_id):
 
 def lambda_handler(event: dict, context) -> dict:
     try:
-        from budget_guard import allow as _budget_allow
+        from ai.budget_guard import allow as _budget_allow
 
         if not _budget_allow(FEATURE):
             logger.info("[coach_memoir] budget tier pauses %s — skipping", FEATURE)

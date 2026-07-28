@@ -10,8 +10,9 @@ no module state). ai_calls.py re-exports them for backward compatibility.
 import re
 from datetime import date as _date_cls
 
-from ai_summaries import _avg, _safe_float  # noqa: F401
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, EXPERIMENT_TZ  # noqa: F401
+
+from ai.ai_summaries import _avg, _safe_float  # noqa: F401
 
 # ── Untrusted reader-input delimiter (R22-SEC-04 / #811) ──────────────────────
 # Reader-submitted text (public /api/ask + /api/board_ask questions) is stored

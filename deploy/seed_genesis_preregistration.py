@@ -326,7 +326,7 @@ def _parse_json_array(text: str):
 def generate_predictions_via_bedrock(goals):
     """One Haiku call per coach through the ADR-062 chokepoint. Returns the frozen-file
     coaches dict. Falls back per-coach to FALLBACK_PREDICTIONS on failure."""
-    import budget_guard
+    from ai import budget_guard
     from common.retry_utils import AI_MODEL, call_anthropic_api
 
     if not budget_guard.allow("coach_narrative"):

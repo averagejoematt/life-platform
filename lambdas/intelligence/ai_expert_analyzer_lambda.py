@@ -68,7 +68,7 @@ except ImportError:
 
 # Phase-3 grounding backstop: deviation + HRV-unit checks against the shared facts.
 try:
-    import ai_output_validator as _aiv
+    from ai import ai_output_validator as _aiv
 
     _HAS_AI_VALIDATOR = True
 except ImportError:
@@ -198,7 +198,7 @@ except ImportError:  # pragma: no cover — flat sys.path (tests)
 # ADR-104: the shared grounded-generation harness — the regen-once keep-if-improved
 # flow moved there (one implementation for every surface), plus the allow-list
 # number gate that catches fabricated trends ("from 58 to 64" with no 58 anywhere).
-import grounded_generation as _gg
+from ai import grounded_generation as _gg
 
 
 def _latest_date(items):

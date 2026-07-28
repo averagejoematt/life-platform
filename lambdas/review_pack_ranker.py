@@ -45,7 +45,7 @@ from coach_corrections import ERROR_CLASSES
 # fail-soft so a missing module degrades the baseline heuristic off rather than
 # killing the pack (mirrors ai_review_pack_lambda's own fail-soft import).
 try:
-    import grounded_generation as _gg
+    from ai import grounded_generation as _gg
 except Exception:  # pragma: no cover — bundle-dependent
     _gg = None
 
@@ -443,7 +443,7 @@ def _default_tier_reader() -> int:
     """Read the current budget tier. Fail-open to 0 (never let a monitoring blip change
     ranking behavior). Isolated so tests can inject a fixed tier."""
     try:
-        import budget_guard
+        from ai import budget_guard
 
         return budget_guard.current_tier()
     except Exception:  # pragma: no cover — fail-open
@@ -494,7 +494,7 @@ def rank_pack(
         invoke = invoke_fn
         if invoke is None:
             try:
-                from bedrock_client import invoke as _bedrock_invoke
+                from ai.bedrock_client import invoke as _bedrock_invoke
 
                 invoke = _bedrock_invoke
             except Exception:  # pragma: no cover — no client → deterministic only

@@ -323,7 +323,7 @@ def _deterministic_ok(text, allowed_numbers):
     """The same deterministic gates every narrative surface uses. Returns (ok, reason)."""
     if allowed_numbers is not None:
         try:
-            from grounded_generation import fabricated_numbers
+            from ai.grounded_generation import fabricated_numbers
 
             fab = fabricated_numbers(text, allowed_numbers)
             if fab:

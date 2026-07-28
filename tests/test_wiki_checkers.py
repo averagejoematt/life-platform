@@ -564,7 +564,7 @@ def test_governor_cadence_surface_includes_the_1254_files_and_beyond():
     surface = {str(p.relative_to(ROOT)) for p in facts._scan_governor_surface()}
     for expected in (
         "lambdas/operational/cost_governor_lambda.py",  # #1254 file 1
-        "lambdas/budget_guard.py",  # #1254 file 2
+        "lambdas/ai/budget_guard.py",  # #1254 file 2
         "site/method/cost/index.html",  # #1254 file 3
         "docs/RUNBOOK.md",  # #1347: found beyond the 3 enumerated files
         "docs/ARCHITECTURE.md",  # #1347: found beyond the 3 enumerated files

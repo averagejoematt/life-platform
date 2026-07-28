@@ -124,7 +124,7 @@ def test_punch_up_fails_soft_on_model_error_never_raises():
 
 
 def test_craft_judge_parses_pass_with_cited_beats(monkeypatch):
-    import bedrock_client
+    from ai import bedrock_client
 
     verdict = {"pass": True, "fails": [], "cited_beats": ["Every last line. Glorious week, or a total dumpster fire.", "reeled me in"]}
     monkeypatch.setattr(bedrock_client, "invoke", _invoke_returning(verdict))
@@ -136,7 +136,7 @@ def test_craft_judge_parses_pass_with_cited_beats(monkeypatch):
 def test_flat_compliant_script_fails_the_craft_judge_when_no_beats_can_be_cited(monkeypatch):
     # The whole point of #1180: a flat-but-compliant script FAILS the humour item because
     # the judge cannot cite two lines that would make a stranger smile.
-    import bedrock_client
+    from ai import bedrock_client
 
     verdict = {
         "pass": False,
@@ -151,9 +151,8 @@ def test_flat_compliant_script_fails_the_craft_judge_when_no_beats_can_be_cited(
 
 
 def test_craft_judge_strips_fences_and_fails_closed_on_error(monkeypatch):
-    import bedrock_client
+    from ai import bedrock_client  # Fenced JSON is tolerated.
 
-    # Fenced JSON is tolerated.
     monkeypatch.setattr(bedrock_client, "invoke", _invoke_returning('```json\n{"pass": true, "cited_beats": ["a line"]}\n```'))
     ok, fails, cited = qa._craft_judge(_DRAFT, qa._INTRO_CRAFT_RUBRIC)
     assert ok is True and cited == ["a line"]

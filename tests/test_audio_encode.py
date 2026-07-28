@@ -19,7 +19,7 @@ import pytest
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
-import audio_encode  # noqa: E402
+from ai import audio_encode  # noqa: E402
 
 try:
     import lameenc  # noqa: F401

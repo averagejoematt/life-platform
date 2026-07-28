@@ -161,8 +161,7 @@ def build_turn_prompt(speaker, other, topic, other_claim, own_position, voice_ru
 def generate_gated_turn(system, user, allowed_sources):
     """One Haiku generation + the ADR-104 grounding gate (one corrective regen).
     Returns (text, findings_left) — text None on hard failure."""
-    import bedrock_client
-    import grounded_generation as gg
+    from ai import bedrock_client, grounded_generation as gg
 
     def _call(extra=""):
         body = {
@@ -221,7 +220,7 @@ def _record_on_coach(lambda_client, coach_id, thread_text, date_str):
 def lambda_handler(event: dict, context) -> dict:
     # Tier gate: the dispute is a luxury — first thing paused (issue: tier-1).
     try:
-        from budget_guard import current_tier
+        from ai.budget_guard import current_tier
 
         tier = current_tier()
         if tier >= 1:

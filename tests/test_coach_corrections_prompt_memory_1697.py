@@ -36,9 +36,11 @@ os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "testing")
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 
-import ai_calls  # noqa: E402
-import bedrock_client  # noqa: E402
 import coach_corrections as cc  # noqa: E402
+from ai import (
+    ai_calls,  # noqa: E402
+    bedrock_client,  # noqa: E402
+)
 from fakes import FakeDdbTable  # noqa: E402
 
 

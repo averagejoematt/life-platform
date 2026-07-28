@@ -30,7 +30,7 @@ import inspect
 
 import bsts_lite
 import calibration_core
-import conversation_enrichment
+from ai import conversation_enrichment
 from common import stats_core
 
 
@@ -95,7 +95,7 @@ SOURCE_MODULES = {
     },
     "conversation_enrichment": {
         "title": "conversation_enrichment.py",
-        "path": "lambdas/conversation_enrichment.py",
+        "path": "lambdas/ai/conversation_enrichment.py",
         "description": (
             "The conversational-capture enrichment layer (#1577) — coach check-in answers, habit "
             "reflections, and field-note responses coded by the same LLM enrichment pass as journal "

@@ -246,7 +246,7 @@ def invoke(body: dict, model_name: str | None = None) -> dict:
     # #1230: no hardcoded dollar figure here — the ceiling floats ($85 base / $100 surge,
     # ADR-133), so a literal is guaranteed to drift; the tier alone says AI is paused.
     try:
-        from budget_guard import BudgetExceeded, current_tier
+        from ai.budget_guard import BudgetExceeded, current_tier
 
         if current_tier() >= 3:
             raise BudgetExceeded("AI paused — monthly budget ceiling reached (tier 3). Auto-resumes at month rollover.")
@@ -315,7 +315,7 @@ def embed_text(text: str, *, dimensions: int | None = None, model_id: str | None
     # Budget backstop — the same tier-3 hard stop invoke() enforces. At tier 3 all
     # AI is paused; pausing embeddings too is correct (backfill runs off-peak anyway).
     try:
-        from budget_guard import BudgetExceeded, current_tier
+        from ai.budget_guard import BudgetExceeded, current_tier
 
         if current_tier() >= 3:
             raise BudgetExceeded("AI paused — monthly budget ceiling reached (tier 3). Auto-resumes at month rollover.")

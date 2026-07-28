@@ -484,7 +484,7 @@ def test_week_behavioral_presence_bad_week_key():
 
 
 def test_facts_block_scale_dark_forces_past_tense_rate():
-    import grounded_generation as gg
+    from ai import grounded_generation as gg
 
     facts = {
         "latest_weight": 296.2,
@@ -501,7 +501,7 @@ def test_facts_block_scale_dark_forces_past_tense_rate():
 
 
 def test_facts_block_fresh_scale_has_no_dark_warning():
-    import grounded_generation as gg
+    from ai import grounded_generation as gg
 
     facts = {"latest_weight": 296.2, "weekly_rate_lbs": -1.8, "last_weighin_date": "2026-06-29", "days_since_weighin": 1}
     blk = gg.authoritative_facts_block(facts)
@@ -510,7 +510,7 @@ def test_facts_block_fresh_scale_has_no_dark_warning():
 
 
 def test_facts_block_provisional_rate_is_labeled():
-    import grounded_generation as gg
+    from ai import grounded_generation as gg
 
     blk = gg.authoritative_facts_block({"weekly_rate_lbs": -7.3, "rate_provisional": True})
     assert "PROVISIONAL" in blk
@@ -519,7 +519,7 @@ def test_facts_block_provisional_rate_is_labeled():
 
 
 def test_facts_block_unchanged_without_recency_keys():
-    import grounded_generation as gg
+    from ai import grounded_generation as gg
 
     blk = gg.authoritative_facts_block({"latest_weight": 296.2, "weekly_rate_lbs": -1.8})
     assert "Last weigh-in" not in blk and "SCALE DARK" not in blk and "PROVISIONAL" not in blk

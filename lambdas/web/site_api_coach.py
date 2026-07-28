@@ -98,7 +98,7 @@ def _regeneration_paused(feature: str) -> bool:
     manufacture a false disclosure banner.
     """
     try:
-        from budget_guard import allow
+        from ai.budget_guard import allow
 
         return not allow(feature)
     except Exception:

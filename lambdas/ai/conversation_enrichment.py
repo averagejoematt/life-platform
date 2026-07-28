@@ -587,7 +587,7 @@ def run(table=None, start_date=None, end_date=None, force=False, caller=None, co
     """One conversational-enrichment sweep. Returns a summary dict; never raises for
     a single bad record. Budget-gated: an over-tier run returns an explicit
     ``paused_by_budget`` status without a single Haiku call (AC1)."""
-    import budget_guard
+    from ai import budget_guard
 
     if not budget_guard.allow(BUDGET_FEATURE):
         tier = budget_guard.current_tier()

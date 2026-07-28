@@ -46,6 +46,7 @@ import dispute_docket as dd  # noqa: E402
 import pytest  # noqa: E402
 from boto3.dynamodb.conditions import AttributeBase  # noqa: E402
 from botocore.exceptions import ClientError  # noqa: E402
+from bundle_stubs import stub_bundled_module
 
 # ── FakeTable: evaluates real Key conditions + honors the conditional put ────
 
@@ -304,7 +305,7 @@ def resolved_run(fake_table, monkeypatch):
     confidence_updates = []
     monkeypatch.setattr(evaluator, "_resolve_metric_value", lambda metric, cache, end: 241.2)
     monkeypatch.setattr(evaluator, "_update_bayesian_confidence", lambda cid, sub, kind: confidence_updates.append((cid, sub, kind)))
-    monkeypatch.setitem(sys.modules, "bedrock_client", _PoisonedBedrock())
+    stub_bundled_module(monkeypatch, "ai.bedrock_client", _PoisonedBedrock())
     summary = dd.resolve_due("2026-08-03")
     return fake_table, summary, confidence_updates
 
@@ -416,7 +417,7 @@ class TestAC3ConcessionMemory:
         its numbers (242, 241.2) is grounded; an invented number still isn't."""
         table, _s, _c = resolved_run
         import coach_history_summarizer as chs
-        from grounded_generation import allowed_numbers, grounding_findings
+        from ai.grounded_generation import allowed_numbers, grounding_findings
 
         loss_rows = [v for (pk, sk), v in table.store.items() if pk == "COACH#training_coach" and sk.startswith("LEARNING#")]
         track = chs._summarize_track_record(loss_rows, [])
@@ -591,7 +592,7 @@ class TestAC5ThrottleReplacesWeeklyCap:
             )
         monkeypatch.setattr(icd, "table", t)
         monkeypatch.setattr(icd, "load_influence_weights", lambda: {})
-        import budget_guard
+        from ai import budget_guard
 
         monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
         aired = []

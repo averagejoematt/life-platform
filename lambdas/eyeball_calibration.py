@@ -165,7 +165,7 @@ def estimate_from_photo(
     caller's separate, guarded step via `write_estimate`.
     """
     try:
-        import budget_guard
+        from ai import budget_guard
 
         if not budget_guard.allow("eyeball_estimate"):
             return {"status": "paused", "reason": "budget tier — eyeball calibration paused (internal/self-grading feature)"}
@@ -173,7 +173,7 @@ def estimate_from_photo(
         pass  # fail-open: never break on a guard-import blip
 
     if invoke_fn is None:
-        from bedrock_client import invoke as invoke_fn  # lazy so offline tests need no boto3
+        from ai.bedrock_client import invoke as invoke_fn  # lazy so offline tests need no boto3
 
     body = {
         "max_tokens": 300,
@@ -410,7 +410,7 @@ def estimated_monthly_cost(photos_per_day: float = 1.0) -> dict:
     the platform meters with (`bedrock_client.estimate_cost_usd`). A meal photo at Bedrock's
     Claude image tiling is ~1,600 input tokens; the prompt adds ~120; the JSON reply is ~90
     output tokens. Pure — unit-testable, no AWS."""
-    from bedrock_client import estimate_cost_usd, resolve_model_id
+    from ai.bedrock_client import estimate_cost_usd, resolve_model_id
 
     per_call_usage = {"input_tokens": 1600 + 120, "output_tokens": 90}
     model_id = resolve_model_id(_HAIKU_MODEL)

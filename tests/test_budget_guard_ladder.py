@@ -20,8 +20,8 @@ _LAMBDAS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 sys.path.insert(0, _LAMBDAS)
 sys.path.insert(0, os.path.join(_LAMBDAS, "operational"))
 
-import budget_guard  # noqa: E402
 import cost_governor_lambda  # noqa: E402
+from ai import budget_guard  # noqa: E402
 
 # The audience bands, as the ladder intends them (pause-tier per feature).
 _INTERNAL = (

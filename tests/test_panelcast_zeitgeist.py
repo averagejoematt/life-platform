@@ -179,7 +179,7 @@ def test_truth_block_labels_headlines_as_provided_and_omits_when_empty():
 
 
 def _capture_invoke(monkeypatch, reply_text="[]"):
-    import bedrock_client
+    from ai import bedrock_client
 
     bodies = []
     monkeypatch.setattr(bedrock_client, "invoke", lambda body, **k: bodies.append(body) or {"content": [{"text": reply_text}]})

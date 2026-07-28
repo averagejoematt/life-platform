@@ -16,7 +16,7 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "compute"))
 
-import budget_guard  # noqa: E402
+from ai import budget_guard  # noqa: E402
 from compute import coach_daily_reflection_lambda as writer  # noqa: E402
 
 

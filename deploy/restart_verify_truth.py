@@ -133,7 +133,7 @@ def main() -> int:
     # a paused budget must not block a reset, but it must be visible that the
     # truth layer did NOT run.
     try:
-        import budget_guard
+        from ai import budget_guard
 
         if not budget_guard.allow(reader_truth_qa.BUDGET_FEATURE):
             tier = budget_guard.current_tier()
@@ -145,7 +145,7 @@ def main() -> int:
         pass  # fail-open, same posture as the guard itself
 
     try:
-        import bedrock_client
+        from ai import bedrock_client
     except Exception as e:
         print(f"  ⏸ SKIP — bedrock_client unavailable ({str(e)[:120]}). The truth layer did NOT run this reset.")
         write_report(SKIP, [f"bedrock_client unavailable: {str(e)[:200]}"], day_label)

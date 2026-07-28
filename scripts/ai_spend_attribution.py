@@ -61,7 +61,7 @@ from datetime import datetime, timedelta, timezone
 # Single source of truth for Bedrock prices + the model back-solve helper: the
 # same table bedrock_client uses to compute the EstimatedCostUSD we read back.
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lambdas"))
-from bedrock_client import _PRICES, estimate_cost_usd  # noqa: E402
+from ai.bedrock_client import _PRICES, estimate_cost_usd  # noqa: E402
 
 NAMESPACE = "LifePlatform/AI"
 REGION = os.environ.get("AWS_REGION", "us-west-2")

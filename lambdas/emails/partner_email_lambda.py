@@ -500,7 +500,7 @@ def build_commentary(data):
         # ADR-062: layer not attached — fall back to bedrock_client directly
         # (bundled in /var/task via Code.from_asset, so it imports without the layer).
         logger.warning("retry_utils unavailable — direct bedrock_client fallback")
-        from bedrock_client import invoke as _bedrock_invoke
+        from ai.bedrock_client import invoke as _bedrock_invoke
 
         resp = _bedrock_invoke(json.loads(payload))
         return resp["content"][0]["text"]
@@ -796,7 +796,7 @@ def lambda_handler(event, context):
         logger.info("Commentary length: %s chars", len(commentary))
         # AI-3: validate output before rendering
         try:
-            from ai_output_validator import AIOutputType, validate_ai_output
+            from ai.ai_output_validator import AIOutputType, validate_ai_output
 
             _val = validate_ai_output(commentary, AIOutputType.WEEKLY_DIGEST)
             if _val.was_replaced:

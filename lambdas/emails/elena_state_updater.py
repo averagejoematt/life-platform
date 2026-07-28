@@ -467,7 +467,7 @@ def lambda_handler(event, context):
 
         # Budget: pauses with the other narrative features (tier >= 1).
         try:
-            import budget_guard
+            from ai import budget_guard
 
             if not budget_guard.allow("coach_narrative"):
                 logger.info("[elena-state] budget tier pauses narrative extraction — skipping")

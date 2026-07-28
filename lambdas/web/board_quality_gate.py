@@ -128,7 +128,7 @@ def enforce(pid: str, answer: str, regenerate_fn, is_grounded_fn, retain_fn, end
             logger.info(f"[{endpoint}] {pid} quality gate skipped — {remaining}ms left (fail-open)")
         return answer
     try:
-        from ai_calls import _invoke_quality_gate_sync, _quality_gate_correction_note
+        from ai.ai_calls import _invoke_quality_gate_sync, _quality_gate_correction_note
 
         report = _invoke_quality_gate_sync(_qg_lambda_client(), pid, answer, None)
     except Exception as e:

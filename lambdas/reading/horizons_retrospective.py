@@ -53,7 +53,7 @@ import broadcast_sensitivity_gate as gate
 # gate module is missing from the bundle we withhold the retrospective rather than
 # publish an ungated one. `generate()` reads `_gg is None` and HOLDS.
 try:
-    import grounded_generation as _gg
+    from ai import grounded_generation as _gg
 except ImportError:  # pragma: no cover — environment-dependent; withhold, never pass through
     _gg = None
 
@@ -144,7 +144,7 @@ def _extract_text(resp: dict) -> str:
 
 def _default_invoker(body: dict) -> dict:
     """Production invoker: the single Bedrock chokepoint (ADR-062), narrative tier."""
-    import bedrock_client
+    from ai import bedrock_client
 
     return bedrock_client.invoke(body, model_name="sonnet")
 
@@ -225,7 +225,7 @@ def generate(pick: dict, *, invoker=None, offtopic_classifier=None) -> dict:
 
     # 1. Budget gate (reader-narrative band 2). Fail-open if budget_guard absent.
     try:
-        import budget_guard
+        from ai import budget_guard
 
         if not budget_guard.allow(BUDGET_FEATURE):
             return {"status": STATUS_PAUSED, "reason": "reader-narrative AI paused (budget tier 2)", "generatedAt": now}

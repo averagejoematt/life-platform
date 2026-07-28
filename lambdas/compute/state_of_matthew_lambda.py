@@ -47,11 +47,11 @@ from datetime import datetime, timedelta, timezone
 import boto3
 import calibration_core  # #538: shared Brier + reliability scorer (layer module)
 import whole_life_context  # #1385: full multi-cycle archive as a 1-hour cached block
-from ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
+from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
+from ai.grounded_generation import allowed_numbers, grounding_findings  # ADR-104 gate
 from boto3.dynamodb.conditions import Key
 from common.numeric import decimals_to_float, floats_to_decimal  # bundled shared module: float<->Decimal
 from er03_gate import BANNED_CAUSAL  # reuse the platform's one causal-language list
-from grounded_generation import allowed_numbers, grounding_findings  # ADR-104 gate
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 try:
@@ -441,7 +441,7 @@ def narrate(state: dict) -> dict:
     on a tier pause, a Bedrock error, or a failed ADR-104 grounding check. Never
     regenerates: this is the platform's ONE weekly call, not two."""
     try:
-        from budget_guard import allow
+        from ai.budget_guard import allow
 
         if not allow(BUDGET_FEATURE):
             return {"narrative": deterministic_fallback_narrative(state), "narrated": False, "model": None, "reason": "budget_tier"}
@@ -450,7 +450,7 @@ def narrate(state: dict) -> dict:
 
     body = build_narration_body(state)
     try:
-        import bedrock_client
+        from ai import bedrock_client
 
         resp = bedrock_client.invoke(body, model_name=MODEL)
         content = resp.get("content") or []

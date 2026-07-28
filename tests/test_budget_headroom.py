@@ -25,7 +25,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
-import budget_guard  # noqa: E402
+from ai import budget_guard  # noqa: E402
 
 
 @pytest.fixture(scope="module")

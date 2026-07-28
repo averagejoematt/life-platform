@@ -202,7 +202,7 @@ def installment_grounding_findings(elena_prompt, user_message, text, archive_tex
     in the archive she saw; a fabricated one is still caught because it appears
     nowhere in prompt + data packet + archive. Widening the window without widening
     the allow-list would false-flag every legitimate callback."""
-    import grounded_generation as _gg
+    from ai import grounded_generation as _gg
 
     findings = _gg.grounding_findings(
         text,

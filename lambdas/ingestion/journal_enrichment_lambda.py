@@ -432,7 +432,7 @@ def _run_conversational(event, start_date, end_date, force):
     are weekly, check-ins land on Matthew's schedule). Budget-gated inside the
     module (band-1 ``conversation_enrichment``); a paused run reports
     ``paused_by_budget`` explicitly, never silent."""
-    import conversation_enrichment
+    from ai import conversation_enrichment
 
     explicit = bool(event.get("full_sync") or "date" in event or ("start" in event and "end" in event))
     return conversation_enrichment.run(

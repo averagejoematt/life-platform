@@ -32,12 +32,12 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import boto3
-import budget_guard
 import coach_nudge_engine as engine
+from ai import budget_guard
+from ai.grounded_generation import allowed_dates, allowed_numbers, grounding_findings
 from boto3.dynamodb.conditions import Key
 from coach_checkin import read_cycle
 from common.pacific_time import PACIFIC
-from grounded_generation import allowed_dates, allowed_numbers, grounding_findings
 from persona_registry import OPERATIONAL_COACH_IDS
 
 logger = logging.getLogger()
@@ -346,7 +346,7 @@ def _reserve_day(date_pt: str, firing: dict) -> bool:
 def _phrase(firing: dict, coach_name: str) -> str:
     """Haiku phrases ONLY the trigger payload (ADR-062 chokepoint via ai_calls).
     Returns '' on any failure — the caller blocks silently."""
-    from ai_calls import AI_MODEL_HAIKU, call_anthropic
+    from ai.ai_calls import AI_MODEL_HAIKU, call_anthropic
 
     system, user = engine.build_phrasing_prompt(coach_name, firing)
     try:
@@ -374,7 +374,7 @@ def _gate(copy_text: str, firing: dict, coach_name: str) -> list:
         return findings  # deterministic gates failed — skip the quality-gate invoke
 
     try:
-        from ai_calls import _enforce_quality_gate
+        from ai.ai_calls import _enforce_quality_gate
 
         brief = f"proactive {firing['trigger_type']} nudge from {coach_name} phrasing only the deterministic trigger payload"
         final, report = _enforce_quality_gate(

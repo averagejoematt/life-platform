@@ -472,7 +472,7 @@ def _judge(transcript, persona_names=None):
     positive this fixes. The sanctioned roster is derived from the canonical
     persona registry (`_persona_names`) so it can't drift from the source."""
     try:
-        import bedrock_client
+        from ai import bedrock_client
     except ImportError:
         return None
     if persona_names is None:
@@ -516,7 +516,7 @@ def _budget_paused() -> bool:
     a defect. Fail-open (treat as not-paused) so a budget-read glitch can't
     silence the canary."""
     try:
-        from budget_guard import allow
+        from ai.budget_guard import allow
 
         return not allow("website_ai")
     except Exception:  # noqa: BLE001

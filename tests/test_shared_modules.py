@@ -62,7 +62,7 @@ def approx(v, rel=1e-3):
 # ======================================================================
 print("\n-- ai_output_validator ------------------------------------------")
 
-from ai_output_validator import (
+from ai.ai_output_validator import (
     AIOutputType,
     _fallback_for_type,
     validate_ai_output,
@@ -635,7 +635,7 @@ print("\n-- call_anthropic middleware -------------------------------------")
 
 import inspect
 
-from ai_calls import _AI_VALIDATOR_AVAILABLE, call_anthropic
+from ai.ai_calls import _AI_VALIDATOR_AVAILABLE, call_anthropic
 
 
 def test_call_anthropic_has_output_type_param():
@@ -661,7 +661,7 @@ def test_ai_output_type_importable():
 
 def test_bod_caller_passes_output_type():
     """call_board_of_directors must pass output_type=AIOutputType.BOD_COACHING to call_anthropic."""
-    src_path = os.path.join(LAMBDAS_DIR, "ai_calls.py")
+    src_path = os.path.join(LAMBDAS_DIR, "ai", "ai_calls.py")
     with open(src_path) as f:
         src = f.read()
     # Check that the BoD final call_anthropic includes BOD_COACHING
@@ -673,7 +673,7 @@ def test_bod_caller_passes_output_type():
 
 def test_journal_caller_passes_output_type():
     """call_journal_coach must pass output_type=AIOutputType.JOURNAL_COACH."""
-    src_path = os.path.join(LAMBDAS_DIR, "ai_calls.py")
+    src_path = os.path.join(LAMBDAS_DIR, "ai", "ai_calls.py")
     with open(src_path) as f:
         src = f.read()
     assert "JOURNAL_COACH" in src, "call_journal_coach must pass output_type=AIOutputType.JOURNAL_COACH"

@@ -602,8 +602,8 @@ def check_reader_truth():
 
     # Budget gate — internal QA pauses first (ADR-125). Explicit ⏸, never silent.
     try:
-        import budget_guard
         import reader_truth_qa
+        from ai import budget_guard
 
         if not budget_guard.allow(reader_truth_qa.BUDGET_FEATURE):
             tier = budget_guard.current_tier()
@@ -629,7 +629,7 @@ def check_reader_truth():
             checks.append(verdict.warn("no surfaces fetched — Reader Truth skipped this run (fail-soft)"))
             return checks
 
-        import bedrock_client
+        from ai import bedrock_client
 
         findings, errors = reader_truth_qa.assess_prose(surfaces, bedrock_client.invoke)
         phase = reader_truth_qa.phase_context()

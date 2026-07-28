@@ -40,7 +40,7 @@ _ALLOWLIST = {"budget_guard.py", "bedrock_client.py"}
 import sys  # noqa: E402
 
 sys.path.insert(0, _LAMBDAS)
-import budget_guard  # noqa: E402
+from ai import budget_guard  # noqa: E402
 
 _HARD_STOP = budget_guard._HARD_STOP_TIER
 

@@ -49,7 +49,7 @@ except ImportError:
     logger.setLevel(logging.INFO)
 
 try:
-    from ai_output_validator import AIOutputType, validate_ai_output
+    from ai.ai_output_validator import AIOutputType, validate_ai_output
 
     _HAS_AI_VALIDATOR = True
 except ImportError:
@@ -334,7 +334,7 @@ def _phase_context_block():
     on an import/runtime error — the bundle always ships ai_context, and
     tests/test_phase_context_coverage.py pins the block's presence."""
     try:
-        from ai_context import build_experiment_phase_context, format_experiment_phase_context
+        from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context
 
         return format_experiment_phase_context(build_experiment_phase_context())
     except Exception as e:  # noqa: BLE001 — grounding must never hard-fail generation

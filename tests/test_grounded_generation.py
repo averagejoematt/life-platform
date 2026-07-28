@@ -15,7 +15,7 @@ import sys
 LAMBDAS_DIR = os.path.join(os.path.dirname(__file__), "..", "lambdas")
 sys.path.insert(0, os.path.abspath(LAMBDAS_DIR))
 
-from grounded_generation import (  # noqa: E402
+from ai.grounded_generation import (  # noqa: E402
     allowed_numbers,
     authoritative_facts_block,
     band_adjective_findings,

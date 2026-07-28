@@ -23,7 +23,7 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "intelligence"))
 
-import grounded_generation as gg  # noqa: E402
+from ai import grounded_generation as gg  # noqa: E402
 
 # Non-benign integers: outside range(0,13), the {15,20,30,45,60,90,100} anchors,
 # and the 2020..2030 year band. 101..999 contains none of those.

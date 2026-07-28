@@ -30,8 +30,8 @@ os.environ.setdefault("S3_BUCKET", "matthew-life-platform")  # mcp.config requir
 os.environ.setdefault("USER_ID", "matthew")
 
 import coach_checkin as cc  # noqa: E402
-import conversation_enrichment as ce  # noqa: E402
 import pytest  # noqa: E402
+from ai import conversation_enrichment as ce  # noqa: E402
 from reading import (  # noqa: E402
     horizons_calibration as hc,
     horizons_verify,

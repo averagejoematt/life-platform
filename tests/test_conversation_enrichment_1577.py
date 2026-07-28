@@ -36,9 +36,11 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas", "ingestion"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "intelligence"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "compute"))
 
-import budget_guard  # noqa: E402
-import conversation_enrichment as ce  # noqa: E402
 import journal_analyzer_lambda as jal  # noqa: E402
+from ai import (
+    budget_guard,  # noqa: E402
+    conversation_enrichment as ce,  # noqa: E402
+)
 from botocore.exceptions import ClientError  # noqa: E402
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────

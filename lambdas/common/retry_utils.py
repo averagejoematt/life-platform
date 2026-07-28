@@ -148,7 +148,7 @@ def call_anthropic_api(  # type: ignore[return]  # loop always returns on succes
     # ADR-062 (2026-05-27): Bedrock invoke_model (was urllib → api.anthropic.com).
     # Auth is IAM — no API key. See lambdas/bedrock_client.py.
     import botocore.exceptions as _bce
-    from bedrock_client import invoke as _bedrock_invoke
+    from ai.bedrock_client import invoke as _bedrock_invoke
 
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:
@@ -199,7 +199,7 @@ def call_anthropic_raw(req: Union[dict[str, Any], urllib.request.Request], timeo
     system message (the wire format is identical on Bedrock).
     """
     import botocore.exceptions as _bce
-    from bedrock_client import invoke as _bedrock_invoke
+    from ai.bedrock_client import invoke as _bedrock_invoke
 
     if isinstance(req, dict):
         body = req
