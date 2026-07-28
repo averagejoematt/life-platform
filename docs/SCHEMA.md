@@ -4,7 +4,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
-**Last updated:** 2026-07-27 (v8.6.0 — 76 MCP tools, 20 data sources, 99 Lambdas, 12 cached tools)
+**Last updated:** 2026-07-28 (v8.6.0 — 76 MCP tools, 20 data sources, 99 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -929,6 +929,19 @@ Notion journal uses multiple SK patterns per day (one per template type):
 | `created_at` | string | Notion page created_time ISO |
 | `updated_at` | string | ISO timestamp of ingestion write |
 | `body_text` | string | Page body content (fetched blocks), when present |
+
+**`channel` backfill posture (#1840, decided 2026-07-27):** the 62 `USER#matthew#SOURCE#notion`
+records that predate channel stamping (everything ingested before the 2026-07-26 Notion schema
+patch that added the Video Diary / Solo Recording select options) carry **no `channel` attribute
+at all** — not `channel: "journal"`, simply absent. This is **by design, not backfilled**:
+ingestion only rewrites a page's DDB item when that page is re-fetched (created or edited within
+the sync window), so a historical entry only gains a `channel` stamp if it is individually
+re-edited in Notion. No one-time backfill script was run against prod. **Any channel-segmented
+analysis (e.g. comparing typed-journal vs. video-diary vs. solo-recording signal) must treat the
+entire pre-2026-07-26 journal history as unlabelled** — filter/group on `channel` presence, don't
+assume every record has one, and don't infer `channel == "journal"` for an absent attribute (an
+absent `channel` means "ingested before provenance existed," which is a different fact than "this
+was a typed journal entry").
 
 Note: since notion Lambda v1.2.0, property extraction is **dynamic** — `extract_all_properties()` reads ALL properties from each Notion page. The per-template field tables below reflect the current Notion template configuration and can drift if templates change in Notion (no code change required).
 

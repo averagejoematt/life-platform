@@ -2100,6 +2100,15 @@ def operational_qa_smoke() -> list[iam.PolicyStatement]:
             resources=[_secret_arn("life-platform/mcp-api-key")],
         ),
         iam.PolicyStatement(
+            sid="SecretsGetNotion",
+            # #1840 check_notion_template_schema: reads the live Notion Journal
+            # database schema to catch code<->Notion-schema drift (TEMPLATE_SK
+            # options the live `Template` select property doesn't have yet, the
+            # #1572/#1573 inert-ship class). Same secret notion_lambda.py reads.
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn("life-platform/ingestion-keys")],
+        ),
+        iam.PolicyStatement(
             sid="SecretsInventory",
             # check_lambda_secrets: list all secrets to validate Lambda SECRET_NAME refs
             actions=["secretsmanager:ListSecrets"],

@@ -505,7 +505,11 @@ def parse_page(page, api_key=None):
     template = extract_select_prop(props, "Template")
     if not template or template not in TEMPLATE_SK:
         if template:
-            logger.info(f"Page {page['id']}: unknown template '{template}', treating as journal entry")
+            # #1840: WARNING (not INFO) — an unrecognized-but-present Template value is
+            # code<->Notion-schema drift (a template the code doesn't know, or a schema
+            # change nobody wired up). #1572/#1573 shipped inert for weeks because this
+            # class of drift failed silently; surface it in CloudWatch instead.
+            logger.warning(f"Page {page['id']}: unknown template '{template}', treating as journal entry")
         template = "journal"
 
     # Base fields (all templates)
