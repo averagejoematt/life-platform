@@ -18,8 +18,11 @@ and engine constants. Three things this guards:
      emoji-free by design).
 """
 
+import copy
 import os
 import sys
+
+import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
@@ -100,3 +103,50 @@ def test_render_is_deterministic():
     """Byte-stable output is what makes the drift check meaningful."""
     config = gx.load_config()
     assert gx.render(config) == gx.render(config)
+
+
+# ── Cast guard (#1891) ───────────────────────────────────────────────────────
+# The page shipped "owner Dr. Peter Attia" — a real, non-consenting clinician
+# named as platform staff — because the pillar owners never got the pilot-era
+# cast rename. These lock the fix AND prove the guards are not no-ops.
+
+
+def test_every_pillar_owner_is_on_the_live_roster():
+    """The regression guard: an owner off the public roster fails the build."""
+    roster = gx.public_roster()
+    assert len(roster) >= 8, f"roster resolved to {roster} — the guard would be validating against nothing"
+    for name, p in gx.load_config()["pillars"].items():
+        owner = p.get("owner")
+        assert owner in roster or owner in gx.OWNER_ROLE_LABELS, (
+            f"pillar {name!r} owner {owner!r} is not on the live public roster {sorted(roster)} "
+            "nor an allowed role label — update config/character_sheet.json to the current cast"
+        )
+
+
+def test_no_real_public_figure_on_the_rendered_page():
+    """The published page passes the same privacy gate as AI-published content."""
+    gx.assert_no_real_figures(_page())
+
+
+def test_cast_guard_rejects_a_real_public_figure():
+    """Proves the cast guard fires — a guard that never fires is worse than none."""
+    config = copy.deepcopy(gx.load_config())
+    config["pillars"]["metabolic"]["owner"] = "Dr. Peter Attia"
+    with pytest.raises(SystemExit, match="off the live roster"):
+        gx.render(config)
+
+
+def test_cast_guard_rejects_retired_pilot_cast():
+    """maya_rodriguez is still IN config/personas.json but off the public roster — must fail."""
+    config = copy.deepcopy(gx.load_config())
+    config["pillars"]["mind"]["owner"] = "Coach Maya Rodriguez"
+    with pytest.raises(SystemExit, match="off the live roster"):
+        gx.render(config)
+
+
+def test_privacy_gate_catches_a_real_figure_outside_the_owner_field():
+    """Owner validation alone wouldn't catch a real name in prose; the privacy gate does."""
+    from privacy import privacy_guard
+
+    with pytest.raises(privacy_guard.PrivacyViolation):
+        gx.assert_no_real_figures("<p>Voice shaped by Andrew Huberman's protocols</p>")
