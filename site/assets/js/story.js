@@ -858,6 +858,16 @@ async function load() {
   );
   const cw = bind("const-window");
   if (cw && couplingV && couplingV.window_days) cw.textContent = ` over the last ${couplingV.window_days} days`;
+  // #1895: when a fresh cycle has too few scored days to measure coupling, the figure
+  // renders nodes with NO lines. That is the honest state, but unexplained emptiness
+  // reads as a broken chart to someone who doesn't know a reset just happened — so
+  // say why. The engine's own n floor decides; this only narrates it (ADR-104).
+  else if (cw && couplingV && couplingV.honest_null) {
+    const floor = Number(couplingV.min_n);
+    cw.textContent = Number.isFinite(floor)
+      ? ` (no lines yet — a new cycle needs ${floor} scored days before co-movement can be measured)`
+      : " (no lines yet — a new cycle needs a few more scored days before co-movement can be measured)";
+  }
 
   // #789 — the friends/family "is he okay this week?" plain-language read, from the
   // pillars + weight already in hand (no extra fetch). The presence result (already

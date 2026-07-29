@@ -698,3 +698,32 @@ def test_pillar_coupling_honest_null_on_a_thin_fresh_cycle(monkeypatch):
     body = json.loads(capi_intel.handle_pillar_coupling()["body"])
     assert body["honest_null"] is True
     assert body["edges"] == [] and body["window_days"] == 0
+
+
+# ── #1895: the front-end belts (story.js) ────────────────────────────────────
+# Source-level assertions: these are ES modules with site-absolute imports, so a
+# real DOM render lives in tests/visual_qa.py (post-deploy). What must not happen
+# silently is the belts being deleted, so pin their presence and their reasons.
+
+
+def _story_js():
+    import pathlib
+
+    return (pathlib.Path(__file__).resolve().parent.parent / "site" / "assets" / "js" / "story.js").read_text(encoding="utf-8")
+
+
+def test_home_ribbon_gates_this_month_copy_on_recency():
+    """The copy says 'this month' — it must not describe a stale record. The server
+    refuses tombstoned ones; this belt covers a NON-tombstoned record going stale
+    when weekly-correlation-compute stalls (observed live: unchanged since 07-04)."""
+    src = _story_js()
+    assert "computed_at" in src and "MAX_AGE_DAYS" in src, "the #1895 recency belt is missing from story.js"
+    assert "newly unlocked this month" in src, "the gated copy moved — re-point the belt"
+
+
+def test_constellation_narrates_its_empty_state():
+    """A fresh cycle renders nodes with no lines. Unexplained emptiness reads as a
+    broken chart, so the caption must say why (Matthew's call on #1910)."""
+    src = _story_js()
+    assert "honest_null" in src, "the constellation empty-state branch is missing"
+    assert "no lines yet" in src, "the empty constellation must explain itself, not just render blank"
