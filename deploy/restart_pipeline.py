@@ -1173,6 +1173,12 @@ def main():
     print(
         '     python3 deploy/send_prereg_lock_email.py --apply            # the one "predictions lock tonight" email (eve-only; refuses late)'
     )
+    print(
+        "  •  python3 scripts/v4_build_game_explained.py                  # #1891: this pipeline rewrites"
+        " config/character_sheet.json, which generates /method/game/. Regenerate + commit so the rulebook"
+        " matches the cycle. (A stale CAST cannot ship silently — the page's cast guard fails the build"
+        " on any owner off the live roster — but regenerating here keeps the reset self-contained.)"
+    )
     print("  •  git status / commit the regenerated files (constants, configs, CYCLE_GENESES, RESET_LOG.md) from MAIN")
     print(
         "  •  Monday morning (post-genesis): python3 deploy/restart_verify.py   # deliberately not folded — it asserts post-genesis state"

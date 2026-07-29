@@ -36,7 +36,9 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from coach import persona_registry  # noqa: E402  — canonical public roster (#1891)
 from health import character_engine as ce  # noqa: E402
+from privacy import privacy_guard  # noqa: E402  — real-public-figure gate (#1891)
 from v4_chrome import (
     doors_nav,
     head_chrome,
@@ -82,6 +84,66 @@ def engine_fingerprint() -> str:
 
 def load_config() -> dict:
     return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+
+
+# ── Cast guard (drift tripwire #3 — #1891) ──────────────────────────────────
+# The pillar `owner` fields are the only place this page names coaching staff.
+# They were authored in the pilot era and never got the cast rename that mapped
+# peter_attia → Dr. Victor Reyes in config/personas.json, so /method/game/
+# published "owner Dr. Peter Attia" — a real, non-consenting clinician presented
+# as platform staff — while /api/coaches one door away named Dr. Amara Patel.
+# Two fail-closed checks now run at render time, so a stale owner cannot ship:
+#
+#   1. Every owner resolves to the LIVE PUBLIC ROSTER (persona_registry's
+#      operational personas + the lead) or is an explicit role label. The
+#      registry as a whole is deliberately NOT the allowed set — it still
+#      carries retired pilot personas like maya_rodriguez, which is precisely
+#      the dead cast this guards against.
+#   2. The rendered page passes privacy_guard — the same deterministic gate the
+#      AI publish/serve chokepoints use, which already bans "peter attia" et al.
+#      This page is generated rather than AI-written, so it never passed that
+#      gate before; wiring it here closes the class, not just the instance.
+
+# Owners naming a role or concept rather than a member of the public roster.
+OWNER_ROLE_LABELS = frozenset(
+    {
+        "Social Connection",  # relationships — the domain owns it; no staff coach
+        "The Chair",  # consistency — the governance role, not a named coach
+    }
+)
+
+
+def public_roster() -> set[str]:
+    """Display names the public sees on /api/coaches: the 8 operational coaches + the lead."""
+    names = {p.get("name") for p in persona_registry.operational_personas().values()}
+    lead = persona_registry.resolve(persona_registry.LEAD_PERSONA_ID)
+    if lead:
+        names.add(lead.get("name"))
+    return {n for n in names if n}
+
+
+def assert_cast_current(config: dict) -> None:
+    """Fail-closed: no pillar owner may name anyone off the live public roster."""
+    roster = public_roster()
+    if not roster:  # registry unreadable — refuse rather than validate against nothing
+        raise SystemExit("cast guard: persona registry resolved to an empty roster; refusing to build")
+    stale = {
+        name: p["owner"]
+        for name, p in config.get("pillars", {}).items()
+        if (owner := p.get("owner")) and owner not in roster and owner not in OWNER_ROLE_LABELS
+    }
+    if stale:
+        raise SystemExit(
+            "cast guard (#1891): pillar owner(s) name someone off the live roster — "
+            + "; ".join(f"{k} → {v!r}" for k, v in sorted(stale.items()))
+            + f". Allowed: {sorted(roster | OWNER_ROLE_LABELS)}. "
+            "Update config/character_sheet.json to the current cast (config/personas.json holds the rename map)."
+        )
+
+
+def assert_no_real_figures(page: str) -> None:
+    """Fail-closed: the rendered page passes the same privacy gate as AI-published content."""
+    privacy_guard.assert_clean(page, context="/method/game/")
 
 
 def esc(s) -> str:
@@ -421,6 +483,14 @@ def _honesty_section(config: dict) -> str:
 
 
 def render(config: dict) -> str:
+    """Render the page, fail-closed on a stale cast or any real public figure (#1891)."""
+    assert_cast_current(config)
+    page = _render_page(config)
+    assert_no_real_figures(page)
+    return page
+
+
+def _render_page(config: dict) -> str:
     meta = config.get("_meta", {})
     hero_promise = (
         "The character sheet is a game — and a game you can't audit is just a badge. This page is the rulebook: every number below is "

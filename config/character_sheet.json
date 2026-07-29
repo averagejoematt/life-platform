@@ -111,7 +111,7 @@
     "metabolic": {
       "weight": 0.12,
       "ema_lambda": 0.95,
-      "owner": "Dr. Peter Attia",
+      "owner": "Dr. Amara Patel",
       "components": {
         "cgm_glucose_control": {
           "weight": 0.3
@@ -134,7 +134,7 @@
     "mind": {
       "weight": 0.15,
       "ema_lambda": 0.85,
-      "owner": "Coach Maya Rodriguez",
+      "owner": "Dr. Nathan Reeves",
       "components": {
         "t0_habit_compliance": {
           "weight": 0.3,
