@@ -887,7 +887,17 @@ load();
       const d = r.ok ? await r.json() : null;
       const nu = ((d && d.newly_unlocked) || [])[0];
       const el = wrap.querySelector("[data-home-unlocked]");
-      if (nu && el) {
+      // #1895 second belt: the copy literally says "this month", so it must never
+      // describe a record that is not from this month. The server now refuses
+      // tombstoned prior-cycle snapshots outright, but a NON-tombstoned record can
+      // still go stale if weekly-correlation-compute stalls (observed: the live
+      // snapshot sat unchanged from 2026-07-04 across several Sunday runs). The
+      // writer is weekly, so >14 days means at least two missed runs — past that,
+      // honest silence beats a confident month-old claim (ADR-104).
+      const MAX_AGE_DAYS = 14;
+      const computedAt = d && d.computed_at ? Date.parse(d.computed_at) : NaN;
+      const fresh = Number.isFinite(computedAt) && (Date.now() - computedAt) / 86400000 <= MAX_AGE_DAYS;
+      if (nu && el && fresh) {
         const pretty = String(nu.label || "").replace(/_vs_/g, " ↔ ").replace(/_/g, " ");
         // r to 2 decimals — 4-decimal display is false precision (ADR-105); the
         // strength label stays the engine's own n-gated call, never re-derived here.

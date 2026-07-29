@@ -1676,10 +1676,22 @@ def handle_pillar_coupling() -> dict:
     constellation draws thin/absent data honestly faint. No AI, no forecast: this is a
     descriptive statistic over the last ~60 days, labeled by its actual date range.
     """
+    # #1895: phase-filter the window. character_sheet is wiped ("all") at a restart
+    # and TOMBSTONED rather than deleted, so an unfiltered trailing-60 read draws the
+    # PRIOR cycle's sheets. Live on Day 3 of cycle 11: 118 of 122 DATE# records were
+    # tombstoned, and the home constellation — the first beat on the page — rendered
+    # 14 edges (r=-0.87, n=47, p=0.0, "significant") computed almost entirely from the
+    # wiped cycle, over a window labelled 2026-05-30 → 2026-07-28. Filtered, a fresh
+    # cycle falls under _COUPLING_MIN_N and the endpoint returns honest_null with no
+    # edges — which is what this module's own docstring calls the honest signal.
     resp = table.query(
-        KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}character_sheet") & Key("sk").begins_with("DATE#"),
-        ScanIndexForward=False,
-        Limit=_COUPLING_WINDOW,
+        **with_phase_filter(
+            {
+                "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}character_sheet") & Key("sk").begins_with("DATE#"),
+                "ScanIndexForward": False,
+                "Limit": _COUPLING_WINDOW,
+            }
+        )
     )
     recs = _decimal_to_float(resp.get("Items", []))
     recs.sort(key=lambda r: str(r.get("sk", "")))  # chronological
