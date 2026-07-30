@@ -48,6 +48,12 @@ except ImportError:
 # ---------------------------------------------------------------------------
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
+# #1894/#1225: the weight-truth assessors live in their own module (the size gate
+# asks for a cohesive split, not a grandfather entry). Re-exported so
+# qa_smoke_lambda.assess_hero_weight stays a valid public entrypoint.
+from operational import weight_truth_qa  # noqa: E402
+from operational.weight_truth_qa import WEIGHT_RECONCILE_TOL, assess_hero_weight  # noqa: E402,F401
+
 S3_BUCKET = os.environ["S3_BUCKET"]
 RECIPIENT = os.environ["EMAIL_RECIPIENT"]
 SENDER = os.environ["EMAIL_SENDER"]
@@ -781,48 +787,8 @@ def check_predict_week_freshness():
 # weighin_count and a single weigh-in must span 0 days (no multi-day trend off one
 # reading — ADR-105). Pure assessor so it's unit-testable offline.
 
-WEIGHT_RECONCILE_TOL = 0.05
-
-
-def assess_hero_weight(journey):
-    """Validate the /api/journey weight row reconciles + is trend-honest.
-
-    Returns (ok: bool, message: str). Pure — no network, no clock. A pre-start
-    payload (weight fields nulled by design, #931) is a clean pass.
-    """
-    if not isinstance(journey, dict):
-        return False, "journey payload is not an object"
-    if journey.get("pre_start") or journey.get("current_weight_lbs") is None:
-        return True, "pre-start / no weigh-in — no weight claim to reconcile"
-
-    now = journey.get("current_weight_lbs")
-    start = journey.get("start_weight_lbs")
-    lost = journey.get("lost_lbs")
-    if start is None or lost is None:
-        return False, f"weight row incomplete — current={now}, start={start}, lost={lost}"
-
-    # (a) Arithmetic: DISPLAYED now − DISPLAYED start must equal the DISPLAYED delta.
-    #     lost_lbs is start − now, so (now − start) must equal −lost_lbs.
-    residual = float(now) - float(start) + float(lost)
-    if abs(residual) > WEIGHT_RECONCILE_TOL:
-        return False, (
-            f"stat row fails arithmetic: now {now} − start {start} = {round(float(now) - float(start), 2)} "
-            f"but the delta shows {lost} (residual {round(residual, 2)}) — a numerate reader can't reconcile it (#1225)"
-        )
-
-    # (b) Trend honesty: "up/down X in N days" needs >= 2 weigh-ins. The payload must
-    #     carry the count, and a single weigh-in must span 0 days (story.js gates the
-    #     elapsed-days copy on exactly this).
-    n = journey.get("weighin_count")
-    if n is None:
-        return False, "journey payload is missing weighin_count — story.js can't gate the 'in N days' trend claim (#1225)"
-    span = journey.get("weighin_span_days") or 0
-    if int(n) < 2 and float(span) > 0:
-        return False, (
-            f"single weigh-in (count={n}) but weighin_span_days={span} > 0 — that would let story.js claim an "
-            f"N-day trend off one reading (#1225)"
-        )
-    return True, f"stat row reconciles (now {now} − start {start} → {lost} delta) · {n} weigh-in(s), span {span}d"
+# assess_hero_weight + WEIGHT_RECONCILE_TOL now live in operational/weight_truth_qa
+# (re-exported at import for the existing public surface).
 
 
 def check_hero_weight_arithmetic():
@@ -838,6 +804,9 @@ def check_hero_weight_arithmetic():
     journey = data.get("journey", data) if isinstance(data, dict) else {}
     ok, msg = assess_hero_weight(journey)
     return [check.ok(msg) if ok else check.fail(msg)]
+
+
+# ---------------------------------------------------------------------------
 
 
 # ---------------------------------------------------------------------------
@@ -1114,6 +1083,7 @@ def lambda_handler(event, context):
         all_checks += check_reader_truth()  # #1096: phase-aware narrative truth (Haiku, budget-aware, fail-soft)
         all_checks += check_predict_week_freshness()  # #1198: predict-the-week never live on a stale ISO week
         all_checks += check_hero_weight_arithmetic()  # #1225: home hero stat row reconciles + trend-honest
+        all_checks += weight_truth_qa.checks(Check, SITE_BASE_URL)  # #1894: home/cockpit vs the coaching door
         all_checks += check_receipt_replay()  # #1373: progression-receipt drift alarm (deterministic replay)
         all_checks += check_redirect_spotcheck()  # #1430: weekly legacy-redirect sample, rotates over redirects.map
         all_checks += check_notion_template_schema()  # #1840: code TEMPLATE_SK vs live Notion schema drift gate
