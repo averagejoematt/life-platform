@@ -15,6 +15,7 @@ Checks (each pass/fail):
   9. No habit streak > day_n (would indicate leak from pre-genesis data)
  10. pytest layer-retirement test passes (i2)
  11. Baked static/no-JS + OG proof (Home + Coaching) is fresh post-genesis (#1815)
+ 12. Plan literals (protein floor et al.) reconcile with config/user_goals.json (#1898)
 
 Returns 0 if all checks pass, 1 if any fail.
 
@@ -204,6 +205,31 @@ def main():
             not changed,
             f"rebaked (now dirty in the working tree, commit+push to deploy): {changed}" if changed else "up to date",
         )
+
+    # 12. #1898 — plan literals reconcile against config/user_goals.json.
+    # A reset rewrites user_goals + the character_sheet BASELINE, but nothing swept
+    # the plan FIGURES scattered through prompt-feeding and page-generating configs.
+    # Cycle 11 shipped the wiped pilot's 190 g protein target: the character engine
+    # graded against it, /method/game/ published "target grams 190", and
+    # board_of_directors fed "(190g target)" into coach prompts — while the sealed
+    # prereg said 170. Same class as the #1219 kept-chronicle figure check, hence the
+    # same WARN-shaped surfacing here; the hard gate is
+    # tests/test_plan_literal_reconciliation.py, which reds CI on divergence.
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-m", "pytest", "tests/test_plan_literal_reconciliation.py", "-q"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+        )
+        tail = (proc.stdout or proc.stderr).strip().splitlines()
+        check(
+            "Plan literals reconcile with config/user_goals.json (#1898)",
+            proc.returncode == 0,
+            tail[-1] if tail else "no output",
+        )
+    except Exception as e:  # never let the verifier itself crash the post-reset check
+        check("Plan literals reconcile with config/user_goals.json (#1898)", False, f"check could not run: {e}")
 
     # Summary
     total = len(checks)
