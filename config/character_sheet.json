@@ -90,7 +90,7 @@
         },
         "protein_total": {
           "weight": 0.2,
-          "target_grams": 190,
+          "target_grams": 170,
           "behavioral": true
         },
         "protein_distribution": {
@@ -460,7 +460,7 @@
     "nutrition": {
       "Foundation": [
         "Log everything in MacroFactor \u2014 even imperfect days. Data > perfection",
-        "Hit protein target (190g) \u2014 the non-negotiable macro during weight loss",
+        "Hit protein target (170g) \u2014 the non-negotiable macro during weight loss",
         "Eat within designated window \u2014 structure prevents drift"
       ],
       "Momentum": [

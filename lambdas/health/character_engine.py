@@ -547,7 +547,12 @@ def compute_nutrition_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple
 
     # Protein total
     protein = _safe_float(mf, "protein") or _safe_float(mf, "total_protein")
-    protein_target = components.get("protein_total", {}).get("target_grams", 190)
+    # #1898: the fallback is a PLAN LITERAL and must track the sealed pre-registration
+    # (170 g floor for cycle 11), not the wiped pilot cycle's 190. A stale default here
+    # is the same drift class as the config copies — worse, it only bites when the config
+    # key is missing, so it fails silently. tests/test_plan_literal_reconciliation.py
+    # pins this against the sealed prereg artifact.
+    protein_target = components.get("protein_total", {}).get("target_grams", 170)
     scores["protein_total"] = _pct_of_target(protein, protein_target, 1.2)
 
     # Protein distribution
