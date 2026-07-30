@@ -200,6 +200,8 @@ except ImportError:  # pragma: no cover — flat sys.path (tests)
 # number gate that catches fabricated trends ("from 58 to 64" with no 58 anywhere).
 from ai import grounded_generation as _gg
 
+from intelligence import weight_recency
+
 
 def _latest_date(items):
     """Newest DATE# present in a list of records (by sk), or None."""
@@ -444,16 +446,13 @@ def gather_data_for_expert(expert_key):
         dexa = _latest_item("dexa")
         meas = _latest_item("measurements")
         weight_items = _query_source("withings", d30, today)
-        weights = [float(w.get("weight_lbs", 0)) for w in weight_items if w.get("weight_lbs")]
-        current_weight = weights[-1] if weights else None
-        weight_4wk = round(weights[-1] - weights[0], 1) if len(weights) >= 2 else None
 
         data = {
             "expert_key": "physical",
             "period": f"experiment days 1-{days_in_experiment}",
-            "current_weight_lb": current_weight,
-            "weight_change_4wk": weight_4wk,
-            "weight_readings": len(weights),
+            # #1894: each weight fact carries its own reading date + staleness, so a
+            # stale weigh-in can't be narrated as today's. See intelligence/weight_recency.
+            **weight_recency.summarize_weight_readings(weight_items, today),
         }
         if dexa:
             bc = dexa.get("body_composition", {})
@@ -768,6 +767,9 @@ on {data.get('draw_date', 'unknown')}. Do NOT describe this as "draws during the
 experiment" — these are periodic lab draws over time.
 """
 
+    # #1894: forbid day-labelling a stale weigh-in (silent when fresh).
+    weight_context = weight_recency.weight_recency_prompt_block(data) if expert_key == "physical" else ""
+
     # Build intelligence preamble (goals, data inventory, data maturity, first-person voice)
     preamble_block = ""
     if _HAS_INTELLIGENCE_COMMON:
@@ -868,6 +870,7 @@ what you have to say this week. This is a weekly appointment, not a generic repo
 ANALYTICAL LENS FOR THIS WEEK: {lens}
 {labs_context}
 {movement_context}
+{weight_context}
 
 Here is Matthew's current data:
 {data_json}
