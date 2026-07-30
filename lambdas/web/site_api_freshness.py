@@ -6,7 +6,7 @@ facade's injectable/monkeypatched state via `_g["<name>"]` — same object the t
 from datetime import datetime, timezone
 
 from boto3.dynamodb.conditions import Key
-from experiment.phase_filter import with_phase_filter
+from experiment.phase_filter import singleton_visible, with_phase_filter
 
 from web.site_api_common import USER_PREFIX, _decimal_to_float, _error, _ok, logger
 
@@ -491,7 +491,14 @@ def presence(*, _g) -> dict:
     table = _g["table"]
     try:
         resp = table.get_item(Key={"pk": USER_PREFIX + "engagement_state", "sk": "STATE#current"})
+        # #1895: honor the restart tombstone — engagement_state is wiped ("all") and
+        # tombstoned, not deleted, and get_item bypasses the query-level phase filter.
+        # Without this, /api/presence reports the wiped cycle's presence/quiet-stretch
+        # as current until the next engagement compute runs. `available: false` (the
+        # empty-record path below) is the honest answer in that window.
         rec = resp.get("Item") or {}
+        if not singleton_visible(rec):
+            rec = {}
     except Exception as e:
         logger.warning("handle_presence read failed: %s", e)
         rec = {}

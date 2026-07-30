@@ -858,6 +858,16 @@ async function load() {
   );
   const cw = bind("const-window");
   if (cw && couplingV && couplingV.window_days) cw.textContent = ` over the last ${couplingV.window_days} days`;
+  // #1895: when a fresh cycle has too few scored days to measure coupling, the figure
+  // renders nodes with NO lines. That is the honest state, but unexplained emptiness
+  // reads as a broken chart to someone who doesn't know a reset just happened — so
+  // say why. The engine's own n floor decides; this only narrates it (ADR-104).
+  else if (cw && couplingV && couplingV.honest_null) {
+    const floor = Number(couplingV.min_n);
+    cw.textContent = Number.isFinite(floor)
+      ? ` (no lines yet — a new cycle needs ${floor} scored days before co-movement can be measured)`
+      : " (no lines yet — a new cycle needs a few more scored days before co-movement can be measured)";
+  }
 
   // #789 — the friends/family "is he okay this week?" plain-language read, from the
   // pillars + weight already in hand (no extra fetch). The presence result (already
@@ -887,7 +897,17 @@ load();
       const d = r.ok ? await r.json() : null;
       const nu = ((d && d.newly_unlocked) || [])[0];
       const el = wrap.querySelector("[data-home-unlocked]");
-      if (nu && el) {
+      // #1895 second belt: the copy literally says "this month", so it must never
+      // describe a record that is not from this month. The server now refuses
+      // tombstoned prior-cycle snapshots outright, but a NON-tombstoned record can
+      // still go stale if weekly-correlation-compute stalls (observed: the live
+      // snapshot sat unchanged from 2026-07-04 across several Sunday runs). The
+      // writer is weekly, so >14 days means at least two missed runs — past that,
+      // honest silence beats a confident month-old claim (ADR-104).
+      const MAX_AGE_DAYS = 14;
+      const computedAt = d && d.computed_at ? Date.parse(d.computed_at) : NaN;
+      const fresh = Number.isFinite(computedAt) && (Date.now() - computedAt) / 86400000 <= MAX_AGE_DAYS;
+      if (nu && el && fresh) {
         const pretty = String(nu.label || "").replace(/_vs_/g, " ↔ ").replace(/_/g, " ");
         // r to 2 decimals — 4-decimal display is false precision (ADR-105); the
         // strength label stays the engine's own n-gated call, never re-derived here.

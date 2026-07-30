@@ -6,7 +6,7 @@ import os
 
 from boto3.dynamodb.conditions import Key
 from common import stats_core
-from experiment.phase_filter import with_phase_filter
+from experiment.phase_filter import singleton_visible, with_phase_filter
 
 from web.site_api_common import S3_REGION, USER_PREFIX, _decimal_to_float, _ok, logger
 
@@ -115,7 +115,14 @@ def what_changed(*, _g) -> dict:
     # Facade state injected via `_g` (the delegator's globals()) — same module the test patched.
     table = _g["table"]
     item = table.get_item(Key={"pk": f"{USER_PREFIX}what_changed", "sk": "SNAPSHOT#current"}).get("Item")
-    if not item:
+    # #1895: honor the restart tombstone. get_item bypasses the query-level phase
+    # filter, and the wipe TOMBSTONES this singleton rather than deleting it
+    # (("what_changed", "all") in restart_intelligence_wipe) — so without this the
+    # wiped cycle's snapshot serves as current until the next weekly compute. It
+    # shipped cycle-5 intelligence (computed 2026-07-04, phase=pilot) onto the home
+    # "newly unlocked this month" ribbon on Day 3 of cycle 11. Shaped-empty is the
+    # honest answer; same shared #946 predicate the coach/board readers apply.
+    if not singleton_visible(item):
         return _ok(
             {"deltas": [], "newly_unlocked": [], "honest_null": True, "window_start": None, "window_end": None, "week": None},
             cache_seconds=900,

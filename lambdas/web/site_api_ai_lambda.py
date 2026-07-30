@@ -478,7 +478,10 @@ def _ask_fetch_computed_reads() -> dict:
     # written weekly; real deltas only, honest_null on a flat month).
     try:
         wc = table.get_item(Key={"pk": f"{USER_PREFIX}what_changed", "sk": "SNAPSHOT#current"}).get("Item")
-        wc = _decimal_to_float(wc or {})
+        # #1895: same restart tombstone as the /api/what_changed reader. Unguarded,
+        # this grounded AI answers in the WIPED cycle's monthly deltas — the leak
+        # reaching the model rather than the page.
+        wc = _decimal_to_float(wc if singleton_visible(wc) else {})
         deltas = []
         for d in (wc.get("deltas") or [])[:6]:
             deltas.append(
@@ -531,7 +534,11 @@ def _ask_fetch_computed_reads() -> dict:
     # quiet stretch is narrated honestly instead of read as missing data).
     try:
         pres = table.get_item(Key={"pk": USER_PREFIX + "engagement_state", "sk": "STATE#current"}).get("Item")
-        pres = _decimal_to_float(pres or {})
+        # #1895: engagement_state is wiped ("all") at a restart and TOMBSTONED, not
+        # deleted — get_item bypasses the query-level phase filter, so without this
+        # the wiped cycle's presence class would ground AI answers until the next
+        # engagement compute overwrote it. Same #946 predicate as the stance reads.
+        pres = _decimal_to_float(pres if singleton_visible(pres) else {})
         if pres.get("presence_class"):
             reads["presence"] = {
                 "class": str(pres["presence_class"])[:20],

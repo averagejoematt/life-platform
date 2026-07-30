@@ -515,3 +515,215 @@ def test_latest_date_reader_available_false_when_partition_empty(monkeypatch, ha
     monkeypatch.setattr(capi_intel, "table", _FakeTable(query_items=[]))
     body = _handler_body(handler)
     assert body.get("available") is False
+
+
+# ── #1895: the CLOSURE guard — derived, not hand-enumerated ───────────────────
+# Everything above this line tests a reader someone remembered to add. That is
+# why this class keeps coming back: #946 fixed the coach readers, #1085 fixed the
+# ones #946 missed, #1197 fixed the latest-DATE# readers — and then #1654 split
+# ledger/what_changed/discoveries out of site_api_data.py into a NEW module whose
+# what_changed() read SNAPSHOT#current with no guard at all. Nothing here noticed,
+# because nothing here asks "is that the complete set?"
+#
+# Live symptom (#1895, Day 3 of cycle 11): /api/what_changed served the cycle-5
+# snapshot (tombstone=true, phase=pilot, computed_at 2026-07-04) and the home
+# ribbon announced it as "newly unlocked this month" — 25 days stale, from a
+# wiped cycle.
+#
+# So this test derives the reader set from the SOURCE instead: every get_item on
+# a STATE#current / SNAPSHOT#current singleton in lambdas/web/ must apply the
+# shared predicate. A new module gets caught the day it is written.
+
+_SINGLETON_SKS = {"STATE#current", "SNAPSHOT#current"}
+
+# Sites that read a singleton sk but are genuinely exempt. Each entry needs a
+# reason — an allowlist without one is how this guard rots into a rubber stamp.
+_SINGLETON_GUARD_EXEMPT: dict[tuple[str, str], str] = {}
+
+
+def _singleton_get_item_sites():
+    """(file, sk, lineno, guarded) for every get_item on a singleton sk in lambdas/web/."""
+    import ast
+    import pathlib
+
+    web = pathlib.Path(__file__).resolve().parent.parent / "lambdas" / "web"
+    out = []
+    for path in sorted(web.glob("*.py")):
+        src = path.read_text(encoding="utf-8")
+        lines = src.split("\n")
+        tree = ast.parse(src)
+        for node in ast.walk(tree):
+            if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "get_item"):
+                continue
+            sk = None
+            for kw in node.keywords:
+                if kw.arg != "Key" or not isinstance(kw.value, ast.Dict):
+                    continue
+                for k, v in zip(kw.value.keys, kw.value.values):
+                    if isinstance(k, ast.Constant) and k.value == "sk" and isinstance(v, ast.Constant):
+                        sk = v.value
+            if sk not in _SINGLETON_SKS:
+                continue
+            # The guard may sit on the same line, just before, or a little after —
+            # window generously, since a documented guard often carries a comment
+            # block between the read and the predicate.
+            window = "\n".join(lines[max(0, node.lineno - 6) : node.lineno + 16])
+            out.append((path.name, sk, node.lineno, "singleton_visible" in window))
+    return out
+
+
+def test_singleton_reader_scan_finds_the_known_sites():
+    """Guard the guard: if this finds nothing, the AST scan silently stopped working."""
+    sites = _singleton_get_item_sites()
+    assert len(sites) >= 4, f"expected several singleton readers in lambdas/web/, found {sites}"
+    files = {f for f, _sk, _ln, _g in sites}
+    assert "site_api_ledger.py" in files, "the #1895 what_changed reader must be in scope of this scan"
+
+
+def test_every_singleton_reader_honors_the_restart_tombstone():
+    """The closure property: no STATE#/SNAPSHOT#current reader may skip the predicate."""
+    unguarded = [
+        (f, sk, ln) for f, sk, ln, guarded in _singleton_get_item_sites() if not guarded and (f, sk) not in _SINGLETON_GUARD_EXEMPT
+    ]
+    assert not unguarded, (
+        "singleton get_item reader(s) without singleton_visible — a restart tombstones "
+        "these records rather than deleting them, so the wiped cycle would serve as "
+        "current until the next writer run (#946/#1085/#1197/#1895):\n"
+        + "\n".join(f"  {f}:{ln} sk={sk!r}" for f, sk, ln in unguarded)
+        + "\nApply experiment.phase_filter.singleton_visible, or add a documented entry to _SINGLETON_GUARD_EXEMPT."
+    )
+
+
+# ── #1895: behavioural — /api/what_changed and the AI grounding read ──────────
+
+
+def _what_changed_body(item):
+    from web import site_api_ledger as led
+
+    return json.loads(led.what_changed(_g={"table": _FakeTable(item=item)})["body"])
+
+
+_WC_PILOT = {
+    "deltas": [{"label": "sleep", "delta": 0.4, "direction": "up"}],
+    "newly_unlocked": [{"label": "habit_pct_vs_day_grade", "r": 0.8777, "n": 20, "first_seen": "2026-06-30"}],
+    "honest_null": False,
+    "window_start": "2026-06-05",
+    "window_end": "2026-07-04",
+    "week": "2026-W27",
+    "computed_at": "2026-07-04T20:45:08+00:00",
+}
+
+
+def test_what_changed_shaped_empty_when_tombstoned():
+    """The live #1895 shape: the wiped cycle's snapshot must not serve as current."""
+    body = _what_changed_body({**TOMBSTONED, **_WC_PILOT})
+    assert body["honest_null"] is True
+    assert body["newly_unlocked"] == [] and body["deltas"] == []
+    # the wiped payload must not leak in any field
+    assert body["window_start"] is None and body["window_end"] is None and body["week"] is None
+    assert "0.8777" not in json.dumps(body)
+
+
+def test_what_changed_shaped_empty_on_non_current_phase():
+    """The latent sibling: a prior cycle's record the wipe never tombstoned."""
+    body = _what_changed_body({"phase": "cycle4", **_WC_PILOT})
+    assert body["honest_null"] is True and body["newly_unlocked"] == []
+
+
+def test_what_changed_still_serves_the_current_cycle():
+    """The guard must not break the feature — a clean record serves normally."""
+    body = _what_changed_body({"phase": "experiment", **_WC_PILOT})
+    assert body["honest_null"] is False
+    assert body["newly_unlocked"][0]["label"] == "habit_pct_vs_day_grade"
+    assert body["week"] == "2026-W27"
+
+
+def test_what_changed_shaped_empty_when_absent():
+    """Pre-first-run: unchanged behaviour (the branch this guard now shares)."""
+    body = _what_changed_body(None)
+    assert body["honest_null"] is True and body["deltas"] == []
+
+
+def test_ask_grounding_drops_tombstoned_monthly_motion(monkeypatch):
+    """#1895's third instance: the leak reaching the MODEL, not just the page.
+
+    _ask_fetch_computed_reads grounds /api/ask. Unguarded it fed the wiped cycle's
+    monthly deltas straight into the prompt, where no page-level check can see it.
+    """
+    ai = _ai()
+    monkeypatch.setattr(ai, "table", _FakeTable(item={**TOMBSTONED, **_WC_PILOT}))
+    reads = ai._ask_fetch_computed_reads()
+    assert "0.8777" not in json.dumps(reads, default=str)
+    assert not (reads.get("monthly_motion") or reads.get("what_changed"))
+
+
+def test_ask_grounding_keeps_current_cycle_monthly_motion(monkeypatch):
+    """The guard must not blind the model to the LIVE cycle's deltas."""
+    ai = _ai()
+    monkeypatch.setattr(ai, "table", _FakeTable(item={"phase": "experiment", **_WC_PILOT}))
+    reads = ai._ask_fetch_computed_reads()
+    assert "sleep" in json.dumps(reads, default=str)
+
+
+# ── #1895: the home constellation's edges (acceptance criterion 2) ────────────
+# /api/pillar_coupling reads a trailing-60 window of character_sheet DATE# records
+# and computes pairwise Pearson r. character_sheet is wiped ("all") and tombstoned,
+# so an UNFILTERED query draws the prior cycle. Live on Day 3 of cycle 11: 118 of
+# 122 records tombstoned, yet the endpoint served 14 edges (r=-0.87, n=47, p=0.0,
+# significant=true) labelled 2026-05-30 -> 2026-07-28 as current — statistically
+# confident claims about a cycle that had been wiped.
+
+
+def test_pillar_coupling_query_is_phase_filtered(monkeypatch):
+    """The fake table cannot evaluate a FilterExpression, so assert it is SENT —
+    same technique as test_board_recent_interactions_query_is_phase_filtered."""
+
+    class _RecordingTable(_FakeTable):
+        def query(self, **kw):
+            self.query_kwargs = kw
+            return {"Items": []}
+
+    t = _RecordingTable()
+    monkeypatch.setattr(capi_intel, "table", t)
+    capi_intel.handle_pillar_coupling()
+    assert "FilterExpression" in t.query_kwargs, (
+        "pillar_coupling must phase-filter its character_sheet window, or the " "constellation draws the wiped cycle's co-movement (#1895)"
+    )
+
+
+def test_pillar_coupling_honest_null_on_a_thin_fresh_cycle(monkeypatch):
+    """Post-filter, a fresh cycle has too few sheets to correlate — the honest answer
+    is no edges, not edges derived from whatever survived."""
+    monkeypatch.setattr(capi_intel, "table", _FakeTable(query_items=[]))
+    body = json.loads(capi_intel.handle_pillar_coupling()["body"])
+    assert body["honest_null"] is True
+    assert body["edges"] == [] and body["window_days"] == 0
+
+
+# ── #1895: the front-end belts (story.js) ────────────────────────────────────
+# Source-level assertions: these are ES modules with site-absolute imports, so a
+# real DOM render lives in tests/visual_qa.py (post-deploy). What must not happen
+# silently is the belts being deleted, so pin their presence and their reasons.
+
+
+def _story_js():
+    import pathlib
+
+    return (pathlib.Path(__file__).resolve().parent.parent / "site" / "assets" / "js" / "story.js").read_text(encoding="utf-8")
+
+
+def test_home_ribbon_gates_this_month_copy_on_recency():
+    """The copy says 'this month' — it must not describe a stale record. The server
+    refuses tombstoned ones; this belt covers a NON-tombstoned record going stale
+    when weekly-correlation-compute stalls (observed live: unchanged since 07-04)."""
+    src = _story_js()
+    assert "computed_at" in src and "MAX_AGE_DAYS" in src, "the #1895 recency belt is missing from story.js"
+    assert "newly unlocked this month" in src, "the gated copy moved — re-point the belt"
+
+
+def test_constellation_narrates_its_empty_state():
+    """A fresh cycle renders nodes with no lines. Unexplained emptiness reads as a
+    broken chart, so the caption must say why (Matthew's call on #1910)."""
+    src = _story_js()
+    assert "honest_null" in src, "the constellation empty-state branch is missing"
+    assert "no lines yet" in src, "the empty constellation must explain itself, not just render blank"
