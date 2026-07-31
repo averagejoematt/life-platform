@@ -80,17 +80,50 @@ jobs:
       # correctly, but as a red run + SNS alert. Detect it up front and skip
       # cleanly instead: the newer commit has its own queued run that deploys
       # a strict superset of this one.
+      #
+      # #1907 — "the newer commit has its own run" is ONLY true when that commit
+      # matches this workflow's `paths:` filter. A merge touching just docs/ advances
+      # origin/main WITHOUT creating a replacement run, so the old check would skip a
+      # run that nothing else replaces. Failure mode, found live 2026-07-29:
+      #   1. a site/ deploy's post-deploy gate flakes → auto-rollback reverts the site
+      #   2. the operator re-runs the deploy to restore the correct tree (correct move)
+      #   3. any docs-only merge landing mid-flight advances origin/main
+      #   4. the re-run marks itself superseded and skips — and no replacement exists
+      # Net: the site stays on the ROLLED-BACK tree indefinitely, both runs green, a
+      # clean exit, nothing alarms. This was one merge from happening while #1903 (a
+      # real clinician's name on a live public page) was being restored.
+      #
+      # So: skip only when the superseding range actually touches a trigger path. The
+      # path list below must mirror `on.push.paths` above. Any git error falls through
+      # to superseded=false — deploying a redundant identical tree is harmless (the
+      # clobber guard is the real backstop), stranding a recovery is not.
       - name: Superseded-run check
         id: supersede
         run: |
-          git fetch --quiet origin main
-          if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ] \
-             && git merge-base --is-ancestor HEAD origin/main; then
-            echo "superseded=true" >> "$GITHUB_OUTPUT"
-            echo "⏭ Superseded by a newer main commit — its own run deploys a superset of this tree. Skipping."
-          else
-            echo "superseded=false" >> "$GITHUB_OUTPUT"
+          set -uo pipefail
+          # Unshallow enough for merge-base: checkout defaults to depth 1.
+          git fetch --quiet --deepen=50 origin main 2>/dev/null || git fetch --quiet origin main || true
+          HEAD_SHA="$(git rev-parse HEAD)"
+          MAIN_SHA="$(git rev-parse origin/main 2>/dev/null || echo "$HEAD_SHA")"
+          SUPERSEDED=false
+          if [ "$HEAD_SHA" != "$MAIN_SHA" ] && git merge-base --is-ancestor HEAD origin/main 2>/dev/null; then
+            # Does a replacement run genuinely exist? Only if the newer commits touch
+            # a path this workflow triggers on.
+            CHANGED="$(git diff --name-only HEAD origin/main -- \
+                        'site/' '.github/workflows/site-deploy.yml' 2>/dev/null || echo '')"
+            if [ -n "$CHANGED" ]; then
+              SUPERSEDED=true
+              echo "⏭ Superseded by ${MAIN_SHA:0:7} — it touches this workflow's trigger paths, so it has its own run deploying a superset. Skipping."
+              echo "   superseding commit: $MAIN_SHA"
+              echo "   trigger-path files changed between ${HEAD_SHA:0:7} and ${MAIN_SHA:0:7}:"
+              echo "$CHANGED" | sed 's/^/     - /'
+            else
+              echo "▶ origin/main has advanced to ${MAIN_SHA:0:7}, but NO trigger-path file changed —"
+              echo "  that commit has no site-deploy run of its own, so this run is NOT superseded (#1907)."
+              echo "  Proceeding: skipping here would strand the site on the currently-deployed tree."
+            fi
           fi
+          echo "superseded=$SUPERSEDED" >> "$GITHUB_OUTPUT"
 
       # setup-python (v7.0.0) via the shared composite (#1655)
       - uses: ./.github/actions/setup-ci

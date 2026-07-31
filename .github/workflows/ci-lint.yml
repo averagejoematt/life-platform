@@ -257,27 +257,20 @@ jobs:
         if: always()
         run: python3 scripts/content_policy_scan.py
 
-      - name: Doc-drift gate (ENFORCED — #389)
-        # sync_doc_metadata.py --check asserts the literal counts quoted in CLAUDE.md
-        # and docs/*.md (tool/Lambda/module/ADR/test counts, served PLATFORM_STATS)
-        # against what AST/regex discovery finds in the source right now. Writes
-        # nothing; a mismatch means a fact changed (new tool, new Lambda, new ADR,
-        # new test) and nobody reran `sync_doc_metadata.py --apply` before merging.
-        if: always()
-        run: python3 deploy/sync_doc_metadata.py --check
-
-      - name: Wiki gates (ENFORCED — links, tombstones, facts, index, ADR index)
-        # The wiki drift machinery (CONVENTIONS §8): dead relative links, live docs
-        # (and lambdas/+mcp/ docstrings) referencing retired concepts
-        # (docs/_lint/tombstones.txt), stale counts/budget stated in any phrasing
-        # (check_doc_facts), index coverage + status headers, and the generated ADR
-        # index being current. docs-ci.yml runs the same gates on docs-only pushes;
-        # this copy catches code pushes that invalidate docs (e.g. a source docstring
-        # that revives a retired concept, or deleting a script a doc links to).
-        if: always()
-        run: |
-          python3 scripts/check_doc_links.py
-          python3 scripts/check_doc_tombstones.py
-          python3 scripts/check_doc_facts.py
-          python3 scripts/check_doc_index.py --strict
-          python3 scripts/generate_adr_index.py --check
+      # ── Doc-drift + wiki gates: MOVED to docs-ci.yml (#1908) ──────────────────
+      # The literal-drift gate (sync_doc_metadata --check, #389) and the wiki drift
+      # machinery (check_doc_links / _tombstones / _facts / _index --strict,
+      # generate_adr_index --check) used to run HERE as well as in docs-ci.yml, so that
+      # a code push invalidating a doc was caught. That duplication had a one-way defect:
+      # the gates could fail inside CI/CD, but the fix for any of them is a DOCS edit,
+      # and `docs/**` is not in ci-cd.yml's path filter — so the fix could not re-run the
+      # workflow it fixed. check_main_green.py reads the CI/CD workflow only, so main
+      # stayed red until a manual workflow_dispatch, which also runs Plan → Deploy and
+      # therefore charged a *documentation* fix a production approval. Three occurrences
+      # in three days (#1900, #1906, #1914).
+      #
+      # docs-ci.yml is now their single home and triggers on BOTH halves of the
+      # doc↔source coupling (docs/** AND lambdas/**, mcp/**, config/**, cdk/**, tests/**),
+      # so code-push coverage is preserved — it is not weaker here, it is the same gate
+      # in a workflow the fix can actually re-run. Do not re-add them to this file:
+      # tests/test_docs_ci_owns_doc_gates.py fails if they come back.

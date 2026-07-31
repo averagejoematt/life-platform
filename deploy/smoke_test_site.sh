@@ -26,12 +26,38 @@ FAIL=0
 # sleeps) — see the lib header for the full mechanism.
 source "$(dirname "$0")/lib/cache_aware_fetch.sh"
 
+# ── Timeout-resilient requests (#1911) ────────────────────────────────────────
+# Under `set -e` a bare $(curl ...) that times out kills this ENTIRE script with a
+# bare `exit 28` — no ❌ row, no URL, and auto-rollback reverts a good deploy. It
+# did exactly that twice in two days. Every request below goes through smoke_curl,
+# which captures curl's exit code instead of dying and retries once on the
+# transport-failure class only. See the lib header.
+source "$(dirname "$0")/lib/resilient_curl.sh"
+
+# ── Name the check in flight (#1911) ──────────────────────────────────────────
+# The belt to smoke_curl's braces: if ANY future call site regresses to a bare
+# curl (or the script dies for an unrelated reason), the exit trap still names
+# what was being checked. In both incidents the failing endpoint had to be
+# inferred from sort order, which cost real diagnosis time.
+CURRENT_CHECK="(startup)"
+_smoke_on_exit() {
+  local rc=$?
+  if [[ "$rc" -ne 0 ]]; then
+    echo ""
+    echo "‼️  smoke ABORTED with exit $rc while checking: $CURRENT_CHECK"
+    [[ "$rc" -eq 28 ]] && echo "    (curl exit 28 = request timed out — see #1911)"
+  fi
+  rm -f "$SMOKE_CURL_RC_FILE" "$SMOKE_CURL_RETRY_LOG" 2>/dev/null || true
+}
+trap _smoke_on_exit EXIT
+
 check_status() {
   local label="$1"
   local url="$2"
   local expected="${3:-200}"
   local status
-  status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url")
+  CURRENT_CHECK="$label ($url)"
+  status=$(smoke_curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url")
   if [[ "$status" == "$expected" ]]; then
     echo "  ✅ $label"
     PASS=$((PASS + 1))
@@ -48,8 +74,9 @@ check_redirect() {
   local url="$2"
   local target="$3"
   local status location
-  status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url")
-  location=$(curl -s -o /dev/null -w "%{redirect_url}" --max-time 10 "$url")
+  CURRENT_CHECK="$label ($url)"
+  status=$(smoke_curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url")
+  location=$(smoke_curl -s -o /dev/null -w "%{redirect_url}" --max-time 10 "$url")
   if [[ "$status" == "301" && "$location" == "$BASE$target" ]]; then
     echo "  ✅ $label"
     PASS=$((PASS + 1))
@@ -64,7 +91,8 @@ check_header() {
   local url="$2"
   local header_pattern="$3"
   local headers
-  headers=$(curl -s -I --max-time 10 "$url")
+  CURRENT_CHECK="$label ($url)"
+  headers=$(smoke_curl -s -I --max-time 10 "$url")
   if echo "$headers" | grep -qi "$header_pattern"; then
     echo "  ✅ $label"
     PASS=$((PASS + 1))
@@ -122,7 +150,8 @@ echo ""
 # still pending, WARN loudly and skip the strict block instead of failing the
 # site-deploy gate into an auto-rollback; once /now/ answers 301, assert strictly.
 echo "── Cockpit rename (expect 301 → /cockpit/, one hop) ──────"
-NOW_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$BASE/now/")
+CURRENT_CHECK="/now/ redirect probe"
+NOW_STATUS=$(smoke_curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$BASE/now/")
 if [[ "$NOW_STATUS" == "301" ]]; then
   check_redirect "/now/ → /cockpit/"          "$BASE/now/"          "/cockpit/"
   check_redirect "/character/ → /cockpit/"    "$BASE/character/"    "/cockpit/"
@@ -150,8 +179,9 @@ check_bare_door() {
   local label="$1"
   local door="$2"   # e.g. /data
   local status effective
-  status=$(curl -sL -o /dev/null -w "%{http_code}" --max-time 15 "$BASE$door")
-  effective=$(curl -sL -o /dev/null -w "%{url_effective}" --max-time 15 "$BASE$door")
+  CURRENT_CHECK="$label ($BASE$door)"
+  status=$(smoke_curl -sL -o /dev/null -w "%{http_code}" --max-time 15 "$BASE$door")
+  effective=$(smoke_curl -sL -o /dev/null -w "%{url_effective}" --max-time 15 "$BASE$door")
   if [[ "$status" == "200" && "$effective" == "$BASE$door/" ]]; then
     echo "  ✅ $label"
     PASS=$((PASS + 1))
@@ -161,8 +191,9 @@ check_bare_door() {
   fi
 }
 echo "── Bare door URLs (expect 200 on the door, no /site/* hop) ─"
-DATA_BARE_STATUS=$(curl -sL -o /dev/null -w "%{http_code}" --max-time 15 "$BASE/data")
-DATA_BARE_EFF=$(curl -sL -o /dev/null -w "%{url_effective}" --max-time 15 "$BASE/data")
+CURRENT_CHECK="bare door /data probe"
+DATA_BARE_STATUS=$(smoke_curl -sL -o /dev/null -w "%{http_code}" --max-time 15 "$BASE/data")
+DATA_BARE_EFF=$(smoke_curl -sL -o /dev/null -w "%{url_effective}" --max-time 15 "$BASE/data")
 if [[ "$DATA_BARE_STATUS" == "200" && "$DATA_BARE_EFF" == "$BASE/data/" ]]; then
   check_bare_door "/data → /data/"           "/data"
   check_bare_door "/cockpit → /cockpit/"     "/cockpit"
@@ -226,8 +257,20 @@ check_json_endpoint() {
   local sep="?"
   [[ "$url" == *\?* ]] && sep="&"
   local cb_url="${url}${sep}_cb=smoke$(date +%s%N)"
-  local out status body
-  out=$(curl -s --max-time 10 -w $'\n%{http_code}' "$cb_url")
+  local out status body rc
+  # #1911: name the dep BEFORE the request, not only after a pass. Pre-fix the log
+  # printed ✅ per pass and then a bare `exit 28`, so the failing endpoint had to be
+  # inferred from sort order — that inference cost real time in both incidents.
+  CURRENT_CHECK="api_dep $dep_path ($cb_url)"
+  out=$(smoke_curl -s --max-time 10 -w $'\n%{http_code}' "$cb_url")
+  rc=$(smoke_curl_rc)
+  # A transport failure (already retried once inside smoke_curl) is now a normal
+  # ❌ row that increments FAIL — it no longer aborts the run with a bare exit code.
+  if [[ "$rc" -ne 0 ]]; then
+    echo "  ❌ api_dep $dep_path — curl failed (exit $rc$([[ "$rc" -eq 28 ]] && echo ', timed out')) after $SMOKE_CURL_ATTEMPTS attempt(s) ($cb_url)"
+    FAIL=$((FAIL + 1))
+    return
+  fi
   status="${out##*$'\n'}"
   body="${out%$'\n'*}"
   if [[ "$status" != "200" ]]; then
@@ -277,12 +320,12 @@ if [[ "$QUICK" != "--quick" ]]; then
     if _needle_absent "$file"; then echo "  ✅ $label"; PASS=$((PASS+1)); else echo "  ❌ $label — unexpectedly found: $needle"; FAIL=$((FAIL+1)); fi
   }
 
-  HOME_FILE=$(mktemp);   curl -s --max-time 15 "$BASE/" > "$HOME_FILE"
-  NOW_FILE=$(mktemp);    curl -s --max-time 15 "$BASE/cockpit/" > "$NOW_FILE"
-  STORY_FILE=$(mktemp);  curl -s --max-time 15 "$BASE/story/" > "$STORY_FILE"
-  EVID_FILE=$(mktemp);   curl -s --max-time 15 "$BASE/data/" > "$EVID_FILE"
-  PIPE_FILE=$(mktemp);   curl -s --max-time 15 "$BASE/method/pipeline/" > "$PIPE_FILE"
-  SUB_FILE=$(mktemp);    curl -s --max-time 15 "$BASE/subscribe/" > "$SUB_FILE"
+  HOME_FILE=$(mktemp);   CURRENT_CHECK="body fetch $BASE/"; smoke_curl -s --max-time 15 "$BASE/" > "$HOME_FILE"
+  NOW_FILE=$(mktemp);    CURRENT_CHECK="body fetch $BASE/cockpit/"; smoke_curl -s --max-time 15 "$BASE/cockpit/" > "$NOW_FILE"
+  STORY_FILE=$(mktemp);  CURRENT_CHECK="body fetch $BASE/story/"; smoke_curl -s --max-time 15 "$BASE/story/" > "$STORY_FILE"
+  EVID_FILE=$(mktemp);   CURRENT_CHECK="body fetch $BASE/data/"; smoke_curl -s --max-time 15 "$BASE/data/" > "$EVID_FILE"
+  PIPE_FILE=$(mktemp);   CURRENT_CHECK="body fetch $BASE/method/pipeline/"; smoke_curl -s --max-time 15 "$BASE/method/pipeline/" > "$PIPE_FILE"
+  SUB_FILE=$(mktemp);    CURRENT_CHECK="body fetch $BASE/subscribe/"; smoke_curl -s --max-time 15 "$BASE/subscribe/" > "$SUB_FILE"
   trap 'rm -f "$HOME_FILE" "$NOW_FILE" "$STORY_FILE" "$EVID_FILE" "$PIPE_FILE" "$SUB_FILE"' EXIT
 
   # Home: cinematic landing + the three doors + interactive constellation
@@ -411,20 +454,20 @@ if [[ "$QUICK" != "--quick" ]]; then
   echo "── API data quality ──────────────────────────────────────"
   # Pre-start (countdown) window: journey serves pre_start=true and baseline-dependent
   # vitals are legitimately absent — accept either state, but only the right one.
-  PRE_START=$(curl -s --max-time 10 "$BASE/api/journey" | python3 -c "import sys,json; d=json.load(sys.stdin); j=d.get('journey',d); print('1' if (j.get('pre_start') or (j.get('day_n') is not None and j.get('day_n') <= 1)) else '0')" 2>/dev/null || echo 0)
+  PRE_START=$(smoke_curl -s --max-time 10 "$BASE/api/journey" | python3 -c "import sys,json; d=json.load(sys.stdin); j=d.get('journey',d); print('1' if (j.get('pre_start') or (j.get('day_n') is not None and j.get('day_n') <= 1)) else '0')" 2>/dev/null || echo 0)
   if [ "$PRE_START" = "1" ]; then
     echo "  ✅ /api/vitals: pre-start/Day-1 window (weight_lbs not required before the first weigh-in)"; PASS=$((PASS + 1))
-  elif curl -s --max-time 10 "$BASE/api/vitals" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('vitals',{}).get('weight_lbs') is not None" 2>/dev/null; then
+  elif smoke_curl -s --max-time 10 "$BASE/api/vitals" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('vitals',{}).get('weight_lbs') is not None" 2>/dev/null; then
     echo "  ✅ /api/vitals: weight_lbs present"; PASS=$((PASS + 1))
   else
     echo "  ❌ /api/vitals: missing weight_lbs"; FAIL=$((FAIL + 1))
   fi
-  if curl -s --max-time 10 "$BASE/api/source_freshness" | python3 -c "import sys,json; d=json.load(sys.stdin); assert isinstance(d.get('sources'),list) and len(d['sources'])>0" 2>/dev/null; then
+  if smoke_curl -s --max-time 10 "$BASE/api/source_freshness" | python3 -c "import sys,json; d=json.load(sys.stdin); assert isinstance(d.get('sources'),list) and len(d['sources'])>0" 2>/dev/null; then
     echo "  ✅ /api/source_freshness: sources present"; PASS=$((PASS + 1))
   else
     echo "  ❌ /api/source_freshness: no sources array"; FAIL=$((FAIL + 1))
   fi
-  if curl -s --max-time 10 "$BASE/api/character" | python3 -c "import sys,json; d=json.load(sys.stdin); assert isinstance(d.get('pillars'),list) and len(d['pillars'])==7" 2>/dev/null; then
+  if smoke_curl -s --max-time 10 "$BASE/api/character" | python3 -c "import sys,json; d=json.load(sys.stdin); assert isinstance(d.get('pillars'),list) and len(d['pillars'])==7" 2>/dev/null; then
     echo "  ✅ /api/character: 7 pillars present"; PASS=$((PASS + 1))
   else
     echo "  ❌ /api/character: pillars missing/incomplete"; FAIL=$((FAIL + 1))
@@ -435,6 +478,12 @@ fi
 # ── Summary ───────────────────────────────────────────────────────────────────
 echo "============================================================"
 echo "Results: $PASS passed, $FAIL failed"
+# #1911: a recovered timeout must stay VISIBLE. Retrying silently would trade one
+# failure mode (spurious rollback) for another (a degrading origin nobody notices).
+SMOKE_RETRIES=$(smoke_curl_retry_count)
+if [[ "$SMOKE_RETRIES" -gt 0 ]]; then
+  echo "⟳ $SMOKE_RETRIES request(s) needed a transport retry — the deploy passed, but the origin is slow (#1911)."
+fi
 if [[ $FAIL -eq 0 ]]; then
   echo "✅ All checks passed."
 else

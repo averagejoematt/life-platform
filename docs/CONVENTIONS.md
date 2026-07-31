@@ -99,7 +99,7 @@ Source: #216, then the 2026-06-29 recurrence (`feedback_squash_merge_drops_unpus
 
 CI's `Lint + Syntax Check` job runs its gates in order —
 `flake8 (enforced subset) → black → ruff → mypy → py_compile → lambda_map coverage →
-content-policy → doc-drift` — but since #749 every gate after flake8 carries
+content-policy` — but since #749 every gate after flake8 carries
 `if: always()`, so **each gate runs and reports even when an earlier one is red**: one
 push surfaces ALL violations at once. (Before #749 the steps were strictly sequential —
 the first red stopped the job and MASKED every later gate, so debt surfaced in layers,
@@ -108,6 +108,24 @@ unchanged: any red gate still fails the Lint job, and `test-critical` (→ `plan
 `deploy`) `needs` Lint, so a **red Lint still blocks the deploy chain** — it just no
 longer hides the other gates' findings. NB: `always()` steps also run after a
 cancellation; with `cancel-in-progress: false` that only happens on a manual cancel.
+
+**The doc/wiki gates are NOT in this job — they live in `Docs CI` (#1908).**
+`sync_doc_metadata --check`, `check_doc_links`, `check_doc_tombstones`, `check_doc_facts`,
+`check_doc_index --strict` and `generate_adr_index --check` used to run here *as well as*
+in `docs-ci.yml`. That duplication was one-way-broken: a gate could fail inside CI/CD, but
+the fix for any of them is a **docs edit**, and `docs/**` is not in `ci-cd.yml`'s path
+filter — so the fix could not re-run the workflow it fixed. `check_main_green.py` reads the
+**CI/CD workflow only**, so main kept reporting the stale failure until someone ran a manual
+`workflow_dispatch`, which also runs Plan → Deploy and therefore charged a *documentation*
+fix a production approval. It fired three times in three days (#1900, #1906, #1914).
+`docs-ci.yml` now owns them outright and triggers on **both** halves of the doc↔source
+coupling (`docs/**` plus `lambdas/** mcp/** config/** cdk/** tests/**`), so code-push
+coverage is unchanged — the gate simply lives where its fix can clear it. Two traps to
+respect there: `docs-ci.yml` must keep **`fetch-depth: 0`** (on a shallow clone
+`check_doc_index.py` *silently skips* the #973 engine-doc drift gate and reports a green it
+did not earn — that was live until #1908), and its `push`/`pull_request` path lists are
+duplicated by hand because GitHub Actions has no YAML anchors.
+`tests/test_docs_ci_owns_doc_gates.py` enforces all of it.
 
 **Run the exact gates before pushing** (over `lambdas/ mcp/ cdk/ tests/ scripts/ deploy/`):
 ```bash

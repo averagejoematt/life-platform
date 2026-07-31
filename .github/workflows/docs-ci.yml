@@ -4,8 +4,30 @@
 # docs-only push used to reach main with NO pipeline at all — the doc-drift gate only
 # fired when an unrelated code change happened to re-run Lint. This workflow closes
 # that hole: every push that touches the wiki surface runs the full drift machinery.
-# (ci-cd.yml's Lint job runs the same gates for code pushes — a code change can
-# invalidate docs too, e.g. deleting a script a page links to.)
+#
+# #1908 — THIS WORKFLOW IS NOW THE SOLE OWNER OF THE DOC GATES. They used to run here
+# AND in ci-cd.yml's Lint job (via ci-lint.yml), because a CODE change can invalidate a
+# doc too (a moved function, a deleted script a page links to). That duplication had a
+# one-way defect: the gate could FAIL inside CI/CD, but its fix is by definition a docs
+# edit, and `docs/**` is not in ci-cd.yml's path filter — so the fix could not re-run the
+# workflow it fixed. `scripts/check_main_green.py` reads the CI/CD workflow ONLY, so main
+# kept reporting the old FAILURE until someone ran a manual `workflow_dispatch` — which
+# also runs Plan → Deploy, making a *documentation* status cost a production approval (or
+# leave a stranded one, #1901). It fired three times in three days (#1900, #1906, #1914).
+#
+# Both halves of the doc↔source coupling now trigger THIS workflow (see `paths:` below),
+# so a code push that drifts a doc still fails a blocking gate, and the docs-only fix
+# re-runs that same gate and clears it — no manual dispatch, no production approval.
+#
+# Chosen from the three options on #1908 (option 1). Rejected: adding `docs/**` to
+# ci-cd.yml (runs the full deploy pipeline + approval on every doc edit), and teaching
+# check_main_green.py to treat a green Docs CI as clearing a CI/CD failure (narrow,
+# stateful, and it would make the green signal harder to reason about, not easier).
+#
+# NB the checkout below MUST stay `fetch-depth: 0`. The #973 engine-doc drift gate reads
+# per-file `git log` dates; on a shallow clone check_doc_index.py SKIPS that gate rather
+# than emit garbage — so a depth-1 checkout would leave this workflow reporting green
+# while the drift gate never ran at all. That was live here until #1908.
 #
 # Gates (all blocking):
 #   1. sync_doc_metadata --check   — literal counts match AST discovery; a sync rule
@@ -20,6 +42,14 @@
 
 name: Docs CI
 
+# BOTH sides of the doc↔source coupling (#1908). The docs half is obvious; the code half
+# is here because these gates read the source: the #973 drift gate compares each engine
+# doc's `Verified:` stamp against the git dates of its declared `Sources of truth`
+# (lambdas/**, mcp/**, config/**), check_doc_tombstones scans lambdas/ + mcp/ docstrings,
+# and sync_doc_metadata/check_doc_facts derive counts from lambdas/, mcp/, cdk/, tests/.
+# The two lists below are duplicated verbatim on purpose: GitHub Actions does NOT support
+# YAML anchors/aliases, so they cannot be shared. tests/test_docs_ci_owns_doc_gates.py
+# asserts they stay identical.
 on:
   push:
     branches: [main]
@@ -32,6 +62,12 @@ on:
       - 'scripts/check_doc_*.py'
       - 'scripts/generate_adr_index.py'
       - 'scripts/generate_mcp_tool_catalog.py'
+      # The code half — a source change can invalidate a doc (#1908).
+      - 'lambdas/**'
+      - 'mcp/**'
+      - 'config/**'
+      - 'cdk/**'
+      - 'tests/**'
   pull_request:
     paths:
       - 'docs/**'
@@ -42,6 +78,12 @@ on:
       - 'scripts/check_doc_*.py'
       - 'scripts/generate_adr_index.py'
       - 'scripts/generate_mcp_tool_catalog.py'
+      # The code half — a source change can invalidate a doc (#1908).
+      - 'lambdas/**'
+      - 'mcp/**'
+      - 'config/**'
+      - 'cdk/**'
+      - 'tests/**'
   workflow_dispatch: {}
 
 permissions:
@@ -60,6 +102,15 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
+        with:
+          # MANDATORY (#1908 / #973). check_doc_index.py's engine-doc drift gate reads
+          # per-file `git log -1 --format=%cs` dates. On a shallow clone every file
+          # reports HEAD's date, which would false-drift every engine doc — so the script
+          # detects `--is-shallow-repository` and SKIPS the gate entirely. With the
+          # default depth-1 checkout this workflow therefore ran `--strict` while the
+          # drift half never executed, and reported green regardless. Now that Docs CI is
+          # the gate's only home, a shallow checkout would silently disable it outright.
+          fetch-depth: 0
 
       - uses: actions/setup-python@v7
         with:
