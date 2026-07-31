@@ -2545,9 +2545,13 @@ def site_api() -> list[iam.PolicyStatement]:
         ),
         # Inference receipt (2026-06-13): read-only token metrics + budget tier.
         # CloudWatch read APIs don't support resource-level scoping.
+        # #1911: GetMetricData added — the receipt now batches its ~62 per-metric reads
+        # into ONE call. The serial GetMetricStatistics fan-out ran 11-15s under
+        # CloudWatch throttling and auto-rolled-back two correct deploys. Still
+        # read-only, and GetMetricStatistics stays granted (other reads use it).
         iam.PolicyStatement(
             sid="InferenceReceiptMetrics",
-            actions=["cloudwatch:GetMetricStatistics", "cloudwatch:ListMetrics"],
+            actions=["cloudwatch:GetMetricData", "cloudwatch:GetMetricStatistics", "cloudwatch:ListMetrics"],
             resources=["*"],
         ),
         iam.PolicyStatement(
