@@ -91,7 +91,19 @@ class MonitoringStack(Stack):
             dims=None,
             ext_stat=None,
             to_digest=False,
+            evaluation_periods=1,
         ):
+            # #1927: `evaluation_periods` defaults to 1, so every existing caller is
+            # unchanged. It exists for alarms whose whole point is DURATION — a
+            # condition that is normal for one period and pathological if it never
+            # lets up. CloudWatch caps evaluation_periods x period at 604800s (7d).
+            #
+            # datapoints_to_alarm is set ONLY for a multi-period alarm. Passing it
+            # unconditionally is semantically identical at 1-of-1 (CloudFormation
+            # already defaults it to EvaluationPeriods) but it emits the property on
+            # every alarm in the stack — the cdk diff showed `[+] DatapointsToAlarm 1`
+            # against ~30 untouched resources. A no-op change to that many deployed
+            # alarms is noise in every future diff and buries the one that matters.
             metric = cloudwatch.Metric(
                 namespace=namespace,
                 metric_name=metric_name,
@@ -104,7 +116,9 @@ class MonitoringStack(Stack):
                 alarm_id,
                 alarm_name=alarm_name,
                 metric=metric,
-                evaluation_periods=1,
+                evaluation_periods=evaluation_periods,
+                # all N datapoints must breach — see the sustained-tier alarm below
+                datapoints_to_alarm=evaluation_periods if evaluation_periods > 1 else None,
                 threshold=threshold,
                 comparison_operator=operator,
                 treat_missing_data=NB,
@@ -441,6 +455,42 @@ class MonitoringStack(Stack):
             1,
             GTE,
             to_digest=True,
+        )
+
+        # #1927: a budget PAUSE is routine; a budget pause that never lifts is a
+        # different fact, and the existing machinery could not tell them apart.
+        #
+        # #1440's QAPausedByBudget alarm is per-day and correct — but between
+        # 2026-07-06 and 2026-08-01 the tier sat at >= 1 for 26 CONSECUTIVE days, so
+        # it fired 26 times, read as background, and nothing moved. In that window
+        # the whole budget_guard cutoff-1 band was off: ensemble, chronicle_editor,
+        # coherence_semantic, reader_truth_qa, visual_ai_qa, eyeball_estimate,
+        # conversation_enrichment — including two CI gates, both of which report
+        # green when paused. A daily alarm on a permanent condition is not a signal.
+        #
+        # This one can only fire when the tier NEVER returned to 0 across a full
+        # week. Statistic=Minimum per 8h period + datapoints_to_alarm == all 21
+        # periods means a single tier-0 datapoint anywhere in the window clears it,
+        # so it stays silent through ordinary end-of-month pressure and speaks only
+        # when band 1 has become the default operating state rather than an
+        # exception. Rarity IS the escalation: it says something the daily alarm
+        # structurally cannot.
+        #
+        # 28800 x 21 = 604800s, exactly CloudWatch's evaluation-window ceiling — do
+        # not lengthen the period or the count without shortening the other.
+        # cost_governor emits BudgetTier every 8h (measured: 91 datapoints/30d, no
+        # gaps), so all 21 periods are genuinely populated.
+        _alarm(
+            "BudgetTierSustained",
+            "budget-tier-sustained-7d",
+            "LifePlatform/Budget",
+            "BudgetTier",
+            28800,
+            "Minimum",
+            1,
+            GTE,
+            to_digest=True,
+            evaluation_periods=21,
         )
 
         # #727: scientific-liveness heartbeat. The coach-prediction-evaluator ran
