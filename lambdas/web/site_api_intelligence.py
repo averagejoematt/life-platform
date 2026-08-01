@@ -12,7 +12,7 @@ Endpoints:
                            multiple sources, computes derived signals)
   /api/pulse_history     — history view of past pulses
 
-Cache state for /api/status (_status_cache, _cost_cache, etc.) is owned
+Cache state for /api/status (_status_cache, etc.) is owned
 by this module (not site_api_common) because the cache lifecycle is
 local to handle_status — the `global` declarations write back to this
 module's namespace.
@@ -57,8 +57,69 @@ from web.vitals_resolver import resolve_vitals  # #1369: the ONE current-vitals 
 # `global` declarations in handle_status target this module's namespace.
 _status_cache: dict[str, Any] = {}
 _status_cache_ts = 0
-_cost_cache: dict[str, Any] = {}
-_cost_cache_ts = 0
+# _cost_cache/_cost_cache_ts retired by #1909: the cost block no longer calls Cost
+# Explorer, so there is nothing expensive left to cache. It reads the governor's
+# already-computed breakdown from SSM (budget_guard caches that itself).
+
+
+def _budget_cost_block() -> dict:
+    """The /api/status cost block, from the governor's own numbers (#1909).
+
+    A module-level function rather than an inline stretch of handle_status so it
+    can be exercised on its own: the honesty of these figures is the whole point
+    of the issue, and a test that had to stand up the entire status handler
+    (DynamoDB, CloudWatch, every pipeline component) to reach four lines of
+    arithmetic would be testing everything except the thing that was wrong.
+    """
+    # ── Cost: report the number the SYSTEM acts on (#1909) ──────────────────
+    # This block used to call Cost Explorer itself and divide by a hardcoded
+    # `budget = 15.0` — a literal that predates the ADR-063 budget system and has
+    # no relation to any real ceiling. It published `pct_of_budget: 627, status:
+    # "red"` on a platform operating correctly INSIDE its ceiling: the inverse of
+    # the usual honest-numbers failure, a needlessly alarming number rather than a
+    # flattering one. ADR-104 cuts both ways.
+    #
+    # It also re-derived the projection with its own assumptions (`days_in_month =
+    # 30`), so the platform published TWO different projections of one quantity,
+    # ~$8 apart. And `TimePeriod={"Start": month_start, "End": today}` is an empty
+    # range on the 1st of the month, which CE rejects — so the whole cost block
+    # silently vanished every month-start (confirmed in the site-api log:
+    # 3 x ValidationException on 2026-08-01, none on other days).
+    #
+    # All three come from re-deriving what cost_governor already computes. Read
+    # its persisted breakdown instead — same numbers the tier decision is made
+    # from, so they cannot disagree by construction. It carries the EFFECTIVE
+    # ceiling, so the ADR-133 dated window and the surge float are handled without
+    # this endpoint knowing they exist. No Cost Explorer call, no $0.01/call, no
+    # 24h cache to reason about, and nothing to break on the 1st.
+    #
+    # read_breakdown() returns None when the parameter is missing, unparseable or
+    # >48h stale, and never raises. None means we publish NO cost block rather
+    # than a stale or invented one.
+    cost_info = {}
+    try:
+        from ai import budget_guard
+
+        breakdown = budget_guard.read_breakdown()
+        if breakdown:
+            ceiling = float(breakdown["ceiling"])
+            projected = float(breakdown["projected"])
+            tier = int(breakdown["tier"])
+            cost_info = {
+                "mtd": round(float(breakdown["mtd"]), 2),
+                "projected": round(projected, 2),
+                "budget": ceiling,  # key name kept — existing readers of this payload
+                "tier": tier,
+                # Same prose /api/receipts publishes, from the same dict — one
+                # vocabulary for one fact (a test keeps it lockstep with the governor).
+                "tier_semantics": _TIER_SEMANTICS.get(tier),
+                "status": _BUDGET_TIER_STATUS.get(tier, "yellow"),
+                "pct_of_budget": round((projected / ceiling) * 100) if ceiling else None,
+                "as_of": breakdown.get("computed_at"),
+            }
+    except Exception as e:  # noqa: BLE001 — display-only; never break /api/status
+        logger.warning(f"[status] budget breakdown unavailable (non-fatal): {e}")
+    return cost_info
 
 
 def handle_status() -> dict:
@@ -798,41 +859,7 @@ def handle_status() -> dict:
     else:
         overall = "yellow"  # 1-2 failures = degraded, not down
 
-    # ── Cost tracking (cached 24h — Cost Explorer API is slow + costs $0.01/call) ──
-    # V2 P5.3 (2026-05-17): bumped from 1h → 24h. CE was billing $0.50-0.70/mo
-    # for ~5 calls/day from this endpoint. Cost data changes by the day, not the
-    # hour; 24h refresh preserves the dashboard signal without daily-cost waste.
-    global _cost_cache, _cost_cache_ts
-    cost_info = {}
-    if _cost_cache and (time.time() - _cost_cache_ts < 86400):
-        cost_info = _cost_cache
-    else:
-        try:
-            ce = boto3.client("ce", region_name="us-east-1")
-            now_date = datetime.now(timezone.utc)
-            month_start = now_date.strftime("%Y-%m-01")
-            today_str = now_date.strftime("%Y-%m-%d")
-            resp = ce.get_cost_and_usage(
-                TimePeriod={"Start": month_start, "End": today_str},
-                Granularity="MONTHLY",
-                Metrics=["UnblendedCost"],
-            )
-            mtd = float(resp["ResultsByTime"][0]["Total"]["UnblendedCost"]["Amount"])
-            days_elapsed = now_date.day
-            days_in_month = 30
-            projected = round((mtd / max(days_elapsed, 1)) * days_in_month, 2)
-            budget = 15.0
-            cost_info = {
-                "mtd": round(mtd, 2),
-                "projected": projected,
-                "budget": budget,
-                "status": "green" if projected <= budget else "yellow" if projected <= budget * 1.2 else "red",
-                "pct_of_budget": round((projected / budget) * 100),
-            }
-            _cost_cache = cost_info
-            _cost_cache_ts = time.time()
-        except Exception as e:
-            logger.warning(f"[status] Cost Explorer failed (non-fatal): {e}")
+    cost_info = _budget_cost_block()
 
     result = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -2325,6 +2352,18 @@ _TIER_SEMANTICS = {
 # age the figures stop being "live" in any meaningful sense — same 48h bound
 # budget_guard._BREAKDOWN_MAX_AGE_S applies, kept in sync by the same test.
 _BREAKDOWN_MAX_AGE_S = 48 * 3600
+
+# #1909: /api/status's traffic-light, derived from the tier rather than from a
+# percentage against an invented denominator. Keyed to what a READER loses, which
+# is what a status page is answering — the exact machine state is published
+# alongside as `tier` + `tier_semantics`, so nothing is hidden by the collapse.
+#
+# Tier 1 is yellow, not green: something IS switched off. Calling it green would
+# be the flattering-number half of the same ADR-104 failure this issue fixes on
+# the alarming side. #1927 makes the case concretely — band 1 contains two CI
+# gates, and 26 straight days of "green" while they were paused is exactly the
+# reading this mapping refuses to produce.
+_BUDGET_TIER_STATUS = {0: "green", 1: "yellow", 2: "yellow", 3: "red"}
 
 
 def _budget_history(cw, month_start, now) -> list:
