@@ -2337,7 +2337,13 @@ def lambda_handler(event, context):
                 vitals={
                     "weight_lbs": round(_curr_wt, 1) if _curr_wt else None,
                     "weight_as_of": _weight_as_of,  # G-3: date of reading for staleness display
-                    "weight_delta_30d": round(_curr_wt - float(_week_ago), 1) if _week_ago and _curr_wt else None,
+                    # #1917: this is a SEVEN-day delta (_week_ago == data["week_ago_weight"]).
+                    # It shipped under the name `weight_delta_30d` since the field was added,
+                    # so public_stats.json — and the weekly-signal email that renders it as
+                    # "(↓X lbs 30d)" — overstated the window by 4x on EVERY day of EVERY
+                    # cycle, not just after a reset. Named for the window it actually covers.
+                    "weight_delta_7d": round(_curr_wt - float(_week_ago), 1) if _week_ago and _curr_wt else None,
+                    "weight_delta_window_days": 7 if (_week_ago and _curr_wt) else None,
                     "hrv_ms": round(_vr["hrv_ms"], 1) if _vr["hrv_ms"] is not None else None,
                     "hrv_trend": html_builder.hrv_trend_str(_hrv.get("hrv_7d"), _hrv.get("hrv_30d")),
                     "rhr_bpm": _vr["rhr_bpm"],
@@ -2444,7 +2450,9 @@ def lambda_handler(event, context):
                     vitals={
                         "weight_lbs": round(_curr_wt, 1) if _curr_wt else None,
                         "weight_as_of": _weight_as_of,
-                        "weight_delta_30d": round(_curr_wt - float(_week_ago), 1) if _week_ago and _curr_wt else None,
+                        # #1917: a 7-day delta — see the write_public_stats call above.
+                        "weight_delta_7d": round(_curr_wt - float(_week_ago), 1) if _week_ago and _curr_wt else None,
+                        "weight_delta_window_days": 7 if (_week_ago and _curr_wt) else None,
                         "hrv_ms": round(_vr["hrv_ms"], 1) if _vr["hrv_ms"] is not None else None,
                         "rhr_bpm": _vr["rhr_bpm"],
                         "recovery_pct": round(_rec, 0) if _rec is not None else None,

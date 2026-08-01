@@ -299,9 +299,11 @@ def write_public_stats(
 
     Args:
         s3_client:    boto3 S3 client (already initialised in the Lambda)
-        vitals:       dict with keys: weight_lbs, weight_delta_30d, hrv_ms,
-                      hrv_trend, rhr_bpm, rhr_trend, recovery_pct, recovery_status,
-                      sleep_hours
+        vitals:       dict with keys: weight_lbs, weight_delta_7d,
+                      weight_delta_window_days, hrv_ms, hrv_trend, rhr_bpm,
+                      rhr_trend, recovery_pct, recovery_status, sleep_hours
+                      (#1917: the delta key names its REAL window — it was
+                      `weight_delta_30d` over a 7-day computation until then)
         journey:      dict with keys: start_weight_lbs, goal_weight_lbs,
                       current_weight_lbs, lost_lbs, remaining_lbs, progress_pct,
                       weekly_rate_lbs, projected_goal_date, days_to_goal,
