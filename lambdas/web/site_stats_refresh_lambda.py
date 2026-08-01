@@ -142,7 +142,10 @@ def lambda_handler(event, context):
     fresh_vitals = {
         "weight_lbs": round(weight) if weight else None,
         "weight_as_of": weight_as_of,
-        "weight_delta_30d": ev.get("weight_delta_30d"),  # preserved from morning
+        # #1917: preserved from morning, under the writer's honest name (it is a
+        # 7-day delta; it was carried as `weight_delta_30d` until #1917).
+        "weight_delta_7d": ev.get("weight_delta_7d"),
+        "weight_delta_window_days": ev.get("weight_delta_window_days"),
         "hrv_ms": round(hrv, 1) if hrv else ev.get("hrv_ms"),
         "hrv_trend": ev.get("hrv_trend"),
         "rhr_bpm": round(rhr, 1) if rhr else ev.get("rhr_bpm"),

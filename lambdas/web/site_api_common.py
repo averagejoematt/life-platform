@@ -121,7 +121,7 @@ PLATFORM_STATS = {
     "review_grade": "A",
     "active_secrets": 21,
     "site_pages": 77,
-    "test_count": 6387,
+    "test_count": 6394,
     "board_technical": 12,
     "board_product": 8,
     "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,
@@ -201,6 +201,53 @@ def _experiment_date(days_back=30):
     The today-clamp (via _clamp_today) prevents the future-genesis 500 — see that helper."""
     raw = (datetime.now(timezone.utc) - timedelta(days=days_back)).strftime("%Y-%m-%d")
     return _clamp_today(max(raw, EXPERIMENT_START))
+
+
+def _window_span(start, end, requested_days):
+    """The honest companion to _experiment_date: given an ALREADY-clamped window,
+    say how much window it actually is.
+
+    Returns {"start", "requested_days", "actual_days", "full"}.
+
+    #1917 — WHY THIS EXISTS. `_experiment_date` gives an honest *query window*
+    (ADR-077 "clamped, not hidden": at a reset the window shrinks rather than
+    reaching into prior-cycle rows). What it does NOT do is tell the caller that
+    the window shrank — so a field computed off it and *named* for the requested
+    window (`weight_delta_30d`, `hrv_30d_avg`) keeps its 30-day name while
+    carrying 6 days of data. The arithmetic was always honest; the label was not.
+    That is what qa-smoke's reader_truth caught on Day 5 of cycle 11, and it
+    recurs on Day 1..N-1 of EVERY cycle restart.
+
+    THE RULE (the #1917 decision, recorded here because this is where the window
+    is measured): a published field named for an N-day window must either span a
+    real N days or not carry a value. Callers therefore do BOTH of:
+
+      1. publish the value under a window-generic name plus the actual window
+         (`weight_delta_lbs` + `weight_delta_window_days`) — the number is real
+         and useful on Day 6, so it is NOT hidden; and
+      2. gate the legacy `_Nd`-named key on `full`, so that key reads None until
+         the window genuinely covers N days.
+
+    Option (2) alone (null-and-hide) was rejected: it would suppress a true
+    number for 30 days after every reset, which contradicts "clamped, not
+    hidden". Renaming outright was rejected because `_Nd` keys are a public API
+    contract; gated, they stay truthful instead of disappearing.
+
+    Takes the clamped `start` rather than re-deriving it from `days_back`, so a
+    handler that already computed its own window — as handle_vitals does for
+    d30/d7 — reports the span of THAT window. Re-deriving is not equivalent: it
+    ignores a caller-local or monkeypatched EXPERIMENT_START, which is both a
+    test-seam break and a real divergence risk on the time-travel path (where
+    ADR-058 deliberately keeps the full 30-day reach). One clamp, one source of
+    truth. `full` is False whenever genesis — including a staged FUTURE genesis —
+    truncated the window.
+
+    The enforcement half is `tests/test_window_name_honesty_1917.py`, which
+    AST-scans lambdas/web/ so a NEW window-named field cannot ship undeclared.
+    """
+    actual = (datetime.strptime(end, "%Y-%m-%d") - datetime.strptime(start, "%Y-%m-%d")).days
+    actual = max(actual, 0)  # a staged FUTURE genesis makes start > end: zero window, never negative
+    return {"start": start, "requested_days": requested_days, "actual_days": actual, "full": actual >= requested_days}
 
 
 def _query_source(source: str, start_date: str, end_date: str, include_pilot: bool = False) -> list:

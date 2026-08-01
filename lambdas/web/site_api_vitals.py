@@ -54,6 +54,7 @@ from web.site_api_common import (
     _latest_item_asof,
     _ok,
     _query_source,
+    _window_span,
     logger,
     pre_start_meta,
     table,
@@ -129,6 +130,11 @@ def handle_vitals(date: str | None = None) -> dict:
     whoop_30d_sorted = sorted(whoop_30d, key=lambda w: w.get("sk", ""))
     hrv_vals = [float(w["hrv"]) for w in whoop_30d_sorted if w.get("hrv")]
     rhr_vals = [float(w["resting_heart_rate"]) for w in whoop_30d_sorted if w.get("resting_heart_rate")]
+    # #1917: how many days the "30d" HRV window ACTUALLY spans. Time-travel
+    # (?date=) keeps the full 30-day reach by contract (ADR-058), so it is only
+    # the LIVE path that genesis clamps — mirror the d30 computation above.
+    _hrv_window = {"start": d30, "requested_days": 30, "actual_days": 30, "full": True} if ip else _window_span(d30, today, 30)
+    _hrv_avg = round(sum(hrv_vals) / len(hrv_vals), 1) if len(hrv_vals) >= _MIN_AVG_N else None
 
     def trend(vals):
         if len(vals) < 6:
@@ -160,8 +166,24 @@ def handle_vitals(date: str | None = None) -> dict:
     weight_as_of = _lw["as_of"]
 
     withings_30d = _query_source("withings", d30, today, include_pilot=ip)
-    weight_vals = [float(w["weight_lbs"]) for w in withings_30d if w.get("weight_lbs")]
-    weight_delta_30d = round(weight_vals[-1] - weight_vals[0], 1) if len(weight_vals) >= 2 else None
+    # #1917: keep the reading DATES alongside the values. The delta's honest window
+    # is the span between the first and last weigh-in actually used — not the query
+    # window (which may be genesis-clamped) and not a nominal 30 days.
+    _w_pairs = sorted(
+        [(w.get("sk", "").replace("DATE#", "")[:10], float(w["weight_lbs"])) for w in withings_30d if w.get("weight_lbs")],
+        key=lambda p: p[0],
+    )
+    weight_vals = [v for _, v in _w_pairs]
+    weight_delta = round(weight_vals[-1] - weight_vals[0], 1) if len(weight_vals) >= 2 else None
+    weight_delta_window_days = None
+    if len(_w_pairs) >= 2:
+        try:
+            weight_delta_window_days = (datetime.strptime(_w_pairs[-1][0], "%Y-%m-%d") - datetime.strptime(_w_pairs[0][0], "%Y-%m-%d")).days
+        except Exception:
+            weight_delta_window_days = None
+    # The legacy `_30d`-named key is truthful-or-absent (see _window_span):
+    # it carries the value only when the span really is >= 30 days.
+    weight_delta_30d = weight_delta if (weight_delta_window_days or 0) >= 30 else None
 
     # DPR-1.20: Page freshness for nav badges
     _today_iso = datetime.now(timezone.utc).isoformat()
@@ -204,13 +226,23 @@ def handle_vitals(date: str | None = None) -> dict:
             "vitals": {
                 "weight_lbs": round(current_weight) if current_weight is not None else None,
                 "weight_as_of": weight_as_of,
+                # #1917: the real number, under a name that does not claim a window.
+                "weight_delta_lbs": weight_delta,
+                "weight_delta_window_days": weight_delta_window_days,
+                # Truthful-or-absent: None until the span really covers 30 days.
                 "weight_delta_30d": weight_delta_30d,
                 "hrv_ms": round(_vr["hrv_ms"], 1) if _vr["hrv_ms"] is not None else None,
                 # #1084 / ADR-105: the claim carries its n — below _MIN_AVG_N the
-                # "30d avg" is None (a 1-2 reading mean isn't an average), and
-                # hrv_30d_n says how much data backs the number when it shows.
-                "hrv_30d_avg": round(sum(hrv_vals) / len(hrv_vals), 1) if len(hrv_vals) >= _MIN_AVG_N else None,
-                "hrv_30d_n": len(hrv_vals),
+                # avg is None (a 1-2 reading mean isn't an average), and the n
+                # says how much data backs the number when it shows.
+                # #1917: ...and the window says how many days those readings span,
+                # because a genesis-clamped window makes "30d" a false name.
+                "hrv_avg_ms": _hrv_avg,
+                "hrv_avg_n": len(hrv_vals),
+                "hrv_avg_window_days": _hrv_window["actual_days"],
+                # Truthful-or-absent, same rule as weight_delta_30d.
+                "hrv_30d_avg": _hrv_avg if _hrv_window["full"] else None,
+                "hrv_30d_n": len(hrv_vals) if _hrv_window["full"] else None,
                 "hrv_trend": trend(hrv_vals),
                 "rhr_bpm": round(_vr["rhr_bpm"], 0) if _vr["rhr_bpm"] is not None else None,
                 "rhr_trend": trend(list(reversed(rhr_vals))),  # lower is better
@@ -1552,6 +1584,7 @@ def handle_glucose() -> dict:
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     d30 = _experiment_date(30)
+    _w30 = _window_span(d30, today, 30)  # #1917: is "30d" a true name today?
 
     records = _query_source("apple_health", d30, today)
     cgm_days = [r for r in records if r.get("blood_glucose_avg") is not None and r.get("sk", "").replace("DATE#", "") >= EXPERIMENT_START]
@@ -1626,10 +1659,18 @@ def handle_glucose() -> dict:
                 "cgm_source": latest.get("cgm_source", "unknown"),
                 "tir_status": tir_status,
                 "variability_status": variability_status,
-                "30d_avg_mg_dl": avg(avg_vals),
-                "30d_avg_tir": avg(tir_vals),
-                "30d_avg_optimal": avg(opt_vals),
-                "30d_avg_std": avg(std_vals),
+                # #1917: truthful-or-absent — these are MEANS, so a genesis-clamped
+                # window makes "30d" a false name, not merely an understatement.
+                # The real values ship under window-generic names beside their span.
+                "avg_mg_dl_window": avg(avg_vals),
+                "avg_tir_window": avg(tir_vals),
+                "avg_optimal_window": avg(opt_vals),
+                "avg_std_window": avg(std_vals),
+                "avg_window_days": _w30["actual_days"],
+                "30d_avg_mg_dl": avg(avg_vals) if _w30["full"] else None,
+                "30d_avg_tir": avg(tir_vals) if _w30["full"] else None,
+                "30d_avg_optimal": avg(opt_vals) if _w30["full"] else None,
+                "30d_avg_std": avg(std_vals) if _w30["full"] else None,
                 "days_tracked": len(cgm_days),
                 "as_of_date": latest.get("sk", "").replace("DATE#", ""),
                 "best_day": best_day,
@@ -1933,6 +1974,7 @@ def handle_sleep_detail() -> dict:
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     d30 = _experiment_date(30)
+    _w30 = _window_span(d30, today, 30)  # #1917: is "30d" a true name today?
 
     eight_days = _query_source("eightsleep", d30, today)
     whoop_days = _query_source("whoop", d30, today)
@@ -1978,6 +2020,23 @@ def handle_sleep_detail() -> dict:
 
     def avg(lst):
         return round(sum(lst) / len(lst), 1) if lst else None
+
+    # #1917: hoisted out of the response literal so the honest key and the gated
+    # `30d_`-named key are the SAME number by construction, never two expressions
+    # that could drift apart. Must sit AFTER `def avg` — the response literal it
+    # came from is only evaluated at return time, so the original position was
+    # fine there and is not here (flake8 F821 caught the move).
+    _avg_recovery_window = (
+        avg(
+            [
+                float(whoop_by_date.get(r.get("sk", "").replace("DATE#", ""), {}).get("recovery_score", 0))
+                for r in eight_with_data
+                if whoop_by_date.get(r.get("sk", "").replace("DATE#", ""), {}).get("recovery_score")
+            ]
+        )
+        if whoop_by_date
+        else None
+    )
 
     # Daily trend — filter to experiment start (EXPERIMENT_QUERY_START is 1 day early for sleep lookback)
     trend = []
@@ -2084,19 +2143,14 @@ def handle_sleep_detail() -> dict:
                 "deep_pct": round(float(latest.get("deep_pct", 0)), 1) if latest.get("deep_pct") else None,
                 "rem_pct": round(float(latest.get("rem_pct", 0)), 1) if latest.get("rem_pct") else None,
                 "light_pct": round(float(latest.get("light_pct", 0)), 1) if latest.get("light_pct") else None,
-                "30d_avg_recovery": (
-                    avg(
-                        [
-                            float(whoop_by_date.get(r.get("sk", "").replace("DATE#", ""), {}).get("recovery_score", 0))
-                            for r in eight_with_data
-                            if whoop_by_date.get(r.get("sk", "").replace("DATE#", ""), {}).get("recovery_score")
-                        ]
-                    )
-                    if whoop_by_date
-                    else None
-                ),
-                "30d_avg_score": avg(score_vals),
-                "30d_avg_efficiency": avg(eff_vals),
+                # #1917: truthful-or-absent, same rule as the CGM block above.
+                "avg_recovery_window": _avg_recovery_window,
+                "avg_score_window": avg(score_vals),
+                "avg_efficiency_window": avg(eff_vals),
+                "avg_window_days": _w30["actual_days"],
+                "30d_avg_recovery": _avg_recovery_window if _w30["full"] else None,
+                "30d_avg_score": avg(score_vals) if _w30["full"] else None,
+                "30d_avg_efficiency": avg(eff_vals) if _w30["full"] else None,
                 "days_tracked": len(eight_with_data),
                 "as_of_date": latest_date,
                 "avg_bedtime": _fmt_hour(avg_bed) if avg_bed is not None else None,

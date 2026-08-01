@@ -129,11 +129,26 @@ export async function renderSleep(d) {
     }
     parts.push(sec("Sleep-score trend · latest = last night", lineChart(d.sleep_trend || [], { valueKey: "sleep_score", label: "Sleep score · nightly", spine: true, emptyMsg: "The sleep-score trend fills in nightly." })));
   }
+  // #1917: label the average with the window it ACTUALLY covers. This read
+  // `30d_avg_recovery` under a hardcoded "30d avg recovery" label; on Day 6 of a
+  // cycle that window is genesis-clamped to 6 days, so the label was a claim the
+  // data did not support. The API now gates the `30d_`-named key on a genuinely
+  // full window and publishes the real value as `avg_recovery_window` beside
+  // `avg_window_days`. Ordered old-key-last so this renders correctly both before
+  // and after the API deploy — the site auto-deploys on merge but site-api ships
+  // through the approval-gated pipeline, so the two are never simultaneous (#1704).
+  const avgRecovery = (s) => {
+    if (s.avg_recovery_window != null && s.avg_window_days != null) {
+      return fig(fmt(s.avg_recovery_window), `${s.avg_window_days}d avg recovery`);
+    }
+    if (s["30d_avg_recovery"] != null) return fig(fmt(s["30d_avg_recovery"]), "30d avg recovery");
+    return false;
+  };
   // §6 — recovery readout (P1.1): HRV / RHR / recovery framed as what sleep DEFENDS in a
   // deficit (cross-link to training). RHR-down = good (ember-positive); never red.
   if (s.recovery_score != null || s.hrv != null || s.rhr != null) {
     parts.push(sec("Recovery — what the sleep defends",
-      figs([s.recovery_score != null && fig(fmt(s.recovery_score), "recovery"), s.hrv != null && fig(fmt(s.hrv) + "ms", "HRV"), s.rhr != null && fig(fmt(s.rhr), "resting HR"), s["30d_avg_recovery"] != null && fig(fmt(s["30d_avg_recovery"]), "30d avg recovery")]) + recNote +
+      figs([s.recovery_score != null && fig(fmt(s.recovery_score), "recovery"), s.hrv != null && fig(fmt(s.hrv) + "ms", "HRV"), s.rhr != null && fig(fmt(s.rhr), "resting HR"), avgRecovery(s)]) + recNote +
       `<p class="rd-meta label">In a calorie deficit, sleep is what protects recovery, HRV and a low resting heart rate — the buffer that lets the training still land. RHR drifting down is the win here. See <a href="/data/training/">Training</a> for what it buys.</p>`));
   }
   // §6b — last-meal-time cross-link (P1.2): reuse the nutrition eating window, observation-only.

@@ -147,7 +147,12 @@ def _build_numbers(stats):
     vitals = stats.get("vitals", {})
     char = stats.get("character", {})
     weight = vitals.get("weight_lbs")
-    delta = vitals.get("weight_delta_30d")
+    # #1917: this was reading `weight_delta_30d` and rendering it as "30d" — but the
+    # writer (daily_brief write_public_stats) computes it from week_ago_weight, so the
+    # email claimed a 30-day window over a 7-day number. Read the honestly-named field
+    # and label it from the window the writer declares, never a hardcoded span.
+    delta = vitals.get("weight_delta_7d")
+    delta_window = vitals.get("weight_delta_window_days")
     sleep = vitals.get("sleep_hours_30d_avg")
     recovery = vitals.get("recovery_pct")
     level = char.get("level", "?")
@@ -156,7 +161,7 @@ def _build_numbers(stats):
     rows = []
     if weight is not None:
         arrow = "↓" if delta and delta < 0 else "↑" if delta and delta > 0 else ""
-        delta_str = f" ({arrow}{abs(delta):.1f} lbs 30d)" if delta else ""
+        delta_str = f" ({arrow}{abs(delta):.1f} lbs {delta_window}d)" if delta and delta_window else ""
         rows.append(
             f'<tr><td style="color:#8b949e;padding:4px 12px 4px 0;">Weight</td><td style="color:#c9d1d9;font-weight:600;">{weight} lbs{delta_str}</td></tr>'
         )
