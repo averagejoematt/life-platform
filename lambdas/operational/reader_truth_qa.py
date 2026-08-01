@@ -136,7 +136,17 @@ def _phase_line(phase):
         f"Today ({phase['today']}) is Day {phase['day_n']} of the experiment (Day 1 = {phase['start_date']}). "
         f"At most {phase['day_n']} day(s) of current-experiment data can exist; any claim of a longer "
         f"in-experiment history (trends, streaks, averages, counts) is impossible unless it is explicitly "
-        f"labeled lifetime / all-time / a previous cycle / the pilot."
+        f"labeled lifetime / all-time / a previous cycle / the pilot. "
+        # #1917: the rubric stated only the upper bound, so the model inferred that any
+        # window number DIFFERING from day_n was a contradiction and flagged 5-on-Day-6
+        # as an "impossible number" on three consecutive runs. After a cycle restart
+        # EVERY trailing window is deliberately clamped to the cycle start (ADR-077
+        # "clamped, not hidden"), so short windows are the honest path, not the failure
+        # mode. Stating the lower bound explicitly is what the model was missing.
+        f"A window, span, average or count SMALLER than {phase['day_n']} day(s) is EXPECTED and CORRECT — "
+        f"trailing windows are deliberately clamped to the cycle start, so on Day {phase['day_n']} a field "
+        f"may honestly report any span from 0 to {phase['day_n']} day(s). Only a span LONGER than "
+        f"{phase['day_n']} day(s) is impossible. Never flag a number for being smaller than {phase['day_n']}."
     )
 
 
@@ -173,7 +183,11 @@ before Day 1 legitimately exists and may be large;
 so far", "no data yet");
 - story/archive/chronicle content clearly dated before the current cycle;
 - the same header/nav/footer chrome appearing on every page;
-- API field names or JSON structure — judge only human-readable narrative values inside them.
+- API field names or JSON structure — judge only human-readable narrative values inside them;
+- a window/span/n SMALLER than the elapsed day count — e.g. "5 day(s)" or "n = 5" on Day 6, or a \
+field named for 30 days reading null. Trailing windows clamp to the cycle start, so an under-filled \
+window is the CORRECT behaviour and a null "30d" field is the system being honest, not broken. \
+Flag a window only when it is LONGER than the days elapsed.
 
 SURFACES ({k}):
 """

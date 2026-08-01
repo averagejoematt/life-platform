@@ -159,6 +159,25 @@ def test_prompt_rubric_categories_and_contract_present():
     assert '"findings"' in prompt and '"severity"' in prompt  # the JSON contract
 
 
+def test_prompt_states_the_lower_bound_not_only_the_upper():
+    """#1917: the rubric must say a SHORTER window is correct, not only that a longer one is impossible.
+
+    Stating only the upper bound let the model infer that any window number differing
+    from day_n was a contradiction: it flagged `weight_delta_window_days: 5` on Day 6
+    as an "impossible number" on three consecutive runs, blocking the deploy pipeline
+    on a payload that was telling the truth. After a cycle restart EVERY trailing
+    window is clamped to the cycle start (ADR-077 "clamped, not hidden"), so short
+    windows are the honest path — the rubric has to say so out loud.
+    """
+    prompt = rtq.build_prompt(_PAGES, rtq.phase_context(_DAY_2))
+    lowered = prompt.lower()
+    assert "smaller than" in lowered, "the prompt must explicitly permit windows smaller than day_n"
+    assert "expected and correct" in lowered
+    assert "only a span longer" in lowered, "the impossible direction must be named as the ONLY one"
+    # the DO-NOT-flag list must carry the concrete case too, not just the phase line
+    assert "under-filled window" in lowered or "under-filled" in lowered
+
+
 def test_prompt_truncates_oversized_prose():
     pages = [{"name": "Big", "path": "/big/", "prose": "x" * (rtq.MAX_PROSE_CHARS + 500)}]
     prompt = rtq.build_prompt(pages, rtq.phase_context(_DAY_2))
