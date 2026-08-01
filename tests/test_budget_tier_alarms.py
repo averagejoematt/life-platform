@@ -35,6 +35,7 @@ _PARAMS = [
     "dims",
     "ext_stat",
     "to_digest",
+    "evaluation_periods",
 ]
 
 
@@ -101,6 +102,79 @@ def test_hardstop_is_strictly_above_escalation():
     escalation = _by_name("life-platform-budget-tier-escalation")
     hardstop = _by_name("budget-tier-hardstop")
     assert escalation["threshold"] < hardstop["threshold"]
+
+
+# ---------------------------------------------------------------------------
+# #1927 — a pause that never lifts is a different fact from a pause
+# ---------------------------------------------------------------------------
+# Between 2026-07-06 and 2026-08-01 the tier sat at >= 1 for 26 CONSECUTIVE days.
+# Nothing alarmed on that: the two alarms above start at tier 2, and #1440's
+# QAPausedByBudget is per-day, so it fired 26 times and read as background. The
+# whole cutoff-1 band was off for the month — including reader_truth_qa and
+# visual_ai_qa, two CI gates that report green when paused.
+
+
+def test_sustained_tier_alarm_present_and_covers_tier_1():
+    a = _by_name("budget-tier-sustained-7d")
+    assert a is not None, "budget-tier-sustained-7d missing — nothing watches a tier-1 band that never lifts (#1927)"
+    assert a["namespace"] == "LifePlatform/Budget"
+    assert a["metric_name"] == "BudgetTier"
+    assert a["threshold"] == 1, "must cover tier 1 — the existing alarms both start at 2"
+    assert a["to_digest"] is True, "routine-but-important: digest, not an urgent page"
+
+
+def test_sustained_alarm_requires_an_unbroken_week():
+    """Minimum + every datapoint means one tier-0 reading anywhere clears it.
+
+    With Statistic=Maximum, or datapoints_to_alarm < evaluation_periods, this would
+    fire during ordinary end-of-month pressure and become the same background noise
+    it exists to replace.
+    """
+    a = _by_name("budget-tier-sustained-7d")
+    assert a["statistic"] == "Minimum", "Maximum would fire on a single spike, not on a sustained condition"
+    assert a["evaluation_periods"] == 21
+    assert a["period_sec"] == 28800, "cost_governor emits BudgetTier every 8h"
+
+
+def test_sustained_alarm_window_is_within_the_cloudwatch_ceiling():
+    """EvaluationPeriods x Period must be <= 604800s or CloudFormation rejects it."""
+    a = _by_name("budget-tier-sustained-7d")
+    window = a["period_sec"] * a["evaluation_periods"]
+    assert window <= 604800, f"alarm window {window}s exceeds CloudWatch's 604800s cap"
+    assert window == 604800, "the window is meant to be exactly 7 days"
+
+
+def test_sustained_alarm_is_distinct_from_the_tier2_escalation():
+    """It must add tier-1 duration coverage, not restate the tier-2 level alarm."""
+    sustained = _by_name("budget-tier-sustained-7d")
+    escalation = _by_name("life-platform-budget-tier-escalation")
+    assert sustained["threshold"] < escalation["threshold"]
+    assert sustained["evaluation_periods"] > (escalation["evaluation_periods"] or 1)
+
+
+def test_alarm_helper_defaults_to_a_single_period():
+    """The new parameter must not silently widen every other alarm's window."""
+    for c in _alarm_calls():
+        if c["alarm_name"] == "budget-tier-sustained-7d":
+            continue
+        assert c["evaluation_periods"] is None, f"{c['alarm_name']} unexpectedly sets evaluation_periods"
+
+
+def test_single_period_alarms_do_not_emit_datapoints_to_alarm():
+    """Adding the parameter must not churn ~30 untouched deployed alarms.
+
+    Passing datapoints_to_alarm unconditionally is semantically identical at 1-of-1
+    (CloudFormation already defaults it to EvaluationPeriods) but it emits the
+    property on EVERY alarm — the first cut of this change produced
+    `[+] DatapointsToAlarm 1` against ~30 resources nobody had touched. A no-op
+    change to that many deployed alarms is noise in every future cdk diff and
+    buries the one line that matters.
+    """
+    with open(MONITORING) as f:
+        src = f.read()
+    assert (
+        "datapoints_to_alarm=evaluation_periods if evaluation_periods > 1 else None" in src
+    ), "the _alarm helper must only set datapoints_to_alarm for a multi-period alarm"
 
 
 if __name__ == "__main__":
