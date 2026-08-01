@@ -72,6 +72,11 @@ CLEAN_FILES = [
     "lambdas/ingestion/source_registry.py",
     "lambdas/ingestion/source_state.py",
     "lambdas/intelligence/intelligence_common.py",
+    # #1921: the qa-smoke result vocabulary (Check + partitions + EMF reporting).
+    # A stdlib-only leaf, clean from birth — listed here because operational/ as a
+    # DIRECTORY is not in the clean set and CLEAN_DIRS globs are non-recursive, so
+    # a new module there silently leaves the gate unless it is named.
+    "lambdas/operational/qa_check.py",
     "lambdas/operational/reader_truth_qa.py",
     "lambdas/operational/redirect_spotcheck.py",
 ]

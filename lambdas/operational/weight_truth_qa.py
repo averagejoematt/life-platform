@@ -110,17 +110,23 @@ def assess_cross_surface_weight(vitals, coaches, tol: float = CROSS_SURFACE_WEIG
     return True, f"coach narratives agree with the cockpit weight ({truth} lb)"
 
 
-def checks(check_cls, site_base_url, timeout=15):
+def checks(check_cls, site_base_url, partition, timeout=15):
     """The qa_smoke-facing entrypoint: fetch both surfaces and return [Check].
 
     `check_cls` is injected rather than imported so this module stays a leaf —
     qa_smoke_lambda imports us, never the reverse. Fail-soft on fetch, matching
     check_hero_weight_arithmetic: a network blip must never red the nightly.
+
+    `partition` (#1921) is likewise injected, not defaulted: this module cannot
+    import qa_smoke_lambda's PARTITIONS, and a literal here would be a second
+    copy of that vocabulary free to drift. The caller decides — and because the
+    parameter is required, a Check built here can never slip through
+    unpartitioned.
     """
     import json
     import urllib.request
 
-    check = check_cls("cross_surface:weight", "Reader Truth")
+    check = check_cls("cross_surface:weight", "Reader Truth", partition)
     try:
         payloads = {}
         for path in ("/api/vitals", "/api/coaching-dashboard"):

@@ -52,6 +52,20 @@ TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 # asks for a cohesive split, not a grandfather entry). Re-exported so
 # qa_smoke_lambda.assess_hero_weight stays a valid public entrypoint.
 from operational import weight_truth_qa  # noqa: E402
+
+# #1921: the result vocabulary (Check + its partitions) and the run's own EMF
+# reporting live in operational/qa_check.py — one concern, lifted out when this
+# module crossed the 1200-line ceiling. Re-exported so qa_smoke_lambda.Check,
+# .emf_summary_line, .PARTITIONS et al. stay valid public entrypoints for the
+# existing tests and callers.
+from operational.qa_check import (  # noqa: E402,F401
+    CONTENT_TRUTH,
+    DEPLOY_HEALTH,
+    PARTITIONS,
+    QA_SMOKE_EMF_NAMESPACE,
+    Check,
+    emf_summary_line,
+)
 from operational.weight_truth_qa import WEIGHT_RECONCILE_TOL, assess_hero_weight  # noqa: E402,F401
 
 S3_BUCKET = os.environ["S3_BUCKET"]
@@ -79,40 +93,6 @@ def pt_now():
 
 def yesterday_str():
     return (pt_now() - timedelta(days=1)).strftime("%Y-%m-%d")
-
-
-class Check:
-    """Single assertion result."""
-
-    def __init__(self, name, category):
-        self.name = name
-        self.category = category
-        self.passed = None  # True=green, False=red, None=yellow
-        self.paused = False  # intentionally-paused surface: shown ⏸, not a fault
-        self.message = ""
-
-    def ok(self, msg=""):
-        self.passed = True
-        self.message = msg
-        return self
-
-    def fail(self, msg=""):
-        self.passed = False
-        self.message = msg
-        return self
-
-    def warn(self, msg=""):
-        self.passed = None
-        self.message = msg
-        return self
-
-    def pause(self, msg=""):
-        # Surface is intentionally paused (will return later). Renders ⏸ and is
-        # NOT counted as a failure or a warning — visible, but never a fault.
-        self.passed = True
-        self.paused = True
-        self.message = msg
-        return self
 
 
 # ---------------------------------------------------------------------------
@@ -143,7 +123,7 @@ def check_ddb_freshness():
     PAUSED = qa_paused()
 
     for source, label in REQUIRED:
-        c = Check(f"DDB:{source}", "Data Freshness")
+        c = Check(f"DDB:{source}", "Data Freshness", CONTENT_TRUTH)
         try:
             resp = table.get_item(Key={"pk": USER_PREFIX + source, "sk": "DATE#" + yesterday})
             item = resp.get("Item")
@@ -153,7 +133,7 @@ def check_ddb_freshness():
         checks.append(c)
 
     for source, label in OPTIONAL:
-        c = Check(f"DDB:{source}", "Data Freshness")
+        c = Check(f"DDB:{source}", "Data Freshness", CONTENT_TRUTH)
         try:
             resp = table.get_item(Key={"pk": USER_PREFIX + source, "sk": "DATE#" + yesterday})
             item = resp.get("Item")
@@ -163,7 +143,7 @@ def check_ddb_freshness():
         checks.append(c)
 
     for source, note in PAUSED:
-        checks.append(Check(f"DDB:{source}", "Data Freshness").pause(note))
+        checks.append(Check(f"DDB:{source}", "Data Freshness", CONTENT_TRUTH).pause(note))
 
     return checks
 
@@ -196,7 +176,7 @@ def check_s3_freshness():
     ]
 
     for key, label, max_hours, non_critical in FILES:
-        c = Check(f"S3:{key}", "Output Files")
+        c = Check(f"S3:{key}", "Output Files", CONTENT_TRUTH)
         try:
             head = s3.head_object(Bucket=S3_BUCKET, Key=key)
             age_h = (datetime.now(timezone.utc) - head["LastModified"]).total_seconds() / 3600
@@ -213,7 +193,9 @@ def check_s3_freshness():
                 c.fail(f"{label} — error: {e}")
         checks.append(c)
 
-    checks.append(Check("S3:buddy/data.json", "Output Files").pause("Buddy JSON — paused (buddy surface dormant); will return"))
+    checks.append(
+        Check("S3:buddy/data.json", "Output Files", CONTENT_TRUTH).pause("Buddy JSON — paused (buddy surface dormant); will return")
+    )
     return checks
 
 
@@ -229,7 +211,7 @@ def check_score_sanity():
         resp = s3.get_object(Bucket=S3_BUCKET, Key="dashboard/matthew/data.json")
         data = json.loads(resp["Body"].read())
     except Exception as e:
-        return [Check("dashboard:parse", "Score Sanity").fail(f"Cannot load dashboard/matthew/data.json: {e}")]
+        return [Check("dashboard:parse", "Score Sanity", CONTENT_TRUTH).fail(f"Cannot load dashboard/matthew/data.json: {e}")]
 
     # Pre-start/Day-1 grace window (shared by three checks below — the 39f01e88
     # class): before genesis, and on Day 1 before the first computes/syncs land,
@@ -245,7 +227,7 @@ def check_score_sanity():
 
     expected_date = yesterday_str()
     actual_date = data.get("date", "")
-    c = Check("dashboard:date", "Score Sanity")
+    c = Check("dashboard:date", "Score Sanity", CONTENT_TRUTH)
     if actual_date == expected_date:
         c.ok(f"Date = {actual_date}")
     elif actual_date and actual_date > expected_date and _genesis_grace:
@@ -259,7 +241,7 @@ def check_score_sanity():
     checks.append(c)
 
     def _range_check(name, value, lo, hi, unit="", optional=False):
-        c = Check(f"value:{name}", "Score Sanity")
+        c = Check(f"value:{name}", "Score Sanity", CONTENT_TRUTH)
         if value is None:
             return c.warn(f"{name} is null (may not have synced)") if optional else c.fail(f"{name} is null — expected data")
         if lo <= float(value) <= hi:
@@ -288,7 +270,7 @@ def check_score_sanity():
         _range_check("glucose", glucose, 50, 300, " mg/dL", optional=True),
     ]
 
-    c = Check("score:day_grade", "Score Sanity")
+    c = Check("score:day_grade", "Score Sanity", CONTENT_TRUTH)
     if grade_l and grade_s is not None:
         c.ok(f"Day grade = {grade_l} ({grade_s}/100)")
     elif EXPERIMENT_START_DATE and actual_date and actual_date < EXPERIMENT_START_DATE:
@@ -297,7 +279,7 @@ def check_score_sanity():
         c.fail(f"Day grade missing — grade={grade_l}, score={grade_s}")
     checks.append(c)
 
-    c = Check("score:hydration", "Score Sanity")
+    c = Check("score:hydration", "Score Sanity", CONTENT_TRUTH)
     if hydration is None:
         c.warn("Hydration null — Apple Health water likely didn't sync")
     elif hydration < 30:
@@ -307,7 +289,7 @@ def check_score_sanity():
     checks.append(c)
 
     cs = data.get("character_sheet") or {}
-    c = Check("character_sheet", "Score Sanity")
+    c = Check("character_sheet", "Score Sanity", CONTENT_TRUTH)
     lvl, tier = cs.get("level"), cs.get("tier")
     if lvl and tier:
         xp = cs.get("xp", 0)
@@ -336,7 +318,7 @@ def check_blog_links():
         index_html = resp["Body"].read().decode("utf-8")
     except Exception as e:
         # Blog index may not exist yet — non-critical
-        return [Check("blog:index", "Blog Links").warn(f"blog/index.html not found (non-critical): {e}")]
+        return [Check("blog:index", "Blog Links", CONTENT_TRUTH).warn(f"blog/index.html not found (non-critical): {e}")]
 
     try:
         paginator = s3.get_paginator("list_objects_v2")
@@ -345,12 +327,12 @@ def check_blog_links():
             for obj in page.get("Contents", []):
                 existing.add(obj["Key"])
     except Exception as e:
-        return [Check("blog:list", "Blog Links").fail(f"Cannot list blog/ objects: {e}")]
+        return [Check("blog:list", "Blog Links", CONTENT_TRUTH).fail(f"Cannot list blog/ objects: {e}")]
 
     linked = set(re.findall(r'href="(week-[\w.]+\.html)"', index_html))
 
     if not linked:
-        checks.append(Check("blog:links", "Blog Links").warn("No week-*.html links found in blog index"))
+        checks.append(Check("blog:links", "Blog Links", CONTENT_TRUTH).warn("No week-*.html links found in blog index"))
         return checks
 
     broken, ok_count = [], 0
@@ -360,7 +342,7 @@ def check_blog_links():
         else:
             broken.append(fname)
 
-    c = Check("blog:links", "Blog Links")
+    c = Check("blog:links", "Blog Links", CONTENT_TRUTH)
     if broken:
         c.fail(f"{len(broken)} broken link(s): {', '.join(broken)} — linked from index but not in S3")
     else:
@@ -389,7 +371,7 @@ def check_lambda_secrets():
                 if s.get("DeletedDate") is None:
                     existing.add(s["Name"])
     except Exception as e:
-        return [Check("secrets:inventory", "Lambda Secrets").fail(f"Cannot list secrets: {e}")]
+        return [Check("secrets:inventory", "Lambda Secrets", DEPLOY_HEALTH).fail(f"Cannot list secrets: {e}")]
 
     stale = []
     try:
@@ -400,9 +382,9 @@ def check_lambda_secrets():
                 if secret_name and secret_name not in existing:
                     stale.append(f"{fn['FunctionName']} → {secret_name}")
     except Exception as e:
-        return [Check("secrets:sweep", "Lambda Secrets").fail(f"Cannot list functions: {e}")]
+        return [Check("secrets:sweep", "Lambda Secrets", DEPLOY_HEALTH).fail(f"Cannot list functions: {e}")]
 
-    c = Check("secrets:lambda_refs", "Lambda Secrets")
+    c = Check("secrets:lambda_refs", "Lambda Secrets", DEPLOY_HEALTH)
     if stale:
         c.fail(f"{len(stale)} stale SECRET_NAME(s): " + "; ".join(stale))
     else:
@@ -427,13 +409,13 @@ def check_avatar_assets():
                 existing.add(obj["Key"])
     except Exception as e:
         # ListBucket permission may be missing — non-critical (IAM least-privilege)
-        return [Check("avatar:sprites", "Avatar Assets").warn(f"Cannot list avatar assets (non-critical): {e}")]
+        return [Check("avatar:sprites", "Avatar Assets", CONTENT_TRUTH).warn(f"Cannot list avatar assets (non-critical): {e}")]
 
     missing = [
         f"{tier}-frame{frame}.png" for tier in TIERS for frame in FRAMES if f"dashboard/avatar/base/{tier}-frame{frame}.png" not in existing
     ]
 
-    c = Check("avatar:sprites", "Avatar Assets")
+    c = Check("avatar:sprites", "Avatar Assets", CONTENT_TRUTH)
     total = len(TIERS) * len(FRAMES)
     if missing:
         c.fail(f"Missing {len(missing)}/{total} sprites: {', '.join(missing)}")
@@ -458,14 +440,14 @@ def check_mcp_tool_calls():
 
     mcp_function_url = resolve_mcp_url()
     if not mcp_function_url:
-        return [Check("mcp:config", "MCP Integration").warn("MCP Function URL unresolved — skipping")]
+        return [Check("mcp:config", "MCP Integration", DEPLOY_HEALTH).warn("MCP Function URL unresolved — skipping")]
 
     # Fetch MCP API key
     sm = boto3.client("secretsmanager", region_name=REGION)
     try:
         api_key = sm.get_secret_value(SecretId=MCP_SECRET_NAME)["SecretString"]
     except Exception as e:
-        return [Check("mcp:auth", "MCP Integration").fail(f"Cannot fetch MCP API key: {e}")]
+        return [Check("mcp:auth", "MCP Integration", DEPLOY_HEALTH).fail(f"Cannot fetch MCP API key: {e}")]
 
     # 2026-05-03: MCP Function URL uses Bearer auth (HMAC-derived from api_key),
     # not x-api-key. Compute the deterministic Bearer token the same way the MCP
@@ -504,7 +486,7 @@ def check_mcp_tool_calls():
             return False, str(e)
 
     # a) get_sources
-    c = Check("mcp:get_sources", "MCP Integration")
+    c = Check("mcp:get_sources", "MCP Integration", DEPLOY_HEALTH)
     ok, data = _mcp_call("get_sources", {})
     if not ok:
         c.fail(f"get_sources failed: {data}")
@@ -518,7 +500,7 @@ def check_mcp_tool_calls():
     checks.append(c)
 
     # b) get_todoist_snapshot (dispatcher) — verifies SIMP-1 dispatcher routing is live
-    c = Check("mcp:get_todoist_snapshot", "MCP Integration")
+    c = Check("mcp:get_todoist_snapshot", "MCP Integration", DEPLOY_HEALTH)
     ok, data = _mcp_call("get_todoist_snapshot", {"view": "load"})
     if not ok:
         c.fail(f"get_todoist_snapshot dispatcher failed: {data}")
@@ -531,7 +513,7 @@ def check_mcp_tool_calls():
     checks.append(c)
 
     # c) Cache warm — query CACHE#matthew / TOOL#* entries
-    c = Check("mcp:cache_warm", "MCP Integration")
+    c = Check("mcp:cache_warm", "MCP Integration", DEPLOY_HEALTH)
     try:
         resp = table.query(
             KeyConditionExpression=Key("pk").eq("CACHE#matthew") & Key("sk").begins_with("TOOL#"),
@@ -604,7 +586,7 @@ def _fetch_reader_truth_surfaces():
 
 def check_reader_truth():
     checks = []
-    verdict = Check("reader_truth:verdict", "Reader Truth")
+    verdict = Check("reader_truth:verdict", "Reader Truth", CONTENT_TRUTH)
 
     # Budget gate — internal QA pauses first (ADR-125). Explicit ⏸, never silent.
     try:
@@ -631,7 +613,7 @@ def check_reader_truth():
 
         surfaces, fetch_warnings = _fetch_reader_truth_surfaces()
         for w in fetch_warnings:
-            checks.append(Check("reader_truth:fetch", "Reader Truth").warn(f"{w} (fail-soft)"))
+            checks.append(Check("reader_truth:fetch", "Reader Truth", CONTENT_TRUTH).warn(f"{w} (fail-soft)"))
         if not surfaces:
             checks.append(verdict.warn("no surfaces fetched — Reader Truth skipped this run (fail-soft)"))
             return checks
@@ -647,7 +629,7 @@ def check_reader_truth():
         return checks
 
     for err in errors:
-        checks.append(Check("reader_truth:batch", "Reader Truth").warn(f"AI batch error (fail-soft): {err}"))
+        checks.append(Check("reader_truth:batch", "Reader Truth", CONTENT_TRUTH).warn(f"AI batch error (fail-soft): {err}"))
 
     def _fmt(f):
         return f"{f['page']} [{f['category']}] {f['note'][:90]}"
@@ -694,7 +676,7 @@ def check_receipt_replay():
       - all digests reproduce → green.
     No receipts at all is YELLOW until the first post-#1373 compute lands.
     """
-    c = Check("character:receipt_replay", "Character Receipts")
+    c = Check("character:receipt_replay", "Character Receipts", DEPLOY_HEALTH)
     try:
         from health import character_engine, progression_receipts as pr
 
@@ -750,7 +732,7 @@ def _iso_week_id(dt):
 
 
 def check_predict_week_freshness():
-    check = Check("predict_week:freshness", "Predict-the-Week Freshness")
+    check = Check("predict_week:freshness", "Predict-the-Week Freshness", CONTENT_TRUTH)
     url = SITE_BASE_URL + "/api/predict_week"
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "life-platform-qa-smoke"})
@@ -792,7 +774,7 @@ def check_predict_week_freshness():
 
 
 def check_hero_weight_arithmetic():
-    check = Check("hero_weight:arithmetic", "Reader Truth")
+    check = Check("hero_weight:arithmetic", "Reader Truth", CONTENT_TRUTH)
     url = SITE_BASE_URL + "/api/journey"
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "life-platform-qa-smoke"})
@@ -829,7 +811,7 @@ REDIRECT_SPOTCHECK_WEEKDAY = 0  # Monday (datetime.weekday(): Mon=0 .. Sun=6)
 
 
 def check_redirect_spotcheck():
-    check = Check("redirect_spotcheck:sample", "Legacy Redirects")
+    check = Check("redirect_spotcheck:sample", "Legacy Redirects", CONTENT_TRUTH)
     now = pt_now()
     if now.weekday() != REDIRECT_SPOTCHECK_WEEKDAY:
         return [check.pause(f"redirect spot-check runs Mondays — skipped ({now.strftime('%A')} PT); rotates over ~1 month")]
@@ -848,7 +830,7 @@ def check_redirect_spotcheck():
 
     checks = []
     for err in result["errors"]:
-        checks.append(Check("redirect_spotcheck:fetch", "Legacy Redirects").warn(err))
+        checks.append(Check("redirect_spotcheck:fetch", "Legacy Redirects", CONTENT_TRUTH).warn(err))
 
     where = f"bucket {result['bucket']}/{result['n_buckets']}, ISO week {iso_week}, {result['n_sampled']}/{result['n_total']} sampled"
     if result["failures"]:
@@ -887,7 +869,7 @@ NOTION_API_VERSION = "2022-06-28"
 
 
 def check_notion_template_schema():
-    check = Check("notion:template_schema", "Notion Schema")
+    check = Check("notion:template_schema", "Notion Schema", DEPLOY_HEALTH)
 
     try:
         from ingestion.notion_lambda import TEMPLATE_SK
@@ -947,55 +929,6 @@ def check_notion_template_schema():
 
 
 # ---------------------------------------------------------------------------
-# #1445: EMF summary metrics — emitted on EVERY run, including all-green
-# ---------------------------------------------------------------------------
-# Before this, qa-smoke only spoke by SENDING AN EMAIL, and only on a real
-# FAILURE — a green run and a run that never happened at all looked
-# identical from the outside (no metric, no heartbeat, nothing for the
-# remediation agent to see). This EMF line is CloudWatch-extracted into
-# LifePlatform/QaSmoke metrics regardless of outcome:
-#   PassCount / WarnCount / FailCount / PausedCount — per-run check tallies.
-#   RunCompleted=1 — the heartbeat target (monitoring_stack.py's
-#     qa-smoke-heartbeat fires BREACHING if this is absent for 2 straight
-#     days, i.e. the Lambda stopped running or died before reaching here).
-# monitoring_stack.py also alarms FailCount>=1 and WarnCount>=1 (both
-# digest-routed, matching this file's own "routine, not urgent" posture) —
-# a warnings-only run now surfaces in the next daily digest email even
-# though it never triggers this Lambda's own direct failure alert, and both
-# alarms are ordinary CloudWatch alarms the remediation agent's existing
-# `describe_alarms(StateValue="ALARM")` sweep already ingests as a source.
-QA_SMOKE_EMF_NAMESPACE = "LifePlatform/QaSmoke"
-
-
-def emf_summary_line(*, passed: int, warned: int, failed: int, paused: int, timestamp_ms: int) -> str:
-    """Build the EMF log line CloudWatch extracts to LifePlatform/QaSmoke metrics."""
-    doc = {
-        "_aws": {
-            "Timestamp": int(timestamp_ms),
-            "CloudWatchMetrics": [
-                {
-                    "Namespace": QA_SMOKE_EMF_NAMESPACE,
-                    "Dimensions": [[]],
-                    "Metrics": [
-                        {"Name": "PassCount"},
-                        {"Name": "WarnCount"},
-                        {"Name": "FailCount"},
-                        {"Name": "PausedCount"},
-                        {"Name": "RunCompleted"},
-                    ],
-                }
-            ],
-        },
-        "PassCount": int(passed),
-        "WarnCount": int(warned),
-        "FailCount": int(failed),
-        "PausedCount": int(paused),
-        "RunCompleted": 1,
-    }
-    return json.dumps(doc)
-
-
-# ---------------------------------------------------------------------------
 # Report builder
 # ---------------------------------------------------------------------------
 
@@ -1005,6 +938,13 @@ def build_report_html(all_checks, run_time_str):
     warns = [c for c in all_checks if c.passed is None]
     paused = [c for c in all_checks if c.paused]
     passes = [c for c in all_checks if c.passed is True and not c.paused]
+
+    # #1921: the email must say which SIDE failed. A content-truth failure no
+    # longer reverts the fleet, so this line is the reader's only cue that a red
+    # run did not (and should not have) triggered a rollback.
+    n_deploy = sum(1 for c in fails if c.partition == DEPLOY_HEALTH)
+    n_content = sum(1 for c in fails if c.partition == CONTENT_TRUTH)
+    split = f" &middot; {n_deploy} deploy-health &middot; {n_content} content-truth" if fails else ""
 
     overall = "ALL CLEAR" if not fails else f"{len(fails)} FAILURE(S)"
     banner_emoji = "✅" if not fails else "🔴"
@@ -1021,7 +961,7 @@ def build_report_html(all_checks, run_time_str):
   <div style="background:{hdr_bg};padding:20px 24px;border-bottom:3px solid #2d2d5e;">
     <p style="color:#94a3b8;font-size:10px;margin:0 0 4px;font-weight:700;">LIFE PLATFORM · QA SMOKE TEST</p>
     <h1 style="color:{hdr_fg};font-size:24px;font-weight:700;margin:0 0 4px;">{banner_emoji} {overall}</h1>
-    <p style="color:#94a3b8;font-size:11px;margin:0;">{run_time_str} &middot; {len(passes)} passed &middot; {len(paused)} paused &middot; {len(warns)} warnings &middot; {len(fails)} failed</p>
+    <p style="color:#94a3b8;font-size:11px;margin:0;">{run_time_str} &middot; {len(passes)} passed &middot; {len(paused)} paused &middot; {len(warns)} warnings &middot; {len(fails)} failed{split}</p>
   </div>"""
 
     for cat, checks in cats.items():
@@ -1083,13 +1023,15 @@ def lambda_handler(event, context):
         all_checks += check_reader_truth()  # #1096: phase-aware narrative truth (Haiku, budget-aware, fail-soft)
         all_checks += check_predict_week_freshness()  # #1198: predict-the-week never live on a stale ISO week
         all_checks += check_hero_weight_arithmetic()  # #1225: home hero stat row reconciles + trend-honest
-        all_checks += weight_truth_qa.checks(Check, SITE_BASE_URL)  # #1894: home/cockpit vs the coaching door
+        all_checks += weight_truth_qa.checks(Check, SITE_BASE_URL, CONTENT_TRUTH)  # #1894: home/cockpit vs the coaching door
         all_checks += check_receipt_replay()  # #1373: progression-receipt drift alarm (deterministic replay)
         all_checks += check_redirect_spotcheck()  # #1430: weekly legacy-redirect sample, rotates over redirects.map
         all_checks += check_notion_template_schema()  # #1840: code TEMPLATE_SK vs live Notion schema drift gate
         # blog moved to /story/ in v4 — shown paused (not failed) so it's not forgotten.
         all_checks.append(
-            Check("blog:links", "Blog Links").pause("Blog — paused (chronicle now lives at /story/ in v4); will return if revived")
+            Check("blog:links", "Blog Links", CONTENT_TRUTH).pause(
+                "Blog — paused (chronicle now lives at /story/ in v4); will return if revived"
+            )
         )
 
         # #1345 DR-drill hook: an explicit {"synthetic_fail": true} invoke payload
@@ -1100,7 +1042,7 @@ def lambda_handler(event, context):
         # reverts qa-smoke to its previous zip.
         if isinstance(event, dict) and event.get("synthetic_fail") is True:
             all_checks.append(
-                Check("drill:synthetic", "DR Drill").fail(
+                Check("drill:synthetic", "DR Drill", DEPLOY_HEALTH).fail(
                     "SYNTHETIC failure (synthetic_fail invoke flag) — #1345 rollback drill, NOT a real defect"
                 )
             )
@@ -1112,6 +1054,17 @@ def lambda_handler(event, context):
         paused = [c for c in all_checks if c.paused]
         passes = [c for c in all_checks if c.passed is True and not c.paused]
 
+        # #1921: split the failures by partition. Only deploy_health failures are
+        # evidence about the deploy in flight, so only they may gate ci-cd's
+        # smoke-test job (deploy/lib/smoke_oracle_decision.py reads
+        # failed_deploy_health). content_truth failures are NOT muted — they still
+        # send the same red email, still land in the log above, still count in the
+        # EMF FailCount that monitoring_stack alarms on, and still make the
+        # scheduled nightly a failed run. They simply stop reverting code that
+        # cannot have caused them and that reverting cannot fix.
+        fails_deploy = [c for c in fails if c.partition == DEPLOY_HEALTH]
+        fails_content = [c for c in fails if c.partition == CONTENT_TRUTH]
+
         # #1610: itemize every fail/warn to the LOG, not just the failure email.
         # The specific failing check used to appear ONLY in the emailed report, so a
         # latched daily FailCount alarm was undiagnosable from CloudWatch without inbox
@@ -1119,10 +1072,22 @@ def lambda_handler(event, context):
         # (queryable via Logs Insights), matching the existing `[QA]` print convention.
         # Messages carry only freshness/sanity metadata, secret NAMES (already in-repo),
         # and public-dashboard values — no sensitive values.
+        # #1921: the partition rides every FAIL line. Which side a failure landed
+        # on is the whole question when a rollback did (or did not) fire, and
+        # reconstructing it later from the check name is guesswork.
         for c in fails:
-            print(f"[QA] FAIL {c.category} / {c.name}: {c.message}")
+            print(f"[QA] FAIL [{c.partition}] {c.category} / {c.name}: {c.message}")
         for c in warns:
-            print(f"[QA] WARN {c.category} / {c.name}: {c.message}")
+            print(f"[QA] WARN [{c.partition}] {c.category} / {c.name}: {c.message}")
+
+        # #1920: a POSITIVE EXECUTION RECEIPT. Check.pause() sets passed=True and
+        # printed nothing, so a paused check and a passing one were byte-identical
+        # in every recorded signal — that is how `reader_truth` sat budget-paused
+        # for 26 consecutive days (2026-07-06 → 08-01) while reporting green, and
+        # why its precision could not be measured after the fact. A skipped check
+        # and a passing check must never look alike again.
+        for c in paused:
+            print(f"[QA] PAUSE [{c.partition}] {c.category} / {c.name}: {c.message}")
 
         # #1445: emit the EMF summary on EVERY run — including all-green — so
         # the nightly QA layer has a heartbeat and its warnings/failures are
@@ -1135,6 +1100,8 @@ def lambda_handler(event, context):
                 failed=len(fails),
                 paused=len(paused),
                 timestamp_ms=int(run_time.timestamp() * 1000),
+                failed_deploy_health=len(fails_deploy),
+                failed_content_truth=len(fails_content),
             )
         )
 
@@ -1142,11 +1109,32 @@ def lambda_handler(event, context):
         # sources with no record yesterday) are normal and were firing a yellow
         # email almost every day — pure noise. They remain visible in logs and
         # in the failure email's body when a failure does occur.
+        # #1921: `failed` stays the TOTAL — it is the nightly's own verdict and
+        # every existing consumer (alarms, the remediation agent, tests) reads it
+        # unchanged. The two partitioned counts are ADDITIVE, and only
+        # failed_deploy_health gates the pipeline. `paused` names ride along as
+        # the #1920 execution receipt, so a caller can tell a green run from a
+        # run where the check never executed.
+        def _body(emailed):
+            return json.dumps(
+                {
+                    "failed": len(fails),
+                    "failed_deploy_health": len(fails_deploy),
+                    "failed_content_truth": len(fails_content),
+                    "warned": len(warns),
+                    "paused": sorted(c.name for c in paused),
+                    "emailed": emailed,
+                }
+            )
+
         if not fails:
             print(f"[QA] {len(warns)} warning(s), 0 failures — no email (warnings not emailed standalone)")
-            return {"statusCode": 200, "body": json.dumps({"failed": 0, "warned": len(warns), "emailed": False})}
+            return {"statusCode": 200, "body": _body(False)}
 
-        subject = f"🔴 QA: {len(fails)} failure{'s' if len(fails)>1 else ''} — {run_time.strftime('%b %-d')}"
+        subject = (
+            f"🔴 QA: {len(fails)} failure{'s' if len(fails)>1 else ''} "
+            f"({len(fails_deploy)} deploy-health, {len(fails_content)} content-truth) — {run_time.strftime('%b %-d')}"
+        )
 
         ses.send_email(
             FromEmailAddress=SENDER,
@@ -1159,8 +1147,12 @@ def lambda_handler(event, context):
             },
         )
 
-        print(f"[QA] Done — {len(fails)} failures, {len(warns)} warnings, email sent")
-        return {"statusCode": 200, "body": json.dumps({"failed": len(fails), "warned": len(warns), "emailed": True})}
+        print(
+            f"[QA] Done — {len(fails)} failures "
+            f"({len(fails_deploy)} deploy_health, {len(fails_content)} content_truth), "
+            f"{len(warns)} warnings, email sent"
+        )
+        return {"statusCode": 200, "body": _body(True)}
     except Exception as e:
         logger.error("lambda_handler failed: %s", e, exc_info=True)
         raise

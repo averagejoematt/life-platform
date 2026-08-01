@@ -123,15 +123,53 @@ def decide(path, ok_extra=()):
     # just because the top-level status/statusCode looks fine.
     body = _parse_body(result)
     if isinstance(body, dict):
-        failed = body.get("failed")
-        if failed:
-            return "FAIL", f"body failed={failed!r} (status={status})"
+        # #1921: gate on DEPLOY-HEALTH failures only. qa-smoke answers two
+        # unrelated questions — "is the code that just shipped broken?" and "is
+        # the published content honest right now?" — and only the first is
+        # evidence about the deploy in flight. Wiring both to this exit code
+        # reverted healthy fleets three times (2026-07-27: 98 functions on a
+        # dashboard-freshness check; 2026-08-01 00:18Z: 100 functions on a
+        # reader_truth finding about a defect that had been live for weeks).
+        # Reverting code cannot un-publish a stale number, so for that class the
+        # rollback was not just disproportionate — it was ineffective.
+        #
+        # Fallback is deliberately CONSERVATIVE and preserves #1831's contract:
+        # when `failed_deploy_health` is absent (an older qa-smoke zip, the
+        # canary — which has no partitions and whose every check IS deploy
+        # health) we fall back to the total `failed`, i.e. exactly the
+        # pre-#1921 behaviour. The oracle never fails open on a missing key.
+        if "failed_deploy_health" in body:
+            gating = body.get("failed_deploy_health")
+            if gating:
+                return "FAIL", f"body failed_deploy_health={gating!r} (status={status})"
+        else:
+            failed = body.get("failed")
+            if failed:
+                return "FAIL", f"body failed={failed!r} (status={status})"
         if body.get("all_pass") is False:
             return "FAIL", f"body all_pass=false (status={status})"
 
     if s in ok or (s and "error" not in s and "fail" not in s):
         return "PASS", str(status)
     return "FAIL", str(status)
+
+
+def content_truth_count(path):
+    """#1921: how many CONTENT_TRUTH failures this oracle reported, or 0.
+
+    Read only for the CI annotation in main(). Kept out of `decide()` so that
+    function's (verdict, detail) contract — and every test asserting on it —
+    stays byte-compatible. A content-truth failure no longer gates the pipeline,
+    which is precisely why it has to be shouted at the surface where the deploy
+    happened; the re-routing is only defensible if it is not also a mute.
+    """
+    try:
+        with open(path) as f:
+            result = json.load(f)
+        body = _parse_body(result) if isinstance(result, dict) else None
+        return int(body.get("failed_content_truth") or 0) if isinstance(body, dict) else 0
+    except Exception:  # noqa: BLE001 — annotation only; never affect the verdict
+        return 0
 
 
 def main(argv=None):
@@ -147,6 +185,18 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     verdict, detail = decide(args.result, args.ok_extra)
+
+    # #1921: surface content-truth failures loudly regardless of the verdict.
+    # They do not gate — they are not evidence about this deploy — but they are
+    # real defects on a live reader surface and must never pass unremarked.
+    content_fails = content_truth_count(args.result)
+    if content_fails:
+        print(
+            f"::warning::{args.label}: {content_fails} content-truth failure(s) — "
+            "NOT gating this deploy (#1921: content findings describe published state, "
+            "not the code that just shipped, and a rollback cannot un-publish them). "
+            "The qa-smoke failure email and the ContentTruthFailCount alarm carry the detail."
+        )
 
     if verdict == "PASS":
         print(f"✅ {args.label} passed")
