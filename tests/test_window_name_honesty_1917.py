@@ -86,17 +86,17 @@ REGISTRY: dict[str, tuple[str, str | None]] = {
     # reader-visible as the two qa-smoke caught: they are on lower-traffic
     # surfaces and several already ship an explicit n beside the claim (ADR-105),
     # which is a partial mitigation, not a fix.
-    "mean_7d": (INTENSIVE, "#1918 — ships n_scored_7d beside it (ADR-105 partial mitigation)"),
-    "mean_30d": (INTENSIVE, "#1918 — ships n_scored_30d beside it (ADR-105 partial mitigation)"),
-    "trend_7d": (INTENSIVE, "#1918 — a per-day series, not a scalar claim; lower risk"),
-    "trend_vs_prior_30d": (INTENSIVE, "#1918 — window-over-window comparison on a clamped window"),
-    "cal_7d_avg": (INTENSIVE, "#1918 — nutrition 7d mean over a clamped window"),
-    "pro_7d_avg": (INTENSIVE, "#1918 — nutrition 7d mean over a clamped window"),
-    "avg_7d_g": (INTENSIVE, "#1918 — protein 7d mean surfaced to the AI layer"),
-    "total_protein_30d_avg_g": (INTENSIVE, "#1918 — 30d mean over a clamped window"),
-    "sleep_hours_30d_avg": (INTENSIVE, "#1918 — written by daily_brief, carried by site_stats_refresh"),
-    "group_90d_avgs": (INTENSIVE, "#1918 — habit group means over a clamped 90d window"),
-    "uptime_90d": (INTENSIVE, "#1918 — a percentage; platform uptime, not experiment-scoped data"),
+    "mean_7d": (INTENSIVE, "#1919 — ships n_scored_7d beside it (ADR-105 partial mitigation)"),
+    "mean_30d": (INTENSIVE, "#1919 — ships n_scored_30d beside it (ADR-105 partial mitigation)"),
+    "trend_7d": (INTENSIVE, "#1919 — a per-day series, not a scalar claim; lower risk"),
+    "trend_vs_prior_30d": (INTENSIVE, "#1919 — window-over-window comparison on a clamped window"),
+    "cal_7d_avg": (INTENSIVE, "#1919 — nutrition 7d mean over a clamped window"),
+    "pro_7d_avg": (INTENSIVE, "#1919 — nutrition 7d mean over a clamped window"),
+    "avg_7d_g": (INTENSIVE, "#1919 — protein 7d mean surfaced to the AI layer"),
+    "total_protein_30d_avg_g": (INTENSIVE, "#1919 — 30d mean over a clamped window"),
+    "sleep_hours_30d_avg": (INTENSIVE, "#1919 — written by daily_brief, carried by site_stats_refresh"),
+    "group_90d_avgs": (INTENSIVE, "#1919 — habit group means over a clamped 90d window"),
+    "uptime_90d": (INTENSIVE, "#1919 — a percentage; platform uptime, not experiment-scoped data"),
     "composite_delta_1d": (INTENSIVE, None),  # a 1-day window is full from Day 2; nothing to under-fill
     # ── extensive: counts and sums. Safe by kind. ───────────────────────────
     "binge_days_30d": (EXTENSIVE, None),
