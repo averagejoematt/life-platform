@@ -2110,30 +2110,121 @@ def handle_inference_receipt() -> dict:
         day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
-        def _sum(namespace, metric, dim_name, dim_value, start):
-            r = cw.get_metric_statistics(
-                Namespace=namespace,
-                MetricName=metric,
-                Dimensions=[{"Name": dim_name, "Value": dim_value}],
-                StartTime=start,
-                EndTime=now,
-                Period=86400,
-                Statistics=["Sum"],
-            )
-            return sum(p["Sum"] for p in r.get("Datapoints", []))
+        # ── One batched read, not ~62 serial ones (#1911) ──────────────────────
+        # This handler used to call get_metric_statistics once per (metric, window,
+        # dimension): 6 models x 2 windows x 2 metrics + 19 lambdas x 2 metrics ≈ 62
+        # SEQUENTIAL CloudWatch calls. That is ~1.6s warm, and when any of those calls
+        # is throttled (boto3 then retries with exponential backoff) the handler ran
+        # 11-15s. Measured at the origin, that is exactly what auto-rolled-back two
+        # correct merged deploys: 2026-07-29 ended at 16:10:19 after 11,628ms and
+        # 2026-07-30 at 18:00:15 after 14,934ms, both with NO cold start (InitDuration
+        # absent) — the smoke's `curl --max-time 10` gave up mid-flight and its exit 28
+        # was read as a bad deploy. (The earlier cold-start hypothesis was wrong; this
+        # is handler cost.) Readers rarely saw it because the response is edge-cached
+        # for 900s — but the smoke deliberately cache-busts, so it always pays full price.
+        #
+        # GetMetricData takes up to 500 queries in ONE call, so the whole sweep is now a
+        # single round trip. Threads were considered and rejected: #1527 showed a
+        # per-thread boto3 Session on this fleet REGRESSED origin latency 3.6s -> 12-16s
+        # (Session construction is pure-Python setup the GIL serializes).
+        #
+        # Windows: one query per (metric, dimension) over the MONTH at Period=86400
+        # yields per-day buckets — "month" sums them all, "today" sums the buckets at or
+        # after midnight UTC. Same numbers as the old two-window pair, half the queries,
+        # and today's figure can no longer disagree with the month's (they now derive
+        # from one read instead of two taken seconds apart).
+        def _batch_daily(specs):
+            """specs: list of (id, namespace, metric, dim_name, dim_value).
+            Returns {id: [(timestamp, value), ...]} from a single GetMetricData sweep."""
+            if not specs:
+                return {}
+            queries = [
+                {
+                    "Id": qid,
+                    "MetricStat": {
+                        "Metric": {"Namespace": ns, "MetricName": mn, "Dimensions": [{"Name": dn, "Value": dv}]},
+                        "Period": 86400,
+                        "Stat": "Sum",
+                    },
+                    "ReturnData": True,
+                }
+                for qid, ns, mn, dn, dv in specs
+            ]
+            out: dict = {}
+            token = None
+            # GetMetricData caps at 500 queries per call; chunk so the sweep stays
+            # correct if the platform ever emits more metrics than that.
+            for i in range(0, len(queries), 500):
+                chunk = queries[i : i + 500]
+                token = None
+                while True:
+                    kwargs = {"MetricDataQueries": chunk, "StartTime": month_start, "EndTime": now}
+                    if token:
+                        kwargs["NextToken"] = token
+                    resp = cw.get_metric_data(**kwargs)
+                    for r in (resp or {}).get("MetricDataResults") or []:
+                        out.setdefault(r.get("Id"), []).extend(zip(r.get("Timestamps") or [], r.get("Values") or []))
+                    token = (resp or {}).get("NextToken")
+                    if not token:
+                        break
+            return out
 
-        # Per-model (AWS/Bedrock emits these for every invoke)
-        models = []
+        def _split(points):
+            """(month_total, today_total) from one metric's daily buckets.
+
+            Timestamps are normalised to UTC-aware before comparing: boto3 returns
+            tz-aware datetimes, but a naive one would raise TypeError here and — because
+            the whole handler is wrapped in a try/except — silently 503 the endpoint
+            rather than surface the bug.
+            """
+            month_total = 0.0
+            today_total = 0.0
+            for ts, v in points:
+                val = float(v)
+                month_total += val
+                if ts is not None and ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                if ts is not None and ts >= day_start:
+                    today_total += val
+            return month_total, today_total
+
+        # Per-model (AWS/Bedrock emits these for every invoke) + per-feature (the
+        # bundled modules' own dimension) are gathered in ONE batch.
+        model_ids: list = []
+        specs: list = []
+        qid_map: dict = {}
         seen = cw.list_metrics(Namespace="AWS/Bedrock", MetricName="InputTokenCount")
         for m in seen.get("Metrics", []):
             mid = next((d["Value"] for d in m["Dimensions"] if d["Name"] == "ModelId"), None)
             if not mid:
                 continue
+            model_ids.append(mid)
+            for field, metric_name in (("in", "InputTokenCount"), ("out", "OutputTokenCount")):
+                qid = f"q{len(specs)}"
+                qid_map[("model", mid, field)] = qid
+                specs.append((qid, "AWS/Bedrock", metric_name, "ModelId", mid))
+
+        fn_names = []
+        fn_metrics = cw.list_metrics(Namespace="LifePlatform/AI", MetricName="AnthropicInputTokens")
+        for m in fn_metrics.get("Metrics", []):
+            fn = next((d["Value"] for d in m["Dimensions"] if d["Name"] == "LambdaFunction"), None)
+            if not fn:
+                continue
+            fn_names.append(fn)
+            for field, metric_name in (("in", "AnthropicInputTokens"), ("out", "AnthropicOutputTokens")):
+                qid = f"q{len(specs)}"
+                qid_map[("feature", fn, field)] = qid
+                specs.append((qid, "LifePlatform/AI", metric_name, "LambdaFunction", fn))
+
+        series = _batch_daily(specs)
+
+        models = []
+        for mid in model_ids:
             price = _price_for_model(mid)
+            in_month, in_today = _split(series.get(qid_map[("model", mid, "in")], []))
+            out_month, out_today = _split(series.get(qid_map[("model", mid, "out")], []))
             row = {"model": mid.split("/")[-1]}
-            for label, start in (("today", day_start), ("month", month_start)):
-                tin = _sum("AWS/Bedrock", "InputTokenCount", "ModelId", mid, start)
-                tout = _sum("AWS/Bedrock", "OutputTokenCount", "ModelId", mid, start)
+            for label, tin, tout in (("today", in_today, out_today), ("month", in_month, out_month)):
                 row[label] = {
                     "input_tokens": int(tin),
                     "output_tokens": int(tout),
@@ -2142,15 +2233,10 @@ def handle_inference_receipt() -> dict:
             if row["month"]["input_tokens"] or row["month"]["output_tokens"]:
                 models.append(row)
 
-        # Per-feature (the bundled modules dimension by Lambda function)
         features = []
-        fn_metrics = cw.list_metrics(Namespace="LifePlatform/AI", MetricName="AnthropicInputTokens")
-        for m in fn_metrics.get("Metrics", []):
-            fn = next((d["Value"] for d in m["Dimensions"] if d["Name"] == "LambdaFunction"), None)
-            if not fn:
-                continue
-            tin = _sum("LifePlatform/AI", "AnthropicInputTokens", "LambdaFunction", fn, month_start)
-            tout = _sum("LifePlatform/AI", "AnthropicOutputTokens", "LambdaFunction", fn, month_start)
+        for fn in fn_names:
+            tin, _ = _split(series.get(qid_map[("feature", fn, "in")], []))
+            tout, _ = _split(series.get(qid_map[("feature", fn, "out")], []))
             if tin or tout:
                 features.append({"lambda": fn, "month_input_tokens": int(tin), "month_output_tokens": int(tout)})
         features.sort(key=lambda f: -(f["month_input_tokens"] + f["month_output_tokens"]))
