@@ -162,6 +162,7 @@ from ai import ai_calls  # -- Extracted module imports -------------------------
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from content import html_builder, output_writers
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from intelligence import weight_recency  # #1894/#1924: a weigh-in carries its own date
 from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
 # ai_calls can be init'd at import time (no dependency on locally-defined functions)
@@ -464,6 +465,16 @@ def gather_daily_data(profile, yesterday):
                 latest_weight = wt
                 break
 
+    # #1924: the reading's own date has to travel with it. `latest_weight` above is a
+    # bare float, and the window it comes from ENDS AT `yesterday` by construction — so
+    # on a day when the brief runs before a fresh weigh-in lands (or simply after a
+    # skipped morning) it is the most recent AVAILABLE weight, not the current one. The
+    # physical coach was handed exactly that and narrated "the latest reading is 316.3
+    # lbs" while the cockpit served 317.0 from today's weigh-in. Same defect #1894 fixed
+    # in ai_expert_analyzer; this is the OTHER coach generator, which never got it.
+    # Reuses that module rather than re-deriving staleness — one definition, two callers.
+    weight_recency_facts = weight_recency.summarize_weight_readings(withings_recent, today.isoformat())
+
     withings_14d = fetch_range("withings", (today - timedelta(days=14)).isoformat(), yesterday)
     week_ago_weight = None
     target_date = (today - timedelta(days=7)).isoformat()
@@ -634,6 +645,9 @@ def gather_daily_data(profile, yesterday):
         "apple_7d": apple_7d,
         "anomaly": anomaly,
         "latest_weight": latest_weight,
+        # #1924: namespaced rather than spread, so adding dated weight facts cannot
+        # collide with the many existing consumers of this dict.
+        "weight_recency": weight_recency_facts,
         "week_ago_weight": week_ago_weight,
         "avatar_weight": avatar_weight,
         "sleep_debt_7d_hrs": round(sleep_debt_hrs, 1),

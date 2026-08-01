@@ -11,6 +11,7 @@ import re
 from datetime import date as _date_cls
 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, EXPERIMENT_TZ  # noqa: F401
+from intelligence import weight_recency  # #1894/#1924: staleness defined once, used by both coach generators
 
 from ai.ai_summaries import _avg, _safe_float  # noqa: F401
 
@@ -1272,6 +1273,15 @@ def _build_physical_data(data):
         "visceral_fat_lb": _safe_float(dexa, "visceral_fat_lb"),
         "waist_height_ratio": _safe_float(meas, "waist_height_ratio"),
         "latest_weight": data.get("latest_weight"),
+        # #1924: `latest_weight` and `weight_lbs` above are bare numbers. Handed to the
+        # coach undated they get narrated as "the latest reading is X" — which is how
+        # /api/coaching-dashboard published 316.3 lb beside a cockpit showing 317.0.
+        # The brief's weight window ends at YESTERDAY, so its newest reading is routinely
+        # older than the cockpit's. These fields carry the reading's own date and its
+        # staleness (intelligence/weight_recency, the #1894 contract) so the narrative
+        # can date the claim instead of implying it is current.
+        **(data.get("weight_recency") or {}),
+        "weight_recency_note": weight_recency.weight_recency_prompt_block(data.get("weight_recency") or {}),
     }
 
 
