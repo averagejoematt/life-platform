@@ -185,6 +185,33 @@ def handle_vitals(date: str | None = None) -> dict:
     # it carries the value only when the span really is >= 30 days.
     weight_delta_30d = weight_delta if (weight_delta_window_days or 0) >= 30 else None
 
+    # #1917 follow-up: say what the window numbers MEAN, in words.
+    #
+    # A bare `weight_delta_window_days: 5` sitting beside "Day 6" is ambiguous —
+    # 5 days of *span* between two weigh-ins is not 5 days of *history*, and
+    # nothing in the payload said which. qa-smoke's reader_truth reproducibly read
+    # it as a contradiction (twice, differently worded), and a human reader has
+    # exactly the same ambiguity with no way to resolve it. Both are fixed by
+    # stating the relationship rather than leaving it to be inferred, which is the
+    # ADR-105 "the claim carries its context" idiom already used by `disclosure`
+    # on /api/fulfillment and `coverage_floor` elsewhere.
+    _day_n = 0
+    try:
+        _day_n = max((datetime.strptime(today, "%Y-%m-%d") - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d")).days + 1, 0)
+    except Exception:
+        _day_n = 0
+    _bits = [f"Today is Day {_day_n} of the cycle that began {EXPERIMENT_START}, so at most {_day_n} day(s) of data can exist."]
+    if weight_delta is not None and weight_delta_window_days is not None:
+        _bits.append(
+            f"weight_delta_lbs is the change between two weigh-ins {weight_delta_window_days} day(s) apart, both inside that window."
+        )
+    if _hrv_avg is not None:
+        _bits.append(f"hrv_avg_ms averages {len(hrv_vals)} reading(s) spanning {_hrv_window['actual_days']} day(s).")
+    _bits.append(
+        "Fields named *_30d stay null until a genuine 30-day window exists; none of the numbers above claims more history than the cycle has."
+    )
+    _window_disclosure = " ".join(_bits)
+
     # DPR-1.20: Page freshness for nav badges
     _today_iso = datetime.now(timezone.utc).isoformat()
     _as_of = _vr.get("recovery_as_of") or _vr.get("sleep_as_of") or today
@@ -243,6 +270,7 @@ def handle_vitals(date: str | None = None) -> dict:
                 # Truthful-or-absent, same rule as weight_delta_30d.
                 "hrv_30d_avg": _hrv_avg if _hrv_window["full"] else None,
                 "hrv_30d_n": len(hrv_vals) if _hrv_window["full"] else None,
+                "window_disclosure": _window_disclosure,
                 "hrv_trend": trend(hrv_vals),
                 "rhr_bpm": round(_vr["rhr_bpm"], 0) if _vr["rhr_bpm"] is not None else None,
                 "rhr_trend": trend(list(reversed(rhr_vals))),  # lower is better

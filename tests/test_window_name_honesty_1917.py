@@ -266,6 +266,22 @@ def test_the_real_numbers_are_still_published(short_cycle):
     assert v["hrv_avg_window_days"] == 5
 
 
+def test_window_numbers_are_explained_in_words(short_cycle):
+    """The bare integers must come with the sentence that disambiguates them.
+
+    `weight_delta_window_days: 5` beside "Day 6" is ambiguous — span between two
+    weigh-ins, or days of history? qa-smoke's reader_truth reproducibly read it as
+    a contradiction, and a human has the same ambiguity with no way to resolve it.
+    """
+    v = json.loads(vitals.handle_vitals()["body"])["vitals"]
+    d = v["window_disclosure"]
+    assert "Day 6" in d, "the disclosure must state the day number it is reconciling against"
+    assert "5 day(s) apart" in d, "it must explain weight_delta_window_days as a SPAN, not a history"
+    assert "*_30d stay null" in d, "it must say why the window-named keys are absent"
+    # and it must never claim more history than the cycle has
+    assert "at most 6 day(s) of data can exist" in d
+
+
 def test_a_full_window_restores_the_window_named_keys(monkeypatch):
     """Date-independent: the same code publishes `_30d` once 30 days really elapsed."""
     genesis = _d(400)
