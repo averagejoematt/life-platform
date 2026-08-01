@@ -111,3 +111,80 @@ def test_stale_threshold_is_the_shared_one():
         _TODAY.isoformat(),
     )
     assert facts["current_weight_is_stale"] is False, "exactly at the threshold is still fresh"
+
+
+# ── the check side: a dated citation is not a contradiction ─────────────────
+
+
+def test_the_live_prose_still_fails_on_the_undated_claim():
+    """The REAL half of #1924 must keep failing — this is not a mute."""
+    from operational import weight_truth_qa as wq
+
+    prose = "The weight anchor I'm working from is 321.1 lbs at Day 1, and the latest reading is 316.3 lbs."
+    cited = wq.weights_cited_in(prose)
+    assert 316.3 in cited, "an undated 'latest reading' is still a present-tense claim"
+    assert 321.1 not in cited, "a figure anchored 'at Day 1' is dated, not a claim about today"
+
+
+def test_dating_the_citation_clears_the_check():
+    """The cure for the real half must be ABLE to pass — otherwise the fix is unreachable.
+
+    intelligence/weight_recency tells the coach to write "as of <date>"; if the check
+    still flagged that, dating the claim would be pointless.
+    """
+    from operational import weight_truth_qa as wq
+
+    ok, msg = wq.assess_cross_surface_weight(
+        {"weight_lbs": 317.0},
+        [
+            {
+                "name": "Dr. Victor Reyes",
+                "position_summary": "The most recent weigh-in is 316.3 lbs as of 2026-07-28; he is at 317.0 lbs now.",
+            }
+        ],
+    )
+    assert ok, msg
+
+
+def test_an_undated_out_of_tolerance_weight_still_blocks():
+    """Negative test: removing the anchor must bring the failure straight back.
+
+    Uses 321.1, not 316.3 — and that distinction is the whole story of the live
+    incident. |316.3 - 317.0| = 0.7 lb, INSIDE the 1.5 lb tolerance, so the stale
+    "latest reading" never tripped the gate. What actually failed was 321.1 vs
+    317.0 — the correctly-labelled Day-1 anchor. The blocking failure was 100% the
+    false positive; the staleness is a real honesty defect that the gate never
+    caught. Two separate problems that looked like one line of output.
+    """
+    from operational import weight_truth_qa as wq
+
+    ok, msg = wq.assess_cross_surface_weight(
+        {"weight_lbs": 317.0},
+        [{"name": "Dr. Victor Reyes", "position_summary": "He is at 321.1 lbs."}],
+    )
+    assert not ok
+    assert "321.1" in msg
+
+
+def test_the_exact_live_failure_now_passes():
+    """Replay of the published prose against the live cockpit value."""
+    from operational import weight_truth_qa as wq
+
+    ok, msg = wq.assess_cross_surface_weight(
+        {"weight_lbs": 317.0},
+        [
+            {
+                "name": "Dr. Victor Reyes",
+                "position_summary": "The weight anchor I'm working from is 321.1 lbs at Day 1, and the latest reading is 316.3 lbs.",
+            }
+        ],
+    )
+    assert ok, msg
+
+
+def test_a_later_date_cannot_launder_an_undated_claim():
+    """The anchor window is deliberately short — a date in the NEXT sentence is not a label."""
+    from operational import weight_truth_qa as wq
+
+    prose = "The latest reading is 316.3 lbs. That measurement was taken as of 2026-07-28."
+    assert 316.3 in wq.weights_cited_in(prose)

@@ -29,17 +29,53 @@ _WEIGHT_IN_PROSE = re.compile(r"\b(\d{2,3}(?:\.\d+)?)\s*(?:lbs?|pounds)\b", re.I
 # Coach fields that carry reader-facing prose.
 _PROSE_FIELDS = ("position_summary", "analysis", "headline", "summary")
 
+# #1924: a weight the prose ANCHORS TO A PAST POINT is not a claim about today.
+# "the weight anchor I'm working from is 321.1 lbs at Day 1" is correct, dated,
+# reader-honest prose — and the #1894 check flagged it anyway, because it compared
+# every extracted figure against the current weight. That matters twice over: it
+# fires on correct writing (which trains people to ignore a blocking gate), and it
+# makes the *cure* for the real half of #1924 — telling the coach to date its
+# citations, per intelligence/weight_recency — unable to clear the check.
+#
+# Deliberately narrow: only an explicit backward reference within a short distance
+# AFTER the figure exempts it. A bare number is still judged as a present-tense
+# claim, so the genuinely stale "the latest reading is 316.3 lbs" still FAILs.
+_HISTORICAL_ANCHOR = re.compile(
+    r"""^\s*(?:
+          at\s+day\s+\d+                 # "321.1 lbs at Day 1"
+        | on\s+day\s+\d+
+        | at\s+(?:the\s+)?(?:start|baseline|outset|beginning)
+        | as\s+of\s+\d{4}-\d{2}-\d{2}    # the dated form weight_recency asks for
+        | back\s+(?:in|on)\b
+        | in\s+(?:january|february|march|april|may|june|july|august|september|october|november|december)\b
+    )""",
+    re.IGNORECASE | re.VERBOSE,
+)
+
+# How far past the figure to look for that anchor. Long enough for "lbs at Day 1",
+# short enough that a later sentence's date cannot launder an undated claim.
+_ANCHOR_WINDOW_CHARS = 24
+
 
 def weights_cited_in(prose: str) -> list[float]:
-    """Every bodyweight-scale figure asserted in a blob of prose."""
+    """Every bodyweight-scale figure asserted **as current** in a blob of prose.
+
+    Figures the prose explicitly anchors to a past point are excluded — see
+    `_HISTORICAL_ANCHOR`. A citation is a contradiction only if it presents itself
+    as today's number.
+    """
+    text = prose or ""
     out = []
-    for raw in _WEIGHT_IN_PROSE.findall(prose or ""):
+    for m in _WEIGHT_IN_PROSE.finditer(text):
         try:
-            v = float(raw)
+            v = float(m.group(1))
         except ValueError:
             continue
-        if v >= _BODYWEIGHT_FLOOR_LBS:
-            out.append(v)
+        if v < _BODYWEIGHT_FLOOR_LBS:
+            continue
+        if _HISTORICAL_ANCHOR.match(text[m.end() : m.end() + _ANCHOR_WINDOW_CHARS]):
+            continue  # dated, therefore not a claim about now
+        out.append(v)
     return out
 
 
