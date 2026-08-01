@@ -1,144 +1,148 @@
-# HANDOVER — the deploy-machinery block: three shipped, and the blocker they uncovered — 2026-07-31/08-01
+# HANDOVER — the window that was never 30 days, and the gate that was never the bug — 2026-08-01
 
-> Instruction thread: take the #1890 wrap's deploy-machinery block — **#1911 → #1907 →
-> #1908 as one wave** — because it compounds and taxes every change. Verify the build beat
-> landed first. Explicitly NOT a Fable session (the banked `/fullreview` partial's delta
-> review is due on/after 2026-08-02). Standing approval given in-session for merges, the
-> deploy-gate approval, and the two ordered deploys.
+> Instruction thread: **#1917 FIRST — it is a live blocker.** Every merge was deploying,
+> failing smoke, and auto-rolling-back (100 Lambdas reverted on a healthy deploy). Then
+> approve the stranded `7408e326` deploy and confirm main goes green. Standing approval was
+> given in-session for the merge, the deploys, and the gate approval; a mid-session fork on
+> gate posture was escalated and decided by Matthew.
 
 ## Shipped (all merged AND live-verified)
 
-- **#1911** (PRs **#1915** + **#1916**) — the endpoint that auto-reverted two correct
-  deploys is fixed, and a timed-out request can no longer revert one anyway. Split into two
-  PRs on purpose: the IAM half reds the R8-ST6 Plan gate by design, so bundling would have
-  reddened main for the zero-risk CI fixes too.
-- **#1907** (PR **#1915**) — the superseded-skip now requires a real trigger-path diff
-  before declaring itself replaced, names the superseding commit, and fails safe.
-- **#1908** (PR **#1915**) — the doc gates moved out of the deploy pipeline into Docs CI,
-  which now triggers on **both** halves of the doc↔source coupling.
+- **#1917** (PR **#1918** + follow-ups `00ced6dd`, `cee3cb60`) — no published field named for
+  an N-day window carries a value until the window really spans N days. Both halves ship:
+  the real number under a window-generic name beside its actual span, and the legacy `_Nd`
+  key gated on `full`.
+- **#1924** (`5471631a`, `b1c55bb4`) — the daily-brief coach generator now receives its
+  weigh-in **with its own date**, and `cross_surface:weight` no longer flags a citation the
+  prose explicitly anchors to a past point.
 
-## The measurement that overturned the issue's own hypothesis
+**Outcome that matters:** `qa-smoke` returns `failed: 0` on **4 consecutive runs**, and
+ci-cd run **30713984885** completed **success end-to-end — Deploy ✅, Smoke ✅,
+Auto-rollback skipped**. First clean merge→deploy since 07-31. The stranded `7408e326` run
+was **cancelled, not approved** (below).
 
-#1911 proposed a cold site-api container. The origin says otherwise. 7 days, 12,386
-invocations: p50 51ms, p99 2.16s, **max 14.93s**. Both incidents align to the second:
+## The premise was wrong three times, and only measurement caught it
 
-| | duration | InitDuration |
+This is the session's actual lesson. Each wrong answer was plausible and would have shipped
+a fix that did nothing.
+
+| # | The plausible story | What the data said |
 |---|---|---|
-| 2026-07-29 ended 16:10:19.407 | **11,628 ms** | *absent* |
-| 2026-07-30 ended 18:00:15.636 | **14,934 ms** | *absent* |
+| 1 | #1917: "a real 30-day delta spans genesis" | #1084 already genesis-clamps the window. `/api/weight_progress` returns the WHOLE cycle — 3 records, 321.1 → 317.0 — and `317.0-321.1 = -4.1`, exactly the published `weight_delta_30d`. The arithmetic was always honest; only the **name** lied. |
+| 2 | "the summariser hallucinated 316.3" | `position_summary` is **empty** on the OUTPUT# row; the dashboard falls back to raw `content`. No summariser is on that surface at all. |
+| 3 | "the stale weight blocked the gate" | `\|316.3-317.0\| = 0.7`, **inside** the 1.5 lb tolerance. It never tripped anything. The blocking failure was **100%** the false positive on the correctly-labelled `321.1 … at Day 1`. |
 
-Each began within a second of the smoke's last `✅ /api/horizons`. **No cold start** — pure
-handler cost: ~62 *sequential* CloudWatch calls (6 models × 2 windows × 2 metrics + 19
-Lambdas × 2), stretching to 11–15s whenever one is throttled and boto3 backs off. Readers
-rarely saw it (900s edge cache); the smoke cache-busts, so it always paid full price. That
-is why it surfaced as a deploy-gate failure and not a user complaint. Fixed with
-`GetMetricData` (≤500 queries per call → one round trip). Threads were considered and
-**rejected on evidence** — #1527 showed per-thread boto3 Sessions regressed this fleet
-3.6s → 12–16s under the GIL.
+**#2 cost a whole module.** I built `summary_grounding.py` + 8 tests on that theory and
+**reverted it unshipped** — its headline test fed the fact set instead of the real
+narrative, so it asserted a repair that would never have happened in production. A green it
+had not earned. Deleting it was cheaper than the false confidence.
 
-## What the class-level framing bought again
+**#3 was a claim I made to Matthew in writing before checking the tolerance.** Corrected in
+the commit message and here; the staleness is a real honesty defect, it simply was never
+what blocked the pipeline. One line of qa output looked like one problem and was two.
 
-Every issue was filed as an instance and was really a class — the third session running:
+## What "guard the set" bought — fourth session running
 
-| Issue | Reported | Actually found |
-|---|---|---|
-| #1911 | 1 slow endpoint | **12** unguarded `$(curl …)` sites, any of which kills the run |
-| #1908 | "gate in ci-cd's lint job" | it is in `ci-lint.yml`, and docs-ci **already ran it** |
-| #1908 | — | + docs-ci's drift gate had been **silently skipping** on a shallow clone |
+- **#1917's AST registry found 7 fields I had missed by reading.** They use the **prefix**
+  form (`30d_avg_mg_dl`) on `/api/glucose` + `/api/sleep`; every `_30d`-**suffix** grep
+  misses them, including the one I ran first. Found on the scan's first execution.
+- **The worst instance was invisible to qa-smoke entirely**: `daily_brief` wrote
+  `weight_delta_30d` from `week_ago_weight` — a **7-day** number under a 30-day name, wrong
+  on *every* day of *every* cycle, which `weekly_signal` rendered to a human as
+  `(↓4.1 lbs 30d)`.
+- **#1924 was the same shape one level up**: #1894 fixed staleness in
+  `ai_expert_analyzer`; the **second** coach generator (`daily_brief` →
+  `ai_context._build_physical_data`) never got it. A test now asserts BOTH import the shared
+  `weight_recency` and that neither re-defines `STALE_AFTER_DAYS` locally.
 
-**#1908's issue text would have made things worse if followed literally.** It proposed
-deleting the ci-lint copy; that copy is load-bearing — it catches *code* pushes that
-invalidate docs, which is exactly the recurring `PILLAR_COMPUTERS` drift. The fix was to
-give docs-ci the code-side triggers *and then* remove the duplicate, so coverage moved
-rather than disappeared.
+## The gate-posture fork (Matthew's call, and he was right)
 
-**The silent skip is the more valuable find.** `check_doc_index.py` skips the #973
-engine-doc drift gate on a shallow clone, and docs-ci checked out at depth 1 — so it had
-been running `--strict` with its drift half disabled, reporting a green it never earned.
-Now `fetch-depth: 0`, with a test that proves the skip path is real rather than asserting a
-knob nobody verified. It caught real drift on its very first run (PR #1916's date literals).
+`reader_truth` produced **2 true findings then 6 false positives across 5 runs** — six
+different rationales, including flagging the #1917 fix itself, its own `window_disclosure`
+echoed back, and the **deliberate, documented** `night_of`/`as_of_date` frame as HIGH.
+
+I recommended demoting it to advisory. **Matthew pushed to fix things properly instead.**
+That was the better call — the gate is green because two real defects got fixed and one
+under-specified rubric got corrected, **not** because a bar was lowered. Recorded because my
+recommendation was the weaker one.
+
+The rubric defect was real and is fixed (`cee3cb60`): it stated only that a window LONGER
+than `day_n` is impossible and never that a SHORTER one is expected — so after a reset,
+where **every** clamped window is short by design (ADR-077 "clamped, not hidden"), it read
+the platform's own honesty as a lie.
 
 ## Gotchas hit
 
-- **`set -e` + `$(curl …)` is the whole #1911 mechanism.** On exit 28 the substitution
-  fails and the script dies *before* the check's own error branch — hence no ❌ row, no URL,
-  and a bare `exit code 28` read as a bad deploy. The guard is **derived** (AST-style scan
-  for any `$(curl …)`), not enumerated, and was negative-tested by injecting a new call site.
-- **The doc-sync stamp is UTC, so "same-day commit+merge" has a 17:00 PDT deadline.** I
-  committed at 17:05 PDT — already 2026-08-01 to the gate — and reddened both main and PR
-  #1916 with 8 stale date literals. `sync_doc_metadata.py:1182` uses
-  `datetime.now(timezone.utc)`. The prior handover's rule is necessary but not sufficient;
-  this is the sharper form.
-- **YAML anchors do not work in GitHub Actions.** Caught before push; would have broken the
-  docs-ci trigger outright. The two `paths:` lists are duplicated by hand with a test
-  asserting they match.
-- **`command curl` bypasses shell-function stubs.** Used it for recursion safety; it
-  defeated every unit test (rc=6, real DNS). Plain `curl` is correct — the function name is
-  already distinct.
-- **A qa-smoke failure unrelated to deploy health reverted 100 Lambdas** — the #1911 pattern
-  recurring on a *different* oracle (see #1917 below).
+- **Approving the stranded `7408e326` run would have REVERTED the day's work.** It is an
+  ancestor of the fix; its tree is missing all 6 changed Lambdas. The prior handover said
+  "approve it after #1917" — correct when written, a trap once #1917 merged. **Cancelled.**
+  (`reference_ci_deploy_race_manual_overwrite`.)
+- **I deployed the rubric fix to Lambda ~30 min before pushing it** — repo and live
+  disagreed in between. Self-inflicted drift; caught at a routine `git log origin/main..HEAD`.
+- **`qa-smoke` invoked off-schedule fails `dashboard:date` legitimately** — daily-brief
+  writes the dashboard at 17:00 UTC, so between 00:00 and 17:00 UTC it is one day behind by
+  design. I nearly logged a timing artifact as a third blocker.
+- **`/api/sleep` is not a route** — it is `/api/sleep_detail`. I invalidated a path that
+  does not exist and had to redo it.
+- **`deploy_lambda.sh` takes the LIVE function name** (`life-platform-qa-smoke`), not the
+  `ci/lambda_map.json` key.
+- **CloudFront caches `/api/*` for 300s**, and `reader_truth` fetches through the edge — so
+  a post-deploy smoke can read a stale payload. Deploy → invalidate → verify → *then* the
+  gate.
 
 ## Verified
 
-- **Full suite 8,165 passed**; the one failure is `test_i16_recent_ingest_records_exist`
-  (`Found: ['whoop@2026-07-31']`) — the exact signature its own docstring calls out as
-  low-logging-activity, **not a code regression**, and CI excludes that file.
-- **Deployed bytes inspected, not inferred**: downloaded the live site-api zip —
-  `_batch_daily` and `cw.get_metric_data` present, old serial `_sum` helper gone.
-- **Deploy order held**: IAM policy 6:02:30 → function 6:02:40. `cloudwatch:GetMetricData`
-  confirmed live on `SiteApiLambdaRole`.
-- `/api/inference_receipt` → 200 with `today_in == month_in == 5921`, which is exactly right
-  on Aug 1 and validates the new `_split` arithmetic. Also confirms the **ADR-133 ceiling
-  reverted $115 → $85** on schedule.
-- `smoke_test_site.sh --quick` end-to-end against live: **186 passed, 0 failed** (twice).
-- Every guard negative-tested: reverting the supersede fix fails 5 tests including both
-  incident cases; injecting a bare `$(curl …)` fails the derived scan.
-- **Honest caveat:** the 0.22–0.36s latency (vs 1.49–1.66s) is **partly confounded** — UTC
-  rolled into August so `month_start` is hours old. The un-confounded proof is the
-  call-count contract, not the stopwatch. And `smoke_test_site.sh` runs **only** from
-  `site-deploy.yml`, so the #1911 smoke fix has not yet executed in production CI; that
-  awaits the next `site/**` merge.
+- **Full suite 8,184 passed**, 0 real failures (two doc-sync count failures cleared by
+  `sync_doc_metadata.py --apply`).
+- **Deployed bytes inspected, not inferred** — downloaded the live site-api zip; `_window_span`
+  present in `site_api_common`, gated keys present in `site_api_vitals`.
+- **Bundle boot with the repo OFF `sys.path`** — `ai_context` reaches `weight_recency` across
+  packages, the rider fires, the coach sees `as_of 2026-07-28`.
+- **Live payloads on all three endpoints**: `_30d` keys null; `weight_delta_lbs -4.1 /
+  window_days 5`; `hrv_avg_ms 55.2 / n 5`; glucose + sleep the same shape.
+- **Negative-tested both ways** — reverting the `_Nd` gate fails on the live `-4.1`;
+  injecting a new field fails the AST scan; a window name in a *comment* does not; an
+  undated out-of-tolerance weight still FAILs the cross-surface check.
+- `qa-smoke` **4/4 green**; ci-cd **30713984885 success**, auto-rollback **skipped**.
 
-**Build beat:** `2026-08-01-the-gate-that-was-never-running`
-**Docs:** `docs/CONVENTIONS.md` §4 — the doc/wiki gates' new home, the `fetch-depth: 0`
-requirement, and the hand-duplicated path lists; gate-order line corrected (doc-drift removed).
-**Decisions:** none needed — #1908's option-1 choice is a CI-placement call recorded in the
-files it changes; no architecture/data/deploy-posture change beyond what ADR-099/103/104 cover.
-**Main:** red — `check_main_green.py` reads **`e8d0ce43` FAILURE**: that run's Smoke Test
-failed on the **pre-existing** qa-smoke reader_truth defect (#1917, which pre-dated the
-deploy by ~48 min), and auto-rollback fired. The newer run on `7408e326` has every gate
-green (Lint, Unit Tests, Deploy-critical, Plan) but sits `waiting` because I deliberately
-did **not** approve its deploy — approving while reader_truth is red would roll back over
-the #1911 fix. Both reds clear when #1917 lands; neither is a regression from this session.
-**Incidents:** 1 row — the 2026-08-01 auto-rollback of 100 Lambdas on a pre-existing
-qa-smoke reader-truth failure.
-**Stash/hooks:** clean
-**Closures:** #1911, #1907, #1908 commented with ADR-099 outcome verdicts
-**Backlog:** Now live at 10 actionable; #1917 filed P1.
+**Build beat:** `2026-08-01-the-window-that-was-never-thirty-days`
+**Docs:** none needed — no deploy path, data model, algorithm, MCP tool, secret or site
+page changed; the #1917 decision is recorded on `_window_span` where the window is measured,
+and the residual debt is issue-tracked (#1919).
+**Decisions:** none needed — the gate-posture question is deliberately **not** decided this
+session; #1925 files the ADR *after* #1920 measures precision, which is the whole point.
+**Main:** green (`b1c55bb4`) — `check_main_green.py` ✅.
+**Incidents:** none — the 100-Lambda auto-rollback that motivated #1917 fired 2026-07-31 and
+is already logged by the prior session; nothing new fired today.
+**Closures:** #1917, #1924 commented with ADR-099 outcome verdicts.
+**Stash/hooks:** clean.
+**Backlog:** Now live at **8 actionable** (no refill needed — threshold is 3); no stale `Later`
+issues, so no promote-or-close calls were due. 6 issues filed (#1919–#1925 less #1918), and the
+filing-contract linter now reports **0 violations across all 74 open issues** (was 12 — all mine,
+fixed this session: missing `## Outcome`, ASCII score grammar, epic `## Stories` coverage).
 
 ## Residual / next picks
 
-1. **#1917 — the live blocker, take it first.** `/api/vitals` publishes `hrv_30d_avg`
-   (n=5) and `weight_delta_30d` labelled "30d" on **Day 5**. It fails qa-smoke's
-   reader_truth check, and qa-smoke is ci-cd's smoke oracle — so **every merge currently
-   deploys, fails smoke, and auto-rolls-back**. The issue separates the two real questions
-   (is the *number* wrong or only the *label*? weight legitimately survives a reset under
-   ADR-077; HRV does not) rather than assuming a fix. Recurs on every cycle restart, so a
-   date-independent fix beats a one-off.
-2. **Approve the stranded deploy on `7408e326` — but only AFTER #1917.** `not-work — an
-   ops step, sequenced.` It ships nothing new (site-api code + IAM already live via the
-   manual deploys; only the `test_count` literal remains) and would roll back over the
-   #1911 fix if approved while reader_truth is red.
-3. **#1909** — `/api/status` reports "627% of budget" against a hardcoded `budget = 15.0`.
-   The **$115 → $85 revert has now happened** (confirmed live: `budget_ceiling_usd: 85.0`,
-   tier 0), so this can finally be verified across the real boundary rather than predicted.
-4. **#1904, #1892, #1893, #1896, #1897** — the rest of epic #1890.
-5. **Fable delta review due on/after 2026-08-02** — `not-work — a scheduling constraint.`
+1. **#1920 — measure `reader_truth`'s real precision.** Take it BEFORE #1921. I built much
+   of today's argument on it being unreliable, then it passed 4/4 after the fixes. That is
+   genuinely ambiguous, and #1921's design must not rest on my bad afternoon.
+2. **#1921 — split the smoke oracle** so a *content* finding cannot revert *code*. Stands
+   regardless of #1920's result: even a perfect check is answering a question that should
+   not trigger a rollback. Third instance of the #1911 class in three sessions.
+3. **#1919** — the 11 intensive `_Nd` fields left ungated, declared as visible debt in the
+   registry rather than silently passing. `group_90d_avgs` is most exposed (under-fills for
+   3 months after a restart).
+4. **#1922 / #1923** — convert the AI's real findings into deterministic rules
+   (phase-plausibility; the `night_of` frame). This is the "AI proposes, rules dispose" loop.
+5. **#1909 · #1904 · #1892 / #1893 · #1896 / #1897** — the rest of epic #1890.
+6. **Fable delta review due on/after 2026-08-02** — `not-work — a scheduling constraint.`
    Do not let another model finish the banked `/fullreview` partial (14/17 lenses).
-6. **Worktree prune** — `not-work — housekeeping, no issue warranted.` Still ~130, many
-   stale and in-repo under `.claude/worktrees/`.
-7. **Standing alarms (#1329 checklist)** — `not-work — checked, nothing outstanding.` No
-   digest-routed freshness alarm or manual-rotation secret reminder is aging; next
-   MCP-bridge key rotation is 2026-10-05.
-8. **Owner-gated, unchanged** — `not-work — owner decisions, not session-startable:` OSS
-   publish one-liner, vocal backfill, #1738 / #1571 / #1114, Dependabot.
+7. **The stale coach narrative self-heals at the next 17:00 UTC brief** — `not-work — a
+   scheduled regeneration, no action needed.` Today's published text still reads "the
+   latest reading is 316.3 lbs"; the check now correctly tolerates it and the generator fix
+   is live.
+8. **Standing alarms (#1329)** — `not-work — checked, nothing outstanding.` No digest-routed
+   freshness alarm or manual-rotation secret reminder is aging; next MCP-bridge key
+   rotation is 2026-10-05.
+9. **Worktree prune** — `not-work — housekeeping, no issue warranted.` Still ~130 stale
+   entries under `.claude/worktrees/`.

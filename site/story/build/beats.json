@@ -1978,6 +1978,21 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/1916"
         }
       ]
+    },
+    {
+      "id": "2026-08-01-the-window-that-was-never-thirty-days",
+      "date": "2026-08-01",
+      "title": "The window that was never thirty days",
+      "shipped": "The site was publishing a field called weight_delta_30d on day six of a six-day-old experiment. The obvious read is that the number was wrong. It wasn't — the number was exactly right. A fix eighteen months in the making already stops these windows reaching back into a previous cycle, so the value was an honest measurement of the five days that actually exist. What lied was the name. Fields named for a thirty-day window now stay empty until thirty days have genuinely passed, and the real figure ships beside the span it actually covers: down 4.1 lb over 5 days, not a thirty-day trend. The same treatment went to a coach who was telling readers a weight from four days ago was the latest one, because the number reached it without its date attached.",
+      "gotcha": "I was wrong about the cause three times, and each wrong answer was plausible enough to have shipped a fix that did nothing. The best of the three: I decided an AI summariser had invented a stray number, and built an entire module with eight tests to catch that class of thing. Then I read the actual stored record and found no summariser was involved on that page at all. I deleted the module unshipped — its headline test fed itself the wrong input, so it proved a repair that would never have happened in production. A test that replays a live failure has to use the live inputs, or it just proves the code does what you wrote.",
+      "honest_miss": "Eleven similar fields are still publishing averages over windows shorter than their names claim. They're now listed in a registry with an issue number attached rather than quietly passing, but listed is not fixed. And the automated proofreader that caught the original problem produced two genuine findings and then six false ones in a single afternoon — including flagging my own fix, and a design decision that was deliberate. It's wired so its opinion can undo a release. Whether that should stay true is now a question with a measurement attached, not an argument.",
+      "why_it_mattered": "A number can be arithmetically perfect and still mislead, if its label claims more than it covers. That is the whole difference between data and honest data, and it is invisible to every check that only asks whether the maths is right. The deeper habit this cost me a day to relearn: a bug report's stated cause is a guess, not a finding. Three times I acted on the plausible story instead of reading the live data, and three times the data said something else. The fix that lasts isn't the patch — it's the check that scans for the whole class automatically. That one found seven more instances I had already missed by reading carefully.",
+      "prs": [
+        {
+          "label": "PR #1918",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1918"
+        }
+      ]
     }
   ]
 }
