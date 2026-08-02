@@ -164,7 +164,7 @@ went `in_progress` immediately *while the old run was still stuck pending in its
    promise on `/subscribe/`. Right now the page promises something the platform hasn't done since April.
 5. **#1940 — the public citation correction** (23 withdrawn citations). Facts settled; the voice is yours.
 
-## Next picks
+## Residual / next picks
 
 1. **data-1** — the countdown-gap rows are live in coach reads now; the fix is a post-genesis verify
    that derives its partition set from `phase_taxonomy` rather than a hand list.
