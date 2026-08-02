@@ -168,6 +168,25 @@ POPULATED_GATE_PAGES = [
         ],
     },
     {
+        # #1971 (completes #802 on the door's first screen): under a tier >= 2
+        # budget pause the dashboard payload carries regeneration_paused: true and
+        # every roster card's as-of kicker must disclose "refresh paused (budget
+        # guard)" — coaching.js marks that state with .rd-paused. The fixture IS
+        # the paused payload, so this pass renders the disclosure deterministically
+        # (the live site only shows it when the budget guard actually holds).
+        "path": "/coaching/",
+        "name": "Coaching hub · paused board [populated]",
+        "wait_for": "body",
+        "checks": [
+            {"selector": ".rd-card", "min_count": 3, "desc": "roster read cards render from the paused dashboard fixture"},
+            {
+                "selector": ".rd-asof.rd-paused",
+                "min_count": 3,
+                "desc": "every card's as-of kicker carries the budget-guard paused disclosure (#1971/#802)",
+            },
+        ],
+    },
+    {
         # #974: the cockpit's levers strip (the Protocols station in the daily
         # slice) only materializes with supplement-registry/experiment data — the
         # empty-mock pass renders its honest-hidden state, so this pass asserts
@@ -225,6 +244,7 @@ POPULATED_API_MOCKS = {
     "**/api/supplements": "supplements.json",
     "**/api/presence": "presence.json",
     "**/api/routine": "routine.json",
+    "**/api/coaching-dashboard": "coaching_dashboard_paused.json",  # #1971 — paused-board disclosure
 }
 
 

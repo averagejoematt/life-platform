@@ -71,6 +71,9 @@
         "length_sample": 0,
         "type": "array"
       },
+      "regeneration_paused": {
+        "type": "boolean"
+      },
       "weekly_priority": {
         "keys": {
           "coach_name": {
