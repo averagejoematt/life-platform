@@ -41,6 +41,7 @@ from web.site_api_common import (
     CORS_HEADERS,
     EXPERIMENT_BASELINE_WEIGHT_LBS,
     EXPERIMENT_START,
+    NIGHT_OF_FRAME,
     PT,
     S3_REGION,
     USER_ID,
@@ -56,6 +57,7 @@ from web.site_api_common import (
     _query_source,
     _window_span,
     logger,
+    night_of_for,
     pre_start_meta,
     table,
 )
@@ -220,11 +222,9 @@ def handle_vitals(date: str | None = None) -> dict:
     # night_of = as_of - 1 day. Surfacing this lets the front-end say "the night of
     # <night_of>" precisely, even when the latest record lags a day or two. (Weight,
     # by contrast, is same-day "today" — see weight_as_of.)
-    _night_of = None
-    try:
-        _night_of = (datetime.strptime(_as_of[:10], "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")  # type: ignore[index]  # _as_of is a str date in practice; the float branch of its inferred union never occurs and is guarded by this try/except
-    except Exception:
-        _night_of = None
+    # #1923: ONE implementation of the frame, in site_api_common. An inline offset
+    # here is what let an AI judge re-litigate the contract every run.
+    _night_of = night_of_for(_as_of)
     # Nutrition is a manual end-of-day upload — structurally ~24h behind. Its freshness
     # is the latest COMPLETE day (normally yesterday), NOT today. Hardcoding _today_iso
     # here (the old behavior) made the nutrition page read "as of now" when today's
@@ -283,7 +283,7 @@ def handle_vitals(date: str | None = None) -> dict:
                 # Temporal frame (additive): recovery/sleep/hrv/rhr are about last
                 # night and set up the as_of_date morning; weight (weight_as_of) is
                 # same-day. night_of is the evening those readings came from.
-                "frame": "last_night",
+                "frame": NIGHT_OF_FRAME,
                 "night_of": _night_of,
                 "time_travel": ip,
             },

@@ -121,7 +121,7 @@ PLATFORM_STATS = {
     "review_grade": "A",
     "active_secrets": 21,
     "site_pages": 77,
-    "test_count": 6451,
+    "test_count": 6461,
     "board_technical": 12,
     "board_product": 8,
     "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,
@@ -248,6 +248,43 @@ def _window_span(start, end, requested_days):
     actual = (datetime.strptime(end, "%Y-%m-%d") - datetime.strptime(start, "%Y-%m-%d")).days
     actual = max(actual, 0)  # a staged FUTURE genesis makes start > end: zero window, never negative
     return {"start": start, "requested_days": requested_days, "actual_days": actual, "full": actual >= requested_days}
+
+
+# ── #1923: the wake-date temporal frame, in ONE place ────────────────────────
+# Sleep/recovery/HRV/RHR are WAKE-DATE-KEYED: a record stored under 2026-07-31 is
+# the reading from the night that set up the morning of 2026-07-31 — i.e. the night
+# of 2026-07-30. So `night_of = as_of - 1 day`, always, by construction. (Weight is
+# the opposite: same-day. See weight_as_of.)
+#
+# This is a deliberate, documented design decision, and on 2026-08-01 `reader_truth`
+# raised it as a HIGH `temporal_contradiction` — an AI judge calling correct code a
+# lie, on a check that gated deploys. The right answer to "a stochastic judge keeps
+# re-litigating our contract" is to pin the contract in code, not to change working
+# code until the judge stops complaining.
+#
+# Every surface publishing a `night_of` key must derive it HERE, so the frame cannot
+# fork. tests/test_night_of_frame_1923.py AST-scans lambdas/web/ for `"night_of"`
+# dict keys and fails any that compute the offset inline — the surface set is
+# derived from the source, never hand-listed (#1917's lesson).
+#
+# NOT to be confused with `recovery_night_of` (site_api_vitals), which is a
+# DIFFERENT quantity: the date of a borrowed recovery block when the latest night
+# has none. That one is a real stored date, not an offset, and is deliberately out
+# of scope here.
+NIGHT_OF_FRAME = "last_night"
+NIGHT_OF_OFFSET_DAYS = 1
+
+
+def night_of_for(as_of):
+    """The night a wake-date-keyed reading came from: `as_of` minus one day.
+
+    Returns None for a missing/unparseable date — a caller must publish no
+    `night_of` rather than a guessed one.
+    """
+    try:
+        return (datetime.strptime(str(as_of)[:10], "%Y-%m-%d") - timedelta(days=NIGHT_OF_OFFSET_DAYS)).strftime("%Y-%m-%d")
+    except Exception:  # noqa: BLE001 — an unparseable date means "no frame", never a guess
+        return None
 
 
 def _query_source(source: str, start_date: str, end_date: str, include_pilot: bool = False) -> list:
