@@ -1,94 +1,149 @@
-# HANDOVER — the gate that had been switched off for 26 days — 2026-08-02
+# HANDOVER — the review that graded itself F — 2026-08-02
 
-> Instruction thread: **#1920 BEFORE #1921**, and let #1920 refute the hypothesis. Then #1921
-> (split deploy-health from content-truth), then the rest of epic #1890. Matthew gave standing
-> approval mid-session for the merges, the deploy-gate approvals and one CDK deploy; the
-> ceiling number in #1927 was explicitly reserved as his.
+> Instruction thread: the Fable delta review FIRST (only Fable may run it), then #1931 · #1922 ·
+> #1927's measurement half · the #1892/#1893 and #1896/#1897 pairs · #1919. Standing authority to
+> merge, approve the deploy gate, and run `deploy_site_api.sh` / `cdk_deploy.sh` from clean main.
+> Matthew away several hours; do not stop for direction.
 
-## Shipped — all merged, deployed and live-verified
+## The headline: a live privacy exposure, found by the review that waited five days
 
-| # | what | PR | live evidence |
-|---|---|---|---|
-| **#1921** | the smoke oracle partitioned; only `deploy_health` may revert | **#1926** (`61a4b23a`) | deployed qa-smoke returns `failed: 1, failed_deploy_health: 0, failed_content_truth: 1` |
-| **#1909** | `/api/status` reads the governor's breakdown, not a hardcoded `15.0` | **#1929** (`9bdd172a`) | `budget 85.0 · 22% · green · tier 0` (was `627% / red`) |
-| **#1904** | 49 of 82 catalog entries remapped + cast guard generalised | **#1930** (`953babf4`) | live catalog: 82 entries, 8 recommenders, **zero** off-roster |
-| **#1923** | the wake-date frame pinned deterministically | **#1932** (`58db6c9c`) | `as_of 2026-07-31 · night_of 2026-07-30 · frame last_night` |
-| **#1927** (part) | `budget-tier-sustained-7d` alarm | **#1928** (`037732ba`) | live in AWS: Minimum/21/21/604800s/digest |
-| — | ci-cd concurrency salted to v4 after a third wedge | **#1933** (`80d567d5`) | new runs pick up immediately |
+`/api/genome_risks` — unauthenticated, CloudFront-cached 24h — was serving **111 personal genome
+variants: 116 dbSNP identifiers and 93 gene names**, each paired with a per-locus risk
+classification. The security lens graded **F on this alone**, correctly: the persisted 2026-07-16
+anchor makes a public genome identifier an automatic F.
 
-**#1920** closed with its measurement. **#1925** closed by filing **ADR-147**.
+**Fixed, deployed, invalidated and verified live the same night** (PR **#1943**): the payload is
+aggregate-only now — per category, a count and a risk-level distribution, plus a disclosure saying
+why detail is absent. Live check after invalidation: **0 rsIDs, 0 gene names, 0 genotype tokens.**
 
-## The session's actual lesson: four of six premises were wrong
+Three things worth carrying forward from it:
 
-Same shape as the last session, which is now a pattern worth naming rather than re-learning.
+1. **The wait was correct.** This lens had never been graded since the repo went public on
+   2026-07-20, and it was one of exactly three lenses the 07-28 run never reached. Letting Opus
+   finish that run would have produced 14 grades and missed this entirely.
+2. **Absent the genome endpoint, security grades A.** 109 IAM roles with no unjustified `Resource:*`,
+   OIDC pinned to `refs/heads/main` + `environment:production`, no `pull_request_target` / no
+   self-hosted runners, MCP OAuth provably fail-closed, and the 07-16 run's only finding (spoofable
+   `X-Forwarded-For`) fully remediated across 17 call sites. The posture is strong; one endpoint was
+   never brought under a rule the platform had already written down four times.
+3. **Guard the instance, not the set — fifth recurrence, first with a real cost.** `_GENETIC_TEXT_RE`
+   sits ~900 lines away **in the same file**, enforcing this exact rule for `/api/labs`. The new
+   guard walks every captured public API schema on disk instead of any handler list.
 
-| issue | the stated premise | what measuring found |
+**PRE-13 — whether ANY per-variant detail may ever be public — is deferred and is yours.** The fix
+takes the conservative default deliberately rather than settling it.
+
+## Shipped — 9 PRs, all merged, main green
+
+| # | what | PR |
 |---|---|---|
-| #1920 | "classify 30 days of stored HIGH verdicts" | the check had been **budget-paused 26 of those 30 days**. Both sides of the argument were about something switched off. |
-| #1909 | "`status: red` is load-bearing for `overall`" | it is not — `overall` is computed from component failures **before** the cost block is built. But measuring found a defect nobody had filed: the cost block **vanished every month-start** (`Start == End` → CE `ValidationException`, 3 logged). |
-| #1904 | "5 names across 46 entries" | 82 entries, **49** to fix. And the names split two ways — Maya/Kai are in `personas.json`, Lena/Sofia/Raj are in no registry — so a "not in the retired list" guard would have passed 18 of the 49. |
-| #1923 | reads as though it covers `recovery_night_of` too | that is a **different quantity** (a borrowed-recovery date, #495/M-9). Asserting the invariant across both would have been wrong. |
+| — | **genome privacy absolute** — aggregate-only payload, set-guard over every captured schema | **#1943** (deployed + verified live) |
+| #1931 | a page the leak sweep never read is neither a pass nor a finding | **#1935** |
+| #1922 | phase-plausibility computed deterministically before any LLM verdict | **#1936** (deployed) |
+| #1893 | the void ledger stops being write-only — 273 voided bets now visible | **#1938** |
+| #1892 | 23 citations withdrawn that didn't resolve to the paper they claimed | **#1939** |
+| #1896 | a coach may not grade a call that never resolved | **#1941** |
+| #1897 | spelled-out experiment-age claims are parsed now | **#1942** |
+| — | qa_smoke split (main was red on the 1200-line ceiling — my own #1922 merge) | **#1944** |
+| — | delta review artifacts + 4 incident rows | `7ef39c7a`, `d1f5ee81` |
 
-**#1921 earned itself within the hour.** The deployed Lambda's very next run returned `failed: 1`
-with `failed_deploy_health: 0` — the old oracle would have reverted 100 Lambdas on that; the new
-one shipped the deploy and still emailed, logged and alarmed the finding.
+**#1927's measurement half** is posted as a comment on the issue (no code): July's $98.34 broken
+down by service and by AI feature.
+
+## The delta review — run 2 is complete (17/17)
+
+`docs/reviews/FULLREVIEW_2026-08-02_DELTA.md` + `fullreview_grades_2026-08-02_delta.json`.
+Run `wf_79e09c12-755`: 11 agents, 0 errors, ~979k subagent tokens, ~1h45m.
+
+**Grades:** security **A- → F**, data-architect **B+ → B-**, growth **B+ → C+**. The other 14 stand
+as banked on 07-28 — nothing re-graded them.
+
+**The 0-REFUTED anomaly is answered: the survival rate was real.** Ten 07-28 survivors re-tested
+under an explicitly lean-REFUTED brief — **0 refuted**. The same brief refuted 2 findings elsewhere
+(observability-1, security-5), so the instrument fires; it had less to fire at. The re-test also
+separated *fixed-since* (dataviz-2 by #1895, cost-1 by #1929) from *refuted*, which a naive re-run
+would have conflated.
+
+**The verifier earned its keep on 3 of 14 new findings** — and never by changing a verdict, only by
+making the evidence exact: security-1's "literal genotype call" sub-claim was struck (it didn't
+reproduce — the identifiers alone carry the finding), security-4 dropped to low after measuring
+**zero requests in 7 days** on the orphaned API, and data-2's root cause was corrected from a
+negative-cache latch to the #1858 missing SSM grant.
+
+**Beyond the genome finding, the two that matter most:**
+
+- **data-1 (high)** — ~370 experiment-scoped rows written in the 15-hour wipe-to-genesis window
+  carry `phase="experiment"`, no cycle, no tombstone, and are feeding cycle-11 coach reads *now*.
+  Future-genesis resets are sanctioned (#931/#939); nothing pauses the daily writers across the gap.
+- **growth-1 (high)** — `/subscribe/` promises "The Measured Life every Wednesday" while
+  `EXTERNAL_EMAILS_ENABLED=false` has been pinned since 2026-04-23. Confirmed subscribers have
+  received nothing for ~3 months. This is ADR-147/#1927's pause-that-never-lifts class, one layer out.
+
+## Gotchas hit — three of them mine
+
+- **I fell into the pytest-pipe trap.** `pytest … | tail -1 && git push` — the pipe returns *tail's*
+  exit code, so a **10-failure** run pushed anyway. Caught on re-read. Redirect to a file and grep it.
+- **A blanket `git checkout origin/main -- <conflicted>` silently deleted a whole new function.**
+  Same hazard as `--ours`, same file class (`grounded_generation.py`, which the previously-merged PR
+  had also touched). Tests caught it *this* time; they would not have if the drop had been additive.
+  Resolve per-file, and diff against `origin/main` after every rebase.
+- **My own #1922 merge red main** on the 1200-line module ceiling and I didn't notice until a later
+  branch's full suite failed. Its PR CI was green — the size guard doesn't run in the fast lane.
+- **Trimming a re-export list dropped `SITE_BASE_URL`** out from under four unrelated checks — a
+  *runtime* break, invisible to imports and to the unit suite. **ruff F821 caught it.**
+- **A re-export cannot be monkeypatched.** After the split, three tests patching the old module were
+  patching a re-export while the real call resolved in the new one.
+- Panel agents going quiet is not a stall — check transcript **size**, not mtime. The three slowest
+  ran ~40 min past the rest.
 
 ## Verified
 
-- **8,230 tests** pass; full suite run before each merge.
-- **Every guard negative-tested by breaking the fix**, then restored: oracle split reverted → content test fails; a partition stripped → AST scan fails; the #1345 DR drill moved to `content_truth` → drill test fails; `Minimum`→`Maximum` → sustained-alarm test fails; a 22nd period → the 604800s cap test fails; the `night_of` offset → 3 fail; an inline offset restored → the derived scan fails.
-- **Bundle boot from a staged tree with the repo off `sys.path`** for both cross-package changes.
-- **Deployed bytes downloaded and inspected**, not inferred — twice, and the second time it caught a stranded deploy.
-- **`cdk diff` read before deploying** — it caught my `_alarm()` change adding `DatapointsToAlarm: 1` to ~30 untouched alarms. Scoped to multi-period only; final diff is exactly one new resource.
+- **8,397 tests** pass on the final tree; full suite run per PR before each merge.
+- **Every guard negative-tested by breaking the fix**, then restored — the leak sweep three ways, the
+  plausibility checker three ways, the citation guard three ways, the self-graded-verdict gate three
+  ways, the span parser three ways, the genome set-guard with an identifier nested three levels deep.
+- **Bundle boot from a staged tree with the repo off `sys.path`** for all three cross-package changes.
+- **Live verification after deploy**, not run conclusions: the genome payload re-fetched post-
+  invalidation; `/api/vitals` now reads "Day 6" where it read "Day 7" before #1922.
 
-## Gotchas hit
+## State
 
-- **A run can report `Deploy: skipped` AND `success` while leaving a merged change undeployed.** #1923 sat live-less for ~1h because the run that would have shipped it was the one I cancelled, and the next run was on a workflow-only commit. Only inspecting the deployed zip caught it.
-- **`git checkout --ours` on a rebase conflict takes main's WHOLE file** — it would have silently deleted the new `night_of_for` helper while every test still passed on the stale copy. Resolve the hunk in place when your branch also modifies that file.
-- **I chained shell commands past a failed `git rebase --continue`.** It hadn't succeeded; the following `--amend` rewrote the wrong commit and I force-pushed it. `git rebase --abort` recovered everything, but by luck — the working tree still held the changes. Check the exit code.
-- **I hand-listed an allowlist in the #1904 guard and got it wrong** (missed `"Social Connection"`), which would have red-flagged *correct* config — the exact drift class I was fixing. It now imports `OWNER_ROLE_LABELS` from the #1891 guard.
-- **Every PR touches the auto-synced `test_count` literal** — three rebase conflicts. Merge one, rebase the next.
-- **doc-sync stamps UTC**: crossing 17:00 PT rolled ~10 docs to `2026-08-02` mid-session.
-- **`deploy_site_api.sh` prints "✅ site-api OK" on a 403** — it only asserts the handler imported (403 is the correct direct-invoke response for *any* route, `/api/status` included). True to what it checks; more reassuring than the evidence.
+**Main:** green (`d1f5ee81`). **Deployed:** site-api (genome fix + #1922's PT anchor), verified live.
+**Incidents:** +4 rows. **Docs:** delta report + grades JSON, `COACH_STANCE.md` re-verified,
+INCIDENT_LOG. **Stash/worktrees:** worktrees under `/private/tmp/claude-501/wt-*` are disposable.
 
-**Build beat:** `2026-08-02-the-check-that-had-been-switched-off-for-26-days`
-**Docs:** `docs/DECISIONS.md` (**ADR-147** + regenerated index, 145 records), `docs/INCIDENT_LOG.md` (+4 rows), plus the auto-synced literal/stamp pages.
-**Decisions:** **ADR-147** filed — the smoke oracle answers two questions; only deploy health may revert a deploy. Closes #1925, whose blocking input (#1920) landed this session.
-**Main:** green (`80d567d5`) — `check_main_green.py` ✅.
-**Incidents:** 4 rows added — **Whoop ingestion dead since 2026-08-01 12:00Z on an OAuth 401 with the auth breaker latched (P2, a real data gap, #1934 — needs your interactive re-auth)**; the 26-day cutoff-1 band outage (P3); the third phantom concurrency wedge that left #1923 merged-but-undeployed (P4); a visual-QA false positive where a connection reset was recorded as a leak finding (P4).
-**Closures:** #1920, #1921, #1923, #1925, #1909, #1904 commented with ADR-099 outcome verdicts.
-**Stash/hooks:** clean — `git stash list` empty, hook freshness 🟢.
-**Backlog:** Now live at **6 actionable** (no refill needed, threshold 3); `later_staleness` clean; hygiene **0 violations over 71 open issues** (2 pre-existing rounding advisories on #1677/#1679, not mine).
+**Build beat: none — deliberately.** The session's flagship shipped work is a *privacy incident
+involving your personal genome data*. Whether and how that gets said publicly is your call, not a
+model's — same class as **#1940**, which I filed for #1892's public-correction half for the same
+reason. Everything else shipped is internal machinery with no reader-facing beat.
 
-## Residual / next picks
+## Decisions only you can make
 
-1. **#1934 — Whoop is dead and only you can fix it.** OAuth 401, auth breaker latched since
-   2026-08-01 12:00Z; `DATE#2026-07-31` is the last record and the gap grows daily. Whoop is
-   the only fully passive daily source and is `qa_required` — it feeds recovery, HRV, RHR and
-   sleep, and therefore the readiness score, the daily brief and `/api/vitals`. Fix:
-   `python3 setup/setup_whoop_auth.py --backfill` (redirect `http://localhost:3000/callback`;
-   the page will NOT load — paste the full `?code=…` URL back, codes expire in ~30–60s).
-   Nothing alarmed: `qa-smoke` checks PT-yesterday, which was still 07-31 all session.
-2. **#1931** — the leak sweep records a connection reset as a finding and reds a gating job.
-   Small, fully specified, closes a class.
-3. **Fable delta review — do this FIRST of the automatable work, and only Fable may do it.** `not-work — a scheduling
-   constraint, tracked in [[project_fullreview_panel]].` The run-2 partial has been banked since
-   2026-07-28 at 14/17 lenses (72 findings, 0 filed) and is due on/after 2026-08-02, which is now.
-   Run the 3 ungraded lenses (security, data-architect, growth), re-apply
-   `docs/reviews/fullreview_grades_2026-07-16.json` anchors **verbatim**, then file the ~55 held
-   findings in ONE pass (epic #1890 is explicit: not ad hoc).
-4. **#1922** — compute phase-plausibility deterministically. Highest-leverage item open: 5 of the
-   8 false positives I classified were one arithmetic complaint restated.
-5. **#1927** — the **measurement half only** is unowned work: where does $98/month actually go,
-   by service and by AI feature. The ceiling number itself is Matthew's and has an **~2026-08-21**
-   forcing date (at $85 the simulation reaches tier 3 — all Bedrock off — around then).
-6. **#1892 / #1893** (credibility) and **#1896 / #1897** (ai-integrity) — each pair shares a
-   subsystem; do them together.
-7. **#1919** — the 11 intensive `_Nd` fields left ungated, declared debt.
-8. **Standing alarms (#1329)** — `not-work — checked, nothing outstanding.` No digest-routed
-   freshness alarm or manual-rotation secret reminder is aging; next MCP-bridge key rotation
-   2026-10-05.
-9. **Worktree prune** — `not-work — housekeeping, no issue warranted.` ~130 stale entries under
-   `.claude/worktrees/`.
-10. **If ci-cd wedges a fourth time** — `not-work — a conditional ops instruction.` Do **not** just
-   salt to v5; replace the hand-bumped counter with a per-run-unique component.
+1. **#1934 — Whoop is still dark** (OAuth 401 since 08-01 12:00Z; last record `DATE#2026-07-31`).
+   `python3 setup/setup_whoop_auth.py --backfill`. The gap grows daily and feeds readiness, the
+   brief and `/api/vitals`.
+2. **PRE-13 / genome publication.** The endpoint is aggregate-only now. Restoring any per-variant
+   detail is a policy decision — deliberately not settled by the fix.
+3. **#1927 — the ceiling number.** My measurement is on the issue: July $98.34 = Bedrock $49.51
+   (Haiku 28.47 / Sonnet 21.04) + CloudWatch **$24.50** + Secrets $9.83 + tax + $1.87 for the
+   governor's own Cost Explorer calls. Non-AI is a flat **~$48.8/mo floor** that does not flex.
+   Two measured inputs before you pick a number: **Sonnet ran the whole month with zero cache
+   hits** (4.0M input tokens at list price while Haiku's cache served 25.0M reads at 90% off), and
+   **~20% of AI spend flows outside the per-feature metering** (remediation agent, CI AI-QA, local
+   scripts). Trailing 7-day burn ≈ $3.49/day → ~$108/mo pace; tier 3 still ~Aug 21 at $85.
+4. **growth-1 — the subscriber kill switch.** Flip `EXTERNAL_EMAILS_ENABLED` back on, or change the
+   promise on `/subscribe/`. Right now the page promises something the platform hasn't done since April.
+5. **#1940 — the public citation correction** (23 withdrawn citations). Facts settled; the voice is yours.
+
+## Next picks
+
+1. **data-1** — the countdown-gap rows are live in coach reads now; the fix is a post-genesis verify
+   that derives its partition set from `phase_taxonomy` rather than a hand list.
+2. **growth-2/-3** — the predict-week seeder's wall-clock `week_id`, and the qa-smoke check that
+   greened six dark days. The second is the third "off state printed as green" this week.
+3. **#1919** — the 11 intensive `_Nd` fields, still declared debt. Untouched this session.
+4. **security-2** — the PII surface guard scans 129 static files and zero of ~134 live API payloads.
+   That is the structural sibling of the genome finding and the reason it survived so long.
+5. **#1896's data remediation** — tombstoning the pre-genesis `STANCE#latest` singletons and deleting
+   the false `THREAD#…lunch_protein_prediction_miss` row. DDB mutations on the accountability ledger;
+   I built the gate that stops new fabrications and left the existing rows alone deliberately.
