@@ -507,6 +507,125 @@ def _phase_for(generation_date_iso: str, start_date_iso: str):
     return "in_experiment", (gen - start).days + 1
 
 
+# ── #1897: experiment-age claims spelled out in words ───────────────────────
+# On 2026-07-27 (Day 1) /api/ai_analysis?expert=nutrition published "Zero food
+# logs in seven days of an experiment". Every gate was blind to it: _NUM_RE is
+# digits-only so "seven" is invisible; 7 is in _BENIGN_NUMBERS anyway; and
+# _DAY_N_RE matches "Day N" tokens, not "N days OF the experiment". A span claim
+# is the same arithmetic as a Day-N claim wearing different clothes.
+#
+# This is the parser #1922 deliberately deferred: that issue moved NUMERIC
+# phase-bound claims into deterministic code and left word-numbers with the LLM
+# precisely because "seven" is not arithmetic until something parses it. This
+# parses it, so the class comes back to the deterministic side.
+_WORD_NUMBERS = {
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+    "eleven": 11,
+    "twelve": 12,
+    "thirteen": 13,
+    "fourteen": 14,
+    "fifteen": 15,
+    "sixteen": 16,
+    "seventeen": 17,
+    "eighteen": 18,
+    "nineteen": 19,
+    "twenty": 20,
+    "thirty": 30,
+    "forty": 40,
+    "fifty": 50,
+    "sixty": 60,
+    "ninety": 90,
+    "a": 1,
+    "an": 1,
+}
+
+# "N days of the experiment" / "three weeks into this experiment" / "seven days in".
+# Requires the experiment framing — a bare "six days" may be about anything
+# (a training block, a sleep streak), and flagging those would make the gate noise.
+_SPAN_RE = re.compile(
+    r"\b(?P<n>\d{1,4}|" + "|".join(sorted(_WORD_NUMBERS, key=len, reverse=True)) + r")\s+"
+    r"(?P<unit>days?|weeks?|months?)\s+"
+    r"(?:of|into|in\b(?!\s+a\s+row))\s+"
+    r"(?:this\s+|the\s+|an\s+|my\s+|his\s+|her\s+|our\s+)?"
+    r"(?:current\s+|new\s+|fresh\s+)?"
+    r"(?:experiment|cycle|season|run|protocol)\b",
+    re.IGNORECASE,
+)
+_SPAN_UNIT_DAYS = {"day": 1, "days": 1, "week": 7, "weeks": 7, "month": 30, "months": 30}
+
+
+def _span_to_days(n_token: str, unit_token: str):
+    """(count, unit) -> days, or None when the count is not a number we parse."""
+    tok = (n_token or "").strip().lower()
+    n = _WORD_NUMBERS.get(tok)
+    if n is None:
+        try:
+            n = int(tok)
+        except (TypeError, ValueError):
+            return None
+    return n * _SPAN_UNIT_DAYS.get((unit_token or "").strip().lower(), 1)
+
+
+def experiment_span_findings(text: str, *, generation_date_iso: str, start_date_iso: str) -> list:
+    """Deterministic check on claimed experiment AGE, digits or words (#1897).
+
+    Flags "seven days of an experiment" / "three weeks into this cycle" when the
+    span exceeds the days actually elapsed. Pre-start (generation before genesis)
+    flags ANY positive span — zero days of the current experiment exist yet.
+
+    A span SHORTER than the elapsed days is correct and never flagged: trailing
+    windows clamp to genesis (ADR-077 "clamped, not hidden"), which is the same
+    lower-bound rule #1917 had to teach the LLM rubric after it flagged 5-on-Day-6
+    three times. Only a LONGER span is impossible.
+
+    Findings use the shared {"type", "detail"} shape (type "experiment_span") so
+    they compose with grounding_findings() / correction_prompt().
+    """
+    phase, expected_day = _phase_for(generation_date_iso, start_date_iso)
+    if phase is None:
+        return []
+    findings = []
+    seen = set()
+    for m in _SPAN_RE.finditer(text or ""):
+        days = _span_to_days(m.group("n"), m.group("unit"))
+        if days is None:
+            continue
+        claim = m.group(0).strip()
+        if claim.lower() in seen:
+            continue
+        if phase == "pre_start":
+            seen.add(claim.lower())
+            findings.append(
+                {
+                    "type": "experiment_span",
+                    "claim": claim,
+                    "detail": (f'the narrative claims "{claim}", but the experiment has not started yet — ' f"zero days of it exist"),
+                }
+            )
+        elif days > expected_day:
+            seen.add(claim.lower())
+            findings.append(
+                {
+                    "type": "experiment_span",
+                    "claim": claim,
+                    "detail": (
+                        f'the narrative claims "{claim}" ({days} day(s)), but only {expected_day} day(s) '
+                        f"have elapsed since genesis — that history does not exist"
+                    ),
+                }
+            )
+    return findings
+
+
 def baseline_freshness_findings(
     text: str,
     *,
@@ -958,6 +1077,8 @@ def grounding_findings(
                 weight_tolerance_lbs=weight_tolerance_lbs,
             )
         )
+    if generation_date_iso and start_date_iso:
+        findings.extend(experiment_span_findings(text, generation_date_iso=generation_date_iso, start_date_iso=start_date_iso))
     if available_logs is not None:
         findings.extend(ungrounded_behavioral_findings(text, available_logs=available_logs))
     if evaluated_predictions is not None:
@@ -994,6 +1115,8 @@ def correction_prompt(findings: list) -> str:
                 f"- Remove the self-graded verdict \"{f.get('claim')}\": no prediction has been evaluated yet, "
                 f"so you cannot report a hit or a miss. State the prediction as still open, or say nothing about it."
             )
+        elif f.get("type") == "experiment_span":
+            lines.append(f"- Remove or correct \"{f.get('claim')}\": {f.get('detail')}. State the real elapsed time or drop the span.")
         elif f.get("type") == "ungrounded_behavioral":
             lines.append(
                 f"{i}. {f['detail']}. Remove the claim or hedge it (\"if you kept your window today\"), or cite the "
