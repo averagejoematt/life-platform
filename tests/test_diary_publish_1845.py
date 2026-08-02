@@ -482,7 +482,8 @@ class TestPlatformNorms:
                 imported.update(a.name.split(".")[0] for a in node.names)
             elif isinstance(node, ast.ImportFrom) and node.module:
                 imported.add(node.module.split(".")[0])
-        assert imported == {"re", "__future__"}, imported
+        # urllib.parse is parse-only (no I/O) — the #1902 hostname check for post URLs.
+        assert imported == {"re", "__future__", "urllib"}, imported
         for forbidden in ("bedrock_client", "invoke_model", "ai_calls", "boto3", "budget_guard"):
             assert forbidden not in imported
 

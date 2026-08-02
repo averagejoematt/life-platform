@@ -91,9 +91,7 @@ def exchange_oauth2(oauth1: dict, consumer: dict) -> dict:
     resp.raise_for_status()
     token = resp.json()
     token["expires_at"] = int(time.time() + token["expires_in"])
-    token["refresh_token_expires_at"] = int(
-        time.time() + token["refresh_token_expires_in"]
-    )
+    token["refresh_token_expires_at"] = int(time.time() + token["refresh_token_expires_in"])
     return token
 
 
@@ -230,14 +228,14 @@ def main():
     # Step 3: Exchange ticket → OAuth1
     print("[3/6] Exchanging SSO ticket for OAuth1 token...")
     oauth1 = get_oauth1_token(ticket, consumer)
-    print(f"  OAuth1 token: {oauth1['oauth_token'][:20]}...")
+    print(f"  OAuth1 token: received ({len(oauth1['oauth_token'])} chars)")
 
     # Step 4: Exchange OAuth1 → OAuth2
     print("[4/6] Exchanging OAuth1 for OAuth2 token...")
     oauth2 = exchange_oauth2(oauth1, consumer)
-    print(f"  Access token: {oauth2['access_token'][:20]}...")
-    print(f"  Expires in: {oauth2['expires_in']}s")
-    print(f"  Refresh expires in: {oauth2['refresh_token_expires_in']}s")
+    print(f"  Access token: received ({len(oauth2['access_token'])} chars)")
+    print(f"  Expires in: {int(oauth2['expires_in'])}s")
+    print(f"  Refresh expires in: {int(oauth2['refresh_token_expires_in'])}s")
 
     # Step 5: Verify
     print("[5/6] Verifying tokens...")
@@ -263,7 +261,7 @@ def main():
     print("  Test with:")
     print("    aws lambda invoke \\")
     print("      --function-name garmin-data-ingestion \\")
-    print("      --payload '{\"date\": \"2026-03-30\"}' \\")
+    print('      --payload \'{"date": "2026-03-30"}\' \\')
     print("      --cli-binary-format raw-in-base64-out \\")
     print("      --region us-west-2 /tmp/garmin_test.json && cat /tmp/garmin_test.json")
     print("=" * 55)

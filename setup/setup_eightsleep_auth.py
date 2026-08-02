@@ -106,7 +106,7 @@ def main():
 
     print("✓ Login successful")
     print(f"  user_id  : {user_id or '(will be resolved on first run)'}")
-    print(f"  token    : {access_token[:20]}...")
+    print(f"  token    : received ({len(access_token)} chars)")
     print(f"  bed_side : {bed_side}")
     print(f"  timezone : {tz}")
     print()

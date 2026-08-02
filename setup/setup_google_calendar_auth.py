@@ -73,11 +73,11 @@ def main():
 
     # Build the secret payload
     secret_data = {
-        "client_id":     creds.client_id,
+        "client_id": creds.client_id,
         "client_secret": creds.client_secret,
         "refresh_token": creds.refresh_token,
-        "token_uri":     creds.token_uri,
-        "scopes":        list(creds.scopes or SCOPES),
+        "token_uri": creds.token_uri,
+        "scopes": list(creds.scopes or SCOPES),
     }
 
     print("\nAuthorization successful!")
@@ -100,8 +100,9 @@ def main():
         print(f"✅ Updated existing secret: {SECRET_NAME}")
 
     print("\nSetup complete. The google-calendar-ingestion Lambda will now run daily.")
+    scopes = secret_data["scopes"]
     print(f"Secret: {SECRET_NAME}")
-    print(f"Scopes: {secret_data['scopes']}")
+    print(f"Scopes: {scopes}")
 
 
 if __name__ == "__main__":

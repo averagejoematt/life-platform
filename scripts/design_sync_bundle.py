@@ -719,7 +719,7 @@ def _sanitize_reference_page(html: str, *, strip_scripts: list[str], strip_meta_
       the RSS <link> are only on some doors), so this is a best-effort strip, not an
       assert-must-find-one; the page-specific rewrites below (css links) stay hard asserts.
     """
-    script_block_re = re.compile(r"<script\b.*?</script>", re.S)
+    script_block_re = re.compile(r"<script\b.*?</script>", re.S | re.I)
     for needle in strip_scripts:
         blocks = script_block_re.findall(html)
         for b in blocks:

@@ -1005,6 +1005,36 @@ from sentinel_quota import (  # noqa: E402,F401
     check_github_quota,
 )
 
+# ── 9. CodeQL open-alert regrowth (#1902) ────────────────────────────────────
+#
+# The 2026-08 triage (#1902) drove the open-alert list on main to zero: every
+# alert was either fixed or dismissed with a written reason. From then on, an
+# OPEN alert is by definition un-triaged — so the steady-state budget is 0 and
+# any count above it is drift (a genuinely new finding, or a fixed one that
+# regressed). NB a just-merged fix stays open until CodeQL's next analysis of
+# main; that window self-clears within one push cycle and is not worth a grace
+# knob.
+CODEQL_ALERT_BUDGET = 0
+
+
+def check_codeql_alerts():
+    data = _gh_api_json("repos/{owner}/{repo}/code-scanning/alerts?state=open&per_page=100")
+    if not isinstance(data, list):
+        return {"status": "error", "detail": "code-scanning API unavailable (gh api failed — auth/scope?)"}
+    n = len(data)
+    sample = []
+    for a in data[:10]:
+        loc = (a.get("most_recent_instance") or {}).get("location") or {}
+        sample.append(f"{(a.get('rule') or {}).get('id')} @ {loc.get('path')}:{loc.get('start_line')}")
+    result = {"status": "clean" if n <= CODEQL_ALERT_BUDGET else "drift", "open_count": n, "sample": sample}
+    if result["status"] == "drift":
+        result["detail"] = (
+            f"{n} open CodeQL alert(s) on main (budget {CODEQL_ALERT_BUDGET}) — triage each to fixed or "
+            "dismissed-with-reason (#1902); a fix merged since the last CodeQL analysis of main clears on its own"
+        )
+    return result
+
+
 # ── Assemble + persist ───────────────────────────────────────────────────────
 
 
@@ -1020,6 +1050,7 @@ def run_sweep():
         "github_config": check_github_config(),
         "github_push_runs": check_github_push_runs(),
         "github_quota": check_github_quota(),
+        "codeql_alerts": check_codeql_alerts(),
     }
     statuses = [c.get("status") for c in checks.values()]
     if "drift" in statuses:
@@ -1057,6 +1088,7 @@ def _summary(status, checks):
         ("site_sha_ancestry", "live site SHA not on main"),
         ("github_config", "GitHub config diverges from documented posture"),
         ("github_push_runs", "main-push workflow runs not queuing"),
+        ("codeql_alerts", "un-triaged open CodeQL alert(s)"),
     ):
         c = checks.get(key, {})
         if c.get("status") == "drift":
