@@ -288,6 +288,41 @@ regenerated page would be merged-but-not-deployed); and `plan` diffs from
 `${GITHUB_SHA}~1` to the reconciled HEAD, so the merged PR's own changes stay in the
 deploy plan even with a reconcile commit stacked on top.
 
+### 4d. Stranded deploy states — the approval gate + the R8-ST6 Plan-red (#1901)
+
+Two pipeline states leave main's deploy path wedged while nothing looks obviously
+broken. `scripts/check_main_green.py` (the /wrap gate) classifies both explicitly —
+never re-diagnose them as ordinary red/green:
+
+1. **Stranded production approval.** A run that reaches the `production` approval gate
+   and is never actioned sits at `status=waiting` indefinitely; because `ci-cd.yml`
+   sets `concurrency: cancel-in-progress: false` (correct — a mid-flight deploy must
+   complete), **every later run queues behind it** as `pending` with **0 jobs**. That
+   presentation is byte-identical at a glance to the phantom-concurrency class
+   (`reference_push_ci_silent_death`) — which has the OPPOSITE fix. **The
+   distinguishing tell: phantom = 0 jobs AND no other run in the group; stranded
+   gate = 0-job runs queued BEHIND an older run in `waiting`.** Check
+   `gh run list --branch main` for a `waiting` run FIRST. Recovery: action the gate —
+   `bash deploy/approve_deployment.sh` (approve or reject, on Matthew's say-so). Do
+   NOT cancel the waiting run: a cancelled run strands its deploy → recover with a
+   `deploy_all=true` workflow_dispatch of `ci-cd.yml`. (Observed 2026-07-28: run
+   30324990970 held the gate ~15h; the #1653 merge queued behind it and never
+   started; the mis-diagnosis as phantom cost a wrongly-cancelled run.)
+
+2. **Stranded Plan — the R8-ST6 shape.** The run FAILS, but the only red job is
+   `Plan deployments` (the IAM-review gate) with `Deploy` **skipped** and lint/tests
+   green. This is by design after an IAM-touching merge: nothing deploys until the
+   pending CDK change goes out from main (`bash deploy/cdk_deploy.sh <Stack>` — the
+   classifier clears it only on Matthew's in-the-moment ask). Until then **every**
+   subsequent merge's deploy strands too; after the CDK deploy, recover the stranded
+   fleet half with a `deploy_all=true` dispatch. A run where any OTHER job also
+   failed (e.g. Unit Tests) is an ordinary red — it owes a code fix; the CDK deploy
+   alone will not clear it.
+
+Both states are surfaced at wrap time by `check_main_green.py` (a `waiting` run older
+than ~2h is reported loudly with its run id + sha; younger ones ride along as a
+notice). Fixture-pinned in `tests/test_stranded_deploy_1901.py`.
+
 ## 5. The CDK asset-staging trap — a 200 invoke is not proof of a good deploy
 
 A `cdk deploy` can publish a `Code.from_asset` Lambda zip that is **missing every
