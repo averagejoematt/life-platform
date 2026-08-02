@@ -54,7 +54,31 @@ table = dynamodb.Table(TABLE_NAME)
 # COST-OPT-1: cache secrets in warm containers (15-min TTL).
 _secret_cache: dict = {}
 _content_filter_cache = None
+_content_filter_cache_at = None
 _supp_metadata_cache = None
+_supp_metadata_cache_at = None
+
+# #2019 — bucket-root config/ objects were cached for the WHOLE life of a warm
+# container. That was the second of three layers that let a merged correction
+# stay dark: even after the object reached S3, live containers kept serving the
+# bytes read on their first request (measured 2026-08-02: ~13h of withdrawn
+# citations on /api/supplements). A short TTL means a synced config object
+# starts serving on its own, with no Lambda recycle required.
+CONFIG_CACHE_TTL_SECONDS = int(os.environ.get("CONFIG_CACHE_TTL_SECONDS", "300"))
+
+
+def config_cache_valid(loaded_at):
+    """True when a cached bucket-root config/ read may still be reused.
+
+    `loaded_at is None` means PINNED: the cache was populated by something
+    other than the S3 load path — tests inject these module globals directly —
+    so it never expires. Only a real S3 read stamps a load time and takes a TTL.
+    """
+    if loaded_at is None:
+        return True
+    return (time.monotonic() - loaded_at) < CONFIG_CACHE_TTL_SECONDS
+
+
 _status_cache: dict = {}
 _status_cache_ts = 0
 _cost_cache: dict = {}
@@ -363,8 +387,8 @@ def _get_profile() -> dict:
 def _load_supp_metadata() -> dict:
     """Load supplement registry from the canonical S3 config/ prefix (root, not the
     site/config mirror — the latter is purged by experiment resets). Cached."""
-    global _supp_metadata_cache
-    if _supp_metadata_cache is not None:
+    global _supp_metadata_cache, _supp_metadata_cache_at
+    if _supp_metadata_cache is not None and config_cache_valid(_supp_metadata_cache_at):
         return _supp_metadata_cache
     try:
         S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
@@ -372,24 +396,27 @@ def _load_supp_metadata() -> dict:
         resp = s3.get_object(Bucket=S3_BUCKET, Key="config/supplement_registry.json")
         data = json.loads(resp["Body"].read())
         _supp_metadata_cache = data
+        _supp_metadata_cache_at = time.monotonic()
         total = sum(len(g.get("items", [])) for g in data.get("groups", {}).values())
         logger.info(f"[supp_registry] Loaded: {total} supplements in {len(data.get('groups', {}))} groups")
     except Exception as e:
         logger.warning(f"[supp_registry] Failed to load from S3: {e}")
         _supp_metadata_cache = {}
+        _supp_metadata_cache_at = time.monotonic()
     return _supp_metadata_cache
 
 
 def _load_content_filter():
     """Load blocked terms from S3 config/content_filter.json. Cached after first call."""
-    global _content_filter_cache
-    if _content_filter_cache is not None:
+    global _content_filter_cache, _content_filter_cache_at
+    if _content_filter_cache is not None and config_cache_valid(_content_filter_cache_at):
         return _content_filter_cache
     try:
         S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
         s3 = boto3.client("s3", region_name=S3_REGION)
         resp = s3.get_object(Bucket=S3_BUCKET, Key="config/content_filter.json")
         _content_filter_cache = json.loads(resp["Body"].read())
+        _content_filter_cache_at = time.monotonic()
         logger.info(f"[content_filter] Loaded: {len(_content_filter_cache.get('blocked_vice_keywords', []))} blocked terms")
     except Exception as e:
         logger.warning(f"[content_filter] Failed to load from S3: {e}")
@@ -397,6 +424,9 @@ def _load_content_filter():
             "blocked_vices": ["No porn", "No marijuana"],
             "blocked_vice_keywords": ["porn", "pornography", "marijuana", "cannabis", "weed", "thc", "edible", "edibles"],
         }
+        # Stamped so the hard-coded fallback is retried against S3 after the TTL
+        # instead of being pinned for the container's whole life (#2019).
+        _content_filter_cache_at = time.monotonic()
         # BUG-05: emit EMF metric when fallback is active. We use sys.stdout.write
         # rather than print() so this file passes test_no_print_in_new_lambdas —
         # CloudWatch EMF parser requires a pure-JSON line with no logger prefix,

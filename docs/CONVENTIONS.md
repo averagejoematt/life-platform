@@ -409,6 +409,26 @@ Source: #382 (epic #342, "live infra matches code").
 - **`git stash` is ONE stack shared across all worktrees** — parallel agents have raced
   stash/pop and swapped each other's trees; never stash in concurrent sessions
   (recovery: the dropped-stash SHA).
+- **There are THREE S3 deploy prefixes, not two (#2019)** — `site/` (sync_site_to_s3.sh)
+  and `generated/` (Lambda-written, ADR-046) were known; **bucket-root `config/`** is the
+  third and had NO deploy path until #2019. A merged change to a repo `config/` twin
+  reached the CloudFront-served `site/config/` mirror but never the object the site-api
+  Lambda actually reads, and three layers hid it: no sync step, a no-TTL warm-container
+  cache, and a 3600s CloudFront TTL on `/api/*`. Measured 2026-08-02: `/api/supplements`
+  served withdrawn citations for ~13h after the withdrawal merged, every gate green.
+  The path is now `deploy/config_twin_sync.py`, run by `site-deploy.yml` on merge:
+  - the twin set is **derived** (`deploy/config_twin_registry.py`), never enumerated — a
+    new repo `config/` file joins the deploy path on its own;
+  - it uploads **explicit files only** — never `aws s3 sync`, never `--delete`, never a
+    prefix operation. Root `config/` also holds Lambda-written runtime state
+    (`config/hevy_template_cache.json`), out-of-band objects (`config/requirements/*`)
+    and an auth session pickle that a prefix sync would clobber or strip;
+  - runtime-written keys are excluded by an AST scan, and a `config/` write whose key
+    can't be resolved statically **reds a test** rather than being silently guessed at;
+  - `.github/workflows/config-drift.yml` runs the read-only check daily, so
+    "merged but not serving" alarms instead of printing green.
+  Read-only check any time: `python3 deploy/config_twin_sync.py` (dry-run is the
+  default; `--apply` is explicit).
 
 ---
 
@@ -538,6 +558,7 @@ read that section for the incident narrative and the exact mechanics.
 | The coverage floor silently lags measured coverage | Coverage-gap drift warning (#1206) | `scripts/coverage_gap_warn.py` |
 | The Unit Tests job's own wall-clock silently climbs (157s→294s, no reminder) | Suite-duration budget warning (#1349) | `scripts/coverage_gap_warn.py --duration-seconds` |
 | A visible page/component regresses (layout break, blank data-bind, JS error) | Visual-QA (Playwright + Bedrock vision) | §4b above |
+| A merged repo `config/` change never reaches the S3 object the API reads ("merged but not serving") | Config-twin sync on merge + daily drift check (#2019) | `deploy/config_twin_sync.py`; `.github/workflows/config-drift.yml`; §7 above |
 | A generator-owned artifact (doc-sync literals, ADR index, chrome block) goes stale across a merge queue | Merge-day reconcile job | §4c above |
 | A doc claims a stale count/version/cadence in any phrasing | `check_doc_facts.py` | §8 above |
 | A page references a retired concept | `check_doc_tombstones.py` + `docs/_lint/tombstones.txt` | §8 above |

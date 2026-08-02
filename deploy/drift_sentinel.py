@@ -611,9 +611,11 @@ PUSH_TRIGGER_GLOBS = (
     "scripts/check_doc_*.py",
     "scripts/generate_adr_index.py",
     "scripts/generate_mcp_tool_catalog.py",
-    # site-deploy.yml (+ v4-gate.yml shares site/**)
+    # site-deploy.yml (+ v4-gate.yml shares site/**; config/** shared with ci-cd.yml)
     "site/**",
     ".github/workflows/site-deploy.yml",
+    "deploy/config_twin_sync.py",  # #2019 — bucket-root config/ deploy path
+    "deploy/config_twin_registry.py",
     # v4-gate.yml
     "scripts/v4_*.py",
     "tests/js/**",
