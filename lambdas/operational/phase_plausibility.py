@@ -1,0 +1,163 @@
+"""phase_plausibility.py — deterministic phase-plausibility over published API payloads (#1922).
+
+reader_truth asked Haiku to judge whether published numbers CAN be true at the
+current experiment phase. Most of that question is arithmetic, and ADR-105 says
+the arithmetic comes first: deterministic computation before any LLM verdict.
+On 2026-08-01 the model mis-graded `weight_delta_window_days: 5` at Day 6 six
+times in a row with six different rationales, while the two findings it got
+right (#1917) were exactly the ones a comparison catches trivially. This module
+is that comparison, run identically every time, at zero token cost — so unlike
+the LLM rubric it is NEVER budget-paused (the 26-day dark window of #1920/#1927
+cannot happen to arithmetic).
+
+THE OVERLAP, STATED (acceptance item 4 of #1922): this module now owns the
+NUMERIC phase-bound claims — window-named fields (via the #1917 registry),
+explicit span declarations (*_window_days / actual_days), numeric day fields,
+and bare "Day N" claims inside strict payloads' strings. The LLM rubric's
+`impossible_number` category is retired (see reader_truth_qa.CATEGORIES);
+the LLM keeps what is genuinely semantic: duplicated_narrative,
+audience_violation, and prose-level temporal_contradiction in human sentences
+(word-numbers — "seven days of an experiment", #1897 — remain the LLM's, since
+"seven" is not arithmetic until something parses it).
+
+Findings are emitted in reader_truth's canonical shape
+({"page", "category", "severity", "note"}) so both passes route through one
+reporting path in qa_smoke's Reader Truth check (partition content_truth,
+ADR-147 — a finding here never reverts a deploy).
+"""
+
+import json
+import re
+
+from web.window_registry import INTENSIVE, REGISTRY, window_days
+
+# Keys that DECLARE an in-cycle span in days. Live payloads clamp trailing
+# windows to genesis (ADR-077 "clamped, not hidden"), so a declared span can
+# never legitimately exceed the days the cycle has actually run. (Time-travel
+# `?date=` payloads keep full reach by contract — but qa-smoke sweeps only the
+# live surfaces, and this module is only pointed at live payloads.)
+_SPAN_DECL_RE = re.compile(r"(?:^|_)(?:window_days|actual_days)$")
+
+# Numeric keys that claim the current experiment day outright.
+_DAY_CLAIM_KEYS = {"day_n", "experiment_day", "cycle_day"}
+
+# "Day N" claims inside string values (e.g. window_disclosure prose). Only
+# applied to payloads swept with strict=True: on a strict surface (vitals) no
+# prior-cycle narration exists, so a Day number beyond today's is impossible
+# arithmetic, not a judgment call. Narrative surfaces (coaches) may legitimately
+# narrate a labeled prior cycle's Day 45 — prose day-claims there stay with the
+# LLM's temporal_contradiction category.
+_DAY_PROSE_RE = re.compile(r"\bDay\s+(\d+)\b")
+
+
+def _walk(obj, path=""):
+    """Yield (json_path, key, value) for every dict entry, depth-first."""
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            p = f"{path}.{k}" if path else str(k)
+            yield p, k, v
+            yield from _walk(v, p)
+    elif isinstance(obj, list):
+        for i, v in enumerate(obj):
+            yield from _walk(v, f"{path}[{i}]")
+
+
+def _is_number(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def check_payload(page, payload, day_n, strict=False):
+    """Deterministic phase-plausibility findings for one live JSON payload.
+
+    Args:
+        page: the surface path, used verbatim in findings (reader_truth shape).
+        payload: the parsed JSON object.
+        day_n: 1-indexed current experiment day (reader_truth_qa.phase_context).
+        strict: also apply the bare "Day N" prose rule to string values.
+
+    Returns a list of {"page", "category", "severity", "note"} findings.
+    Pre-start (day_n == 0) returns [] — the countdown state has its own honest
+    copy and the LLM rubric already knows the pre-start phase line.
+    """
+    if not day_n or day_n < 1:
+        return []
+    findings = []
+    for path, key, value in _walk(payload):
+        # R1 — a gated INTENSIVE window-named field carrying a value before its
+        # window can exist. The registry (one source of truth, #1917) decides
+        # which fields make full-window claims; gap-declared debt (#1919) is
+        # deliberately exempt here because the registry already tracks it.
+        if _is_number(value) and key in REGISTRY:
+            kind, gap = REGISTRY[key]
+            n = window_days(key)
+            if kind == INTENSIVE and gap is None and n is not None and n > day_n:
+                findings.append(
+                    {
+                        "page": page,
+                        "category": "impossible_number",
+                        "severity": "high",
+                        "note": f"{path} = {value}: a full {n}-day intensive claim cannot exist on Day {day_n} "
+                        f"(#1917 gates this field to null until its window is genuinely full)",
+                    }
+                )
+            continue
+        # R2 — an explicit span declaration longer than the cycle has run.
+        if _is_number(value) and _SPAN_DECL_RE.search(key):
+            if value > day_n:
+                findings.append(
+                    {
+                        "page": page,
+                        "category": "impossible_number",
+                        "severity": "high",
+                        "note": f"{path} = {value}: a live in-cycle window cannot span more than the {day_n} day(s) elapsed",
+                    }
+                )
+            continue
+        # R3 — a numeric field claiming a later experiment day than today's.
+        if _is_number(value) and key in _DAY_CLAIM_KEYS:
+            if value > day_n:
+                findings.append(
+                    {
+                        "page": page,
+                        "category": "temporal_contradiction",
+                        "severity": "high",
+                        "note": f"{path} = {value}: today is Day {day_n} — the payload claims a day that has not happened",
+                    }
+                )
+            continue
+        # R4 — bare "Day N" in strict payloads' prose (e.g. window_disclosure).
+        if strict and isinstance(value, str):
+            for m in _DAY_PROSE_RE.finditer(value):
+                n = int(m.group(1))
+                if n > day_n:
+                    findings.append(
+                        {
+                            "page": page,
+                            "category": "temporal_contradiction",
+                            "severity": "high",
+                            "note": f'{path} says "Day {n}" but today is Day {day_n} — a frame/staleness leak',
+                        }
+                    )
+    return findings
+
+
+def sweep_payloads(payloads, today_iso=None):
+    """Run check_payload over [{"path", "body", "strict"?}, ...] raw JSON texts.
+
+    Returns (findings, warnings). A body that does not parse as JSON is a
+    warning, never a crash (fail-soft, same posture as the LLM pass) — but it
+    is REPORTED, because a payload this module could not read is a page it did
+    not check (#1931's lesson).
+    """
+    from operational.reader_truth_qa import phase_context
+
+    day_n = phase_context(today_iso)["day_n"]
+    findings, warnings = [], []
+    for p in payloads:
+        try:
+            payload = json.loads(p["body"])
+        except (ValueError, KeyError) as e:
+            warnings.append(f"{p.get('path', '?')} — not checkable ({str(e)[:80]})")
+            continue
+        findings.extend(check_payload(p.get("path", "?"), payload, day_n, strict=bool(p.get("strict"))))
+    return findings, warnings
