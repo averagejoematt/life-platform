@@ -64,6 +64,7 @@ from web.site_api_autonomic import (
 # P1.1 Phase B extension (2026-05-27): coach + misc inline blocks extracted.
 from web.site_api_coach import (
     _integrator_digest,
+    _regeneration_paused,
     handle_ai_analysis,
     handle_calibration,
     handle_coach,
@@ -959,6 +960,14 @@ def lambda_handler(event, context):
                     "open_actions": _cd_actions,
                     "coaches": _cd_coaches,
                     "predictions": _cd_predictions,
+                    # #1971 (completes #802 on the door's FIRST screen): the same
+                    # budget-guard pause signal /api/coach_analysis already carries.
+                    # The coach OUTPUT# reads above are written by the coach_narrative
+                    # feature — when its regeneration is tier-paused (ADR-063/125),
+                    # every position_summary here is a HELD read, and the front-end
+                    # must disclose that instead of presenting "as of <date>" as
+                    # merely dated. Fail-open to False inside _regeneration_paused.
+                    "regeneration_paused": _regeneration_paused("coach_narrative"),
                 },
                 cache_seconds=300,
             )

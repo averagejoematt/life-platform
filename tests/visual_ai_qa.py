@@ -69,7 +69,10 @@ layout breakage or content overflowing its container; unreadable contrast.
 
 DO NOT flag (these are CORRECT): honest sparse-data states such as "N readings so far", \
 "awaiting data", or an empty-but-shaped section; normal data variation; intentionally minimal \
-design; or a chart simply having few points.
+design; or a chart simply having few points. An "as of <date> — refresh paused (budget guard)" \
+kicker under a coach's read is CORRECT and REQUIRED honesty (#802/#1971): when the budget \
+guard holds AI regeneration, a held board read must carry that paused note — it is a \
+deliberate disclosure, never stale-content breakage.
 
 SEPARATELY (advisory lens, #1466 — NOT a rendering issue, never put it in "issues"): note \
 whether the page has drifted toward generic AI-template gloss — purple-blue gradients, \

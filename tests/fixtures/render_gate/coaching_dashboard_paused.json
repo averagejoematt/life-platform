@@ -1,0 +1,52 @@
+{
+  "_comment": "#1971 — /api/coaching-dashboard under a tier >= 2 budget pause (regeneration_paused: true). Shape mirrors the inline handler in lambdas/web/site_api_lambda.py; values are realistic-but-static and in-range for the accuracy rubric. The paused flag is the point: the gate asserts the roster cards render the 'refresh paused (budget guard)' kicker (.rd-paused).",
+  "weekly_priority": {
+    "text": "Protect the sleep window this week — the deficit only compounds when the nights hold.",
+    "coach_name": "Dr. Kai Nakamura",
+    "generated_at": "2026-07-28T17:05:00Z"
+  },
+  "open_actions": [],
+  "coaches": [
+    {
+      "coach_id": "sleep",
+      "name": "Dr. Lisa Park",
+      "initials": "LP",
+      "title": "Sleep & Circadian Rhythm Specialist",
+      "color": "#818cf8",
+      "observatory_link": "/sleep/",
+      "position_summary": "Three consecutive nights over seven hours — the circadian anchor is holding through the first week.",
+      "emotional_investment": "invested",
+      "prediction_count": 2,
+      "data_phase": "established",
+      "analysis_generated_at": "2026-07-30T14:05:00Z"
+    },
+    {
+      "coach_id": "training",
+      "name": "Dr. Sarah Chen",
+      "initials": "SC",
+      "title": "Exercise Physiology & Strength",
+      "color": "#3db88a",
+      "observatory_link": "/training/",
+      "position_summary": "Volume is ramping conservatively; keep the pulls in reserve until the recovery trend confirms.",
+      "emotional_investment": "curious",
+      "prediction_count": 1,
+      "data_phase": "established",
+      "analysis_generated_at": "2026-07-29T14:05:00Z"
+    },
+    {
+      "coach_id": "nutrition",
+      "name": "Dr. Marcus Webb",
+      "initials": "MW",
+      "title": "Evidence-Based Nutrition",
+      "color": "#10b981",
+      "observatory_link": "/nutrition/",
+      "position_summary": "Protein has cleared the floor every logged day so far; the deficit is coming from the carbohydrate side, which is the right place.",
+      "emotional_investment": "neutral",
+      "prediction_count": 0,
+      "data_phase": "established",
+      "analysis_generated_at": "2026-07-30T14:05:00Z"
+    }
+  ],
+  "predictions": [],
+  "regeneration_paused": true
+}

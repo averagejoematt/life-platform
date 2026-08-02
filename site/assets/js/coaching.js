@@ -37,6 +37,7 @@ import { portrait, markStanceChange } from "/assets/js/portraits.js"; // §8.7 �
 import { momentsIndex, shareMount } from "/assets/js/share.js"; // #404 moment permalinks
 import { wireTabList, markActiveTab } from "/assets/js/tabs.js"; // #579 — real ARIA tabs
 import { BRIEF_LINE_KICKER } from "/assets/js/daily_line.js"; // #1995 — the one honest label for the morning brief's daily line
+import { coachAsOf, regenerationPaused } from "/assets/js/coach_asof.js"; // #802/#1971 — the honest "as of / refresh paused" disclosure
 
 const SECTIONS = [
   { key: "read", label: "The Read", kicker: "what your board is saying — now", kind: "read" },
@@ -85,20 +86,8 @@ async function secFetch(s) {
 }
 const domainOf = (pid) => String(pid || "").replace(/_coach$/, "");
 
-// #802 (R22-CONTENT-03): honest "as of / refresh paused" disclosure for a
-// coach's analysis body. budget_guard (ADR-063/125) can pause narrative
-// regeneration at tier >= 2 — when it does, a served read can be a HELD read
-// from before the pause, not today's, and the site must say so rather than
-// present it tense-free. Dates render in Pacific (site convention).
-const PT_TZ = "America/Los_Angeles";
-function coachAsOf(generatedAt, paused) {
-  const d = generatedAt ? new Date(generatedAt) : null;
-  const valid = d && !isNaN(d.getTime());
-  const dateStr = valid ? d.toLocaleDateString("en-US", { timeZone: PT_TZ, month: "short", day: "numeric" }) : "";
-  if (paused) return dateStr ? `as of ${dateStr} — refresh paused (budget guard)` : "refresh paused (budget guard)";
-  if (valid && (Date.now() - d.getTime()) / 36e5 > 48) return `as of ${dateStr} — next refresh pending`;
-  return dateStr ? `as of ${dateStr}` : "";
-}
+// #802 (R22-CONTENT-03): the honest "as of / refresh paused" disclosure now
+// lives in coach_asof.js (imported above) so it is unit-tested — see #1971.
 
 function entriesFor(s, data) {
   if (s.kind === "read") return READ_SCOPES.slice();
@@ -494,6 +483,13 @@ async function renderReadToday(read) {
   h += docketHTML(docket); // #1386 — renders "" until the first docket opens
   // The stacked all-coach digest — each coach's LIVE read (position_summary), domain-labeled, deep-linking into By Coach.
   const coaches = (d.coaches || []).filter((c) => String(c.position_summary || "").trim());
+  // #1971 (completes #802 on the door's first screen): the dashboard now carries
+  // the same budget-guard pause signal /api/coach_analysis does — under a tier >= 2
+  // pause every read below is HELD, and each card's kicker must say so instead of
+  // presenting "as of <date>" as merely dated. regenerationPaused is strict
+  // (`=== true`): an ABSENT field (an API deploy racing the site deploy) is
+  // unknown and renders exactly what rendered before the field existed.
+  const regenPaused = regenerationPaused(d);
   if (coaches.length) {
     h += `<section class="read-digest"><p class="dx-kicker label">each coach's read · click to go deeper</p><ul class="rd-list">`;
     for (const c of coaches) {
@@ -501,12 +497,12 @@ async function renderReadToday(read) {
       // read's own as-of date so a stale Day-1 vitals quote can't read as current.
       // Graceful when the field is absent (an API deploy racing the site deploy) —
       // coachAsOf returns "" and no kicker renders, never a crash.
-      const asOf = coachAsOf(c.analysis_generated_at, false);
+      const asOf = coachAsOf(c.analysis_generated_at, regenPaused);
       h += `<li class="rd-card" data-coach="${esc(c.coach_id + "_coach")}" style="--coach:${esc(c.color || "")}"><button type="button" class="rd-btn">` +
         `<span class="sigil-md">${sigil(c, { title: "" })}</span><span class="rd-body">` +
         `<span class="rd-top"><span class="rd-dom label">${esc(String(c.title || c.coach_id))}</span><span class="rd-name">${esc(c.name || "")}</span></span>` +
         `<span class="rd-say">${esc(c.position_summary)}</span>` +
-        (asOf ? `<span class="rd-asof label">${esc(asOf)}</span>` : "") +
+        (asOf ? `<span class="rd-asof label${regenPaused ? " rd-paused" : ""}">${esc(asOf)}</span>` : "") +
         `</span></button></li>`;
     }
     h += `</ul></section>`;
@@ -686,7 +682,7 @@ async function renderByCoach(read, id) {
     // staggered days, so any two can quote different "current" vitals) AND
     // disclose when the budget guard has paused regeneration — a served read
     // can then be a HELD read from before the pause, not today's (#802).
-    const asOf = coachAsOf(analysis.generated_at, !!analysis.regeneration_paused);
+    const asOf = coachAsOf(analysis.generated_at, regenerationPaused(analysis));
     h += `<section class="bc-read"><p class="dx-kicker label">their read on your ${esc(dom)} · this week</p>`;
     if (analysis.analysis) h += `<p class="bc-analysis dx-prose">${esc(analysis.analysis)}</p>`;
     if (analysis.key_recommendation) h += `<p class="bc-rec"><span class="label">the one thing</span> ${esc(analysis.key_recommendation)}</p>`;
@@ -694,7 +690,7 @@ async function renderByCoach(read, id) {
     if (analysis.confidence_language) h += `<p class="bc-conf label">${esc(analysis.confidence_language)}</p>`;
     // #1397: asOf is escaped (it is plain text), so the "why is this paused" link is
     // appended OUTSIDE the esc() call — putting it inside would render as literal markup.
-    if (asOf) h += `<p class="bc-asof label">${esc(asOf)}${analysis.regeneration_paused ? ' <a href="/method/receipts/">See the live budget and the current tier →</a>' : ""}</p>`;
+    if (asOf) h += `<p class="bc-asof label">${esc(asOf)}${regenerationPaused(analysis) ? ' <a href="/method/receipts/">See the live budget and the current tier →</a>' : ""}</p>`;
     h += `</section>`;
   } else if (typeof coach.daily === "string" && coach.daily.trim()) {
     h += `<section class="bc-read"><p class="dx-kicker label">today's read</p><p class="bc-analysis dx-prose">${esc(coach.daily)}</p></section>`;
