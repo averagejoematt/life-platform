@@ -25,7 +25,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import boto3
-from experiment.phase_filter import with_phase_filter  # ADR-058
+from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1969
 
 from coach.relationship_engine import compute_relationship_update  # #536
 
@@ -347,11 +347,19 @@ def _call_haiku(system, user_message, max_tokens=3000, temperature=0.1):
 
 
 def _get_item(pk, sk):
-    """Get a single DynamoDB item. Returns None if not found or on error."""
+    """Get a single DynamoDB item. Returns None if not found, hidden, or on error.
+
+    #1969 (#946 class): get_item bypasses the query-level phase filter, so a
+    restart's tombstoned singletons (VOICE#state, RELATIONSHIP#state) would
+    seed the fresh cycle's evolved state from the wiped cycle instead of the
+    honest fresh-start defaults. singleton_visible mirrors the filter
+    (orchestrator pattern); records with no phase attribute pass through."""
     try:
         resp = table.get_item(Key={"pk": pk, "sk": sk})
         item = resp.get("Item")
-        return _decimal_to_float(item) if item else None
+        if not singleton_visible(item):
+            return None
+        return _decimal_to_float(item)
     except Exception as e:
         logger.warning("get_item(%s, %s) failed: %s", pk, sk, e)
         return None

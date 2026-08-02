@@ -41,7 +41,7 @@ import urllib.error
 import urllib.request
 
 import boto3
-from experiment.phase_filter import with_phase_filter  # ADR-058
+from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1969
 
 # Structured logger
 try:
@@ -188,11 +188,19 @@ def _call_haiku(system, user_message, max_tokens=800, temperature=0.1):
 
 
 def _get_item(pk, sk):
-    """Get a single DynamoDB item. Returns None if not found or on error."""
+    """Get a single DynamoDB item. Returns None if not found, hidden, or on error.
+
+    #1969 (#946 class): no current caller, but this is the module's canonical
+    singleton read path — guarded so a future read can't reintroduce the
+    tombstone-blind class. singleton_visible mirrors the query-level phase
+    filter (orchestrator pattern); records with no phase attribute pass
+    through unchanged."""
     try:
         resp = table.get_item(Key={"pk": pk, "sk": sk})
         item = resp.get("Item")
-        return _decimal_to_float(item) if item else None
+        if not singleton_visible(item):
+            return None
+        return _decimal_to_float(item)
     except Exception as e:
         logger.warning("get_item(%s, %s) failed: %s", pk, sk, e)
         return None

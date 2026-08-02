@@ -727,3 +727,283 @@ def test_constellation_narrates_its_empty_state():
     src = _story_js()
     assert "honest_null" in src, "the constellation empty-state branch is missing"
     assert "no lines yet" in src, "the empty constellation must explain itself, not just render blank"
+
+
+# ── #1969: the GENERATION path (lambdas/intelligence + lambdas/coach) ─────────
+# The web/ scan above closed the SERVING path. #1969 found the same class alive
+# in the generation path: ai_expert_analyzer's prior-analysis get_item was
+# tombstone-blind, so on Day 1 of cycle 11 it fed the wiped cycle-10 EXPERT#
+# text into the live prompt as _prior_analysis_summary (the probable vector for
+# #1897's "seven days of an experiment"), then the fresh put_item overwrote the
+# record and hid the evidence. Sibling copies of the same unguarded _get_item
+# helper lived in coach_ensemble_digest / coach_history_summarizer /
+# coach_state_updater / coach_observatory_renderer / coach_quality_gate.
+# Behavioural tests first, then the derived closure scan (guard the SET).
+
+
+def test_expert_prior_analysis_hidden_when_tombstoned(monkeypatch):
+    """The #1969 replay: a tombstoned EXPERT# record yields an empty prior_summary
+    — honest absence (ADR-104), not fabricated continuity with a wiped cycle."""
+    import ai_expert_analyzer_lambda as ana
+
+    wiped = {**TOMBSTONED, "analysis": "Seven days of an experiment tell a story...", "key_recommendation": "hold the deficit"}
+    monkeypatch.setattr(ana, "table", _FakeTable(item=wiped))
+    assert ana._load_prior_analysis("nutrition") == ("", "")
+
+
+def test_expert_prior_analysis_hidden_on_non_current_phase(monkeypatch):
+    import ai_expert_analyzer_lambda as ana
+
+    monkeypatch.setattr(ana, "table", _FakeTable(item={"phase": "pilot", "analysis": "old cycle text"}))
+    assert ana._load_prior_analysis("nutrition") == ("", "")
+
+
+def test_expert_prior_analysis_serves_current_cycle(monkeypatch):
+    import ai_expert_analyzer_lambda as ana
+
+    live = {"phase": "experiment", "analysis": "a" * 400, "key_recommendation": "b" * 300}
+    monkeypatch.setattr(ana, "table", _FakeTable(item=live))
+    summary, rec = ana._load_prior_analysis("nutrition")
+    assert summary == "a" * 300 and rec == "b" * 200  # truncation contract unchanged
+
+
+def test_expert_prior_analysis_empty_when_absent(monkeypatch):
+    import ai_expert_analyzer_lambda as ana
+
+    monkeypatch.setattr(ana, "table", _FakeTable(item=None))
+    assert ana._load_prior_analysis("nutrition") == ("", "")
+
+
+def _fn():
+    import field_notes_lambda as fn
+
+    return fn
+
+
+def test_field_note_prior_notes_skip_tombstoned(monkeypatch):
+    """Prior weeks' notes feed the field-notes prompt — the same prior-context
+    class as the analyzer read. Wiped weeks contribute nothing."""
+    fn = _fn()
+    wiped = {**TOMBSTONED, "ai_present": "the wiped cycle's observation", "ai_tone": "steady"}
+    monkeypatch.setattr(fn, "table", _FakeTable(item=wiped))
+    assert fn.get_prior_notes("2026-W31") == []
+
+
+def test_field_note_prior_notes_serve_current_cycle(monkeypatch):
+    fn = _fn()
+    live = {"phase": "experiment", "ai_present": "fresh observation", "ai_tone": "steady"}
+    monkeypatch.setattr(fn, "table", _FakeTable(item=live))
+    notes = fn.get_prior_notes("2026-W31", count=2)
+    assert len(notes) == 2 and all(n["present"] == "fresh observation" for n in notes)
+
+
+def test_field_note_tombstoned_week_regenerates(monkeypatch):
+    """A tombstoned same-week note must not suppress the fresh cycle's generation
+    — the public read is phase-filtered, so suppression leaves the week blank."""
+    fn = _fn()
+    monkeypatch.setattr(fn, "table", _FakeTable(item={**TOMBSTONED, "ai_generated_at": "2026-07-20T00:00:00"}))
+    sentinel = RuntimeError("proceeded past the dedup check")
+    monkeypatch.setattr(fn, "gather_week_data", lambda *a, **k: (_ for _ in ()).throw(sentinel))
+    with pytest.raises(RuntimeError, match="proceeded past the dedup check"):
+        fn.generate_field_notes("2026-W31")
+
+
+def test_field_note_live_week_still_skips(monkeypatch):
+    fn = _fn()
+    monkeypatch.setattr(fn, "table", _FakeTable(item={"phase": "experiment", "ai_generated_at": "2026-07-30T00:00:00"}))
+    assert fn.generate_field_notes("2026-W31")["status"] == "already_exists"
+
+
+def _cg():
+    os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
+    from intelligence import challenge_generator_lambda as cg
+
+    return cg
+
+
+def test_challenge_dedup_treats_tombstoned_as_absent(monkeypatch):
+    """A tombstoned colliding challenge row is the wiped cycle's archive — the
+    fresh cycle re-issues, and the put restamps the record."""
+    cg = _cg()
+
+    fake = _FakeTable(item={**TOMBSTONED, "name": "Zone 2 Block"})
+    monkeypatch.setattr(cg, "table", fake)
+    result = cg.store_challenge({"name": "Zone 2 Block", "domain": "movement"})
+    assert result is not None
+    assert fake.put_calls, "the fresh cycle's challenge must be written, not suppressed by the wiped record"
+
+
+def test_challenge_dedup_still_skips_live_duplicate(monkeypatch):
+    cg = _cg()
+
+    fake = _FakeTable(item={"phase": "experiment", "name": "Zone 2 Block"})
+    monkeypatch.setattr(cg, "table", fake)
+    assert cg.store_challenge({"name": "Zone 2 Block", "domain": "movement"}) is None
+    assert fake.put_calls == []
+
+
+_COACH_GET_ITEM_MODULES = [
+    "coach_ensemble_digest",
+    "coach_history_summarizer",
+    "coach_observatory_renderer",
+    "coach_quality_gate",
+    "coach_state_updater",
+]
+
+
+@pytest.mark.parametrize("modname", _COACH_GET_ITEM_MODULES)
+def test_coach_get_item_hides_tombstoned_singleton(monkeypatch, modname):
+    """Every copy of the coach _get_item helper honors the restart tombstone —
+    the sibling set of the analyzer bug (#1969), fixed as a class."""
+    import importlib
+
+    mod = importlib.import_module(modname)
+    monkeypatch.setattr(mod, "table", _FakeTable(item={**TOMBSTONED, "summary": "the wiped cycle's state"}))
+    assert mod._get_item("COACH#sleep_coach", "COMPRESSED#latest") is None
+
+
+@pytest.mark.parametrize("modname", _COACH_GET_ITEM_MODULES)
+def test_coach_get_item_passes_clean_singleton(monkeypatch, modname):
+    import importlib
+
+    mod = importlib.import_module(modname)
+    monkeypatch.setattr(mod, "table", _FakeTable(item={"summary": "fresh", "phase": "experiment"}))
+    assert mod._get_item("COACH#sleep_coach", "COMPRESSED#latest") == {"summary": "fresh", "phase": "experiment"}
+
+
+def test_relapse_event_ignores_tombstoned_habit_scores(monkeypatch):
+    """A relapse 'event' fired off wiped vice_streaks would trigger stance
+    refreshes from a cycle that no longer exists."""
+    import coach_prediction_evaluator as pe
+
+    monkeypatch.setattr(pe, "table", _FakeTable(item={**TOMBSTONED, "vice_streaks": {"weed": 12}}))
+    assert pe._habit_scores_for("2026-07-20") == {}
+
+
+def test_habit_scores_serve_current_cycle(monkeypatch):
+    import coach_prediction_evaluator as pe
+
+    live = {"phase": "experiment", "vice_streaks": {"weed": 12}}
+    monkeypatch.setattr(pe, "table", _FakeTable(item=live))
+    assert pe._habit_scores_for("2026-07-20") == live
+
+
+# ── #1969: the closure scan for the generation path — derived, not enumerated ──
+# Same technique as the web/ scan above, wider net: EVERY get_item call in
+# lambdas/intelligence/ + lambdas/coach/ must either show the singleton_visible
+# predicate near the call site or carry a documented exemption. Keyed by
+# (package/file, unparsed sk expression) so the entry survives line drift but
+# dies with a refactor — forcing the reason to be re-argued, not inherited.
+
+_GENERATION_PACKAGES = ("intelligence", "coach")
+
+_GENERATION_GET_ITEM_EXEMPT: dict = {
+    (
+        "intelligence/ai_expert_analyzer_lambda.py",
+        "ingest_health_sk(src)",
+    ): "SYSTEM# ingest-health ops row — system_state, never tombstoned",
+    ("intelligence/intelligence_common.py", "'PROFILE#v1'"): "user profile — cross_phase, no phase attr, never tombstoned",
+    (
+        "intelligence/intelligence_common.py",
+        "f'SOURCE#coach_credibility#{coach_id}'",
+    ): "no live writer anywhere in the repo; fail-soft nascent default — nothing to tombstone",
+    ("coach/coach_calibration.py", "conf_sk"): "domain-specific guard: explicit tombstone check restarts the Beta prior (ADR-077)",
+    (
+        "coach/coach_computation_engine.py",
+        "'STATE#current'",
+    ): "NARRATIVE#arc reuses the `phase` attr for its NARRATIVE phase — guarded on tombstone + entered_date < genesis instead (#946 special case)",
+    (
+        "coach/coach_corrections.py",
+        "sk",
+    ): "coach_corrections is CROSS_PHASE (durable machinery-feedback ledger) — never tombstoned at reset",
+    (
+        "coach/coach_diary_reaction.py",
+        "sk",
+    ): "deliberate cross-cycle dedup: entry-keyed reacted-already marker — treating a tombstoned reaction as absent would re-spend Bedrock re-reacting to pre-genesis entries",
+    (
+        "coach/coach_narrative_orchestrator.py",
+        "'STATE#current'",
+    ): "NARRATIVE#arc special case — tombstone + entered_date guard, documented in _narrative_arc_state (#946)",
+    ("coach/coach_prediction_evaluator.py", "sk"): "domain-specific guard: explicit tombstone check restarts the Beta prior (ADR-077)",
+    (
+        "coach/coach_prediction_evaluator.py",
+        "f'STANCE#{today_str}'",
+    ): "event-refresh spend-cap counter — counting a same-day tombstoned stance is conservative (caps spend); content never feeds generation",
+    (
+        "coach/coach_prediction_evaluator.py",
+        "_LAST_DECIDED_SK",
+    ): "scientific-liveness marker — operational system_state, documented at the call site (#727)",
+    (
+        "coach/dispute_docket.py",
+        "sk",
+    ): "guarded via _docket_row_stands (applies singleton_visible), which also clears tombstoned rows out of the finite open-docket key space (#1801)",
+    ("coach/intake_response.py", "f'DATE#{nxt}'"): "whoop is RAW_TIMESERIES — kept forever, never tombstoned",
+    ("coach/inter_coach_dialogue_lambda.py", "'CONFIG#v1'"): "ENSEMBLE#influence_graph static config — system_state, no phase attr",
+    (
+        "coach/voice_fidelity_harness.py",
+        "f'RUN#{run_month}'",
+    ): "monthly-run idempotency marker — ops bookkeeping; a tombstoned marker suppressing a re-run is conservative",
+}
+
+
+def _generation_get_item_sites():
+    """(pkg/file, sk_source, lineno, guarded) for every get_item call in the
+    generation packages. sk_source is the unparsed AST of the inline Key sk value
+    ('<dynamic>' when the Key is built elsewhere)."""
+    import ast
+    import pathlib
+
+    root = pathlib.Path(__file__).resolve().parent.parent / "lambdas"
+    out = []
+    for pkg in _GENERATION_PACKAGES:
+        for path in sorted((root / pkg).glob("*.py")):
+            src = path.read_text(encoding="utf-8")
+            lines = src.split("\n")
+            for node in ast.walk(ast.parse(src)):
+                if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "get_item"):
+                    continue
+                sk_source = "<dynamic>"
+                for kw in node.keywords:
+                    if kw.arg == "Key" and isinstance(kw.value, ast.Dict):
+                        for k, v in zip(kw.value.keys, kw.value.values):
+                            if isinstance(k, ast.Constant) and k.value == "sk":
+                                sk_source = ast.unparse(v)
+                window = "\n".join(lines[max(0, node.lineno - 10) : node.lineno + 16])
+                out.append((f"{pkg}/{path.name}", sk_source, node.lineno, "singleton_visible" in window))
+    return out
+
+
+def test_generation_get_item_scan_finds_the_known_sites():
+    """Guard the guard: the scan must keep seeing the generation path."""
+    sites = _generation_get_item_sites()
+    assert len(sites) >= 25, f"expected the generation packages' get_item sites, found only {len(sites)}"
+    keys = {(f, sk) for f, sk, _ln, _g in sites}
+    assert (
+        "intelligence/ai_expert_analyzer_lambda.py",
+        "f'EXPERT#{expert_key}'",
+    ) in keys, "the #1969 prior-analysis read left the scan's scope"
+
+
+def test_generation_exemptions_do_not_rot():
+    """Every exemption must still point at a real, still-unguarded call site —
+    a stale entry is a hole the next blind read walks through."""
+    sites = {(f, sk): guarded for f, sk, _ln, guarded in _generation_get_item_sites()}
+    stale = [key for key in _GENERATION_GET_ITEM_EXEMPT if key not in sites or sites[key]]
+    assert not stale, f"exemption entries no longer matching an unguarded site — remove or re-key them: {stale}"
+
+
+def test_every_generation_get_item_guarded_or_exempt():
+    """The #1969 closure property: no get_item in the generation path may be
+    tombstone-blind without a documented reason."""
+    unguarded = [
+        (f, sk, ln) for f, sk, ln, guarded in _generation_get_item_sites() if not guarded and (f, sk) not in _GENERATION_GET_ITEM_EXEMPT
+    ]
+    assert not unguarded, (
+        "tombstone-blind get_item call site(s) in the generation path — a restart "
+        "tombstones experiment-scoped records IN PLACE, so an unguarded read feeds "
+        "the wiped cycle's content into fresh-cycle generation (#946/#1969, live "
+        "vector for #1897):\n"
+        + "\n".join(f"  lambdas/{f}:{ln} sk={sk}" for f, sk, ln in unguarded)
+        + "\nApply experiment.phase_filter.singleton_visible near the call site, "
+        "or add a documented entry to _GENERATION_GET_ITEM_EXEMPT."
+    )

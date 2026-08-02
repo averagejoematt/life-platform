@@ -250,11 +250,16 @@ def get_prior_notes(current_week, count=4):
         pw = get_iso_week(dt)
         prior_weeks.append(pw)
 
+    # #1969 (#946 class): field_notes is EXPERIMENT_SCOPED and the restart wipe
+    # tombstones it in place — an unguarded get_item would seed the fresh cycle's
+    # prompt with the wiped cycle's notes (the exact prior-analysis leak class).
+    from experiment.phase_filter import singleton_visible
+
     notes = []
     for pw in prior_weeks:
         resp = table.get_item(Key={"pk": FN_PK, "sk": f"WEEK#{pw}"})
         item = _decimal_to_float(resp.get("Item"))
-        if item and item.get("ai_present"):
+        if singleton_visible(item) and item.get("ai_present"):
             notes.append(
                 {
                     "week": pw,
@@ -391,9 +396,14 @@ def generate_field_notes(iso_week):
     start, end = week_bounds(iso_week)
     logger.info(f"Generating field notes for {iso_week} ({start} to {end})")
 
-    # Check if already exists
+    # Check if already exists. #1969 (#946 class): a TOMBSTONED row is a prior
+    # cycle's archive, treated as absent — the fresh cycle regenerates its own
+    # note for the week instead of being suppressed by wiped content (the public
+    # read is phase-filtered, so suppression would leave the week blank all cycle).
+    from experiment.phase_filter import singleton_visible
+
     existing = table.get_item(Key={"pk": FN_PK, "sk": f"WEEK#{iso_week}"}).get("Item")
-    if existing and existing.get("ai_generated_at"):
+    if singleton_visible(existing) and existing.get("ai_generated_at"):
         logger.info(f"Field notes for {iso_week} already exist, skipping")
         return {"status": "already_exists", "week": iso_week}
 
