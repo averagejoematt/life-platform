@@ -61,6 +61,119 @@ def test_literal_denylist_arm_when_provided():
     assert all("acme" not in detail.lower() for _, detail in hits)
 
 
+# ═══ Endpoint arm (#1945) — the /api/* surface, offline half ═══════════════════
+#
+# The static walk above never touched the ~130 live /api/* payloads (the #1943
+# genome finding shipped through exactly that gap). These tests are the CI wiring
+# for the guard's endpoint arm: same file, same job, gating.
+
+
+def test_endpoint_arm_offline_scan_is_clean_and_covers_the_route_set():
+    """The gate itself: every committed shape snapshot is key-tell clean, AND every
+    AST-discovered route is either scanned or carries a reasoned exemption — an
+    endpoint never scanned is a violation, not a silent pass (#1935 honesty class).
+    A newly registered route with neither a snapshot nor an exemption fails HERE."""
+    res = guard.scan_schema_snapshots()
+    assert res["files"] >= 50, f"suspiciously few shape snapshots scanned ({res['files']}) — a vacuous scan is not a pass"
+    assert not res["violations"], "PII tells (or unscanned routes) on the /api/* surface:\n" + "\n".join(
+        f"  {w}: [{arm}] {detail}" for w, arm, detail in res["violations"]
+    )
+
+
+def test_endpoint_arm_coverage_check_fires_on_uncovered_routes(tmp_path):
+    """Negative proof of the coverage direction: scanning a snapshot dir that
+    covers almost nothing must report the real router's routes as
+    endpoint-not-scanned — the check cannot go vacuous."""
+    (tmp_path / "api_stub.json").write_text(json.dumps({"path": "/api/vitals", "shape": {"type": "object", "keys": {}}}))
+    (tmp_path / "_exemptions.json").write_text("{}")
+    res = guard.scan_schema_snapshots(snapshot_dir=str(tmp_path))
+    not_scanned = [w for w, arm, _ in res["violations"] if arm == "endpoint-not-scanned"]
+    assert len(not_scanned) > 50, "expected the uncovered real route set to red the offline arm"
+
+
+def test_endpoint_arm_fires_on_a_planted_genetic_tell():
+    """Regression guard (#1945 AC4): a payload carrying the #1943 leak class must
+    red — both as a value tell and as a key tell."""
+    payload = json.dumps({"snps": [{"rsid": "rs429358", "genotype": "C/T", "note": "heterozygous"}]})
+    arms = {arm for arm, _ in guard.scan_endpoint_payload(payload, vice=[], literals=[])}
+    assert "pii-genetic" in arms, "value-level genetic tell (rsID/genotype) must fire"
+    assert "pii-genetic-key" in arms, "key-level genetic tell (rsid field) must fire"
+
+
+def test_endpoint_arm_fires_on_a_planted_birth_year_field():
+    """PhenoAge Option A: bio-age is public, chronological age NEVER. A payload
+    that starts carrying a birth-year/DOB field must red."""
+    hits = guard.scan_endpoint_payload(json.dumps({"profile": {"birth_year": 1985}}), vice=[], literals=[])
+    assert any(arm == "pii-age-key" for arm, _ in hits)
+    hits = guard.scan_endpoint_payload('{"bio": "date of birth: 1985-03-02"}', vice=[], literals=[])
+    assert any(arm == "pii-age" for arm, _ in hits)
+
+
+def test_endpoint_arm_allows_aggregate_genetic_counts_and_public_age_scores():
+    """The sanctioned shapes must NOT trip: aggregate SNP counts (facts about the
+    analysis, #1943) and the public fitness/bio-age scores (Option A keeps those)."""
+    ok = json.dumps({"genome": {"total_snps": 111, "snp_count": 8}, "vitals": {"fitness_age": 44, "bio_age": 39.2, "phenoage": 39.2}})
+    hits = [
+        h for h in guard.scan_endpoint_payload(ok, vice=[], literals=[]) if h[0].startswith("pii-genetic") or h[0].startswith("pii-age")
+    ]
+    assert hits == [], f"sanctioned aggregate/public-age shapes must pass, got {hits}"
+
+
+def test_card_arm_ignores_float_mantissas_but_still_catches_a_card():
+    """#1945 field finding: /api/character_receipt's xp_delta float carries 16
+    consecutive mantissa digits — a number's tail, not a card. The tightened
+    regex must skip it while a bare 16-digit number still fires."""
+    clean = guard.scan_text('{"xp_delta": 1.5714285714285714}', vice=[], literals=[])
+    assert not any(arm == "pii-card" for arm, _ in clean)
+    dirty = guard.scan_text("card 4111111111111111 on file", vice=[], literals=[])
+    assert any(arm == "pii-card" for arm, _ in dirty)
+
+
+def test_live_arm_unreachable_endpoint_is_a_violation_never_a_pass():
+    """#1935: an endpoint the arm planned to scan but could not read must land as
+    an endpoint-not-scanned violation — fail-closed, no silent pass tally."""
+    res = guard.scan_endpoints("https://unit-test.invalid", fetcher=lambda p: (None, None, "connection refused (unit stub)"))
+    assert res["scanned"] == []
+    assert res["violations"], "an unreadable surface must red, not pass"
+    assert all(arm == "endpoint-not-scanned" for _, arm, _ in res["violations"])
+
+
+def test_live_arm_fires_on_a_planted_payload_and_never_fetches_post_only_routes():
+    """Two properties through one stubbed sweep: (a) a planted tell in a fetched
+    payload reds; (b) POST-only routes — derived from the router's own AST method
+    sets, not a hand-list — are never fetched (the /api/cohort_submit 405 class)."""
+    fetched = []
+
+    def stub_fetch(fetch_path):
+        fetched.append(fetch_path)
+        return 200, {"user": {"birth_year": 1985}, "snp": "rs429358"}, None
+
+    res = guard.scan_endpoints("https://unit-test.invalid", fetcher=stub_fetch)
+    arms = {arm for _, arm, _ in res["violations"]}
+    assert "pii-age-key" in arms and "pii-genetic" in arms
+    post_only_skips = [p for p, cat in res["skipped"].items() if "AST-derived" in cat]
+    assert "/api/cohort_submit" in post_only_skips and "/api/replicate_certify" in post_only_skips
+    assert not (set(post_only_skips) & {f.split("?")[0] for f in fetched}), "a POST-only route must never be probed"
+
+
+def test_guard_genetic_vocabulary_covers_the_platform_definition():
+    """One definition of 'genetic identifier' for the platform: the guard's tell
+    regexes must keep matching the canonical probe set that
+    lambdas/web/site_api_vitals._GENETIC_TEXT_RE and
+    tests/test_public_genetic_privacy_absolute._GENETIC_KEY_RE encode — drift here
+    means the arms silently diverged from the labs/genome absolutes."""
+    for probe in ("genotype", "rs429358", "allele"):
+        assert guard._GENETIC_VALUE_RE.search(probe), f"value tell must match {probe!r}"
+    for key in ("rsid", "genotype", "snp_id", "allele", "gene", "genes", "gene_name", "rs123"):
+        assert guard._GENETIC_KEY_RE.search(key), f"key tell must match key {key!r}"
+    for key in ("total_snps", "snp_count", "n_snps"):
+        assert key in guard._GENETIC_AGGREGATE_KEYS
+    for benign in ("generated_at", "genesis", "risk_summary", "hours", "first_seen"):
+        assert not guard._GENETIC_KEY_RE.search(benign), f"benign key {benign!r} must not trip the genetic arm"
+    for benign in ("fitness_age", "bio_age", "phenoage", "average", "message_age_seconds"):
+        assert not guard._CHRON_AGE_KEY_RE.search(benign), f"benign key {benign!r} must not trip the age arm"
+
+
 def test_denylist_is_not_committed_in_cleartext():
     """The repo is PUBLIC: the personal denylist must never be tracked by git.
     Only a values-free example template may be committed."""
