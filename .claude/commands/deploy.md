@@ -35,11 +35,11 @@ bash deploy/deploy_fleet.sh          # one bundle → S3 → every function
 (or `cd cdk && npx cdk deploy --all`, which ships the same staged bundle).
 
 ### Mode 3: Lambda function (anything else)
-Match the argument against the function-name mapping below using fuzzy matching (e.g., "whoop" matches "whoop-data-ingestion", "site-api" matches "life-platform-site-api"). If ambiguous, list the matches and ask which one.
+Match the argument against the function-name mapping below using fuzzy matching (e.g., "whoop" matches "whoop-data-ingestion", "site-api" matches "life-platform-site-api"). If ambiguous, list the matches and ask which one. The table is GENERATED from `ci/lambda_map.json` (the same map CI and `deploy_lambda.sh` resolve from) — if a function isn't listed, check the map directly; never hand-edit the block.
 
 **Deploy command:**
 ```bash
-bash deploy/deploy_and_verify.sh <function-name> lambdas/<source-file>
+bash deploy/deploy_and_verify.sh <function-name> <source-path from the table>
 ```
 
 **Special case — `life-platform-mcp`:**
@@ -69,72 +69,136 @@ channels stay on `deploy/build_bundle.py`.)
 
 ## Function Name → Source File Mapping
 
-**Ingestion:**
-- whoop-data-ingestion → whoop_lambda.py
-- garmin-data-ingestion → garmin_lambda.py
-- notion-journal-ingestion → notion_lambda.py
-- withings-data-ingestion → withings_lambda.py
-- habitify-data-ingestion → habitify_lambda.py
-- strava-data-ingestion → strava_lambda.py
-- journal-enrichment → journal_enrichment_lambda.py
-- todoist-data-ingestion → todoist_lambda.py
-- eightsleep-data-ingestion → eightsleep_lambda.py
-- activity-enrichment → enrichment_lambda.py
-- macrofactor-data-ingestion → macrofactor_lambda.py
-- weather-data-ingestion → weather_handler.py
-- dropbox-poll → dropbox_poll_lambda.py
-- apple-health-ingestion → apple_health_lambda.py
-- food-delivery-ingestion → food_delivery_lambda.py
-- measurements-ingestion → measurements_ingestion_lambda.py
-- health-auto-export-webhook → health_auto_export_lambda.py
+Generated from `ci/lambda_map.json` by `deploy/sync_deploy_doc_map.py` (#2005);
+`tests/test_deploy_doc_map.py` reds CI if this block drifts from the map.
 
-**Compute:**
-- anomaly-detector → anomaly_detector_lambda.py
-- character-sheet-compute → character_sheet_lambda.py
-- daily-metrics-compute → daily_metrics_compute_lambda.py
-- daily-insight-compute → daily_insight_compute_lambda.py
-- adaptive-mode-compute → adaptive_mode_lambda.py
-- hypothesis-engine → hypothesis_engine_lambda.py
-- weekly-correlation-compute → weekly_correlation_compute_lambda.py
-- dashboard-refresh → dashboard_refresh_lambda.py
-- acwr-compute → acwr_compute_lambda.py
-- circadian-compliance → circadian_compliance_lambda.py
-- failure-pattern-compute → failure_pattern_compute_lambda.py
-- challenge-generator → challenge_generator_lambda.py
+<!-- BEGIN GENERATED: deploy-doc-map -->
+<!-- Regenerate: python3 deploy/sync_deploy_doc_map.py   (never hand-edit this block)
+     Source of truth: ci/lambda_map.json — drift gate: tests/test_deploy_doc_map.py -->
 
-**Email:**
-- daily-brief → daily_brief_lambda.py
-- weekly-digest → weekly_digest_lambda.py
-- monthly-digest → monthly_digest_lambda.py
-- nutrition-review → nutrition_review_lambda.py
-- wednesday-chronicle → wednesday_chronicle_lambda.py
-- weekly-plate → weekly_plate_lambda.py
-- monday-compass → monday_compass_lambda.py
-- partner-weekly-email → partner_email_lambda.py
-- evening-nudge → evening_nudge_lambda.py
-- chronicle-email-sender → chronicle_email_sender_lambda.py
-- chronicle-approve → chronicle_approve_lambda.py
-- subscriber-onboarding → subscriber_onboarding_lambda.py
+**Ingestion** (`lambdas/ingestion/`):
+- activity-enrichment → `lambdas/ingestion/enrichment_lambda.py`
+- dropbox-poll → `lambdas/ingestion/dropbox_poll_lambda.py`
+- eightsleep-data-ingestion → `lambdas/ingestion/eightsleep_lambda.py`
+- food-delivery-ingestion → `lambdas/ingestion/food_delivery_lambda.py`
+- garmin-data-ingestion → `lambdas/ingestion/garmin_lambda.py`
+- habitify-data-ingestion → `lambdas/ingestion/habitify_lambda.py`
+- health-auto-export-webhook → `lambdas/ingestion/health_auto_export_lambda.py` (cdk_only†)
+- hevy-backfill → `lambdas/ingestion/hevy_backfill_lambda.py` (cdk_only†)
+- journal-enrichment → `lambdas/ingestion/journal_enrichment_lambda.py`
+- macrofactor-data-ingestion → `lambdas/ingestion/macrofactor_lambda.py`
+- measurements-ingestion → `lambdas/ingestion/measurements_ingestion_lambda.py`
+- notion-journal-ingestion → `lambdas/ingestion/notion_lambda.py`
+- social-enrichment → `lambdas/ingestion/social_enrichment_lambda.py`
+- strava-data-ingestion → `lambdas/ingestion/strava_lambda.py`
+- todoist-data-ingestion → `lambdas/ingestion/todoist_lambda.py`
+- weather-data-ingestion → `lambdas/ingestion/weather_lambda.py`
+- whoop-data-ingestion → `lambdas/ingestion/whoop_lambda.py`
+- withings-data-ingestion → `lambdas/ingestion/withings_lambda.py`
+- youtube-social-ingestion → `lambdas/ingestion/youtube_lambda.py`
 
-**Operational:**
-- life-platform-freshness-checker → freshness_checker_lambda.py
-- life-platform-dlq-consumer → dlq_consumer_lambda.py
-- life-platform-canary → canary_lambda.py
-- life-platform-pip-audit → pip_audit_lambda.py
-- life-platform-qa-smoke → qa_smoke_lambda.py
-- life-platform-key-rotator → key_rotator_lambda.py
-- life-platform-data-export → data_export_lambda.py
-- life-platform-data-reconciliation → data_reconciliation_lambda.py
-- insight-email-parser → insight_email_parser_lambda.py
-- life-platform-site-api → SPECIAL BUILD — full-tree bundle via `deploy_site_api.sh` (see Special case above; NOT single-file)
-- life-platform-site-api-ai → site_api_ai_lambda.py
-- site-stats-refresh → site_stats_refresh_lambda.py
-- pipeline-health-check → pipeline_health_check_lambda.py
-- email-subscriber → email_subscriber_lambda.py
-- og-image-generator → og_image_lambda.py
+**Compute** (`lambdas/compute/`):
+- acwr-compute → `lambdas/compute/acwr_compute_lambda.py`
+- adaptive-mode-compute → `lambdas/compute/adaptive_mode_lambda.py`
+- character-sheet-compute → `lambdas/compute/character_sheet_lambda.py`
+- circadian-compliance → `lambdas/compute/circadian_compliance_lambda.py`
+- coach-daily-reflection → `lambdas/compute/coach_daily_reflection_lambda.py`
+- coach-memoir → `lambdas/compute/coach_memoir_lambda.py`
+- daily-insight-compute → `lambdas/compute/daily_insight_compute_lambda.py`
+- daily-metrics-compute → `lambdas/compute/daily_metrics_compute_lambda.py`
+- dashboard-refresh → `lambdas/compute/dashboard_refresh_lambda.py`
+- episode-detect → `lambdas/compute/episode_detect_lambda.py`
+- failure-pattern-compute → `lambdas/compute/failure_pattern_compute_lambda.py`
+- forecast-engine → `lambdas/compute/forecast_engine_lambda.py`
+- hypothesis-engine → `lambdas/compute/hypothesis_engine_lambda.py`
+- personal-baselines-compute → `lambdas/compute/personal_baselines_lambda.py`
+- scenario-explorer → `lambdas/compute/scenario_explorer_lambda.py` (cdk_only†)
+- state-of-matthew → `lambdas/compute/state_of_matthew_lambda.py`
+- weekly-correlation-compute → `lambdas/compute/weekly_correlation_compute_lambda.py`
+- weekly-signal → `lambdas/compute/weekly_signal_lambda.py`
+
+**Coach** (`lambdas/coach/`):
+- coach-computation-engine → `lambdas/coach/coach_computation_engine.py`
+- coach-ensemble-digest → `lambdas/coach/coach_ensemble_digest.py`
+- coach-history-summarizer → `lambdas/coach/coach_history_summarizer.py`
+- coach-narrative-orchestrator → `lambdas/coach/coach_narrative_orchestrator.py`
+- coach-observatory-renderer → `lambdas/coach/coach_observatory_renderer.py`
+- coach-prediction-evaluator → `lambdas/coach/coach_prediction_evaluator.py`
+- coach-quality-gate → `lambdas/coach/coach_quality_gate.py`
+- coach-state-updater → `lambdas/coach/coach_state_updater.py`
+- inter-coach-dialogue → `lambdas/coach/inter_coach_dialogue_lambda.py` (cdk_only†)
+- voice-fidelity-harness → `lambdas/coach/voice_fidelity_harness.py` (cdk_only†)
+
+**Emails** (`lambdas/emails/`):
+- ai-review-pack → `lambdas/emails/ai_review_pack_lambda.py`
+- anomaly-detector → `lambdas/emails/anomaly_detector_lambda.py`
+- between-chronicle → `lambdas/emails/between_chronicle_lambda.py`
+- chronicle-approve → `lambdas/emails/chronicle_approve_lambda.py`
+- chronicle-email-sender → `lambdas/emails/chronicle_email_sender_lambda.py`
+- chronicle-podcast → `lambdas/emails/chronicle_podcast_lambda.py`
+- coach-nudge → `lambdas/emails/coach_nudge_lambda.py`
+- coach-panel-podcast → `lambdas/emails/coach_panel_podcast_lambda.py` (cdk_only†)
+- daily-brief → `lambdas/emails/daily_brief_lambda.py`
+- daily-debrief → `lambdas/emails/daily_debrief_lambda.py`
+- elena-state-updater → `lambdas/emails/elena_state_updater.py`
+- evening-nudge → `lambdas/emails/evening_nudge_lambda.py`
+- insight-email-parser → `lambdas/emails/insight_email_parser_lambda.py`
+- life-platform-freshness-checker → `lambdas/emails/freshness_checker_lambda.py`
+- milestone-digest → `lambdas/emails/milestone_digest_lambda.py`
+- monday-compass → `lambdas/emails/monday_compass_lambda.py`
+- monthly-digest → `lambdas/emails/monthly_digest_lambda.py`
+- nutrition-review → `lambdas/emails/nutrition_review_lambda.py`
+- partner-weekly-email → `lambdas/emails/partner_email_lambda.py`
+- wednesday-chronicle → `lambdas/emails/wednesday_chronicle_lambda.py`
+- weekly-digest → `lambdas/emails/weekly_digest_lambda.py`
+- weekly-plate → `lambdas/emails/weekly_plate_lambda.py`
+
+**Intelligence** (`lambdas/intelligence/`):
+- ai-expert-analyzer → `lambdas/intelligence/ai_expert_analyzer_lambda.py`
+- challenge-generator → `lambdas/intelligence/challenge_generator_lambda.py`
+- field-notes-generate → `lambdas/intelligence/field_notes_lambda.py`
+- journal-analyzer → `lambdas/intelligence/journal_analyzer_lambda.py`
+
+**Operational** (`lambdas/operational/`):
+- hevy-restamp → `lambdas/operational/hevy_restamp_lambda.py` (cdk_only†)
+- hevy-routine-cron → `lambdas/operational/hevy_routine_cron_lambda.py` (cdk_only†)
+- life-platform-ai-quality-canary → `lambdas/operational/ai_quality_canary_lambda.py`
+- life-platform-alert-digest → `lambdas/operational/alert_digest_lambda.py`
+- life-platform-canary → `lambdas/operational/canary_lambda.py`
+- life-platform-coherence-sentinel → `lambdas/operational/coherence_sentinel_lambda.py`
+- life-platform-cost-governor → `lambdas/operational/cost_governor_lambda.py`
+- life-platform-data-export → `lambdas/operational/data_export_lambda.py`
+- life-platform-data-reconciliation → `lambdas/operational/data_reconciliation_lambda.py`
+- life-platform-delete-user-data → `lambdas/operational/delete_user_data_lambda.py`
+- life-platform-dlq-consumer → `lambdas/operational/dlq_consumer_lambda.py`
+- life-platform-key-rotator → `lambdas/operational/key_rotator_lambda.py`
+- life-platform-pip-audit → `lambdas/operational/pip_audit_lambda.py`
+- life-platform-qa-smoke → `lambdas/operational/qa_smoke_lambda.py`
+- life-platform-remediation-dispatcher → `lambdas/operational/remediation_dispatcher_lambda.py`
+- life-platform-traffic-digest → `lambdas/operational/traffic_digest_lambda.py`
+- pipeline-health-check → `lambdas/operational/pipeline_health_check_lambda.py`
+
+**Reading** (`lambdas/reading/`):
+- reading-cover-pipeline → `lambdas/reading/cover_pipeline_lambda.py`
+- reading-recall-sweep → `lambdas/reading/reading_recall_sweep_lambda.py`
+
+**Web** (`lambdas/web/`):
+- email-subscriber → `lambdas/web/email_subscriber_lambda.py` (region: us-east-1)
+- life-platform-site-api → SPECIAL BUILD — `bash deploy/deploy_site_api.sh` (see Special case above)
+- life-platform-site-api-ai → `lambdas/web/site_api_ai_lambda.py`
+- og-image-generator → `lambdas/web/og_image_lambda.py`
+- site-stats-refresh → `lambdas/web/site_stats_refresh_lambda.py`
+- subscriber-onboarding → `lambdas/web/subscriber_onboarding_lambda.py`
 
 **Special:**
-- life-platform-mcp → SPECIAL BUILD (see above)
+- life-platform-mcp → `mcp_server.py` + `mcp/` — SPECIAL BUILD (see above)
+
+**Lambda@Edge (manually deployed, NOT CI/CD — see the map's notes):**
+- life-platform-cf-auth → `lambdas/cf-auth/index.mjs` (region: us-east-1)
+
+† `cdk_only` is a historical annotation in the map: since #781 every sanctioned deploy path
+ships the same full-tree bundle, so these deploy fine via `deploy_and_verify.sh` too.
+<!-- END GENERATED: deploy-doc-map -->
 
 ## Doc impact (wiki contract — CONVENTIONS §8)
 
