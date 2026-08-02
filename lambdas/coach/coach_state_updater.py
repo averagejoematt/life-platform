@@ -28,6 +28,7 @@ import boto3
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1969
 
 from coach.relationship_engine import compute_relationship_update  # #536
+from coach.voice_register_guard import sanitize_summary  # #1987: deterministic voice-register check
 
 # Structured logger
 try:
@@ -498,7 +499,10 @@ EXTRACTION_SYSTEM_PROMPT = (
     "optimized for a website card (2-3 short paragraphs, ~150-200 words). "
     "Preserve the coach's distinctive voice and key insight but tighten "
     "the prose. Include the most important data point and the key "
-    "recommendation. This will be shown on the public observatory page.\n\n"
+    "recommendation. Write it AS the coach, in first person — never refer "
+    "to the coach in third person (do not write 'the coach believes...' or "
+    "'the sleep coach is...'; write 'I believe...' or 'I'm...' instead). "
+    "This will be shown on the public observatory page.\n\n"
     "9. **key_recommendation**: Extract the single most actionable "
     "recommendation from the output as a standalone 1-2 sentence string.\n\n"
     "10. **elena_quote**: If the output contains or implies a meta-observation "
@@ -576,6 +580,19 @@ def _write_output_record(coach_id, date, output_type, output_text, extraction):
     word_count = len(output_text.split())
     now_iso = datetime.now(timezone.utc).isoformat()
 
+    # #1987: deterministic voice-register check (zero AI cost) — sibling to the item-7
+    # anti_pattern_violations check above. Strips markdown emphasis unconditionally; if
+    # what's left is still third-person coach register ("the coach", "the {domain}
+    # coach"), reject it (write None). The read site (site_api_coach.py) already falls
+    # back to `content` when `observatory_summary` is falsy — reusing that existing
+    # fallback rather than inventing a new one here.
+    observatory_summary, register_rejected = sanitize_summary(extraction.get("observatory_summary"))
+    if register_rejected:
+        logger.warning(
+            "observatory_summary rejected for %s (third-person coach register) — " "falling back to full content at read time",
+            coach_id,
+        )
+
     item = {
         "pk": f"COACH#{coach_id}",
         "sk": f"OUTPUT#{date}#{output_type}",
@@ -587,7 +604,7 @@ def _write_output_record(coach_id, date, output_type, output_text, extraction):
         "threads_opened": [t.get("thread_slug", "") for t in extraction.get("threads_opened", [])],
         "decision_classes": extraction.get("decision_classes_used", []),
         "anti_pattern_violations": extraction.get("anti_pattern_violations", []),
-        "observatory_summary": extraction.get("observatory_summary"),
+        "observatory_summary": observatory_summary,
         "key_recommendation": extraction.get("key_recommendation"),
         "elena_quote": extraction.get("elena_quote"),
         "word_count": word_count,
