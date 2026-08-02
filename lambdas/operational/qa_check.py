@@ -68,6 +68,7 @@ class Check:
         self.partition = partition
         self.passed = None  # True=green, False=red, None=yellow
         self.paused = False  # intentionally-paused surface: shown ⏸, not a fault
+        self.chronic = False  # #1958: known-recurring timing warn — reported, never alarmed
         self.message = ""
 
     def ok(self, msg=""):
@@ -80,8 +81,21 @@ class Check:
         self.message = msg
         return self
 
-    def warn(self, msg=""):
+    def warn(self, msg="", chronic=False):
+        """Yellow. `chronic=True` is RESERVED for the enumerated known-recurring
+        timing conditions (#1958: an OPTIONAL registry source with no record
+        yesterday, and the MCP cache-warm partial) — warns that recur on a
+        healthy platform by the source's own event-driven nature. A chronic
+        warn stays fully visible (email, logs, ChronicWarnCount metric) but
+        does NOT increment the alarmed WarnCount, so qa-smoke-warnings can
+        reach green and a NOVEL warn class is unmissable again. The default is
+        deliberately False: a new warn call site is alarmed unless it
+        explicitly opts out, and tests/test_qa_smoke_chronic_warns.py
+        AST-guards the full set of chronic=True call sites — extending the set
+        means updating that test's enumerated registry, never a silent drift.
+        """
         self.passed = None
+        self.chronic = bool(chronic)
         self.message = msg
         return self
 
@@ -112,11 +126,42 @@ class Check:
 # though it never triggers this Lambda's own direct failure alert, and both
 # alarms are ordinary CloudWatch alarms the remediation agent's existing
 # `describe_alarms(StateValue="ALARM")` sweep already ingests as a source.
+#
+# #1958: WarnCount is the ALARMED warn count and EXCLUDES chronic warns
+# (Check.warn(chronic=True) — the enumerated known-recurring timing set),
+# which ride the separate, deliberately NON-alarmed ChronicWarnCount. Before
+# this split WarnCount's honest daily floor was 4-11 against the >= 1
+# threshold, so qa-smoke-warnings sat red 15+ consecutive nights and carried
+# no information (ADR-105: a threshold must come from the metric's real
+# distribution). The alarm, its threshold, and its load-bearing 86400s
+# Maximum window are all UNCHANGED — only what counts into the metric moved.
 QA_SMOKE_EMF_NAMESPACE = "LifePlatform/QaSmoke"
 
 
+def split_warns(checks):
+    """Partition a run's warned checks into (alarmed, chronic) lists.
+
+    The single classification chokepoint for BOTH check modules
+    (qa_smoke_lambda and qa_check_reader_truth construct the same Check class,
+    so every warn routes through the flag this reads): alarmed warns increment
+    the WarnCount metric that qa-smoke-warnings fires on; chronic warns
+    increment ChronicWarnCount, which no alarm watches (#1958). Paused checks
+    set passed=True so they can never appear on either side.
+    """
+    warned = [c for c in checks if c.passed is None]
+    return [c for c in warned if not c.chronic], [c for c in warned if c.chronic]
+
+
 def emf_summary_line(
-    *, passed: int, warned: int, failed: int, paused: int, timestamp_ms: int, failed_deploy_health: int = 0, failed_content_truth: int = 0
+    *,
+    passed: int,
+    warned: int,
+    failed: int,
+    paused: int,
+    timestamp_ms: int,
+    failed_deploy_health: int = 0,
+    failed_content_truth: int = 0,
+    warned_chronic: int = 0,
 ) -> str:
     """Build the EMF log line CloudWatch extracts to LifePlatform/QaSmoke metrics.
 
@@ -125,6 +170,12 @@ def emf_summary_line(
     from becoming a mute: content-truth failures no longer revert a deploy, so
     they need a dimension of their own to alarm on rather than disappearing into
     an aggregate that the pipeline has stopped reacting to.
+
+    #1958: `warned` is the ALARMED warn count (what qa-smoke-warnings fires on)
+    and `warned_chronic` the known-recurring timing warns — a SEPARATE metric,
+    not a component of WarnCount, so a night whose only warns are chronic emits
+    WarnCount=0 and the alarm can actually clear. Callers pass the two sides of
+    qa_check.split_warns() — never a recomputed subset.
     """
     doc = {
         "_aws": {
@@ -141,6 +192,7 @@ def emf_summary_line(
                         {"Name": "RunCompleted"},
                         {"Name": "DeployHealthFailCount"},
                         {"Name": "ContentTruthFailCount"},
+                        {"Name": "ChronicWarnCount"},
                     ],
                 }
             ],
@@ -152,5 +204,6 @@ def emf_summary_line(
         "RunCompleted": 1,
         "DeployHealthFailCount": int(failed_deploy_health),
         "ContentTruthFailCount": int(failed_content_truth),
+        "ChronicWarnCount": int(warned_chronic),
     }
     return json.dumps(doc)
