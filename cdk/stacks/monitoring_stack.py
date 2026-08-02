@@ -428,6 +428,17 @@ class MonitoringStack(Stack):
         #                          previously fully silent (no email, no
         #                          alarm); now it surfaces in the next daily
         #                          digest — visible, not a full alert.
+        #                          #1958: WarnCount is the ALARMED warn count
+        #                          only — the known-recurring timing warns
+        #                          (optional-source no-record days, cache-warm
+        #                          partial) emit as ChronicWarnCount, which is
+        #                          DELIBERATELY unalarmed (their honest daily
+        #                          floor was 4-11, which held this alarm red 15+
+        #                          consecutive nights against the >= 1
+        #                          threshold; ADR-105). Do not add an alarm on
+        #                          ChronicWarnCount, and do not shorten the
+        #                          86400s Maximum window below — both are
+        #                          load-bearing.
         _heartbeat_alarm(
             "QaSmokeHeartbeat",
             "qa-smoke-heartbeat",

@@ -65,6 +65,7 @@ from operational.qa_check import (  # noqa: E402,F401
     QA_SMOKE_EMF_NAMESPACE,
     Check,
     emf_summary_line,
+    split_warns,
 )
 from operational.weight_truth_qa import WEIGHT_RECONCILE_TOL, assess_hero_weight  # noqa: E402,F401
 
@@ -137,7 +138,14 @@ def check_ddb_freshness():
         try:
             resp = table.get_item(Key={"pk": USER_PREFIX + source, "sk": "DATE#" + yesterday})
             item = resp.get("Item")
-            c.ok(f"{label} found") if item else c.warn(f"{label} — no record (optional)")
+            # #1958: a missing day on an OPTIONAL (event-driven/manual) source is
+            # the definition of the chronic timing class — it recurs on a healthy
+            # platform, so it must not hold the qa-smoke-warnings alarm red.
+            # `chronic` derives from the registry's qa_tier facet (this whole
+            # branch only runs for qa_optional() sources), never a name list.
+            # A DDB ERROR on the same source is NOT chronic: that's a real,
+            # novel fault and stays on the alarmed side below.
+            c.ok(f"{label} found") if item else c.warn(f"{label} — no record (optional)", chronic=True)
         except Exception as e:
             c.warn(f"{label} — error: {e}")
         checks.append(c)
@@ -523,7 +531,10 @@ def check_mcp_tool_calls():
         if n >= 10:
             c.ok(f"Cache has {n} warm entries")
         elif n >= 1:
-            c.warn(f"Cache has only {n} entries — warmer may have partially failed")
+            # #1958: a partially-warm cache recurs by timing (the warmer's cadence
+            # vs this 10:30 PT sweep) — chronic, kept out of the alarmed WarnCount.
+            # A fully EMPTY cache stays a FAIL: that means the warmer never ran.
+            c.warn(f"Cache has only {n} entries — warmer may have partially failed", chronic=True)
         else:
             c.fail("Cache empty — nightly warmer has not run or failed entirely")
     except Exception as e:
@@ -1051,6 +1062,13 @@ def lambda_handler(event, context):
         fails_deploy = [c for c in fails if c.partition == DEPLOY_HEALTH]
         fails_content = [c for c in fails if c.partition == CONTENT_TRUTH]
 
+        # #1958: split the warns the same way — through qa_check.split_warns, the
+        # one chokepoint both check modules share. Alarmed (novel) warns are what
+        # qa-smoke-warnings fires on; chronic warns (the enumerated recurring
+        # timing set) stay fully visible here, in the email, and in their own
+        # ChronicWarnCount metric, but can no longer hold the alarm red.
+        warns_alarmed, warns_chronic = split_warns(all_checks)
+
         # #1610: itemize every fail/warn to the LOG, not just the failure email.
         # The specific failing check used to appear ONLY in the emailed report, so a
         # latched daily FailCount alarm was undiagnosable from CloudWatch without inbox
@@ -1064,7 +1082,9 @@ def lambda_handler(event, context):
         for c in fails:
             print(f"[QA] FAIL [{c.partition}] {c.category} / {c.name}: {c.message}")
         for c in warns:
-            print(f"[QA] WARN [{c.partition}] {c.category} / {c.name}: {c.message}")
+            # #1958: the chronic tag rides every WARN line so Logs Insights can
+            # tell a recurring timing warn from a novel one without the metric.
+            print(f"[QA] WARN [{c.partition}]{' [chronic]' if c.chronic else ''} {c.category} / {c.name}: {c.message}")
 
         # #1920: a POSITIVE EXECUTION RECEIPT. Check.pause() sets passed=True and
         # printed nothing, so a paused check and a passing one were byte-identical
@@ -1082,12 +1102,13 @@ def lambda_handler(event, context):
         print(
             emf_summary_line(
                 passed=len(passes),
-                warned=len(warns),
+                warned=len(warns_alarmed),  # #1958: WarnCount = alarmed warns only
                 failed=len(fails),
                 paused=len(paused),
                 timestamp_ms=int(run_time.timestamp() * 1000),
                 failed_deploy_health=len(fails_deploy),
                 failed_content_truth=len(fails_content),
+                warned_chronic=len(warns_chronic),
             )
         )
 
@@ -1107,14 +1128,21 @@ def lambda_handler(event, context):
                     "failed": len(fails),
                     "failed_deploy_health": len(fails_deploy),
                     "failed_content_truth": len(fails_content),
+                    # `warned` stays the TOTAL (the run's own verdict, unchanged
+                    # for existing consumers); `warned_chronic` is ADDITIVE and
+                    # names how many of them are the recurring timing class (#1958).
                     "warned": len(warns),
+                    "warned_chronic": len(warns_chronic),
                     "paused": sorted(c.name for c in paused),
                     "emailed": emailed,
                 }
             )
 
         if not fails:
-            print(f"[QA] {len(warns)} warning(s), 0 failures — no email (warnings not emailed standalone)")
+            print(
+                f"[QA] {len(warns)} warning(s) ({len(warns_alarmed)} alarmed, {len(warns_chronic)} chronic), "
+                "0 failures — no email (warnings not emailed standalone)"
+            )
             return {"statusCode": 200, "body": _body(False)}
 
         subject = (

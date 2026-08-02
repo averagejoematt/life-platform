@@ -502,6 +502,11 @@ def collect_green_report(now=None):
         runs = _daily_sums(cw, QA_SMOKE_NAMESPACE, "RunCompleted", "Sum", start, now)
         fails = _daily_sums(cw, QA_SMOKE_NAMESPACE, "FailCount", "Sum", start, now)
         warns = _daily_sums(cw, QA_SMOKE_NAMESPACE, "WarnCount", "Sum", start, now)
+        # #1958: WarnCount is now alarmed (novel) warns only; the recurring
+        # timing warns ride ChronicWarnCount. The rollup keeps `warned_checks`
+        # as the honest TOTAL (both sides) and names the chronic share, so the
+        # reclassification never reads as warns having vanished.
+        chronic = _daily_sums(cw, QA_SMOKE_NAMESPACE, "ChronicWarnCount", "Sum", start, now)
         paused = _daily_sums(cw, QA_SMOKE_NAMESPACE, "PausedCount", "Sum", start, now)
         days_with_runs = sum(1 for v in runs if v > 0)
         days_with_failures = sum(1 for v in fails if v > 0)
@@ -510,7 +515,8 @@ def collect_green_report(now=None):
             "days_with_failures": days_with_failures,
             "green_days": max(days_with_runs - days_with_failures, 0),
             "failed_checks": int(sum(fails)),
-            "warned_checks": int(sum(warns)),
+            "warned_checks": int(sum(warns) + sum(chronic)),
+            "chronic_warned_checks": int(sum(chronic)),
             "paused_checks": int(sum(paused)),
         }
     except Exception as e:
