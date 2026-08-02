@@ -143,8 +143,17 @@ went `in_progress` immediately *while the old run was still stuck pending in its
 - **site-api IS deployed** — genome fix + #1922's PT anchor confirmed in the live bytes, and
   `/api/vitals` now reads "Day 6" where it read "Day 7".
 - **The Lambda-side gates are NOT** — `life-platform-qa-smoke` still has no `phase_plausibility`
-  and no `qa_check_reader_truth`. #1922, #1896, #1897 and #1944 are merged, un-deployed, and
-  waiting on the ci-cd Deploy gate that the wedge blocked. Run `30733497898` is the one carrying them.
+  and no `qa_check_reader_truth`. #1922, #1896, #1897 and #1944 are merged and un-deployed, and there
+  is **no pending run** to approve: the post-redesign run failed on `test_residual_queue_gate_1340`
+  (my handover said `## Next picks` where the gate wants `## Residual / next picks` — fixed in
+  `ab428ad6`), and that fix is docs-only, which ci-cd doesn't trigger on. **Filed as #2010** with the
+  verification steps.
+
+  I did **not** dispatch an unattended fleet deploy for it, and that is a judgement call worth your
+  disagreement: #1896's gate is *blocking* — on a finding it regenerates once and then holds the
+  coach section. That is the intended design and it is negative-tested, but its first contact with
+  real generated prose is a production behaviour change I would rather you saw happen than read
+  about. One code merge, or a `deploy_all=true` dispatch, ships all four.
 
 ## Decisions only you can make
 
