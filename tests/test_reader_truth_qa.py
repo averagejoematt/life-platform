@@ -344,8 +344,12 @@ def test_qa_smoke_high_finding_fails_the_check(monkeypatch):
 def test_qa_smoke_clean_run_is_ok(monkeypatch):
     _patch_smoke(monkeypatch, payload=_CLEAN_VERDICT)
     checks = qa_smoke_lambda.check_reader_truth()
-    assert [c.passed for c in checks] == [True]
-    assert "no truth findings" in checks[0].message
+    # #1922: the deterministic plausibility pass reports first (a warn here —
+    # this fixture has no /api/ surfaces for it to check); the LLM verdict follows.
+    assert not any(c.passed is False for c in checks)
+    verdicts = [c for c in checks if c.name == "reader_truth:verdict"]
+    assert len(verdicts) == 1 and verdicts[0].passed is True
+    assert "no truth findings" in verdicts[0].message
 
 
 def test_qa_smoke_low_med_findings_warn_not_fail(monkeypatch):
@@ -373,8 +377,11 @@ def test_qa_smoke_budget_tier_pauses_explicitly(monkeypatch):
     for tier in (1, 2, 3):
         _patch_smoke(monkeypatch, tier=tier, invoke=must_not_call)
         checks = qa_smoke_lambda.check_reader_truth()
-        assert len(checks) == 1 and checks[0].paused is True
-        assert f"budget tier {tier}" in checks[0].message  # explicit skip state, no silent green
+        # #1922: the deterministic pass STILL runs under a pause — only the LLM half skips.
+        paused = [c for c in checks if c.paused]
+        assert len(paused) == 1
+        assert f"budget tier {tier}" in paused[0].message  # explicit skip state, no silent green
+        assert any(c.name == "reader_truth:plausibility" for c in checks)
         assert not any(c.passed is False for c in checks)
 
 
@@ -395,7 +402,7 @@ def test_qa_smoke_budget_tier_pause_emits_qa_paused_metric(monkeypatch):
     _patch_smoke(monkeypatch, tier=2, invoke=must_not_call)
     checks = qa_smoke_lambda.check_reader_truth()
 
-    assert len(checks) == 1 and checks[0].paused is True
+    assert any(c.paused for c in checks)  # #1922: deterministic check accompanies the pause
     assert cw.calls, "a budget-tier pause must emit a CloudWatch metric (#1440)"
     call = cw.calls[-1]
     assert call["Namespace"] == "LifePlatform/QA"

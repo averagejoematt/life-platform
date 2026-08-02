@@ -76,10 +76,16 @@ def emit_budget_pause_metric(source: str, tier: int) -> None:
         print(f"  ⚠ {_QA_PAUSE_METRIC} metric emit failed (non-fatal) [{source}, tier {tier}]: {str(e)[:140]}")
 
 
-# The four rubric categories (#1095). parse/normalize coerce anything else to "other".
+# The rubric categories (#1095). parse/normalize coerce anything else to "other".
+# "impossible_number" was RETIRED by #1922: numeric phase-bound claims (window-
+# named fields, span declarations, day fields, bare "Day N" in strict payloads)
+# are now checked deterministically by operational/phase_plausibility.py, which
+# still emits that category name so downstream consumers see one taxonomy. The
+# LLM keeps the genuinely semantic categories — including WORD-number phase
+# claims in prose ("seven days of an experiment", #1897), which remain
+# temporal_contradiction.
 CATEGORIES = (
     "temporal_contradiction",
-    "impossible_number",
     "duplicated_narrative",
     "audience_violation",
 )
@@ -160,16 +166,16 @@ CAN BE TRUE at the current experiment phase, not whether they match any baseline
 EXPERIMENT PHASE (ground truth, computed from the codebase — trust this over anything the pages say):
 {phase_line}
 
-FLAG findings in exactly these four categories (with severity low|med|high):
-1. "temporal_contradiction" — text asserting a history the phase makes impossible: e.g. "Day 2" \
-alongside "your 30-day trend", "over the past three weeks" early in the experiment, a day number or \
-date inconsistent with the phase above, or two surfaces disagreeing about what day it is.
-2. "impossible_number" — a number that cannot plausibly exist yet at this phase: e.g. "21 workouts \
-this cycle" on Day 2, a streak or in-experiment average spanning more days than have occurred.
-3. "duplicated_narrative" — the SAME substantive narrative paragraph (or a near-identical one) \
+FLAG findings in exactly these three categories (with severity low|med|high):
+1. "temporal_contradiction" — PROSE asserting a history the phase makes impossible: e.g. "over the \
+past three weeks" early in the experiment, "seven days of an experiment" on Day 1 (word-numbers \
+count), a day number or date inconsistent with the phase above, or two surfaces disagreeing about \
+what day it is. Judge sentences, not bare JSON numerics — numeric window/span/day FIELDS are \
+checked deterministically by code before you run and are not your concern.
+2. "duplicated_narrative" — the SAME substantive narrative paragraph (or a near-identical one) \
 appearing on two or more of the surfaces below. Shared navigation, footers, taglines, and short \
 labels do NOT count — only real narrative/analysis prose.
-4. "audience_violation" — copy that assumes the reader saw private context: unexplained internal \
+3. "audience_violation" — copy that assumes the reader saw private context: unexplained internal \
 jargon, references to private conversations or sessions ("as discussed", "like I told you"), or \
 second-person notes clearly addressed to the site's owner rather than a public reader.
 
@@ -195,7 +201,7 @@ SURFACES ({k}):
 _PROMPT_FOOTER = """
 Respond with ONLY a JSON object, no prose, no markdown fences:
 {{"findings": [{{"page": "<path of the surface, exactly as given>", \
-"category": "temporal_contradiction"|"impossible_number"|"duplicated_narrative"|"audience_violation", \
+"category": "temporal_contradiction"|"duplicated_narrative"|"audience_violation", \
 "severity": "low"|"med"|"high", "note": "string"}}], \
 "severity": "ok"|"low"|"med"|"high", "summary": "one sentence"}}
 Set top-level "severity" to the maximum finding severity, or "ok" if there are no findings."""

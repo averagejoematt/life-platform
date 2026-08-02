@@ -561,6 +561,13 @@ READER_TRUTH_APIS = [
     ("/api/coaches", "API · coaches"),
 ]
 
+# #1922: API payloads swept by the DETERMINISTIC phase-plausibility pass with
+# the strict "Day N"-in-prose rule. Strict is right where no prior-cycle
+# narration can legitimately appear (vitals is clamped-to-genesis by ADR-077);
+# narrative payloads (coaches) may narrate a labeled prior cycle, so their
+# prose day-claims stay with the LLM's temporal_contradiction category.
+STRICT_PLAUSIBILITY_APIS = {"/api/vitals"}
+
 
 def _fetch_reader_truth_surfaces():
     """Fetch the reader-truth surface set. Returns (surfaces, fetch_warnings).
@@ -584,9 +591,58 @@ def _fetch_reader_truth_surfaces():
     return surfaces, warnings
 
 
+def _check_phase_plausibility(surfaces):
+    """#1922: the deterministic half of Reader Truth. Pure arithmetic over the
+    fetched API payloads (the #1917 registry + span/day rules) — zero tokens,
+    so it is NEVER budget-paused: the 26-day dark window that hid drift from
+    the LLM pass (#1920/ADR-147 §5) structurally cannot happen here. Runs on
+    the same fetched surfaces and reports through the same Reader Truth path.
+    """
+    det = Check("reader_truth:plausibility", "Reader Truth", CONTENT_TRUTH)
+    try:
+        from operational import phase_plausibility, reader_truth_qa
+
+        payloads = [
+            {"path": p["path"], "body": p["prose"], "strict": p["path"] in STRICT_PLAUSIBILITY_APIS}
+            for p in surfaces
+            if p["path"].startswith("/api/")
+        ]
+        if not payloads:
+            return [det.warn("no API payloads fetched — deterministic pass skipped this run (fail-soft)")]
+        findings, warnings = phase_plausibility.sweep_payloads(payloads)
+        phase = reader_truth_qa.phase_context()
+        day = f"{phase['days_until_start']}d pre-start" if phase["pre_start"] else f"Day {phase['day_n']}"
+        checks = []
+        for w in warnings:
+            checks.append(Check("reader_truth:plausibility", "Reader Truth", CONTENT_TRUTH).warn(f"{w} — NOT checked"))
+        if findings:
+            det.fail(
+                f"{len(findings)} phase-impossible claim(s) at {day} (deterministic): "
+                + "; ".join(f"{f['page']} [{f['category']}] {f['note'][:90]}" for f in findings[:4])
+            )
+        else:
+            det.ok(f"{len(payloads)} API payload(s) phase-plausible at {day} (deterministic, no AI)")
+        checks.append(det)
+        return checks
+    except Exception as e:
+        return [det.warn(f"phase-plausibility errored — skipped this run (fail-soft): {str(e)[:120]}")]
+
+
 def check_reader_truth():
     checks = []
     verdict = Check("reader_truth:verdict", "Reader Truth", CONTENT_TRUTH)
+
+    # Fetch ONCE — both the deterministic and the LLM pass read this set.
+    surfaces, fetch_warnings = _fetch_reader_truth_surfaces()
+    for w in fetch_warnings:
+        checks.append(Check("reader_truth:fetch", "Reader Truth", CONTENT_TRUTH).warn(f"{w} (fail-soft)"))
+    if not surfaces:
+        checks.append(verdict.warn("no surfaces fetched — Reader Truth skipped this run (fail-soft)"))
+        return checks
+
+    # Deterministic pass FIRST, unconditionally (#1922) — arithmetic has no
+    # budget tier. Only the LLM half below is subject to the pause ladder.
+    checks.extend(_check_phase_plausibility(surfaces))
 
     # Budget gate — internal QA pauses first (ADR-125). Explicit ⏸, never silent.
     try:
@@ -602,23 +658,17 @@ def check_reader_truth():
             # check (lambda_handler only emails on a real FAILURE; a pause alone
             # would otherwise never leave CloudWatch Logs).
             reader_truth_qa.emit_budget_pause_metric("qa_smoke", tier)
-            return [verdict.pause(f"Reader Truth AI skipped — budget tier {tier} (internal QA pauses first, ADR-125)")]
+            checks.append(verdict.pause(f"Reader Truth AI skipped — budget tier {tier} (internal QA pauses first, ADR-125)"))
+            return checks
     except Exception as e:
         # Import/SSM blip: same fail-open posture as budget_guard itself — but if
         # the shared module is missing the sweep below can't run either, so warn.
         logger.warning("reader-truth budget gate degraded: %s", e)
 
     try:
-        from operational import reader_truth_qa
-
-        surfaces, fetch_warnings = _fetch_reader_truth_surfaces()
-        for w in fetch_warnings:
-            checks.append(Check("reader_truth:fetch", "Reader Truth", CONTENT_TRUTH).warn(f"{w} (fail-soft)"))
-        if not surfaces:
-            checks.append(verdict.warn("no surfaces fetched — Reader Truth skipped this run (fail-soft)"))
-            return checks
-
         from ai import bedrock_client
+
+        from operational import reader_truth_qa
 
         findings, errors = reader_truth_qa.assess_prose(surfaces, bedrock_client.invoke)
         phase = reader_truth_qa.phase_context()

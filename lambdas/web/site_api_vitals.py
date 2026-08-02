@@ -82,7 +82,14 @@ def handle_vitals(date: str | None = None) -> dict:
     if date and not _re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
         return _error(400, "date must be YYYY-MM-DD")
     ip = bool(date)  # ADR-058: include pilot/prior-cycle records only when time-travelling
-    _now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    # #1922: the site's day frame is PACIFIC (every user-facing date on the site
+    # is PT). Anchoring this handler's "today" in UTC made the payload claim
+    # "Day N+1" every PT evening — window_disclosure said Day 7 while the site's
+    # phase truth (and qa-smoke's reader_truth ground truth, which is PT) said
+    # Day 6, and _window_span could declare a 7-day span on Day 6. No data rows
+    # dated ahead of PT-today exist (ingestion crons run 4am-10pm PT), so the
+    # query end-bound is unaffected in practice; only the day frame honest-izes.
+    _now = datetime.now(PT).strftime("%Y-%m-%d")
     anchor = min(date, _now) if date else _now  # clamp a future scrub to today
     _anchor_dt = datetime.strptime(anchor, "%Y-%m-%d").replace(tzinfo=timezone.utc)
     today = anchor
@@ -231,7 +238,7 @@ def handle_vitals(date: str | None = None) -> dict:
     # intake simply hasn't been uploaded yet. Mirror /physical's weight_as_of pattern.
     _nutrition_as_of = None
     try:
-        _mf = _query_source("macrofactor", (datetime.now(timezone.utc) - timedelta(days=10)).strftime("%Y-%m-%d"), today)
+        _mf = _query_source("macrofactor", (datetime.now(PT) - timedelta(days=10)).strftime("%Y-%m-%d"), today)
         _mf_dates = [(m.get("date") or m.get("sk", "").replace("DATE#", "")) for m in _mf]
         _nutrition_as_of = max([d for d in _mf_dates if d], default=None)
     except Exception:
