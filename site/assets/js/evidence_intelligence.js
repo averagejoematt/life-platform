@@ -338,9 +338,16 @@ export function renderCalibration(d) {
     ? _calStatFigs(p)
     : `<p class="cs-fresh">Fresh slate — career: n=${life.n}. Nothing has graded this cycle yet; the coaches' calls are already logged and resolve as their windows close.</p>`;
   const careerBody = life.n > 0 ? _calStatFigs(life) : `<p class="cs-fresh">No graded forecasts in the archive yet.</p>`;
+  // #1893: the void ledger, made visible. A reset voids (never grades) every
+  // still-open pre-registered bet; without this line the career n silently
+  // reads as the whole record when ~85% of all bets were voided at resets.
+  const voided = (d && d.voided) || {};
+  const voidLine = voided.n > 0
+    ? `<p class="cs-fresh">${esc(String(voided.n))} pre-registered bets voided at resets — never graded, shown so this denominator is honest.</p>`
+    : "";
   const pair = `<div class="cs-pair">` +
     `<div class="cs-card"><h3 class="cs-h">This season${cycle ? ` · cycle ${esc(cycle)}` : ""}</h3>${seasonBody}</div>` +
-    `<div class="cs-card"><h3 class="cs-h">Career · every cycle</h3>${careerBody}</div>` +
+    `<div class="cs-card"><h3 class="cs-h">Career · every cycle</h3>${careerBody}${voidLine}</div>` +
     `</div>`;
 
   const bins = p.reliability_bins || [];
