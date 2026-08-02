@@ -528,3 +528,173 @@ SCOPED_SOURCES = tuple(sorted(s for s, c in SOURCE_CLASS.items() if c == EXPERIM
 CROSS_PHASE_SOURCES = tuple(sorted(s for s, c in SOURCE_CLASS.items() if c == CROSS_PHASE))
 SYSTEM_STATE_SOURCES = tuple(sorted(s for s, c in SOURCE_CLASS.items() if c == SYSTEM_STATE))
 RAW_TIMESERIES_SOURCES = tuple(sorted(s for s, c in SOURCE_CLASS.items() if c == RAW_TIMESERIES))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# The pre-registered-bet ledger invariant (#1978)
+# ─────────────────────────────────────────────────────────────────────────────
+# EXPERIMENT_SCOPED bets (HYPOTHESIS# rows, coach PREDICTION# rows) are tombstoned
+# by the wipe, which hides them from every phase-filtered read forever. ADR-077
+# justifies that on the promise that the outcome survives in the CROSS_PHASE
+# calibration ledger, and #1199 made the reset keep that promise going forward.
+#
+# But "forward" was doing load-bearing work: nothing ever ASSERTED the promise, so
+# a bet that slipped past the void step (anything tombstoned before #1199 landed,
+# plus anything whose void row got clobbered — see void_row_sk) went phase-hidden
+# while still `pending`, unreachable by the grader and absent from the ledger. That
+# is a pre-registered bet the platform made and then quietly stopped counting.
+#
+# The invariant, stated once and enforced by find_unvoided_open_bets():
+#
+#     no record may be BOTH open-status AND tombstoned AND absent from the
+#     calibration void ledger — every bet resolves to graded or voided.
+#
+# Same posture as classify()'s unknown-source KeyError: the registry refuses to let
+# a case default silently. Deliberately pure (no boto3, no I/O) so the reset tools,
+# the reconcile script and the test suite all assert the identical rule.
+
+# Statuses that mean "this bet has not resolved yet". Everything else (confirmed,
+# refuted, inconclusive, archived, …) is a terminal grade and needs no void row.
+OPEN_BET_STATUSES = frozenset({"pending", "confirming"})
+
+# kind → the calibration ledger's record_type for its void row.
+VOID_RECORD_TYPES = {"hypothesis": "hypothesis_void", "prediction": "prediction_void"}
+
+# The date #1199 (grade-or-void at reset) landed. Used only to CLASSIFY an orphan as
+# historical-backlog vs. a live escape — never to excuse one.
+PREREG_VOID_FIX_LANDED = "2026-07-17"
+
+
+def is_open_bet(item: dict) -> bool:
+    """True when a bet's status is still unresolved (no terminal grade)."""
+    return str(item.get("status", "")).strip().lower() in OPEN_BET_STATUSES
+
+
+def bet_registered_at(kind: str, bet: dict) -> str:
+    """The bet's own pre-registration stamp — the half of its identity that its
+    slug does NOT carry.
+
+    Mirrors what restart_pipeline.build_void_calib_item writes into the void row's
+    `pre_registered_at`, so a bet and its ledger row agree by construction:
+    hypotheses use pre_registered_at (falling back to created_at for rows written
+    before the field existed), predictions use created_date.
+    """
+    if kind == "hypothesis":
+        return str(bet.get("pre_registered_at") or bet.get("created_at") or "")
+    return str(bet.get("created_date") or bet.get("created_at") or "")
+
+
+def bet_id_of(kind: str, bet: dict) -> str:
+    """The bet's slug, falling back to the sk suffix (mirrors build_void_calib_item)."""
+    prefix = "HYPOTHESIS#" if kind == "hypothesis" else "PREDICTION#"
+    field = "hypothesis_id" if kind == "hypothesis" else "prediction_id"
+    return str(bet.get(field) or str(bet.get("sk", "")).replace(prefix, ""))
+
+
+def bet_ledger_key(kind: str, bet: dict) -> tuple:
+    """Identity of a bet IN the calibration ledger: (record_type, coach, id, registered_at).
+
+    The registration stamp is part of the key on purpose. `hypothesis_id` alone is
+    NOT unique — the genesis pre-registration re-uses the same slugs every cycle
+    (genesis_prereg_h1/h2), so slug-only matching silently treats one cycle's void
+    row as proof that a different cycle's identically-named bet was resolved.
+    """
+    return (VOID_RECORD_TYPES.get(kind, kind), str(bet.get("coach_id") or ""), bet_id_of(kind, bet), bet_registered_at(kind, bet))
+
+
+def void_row_ledger_key(row: dict) -> tuple | None:
+    """The same identity read off a CALIB# void row, or None if it isn't one."""
+    rt = str(row.get("record_type") or "")
+    if rt not in VOID_RECORD_TYPES.values():
+        return None
+    bet_id = str(row.get("hypothesis_id") or row.get("prediction_id") or "")
+    return (rt, str(row.get("coach_id") or ""), bet_id, str(row.get("pre_registered_at") or ""))
+
+
+def void_row_sk(genesis: str, kind: str, bet: dict) -> str:
+    """Collision-proof sk for a void row: CALIB#<genesis>#void#<hyp|pred>#<id>[#<8hex>].
+
+    The original #1199 key was (genesis, slug) only — which is why two of the
+    post-#1199 orphans exist. The 2026-07-20 reset voided that cycle's genesis
+    pre-registration pair, then a same-genesis re-run voided the NEW pair, whose
+    slugs are byte-identical (genesis_prereg_h1/h2); the second put_item overwrote
+    the first and the earlier pair's only ledger record vanished. Folding a digest
+    of the registration stamp into the key makes each bet's row its own, while
+    staying idempotent (same bet + same genesis → same sk).
+    """
+    import hashlib
+
+    tag = "hyp" if kind == "hypothesis" else "pred"
+    coach = str(bet.get("coach_id") or "")
+    base = f"CALIB#{genesis}#void#{tag}#" + (f"{coach}#" if tag == "pred" else "") + bet_id_of(kind, bet)
+    registered = bet_registered_at(kind, bet)
+    if not registered:
+        return base
+    return base + "#" + hashlib.sha256(registered.encode("utf-8")).hexdigest()[:8]
+
+
+def find_unvoided_open_bets(bets, void_rows) -> list:
+    """THE invariant. Return every (kind, bet) that is open-status AND tombstoned AND
+    has no matching row in the calibration void ledger — i.e. every pre-registered bet
+    the platform hid without ever resolving it. An empty list is the healthy state.
+
+    `bets` is an iterable of (kind, item); `void_rows` is the CALIB# partition.
+    Untombstoned open bets are excluded: they are still live and visible to the
+    grader, and the reset's own void step is what will resolve them.
+    """
+    voided = {k for k in (void_row_ledger_key(r) for r in void_rows) if k is not None}
+    return [(kind, bet) for kind, bet in bets if is_open_bet(bet) and bet.get("tombstone") and bet_ledger_key(kind, bet) not in voided]
+
+
+def assert_no_unvoided_open_bets(bets, void_rows) -> int:
+    """Raise ValueError naming the breach when the invariant fails; else return 0.
+
+    Same refuse-to-default posture as classify()'s unknown-source KeyError — the
+    reset asserts the promise ADR-077 makes instead of assuming it.
+    """
+    orphans = find_unvoided_open_bets(bets, void_rows)
+    if not orphans:
+        return 0
+    by_kind: dict[str, int] = {}
+    for kind, _ in orphans:
+        by_kind[kind] = by_kind.get(kind, 0) + 1
+    breakdown = ", ".join(f"{k}={v}" for k, v in sorted(by_kind.items()))
+    raise ValueError(
+        f"phase_taxonomy: pre-registered-bet ledger invariant BREACHED — {len(orphans)} open+tombstoned "
+        f"bet(s) with no calibration void row ({breakdown}). ADR-077 only sanctions hiding a bet if its "
+        f"outcome survives in the CROSS_PHASE ledger. Reconcile with "
+        f"`python3 deploy/reconcile_prereg_voids.py --apply` (#1978), then re-run."
+    )
+
+
+def closing_genesis_of(bet: dict) -> str | None:
+    """The genesis of the reset that tombstoned this bet, from its own provenance.
+
+    The wipe writes `tombstoned_reason = experiment_restart_<YYYY-MM-DD>`; the
+    `tombstoned_at` date is the fallback. Returns None when neither is readable —
+    the caller must then void with an explicitly unknown stamp rather than guess
+    (ADR-104: an unknown provenance is reported, never invented).
+    """
+    import re as _re
+
+    m = _re.search(r"experiment_restart_(\d{4}-\d{2}-\d{2})", str(bet.get("tombstoned_reason") or ""))
+    if m:
+        return m.group(1)
+    stamp = str(bet.get("tombstoned_at") or "")[:10]
+    return stamp if _re.fullmatch(r"\d{4}-\d{2}-\d{2}", stamp) else None
+
+
+def closing_cycle_for_genesis(genesis: str | None, cycle_geneses: dict) -> int | None:
+    """The cycle that a reset CLOSED, given the genesis it opened.
+
+    `cycle_geneses` maps cycle number → genesis date (site_api_data.CYCLE_GENESES).
+    The reset that opens cycle N closes cycle N-1 — which is exactly the number the
+    wipe stamps onto the records it archives. Returns None for an unregistered or
+    unknown genesis (cycle 1 has no predecessor).
+    """
+    if not genesis:
+        return None
+    for cycle, gen in cycle_geneses.items():
+        if gen == genesis:
+            return int(cycle) - 1 if int(cycle) > 1 else None
+    return None
