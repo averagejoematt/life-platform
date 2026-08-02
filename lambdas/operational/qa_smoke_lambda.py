@@ -50,7 +50,13 @@ TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 # #1894/#1225: the weight-truth assessors live in their own module (the size gate
 # asks for a cohesive split, not a grandfather entry). Re-exported so
 # qa_smoke_lambda.assess_hero_weight stays a valid public entrypoint.
-from operational import weight_truth_qa  # noqa: E402
+# #1949: the raw-archive liveness check (raw_layout facets must be live-true)
+# lives in its own module, same size-split pattern — this file owns the AWS
+# clients and the nightly wiring, raw_archive_qa owns the logic.
+from operational import (
+    raw_archive_qa,  # noqa: E402
+    weight_truth_qa,  # noqa: E402
+)
 
 # #1921: the result vocabulary (Check + its partitions) and the run's own EMF
 # reporting live in operational/qa_check.py — one concern, lifted out when this
@@ -871,6 +877,8 @@ def lambda_handler(event, context):
         all_checks += check_ddb_freshness()
         all_checks += check_hae_liveness_truth()  # #2001: dark HAE datatypes must carry a numeric days_dark when one is findable
         all_checks += check_s3_freshness()
+        # #1949: raw_layout facets must be live-true (DDB-fresh/raw-dead reds a check)
+        all_checks += raw_archive_qa.check_raw_archive_liveness(table, s3, S3_BUCKET, Check, CONTENT_TRUTH, pt_now)
         all_checks += check_score_sanity()
         all_checks += check_lambda_secrets()
         all_checks += check_avatar_assets()  # character avatar visuals — kept (real check)

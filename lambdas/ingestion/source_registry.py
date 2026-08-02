@@ -546,7 +546,13 @@ SOURCE_REGISTRY = {
             "prefix": "raw/weather",
             "scheme": "date-tree",
             "filename": "YYYY-MM-DD.json",
-            "note": "legacy layout — no user segment (X-9)",
+            "note": (
+                "legacy layout — no user segment (X-9). Gap 2026-03-10 → 2026-08 (#1949): the "
+                "03-09 IAM migration dropped the role's PutObject grant and the framework "
+                "swallowed the AccessDenied; grant restored + failure unswallowed 2026-08-02. "
+                "The gap is refetchable from Open-Meteo's archive API if ever needed (DDB was "
+                "never affected)."
+            ),
         },
     },
     # ── #498: registry-resident for facets only — freshness: False keeps every

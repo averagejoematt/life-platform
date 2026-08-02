@@ -77,6 +77,9 @@ CLEAN_FILES = [
     # DIRECTORY is not in the clean set and CLEAN_DIRS globs are non-recursive, so
     # a new module there silently leaves the gate unless it is named.
     "lambdas/operational/qa_check.py",
+    # #1949: the raw-archive liveness check — clean from birth, named for the
+    # same reason as qa_check.py above (operational/ globs are non-recursive).
+    "lambdas/operational/raw_archive_qa.py",
     "lambdas/operational/reader_truth_qa.py",
     "lambdas/operational/redirect_spotcheck.py",
 ]

@@ -487,12 +487,28 @@ def ingestion_macrofactor() -> list[iam.PolicyStatement]:
 
 
 def ingestion_weather() -> list[iam.PolicyStatement]:
-    """Weather: DDB write only, no S3, no secrets."""
+    """Weather: DDB write + S3 raw/weather (legacy X-9 prefix, no user segment), no secrets.
+
+    #1949: the 2026-03-09 IAM migration (8426d0e) shipped this role "DDB write
+    only, no S3" while weather_lambda.py kept s3_archive_prefix="raw/weather" —
+    the framework's swallowed AccessDenied killed the raw archive silently for
+    ~5 months (newest object stayed 2026/03/2026-03-09.json). The archive is the
+    intended posture (the lambda never stopped attempting the write), so the
+    grant is restored here; tests/test_raw_archive_role_parity.py now pins every
+    s3_archive_prefix to a role that can actually write it.
+    """
     return [
         iam.PolicyStatement(
             sid="DynamoDB",
             actions=["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:Query"],
             resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="S3Write",
+            actions=["s3:PutObject"],
+            # Legacy raw layout — raw/weather/{YYYY}/{MM}/{YYYY-MM-DD}.json, no
+            # user segment (X-9/#498; the registry's raw_layout facet is canon).
+            resources=_s3("raw/weather/*"),
         ),
         iam.PolicyStatement(
             sid="KMS",
@@ -2120,7 +2136,12 @@ def operational_qa_smoke() -> list[iam.PolicyStatement]:
             resources=[BUCKET_ARN],
             # check_avatar_assets lists the character avatar sprites (was AccessDenied —
             # 2026-06-03). blog/* kept scoped for if/when that surface is revived.
-            conditions={"StringLike": {"s3:prefix": ["dashboard/avatar/*", "blog/*"]}},
+            # + raw/* (#1949): check_raw_archive_liveness lists each registry
+            #   raw_layout prefix (metadata only — LastModified; no GetObject on
+            #   raw/*) so a DDB-fresh/raw-dead source reds a check instead of
+            #   printing into an unread log for five months. Fail-soft in the
+            #   lambda — degrades to a WARN naming this grant until it deploys.
+            conditions={"StringLike": {"s3:prefix": ["dashboard/avatar/*", "blog/*", "raw/*"]}},
         ),
         iam.PolicyStatement(
             sid="SecretsGetMCP",

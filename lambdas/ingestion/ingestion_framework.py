@@ -470,7 +470,15 @@ def _store_item(table, s3, config, item, date_str, logger):
 
 
 def _archive_raw(s3, config, date_str, raw_data):
-    """Archive raw API response to S3."""
+    """Archive raw API response to S3.
+
+    Returns the exception on failure, None on success. #1949: this failure used
+    to be fully swallowed (log-and-continue) — weather's raw archive died with
+    the 2026-03-09 IAM migration and the AccessDenied printed into an unread log
+    twice daily for ~5 months. Still non-fatal per date (the DDB write already
+    succeeded), but the runner now counts it, fails the run's ER-01 ingest-health
+    record, and returns 207 so the failure has a pulse on every liveness surface.
+    """
     try:
         year = date_str[:4]
         month = date_str[5:7]
@@ -487,9 +495,11 @@ def _archive_raw(s3, config, date_str, raw_data):
             ),
             ContentType="application/json",
         )
+        return None
     except Exception as e:
-        # S3 archive is non-fatal but losing audit trail is concerning — log as ERROR
+        # Non-fatal for the date's stored data, but never silent (#1949).
         print(f"[ERROR] S3 archive failed for {config.source_name}/{date_str} — audit trail lost: {e}")
+        return e
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -645,6 +655,8 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn, event, co
     results = {}
     records_written = 0
     errors = 0
+    archive_failures = 0  # #1949: raw-S3 archive writes that failed (non-fatal per date, never silent)
+    last_archive_error = None
     last_error_class = "none"  # ER-01: classify the most recent per-date failure
 
     for i, date_str in enumerate(dates_to_ingest):
@@ -694,10 +706,18 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn, event, co
                 except Exception as e:
                     logger.warning(f"post_store_fn failed for {date_str}: {e}")
 
-            # Archive raw to S3
-            _archive_raw(s3, config, date_str, raw)
+            # Archive raw to S3. #1949: a failed archive no longer vanishes —
+            # it fails the run's ingest-health record and the 207 below. It stays
+            # OUT of `errors` so it can't trip the ADR-052 auth breaker (an S3
+            # AccessDenied is an IAM/role fault, not an upstream credential one)
+            # and can't stop the loop from storing the remaining dates.
+            archive_exc = _archive_raw(s3, config, date_str, raw)
+            if archive_exc is not None:
+                archive_failures += 1
+                last_archive_error = archive_exc
+                logger.error(f"  {date_str}: raw-archive write FAILED ({config.s3_archive_prefix}) — {archive_exc}")
 
-            results[date_str] = len(stored_items)
+            results[date_str] = len(stored_items) if archive_exc is None else f"{len(stored_items)} (archive_failed)"
             logger.info(f"  {date_str}: {len(stored_items)} record(s) stored")
 
         except Exception as e:
@@ -728,13 +748,21 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn, event, co
     # (a date that simply had no data is NOT an error → still a healthy run). This
     # is what distinguishes "user didn't log" (succeeded) from "ingestion erroring"
     # (errors > 0 → streak grows → heartbeat alerts).
+    # #1949: a raw-archive write failure ALSO fails the run — it was invisible on
+    # every liveness surface for ~5 months while weather's role couldn't write
+    # raw/weather. classify_error on the S3 exception is honest here: AccessDenied
+    # classifies "auth" (it IS an authorization fault — just IAM, not upstream;
+    # the ADR-052 breaker is deliberately not tripped above).
+    if errors == 0 and archive_failures > 0:
+        last_error_class = classify_error(last_archive_error) if _INGEST_HEALTH_AVAILABLE else "transport"
+    succeeded = errors == 0 and archive_failures == 0
     _record_ingest_health(
         table,
         config,
         logger,
         attempted=True,
-        succeeded=(errors == 0),
-        error_class="none" if errors == 0 else last_error_class,
+        succeeded=succeeded,
+        error_class="none" if succeeded else last_error_class,
     )
 
     # ── Summary ──
@@ -743,15 +771,16 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn, event, co
         "dates_processed": len(dates_to_ingest),
         "records_written": records_written,
         "errors": errors,
+        "archive_failures": archive_failures,
         "results": results,
     }
     if config.enable_gap_detection:
         summary["mode"] = "gap_fill"
         summary["lookback_days"] = config.lookback_days
 
-    logger.info(f"Ingestion complete: {records_written} records, {errors} errors")
+    logger.info(f"Ingestion complete: {records_written} records, {errors} errors, {archive_failures} archive failures")
 
     return {
-        "statusCode": 200 if errors == 0 else 207,
+        "statusCode": 200 if succeeded else 207,
         "body": json.dumps(summary, default=str),
     }
