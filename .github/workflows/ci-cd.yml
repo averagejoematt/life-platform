@@ -84,7 +84,25 @@ concurrency:
   # success; only this workflow's group was stuck. Trigger matches v2/v3 — several
   # supersede-cancellations earlier in the session. Salting is the only known fix;
   # cancelling members does not clear the phantom entry.
-  group: ${{ github.workflow }}-${{ github.ref }}-v4
+  #
+  # 2026-08-02, FOURTH recurrence (run 30733223422 — pending, 0 jobs, 13+ min, only
+  # member of the group; Docs CI and CodeQL on the same sha both succeeded). Salting
+  # a hand-bumped counter has now failed three times in eleven days, so this stops
+  # being a salt and becomes a design change:
+  #
+  #   * The WORKFLOW-level group is per-RUN unique, so a run can never queue behind
+  #     anything and therefore can never inherit a phantom queue entry. This is the
+  #     property that was actually protecting nothing — validation jobs (lint, tests,
+  #     plan) are pure and safe to run concurrently.
+  #   * The invariant that DID matter — never two concurrent deploys of the same ref —
+  #     moves to a job-level concurrency block on `deploy` (below), where it belongs.
+  #     Blast radius if a phantom ever forms there is one job on one ref, visible as a
+  #     stuck Deploy rather than an entire pipeline that never starts, and the
+  #     production approval gate already serialises it in practice.
+  #
+  # If a phantom EVER appears again after this, it can only be in the deploy group —
+  # and that is a much narrower thing to reason about than "no CI at all".
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.run_id }}
   cancel-in-progress: false
 
 env:
@@ -625,6 +643,13 @@ jobs:
     needs: [reconcile, plan]   # #1173: reconcile listed to read build_sha
     if: needs.plan.outputs.has_deploys == 'true'
     environment: production   # ← Manual approval gate
+    # The real invariant, moved here from the workflow level (2026-08-02, 4th
+    # phantom-queue wedge): never two concurrent deploys of the same ref. A
+    # mid-flight deploy still completes (cancel-in-progress: false) — it is only
+    # the *validation* jobs that no longer queue behind anything.
+    concurrency:
+      group: ci-cd-deploy-${{ github.ref }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
