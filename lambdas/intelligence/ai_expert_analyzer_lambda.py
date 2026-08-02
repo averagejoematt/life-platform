@@ -1299,8 +1299,21 @@ def generate_and_cache(expert_key, shared_system=None):
             _facts = _load_canonical_facts()
             _allowed = _gg.allowed_numbers(prompt, shared_system, _facts)
 
+            # #1897: pass the cycle anchors so the phase-aware classes actually
+            # run. Omitting them is why "Zero food logs in seven days of an
+            # experiment" shipped on Day 1 — baseline_freshness and the new
+            # experiment_span class both no-op without them, and the digit gates
+            # cannot see a spelled-out number.
+            _gen_date_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
             def _findings_fn(_t):
-                return _gg.grounding_findings(_t, facts=_facts, allowed=_allowed)
+                return _gg.grounding_findings(
+                    _t,
+                    facts=_facts,
+                    allowed=_allowed,
+                    generation_date_iso=_gen_date_iso,
+                    start_date_iso=EXPERIMENT_START,
+                )
 
             def _regen(_correction):
                 from common.retry_utils import call_anthropic_raw
