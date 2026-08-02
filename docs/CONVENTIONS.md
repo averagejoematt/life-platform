@@ -134,9 +134,14 @@ python3 -m ruff check .
 python3 -m pytest tests/test_mypy_clean_modules.py     # the mypy-clean module set
 ```
 CI pins specific tool versions — read them from CI rather than quoting here
-(`grep -E 'black==|ruff==|mypy==' .github/workflows/ci-cd.yml requirements-dev.txt`).
-Note `requirements-dev.txt` can drift from the CI pin; match the **CI** version when
-they disagree.
+(`grep -E 'black==|ruff==|mypy==' .github/workflows/*.yml requirements-dev.txt`).
+Grep the **whole workflows directory**, not one file: the #1655 extraction moved the
+lint pins out of `ci-cd.yml` into `ci-lint.yml`, and a single-file grep silently shows
+only the `requirements-dev.txt` half — exactly the half the next sentence tells you
+not to trust. Note `requirements-dev.txt` can drift from the CI pin; match the **CI**
+version when they disagree. (`tests/test_ci_pin_consistency.py` runs this command
+verbatim from this page and reds if it stops surfacing the CI-side pins, so a future
+workflow reshuffle can't blind it again.)
 
 **The CDK toolchain is pinned both directions too (#814, R22-MOD-01).** Before this
 fix, `ci-cd.yml`'s `npm install -g aws-cdk` had no version (always latest CLI) and
