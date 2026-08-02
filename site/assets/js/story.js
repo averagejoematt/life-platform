@@ -20,6 +20,7 @@ import { instrumentMark, fnv1a, mulberry32 } from "/assets/js/sigils.js"; // vis
 import { domainIcon } from "/assets/js/icons.js"; // #590 — pillar icon for the hover door affordance
 import { seasonBand } from "/assets/js/texture.js"; // #1471 — the season banner on the premiere beat
 import { featuredQuoteHTML } from "/assets/js/journal_quotes.js"; // #1568 — the weekly featured line (ADR-142)
+import { heroProofLine, BRIEF_LINE_KICKER } from "/assets/js/daily_line.js"; // #1994/#1995 — Day-1-safe hero sentence + the one honest brief-line label
 
 const $ = (s, r = document) => r.querySelector(s);
 const bind = (n, r = document) => r.querySelector(`[data-bind="${n}"]`);
@@ -347,38 +348,13 @@ function renderNumbers(journey, pre) {
   // P2.1 — pair the live weight delta with the genesis timeframe up in the hero, so the claim
   // meets its proof on the opening screen (down-beat waveform leads just below).
   if (journey.lost_lbs != null) {
-    const lost = Number(journey.lost_lbs);
     const hp = bind("hero-proof");
     if (hp) {
-      const mag = Math.round(Math.abs(lost) * 10) / 10;
-      const dir = lost > 0.05 ? `down ${mag} lb` : lost < -0.05 ? `up ${mag} lb` : "even";
-      // #1225 — "in N days" is a TREND claim; it needs >= 2 weigh-ins spanning that
-      // stretch. Off a single Day-1 weigh-in "up 1.6 lb in 4 days" invents a 4-day arc
-      // that never happened (the delta elapsed in ~0 experiment days). With one reading
-      // we say "since the start" and name the lone weigh-in instead (ADR-105).
-      const nWeighins = Number(journey.weighin_count) || 0;
-      const span = Number(journey.weighin_span_days) || 0;
-      const { dayN } = genesisCount();
-      // Honest as-of: the day counter ticks live while the weight only moves at weigh-ins —
-      // during a quiet stretch the pairing reads false without the anchor date.
-      let lwLabel = "";
-      if (journey.last_weighin_date) {
-        const lw = new Date(`${journey.last_weighin_date}T12:00:00`);
-        if (!isNaN(lw.getTime())) lwLabel = lw.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-      }
-      if (nWeighins >= 2 && span >= 1) {
-        // A real multi-weigh-in trend — keep the elapsed-days framing, anchored when stale.
-        let asof = "";
-        if (lwLabel && journey.last_weighin_date) {
-          const lw = new Date(`${journey.last_weighin_date}T12:00:00`);
-          if ((Date.now() - lw.getTime()) / 86400000 > 1.5) asof = ` (last weigh-in ${lwLabel})`;
-        }
-        hp.textContent = `${dir} in ${dayN} days${asof} — the shape of it, every day, just below.`;
-      } else {
-        // A single weigh-in: no N-day trend. State it honestly.
-        const one = lwLabel ? ` — one weigh-in so far, ${lwLabel}` : " so far";
-        hp.textContent = `${dir} since the start${one}. The shape of it, every day, just below.`;
-      }
+      // #1994 — the sentence (all three delta branches + the #1225 single-weigh-in
+      // honesty rules) is composed by the PURE heroProofLine in daily_line.js so
+      // tests/js/daily_line.test.mjs can pin the Day-1 zero-delta branch to
+      // deliberate English ("holding even since the start"), never a bare "even".
+      hp.textContent = heroProofLine(journey, genesisCount().dayN);
       hp.hidden = false;
     }
   }
@@ -768,7 +744,21 @@ async function load() {
   if (statsV) {
     // Pre-start the stored hero line can narrate the WIPED cycle — the static
     // timeless line in the HTML stands instead.
-    if (statsV.elena_hero_line && !pre) bind("elena").textContent = statsV.elena_hero_line;
+    if (statsV.elena_hero_line && !pre) {
+      // #1995 — the brief line's deictics are anchored to the DATA day (yesterday
+      // by mint time, #1251): label it with the one honest kicker before binding,
+      // so "tomorrow" in the line can never sit under a "today" frame on home.
+      // The static timeless line stays unlabeled — the kicker belongs to the
+      // live brief line only, so it is inserted here, not in the HTML shell.
+      const elenaEl = bind("elena");
+      if (elenaEl && !$(".hero-elena-kicker")) {
+        const k = document.createElement("p");
+        k.className = "label hero-elena-kicker";
+        k.textContent = BRIEF_LINE_KICKER;
+        elenaEl.parentNode.insertBefore(k, elenaEl);
+      }
+      if (elenaEl) elenaEl.textContent = statsV.elena_hero_line;
+    }
     if (statsV._meta && statsV._meta.generated_at) bind("asof").textContent = `updated ${String(statsV._meta.generated_at).slice(0, 10)}`;
   }
   // #949 — the hero's "this attempt starts at …" claim binds to the LIVE baseline
