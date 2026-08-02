@@ -598,7 +598,17 @@ def check_hero_weight_arithmetic():
 
 
 # ---------------------------------------------------------------------------
-
+# CHECK 10b — Coach labs truth (#1993)
+# ---------------------------------------------------------------------------
+# A served coach card must never narrate an empty labs store ("zero results …
+# a total sync failure") while /api/labs serves real draws. Lives in
+# operational/qa_check_coach_labs.py (the module-size ceiling split idiom,
+# #1665/#1944); re-exported here so qa_smoke_lambda.check_coach_labs_truth and
+# .assess_coach_labs_truth are valid public entrypoints for tests and callers.
+from operational.qa_check_coach_labs import (  # noqa: F401,E402
+    assess_coach_labs_truth,
+    check_coach_labs_truth,
+)
 
 # ---------------------------------------------------------------------------
 # CHECK 11 — Legacy redirect spot-check (#1430)
@@ -886,6 +896,7 @@ def lambda_handler(event, context):
         all_checks += check_reader_truth()  # #1096: phase-aware narrative truth (Haiku, budget-aware, fail-soft)
         all_checks += check_predict_week_freshness()  # #1198: predict-the-week never live on a stale ISO week
         all_checks += check_hero_weight_arithmetic()  # #1225: home hero stat row reconciles + trend-honest
+        all_checks += check_coach_labs_truth()  # #1993: no served coach text may narrate an empty labs store against real draws
         all_checks += weight_truth_qa.checks(Check, SITE_BASE_URL, CONTENT_TRUTH)  # #1894: home/cockpit vs the coaching door
         all_checks += check_receipt_replay()  # #1373: progression-receipt drift alarm (deterministic replay)
         all_checks += check_redirect_spotcheck()  # #1430: weekly legacy-redirect sample, rotates over redirects.map
