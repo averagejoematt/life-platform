@@ -17,7 +17,7 @@ keyed by the Pacific day. DST-aware via ``zoneinfo`` (mirrors the existing usage
 Pacific "today" from a raw UTC ``now`` inline.
 """
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from zoneinfo import ZoneInfo
 
 # DST-aware Pacific Time. PT swings between UTC-8 (PST) and UTC-7 (PDT) — a hardcoded
@@ -52,3 +52,25 @@ def pacific_date_of(iso_ts: str) -> str | None:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(PACIFIC).strftime("%Y-%m-%d")
+
+
+def pacific_day_n(start_date: str, on_date: str | None = None) -> int:
+    """1-based day index of a cycle in the Pacific frame — Day 1 IS ``start_date``.
+
+    THE one day-index formula (#1955): every public "Day N" claim — the vitals
+    window disclosure, /api/journey's ``day_n``, the home og:description — must
+    derive from this helper so two surfaces can never disagree on the day number
+    at the same wall-clock instant (og said "Day 6 … As of 2026-08-02" while
+    /api/vitals said "Day 7", 2026-08-02T02:36Z). Companion sweep of the
+    remaining UTC anchors in site_api_vitals is #1937.
+
+    ``start_date`` and ``on_date`` are YYYY-MM-DD strings already in the Pacific
+    calendar; ``on_date`` defaults to ``pacific_today()``. Clamped at 0 for a
+    pre-start date (matching the site_api_vitals inline formula this replaces);
+    returns 0 when either date can't be parsed (caller decides the fallback).
+    """
+    on = on_date or pacific_today()
+    try:
+        return max((date.fromisoformat(on) - date.fromisoformat(start_date)).days + 1, 0)
+    except (ValueError, TypeError):
+        return 0

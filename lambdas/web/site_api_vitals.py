@@ -30,6 +30,7 @@ from typing import Any
 
 import boto3  # #1240: S3/DDB clients used by handle_labs / handle_glucose / handle_genome_risks
 from boto3.dynamodb.conditions import Key
+from common.pacific_time import pacific_day_n  # #1955 — THE one PT day-index formula (shared with scripts/v4_proof.py)
 from experiment.phase_filter import with_phase_filter  # ADR-058 — used by handle_timeline
 from health import (
     achievement_rules,  # #1624: the ONE place badge thresholds live (shared with daily-metrics-compute)
@@ -204,11 +205,9 @@ def handle_vitals(date: str | None = None) -> dict:
     # stating the relationship rather than leaving it to be inferred, which is the
     # ADR-105 "the claim carries its context" idiom already used by `disclosure`
     # on /api/fulfillment and `coverage_floor` elsewhere.
-    _day_n = 0
-    try:
-        _day_n = max((datetime.strptime(today, "%Y-%m-%d") - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d")).days + 1, 0)
-    except Exception:
-        _day_n = 0
+    # #1955: the shared PT day-index helper — the same formula the home og uses,
+    # so this disclosure and the share card cannot disagree on the day number.
+    _day_n = pacific_day_n(EXPERIMENT_START, on_date=today)
     _bits = [f"Today is Day {_day_n} of the cycle that began {EXPERIMENT_START}, so at most {_day_n} day(s) of data can exist."]
     if weight_delta is not None and weight_delta_window_days is not None:
         _bits.append(
@@ -364,8 +363,9 @@ def handle_journey() -> dict:
     days_to_goal = _traj["days_to_goal"]
 
     # Day-of-experiment counter (1-indexed, experiment TZ) — the home/cockpit
-    # "what day are we on" number. Single source so labels stay in sync.
-    _day_n = max((datetime.now(PT).date() - date.fromisoformat(EXPERIMENT_START)).days + 1, 0)
+    # "what day are we on" number. Single source so labels stay in sync (#1955:
+    # the shared common.pacific_time helper, also used by scripts/v4_proof.py).
+    _day_n = pacific_day_n(EXPERIMENT_START)
 
     journey = {
         "start_weight_lbs": start_weight_disp,
