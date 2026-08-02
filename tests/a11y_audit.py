@@ -204,6 +204,26 @@ def update_baseline(observed_by_path, path=None, theme="dark"):
     return baseline
 
 
+def shrink_candidates(gate_results_by_path):
+    """{page_path: [rule_id, …]} for pages whose gate_findings() reported
+    "fixed" rules — baselined but no longer observed live (#1990).
+
+    `gate_findings` computes "fixed" on EVERY run, not just --update-baseline
+    ones, but before #1990 that signal only ever surfaced folded into each
+    page's free-text `warnings` list in tests/visual_qa.py, where it scrolled
+    by untriaged — the root cause the debt ledger went stale in the good
+    direction (real gating quietly off on pages that were actually clean)
+    with nobody the wiser. This gives it an explicit consumer: callers render
+    it as its own section (CI step summary, console tally) instead of one
+    line among many.
+
+    gate_results_by_path: {page_path: gate_findings() result dict}, e.g.
+    {r["path"]: r["a11y"] for r in results if r.get("a11y")} from a
+    tests/visual_qa.py sweep. Pure — no I/O.
+    """
+    return {path: g["fixed"] for path, g in gate_results_by_path.items() if g.get("fixed")}
+
+
 def summarize(baseline, theme="dark"):
     """{impact: total violation entries} across the baseline — honest numbers.
 

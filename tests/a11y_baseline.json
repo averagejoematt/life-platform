@@ -1,7 +1,7 @@
 {
   "_meta": {
     "axe_version": "4.12.1",
-    "captured_at": "2026-07-19T22:49:39+00:00",
+    "captured_at": "2026-08-02T21:24:07+00:00",
     "note": "Committed a11y debt ledger (#1433) \u2014 honest capture of current axe violations per page. The visual-qa gate reds only on NEW serious/critical violations vs this file. Update DELIBERATELY via `python3 tests/visual_qa.py --update-baseline` and review the diff in the PR; added entries are newly accepted debt, removed entries are fixes. Never hand-edit, never auto-regenerate.",
     "captured_at_light": "2026-08-02T20:45:21+00:00",
     "note_light": "Light-theme sibling ledger (#1991) \u2014 same honest-capture contract as 'pages'/note above, scoped to axe findings observed under a Playwright color_scheme='light' context. Update DELIBERATELY via `python3 tests/visual_qa.py --color-scheme light --update-baseline`; the weekly standalone sweep alternates dark/light by ISO-week parity so both ledgers stay current without a dedicated job."
@@ -13,12 +13,6 @@
         "impact": "minor",
         "help": "ARIA role should be appropriate for the element",
         "nodes": 1
-      },
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
       }
     ],
     "/coaching/by-coach/#eli_marsh": [
@@ -27,12 +21,6 @@
         "impact": "minor",
         "help": "ARIA role should be appropriate for the element",
         "nodes": 1
-      },
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 2
       }
     ],
     "/coaching/by-coach/#training_coach": [
@@ -41,12 +29,6 @@
         "impact": "minor",
         "help": "ARIA role should be appropriate for the element",
         "nodes": 1
-      },
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 3
       }
     ],
     "/coaching/coaches/": [
@@ -55,12 +37,6 @@
         "impact": "minor",
         "help": "ARIA role should be appropriate for the element",
         "nodes": 1
-      },
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 10
       }
     ],
     "/coaching/lab-notes/": [
@@ -68,12 +44,6 @@
         "id": "aria-allowed-role",
         "impact": "minor",
         "help": "ARIA role should be appropriate for the element",
-        "nodes": 1
-      },
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 1
       }
     ],
@@ -83,12 +53,6 @@
         "impact": "minor",
         "help": "ARIA role should be appropriate for the element",
         "nodes": 1
-      },
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
       }
     ],
     "/coaching/read/": [
@@ -96,12 +60,6 @@
         "id": "aria-allowed-role",
         "impact": "minor",
         "help": "ARIA role should be appropriate for the element",
-        "nodes": 1
-      },
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 1
       }
     ],
@@ -111,12 +69,6 @@
         "impact": "minor",
         "help": "ARIA role should be appropriate for the element",
         "nodes": 1
-      },
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
       }
     ],
     "/coaching/team/": [
@@ -125,12 +77,6 @@
         "impact": "minor",
         "help": "ARIA role should be appropriate for the element",
         "nodes": 1
-      },
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 10
       }
     ],
     "/cockpit/": [
@@ -138,28 +84,14 @@
         "id": "region",
         "impact": "moderate",
         "help": "All page content should be contained by landmarks",
-        "nodes": 3
+        "nodes": 4
       }
     ],
     "/data/": [
       {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      },
-      {
         "id": "heading-order",
         "impact": "moderate",
         "help": "Heading levels should only increase by one",
-        "nodes": 1
-      }
-    ],
-    "/data/autonomic/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 1
       }
     ],
@@ -168,7 +100,7 @@
         "id": "color-contrast",
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 41
+        "nodes": 40
       }
     ],
     "/data/character/": [
@@ -176,82 +108,22 @@
         "id": "color-contrast",
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 60
-      }
-    ],
-    "/data/glucose/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
+        "nodes": 61
       }
     ],
     "/data/habits/": [
       {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      },
-      {
         "id": "heading-order",
         "impact": "moderate",
         "help": "Heading levels should only increase by one",
-        "nodes": 1
-      }
-    ],
-    "/data/labs/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/data/mind/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/data/nutrition/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 1
       }
     ],
     "/data/physical/": [
       {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      },
-      {
         "id": "heading-order",
         "impact": "moderate",
         "help": "Heading levels should only increase by one",
-        "nodes": 1
-      }
-    ],
-    "/data/reading/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/data/sleep/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 1
       }
     ],
@@ -263,20 +135,12 @@
         "nodes": 7
       }
     ],
-    "/data/vices/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
     "/data/vitals/": [
       {
         "id": "color-contrast",
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 8
+        "nodes": 10
       },
       {
         "id": "heading-order",
@@ -285,29 +149,7 @@
         "nodes": 1
       }
     ],
-    "/data/zone2/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/gear/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 86
-      }
-    ],
     "/method/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      },
       {
         "id": "empty-table-header",
         "impact": "minor",
@@ -315,45 +157,15 @@
         "nodes": 1
       }
     ],
-    "/method/ask/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/method/benchmarks/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/method/biology/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
     "/method/board/": [
       {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 2
+        "id": "heading-order",
+        "impact": "moderate",
+        "help": "Heading levels should only increase by one",
+        "nodes": 1
       }
     ],
     "/method/build/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      },
       {
         "id": "svg-img-alt",
         "impact": "serious",
@@ -361,257 +173,11 @@
         "nodes": 1
       }
     ],
-    "/method/calibration/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/method/character/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/method/cost/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
     "/method/cycles/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      },
       {
         "id": "empty-table-header",
         "impact": "minor",
         "help": "Table header text should not be empty",
-        "nodes": 1
-      }
-    ],
-    "/method/data/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/method/explorer/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/method/game/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 60
-      }
-    ],
-    "/method/inference/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/method/intelligence/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/method/kitchen/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/method/methodology/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/method/mirror/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/method/pipeline/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 8
-      }
-    ],
-    "/method/platform/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/method/postmortems/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/method/predictions/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/method/registry/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 85
-      }
-    ],
-    "/method/results/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/method/scenarios/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/method/survival/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/method/tools/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/method/verify/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/method/voicefidelity/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/method/wrong/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/mind/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/protocols/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/protocols/challenges/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/protocols/discoveries/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/protocols/experiments/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/protocols/protocols/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
-      }
-    ],
-    "/protocols/supplements/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 1
       }
     ],
@@ -620,12 +186,6 @@
         "id": "aria-allowed-role",
         "impact": "minor",
         "help": "ARIA role should be appropriate for the element",
-        "nodes": 1
-      },
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 1
       }
     ],
@@ -639,23 +199,9 @@
     ],
     "/story/agents/": [
       {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 4
-      },
-      {
         "id": "heading-order",
         "impact": "moderate",
         "help": "Heading levels should only increase by one",
-        "nodes": 1
-      }
-    ],
-    "/story/build/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 1
       }
     ],
@@ -665,12 +211,6 @@
         "impact": "minor",
         "help": "ARIA role should be appropriate for the element",
         "nodes": 1
-      },
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
       }
     ],
     "/story/journal/": [
@@ -678,12 +218,6 @@
         "id": "aria-allowed-role",
         "impact": "minor",
         "help": "ARIA role should be appropriate for the element",
-        "nodes": 1
-      },
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 1
       }
     ],
@@ -693,12 +227,6 @@
         "impact": "minor",
         "help": "ARIA role should be appropriate for the element",
         "nodes": 1
-      },
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 1
       }
     ],
     "/story/timeline/": [
@@ -706,6 +234,12 @@
         "id": "aria-allowed-role",
         "impact": "minor",
         "help": "ARIA role should be appropriate for the element",
+        "nodes": 1
+      },
+      {
+        "id": "landmark-unique",
+        "impact": "moderate",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
         "nodes": 1
       }
     ],

@@ -215,6 +215,56 @@ def test_summarize_counts_by_impact():
     assert a11y_audit.summarize(base) == {"serious": 2, "moderate": 1}
 
 
+# ── #1990 regression guard: the ledger re-arm actually restores gating ────────
+#
+# tests/a11y_baseline.json's dark "pages" ledger was re-captured against the
+# live site with the real tests/visual_qa.py capture_page/run_sweep harness
+# (#1990) — most baselined entries were stale (a color-contrast fix landed,
+# the entry never shrank) so real gating was silently off on those pages.
+# These tests prove the re-arm didn't just produce an empty diff: a page whose
+# stale entry got removed must gate again on a genuinely new violation.
+
+
+def test_gear_regression_guard_gates_after_rearm():
+    """/gear/ is the issue's own headline staleness example (86 baselined
+    nodes -> 0 live). Its dark entry is gone after the #1990 re-arm; a planted
+    serious violation on it must now gate — proving restored coverage, not
+    just a shrunk ledger."""
+    base = a11y_audit.load_baseline()
+    assert "/gear/" not in base["pages"], "expected /gear/'s stale ledger entry removed by the #1990 re-arm"
+    out = a11y_audit.gate_findings("/gear/", [_v("color-contrast", "serious")], base)
+    assert [v["id"] for v in out["new"]] == ["color-contrast"]
+
+
+def test_method_game_regression_guard_gates_after_rearm():
+    """#1990's own acceptance criteria flagged /method/game/ as NOT stale (a
+    verifier claimed ~60 live serious nodes) and required either fixing it
+    first or explicitly keeping its entry. Direct re-measurement against the
+    live site with the real capture_page harness (which force-reveals
+    motion-hidden sections before running axe — the harness step a simpler
+    ad hoc check missed) found it genuinely clean, twice, repeatably. Honored
+    per "measure first": its entry is removed, same as any other confirmed-
+    clean page, and it must gate on a planted serious violation like any
+    other re-armed page."""
+    base = a11y_audit.load_baseline()
+    assert "/method/game/" not in base["pages"], "expected /method/game/ clean per #1990's direct live re-measurement"
+    out = a11y_audit.gate_findings("/method/game/", [_v("color-contrast", "serious")], base)
+    assert [v["id"] for v in out["new"]] == ["color-contrast"]
+
+
+def test_genuinely_live_pages_still_baselined_not_wiped_indiscriminately():
+    """Sanity check on the #1990 re-arm: pages that direct measurement showed
+    STILL carry live color-contrast debt (not "Day-1 emptiness" — re-verified
+    mid-cycle-11 per the issue's own acceptance criteria) must still be
+    baselined, so this PR's shrink didn't just wipe the ledger wholesale."""
+    base = a11y_audit.load_baseline()
+    for page_path in ("/data/character/", "/data/badges/", "/data/training/", "/data/vitals/"):
+        ids = {r["id"] for r in base["pages"].get(page_path, [])}
+        assert "color-contrast" in ids, f"{page_path} measured live during #1990's re-arm — its entry must survive"
+        out = a11y_audit.gate_findings(page_path, [_v("color-contrast", "serious")], base)
+        assert out["new"] == [], f"{page_path}'s still-live color-contrast rule must stay baselined (not re-gate)"
+
+
 # ── the committed artifacts: vendored bundle + day-one baseline ───────────────
 
 
