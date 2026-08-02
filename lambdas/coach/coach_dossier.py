@@ -104,8 +104,10 @@ def find_dossier_violations(text) -> list:
     commitment_natural, an outcome_notes, a docket claim, a RELATIONSHIP context_summary)
     crossed to the public coach page untouched — even though the repo already ships a
     deterministic, offline, fail-closed PII detector and DATA_GOVERNANCE.md classifies
-    contact strings as never-Tier-0-public. `deploy/pii_surface_guard.py` covers only the
-    static site/ surface, not this API payload. The module's own conservative reasoning
+    contact strings as never-Tier-0-public. `deploy/pii_surface_guard.py` covered only the
+    static site/ surface at the time (#1945 later added the /api/* endpoint arm — an
+    after-the-fact sweep; this in-handler leg still gates at render time). The module's
+    own conservative reasoning
     ("a false positive only withholds a dossier line") applies identically here, so PII
     withholds wholesale exactly like a genotype hit.
 
