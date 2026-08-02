@@ -90,6 +90,11 @@ def _evidence_rows():
     for entry in v.REGISTRY:
         slug, title, _blurb, group, mode, endpoint = entry[:6]
         flags = set(entry[8:])
+        if "external" in flags:
+            # #1392: a curated page that keeps its archive tile — it registers its own
+            # _CURATED manifest entry (with its real js_modules/visual checks); deriving
+            # an archive row here would both duplicate the path and lie about the page.
+            continue
         base = group_to_base.get(group)
         if base is None:  # a group outside the three pillars would be a build bug
             raise AssertionError(f"REGISTRY group {group!r} not in any PILLARS entry")
@@ -558,6 +563,30 @@ _CURATED = [
             "checks": [
                 {"selector": "[data-readout]", "not_empty": True, "desc": "scorecard readout rendered (scored or honest empty state)"},
                 {"selector": "#gyc-input", "min_count": 1, "desc": "the paste box is present"},
+            ],
+        },
+    },
+    {
+        # #1392: "The Mirror" — a reader's Whoop export scored on the platform's own
+        # instruments, overlaid on Matthew's published distributions (GENERATED —
+        # scripts/v4_build_mirror.py). Computation is ENTIRELY client-side
+        # (mirror.js -> mirror-core.js, parity-pinned to the deployed Python by
+        # tests/test_mirror_parity.py + tests/js/mirror_core.test.mjs); the page reads
+        # ONE static artifact (/data/mirror_distributions.json), so no api_deps and no
+        # autodeploy race. The reader's file never leaves the browser — structurally
+        # enforced (exactly one fetch, no upload mechanisms).
+        "path": "/method/mirror/",
+        "name": "Method · The Mirror — your export on my instruments",
+        "tier": 3,
+        "content_class": "generated",
+        "api_deps": [],
+        "js_modules": ["mirror.js", "mirror-core.js", "mirror_demo.js", "calibration-core.js"],
+        "visual": {
+            "wait_for": "[data-readout]",
+            "checks": [
+                {"selector": "[data-readout]", "not_empty": True, "desc": "mirror readout rendered (scored or honest empty state)"},
+                {"selector": "#mirror-drop", "min_count": 1, "desc": "the drop zone is present"},
+                {"selector": ".mr-banner", "min_count": 1, "desc": "the calibrated-on-me banner is permanent"},
             ],
         },
     },

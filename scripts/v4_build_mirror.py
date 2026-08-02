@@ -1,30 +1,80 @@
-<!DOCTYPE html>
-<html lang="en" data-door="method">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>The Mirror — your wearable export on my instruments — averagejoematt</title>
-  <meta name="description" content="Drop your Whoop CSV export and get scored by the same deterministic instruments that score me every night — readiness, sleep, recovery — then see your numbers laid over my published distributions. Your file never leaves your browser: there is no upload endpoint on this site.">
-  <link rel="canonical" href="https://averagejoematt.com/method/mirror/">
-  <meta property="og:type" content="website">
-  <meta property="og:site_name" content="averagejoematt">
-  <meta property="og:url" content="https://averagejoematt.com/method/mirror/">
-  <meta property="og:title" content="The Mirror — your wearable export on my instruments — averagejoematt">
-  <meta property="og:description" content="Drop your Whoop CSV export and get scored by the same deterministic instruments that score me every night — readiness, sleep, recovery — then see your numbers laid over my published distributions. Your file never leaves your browser: there is no upload endpoint on this site.">
-  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-home.png">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="The Mirror — your wearable export on my instruments — averagejoematt">
-  <meta name="twitter:description" content="Drop your Whoop CSV export and get scored by the same deterministic instruments that score me every night — readiness, sleep, recovery — then see your numbers laid over my published distributions. Your file never leaves your browser: there is no upload endpoint on this site.">
-  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4EFE4">
-  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E0C08">
-  <link rel="icon" href="/favicon.ico">
-  <link rel="icon" type="image/svg+xml" href="/assets/marks/favicon-dark.svg">
-  <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <link rel="preload" href="/assets/fonts/v4/pxiTypc9vsFDm051Uf6KVwgkfoSxQ0GsQv8ToedPibnr0SZe1ZuWi3g.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/assets/fonts/v4/6NU58FyLNQOQZAnv9ZwNjucMHVn85Ni7emAe9lKqZTnbB-gzTK0K1ChjeveQ7ZXk8g.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/assets/fonts/v4/-F63fjptAgt5VM-kVkqdyU8n1i8q131nj-o.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/assets/css/fonts.css">
-  <link rel="stylesheet" href="/assets/css/tokens.css">
-  <link rel="stylesheet" href="/assets/css/evidence.css">
-  
+#!/usr/bin/env python3
+"""v4_build_mirror.py — generate /method/mirror/ (#1392): The Mirror.
+
+A reader drops the CSV export Whoop already gives them, and their months get
+scored IN THE BROWSER by the same deterministic instruments that score Matthew
+every night — then laid over his published distributions ("your HRV sits at his
+62nd percentile"). The privacy property is architectural, not policy: there is
+no upload endpoint on this site, so the promise "your file never leaves this
+page" has nothing to depend on but the absence of code — which
+tests/test_mirror_parity.py enforces structurally (exactly one fetch, of the
+static distributions artifact; no XHR/beacon/WebSocket/EventSource).
+
+Deploy-race-safe like grade-your-coach (#1396): the page reads only STATIC
+committed artifacts —
+  * /data/mirror_distributions.json  (scripts/gen_mirror_distributions.py —
+    full sorted daily samples of six already-public metrics + window + n)
+  * the module graph /assets/js/mirror.js → mirror-core.js / mirror_demo.js —
+    mirror-core is pinned to the deployed Python by tests/vectors/mirror_vectors.json.
+
+Run from repo root:  python3 scripts/v4_build_mirror.py
+"""
+
+from __future__ import annotations
+
+import html
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from v4_chrome import doors_nav, site_footer  # noqa: E402
+from v4_kit import loop_ribbon  # noqa: E402
+
+SLUG = "mirror"
+CANONICAL = f"/method/{SLUG}/"
+TITLE = "The Mirror — your wearable export on my instruments — averagejoematt"
+DESCRIPTION = (
+    "Drop your Whoop CSV export and get scored by the same deterministic instruments that "
+    "score me every night — readiness, sleep, recovery — then see your numbers laid over my "
+    "published distributions. Your file never leaves your browser: there is no upload endpoint on this site."
+)
+
+
+def esc(s) -> str:
+    return html.escape(str(s), quote=True)
+
+
+FONTS = (
+    '<link rel="preload" href="/assets/fonts/v4/pxiTypc9vsFDm051Uf6KVwgkfoSxQ0GsQv8ToedPibnr0SZe1ZuWi3g.woff2" as="font" type="font/woff2" crossorigin>'
+    '<link rel="preload" href="/assets/fonts/v4/6NU58FyLNQOQZAnv9ZwNjucMHVn85Ni7emAe9lKqZTnbB-gzTK0K1ChjeveQ7ZXk8g.woff2" as="font" type="font/woff2" crossorigin>'
+    '<link rel="preload" href="/assets/fonts/v4/-F63fjptAgt5VM-kVkqdyU8n1i8q131nj-o.woff2" as="font" type="font/woff2" crossorigin>'
+    '<link rel="stylesheet" href="/assets/css/fonts.css">'
+)
+THEME = (
+    '<script>(function(){try{var t=localStorage.getItem("ajm-theme");'
+    'if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();</script>'
+)
+MOTION_HEAD = (
+    '<script>(function(){try{if(!("IntersectionObserver" in window))return;'
+    'if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;'
+    'document.documentElement.classList.add("mo");'
+    'window.__moFail=setTimeout(function(){document.documentElement.classList.remove("mo");},2600);}catch(e){}})();</script>'
+)
+MOTION_SCRIPT = '<script src="/assets/js/motion.js" defer></script>'
+CLIENT_JS = '<script type="module" src="/assets/js/mirror.js"></script>'
+
+
+def topbar() -> str:
+    return (
+        '<header class="ev-top"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span>'
+        '<span class="brand-name">averagejoematt</span> <span class="brand-door label">method</span></a>'
+        f'{doors_nav("/data/", with_follow=False)}</header>'
+    )
+
+
+STYLE = """
 <style>
 .mr-wrap { max-width: var(--container); margin-inline: auto; padding: 0 var(--gutter) var(--sp-9); }
 .mr-cols { display: grid; gap: var(--sp-5); margin-top: var(--sp-5); min-width: 0; align-items: start; }
@@ -82,19 +132,44 @@
 .mr-you { fill: var(--accent, var(--ink)); stroke: var(--surface-raised); stroke-width: 2; }
 .mr-note { margin-top: var(--sp-4); font-size: var(--fs-small); color: var(--ink-muted); line-height: var(--lh-relaxed); }
 </style>
+"""
 
-  <script>(function(){try{var t=localStorage.getItem("ajm-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();</script>
-  <script>(function(){try{if(!("IntersectionObserver" in window))return;if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;document.documentElement.classList.add("mo");window.__moFail=setTimeout(function(){document.documentElement.classList.remove("mo");},2600);}catch(e){}})();</script>
+
+def render_page() -> str:
+    return f"""<!DOCTYPE html>
+<html lang="en" data-door="method">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>{esc(TITLE)}</title>
+  <meta name="description" content="{esc(DESCRIPTION)}">
+  <link rel="canonical" href="https://averagejoematt.com{CANONICAL}">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="averagejoematt">
+  <meta property="og:url" content="https://averagejoematt.com{CANONICAL}">
+  <meta property="og:title" content="{esc(TITLE)}">
+  <meta property="og:description" content="{esc(DESCRIPTION)}">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-home.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{esc(TITLE)}">
+  <meta name="twitter:description" content="{esc(DESCRIPTION)}">
+  <link rel="icon" href="/favicon.ico">
+  {FONTS}
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/evidence.css">
+  {STYLE}
+  {THEME}
+  {MOTION_HEAD}
 </head>
 <body>
   <a class="skip" href="#mirror">Skip to the tool</a>
-  <header class="ev-top"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">averagejoematt</span> <span class="brand-door label">method</span></a><nav class="doors" aria-label="Doors"><a href="/cockpit/" title="Today&#x27;s live instrument — your daily numbers, read back to you"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-cockpit"></use></svg>the cockpit</a><a href="/data/" title="Every source the platform reads — trends now and over time" aria-current="page"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-data"></use></svg>the data</a><a href="/coaching/" title="The AI team &amp; their arguments — stances, track records, disagreements"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-coaching"></use></svg>the coaching</a><a href="/protocols/" title="The levers — supplements, experiments, challenges, discoveries"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-protocols"></use></svg>the protocols</a><a href="/story/" title="The writing &amp; the why — chronicle, journal, timeline, about"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-story"></use></svg>the story</a><button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button></nav></header>
+  {topbar()}
   <main id="mirror">
     <div class="page-hero">
       <p class="ph-kicker label">the method &middot; the open artifact</p>
       <h1 class="ph-title">The Mirror</h1>
       <p class="ph-promise">Every number on this site is me. This page is the one place it gets to be you: drop the CSV export Whoop already lets you download, and your months are scored by the <em>same</em> deterministic instruments that score me every night &mdash; then laid over my published distributions. Your file never leaves this page. There is no server on this site that could receive it.</p>
-      <nav class="loop-ribbon" aria-label="Where this sits in the loop"><a href="/cockpit/">Now</a><span class="lr-sep" aria-hidden="true">&middot;</span><a href="/data/">Data</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/coaching/">Coaching</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/protocols/">Protocols</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/story/">Story</a><span class="lr-arrow" aria-hidden="true">&#8635;</span></nav>
+      {loop_ribbon("method")}
     </div>
     <div class="mr-wrap">
       <p class="mr-banner"><strong>One person&rsquo;s model, applied to another.</strong> These instruments are calibrated on me &mdash; my thresholds, my variance, my device. Where your own export runs deep enough (30+ days), the thresholds re-derive from <em>your</em> distribution, exactly as mine do; where it doesn&rsquo;t, the fallback is labelled. Read the output as a lens, not a verdict.</p>
@@ -142,8 +217,24 @@
       <p class="correlative">Generated by <code>scripts/v4_build_mirror.py</code>. Scoring: <code>/assets/js/mirror-core.js</code>, pinned to the deployed engine by <code>tests/test_mirror_parity.py</code>. <span class="confidence conf-low">client-side &middot; nothing uploaded</span></p>
     </div>
   </main>
-  <aside class="loop-forward" aria-label="Continue the loop"><p class="lf-next"><span class="label">next on the loop</span> <a href="/coaching/">the coaching</a> — See what the AI team makes of it</p><p class="lf-return"><span class="label">or come back</span> <a href="/subscribe/">follow by email</a> for the next entry</p></aside><footer class="site-foot"><nav class="site-foot-cols" aria-label="Site map"><div class="sf-col"><p class="sf-h label">The Story</p><a href="/story/chronicle/">Chronicle</a><a href="/story/panel/">Podcast</a><a href="/story/journal/">In my own words</a><a href="/story/timeline/">Timeline</a><a href="/story/attempts/">The attempts</a><a href="/story/agents/">The agents</a><a href="/story/about/">About</a></div><div class="sf-col"><p class="sf-h label">The Data</p><a href="/data/">All topics</a><a href="/method/ask/">Ask the data</a><a href="/data/labs/">Labs</a><a href="/data/training/">Training</a><a href="/data/sleep/">Sleep</a><a href="/data/ledger/">The ledger</a></div><div class="sf-col"><p class="sf-h label">The Protocols</p><a href="/protocols/">All protocols</a><a href="/protocols/supplements/">Supplements</a><a href="/protocols/experiments/">Experiments</a><a href="/protocols/challenges/">Challenges</a></div><div class="sf-col"><p class="sf-h label">The Coaching</p><a href="/coaching/">The Read</a><a href="/coaching/by-coach/">By Coach</a><a href="/coaching/scorecard/">Scorecard</a><a href="/coaching/team/">The Team</a><a href="/coaching/lab-notes/">AI lab notes</a></div><div class="sf-col"><p class="sf-h label">The Technology</p><a href="/method/">The machine</a><a href="/story/build/">Build log</a><a href="/method/platform/">The platform</a><a href="/method/pipeline/">Pipeline status</a><a href="/method/cost/">Cost</a><a href="/gear/">The gear</a></div><div class="sf-col"><p class="sf-h label">Follow &amp; context</p><a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a><a href="https://bsky.app/profile/averagejoematt.bsky.social" target="_blank" rel="me noopener">Bluesky</a><a href="https://x.com/averagejoematt_" target="_blank" rel="me noopener">X</a><a href="https://www.instagram.com/averagejoematt/" target="_blank" rel="me noopener">Instagram</a><a href="https://www.reddit.com/user/averagejoematt/" target="_blank" rel="me noopener">Reddit</a><a href="https://www.youtube.com/@averagejoematt" target="_blank" rel="me noopener">YouTube</a><a href="https://www.tiktok.com/@averagejoematt" target="_blank" rel="me noopener">TikTok</a><a href="/story/about/">About</a><a href="/privacy/">Privacy</a></div></nav><p class="sf-base label"><span>averagejoematt</span><a href="/">← home</a></p><script type="module" src="/assets/js/attribution.js"></script></footer>
-  <script src="/assets/js/motion.js" defer></script>
-  <script type="module" src="/assets/js/mirror.js"></script>
+  {site_footer()}
+  {MOTION_SCRIPT}
+  {CLIENT_JS}
 </body>
 </html>
+"""
+
+
+def main() -> int:
+    out_dir = ROOT / "site" / "method" / SLUG
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "index.html").write_text(render_page(), encoding="utf-8")
+    dist = ROOT / "site" / "data" / "mirror_distributions.json"
+    if not dist.exists():
+        print("WARNING: site/data/mirror_distributions.json is missing — run scripts/gen_mirror_distributions.py", file=sys.stderr)
+    print(f"{CANONICAL}: written")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
