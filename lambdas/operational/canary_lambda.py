@@ -73,6 +73,15 @@ RECIPIENT = os.environ["EMAIL_RECIPIENT"]
 
 CANARY_PK = "CANARY#matthew"
 
+# #1954: the REAL subscriber partition the subscribe-flow check writes a
+# synthetic (source='canary') row into. After cleanup, the canary asserts this
+# partition holds ZERO synthetic rows — on 2026-07-21 a silent cleanup failure
+# left a stray canary row sitting there for 12 days.
+SUBSCRIBERS_PK = "USER#matthew#SOURCE#subscribers"
+# Bounded pagination for the residue count — a pathological LastEvaluatedKey
+# (or a MagicMock in tests) must never spin the loop forever.
+CANARY_COUNT_MAX_PAGES = 50
+
 # ── AWS clients ────────────────────────────────────────────────────────────────
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE_NAME)
@@ -351,6 +360,35 @@ def check_anthropic(canary_ts: str) -> tuple[bool, str, float]:
         return False, f"Bedrock error: {e}", latency
 
 
+def count_canary_subscriber_rows(ddb_client) -> int:
+    """#1954: READ-ONLY count of synthetic (source='canary') rows left in the
+    real subscriber partition after cleanup.
+
+    Query (not Scan) on the single partition, Select=COUNT (no item data
+    leaves DDB), ConsistentRead so the row this run just deleted is not
+    counted back. `source` is a DynamoDB reserved word, hence the
+    ExpressionAttributeNames indirection. Pagination is bounded — never trust
+    a LastEvaluatedKey to terminate the loop."""
+    count = 0
+    kwargs = {
+        "TableName": TABLE_NAME,
+        "KeyConditionExpression": "pk = :pk",
+        "FilterExpression": "#src = :canary",
+        "ExpressionAttributeNames": {"#src": "source"},
+        "ExpressionAttributeValues": {":pk": {"S": SUBSCRIBERS_PK}, ":canary": {"S": "canary"}},
+        "Select": "COUNT",
+        "ConsistentRead": True,
+    }
+    for _ in range(CANARY_COUNT_MAX_PAGES):
+        resp = ddb_client.query(**kwargs)
+        count += int(resp.get("Count") or 0)
+        lek = resp.get("LastEvaluatedKey")
+        if not lek:
+            break
+        kwargs["ExclusiveStartKey"] = lek
+    return count
+
+
 def check_subscribe_flow(canary_ts: str) -> tuple[bool, str, float]:
     """Verify the subscriber-onboarding flow creates a DDB record in <5s.
 
@@ -407,12 +445,29 @@ def check_subscribe_flow(canary_ts: str) -> tuple[bool, str, float]:
         try:
             ddb_client.delete_item(
                 TableName=TABLE_NAME,
-                Key={"pk": {"S": "USER#matthew#SOURCE#subscribers"}, "sk": {"S": sk}},
+                Key={"pk": {"S": SUBSCRIBERS_PK}, "sk": {"S": sk}},
             )
-        except Exception:
-            pass  # cleanup failure is non-fatal for the canary itself
+        except Exception as e:
+            # Not fatal on its own — the residue postcondition below is the
+            # authoritative verdict (the old silent `pass` here is exactly how
+            # the 2026-07-21 stray row went unseen for 12 days, #1954).
+            print(f"[WARN] subscribe canary cleanup delete failed: {e}")
 
-        return True, f"subscribe flow OK ({api_status}, DDB pending_confirmation in {round(latency)}ms)", latency
+        # #1954 postcondition: the partition must hold ZERO synthetic rows.
+        # Fails loudly on any survivor (this run's or a previous run's) — and
+        # fails too if the count itself is unreadable, because an unverifiable
+        # assertion must never report green (ADR-104 posture).
+        try:
+            residue = count_canary_subscriber_rows(ddb_client)
+        except Exception as e:
+            latency = (time.monotonic() - t0) * 1000
+            return False, f"subscribe canary residue count failed (postcondition unverifiable): {e}", latency
+        emit("CanarySubscribeResidueRows", residue)  # positive confirmation: 0 on every clean run
+        latency = (time.monotonic() - t0) * 1000
+        if residue > 0:
+            return False, f"{residue} synthetic canary row(s) survived cleanup in the subscriber partition — delete them (#1954)", latency
+
+        return True, f"subscribe flow OK ({api_status}, DDB pending_confirmation in {round(latency)}ms, 0 residue rows)", latency
     except Exception as e:
         latency = (time.monotonic() - t0) * 1000
         return False, f"subscribe canary error: {e}", latency

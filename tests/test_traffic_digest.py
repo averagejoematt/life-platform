@@ -215,3 +215,142 @@ def test_lambda_handler_emits_zero_on_genuinely_quiet_week(monkeypatch):
     assert resp["statusCode"] == 200
     assert _metric_value(cw, "UniqueVisitors7d") == 0
     assert _metric_value(cw, "PageViews7d") == 0
+
+
+# ── Subscriber funnel (#1954): the digest joins the subscriber partition ──────
+# Regression guard: before #1954 the digest reported traffic only, so a dead
+# pending or a stray synthetic canary row was invisible forever (2 pendings from
+# 2026-07-03 died unseen; a source='canary' row sat 12 days).
+
+FUNNEL_NOW = datetime(2026, 8, 3, 12, 0, tzinfo=timezone.utc)
+
+SUBSCRIBER_FIXTURE = [
+    # the long-standing confirmed subscriber
+    {
+        "sk": "EMAIL#aaa",
+        "status": "confirmed",
+        "created_at": "2026-03-28T10:00:00+00:00",
+        "confirmed_at": "2026-03-28T10:05:00+00:00",
+        "source": "subscribe_page",
+    },
+    # the two real pendings that died unseen (~30 days old at FUNNEL_NOW)
+    {"sk": "EMAIL#bbb", "status": "pending_confirmation", "created_at": "2026-07-03T09:00:00+00:00", "source": "subscribe_page"},
+    {"sk": "EMAIL#ccc", "status": "pending_confirmation", "created_at": "2026-07-03T11:00:00+00:00", "source": "subscribe_page"},
+    # a fresh attempt inside the 7d window
+    {"sk": "EMAIL#ddd", "status": "pending_confirmation", "created_at": "2026-08-01T08:00:00+00:00", "source": "reddit.com"},
+    # an attempt inside the window that also converted inside the window
+    {
+        "sk": "EMAIL#eee",
+        "status": "confirmed",
+        "created_at": "2026-07-30T08:00:00+00:00",
+        "confirmed_at": "2026-08-01T09:00:00+00:00",
+        "source": "subscribe_page",
+    },
+    # the stray synthetic row the canary failed to clean up (2026-07-21 incident)
+    {"sk": "EMAIL#fff", "status": "pending_confirmation", "created_at": "2026-07-21T00:00:00+00:00", "source": "canary"},
+]
+
+
+def test_funnel_aggregate_counts_by_status_and_window():
+    f = td.aggregate_subscriber_funnel(SUBSCRIBER_FIXTURE, now=FUNNEL_NOW)
+    assert dict(f["by_status"]) == {"confirmed": 2, "pending_confirmation": 3}  # canary row excluded
+    assert f["total"] == 5
+    assert f["new_pending_7d"] == 2  # ddd + eee created inside the window
+    assert f["new_confirmed_7d"] == 1  # eee confirmed inside the window
+    assert f["canary_rows"] == 1  # the stray synthetic row is counted, loudly, not hidden
+    assert f["oldest_pending_days"] == 31  # the 2026-07-03 pendings, visible at last
+
+
+def test_funnel_aggregate_empty_partition_is_a_valid_reading():
+    f = td.aggregate_subscriber_funnel([], now=FUNNEL_NOW)
+    assert f["by_status"] == []
+    assert f["total"] == 0
+    assert f["new_pending_7d"] == 0
+    assert f["new_confirmed_7d"] == 0
+    assert f["canary_rows"] == 0
+    assert f["oldest_pending_days"] is None
+
+
+def test_build_html_renders_funnel_section_from_fixture_partition():
+    """THE #1954 regression guard: build_html must render the subscriber-funnel
+    section (counts by status + 7d new-pending/new-confirmed + the canary-row
+    warning) from a fixture partition. Fails against pre-#1954 code, which has
+    no funnel parameter at all."""
+    funnel = td.aggregate_subscriber_funnel(SUBSCRIBER_FIXTURE, now=FUNNEL_NOW)
+    agg = td.aggregate([])
+    html = td.build_html(agg, "Jul 27", "Aug 03", funnel=funnel)
+    assert "Subscriber funnel" in html
+    assert "pending_confirmation" in html and "confirmed" in html
+    assert "<strong>2</strong> new pending" in html and "<strong>1</strong> new confirmed" in html
+    # the stray synthetic row renders as a loud warning, not silence
+    assert "1 synthetic canary row" in html
+    # the dead-pending state is visible: oldest pending age is surfaced
+    assert "31 days" in html
+
+
+def test_build_html_funnel_fail_soft_renders_not_collected():
+    """A broken DDB read must never take the Monday email down — the section
+    renders an honest 'not collected' line instead (same contract as the
+    green report, ADR-104)."""
+    agg = td.aggregate([])
+    html = td.build_html(agg, "Jul 27", "Aug 03", funnel={"error": "DDB read failed (boom)"})
+    assert "Subscriber funnel" in html
+    assert "not collected" in html
+    assert "DDB read failed (boom)" in html
+
+
+def test_build_html_without_funnel_still_renders():
+    """funnel=None (e.g. collector unavailable) omits the section without crashing."""
+    html = td.build_html(td.aggregate([]), "Jul 27", "Aug 03")
+    assert "<h1" in html
+
+
+class _FakeFunnelTable:
+    """Two-page paginated query — plain dicts, never a MagicMock (a MagicMock
+    feeding a pagination loop truthy LastEvaluatedKeys spins forever/OOMs)."""
+
+    def __init__(self):
+        self.calls = []
+
+    def query(self, **kwargs):
+        self.calls.append(kwargs)
+        if "ExclusiveStartKey" not in kwargs:
+            return {"Items": SUBSCRIBER_FIXTURE[:3], "LastEvaluatedKey": {"pk": "x", "sk": "y"}}
+        return {"Items": SUBSCRIBER_FIXTURE[3:]}
+
+
+class _FakeFunnelDDB:
+    def __init__(self, tbl):
+        self._tbl = tbl
+
+    def Table(self, name):
+        return self._tbl
+
+
+class _FakeFunnelBoto3:
+    def __init__(self, tbl):
+        self._tbl = tbl
+
+    def resource(self, name, region_name=None):
+        assert name == "dynamodb"
+        return _FakeFunnelDDB(self._tbl)
+
+
+def test_collect_subscriber_funnel_paginates_and_is_read_only(monkeypatch):
+    tbl = _FakeFunnelTable()
+    monkeypatch.setattr(td, "boto3", _FakeFunnelBoto3(tbl))
+    f = td.collect_subscriber_funnel(now=FUNNEL_NOW)
+    assert f["total"] == 5  # both pages joined
+    assert f["canary_rows"] == 1
+    assert len(tbl.calls) == 2
+    assert tbl.calls[1]["ExclusiveStartKey"] == {"pk": "x", "sk": "y"}
+
+
+def test_collect_subscriber_funnel_fail_soft(monkeypatch):
+    class _Broken:
+        def resource(self, *a, **k):
+            raise RuntimeError("no ddb here")
+
+    monkeypatch.setattr(td, "boto3", _Broken())
+    f = td.collect_subscriber_funnel(now=FUNNEL_NOW)
+    assert "error" in f and "no ddb here" in f["error"]
