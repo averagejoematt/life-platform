@@ -1,6 +1,6 @@
 # CONVENTIONS — the load-bearing reflexes
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-27
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-02
 
 The single canonical home for the hard-won operational reflexes that keep a deploy
 from silently regressing production. Each one was learned from a real incident. When
@@ -399,8 +399,13 @@ AI powered down.** Four layers, each with a named owner-mechanism:
      while the ruled header said 64). Precision-first: a false-positive gate gets disabled,
      so it is deliberately narrow (forward-only, glue-guarded, ledgers exempt);
    - `scripts/check_doc_index.py` — every page is indexed from the wiki home, carries
-     the status header, the >90d advisory freshness report, and a **blocking 180d ceiling**
-     (a canonical page unverified that long fails CI).
+     the status header, the >90d advisory freshness report, a **blocking 180d ceiling**
+     (a canonical page unverified that long fails CI), and the #973 engine-doc
+     source-drift gate — **strict by default** (#1965): the bare command fails exactly
+     where Docs CI's `--strict` run fails, so a locally-green tree cannot red CI on
+     drift (the 2026-07-27 double-red). `--advisory` demotes drift to a loud
+     "would RED CI under --strict" report; on a shallow clone the drift half skips
+     with a note (run it from a full clone for CI parity — Docs CI uses fetch-depth: 0).
 3. **Process gates.** The wrap skill's step (e) is a hard gate — every session ends
    with `**Docs:** <pages>` or `**Docs:** none needed — <reason>` in the handover,
    checkers green. The deploy skill prompts the same at deploy time. (A PR-time

@@ -3,14 +3,16 @@
 check_doc_index.py's calendar freshness (90d advisory / 180d blocking) had zero
 linkage to whether a doc's declared "Sources of truth" files changed after its
 Verified date — docs/engines/CHARACTER.md re-verified today would stay "fresh"
-for months even if character_engine.py were rewritten tomorrow. Gate 4 compares
+for months even if character_engine.py were rewritten tomorrow. Gate 5 compares
 git last-commit dates of the declared sources against the Verified date:
-advisory by default, blocking under --strict.
+BLOCKING by default since #1965 (local == CI), advisory only under --advisory,
+which must print a loud "would RED CI under --strict" banner.
 
 Unit tests drive check_engine_source_freshness() against synthetic engine docs
 in tmp_path with an injected git-date function — no live-git assumptions beyond
-the repo itself. One integration test runs the real script (default, advisory
-mode) against the repo to confirm the docs-ci wiring stays green.
+the repo itself. One integration test runs the real script flagless (the strict
+default — the exact command every local path runs) against the repo to confirm
+the docs-ci wiring stays green.
 """
 
 import os
@@ -114,24 +116,41 @@ def test_unavailable_git_date_is_a_note(tmp_path, monkeypatch):
     assert any("git last-commit date unavailable" in n for n in notes)
 
 
-def test_strict_flag_promotes_drift_to_failure(monkeypatch):
-    """--strict turns a flagged source into an exit-1 problem; default stays advisory."""
-    fake_drift = ([("docs/engines/FAKE.md", "lambdas/fake_engine.py", "2026-07-12", "2026-07-10")], [])
-    monkeypatch.setattr(cdi, "check_engine_source_freshness", lambda git_date_fn=None: fake_drift)
+_FAKE_DRIFT = ([("docs/engines/FAKE.md", "lambdas/fake_engine.py", "2026-07-12", "2026-07-10")], [])
 
-    monkeypatch.setattr(sys, "argv", ["check_doc_index.py", "--strict"])
-    with pytest.raises(SystemExit) as exc:
-        cdi.main()
-    assert exc.value.code == 1
 
-    # Default (advisory) mode: same drift, no failure. Relies on the real repo's
-    # gates 1-3 being green, which test_default_mode_is_green_on_repo_head asserts.
-    monkeypatch.setattr(sys, "argv", ["check_doc_index.py"])
+def test_default_mode_is_strict_and_promotes_drift_to_failure(monkeypatch):
+    """#1965: the bare, flagless invocation — what wrap.md and CONVENTIONS §8 run —
+    fails on drift exactly like Docs CI's --strict run. Local == CI, no memory
+    reflex required. --strict stays accepted as an explicit synonym."""
+    monkeypatch.setattr(cdi, "check_engine_source_freshness", lambda git_date_fn=None: _FAKE_DRIFT)
+
+    for argv in (["check_doc_index.py"], ["check_doc_index.py", "--strict"]):
+        monkeypatch.setattr(sys, "argv", argv)
+        with pytest.raises(SystemExit) as exc:
+            cdi.main()
+        assert exc.value.code == 1, f"{argv} must exit 1 on engine-doc drift"
+
+
+def test_advisory_optout_reports_instead_of_failing(monkeypatch, capsys):
+    """--advisory demotes the same drift to a report — but the banner must name the
+    CI consequence loudly ("N ... would RED CI under --strict"), so an advisory
+    green can never be mistaken for a CI green (#1965 regression guard).
+    Relies on the real repo's other gates being green, which
+    test_default_mode_is_green_on_repo_head asserts."""
+    monkeypatch.setattr(cdi, "check_engine_source_freshness", lambda git_date_fn=None: _FAKE_DRIFT)
+
+    monkeypatch.setattr(sys, "argv", ["check_doc_index.py", "--advisory"])
     cdi.main()  # must not raise
+    out = capsys.readouterr().out
+    assert "1 advisory item(s) would RED CI under --strict" in out, f"missing the would-RED-CI banner:\n{out}"
+    assert "docs/engines/FAKE.md" in out
 
 
 def test_default_mode_is_green_on_repo_head():
-    """Integration: the real script in docs-ci's (advisory) wiring must stay green."""
+    """Integration: the real script, flagless (the strict default — the same gate
+    Docs CI runs with --strict), must be green on repo HEAD. This is the parity
+    proof: if this passes locally on a full clone, Docs CI's run passes too."""
     result = subprocess.run(
         [sys.executable, os.path.join(_REPO, "scripts", "check_doc_index.py")],
         cwd=_REPO,
