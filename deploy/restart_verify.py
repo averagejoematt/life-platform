@@ -19,6 +19,11 @@ Checks (each pass/fail):
  13. /api/predict_week is active once the genesis week begins (#1952 — the
      cycle-11 seed carried the wall-clock pre-genesis week_id and the #1198
      guard hid the opening-week hook; pre-genesis countdown => dark is correct)
+ 14. Countdown-gap sweep (#1947): no un-tombstoned EXPERIMENT_SCOPED row was
+     written in [wipe run, genesis) — the wipe is a point-in-time snapshot and
+     the daily writers keep running through a future-genesis countdown window;
+     cycle 11 leaked ~397 rows this way. Partition list derived from the wipe
+     registries (guard-the-set); repairs via deploy/reconcile_countdown_gap.py.
 
 Returns 0 if all checks pass, 1 if any fail.
 
@@ -253,6 +258,30 @@ def main():
         check("/api/predict_week live once the genesis week begins (#1952)", ok, detail)
     except Exception as e:  # never let the verifier itself crash the post-reset check
         check("/api/predict_week live once the genesis week begins (#1952)", False, f"check could not run: {e}")
+
+    # 14. #1947 — the wipe-to-genesis countdown-gap sweep. The wipe is a
+    # point-in-time snapshot; on a future-genesis reset the daily writers keep
+    # running between the wipe run and the genesis boundary, and everything they
+    # write in that window passes PHASE_FILTER_EXPRESSION un-tombstoned forever
+    # (cycle 11: ~397 escapees consumed as live coach state). Fails loudly on
+    # any determinate escapee; flagged rows (no timestamp anywhere / date-only
+    # ambiguity / pre-window stamps) are surfaced in the detail, never hidden.
+    try:
+        from countdown_gap_sweep import FLAG_CATEGORIES, run_sweep
+
+        res = run_sweep(t)
+        esc = res["totals"].get("escapee", 0)
+        flags = sum(res["totals"].get(c, 0) for c in FLAG_CATEGORIES)
+        by_part = {k: v.get("escapee", 0) for k, v in res["per_partition"].items() if v.get("escapee", 0)}
+        detail = (
+            f"escapees={esc} flagged={flags} in window [{res['window_start'].isoformat()} → "
+            f"{res['window_end'].isoformat()}) ({res['wipe_ts_source']})"
+            + (f"; per-partition {by_part}" if by_part else "")
+            + ("; repair: python3 deploy/reconcile_countdown_gap.py (dry-run first)" if esc else "")
+        )
+        check("No countdown-gap escapees (wipe→genesis swept, #1947)", esc == 0, detail)
+    except Exception as e:  # never let the verifier itself crash the post-reset check
+        check("No countdown-gap escapees (wipe→genesis swept, #1947)", False, f"check could not run: {e}")
 
     # Summary
     total = len(checks)
