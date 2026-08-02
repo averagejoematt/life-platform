@@ -611,6 +611,20 @@ from operational.qa_check_coach_labs import (  # noqa: F401,E402
 )
 
 # ---------------------------------------------------------------------------
+# CHECK 10c — Content cadence next-installment guard (#1972)
+# ---------------------------------------------------------------------------
+# The chronicle/podcast list pages must carry either a next-date line or an
+# explicit honest-pending line — never neither. Purely deterministic (no
+# LLM/Bedrock), so it never pauses under the budget ladder. Lives in
+# operational/qa_check_content_cadence.py (the module-size ceiling split
+# idiom, #1665/#1944/#1993); re-exported here so qa_smoke_lambda.check_content_cadence
+# and .assess_content_cadence are valid public entrypoints for tests and callers.
+from operational.qa_check_content_cadence import (  # noqa: F401,E402
+    assess_content_cadence,
+    check_content_cadence,
+)
+
+# ---------------------------------------------------------------------------
 # CHECK 11 — Legacy redirect spot-check (#1430)
 # ---------------------------------------------------------------------------
 # 84 legacy pages 301 via the CloudFront v4-redirects function, generated 1:1
@@ -897,6 +911,8 @@ def lambda_handler(event, context):
         all_checks += check_predict_week_freshness()  # #1198: predict-the-week never live on a stale ISO week
         all_checks += check_hero_weight_arithmetic()  # #1225: home hero stat row reconciles + trend-honest
         all_checks += check_coach_labs_truth()  # #1993: no served coach text may narrate an empty labs store against real draws
+        # #1972: chronicle/podcast lists must carry a next-date OR an honest-pending line, never neither
+        all_checks += check_content_cadence()
         all_checks += weight_truth_qa.checks(Check, SITE_BASE_URL, CONTENT_TRUTH)  # #1894: home/cockpit vs the coaching door
         all_checks += check_receipt_replay()  # #1373: progression-receipt drift alarm (deterministic replay)
         all_checks += check_redirect_spotcheck()  # #1430: weekly legacy-redirect sample, rotates over redirects.map

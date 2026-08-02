@@ -60,6 +60,7 @@ from web.site_api_autonomic import (
     handle_autonomic_balance,
     handle_zone2_breakdown,
 )
+from web.site_api_cadence import handle_content_cadence  # #1972 — cron-derived next-installment line
 
 # P1.1 Phase B extension (2026-05-27): coach + misc inline blocks extracted.
 from web.site_api_coach import (
@@ -358,6 +359,7 @@ ROUTES = {
     "/api/constellation": handle_constellation,  # Mind pillar (Phase E) — the idea-graph signature
     "/api/journey": handle_journey,
     "/api/vacation_fund": handle_vacation_fund,
+    "/api/content_cadence": handle_content_cadence,  # #1972 — chronicle/podcast next-installment line
     "/api/methods": handle_methods,  # #544: the auto-generated statistics registry (ADR-105)
     "/api/character": handle_character,
     # #1379: the Daily Fingerprint (dateless = today; ?date=YYYY-MM-DD handled inline below) + the Wall (all-attempts field)

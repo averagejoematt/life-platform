@@ -27,10 +27,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from v4_kit import loop_ribbon  # noqa: E402  — shared .loop-ribbon (#578)
-from v4_proof import (  # noqa: E402  — #730/#803 static proof + #1395 data-driven OG
+from v4_proof import (  # noqa: E402  — #730/#803 static proof + #1395 data-driven OG + #1972 cadence
     chronicle_list_html,
     load_chronicle,
     load_chronicle_pending,
+    load_content_cadence,
     story_og,
 )
 
@@ -177,7 +178,7 @@ def main() -> None:
     # #803: also bakes an honest "why didn't this week land" disclosure — a currently
     # withheld week and/or a break in the Week-N numbering — instead of a silent skip.
     posts = load_chronicle()
-    chronicle_proof = chronicle_list_html(posts, pending=load_chronicle_pending())
+    chronicle_proof = chronicle_list_html(posts, pending=load_chronicle_pending(), cadence=load_content_cadence())
     # #1395: the /story/ HUB carries a data-driven OG (the count of published
     # dispatches, dated) on the weekly-chronicle card instead of the generic home card.
     hub_og = story_og(posts)

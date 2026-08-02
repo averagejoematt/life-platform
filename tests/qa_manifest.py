@@ -281,7 +281,8 @@ _CURATED = [
         "name": "Story · chronicle",
         "tier": 2,
         "content_class": "narrative",
-        "api_deps": ["/api/timeline"],
+        # /api/content_cadence (#1972): the cron-derived "next installment" list-rail note.
+        "api_deps": ["/api/timeline", "/api/content_cadence"],
         "js_modules": ["story.js"],
         "visual": {"checks": [{"selector": "main, [data-readout], article", "not_empty": True, "desc": "chronicle content"}]},
     },
@@ -362,7 +363,9 @@ _CURATED = [
         "name": "Story · panelcast",
         "tier": 3,
         "content_class": "narrative",
-        "api_deps": ["/panelcast/episodes.json"],
+        # /api/content_cadence (#1972): the cron-derived "next installment" list-rail note
+        # (the podcast has no independent cron — its cadence line rides the chronicle's).
+        "api_deps": ["/panelcast/episodes.json", "/api/content_cadence"],
         "js_modules": [],
         "visual": {"checks": [{"selector": "main, [data-readout], article", "not_empty": True, "desc": "panelcast content"}]},
     },

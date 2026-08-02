@@ -68,6 +68,7 @@ EXPECTED_ROUTE_MAP = {
     "/api/coach_timeline": "handle_coach_timeline",
     "/api/coaches": "handle_coaches",
     "/api/constellation": "handle_constellation",
+    "/api/content_cadence": "handle_content_cadence",  # #1972 — chronicle/podcast next-installment line
     "/api/correlations": "handle_correlations",
     "/api/current_challenge": "handle_current_challenge",
     "/api/cycle_compare": "handle_cycle_compare",

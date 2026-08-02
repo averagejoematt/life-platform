@@ -640,28 +640,41 @@ async function loadFull(btn, target, excerptEl) {
   }
 }
 
-// #803: an honest "why didn't this week land" notice for the chronicle list — a
-// currently-withheld week (the `pending` marker wednesday_chronicle_lambda writes
-// when a draft is generated and then held by the budget guard or privacy gate,
-// mirrors the Panel podcast's episodes.json pending marker) and/or a break in the
-// "Week N" numbering (e.g. Week 1 -> Week 3, no Week 2). Never invents a cause
-// beyond what the data says; returns "" when there's nothing to report.
-function chronicleNoteHTML(data, entries) {
+// #803/#1972: an honest "when's the next one" notice for the chronicle AND
+// podcast list rails. Precedence: an existing event-driven `pending` marker
+// (wednesday_chronicle_lambda writes it onto /journal/posts.json when a draft
+// is generated and then held by the budget guard or privacy gate — a
+// concrete already-happened event, more authoritative than a live derived
+// guess) beats the cron-derived /api/content_cadence line (#1972 — neither
+// list previously said WHEN the next installment lands, even though the
+// cadence is entirely cron-derivable). The chronicle-only "Week N" gap note
+// layers on top of either — a break in the numbering (e.g. Week 1 -> Week 3,
+// no Week 2) is worth flagging regardless of what the cadence line says.
+// Never invents a cause beyond what the data says; returns "" when there's
+// nothing to report.
+async function cadenceNoteHTML(key, data, entries) {
   const bits = [];
   if (data && data.pending && data.pending.display) {
     bits.push(`<li class="dx-empty">${esc(data.pending.display)}</li>`);
+  } else {
+    const cad = await tryJSON("/api/content_cadence");
+    const feature = key === "panel" ? "podcast" : "chronicle";
+    const line = cad && cad[feature] && cad[feature].display;
+    if (line) bits.push(`<li class="dx-empty">${esc(line)}</li>`);
   }
-  const weeks = [...new Set(entries.map((e) => {
-    const m = /^Week (\d+)$/.exec(e.label || "");
-    return m ? Number(m[1]) : null;
-  }).filter((n) => n != null))].sort((a, b) => a - b);
-  if (weeks.length >= 2) {
-    const missing = [];
-    for (let n = weeks[0]; n <= weeks[weeks.length - 1]; n++) if (!weeks.includes(n)) missing.push(n);
-    if (missing.length) {
-      const names = missing.map((n) => `Week ${n}`).join(", ");
-      const plural = missing.length > 1 ? "s" : "";
-      bits.push(`<li class="dx-empty">${esc(names)} — no installment${plural} ran. A draft can be withheld before publishing (for example, if it doesn't clear the platform's privacy safety check).</li>`);
+  if (key === "chronicle") {
+    const weeks = [...new Set(entries.map((e) => {
+      const m = /^Week (\d+)$/.exec(e.label || "");
+      return m ? Number(m[1]) : null;
+    }).filter((n) => n != null))].sort((a, b) => a - b);
+    if (weeks.length >= 2) {
+      const missing = [];
+      for (let n = weeks[0]; n <= weeks[weeks.length - 1]; n++) if (!weeks.includes(n)) missing.push(n);
+      if (missing.length) {
+        const names = missing.map((n) => `Week ${n}`).join(", ");
+        const plural = missing.length > 1 ? "s" : "";
+        bits.push(`<li class="dx-empty">${esc(names)} — no installment${plural} ran. A draft can be withheld before publishing (for example, if it doesn't clear the platform's privacy safety check).</li>`);
+      }
     }
   }
   return bits.join("");
@@ -692,7 +705,7 @@ async function selectSection(key, preId, push = true) {
   const data = await secFetch(s);
   const entries = entriesFor(s, data);
   if (!entries.length) { listEl.innerHTML = `<li class="dx-empty">Nothing published here yet — it fills as the experiment runs.</li>`; $("[data-dx-read]").innerHTML = `<p class="dx-empty">Nothing to read yet. The first entries land once the experiment is underway — check back after Day 1.</p>`; if (s.key === "journal") injectJournalQuotes(listEl); return; }
-  const noteHTML = s.key === "chronicle" ? chronicleNoteHTML(data, entries) : "";
+  const noteHTML = (s.key === "chronicle" || s.key === "panel") ? await cadenceNoteHTML(s.key, data, entries) : "";
   listEl.innerHTML = noteHTML + entries.map((e) => `<li><button class="dx-item" data-id="${esc(e.id)}"><span class="dx-item-t">${esc(e.title)}${isNewSince(e.date) ? ` <span class="dx-new label">new</span>` : ""}</span><span class="dx-item-d label">${esc(e.date || "")}</span></button></li>`).join("");
   listEl.querySelectorAll(".dx-item").forEach((b) => b.addEventListener("click", () => selectEntry(s, b.dataset.id)));
   // #1568 (ADR-142): the pull-quote archive on the "In my own words" section —
