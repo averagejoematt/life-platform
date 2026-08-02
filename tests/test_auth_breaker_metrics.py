@@ -98,3 +98,64 @@ def test_emit_never_raises(monkeypatch):
     # Observability is best-effort: a metric failure must never break ingestion.
     ab.mark_failure(MagicMock(), "notion", "matthew", "401", None)
     ab.clear_failure(MagicMock(), "notion", "matthew", None)
+
+
+# ── #1960: the Source dimension ─────────────────────────────────────────────
+# The metric used to be dimensionless "on purpose" (source name to the log), which
+# meant the URGENT page fired by `ingest-auth-unhealthy-24h` could not name WHICH
+# OAuth source had died — and made the remediation agent's "duplicate, covered by
+# source-specific alarms" ack factually wrong for every source outside the 5-alarm
+# consecutive-failures set. Both datapoints now ship in one call.
+
+
+def _dims(point):
+    return {d["Name"]: d["Value"] for d in point.get("Dimensions", [])}
+
+
+def test_emission_carries_both_dimensionless_and_source_dimensioned(monkeypatch):
+    cw = _patch_cw(monkeypatch)
+    ab.mark_failure(MagicMock(), "garmin", "matthew", "401 Unauthorized", None)
+    data = cw.calls[-1]["MetricData"]
+    assert len(data) == 2, "expected exactly two datapoints (aggregate + per-source)"
+    plain = [p for p in data if not p.get("Dimensions")]
+    tagged = [p for p in data if p.get("Dimensions")]
+    assert len(plain) == 1, "the fleet aggregate alarm reads the DIMENSIONLESS stream — it must still be emitted"
+    assert len(tagged) == 1
+    assert _dims(tagged[0]) == {"Source": "garmin"}, "the per-source page needs Source=<name> to name the culprit"
+    assert plain[0]["Value"] == tagged[0]["Value"] == 0
+    assert plain[0]["MetricName"] == tagged[0]["MetricName"] == "IngestAuthHealthy"
+
+
+def test_clear_and_short_circuit_also_carry_the_dimension(monkeypatch):
+    cw = _patch_cw(monkeypatch)
+    ab.clear_failure(MagicMock(), "todoist", "matthew", None)
+    assert _dims(cw.calls[-1]["MetricData"][1]) == {"Source": "todoist"}
+    assert cw.calls[-1]["MetricData"][1]["Value"] == 1, "recovery must clear the per-source stream, not just the aggregate"
+
+    table = MagicMock()
+    table.get_item.return_value = {"Item": {"sk": "AUTH_FAILURE", "marked_at": datetime.now(timezone.utc).isoformat()}}
+    ab.check_breaker(table, "dropbox", "matthew", None)
+    assert _dims(cw.calls[-1]["MetricData"][1]) == {"Source": "dropbox"}
+
+
+def test_metric_data_builder_is_pure_and_stringifies_the_source():
+    data = ab.auth_health_metric_data(1, "notion")
+    assert data == [
+        {"MetricName": "IngestAuthHealthy", "Value": 1, "Unit": "None"},
+        {"MetricName": "IngestAuthHealthy", "Value": 1, "Unit": "None", "Dimensions": [{"Name": "Source", "Value": "notion"}]},
+    ]
+
+
+def test_every_registry_oauth_source_can_be_named(monkeypatch):
+    """A per-source alarm is only real if the emitter actually tags that source.
+    Derived from the registry — never hand-listed (#1960)."""
+    import os as _os
+    import sys as _sys
+
+    _sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "lambdas"))
+    from ingestion.source_registry import oauth_source_ids
+
+    for src in oauth_source_ids():
+        cw = _patch_cw(monkeypatch)
+        ab.mark_failure(MagicMock(), src, "matthew", "401", None)
+        assert _dims(cw.calls[-1]["MetricData"][1]) == {"Source": src}

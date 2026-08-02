@@ -59,6 +59,34 @@ _AUTH_FAIL_KEYWORDS = (
 
 _METRIC_NAMESPACE = "LifePlatform/OAuth"
 _METRIC_NAME = "IngestAuthHealthy"
+_SOURCE_DIMENSION = "Source"
+
+
+def auth_health_metric_data(healthy: int, source_name: str) -> list:
+    """The MetricData payload every auth-health emission writes (#1960).
+
+    TWO datapoints, one PutMetricData call — deliberately, not redundantly:
+
+      * **dimensionless** — the fleet-wide stream the existing
+        `ingest-auth-unhealthy-24h` alarm reads (Min < 1 over 24h fires if ANY
+        breaker source went unhealthy). CloudWatch treats a dimensioned metric
+        and its dimensionless namesake as two SEPARATE metrics, so *replacing*
+        the dimensionless emission with a dimensioned one would have silently
+        blinded that alarm the moment this shipped. It stays, byte-identical.
+      * **Source=<name>** — the new per-source stream. Until #1960 the metric was
+        dimensionless "on purpose" (source name to the log only), which meant the
+        URGENT page could not name WHICH OAuth source died, and made the
+        remediation agent's "duplicate, covered by source-specific alarms" ack
+        factually wrong for every source outside the 5-alarm consecutive-failures
+        set. The per-source `ingest-auth-unhealthy-{src}` alarms in
+        monitoring_stack.py read this stream.
+
+    Split out (and public) so the unit tests can assert the dimension contract
+    without patching boto3.
+    """
+    point = {"MetricName": _METRIC_NAME, "Value": healthy, "Unit": "None"}
+    dimensioned = dict(point, Dimensions=[{"Name": _SOURCE_DIMENSION, "Value": str(source_name)}])
+    return [point, dimensioned]
 
 
 def _emit_auth_health(healthy: int, source_name: str, logger) -> None:
@@ -70,8 +98,8 @@ def _emit_auth_health(healthy: int, source_name: str, logger) -> None:
     error heartbeat reads green while the source is suppressed for 24h. Emitting
     a 0 on every mark + short-circuit makes that visible.
 
-    Dimensionless on purpose — one fleet-wide alarm (Min < 1) catches whichever
-    source goes unhealthy; the source name goes to the log for diagnosis.
+    Emitted BOTH dimensionless (the fleet aggregate) and with Source=<name> (so
+    the page names the culprit) — see auth_health_metric_data for why both.
     Best-effort: never raises (a metric hiccup must not break ingestion).
     Ingestion roles already hold cloudwatch:PutMetricData (role_policies
     _ingestion_base), so no IAM change is required.
@@ -81,7 +109,7 @@ def _emit_auth_health(healthy: int, source_name: str, logger) -> None:
 
         boto3.client("cloudwatch").put_metric_data(
             Namespace=_METRIC_NAMESPACE,
-            MetricData=[{"MetricName": _METRIC_NAME, "Value": healthy, "Unit": "None"}],
+            MetricData=auth_health_metric_data(healthy, source_name),
         )
     except Exception as e:  # noqa: BLE001 — observability is best-effort
         if logger:

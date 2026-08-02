@@ -23,6 +23,16 @@ UNLESS its data shows a material change since `acked_at` (new state reason, new
 metric value, a related deploy). A whole run must never be spent re-deriving a
 known persistent condition.
 
+The ack carries `renewals` and `first_acked_at`. An ack is a "I looked, carry it
+forward" note with a shelf life, NOT a mute button — the harness stops annotating
+it after 3 renewals and escalates it to needs-human with its age, so a signal that
+arrives WITHOUT an `acked` field may still be a long-standing red whose prior
+conclusion has expired. Treat those as fresh, and when you carry an ack forward,
+check the conclusion is still TRUE rather than restating it: a wrong ack renews
+exactly as silently as a right one (the 2026-07-28 case — an alarm acked
+"duplicate, covered by source-specific alarms" for sources that had no
+source-specific alarm at all, renewed for a week).
+
 ## Turn budget discipline
 Your turn budget is hard-capped. Triage cheapest-first (stale/acked/duplicates
 collapse in one line each), then investigate the genuinely-new signals. Cap any
