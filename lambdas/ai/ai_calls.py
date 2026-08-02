@@ -414,11 +414,16 @@ def _ground_legacy_output(label, output, regen_fn, *allow_sources):
         return output
     try:
         from ai import grounded_generation as _gg  # bundled shared module (ADR-104)
+        from ai.grounding_gate_params import cycle_gate_params  # #1967
 
         _allowed = _gg.allowed_numbers(*allow_sources)
+        # #1967: `allow_sources` IS everything the model was given, so the date allow-list
+        # is built from exactly the same material as the number one; the cycle anchors arm
+        # the phase-aware classes (#1691/#1897) these legacy surfaces shipped without.
+        _allowed_dates = _gg.allowed_dates(*allow_sources)
 
         def _findings_fn(_t):
-            return _gg.grounding_findings(_t, facts=None, allowed=_allowed)
+            return _gg.grounding_findings(_t, facts=None, allowed=_allowed, allowed_dates=_allowed_dates, **cycle_gate_params())
 
         _pre = _findings_fn(output)
         if _pre:

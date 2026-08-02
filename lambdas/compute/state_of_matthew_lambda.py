@@ -46,7 +46,8 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
-from ai.grounded_generation import allowed_numbers, grounding_findings  # ADR-104 gate
+from ai.grounded_generation import allowed_dates, allowed_numbers, grounding_findings  # ADR-104 gate
+from ai.grounding_gate_params import cycle_gate_params  # #1967 — cycle anchors (#1691/#1897)
 from boto3.dynamodb.conditions import Key
 from common.numeric import decimals_to_float, floats_to_decimal  # bundled shared module: float<->Decimal
 from experiment import calibration_core  # #538: shared Brier + reliability scorer (layer module)
@@ -392,11 +393,19 @@ def narration_gate(state: dict, text: str) -> tuple:
     its numbers join the allow-list — a number recalled from a real prior installment is
     grounded, not fabricated. The narrator still may not COMPUTE a new figure: anything
     absent from BOTH the payload and the archive it saw is still caught."""
-    allowed = allowed_numbers(_narration_payload(state))
+    payload = _narration_payload(state)
+    allowed = allowed_numbers(payload)
     archive_text = state.get("archive_text")
+    # #1967: the date allow-list is built from the SAME sources as the number one
+    # (payload + whatever archive the narrator was shown), and the cycle anchors arm the
+    # phase-aware classes (#1691/#1897) — the weekly narration is precisely the surface
+    # that can claim "seven days of an experiment" on Day 1.
+    allowed_date_set = allowed_dates(payload)
     if archive_text:
         allowed |= allowed_numbers(archive_text)
-    return grounding_findings(text, facts=None, allowed=allowed), _causal_language(text)
+        allowed_date_set |= allowed_dates(archive_text)
+    findings = grounding_findings(text, facts=None, allowed=allowed, allowed_dates=allowed_date_set, **cycle_gate_params())
+    return findings, _causal_language(text)
 
 
 def deterministic_fallback_narrative(state: dict) -> str:

@@ -38,7 +38,8 @@ from datetime import datetime, timezone
 
 import boto3
 from ai import google_tts
-from ai.grounded_generation import allowed_numbers, grounding_findings  # ADR-104 gate
+from ai.grounded_generation import allowed_dates, allowed_numbers, grounding_findings  # ADR-104 gate
+from ai.grounding_gate_params import cycle_gate_params  # #1967 — cycle anchors (#1691/#1897)
 from boto3.dynamodb.conditions import Key
 from experiment.er03_gate import BANNED_CAUSAL  # the platform's one banned-causal-connective list
 
@@ -275,7 +276,16 @@ def narrate(facts: dict, presence_block: str = "") -> dict:
         return {"narrative": deterministic_fallback_narrative(facts), "narrated": False, "model": None, "reason": "empty_response"}
 
     allowed = allowed_numbers(facts, presence_block or None)
-    findings = grounding_findings(text, facts=None, allowed=allowed)
+    # #1967: date allow-list from the SAME sources the model was handed, plus the cycle
+    # anchors so the spoken debrief can't narrate a stale "Day N" / prior-cycle baseline
+    # (#1691/#1897). A finding here falls back to the deterministic template, as before.
+    findings = grounding_findings(
+        text,
+        facts=None,
+        allowed=allowed,
+        allowed_dates=allowed_dates(facts, presence_block or None),
+        **cycle_gate_params(),
+    )
     causal_hits = _causal_language(text)
     if findings or causal_hits:
         logger.warning("[debrief] ADR-104 gate failed (findings=%s, causal=%s) — falling back to template", findings, causal_hits)
