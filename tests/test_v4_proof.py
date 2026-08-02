@@ -473,6 +473,9 @@ class TestGrowthSurface1395:
             "start_weight": 315.6,
             "goal_weight": 185.0,
             "pre_start": False,
+            # #1955: day_n is DERIVED as the PT day-index of as_of (start 07-21 →
+            # 08-01 is Day 12); the payload's own day_n is a fallback, not truth.
+            "start_date": "2026-07-21",
             "day_n": 12,
             "current_weight": 308.0,
             "lost_lbs": 7.6,

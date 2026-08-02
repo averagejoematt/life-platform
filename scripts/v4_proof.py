@@ -36,8 +36,14 @@ from __future__ import annotations
 import datetime
 import json
 import re
+import sys
 import urllib.request
 from pathlib import Path
+
+# #1955: the day/as-of frame is PACIFIC (the site convention) — the shared helper
+# lives in lambdas/common/pacific_time.py (stdlib-only, safe for a build script).
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lambdas"))
+from common.pacific_time import pacific_date_of, pacific_day_n, pacific_today  # noqa: E402
 
 SITE = "https://averagejoematt.com"
 SNAPSHOT = Path(__file__).resolve().parent / "proof_snapshot.json"
@@ -45,7 +51,13 @@ CONSTANTS_PY = Path(__file__).resolve().parent.parent / "lambdas" / "common" / "
 
 
 def _today() -> str:
-    return datetime.date.today().isoformat()
+    """Today as a PACIFIC calendar date (#1955).
+
+    The generator runs in CI/UTC — `datetime.date.today()` here stamped the og
+    description "As of <tomorrow>" every PT evening while day_n stayed PT-correct.
+    Every date this module emits is a site-facing day, so it uses the site's frame.
+    """
+    return pacific_today()
 
 
 def _experiment_start() -> str:
@@ -522,11 +534,20 @@ def coaching_read_block_html(read: dict) -> str:
 
 
 def _meta_stamp(d) -> str:
-    """The API payload's own `_meta.generated_at` date (YYYY-MM-DD), or ''."""
+    """The API payload's own `_meta.generated_at` as a PACIFIC calendar date, or ''.
+
+    #1955: `generated_at` is a UTC instant — slicing `[:10]` took the UTC day, which
+    is *tomorrow* every PT evening. An instant is not a day frame; convert it to the
+    Pacific day it belongs to. A bare YYYY-MM-DD (no time part) is already a day and
+    passes through untouched.
+    """
     try:
-        return str(d.get("_meta", {}).get("generated_at", ""))[:10]
+        ts = str(d.get("_meta", {}).get("generated_at", ""))
     except Exception:
         return ""
+    if "T" in ts:
+        return pacific_date_of(ts) or ts[:10]
+    return ts[:10]
 
 
 def _fmt_lbs(x) -> str:
@@ -621,6 +642,28 @@ _DOORS_TAIL = (
 )
 
 
+def _pt_day_frame(journey: dict) -> tuple:
+    """Home's (day_n, as_of) pair, BOTH from the same Pacific frame (#1955).
+
+    The og:description once said "Day 6 … As of 2026-08-02" during the PT evening
+    of 08-01: day_n came from the (PT-correct) journey payload while as_of was a
+    UTC date. Deriving day_n as the Pacific day-index OF the as_of date (via the
+    shared common.pacific_time.pacific_day_n — the same formula the vitals
+    disclosure uses) makes the pair definitionally coherent: whatever date the
+    claim is stamped with is the date the day number counts to. Falls back to the
+    payload's day_n when the start date is unknown or the arithmetic can't run
+    (pre-start is rendered by a separate branch and never uses day_n).
+    """
+    as_of = journey.get("as_of", "") or _today()
+    day_n = journey.get("day_n")
+    start = journey.get("start_date") or _experiment_start()
+    if start:
+        n = pacific_day_n(start, on_date=as_of)
+        if n >= 1:
+            day_n = n
+    return day_n, as_of
+
+
 def home_block_html(journey: dict, char: dict) -> str:
     """Home's static core (#1395): the mission in real numbers — baseline → goal, the
     day-of-experiment (or the countdown pre-start), and the live character level —
@@ -632,7 +675,7 @@ def home_block_html(journey: dict, char: dict) -> str:
     journey = journey or {}
     sw = _fmt_lbs(journey.get("start_weight"))
     gw = _fmt_lbs(journey.get("goal_weight"))
-    as_of = journey.get("as_of", "") or _today()
+    day_frame_n, as_of = _pt_day_frame(journey)  # #1955: one PT frame for day + stamp
     if not sw and not gw:
         return ""
 
@@ -650,7 +693,7 @@ def home_block_html(journey: dict, char: dict) -> str:
             f"{_esc(gw)} lb{_esc(climb)} — measured every day and published either way.</p>"
         )
     else:
-        day_n = journey.get("day_n")
+        day_n = day_frame_n
         lost = _fmt_lbs(journey.get("lost_lbs"))
         cur = _fmt_lbs(journey.get("current_weight"))
         day_txt = f"Day {int(day_n)}. " if isinstance(day_n, (int, float)) else ""
@@ -751,11 +794,15 @@ def _og_tags(url: str, title: str, desc: str, card: str) -> dict:
 
 
 def home_og(journey: dict, char: dict) -> dict:
-    """Home's data-driven OG: baseline → goal + the countdown/day + level."""
+    """Home's data-driven OG: baseline → goal + the countdown/day + level.
+
+    #1955: day_n and as_of both come from `_pt_day_frame` — one Pacific frame, so
+    the most-shared artifact can never claim a day number and a date that disagree.
+    """
     journey = journey or {}
     sw = _fmt_lbs(journey.get("start_weight")) or "316"
     gw = _fmt_lbs(journey.get("goal_weight")) or "185"
-    as_of = journey.get("as_of", "") or _today()
+    day_frame_n, as_of = _pt_day_frame(journey)
     title = f"averagejoematt — {sw} lb → {gw} lb, measured in public"
     if journey.get("pre_start") and journey.get("start_date"):
         desc = (
@@ -763,7 +810,7 @@ def home_og(journey: dict, char: dict) -> dict:
             f"every number published either way. As of {as_of}."
         )
     else:
-        day_n = journey.get("day_n")
+        day_n = day_frame_n
         lost = _fmt_lbs(journey.get("lost_lbs"))
         day_txt = f"Day {int(day_n)}: " if isinstance(day_n, (int, float)) else ""
         gained = f"{lost} lb down. " if lost else ""
