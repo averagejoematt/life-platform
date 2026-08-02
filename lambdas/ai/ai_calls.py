@@ -2079,6 +2079,46 @@ Write your {domain_label} coaching section now."""
         except Exception as _behav_e:  # noqa: BLE001 — advisory gate is never load-bearing
             print(f"[COACH-V2:{coach_id}] ungrounded-behavioral gate failed (non-blocking): {_behav_e}")
 
+        # Step 6.4 (#1896): self-graded-verdict gate — BLOCKING (regenerate once,
+        # then hold), the same ADR-108 shape as presence-ack above. The other
+        # deterministic gates check claims about MATTHEW; none checked a claim the
+        # coach makes about ITSELF. On 2026-07-27 Dr. Webb published "I called lunch
+        # wrong… that's a prediction miss, and I'm logging it as one" with every
+        # stored PREDICTION# still pending and the same paragraph admitting "I have
+        # zero food logs" — then persisted the fabricated verdict to THREAD# so it
+        # fed forward, and it was baked into the committed noscript. The prompt
+        # actively invites it (build_thread_prompt_block: 'If a prediction resolved:
+        # explicitly call it out'), so a rule in the prompt is not enough — ADR-105:
+        # the deterministic computation comes first, and "has anything resolved?" is
+        # a COUNT. Blocking rather than advisory because the failure mode PERSISTS:
+        # an ungrounded behavioral line is wrong for a day, a fabricated verdict
+        # becomes a stored grade. Opt-out contract: a brief with no
+        # evaluated_prediction_count (older orchestrator, other callers) passes None
+        # and the gate no-ops. Fail-soft on infra: never raises into generation.
+        try:
+            from ai import grounded_generation as _gg_sgv
+
+            _eval_n = brief.get("evaluated_prediction_count") if isinstance(brief, dict) else None
+            _sgv_findings = _gg_sgv.self_graded_verdict_findings(output or "", evaluated_predictions=_eval_n)
+            if _sgv_findings:
+                print(f"[COACH-V2:{coach_id}] self-graded-verdict gate fired: " + "; ".join(f.get("detail", "") for f in _sgv_findings))
+                _regen = call_anthropic(
+                    system_prompt + "\n\n" + user_message_full + "\n\n" + _gg_sgv.correction_prompt(_sgv_findings),
+                    api_key,
+                    max_tokens=600,
+                )
+                if _regen and not _is_ai_unavailable(_regen):
+                    _still = _gg_sgv.self_graded_verdict_findings(_regen, evaluated_predictions=_eval_n)
+                    if _still:
+                        print(f"[COACH-V2:{coach_id}] Held by self-graded-verdict gate (#1896) — regeneration still grades a phantom call")
+                        return CoachHold(coach_id, "self_graded_verdict")
+                    output = _regen
+                else:
+                    print(f"[COACH-V2:{coach_id}] Held by self-graded-verdict gate (#1896) — regeneration unavailable")
+                    return CoachHold(coach_id, "self_graded_verdict")
+        except Exception as _sgv_e:  # noqa: BLE001 — a gate must never break generation
+            print(f"[COACH-V2:{coach_id}] self-graded-verdict gate failed (non-blocking): {_sgv_e}")
+
         # #1441: generation-time archive — the exact gate-passed text that goes to
         # the state updater (i.e. what the brief + site publish) lands in
         # generated/qa_archive/ keyed by date+surface. Fail-soft inside the module.
