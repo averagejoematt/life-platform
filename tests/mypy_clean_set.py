@@ -72,11 +72,17 @@ CLEAN_FILES = [
     "lambdas/ingestion/source_registry.py",
     "lambdas/ingestion/source_state.py",
     "lambdas/intelligence/intelligence_common.py",
+    # #1993: the labs coach's fact-block builder — a stdlib-only leaf, clean from
+    # birth (intelligence/ as a directory is not in the clean set).
+    "lambdas/intelligence/labs_facts.py",
     # #1921: the qa-smoke result vocabulary (Check + partitions + EMF reporting).
     # A stdlib-only leaf, clean from birth — listed here because operational/ as a
     # DIRECTORY is not in the clean set and CLEAN_DIRS globs are non-recursive, so
     # a new module there silently leaves the gate unless it is named.
     "lambdas/operational/qa_check.py",
+    # #1993: the coach-labs-truth check pair (split from qa_smoke_lambda per the
+    # module-size ceiling idiom) — clean from birth, named for the same reason.
+    "lambdas/operational/qa_check_coach_labs.py",
     # #1949: the raw-archive liveness check — clean from birth, named for the
     # same reason as qa_check.py above (operational/ globs are non-recursive).
     "lambdas/operational/raw_archive_qa.py",

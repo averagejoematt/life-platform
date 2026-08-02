@@ -44,6 +44,9 @@ from datetime import datetime, timedelta, timezone
 import boto3
 from boto3.dynamodb.conditions import Key
 
+# #1993: labs fact extraction against the real draw-record schema (SCHEMA.md).
+from intelligence.labs_facts import build_labs_fact_block
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
@@ -523,25 +526,13 @@ def gather_data_for_expert(expert_key):
         }
 
     elif expert_key == "labs":
-        # Labs data spans all-time (not limited to experiment window — draws are periodic)
+        # Labs data spans all-time (not limited to experiment window — draws are periodic).
+        # #1993: extraction reads the REAL draw-record schema (nested `biomarkers` map +
+        # `out_of_range` list — SCHEMA.md) via labs_facts. The old top-level *_flag hunt
+        # matched a schema that never existed, so flagged_count was 0 against every real
+        # draw and the coach narrated the empty extraction as a sync failure (ADR-104).
         lab_items = _query_source("labs", "2019-01-01", today)
-        if not lab_items:
-            return {"expert_key": "labs", "period": "all draws", "note": "No lab data available"}
-        latest = lab_items[-1] if lab_items else {}
-        flagged = []
-        for key, val in latest.items():
-            if key.endswith("_flag") and val in ("H", "L"):
-                marker_name = key.replace("_flag", "").replace("_", " ").title()
-                marker_val = latest.get(key.replace("_flag", ""), "")
-                flagged.append(f"{marker_name}: {marker_val} ({val})")
-        return {
-            "expert_key": "labs",
-            "period": "most recent draw",
-            "draw_date": latest.get("sk", "").replace("DATE#", "")[:10],
-            "total_draws": len(lab_items),
-            "flagged_markers": flagged[:10],
-            "flagged_count": len(flagged),
-        }
+        return build_labs_fact_block(lab_items)
 
     elif expert_key == "sleep":
         whoop_items = _query_source("whoop", d30, today)
@@ -765,6 +756,12 @@ IMPORTANT: Lab data spans Matthew's full history, not just the current experimen
 The data shows {data.get('total_draws', 0)} total blood draws, with the most recent
 on {data.get('draw_date', 'unknown')}. Do NOT describe this as "draws during the
 experiment" — these are periodic lab draws over time.
+DATA-INTEGRITY GROUND RULES (ADR-104, #1993): you may describe the labs store as
+empty ("zero results", "no draws", "a sync failure") ONLY when store_empty is true
+in the data above. When draws exist, flagged_count of 0 means every extracted
+biomarker was in range — an unremarkable panel, never a data failure. If
+extraction_incomplete appears, name it as a platform extraction gap on real draws,
+not as missing labs.
 """
 
     # #1894: forbid day-labelling a stale weigh-in (silent when fresh).
