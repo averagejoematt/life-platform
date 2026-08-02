@@ -117,6 +117,35 @@ involving your personal genome data*. Whether and how that gets said publicly is
 model's — same class as **#1940**, which I filed for #1892's public-correction half for the same
 reason. Everything else shipped is internal machinery with no reader-facing beat.
 
+## Filing — the one pass epic #1890 required
+
+**64 issues, #1945–#2008**, all verified before filing, plus a scope-expansion comment on **#1905**.
+Not filed: security-1 (fixed+deployed this session), security-5 and observability-1 (REFUTED),
+dataviz-2 and cost-1 (fixed since by #1895/#1929 — the re-test separated *fixed* from *refuted*).
+Six cross-lens merges where two graders found the same defect. Milestones: **Now 6** · Next 31 ·
+Later 27; `gate:owner` on #1951 (the subscriber kill switch) and #1985 (in-world editorial voice).
+
+**Backlog hygiene: 0 violations over 132 open issues.** The 2 remaining advisories are the
+pre-existing rounding notes on #1677/#1679. Fixing the epic's story coverage took three attempts —
+the filer had put the 64 rows under a `### Filed 2026-08-02` **sub-heading**, and
+`backlog_contract.story_refs` stops at any `#`-prefixed line, so they parsed as outside the section.
+Demoting it to bold text made all 89 rows count. Worth knowing before the next bulk file.
+
+## CI — the fourth phantom wedge, and the redesign
+
+Run `30733223422` sat pending, 0 jobs, 13+ min, the **only** member of its group. Per your standing
+instruction I did not salt to v5: PR **#2009** makes the workflow-level group **per-run unique** and
+moves the invariant that actually mattered — never two concurrent deploys of a ref — to a job-level
+`concurrency` on `deploy`. **The proof it was the group and not GitHub:** the very next merge's run
+went `in_progress` immediately *while the old run was still stuck pending in its stale group.*
+
+**Deploy state, verified against the deployed zips rather than run conclusions:**
+- **site-api IS deployed** — genome fix + #1922's PT anchor confirmed in the live bytes, and
+  `/api/vitals` now reads "Day 6" where it read "Day 7".
+- **The Lambda-side gates are NOT** — `life-platform-qa-smoke` still has no `phase_plausibility`
+  and no `qa_check_reader_truth`. #1922, #1896, #1897 and #1944 are merged, un-deployed, and
+  waiting on the ci-cd Deploy gate that the wedge blocked. Run `30733497898` is the one carrying them.
+
 ## Decisions only you can make
 
 1. **#1934 — Whoop is still dark** (OAuth 401 since 08-01 12:00Z; last record `DATE#2026-07-31`).
