@@ -2047,6 +2047,33 @@
         }
       ],
       "why_it_mattered": "Until tonight every number on the site was mine — you could watch, not try. The participation ladder this platform keeps promising needs a first rung that costs a reader nothing and risks them nothing, and 'the same instruments, provably, with no server to trust' is that rung. The privacy design is the product: the guarantee isn't a policy sentence, it's the absence of an endpoint, enforced by a test anyone can read in the public repo."
+    },
+    {
+      "id": "2026-08-02-merged-is-not-live",
+      "date": "2026-08-02",
+      "title": "Merged is not live: the 13-hour stale fix, and seventeen PRs of paydown",
+      "shipped": "A verification sweep of the week's shipped work found the one that mattered: the fix that withdrew 20 fabricated supplement citations had merged, deployed green, and looked done — while /api/supplements kept serving 18 of the 20 for thirteen hours, because the S3 prefix the API actually reads has no deploy path and three stacked caches made 'merged' look like 'live'. Fixed the same hour, verified 0-of-20 on the live payload, and the structural gap is now a tracked issue. Around it, seventeen PRs of backlog paydown merged in one evening: the PII guard now derives and sweeps all ~134 live API endpoints (118 payloads scanned, 0 violations), every get_item in the coach generation path is tombstone-guarded, the 379 rows that escaped the cycle-11 wipe got a measured reconcile script, the qa-smoke warnings alarm becomes clearable after 15 structurally-red nights, all 99 CodeQL alerts were triaged to a path to zero, and the cockpit's scope buttons finally meet WCAG AA in both themes with the gate re-armed.",
+      "gotcha": "Three concurrent PRs each passed CI alone, then redded main together — the merge union pushed two shared modules over the 1200-line size ceiling, a property no per-branch CI run can see. The fix was a real extraction, not an exception comment, and the lesson is now a standing rule: check shared-file headroom before a fan-out wave, and re-run the union's gates on main after.",
+      "honest_miss": "Most of the lambda-side fixes are merged but not yet running — the fleet deploy is parked behind an IAM review gate only the owner can clear, so the coach-integrity gates, the canary fix, and the alarm reclassification go live only after his next deploy. The fabricated 'prediction miss' record also still sits in the database: deleting it is deliberately owner-gated.",
+      "prs": [
+        {
+          "label": "PR #2021",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2021"
+        },
+        {
+          "label": "PR #2026",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2026"
+        },
+        {
+          "label": "PR #2028",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2028"
+        },
+        {
+          "label": "PR #2016",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2016"
+        }
+      ],
+      "why_it_mattered": "The platform's whole pitch is that its numbers are checked, not asserted. A fix that merges green while readers keep getting the fabricated citations is exactly the failure the week's theme named — an off state printed as green — and it survives precisely because nothing re-reads the live surface after the merge celebration. The sweep exists so 'shipped' means what a reader would measure, not what CI concluded."
     }
   ]
 }

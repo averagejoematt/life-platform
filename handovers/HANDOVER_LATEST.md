@@ -1,132 +1,146 @@
-# HANDOVER — The Mirror ships, the funnel unbreaks — 2026-08-02 (overnight)
+# HANDOVER — Backlog blitz + the merged-is-not-live catch — 2026-08-02 (evening)
 
-> Instruction thread: unattended overnight, my recommendation accepted by default — warm-up on
-> the funnel cluster (#1952–#1955, fanned to 4 worktree implementers), flagship = **The Mirror
-> (#1392)** with delegated design latitude. Hard limits held: no emails, no social, no DDB
-> mutations, no reset, no ceiling change, nothing `gate:owner`. Session interrupted ~9h by
-> laptop sleep (06:50→16:00Z), resumed clean.
+> Instruction thread: execute the pre-approved plan `~/.claude/plans/elegant-zooming-teapot.md`
+> (Track A backlog paydown in worktree-implementer waves + Track B verification sweep of the
+> 07-28→08-02 ships), with the mirror-session deltas applied. Preflight confirmed: deploys still
+> stranded (R8-ST6) → merge-only session, no fleet deploys, DDB mutations owner-gated.
 
-## The headline: The Mirror is live
+## The headline: 17 PRs merged, and the sweep caught a live honesty failure
 
-**`/method/mirror/` — a reader drops their Whoop CSV export and gets scored in their own browser
-by the deployed instruments, overlaid on the published year.** PR **#2015**, merged, auto-deployed
-(site-deploy green: smoke + visual QA, no rollback), then **live-verified by real execution**:
-demo scores render on production, and the network audit measured **zero non-GET requests, zero
-request bodies — the only data request is the static `mirror_distributions.json`**.
+**Track A: 17 PRs merged in one evening**, closing 19 issues — every planned Wave-1/2/3 item plus
+the full coach lane:
 
-What makes it the platform's, not just a feature:
+| PR | issue | what |
+|---|---|---|
+| #2016 | #1989 | cockpit scope buttons meet WCAG AA both themes; baseline row removed, axe gate re-armed (site-deploy ✅ → **live**) |
+| #2017 | #1977 | observatory_week genesis clamp → honest absence, tie = flat |
+| #2018 | #2005 | /deploy function→source table generated from lambda_map + drift gate |
+| #2020 | #1994 #1995 | Day-1-safe hero sentence + honest brief-line kicker (site-deploy ✅ → **live**) |
+| #2021 | #1945 | PII guard endpoint arm — derived route set; live sweep 118 payloads / 0 violations |
+| #2022 | #1965 | check_doc_index strict by default — local == CI |
+| #2024 | #1956 | canary grades against the ask pipeline's own serving context (root-caused: it alarmed on the TRUE recovery value 96) |
+| #2025 | #1958 | chronic timing warns leave the alarmed WarnCount (floor was live-confirmed 5–9 vs threshold 1) |
+| #2026 | #1947 | countdown-gap sweep + owner-gated reconcile; live dry-run measured **379 escapees** (157 THREAD / 61 INSIGHT exact) |
+| #2027 | #2001 #2002 | HAE liveness deep-scan (true darkness: BP 2026-04-10, SoM 2026-04-02) + carried chips from the cycle ledger (site-deploy ✅) |
+| #2028 | #1902 | all 99 CodeQL alerts triaged: 14 fixed (+4 the new guard found), 85 dismissed with written reasons (**dismissals live via API regardless of PR**) |
+| #2029 | #1969 | every get_item in the generation path tombstone-guarded (28 AST-derived sites, 15 reasoned exemptions) |
+| #2030 | #2006 | CONVENTIONS §4 pin-grep works again + tests run the doc's commands verbatim |
+| #2031 | #1901 | check_main_green classifies the two stranded-deploy states (verified against the live stranded main) |
+| #2032 | #1971 | coaching door discloses the budget-pause (JS live + safe; API field awaits the flush) |
+| #2033 | #1949 | weather raw archive restored (IAM) + raw-archive failures unswallowed platform-wide (premise live-confirmed: newest object 2026-03-09) |
+| #2034 | #1993 | labs coach reads the draws that exist — schema-true fact block + "zero results" qa tripwire |
 
-- **Parity is enforced, not asserted.** 131 test vectors generated FROM the deployed Python
-  (`scripts/gen_mirror_vectors.py`) pin `mirror-core.js` to exact equality (banker's rounding via
-  the shared `pyRound`) — `tests/test_mirror_parity.py` + `tests/js/mirror_core.test.mjs`.
-  Negative-tested three ways (doctored weight / rogue fetch / stale vector — each fires).
-- **The privacy control is the absence of code.** No upload endpoint exists; a structural test
-  pins the module graph to exactly one `fetch(DIST_URL)` and zero XHR/beacon/WS/EventSource.
-- **ADR-104/105 applied to the reader:** TSB absent-not-zero with the renormalisation said out
-  loud; their own HRV band derives from their distribution past the same MIN_N=30 floor-guard,
-  labelled population-fallback below it. HRV comparability disclosed (Whoop RMSSD; Apple SDNN is
-  why v1 is Whoop-only).
-- **`site/data/mirror_distributions.json`** — full sorted daily samples (exact midrank
-  percentiles), six already-public metrics, n=341/359, window stamped. A test pins the metric
-  set: a seventh metric is a PRE-13-class publication decision, not a code change.
+Plus direct-to-main `30b3e5e2` (see incident 2 below) and issues **#2019 + #2023 filed**.
 
-**The near-miss that became a feature:** `/method/mirror/` already existed — the old
-type-three-numbers evidence widget — and my builder **silently clobbered it** (caught by
-qa_manifest's duplicate gate, memory rule filed). Resolution: the new page replaces it at the
-same URL, keeps the zero-friction rung (type-a-number now compares against the 341-day year, not
-the old 7-day window), and a new **`"external"` registry flag** lets a curated page keep its
-archive-nav tile without the evidence build ever overwriting it (evidence.js follows the link
-for real; `renderMirror` + the `/api/pulse_history` binding removed).
+**Track B: the verification sweep found and fixed a live reader-facing failure.** PR #1939's
+citation withdrawal (merged 03:38Z, site-deploy green) never reached readers — `/api/supplements`
+served **18 of the 20 fabricated PMIDs for ~13h** because the S3 root `config/` prefix the Lambda
+reads has **no deploy path** (S3 object dated 07-18; `experiment_library.json` equally stale), a
+no-TTL warm-container cache and CloudFront 3600s stacked on top. Remediated same session:
+explicit `aws s3 cp` of the two repo twins (never a prefix sync — root `config/` holds
+Lambda-written runtime state), a description-only site-api touch to recycle containers,
+CloudFront invalidation of the three affected paths, then **verified live: 0/20 forbidden PMIDs,
+explib clean**. Structural gap filed as **#2019** (P1, Now, epic #1890).
 
-Render-QA earned its keep: two real findings (a `display:inline` label overpainting its
-instructions 21px; a degenerate demo walk marching resting HR to 13 bpm) — both fixed and
-re-verified before merge.
+Rest of Track B (per the shrunk scope): **B0 truth table** in the session scratchpad
+(`B0_truth_table.md`) — only site-api (15:53Z) + qa-smoke (16:23Z) carry Aug-2 merges; everything
+else is Aug-1 bytes awaiting the flush. **#1893/#1938 voided bets: PASS live** (273 exact on
+`/api/calibration`, JS binds at `/method/calibration/` — NOT `/data/`, and `/api/ledger` is a
+different surface; that's why the earlier spot-check found nothing). **B4 alarm sweep:** all 8 red
+alarms mapped to owners; the one unowned signal was verified (verdict CONFIRMED with corrections)
+and filed as **#2023** — the #813 gradability gate phase-filters its raw-source liveness query
+(genesis-blinded, #1203-class recurrence; cycle-11 gradable share ~1.4% vs the ~9% best).
 
-## The funnel wave — all four merged via /reconcile-branch, literals regenerated per merge
+## Blocked on you — the ONE numbered ask (updated; supersedes the overnight list)
 
-| # | what | PR | deploy state |
-|---|---|---|---|
-| #1953 | qa-smoke distinguishes dark-during-live-cycle (WARN→FAIL ≥2d, `qa_predict_dark` streak row) | **#2011** | **deployed** 16:23Z, bytes verified — IAM PutItem grant still pending (fail-soft WARN until CDK deploy) |
-| #1954 | Monday digest subscriber-funnel section + canary zero-residue assertion | **#2012** | merged; code+IAM ride the CDK deploy |
-| #1955 | one PT day-frame (`common/pacific_time.py`) for share card + vitals | **#2013** | site-api **deployed + live-verified** ("Day 7" PT-correct); og tags bake on next proof-builder run |
-| #1952 | seeder stamps the GENESIS ISO week; restart-verify asserts the hook live | **#2014** | merged; deploy-tools only |
-
-Full suite green after the wave (**8,486 passed**) and again on the Mirror tree (**8,490**, +
-185 JS). The only deselect both times: the documented `i16` live-data flake (only Withings fresh
-— Whoop dark, #1934).
-
-**#2010 progress:** qa-smoke's stranded gates (`phase_plausibility`, `qa_check_reader_truth`)
-are **deployed and byte-verified**; site-api deployed. Still stranded: the email/compute-side
-gates (#1896/#1897) behind the Plan red below.
-
-## Blocked on you — the numbered ask (batched per convention)
-
-1. **`bash deploy/cdk_deploy.sh LifePlatformOperational -- --require-approval never`** — the
-   classifier only clears CDK deploys on your in-the-moment ask (memory rule confirmed tonight).
-   Ships the #2011/#2012 IAM grants + digest/canary code, and **un-reds every ci-cd Plan**
-   (R8-ST6 currently fails every push on main — 5 runs tonight, all only-Plan-red).
-2. Then **`deploy_all=true` dispatch + approve** — ships the #1896/#1897 fleet gates (#2010).
-3. **The stray canary row delete** — command in PR #2012's body, discovery query in its comments
-   (I held the no-DDB-mutations line; the new canary assertion will loudly flag the row until
-   deleted).
-4. **PR #2012 revision-history purge** — a subagent pasted the subscriber row's hashed key into
-   the public PR body; I redacted it, but GitHub keeps public edit history (PR → "edited"
-   dropdown → delete revision). Incident row filed; memory rule written so implementer briefs
-   demand discovery-queries, not concrete keys.
-5. **#1934 Whoop OAuth** (`python3 setup/setup_whoop_auth.py --backfill`) — dark since 08-01
-   12:00Z, gap now ~2 days, feeds readiness/brief/vitals **and the new Mirror's freshest
-   comparison data**.
-6. Standing from the prior wrap, still yours: PRE-13 (genome/per-variant publication — the
-   Mirror's distribution artifact is deliberately scope-pinned to the six long-public metrics),
-   #1927 ceiling number, growth-1/#1951 subscriber kill-switch, #1940 public correction.
+1. **`bash deploy/cdk_deploy.sh LifePlatformOperational LifePlatformIngestion -- --require-approval never`**
+   — now carries: #2011 qa-smoke PutItem, #2012 digest/canary IAM, #2024 qa-smoke S3Read on
+   `ai-canary-log/*`, #2033 weather PutObject on `raw/weather/*` + qa-smoke ListBucket on `raw/*`.
+   Un-reds every ci-cd Plan (R8-ST6).
+2. **`deploy_all=true` dispatch + approve** — ships the whole stranded fleet: the #1941/#1942
+   coach-integrity gates, #2012 digest/canary code, og-image PT frame (#2013), #2024 canary
+   universe, #2025 chronic warns, #2027 freshness checker, #2029's nine coach/intelligence
+   functions, #2033 unswallow, #2034 labs extractor — plus `bash deploy/deploy_site_api.sh` for
+   the site-api half (#2027/#2032 field, #2017 clamp).
+3. **After 1+2, the DDB remediation pair** (dry-run first, both scripts print every mutation):
+   `python3 deploy/reconcile_countdown_gap.py` → review → `--apply` → re-run dry-run expecting 0
+   (#1947's 379 escapees; **3 flagged rows** need your per-row `--include-flagged` judgment). Then
+   the #1896 remainder: tombstone the fabricated `lunch_protein_prediction_miss` THREAD (my
+   dry-run script is in the session scratchpad; the countdown reconcile covers the other 16 of
+   its 17 rows). Then regenerate coach analyses + rerun the proof-builder so the noscript stops
+   asserting the false verdict (#1896 acceptance 3), and invoke the analyzer with
+   `{"expert":"labs"}` for #1993 acceptance 4.
+4. **The stray canary row delete** — unchanged from the overnight list (command in PR #2012's body).
+5. **PR #2012 revision-history purge** — unchanged (GitHub keeps public edit history).
+6. **#1934 Whoop OAuth** (`python3 setup/setup_whoop_auth.py --backfill`) — gap now ~2.5 days;
+   drives 3 of the 8 red alarms. (#2028 masked its token prints; the interactive flow is untouched.)
+7. Standing, still yours: PRE-13, #1927 ceiling number, growth-1/#1951, #1940 public correction.
 
 ## Gotchas hit
 
-- **The classifier is not overridable by standing authority** — the CDK deploy block held even
-  with the handover's explicit grant; the memory rule ("clears only when Matthew asks in the
-  moment") is exactly right. Plan accordingly: IAM-touching merges in an unattended session
-  strand the CI deploy path until the owner's next touch.
-- **Check the URL before building a page** — the flagship nearly shipped by silently destroying
-  an existing reader feature. `git ls-files site/<path>` + a REGISTRY grep first, always
-  (memory: `reference_check_existing_page_before_building`).
-- **A `<label>` computes `display:inline`** — vertical padding takes no layout space and the
-  box overpaints the paragraph above; render-QA's screenshot pass caught what 34 DOM checks
-  missed. Also: seedless demo data needs its arithmetic checked (`(i*3)%3` is always 0).
-- **A 9-hour laptop sleep mid-deploy** produced an `InvalidSignatureException` clock-skew
-  failure on the settle-waiter — the code update itself had already succeeded (CodeSha256
-  printed); verify function state before re-running, don't re-deploy on reflex.
+- **Merged is not live** — the #2019 class above; the sweep exists for exactly this. When a PR
+  body carries a manual deploy note, that note has no owner once the PR merges.
+- **Concurrent PRs breach size gates in UNION** (memory rule filed): #2025+#2026+#2027 each green
+  alone put qa_smoke_lambda at 1296 and restart_pipeline at 1202 → main's Unit Tests red ~1.5h.
+  Fixed by a real extraction (`qa_check_outputs.py`, `30b3e5e2`), not an exception comment. Check
+  shared-file headroom before a wave; re-run the size guard on main after the union.
+- **The reconcile bot**: ci-cd's "Reconcile derived artifacts" job now auto-pushes the doc-sync
+  literal regeneration after every merge — the manual `/reconcile-branch` regen step is automated
+  (I verified the bot's commit byte-identical to a manual run). Conflict resolution and
+  linearize-before-squash are still manual (#2034 needed the full ritual after #2033 landed).
+- **The pre-commit hook auto-stages doc-sync literal bumps into implementer commits** — all nine
+  implementers hit it; the brief now has to say "restore from origin/main + amend --no-verify".
+- **#2028's 85 CodeQL dismissals are live API state** independent of the PR — if that PR had been
+  rejected, the dismissals would have needed revisiting.
+- **Watch item:** the 07-31 canary record carries a REAL `board_meta_pressure:no_vendor` alarm
+  (training_coach said "claude" under meta-pressure) — `not-work — single occurrence, out of
+  #1956's scope; file only if it recurs post-deploy`.
+
+## What to expect from tonight's automated runs
+
+Tonight's 22:30Z qa-smoke still runs the **old deployed bytes** (16:23Z): expect the truthful
+WARN on the dark predict widget (#1953 working — day 2 may FAIL, still correct), the Reader Truth
+FAILs on frozen coach text (321.1 vs 317.0 — clears only after ask 2+3's regeneration), and the
+warnings alarm still red (clears one window after ask 2 ships #2025). The `_30d` honesty FAILs
+should stop tonight — #1918's fix went live with today's site-api deploy.
 
 ## Verified
 
-- 8,490 tests + 185 JS on the final tree; doc-sync truth-gate green after every merge in the
-  wave; every new guard negative-tested by breaking the fix.
-- Deployed bytes read back (qa-smoke gate modules; site-api PT frame) rather than run
-  conclusions; The Mirror executed on production with a full network capture.
+- Final main union: **only the Plan job red (R8-ST6, by design)** — Unit Tests/lint/
+  deploy-critical green on `cddf2f82`; doc-sync CHECK PASSED after the last bot reconcile; module
+  size guard green on the union; all four site-deploys green (no rollbacks).
+- Every implementer PR negative-tested its guard; three measure-first premises checked live
+  before building (#1949 S3 listing, #1958 CloudWatch, #1993 line 533) — all three held.
+- #1939 remediation verified on the live payloads (0/20); #1938 verified by live render + real
+  fetch; #2031's classifier verified against the actual stranded state.
+- All implementer worktrees removed, branches deleted (local + remote), tree clean on main.
 
-**Main:** red — only the Plan job (R8-ST6 IAM-review, by design) on every run since #2011
-merged; lint/tests/deploy-critical all green; clears with ask #1.
-**Build beat:** 2026-08-02-the-mirror.
-**Docs:** SITE_MAP_AND_INTENT (Mirror entry + external flag), INCIDENT_LOG (+1 row);
-SCHEMA/qa rows landed in the PRs themselves.
-**Decisions:** none needed — the "external" registry flag is an implementation pattern
-documented in-code + SITE_MAP_AND_INTENT; no governance posture changed.
-**Incidents:** 1 row added — subscriber-key paste into public PR #2012 (redacted; purge is ask #4).
-**Closures:** #1952 #1953 #1954 #1955 #1392 commented; backfilled #1931 #1922 #1897 #1893 #1892
-from the delta session (uncommented at its close).
+**Main:** stranded — every run fails only Plan (R8-ST6 IAM-review); clears with ask 1; #1901's
+classifier now decodes this state by name.
+**Build beat:** 2026-08-02-merged-is-not-live.
+**Docs:** INCIDENT_LOG (+2 rows), CONVENTIONS §4/§4d + deploy.md table (landed in the PRs
+themselves); no other pages invalidated — the ships are code-level fixes under existing contracts.
+**Decisions:** none needed — no governance posture changed; the qa_check_outputs extraction is
+the established #1665 split idiom.
+**Incidents:** 2 rows added — the config-prefix 13h stale serve (+#2019), the union size-gate red.
+**Closures:** #1901 #1902 #1945 #1947 #1949 #1956 #1958 #1965 #1969 #1971 #1977 #1989 #1993
+#1994 #1995 #2001 #2002 #2005 #2006 commented (19, per the ADR-099 two-line contract; honest
+partial verdicts where behavior proof waits on the flush).
 **Stash/hooks:** clean (empty stash; hook 🟢).
-**Backlog:** Now live at 5 (top actionable #1989, #1896-remainder); no stale Later issues;
+**Backlog:** Now live at 3 actionable (#1896-remainder, #1927, #2019); no stale Later issues;
 hygiene 0 violations / 2 pre-existing advisories (#1677/#1679 class).
 
 ## Residual / next picks
 
-1. **Watch tonight's qa-smoke** (22:30Z): expect a truthful WARN on the dark predict widget
-   (day 1 of the new check's streak; FAIL at day 2) — that is #1953 working, not a regression
-   (`not-work — expected-alarm note, no action unless it fires on something else`).
-2. **#1989** — cockpit scope-button contrast (top-ranked actionable Now story).
-3. **#1896 remainder** — the DDB remediation half (tombstones + false THREAD row) stayed
-   deliberately unshipped (owner-adjacent DDB mutations).
-4. **#1937** — the ~13 remaining UTC anchors in vitals; #2013 carried the cross-reference.
-5. **#1946-class data-1** — countdown-gap rows in coach reads (from the delta review's queue).
-6. Mirror follow-ons worth filing only if Matthew wants them: ZIP ingestion + Apple Health
-   (SDNN-aware) — recorded in PR #2015's decision notes (`not-work — awaiting owner interest,
-   scope decision recorded in the PR`).
+1. **Post-flush verification pass** (#2010 closes then): after asks 1–2, confirm the gates fire
+   on real generations (#1941/#1942), the canary stops false-alarming (#1956/#2024), the warnings
+   alarm clears (#1958), and no auto-rollback fired on stale smoke (#1915 class).
+2. **#2019** — the config/ deploy path (top actionable Now story after #1896).
+3. **#2023** — genesis-blinded gradability gate (Next; worst exactly when readers watch a fresh cycle).
+4. **#1937** — remaining UTC anchors in vitals (`not-work` tag not needed: filed issue).
+5. **/fullreview delta**: the ~55 banked findings from 07-28 await one clean filing pass
+   (`not-work — filing pass is its own session per the bank-and-delta convention, #1889 context`).
+6. Whoop dark >2 days now (#1934) — the longer it runs, the bigger the Mirror/readiness backfill.
+7. Standing-alarms checklist (#1329): 5 manual-rotation secrets stale >120d routed to the
+   remediation agent's needs-human digest (todoist 125d, ingestion-keys 122d, +3) — `not-work —
+   owner rotation ritual, surfaced by freshness-checker nightly`.
