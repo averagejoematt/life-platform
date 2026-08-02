@@ -68,26 +68,35 @@ def _apple_health_datatypes(*, _g):
         return None
 
 
-def _carried_from_cycle(source: str, date_str: str, *, _g) -> int | None:
-    """The ADR-077 cycle stamp on a source's latest record, or None.
+def _carried_from_cycle(date_str: str, *, _g) -> int | None:
+    """Which experiment attempt a pre-genesis record belongs to — a PURE function
+    of the record's CONTENT date against the CYCLE_GENESES ledger (#2002).
 
-    Only consulted when that record's CONTENT date predates the current genesis
-    (never inferred from tombstoned_at) — the chip provenance for "carried from
-    attempt N" (#1371). Fail-soft: a missing stamp renders an unnumbered label.
+    #1371 originally read an ADR-077 `cycle` attribute stamped on the record, but
+    NO writer in the reset pipeline ever stamps `cycle` on raw partitions
+    (restart_phase_tag writes only `phase`; the wipe stamps only tombstoned
+    experiment-scoped intelligence), so the numbered chip was structurally
+    unreachable — every carried source rendered the unnumbered fallback. Deriving
+    from the date needs no extra read and handles hevy's sub-record-only shape
+    (no plain DATE#{date} item, only DATE#…#WORKOUT#<uuid>) for free.
+
+    Returns the highest cycle whose genesis is <= the date; None for a date that
+    predates cycle 1 entirely (the unnumbered "a previous attempt" fallback stays
+    the honest label — ADR-104: absence stated, never fabricated).
     """
-    # Facade state injected via `_g` (the delegator's globals()) — same module the test patched.
-    table = _g["table"]
     try:
-        item = table.get_item(
-            Key={"pk": f"{USER_PREFIX}{source}", "sk": f"DATE#{date_str}"},
-            ProjectionExpression="#c",
-            ExpressionAttributeNames={"#c": "cycle"},
-        ).get("Item")
-        if item and item.get("cycle") is not None:
-            return int(item["cycle"])
+        geneses = sorted(_g["CYCLE_GENESES"].items(), key=lambda kv: str(kv[1]))
     except Exception as e:
-        logger.warning("source_freshness: carried-cycle read failed for %s: %s", source, e)
-    return None
+        logger.warning("source_freshness: carried-cycle derivation failed: %s", e)
+        return None
+    d = str(date_str)[:10]
+    cycle = None
+    for n, genesis in geneses:
+        if d >= str(genesis)[:10]:
+            cycle = int(n)
+        else:
+            break
+    return cycle
 
 
 def source_freshness(*, _g) -> dict:
@@ -176,7 +185,7 @@ def source_freshness(*, _g) -> dict:
         # current genesis, so its age is carried history, not a live-cycle outage.
         if last_update and last_update < EXPERIMENT_START:
             entry["carried"] = True
-            entry["carried_from_cycle"] = _carried_from_cycle(sid, last_update, _g=_g)
+            entry["carried_from_cycle"] = _carried_from_cycle(last_update, _g=_g)
         # D-4 (#468): apple_health is one partition fed by many sensors, so its single
         # "fresh" hides a months-dark CGM/BP/SoM/workout stream. Surface the per-datatype
         # liveness the freshness-checker stores so the darkness is visible.
@@ -187,9 +196,18 @@ def source_freshness(*, _g) -> dict:
                 # #746: dark HAE streams now carry their days-dark + manual flag, so
                 # the board can stamp "CGM dark 5d" and separate the hand-captured
                 # streams (CGM/BP/SoM/water) from a passive device-stream gap.
-                entry["dark_datatypes"] = [
-                    {"label": d["label"], "days_dark": d.get("age_days"), "manual": bool(d.get("manual"))} for d in dts if d.get("dark")
-                ]
+                # #2001: when the checker exhausted its deep lookback without a hit,
+                # forward the floor so the board can say "dark >400d" — the honest
+                # bound (ADR-104), never an unnumbered shrug when a bound is known.
+                dark_rows = []
+                for d in dts:
+                    if not d.get("dark"):
+                        continue
+                    row = {"label": d["label"], "days_dark": d.get("age_days"), "manual": bool(d.get("manual"))}
+                    if d.get("age_days") is None and d.get("age_floor_days") is not None:
+                        row["days_dark_floor"] = int(d["age_floor_days"])
+                    dark_rows.append(row)
+                entry["dark_datatypes"] = dark_rows
         sources.append(entry)
         summary["total"] += 1
         if status == "fresh":

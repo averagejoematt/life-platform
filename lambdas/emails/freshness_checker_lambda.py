@@ -74,8 +74,18 @@ AH_ACTIVITY_WINDOW_DAYS = int(os.environ.get("AH_ACTIVITY_WINDOW_DAYS", "7"))
 from ingestion.source_registry import hae_datatype_thresholds  # noqa: E402
 
 HAE_DATATYPES = hae_datatype_thresholds()
-# Longest lookback needed to find a still-present-but-slow datatype (cap the scan).
+# First-pass window: cheap newest-N scan that resolves every reasonably-live datatype.
+# #2001: this is NOT the truth horizon — a datatype unresolved here gets a targeted
+# deep scan (below) so the cap can never erase the "dark N days" number exactly when
+# the lapse is longest (the two ~114/~122-day lapses rendered with no number).
 HAE_LIVENESS_WINDOW_DAYS = int(os.environ.get("HAE_LIVENESS_WINDOW_DAYS", "45"))
+# #2001: how far back the per-datatype deep scan searches before honestly reporting
+# ">N days" instead of a number (ADR-104: absence stated, never fabricated). The
+# checker runs 1×/day, so a few extra filtered pages are free.
+HAE_LIVENESS_MAX_LOOKBACK_DAYS = int(os.environ.get("HAE_LIVENESS_MAX_LOOKBACK_DAYS", "400"))
+# Safety cap on filtered pagination (each page is up to 1MB of scanned keys; the
+# 400-day key-condition floor already bounds the scan — this is belt-and-suspenders).
+_HAE_DEEP_SCAN_MAX_PAGES = 25
 _HAE_LIVENESS_SK = "DATATYPE_LIVENESS"  # sentinel SK on the apple_health partition (sorts before DATE#)
 _AH_ALERT_STATE_SK = "ALERTSTATE#ah_activity_degraded"  # DI-1.6 episode sentinel
 
@@ -318,8 +328,52 @@ def compute_datatype_liveness(records, now, datatypes=None):
     return out
 
 
+def _find_last_seen_beyond_window(table, pk, fields, floor_date):
+    """#2001: newest DATE# record (bounded below by `floor_date`) where ANY of
+    `fields` is present — the targeted deep scan for a datatype the cheap
+    newest-N window could not resolve. Newest-first filtered pagination; returns
+    'YYYY-MM-DD' or None (None = no record within the lookback horizon).
+
+    The floor rides the KEY CONDITION (sk BETWEEN), so DynamoDB never scans past
+    the horizon; the filter only prunes within it. Presence is re-checked in
+    Python (`is not None`) so a NULL-typed attribute can't fake a sighting.
+    """
+    kwargs = {
+        "KeyConditionExpression": "pk = :pk AND sk BETWEEN :lo AND :hi",
+        # '~' (0x7E) sorts after every digit, so DATE#~ is an inclusive upper
+        # bound covering all DATE#YYYY-MM-DD records + sub-record suffixes.
+        "ExpressionAttributeValues": {":pk": pk, ":lo": f"DATE#{floor_date}", ":hi": "DATE#~"},
+        "FilterExpression": " OR ".join(f"attribute_exists({f})" for f in fields),
+        "ScanIndexForward": False,
+        "ProjectionExpression": "sk, " + ", ".join(fields),
+    }
+    for _ in range(_HAE_DEEP_SCAN_MAX_PAGES):
+        resp = table.query(**kwargs)
+        for it in resp.get("Items", []):  # newest-first: first real hit IS the last-seen date
+            if any(it.get(f) is not None for f in fields):
+                d = _rec_date(it)
+                if len(d) == 10:
+                    return d
+        lek = resp.get("LastEvaluatedKey")
+        if not lek:
+            return None
+        kwargs["ExclusiveStartKey"] = lek
+    return None
+
+
 def check_apple_health_datatypes(table, now):
-    """Query the apple_health partition and compute per-datatype liveness (D-4/#468)."""
+    """Query the apple_health partition and compute per-datatype liveness (D-4/#468).
+
+    #2001: two-phase. Phase 1 is the cheap newest-N window scan that resolves every
+    reasonably-live datatype in one query. Phase 2 deep-scans ONLY the datatypes the
+    window couldn't resolve (last_seen None), paginating a filtered newest-first
+    query back to HAE_LIVENESS_MAX_LOOKBACK_DAYS — so a months-long lapse reports
+    its true "dark N days" number instead of losing it exactly when it's longest
+    (measured 2026-08-02: BP last 2026-04-10 / SoM last 2026-04-02 were both
+    invisible behind a window that bottomed out 2026-06-16). A datatype with no
+    record inside even the deep horizon carries `age_floor_days` — the honest
+    ">N days" (ADR-104), never a fabricated number.
+    """
     pk = f"USER#{USER_ID}#SOURCE#apple_health"
     fields = sorted({f for dt in HAE_DATATYPES for f in dt["fields"]})
     # sk + every datatype field. None are DynamoDB reserved words, so no aliasing needed.
@@ -335,7 +389,30 @@ def check_apple_health_datatypes(table, now):
     except Exception as e:  # noqa: BLE001
         logger.warning("apple_health datatype-liveness query failed (non-fatal): %s", e)
         return None
-    return compute_datatype_liveness(resp.get("Items", []), now)
+    out = compute_datatype_liveness(resp.get("Items", []), now)
+
+    # ── #2001 phase 2: resolve the datatypes the window lost ──
+    today = now.date()
+    floor_date = (today - timedelta(days=HAE_LIVENESS_MAX_LOOKBACK_DAYS)).isoformat()
+    fields_by_key = {dt["key"]: dt["fields"] for dt in HAE_DATATYPES}
+    for entry in out:
+        if entry["last_seen"] is not None:
+            continue
+        try:
+            found = _find_last_seen_beyond_window(table, pk, fields_by_key[entry["key"]], floor_date)
+        except Exception as e:  # noqa: BLE001 — one datatype's deep scan must not sink the rest
+            logger.warning("HAE deep last-seen scan failed for %s (non-fatal): %s", entry["key"], e)
+            continue
+        if found:
+            entry["last_seen"] = found
+            entry["age_days"] = (today - datetime.strptime(found, "%Y-%m-%d").date()).days
+            entry["dark"] = entry["age_days"] > entry["stale_days"]
+        else:
+            # No record within the deep horizon: the truth is ">N days dark (or
+            # never captured)". Stamp the floor so readers can SAY that (ADR-104)
+            # rather than rendering an unnumbered 'dark'.
+            entry["age_floor_days"] = HAE_LIVENESS_MAX_LOOKBACK_DAYS
+    return out
 
 
 def alert_episode_decision(state, degraded, now, reminder_hours=24):

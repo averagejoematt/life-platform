@@ -25,6 +25,10 @@ Checks (each PASS / FAIL / SKIP — a SKIP is honest, never a silent pass):
      entry pre-genesis-dated and backed by a live (phase=experiment,
      non-tombstoned) chronicle record — a wiped installment surviving in the
      manifest is the leak.
+  5b. /api/source_freshness carried chips are NUMBERED (#2002): >=1 source
+     marked carried post-reset, and >=1 carried source with a numeric
+     carried_from_cycle (date-derived against CYCLE_GENESES — an all-null
+     board means the numbered provenance is structurally dead again).
   6. DDB spot-check: ZERO rows with phase=experiment dated before genesis
      across every raw-timeseries source (phase-taxonomy-derived). Catches the
      ingestion-poisoning class found 2026-07-12: a warm ingestion Lambda with
@@ -136,6 +140,31 @@ def check_dispute_current(payload: dict, genesis: str) -> list[str]:
     return [
         f"/api/coach_team: dispute {d.get('topic')!r} has created_at {d.get('created_at')!r} — pre-genesis (expected null or >= {genesis})"
     ]
+
+
+def check_carried_provenance_numbered(payload: dict) -> list[str]:
+    """/api/source_freshness post-reset: the Day-1 board's carried chips must be
+    NUMBERED (#2002). After a reset every source's newest record predates genesis,
+    so >=1 source must be marked carried AND >=1 carried source must return a
+    numeric carried_from_cycle — the cycle now derives from the record's date
+    against the CYCLE_GENESES ledger, so an all-null board means the derivation
+    (or the ledger append the reset performs) is broken, exactly the structurally-
+    dead state #2002 fixed. A None on a pre-cycle-1-dated source alone is honest
+    and allowed; ALL-None is the failure."""
+    sources = payload.get("sources") or []
+    carried = [s for s in sources if s.get("carried")]
+    if not carried:
+        return ["/api/source_freshness: no carried source on the post-reset board (expected >=1 — every pre-genesis source is carried)"]
+    numbered = [
+        s for s in carried if isinstance(s.get("carried_from_cycle"), (int, float)) and not isinstance(s.get("carried_from_cycle"), bool)
+    ]
+    if not numbered:
+        ids = ", ".join(str(s.get("id")) for s in carried[:8])
+        return [
+            f"/api/source_freshness: {len(carried)} carried source(s) ({ids}) and NONE carries a numeric "
+            f"carried_from_cycle — the #1371 numbered chip is unreachable again (#2002)"
+        ]
+    return []
 
 
 def live_chronicle_keys(records: list[dict]) -> set[tuple[str, str]]:
@@ -280,6 +309,8 @@ def main() -> int:
         ("character zeroed", "/api/character", check_character_zeroed),
         ("discoveries clean", "/api/discoveries", check_discoveries_clean),
         ("coach_team dispute", "/api/coach_team", lambda p: check_dispute_current(p, genesis)),
+        # #2002: the reset-honesty chip must be numbered, not the unnumbered fallback.
+        ("carried provenance numbered", "/api/source_freshness", check_carried_provenance_numbered),
     ]
     for name, path, checker in live_checks:
         if net_skip:
