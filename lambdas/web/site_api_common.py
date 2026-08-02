@@ -548,3 +548,54 @@ def _load_s3_json(key: str, cache_name: str) -> dict:
     except Exception as e:
         logger.warning(f"[{cache_name}] Failed to load {key}: {e}")
         return {}
+
+
+def _prereg_stamp_key(genesis: str) -> str:
+    """S3 key of the genesis pre-registration's hash-stamp sidecar.
+
+    MUST mirror deploy/genesis_prereg_stamp.py's stamp_key() exactly — duplicated
+    rather than imported because deploy/ is operator tooling, never part of the
+    lambda bundle (#781). Parity between the two literal formats is pinned by
+    tests/test_prereg_seal_1980.py (calls gps.stamp_key() and this function with
+    the same genesis and asserts equality) so the two can't silently drift."""
+    return f"generated/experiments/prereg/genesis-{genesis}.sha256.json"
+
+
+# #1980: cache the seal lookup per warm container (same pattern as _supp_metadata_cache),
+# but a MISSING stamp is a legitimate, cacheable answer (a freshly re-anchored cycle
+# whose --with-preregistration hasn't landed yet) — so a separate "attempted" flag
+# distinguishes "not tried" from "tried, none published" without needing a sentinel.
+_prereg_seal_cache: dict | None = None
+_prereg_seal_attempted = False
+
+
+def prereg_seal_meta() -> dict | None:
+    """#1980: the CURRENT cycle's sealed pre-registration artifact — link + SHA-256
+    + the copy-pasteable verify command, read verbatim from the stamp
+    genesis_prereg_stamp.py published to S3 (the hash is never recomputed here —
+    read-the-stamp, not recompute-and-trust, is the honesty rule).
+
+    The genesis is DERIVED from EXPERIMENT_START (never a literal date), so the
+    link is correct again the moment restart_pipeline.py re-anchors and a fresh
+    stamp is published — no code change needed at the next reset.
+
+    Returns None (honest-empty) when no stamp exists yet for this genesis; callers
+    render nothing rather than a broken/guessed link.
+    """
+    global _prereg_seal_cache, _prereg_seal_attempted
+    if _prereg_seal_attempted:
+        return _prereg_seal_cache
+    _prereg_seal_attempted = True
+    stamp = _load_s3_json(_prereg_stamp_key(EXPERIMENT_START), "prereg_seal")
+    if not stamp or not stamp.get("sha256") or stamp.get("genesis") != EXPERIMENT_START:
+        _prereg_seal_cache = None
+        return None
+    _prereg_seal_cache = {
+        "genesis": stamp.get("genesis"),
+        "sha256": stamp.get("sha256"),
+        "artifact_url": stamp.get("public_artifact_url"),
+        "stamp_url": stamp.get("public_stamp_url"),
+        "verify": stamp.get("verify"),
+        "stamped_at": stamp.get("stamped_at"),
+    }
+    return _prereg_seal_cache

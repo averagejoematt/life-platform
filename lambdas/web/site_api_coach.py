@@ -65,6 +65,7 @@ from web.site_api_common import (
     _scrub_blocked_terms,
     logger,
     pre_start_meta,
+    prereg_seal_meta,
     table,
 )
 
@@ -1984,6 +1985,10 @@ def handle_calibration(event):
     for existing readers), and a nested `lifetime` object carries the same
     shape for the career, all-cycles view — sports solved this decades ago.
     """
+    # #1980: the current cycle's sealed pre-registration (link + SHA-256 + verify
+    # command) — independent of the DDB fetches below, computed first so it still
+    # renders on the exception fallback (prereg_seal_meta never raises).
+    seal = prereg_seal_meta()
     try:
         # #1527: all 8 coach partitions + the hypothesis ledger fetched
         # concurrently — total fetch latency is max(single query), not the sum.
@@ -2048,6 +2053,7 @@ def handle_calibration(event):
                 "interval_forecasts": {**interval_forecasts, "lifetime": interval_forecasts_lifetime},
                 "voided": voided,
                 "cycle": _current_cycle(),
+                "prereg_seal": seal,
                 "disclosure": (
                     "Self-graded: every prediction here was resolved against the platform's own data by a "
                     "deterministic evaluator — no human scoring. Brier score: 0 is perfect, 0.25 is the "
@@ -2065,7 +2071,7 @@ def handle_calibration(event):
         )
     except Exception as e:
         logger.error(f"[calibration] {e}")
-        return _ok({"platform": {}, "coaches": [], "hypotheses": {}, "interval_forecasts": {}}, cache_seconds=60)
+        return _ok({"platform": {}, "coaches": [], "hypotheses": {}, "interval_forecasts": {}, "prereg_seal": seal}, cache_seconds=60)
 
 
 def handle_voice_fidelity(event):
@@ -2112,6 +2118,9 @@ def handle_voice_fidelity(event):
 
 def handle_predictions(event):
     """GET /api/predictions"""
+    # #1980: computed first (never raises) so the seal still renders on the
+    # exception fallback below — see handle_calibration for the same pattern.
+    seal = prereg_seal_meta()
     try:
         qs = event.get("queryStringParameters") or {}
         status_filter = qs.get("status", "all")
@@ -2266,12 +2275,13 @@ def handle_predictions(event):
                 "by_coach": by_coach,
                 "predictions": all_predictions,
                 "cycle": _current_cycle(),
+                "prereg_seal": seal,
             },
             cache_seconds=300,
         )
     except Exception as _e:
         logger.warning(f"[/api/predictions] {_e}")
-        return _ok({"overall": {}, "by_coach": {}, "predictions": []}, cache_seconds=60)
+        return _ok({"overall": {}, "by_coach": {}, "predictions": [], "prereg_seal": seal}, cache_seconds=60)
 
     # Coach Learning Timeline (GET with ?coach_id= query param)
 
