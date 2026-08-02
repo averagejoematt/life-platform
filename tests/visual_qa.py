@@ -63,7 +63,6 @@ doors only); the full untiered surface runs on the weekly standalone schedule
 workflow's header comment for the exact cadence split.
 """
 
-import argparse
 import json
 import os
 import sys
@@ -533,7 +532,7 @@ def run_leak_token_sweep(base_url=None):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capture_prose=False, a11y_baseline=None):
+def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capture_prose=False, a11y_baseline=None, theme="dark"):
     """Drive one page def in an open browser context and return its result dict.
 
     Pure capture: navigate, scroll/reveal, run element/chart/interaction checks,
@@ -548,6 +547,13 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capt
     direct capture_page callers (site_review, pr_render_gate) are byte-for-byte
     unchanged — they render against mocked/partial data where axe findings
     would not match the live-surface baseline.
+
+    theme (#1991): which baseline ledger ("pages" for "dark", "pages_light" for
+    "light") the axe gate compares against — must match the color_scheme the
+    caller opened `context` with, so the gate reads the ledger that was
+    actually captured under that theme. Defaults to "dark", matching every
+    pre-#1991 call site (context is still opened by the caller; capture_page
+    itself never sets color_scheme).
 
     Extracted from run_sweep's per-page loop (2026-06-20) so tests/site_review.py
     can reuse identical capture without forking the gating visual-qa harness.
@@ -690,7 +696,7 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capt
                 observed = None
                 warnings.append(f"a11y audit did not run (axe inject/run failed: {str(e)[:100]}) — not a pass (#1433)")
             if observed is not None:
-                a11y_result = a11y_audit.gate_findings(path, observed, a11y_baseline)
+                a11y_result = a11y_audit.gate_findings(path, observed, a11y_baseline, theme=theme)
                 for v in a11y_result["new"]:
                     tgt = f" e.g. {v['targets'][0]}" if v.get("targets") else ""
                     issues.append(f"NEW {v['impact']} a11y violation (axe: {v['id']}): {v['help']} — {v['nodes']} node(s){tgt} (#1433)")
@@ -881,6 +887,7 @@ def run_sweep(
     a11y=True,
     update_a11y_baseline=False,
     leak_scan=True,
+    color_scheme="dark",
 ):
     """Run the v4 visual QA sweep. Returns True if no page FAILED.
 
@@ -917,6 +924,15 @@ def run_sweep(
     engine default — the site does no UA sniffing, the ENGINE is the coverage).
     capture_page's own in-page viewport passes (390/844, 360/800, 1280) behave
     exactly as before. Defaults reproduce today's gating runs byte-for-byte.
+
+    color_scheme (#1991): "dark" (default, unchanged behavior) or "light" —
+    both Playwright contexts (mobile and desktop) below open with this scheme,
+    and it's threaded into the axe gate (capture_page's `theme` param) and the
+    --update-baseline write path so a light run reads/writes the sibling
+    "pages_light" ledger in tests/a11y_baseline.json instead of "pages". Every
+    other check (element/text, chart geometry, tap-target, etc.) is theme-
+    agnostic and runs identically either way — only the axe-core pass and its
+    baseline differ by theme.
     """
     from playwright.sync_api import sync_playwright
 
@@ -940,15 +956,21 @@ def run_sweep(
                 device_scale_factor=3,
                 is_mobile=True,
                 has_touch=True,
-                color_scheme="dark",
+                color_scheme=color_scheme,
             )
         else:
-            context = browser.new_context(viewport={"width": 1440, "height": 900}, color_scheme="dark")
+            context = browser.new_context(viewport={"width": 1440, "height": 900}, color_scheme=color_scheme)
 
         for page_def in sweep_pages(pages or PAGES, max_tier):
             # --reader-truth needs each page's rendered innerText (the prose dump).
             result = capture_page(
-                context, page_def, screenshot_dir, save_screenshots, capture_prose=reader_truth, a11y_baseline=a11y_baseline
+                context,
+                page_def,
+                screenshot_dir,
+                save_screenshots,
+                capture_prose=reader_truth,
+                a11y_baseline=a11y_baseline,
+                theme=color_scheme,
             )
             results.append(result)
             icon = "✅" if not result["issues"] else "❌"
@@ -998,10 +1020,10 @@ def run_sweep(
         observed_by_path = {r["path"]: r["a11y"]["observed"] for r in results if r.get("a11y") is not None}
         skipped = [r["path"] for r in results if r.get("a11y") is None]
         if observed_by_path:
-            new_baseline = a11y_audit.update_baseline(observed_by_path)
-            counts = a11y_audit.summarize(new_baseline)
+            new_baseline = a11y_audit.update_baseline(observed_by_path, theme=color_scheme)
+            counts = a11y_audit.summarize(new_baseline, theme=color_scheme)
             counts_str = ", ".join(f"{k}: {v}" for k, v in sorted(counts.items())) or "clean — no violations"
-            print(f"\na11y baseline rewritten ({len(observed_by_path)} page(s) captured) → tests/a11y_baseline.json")
+            print(f"\na11y baseline ({color_scheme}) rewritten ({len(observed_by_path)} page(s) captured) → tests/a11y_baseline.json")
             print(f"  ledger now: {counts_str} — review + commit the diff deliberately (#1433)")
         if skipped:
             print(f"  ⚠ a11y baseline NOT updated for {len(skipped)} page(s) where the audit failed to run: {', '.join(skipped[:5])}")
@@ -1058,6 +1080,7 @@ def run_sweep(
                 "browser": browser_name,
                 "mobile": mobile,
                 "max_tier": max_tier,
+                "color_scheme": color_scheme,
                 "passed": passed,
                 "failed": failed,
                 "warnings": warns,
@@ -1077,89 +1100,10 @@ def run_sweep(
 
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(description="v4 visual QA sweep for averagejoematt.com")
-    ap.add_argument("--page", help="Test a single page path (e.g. /cockpit/)")
-    ap.add_argument("--screenshot", action="store_true", help="Save full-page + chart-crop + mobile screenshots")
-    ap.add_argument("--ai-qa", action="store_true", help="Run Claude (Bedrock) semantic QA over the screenshots")
-    ap.add_argument(
-        "--ai-qa-max-tier",
-        type=int,
-        default=None,
-        help=(
-            "Restrict --ai-qa to qa_manifest pages with tier <= N (#1428; deploy-time CI passes 1 to cover exactly "
-            "the 6 flagship doors). Omit for the full-surface pass (the weekly scheduled run). Never affects the "
-            "deterministic Playwright coverage, which always runs over every page in --page/PAGES."
-        ),
-    )
-    ap.add_argument(
-        "--reader-truth",
-        action="store_true",
-        help="Run the phase-aware reader-truth QA over each page's rendered prose (#1095; high severity gates like --ai-qa)",
-    )
-    ap.add_argument(
-        "--browser",
-        choices=["chromium", "webkit", "firefox"],
-        default="chromium",
-        help="Playwright engine to drive (#1434; the weekly advisory iOS-Safari-engine run passes webkit)",
-    )
-    ap.add_argument(
-        "--mobile",
-        action="store_true",
-        help="Open the browser context at an iPhone-class mobile profile (390x844, dpr 3, touch) instead of 1440x900 desktop (#1434)",
-    )
-    ap.add_argument(
-        "--no-a11y",
-        action="store_true",
-        help="Skip the axe-core accessibility audit (#1433). Debug escape hatch only — every CI run keeps the audit on.",
-    )
-    ap.add_argument(
-        "--update-baseline",
-        action="store_true",
-        help=(
-            "Rewrite tests/a11y_baseline.json from this run's axe findings for the pages swept (#1433). DELIBERATE path: "
-            "the run still reds on NEW serious/critical violations, and the committed baseline diff is the review surface "
-            "(added entries = newly accepted debt, removed = fixes). See tests/a11y_audit.py."
-        ),
-    )
-    ap.add_argument(
-        "--max-tier",
-        type=int,
-        default=None,
-        help=(
-            "Restrict the DETERMINISTIC sweep to qa_manifest pages with tier <= N (#1434; the weekly WebKit run passes 2 "
-            "for the flagship doors + live-data topic pages). Omit for full coverage — every existing gating run does."
-        ),
-    )
-    ap.add_argument(
-        "--no-leak-scan",
-        action="store_true",
-        help=(
-            "Skip the deterministic leak-token sweep (#1448; tests/leak_token_sweep.py — the same checks "
-            "deploy/restart_verify_rendered.py runs at reset time). Debug escape hatch only — every CI run keeps it on."
-        ),
-    )
-    args = ap.parse_args()
+    # CLI/argparse wiring lives in visual_qa_cli.py (#1991 — extracted to hold this
+    # module's line count inside the module-size headroom). Pass this already-executed
+    # module object (sys.modules["__main__"] when run as `python3 tests/visual_qa.py`)
+    # so visual_qa_cli never re-imports/re-executes this file under a second name.
+    from visual_qa_cli import main as _cli_main
 
-    pages = None
-    if args.page:
-        pages = [p for p in PAGES if p["path"] == args.page]
-        if not pages:
-            print(f"Unknown page: {args.page}\nAvailable: {', '.join(p['path'] for p in PAGES)}")
-            sys.exit(1)
-
-    profile = f" [{args.browser}{', mobile' if args.mobile else ''}{f', tier<={args.max_tier}' if args.max_tier is not None else ''}]"
-    print(f"v4 Visual QA Sweep — {SITE_URL}{profile if profile != ' [chromium]' else ''}\n{'=' * 56}")
-    ok = run_sweep(
-        pages=pages,
-        save_screenshots=args.screenshot,
-        ai_qa=args.ai_qa,
-        reader_truth=args.reader_truth,
-        ai_qa_max_tier=args.ai_qa_max_tier,
-        browser_name=args.browser,
-        mobile=args.mobile,
-        max_tier=args.max_tier,
-        a11y=not args.no_a11y,
-        update_a11y_baseline=args.update_baseline,
-        leak_scan=not args.no_leak_scan,
-    )
-    sys.exit(0 if ok else 1)
+    sys.exit(_cli_main(vqa=sys.modules[__name__]))

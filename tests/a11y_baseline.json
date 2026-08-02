@@ -2,7 +2,9 @@
   "_meta": {
     "axe_version": "4.12.1",
     "captured_at": "2026-07-19T22:49:39+00:00",
-    "note": "Committed a11y debt ledger (#1433) \u2014 honest capture of current axe violations per page. The visual-qa gate reds only on NEW serious/critical violations vs this file. Update DELIBERATELY via `python3 tests/visual_qa.py --update-baseline` and review the diff in the PR; added entries are newly accepted debt, removed entries are fixes. Never hand-edit, never auto-regenerate."
+    "note": "Committed a11y debt ledger (#1433) \u2014 honest capture of current axe violations per page. The visual-qa gate reds only on NEW serious/critical violations vs this file. Update DELIBERATELY via `python3 tests/visual_qa.py --update-baseline` and review the diff in the PR; added entries are newly accepted debt, removed entries are fixes. Never hand-edit, never auto-regenerate.",
+    "captured_at_light": "2026-08-02T20:45:21+00:00",
+    "note_light": "Light-theme sibling ledger (#1991) \u2014 same honest-capture contract as 'pages'/note above, scoped to axe findings observed under a Playwright color_scheme='light' context. Update DELIBERATELY via `python3 tests/visual_qa.py --color-scheme light --update-baseline`; the weekly standalone sweep alternates dark/light by ISO-week parity so both ledgers stay current without a dedicated job."
   },
   "pages": {
     "/coaching/": [
@@ -704,6 +706,404 @@
         "id": "aria-allowed-role",
         "impact": "minor",
         "help": "ARIA role should be appropriate for the element",
+        "nodes": 1
+      }
+    ],
+    "/subscribe/confirm/": [
+      {
+        "id": "page-has-heading-one",
+        "impact": "moderate",
+        "help": "Page should contain a level-one heading",
+        "nodes": 1
+      }
+    ]
+  },
+  "pages_light": {
+    "/coaching/": [
+      {
+        "id": "aria-allowed-role",
+        "impact": "minor",
+        "help": "ARIA role should be appropriate for the element",
+        "nodes": 1
+      },
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": 9
+      }
+    ],
+    "/coaching/by-coach/": [
+      {
+        "id": "aria-allowed-role",
+        "impact": "minor",
+        "help": "ARIA role should be appropriate for the element",
+        "nodes": 1
+      },
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": 1
+      }
+    ],
+    "/coaching/by-coach/#eli_marsh": [
+      {
+        "id": "aria-allowed-role",
+        "impact": "minor",
+        "help": "ARIA role should be appropriate for the element",
+        "nodes": 1
+      },
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": 1
+      }
+    ],
+    "/coaching/by-coach/#training_coach": [
+      {
+        "id": "aria-allowed-role",
+        "impact": "minor",
+        "help": "ARIA role should be appropriate for the element",
+        "nodes": 1
+      }
+    ],
+    "/coaching/coaches/": [
+      {
+        "id": "aria-allowed-role",
+        "impact": "minor",
+        "help": "ARIA role should be appropriate for the element",
+        "nodes": 1
+      }
+    ],
+    "/coaching/lab-notes/": [
+      {
+        "id": "aria-allowed-role",
+        "impact": "minor",
+        "help": "ARIA role should be appropriate for the element",
+        "nodes": 1
+      },
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": 3
+      }
+    ],
+    "/coaching/qa/": [
+      {
+        "id": "aria-allowed-role",
+        "impact": "minor",
+        "help": "ARIA role should be appropriate for the element",
+        "nodes": 1
+      }
+    ],
+    "/coaching/read/": [
+      {
+        "id": "aria-allowed-role",
+        "impact": "minor",
+        "help": "ARIA role should be appropriate for the element",
+        "nodes": 1
+      },
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": 9
+      }
+    ],
+    "/coaching/scorecard/": [
+      {
+        "id": "aria-allowed-role",
+        "impact": "minor",
+        "help": "ARIA role should be appropriate for the element",
+        "nodes": 1
+      }
+    ],
+    "/coaching/team/": [
+      {
+        "id": "aria-allowed-role",
+        "impact": "minor",
+        "help": "ARIA role should be appropriate for the element",
+        "nodes": 1
+      }
+    ],
+    "/cockpit/": [
+      {
+        "id": "region",
+        "impact": "moderate",
+        "help": "All page content should be contained by landmarks",
+        "nodes": 4
+      }
+    ],
+    "/data/": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": 5
+      },
+      {
+        "id": "heading-order",
+        "impact": "moderate",
+        "help": "Heading levels should only increase by one",
+        "nodes": 1
+      }
+    ],
+    "/data/badges/": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": 80
+      }
+    ],
+    "/data/character/": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": 127
+      }
+    ],
+    "/data/habits/": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": 9
+      },
+      {
+        "id": "heading-order",
+        "impact": "moderate",
+        "help": "Heading levels should only increase by one",
+        "nodes": 1
+      }
+    ],
+    "/data/labs/": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": 52
+      }
+    ],
+    "/data/mind/": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": 5
+      }
+    ],
+    "/data/physical/": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": 5
+      },
+      {
+        "id": "heading-order",
+        "impact": "moderate",
+        "help": "Heading levels should only increase by one",
+        "nodes": 1
+      }
+    ],
+    "/data/training/": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": 10
+      }
+    ],
+    "/data/vitals/": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": 11
+      },
+      {
+        "id": "heading-order",
+        "impact": "moderate",
+        "help": "Heading levels should only increase by one",
+        "nodes": 1
+      }
+    ],
+    "/journal/essays/org-chart-of-one/": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": 2
+      }
+    ],
+    "/method/": [
+      {
+        "id": "empty-table-header",
+        "impact": "minor",
+        "help": "Table header text should not be empty",
+        "nodes": 1
+      }
+    ],
+    "/method/board/": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": 8
+      },
+      {
+        "id": "heading-order",
+        "impact": "moderate",
+        "help": "Heading levels should only increase by one",
+        "nodes": 1
+      }
+    ],
+    "/method/build/": [
+      {
+        "id": "svg-img-alt",
+        "impact": "serious",
+        "help": "<svg> elements with an img role must have alternative text",
+        "nodes": 1
+      }
+    ],
+    "/method/cycles/": [
+      {
+        "id": "empty-table-header",
+        "impact": "minor",
+        "help": "Table header text should not be empty",
+        "nodes": 1
+      }
+    ],
+    "/method/pipeline/": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": 4
+      }
+    ],
+    "/method/results/": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": 4
+      }
+    ],
+    "/method/survival/": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": 5
+      }
+    ],
+    "/protocols/discoveries/": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": 1
+      }
+    ],
+    "/protocols/experiments/": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": 1
+      }
+    ],
+    "/story/": [
+      {
+        "id": "aria-allowed-role",
+        "impact": "minor",
+        "help": "ARIA role should be appropriate for the element",
+        "nodes": 1
+      },
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": 5
+      }
+    ],
+    "/story/about/": [
+      {
+        "id": "aria-allowed-role",
+        "impact": "minor",
+        "help": "ARIA role should be appropriate for the element",
+        "nodes": 1
+      }
+    ],
+    "/story/agents/": [
+      {
+        "id": "heading-order",
+        "impact": "moderate",
+        "help": "Heading levels should only increase by one",
+        "nodes": 1
+      }
+    ],
+    "/story/broadcast/": [
+      {
+        "id": "aria-allowed-role",
+        "impact": "minor",
+        "help": "ARIA role should be appropriate for the element",
+        "nodes": 1
+      }
+    ],
+    "/story/chronicle/": [
+      {
+        "id": "aria-allowed-role",
+        "impact": "minor",
+        "help": "ARIA role should be appropriate for the element",
+        "nodes": 1
+      },
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": 5
+      }
+    ],
+    "/story/journal/": [
+      {
+        "id": "aria-allowed-role",
+        "impact": "minor",
+        "help": "ARIA role should be appropriate for the element",
+        "nodes": 1
+      },
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": 4
+      }
+    ],
+    "/story/panel/": [
+      {
+        "id": "aria-allowed-role",
+        "impact": "minor",
+        "help": "ARIA role should be appropriate for the element",
+        "nodes": 1
+      }
+    ],
+    "/story/timeline/": [
+      {
+        "id": "aria-allowed-role",
+        "impact": "minor",
+        "help": "ARIA role should be appropriate for the element",
+        "nodes": 1
+      },
+      {
+        "id": "landmark-unique",
+        "impact": "moderate",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
         "nodes": 1
       }
     ],
