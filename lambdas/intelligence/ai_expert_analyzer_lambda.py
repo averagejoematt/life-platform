@@ -1069,22 +1069,33 @@ Write only the analysis — no preamble, just paragraphs followed by tagged line
     return "\n\n".join(parts)
 
 
+def _load_prior_analysis(expert_key):
+    """Prior EXPERT#<key> analysis + recommendation for anti-repetition context;
+    (summary, recommendation), fail-soft ("", "").
+
+    #1969 (#946 class, live vector for #1897): the restart wipe tombstones
+    ai_analysis IN PLACE and get_item bypasses the query-level phase filter, so
+    on Day 1 this read fed the wiped cycle-10 text into the live prompt. A
+    tombstoned/wrong-phase prior reads as ABSENT (honest absence, ADR-104)."""
+    try:
+        from experiment.phase_filter import singleton_visible
+
+        prior = table.get_item(Key={"pk": CACHE_PK, "sk": f"EXPERT#{expert_key}"}).get("Item")
+        if not singleton_visible(prior):
+            return "", ""
+        summary = str(prior["analysis"])[:300] if prior.get("analysis") else ""
+        recommendation = str(prior["key_recommendation"])[:200] if prior.get("key_recommendation") else ""
+        return summary, recommendation
+    except Exception:
+        return "", ""
+
+
 def generate_and_cache(expert_key, shared_system=None):
     logger.info(f"Generating analysis for expert: {expert_key}")
     data = gather_data_for_expert(expert_key)
 
-    # Read prior analysis + recommendation to prevent repetition
-    prior_summary = ""
-    prior_recommendation = ""
-    try:
-        prior = table.get_item(Key={"pk": CACHE_PK, "sk": f"EXPERT#{expert_key}"}).get("Item")
-        if prior:
-            if prior.get("analysis"):
-                prior_summary = str(prior["analysis"])[:300]
-            if prior.get("key_recommendation"):
-                prior_recommendation = str(prior["key_recommendation"])[:200]
-    except Exception:
-        pass
+    # Read prior analysis + recommendation to prevent repetition (#1969: tombstone-guarded)
+    prior_summary, prior_recommendation = _load_prior_analysis(expert_key)
     if prior_summary:
         data["_prior_analysis_summary"] = prior_summary
     if prior_recommendation:

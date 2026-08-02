@@ -434,9 +434,14 @@ def store_challenge(challenge: dict):
     challenge_id = f"{ch_slug}_{date_str}"
     sk = f"CHALLENGE#{challenge_id}"
 
-    # Dedup check
+    # Dedup check. #1969 (#946 class): challenges is EXPERIMENT_SCOPED — a
+    # TOMBSTONED colliding row is the wiped prior cycle's archive (only possible
+    # when a reset landed the same day), treated as absent: the fresh cycle may
+    # legitimately re-issue the challenge, and the put below restamps the record.
+    from experiment.phase_filter import singleton_visible
+
     existing = table.get_item(Key={"pk": CHALLENGES_PK, "sk": sk}).get("Item")
-    if existing:
+    if singleton_visible(existing):
         logger.info(f"Skipping duplicate challenge: {challenge_id}")
         return None
 

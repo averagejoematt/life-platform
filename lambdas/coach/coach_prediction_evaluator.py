@@ -1277,9 +1277,18 @@ def _detect_sick_day_event(today_str, yesterday_str):
 
 
 def _habit_scores_for(date_str):
+    # #1969 (#946 class): habit_scores is EXPERIMENT_SCOPED — around a reset the
+    # exact-key read can hit a tombstoned row, and a relapse "event" fired off
+    # wiped vice_streaks would trigger stance refreshes from a cycle that no
+    # longer exists. Tombstoned/wrong-phase rows read as absent.
     try:
+        from experiment.phase_filter import singleton_visible
+
         resp = table.get_item(Key={"pk": f"{USER_PREFIX}habit_scores", "sk": f"DATE#{date_str}"})
-        return _decimal_to_float(resp.get("Item")) or {}
+        item = _decimal_to_float(resp.get("Item"))
+        if not singleton_visible(item):
+            return {}
+        return item
     except Exception as e:
         logger.warning("[stance-event] habit_scores read failed for %s (non-fatal): %s", date_str, e)
         return {}
