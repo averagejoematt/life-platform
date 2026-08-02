@@ -1,6 +1,6 @@
 # Coach Stance Engine + the Coach Quality Gate
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-28 (#1653 packaging re-verify — `coach_stance.py` moved to `lambdas/coach/` and `ai_calls.py` to `lambdas/ai/`; `coach_history_summarizer.py`/`coach_quality_gate.py` had imports rewritten only. Stance/gate logic, the 8-coach roster and every threshold are untouched. The two affected line citations DID drift by +1 from the import block and are corrected here (`ai_calls.py`:1214→1215, `coach_stance.py`:23-69→24-70); the other three were re-derived and are unchanged. Prior verify 2026-07-26: #1590 re-verify — line refs re-derived against live source; stance/gate logic, the 8-coach roster, and the ADR-108 fire-rate figure all confirmed unchanged since #390/#1138. 2026-07-26 re-verify: #1656 mypy churn in `coach_stance.py` + additive `structured_output_config` in `ai_calls.py` (#1385) since; stance/gate logic unchanged)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-02 (#1896 — a new BLOCKING deterministic gate, `self_graded_verdict`, was added to the coach-narrative pipeline in `ai_calls.py` and is documented below; the ADR-108 quality gate, the stance engine, the 8-coach roster and every threshold are unchanged. Prior verify 2026-07-28: #1653 packaging re-verify — `coach_stance.py` moved to `lambdas/coach/` and `ai_calls.py` to `lambdas/ai/`; `coach_history_summarizer.py`/`coach_quality_gate.py` had imports rewritten only. Stance/gate logic, the 8-coach roster and every threshold are untouched. The two affected line citations DID drift by +1 from the import block and are corrected here (`ai_calls.py`:1214→1215, `coach_stance.py`:23-69→24-70); the other three were re-derived and are unchanged. Prior verify 2026-07-26: #1590 re-verify — line refs re-derived against live source; stance/gate logic, the 8-coach roster, and the ADR-108 fire-rate figure all confirmed unchanged since #390/#1138. 2026-07-26 re-verify: #1656 mypy churn in `coach_stance.py` + additive `structured_output_config` in `ai_calls.py` (#1385) since; stance/gate logic unchanged)
 > **Sources of truth:** `lambdas/coach/coach_history_summarizer.py` (stance engine, :940-1360), `lambdas/coach/coach_stance.py` (stage-ladder fallback), `lambdas/ai/ai_calls.py` (`_enforce_quality_gate`, :1356-1423), `lambdas/coach/coach_quality_gate.py`
 
 ## Purpose
@@ -75,6 +75,34 @@ draft/findings/disposition via `eval_retention` (verdicts: `flagged_dropped`,
 `flagged_corrected`, `flagged_kept_best`). It never fails open on a real sub-threshold verdict —
 only when the gate itself was unreachable. Measured fire rate at promotion: 10.2% of 206 logged
 verdicts over 30 days (ADR-108).
+
+## Deterministic gates on the narrative path (before the ADR-108 scorer)
+
+Three zero-AI checks run over a generated coach section. They are cheap, never budget-paused
+(no tokens), and each answers a question that has a right answer rather than a judgment:
+
+| gate | question | posture |
+|---|---|---|
+| baseline-freshness (#1691) | does a stated baseline weight match the real one? | advisory |
+| ungrounded-behavioral (#1699) | is a same-day completed behavior backed by a log? | advisory |
+| **self-graded-verdict (#1896)** | **is a self-graded prediction outcome backed by a resolved record?** | **BLOCKING** |
+
+**self-graded-verdict** (`grounded_generation.self_graded_verdict_findings`, wired in
+`ai_calls._run_coach_v2_pipeline`). Every other gate checks claims about *Matthew*; this one
+checks a claim the coach makes about *itself*. On 2026-07-27 the nutrition coach published
+"I called lunch wrong… That's a prediction miss, and I'm logging it as one" while every stored
+`PREDICTION#` was `status=pending` and the same paragraph admitted "I have zero food logs" —
+then persisted the fabricated verdict to `THREAD#`, feeding it forward.
+
+The input is a COUNT, not a judgment (ADR-105): `coach_narrative_orchestrator` puts
+`evaluated_prediction_count` in the generation brief, computed where the whole `PREDICTION#`
+partition is already in hand (no extra query). `pending`/`confirming` are deliberately excluded
+— an open call is not a verdict, and counting them would make the gate permanently silent.
+
+It is **blocking** (regenerate once, then `CoachHold`) rather than advisory like the other two
+because its failure mode *persists*: an ungrounded behavioral line is wrong for a day; a
+fabricated verdict becomes a stored grade that feeds later generations. A brief without the
+count opts out (`None`), the same contract `available_logs` uses.
 
 ## Config surface
 
