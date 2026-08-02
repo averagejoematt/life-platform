@@ -16,6 +16,9 @@ Checks (each pass/fail):
  10. pytest layer-retirement test passes (i2)
  11. Baked static/no-JS + OG proof (Home + Coaching) is fresh post-genesis (#1815)
  12. Plan literals (protein floor et al.) reconcile with config/user_goals.json (#1898)
+ 13. /api/predict_week is active once the genesis week begins (#1952 — the
+     cycle-11 seed carried the wall-clock pre-genesis week_id and the #1198
+     guard hid the opening-week hook; pre-genesis countdown => dark is correct)
 
 Returns 0 if all checks pass, 1 if any fail.
 
@@ -26,13 +29,15 @@ import json
 import subprocess
 import sys
 import urllib.request
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import boto3
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(REPO_ROOT / "deploy"))
 
 from lambdas.common.constants import (
     EXPERIMENT_BASELINE_WEIGHT_LBS,
@@ -230,6 +235,24 @@ def main():
         )
     except Exception as e:  # never let the verifier itself crash the post-reset check
         check("Plan literals reconcile with config/user_goals.json (#1898)", False, f"check could not run: {e}")
+
+    # 13. #1952 — predict-the-week must be LIVE once the genesis week begins.
+    # Cycle 11 ran its whole opening week dark: the Sunday prep run stamped the
+    # wall-clock (pre-genesis) ISO week and the #1198 fail-closed guard hid the
+    # challenge for Days 1-6. Pre-genesis, dark is the correct countdown state.
+    try:
+        from build_genesis_predict_week import evaluate_predict_week_state
+
+        try:
+            with urllib.request.urlopen(f"{API}/api/predict_week?cb=verify", timeout=10) as r:
+                active = bool(json.loads(r.read()).get("active"))
+        except Exception:
+            active = None
+        today_pt = datetime.now(ZoneInfo("America/Los_Angeles")).date()
+        ok, detail = evaluate_predict_week_state(EXPERIMENT_START_DATE, today_pt, active)
+        check("/api/predict_week live once the genesis week begins (#1952)", ok, detail)
+    except Exception as e:  # never let the verifier itself crash the post-reset check
+        check("/api/predict_week live once the genesis week begins (#1952)", False, f"check could not run: {e}")
 
     # Summary
     total = len(checks)
