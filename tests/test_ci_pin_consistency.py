@@ -1,9 +1,16 @@
 """tests/test_ci_pin_consistency.py — CQ-01: dev tooling pins must match the CI gate.
 
-The enforced format/lint/visual-QA gates run in ci-cd.yml with hardcoded versions.
-requirements-dev.txt must pin the SAME versions, or local `make format` / `pytest`
-can pass while the build fails (or vice-versa) — the exact drift AUDIT CQ-01 found
-(black 26.5.1 local vs 25.9.0 CI). This test is the single-source guard.
+The enforced format/lint/test gates run across ci-cd.yml/ci-lint.yml/ci-test.yml with
+hardcoded versions. requirements-dev.txt must pin the SAME versions, or local
+`make format` / `pytest` can pass while the build fails (or vice-versa) — the exact
+drift AUDIT CQ-01 found (black 26.5.1 local vs 25.9.0 CI). This test is the
+single-source guard.
+
+Extended #1963: the original guard only covered black/ruff/playwright — mypy,
+hypothesis, pytest, pytest-cov, boto3, and botocore had all drifted (mypy 2.1.0 CI
+vs 2.3.0 dev; hypothesis 6.161.2 vs 6.163.0; pytest/pytest-cov/boto3/botocore
+entirely unpinned in ci-test.yml/ci-cd.yml) with nothing to catch it. Both the
+literal drift and the guard's blind spot are fixed here.
 """
 
 import os
@@ -28,8 +35,27 @@ def _ci_gate_text():
     return "\n".join(parts)
 
 
-# Tools whose versions are BOTH pinned in ci-cd.yml and installed for local dev.
-_GATED_TOOLS = ("black", "ruff", "playwright")
+# Tools whose versions are BOTH pinned in the CI gate (ci-cd/ci-lint/ci-test.yml) and
+# installed for local dev. Extended #1963 to add mypy/hypothesis/pytest/pytest-cov/
+# boto3/botocore. Kept as a literal tuple for readability, but
+# test_gated_tools_matches_requirements_dev_pins below DERIVES the expected
+# membership from requirements-dev.txt itself, so a future Dependabot-managed pin
+# can't silently land outside this guard's coverage again (guard the SET, not the
+# instance).
+_GATED_TOOLS = ("black", "ruff", "mypy", "playwright", "hypothesis", "pytest", "pytest-cov", "boto3", "botocore")
+
+# requirements-dev.txt pins deliberately OUTSIDE this guard's coverage, each with why:
+_UNGATED_DEV_PINS = {
+    # ci-lint.yml installs flake8 unpinned ("pip install flake8") — a pre-existing
+    # gap #1963 did not scope in; tracked separately from this guard.
+    "flake8",
+    # The CDK toolchain is pinned bidirectionally by its OWN convention
+    # (cdk/requirements.txt <-> ci-cd.yml's `npm install -g aws-cdk@X`, #814,
+    # R22-MOD-01) — a CLI-install shape, not this guard's `pip install tool==`
+    # pattern, so it doesn't fit _pin_mismatches below.
+    "aws-cdk-lib",
+    "constructs",
+}
 
 
 def _versions(path, tool):
@@ -37,6 +63,60 @@ def _versions(path, tool):
     with open(path, encoding="utf-8") as f:
         text = f.read()
     return set(re.findall(rf"\b{tool}==([0-9][0-9A-Za-z.\-]*)", text))
+
+
+def _pin_mismatches(ci_text, tools):
+    """Every tool in `tools` whose requirements-dev.txt pin isn't among the
+    versions `ci_text` installs. Factored out of test_dev_pins_match_ci_gate so a
+    synthetic ci_text can prove the guard actually fires (see the prove-red test
+    below) without editing real workflow files."""
+    mismatches = []
+    for tool in tools:
+        ci = set(re.findall(rf"\b{tool}==([0-9][0-9A-Za-z.\-]*)", ci_text))
+        dev = _versions(_REQ, tool)
+        assert ci, f"{tool} not pinned in the CI gate (ci-cd/ci-lint/ci-test.yml) — update this test's expectations"
+        assert dev, f"{tool} not pinned in requirements-dev.txt"
+        # Every dev pin must be a version CI actually installs (usually exactly one each).
+        if not dev <= ci:
+            mismatches.append(f"{tool}: requirements-dev={sorted(dev)} vs ci-gate={sorted(ci)}")
+    return mismatches
+
+
+def _requirements_dev_pinned_tools():
+    """Every top-level `name==version` pin in requirements-dev.txt, as tool names."""
+    with open(_REQ, encoding="utf-8") as f:
+        text = f.read()
+    return set(re.findall(r"^([A-Za-z][A-Za-z0-9_.\-]*)==[0-9]", text, re.MULTILINE))
+
+
+def test_gated_tools_matches_requirements_dev_pins():
+    """Guard the SET, not the instance (#1963): every requirements-dev.txt pin not
+    on the documented _UNGATED_DEV_PINS exception list must be covered by
+    _GATED_TOOLS — a tool Dependabot bumps in requirements-dev.txt can't silently
+    sit outside this guard's coverage the way mypy/hypothesis/pytest did."""
+    expected = _requirements_dev_pinned_tools() - _UNGATED_DEV_PINS
+    actual = set(_GATED_TOOLS)
+    assert expected == actual, (
+        "requirements-dev.txt pins and _GATED_TOOLS have diverged — add the new tool to "
+        "_GATED_TOOLS, or to _UNGATED_DEV_PINS with a rationale if it's deliberately out of "
+        f"scope: missing from _GATED_TOOLS={sorted(expected - actual)}, "
+        f"stale in _GATED_TOOLS={sorted(actual - expected)}"
+    )
+
+
+def test_guard_fires_on_synthetic_divergence_for_a_newly_covered_tool():
+    """Prove-red (#1963 acceptance): the extended guard must actually FIRE on a
+    version mismatch for one of the newly-covered tools, not just the original
+    black/ruff/playwright set. Reproduces the exact #1963 drift class — CI pinned
+    to a stale mypy version while requirements-dev.txt moved on — via synthetic CI
+    text, so this stays true even after the real files are reconciled."""
+    assert "mypy" in _GATED_TOOLS, "mypy must be a newly-covered tool for this regression proof to be meaningful"
+    real_mypy_pin = _versions(_REQ, "mypy")
+    assert real_mypy_pin, "requirements-dev.txt must pin mypy for this test to be meaningful"
+    synthetic_ci_text = "pip install mypy==0.0.1-synthetic-stale-pin"
+    mismatches = _pin_mismatches(synthetic_ci_text, ("mypy",))
+    assert mismatches, "the pin-parity guard failed to fire on a synthetic mypy divergence — regression"
+    assert mismatches[0].startswith("mypy:")
 
 
 # --- Doc-command truth (#2006) -------------------------------------------------
@@ -99,14 +179,5 @@ def test_doc_lint_pin_grep_surfaces_the_ci_side():
 
 
 def test_dev_pins_match_ci_gate():
-    mismatches = []
-    ci_text = _ci_gate_text()
-    for tool in _GATED_TOOLS:
-        ci = set(re.findall(rf"\b{tool}==([0-9][0-9A-Za-z.\-]*)", ci_text))
-        dev = _versions(_REQ, tool)
-        assert ci, f"{tool} not pinned in the CI gate (ci-cd/ci-lint/ci-test.yml) — update this test's expectations"
-        assert dev, f"{tool} not pinned in requirements-dev.txt"
-        # Every dev pin must be a version CI actually installs (usually exactly one each).
-        if not dev <= ci:
-            mismatches.append(f"{tool}: requirements-dev={sorted(dev)} vs ci-cd.yml={sorted(ci)}")
+    mismatches = _pin_mismatches(_ci_gate_text(), _GATED_TOOLS)
     assert not mismatches, "dev tooling pins drifted from the enforced CI gate (CQ-01):\n" + "\n".join(mismatches)

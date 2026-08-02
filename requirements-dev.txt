@@ -3,11 +3,14 @@
 # Runtime deps are in lambdas/ (stdlib only) or cdk/requirements.txt
 
 # Testing
+# pytest/pytest-cov versions MUST equal the CI gate's pins (CQ-01, #1963) — read
+# from ci-test.yml (Unit Tests) and ci-cd.yml's test-critical lane, not quoted here.
 pytest==9.1.1
 pytest-cov==7.1.0
 # Property-based testing (Hypothesis @given) — pure calculators + AI grounding
 # gates (tests/test_prop_*.py, #1664). Deterministic + bounded example counts so CI
-# stays fast; no browser/native deps.
+# stays fast; no browser/native deps. Version MUST equal the CI gate's pin (CQ-01,
+# #1963) — read from ci-test.yml / ci-cd.yml, not quoted here.
 hypothesis==6.163.0
 
 # Visual QA — Playwright browser automation (tests/visual_qa.py).
@@ -19,16 +22,22 @@ playwright==1.61.0
 
 # Linting & formatting (config in pyproject.toml). ruff owns lint + import-sort;
 # black owns formatting. (standalone isort removed — it fought ruff's sorter.)
-# black + ruff versions MUST equal ci-cd.yml's pins (CQ-01) — the ENFORCED gate.
+# black + ruff versions MUST equal ci-lint.yml's pins (CQ-01) — the ENFORCED gate.
+# (Corrected #1963: these moved out of ci-cd.yml into ci-lint.yml when #1655 split
+# the reusable lint workflow out; the old comment still pointed at ci-cd.yml.)
+# flake8's CI install is intentionally UNPINNED (ci-lint.yml) — out of the CQ-01
+# pin-parity guard's scope (tests/test_ci_pin_consistency.py), tracked separately.
 flake8==7.3.0
 ruff==0.14.14
 black==25.9.0
 
 # Type checking (ENFORCED/blocking on the clean-module set, advisory elsewhere —
-# see tests/test_mypy_clean_modules.py + mypy.ini)
+# see tests/test_mypy_clean_modules.py + mypy.ini). Version MUST equal ci-lint.yml's
+# pin (CQ-01, #1963).
 mypy==2.3.0
 
-# AWS SDK (for tests that call boto3 directly)
+# AWS SDK (for tests that call boto3 directly). Versions MUST equal the CI gate's
+# pins (CQ-01, #1963) — read from ci-test.yml / ci-cd.yml, not quoted here.
 boto3==1.43.57
 botocore==1.43.57
 

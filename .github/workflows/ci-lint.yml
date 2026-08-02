@@ -72,7 +72,7 @@ jobs:
       - name: Mypy gate (ENFORCED — clean-module set, ADR-080)
         if: always()
         run: |
-          pip install mypy==2.1.0
+          pip install mypy==2.3.0  # MUST equal requirements-dev.txt (CQ-01, #1963)
           echo "::group::Mypy on the first-party clean surface (#1656)"
           # Authoritative list: tests/mypy_clean_set.py (single source of truth,
           # also consumed by tests/test_mypy_clean_modules.py so the two can't

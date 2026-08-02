@@ -320,7 +320,7 @@ jobs:
           python-cache: 'pip'
 
       - name: Install test dependencies
-        run: pip install pytest boto3 botocore hypothesis==6.161.2  # hypothesis: property tests (#1664) collected in this lane
+        run: pip install pytest==9.1.1 boto3==1.43.57 botocore==1.43.57 hypothesis==6.163.0  # hypothesis: property tests (#1664) collected in this lane; pinned to match requirements-dev.txt (CQ-01, #1963)
 
       - name: Run deploy-critical test lane
         run: |
