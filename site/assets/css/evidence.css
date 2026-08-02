@@ -230,6 +230,20 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
   font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink); line-height: var(--lh-relaxed); overflow-x: auto;
   white-space: pre; }
 
+/* #1980: the sealed pre-registration's verify command — the code block from the
+   rule above, paired with a copy button styled on the same pill language as
+   .scn-chip (evidence.css's existing small-button convention). */
+.rd-verify { display: flex; align-items: flex-start; gap: var(--sp-3); flex-wrap: wrap; }
+.rd-verify .rd-code { flex: 1 1 auto; min-width: 0; margin-top: 0; }
+.rd-copy-btn {
+  flex: 0 0 auto; margin-top: var(--sp-3);
+  font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-muted);
+  background: none; border: 1px solid var(--rule); border-radius: 999px;
+  padding: var(--sp-1) var(--sp-3); cursor: pointer; white-space: nowrap;
+}
+.rd-copy-btn:hover { color: var(--ink); border-color: var(--ink-faint); }
+.rd-copy-btn.is-copied { color: var(--ember); border-color: var(--ember); }
+
 /* Protocol / experiment cards */
 .rd-cards { display: grid; gap: var(--bento-gap); margin-top: var(--sp-3); }
 @media (min-width: 761px) { .rd-cards { grid-template-columns: 1fr 1fr; } }

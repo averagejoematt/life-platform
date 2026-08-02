@@ -259,6 +259,51 @@ export async function renderCorrelations(d) {
   return head + betsLine + tbl + (obj.methodology ? `<p class="rd-desc">${esc(obj.methodology)}</p>` : "") + note("Correlative only — Pearson r with Benjamini-Hochberg FDR control across all pairs. Never causal. p-values below 0.001 display as &lt;0.001.");
 }
 
+// #1980: the sealed pre-registration — a link to the current cycle's frozen,
+// hash-stamped artifact + its SHA-256 + the copy-pasteable verify command, read
+// verbatim from the .sha256.json stamp (site_api_common.prereg_seal_meta — the
+// hash is never recomputed client-side). Shared by renderCalibration and
+// renderPredictions, the platform's two forward-looking credibility surfaces, so
+// a skeptic reaches the frozen artifact whichever door they came in. Honest-empty:
+// a freshly re-anchored cycle whose stamp hasn't published yet renders nothing.
+function _sealBlock(seal) {
+  if (!seal || !seal.sha256 || !seal.artifact_url) return "";
+  return sec(
+    "The frozen pre-registration — sealed before Day 1",
+    `<p class="rd-line">This cycle's predictions and hypotheses were locked and hash-sealed before any Day-1 data existed: ` +
+      `<a class="supp-ev-link" href="${esc(seal.artifact_url)}" target="_blank" rel="noopener">the frozen artifact ↗</a></p>` +
+      `<p class="rd-line label">SHA-256</p><pre class="rd-code">${esc(seal.sha256)}</pre>` +
+      (seal.verify
+        ? `<div class="rd-verify"><pre class="rd-code rd-verify-cmd">${esc(seal.verify)}</pre>` +
+          `<button type="button" class="rd-copy-btn" data-copy="${esc(seal.verify)}">copy verify command</button></div>`
+        : "") +
+      `<p class="rd-archive">Anyone can run that command and compare the printed hash against the one above — the claims can't be quietly edited after they were made.</p>`,
+  );
+}
+
+// #1980: one delegated copy-to-clipboard listener for every .rd-copy-btn this
+// module renders (calibration + predictions share it) — same clipboard pattern
+// as share.js, wired once at module load since ES modules are singletons.
+if (typeof document !== "undefined") {
+  document.addEventListener("click", async (e) => {
+    const btn = e.target.closest && e.target.closest(".rd-copy-btn");
+    if (!btn) return;
+    const text = btn.dataset.copy || "";
+    try {
+      await navigator.clipboard.writeText(text);
+      const was = btn.textContent;
+      btn.textContent = "copied ✓";
+      btn.classList.add("is-copied");
+      setTimeout(() => {
+        btn.textContent = was;
+        btn.classList.remove("is-copied");
+      }, 1800);
+    } catch (err) {
+      /* clipboard unavailable — the command is already selectable in the <pre> above */
+    }
+  });
+}
+
 // One stat block (season OR career) — shared so the two cards render identically.
 function _calStatFigs(s) {
   const cal = String(s.calibration || "").replace(/_/g, " ");
@@ -300,8 +345,14 @@ export function renderCalibration(d) {
   const hyp = (d && d.hypotheses) || {};
   const cycle = d && d.cycle;
   // True zero state: nothing has ever graded, this cycle or any before it.
+  // The seal still renders here — a skeptic can verify the pre-registration
+  // exists and is unedited even before the first forecast has come due.
   if (!(p.n > 0) && !(life.n > 0))
-    return empty("No graded forecasts yet — the calibration ledger restarts at each genesis. Coaches log forward predictions with a stated confidence; a deterministic evaluator scores each against measured outcomes as its target date passes. Brier scores and the reliability curve fill in as the first calls come due — the platform grading its own predictions, in public.") + _OPEN_ARTIFACT_LINE;
+    return (
+      _sealBlock(d && d.prereg_seal) +
+      empty("No graded forecasts yet — the calibration ledger restarts at each genesis. Coaches log forward predictions with a stated confidence; a deterministic evaluator scores each against measured outcomes as its target date passes. Brier scores and the reliability curve fill in as the first calls come due — the platform grading its own predictions, in public.") +
+      _OPEN_ARTIFACT_LINE
+    );
 
   const seasonBody = p.n > 0
     ? _calStatFigs(p)
@@ -348,19 +399,21 @@ export function renderCalibration(d) {
     `<table class="rd-tbl"><thead><tr><th>coach</th><th>season</th><th>career</th><th>Brier</th><th>hit rate</th><th>calibration</th></tr></thead><tbody>${cRows}</tbody></table>`,
   );
   const hypLine = hyp && hyp.n > 0 ? note(`Hypothesis engine: ${hyp.n} resolved this season (career ${(hyp.lifetime && hyp.lifetime.n) || hyp.n}), Brier ${fmt(hyp.brier)}${hyp.calibration && hyp.calibration !== "insufficient_data" ? " (" + ttl(String(hyp.calibration).replace(/_/g, " ")) + ")" : ""}.`) : "";
-  return pair + relTbl + board + hypLine + note(d.disclosure || "Self-graded against the platform's own data — Brier 0 is perfect, 0.25 is the always-say-50% baseline, lower is better.") + _OPEN_ARTIFACT_LINE;
+  return _sealBlock(d && d.prereg_seal) + pair + relTbl + board + hypLine + note(d.disclosure || "Self-graded against the platform's own data — Brier 0 is perfect, 0.25 is the always-say-50% baseline, lower is better.") + _OPEN_ARTIFACT_LINE;
 }
 
 export function renderPredictions(d) {
   const o = (d && d.overall) || {};
   const list = (d && d.predictions) || [];
   const resolved = (o.confirmed || 0) + (o.refuted || 0);
-  if (!(o.total > 0) && !list.length) return empty("No scored predictions yet — the prediction ledger restarts with each genesis rather than carrying old scores forward. Coaches log forward calls that get auto-graded against measured outcomes as target dates pass, so the track record rebuilds honestly from day one. It fills in as the first calls come due.");
+  // The seal renders even at zero — a skeptic can verify the pre-registration
+  // exists and is unedited before the first call has come due.
+  if (!(o.total > 0) && !list.length) return _sealBlock(d && d.prereg_seal) + empty("No scored predictions yet — the prediction ledger restarts with each genesis rather than carrying old scores forward. Coaches log forward calls that get auto-graded against measured outcomes as target dates pass, so the track record rebuilds honestly from day one. It fills in as the first calls come due.");
   const head = figs([fig(o.total ?? 0, "predictions"), o.confirmed != null && fig(o.confirmed, "confirmed"), o.refuted != null && fig(o.refuted, "refuted"), o.pending != null && fig(o.pending, "pending"), resolved > 0 && fig(fmt(o.accuracy_pct) + "%", "accuracy")]);
   const badge = (s) => s === "confirmed" ? "rd-badge-live" : "";
   const rows = list.slice(0, 40).map((p) => `<tr><td class="rd-name">${esc(p.coach_name || p.coach_id)}</td><td>${esc(p.text)}</td><td><span class="rd-badge ${badge(p.status)}">${esc(p.status)}</span></td><td class="num rd-range">${esc(p.date || "")}</td></tr>`).join("");
   const tbl = list.length ? sec("The prediction ledger", `<table class="rd-tbl"><thead><tr><th>coach</th><th>call</th><th>verdict</th><th>made</th></tr></thead><tbody>${rows}</tbody></table>`) : "";
-  return head + tbl + note("Forward calls logged, then scored against reality — the coaches' track record, kept honest.");
+  return _sealBlock(d && d.prereg_seal) + head + tbl + note("Forward calls logged, then scored against reality — the coaches' track record, kept honest.");
 }
 
 // Benchmarks — where the numbers sit vs age-band + centenarian-decathlon targets.
