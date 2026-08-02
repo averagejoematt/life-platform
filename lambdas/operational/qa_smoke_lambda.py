@@ -557,6 +557,76 @@ from operational.qa_check_reader_truth import (  # noqa: F401,E402
 # catches a REGRESSION of that guard: if the API ever returns active:true with a
 # week_id that isn't the current PT ISO week, fail loudly — it fires the Monday a
 # subject goes stale, before a reader can bet on a dead week.
+#
+# #1953: the INVERSE blind spot — active:false used to be unconditionally ok, so
+# the widget being dark for 6 consecutive days of a fresh cycle produced 6 green
+# nightlies (the third "off state printed as green" of the season, after
+# reader_truth #1920/ADR-147 and the leak sweep #1931). The check now
+# distinguishes three states:
+#   (a) active on the current ISO week            -> ok
+#   (b) fail-closed with NO live cycle running    -> ok (pre-genesis countdown —
+#       dark is the honest state; live-cycle awareness derives from
+#       EXPERIMENT_START_DATE, same as the genesis-grace checks above)
+#   (c) DARK during a live-cycle week             -> WARN on the first dark day,
+#       escalating to a content_truth FAIL at >= 2 consecutive dark days
+# The consecutive-day streak persists in one DDB state row
+# (SOURCE#qa_predict_dark / STATE#predict_dark — same single-row snapshot
+# pattern as pipeline_health_check's ingest_liveness; SYSTEM_STATE in the phase
+# taxonomy). Streak bookkeeping is fail-soft: a DDB blip degrades to the
+# single-day WARN, never a crash, never a phantom FAIL — and never a green.
+
+_PREDICT_DARK_SK = "STATE#predict_dark"
+# Consecutive dark live-cycle days before the WARN escalates to a FAIL (#1953).
+PREDICT_DARK_FAIL_DAYS = 2
+
+
+def _live_cycle_today(today):
+    """True when an experiment cycle is live on `today` (a PT date): genesis is
+    known and has arrived. Pre-genesis (the countdown) or no genesis constant at
+    all = no live cycle, so a dark predict widget is the honest fail-closed state."""
+    if not EXPERIMENT_START_DATE:
+        return False
+    try:
+        return today >= date.fromisoformat(EXPERIMENT_START_DATE)
+    except ValueError:
+        return False
+
+
+def _advance_predict_dark_streak(today):
+    """Read + advance the consecutive-dark-day counter for tonight's run.
+
+    Idempotent per PT day (a same-day re-invoke keeps the stored streak), continues
+    only from exactly yesterday (a live day in between restarts at 1), and is
+    Decimal-safe: the streak round-trips as int (DDB Numbers read back as Decimal),
+    never float. Fail-soft on any DDB error: returns 1 — tonight's observation
+    alone — so a missing grant or table blip yields the WARN, not a crash.
+    """
+    today_s = today.strftime("%Y-%m-%d")
+    yesterday_s = (today - timedelta(days=1)).strftime("%Y-%m-%d")
+    streak = 1
+    try:
+        prev = table.get_item(Key={"pk": USER_PREFIX + "qa_predict_dark", "sk": _PREDICT_DARK_SK}).get("Item") or {}
+        last_dark = str(prev.get("last_dark_date") or "")
+        prev_streak = int(prev.get("streak") or 0)
+        if last_dark == today_s:
+            streak = max(prev_streak, 1)  # re-run tonight: don't double-count the day
+        elif last_dark == yesterday_s:
+            streak = prev_streak + 1
+    except Exception as e:  # noqa: BLE001 — streak read must never break the sweep
+        print(f"[QA] predict-dark streak read failed (fail-soft, counting tonight only): {str(e)[:120]}")
+    try:
+        table.put_item(
+            Item={
+                "pk": USER_PREFIX + "qa_predict_dark",
+                "sk": _PREDICT_DARK_SK,
+                "last_dark_date": today_s,
+                "streak": streak,  # int — Decimal-safe for DDB (never float)
+                "updated_at": pt_now().isoformat(),
+            }
+        )
+    except Exception as e:  # noqa: BLE001 — streak write must never break the sweep
+        print(f"[QA] predict-dark streak write failed (fail-soft): {str(e)[:120]}")
+    return streak
 
 
 def check_receipt_replay():
@@ -638,7 +708,27 @@ def check_predict_week_freshness():
         # Fail-soft: a fetch/parse blip must never red the nightly.
         return [check.warn(f"/api/predict_week fetch failed (fail-soft): {str(e)[:120]}")]
     if not data.get("active"):
-        return [check.ok("no active prediction subject (fail-closed) — no stale bets solicited")]
+        today = pt_now().date()
+        if not _live_cycle_today(today):
+            return [check.ok("no active prediction subject (fail-closed) — no live cycle running, no stale bets solicited")]
+        # #1953: a cycle is LIVE, so a subject SHOULD exist — dark is a defect,
+        # not the fail-closed happy path. WARN day 1, FAIL at >= 2 consecutive days.
+        streak = _advance_predict_dark_streak(today)
+        if streak >= PREDICT_DARK_FAIL_DAYS:
+            return [
+                check.fail(
+                    f"predict-the-week is DARK during a live-cycle week: no active subject for {streak} consecutive "
+                    f"days while cycle day {today.isoformat()} (genesis {EXPERIMENT_START_DATE}) is live — the primary "
+                    "reader-participation hook is invisible (re-seed site/config/current_challenge.json; #1953)"
+                )
+            ]
+        return [
+            check.warn(
+                f"predict-the-week is DARK during a live-cycle week (day {streak} of the dark streak) — no active "
+                f"subject on {today.isoformat()} with genesis {EXPERIMENT_START_DATE} live; escalates to FAIL at "
+                f"{PREDICT_DARK_FAIL_DAYS} consecutive dark days (re-seed site/config/current_challenge.json; #1953)"
+            )
+        ]
     week_id = (data.get("week_id") or "").strip()
     current = _iso_week_id(pt_now())
     if week_id != current:

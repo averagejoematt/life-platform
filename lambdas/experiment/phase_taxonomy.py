@@ -297,6 +297,9 @@ SOURCE_CLASS: dict[str, str] = {
     # ADR-126) — one overwritten row per (coach, output_type); the semantic fingerprint self-busts
     # on any input change (incl. a reset), so the phase machinery can ignore it.
     "ingest_liveness": SYSTEM_STATE,  # #951: daily pipeline-health snapshot (pipeline_health_check)
+    "qa_predict_dark": SYSTEM_STATE,  # #1953: qa-smoke's predict-the-week dark-streak counter (one
+    # STATE#predict_dark row) — pure nightly-QA bookkeeping; a reset moves genesis, so the check's own
+    # live-cycle gate goes fail-closed-ok and any stale streak self-expires (non-consecutive => 1).
     "personal_baselines": SYSTEM_STATE,  # #951: SNAPSHOT#LATEST percentile bands (#543/ADR-105) —
     # fully recomputable monthly from raw_timeseries; consumers floor-guard to constants if absent.
     "deletion_log": SYSTEM_STATE,  # #951: USER#admin GDPR-deletion audit records
