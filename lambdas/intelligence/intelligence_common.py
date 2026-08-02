@@ -20,6 +20,7 @@ from typing import Any
 
 import boto3
 from boto3.dynamodb.conditions import Key
+from coach.voice_register_guard import sanitize_summary  # #1987: deterministic voice-register check
 from common.text_utils import truncate_at_word  # #1224: word-boundary summary truncation (no mid-word cut)
 from experiment import calibration_core  # #538: the shared prediction-calibration scorer (Brier + reliability)
 from experiment.phase_filter import with_phase_filter  # ADR-058
@@ -1481,7 +1482,7 @@ Extract:
 }}
 
 Rules:
-- position_summary: what does the coach believe RIGHT NOW about their domain for Matthew?
+- position_summary: what does the coach believe RIGHT NOW about their domain for Matthew? Write it AS the coach, in first person ("I'm noticing...", "I'd expect...") — never refer to the coach in third person (do not write "the coach believes..." or "the sleep coach is...").
 - predictions: only include explicit forward-looking claims. Not observations. State the claim, a confidence, an optional metric, and an optional timeframe. Do NOT invent an ID or a calendar date — the system stamps prediction_id and target_date in code.
 - emotional_investment: infer from language intensity. Academic/measured = observing. Strong opinions = invested. Worry = concerned.
 - If nothing fits a field, use empty list or "observing" default."""
@@ -1525,6 +1526,19 @@ Rules:
         parsed = json.loads(cleaned.strip())
         # ADR-106: code owns prediction identity + target dates, never the model.
         parsed["predictions"] = stamp_thread_predictions(coach_id, parsed.get("predictions", []))
+        # #1987: deterministic voice-register check (zero AI cost), sibling to the
+        # anti-pattern check in coach_state_updater.py. Strips markdown emphasis
+        # unconditionally; if what's left is still third-person coach register,
+        # reject and fall back to the same truncated-narrative text the except
+        # block below already uses on a hard parse failure — no new control flow.
+        summary, register_rejected = sanitize_summary(parsed.get("position_summary"))
+        if register_rejected:
+            logger.warning(
+                "position_summary rejected for %s (third-person coach register) — " "falling back to truncated narrative",
+                coach_id,
+            )
+            summary = truncate_at_word(narrative, 200)  # #1224: word boundary, no mid-word cut
+        parsed["position_summary"] = summary
         return parsed
 
     except Exception as e:
