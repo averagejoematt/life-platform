@@ -950,14 +950,13 @@
       ],
       "evidence_for": [
         {
-          "title": "Effect of Tongkat Ali on stress hormones and psychological mood state",
-          "url": "https://pubmed.ncbi.nlm.nih.gov/23615780/",
-          "summary": "Reduced cortisol 16% and increased testosterone 37% in moderately stressed adults over 4 weeks."
+          "title": "Open question — no verified study found for: Effect of Tongkat Ali on stress hormones and psychological mood state (the citation previously here did not resolve to a supporting paper; withdrawn 2026-08-02, #1892)"
         },
         {
           "title": "Eurycoma longifolia for male sexual health",
           "url": "https://pubmed.ncbi.nlm.nih.gov/26365449/",
-          "summary": "Systematic review found consistent testosterone-boosting effects across 5 human trials."
+          "summary": "Systematic review and meta-analysis of randomized trials; the graded outcome is erectile-function improvement, not the testosterone or cortisol effect this protocol targets.",
+          "resolved_title": "Efficacy of Tongkat Ali (Eurycoma longifolia) on erectile function improvement: systematic review and meta-analysis of randomized controlled trials."
         }
       ],
       "evidence_against": [
@@ -1012,12 +1011,14 @@
         {
           "title": "NMN increases NAD+ biosynthesis in humans",
           "url": "https://pubmed.ncbi.nlm.nih.gov/36482258/",
-          "summary": "First human trial confirming oral NMN raises blood NAD+ levels in a dose-dependent manner."
+          "summary": "First human trial confirming oral NMN raises blood NAD+ levels in a dose-dependent manner.",
+          "resolved_title": "The efficacy and safety of β-nicotinamide mononucleotide (NMN) supplementation in healthy middle-aged adults: a randomized, multicenter, double-blind, placebo-controlled, parallel-group, dose-dependent clinical trial."
         },
         {
           "title": "NAD+ precursors in aging biology",
           "url": "https://pubmed.ncbi.nlm.nih.gov/29514064/",
-          "summary": "NAD+ decline is a hallmark of aging; precursor supplementation reverses age-related metabolic dysfunction in animal models."
+          "summary": "NAD+ decline is a hallmark of aging; precursor supplementation reverses age-related metabolic dysfunction in animal models.",
+          "resolved_title": "Therapeutic Potential of NAD-Boosting Molecules: The In Vivo Evidence."
         }
       ],
       "evidence_against": [
@@ -1077,12 +1078,14 @@
         {
           "title": "ISSN Position Stand on Creatine",
           "url": "https://pubmed.ncbi.nlm.nih.gov/28615996/",
-          "summary": "Most extensively studied ergogenic aid in history. Consistent benefits for strength, power, and lean mass across hundreds of studies."
+          "summary": "Most extensively studied ergogenic aid in history. Consistent benefits for strength, power, and lean mass across hundreds of studies.",
+          "resolved_title": "International Society of Sports Nutrition position stand: safety and efficacy of creatine supplementation in exercise, sport, and medicine."
         },
         {
           "title": "Creatine supplementation and cognitive function",
           "url": "https://pubmed.ncbi.nlm.nih.gov/29704637/",
-          "summary": "Emerging evidence for neuroprotective effects and cognitive benefits, particularly under stress or sleep deprivation."
+          "summary": "Emerging evidence for neuroprotective effects and cognitive benefits, particularly under stress or sleep deprivation.",
+          "resolved_title": "Effects of creatine supplementation on cognitive function of healthy individuals: A systematic review of randomized controlled trials."
         }
       ],
       "evidence_against": [
@@ -1137,12 +1140,11 @@
         {
           "title": "Berberine vs metformin for type 2 diabetes",
           "url": "https://pubmed.ncbi.nlm.nih.gov/18442638/",
-          "summary": "Comparable glucose-lowering effects to metformin in diabetic patients. HbA1c reduction of 0.9%."
+          "summary": "Comparable glucose-lowering effects to metformin in diabetic patients. HbA1c reduction of 0.9%.",
+          "resolved_title": "Efficacy of berberine in patients with type 2 diabetes mellitus."
         },
         {
-          "title": "Berberine activates AMPK pathway",
-          "url": "https://pubmed.ncbi.nlm.nih.gov/22198837/",
-          "summary": "Mechanistic evidence for metabolic benefits through AMPK activation — same pathway as exercise and metformin."
+          "title": "Open question — no verified study found for: Berberine activates AMPK pathway (the citation previously here did not resolve to a supporting paper; withdrawn 2026-08-02, #1892)"
         }
       ],
       "evidence_against": [
