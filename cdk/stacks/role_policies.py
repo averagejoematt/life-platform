@@ -1804,9 +1804,24 @@ def operational_traffic_digest() -> list[iam.PolicyStatement]:
 
     #1452 (QA-depth dial): + ssm:GetParameter on /life-platform/qa-level so the
     green report can surface the dial state (E3) — a lean/off estate must never
-    read as a fully-swept green week. Read-only."""
+    read as a fully-swept green week. Read-only.
+
+    #1954 (subscriber funnel): + dynamodb:Query on the table (and kms:Decrypt —
+    the table is CMK-encrypted) so the Monday email can join the subscriber
+    partition: counts by status, 7d new-pending/new-confirmed, stray-canary-row
+    warning. Query only, never write — the digest is read-only by contract."""
     log_bucket_arn = "arn:aws:s3:::matthew-life-platform-cf-logs"
     return [
+        iam.PolicyStatement(
+            sid="SubscriberFunnelRead",
+            actions=["dynamodb:Query"],
+            resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt"],
+            resources=[KMS_KEY_ARN],
+        ),
         iam.PolicyStatement(
             sid="ReadCFLogs",
             actions=["s3:GetObject", "s3:ListBucket"],
@@ -1972,8 +1987,12 @@ def operational_canary() -> list[iam.PolicyStatement]:
     return [
         iam.PolicyStatement(
             sid="DynamoDB",
-            # Canary writes a synthetic record, reads it back, then deletes it
-            actions=["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:DeleteItem"],
+            # Canary writes a synthetic record, reads it back, then deletes it.
+            # #1954: + Query (read-only, Select=COUNT) so the subscribe check can
+            # assert ZERO synthetic source='canary' rows survive in the subscriber
+            # partition after cleanup — a silent cleanup failure left a stray row
+            # sitting 12 days (2026-07-21).
+            actions=["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:DeleteItem", "dynamodb:Query"],
             resources=[TABLE_ARN],
         ),
         iam.PolicyStatement(

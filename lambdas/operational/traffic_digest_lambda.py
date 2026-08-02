@@ -37,6 +37,7 @@ from collections import Counter
 from datetime import datetime, timedelta, timezone
 
 import boto3
+from boto3.dynamodb.conditions import Key
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -48,6 +49,14 @@ EMAIL_RECIPIENT = os.environ.get("EMAIL_RECIPIENT", "awsdev@mattsusername.com")
 EMAIL_SENDER = os.environ.get("EMAIL_SENDER", "awsdev@mattsusername.com")
 SITE_HOST = os.environ.get("SITE_HOST", "averagejoematt.com")
 DAYS = int(os.environ.get("DIGEST_DAYS", "7"))
+TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
+
+# #1954: the subscriber partition the funnel section joins in — READ-ONLY. The
+# digest must never write; core data queries are read-only by convention.
+SUBSCRIBERS_PK = "USER#matthew#SOURCE#subscribers"
+# Bounded pagination — a pathological LastEvaluatedKey (or a mock in tests)
+# must never spin the loop forever. 100 pages ≫ any plausible list size.
+FUNNEL_MAX_PAGES = 100
 
 # Travel watch (#741): published artifacts whose reach we want measured every week
 # regardless of whether they crack the site-wide top-15 — per-page views plus WHERE
@@ -219,7 +228,134 @@ def aggregate(records):
     }
 
 
-def build_html(agg, start_date, end_date, green_html=""):
+# ── Subscriber funnel (#1954) ────────────────────────────────────────────────
+# The digest was built from CloudFront logs only, so the one conversion the
+# flywheel depends on (subscribe attempts → confirms) had no owner surface: two
+# real pendings from 2026-07-03 died ~30 days unseen, and a stray synthetic
+# source='canary' row from 2026-07-21 sat 12 days. This section joins the
+# subscriber partition (READ-ONLY) into the Monday email: counts by status,
+# 7d new-pending / new-confirmed, oldest-pending age, and a loud warning line
+# for any synthetic canary rows (the canary excludes itself from every public
+# count, so only this email would ever show a leak).
+
+
+def _parse_iso_utc(ts):
+    """Parse an ISO timestamp (with or without offset/Z) → aware UTC datetime, or None."""
+    if not ts:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    except (ValueError, TypeError):
+        return None
+
+
+def aggregate_subscriber_funnel(items, now=None):
+    """Pure aggregation over subscriber partition items → funnel dict.
+
+    Synthetic source='canary' rows are excluded from every count (platform-wide
+    convention, email_subscriber_lambda.build_attribution) but tallied
+    separately in `canary_rows` so a failed canary cleanup is VISIBLE, not
+    silently folded into real numbers."""
+    now = now or datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=DAYS)
+    by_status = Counter()
+    canary_rows = 0
+    new_pending = 0
+    new_confirmed = 0
+    oldest_pending = None
+    for it in items or []:
+        if str(it.get("source") or "") == "canary":
+            canary_rows += 1
+            continue
+        status = str(it.get("status") or "unknown")
+        by_status[status] += 1
+        created = _parse_iso_utc(it.get("created_at"))
+        confirmed = _parse_iso_utc(it.get("confirmed_at"))
+        if created and created >= cutoff:
+            new_pending += 1
+        if confirmed and confirmed >= cutoff:
+            new_confirmed += 1
+        if status == "pending_confirmation" and created and (oldest_pending is None or created < oldest_pending):
+            oldest_pending = created
+    return {
+        "by_status": sorted(by_status.items()),
+        "total": sum(by_status.values()),
+        "new_pending_7d": new_pending,
+        "new_confirmed_7d": new_confirmed,
+        "canary_rows": canary_rows,
+        "oldest_pending_days": (now - oldest_pending).days if oldest_pending else None,
+        "window_days": DAYS,
+    }
+
+
+def collect_subscriber_funnel(now=None):
+    """READ-ONLY paginated query of the subscriber partition → funnel dict.
+
+    Fail-soft: any error returns {"error": reason} and the section renders an
+    honest 'not collected' line (ADR-104) — a broken DDB read must never take
+    the Monday email down."""
+    try:
+        table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE_NAME)
+        items = []
+        kwargs = {"KeyConditionExpression": Key("pk").eq(SUBSCRIBERS_PK)}
+        for _ in range(FUNNEL_MAX_PAGES):
+            resp = table.query(**kwargs)
+            items.extend(resp.get("Items") or [])
+            lek = resp.get("LastEvaluatedKey")
+            if not lek:
+                break
+            kwargs["ExclusiveStartKey"] = lek
+        return aggregate_subscriber_funnel(items, now=now)
+    except Exception as e:
+        return {"error": f"DDB read failed ({str(e)[:120]})"}
+
+
+def build_subscriber_funnel_html(funnel):
+    """Render the subscriber-funnel section. Must never raise — every key may
+    be absent or error-shaped, and a crash here would take the whole Monday
+    ops email down (same contract as build_green_report_html)."""
+    parts = ['<h2 style="font-size:16px;margin-top:24px">Subscriber funnel</h2>']
+    funnel = funnel or {}
+    if funnel.get("error") or "by_status" not in funnel:
+        reason = funnel.get("error") or "no subscriber reading in this run"
+        parts.append(f'<p style="color:#6e665a;font-size:13px">not collected — {reason}</p>')
+        return "".join(parts)
+    status_pairs = funnel.get("by_status") or []
+    if status_pairs:
+        rows = "".join(
+            f'<tr><td style="padding:4px 0;font-family:monospace">{k}</td>'
+            f'<td style="padding:4px 0;text-align:right;font-variant-numeric:tabular-nums">{v}</td></tr>'
+            for k, v in status_pairs
+        )
+    else:
+        rows = '<tr><td colspan="2" style="color:#888;padding:6px 0">No subscribers yet.</td></tr>'
+    parts.append(f'<table style="width:100%;border-collapse:collapse">{rows}</table>')
+    window = funnel.get("window_days") or DAYS
+    parts.append(
+        f'<p style="margin:6px 0;font-size:13px"><strong>{funnel.get("new_pending_7d") or 0}</strong> new pending · '
+        f'<strong>{funnel.get("new_confirmed_7d") or 0}</strong> new confirmed in the last {window} days</p>'
+    )
+    oldest = funnel.get("oldest_pending_days")
+    if oldest is not None and oldest > window:
+        parts.append(
+            f'<p style="margin:6px 0;color:#9a6700;font-size:13px">⚠ oldest pending confirmation is {oldest} days old — '
+            "its confirmation link is long expired; the funnel is leaking</p>"
+        )
+    canary_rows = funnel.get("canary_rows") or 0
+    if canary_rows:
+        parts.append(
+            f'<p style="margin:6px 0;color:#b42318;font-size:13px">✗ {canary_rows} synthetic canary row(s) in the subscriber '
+            "partition — canary cleanup failed; these are excluded from the counts above but must be deleted (#1954)</p>"
+        )
+    parts.append(
+        '<p style="color:#888;font-size:12px;margin:8px 0 0">Read-only join of the subscriber partition — counts exclude '
+        "synthetic canary rows.</p>"
+    )
+    return "".join(parts)
+
+
+def build_html(agg, start_date, end_date, green_html="", funnel=None):
     def rows(pairs, label):
         if not pairs:
             return f'<tr><td colspan="2" style="color:#888;padding:6px 0">No {label} this week.</td></tr>'
@@ -257,6 +393,7 @@ def build_html(agg, start_date, end_date, green_html=""):
 <h2 style="font-size:16px;margin-top:24px">Where they came from</h2>
 <table style="width:100%;border-collapse:collapse">{rows(agg['top_referrers'], 'external referrers')}</table>
 {watched_block(agg.get('watched_pages', []))}
+{build_subscriber_funnel_html(funnel) if funnel is not None else ""}
 {green_html}
 <p style="color:#888;font-size:12px;margin-top:24px">From first-party CloudFront access logs — aggregate only, no cookies, no tracking, IPs hashed-then-discarded. {agg['returning_visitors']} of {agg['unique_visitors']} visitors returned on a second day.</p>
 </body></html>"""
@@ -595,6 +732,16 @@ def lambda_handler(event, context):
                 f'<p style="color:#6e665a;font-size:13px">not collected — rollup builder error (fail-soft): {str(e)[:160]}</p>'
             )
 
+        # #1954: the subscriber-funnel section — read-only DDB join, fail-soft
+        # (collect_subscriber_funnel returns an error dict on any failure, and
+        # this belt-and-braces catch keeps even a collector bug from killing
+        # the email).
+        try:
+            funnel = collect_subscriber_funnel(now)
+        except Exception as e:
+            logger.warning("subscriber funnel failed (fail-soft, #1954): %s", e)
+            funnel = {"error": f"funnel collector error (fail-soft): {str(e)[:120]}"}
+
         if object_count == 0:
             # No log objects at all — logging is likely disabled, not just a quiet week.
             _emit_no_logs_alert(s3, cw, start_dt, now, green_html)
@@ -634,7 +781,7 @@ def lambda_handler(event, context):
         if quiet:
             logger.info("no human page views in window (logs present, genuinely quiet) — sending green report anyway (#1446)")
 
-        html = build_html(agg, start_dt.strftime("%b %d"), now.strftime("%b %d"), green_html)
+        html = build_html(agg, start_dt.strftime("%b %d"), now.strftime("%b %d"), green_html, funnel=funnel)
         subject = (
             "Weekly ops — quiet traffic week · QA green report"
             if quiet
