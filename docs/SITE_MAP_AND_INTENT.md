@@ -79,9 +79,18 @@ Coaching (`/coaching/`) and Story (`/story/`) are their own master-detail apps
 ### The Method — `/method/` · under the hood (footer-tier, no door)
 - **Loop role:** how the numbers are made, how honest they are, the resets along the way. **Audience:** skeptics + the build-in-public crowd.
 - **Sections:** *How it holds up* (methodology, the **character explainer**, predictions, benchmarks,
-  biology, post-mortems, survival curve, the mirror, the wrong page, results), *The machine*
+  biology, post-mortems, survival curve, **The Mirror**, the wrong page, results), *The machine*
   (board, build/architecture, intelligence, platform, data sources, pipeline, tools, cost, inference,
   explorer, ask), *The reset log* (cycles).
+- **The Mirror** (`/method/mirror/`, #1392 — upgraded 2026-08-02 from the type-three-numbers widget):
+  a reader's Whoop CSV export scored **in the browser** on the deployed instruments and overlaid on
+  Matthew's published year (`site/data/mirror_distributions.json`, regenerate attended via
+  `scripts/gen_mirror_distributions.py`). CURATED page (`scripts/v4_build_mirror.py` + apply-chrome),
+  not an archive shell — its registry row carries the **`"external"` flag** (keeps the nav tile;
+  the evidence build skips writing its index.html; evidence.js follows the link as a real
+  navigation). Parity + no-upload privacy are enforced by `tests/test_mirror_parity.py` /
+  `tests/js/mirror_core.test.mjs` over `tests/vectors/mirror_vectors.json`. The first rung of
+  #1366's participation ladder.
 - **Must deliver:** the credibility story — the architecture, the budget governor, the AI-failure log,
   the methodology, the character-level explainer (linked from cockpit + timeline).
 - **Good looks like:** a skeptic comes away trusting the machine *because* it shows its failures.

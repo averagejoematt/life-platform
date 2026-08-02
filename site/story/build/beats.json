@@ -2024,6 +2024,29 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/1932"
         }
       ]
+    },
+    {
+      "id": "2026-08-02-the-mirror",
+      "date": "2026-08-02",
+      "title": "The Mirror: your Whoop export, scored on my instruments, nothing uploaded",
+      "shipped": "Drop the CSV export Whoop already gives you at /method/mirror/ and your months get scored in your own browser by the same deterministic engine that scores me nightly — readiness, sleep, recovery, even your own personal HRV thresholds once you have 30 days — then laid over my published year (341 days, exact midrank percentiles). There is no upload endpoint on this site; a repo test pins the page to exactly one network request, the static distributions file, and the production network audit measured zero non-GET requests. Same night, four funnel fixes landed: the predict-the-week seeder stamps the genesis week instead of wall-clock, the QA check that greened six dark days now escalates, the Monday digest finally counts subscribe conversions, and the share card stopped disagreeing with the site about what day it is.",
+      "gotcha": "The URL already existed — an older three-field 'type your numbers' widget owned /method/mirror/, and my page generator silently clobbered it. The registry's duplicate gate caught it; the fix is a new 'external' registry flag so a curated page can keep its nav tile without the archive build ever overwriting it.",
+      "honest_miss": "v1 is Whoop-only, deliberately: an Apple Health export reports HRV as SDNN, a different quantity than Whoop's RMSSD, and overlaying incomparables would have been a quiet lie. The AI board-read of your data (v2) is a cost-and-consent decision that stays with Matthew, not a model.",
+      "prs": [
+        {
+          "label": "PR #2015",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2015"
+        },
+        {
+          "label": "PR #2011",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2011"
+        },
+        {
+          "label": "PR #2014",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2014"
+        }
+      ],
+      "why_it_mattered": "Until tonight every number on the site was mine — you could watch, not try. The participation ladder this platform keeps promising needs a first rung that costs a reader nothing and risks them nothing, and 'the same instruments, provably, with no server to trust' is that rung. The privacy design is the product: the guarantee isn't a policy sentence, it's the absence of an endpoint, enforced by a test anyone can read in the public repo."
     }
   ]
 }
