@@ -179,6 +179,8 @@ def _grounding_gate(pick: dict, text: str, invoke) -> tuple:
     if _gg is None:  # pragma: no cover — environment-dependent
         return text, [{"type": "gate_unavailable", "detail": "grounded_generation is not available in this bundle"}]
     try:
+        from ai.grounding_gate_params import cycle_gate_params  # #1967
+
         facts_block = _grounding_facts(pick)
         allowed = _gg.allowed_numbers(facts_block)
         # An EMPTY date allow-list is meaningful, not a no-op: it means "no calendar
@@ -186,7 +188,10 @@ def _grounding_gate(pick: dict, text: str, invoke) -> tuple:
         allowed_date_set = _gg.allowed_dates(facts_block)
 
         def _findings_fn(candidate):
-            return _gg.grounding_findings(candidate, facts=None, allowed=allowed, allowed_dates=allowed_date_set)
+            # #1967: cycle anchors arm stale_phase/stale_baseline/experiment_span
+            # (#1691/#1897); framing-scoped, so a retrospective that never frames a
+            # "Day N" claim sees no change in behavior.
+            return _gg.grounding_findings(candidate, facts=None, allowed=allowed, allowed_dates=allowed_date_set, **cycle_gate_params())
 
         def _regen_fn(correction):
             body = build_body(pick)

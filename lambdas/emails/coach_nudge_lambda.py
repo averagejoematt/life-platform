@@ -34,6 +34,7 @@ from datetime import datetime, timedelta, timezone
 import boto3
 from ai import budget_guard
 from ai.grounded_generation import allowed_dates, allowed_numbers, grounding_findings
+from ai.grounding_gate_params import cycle_gate_params  # #1967 — cycle anchors (#1691/#1897)
 from boto3.dynamodb.conditions import Key
 from coach import coach_nudge_engine as engine
 from coach.coach_checkin import read_cycle
@@ -368,6 +369,10 @@ def _gate(copy_text: str, firing: dict, coach_name: str) -> list:
         copy_text,
         allowed=allowed_numbers(firing["payload"], firing["invited_action"]),
         allowed_dates=allowed_dates(firing["payload"]),
+        # #1967: cycle anchors (#1691/#1897). A nudge that frames a stale "Day N" is
+        # dropped rather than sent — the same deterministic-first disposition as the
+        # number/date findings above.
+        **cycle_gate_params(),
     )
     findings.extend(f"grounding:{f.get('type')}:{f.get('detail', '')}" for f in grounding)
     if findings:

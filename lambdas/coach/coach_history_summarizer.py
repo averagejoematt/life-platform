@@ -171,9 +171,14 @@ from common.retry_utils import _emit_token_metrics  # noqa: E402,F401
 # named fast-follow"). Fails open (gate becomes a no-op) if the shared module
 # is somehow missing from the bundle/layer — never blocks stance generation.
 try:
-    from ai.grounded_generation import allowed_numbers, grounding_findings, regen_once
+    from ai.grounded_generation import allowed_dates, allowed_numbers, grounding_findings, regen_once
+    from ai.grounding_gate_params import cycle_gate_params  # #1967 — the cycle anchors, one provider
 except ImportError:  # pragma: no cover — environment-dependent
-    allowed_numbers = grounding_findings = regen_once = None
+    allowed_dates = allowed_numbers = grounding_findings = regen_once = None
+
+    def cycle_gate_params(generation_date_iso=None):  # type: ignore[misc]
+        return {}
+
 
 # R22-SEC-04 (#811): the compression prompt replays stored public-board reader
 # questions (INTERACTION#) — delimit that untrusted text as data. Fail-soft to a
@@ -1334,10 +1339,15 @@ def _apply_grounding_gate(coach_id, meta, compressed, prior_stance, user_message
         return result, []  # shared module unavailable — fail-open, matches its own design
 
     allowed = allowed_numbers(user_message)
+    # #1967: the stance's allow-list source (`user_message`) is exactly what the model
+    # saw, so the date gate is built from the same material; the cycle anchors arm the
+    # phase-aware classes (#1691/#1897) — a stance that narrates a stale "Day N" or a
+    # cycle-9 starting weight is the same failure class as a fabricated number.
+    _dates = allowed_dates(user_message) if allowed_dates is not None else None
     holder = {"latest": result}
 
     def _findings_fn(text):
-        return grounding_findings(text, facts=None, allowed=allowed)
+        return grounding_findings(text, facts=None, allowed=allowed, allowed_dates=_dates, **cycle_gate_params())
 
     def _regen_fn(correction):
         strict_message = user_message + "\n\n" + correction

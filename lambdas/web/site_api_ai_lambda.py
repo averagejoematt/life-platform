@@ -912,9 +912,12 @@ def board_grounding_findings(system_text: str, message_text: str, answer_text: s
     harness replays fixtures through the ACTUAL gate path, not a re-implementation.
     Returns grounded_generation findings ([] = grounded)."""
     from ai import grounded_generation as _gg
+    from ai.grounding_gate_params import cycle_gate_params  # #1967
 
-    allowed = _gg.allowed_numbers(system_text, message_text, prior_answers or None)
-    return _gg.grounding_findings(answer_text, allowed=allowed)
+    _srcs = (system_text, message_text, prior_answers or None)
+    allowed = _gg.allowed_numbers(*_srcs)
+    # #1967: date allow-list from the SAME sources, plus the cycle anchors (#1691/#1897).
+    return _gg.grounding_findings(answer_text, allowed=allowed, allowed_dates=_gg.allowed_dates(*_srcs), **cycle_gate_params())
 
 
 def _retain_board_flag(pid: str, verdict: str, draft: str, final: str, findings: list, extra: dict = None) -> None:
@@ -1239,11 +1242,15 @@ def _handle_ask(event: dict) -> dict:
         # can't be grounded, say so honestly instead of serving them.
         try:
             from ai import grounded_generation as _gg
+            from ai.grounding_gate_params import cycle_gate_params  # #1967
 
-            _allowed = _gg.allowed_numbers(system_prompt, question, [a_ for _, a_ in history])
+            _ask_srcs = (system_prompt, question, [a_ for _, a_ in history])
+            _allowed = _gg.allowed_numbers(*_ask_srcs)
+            # #1967: date allow-list from the SAME sources, plus the cycle anchors.
+            _allowed_dates = _gg.allowed_dates(*_ask_srcs)
 
             def _ask_findings(_t):
-                return _gg.grounding_findings(_t, allowed=_allowed)
+                return _gg.grounding_findings(_t, allowed=_allowed, allowed_dates=_allowed_dates, **cycle_gate_params())
 
             _pre = _ask_findings(answer)
             if _pre:
@@ -1455,9 +1462,12 @@ def _handle_explain(event: dict) -> dict:
         # ADR-104 fail-closed gate: every number must exist in the fetched JSON.
         try:
             from ai import grounded_generation as _gg
+            from ai.grounding_gate_params import cycle_gate_params  # #1967
 
             _allowed = _gg.allowed_numbers(payload_txt, day_ctx)
-            if _gg.grounding_findings(explanation, allowed=_allowed):
+            # #1967: date allow-list from the SAME fetched JSON, plus the cycle anchors.
+            _allowed_dates = _gg.allowed_dates(payload_txt, day_ctx)
+            if _gg.grounding_findings(explanation, allowed=_allowed, allowed_dates=_allowed_dates, **cycle_gate_params()):
                 logger.warning(f"[explain] ungrounded numbers for {surface} — refusing")
                 explanation = (
                     "I'd rather not narrate numbers I can't ground in this page's data. "

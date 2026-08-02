@@ -162,6 +162,7 @@ def generate_gated_turn(system, user, allowed_sources):
     """One Haiku generation + the ADR-104 grounding gate (one corrective regen).
     Returns (text, findings_left) — text None on hard failure."""
     from ai import bedrock_client, grounded_generation as gg
+    from ai.grounding_gate_params import cycle_gate_params  # #1967
 
     def _call(extra=""):
         body = {
@@ -177,9 +178,12 @@ def generate_gated_turn(system, user, allowed_sources):
     if not text:
         return None, []
     allowed = gg.allowed_numbers(system, user, *allowed_sources)
+    # #1967: same sources as the number allow-list (literally what the turn was given),
+    # plus the cycle anchors so a dialogue turn can't cite a stale "Day N" / baseline.
+    allowed_date_set = gg.allowed_dates(system, user, *allowed_sources)
 
     def findings_fn(t):
-        return gg.grounding_findings(t, allowed=allowed)
+        return gg.grounding_findings(t, allowed=allowed, allowed_dates=allowed_date_set, **cycle_gate_params())
 
     text, left, _corrected = gg.regen_once(text, findings_fn, lambda corr: _call("\n\n" + corr))
     return text, left

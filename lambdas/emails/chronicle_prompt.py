@@ -203,11 +203,16 @@ def installment_grounding_findings(elena_prompt, user_message, text, archive_tex
     nowhere in prompt + data packet + archive. Widening the window without widening
     the allow-list would false-flag every legitimate callback."""
     from ai import grounded_generation as _gg
+    from ai.grounding_gate_params import cycle_gate_params  # #1967
 
     findings = _gg.grounding_findings(
         text,
         allowed=_gg.allowed_numbers(elena_prompt, user_message, archive_text),
         allowed_dates=_gg.allowed_dates(elena_prompt, user_message, archive_text),
+        # #1967: the cycle anchors arm stale_phase/stale_baseline/experiment_span
+        # (#1691/#1897) — an installment framing the wrong "Day N" or a prior cycle's
+        # starting weight is the class the number/date gates are structurally blind to.
+        **cycle_gate_params(),
     )
     year, month = _covered_year_month(user_message)
     if year is not None:
