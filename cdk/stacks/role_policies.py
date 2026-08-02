@@ -2108,7 +2108,11 @@ def operational_qa_smoke() -> list[iam.PolicyStatement]:
             sid="S3Read",
             actions=["s3:GetObject"],
             # dashboard/* + config/* + blog/* (check_blog_links reads blog/index.html)
-            resources=_s3("dashboard/*", "config/*", "blog/*"),
+            # + ai-canary-log/* (#1956: check_canary_precision reads the canary's
+            #   dated findings records for the nightly grounded false-positive-rate
+            #   line; fail-soft in the lambda — degrades to a WARN naming this
+            #   grant until it deploys).
+            resources=_s3("dashboard/*", "config/*", "blog/*", "ai-canary-log/*"),
         ),
         iam.PolicyStatement(
             sid="S3List",
@@ -2317,8 +2321,10 @@ def operational_coherence_sentinel() -> list[iam.PolicyStatement]:
 
 
 def operational_ai_quality_canary() -> list[iam.PolicyStatement]:
-    """AI Quality Canary (#385): read-only DDB (the canonical facts to ground the
-    digit check) + INVOKE the site-api-ai Lambda directly (never through
+    """AI Quality Canary (#385): read-only DDB (#1956: feeds the ask pipeline's
+    OWN context builders — _ask_fetch_context reads vitals/profile/character/
+    computed items under the canary's role to derive the grounded-digits
+    universe) + INVOKE the site-api-ai Lambda directly (never through
     CloudFront, so no reader rate-limit quota is spent) + emit LifePlatform/
     AICanary metrics + a budget-gated Haiku advisory judge + persist findings to
     a scoped audit prefix. No platform writes (ai-canary-log/ is an out-of-band

@@ -12,7 +12,8 @@ CloudFront, never touching a reader's rate-limit quota) with a small suite of
 PRE-REGISTERED probes — factual, causal, and three regression cases for the
 exact defects above. DETERMINISTIC checks run first and drive the verdict:
 non-empty per-persona responses, no fourth-wall vendor/model strings, no
-fabricated digits (numbers absent from the authoritative grounding facts), no
+fabricated digits (numbers absent from the ask pipeline's served grounding
+context — #1956), no
 blocked vice terms, and the invalid-persona 400 (never a 500). A budget-gated
 Haiku judge adds an ADVISORY read on top — it never trips the alarm, because a
 permanently-red AI-judged alarm gets ignored (the lesson from the Coherence
@@ -24,11 +25,20 @@ remediation agent and a human can triage WHAT failed. Respects the same
 budget-tier gating as every other AI feature: when website AI is paused
 (tier 3), the canary skips the live probes and reports OK (legitimately quiet).
 
-Read-only against platform data: queries DDB for the canonical facts, invokes
-the AI Lambda, writes only its own audit trail. Pattern mirrors
-coherence_sentinel_lambda.py (probe → check → emit + digest + persist).
+Read-only against platform data: derives the grounding universe by running the
+ask pipeline's OWN context builders (#1956), invokes the AI Lambda, writes only
+its own audit trail. Pattern mirrors coherence_sentinel_lambda.py
+(probe → check → emit + digest + persist).
 
 v1.0.0 — 2026-07-03 (#385, epic #337 — trust every answer)
+v1.1.0 — 2026-08-02 (#1956): the grounded-digits fact universe is the ask
+pipeline's own serving context (_ask_fetch_context → _ask_build_prompt →
+grounded_generation.allowed_numbers), never a parallel re-enumeration. The old
+computed_metrics-only snapshot was strictly narrower than what the pipeline
+serves, so TRUE numbers (a real weigh-in, the served recovery %) scored as
+fabrication — the boy-who-cried-wolf alarm this module's own docstring warns
+about (07-22 [317.61], 07-27 [56.0, 321.09], 07-31 [96.0] all fired on true,
+served numbers).
 """
 
 import json
@@ -37,7 +47,6 @@ import os
 import re
 
 import boto3
-from boto3.dynamodb.conditions import Key
 
 try:
     from common.platform_logger import get_logger
@@ -48,9 +57,6 @@ except ImportError:  # pragma: no cover
     logger.setLevel(logging.INFO)
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
-TABLE = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID = os.environ.get("USER_ID", "matthew")
-USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 CW_NAMESPACE = "LifePlatform/AICanary"
 LOG_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 CANARY_LOG_PREFIX = "ai-canary-log"
@@ -64,8 +70,6 @@ CANARY_IP = os.environ.get("AI_CANARY_SOURCE_IP", "203.0.113.201")  # TEST-NET-3
 # presents the header, exactly like a CloudFront-forwarded request.
 ORIGIN_SECRET_NAME = os.environ.get("SITE_API_ORIGIN_SECRET_NAME", "life-platform/site-api-origin-secret")
 
-dynamodb = boto3.resource("dynamodb", region_name=REGION)
-table = dynamodb.Table(TABLE)
 _cw = boto3.client("cloudwatch", region_name=REGION)
 _s3 = boto3.client("s3", region_name=REGION)
 _lambda = boto3.client("lambda", region_name=REGION)
@@ -146,25 +150,26 @@ def _blocked_hits(text: str):
     return [p.pattern for p in _BLOCKED_TERMS if p.search(text)]
 
 
-def _grounding_numbers(facts: dict):
-    """The set of authoritative numbers a factual answer is allowed to cite —
-    rounded int + 1dp forms of every canonical fact value."""
-    allowed = set()
-    for v in (facts or {}).values():
-        if isinstance(v, (int, float)):
-            allowed.add(round(float(v)))
-            allowed.add(round(float(v), 1))
-    return allowed
+def _ungrounded_numbers(text: str, allowed: set):
+    """Metric-looking numbers in `text` grounded in NO number of the serving
+    universe `allowed` (#1956: the numbers the ask pipeline actually served —
+    see _grounding_universe).
 
-
-def _ungrounded_numbers(text: str, facts: dict):
-    """Metric-looking numbers in `text` that match NO grounding fact within a
-    tolerant band (max(2, 5%) — the Coherence-Sentinel grounding rule, wide
-    enough to absorb rounding/day-boundary skew, tight enough to catch a
-    fabricated 'recovery 30' when the real value is 64)."""
-    allowed = _grounding_numbers(facts)
+    A candidate is ungrounded only when BOTH legs agree:
+      1. the serving gate's own verdict (grounded_generation.fabricated_numbers —
+         the exact matching the pipeline's ADR-104 gate applies: benign-number
+         set, exact match, integer restatement of an input float), AND
+      2. the canary's historical skew band (max(2, 5%) — the Coherence-Sentinel
+         grounding rule, wide enough to absorb rounding + the serve-time vs
+         check-time day-boundary drift between two context reads).
+    Both legs only ever REMOVE candidates, so this is strictly
+    precision-increasing over either alone."""
     if not allowed:
         return []  # no ground truth → can't judge; skip (not a failure)
+    try:
+        from ai.grounded_generation import fabricated_numbers
+    except ImportError:  # pragma: no cover — bundle always carries ai/
+        fabricated_numbers = None
     cands = set()
     for m in _UNIT_RE.finditer(text):
         cands.add(float(m.group(1)))
@@ -173,10 +178,16 @@ def _ungrounded_numbers(text: str, facts: dict):
         if 20 <= n < 1000:  # excludes reps/sets/hours (<20) and years/large ids
             cands.add(n)
     bad = []
-    for n in cands:
-        if not any(abs(n - a) <= max(2.0, 0.05 * abs(a)) for a in allowed):
-            bad.append(n)
-    return sorted(bad)
+    for n in sorted(cands):
+        # Leg 1 — the pipeline's own gate: if IT would pass this number, the
+        # canary must too (repr(n) renders the one candidate as text).
+        if fabricated_numbers is not None and not fabricated_numbers(repr(n), allowed):
+            continue
+        # Leg 2 — the tolerant skew band.
+        if any(abs(n - a) <= max(2.0, 0.05 * abs(a)) for a in allowed):
+            continue
+        bad.append(n)
+    return bad
 
 
 # ── pre-registered probe suite ────────────────────────────────────────────────
@@ -247,36 +258,29 @@ PROBES = [
 # ── data + invocation ─────────────────────────────────────────────────────────
 
 
-def _decimal(obj):
-    from decimal import Decimal
+def _grounding_universe() -> set:
+    """The ask pipeline's OWN numeric grounding universe (#1956) — derived by
+    running the SAME context builders site-api-ai runs at serve time
+    (_ask_fetch_context → _ask_build_prompt) and the SAME extractor its ADR-104
+    grounding gate applies (grounded_generation.allowed_numbers over the
+    rendered system prompt). NEVER a parallel re-enumeration of fact keys: the
+    old computed_metrics-only snapshot was strictly narrower than the serving
+    context (profile start/goal weight, vitals, character sheet, computed
+    reads), so true served numbers scored as fabrication — the exact
+    boy-who-cried-wolf failure the module docstring warns about. Consuming the
+    builder itself means a context field added to the pipeline tomorrow lands in
+    this universe with zero canary changes (guard the SET, not the instance).
 
-    if isinstance(obj, Decimal):
-        return float(obj)
-    if isinstance(obj, list):
-        return [_decimal(i) for i in obj]
-    if isinstance(obj, dict):
-        return {k: _decimal(v) for k, v in obj.items()}
-    return obj
-
-
-def _canonical_facts() -> dict:
-    """The authoritative grounding numbers — the SAME schema the coaches ground
-    on (canonical_facts.build_canonical_facts over the latest computed_metrics).
-    Empty dict on any failure → grounded-digits check degrades to skipped."""
+    Empty set on any failure → grounded-digits check degrades to WARN/skipped,
+    exactly like the old facts-unavailable path."""
     try:
-        from experiment.canonical_facts import build_canonical_facts
+        from ai.grounded_generation import allowed_numbers
+        from web.site_api_ai_lambda import _ask_build_prompt, _ask_fetch_context
 
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}computed_metrics"),
-            ScanIndexForward=False,
-            Limit=1,
-        )
-        items = _decimal(resp.get("Items", []))
-        cm = items[0] if items else {}
-        return {k: v for k, v in build_canonical_facts(cm).items() if k != "as_of" and v is not None}
+        return allowed_numbers(_ask_build_prompt(_ask_fetch_context()))
     except Exception as e:  # noqa: BLE001
-        logger.warning("canary: canonical facts unavailable: %s", e)
-        return {}
+        logger.warning("canary: ask grounding universe unavailable: %s", e)
+        return set()
 
 
 def _origin_secret() -> str:
@@ -337,8 +341,10 @@ def _probe_texts(endpoint: str, payload: dict):
 # ── deterministic checks per probe ────────────────────────────────────────────
 
 
-def evaluate_probe(probe: dict, status, payload: dict, facts: dict):
-    """Pure: run the probe's declared checks → list[Finding]. No I/O."""
+def evaluate_probe(probe: dict, status, payload: dict, universe: set):
+    """Pure: run the probe's declared checks → list[Finding]. No I/O.
+    `universe` is the serving grounding universe (a set of floats — see
+    _grounding_universe); empty set = no ground truth, grounded check WARNs."""
     pid = probe["id"]
     checks = probe["checks"]
     findings = []
@@ -388,18 +394,34 @@ def evaluate_probe(probe: dict, status, payload: dict, facts: dict):
             findings.append(Finding(f"{pid}:no_blocked", OK, "clean"))
 
     if "grounded" in checks:
-        if not facts:
-            findings.append(Finding(f"{pid}:grounded", WARN, "no canonical facts to check against"))
+        if not universe:
+            findings.append(Finding(f"{pid}:grounded", WARN, "ask grounding universe unavailable — no ground truth to check against"))
         else:
+            # Mirror the serving gate exactly: the pipeline allows numbers from
+            # the system prompt AND the question — so the probe question's own
+            # numbers are grounded here too.
+            allowed = set(universe)
+            try:
+                from ai.grounded_generation import numbers_in_text
+
+                allowed |= numbers_in_text(str(probe["body"].get("question", "")))
+            except ImportError:  # pragma: no cover — bundle always carries ai/
+                pass
             bad = {}
             for label, t in texts:
-                u = _ungrounded_numbers(t, facts)
+                u = _ungrounded_numbers(t, allowed)
                 if u:
                     bad[label] = u
             if bad:
-                findings.append(Finding(f"{pid}:grounded", ALARM, f"ungrounded numbers {bad}; facts={facts}"))
+                findings.append(
+                    Finding(
+                        f"{pid}:grounded",
+                        ALARM,
+                        f"ungrounded numbers {bad}; serving universe n={len(allowed)} (ask pipeline context — #1956)",
+                    )
+                )
             else:
-                findings.append(Finding(f"{pid}:grounded", OK, "all cited numbers grounded"))
+                findings.append(Finding(f"{pid}:grounded", OK, "all cited numbers grounded in the served context"))
 
     return findings
 
@@ -526,12 +548,12 @@ def _budget_paused() -> bool:
 def run_probes():
     """Invoke every probe, evaluate deterministically, add an advisory judge.
     Returns (findings, transcript, judge)."""
-    facts = _canonical_facts()
+    universe = _grounding_universe()
     findings = []
     transcript = []
     for probe in PROBES:
         status, payload = _invoke(probe["endpoint"], probe["body"])
-        findings.extend(evaluate_probe(probe, status, payload, facts))
+        findings.extend(evaluate_probe(probe, status, payload, universe))
         transcript.append({"probe": probe["id"], "status": status, "response": payload})
     judge = _judge(transcript)
     return findings, transcript, judge

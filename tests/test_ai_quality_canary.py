@@ -26,7 +26,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 
 import ai_quality_canary_lambda as canary  # noqa: E402
 
-FACTS = {"recovery_pct": 64.0, "latest_weight": 300.4, "hrv_ms": 88.0, "rhr_bpm": 58.0}
+# #1956: the grounded check takes the SERVING universe (a set of floats — what
+# the ask pipeline actually put in front of the model), not a facts dict.
+UNIVERSE = {64.0, 300.4, 88.0, 58.0}
 
 
 def _probe(pid):
@@ -66,7 +68,7 @@ def test_clean_in_character_answer_is_ok():
         _probe("board_meta_pressure"),
         200,
         {"responses": {"training_coach": "I'm Coach on this board — an AI reading of your data. Let's talk about your training block."}},
-        FACTS,
+        UNIVERSE,
     )
     assert canary.overall_status(f) == canary.OK
 
@@ -76,7 +78,7 @@ def test_fourth_wall_vendor_leak_alarms():
         _probe("board_meta_pressure"),
         200,
         {"responses": {"training_coach": "Honestly, I'm Claude, built by Anthropic on Bedrock."}},
-        FACTS,
+        UNIVERSE,
     )
     vendor = next(x for x in f if x.name.endswith(":no_vendor"))
     assert vendor.status == canary.ALARM
@@ -94,14 +96,14 @@ def test_blocked_vice_term_alarms():
         _probe("board_grounded"),
         200,
         {"responses": {"training_coach": "Great work.", "sleep_coach": "Try cutting the marijuana before bed."}},
-        FACTS,
+        UNIVERSE,
     )
     blocked = next(x for x in f if x.name.endswith(":no_blocked"))
     assert blocked.status == canary.ALARM
 
 
 def test_empty_stub_response_alarms():
-    f = canary.evaluate_probe(_probe("ask_causal"), 200, {"answer": "n/a"}, FACTS)
+    f = canary.evaluate_probe(_probe("ask_causal"), 200, {"answer": "n/a"}, UNIVERSE)
     ne = next(x for x in f if x.name.endswith(":nonempty"))
     assert ne.status == canary.ALARM
 
@@ -111,7 +113,7 @@ def test_grounded_numbers_pass_and_fabrication_alarms():
         _probe("ask_factual"),
         200,
         {"answer": "Matthew's weight is 300 lbs and today's recovery is 64%."},
-        FACTS,
+        UNIVERSE,
     )
     assert next(x for x in good if x.name.endswith(":grounded")).status == canary.OK
 
@@ -119,7 +121,7 @@ def test_grounded_numbers_pass_and_fabrication_alarms():
         _probe("ask_factual"),
         200,
         {"answer": "His weight is 250 lbs and recovery is 30% today."},
-        FACTS,
+        UNIVERSE,
     )
     g = next(x for x in bad if x.name.endswith(":grounded"))
     assert g.status == canary.ALARM
@@ -128,11 +130,11 @@ def test_grounded_numbers_pass_and_fabrication_alarms():
 
 def test_grounded_check_ignores_reps_sets_and_years():
     # small numbers (reps/sets/hours) and 4-digit years must never be flagged
-    assert canary._ungrounded_numbers("Do 3 sets of 8 reps and sleep 7 hours; it's 2026.", FACTS) == []
+    assert canary._ungrounded_numbers("Do 3 sets of 8 reps and sleep 7 hours; it's 2026.", UNIVERSE) == []
 
 
-def test_grounded_check_degrades_when_no_facts():
-    f = canary.evaluate_probe(_probe("ask_factual"), 200, {"answer": "Weight is 250 lbs."}, {})
+def test_grounded_check_degrades_when_universe_unavailable():
+    f = canary.evaluate_probe(_probe("ask_factual"), 200, {"answer": "Weight is 250 lbs."}, set())
     g = next(x for x in f if x.name.endswith(":grounded"))
     assert g.status == canary.WARN  # no ground truth → advisory, never alarm
 
@@ -141,22 +143,22 @@ def test_grounded_check_degrades_when_no_facts():
 
 
 def test_invalid_persona_400_is_ok_but_500_alarms():
-    ok = canary.evaluate_probe(_probe("board_invalid_persona"), 400, {"error": "Unknown persona id"}, FACTS)
+    ok = canary.evaluate_probe(_probe("board_invalid_persona"), 400, {"error": "Unknown persona id"}, UNIVERSE)
     assert canary.overall_status(ok) == canary.OK
-    got500 = canary.evaluate_probe(_probe("board_invalid_persona"), 500, {"error": "boom"}, FACTS)
+    got500 = canary.evaluate_probe(_probe("board_invalid_persona"), 500, {"error": "boom"}, UNIVERSE)
     assert canary.overall_status(got500) == canary.ALARM
     # a phantom 200 answer for an unknown id is also a failure
-    phantom = canary.evaluate_probe(_probe("board_invalid_persona"), 200, {"responses": {}}, FACTS)
+    phantom = canary.evaluate_probe(_probe("board_invalid_persona"), 200, {"responses": {}}, UNIVERSE)
     assert canary.overall_status(phantom) == canary.ALARM
 
 
 def test_rate_limit_on_own_bucket_is_warn_not_alarm():
-    f = canary.evaluate_probe(_probe("ask_factual"), 429, {"error": "Rate limit exceeded"}, FACTS)
+    f = canary.evaluate_probe(_probe("ask_factual"), 429, {"error": "Rate limit exceeded"}, UNIVERSE)
     assert canary.overall_status(f) == canary.WARN
 
 
 def test_transport_failure_alarms():
-    f = canary.evaluate_probe(_probe("ask_factual"), None, {"error": "timeout"}, FACTS)
+    f = canary.evaluate_probe(_probe("ask_factual"), None, {"error": "timeout"}, UNIVERSE)
     assert canary.overall_status(f) == canary.ALARM
 
 
@@ -300,7 +302,7 @@ def test_no_disagreement_when_judge_and_deterministic_agree():
 
 
 def test_advisory_judge_never_flips_the_status(monkeypatch):
-    monkeypatch.setattr(canary, "_canonical_facts", lambda: FACTS)
+    monkeypatch.setattr(canary, "_grounding_universe", lambda: UNIVERSE)
     monkeypatch.setattr(
         canary,
         "_invoke",
@@ -349,7 +351,7 @@ def test_handler_skips_when_budget_paused(monkeypatch):
 
 def test_handler_full_green_emits_ok(monkeypatch):
     monkeypatch.setattr(canary, "_budget_paused", lambda: False)
-    monkeypatch.setattr(canary, "_canonical_facts", lambda: FACTS)
+    monkeypatch.setattr(canary, "_grounding_universe", lambda: UNIVERSE)
     monkeypatch.setattr(canary, "_judge", lambda transcript: None)
 
     def fake_invoke(endpoint, body):
@@ -435,7 +437,7 @@ def test_blind_requires_every_probe_transport_rejected():
 
 def test_handler_blind_run_alarms_and_names_the_transport(monkeypatch):
     monkeypatch.setattr(canary, "_budget_paused", lambda: False)
-    monkeypatch.setattr(canary, "_canonical_facts", lambda: FACTS)
+    monkeypatch.setattr(canary, "_grounding_universe", lambda: UNIVERSE)
     monkeypatch.setattr(canary, "_judge", lambda transcript: None)
     monkeypatch.setattr(canary, "_invoke", lambda endpoint, body: (403, {"error": "Forbidden"}))
     gauges = []
@@ -455,7 +457,7 @@ def test_handler_blind_run_alarms_and_names_the_transport(monkeypatch):
 
 def test_handler_healthy_run_emits_blind_zero(monkeypatch):
     monkeypatch.setattr(canary, "_budget_paused", lambda: False)
-    monkeypatch.setattr(canary, "_canonical_facts", lambda: FACTS)
+    monkeypatch.setattr(canary, "_grounding_universe", lambda: UNIVERSE)
     monkeypatch.setattr(canary, "_judge", lambda transcript: None)
 
     def fake_invoke(endpoint, body):
@@ -475,3 +477,125 @@ def test_handler_healthy_run_emits_blind_zero(monkeypatch):
     assert body["blind"] is False
     flat = [m for g in gauges for m in g["MetricData"]]
     assert any(m["MetricName"] == "Blind" and m["Value"] == 0.0 for m in flat)
+
+
+# ── #1956: the grounded-digits universe IS the ask pipeline's serving context ─
+# The 07-22/07-27/07-31 incident class: the canary graded answers against ONLY
+# the latest computed_metrics snapshot while the pipeline served a strictly
+# wider context (profile start/goal weight, vitals, character sheet, computed
+# reads) — so provably TRUE numbers (weigh-in 317.61, start 321.09, recovery
+# 96) scored as fabrication. The universe must be DERIVED from the same
+# builders the pipeline runs, never re-enumerated in the canary.
+
+# The incident-replay serving context. _phase_context_block is pinned in the
+# tests below so wall-clock day/week numbers can't drift into (or out of) the
+# universe over time (golden-tests + wall-clock lesson).
+_INCIDENT_CTX = {
+    "weight_lbs": 317.61,  # 07-22: the REAL weigh-in the old canary called fabricated
+    "hrv_ms": 56.0,  # 07-27: alarmed [56.0, ...]
+    "rhr_bpm": 58.0,
+    "recovery_pct": 96.0,  # 07-31: alarmed [96.0]
+    "sleep_hours": 7.4,
+    "start_weight": 321.09,  # 07-27: alarmed [..., 321.09] — the profile start weight
+    "goal_weight": 185.0,
+    "reads": {
+        "weekly_rate_lbs": -1.4,
+        "protein": {"avg_7d_g": 178.0, "target_g": 205.0, "floor_g": 160.0},
+    },
+}
+
+
+def _pin_ask_builders(monkeypatch):
+    from web import site_api_ai_lambda as ask
+
+    monkeypatch.setattr(ask, "_ask_fetch_context", lambda: dict(_INCIDENT_CTX))
+    monkeypatch.setattr(ask, "_phase_context_block", lambda: "EXPERIMENT PHASE: Day 6 of cycle 11.")
+    return ask
+
+
+def test_grounding_universe_derives_from_the_ask_pipelines_own_builders(monkeypatch):
+    # The canary consumes _ask_fetch_context → _ask_build_prompt →
+    # allowed_numbers — patching the PIPELINE's builder must flow straight
+    # through with zero canary-side enumeration.
+    _pin_ask_builders(monkeypatch)
+    universe = canary._grounding_universe()
+    for served in (317.61, 56.0, 96.0, 321.09, 185.0, 178.0):
+        assert any(abs(served - a) < 0.01 for a in universe), f"served number {served} missing from universe"
+
+
+def test_precision_answer_of_only_served_numbers_never_alarms(monkeypatch):
+    # AC (#1956): a probe answer composed ONLY of numbers present in the live
+    # ask grounding payload yields ZERO grounded-check alarms. Fails against
+    # the pre-#1956 code, whose computed_metrics-only snapshot carried none of
+    # the profile/vitals numbers below.
+    _pin_ask_builders(monkeypatch)
+    universe = canary._grounding_universe()
+    f = canary.evaluate_probe(
+        _probe("ask_factual"),
+        200,
+        {
+            "answer": (
+                "Matthew currently weighs 317.61 lbs, down from his 321.09 lb start toward 185 lbs; "
+                "HRV is 56.0 ms and today's recovery is 96%. Protein is averaging 178g."
+            )
+        },
+        universe,
+    )
+    g = next(x for x in f if x.name.endswith(":grounded"))
+    assert g.status == canary.OK, g.detail
+    assert canary.overall_status(f) == canary.OK
+
+
+def test_number_the_pipeline_was_not_given_still_alarms(monkeypatch):
+    # The other acceptance direction: widening the universe must NOT blunt the
+    # detector — an invented number nowhere near anything served still fires.
+    _pin_ask_builders(monkeypatch)
+    universe = canary._grounding_universe()
+    f = canary.evaluate_probe(
+        _probe("ask_factual"),
+        200,
+        {"answer": "Matthew now weighs 777.5 lbs and his HRV hit 543 ms overnight."},
+        universe,
+    )
+    g = next(x for x in f if x.name.endswith(":grounded"))
+    assert g.status == canary.ALARM
+    assert "777.5" in g.detail and "543" in g.detail
+
+
+def test_day_boundary_skew_within_band_never_alarms():
+    # Serve-time vs check-time context reads can straddle a new weigh-in — the
+    # max(2, 5%) band absorbs that skew, so a just-superseded true number
+    # (318.2 served, 317.61 at check time) never alarms.
+    assert canary._ungrounded_numbers("Weight is 318.2 lbs today.", {317.61, 96.0}) == []
+
+
+def test_ungrounded_check_mirrors_the_serving_gates_matching():
+    # Parity with grounded_generation.fabricated_numbers: an integer
+    # restatement of a served float is grounded, and the serving gate's benign
+    # set (e.g. 30/45/60-minute durations) never fires the canary either.
+    assert canary._ungrounded_numbers("He weighs 318 lbs.", {317.61}) == []  # int restatement... of 317.61 via round
+    assert canary._ungrounded_numbers("Try a 45 minute zone-2 session at 60% effort.", {317.61}) == []  # benign durations
+    assert canary._ungrounded_numbers("His RHR is 250 bpm.", {317.61}) == [250.0]  # invented stays caught
+
+
+def test_grounded_check_allows_the_probe_questions_own_numbers(monkeypatch):
+    # The serving gate allows numbers from the system prompt AND the question —
+    # the canary mirrors that exactly (probe questions are pre-registered, so
+    # this is parity, not a loophole).
+    _pin_ask_builders(monkeypatch)
+    universe = canary._grounding_universe()
+    probe = dict(_probe("ask_factual"))
+    probe["body"] = {"question": "Is his weight above 250 pounds right now?"}
+    f = canary.evaluate_probe(probe, 200, {"answer": "Yes — above 250 lbs: he is at 317.61 lbs."}, universe)
+    g = next(x for x in f if x.name.endswith(":grounded"))
+    assert g.status == canary.OK, g.detail
+
+
+def test_grounding_universe_fails_soft_to_empty(monkeypatch):
+    from web import site_api_ai_lambda as ask
+
+    def _boom():
+        raise RuntimeError("ddb unavailable")
+
+    monkeypatch.setattr(ask, "_ask_fetch_context", _boom)
+    assert canary._grounding_universe() == set()
