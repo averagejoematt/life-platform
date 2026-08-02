@@ -269,6 +269,24 @@ def load_chronicle_pending() -> dict:
     return pending if isinstance(pending, dict) else {}
 
 
+def load_content_cadence() -> dict:
+    """#1972: the cron-derived "next installment" line, for the static/no-JS
+    chronicle shell. Tries the live /api/content_cadence endpoint first (the
+    true, budget-tier-aware read, same fetch pattern as load_chronicle_pending
+    above); on ANY failure — endpoint not yet deployed, offline build,
+    transient error — falls back to the pure cron-only positive computation
+    (common.content_cadence.build_payload with allowed=True) rather than
+    omitting the line or blocking the build. The fallback is a LOCAL, AWS-free
+    computation (no budget-tier read), so a build-time SSM outage degrades
+    this line to "assumed running", never blocks the whole build."""
+    d = _fetch_json("/api/content_cadence")
+    if isinstance(d, dict) and isinstance(d.get("chronicle"), dict):
+        return d["chronicle"]
+    from common.content_cadence import build_payload
+
+    return build_payload(datetime.datetime.now(datetime.timezone.utc), allowed=True)["chronicle"]
+
+
 # ── render helpers (return "" rather than fabricate on missing data) ─────────
 
 
@@ -337,10 +355,13 @@ def _week_gap_note(posts: list) -> str:
     )
 
 
-def chronicle_list_html(posts: list, limit: int = 20, pending: dict | None = None) -> str:
+def chronicle_list_html(posts: list, limit: int = 20, pending: dict | None = None, cadence: dict | None = None) -> str:
     """A dated, crawlable chronicle post list (#730). Newest first. #803 adds two honest
     disclosures on top: a currently-withheld week (`pending`, from load_chronicle_pending)
-    and any break in the "Week N" numbering found in `posts` itself."""
+    and any break in the "Week N" numbering found in `posts` itself. #1972 adds a THIRD:
+    the cron-derived "next installment" line (`cadence`, from load_content_cadence) —
+    shown only when there's no currently-withheld week to report (an already-happened
+    event is more informative than a live derived guess of what's next)."""
     if not posts:
         return ""
     rows = []
@@ -352,11 +373,12 @@ def chronicle_list_html(posts: list, limit: int = 20, pending: dict | None = Non
         suffix = f" · {_esc(label)}" if label else ""
         rows.append(f'<li><a href="{url}"><time datetime="{date}">{date}</time> — {title}</a>{suffix}</li>')
     pending_note = f"<p>{_esc(pending['display'])}</p>" if pending and pending.get("display") else ""
+    cadence_note = f"<p>{_esc(cadence['display'])}</p>" if not pending_note and cadence and cadence.get("display") else ""
     gap_note = _week_gap_note(posts)
     return (
         '<noscript><section class="proof-static dx-prose" aria-label="Chronicle posts">'
         f'<p class="label">The weekly chronicle — {len(posts)} posts, newest first (as of {_esc(_today())})</p>'
-        f"{pending_note}{gap_note}"
+        f"{pending_note}{cadence_note}{gap_note}"
         f'<ul>{"".join(rows)}</ul>'
         "</section></noscript>"
     )
