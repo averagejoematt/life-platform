@@ -18,6 +18,10 @@ USAGE:
   python3 deploy/sync_doc_metadata.py --check  # CI GATE: like dry run, but exits
                                                 # non-zero if any literal has drifted
                                                 # (writes nothing either way — see #389)
+  python3 deploy/sync_doc_metadata.py --refresh-secrets
+                                               # read the LIVE Secrets Manager inventory
+                                               # (read-only) and rewrite the secret_count
+                                               # literal + its live-verified date (#1957)
 
 WHAT IT UPDATES:
   - Version + date in all doc headers
@@ -1251,7 +1255,7 @@ PLATFORM_FACTS = {
     "module_count": 31,  # fallback: all mcp/*.py except __init__.py
     "tool_module_count": 25,  # fallback: mcp/tools_*.py domain modules only
     "adr_count": 120,  # fallback: ## ADR- headings in docs/DECISIONS.md (record count; max number may differ — see adr_max)
-    "secret_count": 21,  # live-verified 2026-07-10 via `aws secretsmanager list-secrets` (not auto-discovered — update after secret add/delete)
+    "secret_count": 25,  # live-verified 2026-08-02 via `aws secretsmanager list-secrets` (not auto-discovered — update after secret add/delete)
     "account_concurrency_limit": 100,  # live-verified 2026-07-18 via `aws lambda get-account-settings` (#1328; raised from 10 by AWS case 177921309700709 — update after any quota change)
     "alarm_count": 86,  # fallback: auto-discovered from cdk/stacks/*.py when parseable (#795, _auto_discover_alarm_count); 113→65 on #790 (ADR-116); 65→67 on #809 (site-api-ai-errors + recursive-loop adopted into CDK); 67→69 on #1229 (alert-digest Errors + queue-age alarms); 69→71 on #1328 (serve-stack Throttles alarms); 71→77 refreshed to discovery on #1455 (drift >5; includes compute-outputs-missing + compute-outputs-heartbeat); 77→86 refreshed to discovery on #1960 (drift >5; includes the 5 per-source ingest-auth-unhealthy-* alarms)
     "endpoint_count": 115,  # fallback: AST-derived from site_api_lambda.py (#1437) — ROUTES + _SIMPLE_ROUTES + inline, deduped
@@ -1659,7 +1663,56 @@ def process_doc(rel_path: str, dry_run: bool) -> list[str]:
     return changes
 
 
+def _refresh_secret_count() -> int:
+    """`--refresh-secrets`: read the LIVE Secrets Manager inventory and rewrite the
+    `secret_count` literal (number + `live-verified` date) in this file. Read-only in AWS.
+
+    Why a flag and not another `_auto_discover_*` (#1957): the secret inventory exists
+    only in AWS — nothing in the repo can derive it. Discovering it inline would make the
+    sync's OUTPUT depend on whether the caller happened to hold credentials, so a
+    credentialed `--apply` and a credential-free `--check` would stamp different numbers
+    and fight each other forever. Instead discovery is an explicit, deterministic-output
+    command: it updates the literal + its verification date, and
+    `scripts/doc_facts_ops.py` reds CI when that date goes stale (>90d). That closes the
+    "manufactured freshness" hole — the doc-sync re-stamping "Last updated" over a count
+    nobody had verified since 2026-07-10 — without introducing environment-dependent docs.
+    """
+    import boto3
+
+    client = boto3.client("secretsmanager", region_name="us-west-2")
+    names = []
+    kwargs: dict = {"MaxResults": 100}
+    while True:
+        page = client.list_secrets(**kwargs)
+        names += [s["Name"] for s in page.get("SecretList", [])]
+        token = page.get("NextToken")
+        if not token:
+            break
+        kwargs["NextToken"] = token
+    live = sorted(n for n in names if n.startswith("life-platform/"))
+    src = Path(__file__).read_text(encoding="utf-8")
+    today = datetime.now(timezone.utc).date().isoformat()
+    new_src, n = re.subn(
+        r'"secret_count": \d+,  # live-verified \d{4}-\d{2}-\d{2}',
+        f'"secret_count": {len(live)},  # live-verified {today}',
+        src,
+        count=1,
+    )
+    if n != 1:
+        print("error: could not locate the secret_count literal to rewrite", file=sys.stderr)
+        sys.exit(2)
+    Path(__file__).write_text(new_src, encoding="utf-8")
+    print(f"  secret_count → {len(live)} (live-verified {today}, region us-west-2)")
+    for name in live:
+        print(f"    {name}")
+    print("\n  Next: python3 deploy/sync_doc_metadata.py --apply   (propagate to the docs)")
+    return len(live)
+
+
 def main():
+    if "--refresh-secrets" in sys.argv:
+        _refresh_secret_count()
+        return
     is_check = "--check" in sys.argv
     is_apply = "--apply" in sys.argv
     if is_check and is_apply:

@@ -60,6 +60,7 @@ on:
       - '.claude/commands/**'
       - 'deploy/sync_doc_metadata.py'
       - 'scripts/check_doc_*.py'
+      - 'scripts/doc_facts_ops.py'   # the #1957 operational-claim rules the gate loads
       - 'scripts/generate_adr_index.py'
       - 'scripts/generate_mcp_tool_catalog.py'
       # The code half — a source change can invalidate a doc (#1908).
@@ -76,6 +77,7 @@ on:
       - '.claude/commands/**'
       - 'deploy/sync_doc_metadata.py'
       - 'scripts/check_doc_*.py'
+      - 'scripts/doc_facts_ops.py'   # the #1957 operational-claim rules the gate loads
       - 'scripts/generate_adr_index.py'
       - 'scripts/generate_mcp_tool_catalog.py'
       # The code half — a source change can invalidate a doc (#1908).

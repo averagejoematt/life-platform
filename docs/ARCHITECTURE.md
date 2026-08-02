@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-18
 
-Last updated: 2026-08-02 (v8.6.0 — 76 tools, 37-module MCP package, 20 data sources, 99 Lambdas, 21 secrets, 86 alarms, 9 CDK stacks deployed).
+Last updated: 2026-08-02 (v8.6.0 — 76 tools, 37-module MCP package, 20 data sources, 99 Lambdas, 25 secrets, 86 alarms, 9 CDK stacks deployed).
 
 > **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **Home + five doors** (v5 IA): the cockpit (`/cockpit/`, live data), the data (`/data/`, the evidence archive — old `/evidence/*` slugs 301), the coaching, the protocols, and the story (`/story/`, the writing hub); the pre-v4 site is preserved verbatim at `/legacy`. Shared code ships **bundled inside every function** (#781/ADR-131 — the shared layer is retired; see [CONVENTIONS.md §1](CONVENTIONS.md)). **145 ADRs** (ADR-001 → ADR-147 — full index auto-generated in [DECISIONS.md](DECISIONS.md)). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
 
@@ -43,10 +43,10 @@ The life platform is a personal health intelligence system built on AWS. It inge
 │  compute → store → read pattern: runs before Daily Brief    │
 │                                                             │
 │  EMAIL LAYER                                                │
-│  monday-compass (Mon 7am) · daily-brief (10am)              │
-│  wednesday-chronicle (Wed 7am) · weekly-plate (Fri 6pm)     │
-│  weekly-digest (Sun 8am) · monthly-digest (1st Mon 8am)     │
-│  nutrition-review (Sat 9am) · anomaly-detector (8:05am)     │
+│  monday-compass (Mon 8am) · daily-brief (10am)              │
+│  wednesday-chronicle (Wed 8am) · weekly-plate (Fri 7pm)     │
+│  weekly-digest (Sun 9am) · monthly-digest (1st Mon 9am)     │
+│  nutrition-review (Sat 10am) · anomaly-detector (8:05am)    │
 │  freshness-checker (9:45am) · insight-email-parser (S3 trig)│
 │                                                             │
 │  WEB LAYER — v4 "The Measured Life" (ADR-071)              │
@@ -74,7 +74,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | SQS queue | Dead-letter queue | `life-platform-ingestion-dlq` |
 | Lambda Function URL (remote MCP) | Remote MCP HTTPS endpoint | `<not committed — SEC-02 #780; read live: aws lambda get-function-url-config --function-name life-platform-mcp --region us-west-2>` (OAuth 2.1 auto-approve + HMAC Bearer) |
 | API Gateway | HTTP endpoint | `health-auto-export-api` (a76xwxt2wa) — webhook ingest |
-| Secrets Manager | Credential store | **21 active secrets** at $0.40/month each = **~$8.40/month**
+| Secrets Manager | Credential store | **25 active secrets** at $0.40/month each = **~$10.00/month**
 | SNS topic | Alert routing | `life-platform-alerts` (urgent) + `life-platform-alerts-digest` (batched daily by `alert-digest-lambda` per ADR-050) |
 | CloudFront (amj) | CDN (public) | `E3S424OXQZ8NBE` → site-api Lambda + S3 `/site`, alias `averagejoematt.com` |
 | CloudFront (dash) | CDN + auth | `EM5NPX6NJN095` (`d14jnhrgfrte42.cloudfront.net`) → S3 `/dashboard`, Lambda@Edge auth, alias `dash.averagejoematt.com` |
@@ -86,7 +86,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | CloudWatch | Alarms + logs | **~86 metric alarms**. Per-Lambda `ingestion-error-*` first-error alarms are retired across ingestion (2026-05-29), compute + email (#790/ADR-116, 2026-07-07 — 48 alarms) in favour of the shared `life-platform-ingestion-dlq` digest path (`life-platform-ingestion-dlq-messages` + `life-platform-dlq-depth-warning`). |
 | CDK | Infrastructure as Code | `cdk/` — 9 stacks deployed. CDK owns all Lambda IAM roles + ~50 EventBridge rules. Stacks: `core_stack`, `ingestion_stack`, `email_stack`, `compute_stack`, `mcp_stack`, `operational_stack`, `serve_stack` (public serving path: site-api + site-api-ai — #793, split via `cdk refactor` 2026-07-08), `web_stack`, `monitoring_stack`. |
 | CloudTrail | Audit logging | `life-platform-trail` → S3. Data events enabled for `s3://matthew-life-platform/raw/` and `s3://matthew-life-platform/uploads/`. |
-| AWS Budget | Cost guardrail | **$85/mo all-in cap** (ADR-063, raised from $75 + surge-to-$100 rule per ADR-133), alerts at 50%/70%/85%/100%. Enforced via `cost_governor_lambda` (every 8h) → SSM `/life-platform/budget-tier` → `budget_guard.py` gates AI features (1=coaches, 2=website AI, 3=hard cutoff in `bedrock_client.invoke()`). |
+| AWS Budget | Cost guardrail | **$85/mo all-in cap** (ADR-063, raised from $75 + surge-to-$100 rule per ADR-133), alerts at 50%/70%/85%/100%. Enforced via `cost_governor_lambda` (every 8h) → SSM `/life-platform/budget-tier` → `budget_guard.py` gates AI features by AUDIENCE band (ADR-125; ground truth = `_FEATURE_CUTOFF`): 1=internal/dev AI (ensemble, chronicle editor, the coherence/reader-truth/visual QA passes), 2=reader narratives (coach commentary, State of Matthew, chronicle, nudges), 3=hard cutoff — the public ask endpoints and the daily brief's AI, the two surfaces that degrade LAST, enforced in `bedrock_client.invoke()`. |
 | Concurrency quota | Account-level | **100** (raised 2026-05-19 from the account default of 10 — AWS Support case 177921309700709) |
 
 ---
@@ -188,8 +188,9 @@ Later phases (B–E): MCP tools + rules-based recommender, the `/mind/` page, th
 | Source | Lambda | S3 Trigger Path |
 |---|---|---|
 | MacroFactor | `macrofactor-data-ingestion` | `uploads/macrofactor/*.csv` |
-| Apple Health | `apple-health-ingestion` | `imports/apple_health/*.xml` |
 | Insight Email | `insight-email-parser` | `raw/inbound_email/*` ObjectCreated |
+
+> Apple Health's own XML ingestion is **retired** (ADR-103/#474 — the function no longer exists in AWS or in CDK): the Health Auto Export webhook below is the Apple Health path.
 
 ### Webhook ingestion (API Gateway → Lambda)
 
@@ -199,7 +200,9 @@ Later phases (B–E): MCP tools + rules-based recommender, the `/mind/` page, th
 
 ### Failure handling
 
-DLQ coverage: all async Lambdas → `life-platform-ingestion-dlq`. CloudWatch: **~50 alarms** total. Alarm actions → SNS `life-platform-alerts`.
+DLQ coverage: all async Lambdas → `life-platform-ingestion-dlq`. Alarm actions route to SNS `life-platform-alerts`.
+
+CloudWatch carries **~86 metric alarms** (CDK-declared; the count is auto-discovered by `deploy/sync_doc_metadata.py` and the inventory is regenerated into `docs/MONITORING.md`).
 
 Additional safeguards: DLQ Consumer Lambda, Canary Lambda (synthetic health check every 30 min), item size guard.
 
@@ -277,16 +280,20 @@ All 7 modules ship together via the standard `Code.from_asset("../lambdas")` zip
 
 ### Email / Intelligence cadence
 
-| Lambda | Time (PDT) | Purpose |
-|---|---|---|
-| `anomaly-detector` | 9:05 AM daily | 15 metrics, CV-based Z thresholds |
-| `daily-brief` | 11:00 AM daily | 18-section brief, 4 Haiku calls |
-| `monday-compass` | Mon 8:00 AM | Forward-looking planning + Todoist |
-| `wednesday-chronicle` | Wed 8:00 AM | Elena Voss narrative, blog + email |
-| `weekly-plate` | Fri 7:00 PM | Food magazine column |
-| `weekly-digest` | Sun 9:00 AM | 7-day summary, Board commentary |
-| `nutrition-review` | Sat 10:00 AM | Deep Sonnet nutrition analysis |
-| `hypothesis-engine` | Sun 12:00 PM | IC-18 hypothesis generation |
+Schedules are fixed UTC (no DST drift); the PDT column is the UTC-7 rendering. The cron
+column is diffed against `cdk/stacks/*.py` by `scripts/check_doc_facts.py` (#1205), so a
+schedule change that skips this table reds CI.
+
+| Lambda | Schedule (UTC) | Time (PDT) | Purpose |
+|---|---|---|---|
+| `anomaly-detector` | `cron(5 15 * * ? *)` | 8:05 AM daily | 15 metrics, CV-based Z thresholds |
+| `daily-brief` | `cron(0 17 * * ? *)` | 10:00 AM daily | 18-section brief, 4 Haiku calls |
+| `monday-compass` | `cron(0 15 ? * MON *)` | Mon 8:00 AM | Forward-looking planning + Todoist |
+| `wednesday-chronicle` | `cron(0 15 ? * WED *)` | Wed 8:00 AM | Elena Voss narrative, blog + email |
+| `weekly-plate` | `cron(0 2 ? * SAT *)` | Fri 7:00 PM | Food magazine column |
+| `weekly-digest` | `cron(0 16 ? * SUN *)` | Sun 9:00 AM | 7-day summary, Board commentary |
+| `nutrition-review` | `cron(0 17 ? * SAT *)` | Sat 10:00 AM | Deep Sonnet nutrition analysis |
+| `hypothesis-engine` | `cron(0 19 ? * SUN *)` | Sun 12:00 PM | IC-18 hypothesis generation |
 
 ### Coach Intelligence Layer (v6.0.0)
 
@@ -347,13 +354,16 @@ Active role categories (approx counts):
 - **Coach Intelligence roles (8):** DDB read/write on COACH#/ENSEMBLE#/NARRATIVE# partitions, S3 read on config/coaches/*, ai-keys
 - **Operational roles (14+):** scoped per function
 - **Site API role:** DDB primarily read-only (`GetItem, Query`) + limited `PutItem` for interactive features (votes, follows, checkins), `kms:Decrypt`, S3 `site/config/*`, Secrets read (`site-api-ai-key` only) — **NO Scan**
-- No role has `dynamodb:Scan` or cross-account permissions
+- **`dynamodb:Scan` is granted, deliberately, to exactly three operational roles** (`cdk/stacks/role_policies.py`): `life-platform-data-export` and `life-platform-data-reconciliation` (whole-table reads are their job) and `life-platform-delete-user-data` (it must find every item belonging to a user). No serving, ingest, compute or coach role has it. The un-audited fallback branch in `lambda_helpers.py` also lists Scan, but no deployed function reaches it — every function passes either `custom_policies=` or an explicit `role=`.
+- No role has cross-account permissions
 
 ---
 
 ## Secrets Manager
 
-**21 active secrets** at $0.40/month each = **~$8.40/month**
+**25 active secrets** at $0.40/month each = **~$10.00/month**
+
+The count and the table below must agree, and the count's `live-verified` stamp must be under 90 days old — both enforced by `scripts/check_doc_facts.py` (#1957). Re-verify against AWS with `python3 deploy/sync_doc_metadata.py --refresh-secrets` (read-only), then `--apply` to propagate. Per-secret consumers, rotation procedures and the retire ledger live in [SECRETS_MAP.md](SECRETS_MAP.md).
 
 | Secret | Used By |
 |---|---|
@@ -363,15 +373,27 @@ Active role categories (approx counts):
 | `life-platform/garmin` | Garmin Lambda — garth OAuth tokens |
 | `life-platform/eightsleep` | Eight Sleep Lambda — username + password |
 | `life-platform/eightsleep-client` | Eight Sleep Lambda — client credential alongside user creds |
-| `life-platform/ai-keys` | 24 Lambdas — Anthropic API key (main pool) |
-| `life-platform/ingestion-keys` | Notion, Todoist, Habitify, Dropbox, HAE webhook — COST-B bundle (now sole source for Notion + Dropbox after V2 dedicated-secret deletion) |
+| `life-platform/ai-keys` | Legacy direct-API fallback across the intelligence/email Lambdas — Anthropic API key (Bedrock/IAM is the primary path, ADR-062) |
+| `life-platform/ingestion-keys` | Notion, Todoist, Habitify, Dropbox, HAE webhook — COST-B bundle (sole source for Dropbox) |
 | `life-platform/habitify` | Habitify Lambda — dedicated key (ADR-014) |
 | `life-platform/todoist` | MCP write tools — Todoist API token (TD-23, added to MCP IAM 2026-05-02) |
+| `life-platform/notion` | **LIVE** — referenced by `life-platform-freshness-checker` + `pipeline-health-check`; journal ingestion reads the bundle. Retire-candidate, unresolved: see `docs/SECRETS_MAP.md` |
+| `life-platform/hevy` | Hevy ingestion — read API key (ADR-060) |
+| `life-platform/hevy-write` | MCP routine tools — Hevy write key |
 | `life-platform/mcp-api-key` | MCP Key Rotator — bearer token (90-day auto-rotation) |
 | `life-platform/site-api-ai-key` | Site API Lambda — dedicated Anthropic key (R17-04, isolated from main ai-keys) |
-| ~~`life-platform/notion`~~ | **SOFT-DELETED 2026-05-17** (30-day recovery; consumer migrated to `ingestion-keys`) |
-| ~~`life-platform/dropbox`~~ | **SOFT-DELETED 2026-05-17** (30-day recovery; consumer migrated to `ingestion-keys`) |
-| ~~`life-platform/anthropic-api-key`~~ | **SOFT-DELETED 2026-05-16** (orphan, no consumer in source) |
+| `life-platform/site-api-origin-secret` | CloudFront ↔ site-api origin verification header (CDK-injected) |
+| `life-platform/subscriber-token-secret` | Site API — HMAC signing for subscriber tokens |
+| `life-platform/ritual-token-secret` | Site API + `evening-nudge` — HMAC signing for ritual links |
+| `life-platform/github-dispatch-token` | `life-platform-remediation-dispatcher` — repo-scoped PAT |
+| `life-platform/github-billing` | `deploy/sentinel_quota.py` — Actions-minutes quota probe (user-scoped PAT) |
+| `life-platform/google-tts` | Podcast pipeline — TTS credentials (ADR-087) |
+| `life-platform/pexels` | Editorial image fetcher — free-tier API key |
+| `life-platform/youtube` | `youtube-social-ingestion` — owner-provisioned channel id |
+| `life-platform/bluesky` | Syndication — handle + scoped app password (`docs/RUNBOOK_SYNDICATION.md`) |
+| `life-platform/digest` | `milestone-digest` — operator-configured recipient list (kept out of git) |
+| ~~`life-platform/dropbox`~~ | **DELETED** — window closed 2026-05; the `ingestion-keys` bundle is authoritative |
+| ~~`life-platform/anthropic-api-key`~~ | **DELETED** — window closed 2026-05 (orphan, no consumer in source) |
 | ~~`life-platform/webhook-key`~~ | **HARD-DELETED 2026-03-14** |
 | ~~`life-platform/google-calendar`~~ | **HARD-DELETED 2026-03-15 (ADR-030)** |
 | ~~`life-platform/api-keys`~~ | **HARD-DELETED 2026-03-14** |
@@ -380,16 +402,16 @@ Active role categories (approx counts):
 
 ## Cost Profile
 
-Target: within the **$85/mo all-in budget ceiling** (ADR-063; surge-to-$100 per ADR-133) | Current: ~$80/month all-in (tier 1)
+Target: within the **$85/mo all-in budget ceiling** (ADR-063; surge-to-$100 per ADR-133). The canonical spend ledger is [COST_TRACKER.md](COST_TRACKER.md) (~$80/mo projected at its last close); the **live** tier is never stated here — read it from SSM `/life-platform/budget-tier`, which `life-platform-cost-governor` rewrites every 8h.
 
 | Driver | Monthly Cost |
 |---|---|
-| Secrets Manager (21 active secrets) | ~$8.40 |
+| Secrets Manager (25 active secrets) | ~$10.00 |
 | Lambda invocations (~2,000/mo) | ~$0.50 |
 | DynamoDB (on-demand) | ~$1.00 |
 | S3 (~2.5 GB + requests) | ~$0.50 |
 | CloudFront (4 distributions) | ~$1.50 |
-| CloudWatch (~50 alarms + logs) | ~$4-5 |
+| CloudWatch (~86 alarms + logs) | ~$4-5 |
 | Bedrock — Claude Sonnet/Haiku via `bedrock_client.py`, prompt-cached (ADR-062/049); the dominant driver, governed by `cost_governor` tiering | ~$60-65 |
 | **Total** | **~$78-82** |
 
@@ -459,7 +481,7 @@ Target: within the **$85/mo all-in budget ceiling** (ADR-063; surge-to-$100 per 
   docs/                           ← All documentation
   deploy/                         ← ~120 deploy scripts
   cdk/                            ← 9 CDK stacks
-  tests/                          ← 1075+ passing tests, 8 CI linters
+  tests/                          ← the pytest suite (live count: docs/TESTING.md) + 8 CI linters
   handovers/                      ← The live session pointer (HANDOVER_LATEST.md); history on the session-archive branch
 ```
 

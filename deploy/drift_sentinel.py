@@ -609,6 +609,7 @@ PUSH_TRIGGER_GLOBS = (
     ".claude/commands/**",
     "deploy/sync_doc_metadata.py",
     "scripts/check_doc_*.py",
+    "scripts/doc_facts_ops.py",
     "scripts/generate_adr_index.py",
     "scripts/generate_mcp_tool_catalog.py",
     # site-deploy.yml (+ v4-gate.yml shares site/**)

@@ -437,7 +437,15 @@ AI powered down.** Four layers, each with a named owner-mechanism:
      stale count/budget stated in ANY phrasing, not just the exact ones the sync RULES
      target. This is what catches the un-ruled-phrasing class (`**Tools:** 127` drifting
      while the ruled header said 64). Precision-first: a false-positive gate gets disabled,
-     so it is deliberately narrow (forward-only, glue-guarded, ledgers exempt);
+     so it is deliberately narrow (forward-only, glue-guarded, ledgers exempt).
+     `scripts/doc_facts_ops.py` is its **operational-claim** half (#1957 — the classes a
+     number/cron scan structurally cannot see, each ground-truthed by AST/source parse):
+     the budget-tier ladder vs `budget_guard._FEATURE_CUTOFF`, every Lambda named in a
+     doc table vs the CDK `function_name=` set, the alarm inventory, and the secret
+     inventory (stamped count == live table rows · nothing documented as deleted while an
+     IAM role is granted it · the `live-verified` stamp under 90d, refreshed read-only via
+     `python3 deploy/sync_doc_metadata.py --refresh-secrets`). Adding a rule there means
+     adding its planted-violation test in `tests/test_doc_facts_ops_1957.py`;
    - `scripts/check_doc_index.py` — every page is indexed from the wiki home, carries
      the status header, the >90d advisory freshness report, a **blocking 180d ceiling**
      (a canonical page unverified that long fails CI), and the #973 engine-doc

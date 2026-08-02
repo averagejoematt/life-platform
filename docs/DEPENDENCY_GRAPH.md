@@ -1,9 +1,9 @@
 # Life Platform — Dependency Graph
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-02
 
 > Complete dependency map: which Lambdas depend on which DynamoDB partitions, which MCP tools depend on which data, which emails depend on which compute Lambdas.
-> Last updated: 2026-05-19 (v8.0.0 — V2 audit + follow-up)
+> Last updated: 2026-08-02 (#1957 — compute + email cadence tables re-derived from the CDK crons and made machine-checkable)
 
 ---
 
@@ -43,14 +43,18 @@ EXTERNAL APIs → INGESTION LAMBDAS → DDB PARTITIONS → COMPUTE LAMBDAS → C
 
 Runs daily after ingestion completes. **Order matters** — see critical path below.
 
-| Lambda | Schedule (PT) | Reads | Writes |
-|--------|--------------|-------|--------|
-| `anomaly_detector` | 09:05 AM | whoop, strava, apple_health, macrofactor, computed_metrics, withings, garmin, travel | `anomaly_detector` |
-| `daily_metrics_compute` | 10:25 AM | whoop, strava, macrofactor, apple_health, garmin, withings, habitify, notion, food_delivery | `computed_metrics`, `day_grade`, `habit_scores` |
-| `adaptive_mode` | 10:30 AM | notion, `habit_scores`, `day_grade` | `adaptive_mode` |
-| `character_sheet` | 10:35 AM | whoop, strava, macrofactor, apple_health, withings, labs, habitify, notion, state_of_mind, food_delivery, `character_sheet` (prior day) | `character_sheet` |
-| `daily_insight_compute` | 10:20 AM | `computed_metrics`, `habit_scores`, `day_grade`, platform_memory, whoop, garmin, macrofactor, apple_health, withings | `computed_insights`, `platform_memory` |
-| `hypothesis_engine` | Sun 12:00 PM | ALL 9 ingestion sources + `hypotheses` (self) | `hypotheses`, `platform_memory` |
+Rows are keyed by the CDK **function name** and carry the UTC cron, so
+`scripts/check_doc_facts.py` (#1205) diffs this table against `cdk/stacks/*.py` directly.
+PT is the UTC-7 (PDT) rendering; the schedules themselves are fixed UTC.
+
+| Lambda | Schedule (UTC) | Schedule (PT) | Reads | Writes |
+|--------|---------------|--------------|-------|--------|
+| `anomaly-detector` | `cron(5 15 * * ? *)` | 08:05 AM | whoop, strava, apple_health, macrofactor, computed_metrics, withings, garmin, travel | `anomaly_detector` |
+| `character-sheet-compute` | `cron(30 16 * * ? *)` | 09:30 AM | whoop, strava, macrofactor, apple_health, withings, labs, habitify, notion, state_of_mind, food_delivery, `character_sheet` (prior day) | `character_sheet` |
+| `adaptive-mode-compute` | `cron(35 16 * * ? *)` | 09:35 AM | notion, `habit_scores`, `day_grade` | `adaptive_mode` |
+| `daily-metrics-compute` | `cron(40 16 * * ? *)` | 09:40 AM | whoop, strava, macrofactor, apple_health, garmin, withings, habitify, notion, food_delivery | `computed_metrics`, `day_grade`, `habit_scores` |
+| `daily-insight-compute` | `cron(45 16 * * ? *)` | 09:45 AM | `computed_metrics`, `habit_scores`, `day_grade`, platform_memory, whoop, garmin, macrofactor, apple_health, withings | `computed_insights`, `platform_memory` |
+| `hypothesis-engine` | `cron(0 19 ? * SUN *)` | Sun 12:00 PM | ALL 9 ingestion sources + `hypotheses` (self) | `hypotheses`, `platform_memory` |
 
 ### Compute → COACH-V2 hand-off (v51, 2026-05-19; blocking as of N-06, #390, 2026-07-05)
 
@@ -58,22 +62,22 @@ After each COACH-V2 generation, `ai_calls._run_coach_v2_pipeline` invokes `coach
 
 ### Schedule Ordering Note
 
-Historical bug (v4.5.0): `daily_insight_compute` ran at 10:20 AM while reading `computed_metrics` written at 10:25 AM. Schedules in current ARCHITECTURE.md table reflect the canonical order — verify against `cdk/stacks/compute_stack.py` if a stale-data symptom recurs.
+Historical bug (v4.5.0): `daily-insight-compute` ran BEFORE the `computed_metrics` it reads. The live order is now correct and 5 minutes apart at each step — character sheet (09:30) → adaptive mode (09:35) → daily metrics (09:40) → daily insight (09:45) → the 10:00 brief. The crons above are the CDK values; `scripts/check_doc_facts.py` reds CI if they drift from `cdk/stacks/compute_stack.py`.
 
 ---
 
 ## 3. Email/Output Layer (Computed Results → User-Facing Outputs)
 
-| Lambda | Schedule (PT) | Reads (computed) | Reads (raw) | Outputs |
-|--------|--------------|------------------|-------------|---------|
-| `daily_brief` | 11:00 AM daily | computed_metrics, computed_insights, character_sheet, adaptive_mode, anomaly_detector, day_grade, habit_scores | whoop, eightsleep, garmin, strava, macrofactor, apple_health, withings, notion, todoist, state_of_mind, labs, food_delivery, platform_memory | S3: `public_stats.json`, `dashboard.json`, `clinical.json`, `buddy.json` + Email |
-| `wednesday_chronicle` | Wed 8:00 AM | day_grade, habit_scores, character_sheet | whoop, eightsleep, garmin, strava, withings, macrofactor, apple_health, notion | DDB: `chronicle` + Email + S3: blog post (via approve) |
-| `weekly_digest` | Sun 9:00 AM | day_grade, character_sheet, computed_metrics, habit_scores | all raw sources | Email |
-| `monthly_digest` | 1st Mon 9:00 AM | character_sheet, day_grade, habit_scores | all raw sources + labs, dexa | Email |
-| `nutrition_review` | Sat 10:00 AM | — | macrofactor, withings, strava, supplements, labs | Email |
-| `monday_compass` | Mon 8:00 AM | day_grade | Todoist API, notion | Email |
-| `weekly_plate` | Fri 7:00 PM | — | macrofactor, withings, platform_memory | Email |
-| `og_image_generator` | 11:30 AM daily | — | S3: `public_stats.json` | S3: 12 OG images |
+| Lambda | Schedule (UTC) | Schedule (PT) | Reads (computed) | Reads (raw) | Outputs |
+|--------|---------------|--------------|------------------|-------------|---------|
+| `daily-brief` | `cron(0 17 * * ? *)` | 10:00 AM daily | computed_metrics, computed_insights, character_sheet, adaptive_mode, anomaly_detector, day_grade, habit_scores | whoop, eightsleep, garmin, strava, macrofactor, apple_health, withings, notion, todoist, state_of_mind, labs, food_delivery, platform_memory | S3: `public_stats.json`, `dashboard.json`, `clinical.json`, `buddy.json` + Email |
+| `wednesday-chronicle` | `cron(0 15 ? * WED *)` | Wed 8:00 AM | day_grade, habit_scores, character_sheet | whoop, eightsleep, garmin, strava, withings, macrofactor, apple_health, notion | DDB: `chronicle` + Email + S3: blog post (via approve) |
+| `weekly-digest` | `cron(0 16 ? * SUN *)` | Sun 9:00 AM | day_grade, character_sheet, computed_metrics, habit_scores | all raw sources | Email |
+| `monthly-digest` | `cron(0 16 ? * 1#1 *)` | 1st Mon 9:00 AM | character_sheet, day_grade, habit_scores | all raw sources + labs, dexa | Email |
+| `nutrition-review` | `cron(0 17 ? * SAT *)` | Sat 10:00 AM | — | macrofactor, withings, strava, supplements, labs | Email |
+| `monday-compass` | `cron(0 15 ? * MON *)` | Mon 8:00 AM | day_grade | Todoist API, notion | Email |
+| `weekly-plate` | `cron(0 2 ? * SAT *)` | Fri 7:00 PM | — | macrofactor, withings, platform_memory | Email |
+| `og-image-generator` | `cron(30 19 * * ? *)` | 12:30 PM daily | — | S3: `public_stats.json` | S3: 12 OG images |
 
 ---
 

@@ -21,6 +21,11 @@ THE FIX
   tolerance and honor "~"/"+" approximation markers, hard counts (registry-exact) use
   zero tolerance, and any line that frames a number as history is exempt.
 
+  #1957 widened the class beyond numbers and crons: `scripts/doc_facts_ops.py` adds the
+  OPERATIONAL claims an incident responder reads — the budget-tier ladder, the Lambda
+  names in doc tables, the alarm inventory, the secret inventory + its verification
+  freshness — each ground-truthed from the same AST/source parse the platform runs on.
+
 EXEMPTING A LINE
   Put the number in a clearly historical frame ("was 75", "raised 75->85", "as of
   2026-05", "formerly"), or add an inline `<!-- drift-ok: reason -->` (any comment
@@ -38,6 +43,19 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def _load_ops():
+    """The #1957 operational-claim checks (scripts/doc_facts_ops.py).
+
+    Loaded by path, the same way this file loads sync_doc_metadata: this script is run as
+    `python3 scripts/check_doc_facts.py` AND loaded by spec in tests, so `scripts/` is not
+    reliably importable as a package.
+    """
+    spec = importlib.util.spec_from_file_location("_docfactsops", ROOT / "scripts" / "doc_facts_ops.py")
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
 
 
 # ── ground truth (imported from the sync tool's discoverers — ONE source) ──────
@@ -149,6 +167,28 @@ HISTORICAL = re.compile(
     re.I,
 )
 APPROX = ("~", "≈", "+", "about ", "around ", "roughly ")
+
+
+def line_is_exempt(line: str) -> bool:
+    """The ONE exemption predicate — historical framing or an inline `drift-ok` marker.
+
+    Passed into the #1957 operational checks (scripts/doc_facts_ops.py) so both halves of
+    the gate share one definition of "this line is allowed to say that".
+    """
+    return bool(HISTORICAL.search(line))
+
+
+def marker_is_exempt(line: str) -> bool:
+    """The NARROW exemption: an explicit `drift-ok` marker only.
+
+    Used for the budget-tier ladder (#1957). A tier mapping is a discrete operational
+    claim, not a count, so the usual historical wording must NOT excuse it — the drifted
+    line that motivated this ("1=coaches, 2=website AI") escaped the wide predicate purely
+    because the same table cell also said "raised from $75". A doc that deliberately
+    quotes the pre-ADR-125 ladder says so with `<!-- drift-ok: pre-ADR-125 ladder -->`.
+    """
+    return "drift-ok" in line
+
 
 # Same skip surface as the tombstone scanner + the cost ledger.
 EXEMPT_FILES = {
@@ -832,6 +872,25 @@ def main():
         print("error: could not discover SOURCE_REGISTRY count for the og-card scan", file=sys.stderr)
         sys.exit(2)
     hits += _og_source_hits(_scan_og_files(), registry_n)
+
+    # #1957: the operational-claim half of the gate — the four classes the #1205 cron
+    # scan structurally cannot see (tier semantics, doc-named Lambdas, alarm inventory,
+    # secret inventory). Ground truth is AST/source-derived in doc_facts_ops.py.
+    ops = _load_ops()
+    docs = _scan_files()
+    cutoffs = ops.budget_tier_cutoffs()
+    if not cutoffs:
+        print("error: could not AST-read _FEATURE_CUTOFF from lambdas/ai/budget_guard.py", file=sys.stderr)
+        sys.exit(2)
+    cdk_names = ops.cdk_function_names()
+    if len(cdk_names) < 30:  # same sanity floor as _auto_discover_lambda_count
+        print("error: could not discover the CDK Lambda name set for the doc-table scan", file=sys.stderr)
+        sys.exit(2)
+    hits += ops.tier_semantics_hits(docs, cutoffs, marker_is_exempt)
+    hits += ops.lambda_name_hits(docs, cdk_names, line_is_exempt)
+    hits += ops.alarm_count_hits(docs, truth["alarm_count"], line_is_exempt)
+    secret_count, secret_verified = ops.stamped_secret_fact()
+    hits += ops.secret_inventory_hits(ops.ARCHITECTURE_PATH, secret_count, secret_verified, ops.cdk_granted_secrets())
 
     # #1351: DATA_GOVERNANCE.md-specific fact checks (repo visibility, deletion-lambda
     # status, Verified-header freshness).
