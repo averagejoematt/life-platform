@@ -1,0 +1,15 @@
+{
+  "_comment": "Curated alarm-name -> citation registry read by scripts/check_alarm_citations.py (#1959). Every CloudWatch alarm that has been in ALARM >72h must have an entry here (exact AlarmName key) naming the incident row or issue that explains it, or the /wrap gate flags it by name. Add an entry the same session a new long-red alarm is triaged; remove/replace one once the underlying issue closes AND the alarm has actually cleared live.",
+  "qa-paused-by-budget": {
+    "citation": "#1927",
+    "note": "budget-tier cutoff-1 band (incl. qa-paused-by-budget's own AI gates) was off 26 of the last 30 days; fires whenever a qa-smoke run overlaps a paused feature. Red continuously since 2026-07-18."
+  },
+  "qa-smoke-warnings": {
+    "citation": "#1958 (closed 2026-08-02)",
+    "note": "WarnCount's honest daily floor is 4-11 against a >=1 threshold, so red carried no information (15 consecutive red nights). Reclassification fix merged 2026-08-02 but not yet deployed live as of this filing — the alarm clears once the deploy ships (cdk_deploy.sh / deploy_all)."
+  },
+  "ingest-auth-unhealthy-24h": {
+    "citation": "#1934",
+    "note": "Whoop OAuth 401, auth breaker latched since 2026-08-01 12:00Z. Needs Matthew's interactive re-auth (setup/setup_whoop_auth.py --backfill) — gate:owner, cannot be automated."
+  }
+}
