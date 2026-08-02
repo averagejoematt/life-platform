@@ -17,14 +17,22 @@ tests/visual_qa.py pass, not only here at reset time — this script's own
 behavior is unchanged (full FORBIDDEN_TOKENS list, same --old-genesis waiver
 logic, same report).
 
+Also asserts (#1952) that GET /api/predict_week is active:true once the genesis
+week begins — pre-genesis (countdown) dark is correct; see
+check_predict_week_live().
+
 Exit code 0 if all checks pass; 1 otherwise.
 
 Usage:
     python3 deploy/restart_verify_rendered.py [--old-genesis YYYY-MM-DD]
 """
 import argparse
+import json
 import sys
+import urllib.request
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
@@ -49,6 +57,28 @@ from leak_token_sweep import (  # noqa: E402
 from qa_manifest import leak_scan_paths  # noqa: E402
 
 PAGES = leak_scan_paths()
+
+
+def check_predict_week_live() -> tuple:
+    """#1952 — the predict-the-week hook, checked alongside the page sweep.
+
+    Once the genesis week begins, GET /api/predict_week must return active:true:
+    the cycle-11 seed carried the wall-clock (pre-genesis) week_id and the #1198
+    fail-closed guard correctly hid the flagship engagement hook for the whole
+    opening week — a state every prior reset verification blessed. Pre-genesis
+    (the countdown, #931) dark is correct; after the genesis week, weekly
+    re-seeding is outside the reset verifier. Returns (ok, detail).
+    """
+    sys.path.insert(0, str(REPO_ROOT / "deploy"))
+    from build_genesis_predict_week import evaluate_predict_week_state
+
+    try:
+        with urllib.request.urlopen(f"{BASE}/api/predict_week?cb=verify", timeout=15) as r:
+            active = bool(json.loads(r.read()).get("active"))
+    except Exception:
+        active = None
+    today_pt = datetime.now(ZoneInfo("America/Los_Angeles")).date()
+    return evaluate_predict_week_state(EXPERIMENT_START_DATE, today_pt, active)
 
 
 def main():
@@ -103,6 +133,10 @@ def main():
             else:
                 print(f"  ✓ {path}")
 
+    # #1952 — predict-the-week liveness, alongside the page sweep.
+    predict_ok, predict_detail = check_predict_week_live()
+    print(f"\n  {'✓' if predict_ok else '✗'} /api/predict_week — {predict_detail}")
+
     print("\n══ summary ══")
     checked_pages = total_pages - unreachable_pages
     print(f"  {checked_pages - failed_pages}/{checked_pages} checked pages clean; {unreachable_pages} NOT checked (unreachable)")
@@ -114,6 +148,7 @@ def main():
     lines.append(
         f"checked {checked_pages} of {total_pages} URLs ({unreachable_pages} unreachable, NOT checked), {failed_pages} with forbidden tokens"
     )
+    lines.append(f"predict_week (#1952): {'PASS' if predict_ok else 'FAIL'} — {predict_detail}")
     for url, hits in all_hits:
         lines.append(f"\n{url}")
         for label, samples in hits:
@@ -121,7 +156,7 @@ def main():
     report.write_text("\n".join(lines))
     print(f"Report: {report.relative_to(REPO_ROOT)}")
 
-    if failed_pages > 0:
+    if failed_pages > 0 or not predict_ok:
         sys.exit(1)
     # Coverage-collapse guard (#1931): this is the reset-time verification —
     # if a quarter of the surface was never read, a clean tally is a verdict

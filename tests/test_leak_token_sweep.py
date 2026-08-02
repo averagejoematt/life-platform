@@ -326,9 +326,12 @@ def test_run_leak_token_sweep_real_leak_still_fails_alongside_unreachable(monkey
     assert result["issues"] == ['/api/journey — [Tombstone leak] "tombstone": true']
 
 
-def _run_restart_verify_main(monkeypatch, tmp_path, sweep_results):
+def _run_restart_verify_main(monkeypatch, tmp_path, sweep_results, predict=(True, "stubbed live")):
     rv = _load("deploy/restart_verify_rendered.py", "rv_1931")
     monkeypatch.setattr(rv, "_leak_sweep", lambda *a, **k: sweep_results)
+    # #1952: the predict-week liveness probe is a real HTTP fetch — stub it so
+    # these tests stay offline and pin its exit-code contribution explicitly.
+    monkeypatch.setattr(rv, "check_predict_week_live", lambda: predict)
     monkeypatch.setattr(rv, "REPO_ROOT", tmp_path)
     monkeypatch.setattr(sys, "argv", ["restart_verify_rendered.py"])
     try:
@@ -362,6 +365,15 @@ def test_restart_verify_coverage_collapse_fails(monkeypatch, tmp_path):
 def test_restart_verify_token_hit_still_fails(monkeypatch, tmp_path):
     results = [_rv_result("/dirty/", hits=[("Tombstone leak", ['"tombstone": true'])])]
     assert _run_restart_verify_main(monkeypatch, tmp_path, results) == 1
+
+
+def test_restart_verify_predict_week_dark_in_genesis_week_fails(monkeypatch, tmp_path):
+    """#1952: a clean page sweep must NOT bless a reset whose opening-week
+    predict-the-week hook is dark — the exact cycle-11 state every prior
+    verification greenlit."""
+    results = [_rv_result(f"/p{i}/") for i in range(4)]
+    dark = (False, "genesis week 2026-W31 but /api/predict_week is dark (active:false) — the opening-week hook is hidden (#1952)")
+    assert _run_restart_verify_main(monkeypatch, tmp_path, results, predict=dark) == 1
 
 
 def test_every_sweep_caller_handles_unreachable():

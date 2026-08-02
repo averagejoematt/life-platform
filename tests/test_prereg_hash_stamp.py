@@ -27,7 +27,6 @@ import re
 import sys
 from datetime import date, datetime, timezone
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -272,8 +271,7 @@ def test_page_without_stamp_carries_no_seal():
 def test_predict_week_derives_from_frozen_hypothesis_specs():
     frozen = _fixture_frozen()
     stamp = _fixture_stamp(frozen)
-    now = datetime(2026, 7, 19, 12, 0, tzinfo=ZoneInfo("America/Los_Angeles"))
-    ch = predict_builder.build_challenge(frozen, stamp, now=now)
+    ch = predict_builder.build_challenge(frozen, stamp)
     keys = [m["key"] for m in ch["predict_metrics"]]
     # h1 lever (calories @ plan kcal) + h2 lever (steps @ 6000) — weight excluded
     assert keys == ["calories", "steps"]
@@ -289,13 +287,17 @@ def test_predict_week_derives_from_frozen_hypothesis_specs():
     assert not _CYCLE_LANGUAGE.findall(ch["title"] + " " + labels)
 
 
-def test_predict_week_id_is_current_pacific_iso_week():
-    """#1198 parity: _predict_subject fails closed unless week_id == the current PT ISO week."""
+def test_predict_week_id_is_the_genesis_iso_week():
+    """#1952: week_id is the ISO week containing Day 1 — never the run-time week.
+
+    (#1198 parity: _predict_subject fails closed unless week_id == the current PT
+    ISO week, so the genesis-week stamp is exactly what makes the challenge go
+    live when the genesis week begins — a Sunday prep run must not shift it.)
+    """
     frozen = _fixture_frozen()
     stamp = _fixture_stamp(frozen)
-    now = datetime(2026, 7, 19, 23, 30, tzinfo=ZoneInfo("America/Los_Angeles"))  # Sunday PT → 2026-W29
-    ch = predict_builder.build_challenge(frozen, stamp, now=now)
-    iso = now.isocalendar()
+    ch = predict_builder.build_challenge(frozen, stamp)
+    iso = date.fromisoformat(frozen["genesis"]).isocalendar()
     assert ch["week_id"] == f"{iso[0]}-W{iso[1]:02d}"
     # and the shape _predict_subject parses: lowercase non-empty keys, labels present
     mmap = {(m.get("key") or "").strip().lower(): m.get("label") for m in ch["predict_metrics"]}

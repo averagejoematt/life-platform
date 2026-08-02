@@ -1168,7 +1168,8 @@ def main():
     print("                                                                 #   (the seeder stamps at freeze time; this uploads the copy)")
     print("  •  GENESIS-EVE engagement, attended (#1378):")
     print(
-        "     python3 deploy/build_genesis_predict_week.py --apply        # predict-the-week vs the FROZEN targets (week_id = upload week)"
+        "     python3 deploy/build_genesis_predict_week.py --apply        # predict-the-week vs the FROZEN targets (week_id = the GENESIS"
+        " ISO week, #1952 — safe to run before the week starts)"
     )
     print(
         '     python3 deploy/send_prereg_lock_email.py --apply            # the one "predictions lock tonight" email (eve-only; refuses late)'
