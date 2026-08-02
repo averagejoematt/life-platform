@@ -167,8 +167,9 @@ def test_sweep_reports_unparseable_payload_as_warning():
 
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
-import qa_smoke_lambda  # noqa: E402
+import qa_smoke_lambda  # noqa: F401,E402  (imported for its module-level env/AWS setup)
 from ai import budget_guard  # noqa: E402
+from operational import qa_check_reader_truth  # noqa: E402  (#1665: check_reader_truth's real home)
 
 _API_SURFACES = [
     {"name": "API · vitals", "path": "/api/vitals", "prose": '{"weight_delta_30d": -4.1}'},
@@ -183,9 +184,9 @@ def test_qa_smoke_deterministic_runs_even_when_budget_paused(monkeypatch):
 
     monkeypatch.setattr(budget_guard, "current_tier", lambda: 2)
     monkeypatch.setattr(budget_guard, "allow", lambda feature: False)
-    monkeypatch.setattr(qa_smoke_lambda, "_fetch_reader_truth_surfaces", lambda: (_API_SURFACES, []))
+    monkeypatch.setattr(qa_check_reader_truth, "_fetch_reader_truth_surfaces", lambda: (_API_SURFACES, []))
     monkeypatch.setattr(bedrock_client, "invoke", must_not_call)
-    checks = qa_smoke_lambda.check_reader_truth()
+    checks = qa_check_reader_truth.check_reader_truth()
     names = [c.name for c in checks]
     assert "reader_truth:plausibility" in names, "the deterministic pass must run under a budget pause (#1922)"
     assert any(c.paused for c in checks), "the LLM half still pauses explicitly"
@@ -194,13 +195,13 @@ def test_qa_smoke_deterministic_runs_even_when_budget_paused(monkeypatch):
 def test_qa_smoke_deterministic_finding_fails_reader_truth(monkeypatch):
     monkeypatch.setattr(budget_guard, "current_tier", lambda: 3)
     monkeypatch.setattr(budget_guard, "allow", lambda feature: False)
-    monkeypatch.setattr(qa_smoke_lambda, "_fetch_reader_truth_surfaces", lambda: (_API_SURFACES, []))
+    monkeypatch.setattr(qa_check_reader_truth, "_fetch_reader_truth_surfaces", lambda: (_API_SURFACES, []))
     import re
 
     from operational import reader_truth_qa
 
     day_n = reader_truth_qa.phase_context()["day_n"]
-    checks = qa_smoke_lambda.check_reader_truth()
+    checks = qa_check_reader_truth.check_reader_truth()
     det = [c for c in checks if c.name == "reader_truth:plausibility"]
     assert det, "deterministic check missing"
     if 1 <= day_n < 30:

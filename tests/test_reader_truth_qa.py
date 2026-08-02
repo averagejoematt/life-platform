@@ -320,21 +320,22 @@ def test_harness_budget_skip_returns_explicit_status_and_emits_metric(tmp_path, 
 
 # ── nightly qa_smoke check (#1096) ────────────────────────────────────────────
 
-import qa_smoke_lambda  # noqa: E402
+import qa_smoke_lambda  # noqa: F401,E402  (imported for its module-level env/AWS setup)
 from ai import bedrock_client  # noqa: E402
+from operational import qa_check_reader_truth  # noqa: E402  (#1665: check_reader_truth's real home)
 
 
 def _patch_smoke(monkeypatch, payload=None, tier=0, surfaces=None, fetch_warnings=None, invoke=None):
     monkeypatch.setattr(budget_guard, "current_tier", lambda: tier)
     monkeypatch.setattr(
-        qa_smoke_lambda, "_fetch_reader_truth_surfaces", lambda: (surfaces if surfaces is not None else _PAGES, fetch_warnings or [])
+        qa_check_reader_truth, "_fetch_reader_truth_surfaces", lambda: (surfaces if surfaces is not None else _PAGES, fetch_warnings or [])
     )
     monkeypatch.setattr(bedrock_client, "invoke", invoke or _fake_invoke(payload if payload is not None else _CLEAN_VERDICT))
 
 
 def test_qa_smoke_high_finding_fails_the_check(monkeypatch):
     _patch_smoke(monkeypatch, payload=_HIGH_VERDICT)
-    checks = qa_smoke_lambda.check_reader_truth()
+    checks = qa_check_reader_truth.check_reader_truth()
     fails = [c for c in checks if c.passed is False]
     assert len(fails) == 1
     assert fails[0].category == "Reader Truth"
@@ -343,7 +344,7 @@ def test_qa_smoke_high_finding_fails_the_check(monkeypatch):
 
 def test_qa_smoke_clean_run_is_ok(monkeypatch):
     _patch_smoke(monkeypatch, payload=_CLEAN_VERDICT)
-    checks = qa_smoke_lambda.check_reader_truth()
+    checks = qa_check_reader_truth.check_reader_truth()
     # #1922: the deterministic plausibility pass reports first (a warn here —
     # this fixture has no /api/ surfaces for it to check); the LLM verdict follows.
     assert not any(c.passed is False for c in checks)
@@ -355,7 +356,7 @@ def test_qa_smoke_clean_run_is_ok(monkeypatch):
 def test_qa_smoke_low_med_findings_warn_not_fail(monkeypatch):
     low = {"findings": [{"page": "/", "category": "duplicated_narrative", "severity": "low", "note": "same paragraph twice"}]}
     _patch_smoke(monkeypatch, payload=low)
-    checks = qa_smoke_lambda.check_reader_truth()
+    checks = qa_check_reader_truth.check_reader_truth()
     assert not any(c.passed is False for c in checks)
     assert any(c.passed is None and "duplicated_narrative" in c.message for c in checks)
 
@@ -365,7 +366,7 @@ def test_qa_smoke_bedrock_error_never_reds_the_nightly(monkeypatch):
         raise RuntimeError("ServiceUnavailableException: Bedrock down")
 
     _patch_smoke(monkeypatch, invoke=boom)
-    checks = qa_smoke_lambda.check_reader_truth()
+    checks = qa_check_reader_truth.check_reader_truth()
     assert not any(c.passed is False for c in checks), "a Bedrock outage must NOT red the nightly"
     assert any(c.passed is None and "fail-soft" in c.message for c in checks)
 
@@ -376,7 +377,7 @@ def test_qa_smoke_budget_tier_pauses_explicitly(monkeypatch):
 
     for tier in (1, 2, 3):
         _patch_smoke(monkeypatch, tier=tier, invoke=must_not_call)
-        checks = qa_smoke_lambda.check_reader_truth()
+        checks = qa_check_reader_truth.check_reader_truth()
         # #1922: the deterministic pass STILL runs under a pause — only the LLM half skips.
         paused = [c for c in checks if c.paused]
         assert len(paused) == 1
@@ -400,7 +401,7 @@ def test_qa_smoke_budget_tier_pause_emits_qa_paused_metric(monkeypatch):
 
     cw = _patch_cw(monkeypatch)
     _patch_smoke(monkeypatch, tier=2, invoke=must_not_call)
-    checks = qa_smoke_lambda.check_reader_truth()
+    checks = qa_check_reader_truth.check_reader_truth()
 
     assert any(c.paused for c in checks)  # #1922: deterministic check accompanies the pause
     assert cw.calls, "a budget-tier pause must emit a CloudWatch metric (#1440)"
@@ -412,7 +413,7 @@ def test_qa_smoke_budget_tier_pause_emits_qa_paused_metric(monkeypatch):
 
 def test_qa_smoke_fetch_failures_warn_softly(monkeypatch):
     _patch_smoke(monkeypatch, payload=_CLEAN_VERDICT, fetch_warnings=["Home (/) — fetch failed: boom"])
-    checks = qa_smoke_lambda.check_reader_truth()
+    checks = qa_check_reader_truth.check_reader_truth()
     assert any(c.passed is None and "fetch failed" in c.message for c in checks)
     assert any(c.passed is True for c in checks)  # the surviving surfaces still got judged
 
@@ -422,7 +423,7 @@ def test_qa_smoke_no_surfaces_skips_softly(monkeypatch):
         raise AssertionError("no surfaces — Bedrock must not be called")
 
     _patch_smoke(monkeypatch, surfaces=[], fetch_warnings=["all fetches failed"], invoke=must_not_call)
-    checks = qa_smoke_lambda.check_reader_truth()
+    checks = qa_check_reader_truth.check_reader_truth()
     assert not any(c.passed is False for c in checks)
     assert any("skipped this run" in c.message for c in checks)
 
