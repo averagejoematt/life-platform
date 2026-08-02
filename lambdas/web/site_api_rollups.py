@@ -274,13 +274,26 @@ def observatory_week(qs: dict = None, *, _g) -> dict:
     _anchor = datetime.strptime(anchor, "%Y-%m-%d").replace(tzinfo=timezone.utc)
     end_date = anchor
     start_date = max((_anchor - timedelta(days=7)).strftime("%Y-%m-%d"), EXPERIMENT_START)
-    prev_start = max((_anchor - timedelta(days=14)).strftime("%Y-%m-%d"), EXPERIMENT_START)
-    prev_end = max((_anchor - timedelta(days=8)).strftime("%Y-%m-%d"), EXPERIMENT_START)
+    # #1977 (ADR-104): "last week" must be a real prior window INSIDE the cycle. The old
+    # max(..., EXPERIMENT_START) clamp mapped a fully-pre-genesis prev window onto
+    # [genesis, genesis] — inside the current week — so week 1 of every cycle compared
+    # the week to itself ("declined 0.0h vs last week"). If the raw prev window ends
+    # before genesis there IS no prior week: prev_* go None, the branches below skip
+    # the prev query entirely, and the honest "no prior week yet" branch engages.
+    # A partially-pre-genesis prev window still clamps its START to genesis (a real,
+    # shorter prior window); whenever prev_end exists it is anchor-8d < start_date,
+    # so the prev window can never intersect [start_date, end_date].
+    _prev_end_raw = (_anchor - timedelta(days=8)).strftime("%Y-%m-%d")
+    if _prev_end_raw < EXPERIMENT_START:
+        prev_start = prev_end = None  # no completed prior day-range in this cycle
+    else:
+        prev_start = max((_anchor - timedelta(days=14)).strftime("%Y-%m-%d"), EXPERIMENT_START)
+        prev_end = _prev_end_raw
 
     try:
         if domain == "sleep":
             items = _query_source("whoop", start_date, end_date, include_pilot=ip)
-            prev_items = _query_source("whoop", prev_start, prev_end, include_pilot=ip)
+            prev_items = _query_source("whoop", prev_start, prev_end, include_pilot=ip) if prev_end else []
 
             durations = [float(i.get("sleep_duration_hours", 0)) for i in items if i.get("sleep_duration_hours")]
             prev_durations = [float(i.get("sleep_duration_hours", 0)) for i in prev_items if i.get("sleep_duration_hours")]
@@ -297,18 +310,20 @@ def observatory_week(qs: dict = None, *, _g) -> dict:
             ]
             best_eff = max(eff_vals) if eff_vals else None
 
-            # ADR-104 (#948): a week-over-week claim needs BOTH weeks. In week 1 of a
-            # cycle the prior window clamps to genesis and stays empty — "vs 0 last
-            # week" would be a fabricated comparison, so the delta goes null instead.
+            # ADR-104 (#948/#1977): a week-over-week claim needs BOTH weeks. In week 1
+            # of a cycle there is no prior window (prev_items comes back [] above —
+            # the window is never manufactured by clamping), so the delta goes null.
+            # Trend follows the DISPLAYED (rounded) delta: a tie is 'flat', never 'down'.
             _has_wow = bool(durations and prev_durations)
+            _delta = round(avg_dur - prev_avg, 1) if _has_wow else None
             summary = {
                 "primary": {
                     "label": "Average Duration",
                     "value": round(avg_dur, 1) if durations else None,
                     "unit": "hrs",
-                    "delta": round(avg_dur - prev_avg, 1) if _has_wow else None,
+                    "delta": _delta,
                     "delta_label": f"vs {round(prev_avg, 1)} last week" if _has_wow else "",
-                    "trend": ("up" if avg_dur > prev_avg else "down") if _has_wow else "flat",
+                    "trend": ("up" if _delta > 0 else "down" if _delta < 0 else "flat") if _has_wow else "flat",
                     "sparkline": [round(d, 1) for d in durations],
                 },
                 "highlight": {
@@ -331,8 +346,10 @@ def observatory_week(qs: dict = None, *, _g) -> dict:
                 },
                 "best_efficiency": round(best_eff) if best_eff else None,
             }
-            if _has_wow:
-                notable = f"Avg sleep {'improved' if avg_dur > prev_avg else 'declined'} {abs(round(avg_dur - prev_avg, 1))}h vs last week"
+            if _has_wow and _delta:
+                notable = f"Avg sleep {'improved' if _delta > 0 else 'declined'} {abs(_delta)}h vs last week"
+            elif _has_wow:
+                notable = f"Avg sleep held steady at {round(avg_dur, 1)}h vs last week"
             elif durations:
                 notable = f"Avg sleep {round(avg_dur, 1)}h this week (no completed prior week in this cycle to compare)"
             else:
@@ -340,7 +357,7 @@ def observatory_week(qs: dict = None, *, _g) -> dict:
 
         elif domain == "nutrition":
             items = _query_source("macrofactor", start_date, end_date, include_pilot=ip)
-            prev_items = _query_source("macrofactor", prev_start, prev_end, include_pilot=ip)
+            prev_items = _query_source("macrofactor", prev_start, prev_end, include_pilot=ip) if prev_end else []
 
             cals = [
                 float(i.get("total_calories_kcal") or i.get("calories") or 0)
@@ -367,17 +384,18 @@ def observatory_week(qs: dict = None, *, _g) -> dict:
                 _complete_days = max(1, (datetime.strptime(end_date, "%Y-%m-%d") - datetime.strptime(start_date, "%Y-%m-%d")).days)
             except Exception:
                 _complete_days = 6
-            # ADR-104 (#948): same week-over-week rule as sleep — no prior-week data,
-            # no comparison claim (week 1 of a cycle must not read "vs 0 last week").
+            # ADR-104 (#948/#1977): same week-over-week rule as sleep — no prior week in
+            # the cycle, no comparison claim; a tied (rounded) delta is 'flat', not 'down'.
             _has_wow = bool(cals and prev_cals)
+            _delta = round(avg_cal - prev_avg_cal) if _has_wow else None
             summary = {
                 "primary": {
                     "label": "Avg Calories",
                     "value": round(avg_cal) if cals else None,
                     "unit": "kcal",
-                    "delta": round(avg_cal - prev_avg_cal) if _has_wow else None,
+                    "delta": _delta,
                     "delta_label": f"vs {round(prev_avg_cal)} last week" if _has_wow else "",
-                    "trend": ("up" if avg_cal > prev_avg_cal else "down") if _has_wow else "flat",
+                    "trend": ("up" if _delta > 0 else "down" if _delta < 0 else "flat") if _has_wow else "flat",
                     "sparkline": [round(c) for c in cals],
                 },
                 "highlight": {"label": "Avg Protein", "value": f"{round(avg_protein)}g/day", "detail": ""},
@@ -472,13 +490,15 @@ def observatory_week(qs: dict = None, *, _g) -> dict:
                         "unit": "lbs",
                         "delta": delta,
                         "delta_label": f"{delta:+.1f} lbs this week",
-                        "trend": "down" if delta < 0 else "up",
+                        "trend": "down" if delta < 0 else "up" if delta > 0 else "flat",  # #1977: a tie is never a direction
                         "sparkline": [round(w) for w in weights],
                     },
                     "highlight": {"label": "Weigh-ins", "value": str(len(weights)), "detail": "this week"},
                     "lowlight": {"label": "Current", "value": f"{round(end_w)} lbs", "detail": ""},
                 }
-                notable = f"Weight {'dropped' if delta < 0 else 'gained'} {abs(delta)} lbs this week"
+                notable = (
+                    f"Weight {'dropped' if delta < 0 else 'gained'} {abs(delta)} lbs this week" if delta else "Weight held steady this week"
+                )
             else:
                 summary = {
                     "primary": {
