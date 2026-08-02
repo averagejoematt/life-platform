@@ -53,37 +53,6 @@ export function renderSurvival(d) {
     `<p class="correlative">${esc(d.note || "")} <span class="confidence conf-low">${esc(d.confidence || "")}</span></p>`;
 }
 
-// The mirror — visitor's numbers vs the experiment's distributions. Pure
-// client-side: nothing is sent, stored, or logged.
-export function renderMirror(d) {
-  const hist = (d && d.pulse_history) || [];
-  const series = (k) => hist.map((h) => h[k]).filter((v) => typeof v === "number");
-  const DIMS = [
-    ["sleep_hours", "Sleep last night (hours)", "h", 0.1],
-    ["steps", "Steps yesterday", "", 100],
-    ["recovery_pct", "Recovery this morning (%)", "%", 1],
-  ];
-  const inputs = DIMS.map(([k, label, , step]) => {
-    const s_ = series(k);
-    return `<div class="mi-row"><label class="label" for="mi-${k}">${esc(label)}</label>` +
-      `<input id="mi-${k}" class="ask-in mi-in" type="number" step="${step}" data-mi="${k}" ${s_.length ? "" : "disabled"}>` +
-      `<span class="mi-out" data-mi-out="${k}">${s_.length ? "" : "no data yet"}</span></div>`;
-  }).join("");
-  setTimeout(() => {
-    document.querySelectorAll(".mi-in").forEach((inp) => inp.addEventListener("input", () => {
-      const k = inp.dataset.mi, v = parseFloat(inp.value);
-      const out = document.querySelector(`[data-mi-out="${k}"]`);
-      const s_ = series(k);
-      if (!out || !s_.length || !isFinite(v)) { if (out) out.textContent = ""; return; }
-      const pct = Math.round(s_.filter((x) => x < v).length / s_.length * 100);
-      out.textContent = `beats ${pct}% of Matthew's last ${s_.length} days`;
-    }));
-  }, 0);
-  return `<p class="rd-lede">Where would your day sit inside this experiment? Type a number — the comparison runs in your browser against the last ${fmt(hist.length)} days of the record. Nothing you type is sent, stored, or seen.</p>` +
-    sec("Your numbers vs the record", `<div class="mi-grid">${inputs}</div>`) +
-    `<p class="correlative">A mirror, not a benchmark — this is one person's distribution, N=1. For population reference ranges, see Benchmarks.</p>`;
-}
-
 // Scenario explorer (#550) — pick a kind of day, see the distribution of what
 // historically FOLLOWED similar days. The anti-causal framing is the feature:
 // what followed, never what it causes. All math is precomputed nightly

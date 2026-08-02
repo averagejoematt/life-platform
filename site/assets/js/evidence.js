@@ -20,7 +20,7 @@ import { wireCharacter, renderCharacter, renderBadges } from "/assets/js/evidenc
 import { wireDataFigure, moveTrendMarker } from "/assets/js/evidence_datafigure.js";
 import { renderDiscoveries, renderGenome, renderChallenges, renderProtocols, renderExperiments, wireChallenges, wireExperiments, wireDiscoveries } from "/assets/js/evidence_discovery.js";
 import { renderHabits, renderLedger } from "/assets/js/evidence_habits.js";
-import { renderResults, renderPostmortems, renderSurvival, renderMirror, renderScenarios, renderWrong, renderCycles, renderCorrelations, renderCalibration, renderPredictions, renderBenchmarks } from "/assets/js/evidence_intelligence.js";
+import { renderResults, renderPostmortems, renderSurvival, renderScenarios, renderWrong, renderCycles, renderCorrelations, renderCalibration, renderPredictions, renderBenchmarks } from "/assets/js/evidence_intelligence.js";
 import { renderBoard, renderPlatform, renderCost, renderData, renderTools, renderInference, renderReceipts, renderPipeline, renderAsk, renderExplorer, renderVerify, renderGeneric, ASK_CHIPS } from "/assets/js/evidence_meta.js";
 import { renderNutrition, renderGlucose } from "/assets/js/evidence_nutrition.js";
 import { renderReading } from "/assets/js/evidence_reading.js";
@@ -65,7 +65,7 @@ const DOORTITLE = window.__ARCHIVE_TITLE__ || "Evidence";
 const slugFromPath = () => resolveSlugFromPath(location.pathname);
 
 const RENDERERS = {
-  vitals: renderPulse, autonomic: renderAutonomic, zone2: renderZone2, supplements: renderSupplements, labs: renderLabs, physical: renderPhysical, training: renderTraining, nutrition: renderNutrition, glucose: renderGlucose, sleep: renderSleep, mind: renderMind, reading: renderReading, vices: renderVices, ledger: renderLedger, discoveries: renderDiscoveries, biology: renderGenome, challenges: renderChallenges, protocols: renderProtocols, experiments: renderExperiments, habits: renderHabits, board: renderBoard, platform: renderPlatform, cost: renderCost, data: renderData, pipeline: renderPipeline, results: renderResults, tools: renderTools, ask: renderAsk, cycles: renderCycles, inference: renderInference, receipts: renderReceipts, wrong: renderWrong, survival: renderSurvival, postmortems: renderPostmortems, mirror: renderMirror, explorer: renderExplorer, verify: renderVerify, intelligence: renderCorrelations, predictions: renderPredictions, calibration: renderCalibration, benchmarks: renderBenchmarks, character: renderCharacter, badges: renderBadges, scenarios: renderScenarios, wall: renderWall };
+  vitals: renderPulse, autonomic: renderAutonomic, zone2: renderZone2, supplements: renderSupplements, labs: renderLabs, physical: renderPhysical, training: renderTraining, nutrition: renderNutrition, glucose: renderGlucose, sleep: renderSleep, mind: renderMind, reading: renderReading, vices: renderVices, ledger: renderLedger, discoveries: renderDiscoveries, biology: renderGenome, challenges: renderChallenges, protocols: renderProtocols, experiments: renderExperiments, habits: renderHabits, board: renderBoard, platform: renderPlatform, cost: renderCost, data: renderData, pipeline: renderPipeline, results: renderResults, tools: renderTools, ask: renderAsk, cycles: renderCycles, inference: renderInference, receipts: renderReceipts, wrong: renderWrong, survival: renderSurvival, postmortems: renderPostmortems, explorer: renderExplorer, verify: renderVerify, intelligence: renderCorrelations, predictions: renderPredictions, calibration: renderCalibration, benchmarks: renderBenchmarks, character: renderCharacter, badges: renderBadges, scenarios: renderScenarios, wall: renderWall };
 
 const WIRE = {
   ask: () => {
@@ -152,6 +152,9 @@ function buildSide() {
     : LISTED.filter((t) => t.group === g).map(tileHTML).join("");
   side.querySelectorAll(".ev-tile").forEach((a) => a.addEventListener("click", (e) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return; // let the browser do link things
+    // #1392: an external entry (e.g. The Mirror) is a curated page, not an archive
+    // slug — there is no renderer for it here, so follow the link for real.
+    if (BYSLUG[a.dataset.slug] && BYSLUG[a.dataset.slug].external) return;
     e.preventDefault();
     if (listOpen) setList(false);
     select(a.dataset.slug);
@@ -252,7 +255,7 @@ async function renderCenter() {
 }
 
 function select(slug, push = true) {
-  if (!BYSLUG[slug]) return;
+  if (!BYSLUG[slug] || BYSLUG[slug].external) return; // external pages navigate for real (#1392)
   current = slug;
   if (push) history.pushState({ slug }, "", `${BASE}${slug}/`);
   document.title = `${BYSLUG[slug].title} — The ${DOORTITLE} — averagejoematt`;

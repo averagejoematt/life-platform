@@ -481,14 +481,22 @@ REGISTRY = [
         None,
     ),
     (
+        # #1392: upgraded from the type-three-numbers widget to the full Mirror —
+        # a reader's Whoop export scored on the platform's own instruments. The
+        # page is CURATED (scripts/v4_build_mirror.py), not an archive shell, so
+        # it carries the "external" flag: it keeps its tile in the section nav,
+        # but the archive build never writes (or clobbers) its index.html, and
+        # evidence.js follows the link as a real navigation instead of
+        # SPA-rendering a slug that has no archive renderer.
         "mirror",
-        "The mirror",
-        "Type your numbers — see where you'd sit in this experiment. Nothing leaves the page.",
+        "The Mirror",
+        "Drop your Whoop export — scored by the same instruments that score me, laid over my distributions. Nothing leaves the page.",
         "Credibility & the machine",
         "data",
-        "/api/pulse_history",
         None,
         None,
+        None,
+        "external",
     ),
     (
         "wrong",
@@ -850,6 +858,10 @@ def registry_json(groups):
         }
         if "unlisted" in flags:
             e["unlisted"] = True
+        if "external" in flags:
+            # #1392: a curated page that keeps its nav tile — evidence.js must follow
+            # the link (no SPA select), and no consumer may expect an archive shell.
+            e["external"] = True
         if mode == "editorial":
             e["editorial"] = EDITORIAL.get(slug, "")
         out.append(e)
@@ -1020,8 +1032,12 @@ def main() -> int:
             encoding="utf-8",
         )
         n = 0
-        for slug, title, blurb, group, *_ in REGISTRY:
+        for slug, title, blurb, group, *rest in REGISTRY:
             if group not in pillar["groups"]:
+                continue
+            if "external" in rest[4:]:
+                # #1392: curated page, built by its own script — writing the archive
+                # shell here would clobber it (the stored-artifact-regen trap).
                 continue
             d = out / slug
             d.mkdir(parents=True, exist_ok=True)
