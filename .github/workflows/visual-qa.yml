@@ -117,7 +117,7 @@ jobs:
           esac
           echo "level=$LEVEL" >> "$GITHUB_OUTPUT"
 
-      - name: Determine cadence (#1428 full-surface AI-vision Sunday/manual · #1452 dial scaling)
+      - name: Determine cadence (#1428 full-surface AI-vision Sunday/manual · #1452 dial scaling · #1991 theme parity)
         id: cadence
         run: |
           LEVEL="${{ steps.dial.outputs.level }}"
@@ -145,10 +145,28 @@ jobs:
           echo "ai_qa_flag=$AI" >> "$GITHUB_OUTPUT"
           echo "reader_truth_flag=$RT" >> "$GITHUB_OUTPUT"
 
+          # #1991 — the axe-core a11y audit gains a light-theme dimension: this
+          # standalone full-surface sweep alternates color_scheme by ISO-week
+          # parity (odd week → light, even → dark) so light-only AA regressions
+          # (opacity/color-mix composite failures dark-only coverage can't see)
+          # get caught within ~2 weeks without a second job or extra Bedrock
+          # spend. The deploy-gating copies (ci-cd.yml/site-deploy.yml) stay
+          # dark-only, unaffected. 10# forces base-10 so a zero-padded week
+          # number (e.g. "08") is never misread as an invalid octal literal.
+          WEEK=$(date -u +%V)
+          if [ $((10#$WEEK % 2)) -eq 0 ]; then
+            SCHEME=dark
+          else
+            SCHEME=light
+          fi
+          echo "color_scheme=$SCHEME" >> "$GITHUB_OUTPUT"
+          echo "Color scheme this fire: $SCHEME (ISO week $WEEK, #1991 week-parity alternation)"
+
       - name: Run visual + AI-vision QA sweep
         if: steps.dial.outputs.level != 'off'
         run: |
-          python3 tests/visual_qa.py --screenshot ${{ steps.cadence.outputs.ai_qa_flag }} ${{ steps.cadence.outputs.reader_truth_flag }}
+          python3 tests/visual_qa.py --screenshot ${{ steps.cadence.outputs.ai_qa_flag }} ${{ steps.cadence.outputs.reader_truth_flag }} \
+            --color-scheme ${{ steps.cadence.outputs.color_scheme }}
 
       - name: Accuracy gate (per-page resolves + no impossible numbers)
         if: always() && steps.dial.outputs.level != 'off'

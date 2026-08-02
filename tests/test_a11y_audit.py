@@ -73,6 +73,80 @@ def test_baseline_is_per_page_not_global():
     assert [v["id"] for v in out["new"]] == ["image-alt"]
 
 
+# ── theme dimension (#1991) ────────────────────────────────────────────────────
+
+
+def test_theme_light_reads_pages_light_not_pages():
+    """theme='light' must consult 'pages_light', never the dark 'pages' ledger —
+    a rule baselined only under dark still gates under light on the same page."""
+    base = {
+        "pages": {"/cockpit/": [{"id": "color-contrast", "impact": "serious", "help": "x", "nodes": 2}]},
+        "pages_light": {},
+    }
+    out = a11y_audit.gate_findings("/cockpit/", [_v("color-contrast", "serious")], base, theme="light")
+    assert [v["id"] for v in out["new"]] == ["color-contrast"]  # NOT baselined under pages_light
+
+
+def test_theme_light_baselined_entry_does_not_gate():
+    base = {
+        "pages": {},
+        "pages_light": {"/cockpit/": [{"id": "color-contrast", "impact": "serious", "help": "x", "nodes": 2}]},
+    }
+    out = a11y_audit.gate_findings("/cockpit/", [_v("color-contrast", "serious")], base, theme="light")
+    assert out["new"] == []
+    assert [v["id"] for v in out["baselined"]] == ["color-contrast"]
+
+
+def test_theme_defaults_to_dark_backward_compatible():
+    """The default (no theme kwarg) must be byte-identical to theme='dark' —
+    every pre-#1991 call site never passes theme."""
+    base = {"pages": {"/": [{"id": "image-alt", "impact": "critical", "help": "x", "nodes": 1}]}, "pages_light": {}}
+    violations = [_v("image-alt", "critical")]
+    assert a11y_audit.gate_findings("/", violations, base) == a11y_audit.gate_findings("/", violations, base, theme="dark")
+
+
+def test_load_baseline_setdefaults_pages_light_for_legacy_files(tmp_path):
+    """A pre-#1991 baseline file with no 'pages_light' key loads as an empty
+    light ledger rather than KeyError-ing."""
+    p = tmp_path / "legacy.json"
+    p.write_text(json.dumps({"_meta": {}, "pages": {"/": [{"id": "x", "impact": "serious", "help": "h", "nodes": 1}]}}))
+    base = a11y_audit.load_baseline(str(p))
+    assert base["pages_light"] == {}
+    assert base["pages"]  # unchanged
+
+
+def test_missing_baseline_file_has_empty_pages_light_too(tmp_path):
+    base = a11y_audit.load_baseline(str(tmp_path / "nope.json"))
+    assert base["pages"] == {} and base["pages_light"] == {}
+
+
+def test_update_baseline_light_theme_writes_pages_light_and_preserves_pages(tmp_path):
+    """update_baseline(theme='light') touches ONLY 'pages_light' — the dark
+    'pages' ledger (and its capture record) is untouched, so #1991's baseline
+    change is purely additive for every already-committed dark entry."""
+    p = str(tmp_path / "b.json")
+    a11y_audit.update_baseline({"/cockpit/": [_v("color-contrast", "serious")]}, path=p, theme="dark")
+    dark_meta_before = a11y_audit.load_baseline(p)["_meta"]["captured_at"]
+
+    a11y_audit.update_baseline({"/cockpit/": [_v("color-contrast", "serious", nodes=2)]}, path=p, theme="light")
+    base = a11y_audit.load_baseline(p)
+
+    assert set(base["pages"]["/cockpit/"][0]) == {"id", "impact", "help", "nodes"}
+    assert base["pages"]["/cockpit/"][0]["nodes"] == 1  # dark entry untouched by the light write
+    assert base["pages_light"]["/cockpit/"][0]["nodes"] == 2
+    assert base["_meta"]["captured_at"] == dark_meta_before  # dark capture record preserved
+    assert "captured_at_light" in base["_meta"] and "note_light" in base["_meta"]
+
+
+def test_summarize_theme_light_counts_pages_light_only():
+    base = {
+        "pages": {"/": [{"id": "a", "impact": "serious"}]},
+        "pages_light": {"/": [{"id": "a", "impact": "serious"}, {"id": "b", "impact": "moderate"}]},
+    }
+    assert a11y_audit.summarize(base, theme="light") == {"serious": 1, "moderate": 1}
+    assert a11y_audit.summarize(base) == {"serious": 1}  # default (dark) unaffected
+
+
 def test_node_count_change_on_baselined_rule_does_not_gate():
     """Gate key is (page, rule id) — node counts move with daily data and are
     deliberately not part of the key (the #1428 anti-flake lesson)."""
@@ -158,11 +232,13 @@ def test_committed_baseline_exists_and_matches_pinned_axe_version():
         "tests/a11y_baseline.json was captured under a different axe version — re-capture via "
         "`python3 tests/visual_qa.py --update-baseline` in the same PR as the bump (#1433)"
     )
-    # every committed entry is well-formed (the gate reads only these fields)
-    for page, rows in base["pages"].items():
-        assert page.startswith("/")
-        for r in rows:
-            assert set(r) == {"id", "impact", "help", "nodes"}, f"malformed baseline row on {page}: {r}"
+    # every committed entry is well-formed (the gate reads only these fields) —
+    # both the dark 'pages' ledger and the #1991 'pages_light' sibling.
+    for key in ("pages", "pages_light"):
+        for page, rows in base.get(key, {}).items():
+            assert page.startswith("/")
+            for r in rows:
+                assert set(r) == {"id", "impact", "help", "nodes"}, f"malformed baseline row on {key}/{page}: {r}"
 
 
 def test_visual_qa_wiring_defaults_off_for_direct_capture_callers():
@@ -174,4 +250,15 @@ def test_visual_qa_wiring_defaults_off_for_direct_capture_callers():
     assert cp["a11y_baseline"].default is None
     rs = inspect.signature(visual_qa.run_sweep).parameters
     assert rs["a11y"].default is True
+
+
+def test_visual_qa_color_scheme_defaults_to_dark_everywhere():
+    """#1991: capture_page's theme and run_sweep's color_scheme both default to
+    'dark' — every existing caller (which never passes either) is unchanged."""
+    import visual_qa
+
+    cp = inspect.signature(visual_qa.capture_page).parameters
+    assert cp["theme"].default == "dark"
+    rs = inspect.signature(visual_qa.run_sweep).parameters
+    assert rs["color_scheme"].default == "dark"
     assert rs["update_a11y_baseline"].default is False
