@@ -192,6 +192,29 @@ function renderCategories(categories) {
     return bU - aU;
   });
 
+  // Privacy absolute (2026-08-02): /api/genome_risks now publishes AGGREGATES
+  // only — per-variant identifiers (rsid, gene) and their readouts are
+  // owner-only under the platform's data-governance tiers, and whether any of
+  // it may be published is a deferred PRE-13 decision. Each category is now
+  // {n, risk_levels} rather than an array of SNPs, so render the shape we
+  // actually get instead of throwing on .filter of an object.
+  const isAggregate = catOrder.length && !Array.isArray(catOrder[0][1]);
+  if (isAggregate) {
+    container.innerHTML = catOrder.map(([cat, agg]) => {
+      const levels = (agg && agg.risk_levels) || {};
+      const n = (agg && agg.n) || 0;
+      const shown = activeFilter === 'all' ? n : (levels[activeFilter] || 0);
+      if (!shown) return '';
+      return `<div class="category">
+        <div class="category__header">
+          <div class="category__name">${cat}</div>
+          <div class="category__count">${shown} variant${shown !== 1 ? 's' : ''}</div>
+        </div>
+      </div>`;
+    }).join('') || '<p>No variants in this risk band.</p>';
+    return;
+  }
+
   container.innerHTML = catOrder.map(([cat, snps]) => {
     const filtered = activeFilter === 'all' ? snps : snps.filter(s => s.risk_level === activeFilter);
     if (!filtered.length) return '';
