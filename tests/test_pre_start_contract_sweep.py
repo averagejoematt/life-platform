@@ -137,8 +137,8 @@ def test_observatory_week_inert_when_genesis_past(monkeypatch):
 
 
 def test_observatory_week_week1_no_fabricated_comparison(monkeypatch):
-    # Week 1 of a cycle: the prior window clamps to genesis and stays empty —
-    # never "vs 0 last week" (ADR-104).
+    # Week 1 of a cycle: there is no prior window inside the cycle (#1977: it is
+    # never manufactured by clamping) — never "vs 0 last week" (ADR-104).
     _past(monkeypatch, days=3)
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     d1 = _iso(_today_pt() - timedelta(days=1))
@@ -154,6 +154,135 @@ def test_observatory_week_week1_no_fabricated_comparison(monkeypatch):
     assert p["delta_label"] == ""
     assert p["trend"] == "flat"
     assert "vs last week" not in (b["notable"] or "")
+
+
+# ── /api/observatory_week week-1 genesis clamp (#1977) ────────────────────────
+#
+# The pre-fix clamp mapped a fully-pre-genesis prev window onto [genesis, genesis]
+# — INSIDE the current week — so Day 1 compared today to itself ("declined 0.0h
+# vs last week", trend 'down') the moment genesis day had data. A window-shaped
+# stub (return [] unless e == today) masks that; these tests stub a TABLE: rows
+# keyed by date, any query that touches a row's date returns it, and every
+# queried window is recorded so the guard is negative-tested structurally.
+
+
+def _stub_table(monkeypatch, records):
+    """Stubbed table: serves rows whose date falls inside the queried window
+    (like the real DDB BETWEEN) and logs every queried window."""
+    windows = []
+
+    def qs(source, s, e, include_pilot=False):
+        windows.append((s, e))
+        return [r for r in records if s <= str(r["sk"])[5:] <= e]
+
+    monkeypatch.setattr(data, "_query_source", qs)
+    return windows
+
+
+def _mf(date, kcal=2000, protein=150):
+    return {"sk": f"DATE#{date}", "total_calories_kcal": kcal, "total_protein_g": protein}
+
+
+def test_observatory_week_genesis_day_prev_window_never_manufactured(monkeypatch):
+    # anchor == genesis, genesis day HAS data: the honest output is absence —
+    # null delta, 'flat', no "vs last week" — and the prev window is never queried.
+    genesis = _past(monkeypatch, days=0)
+    windows = _stub_table(monkeypatch, [_whoop(genesis, 7.2)])
+    b = _body(data.handle_observatory_week({"domain": "sleep"}))
+    p = b["summary"]["primary"]
+    assert p["value"] == 7.2
+    assert p["delta"] is None
+    assert p["delta_label"] == ""
+    assert p["trend"] == "flat"
+    assert "vs last week" not in (b["notable"] or "")
+    # the ONLY query is the current window — no manufactured prev window
+    # intersecting [start, end] (pre-fix: a second [genesis, genesis] query)
+    assert windows == [(b["period"]["start"], b["period"]["end"])]
+
+
+def test_observatory_week_week1_day3_absence_not_zero_delta(monkeypatch):
+    # anchor == genesis+2d with data on every cycle day so far: still absence —
+    # pre-fix this served the genesis row as "last week".
+    genesis = _past(monkeypatch, days=2)
+    g = datetime.strptime(genesis, "%Y-%m-%d")
+    windows = _stub_table(monkeypatch, [_whoop(_iso(g + timedelta(days=i)), 7.0 + 0.1 * i) for i in range(3)])
+    b = _body(data.handle_observatory_week({"domain": "sleep"}))
+    p = b["summary"]["primary"]
+    assert p["delta"] is None
+    assert p["trend"] == "flat"
+    assert "vs last week" not in (b["notable"] or "")
+    assert windows == [(b["period"]["start"], b["period"]["end"])]
+
+
+def test_observatory_week_partial_prior_week_still_compares(monkeypatch):
+    # Week 2: the prev window is partially pre-genesis — its START clamps to
+    # genesis (a real, shorter prior window), the comparison is real, and the
+    # prev window never intersects the current week.
+    genesis = _past(monkeypatch, days=10)
+    g = datetime.strptime(genesis, "%Y-%m-%d")
+    anchor = datetime.now(timezone.utc)
+    windows = _stub_table(
+        monkeypatch,
+        [_whoop(_iso(g + timedelta(days=1)), 8.0), _whoop(_iso(anchor - timedelta(days=1)), 7.0)],
+    )
+    b = _body(data.handle_observatory_week({"domain": "sleep"}))
+    p = b["summary"]["primary"]
+    assert p["value"] == 7.0
+    assert p["delta"] == -1.0
+    assert p["delta_label"] == "vs 8.0 last week"
+    assert p["trend"] == "down"
+    prev_windows = [w for w in windows if w != (b["period"]["start"], b["period"]["end"])]
+    assert prev_windows, "the partial prior week must still be queried"
+    assert all(w[0] >= genesis and w[1] < b["period"]["start"] for w in prev_windows)
+
+
+def test_observatory_week_tie_is_flat_not_down(monkeypatch):
+    # Both weeks present at the same average: delta 0.0 must read 'flat' with a
+    # neutral notable — pre-fix the tie mapped to 'down' ("declined 0.0h").
+    _past(monkeypatch, days=30)
+    anchor = datetime.now(timezone.utc)
+    _stub_table(monkeypatch, [_whoop(_iso(anchor - timedelta(days=1)), 7.5), _whoop(_iso(anchor - timedelta(days=9)), 7.5)])
+    b = _body(data.handle_observatory_week({"domain": "sleep"}))
+    p = b["summary"]["primary"]
+    assert p["delta"] == 0.0
+    assert p["trend"] == "flat"
+    assert "declined" not in b["notable"] and "improved" not in b["notable"]
+    assert "held steady" in b["notable"]
+
+
+def test_observatory_week_nutrition_week1_absence_and_tie(monkeypatch):
+    # Same contract on the other week-over-week branch (nutrition).
+    genesis = _past(monkeypatch, days=1)
+    windows = _stub_table(monkeypatch, [_mf(genesis)])
+    b = _body(data.handle_observatory_week({"domain": "nutrition"}))
+    p = b["summary"]["primary"]
+    assert p["delta"] is None
+    assert p["delta_label"] == ""
+    assert p["trend"] == "flat"
+    assert windows == [(b["period"]["start"], b["period"]["end"])]
+
+    _past(monkeypatch, days=30)
+    anchor = datetime.now(timezone.utc)
+    _stub_table(monkeypatch, [_mf(_iso(anchor - timedelta(days=1))), _mf(_iso(anchor - timedelta(days=9)))])
+    b2 = _body(data.handle_observatory_week({"domain": "nutrition"}))
+    p2 = b2["summary"]["primary"]
+    assert p2["delta"] == 0
+    assert p2["trend"] == "flat"
+
+
+def test_observatory_week_physical_tie_is_flat(monkeypatch):
+    # Physical's intra-week delta: an unchanged weight is 'flat', never "gained 0.0 lbs".
+    _past(monkeypatch, days=30)
+    anchor = datetime.now(timezone.utc)
+    _stub_table(
+        monkeypatch,
+        [{"sk": f"DATE#{_iso(anchor - timedelta(days=d))}", "weight_lbs": 200.0} for d in (5, 1)],
+    )
+    b = _body(data.handle_observatory_week({"domain": "physical"}))
+    p = b["summary"]["primary"]
+    assert p["delta"] == 0.0
+    assert p["trend"] == "flat"
+    assert b["notable"] == "Weight held steady this week"
 
 
 # ── /api/cycle_compare ────────────────────────────────────────────────────────
