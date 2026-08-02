@@ -1184,12 +1184,9 @@ def main():
     print(
         "  •  Monday morning (post-genesis): python3 deploy/restart_verify.py   # deliberately not folded — it asserts post-genesis state"
     )
-    print(
-        "     (its check 14 sweeps the wipe→genesis countdown window, #1947 — the daily writers keep"
-        " running between the wipe and a future genesis BY DECISION (sweep, don't pause; see"
-        " deploy/countdown_gap_sweep.py); if it finds escapees, repair with"
-        " python3 deploy/reconcile_countdown_gap.py   # dry-run first, --apply to commit)"
-    )
+    # Check 14 = the #1947 countdown-window sweep (writers run until genesis BY DECISION —
+    # sweep, don't pause; see countdown_gap_sweep.py). Escapees → reconcile_countdown_gap.py.
+    print("     (its check 14 sweeps the countdown window, #1947; escapees → python3 deploy/reconcile_countdown_gap.py)")
     if args.apply and verify_rc != 0:
         print("\n(exiting nonzero: a verify gate failed — rendered and/or semantic, see above)")
         if not args.continue_on_error:
