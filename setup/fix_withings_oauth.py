@@ -50,9 +50,7 @@ class CallbackHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "text/html")
             self.end_headers()
             self.wfile.write(
-                b"<html><body><h2>Withings authorized!</h2>"
-                b"<p>You can close this tab. Tokens are being saved...</p>"
-                b"</body></html>"
+                b"<html><body><h2>Withings authorized!</h2>" b"<p>You can close this tab. Tokens are being saved...</p>" b"</body></html>"
             )
         else:
             self.send_response(400)
@@ -141,7 +139,7 @@ def main():
     print("\n[1/5] Reading client credentials from Secrets Manager...")
     secret = get_secret()
     client_id = secret["client_id"]
-    print(f"  client_id: {client_id[:12]}...")
+    print(f"  client_id: (set, {len(client_id)} chars)")
 
     # Step 2: Start local server
     print("\n[2/5] Starting local callback server on port 3000...")
@@ -171,9 +169,9 @@ def main():
     # Step 5: Exchange code for tokens
     print("\n[4/5] Exchanging code for tokens...")
     token_body = exchange_code(client_id, secret["client_secret"], captured_code)
-    print(f"  access_token:  {token_body['access_token'][:16]}...")
-    print(f"  refresh_token: {token_body['refresh_token'][:16]}...")
-    print(f"  userid:        {token_body['userid']}")
+    print(f"  access_token:  received ({len(token_body['access_token'])} chars)")
+    print(f"  refresh_token: received ({len(token_body['refresh_token'])} chars)")
+    print("  userid:        (received)")
 
     # Step 6: Save to Secrets Manager
     print("\n[5/5] Saving tokens to Secrets Manager...")
@@ -187,19 +185,27 @@ def main():
     try:
         result = subprocess.run(
             [
-                "aws", "lambda", "invoke",
-                "--function-name", "withings-data-ingestion",
-                "--region", "us-west-2",
-                "--log-type", "Tail",
+                "aws",
+                "lambda",
+                "invoke",
+                "--function-name",
+                "withings-data-ingestion",
+                "--region",
+                "us-west-2",
+                "--log-type",
+                "Tail",
                 "/tmp/withings_test.json",
-                "--query", "LogResult",
-                "--output", "text",
+                "--query",
+                "LogResult",
+                "--output",
+                "text",
             ],
             capture_output=True,
             text=True,
             timeout=30,
         )
         import base64
+
         if result.stdout.strip():
             logs = base64.b64decode(result.stdout.strip()).decode()
             print(logs)

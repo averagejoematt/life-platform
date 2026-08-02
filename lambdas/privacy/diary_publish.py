@@ -74,6 +74,7 @@ v1.0.0 — 2026-07-27 (#1845, epic #1668)
 from __future__ import annotations
 
 import re
+from urllib.parse import urlparse
 
 # ── The publication ledger ───────────────────────────────────────────────────────
 # pk `DIARY_PUBLISH#{channel}`; sk `POST#{post_id}`.
@@ -219,7 +220,13 @@ def parse_post_ref(url):
     u = str(url or "").strip()
     if not u:
         return None, None
-    if "youtube.com" in u or "youtu.be" in u:
+    # Hostname check, not substring — "evil.com/youtube.com/…" must not pass
+    # (CodeQL py/incomplete-url-substring-sanitization, #1902).
+    try:
+        host = (urlparse(u if "://" in u else f"https://{u}").hostname or "").lower()
+    except ValueError:
+        return None, None
+    if host == "youtu.be" or host == "youtube.com" or host.endswith(".youtube.com"):
         for pattern in _YT_PATTERNS:
             m = pattern.search(u)
             if m:

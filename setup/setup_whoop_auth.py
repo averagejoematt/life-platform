@@ -203,7 +203,7 @@ def main() -> int:
     if not client_id or not client_secret:
         print("ERROR: client_id/client_secret missing from the secret.")
         return 2
-    print(f"  client_id: {client_id[:12]}...")
+    print(f"  client_id: (set, {len(client_id)} chars)")
 
     authorize_url = build_authorize_url(client_id, args.redirect_uri)
     print("\n[2/5] Authorizing in the browser...")

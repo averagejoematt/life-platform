@@ -267,7 +267,7 @@ def ensure_user_id(secret: dict) -> dict:
     with urlopen_with_retry(req, timeout=30) as resp:
         data = json.loads(resp.read())
     secret["user_id"] = data["user"]["userId"]
-    print(f"Resolved user_id: {secret['user_id']}")
+    print("Resolved user_id (cached into secret)")
     return secret
 
 

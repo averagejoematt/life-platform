@@ -113,9 +113,9 @@ def main():
     saved = save_secret(secret, token_body)
 
     print("\nSuccess! Saved to Secrets Manager:")
-    print(f"  userid:        {saved['userid']}")
-    print(f"  access_token:  {saved['access_token'][:20]}...")
-    print(f"  refresh_token: {saved['refresh_token'][:20]}...")
+    print("  userid:        (stored)")
+    print(f"  access_token:  received ({len(saved['access_token'])} chars)")
+    print(f"  refresh_token: received ({len(saved['refresh_token'])} chars)")
 
 
 if __name__ == "__main__":

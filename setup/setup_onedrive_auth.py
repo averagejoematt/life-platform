@@ -49,10 +49,12 @@ def device_code_flow(client_id):
 
     # Step 1: Request device code
     print("\n📱 Requesting device code...")
-    data = urllib.parse.urlencode({
-        "client_id": client_id,
-        "scope": SCOPE,
-    }).encode()
+    data = urllib.parse.urlencode(
+        {
+            "client_id": client_id,
+            "scope": SCOPE,
+        }
+    ).encode()
     req = urllib.request.Request(DEVICE_CODE_URL, data=data, method="POST")
     with urllib.request.urlopen(req) as resp:
         dc = json.loads(resp.read())
@@ -69,11 +71,13 @@ def device_code_flow(client_id):
 
     while True:
         time.sleep(interval)
-        token_data = urllib.parse.urlencode({
-            "client_id": client_id,
-            "device_code": device_code,
-            "grant_type": "urn:ietf:params:oauth:grant_type:device_code",
-        }).encode()
+        token_data = urllib.parse.urlencode(
+            {
+                "client_id": client_id,
+                "device_code": device_code,
+                "grant_type": "urn:ietf:params:oauth:grant_type:device_code",
+            }
+        ).encode()
         token_req = urllib.request.Request(TOKEN_URL, data=token_data, method="POST")
         try:
             with urllib.request.urlopen(token_req) as resp:
@@ -128,11 +132,13 @@ def verify_access(access_token):
 def store_secret(client_id, refresh_token):
     """Store credentials in Secrets Manager."""
     secrets = boto3.client("secretsmanager", region_name=REGION)
-    secret_value = json.dumps({
-        "client_id": client_id,
-        "refresh_token": refresh_token,
-        "folder": ONEDRIVE_FOLDER,
-    })
+    secret_value = json.dumps(
+        {
+            "client_id": client_id,
+            "refresh_token": refresh_token,
+            "folder": ONEDRIVE_FOLDER,
+        }
+    )
 
     try:
         secrets.describe_secret(SecretId=SECRET_NAME)
@@ -174,8 +180,8 @@ def main():
         return
 
     print("\n✅ Tokens received!")
-    print(f"   Access token: {access_token[:20]}...")
-    print(f"   Refresh token: {refresh_token[:20]}...")
+    print(f"   Access token: received ({len(access_token)} chars)")
+    print(f"   Refresh token: received ({len(refresh_token)} chars)")
 
     # Verify
     verify_access(access_token)

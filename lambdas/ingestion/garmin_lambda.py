@@ -392,7 +392,7 @@ def get_garmin_client(secret: dict):
     # Prefer pre-stored display_name from browser auth
     if secret.get("display_name"):
         api.display_name = secret["display_name"]
-        logger.info(f"display_name from secret: {api.display_name}")
+        logger.info("display_name resolved from stored secret")
     else:
         for profile_path in [
             "/userprofile-service/socialProfile",

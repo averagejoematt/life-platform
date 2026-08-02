@@ -40,7 +40,7 @@ test("a quote renders verbatim, dated, labeled, with the receipts link", () => {
 
 test("quote text is HTML-escaped — a marked line can never inject markup", () => {
   const html = quotesArchiveHTML({ quotes: [{ ...Q, quote: '<script>alert("x")</script> & so on' }] });
-  assert.doesNotMatch(html, /<script>/);
+  assert.doesNotMatch(html, /<script>/i);
   assert.match(html, /&lt;script&gt;/);
   assert.match(html, /&amp; so on/);
 });

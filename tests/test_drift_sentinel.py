@@ -151,7 +151,10 @@ def test_site_sha_ancestry_survives_git_fetch_failure(monkeypatch):
 # ── sweep status aggregation + summary (AC1/AC4) ─────────────────────────────
 
 
-def _patch_all(monkeypatch, cfn, post, orphan, bucket, doc=None, site=None, oidc=None, gh_config=None, gh_push=None, quota=None):
+def _patch_all(
+    monkeypatch, cfn, post, orphan, bucket, doc=None, site=None, oidc=None, gh_config=None, gh_push=None, quota=None, codeql=None
+):
+    monkeypatch.setattr(ds, "check_codeql_alerts", lambda: codeql or {"status": "clean", "open_count": 0, "sample": []})
     monkeypatch.setattr(ds, "check_cfn_drift", lambda *a, **k: cfn)
     monkeypatch.setattr(ds, "check_postflight", lambda: post)
     monkeypatch.setattr(ds, "check_orphan_functions", lambda: orphan)
@@ -1078,3 +1081,46 @@ def test_quota_html_renders_warn_bold_when_over_threshold():
 def test_quota_html_empty_when_no_record_or_no_quota_check():
     assert drift_report.quota_html(None) == ""
     assert drift_report.quota_html({"checks": {}}) == ""
+
+
+# ── codeql_alerts regrowth check (#1902) ─────────────────────────────────────
+
+
+def test_codeql_alerts_clean_at_zero(monkeypatch):
+    monkeypatch.setattr(ds, "_gh_api_json", lambda path, timeout=30: [])
+    res = ds.check_codeql_alerts()
+    assert res["status"] == "clean"
+    assert res["open_count"] == 0
+
+
+def test_codeql_alerts_drift_on_any_open_alert(monkeypatch):
+    alert = {
+        "rule": {"id": "py/clear-text-logging-sensitive-data"},
+        "most_recent_instance": {"location": {"path": "setup/x.py", "start_line": 7}},
+    }
+    monkeypatch.setattr(ds, "_gh_api_json", lambda path, timeout=30: [alert])
+    res = ds.check_codeql_alerts()
+    assert res["status"] == "drift"
+    assert res["open_count"] == 1
+    assert "py/clear-text-logging-sensitive-data @ setup/x.py:7" in res["sample"]
+    assert "triage" in res["detail"]
+
+
+def test_codeql_alerts_error_when_api_unavailable(monkeypatch):
+    monkeypatch.setattr(ds, "_gh_api_json", lambda path, timeout=30: None)
+    res = ds.check_codeql_alerts()
+    assert res["status"] == "error"
+
+
+def test_sweep_surfaces_codeql_drift_in_summary(monkeypatch):
+    _patch_all(
+        monkeypatch,
+        cfn={"status": "clean", "stacks": {}},
+        post={"config_drift": {"status": "clean"}, "layer_uniformity": {"status": "clean"}, "asset_completeness": {"status": "clean"}},
+        orphan={"status": "clean", "orphans": []},
+        bucket={"status": "clean", "missing_prefixes": []},
+        codeql={"status": "drift", "open_count": 3, "sample": [], "detail": "3 open CodeQL alert(s)"},
+    )
+    rec = ds.run_sweep()
+    assert rec["status"] == "drift"
+    assert "un-triaged open CodeQL alert(s)" in rec["summary"]
