@@ -26,6 +26,7 @@ import { explainMount } from "/assets/js/explain.js"; // #403 one-tap explainer
 import { momentsIndex, shareMount } from "/assets/js/share.js"; // #404 moment permalinks
 import { preStart, GENESIS_ISO } from "/assets/js/coach_popover.js"; // #931 pre-start countdown · #1088 scrub-floor fallback
 import { cohortAheadPercent } from "/assets/js/cohort_math.js"; // #1820 — direction-aware cohort percentile
+import { BRIEF_LINE_KICKER } from "/assets/js/daily_line.js"; // #1995 — the one honest label for the morning brief's daily line
 
 const API = "/api";
 
@@ -223,7 +224,10 @@ function renderVerdict(stats) {
   const v = bind("verdict");
   const text = stats && stats.elena_hero_line;
   if (isBad(text)) {
-    v.innerHTML = `<span class="mark">&rsaquo;</span> Today's line isn't in yet — it posts with the morning brief.`;
+    // #1995 — a "today"-possessive name here would re-anchor the brief to the
+    // render-day; the line is the brief's read of the DATA day. Same
+    // anchor-neutral name as the kicker ("the daily line").
+    v.innerHTML = `<span class="mark">&rsaquo;</span> The daily line isn't in yet — it posts with the morning brief.`;
     return;
   }
   // Decimal-safe sentence split: the old /[^.!?]+[.!?]+/ regex treated the "." in
@@ -244,7 +248,10 @@ function renderVerdict(stats) {
   // minted before today has any). That scope was only ever explained by the
   // dismiss-once intro card — stamp it PERMANENTLY in the attribution so it can't
   // read as conflicting with the last-night panel's own-scope numbers directly below.
-  const who = `<p class="vd-who label">the daily line · yesterday's read · from the morning brief${stamp ? ` · <span class="vd-stamp">${escapeHTML(stamp)}</span>` : ""}</p>`;
+  // #1995 — the label text itself now lives in daily_line.js (BRIEF_LINE_KICKER),
+  // shared by all three consumers so no surface can drift back to a render-day
+  // "today" kicker.
+  const who = `<p class="vd-who label">${BRIEF_LINE_KICKER}${stamp ? ` · <span class="vd-stamp">${escapeHTML(stamp)}</span>` : ""}</p>`;
   v.innerHTML = who + beats.map((b, i) =>
     `<span class="vd-beat" style="--vd-delay:${(i * 0.45).toFixed(2)}s">${i === 0 ? `<span class="mark">&rsaquo;</span> ` : ""}${escapeHTML(b)}</span>`
   ).join(" ");

@@ -71,6 +71,16 @@ def test_daily_line_carries_permanent_yesterday_scope():
     m = re.search(r'const who = `<p class="vd-who[^`]*`', src)
     assert m, "the vd-who daily-line attribution template must exist in cockpit.js"
     who = m.group(0)
+    # #1995: the kicker text moved to the ONE shared constant in daily_line.js
+    # (BRIEF_LINE_KICKER, imported by cockpit/coaching/story). Resolve it across
+    # the module boundary and assert on the RENDERED text, not the reference —
+    # a hollowed-out constant must turn this red (the re-export-is-not-a-patch-point
+    # lesson applied to a guard).
+    daily_line = _read(os.path.join(_ROOT, "site", "assets", "js", "daily_line.js"))
+    km = re.search(r'export const BRIEF_LINE_KICKER = "([^"]+)"', daily_line)
+    assert km, "#1995: daily_line.js must export the BRIEF_LINE_KICKER constant"
+    assert "${BRIEF_LINE_KICKER}" in who, f"#1995: the cockpit attribution must render the shared kicker constant; got: {who}"
+    who = who.replace("${BRIEF_LINE_KICKER}", km.group(1))
     # The scope must be a PERMANENT token in the attribution itself, not the intro card.
     assert "yesterday" in who.lower(), "#1251: the daily-line attribution must carry an explicit yesterday-scope token; " f"got: {who}"
     # Non-vacuous: the pre-fix template read `the daily line · from the morning brief`

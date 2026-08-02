@@ -36,6 +36,7 @@ import { sigil, instrumentMark } from "/assets/js/sigils.js";
 import { portrait, markStanceChange } from "/assets/js/portraits.js"; // §8.7 — portrait(c) || sigil(c); #594 stance-change sweep
 import { momentsIndex, shareMount } from "/assets/js/share.js"; // #404 moment permalinks
 import { wireTabList, markActiveTab } from "/assets/js/tabs.js"; // #579 — real ARIA tabs
+import { BRIEF_LINE_KICKER } from "/assets/js/daily_line.js"; // #1995 — the one honest label for the morning brief's daily line
 
 const SECTIONS = [
   { key: "read", label: "The Read", kicker: "what your board is saying — now", kind: "read" },
@@ -483,7 +484,10 @@ async function renderReadToday(read) {
   let h = `<p class="dx-kicker label">the board's read on you · right now</p><h2 class="dx-title">What the board is saying</h2>`;
   const daily = stats && stats.elena_hero_line;
   if (daily) {
-    h += `<section class="read-priority"><p class="dx-kicker label">today's line · from the morning brief</p>` +
+    // #1995 — never a render-day "today" kicker: the brief's deictics are anchored
+    // to the DATA day (yesterday by mint time, #1251). One honest label, shared
+    // with cockpit/home.
+    h += `<section class="read-priority"><p class="dx-kicker label">${BRIEF_LINE_KICKER}</p>` +
       `<blockquote class="rp-text">${esc(daily)}</blockquote></section>`;
   }
   if (team) h += tensionsHTML(team);

@@ -144,6 +144,10 @@ body { overflow-x: hidden; }
 .verse .vgo:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs); }
 .verse-close { gap: var(--sp-4); }
 .verse-close .hero-elena { margin-top: 0; }
+/* #1995 — the live brief line's anchor label ("yesterday's read"), inserted by
+   story.js only when the daily line binds; pulled tight over its quote against
+   the verse's flex gap. */
+.verse-close .hero-elena-kicker { margin-bottom: calc(-1 * var(--sp-3)); }
 .verse-close a:not(.cta):not(.vgo) { color: var(--ink-muted); }
 .cta-row { display: flex; gap: var(--sp-5); flex-wrap: wrap; margin-top: var(--sp-2); }
 
