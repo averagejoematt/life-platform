@@ -3,49 +3,880 @@
   "updated_at": "2026-07-18",
   "groups": {
     "sleep": {
-      "name": "Sleep Architecture", "icon": "\ud83d\ude34", "desc": "The compounds that protect the master variable. Circadian support, GABA modulation, and core temperature regulation.",
+      "name": "Sleep Architecture",
+      "icon": "😴",
+      "desc": "The compounds that protect the master variable. Circadian support, GABA modulation, and core temperature regulation.",
       "items": [
-        {"key":"l_threonate","name":"Magnesium L-Threonate","dose":"144mg elemental","timing":"PM","ev":"moderate","evPct":66,"board":"Dr. Kai Nakamura","cost_monthly":12,"experiment":"sleep-stack","why":"Sleep stack anchor. Combined with Apigenin and Glycine, this is the recommended pre-sleep protocol. Under the training volume ahead, magnesium loss through sweat is a real risk.","science":["Marketed as the magnesium form that raises brain magnesium, but the direct evidence is a rodent study — superior blood-brain-barrier penetration over other forms is not established in humans","Supports GABA signaling, may reduce sleep onset latency","~48% of Americans consume less magnesium than the estimated average requirement (NHANES); clinical deficiency is far less common"],"sources":[{"title":"Magnesium L-threonate enhances learning and memory (original rodent study)","url":"https://pubmed.ncbi.nlm.nih.gov/20152124/","stance":"supports"},{"title":"Magnesium and sleep quality (systematic review)","url":"https://pubmed.ncbi.nlm.nih.gov/35184264/","stance":"supports"},{"title":"Suboptimal magnesium status in the US — NHANES: about 48% consume less magnesium than the estimated requirement","url":"https://pubmed.ncbi.nlm.nih.gov/22364157/","stance":"supports"},{"title":"Open question — no direct study found for a cost-effectiveness or human brain-uptake advantage of L-threonate over standard magnesium forms","stance":"challenges"},{"title":"Most magnesium sleep benefits apply to deficient populations","url":"https://pubmed.ncbi.nlm.nih.gov/33865376/","stance":"challenges"}],"rationale":"Heavy training + sweat + deficit increases depletion risk. L-threonate specifically targets the CNS.","impact":"Sleep onset latency, deep sleep %, cognitive clarity","watching":"Eight Sleep score on adherent vs non-adherent nights","synergy":"sleep_supps","hoped_outcome":"Shorter sleep-onset latency and a higher deep-sleep share on adherent nights \u2014 the sleep stack's anchor claim.","measured_by":"Eight Sleep onset latency + deep-sleep % on adherent vs non-adherent nights; Whoop sleep performance as the cross-check."},
-        {"key":"glycine","name":"Glycine","dose":"2-3g","timing":"PM","ev":"moderate","evPct":66,"board":"Dr. Kai Nakamura","cost_monthly":8,"why":"Beautiful synergy with Eight Sleep \u2014 both work by lowering core temperature. Collagen synthesis bonus for joint health during heavy training.","science":["2-3g before bed lowers core body temperature","Primary physiological trigger for sleep onset","Synergistic with Eight Sleep cooling"],"sources":[{"title":"Glycine ingestion improves subjective sleep quality (original RCT)","url":"https://pubmed.ncbi.nlm.nih.gov/17693028/","stance":"supports"},{"title":"Glycine-induced hypothermia and sleep regulation","url":"https://pubmed.ncbi.nlm.nih.gov/22293292/","stance":"supports"},{"title":"Effect size on sleep is modest in non-deficient populations","url":"https://pubmed.ncbi.nlm.nih.gov/27253365/","stance":"challenges"}],"rationale":"Synergistic with Eight Sleep cooling — both lower core temp via different mechanisms.","impact":"Core temp drop, sleep onset latency, deep sleep %","watching":"Eight Sleep temp data correlation","synergy":"sleep_supps","hoped_outcome":"A faster core-temperature drop at bedtime, showing up as shorter sleep-onset latency.","measured_by":"Eight Sleep bed-temperature and sleep-onset data \u2014 the same instrument the mechanism acts on."},
-        {"key":"apigenin","name":"Apigenin","dose":"50mg","timing":"PM","ev":"moderate","evPct":66,"board":"Dr. Kai Nakamura","cost_monthly":10,"experiment":"sleep-stack","why":"Gentlest member of the sleep stack \u2014 best risk/reward ratio. If you take one sleep supplement, this is it.","science":["Flavonoid that modulates GABA-A receptors","Reduces sleep onset latency and anxiety without grogginess","No tolerance, no dependence"],"sources":[{"title":"Apigenin as a GABA-A receptor modulator (preclinical)","url":"https://pubmed.ncbi.nlm.nih.gov/10802676/","stance":"supports"},{"title":"Chamomile extract (apigenin) for generalized anxiety disorder","url":"https://pubmed.ncbi.nlm.nih.gov/22894890/","stance":"supports"},{"title":"The Therapeutic Potential of Apigenin (review) — evidence is predominantly preclinical/animal; human clinical trials are limited","url":"https://pubmed.ncbi.nlm.nih.gov/30875872/","stance":"challenges"}],"rationale":"Best risk/reward in the sleep stack — extremely safe with plausible mechanism.","impact":"Sleep onset latency, subjective sleep quality","watching":"Sleep quality trend","synergy":"sleep_supps","hoped_outcome":"Calmer sleep onset as part of the pre-bed stack \u2014 tested as a unit with magnesium and glycine, not expected to be separable on its own.","measured_by":"Eight Sleep sleep-score trend on stack-adherent vs non-adherent nights."},
-        {"key":"theanine","name":"L-Theanine","dose":"100-200mg","timing":"PM","ev":"moderate","evPct":66,"board":"Dr. Kai Nakamura","cost_monthly":8,"why":"Monitor your response \u2014 if Eight Sleep shows no difference or worse sleep on Theanine nights, candidate for removal.","science":["Promotes alpha brain waves, reduces anxiety without sedation","Synergistic with caffeine during the day","Some people get disruptive vivid dreams \u2014 individual response varies"],"sources":[{"title":"L-theanine promotes relaxation without drowsiness","url":"https://pubmed.ncbi.nlm.nih.gov/18296328/","stance":"supports"},{"title":"Effects of L-theanine on stress and sleep quality","url":"https://pubmed.ncbi.nlm.nih.gov/30707852/","stance":"supports"},{"title":"Open question — no controlled study found linking L-theanine to vivid dreams or disrupted sleep architecture; the report is anecdotal and individual (see science notes)","stance":"challenges"}],"rationale":"Monitoring via Eight Sleep — data will determine whether this stays.","impact":"Subjective anxiety, sleep onset","watching":"Vivid dream reports in journal","synergy":"sleep_supps","questioning":true,"questionReason":"Individual response varies \u2014 vivid dreams may disrupt sleep for some","hoped_outcome":"A calmer wind-down and easier sleep onset without sedation.","measured_by":"Sleep-onset latency (Eight Sleep) + wind-down and vivid-dream notes in the journal."}
+        {
+          "key": "l_threonate",
+          "name": "Magnesium L-Threonate",
+          "dose": "144mg elemental",
+          "timing": "PM",
+          "ev": "moderate",
+          "evPct": 66,
+          "board": "Dr. Kai Nakamura",
+          "cost_monthly": 12,
+          "experiment": "sleep-stack",
+          "why": "Sleep stack anchor. Combined with Apigenin and Glycine, this is the recommended pre-sleep protocol. Under the training volume ahead, magnesium loss through sweat is a real risk.",
+          "science": [
+            "Marketed as the magnesium form that raises brain magnesium, but the direct evidence is a rodent study — superior blood-brain-barrier penetration over other forms is not established in humans",
+            "Supports GABA signaling, may reduce sleep onset latency",
+            "~48% of Americans consume less magnesium than the estimated average requirement (NHANES); clinical deficiency is far less common"
+          ],
+          "sources": [
+            {
+              "title": "Magnesium L-threonate enhances learning and memory (original rodent study)",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/20152124/",
+              "stance": "supports",
+              "resolved_title": "Enhancement of learning and memory by elevating brain magnesium."
+            },
+            {
+              "title": "Magnesium and sleep quality (systematic review)",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/35184264/",
+              "stance": "supports",
+              "resolved_title": "The Role of Magnesium in Sleep Health: a Systematic Review of Available Literature."
+            },
+            {
+              "title": "Suboptimal magnesium status in the US — NHANES: about 48% consume less magnesium than the estimated requirement",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/22364157/",
+              "stance": "supports",
+              "resolved_title": "Suboptimal magnesium status in the United States: are the health consequences underestimated?"
+            },
+            {
+              "title": "Open question — no direct study found for a cost-effectiveness or human brain-uptake advantage of L-threonate over standard magnesium forms",
+              "stance": "challenges"
+            },
+            {
+              "title": "Most magnesium sleep benefits apply to deficient populations",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/33865376/",
+              "stance": "challenges",
+              "resolved_title": "Oral magnesium supplementation for insomnia in older adults: a Systematic Review & Meta-Analysis."
+            }
+          ],
+          "rationale": "Heavy training + sweat + deficit increases depletion risk. L-threonate specifically targets the CNS.",
+          "impact": "Sleep onset latency, deep sleep %, cognitive clarity",
+          "watching": "Eight Sleep score on adherent vs non-adherent nights",
+          "synergy": "sleep_supps",
+          "hoped_outcome": "Shorter sleep-onset latency and a higher deep-sleep share on adherent nights — the sleep stack's anchor claim.",
+          "measured_by": "Eight Sleep onset latency + deep-sleep % on adherent vs non-adherent nights; Whoop sleep performance as the cross-check."
+        },
+        {
+          "key": "glycine",
+          "name": "Glycine",
+          "dose": "2-3g",
+          "timing": "PM",
+          "ev": "moderate",
+          "evPct": 66,
+          "board": "Dr. Kai Nakamura",
+          "cost_monthly": 8,
+          "why": "Beautiful synergy with Eight Sleep — both work by lowering core temperature. Collagen synthesis bonus for joint health during heavy training.",
+          "science": [
+            "2-3g before bed lowers core body temperature",
+            "Primary physiological trigger for sleep onset",
+            "Synergistic with Eight Sleep cooling"
+          ],
+          "sources": [
+            {
+              "title": "Open question — no verified study found for: Glycine ingestion improves subjective sleep quality (original RCT) (the citation previously here did not resolve to a paper supporting this claim; withdrawn 2026-08-02, #1892)",
+              "stance": "supports"
+            },
+            {
+              "title": "Glycine-induced hypothermia and sleep regulation",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/22293292/",
+              "stance": "supports",
+              "resolved_title": "New therapeutic strategy for amino acid medicine: glycine improves the quality of sleep."
+            },
+            {
+              "title": "Open question — no verified study found for: Effect size on sleep is modest in non-deficient populations (the citation previously here did not resolve to a paper supporting this claim; withdrawn 2026-08-02, #1892)",
+              "stance": "challenges"
+            }
+          ],
+          "rationale": "Synergistic with Eight Sleep cooling — both lower core temp via different mechanisms.",
+          "impact": "Core temp drop, sleep onset latency, deep sleep %",
+          "watching": "Eight Sleep temp data correlation",
+          "synergy": "sleep_supps",
+          "hoped_outcome": "A faster core-temperature drop at bedtime, showing up as shorter sleep-onset latency.",
+          "measured_by": "Eight Sleep bed-temperature and sleep-onset data — the same instrument the mechanism acts on."
+        },
+        {
+          "key": "apigenin",
+          "name": "Apigenin",
+          "dose": "50mg",
+          "timing": "PM",
+          "ev": "moderate",
+          "evPct": 66,
+          "board": "Dr. Kai Nakamura",
+          "cost_monthly": 10,
+          "experiment": "sleep-stack",
+          "why": "Gentlest member of the sleep stack — best risk/reward ratio. If you take one sleep supplement, this is it.",
+          "science": [
+            "Flavonoid that modulates GABA-A receptors",
+            "Reduces sleep onset latency and anxiety without grogginess",
+            "No tolerance, no dependence"
+          ],
+          "sources": [
+            {
+              "title": "Open question — no verified study found for: Apigenin as a GABA-A receptor modulator (preclinical) (the citation previously here did not resolve to a paper supporting this claim; withdrawn 2026-08-02, #1892)",
+              "stance": "supports"
+            },
+            {
+              "title": "Chamomile extract (apigenin) for generalized anxiety disorder",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/22894890/",
+              "stance": "supports",
+              "resolved_title": "Chamomile (Matricaria recutita) may provide antidepressant activity in anxious, depressed humans: an exploratory study."
+            },
+            {
+              "title": "The Therapeutic Potential of Apigenin (review) — evidence is predominantly preclinical/animal; human clinical trials are limited",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/30875872/",
+              "stance": "challenges",
+              "resolved_title": "The Therapeutic Potential of Apigenin."
+            }
+          ],
+          "rationale": "Best risk/reward in the sleep stack — extremely safe with plausible mechanism.",
+          "impact": "Sleep onset latency, subjective sleep quality",
+          "watching": "Sleep quality trend",
+          "synergy": "sleep_supps",
+          "hoped_outcome": "Calmer sleep onset as part of the pre-bed stack — tested as a unit with magnesium and glycine, not expected to be separable on its own.",
+          "measured_by": "Eight Sleep sleep-score trend on stack-adherent vs non-adherent nights."
+        },
+        {
+          "key": "theanine",
+          "name": "L-Theanine",
+          "dose": "100-200mg",
+          "timing": "PM",
+          "ev": "moderate",
+          "evPct": 66,
+          "board": "Dr. Kai Nakamura",
+          "cost_monthly": 8,
+          "why": "Monitor your response — if Eight Sleep shows no difference or worse sleep on Theanine nights, candidate for removal.",
+          "science": [
+            "Promotes alpha brain waves, reduces anxiety without sedation",
+            "Synergistic with caffeine during the day",
+            "Some people get disruptive vivid dreams — individual response varies"
+          ],
+          "sources": [
+            {
+              "title": "L-theanine promotes relaxation without drowsiness",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/18296328/",
+              "stance": "supports",
+              "resolved_title": "L-theanine, a natural constituent in tea, and its effect on mental state."
+            },
+            {
+              "title": "Effects of L-theanine on stress and sleep quality",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/30707852/",
+              "stance": "supports",
+              "resolved_title": "GABA and l-theanine mixture decreases sleep latency and improves NREM sleep."
+            },
+            {
+              "title": "Open question — no controlled study found linking L-theanine to vivid dreams or disrupted sleep architecture; the report is anecdotal and individual (see science notes)",
+              "stance": "challenges"
+            }
+          ],
+          "rationale": "Monitoring via Eight Sleep — data will determine whether this stays.",
+          "impact": "Subjective anxiety, sleep onset",
+          "watching": "Vivid dream reports in journal",
+          "synergy": "sleep_supps",
+          "questioning": true,
+          "questionReason": "Individual response varies — vivid dreams may disrupt sleep for some",
+          "hoped_outcome": "A calmer wind-down and easier sleep onset without sedation.",
+          "measured_by": "Sleep-onset latency (Eight Sleep) + wind-down and vivid-dream notes in the journal."
+        }
       ]
     },
     "muscle": {
-      "name": "Muscle & Performance", "icon": "\ud83d\udcaa", "desc": "Protecting lean mass through the deficit ahead. Every gram of muscle preserved is metabolic insurance.",
+      "name": "Muscle & Performance",
+      "icon": "💪",
+      "desc": "Protecting lean mass through the deficit ahead. Every gram of muscle preserved is metabolic insurance.",
       "items": [
-        {"key":"creatine","name":"Creatine Monohydrate","dose":"5g","timing":"AM with food","ev":"strong","evPct":95,"board":"Dr. Victor Reyes","cost_monthly":8,"experiment":"creatine-cognitive","why":"During deficit, creatine is protective \u2014 helps preserve the muscle you're working to keep. 5g/day, no loading, no cycling.","science":["Most studied sports supplement in history","Increases phosphocreatine stores for high-intensity performance","Emerging cognitive benefits \u2014 neuroprotective properties","Supports lean mass retention during caloric deficit"],"sources":[{"title":"ISSN Position Stand: Creatine Supplementation","url":"https://pubmed.ncbi.nlm.nih.gov/28615996/","stance":"supports"},{"title":"Creatine and creatinine metabolism (physiological review)","url":"https://pubmed.ncbi.nlm.nih.gov/10731009/","stance":"supports"},{"title":"Long-term safety concerns and kidney function (review)","url":"https://pubmed.ncbi.nlm.nih.gov/21399917/","stance":"challenges"}],"rationale":"Most extensively studied supplement in history with consistent positive results across hundreds of RCTs.","impact":"Strength performance, lean mass on DEXA, cognitive clarity","watching":"DEXA lean mass trend","hoped_outcome":"Strength held \u2014 or built \u2014 through the cut, with a possible cognitive-clarity bonus under sleep pressure.","measured_by":"Hevy training volume and benchmark-lift e1RM trends; DEXA lean mass across scans."},
-        {"key":"protein","name":"Protein Supplement","dose":"30g whey/casein","timing":"Post-training","ev":"strong","evPct":90,"board":"Dr. Sarah Chen","cost_monthly":30,"why":"On a calorie deficit with a high daily protein target, protein has to make up a large share of the day's calories — and a shake is often the only way to close the gap.","science":["Whey/casein helps hit a high daily protein target","Most calorie-efficient protein source (120-150 cal for 30g)","Critical for lean mass preservation during deficit"],"sources":[{"title":"Protein supplementation and lean mass (meta-analysis)","url":"https://pubmed.ncbi.nlm.nih.gov/28698222/","stance":"supports"},{"title":"Dietary protein and muscle mass in older adults","url":"https://pubmed.ncbi.nlm.nih.gov/25926512/","stance":"supports"},{"title":"Whole food protein sources superior to supplements for muscle protein synthesis","url":"https://pubmed.ncbi.nlm.nih.gov/28978542/","stance":"challenges"}],"rationale":"At a high protein target inside a deficit, hitting it without a shake requires extreme food selection.","impact":"MacroFactor protein hit rate, lean mass retention","watching":"Daily protein completion in MacroFactor","hoped_outcome":"The daily protein target actually hit, so the deficit burns fat rather than muscle.","measured_by":"MacroFactor protein hit-rate; DEXA lean-mass retention across the cut."},
-        {"key":"electrolytes","name":"Electrolytes","dose":"Full spectrum","timing":"AM + intra-workout","ev":"strong","evPct":85,"board":"Dr. Sarah Chen","cost_monthly":12,"why":"Deficit + hard training + high water intake + sweat = a quadruple depletion vector. If fatigue and headaches show up, they may be electrolyte-driven, not calorie-driven.","science":["Sodium, potassium, magnesium depleted through sweat and restriction","Most people training in deficit are electrolyte depleted","Symptoms: fatigue, cramps, headaches, reduced performance"],"sources":[{"title":"Sodium and fluid replacement during prolonged exercise","url":"https://pubmed.ncbi.nlm.nih.gov/17277604/","stance":"supports"},{"title":"ACSM position stand: exercise and fluid replacement","url":"https://pubmed.ncbi.nlm.nih.gov/17277604/","stance":"supports"},{"title":"Electrolyte supplementation unnecessary for most recreational exercisers","url":"https://pubmed.ncbi.nlm.nih.gov/25920354/","stance":"challenges"}],"rationale":"Deficit + training + hydration = quadruple depletion vector. Symptoms resolve immediately on supplementation.","impact":"Training performance, energy, cramp frequency","watching":"Pre/post workout energy levels","hoped_outcome":"Training output held on heavy-sweat days, with no cramping under the deficit.","measured_by":"Hevy session volume on training days; cramp mentions in the journal."},
-        {"key":"collagen","name":"Collagen Peptides","dose":"10-15g","timing":"Pre-training + Vitamin C","ev":"moderate","evPct":60,"board":"Dr. Sarah Chen","cost_monthly":15,"why":"A 117-lb weight-loss journey means significant skin adaptation. Joint protection through high training volume is the secondary benefit.","science":["15g + vitamin C 30-60 min before exercise increases collagen synthesis","Supports joint cartilage, tendon health, skin elasticity","Baar research on tendon/ligament collagen synthesis"],"sources":[{"title":"Vitamin C-enriched gelatin supplementation increases collagen synthesis (Baar lab)","url":"https://pubmed.ncbi.nlm.nih.gov/27053525/","stance":"supports"},{"title":"Collagen peptides improve skin elasticity (RCT)","url":"https://pubmed.ncbi.nlm.nih.gov/23949208/","stance":"supports"},{"title":"Systematic review found inconsistent evidence for joint health claims","url":"https://pubmed.ncbi.nlm.nih.gov/30368550/","stance":"challenges"}],"rationale":"A 117-lb loss creates unique skin/joint demands — Baar research on pre-exercise collagen + vitamin C is specific.","impact":"Joint comfort, skin elasticity during weight loss","watching":"Joint pain reports in journal","hoped_outcome":"Joints that keep up with rising training volume \u2014 a comfort claim, not a performance one.","measured_by":"Joint-pain mentions in the journal read against Hevy volume; the evidence here is modest and the bar is low."},
-        {"key":"glutamine","name":"L-Glutamine","dose":"5g","timing":"Post-training","ev":"moderate","evPct":50,"board":"Dr. Sarah Chen","cost_monthly":10,"why":"At a high daily protein target, supplemental benefit is likely marginal. Keep only if GI comfort is noticeably better.","science":["Supports gut barrier integrity and immune function","Most abundant amino acid","At high protein intake, likely getting adequate from food"],"sources":[{"title":"Glutamine supplementation and gut barrier function","url":"https://pubmed.ncbi.nlm.nih.gov/28426424/","stance":"supports"},{"title":"Glutamine and immune function during exercise (review)","url":"https://pubmed.ncbi.nlm.nih.gov/18806122/","stance":"supports"},{"title":"At adequate protein intake (>1.6g/kg), supplemental glutamine provides no measurable benefit (meta-analysis)","url":"https://pubmed.ncbi.nlm.nih.gov/18806122/","stance":"challenges"}],"rationale":"Only remains for GI comfort — monitoring for removal.","impact":"GI comfort, immune function","watching":"GI comfort changes","questioning":true,"questionReason":"At a high protein target, likely redundant \u2014 candidate for 'do I need this?'","hoped_outcome":"GI comfort held through a high-protein deficit \u2014 a maintenance claim, not a performance one.","measured_by":"GI-comfort notes in the journal; no objective marker is expected to move."}
+        {
+          "key": "creatine",
+          "name": "Creatine Monohydrate",
+          "dose": "5g",
+          "timing": "AM with food",
+          "ev": "strong",
+          "evPct": 95,
+          "board": "Dr. Victor Reyes",
+          "cost_monthly": 8,
+          "experiment": "creatine-cognitive",
+          "why": "During deficit, creatine is protective — helps preserve the muscle you're working to keep. 5g/day, no loading, no cycling.",
+          "science": [
+            "Most studied sports supplement in history",
+            "Increases phosphocreatine stores for high-intensity performance",
+            "Emerging cognitive benefits — neuroprotective properties",
+            "Supports lean mass retention during caloric deficit"
+          ],
+          "sources": [
+            {
+              "title": "ISSN Position Stand: Creatine Supplementation",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/28615996/",
+              "stance": "supports",
+              "resolved_title": "International Society of Sports Nutrition position stand: safety and efficacy of creatine supplementation in exercise, sport, and medicine."
+            },
+            {
+              "title": "Creatine and creatinine metabolism (physiological review)",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/10731009/",
+              "stance": "supports",
+              "resolved_title": "Effects of oral creatine supplementation on muscular strength and body composition."
+            },
+            {
+              "title": "Long-term safety concerns and kidney function (review)",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/21399917/",
+              "stance": "challenges",
+              "resolved_title": "Studies on the safety of creatine supplementation."
+            }
+          ],
+          "rationale": "Most extensively studied supplement in history with consistent positive results across hundreds of RCTs.",
+          "impact": "Strength performance, lean mass on DEXA, cognitive clarity",
+          "watching": "DEXA lean mass trend",
+          "hoped_outcome": "Strength held — or built — through the cut, with a possible cognitive-clarity bonus under sleep pressure.",
+          "measured_by": "Hevy training volume and benchmark-lift e1RM trends; DEXA lean mass across scans."
+        },
+        {
+          "key": "protein",
+          "name": "Protein Supplement",
+          "dose": "30g whey/casein",
+          "timing": "Post-training",
+          "ev": "strong",
+          "evPct": 90,
+          "board": "Dr. Sarah Chen",
+          "cost_monthly": 30,
+          "why": "On a calorie deficit with a high daily protein target, protein has to make up a large share of the day's calories — and a shake is often the only way to close the gap.",
+          "science": [
+            "Whey/casein helps hit a high daily protein target",
+            "Most calorie-efficient protein source (120-150 cal for 30g)",
+            "Critical for lean mass preservation during deficit"
+          ],
+          "sources": [
+            {
+              "title": "Protein supplementation and lean mass (meta-analysis)",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/28698222/",
+              "stance": "supports",
+              "resolved_title": "A systematic review, meta-analysis and meta-regression of the effect of protein supplementation on resistance training-induced gains in muscle mass and strength in healthy adults."
+            },
+            {
+              "title": "Dietary protein and muscle mass in older adults",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/25926512/",
+              "stance": "supports",
+              "resolved_title": "The role of protein in weight loss and maintenance."
+            },
+            {
+              "title": "Whole food protein sources superior to supplements for muscle protein synthesis",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/28978542/",
+              "stance": "challenges",
+              "resolved_title": "Consumption of whole eggs promotes greater stimulation of postexercise muscle protein synthesis than consumption of isonitrogenous amounts of egg whites in young men."
+            }
+          ],
+          "rationale": "At a high protein target inside a deficit, hitting it without a shake requires extreme food selection.",
+          "impact": "MacroFactor protein hit rate, lean mass retention",
+          "watching": "Daily protein completion in MacroFactor",
+          "hoped_outcome": "The daily protein target actually hit, so the deficit burns fat rather than muscle.",
+          "measured_by": "MacroFactor protein hit-rate; DEXA lean-mass retention across the cut."
+        },
+        {
+          "key": "electrolytes",
+          "name": "Electrolytes",
+          "dose": "Full spectrum",
+          "timing": "AM + intra-workout",
+          "ev": "strong",
+          "evPct": 85,
+          "board": "Dr. Sarah Chen",
+          "cost_monthly": 12,
+          "why": "Deficit + hard training + high water intake + sweat = a quadruple depletion vector. If fatigue and headaches show up, they may be electrolyte-driven, not calorie-driven.",
+          "science": [
+            "Sodium, potassium, magnesium depleted through sweat and restriction",
+            "Most people training in deficit are electrolyte depleted",
+            "Symptoms: fatigue, cramps, headaches, reduced performance"
+          ],
+          "sources": [
+            {
+              "title": "Sodium and fluid replacement during prolonged exercise",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/17277604/",
+              "stance": "supports",
+              "resolved_title": "American College of Sports Medicine position stand. Exercise and fluid replacement."
+            },
+            {
+              "title": "Open question — no verified study found for: ACSM position stand: exercise and fluid replacement (the citation previously here did not resolve to a paper supporting this claim; withdrawn 2026-08-02, #1892)",
+              "stance": "supports"
+            },
+            {
+              "title": "Open question — no verified study found for: Electrolyte supplementation unnecessary for most recreational exercisers (the citation previously here did not resolve to a paper supporting this claim; withdrawn 2026-08-02, #1892)",
+              "stance": "challenges"
+            }
+          ],
+          "rationale": "Deficit + training + hydration = quadruple depletion vector. Symptoms resolve immediately on supplementation.",
+          "impact": "Training performance, energy, cramp frequency",
+          "watching": "Pre/post workout energy levels",
+          "hoped_outcome": "Training output held on heavy-sweat days, with no cramping under the deficit.",
+          "measured_by": "Hevy session volume on training days; cramp mentions in the journal."
+        },
+        {
+          "key": "collagen",
+          "name": "Collagen Peptides",
+          "dose": "10-15g",
+          "timing": "Pre-training + Vitamin C",
+          "ev": "moderate",
+          "evPct": 60,
+          "board": "Dr. Sarah Chen",
+          "cost_monthly": 15,
+          "why": "A 117-lb weight-loss journey means significant skin adaptation. Joint protection through high training volume is the secondary benefit.",
+          "science": [
+            "15g + vitamin C 30-60 min before exercise increases collagen synthesis",
+            "Supports joint cartilage, tendon health, skin elasticity",
+            "Baar research on tendon/ligament collagen synthesis"
+          ],
+          "sources": [
+            {
+              "title": "Open question — no verified study found for: Vitamin C-enriched gelatin supplementation increases collagen synthesis (Baar lab) (the citation previously here did not resolve to a paper supporting this claim; withdrawn 2026-08-02, #1892)",
+              "stance": "supports"
+            },
+            {
+              "title": "Collagen peptides improve skin elasticity (RCT)",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/23949208/",
+              "stance": "supports",
+              "resolved_title": "Oral supplementation of specific collagen peptides has beneficial effects on human skin physiology: a double-blind, placebo-controlled study."
+            },
+            {
+              "title": "Systematic review found inconsistent evidence for joint health claims",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/30368550/",
+              "stance": "challenges",
+              "resolved_title": "Effect of collagen supplementation on osteoarthritis symptoms: a meta-analysis of randomized placebo-controlled trials."
+            }
+          ],
+          "rationale": "A 117-lb loss creates unique skin/joint demands — Baar research on pre-exercise collagen + vitamin C is specific.",
+          "impact": "Joint comfort, skin elasticity during weight loss",
+          "watching": "Joint pain reports in journal",
+          "hoped_outcome": "Joints that keep up with rising training volume — a comfort claim, not a performance one.",
+          "measured_by": "Joint-pain mentions in the journal read against Hevy volume; the evidence here is modest and the bar is low."
+        },
+        {
+          "key": "glutamine",
+          "name": "L-Glutamine",
+          "dose": "5g",
+          "timing": "Post-training",
+          "ev": "moderate",
+          "evPct": 50,
+          "board": "Dr. Sarah Chen",
+          "cost_monthly": 10,
+          "why": "At a high daily protein target, supplemental benefit is likely marginal. Keep only if GI comfort is noticeably better.",
+          "science": [
+            "Supports gut barrier integrity and immune function",
+            "Most abundant amino acid",
+            "At high protein intake, likely getting adequate from food"
+          ],
+          "sources": [
+            {
+              "title": "Open question — no verified study found for: Glutamine supplementation and gut barrier function (the citation previously here did not resolve to a paper supporting this claim; withdrawn 2026-08-02, #1892)",
+              "stance": "supports"
+            },
+            {
+              "title": "Glutamine and immune function during exercise (review)",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/18806122/",
+              "stance": "supports",
+              "resolved_title": "Dosing and efficacy of glutamine supplementation in human exercise and sport training."
+            },
+            {
+              "title": "Open question — no verified study found for: At adequate protein intake (>1.6g/kg), supplemental glutamine provides no measurable benefit (meta-analysis) (the citation previously here did not resolve to a paper supporting this claim; withdrawn 2026-08-02, #1892)",
+              "stance": "challenges"
+            }
+          ],
+          "rationale": "Only remains for GI comfort — monitoring for removal.",
+          "impact": "GI comfort, immune function",
+          "watching": "GI comfort changes",
+          "questioning": true,
+          "questionReason": "At a high protein target, likely redundant — candidate for 'do I need this?'",
+          "hoped_outcome": "GI comfort held through a high-protein deficit — a maintenance claim, not a performance one.",
+          "measured_by": "GI-comfort notes in the journal; no objective marker is expected to move."
+        }
       ]
     },
     "cognitive": {
-      "name": "Cognitive Support", "icon": "\ud83e\udde0", "desc": "Neuroplasticity, focus, and the cognitive infrastructure.",
+      "name": "Cognitive Support",
+      "icon": "🧠",
+      "desc": "Neuroplasticity, focus, and the cognitive infrastructure.",
       "items": [
-        {"key":"lions_mane","name":"Lion's Mane","dose":"500-1000mg","timing":"AM","ev":"emerging","evPct":35,"board":"Dr. Kai Nakamura","cost_monthly":15,"paused":true,"pausedReason":"Not in the starting stack \u2014 emerging evidence only, held until adherence can be tracked","why":"Cognitive performance matters. Emerging evidence \u2014 don't stress if missed.","science":["Stimulates nerve growth factor (NGF) synthesis","Supports neuroplasticity and cognitive function","Not yet confirmed in large RCTs"],"sources":[{"title":"Lion's mane stimulates nerve growth factor synthesis (preclinical)","url":"https://pubmed.ncbi.nlm.nih.gov/24266378/","stance":"supports"},{"title":"Hericium erinaceus improves mild cognitive impairment (small RCT)","url":"https://pubmed.ncbi.nlm.nih.gov/18844328/","stance":"supports"},{"title":"Hericium erinaceus neuroprotection — systematic review of preclinical (in vitro/rodent) models; no large human RCT","url":"https://pubmed.ncbi.nlm.nih.gov/40626304/","stance":"challenges"}],"rationale":"Held out of the starting stack. A good N=1 candidate if picked up with real adherence tracking.","impact":"Subjective cognitive clarity, focus during deep work","watching":"Journal focus reports","questioning":true,"questionReason":"Emerging evidence only \u2014 good N=1 candidate"},
-        {"key":"cordyceps","name":"Cordyceps","dose":"500mg","timing":"AM","ev":"emerging","evPct":30,"board":"Dr. Sarah Chen","cost_monthly":12,"paused":true,"pausedReason":"Not in the starting stack \u2014 emerging evidence only, held until adherence can be tracked","why":"Theoretically supports the aerobic engine during Zone 2. Evidence is thin. Good N=1 candidate.","science":["May improve oxygen utilization and aerobic performance","Supports ATP production","Adaptogenic properties \u2014 evidence promising but limited"],"sources":[{"title":"Cordyceps supplementation improves exercise performance (systematic review)","url":"https://pubmed.ncbi.nlm.nih.gov/27408987/","stance":"supports"},{"title":"Cordyceps militaris improves tolerance to high-intensity exercise","url":"https://pubmed.ncbi.nlm.nih.gov/20804368/","stance":"supports"},{"title":"Human trials show inconsistent results for aerobic performance","url":"https://pubmed.ncbi.nlm.nih.gov/27408987/","stance":"challenges"}],"rationale":"Held out of the starting stack. If picked up, HR recovery would be the validation metric.","impact":"Aerobic performance, HR recovery, Zone 2 efficiency","watching":"HR recovery trend on vs off weeks","questioning":true,"questionReason":"Evidence is thin \u2014 track HR recovery as validation metric"},
-        {"key":"reishi","name":"Reishi","dose":"500mg","timing":"PM","ev":"emerging","evPct":20,"board":"Dr. Victor Reyes","cost_monthly":12,"paused":true,"pausedReason":"Not in the starting stack \u2014 emerging evidence only, held until adherence can be tracked","why":"Lowest-evidence mushroom supplement. Consider whether cost and pill burden is justified.","science":["Adaptogenic mushroom with immunomodulatory properties","Traditional use for sleep and stress","Limited clinical evidence"],"sources":[{"title":"Ganoderma lucidum (reishi) immunomodulatory properties","url":"https://pubmed.ncbi.nlm.nih.gov/16428086/","stance":"supports"},{"title":"Reishi for fatigue and quality of life (small trial)","url":"https://pubmed.ncbi.nlm.nih.gov/22203880/","stance":"supports"},{"title":"Clinical evidence is extremely limited — mostly traditional medicine claims","url":"https://pubmed.ncbi.nlm.nih.gov/26462366/","stance":"challenges"}],"rationale":"Lowest evidence in the stack — not in the starting lineup.","impact":"Subjective calm, sleep quality","watching":"No clear signal yet","questioning":true,"questionReason":"Lowest evidence in the stack \u2014 candidate for pausing"}
+        {
+          "key": "lions_mane",
+          "name": "Lion's Mane",
+          "dose": "500-1000mg",
+          "timing": "AM",
+          "ev": "emerging",
+          "evPct": 35,
+          "board": "Dr. Kai Nakamura",
+          "cost_monthly": 15,
+          "paused": true,
+          "pausedReason": "Not in the starting stack — emerging evidence only, held until adherence can be tracked",
+          "why": "Cognitive performance matters. Emerging evidence — don't stress if missed.",
+          "science": [
+            "Stimulates nerve growth factor (NGF) synthesis",
+            "Supports neuroplasticity and cognitive function",
+            "Not yet confirmed in large RCTs"
+          ],
+          "sources": [
+            {
+              "title": "Lion's mane stimulates nerve growth factor synthesis (preclinical)",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/24266378/",
+              "stance": "supports",
+              "resolved_title": "Neurotrophic properties of the Lion's mane medicinal mushroom, Hericium erinaceus (Higher Basidiomycetes) from Malaysia."
+            },
+            {
+              "title": "Hericium erinaceus improves mild cognitive impairment (small RCT)",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/18844328/",
+              "stance": "supports",
+              "resolved_title": "Improving effects of the mushroom Yamabushitake (Hericium erinaceus) on mild cognitive impairment: a double-blind placebo-controlled clinical trial."
+            },
+            {
+              "title": "Hericium erinaceus neuroprotection — systematic review of preclinical (in vitro/rodent) models; no large human RCT",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/40626304/",
+              "stance": "challenges",
+              "resolved_title": "Unveiling the role of erinacines in the neuroprotective effects of Hericium erinaceus: a systematic review in preclinical models."
+            }
+          ],
+          "rationale": "Held out of the starting stack. A good N=1 candidate if picked up with real adherence tracking.",
+          "impact": "Subjective cognitive clarity, focus during deep work",
+          "watching": "Journal focus reports",
+          "questioning": true,
+          "questionReason": "Emerging evidence only — good N=1 candidate"
+        },
+        {
+          "key": "cordyceps",
+          "name": "Cordyceps",
+          "dose": "500mg",
+          "timing": "AM",
+          "ev": "emerging",
+          "evPct": 30,
+          "board": "Dr. Sarah Chen",
+          "cost_monthly": 12,
+          "paused": true,
+          "pausedReason": "Not in the starting stack — emerging evidence only, held until adherence can be tracked",
+          "why": "Theoretically supports the aerobic engine during Zone 2. Evidence is thin. Good N=1 candidate.",
+          "science": [
+            "May improve oxygen utilization and aerobic performance",
+            "Supports ATP production",
+            "Adaptogenic properties — evidence promising but limited"
+          ],
+          "sources": [
+            {
+              "title": "Cordyceps supplementation improves exercise performance (systematic review)",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/27408987/",
+              "stance": "supports",
+              "resolved_title": "Cordyceps militaris Improves Tolerance to High-Intensity Exercise After Acute and Chronic Supplementation."
+            },
+            {
+              "title": "Cordyceps militaris improves tolerance to high-intensity exercise",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/20804368/",
+              "stance": "supports",
+              "resolved_title": "Effect of Cs-4 (Cordyceps sinensis) on exercise performance in healthy older subjects: a double-blind, placebo-controlled trial."
+            },
+            {
+              "title": "Open question — no verified study found for: Human trials show inconsistent results for aerobic performance (the citation previously here did not resolve to a paper supporting this claim; withdrawn 2026-08-02, #1892)",
+              "stance": "challenges"
+            }
+          ],
+          "rationale": "Held out of the starting stack. If picked up, HR recovery would be the validation metric.",
+          "impact": "Aerobic performance, HR recovery, Zone 2 efficiency",
+          "watching": "HR recovery trend on vs off weeks",
+          "questioning": true,
+          "questionReason": "Evidence is thin — track HR recovery as validation metric"
+        },
+        {
+          "key": "reishi",
+          "name": "Reishi",
+          "dose": "500mg",
+          "timing": "PM",
+          "ev": "emerging",
+          "evPct": 20,
+          "board": "Dr. Victor Reyes",
+          "cost_monthly": 12,
+          "paused": true,
+          "pausedReason": "Not in the starting stack — emerging evidence only, held until adherence can be tracked",
+          "why": "Lowest-evidence mushroom supplement. Consider whether cost and pill burden is justified.",
+          "science": [
+            "Adaptogenic mushroom with immunomodulatory properties",
+            "Traditional use for sleep and stress",
+            "Limited clinical evidence"
+          ],
+          "sources": [
+            {
+              "title": "Ganoderma lucidum (reishi) immunomodulatory properties",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/16428086/",
+              "stance": "supports",
+              "resolved_title": "Monitoring of immune responses to a herbal immuno-modulator in patients with advanced colorectal cancer."
+            },
+            {
+              "title": "Reishi for fatigue and quality of life (small trial)",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/22203880/",
+              "stance": "supports",
+              "resolved_title": "Spore Powder of Ganoderma lucidum Improves Cancer-Related Fatigue in Breast Cancer Patients Undergoing Endocrine Therapy: A Pilot Clinical Trial."
+            },
+            {
+              "title": "Open question — no verified study found for: Clinical evidence is extremely limited — mostly traditional medicine claims (the citation previously here did not resolve to a paper supporting this claim; withdrawn 2026-08-02, #1892)",
+              "stance": "challenges"
+            }
+          ],
+          "rationale": "Lowest evidence in the stack — not in the starting lineup.",
+          "impact": "Subjective calm, sleep quality",
+          "watching": "No clear signal yet",
+          "questioning": true,
+          "questionReason": "Lowest evidence in the stack — candidate for pausing"
+        }
       ]
     },
     "longevity": {
-      "name": "Longevity Foundation", "icon": "\u2764\ufe0f", "desc": "The long-game supplements. Cardiovascular protection, immune resilience, and micronutrient insurance.",
+      "name": "Longevity Foundation",
+      "icon": "❤️",
+      "desc": "The long-game supplements. Cardiovascular protection, immune resilience, and micronutrient insurance.",
       "items": [
-        {"key":"omega3","name":"Omega-3 (EPA/DHA)","dose":"2-4g combined","timing":"With fat-containing meal","ev":"strong","evPct":90,"board":"Dr. Victor Reyes","cost_monthly":15,"why":"Lab work shows cardiovascular risk markers. Omega-3 is most likely to move your TG/HDL ratio over time.","science":["Reduces systemic inflammation, improves TG/HDL ratio","Supports cell membrane fluidity, cardioprotective","EPA specifically has antidepressant effects at 1g+ doses"],"sources":[{"title":"Omega-3 fatty acids and cardiovascular disease (Cochrane Review)","url":"https://pubmed.ncbi.nlm.nih.gov/29387889/","stance":"supports"},{"title":"VITAL trial: n-3 fatty acids and cardiovascular events","url":"https://pubmed.ncbi.nlm.nih.gov/30415637/","stance":"challenges"}],"rationale":"Clinical lab context makes pre-formed EPA/DHA the reliable choice — measured TG/HDL response is the validation metric.","impact":"Triglycerides, TG/HDL ratio, hs-CRP, mood stability","watching":"Lipid panel trends across lab draws","hoped_outcome":"Lower triglycerides and TG/HDL ratio, with hs-CRP trending down.","measured_by":"The lipid panel (triglycerides, TG/HDL) + hs-CRP across quarterly lab draws."},
-        {"key":"vitamin_d","name":"Vitamin D3 + K2","dose":"5000 IU","timing":"AM with fat","ev":"strong","evPct":90,"board":"Dr. Victor Reyes","cost_monthly":5,"why":"Living in Seattle makes this non-optional. Lab trends track 25-OH Vitamin D to confirm range.","science":["Essential for calcium metabolism, immune function, mood","Deficiency 40-50% at northern latitudes","Seattle (47\u00b0N) produces zero cutaneous vitamin D Oct\u2013Mar","Target: 40-60 ng/mL"],"sources":[{"title":"Vitamin D supplementation and musculoskeletal health (meta-analysis)","url":"https://pubmed.ncbi.nlm.nih.gov/29279934/","stance":"supports"},{"title":"VITAL trial: Vitamin D and cancer/CVD prevention","url":"https://pubmed.ncbi.nlm.nih.gov/30415629/","stance":"challenges"}],"rationale":"Living at 47\u00b0N latitude with zero cutaneous synthesis Oct\u2013Mar makes this non-negotiable \u2014 lab-confirmed.","impact":"25-OH Vitamin D lab levels, immune function, mood","watching":"25-OH-D lab trend \u2014 currently in range?","hoped_outcome":"25-OH vitamin D held in the optimal range through indoor-heavy months.","measured_by":"25-OH-D on quarterly labs."},
-        {"key":"zinc","name":"Zinc Picolinate","dose":"30mg","timing":"With meal","ev":"moderate","evPct":60,"board":"Dr. Victor Reyes","cost_monthly":8,"why":"Under a deficit plus heavy training, zinc loss through sweat is a real risk. Supports immune resilience.","science":["Supports immune function, testosterone production","Athletes lose zinc through sweat","Picolinate has superior bioavailability","Excess (>40mg) can deplete copper"],"sources":[{"title":"Zinc supplementation and immune function (meta-analysis)","url":"https://pubmed.ncbi.nlm.nih.gov/22566526/","stance":"supports"},{"title":"Zinc status and exercise performance","url":"https://pubmed.ncbi.nlm.nih.gov/16648789/","stance":"supports"},{"title":"Excess zinc depletes copper — balance is critical","url":"https://pubmed.ncbi.nlm.nih.gov/23647674/","stance":"challenges"}],"rationale":"Serum zinc has run low on labs despite adequate dietary intake — supplementation is the corrective lever, and serum zinc validates the need.","impact":"Immune resilience, testosterone, zinc lab levels","watching":"Serum zinc levels","hoped_outcome":"Zinc status and immune resilience held through the deficit.","measured_by":"Serum zinc on lab draws; sick-day count as the blunt cross-check."},
-        {"key":"nac","name":"NAC (N-Acetyl Cysteine)","dose":"600-1200mg","timing":"AM","ev":"moderate","evPct":60,"board":"Dr. Victor Reyes","cost_monthly":10,"why":"Glutathione support during deficit and high training load. Behavioral benefit (reducing rumination) may support discipline stack.","science":["Glutathione precursor \u2014 body's master antioxidant","Supports liver detoxification, reduces oxidative stress","Evidence for reducing rumination/compulsive behavior"],"sources":[{"title":"NAC as a glutathione precursor and antioxidant (review)","url":"https://pubmed.ncbi.nlm.nih.gov/24629205/","stance":"supports"},{"title":"NAC reduces oxidative stress and supports liver function","url":"https://pubmed.ncbi.nlm.nih.gov/17284826/","stance":"supports"},{"title":"Some evidence NAC may blunt exercise adaptations (antioxidant interference)","url":"https://pubmed.ncbi.nlm.nih.gov/25974857/","stance":"challenges"}],"rationale":"Glutathione support during deficit outweighs theoretical adaptation blunting — liver panels will validate.","impact":"Liver function markers (AST, ALT), oxidative stress","watching":"AST/ALT liver panel trend","hoped_outcome":"Liver markers (AST/ALT) holding or improving under antioxidant support.","measured_by":"AST/ALT on the quarterly liver panel."},
-        {"key":"multivitamin","name":"Multivitamin","dose":"1 daily","timing":"AM with food","ev":"moderate","evPct":50,"board":"Dr. Victor Reyes","cost_monthly":12,"why":"In a sustained deficit, eating significantly less food than the body is sized for. Insurance policy.","science":["During restriction, micronutrient gaps more likely","Fills selenium, manganese, trace mineral gaps","Evidence in well-nourished populations is weak","In a sustained deficit the insurance argument is stronger"],"sources":[{"title":"Multivitamin supplementation and micronutrient adequacy during caloric restriction","url":"https://pubmed.ncbi.nlm.nih.gov/17921406/","stance":"supports"},{"title":"COSMOS trial: multivitamins and cognitive function in older adults","url":"https://pubmed.ncbi.nlm.nih.gov/36129998/","stance":"supports"},{"title":"USPSTF finds insufficient evidence for multivitamins in well-nourished adults","url":"https://pubmed.ncbi.nlm.nih.gov/35727271/","stance":"challenges"}],"rationale":"In a sustained deficit, 'well-nourished' doesn't apply — micronutrient insurance argument is stronger.","impact":"Micronutrient sufficiency","watching":"General health markers","hoped_outcome":"Micronutrient insurance under a caloric deficit \u2014 no single marker is expected to move.","measured_by":"Deficiency screens on quarterly labs; absence of a problem is the win condition."},
-        {"key":"b_complex","name":"B Complex","dose":"1 daily","timing":"AM","ev":"moderate","evPct":55,"board":"Dr. Victor Reyes","cost_monthly":8,"why":"Homocysteine is the validation metric \u2014 worth checking whether methylated B forms move it.","science":["Cofactors in energy metabolism, methylation, neurotransmitter synthesis","Depletion risk increases during caloric restriction","B12 and folate important for homocysteine management"],"sources":[{"title":"B vitamins and homocysteine metabolism (review)","url":"https://pubmed.ncbi.nlm.nih.gov/16531613/","stance":"supports"},{"title":"B vitamin supplementation and cognitive function","url":"https://pubmed.ncbi.nlm.nih.gov/20838622/","stance":"supports"},{"title":"Excess B6 can cause peripheral neuropathy","url":"https://pubmed.ncbi.nlm.nih.gov/29495902/","stance":"challenges"}],"rationale":"Elevated homocysteine on labs is what would justify methylation support — it's the validation metric.","impact":"Homocysteine levels, energy, cognitive clarity","watching":"Homocysteine lab trend","hoped_outcome":"Homocysteine held in range, with steadier day-to-day energy.","measured_by":"Homocysteine on lab draws."}
+        {
+          "key": "omega3",
+          "name": "Omega-3 (EPA/DHA)",
+          "dose": "2-4g combined",
+          "timing": "With fat-containing meal",
+          "ev": "strong",
+          "evPct": 90,
+          "board": "Dr. Victor Reyes",
+          "cost_monthly": 15,
+          "why": "Lab work shows cardiovascular risk markers. Omega-3 is most likely to move your TG/HDL ratio over time.",
+          "science": [
+            "Reduces systemic inflammation, improves TG/HDL ratio",
+            "Supports cell membrane fluidity, cardioprotective",
+            "EPA specifically has antidepressant effects at 1g+ doses"
+          ],
+          "sources": [
+            {
+              "title": "Omega-3 fatty acids and cardiovascular disease (Cochrane Review)",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/29387889/",
+              "stance": "supports",
+              "resolved_title": "Associations of Omega-3 Fatty Acid Supplement Use With Cardiovascular Disease Risks: Meta-analysis of 10 Trials Involving 77 917 Individuals."
+            },
+            {
+              "title": "VITAL trial: n-3 fatty acids and cardiovascular events",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/30415637/",
+              "stance": "challenges",
+              "resolved_title": "Marine n-3 Fatty Acids and Prevention of Cardiovascular Disease and Cancer."
+            }
+          ],
+          "rationale": "Clinical lab context makes pre-formed EPA/DHA the reliable choice — measured TG/HDL response is the validation metric.",
+          "impact": "Triglycerides, TG/HDL ratio, hs-CRP, mood stability",
+          "watching": "Lipid panel trends across lab draws",
+          "hoped_outcome": "Lower triglycerides and TG/HDL ratio, with hs-CRP trending down.",
+          "measured_by": "The lipid panel (triglycerides, TG/HDL) + hs-CRP across quarterly lab draws."
+        },
+        {
+          "key": "vitamin_d",
+          "name": "Vitamin D3 + K2",
+          "dose": "5000 IU",
+          "timing": "AM with fat",
+          "ev": "strong",
+          "evPct": 90,
+          "board": "Dr. Victor Reyes",
+          "cost_monthly": 5,
+          "why": "Living in Seattle makes this non-optional. Lab trends track 25-OH Vitamin D to confirm range.",
+          "science": [
+            "Essential for calcium metabolism, immune function, mood",
+            "Deficiency 40-50% at northern latitudes",
+            "Seattle (47°N) produces zero cutaneous vitamin D Oct–Mar",
+            "Target: 40-60 ng/mL"
+          ],
+          "sources": [
+            {
+              "title": "Vitamin D supplementation and musculoskeletal health (meta-analysis)",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/29279934/",
+              "stance": "supports",
+              "resolved_title": "Association Between Calcium or Vitamin D Supplementation and Fracture Incidence in Community-Dwelling Older Adults: A Systematic Review and Meta-analysis."
+            },
+            {
+              "title": "VITAL trial: Vitamin D and cancer/CVD prevention",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/30415629/",
+              "stance": "challenges",
+              "resolved_title": "Vitamin D Supplements and Prevention of Cancer and Cardiovascular Disease."
+            }
+          ],
+          "rationale": "Living at 47°N latitude with zero cutaneous synthesis Oct–Mar makes this non-negotiable — lab-confirmed.",
+          "impact": "25-OH Vitamin D lab levels, immune function, mood",
+          "watching": "25-OH-D lab trend — currently in range?",
+          "hoped_outcome": "25-OH vitamin D held in the optimal range through indoor-heavy months.",
+          "measured_by": "25-OH-D on quarterly labs."
+        },
+        {
+          "key": "zinc",
+          "name": "Zinc Picolinate",
+          "dose": "30mg",
+          "timing": "With meal",
+          "ev": "moderate",
+          "evPct": 60,
+          "board": "Dr. Victor Reyes",
+          "cost_monthly": 8,
+          "why": "Under a deficit plus heavy training, zinc loss through sweat is a real risk. Supports immune resilience.",
+          "science": [
+            "Supports immune function, testosterone production",
+            "Athletes lose zinc through sweat",
+            "Picolinate has superior bioavailability",
+            "Excess (>40mg) can deplete copper"
+          ],
+          "sources": [
+            {
+              "title": "Zinc supplementation and immune function (meta-analysis)",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/22566526/",
+              "stance": "supports",
+              "resolved_title": "Zinc for the treatment of the common cold: a systematic review and meta-analysis of randomized controlled trials."
+            },
+            {
+              "title": "Zinc status and exercise performance",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/16648789/",
+              "stance": "supports",
+              "resolved_title": "The effect of exhaustion exercise on thyroid hormones and testosterone levels of elite athletes receiving oral zinc."
+            },
+            {
+              "title": "Open question — no verified study found for: Excess zinc depletes copper — balance is critical (the citation previously here did not resolve to a paper supporting this claim; withdrawn 2026-08-02, #1892)",
+              "stance": "challenges"
+            }
+          ],
+          "rationale": "Serum zinc has run low on labs despite adequate dietary intake — supplementation is the corrective lever, and serum zinc validates the need.",
+          "impact": "Immune resilience, testosterone, zinc lab levels",
+          "watching": "Serum zinc levels",
+          "hoped_outcome": "Zinc status and immune resilience held through the deficit.",
+          "measured_by": "Serum zinc on lab draws; sick-day count as the blunt cross-check."
+        },
+        {
+          "key": "nac",
+          "name": "NAC (N-Acetyl Cysteine)",
+          "dose": "600-1200mg",
+          "timing": "AM",
+          "ev": "emerging",
+          "evPct": 20,
+          "board": "Dr. Victor Reyes",
+          "cost_monthly": 10,
+          "why": "Glutathione support during deficit and high training load. Behavioral benefit (reducing rumination) may support discipline stack.",
+          "science": [
+            "Glutathione precursor — body's master antioxidant",
+            "Supports liver detoxification, reduces oxidative stress",
+            "Evidence for reducing rumination/compulsive behavior"
+          ],
+          "sources": [
+            {
+              "title": "Open question — no verified study found for: NAC as a glutathione precursor and antioxidant (review) (the citation previously here did not resolve to a paper supporting this claim; withdrawn 2026-08-02, #1892)",
+              "stance": "supports"
+            },
+            {
+              "title": "Open question — no verified study found for: NAC reduces oxidative stress and supports liver function (the citation previously here did not resolve to a paper supporting this claim; withdrawn 2026-08-02, #1892)",
+              "stance": "supports"
+            },
+            {
+              "title": "Open question — no verified study found for: Some evidence NAC may blunt exercise adaptations (antioxidant interference) (the citation previously here did not resolve to a paper supporting this claim; withdrawn 2026-08-02, #1892)",
+              "stance": "challenges"
+            }
+          ],
+          "rationale": "Glutathione support during deficit outweighs theoretical adaptation blunting — liver panels will validate.",
+          "impact": "Liver function markers (AST, ALT), oxidative stress",
+          "watching": "AST/ALT liver panel trend",
+          "hoped_outcome": "Liver markers (AST/ALT) holding or improving under antioxidant support.",
+          "measured_by": "AST/ALT on the quarterly liver panel.",
+          "evidence_note": "All citations previously listed here were withdrawn on 2026-08-02 (#1892) because they did not resolve to papers supporting these claims. The evidence rating is downgraded to reflect what is actually cited — nothing — rather than what was claimed."
+        },
+        {
+          "key": "multivitamin",
+          "name": "Multivitamin",
+          "dose": "1 daily",
+          "timing": "AM with food",
+          "ev": "moderate",
+          "evPct": 50,
+          "board": "Dr. Victor Reyes",
+          "cost_monthly": 12,
+          "why": "In a sustained deficit, eating significantly less food than the body is sized for. Insurance policy.",
+          "science": [
+            "During restriction, micronutrient gaps more likely",
+            "Fills selenium, manganese, trace mineral gaps",
+            "Evidence in well-nourished populations is weak",
+            "In a sustained deficit the insurance argument is stronger"
+          ],
+          "sources": [
+            {
+              "title": "Open question — no verified study found for: Multivitamin supplementation and micronutrient adequacy during caloric restriction (the citation previously here did not resolve to a paper supporting this claim; withdrawn 2026-08-02, #1892)",
+              "stance": "supports"
+            },
+            {
+              "title": "Open question — no verified study found for: COSMOS trial: multivitamins and cognitive function in older adults (the citation previously here did not resolve to a paper supporting this claim; withdrawn 2026-08-02, #1892)",
+              "stance": "supports"
+            },
+            {
+              "title": "USPSTF finds insufficient evidence for multivitamins in well-nourished adults",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/35727271/",
+              "stance": "challenges",
+              "resolved_title": "Vitamin, Mineral, and Multivitamin Supplementation to Prevent Cardiovascular Disease and Cancer: US Preventive Services Task Force Recommendation Statement."
+            }
+          ],
+          "rationale": "In a sustained deficit, 'well-nourished' doesn't apply — micronutrient insurance argument is stronger.",
+          "impact": "Micronutrient sufficiency",
+          "watching": "General health markers",
+          "hoped_outcome": "Micronutrient insurance under a caloric deficit — no single marker is expected to move.",
+          "measured_by": "Deficiency screens on quarterly labs; absence of a problem is the win condition."
+        },
+        {
+          "key": "b_complex",
+          "name": "B Complex",
+          "dose": "1 daily",
+          "timing": "AM",
+          "ev": "moderate",
+          "evPct": 55,
+          "board": "Dr. Victor Reyes",
+          "cost_monthly": 8,
+          "why": "Homocysteine is the validation metric — worth checking whether methylated B forms move it.",
+          "science": [
+            "Cofactors in energy metabolism, methylation, neurotransmitter synthesis",
+            "Depletion risk increases during caloric restriction",
+            "B12 and folate important for homocysteine management"
+          ],
+          "sources": [
+            {
+              "title": "B vitamins and homocysteine metabolism (review)",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/16531613/",
+              "stance": "supports",
+              "resolved_title": "Homocysteine lowering with folic acid and B vitamins in vascular disease."
+            },
+            {
+              "title": "B vitamin supplementation and cognitive function",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/20838622/",
+              "stance": "supports",
+              "resolved_title": "Homocysteine-lowering by B vitamins slows the rate of accelerated brain atrophy in mild cognitive impairment: a randomized controlled trial."
+            },
+            {
+              "title": "Open question — no verified study found for: Excess B6 can cause peripheral neuropathy (the citation previously here did not resolve to a paper supporting this claim; withdrawn 2026-08-02, #1892)",
+              "stance": "challenges"
+            }
+          ],
+          "rationale": "Elevated homocysteine on labs is what would justify methylation support — it's the validation metric.",
+          "impact": "Homocysteine levels, energy, cognitive clarity",
+          "watching": "Homocysteine lab trend",
+          "hoped_outcome": "Homocysteine held in range, with steadier day-to-day energy.",
+          "measured_by": "Homocysteine on lab draws."
+        }
       ]
     },
     "metabolic": {
-      "name": "Metabolic & Body Comp", "icon": "\ud83d\udd2c", "desc": "Supporting the deficit engine. Glucose management, fat oxidation, and gut health.",
+      "name": "Metabolic & Body Comp",
+      "icon": "🔬",
+      "desc": "Supporting the deficit engine. Glucose management, fat oxidation, and gut health.",
       "items": [
-        {"key":"inositol","name":"Myo-Inositol","dose":"2-4g","timing":"PM","ev":"moderate","evPct":55,"board":"Dr. Kai Nakamura","cost_monthly":10,"why":"During metabolic transformation, insulin sensitivity is a key lever. CGM data should validate.","science":["Supports insulin signaling and serotonin receptor sensitivity","Anxiolytic properties","Evidence for metabolic benefit in insulin-resistant populations"],"sources":[{"title":"Myo-inositol improves insulin sensitivity (meta-analysis)","url":"https://pubmed.ncbi.nlm.nih.gov/27510537/","stance":"supports"},{"title":"Inositol and glucose metabolism in metabolic syndrome","url":"https://pubmed.ncbi.nlm.nih.gov/26905542/","stance":"supports"},{"title":"Most positive evidence is in PCOS populations — limited data in metabolically healthy males","url":"https://pubmed.ncbi.nlm.nih.gov/28954909/","stance":"challenges"}],"rationale":"CGM data will validate whether glucose disposal improves — clear measurable outcome.","impact":"Glucose variability, insulin sensitivity via CGM","watching":"CGM glucose disposal post-meals","hoped_outcome":"Flatter post-meal glucose and lower overall glucose variability.","measured_by":"CGM post-meal excursions and variability on adherent vs non-adherent stretches."},
-        {"key":"green_tea","name":"Green Tea Phytosome (EGCG)","dose":"250mg","timing":"AM","ev":"moderate","evPct":45,"board":"Dr. Victor Reyes","cost_monthly":10,"why":"Marginal fat oxidation support. Insurance, not primary lever. Weight trend won't show it.","science":["EGCG supports fat oxidation and thermogenesis","Antioxidant properties","Modest effect on fat loss (1-2 lbs over 12 weeks)"],"sources":[{"title":"Green tea catechins and fat oxidation (meta-analysis)","url":"https://pubmed.ncbi.nlm.nih.gov/19597519/","stance":"supports"},{"title":"EGCG and thermogenesis in humans","url":"https://pubmed.ncbi.nlm.nih.gov/10584049/","stance":"supports"},{"title":"Effect size on fat loss is 1-2 lbs over 12 weeks — clinically meaningless","url":"https://pubmed.ncbi.nlm.nih.gov/22747440/","stance":"challenges"}],"rationale":"Insurance play only — wouldn't supplement for fat loss alone.","impact":"Marginal fat oxidation, antioxidant status","watching":"No clear signal expected","questioning":true,"questionReason":"Effect size too small to measure \u2014 pure insurance play","hoped_outcome":"A marginal fat-oxidation assist \u2014 honestly small; no visible signal is the likely outcome.","measured_by":"The weight-trend rate read against the deficit math; a clear null here retires it."},
-        {"key":"probiotics","name":"Probiotics","dose":"Multi-strain","timing":"AM empty stomach","ev":"moderate","evPct":45,"board":"Dr. Kai Nakamura","cost_monthly":15,"why":"During high-protein deficit, GI comfort matters for adherence. Consider fermented foods instead.","science":["Gut microbiome correlates with metabolic health and mood","Evidence is strain-specific and mixed","Fermented foods may be superior for diversity"],"sources":[{"title":"Probiotics and gut microbiome modulation (systematic review)","url":"https://pubmed.ncbi.nlm.nih.gov/24912386/","stance":"supports"},{"title":"Probiotics for GI health during dietary restriction","url":"https://pubmed.ncbi.nlm.nih.gov/25157183/","stance":"supports"},{"title":"Probiotic supplementation may reduce gut microbiome diversity vs fermented foods","url":"https://pubmed.ncbi.nlm.nih.gov/34256014/","stance":"challenges"}],"rationale":"Candidate for replacement with fermented food strategy.","impact":"GI comfort, digestion quality","watching":"GI comfort changes on vs off","questioning":true,"questionReason":"Candidate for reassessment \u2014 fermented foods may be food-first approach","hoped_outcome":"Steadier GI comfort and digestion quality.","measured_by":"GI-comfort notes in the journal on vs off; no lab marker is expected to move."}
+        {
+          "key": "inositol",
+          "name": "Myo-Inositol",
+          "dose": "2-4g",
+          "timing": "PM",
+          "ev": "emerging",
+          "evPct": 20,
+          "board": "Dr. Kai Nakamura",
+          "cost_monthly": 10,
+          "why": "During metabolic transformation, insulin sensitivity is a key lever. CGM data should validate.",
+          "science": [
+            "Supports insulin signaling and serotonin receptor sensitivity",
+            "Anxiolytic properties",
+            "Evidence for metabolic benefit in insulin-resistant populations"
+          ],
+          "sources": [
+            {
+              "title": "Open question — no verified study found for: Myo-inositol improves insulin sensitivity (meta-analysis) (the citation previously here did not resolve to a paper supporting this claim; withdrawn 2026-08-02, #1892)",
+              "stance": "supports"
+            },
+            {
+              "title": "Open question — no verified study found for: Inositol and glucose metabolism in metabolic syndrome (the citation previously here did not resolve to a paper supporting this claim; withdrawn 2026-08-02, #1892)",
+              "stance": "supports"
+            },
+            {
+              "title": "Open question — no verified study found for: Most positive evidence is in PCOS populations — limited data in metabolically healthy males (the citation previously here did not resolve to a paper supporting this claim; withdrawn 2026-08-02, #1892)",
+              "stance": "challenges"
+            }
+          ],
+          "rationale": "CGM data will validate whether glucose disposal improves — clear measurable outcome.",
+          "impact": "Glucose variability, insulin sensitivity via CGM",
+          "watching": "CGM glucose disposal post-meals",
+          "hoped_outcome": "Flatter post-meal glucose and lower overall glucose variability.",
+          "measured_by": "CGM post-meal excursions and variability on adherent vs non-adherent stretches.",
+          "evidence_note": "All citations previously listed here were withdrawn on 2026-08-02 (#1892) because they did not resolve to papers supporting these claims. The evidence rating is downgraded to reflect what is actually cited — nothing — rather than what was claimed."
+        },
+        {
+          "key": "green_tea",
+          "name": "Green Tea Phytosome (EGCG)",
+          "dose": "250mg",
+          "timing": "AM",
+          "ev": "moderate",
+          "evPct": 45,
+          "board": "Dr. Victor Reyes",
+          "cost_monthly": 10,
+          "why": "Marginal fat oxidation support. Insurance, not primary lever. Weight trend won't show it.",
+          "science": [
+            "EGCG supports fat oxidation and thermogenesis",
+            "Antioxidant properties",
+            "Modest effect on fat loss (1-2 lbs over 12 weeks)"
+          ],
+          "sources": [
+            {
+              "title": "Green tea catechins and fat oxidation (meta-analysis)",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/19597519/",
+              "stance": "supports",
+              "resolved_title": "The effects of green tea on weight loss and weight maintenance: a meta-analysis."
+            },
+            {
+              "title": "EGCG and thermogenesis in humans",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/10584049/",
+              "stance": "supports",
+              "resolved_title": "Efficacy of a green tea extract rich in catechin polyphenols and caffeine in increasing 24-h energy expenditure and fat oxidation in humans."
+            },
+            {
+              "title": "Open question — no verified study found for: Effect size on fat loss is 1-2 lbs over 12 weeks — clinically meaningless (the citation previously here did not resolve to a paper supporting this claim; withdrawn 2026-08-02, #1892)",
+              "stance": "challenges"
+            }
+          ],
+          "rationale": "Insurance play only — wouldn't supplement for fat loss alone.",
+          "impact": "Marginal fat oxidation, antioxidant status",
+          "watching": "No clear signal expected",
+          "questioning": true,
+          "questionReason": "Effect size too small to measure — pure insurance play",
+          "hoped_outcome": "A marginal fat-oxidation assist — honestly small; no visible signal is the likely outcome.",
+          "measured_by": "The weight-trend rate read against the deficit math; a clear null here retires it."
+        },
+        {
+          "key": "probiotics",
+          "name": "Probiotics",
+          "dose": "Multi-strain",
+          "timing": "AM empty stomach",
+          "ev": "moderate",
+          "evPct": 45,
+          "board": "Dr. Kai Nakamura",
+          "cost_monthly": 15,
+          "why": "During high-protein deficit, GI comfort matters for adherence. Consider fermented foods instead.",
+          "science": [
+            "Gut microbiome correlates with metabolic health and mood",
+            "Evidence is strain-specific and mixed",
+            "Fermented foods may be superior for diversity"
+          ],
+          "sources": [
+            {
+              "title": "Probiotics and gut microbiome modulation (systematic review)",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/24912386/",
+              "stance": "supports",
+              "resolved_title": "Expert consensus document. The International Scientific Association for Probiotics and Prebiotics consensus statement on the scope and appropriate use of the term probiotic."
+            },
+            {
+              "title": "Probiotics for GI health during dietary restriction",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/25157183/",
+              "stance": "supports",
+              "resolved_title": "Use of probiotics to correct dysbiosis of normal microbiota following disease or disruptive events: a systematic review."
+            },
+            {
+              "title": "Probiotic supplementation may reduce gut microbiome diversity vs fermented foods",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/34256014/",
+              "stance": "challenges",
+              "resolved_title": "Gut-microbiota-targeted diets modulate human immune status."
+            }
+          ],
+          "rationale": "Candidate for replacement with fermented food strategy.",
+          "impact": "GI comfort, digestion quality",
+          "watching": "GI comfort changes on vs off",
+          "questioning": true,
+          "questionReason": "Candidate for reassessment — fermented foods may be food-first approach",
+          "hoped_outcome": "Steadier GI comfort and digestion quality.",
+          "measured_by": "GI-comfort notes in the journal on vs off; no lab marker is expected to move."
+        }
       ]
     }
   },
