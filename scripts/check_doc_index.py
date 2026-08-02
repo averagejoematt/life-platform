@@ -21,7 +21,8 @@ Four assertions over the engineering wiki (docs/README.md is the home page):
    operators onto the retired boot-broken manual MCP zip — a deploy-surface doc
    must not be able to sit unverified for months again.
 
-5. SOURCE-NEWER-THAN-VERIFY (#973 — advisory; blocking under --strict) — for each
+5. SOURCE-NEWER-THAN-VERIFY (#973 — BLOCKING by default since #1965; advisory only
+   under --advisory) — for each
    engine doc (docs/engines/*.md), the git last-commit date of every declared
    `Sources of truth` file is compared against the doc's Verified date. Calendar
    freshness alone (gate 3) misses the real staleness signal: a doc verified
@@ -30,9 +31,16 @@ Four assertions over the engineering wiki (docs/README.md is the home page):
    Missing/unparseable metadata is skipped with a note, never a crash.
 
 USAGE:
-  python3 scripts/check_doc_index.py            # gates 1+2(+3 hard), prints 3+4; exit 1 on fail
-  python3 scripts/check_doc_index.py --strict   # gate 4 drift also FAILS (promotion path for docs-ci)
-  python3 scripts/check_doc_index.py --fresh    # only the freshness + source-drift reports, exit 0
+  python3 scripts/check_doc_index.py             # STRICT — the default since #1965: gate 5 drift FAILS, identical to Docs CI
+  python3 scripts/check_doc_index.py --strict    # same as the default (kept so docs-ci.yml's explicit invocation stays valid)
+  python3 scripts/check_doc_index.py --advisory  # gate 5 drift reports ("N would RED CI under --strict") instead of failing
+  python3 scripts/check_doc_index.py --fresh     # only the freshness + source-drift reports, exit 0
+
+Local == CI (#1965): Docs CI runs `--strict`, which is now the bare command's behavior,
+so a locally-green run cannot red CI on engine-doc source drift (the 2026-07-27 incident:
+two main pushes redded on drift the flagless local run never surfaced). Caveat: gate 5
+reads per-file git dates, so it SKIPS (loudly) on a shallow clone — a full local clone
+behaves exactly like Docs CI's fetch-depth: 0 checkout.
 """
 
 import re
@@ -197,7 +205,12 @@ def check_deploy_docs(deploy_dir=None, today=None):
 
 def main():
     fresh_only = "--fresh" in sys.argv
-    strict = "--strict" in sys.argv
+    # #1965: strict is the DEFAULT — Docs CI and every documented local path run the
+    # same gate, so local green == CI green by construction. `--advisory` opts out
+    # (drift prints a loud would-RED-CI banner instead of failing); `--strict` is
+    # still accepted as an explicit no-op (docs-ci.yml passes it).
+    advisory = "--advisory" in sys.argv
+    strict = not advisory
     problems = []
 
     index_src = INDEX.read_text(encoding="utf-8")
@@ -239,11 +252,11 @@ def main():
         problems += dep_problems
     stale += dep_stale
 
-    # 5. source-newer-than-verify (#973) — advisory unless --strict
+    # 5. source-newer-than-verify (#973) — BLOCKING by default (#1965), advisory under --advisory
     flagged, notes = check_engine_source_freshness()
     if flagged and strict and not fresh_only:
         for doc_rel, source_rel, committed, verified in flagged:
-            problems.append(f"engine-doc source drift (--strict): {doc_rel} verified {verified} but {source_rel} committed {committed}")
+            problems.append(f"engine-doc source drift (strict): {doc_rel} verified {verified} but {source_rel} committed {committed}")
 
     if problems:
         print(f"❌ {len(problems)} wiki index/header problem(s):")
@@ -261,10 +274,10 @@ def main():
         print(f"📋 freshness: all canonical pages verified within {FRESHNESS_DAYS}d.")
 
     if flagged:
-        print(
-            f"\n⚠️  engine-doc source drift (#973 — ADVISORY; fails under --strict) — "
-            f"{len(flagged)} source(s) committed after the doc's Verified date:"
-        )
+        # Only reachable in --advisory / --fresh runs (the strict default exits above).
+        # The banner names the CI consequence so an advisory green can't be mistaken
+        # for a CI green (#1965 regression guard — asserted by unit test).
+        print(f"\n🔴 {len(flagged)} advisory item(s) would RED CI under --strict (#973 engine-doc source drift):")
         for doc_rel, source_rel, committed, verified in flagged:
             print(f"   {doc_rel} (verified {verified}) ← {source_rel} committed {committed} — re-verify the doc + bump its header")
     else:
