@@ -198,7 +198,7 @@ def test_run_leak_token_sweep_ok_when_clean(monkeypatch):
         ],
     )
     result = visual_qa.run_leak_token_sweep(base_url="https://x.example")
-    assert result == {"ok": True, "checked": 1, "issues": []}
+    assert result == {"ok": True, "checked": 1, "not_checked": 0, "issues": [], "warnings": []}
 
 
 def test_run_leak_token_sweep_flags_and_formats_issues(monkeypatch):
@@ -237,3 +237,175 @@ def test_cli_exposes_no_leak_scan_escape_hatch():
         timeout=30,
     )
     assert "--no-leak-scan" in out.stdout
+
+
+# ── #1931: transport failure ≠ finding ──────────────────────────────────────
+# A connection that never completed says nothing about the page. sweep() must
+# retry once, then report the page as unreachable (hits EMPTY) — and both
+# callers must surface it as not-checked, never as a leak finding.
+
+
+def test_sweep_retries_transport_failure_then_succeeds(monkeypatch):
+    calls = []
+
+    def flaky_fetch(url, timeout=15):
+        calls.append(url)
+        return (0, "") if len(calls) == 1 else (200, "<p>all good</p>")
+
+    monkeypatch.setattr(lts, "fetch", flaky_fetch)
+    results = lts.sweep("https://x.example", ["/blip/"])
+    assert len(calls) == 2  # exactly one retry
+    assert results[0]["unreachable"] is False
+    assert results[0]["http_status"] == 200
+    assert results[0]["hits"] == []
+
+
+def test_sweep_unreachable_after_retry_is_not_a_finding(monkeypatch):
+    calls = []
+
+    def dead_fetch(url, timeout=15):
+        calls.append(url)
+        return 0, ""
+
+    monkeypatch.setattr(lts, "fetch", dead_fetch)
+    results = lts.sweep("https://x.example", ["/gone/"])
+    assert len(calls) == 2  # one retry, no more
+    assert results[0]["unreachable"] is True
+    assert results[0]["http_status"] == 0
+    assert results[0]["hits"] == []  # NEVER a finding
+
+
+def test_sweep_real_http_error_is_not_retried_and_stays_a_finding(monkeypatch):
+    calls = []
+
+    def fetch_500(url, timeout=15):
+        calls.append(url)
+        return 500, "origin error"
+
+    monkeypatch.setattr(lts, "fetch", fetch_500)
+    results = lts.sweep("https://x.example", ["/broken/"])
+    assert len(calls) == 1  # a real origin status is not a transport blip
+    assert results[0]["unreachable"] is False
+    assert results[0]["hits"] == [("HTTP error", ["500"])]
+
+
+def test_run_leak_token_sweep_unreachable_is_warning_not_issue(monkeypatch):
+    monkeypatch.setattr(
+        visual_qa.leak_token_sweep,
+        "sweep",
+        lambda base_url, pages, json_endpoints, tokens=None, allow_503_paths=(): [
+            {"path": "/ok/", "url": base_url + "/ok/", "http_status": 200, "hits": [], "unreachable": False},
+            {"path": "/gone/", "url": base_url + "/gone/", "http_status": 0, "hits": [], "unreachable": True},
+        ],
+    )
+    result = visual_qa.run_leak_token_sweep(base_url="https://x.example")
+    assert result["ok"] is True  # a blip does not red the gating job
+    assert result["checked"] == 1  # partial coverage is visible…
+    assert result["not_checked"] == 1  # …as partial
+    assert result["issues"] == []
+    assert result["warnings"] == ["/gone/ — UNREACHABLE after retry (leak status unknown, page NOT checked)"]
+
+
+def test_run_leak_token_sweep_real_leak_still_fails_alongside_unreachable(monkeypatch):
+    monkeypatch.setattr(
+        visual_qa.leak_token_sweep,
+        "sweep",
+        lambda base_url, pages, json_endpoints, tokens=None, allow_503_paths=(): [
+            {"path": "/gone/", "url": base_url + "/gone/", "http_status": 0, "hits": [], "unreachable": True},
+            {
+                "path": "/api/journey",
+                "url": base_url + "/api/journey",
+                "http_status": 200,
+                "hits": [("Tombstone leak", ['"tombstone": true'])],
+                "unreachable": False,
+            },
+        ],
+    )
+    result = visual_qa.run_leak_token_sweep(base_url="https://x.example")
+    assert result["ok"] is False  # an injected real token still fails the job
+    assert result["issues"] == ['/api/journey — [Tombstone leak] "tombstone": true']
+
+
+def _run_restart_verify_main(monkeypatch, tmp_path, sweep_results):
+    rv = _load("deploy/restart_verify_rendered.py", "rv_1931")
+    monkeypatch.setattr(rv, "_leak_sweep", lambda *a, **k: sweep_results)
+    monkeypatch.setattr(rv, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(sys, "argv", ["restart_verify_rendered.py"])
+    try:
+        rv.main()
+        return 0
+    except SystemExit as e:
+        return e.code or 0
+
+
+def _rv_result(path, *, unreachable=False, hits=None, status=200):
+    return {
+        "path": path,
+        "url": "https://x.example" + path,
+        "http_status": 0 if unreachable else status,
+        "hits": hits or [],
+        "unreachable": unreachable,
+    }
+
+
+def test_restart_verify_minority_unreachable_warns_but_passes(monkeypatch, tmp_path):
+    results = [_rv_result(f"/p{i}/") for i in range(7)] + [_rv_result("/gone/", unreachable=True)]
+    assert _run_restart_verify_main(monkeypatch, tmp_path, results) == 0
+
+
+def test_restart_verify_coverage_collapse_fails(monkeypatch, tmp_path):
+    # ≥25% unreachable at reset time = a clean verdict the sweep did not earn.
+    results = [_rv_result("/p1/"), _rv_result("/p2/"), _rv_result("/g1/", unreachable=True), _rv_result("/g2/", unreachable=True)]
+    assert _run_restart_verify_main(monkeypatch, tmp_path, results) == 1
+
+
+def test_restart_verify_token_hit_still_fails(monkeypatch, tmp_path):
+    results = [_rv_result("/dirty/", hits=[("Tombstone leak", ['"tombstone": true'])])]
+    assert _run_restart_verify_main(monkeypatch, tmp_path, results) == 1
+
+
+def test_every_sweep_caller_handles_unreachable():
+    """Guard the SET, not the instance: any file that calls the shared sweep()
+    must handle the unreachable result class. A new caller that folds
+    unreachable pages into pass/fail would resurrect #1931 — add it here only
+    after it distinguishes not-checked from checked."""
+    import ast
+
+    known_handled = {
+        os.path.join("tests", "visual_qa.py"),
+        os.path.join("deploy", "restart_verify_rendered.py"),
+    }
+    callers = set()
+    for base in ("tests", "deploy", "scripts", "lambdas", "mcp"):
+        for dirpath, _dirnames, filenames in os.walk(os.path.join(_REPO, base)):
+            for fn in filenames:
+                if not fn.endswith(".py"):
+                    continue
+                full = os.path.join(dirpath, fn)
+                rel = os.path.relpath(full, _REPO)
+                if rel == os.path.join("tests", "leak_token_sweep.py") or rel.startswith(os.path.join("tests", "test_")):
+                    continue
+                try:
+                    tree = ast.parse(open(full, encoding="utf-8").read())
+                except SyntaxError:
+                    continue
+                src_imports_sweep = False
+                calls_sweep = False
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.ImportFrom) and node.module == "leak_token_sweep":
+                        src_imports_sweep = True
+                    if isinstance(node, ast.Import) and any(a.name == "leak_token_sweep" for a in node.names):
+                        src_imports_sweep = True
+                    if isinstance(node, ast.Call):
+                        f = node.func
+                        name = f.id if isinstance(f, ast.Name) else (f.attr if isinstance(f, ast.Attribute) else "")
+                        if name in ("sweep", "_leak_sweep"):
+                            calls_sweep = True
+                if src_imports_sweep and calls_sweep:
+                    callers.add(rel)
+    assert callers == known_handled, (
+        f"sweep() caller set changed: {sorted(callers ^ known_handled)} — a new caller must "
+        "handle result['unreachable'] (not-checked ≠ pass ≠ finding) and be added to known_handled"
+    )
+    for rel in known_handled:
+        assert "unreachable" in open(os.path.join(_REPO, rel), encoding="utf-8").read(), f"{rel} no longer handles unreachable"

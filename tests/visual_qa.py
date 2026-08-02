@@ -491,7 +491,10 @@ def run_leak_token_sweep(base_url=None):
     character level, ...) once the current cycle has legitimately matured past
     them, so real progress never reds this.
 
-    Returns {"ok": bool, "checked": int, "issues": [str, ...]}.
+    Returns {"ok": bool, "checked": int, "not_checked": int,
+    "issues": [str, ...], "warnings": [str, ...]} — unreachable pages (#1931)
+    are warnings + not_checked, never issues: a page the sweep could not read
+    has an unknown leak status, and partial coverage must be visible as such.
     """
     base_url = base_url or SITE_URL
     tokens = leak_token_sweep.tokens_for_daily_run()
@@ -504,10 +507,25 @@ def run_leak_token_sweep(base_url=None):
         allow_503_paths=leak_token_sweep.ALLOW_503_NOT_COMPUTED,
     )
     issues = []
+    warnings = []
+    not_checked = 0
     for r in page_results:
+        if r.get("unreachable"):
+            # Transport failure after one retry (#1931): the page was never
+            # read, so its leak status is unknown — a WARNING, never a finding,
+            # and never counted as checked.
+            not_checked += 1
+            warnings.append(f"{r['path']} — UNREACHABLE after retry (leak status unknown, page NOT checked)")
+            continue
         for label, samples in r["hits"]:
             issues.append(f"{r['path']} — [{label}] {' | '.join(samples)}")
-    return {"ok": not issues, "checked": len(page_results), "issues": issues}
+    return {
+        "ok": not issues,
+        "checked": len(page_results) - not_checked,
+        "not_checked": not_checked,
+        "issues": issues,
+        "warnings": warnings,
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -999,16 +1017,21 @@ def run_sweep(
         leak_status = run_leak_token_sweep()
         icon = "✅" if leak_status["ok"] else "❌"
         print("\n── Leak-token sweep (deterministic, #1448) ──")
-        print(f"  {icon} {leak_status['checked']} URL(s) checked, {len(leak_status['issues'])} finding(s)")
+        print(
+            f"  {icon} {leak_status['checked']} URL(s) checked"
+            f" ({leak_status['not_checked']} NOT checked), {len(leak_status['issues'])} finding(s)"
+        )
         for x in leak_status["issues"]:
             print(f"      → {x}")
+        for x in leak_status["warnings"]:
+            print(f"      ⚠ {x}")
         results.append(
             {
                 "page": "Leak-token sweep",
                 "path": "(cross-cutting — leak_scan_paths + JSON endpoints)",
                 "status": "PASS" if leak_status["ok"] else "FAIL",
                 "issues": leak_status["issues"],
-                "warnings": [],
+                "warnings": leak_status["warnings"],
                 "screenshots": {},
             }
         )

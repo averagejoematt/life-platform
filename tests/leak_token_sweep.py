@@ -221,22 +221,35 @@ def tokens_for_daily_run(today: str | None = None) -> list:
 def sweep(base_url: str, pages, json_endpoints=(), tokens=None, allow_503_paths=(), timeout: int = 15) -> list[dict]:
     """Fetch base_url+path for every path in pages+json_endpoints and check_body
     each against `tokens` (defaults to FORBIDDEN_TOKENS). Returns a list of dicts:
-        {"path", "url", "http_status", "hits": [(label, [samples]), ...]}
+        {"path", "url", "http_status", "hits": [(label, [samples]), ...], "unreachable": bool}
+
     `hits` is empty for a clean page/endpoint whose fetch succeeded (or was an
-    allowed 503). A non-200/non-allowed-503 fetch is reported as a single
-    ("HTTP error", [str(status)]) hit so callers can treat it uniformly.
+    allowed 503). A real HTTP status the origin returned (non-200, non-allowed-503)
+    is reported as a single ("HTTP error", [str(status)]) hit.
+
+    A transport failure (fetch() returned status 0 — the connection never
+    completed, so the page's leak status is UNKNOWN) is retried once; if it
+    fails again the result carries unreachable=True and an EMPTY hits list
+    (#1931): a page that was never read is neither a pass nor a finding, and
+    callers must surface it as not-checked rather than fold it into either
+    tally.
     """
     tokens = FORBIDDEN_TOKENS if tokens is None else tokens
     results = []
     for path in list(pages) + list(json_endpoints):
         url = base_url + path
         status, body = fetch(url, timeout=timeout)
+        if status == 0:
+            status, body = fetch(url, timeout=timeout)  # one retry (#1931)
+        if status == 0:
+            results.append({"path": path, "url": url, "http_status": 0, "hits": [], "unreachable": True})
+            continue
         if status != 200:
             if status == 503 and path in allow_503_paths and "not yet computed" in body:
-                results.append({"path": path, "url": url, "http_status": status, "hits": []})
+                results.append({"path": path, "url": url, "http_status": status, "hits": [], "unreachable": False})
                 continue
-            results.append({"path": path, "url": url, "http_status": status, "hits": [("HTTP error", [str(status)])]})
+            results.append({"path": path, "url": url, "http_status": status, "hits": [("HTTP error", [str(status)])], "unreachable": False})
             continue
         hits = check_body(path, body, tokens=tokens)
-        results.append({"path": path, "url": url, "http_status": status, "hits": hits})
+        results.append({"path": path, "url": url, "http_status": status, "hits": hits, "unreachable": False})
     return results

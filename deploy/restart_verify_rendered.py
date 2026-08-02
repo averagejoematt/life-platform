@@ -73,11 +73,19 @@ def main():
 
     total_pages = 0
     failed_pages = 0
+    unreachable_pages = 0
     all_hits = []  # list of (url, [(label, samples)])
 
     for r in page_results:
         total_pages += 1
         path, url, status, hits = r["path"], r["url"], r["http_status"], r["hits"]
+        if r.get("unreachable"):
+            # Transport failure after one retry (#1931): the page was never
+            # read, so it is neither clean nor failed — count it separately so
+            # partial coverage cannot read as full coverage.
+            unreachable_pages += 1
+            print(f"  ⚠ {path} — UNREACHABLE after retry (NOT checked)")
+            continue
         if hits and hits[0][0] == "HTTP error":
             print(f"  ✗ {path} — HTTP {status}")
             failed_pages += 1
@@ -96,13 +104,16 @@ def main():
                 print(f"  ✓ {path}")
 
     print("\n══ summary ══")
-    print(f"  {total_pages - failed_pages}/{total_pages} pages clean")
+    checked_pages = total_pages - unreachable_pages
+    print(f"  {checked_pages - failed_pages}/{checked_pages} checked pages clean; {unreachable_pages} NOT checked (unreachable)")
 
     # Persist report
     report = REPO_ROOT / "docs" / "restart" / "_verify_rendered_report.txt"
     report.parent.mkdir(parents=True, exist_ok=True)
     lines = [f"verify_rendered report — genesis={EXPERIMENT_START_DATE}", ""]
-    lines.append(f"checked {total_pages} URLs, {failed_pages} with forbidden tokens")
+    lines.append(
+        f"checked {checked_pages} of {total_pages} URLs ({unreachable_pages} unreachable, NOT checked), {failed_pages} with forbidden tokens"
+    )
     for url, hits in all_hits:
         lines.append(f"\n{url}")
         for label, samples in hits:
@@ -111,6 +122,12 @@ def main():
     print(f"Report: {report.relative_to(REPO_ROOT)}")
 
     if failed_pages > 0:
+        sys.exit(1)
+    # Coverage-collapse guard (#1931): this is the reset-time verification —
+    # if a quarter of the surface was never read, a clean tally is a verdict
+    # the sweep did not earn. Fail rather than bless unverified pages.
+    if total_pages and unreachable_pages * 4 >= total_pages:
+        print(f"  ✗ coverage collapse: {unreachable_pages}/{total_pages} pages unreachable — verdict not earned")
         sys.exit(1)
 
 
