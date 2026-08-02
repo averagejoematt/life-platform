@@ -445,6 +445,19 @@ def _write_step_summary(path, passed, failed, warns, results, reader_truth_statu
     # summary — never silently absent, never indistinguishable from a clean run.
     if ai_vision_status and ai_vision_status.get("status") == "skipped_by_budget":
         lines.append(f"⏸ **AI-vision QA: SKIPPED-BY-BUDGET** (tier {ai_vision_status['tier']}) — not run, not a pass.\n")
+    # #1990: the a11y ledger-shrink signal (gate_findings' "fixed" list) gets its
+    # own hard-to-miss section instead of scrolling by folded into per-page
+    # `warnings` — the "consumer" #1990's acceptance criteria asks for.
+    shrink_candidates = a11y_audit.shrink_candidates({r["path"]: r["a11y"] for r in results if r.get("a11y")})
+    if shrink_candidates:
+        lines.append("\n### a11y ledger — shrink candidates (#1990)\n")
+        lines.append(
+            "Baselined violation(s) no longer observed live — safe to remove via "
+            "`python3 tests/visual_qa.py --update-baseline` (review the diff before committing):\n"
+        )
+        for page_path, rule_ids in sorted(shrink_candidates.items()):
+            lines.append(f"- `{page_path}`: {', '.join(rule_ids)}")
+        lines.append("")
     if reader_truth_status and reader_truth_status.get("status") == "skipped_by_budget":
         lines.append(f"⏸ **Reader-truth QA: SKIPPED-BY-BUDGET** (tier {reader_truth_status['tier']}) — not run, not a pass.\n")
     for r in results:
@@ -1070,6 +1083,15 @@ def run_sweep(
         print(f"AI-vision QA: SKIPPED-BY-BUDGET (tier {ai_vision_status['tier']}) — not run, not a pass")
     if reader_truth_status and reader_truth_status.get("status") == "skipped_by_budget":
         print(f"Reader-truth QA: SKIPPED-BY-BUDGET (tier {reader_truth_status['tier']}) — not run, not a pass")
+    # #1990: a dedicated, hard-to-miss tally for baselined a11y debt that's no
+    # longer live — the consumer the shrink warnings previously lacked.
+    shrink_candidates = a11y_audit.shrink_candidates({r["path"]: r["a11y"] for r in results if r.get("a11y")})
+    if shrink_candidates:
+        total_rules = sum(len(v) for v in shrink_candidates.values())
+        print(
+            f"a11y ledger: {total_rules} shrink candidate(s) across {len(shrink_candidates)} page(s) "
+            f"— run --update-baseline and review the diff (#1990)"
+        )
     if save_screenshots:
         print(f"Screenshots: {screenshot_dir}/")
 
