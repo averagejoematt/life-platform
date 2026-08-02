@@ -783,6 +783,109 @@ def ungrounded_behavioral_findings(text: str, *, available_logs) -> list:
     return findings
 
 
+# ── #1896: a coach's own track-record claims ────────────────────────────────
+# The gates above check claims about MATTHEW (his numbers, his dates, his logged
+# behavior). None of them check a claim the coach makes about ITSELF — and on
+# 2026-07-27 Dr. Webb published "I called lunch wrong… That's a prediction miss,
+# and I'm logging it as one" while every stored PREDICTION# was status=pending
+# and the same paragraph admitted "I have zero food logs. Nothing." The verdict
+# was then persisted as a THREAD# row and baked into the committed noscript, so
+# a fabricated grade fed forward into later generations.
+#
+# The prompt actively invites this (intelligence_common.build_thread_prompt_block:
+# 'If a prediction resolved: explicitly call it out. "I predicted [X]. I was
+# [right/wrong]."'), and ADR-105 says the deterministic computation comes FIRST:
+# a self-graded outcome is only sayable if an evaluated record exists to say it
+# from. That is a count, not a judgment.
+_SGV_VERDICT_PATTERNS = [
+    # explicit self-grading of a call
+    re.compile(r"\bprediction\s+(?:miss|hit)\b", re.IGNORECASE),
+    re.compile(r"\b(?:i|my)\s+(?:called|predicted)\b[^.!?]{0,60}\b(?:wrong|right|correctly|incorrectly)\b", re.IGNORECASE),
+    re.compile(r"\bi\s+was\s+(?:right|wrong)\b", re.IGNORECASE),
+    re.compile(r"\b(?:that|this)(?:'s| is| was)\s+a\s+(?:miss|hit)\b", re.IGNORECASE),
+    re.compile(r"\blogging\s+it\s+as\s+(?:a\s+)?(?:miss|hit|one)\b", re.IGNORECASE),
+    re.compile(r"\bmy\s+(?:call|prediction|forecast)\s+(?:was|proved)\b[^.!?]{0,40}\b(?:right|wrong|correct)\b", re.IGNORECASE),
+    # outcome-framed comparison against a prior prediction — the softer form the
+    # same coach was still publishing on 2026-08-01 ("week-one protein
+    # consistency exceeded predictions") with all 50 predictions still pending.
+    re.compile(
+        r"\b(?:exceeded|beat|outperformed|fell short of|missed|undershot|overshot)\s+(?:\w+\s+){0,2}(?:my\s+|the\s+|his\s+|her\s+|their\s+)?(?:baseline\s+)?(?:prediction|predictions|forecast|forecasts)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\b(?:better|worse)\s+than\s+(?:\w+\s+){0,3}(?:predicted|forecast|expected by my)\b", re.IGNORECASE),
+]
+
+# Hypotheticals and forward-looking framing are not verdicts. Scoped to the text
+# BEFORE the verdict phrase, not the whole sentence: "consistency exceeded
+# predictions, but cannot determine if adherence is system-driven" is a verdict
+# followed by an unrelated conditional, and a whole-sentence modal test let
+# exactly that sentence through when I first wrote this.
+_SGV_MODAL_RE = re.compile(
+    r"\b(?:if|would|could|should|might|may|will|going to|expect to|plan to|when it resolves|once .{0,20}resolves)\b",
+    re.IGNORECASE,
+)
+
+
+def self_graded_verdict_findings(text: str, *, evaluated_predictions) -> list:
+    """Deterministic check that a coach's self-graded verdict has a record (#1896).
+
+    Flags any sentence in which the coach grades its OWN prediction — "that's a
+    prediction miss", "I was wrong", "protein consistency exceeded predictions" —
+    when `evaluated_predictions` is 0. An evaluated prediction is one whose
+    status has actually resolved (confirmed/refuted/graded); `pending` is not a
+    verdict, and neither is a prediction that merely exists.
+
+    `evaluated_predictions` is REQUIRED and caller-supplied (the caller owns the
+    lookup; this function does no I/O and stays pure). Passing ``None`` returns []
+    — the caller has opted out, the same contract ungrounded_behavioral_findings
+    uses for `available_logs`. A positive count returns [] too: once real graded
+    records exist, WHICH one the coach means is a semantic question, and this
+    gate deliberately does not answer semantic questions (ADR-105: deterministic
+    first, LLM for what is genuinely semantic).
+
+    Findings use the shared {"type", "detail"} shape (type
+    ``"self_graded_verdict"``) so they compose with grounding_findings() and
+    correction_prompt().
+    """
+    if evaluated_predictions is None:
+        return []
+    try:
+        n_evaluated = int(evaluated_predictions)
+    except (TypeError, ValueError):
+        return []
+    if n_evaluated > 0:
+        return []
+    findings = []
+    seen = set()
+    for raw in _UB_SENTENCE_SPLIT_RE.split((text or "").strip()):
+        sent = raw.strip()
+        if not sent:
+            continue
+        for rx in _SGV_VERDICT_PATTERNS:
+            m = rx.search(sent)
+            if not m:
+                continue
+            if _SGV_MODAL_RE.search(sent[: m.end()]):  # the clause GOVERNING the phrase is conditional
+                continue
+            key = m.group(0).lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            snippet = sent if len(sent) <= 140 else sent[:137].rstrip() + "…"
+            findings.append(
+                {
+                    "type": "self_graded_verdict",
+                    "claim": m.group(0).strip(),
+                    "detail": (
+                        f'the narrative grades its own prediction ("{snippet}"), but ZERO predictions '
+                        f"have been evaluated — every stored record is still pending, so there is no "
+                        f"verdict to report"
+                    ),
+                }
+            )
+    return findings
+
+
 def grounding_findings(
     text: str,
     facts: dict = None,
@@ -794,6 +897,7 @@ def grounding_findings(
     start_date_iso: str = None,
     weight_tolerance_lbs: float = 1.0,
     available_logs=None,
+    evaluated_predictions=None,
 ) -> list:
     """Deterministic grounding check. Returns [{type, detail, ...}] — empty = grounded.
 
@@ -856,6 +960,8 @@ def grounding_findings(
         )
     if available_logs is not None:
         findings.extend(ungrounded_behavioral_findings(text, available_logs=available_logs))
+    if evaluated_predictions is not None:
+        findings.extend(self_graded_verdict_findings(text, evaluated_predictions=evaluated_predictions))
     return findings
 
 
@@ -883,6 +989,11 @@ def correction_prompt(findings: list) -> str:
                 lines.append(f"{i}. {f['detail']}. Use Day {f['expected_day']}, or drop the day count — never a stale one.")
             else:
                 lines.append(f"{i}. {f['detail']}. Frame it as the pre-start countdown, not a Day count.")
+        elif f.get("type") == "self_graded_verdict":
+            lines.append(
+                f"- Remove the self-graded verdict \"{f.get('claim')}\": no prediction has been evaluated yet, "
+                f"so you cannot report a hit or a miss. State the prediction as still open, or say nothing about it."
+            )
         elif f.get("type") == "ungrounded_behavioral":
             lines.append(
                 f"{i}. {f['detail']}. Remove the claim or hedge it (\"if you kept your window today\"), or cite the "

@@ -49,6 +49,11 @@ except ImportError:
     logger = logging.getLogger("coach-narrative-orchestrator")
     logger.setLevel(logging.INFO)
 
+# #1896: a prediction is EVALUATED only once it has actually resolved. `pending`
+# and `confirming` are OPEN calls, not verdicts — that distinction is the whole
+# point of the self-graded-verdict gate in grounded_generation.
+_EVALUATED_PREDICTION_STATUSES = ("confirmed", "refuted", "correct", "incorrect", "graded", "resolved")
+
 # ══════════════════════════════════════════════════════════════════════════════
 # CONFIGURATION
 # ══════════════════════════════════════════════════════════════════════════════
@@ -381,6 +386,7 @@ def _gather_all_state(coach_id):
             "key_themes": [],
             "open_threads": [],
             "active_predictions": [],
+            "evaluated_prediction_count": 0,
             "confidence_state": {},
         }
 
@@ -464,6 +470,14 @@ def _gather_all_state(coach_id):
     active_predictions = [p for p in all_predictions if p.get("status") in ("pending", "confirming")]
     if not active_predictions:
         logger.info("No active predictions for %s", coach_id)
+    # #1896: how many of this coach's predictions have actually RESOLVED. The brief
+    # has always carried the OPEN ones; nothing carried the graded count, so the
+    # self-graded-verdict gate downstream had no way to tell "I called it wrong"
+    # (a verdict) from "I have an open call" (not one). On 2026-07-27 that gap let
+    # a coach publish a fabricated 'prediction miss' with every record still
+    # pending — and persist it to THREAD#, feeding it forward. Counted here, where
+    # the whole partition is already in hand: no extra query.
+    evaluated_prediction_count = sum(1 for p in all_predictions if p.get("status") in _EVALUATED_PREDICTION_STATUSES)
 
     # 9b. Commitments (#532) — the concrete actions this coach pushed. Due/overdue
     # pending ones get injected so the coach MUST revisit its own advice; recently
@@ -514,6 +528,7 @@ def _gather_all_state(coach_id):
         "voice_state": voice_state,
         "open_threads": open_threads,
         "active_predictions": active_predictions,
+        "evaluated_prediction_count": evaluated_prediction_count,
         "due_commitments": due_commitments,
         "resolved_commitments": resolved_commitments,
         "commitment_record": commitment_record,
