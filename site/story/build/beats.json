@@ -1993,6 +1993,37 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/1918"
         }
       ]
+    },
+    {
+      "id": "2026-08-02-the-check-that-had-been-switched-off-for-26-days",
+      "date": "2026-08-02",
+      "title": "The check that had been switched off for 26 days",
+      "shipped": "An automated check reads this site every night and asks an AI whether the published numbers could possibly be true — whether a page claims a month of history on day five, that sort of thing. Last week it started blocking releases, and I set out to measure how often it was right before deciding whether to keep trusting it. The measurement went sideways immediately: the check had been switched off for twenty-six of the thirty days I was trying to analyse. A spending guard pauses it automatically when the monthly bill runs high, and a paused check and a passing check looked identical in every record the system keeps. It had been reporting green without running. I fixed that first, then fixed the deeper problem: this check answers 'is the published text honest', which is a completely different question from 'did the code we just released break something'. Only the second one is a reason to undo a release. They were wired to the same trigger, so a complaint about a stale number could — and twice did — automatically undo a hundred pieces of working software.",
+      "gotcha": "The moment it came back on told the whole story. The spending guard resets when the month rolls over, so at midnight UTC the check woke up after twenty-six days of silence. Eighteen minutes later it flagged a problem that had been on the site for weeks, and the system automatically reverted a hundred components that had nothing to do with it. That is the worst possible property for a safety net: it goes blind for weeks while problems pile up, then wakes and blames whatever happens to be passing at that exact moment.",
+      "honest_miss": "I nearly argued the wrong case entirely. I had built a whole position on this check being unreliable — and the number, when I finally measured it, was poor: right two times out of ten. But the honest reading is that ten judgements from a single day is not enough to conclude anything, and I had been ready to treat it as settled. Separately, while writing a guard to stop retired names appearing on the site, I hand-typed a list of allowed exceptions and got it wrong — the exact kind of hand-maintained list whose drift I was fixing. And late in the session I chained together a sequence of version-control commands without checking whether the first one succeeded; it hadn't, and I rewrote the wrong entry and published it. Recovered with nothing lost, but by luck rather than care.",
+      "why_it_mattered": "Two of the things I found this week were checks that reported success without doing any work, and neither was detectable from outside. That is a nastier failure than a check that fails loudly: nothing alarms, the badge stays green, and the only way to notice is to go looking. It also changed how I think about automated judgement. The instinct when an alarm keeps crying wolf is to switch it off. The better question turned out to be whether it was ever being asked a question it could answer — and here it wasn't, because whether the published text is honest has nothing to do with whether today's release is safe.",
+      "prs": [
+        {
+          "label": "PR #1926",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1926"
+        },
+        {
+          "label": "PR #1928",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1928"
+        },
+        {
+          "label": "PR #1929",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1929"
+        },
+        {
+          "label": "PR #1930",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1930"
+        },
+        {
+          "label": "PR #1932",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1932"
+        }
+      ]
     }
   ]
 }
