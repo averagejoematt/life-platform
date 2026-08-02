@@ -305,8 +305,8 @@ def handle_journey() -> dict:
     Returns: weight trajectory, progress, milestones, projected goal date.
     Cache: 3600s (1 hr) — weight changes slowly.
     """
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d120 = max((datetime.now(timezone.utc) - timedelta(days=120)).strftime("%Y-%m-%d"), EXPERIMENT_START)
+    today = datetime.now(PT).strftime("%Y-%m-%d")
+    d120 = max((datetime.now(PT) - timedelta(days=120)).strftime("%Y-%m-%d"), EXPERIMENT_START)
 
     withings_all = _query_source("withings", d120, today)
     weight_series = sorted(
@@ -332,7 +332,7 @@ def handle_journey() -> dict:
     # #491/M-6: the shared resolution can find a NEWER Apple Health weigh-in
     # (travel scale) than the Withings series — same helper as vitals/character.
     try:
-        _ah_start = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
+        _ah_start = (datetime.now(PT) - timedelta(days=7)).strftime("%Y-%m-%d")
         _lw = weight_trend.latest_weight([], _query_source("apple_health", _ah_start, today))
         if _lw["as_of"] and _lw["as_of"] > last_weighin_date:
             current_weight = _lw["weight_lbs"]
@@ -652,8 +652,8 @@ def handle_weight_progress() -> dict:
     Returns: daily weight readings for last 180 days.
     Cache: 3600s (1 hr).
     """
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d180 = max((datetime.now(timezone.utc) - timedelta(days=180)).strftime("%Y-%m-%d"), EXPERIMENT_START)
+    today = datetime.now(PT).strftime("%Y-%m-%d")
+    d180 = max((datetime.now(PT) - timedelta(days=180)).strftime("%Y-%m-%d"), EXPERIMENT_START)
     items = _query_source("withings", d180, today)
 
     readings = sorted(
@@ -863,8 +863,8 @@ def handle_character_stats() -> dict:
     Returns: current character level, tier, and all 7 pillar scores.
     Cache: 3600s (1 hr) — computed nightly.
     """
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    today = datetime.now(PT).strftime("%Y-%m-%d")
+    yesterday = (datetime.now(PT) - timedelta(days=1)).strftime("%Y-%m-%d")
     pk = f"{USER_PREFIX}character_sheet"
     record = None
     for date_str in [today, yesterday]:
@@ -946,7 +946,7 @@ def handle_timeline() -> dict:
     for the interactive Transformation Timeline page.
     Cache: 3600s.
     """
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(PT).strftime("%Y-%m-%d")
     start = EXPERIMENT_START
 
     # Weight series (full journey)
@@ -1050,7 +1050,7 @@ def handle_journey_timeline() -> dict:
     - Experiment start/completion events
     Cache: 3600s (1 hr).
     """
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(PT).strftime("%Y-%m-%d")
     start_date = _clamp_today(EXPERIMENT_START)  # future-genesis guard: keep sk.between(lower<=upper) valid
     _p = _get_profile()
     start_weight = float(_p.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))
@@ -1428,8 +1428,8 @@ def handle_achievements() -> dict:
              achievements (BADGE#<id> — the first-earn ledger).
     Cache: 3600s (1 hr) — achievements update nightly.
     """
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d365 = (datetime.now(timezone.utc) - timedelta(days=365)).strftime("%Y-%m-%d")
+    today = datetime.now(PT).strftime("%Y-%m-%d")
+    d365 = (datetime.now(PT) - timedelta(days=365)).strftime("%Y-%m-%d")
 
     start_weight = float(_get_profile().get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))
     inputs = achievement_rules.collect_inputs(
@@ -1630,7 +1630,7 @@ def handle_glucose() -> dict:
     Source: apple_health DynamoDB records.
     Cache: 3600s (1h).
     """
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(PT).strftime("%Y-%m-%d")
     d30 = _experiment_date(30)
     _w30 = _window_span(d30, today, 30)  # #1917: is "30d" a true name today?
 
@@ -1841,7 +1841,7 @@ def handle_sleep_correlations() -> dict:
     direction-only under 2 weeks (no coefficient); Pearson only at >=2 weeks. Sleep-vs-weight
     withheld through the water-weight phase. Cache: 3600s.
     """
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(PT).strftime("%Y-%m-%d")
     d30 = _experiment_date(30)
     wd = _whoop_daily(d30, today)
     recovery = {d: v["recovery"] for d, v in wd.items() if v["recovery"] is not None}
@@ -2020,7 +2020,7 @@ def handle_sleep_detail() -> dict:
     Shows sleep score, efficiency, quality, and daily trend.
     Cache: 3600s (1h).
     """
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(PT).strftime("%Y-%m-%d")
     d30 = _experiment_date(30)
     _w30 = _window_span(d30, today, 30)  # #1917: is "30d" a true name today?
 

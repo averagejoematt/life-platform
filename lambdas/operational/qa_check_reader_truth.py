@@ -30,8 +30,8 @@ logger = logging.getLogger(__name__)
 SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "https://averagejoematt.com")
 
 # Small, reader-critical set: the cockpit, home, the coaching read, data vitals —
-# plus the two API payloads whose narrative values those pages bind. One Haiku
-# batch (<= 6 surfaces), pennies per night.
+# plus the API payloads whose narrative/numeric values those pages bind. One
+# Haiku batch (<= 8 surfaces as of #1937), still pennies per night.
 READER_TRUTH_SURFACES = [
     ("/", "Home"),
     ("/now/", "Cockpit"),
@@ -41,6 +41,13 @@ READER_TRUTH_SURFACES = [
 READER_TRUTH_APIS = [
     ("/api/vitals", "API · vitals"),
     ("/api/coaches", "API · coaches"),
+    # #1937: added once their day-frame anchors moved off UTC to Pacific — each
+    # publishes a `day_n` claim or a `_window_span`-derived `actual_days`/
+    # `*_window_days` span, the exact class of claim that ran a day ahead every
+    # PT evening before the fix (site_api_vitals.py).
+    ("/api/journey", "API · journey"),
+    ("/api/glucose", "API · glucose"),
+    ("/api/sleep_detail", "API · sleep detail"),
 ]
 
 # #1922: API payloads swept by the DETERMINISTIC phase-plausibility pass with
@@ -48,7 +55,10 @@ READER_TRUTH_APIS = [
 # narration can legitimately appear (vitals is clamped-to-genesis by ADR-077);
 # narrative payloads (coaches) may narrate a labeled prior cycle, so their
 # prose day-claims stay with the LLM's temporal_contradiction category.
-STRICT_PLAUSIBILITY_APIS = {"/api/vitals"}
+# #1937: /api/journey, /api/glucose, /api/sleep_detail joined once their
+# handlers anchored "today" in Pacific (matching vitals' contract — clamped to
+# genesis, no legitimate prior-cycle narration).
+STRICT_PLAUSIBILITY_APIS = {"/api/vitals", "/api/journey", "/api/glucose", "/api/sleep_detail"}
 
 
 def _fetch_reader_truth_surfaces():
