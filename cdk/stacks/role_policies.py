@@ -2070,7 +2070,13 @@ def operational_qa_smoke() -> list[iam.PolicyStatement]:
         ),
         iam.PolicyStatement(
             sid="DynamoDB",
-            actions=["dynamodb:GetItem", "dynamodb:Query"],
+            # #1953: + PutItem — check_predict_week_freshness persists its
+            # consecutive-dark-day streak in ONE state row
+            # (USER#matthew#SOURCE#qa_predict_dark / STATE#predict_dark) so a dark
+            # predict widget escalates WARN -> FAIL across nightly runs. The write
+            # is fail-soft in the lambda (degrades to the single-day WARN without
+            # the grant), but the >=2-day escalation only works once this deploys.
+            actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem"],
             resources=[TABLE_ARN],
         ),
         iam.PolicyStatement(
