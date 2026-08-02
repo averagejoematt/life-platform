@@ -157,3 +157,73 @@ def test_contrast_math_is_non_vacuous():
     historical = _contrast("#CB634C", "#F4EFE4")
     assert round(historical, 2) == 3.37
     assert historical < AA_NORMAL
+
+
+# ── #1989 — the cockpit scope-button opacity-composite guard ──────────────────
+# The Month/Journey de-emphasis shipped as whole-element `opacity: 0.6` over
+# --ink-faint, compositing to 2.84:1 (dark) / 2.34:1 (light) — a WCAG AA miss the
+# plain token pairs above cannot see (they measure tokens at full opacity). This
+# section composites the ACTUAL applied opacity from cockpit.css and holds the
+# result to AA, so re-adding an opacity de-emphasis reds CI offline instead of
+# waiting for the live axe sweep.
+
+COCKPIT_CSS = TOKENS.parent / "cockpit.css"
+
+
+def _composite(fg: str, bg: str, alpha: float) -> str:
+    """Simple-alpha composite of fg text over an opaque bg (per-channel lerp) —
+    the effective rendered colour of text under whole-element opacity."""
+    f, b = fg.lstrip("#"), bg.lstrip("#")
+    return "#" + "".join(f"{round(alpha * int(f[i:i + 2], 16) + (1 - alpha) * int(b[i:i + 2], 16)):02X}" for i in (0, 2, 4))
+
+
+def _scope_deep_default_opacity(css: str) -> float:
+    """The effective DEFAULT-state opacity on .scope-btn.scope-deep (1.0 when no
+    opacity is declared). Scans every rule whose selector hits .scope-deep in its
+    resting state (no :hover/:focus pseudo, no .is-active) and takes the lowest
+    declared opacity. Asserts the rule still exists so a rename can't silently
+    no-op this guard (memory: guard the set, prove it fires)."""
+    opacity, found_rule = 1.0, False
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)  # comments would bleed into the naive selector chunks
+    for m in re.finditer(r"([^{}]+)\{([^{}]*)\}", css):
+        selectors, body = m.group(1), m.group(2)
+        default_sels = [s for s in selectors.split(",") if ".scope-deep" in s and ":" not in s and ".is-active" not in s]
+        if not default_sels:
+            continue
+        found_rule = True
+        om = re.search(r"opacity:\s*([0-9.]+)", body)
+        if om:
+            opacity = min(opacity, float(om.group(1)))
+    assert found_rule, ".scope-btn.scope-deep rule not found in cockpit.css — re-point this #1989 guard at the renamed selector"
+    return opacity
+
+
+def test_cockpit_scope_deep_composites_to_aa_in_both_themes():
+    """#1989: the Month/Journey scope buttons (--ink-faint text, --page behind, any
+    default-state opacity from cockpit.css) must clear AA normal-size in the dark
+    theme AND both light blocks. Fails if anyone re-adds an opacity de-emphasis."""
+    alpha = _scope_deep_default_opacity(COCKPIT_CSS.read_text(encoding="utf-8"))
+    blocks = _extract_theme_blocks(TOKENS.read_text(encoding="utf-8"))
+    failures = []
+    for theme, block in blocks.items():
+        fg, bg = _token(block, "ink-faint"), _token(block, "page")
+        ratio = _contrast(_composite(fg, bg, alpha), bg)
+        if ratio < AA_NORMAL:
+            failures.append(
+                f"[{theme}] .scope-btn.scope-deep: --ink-faint {fg} @ opacity {alpha} on --page {bg} "
+                f"= {ratio:.2f}:1 < {AA_NORMAL}:1 (WCAG AA, #1989 — de-emphasize by size, never opacity)"
+            )
+    assert not failures, "cockpit scope-button composite contrast regressed:\n" + "\n".join(failures)
+
+
+def test_scope_deep_composite_guard_is_non_vacuous():
+    """Prove the composite math catches the exact shipped #1989 miss: opacity 0.6
+    over --ink-faint measured 2.83:1 (dark) / 2.35:1 (light) — both under AA. If
+    this stops failing at 0.6, the guard has gone vacuous."""
+    dark = _contrast(_composite("#988D78", "#0E0C08", 0.6), "#0E0C08")
+    light = _contrast(_composite("#6F6757", "#F4EFE4", 0.6), "#F4EFE4")
+    assert round(dark, 2) == 2.83 and dark < AA_NORMAL
+    assert round(light, 2) == 2.35 and light < AA_NORMAL
+    # and at full opacity the same pairs clear AA — the fix is sound, not accidental
+    assert _contrast("#988D78", "#0E0C08") >= AA_NORMAL
+    assert _contrast("#6F6757", "#F4EFE4") >= AA_NORMAL

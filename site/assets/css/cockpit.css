@@ -91,8 +91,10 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .scope-btn.is-active { color: var(--ink); background: color-mix(in oklch, var(--ink) 8%, transparent); }
 /* P2.2 — Month/Journey are deeper scopes: quieter by default so the cockpit opens calm. */
 .scope-sep { width: 1px; align-self: stretch; margin: 0 var(--sp-1); background: var(--rule); }
-.scope-btn.scope-deep { opacity: 0.6; font-size: 0.9em; /* fs-ok: deliberate de-emphasis below the label size */ }
-.scope-btn.scope-deep.is-active { opacity: 1; }
+/* De-emphasis is SIZE-only (#1989): whole-element opacity over --ink-faint composited
+   below WCAG AA in both themes (2.84:1 dark / 2.34:1 light) — full-opacity --ink-faint
+   already reads quieter than active ink and clears AA (5.97:1 / 4.88:1). */
+.scope-btn.scope-deep { font-size: 0.9em; /* fs-ok: deliberate de-emphasis below the label size */ }
 /* P2.2 — the composite level decomposes to its pillars (anti-black-box). */
 .hub-decomp { text-align: center; margin: var(--sp-2) 0 0; }
 .hub-decomp a { color: var(--ink-muted); text-decoration: none; }
