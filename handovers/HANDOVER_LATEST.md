@@ -108,7 +108,7 @@ negative-cache latch to the #1858 missing SSM grant.
 
 ## State
 
-**Main:** green (`d1f5ee81`). **Deployed:** site-api (genome fix + #1922's PT anchor), verified live.
+**Main:** red — the last COMPLETED ci-cd run (`30733497898`) failed `test_residual_queue_gate_1340` because this handover said `## Next picks` where the gate requires `## Residual / next picks`. Fixed in `ab428ad6`, but docs-only pushes don't trigger ci-cd, so nothing has re-validated since; the next code merge or a `workflow_dispatch` clears it. Tracked with the undeployed gates in **#2010**. Every other gate on that run passed (lint, deploy-critical, CodeQL, gitleaks, surface-drift). **Deployed:** site-api (genome fix + #1922's PT anchor), verified live against the deployed bytes.
 **Incidents:** +4 rows. **Docs:** delta report + grades JSON, `COACH_STANCE.md` re-verified,
 INCIDENT_LOG. **Stash/worktrees:** worktrees under `/private/tmp/claude-501/wt-*` are disposable.
 
