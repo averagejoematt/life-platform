@@ -352,6 +352,63 @@ def pairs_from_calibration_rows(rows):
     return pairs
 
 
+def count_voided(rows):
+    """The void ledger, counted (#1893).
+
+    A reset voids (never grades) every still-open pre-registered bet and records
+    one CROSS_PHASE `voided_at_reset` row per bet (restart_pipeline's
+    build_void_calib_item). outcome_to_binary correctly returns None for them so
+    they never distort Brier — but until #1893 nothing ever READ them, so the
+    public career denominator silently shrank by every reset's open slate
+    (273 of 323 lifetime bets were invisible on the surface whose subtitle is
+    "the honesty moat, made public"). Returns
+    {"n", "hypotheses", "predictions", "by_reset": {genesis: count}}.
+    """
+    n = hyp = pred = 0
+    by_reset = {}
+    for r in rows or []:
+        if str(r.get("outcome") or "").strip().lower() != "voided_at_reset":
+            continue
+        n += 1
+        rt = r.get("record_type")
+        if rt == "hypothesis_void":
+            hyp += 1
+        elif rt == "prediction_void":
+            pred += 1
+        g = str(r.get("reset_genesis") or "unknown")
+        by_reset[g] = by_reset.get(g, 0) + 1
+    return {"n": n, "hypotheses": hyp, "predictions": pred, "by_reset": dict(sorted(by_reset.items()))}
+
+
+def classify_calibration_rows(rows):
+    """Totality check over the shared CALIB# ledger (#1893 regression guard).
+
+    Every row must be accounted for by exactly one of: binary-scorable
+    (graded), forecast_resolution (graded or awaiting `covered`), or voided.
+    Returns {"graded", "awaiting", "voided", "unclassified": [sk, ...]} —
+    a NEW record_type that lands in `unclassified` means some future writer
+    added a row class no reader counts, which is exactly how the void ledger
+    went write-only for five resets. The guard fails loud instead.
+    """
+    graded = awaiting = voided = 0
+    unclassified = []
+    for r in rows or []:
+        if str(r.get("outcome") or "").strip().lower() == "voided_at_reset":
+            voided += 1
+        elif r.get("record_type") == "forecast_resolution":
+            if r.get("covered") is None:
+                awaiting += 1
+            else:
+                graded += 1
+        elif outcome_to_binary(r.get("outcome")) is not None:
+            graded += 1
+        elif str(r.get("status") or "").strip().lower() in ("open", "pending"):
+            awaiting += 1
+        else:
+            unclassified.append(str(r.get("sk") or "?"))
+    return {"graded": graded, "awaiting": awaiting, "voided": voided, "unclassified": unclassified}
+
+
 def pairs_from_forecast_resolution_rows(rows):
     """``(confidence, outcome)`` pairs from interval-forecast resolution rows.
 

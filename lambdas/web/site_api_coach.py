@@ -2029,6 +2029,14 @@ def handle_calibration(event):
         platform_lifetime = calibration_core.score_pairs(platform_career_pairs + hyp_career_pairs + forecast_career_pairs)
         platform["lifetime"] = platform_lifetime
 
+        # #1893: the void ledger stops being write-only. Every reset stamps one
+        # voided_at_reset row per still-open pre-registered bet into this SAME
+        # CALIB# partition (already fetched above — zero extra queries); until
+        # now no surface read them, so the career denominator silently excluded
+        # ~85% of every bet the platform ever pre-registered. Counted and served
+        # so a reader can see the graded n is a subset, not the whole record.
+        voided = calibration_core.count_voided(hyp_rows)
+
         # Rank coaches by Brier (best first); the never-graded fall to the bottom.
         per_coach.sort(key=lambda c: (c["n"] == 0, c["brier"] if c["brier"] is not None else 1.0))
 
@@ -2038,6 +2046,7 @@ def handle_calibration(event):
                 "coaches": per_coach,
                 "hypotheses": {**hypotheses, "lifetime": hypotheses_lifetime},
                 "interval_forecasts": {**interval_forecasts, "lifetime": interval_forecasts_lifetime},
+                "voided": voided,
                 "cycle": _current_cycle(),
                 "disclosure": (
                     "Self-graded: every prediction here was resolved against the platform's own data by a "
@@ -2046,7 +2055,9 @@ def handle_calibration(event):
                     "calibrated means stated confidence matches how often calls turn out right (reliability); "
                     "skilled means beating the base rate (Brier skill > 0). A surface can be reliable without "
                     "being skillful — when skill is at or below zero it reads Not Yet Skillful, never Well "
-                    "Calibrated."
+                    "Calibrated. Voided bets: a reset voids — never grades — every still-open pre-registered "
+                    "bet; each is recorded in the ledger and counted in `voided` so the graded denominator "
+                    "is honest. They are excluded from Brier because they never resolved."
                 ),
                 "as_of": datetime.now(PT).strftime("%Y-%m-%d"),
             },
