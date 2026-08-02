@@ -40,12 +40,16 @@ old flow and it is what grew the directory to 489 files.
    merged/deployed status), what was verified (tests, smoke, live checks), gotchas hit,
    and the residual/next-picks queue. This file is the live driver the next session reads
    first (see `/uplevel` Phase 0 and `docs/README.md`).
-4. **Standing-alarms checklist (#1329):** any standing freshness/staleness alarms? A
-   digest-routed alarm or a manual-rotation secret reminder (see `docs/SECRETS_ROTATION.md`
-   "Monitoring" + the remediation agent's last curated needs-human email — Mon/Wed/Fri,
-   `remediation/agent.py`'s `aged_alarm_escalations`/`stale_secret_escalations`) can sit
-   unactioned across sessions with no other prompt to notice it. Note anything still
-   outstanding in the next-picks queue you just wrote in step 3 — don't let it silently age.
+4. **Standing-alarms checklist (#1329, folded into step (e10)):** the full alarm-board
+   reconcile — enumerate every CloudWatch alarm in ALARM state and require a citation
+   for anything red >72h — now lives in step (e10) below and supersedes this item's
+   original freshness/staleness-only scope (#1959: the #1329 version was scoped and
+   advisory — 3 alarms sat red 9–15 days with one incident row between them). Do
+   step (e10) instead of hand-checking here. Manual-rotation SECRET staleness is
+   NOT a CloudWatch alarm (Secrets Manager `DescribeSecret`, not `describe-alarms`)
+   so it's still worth a glance on its own — see `docs/SECRETS_ROTATION.md`
+   "Monitoring" + `remediation/agent.py`'s `stale_secret_escalations` — but the
+   alarm board itself is (e10)'s job now, not this item's.
 
 ### (b) Replace — never stack — the CLAUDE.md session-status block
 
@@ -374,13 +378,45 @@ upkeep the wrap can't skip.
   #N, #M); Later sweep — <calls made>` or `**Backlog:** Now live at <n>; no stale Later
   issues`.
 
+### (e10) Alarm-citation gate — a wrap gate, same shape as (d)/(e)/(e2)–(e9) (#1959)
+
+Nothing owned "an alarm red >72h must cite an incident row or issue #" — the #1329
+standing-alarms item (step (a).4) was scoped to freshness/staleness alarms and was
+advisory only (a next-picks note, no `describe-alarms` enumeration, no fail
+condition). At the 2026-07-28 review 6 alarms were red simultaneously against one
+incident row in the session ledger; a new red could hide among the chronic ones.
+
+- Run:
+  ```bash
+  python3 scripts/check_alarm_citations.py
+  ```
+  It reads live CloudWatch state (`describe_alarms(StateValue="ALARM")`, read-only —
+  no writes, no alarm mutation) and cross-references the curated registry
+  `docs/alarm_citations.json` (exact `AlarmName` -> `{"citation": "#N or an incident
+  row", "note": "..."}`, hand-maintained the same way `remediation/agent.py`'s
+  `MANUAL_ROTATION_SECRETS` is). Every alarm that has been in ALARM **>72h** must
+  have an entry, or the gate names it explicitly and exits 1.
+- If a printed alarm is a genuine gap: add a `docs/alarm_citations.json` entry (file
+  the issue first if none exists yet, ADR-099 shape) — or, if it's not really
+  actionable this session, write the shortfall explicitly into the handover and
+  re-run with `--decoded` to close this step honestly (same contract as (e2)'s
+  `check_main_green.py --decoded`). Do not leave a printed uncited alarm unfixed
+  AND unacknowledged.
+- **AWS-unreachable degrade:** if CloudWatch can't be reached (no creds, offline),
+  the script prints `UNVERIFIED` and exits 0 on its own — note that in the handover
+  rather than claiming a clean board (mirrors the (e6)/(e7) `gh`-unavailable
+  fail-open shape).
+- The handover carries one line either way: `**Alarms:** <N> red >72h, all cited`,
+  `**Alarms:** <M> uncited — named: <alarm names>`, or `**Alarms:** unverified — AWS
+  unreachable`.
+
 ### (f) Commit the wrap
 
 Stage the repo-tracked wrap artifacts only (memory-dir changes from step (c) are outside
 git and are never part of this commit):
 
 ```bash
-git add handovers/HANDOVER_LATEST.md CLAUDE.md docs/ site/story/build/beats.json   # beats.json only if (d) fired; docs/ only if (e) touched pages
+git add handovers/HANDOVER_LATEST.md CLAUDE.md docs/ site/story/build/beats.json   # beats.json only if (d) fired; docs/ only if (e) touched pages or (e10) updated docs/alarm_citations.json
 git commit -m "$(cat <<'EOF'
 docs(wrap): <short session theme> (<n items/PRs shipped>)
 
@@ -430,3 +466,8 @@ session — status block, handover, build beat (9 R22 smalls #836–#845)`).
 - **The queue is refilled or its depth is reported, never silence (#1870).** Step (e9):
   `Now` below 3 actionable stories gets promotions from `Next` by stored rank, and every
   `Later` issue untouched >60d gets an explicit promote-or-close call in the handover.
+- **A red alarm >72h cites something, or the wrap names it, never silence (#1959).**
+  Step (e10): `scripts/check_alarm_citations.py` must exit 0 (clean or `--decoded`)
+  before the wrap commit; an alarm printed uncited gets a `docs/alarm_citations.json`
+  entry or an explicit named line in the handover — never left both unfixed and
+  unacknowledged.
