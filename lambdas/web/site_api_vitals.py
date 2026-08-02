@@ -1559,8 +1559,26 @@ def handle_snapshot() -> dict:
 def handle_genome_risks() -> dict:
     """
     GET /api/genome_risks
-    Returns genome SNPs grouped by category with risk levels.
-    No raw genotypes exposed. Cache: 86400s (24h).
+    Returns genome risk AGGREGATES grouped by category. Cache: 86400s (24h).
+
+    PRIVACY ABSOLUTE — no genetic IDENTIFIER may reach this public payload.
+    The docstring here used to say "no raw genotypes exposed", which was true
+    and beside the point: this endpoint served 111 dbSNP `rsid` values and 93
+    `gene` names, each paired with the owner's personal risk classification, to
+    any unauthenticated caller. An rsID IS the identifier — it is what
+    `_GENETIC_TEXT_RE` (line ~2450 of this same file) exists to keep out of the
+    public labs payload, what `docs/DATA_GOVERNANCE.md` classes Tier 2
+    owner-only, and what #920/#945 purged from three other surfaces. This
+    handler was simply never brought under the rule (guard-the-instance, not
+    the set), and PRE-13 — the review that would decide whether ANY of this may
+    be published — is still deferred. Until that decision is Matthew's to make
+    explicitly, the public shape is aggregate-only:
+
+      per category: how many variants, and the risk-level distribution.
+
+    That keeps the honest reader-facing fact ("the genome has been analysed and
+    here is the shape of it") without publishing which variants he carries.
+    Restoring per-variant detail is a PRE-13 decision, not a code change.
     """
     pk = f"{USER_PREFIX}genome"
     resp = table.query(KeyConditionExpression=Key("pk").eq(pk))
@@ -1573,37 +1591,32 @@ def handle_genome_risks() -> dict:
             cache_seconds=3600,
         )
 
-    categories: dict[str, list[dict[str, Any]]] = {}
+    categories: dict[str, dict[str, Any]] = {}
     risk_summary = {"unfavorable": 0, "mixed": 0, "neutral": 0, "favorable": 0}
 
     for snp in items:
         cat = snp.get("category", "other")
         risk = snp.get("risk_level", "neutral")
         risk_summary[risk] = risk_summary.get(risk, 0) + 1
-
-        if cat not in categories:
-            categories[cat] = []
-        categories[cat].append(
-            {
-                "gene": snp.get("gene", ""),
-                "rsid": snp.get("rsid", snp.get("sk", "").replace("SNP#", "")),
-                "risk_level": risk,
-                "summary": snp.get("summary", ""),
-                "implications": snp.get("implications", ""),
-                "interventions": snp.get("interventions", []),
-                "evidence": snp.get("evidence_strength", "moderate"),
-            }
-        )
-
-    for cat in categories:
-        categories[cat].sort(key=lambda x: {"unfavorable": 0, "mixed": 1, "neutral": 2, "favorable": 3}.get(x["risk_level"], 2))
+        # Aggregate ONLY — never the rsid, the gene, or the per-variant free
+        # text (summary/implications carried genotype calls). Counting a
+        # category is a fact about the analysis; naming a variant is a fact
+        # about the person.
+        bucket = categories.setdefault(cat, {"n": 0, "risk_levels": {"unfavorable": 0, "mixed": 0, "neutral": 0, "favorable": 0}})
+        bucket["n"] += 1
+        bucket["risk_levels"][risk] = bucket["risk_levels"].get(risk, 0) + 1
 
     return _ok(
         {
             "genome": {
                 "total_snps": len(items),
                 "risk_summary": risk_summary,
-                "categories": categories,
+                "categories": dict(sorted(categories.items())),
+                "disclosure": (
+                    "Per-variant detail (identifiers, genes, and their individual readouts) is deliberately "
+                    "not published: genome variants are owner-only under this platform's data-governance tiers. "
+                    "These are counts of what was analysed, not which variants he carries."
+                ),
             }
         },
         cache_seconds=86400,

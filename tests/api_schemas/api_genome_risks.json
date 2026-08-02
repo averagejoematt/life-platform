@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-02T03:00:00.000000+00:00",
   "fetch_path": "/api/genome_risks",
   "is_prefix_sample": false,
   "path": "/api/genome_risks",
@@ -24,487 +24,385 @@
           "categories": {
             "keys": {
               "antioxidant": {
-                "items": {
-                  "keys": {
-                    "evidence": {
-                      "type": "string"
-                    },
-                    "gene": {
-                      "type": "string"
-                    },
-                    "implications": {
-                      "type": "string"
-                    },
-                    "interventions": {
-                      "items": null,
-                      "length_sample": 0,
-                      "type": "array"
-                    },
-                    "risk_level": {
-                      "type": "string"
-                    },
-                    "rsid": {
-                      "type": "string"
-                    },
-                    "summary": {
-                      "type": "string"
-                    }
+                "keys": {
+                  "n": {
+                    "type": "integer"
                   },
-                  "type": "object"
+                  "risk_levels": {
+                    "keys": {
+                      "favorable": {
+                        "type": "integer"
+                      },
+                      "mixed": {
+                        "type": "integer"
+                      },
+                      "neutral": {
+                        "type": "integer"
+                      },
+                      "unfavorable": {
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  }
                 },
-                "length_sample": 2,
-                "type": "array"
+                "type": "object"
               },
               "caffeine": {
-                "items": {
-                  "keys": {
-                    "evidence": {
-                      "type": "string"
-                    },
-                    "gene": {
-                      "type": "string"
-                    },
-                    "implications": {
-                      "type": "string"
-                    },
-                    "interventions": {
-                      "items": null,
-                      "length_sample": 0,
-                      "type": "array"
-                    },
-                    "risk_level": {
-                      "type": "string"
-                    },
-                    "rsid": {
-                      "type": "string"
-                    },
-                    "summary": {
-                      "type": "string"
-                    }
+                "keys": {
+                  "n": {
+                    "type": "integer"
                   },
-                  "type": "object"
+                  "risk_levels": {
+                    "keys": {
+                      "favorable": {
+                        "type": "integer"
+                      },
+                      "mixed": {
+                        "type": "integer"
+                      },
+                      "neutral": {
+                        "type": "integer"
+                      },
+                      "unfavorable": {
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  }
                 },
-                "length_sample": 1,
-                "type": "array"
+                "type": "object"
               },
               "cancer_risk": {
-                "items": {
-                  "keys": {
-                    "evidence": {
-                      "type": "string"
-                    },
-                    "gene": {
-                      "type": "string"
-                    },
-                    "implications": {
-                      "type": "string"
-                    },
-                    "interventions": {
-                      "items": null,
-                      "length_sample": 0,
-                      "type": "array"
-                    },
-                    "risk_level": {
-                      "type": "string"
-                    },
-                    "rsid": {
-                      "type": "string"
-                    },
-                    "summary": {
-                      "type": "string"
-                    }
+                "keys": {
+                  "n": {
+                    "type": "integer"
                   },
-                  "type": "object"
+                  "risk_levels": {
+                    "keys": {
+                      "favorable": {
+                        "type": "integer"
+                      },
+                      "mixed": {
+                        "type": "integer"
+                      },
+                      "neutral": {
+                        "type": "integer"
+                      },
+                      "unfavorable": {
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  }
                 },
-                "length_sample": 1,
-                "type": "array"
+                "type": "object"
               },
               "cardiovascular": {
-                "items": {
-                  "keys": {
-                    "evidence": {
-                      "type": "string"
-                    },
-                    "gene": {
-                      "type": "string"
-                    },
-                    "implications": {
-                      "type": "string"
-                    },
-                    "interventions": {
-                      "items": null,
-                      "length_sample": 0,
-                      "type": "array"
-                    },
-                    "risk_level": {
-                      "type": "string"
-                    },
-                    "rsid": {
-                      "type": "string"
-                    },
-                    "summary": {
-                      "type": "string"
-                    }
+                "keys": {
+                  "n": {
+                    "type": "integer"
                   },
-                  "type": "object"
+                  "risk_levels": {
+                    "keys": {
+                      "favorable": {
+                        "type": "integer"
+                      },
+                      "mixed": {
+                        "type": "integer"
+                      },
+                      "neutral": {
+                        "type": "integer"
+                      },
+                      "unfavorable": {
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  }
                 },
-                "length_sample": 1,
-                "type": "array"
+                "type": "object"
               },
               "exercise": {
-                "items": {
-                  "keys": {
-                    "evidence": {
-                      "type": "string"
-                    },
-                    "gene": {
-                      "type": "string"
-                    },
-                    "implications": {
-                      "type": "string"
-                    },
-                    "interventions": {
-                      "items": null,
-                      "length_sample": 0,
-                      "type": "array"
-                    },
-                    "risk_level": {
-                      "type": "string"
-                    },
-                    "rsid": {
-                      "type": "string"
-                    },
-                    "summary": {
-                      "type": "string"
-                    }
+                "keys": {
+                  "n": {
+                    "type": "integer"
                   },
-                  "type": "object"
+                  "risk_levels": {
+                    "keys": {
+                      "favorable": {
+                        "type": "integer"
+                      },
+                      "mixed": {
+                        "type": "integer"
+                      },
+                      "neutral": {
+                        "type": "integer"
+                      },
+                      "unfavorable": {
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  }
                 },
-                "length_sample": 6,
-                "type": "array"
+                "type": "object"
               },
               "immune": {
-                "items": {
-                  "keys": {
-                    "evidence": {
-                      "type": "string"
-                    },
-                    "gene": {
-                      "type": "string"
-                    },
-                    "implications": {
-                      "type": "string"
-                    },
-                    "interventions": {
-                      "items": null,
-                      "length_sample": 0,
-                      "type": "array"
-                    },
-                    "risk_level": {
-                      "type": "string"
-                    },
-                    "rsid": {
-                      "type": "string"
-                    },
-                    "summary": {
-                      "type": "string"
-                    }
+                "keys": {
+                  "n": {
+                    "type": "integer"
                   },
-                  "type": "object"
+                  "risk_levels": {
+                    "keys": {
+                      "favorable": {
+                        "type": "integer"
+                      },
+                      "mixed": {
+                        "type": "integer"
+                      },
+                      "neutral": {
+                        "type": "integer"
+                      },
+                      "unfavorable": {
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  }
                 },
-                "length_sample": 9,
-                "type": "array"
+                "type": "object"
               },
               "lipids": {
-                "items": {
-                  "keys": {
-                    "evidence": {
-                      "type": "string"
-                    },
-                    "gene": {
-                      "type": "string"
-                    },
-                    "implications": {
-                      "type": "string"
-                    },
-                    "interventions": {
-                      "items": null,
-                      "length_sample": 0,
-                      "type": "array"
-                    },
-                    "risk_level": {
-                      "type": "string"
-                    },
-                    "rsid": {
-                      "type": "string"
-                    },
-                    "summary": {
-                      "type": "string"
-                    }
+                "keys": {
+                  "n": {
+                    "type": "integer"
                   },
-                  "type": "object"
+                  "risk_levels": {
+                    "keys": {
+                      "favorable": {
+                        "type": "integer"
+                      },
+                      "mixed": {
+                        "type": "integer"
+                      },
+                      "neutral": {
+                        "type": "integer"
+                      },
+                      "unfavorable": {
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  }
                 },
-                "length_sample": 10,
-                "type": "array"
+                "type": "object"
               },
               "longevity": {
-                "items": {
-                  "keys": {
-                    "evidence": {
-                      "type": "string"
-                    },
-                    "gene": {
-                      "type": "string"
-                    },
-                    "implications": {
-                      "type": "string"
-                    },
-                    "interventions": {
-                      "items": null,
-                      "length_sample": 0,
-                      "type": "array"
-                    },
-                    "risk_level": {
-                      "type": "string"
-                    },
-                    "rsid": {
-                      "type": "string"
-                    },
-                    "summary": {
-                      "type": "string"
-                    }
+                "keys": {
+                  "n": {
+                    "type": "integer"
                   },
-                  "type": "object"
+                  "risk_levels": {
+                    "keys": {
+                      "favorable": {
+                        "type": "integer"
+                      },
+                      "mixed": {
+                        "type": "integer"
+                      },
+                      "neutral": {
+                        "type": "integer"
+                      },
+                      "unfavorable": {
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  }
                 },
-                "length_sample": 20,
-                "type": "array"
+                "type": "object"
               },
               "metabolism": {
-                "items": {
-                  "keys": {
-                    "evidence": {
-                      "type": "string"
-                    },
-                    "gene": {
-                      "type": "string"
-                    },
-                    "implications": {
-                      "type": "string"
-                    },
-                    "interventions": {
-                      "items": null,
-                      "length_sample": 0,
-                      "type": "array"
-                    },
-                    "risk_level": {
-                      "type": "string"
-                    },
-                    "rsid": {
-                      "type": "string"
-                    },
-                    "summary": {
-                      "type": "string"
-                    }
+                "keys": {
+                  "n": {
+                    "type": "integer"
                   },
-                  "type": "object"
+                  "risk_levels": {
+                    "keys": {
+                      "favorable": {
+                        "type": "integer"
+                      },
+                      "mixed": {
+                        "type": "integer"
+                      },
+                      "neutral": {
+                        "type": "integer"
+                      },
+                      "unfavorable": {
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  }
                 },
-                "length_sample": 20,
-                "type": "array"
+                "type": "object"
               },
               "miscellaneous": {
-                "items": {
-                  "keys": {
-                    "evidence": {
-                      "type": "string"
-                    },
-                    "gene": {
-                      "type": "string"
-                    },
-                    "implications": {
-                      "type": "string"
-                    },
-                    "interventions": {
-                      "items": null,
-                      "length_sample": 0,
-                      "type": "array"
-                    },
-                    "risk_level": {
-                      "type": "string"
-                    },
-                    "rsid": {
-                      "type": "string"
-                    },
-                    "summary": {
-                      "type": "string"
-                    }
+                "keys": {
+                  "n": {
+                    "type": "integer"
                   },
-                  "type": "object"
+                  "risk_levels": {
+                    "keys": {
+                      "favorable": {
+                        "type": "integer"
+                      },
+                      "mixed": {
+                        "type": "integer"
+                      },
+                      "neutral": {
+                        "type": "integer"
+                      },
+                      "unfavorable": {
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  }
                 },
-                "length_sample": 5,
-                "type": "array"
+                "type": "object"
               },
               "nutrient_metabolism": {
-                "items": {
-                  "keys": {
-                    "evidence": {
-                      "type": "string"
-                    },
-                    "gene": {
-                      "type": "string"
-                    },
-                    "implications": {
-                      "type": "string"
-                    },
-                    "interventions": {
-                      "items": null,
-                      "length_sample": 0,
-                      "type": "array"
-                    },
-                    "risk_level": {
-                      "type": "string"
-                    },
-                    "rsid": {
-                      "type": "string"
-                    },
-                    "summary": {
-                      "type": "string"
-                    }
+                "keys": {
+                  "n": {
+                    "type": "integer"
                   },
-                  "type": "object"
+                  "risk_levels": {
+                    "keys": {
+                      "favorable": {
+                        "type": "integer"
+                      },
+                      "mixed": {
+                        "type": "integer"
+                      },
+                      "neutral": {
+                        "type": "integer"
+                      },
+                      "unfavorable": {
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  }
                 },
-                "length_sample": 19,
-                "type": "array"
+                "type": "object"
               },
               "other": {
-                "items": {
-                  "keys": {
-                    "evidence": {
-                      "type": "string"
-                    },
-                    "gene": {
-                      "type": "string"
-                    },
-                    "implications": {
-                      "type": "string"
-                    },
-                    "interventions": {
-                      "items": null,
-                      "length_sample": 0,
-                      "type": "array"
-                    },
-                    "risk_level": {
-                      "type": "string"
-                    },
-                    "rsid": {
-                      "type": "string"
-                    },
-                    "summary": {
-                      "type": "string"
-                    }
+                "keys": {
+                  "n": {
+                    "type": "integer"
                   },
-                  "type": "object"
+                  "risk_levels": {
+                    "keys": {
+                      "favorable": {
+                        "type": "integer"
+                      },
+                      "mixed": {
+                        "type": "integer"
+                      },
+                      "neutral": {
+                        "type": "integer"
+                      },
+                      "unfavorable": {
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  }
                 },
-                "length_sample": 1,
-                "type": "array"
+                "type": "object"
               },
               "sleep": {
-                "items": {
-                  "keys": {
-                    "evidence": {
-                      "type": "string"
-                    },
-                    "gene": {
-                      "type": "string"
-                    },
-                    "implications": {
-                      "type": "string"
-                    },
-                    "interventions": {
-                      "items": null,
-                      "length_sample": 0,
-                      "type": "array"
-                    },
-                    "risk_level": {
-                      "type": "string"
-                    },
-                    "rsid": {
-                      "type": "string"
-                    },
-                    "summary": {
-                      "type": "string"
-                    }
+                "keys": {
+                  "n": {
+                    "type": "integer"
                   },
-                  "type": "object"
+                  "risk_levels": {
+                    "keys": {
+                      "favorable": {
+                        "type": "integer"
+                      },
+                      "mixed": {
+                        "type": "integer"
+                      },
+                      "neutral": {
+                        "type": "integer"
+                      },
+                      "unfavorable": {
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  }
                 },
-                "length_sample": 6,
-                "type": "array"
+                "type": "object"
               },
               "statin_response": {
-                "items": {
-                  "keys": {
-                    "evidence": {
-                      "type": "string"
-                    },
-                    "gene": {
-                      "type": "string"
-                    },
-                    "implications": {
-                      "type": "string"
-                    },
-                    "interventions": {
-                      "items": null,
-                      "length_sample": 0,
-                      "type": "array"
-                    },
-                    "risk_level": {
-                      "type": "string"
-                    },
-                    "rsid": {
-                      "type": "string"
-                    },
-                    "summary": {
-                      "type": "string"
-                    }
+                "keys": {
+                  "n": {
+                    "type": "integer"
                   },
-                  "type": "object"
+                  "risk_levels": {
+                    "keys": {
+                      "favorable": {
+                        "type": "integer"
+                      },
+                      "mixed": {
+                        "type": "integer"
+                      },
+                      "neutral": {
+                        "type": "integer"
+                      },
+                      "unfavorable": {
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  }
                 },
-                "length_sample": 3,
-                "type": "array"
+                "type": "object"
               },
               "taste": {
-                "items": {
-                  "keys": {
-                    "evidence": {
-                      "type": "string"
-                    },
-                    "gene": {
-                      "type": "string"
-                    },
-                    "implications": {
-                      "type": "string"
-                    },
-                    "interventions": {
-                      "items": null,
-                      "length_sample": 0,
-                      "type": "array"
-                    },
-                    "risk_level": {
-                      "type": "string"
-                    },
-                    "rsid": {
-                      "type": "string"
-                    },
-                    "summary": {
-                      "type": "string"
-                    }
+                "keys": {
+                  "n": {
+                    "type": "integer"
                   },
-                  "type": "object"
+                  "risk_levels": {
+                    "keys": {
+                      "favorable": {
+                        "type": "integer"
+                      },
+                      "mixed": {
+                        "type": "integer"
+                      },
+                      "neutral": {
+                        "type": "integer"
+                      },
+                      "unfavorable": {
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  }
                 },
-                "length_sample": 7,
-                "type": "array"
+                "type": "object"
               }
             },
             "type": "object"
+          },
+          "disclosure": {
+            "type": "string"
           },
           "risk_summary": {
             "keys": {
