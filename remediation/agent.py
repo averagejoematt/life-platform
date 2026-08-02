@@ -77,32 +77,134 @@ def gate():
 ACK_LEDGER_KEY = "remediation-log/ack_ledger.json"
 ACK_TTL_DAYS = 7
 
+# ── Ack-age ratchet (#1960) ─────────────────────────────────────────────────
+# The loop above had no upper bound: every run that reached the same conclusion
+# rewrote the entry with a fresh 7-day expiry, so an ack renewed FOREVER and a
+# red board became normal. Worse, a WRONG ack renewed just as happily — the
+# 2026-07-28 review found ingest-auth-unhealthy-24h acked "duplicate, covered by
+# source-specific alarms" (false for garmin/notion/todoist, which had no
+# per-source alarm at all), still being re-renewed on 2026-08-01 with 10 alarms
+# simultaneously red. An ack is a "I looked, carry it forward" note, not a mute
+# button: after ACK_MAX_RENEWALS consecutive renewals the alarm stops counting as
+# acknowledged and escalates to needs_human WITH ITS AGE, every run, until it
+# actually clears.
+ACK_MAX_RENEWALS = 3
+
+# Ledger schema version. Bumping it INVALIDATES every stored entry on the next
+# load — deliberate, and the mechanism by which the wrong "duplicate" ack is
+# corrected: v1 entries carry no first_acked_at/renewals, so their true age is
+# unknowable and grandfathering them in at renewals=0 would hand the mislabeled
+# ack another three free renewals. Dropping them forces one honest re-triage of
+# every currently-acked alarm; the ones that are genuinely known get re-acked on
+# that same run at renewals=1 and the ratchet starts counting from real data.
+ACK_SCHEMA = 2
+
 
 def load_ack_ledger():
     try:
         obj = _s3.get_object(Bucket=LOG_BUCKET, Key=ACK_LEDGER_KEY)
         ledger = json.loads(obj["Body"].read().decode())
-        return ledger if isinstance(ledger, dict) else {}
+        if not isinstance(ledger, dict):
+            return {}
+        return {k: v for k, v in ledger.items() if isinstance(v, dict) and v.get("schema") == ACK_SCHEMA}
     except Exception:
         return {}
 
 
+def _ack_renewals(entry):
+    try:
+        return int(entry.get("renewals", 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _ack_age_hours(entry, now):
+    """Hours since the alarm was FIRST acked (not since the last renewal — that
+    resets every run and is exactly what made the staleness invisible)."""
+    stamp = entry.get("first_acked_at") or entry.get("acked_at")
+    if not stamp:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return (now - dt).total_seconds() / 3600.0
+
+
+def ack_is_exhausted(entry):
+    """True once the ack has been renewed ACK_MAX_RENEWALS times — the 3rd
+    consecutive renewal is the ratchet's trip point."""
+    return _ack_renewals(entry) >= ACK_MAX_RENEWALS
+
+
 def annotate_acked(signals, ledger, now=None):
-    """Mark alarms that were already triaged on a recent run (unexpired ack)."""
-    now_iso = (now or datetime.now(timezone.utc)).isoformat()
+    """Mark alarms that were already triaged on a recent run (unexpired ack).
+
+    An EXHAUSTED ack (#1960) is deliberately not annotated: the alarm goes back
+    to the agent untriaged, and the deterministic aging backstop
+    (aged_alarm_escalations) stops skipping it — the ack has run out of the
+    benefit of the doubt."""
+    now_dt = now or datetime.now(timezone.utc)
+    now_iso = now_dt.isoformat()
     for a in signals.get("alarms", []):
         entry = ledger.get(a.get("name", ""))
-        if entry and str(entry.get("expires", "")) > now_iso:
+        if entry and str(entry.get("expires", "")) > now_iso and not ack_is_exhausted(entry):
             a["acked"] = {
                 "acked_at": entry.get("acked_at"),
+                "first_acked_at": entry.get("first_acked_at"),
+                "renewals": _ack_renewals(entry),
                 "bucket": entry.get("bucket"),
                 "prior_conclusion": entry.get("conclusion", "")[:300],
             }
 
 
+def ack_ratchet_escalations(signals, ledger, now=None):
+    """Return `(alarm_name, needs_human_item)` for every still-firing alarm whose
+    ack has been renewed ACK_MAX_RENEWALS times (#1960).
+
+    Deterministic and pure, like aged_alarm_escalations — it fires even when the
+    LLM turn budget burns out. The item names the alarm, the renewal count, the
+    age since the FIRST ack, and the prior conclusion, so the operator is asked
+    the one question a renewed ack never asks: is this conclusion still TRUE?"""
+    now_dt = now or datetime.now(timezone.utc)
+    out = []
+    for a in signals.get("alarms", []) or []:
+        name = a.get("name", "")
+        entry = ledger.get(name)
+        if not name or not entry or not ack_is_exhausted(entry):
+            continue
+        renewals = _ack_renewals(entry)
+        age = _ack_age_hours(entry, now_dt)
+        age_txt = _fmt_age(age) if age is not None else "unknown age"
+        prior = str(entry.get("conclusion", ""))[:200] or "(no conclusion recorded)"
+        out.append(
+            (
+                name,
+                {
+                    "issue": f"Alarm '{name}' has been acked and renewed {renewals}x over {age_txt} and is STILL in ALARM "
+                    f"(> {ACK_MAX_RENEWALS}-renewal ratchet, #1960). The stored conclusion was: {prior!r}. An ack that "
+                    "renews forever is a mute button, not an acknowledgement — and a wrong conclusion renews just as "
+                    "silently as a right one (the 2026-07-28 'duplicate, covered by source-specific alarms' ack was "
+                    "false for three sources and was still being renewed a week later).",
+                    "action": f"Re-verify the stored conclusion for '{name}' against current reality — do not re-ack it "
+                    "unchanged. Either fix the underlying condition, file/point at a tracking issue and add the alarm to "
+                    "docs/alarm_citations.json, or retire the alarm. This escalation repeats every run until the alarm "
+                    "clears.",
+                },
+            )
+        )
+    return out
+
+
 def update_ack_ledger(ledger, report, signals, now=None):
     """Ack every alarm the run concluded needs_human or stale (the persistent
-    classes) so the next runs skip the from-scratch investigation. Fail-soft."""
+    classes) so the next runs skip the from-scratch investigation. Fail-soft.
+
+    #1960: an ack now CARRIES ITS HISTORY — first_acked_at survives every renewal
+    and `renewals` counts them, so the ratchet above can tell "triaged on Monday"
+    from "renewed unchanged for a month"."""
     now_dt = now or datetime.now(timezone.utc)
     alarm_names = [a.get("name", "") for a in signals.get("alarms", []) if a.get("name")]
     changed = False
@@ -113,8 +215,12 @@ def update_ack_ledger(ledger, report, signals, now=None):
             text = " ".join(str(item.get(k, "")) for k in text_keys)
             for name in alarm_names:
                 if name and name in text:
+                    prior = ledger.get(name) if isinstance(ledger.get(name), dict) else None
                     ledger[name] = {
+                        "schema": ACK_SCHEMA,
                         "acked_at": now_dt.isoformat(),
+                        "first_acked_at": (prior or {}).get("first_acked_at") or now_dt.isoformat(),
+                        "renewals": (_ack_renewals(prior) + 1) if prior else 0,
                         "expires": (now_dt + timedelta(days=ACK_TTL_DAYS)).isoformat(),
                         "bucket": bucket,
                         "conclusion": text[:500],
@@ -750,6 +856,13 @@ def main():
     # load-bearing sensor. Dedup by name against what the agent already reported.
     existing_nh = report.get("needs_human", []) or []
     existing_text = " ".join(str(i.get("issue", "")) + " " + str(i.get("action", "")) for i in existing_nh if isinstance(i, dict))
+    # #1960: ack-age ratchet — an ack renewed past ACK_MAX_RENEWALS is no longer an
+    # acknowledgement. Runs BEFORE the aging backstop so the more specific
+    # "your conclusion may be wrong" item wins the name dedup.
+    for name, item in ack_ratchet_escalations(signals, ledger):
+        if name not in existing_text:
+            report.setdefault("needs_human", []).append(item)
+            existing_text += " " + name
     for name, item in aged_alarm_escalations(signals):
         if name not in existing_text:
             report.setdefault("needs_human", []).append(item)

@@ -673,3 +673,164 @@ def test_secrets_stale_signal_does_not_short_circuit_clean_run(monkeypatch, tmp_
     assert emailed.get("report") != {}  # NOT the clean-run bare-{} email
     assert "life-platform/ai-keys" in _json.dumps(emailed.get("report", {}).get("needs_human", []))
     assert code == 0
+
+
+# ── #1960: the ack-age ratchet ──────────────────────────────────────────────
+# The ack loop renewed forever. The 2026-07-28 review found
+# `ingest-auth-unhealthy-24h` acked "duplicate, covered by source-specific alarms" —
+# false for garmin/notion/todoist, which had no source-specific alarm at all — and
+# the wrong ack was still being renewed on 2026-08-01 with 10 alarms simultaneously
+# red. An ack must now carry its history and run out.
+
+
+def _entry(now, *, renewals, first_days_ago, conclusion="duplicate, covered by source-specific alarms"):
+    from datetime import timedelta
+
+    return {
+        "schema": agent.ACK_SCHEMA,
+        "acked_at": now.isoformat(),
+        "first_acked_at": (now - timedelta(days=first_days_ago)).isoformat(),
+        "renewals": renewals,
+        "expires": (now + timedelta(days=5)).isoformat(),
+        "bucket": "stale",
+        "conclusion": conclusion,
+    }
+
+
+def test_update_ack_ledger_counts_renewals_and_preserves_first_ack(monkeypatch):
+    from datetime import datetime, timedelta, timezone
+
+    monkeypatch.setattr(agent._s3, "put_object", lambda **kw: None)
+    first = datetime(2026, 7, 1, tzinfo=timezone.utc)
+    signals = {"alarms": [{"name": "ingest-auth-unhealthy-24h"}]}
+    report = {"stale": [{"summary": "ingest-auth-unhealthy-24h — duplicate, covered by source-specific alarms"}]}
+
+    ledger = agent.update_ack_ledger({}, report, signals, now=first)
+    assert ledger["ingest-auth-unhealthy-24h"]["renewals"] == 0
+    assert ledger["ingest-auth-unhealthy-24h"]["first_acked_at"] == first.isoformat()
+
+    for i in (1, 2, 3):
+        ledger = agent.update_ack_ledger(ledger, report, signals, now=first + timedelta(days=2 * i))
+        assert ledger["ingest-auth-unhealthy-24h"]["renewals"] == i
+        # The first-ack stamp is what makes the age honest — a renewal must not reset it.
+        assert ledger["ingest-auth-unhealthy-24h"]["first_acked_at"] == first.isoformat()
+
+
+def test_exhausted_ack_is_not_annotated_as_acked():
+    from datetime import datetime, timezone
+
+    now = datetime(2026, 8, 2, tzinfo=timezone.utc)
+    ledger = {
+        "fresh": _entry(now, renewals=1, first_days_ago=2),
+        "worn-out": _entry(now, renewals=agent.ACK_MAX_RENEWALS, first_days_ago=21),
+    }
+    signals = {"alarms": [{"name": "fresh"}, {"name": "worn-out"}]}
+    agent.annotate_acked(signals, ledger, now=now)
+    by_name = {a["name"]: a for a in signals["alarms"]}
+    assert by_name["fresh"]["acked"]["renewals"] == 1
+    assert "acked" not in by_name["worn-out"], "an ack renewed past the ratchet is no longer an acknowledgement"
+
+
+def test_ack_ratchet_escalates_the_wrong_duplicate_ack_with_its_age():
+    """The exact live case: a wrong 'duplicate' ack renewed past the ratchet must
+    reach needs_human naming the alarm, the renewal count, its age, and the stored
+    conclusion the operator is being asked to re-verify."""
+    from datetime import datetime, timezone
+
+    now = datetime(2026, 8, 2, tzinfo=timezone.utc)
+    ledger = {"ingest-auth-unhealthy-24h": _entry(now, renewals=4, first_days_ago=9)}
+    signals = {"alarms": [{"name": "ingest-auth-unhealthy-24h"}]}
+    out = agent.ack_ratchet_escalations(signals, ledger, now=now)
+    assert len(out) == 1
+    name, item = out[0]
+    assert name == "ingest-auth-unhealthy-24h"
+    assert "4x" in item["issue"]
+    assert "9.0d" in item["issue"], "the escalation must carry the AGE, not just the count"
+    assert "duplicate, covered by source-specific alarms" in item["issue"]
+    assert "do not re-ack it" in item["action"]
+
+
+def test_ack_ratchet_stays_quiet_under_the_threshold():
+    from datetime import datetime, timezone
+
+    now = datetime(2026, 8, 2, tzinfo=timezone.utc)
+    ledger = {"a": _entry(now, renewals=agent.ACK_MAX_RENEWALS - 1, first_days_ago=6)}
+    assert agent.ack_ratchet_escalations({"alarms": [{"name": "a"}]}, ledger, now=now) == []
+
+
+def test_ack_ratchet_ignores_alarms_that_have_cleared():
+    """The ratchet is about STILL-firing alarms. A stale ledger row for an alarm
+    that is no longer in the signal set must not manufacture a page."""
+    from datetime import datetime, timezone
+
+    now = datetime(2026, 8, 2, tzinfo=timezone.utc)
+    ledger = {"cleared-long-ago": _entry(now, renewals=9, first_days_ago=40)}
+    assert agent.ack_ratchet_escalations({"alarms": []}, ledger, now=now) == []
+
+
+def test_load_ack_ledger_drops_pre_ratchet_entries(monkeypatch):
+    """Schema bump = the correction mechanism for the wrong ack. A v1 entry has no
+    renewal history, so grandfathering it in at renewals=0 would hand the mislabeled
+    'duplicate' ack three more free renewals. It is dropped and re-triaged."""
+    import json as _json
+
+    payload = {
+        "ingest-auth-unhealthy-24h": {"acked_at": "2026-08-01T00:00:00+00:00", "expires": "2026-08-08T00:00:00+00:00", "bucket": "stale"},
+        "keeper": {
+            "schema": agent.ACK_SCHEMA,
+            "acked_at": "2026-08-01T00:00:00+00:00",
+            "expires": "2026-08-08T00:00:00+00:00",
+            "renewals": 1,
+        },
+    }
+    monkeypatch.setattr(agent._s3, "get_object", lambda **kw: {"Body": _Body(_json.dumps(payload).encode())})
+    ledger = agent.load_ack_ledger()
+    assert "ingest-auth-unhealthy-24h" not in ledger, "pre-ratchet acks must not survive the schema bump"
+    assert "keeper" in ledger
+
+
+def test_ratchet_escalation_reaches_the_report_through_main(monkeypatch, tmp_path):
+    """End-to-end through main(): even if the LLM triage says nothing, a
+    ratchet-exhausted ack lands in needs_human (deterministic backstop shape)."""
+    import json as _json
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc)
+    entry = _entry(now, renewals=agent.ACK_MAX_RENEWALS + 1, first_days_ago=11)
+    report_path = tmp_path / "r.json"
+    monkeypatch.setenv("REMEDIATION_REPORT_PATH", str(report_path))
+    monkeypatch.setattr(agent, "gate", lambda: "shadow")
+    monkeypatch.setattr(
+        agent,
+        "gather_signals",
+        lambda ev: {
+            "alarms": [{"name": "ingest-auth-unhealthy-24h", "updated": now.isoformat()}],
+            "ci_failures": [],
+            "dlq": {},
+            "coherence": None,
+            "drift": None,
+            "urgent": None,
+        },
+    )
+    monkeypatch.setattr(agent, "load_ack_ledger", lambda: {"ingest-auth-unhealthy-24h": entry})
+    monkeypatch.setattr(agent, "build_prompt", lambda mode, signals: "prompt")
+    transcript = (
+        "Carried the known auth alarm forward.\n"
+        '```json\n{"auto_fixed": [], "prs": [], "needs_human": [], '
+        '"stale": [{"summary": "known auth condition"}], "untriaged": []}\n```'
+    )
+
+    async def _fake(prompt):
+        return transcript
+
+    monkeypatch.setattr(agent, "run_agent", _fake)
+    monkeypatch.setattr(agent, "update_ack_ledger", lambda *a, **k: {})
+    monkeypatch.setattr(agent, "audit_log", lambda *a, **k: None)
+    monkeypatch.setattr(agent, "email_report", lambda *a, **k: None)
+
+    agent.main()
+
+    on_disk = _json.loads(report_path.read_text())
+    issues = " ".join(i.get("issue", "") for i in on_disk.get("needs_human", []))
+    assert "ingest-auth-unhealthy-24h" in issues
+    assert "renewed" in issues

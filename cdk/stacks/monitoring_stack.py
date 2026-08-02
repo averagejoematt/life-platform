@@ -630,8 +630,10 @@ class MonitoringStack(Stack):
         # #467 (X-13 — before that the framework had a metric-less private copy and
         # this comment overstated coverage). A tripped breaker returns a healthy 200
         # "skip", so without this a dead credential silently suppresses a source
-        # for 24h — exactly how Garmin/Strava stayed dead for weeks. Dimensionless
-        # + Minimum: if ANY breaker source emits a 0 in the window, Min=0 → fire.
+        # for 24h — exactly how Garmin/Strava stayed dead for weeks. Reads the
+        # DIMENSIONLESS stream (still emitted verbatim after #1960 added the
+        # Source-dimensioned twin) + Minimum: if ANY breaker source emits a 0 in the
+        # window, Min=0 → fire. The per-source alarms below name the culprit.
         # Absence (no breaker source ran at all) is NOT a failure — the freshness
         # checker covers prolonged data gaps; here we only care about a source
         # that ran and got auth-suppressed.
@@ -651,6 +653,59 @@ class MonitoringStack(Stack):
             treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
         )
         _ingest_auth_dead.add_alarm_action(cw_actions.SnsAction(topic))
+
+        # ── Per-source auth-liveness (#1960) ───────────────────────────────────
+        # The aggregate above could not NAME the dead source, because the metric was
+        # emitted without dimensions "on purpose". That gap had a second cost: the
+        # remediation agent acked ingest-auth-unhealthy-24h as "duplicate, covered by
+        # source-specific alarms" — false for every OAuth source outside the 5-source
+        # consecutive-failures loop above, so a garmin/notion/todoist auth death fired
+        # ONLY the alarm the ack dismissed. auth_breaker now emits the same 0/1 TWICE:
+        # dimensionless (the aggregate above, unchanged) AND Source=<name>. These read
+        # the dimensioned stream, so the page names the culprit.
+        #
+        # Same shape as the aggregate (Minimum over 24h, NOT_BREACHING): a source that
+        # never ran emits nothing and must not fire; a source that ran and got
+        # auth-suppressed emits a 0 and does.
+        #
+        # The tuples are LITERALS on purpose — deploy/sync_doc_metadata.py AST-resolves
+        # alarm names out of this file for docs/MONITORING.md and can only resolve a
+        # loop var bound to a constant, so an import here would erase these names from
+        # the inventory. lambdas/ingestion/source_registry.py stays the authority:
+        # tests/test_oauth_alarm_coverage.py derives oauth_source_ids() /
+        # oauth_digest_only_source_ids() from the registry and FAILS if any credentialed
+        # source is missing coverage or is routed to the wrong topic. (Loop var is
+        # `_auth_src`, not `_src` — test_source_enumeration_drift.py regex-matches the
+        # first `for _src in (...)` and must keep finding the consec-failures tuple.)
+        for _auth_src in ("todoist", "habitify", "dropbox"):
+            _alarm(
+                f"IngestAuthUnhealthy{_auth_src.title()}",
+                f"ingest-auth-unhealthy-{_auth_src}",
+                "LifePlatform/OAuth",
+                "IngestAuthHealthy",
+                86400,
+                "Minimum",
+                1,
+                LT,
+                dims={"Source": _auth_src},
+            )
+        # DIGEST, not urgent — registry-derived (oauth_digest_only_source_ids):
+        # garmin is paused + best_effort (its 429 auth death is the accepted,
+        # unfixable state ADR-074 de-paged; coverage returns, the page does not) and
+        # notion is monitored:False (operator view only, never a paging surface).
+        for _auth_src in ("garmin", "notion"):
+            _alarm(
+                f"IngestAuthUnhealthy{_auth_src.title()}",
+                f"ingest-auth-unhealthy-{_auth_src}",
+                "LifePlatform/OAuth",
+                "IngestAuthHealthy",
+                86400,
+                "Minimum",
+                1,
+                LT,
+                dims={"Source": _auth_src},
+                to_digest=True,
+            )
 
         # ══════════════════════════════════════════════════════════════
         # RETIRED 2026-07-08 (#734): panelcast-no-episode-7d.

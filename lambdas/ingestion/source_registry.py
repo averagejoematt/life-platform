@@ -105,6 +105,20 @@ DEFAULT_STALE_HOURS = 48
 #                  whose provider exposes a queryable record list AND that aren't
 #                  rate-limit-degraded qualify; garmin is EXPLICITLY excluded
 #                  (ADR-123). Default absent/False. Read by provider_reconcile_source_ids().
+#   oauth          (#1960) True = a CREDENTIALED API pull whose auth can DIE — an
+#                  OAuth token that expires/gets revoked, or a static API key that
+#                  gets rotated. This is exactly the set that routes through
+#                  common/auth_breaker (directly or via the SIMP-2 framework's
+#                  breaker hooks) and can therefore emit
+#                  LifePlatform/OAuth IngestAuthHealthy = 0. Keyless pulls are
+#                  False by omission: weather (Open-Meteo, no key) and youtube
+#                  (per-channel RSS) have no credential to expire, so a per-source
+#                  auth alarm on them could never fire. Webhook / manual sources
+#                  (apple_health, measurements, food_delivery, supplements) have no
+#                  outbound credential at all. Read by oauth_source_ids() —
+#                  tests/test_oauth_alarm_coverage.py derives the required
+#                  per-source alarm set from it, so a NEW credentialed source with
+#                  no alarm fails CI instead of dying silently.
 #   capture_channel  the manual capture channel that fills this source by hand
 #                  (#746, Matthew's decision — the three manual channels are HAE,
 #                  Notion, MCP conversation): 'hae' (Health Auto Export webhook —
@@ -147,6 +161,7 @@ SOURCE_REGISTRY = {
     "whoop": {
         "label": "Whoop",
         "checker_label": "Whoop recovery/sleep",
+        "oauth": True,  # #1960: credentialed pull — auth can die, routes through auth_breaker
         "desc": "Recovery, sleep, HRV",
         "category": "Wearables",
         "behavioral": False,  # worn 24/7 — data flows without participation
@@ -167,6 +182,7 @@ SOURCE_REGISTRY = {
     "withings": {
         "label": "Withings",
         "checker_label": "Withings weight/body comp",
+        "oauth": True,  # #1960: credentialed pull — auth can die, routes through auth_breaker
         "desc": "Weight & body composition",
         "category": "Wearables",
         # A record only exists when he steps on the scale. The scale syncs
@@ -189,6 +205,7 @@ SOURCE_REGISTRY = {
     "strava": {
         "label": "Strava",
         "checker_label": "Strava activities",
+        "oauth": True,  # #1960: credentialed pull — auth can die, routes through auth_breaker
         "desc": "Activities & walks",
         "category": "Wearables",
         # Activities only exist when he exercises — a rest stretch is a lapse.
@@ -209,6 +226,7 @@ SOURCE_REGISTRY = {
     "eightsleep": {
         "label": "Eight Sleep",
         "checker_label": "Eight Sleep",
+        "oauth": True,  # #1960: credentialed pull — auth can die, routes through auth_breaker
         "desc": "Sleep stages, HR, HRV",
         "category": "Wearables",
         "behavioral": False,  # he sleeps on it every night — passive
@@ -293,6 +311,7 @@ SOURCE_REGISTRY = {
     "todoist": {
         "label": "Todoist",
         "checker_label": "Todoist tasks",
+        "oauth": True,  # #1960: credentialed pull — auth can die, routes through auth_breaker
         "desc": "Tasks completed",
         "category": "Inputs",
         "behavioral": False,  # scheduled API pull
@@ -321,6 +340,7 @@ SOURCE_REGISTRY = {
     "habitify": {
         "label": "Habitify",
         "checker_label": "Habitify habits",
+        "oauth": True,  # #1960: credentialed pull — auth can die, routes through auth_breaker
         "desc": "Daily habit completions",
         "category": "Inputs",
         "behavioral": False,  # scheduled API pull writes a record daily
@@ -360,6 +380,7 @@ SOURCE_REGISTRY = {
     "hevy": {
         "label": "Hevy",
         "checker_label": "Hevy strength sets",
+        "oauth": True,  # #1960: credentialed pull — auth can die, routes through auth_breaker
         "desc": "Strength sets — logged when he lifts",
         "category": "Manual logs",
         "behavioral": True,  # a rest week must not read as an outage
@@ -411,6 +432,7 @@ SOURCE_REGISTRY = {
     "garmin": {
         "label": "Garmin",
         "checker_label": "Garmin biometrics",
+        "oauth": True,  # #1960: credentialed pull — auth can die, routes through auth_breaker
         "desc": "Biometrics — paused (vendor anti-automation, ADR-074)",
         "category": "Wearables",
         "behavioral": False,
@@ -444,6 +466,7 @@ SOURCE_REGISTRY = {
     "notion": {
         "label": "Notion",
         "checker_label": "Notion journal",
+        "oauth": True,  # #1960: credentialed pull — auth can die, routes through auth_breaker
         "desc": "Journal entries",
         "category": "Inputs",
         "behavioral": True,  # journaling is the behavior
@@ -576,6 +599,7 @@ SOURCE_REGISTRY = {
     "dropbox": {
         "label": "Dropbox poller",
         "checker_label": "Dropbox poll",
+        "oauth": True,  # #1960: credentialed pull — auth can die, routes through auth_breaker
         "desc": "MacroFactor CSV transport",
         "category": "Inputs",
         "behavioral": False,
@@ -682,6 +706,35 @@ def provider_reconcile_source_ids() -> list:
     provider-API diff that catches a silent drop the DDB high-water mark hides.
     garmin is deliberately absent (ADR-123 — rate-limited/paused, not worth it)."""
     return sorted(k for k, v in SOURCE_REGISTRY.items() if v.get("provider_reconcile"))
+
+
+def oauth_source_ids() -> list:
+    """Credentialed API pulls whose AUTH can die (#1960) — the set that routes
+    through common/auth_breaker and can emit IngestAuthHealthy = 0, so the set
+    that needs per-source auth alarm coverage. Keyless pulls (weather, youtube)
+    and webhook/manual sources are excluded: no credential, nothing to expire.
+    Authority for tests/test_oauth_alarm_coverage.py."""
+    return sorted(k for k, v in SOURCE_REGISTRY.items() if v.get("oauth"))
+
+
+def oauth_digest_only_source_ids() -> set:
+    """OAuth sources whose auth alarm must route to the DAILY DIGEST rather than
+    the URGENT page (#1960). Two registry-derived reasons, no hand-list:
+
+      * `paused` / `best_effort` — the failure is an ACCEPTED upstream condition.
+        ADR-074 removed `garmin-auth-unhealthy-24h` from paging for exactly this:
+        a permanently-red alarm for an unfixable state trains the operator to
+        ignore the channel. Restoring per-source coverage must not restore that.
+      * `monitored: False` — operator-MCP visibility only (notion), never on a
+        paging surface.
+
+    Everything else pages: a dead credential on a monitored, live source is
+    actionable within the hour."""
+    return {
+        k
+        for k, v in SOURCE_REGISTRY.items()
+        if v.get("oauth") and (v.get("paused") or v.get("best_effort") or not v.get("monitored", True))
+    }
 
 
 def qa_required() -> list:
