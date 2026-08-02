@@ -78,7 +78,13 @@ concurrency:
   # -v3 (2026-07-27): the v2 group wedged the same way (run 30233540531 pending,
   # 0 jobs, 20+ min, genesis eve) after two supersede-cancellations in quick
   # succession — same fix, fresh queue.
-  group: ${{ github.workflow }}-${{ github.ref }}-v3
+  # -v4 (2026-08-02): third recurrence, run 30725124678 — pending, 0 jobs, 13+ min,
+  # with NOTHING else queued. Diagnosis that rules out an Actions-wide fault: Docs CI
+  # and CodeQL on the SAME sha (58db6c9c), created the same second, both completed
+  # success; only this workflow's group was stuck. Trigger matches v2/v3 — several
+  # supersede-cancellations earlier in the session. Salting is the only known fix;
+  # cancelling members does not clear the phantom entry.
+  group: ${{ github.workflow }}-${{ github.ref }}-v4
   cancel-in-progress: false
 
 env:
