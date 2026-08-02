@@ -9,9 +9,12 @@ Guards the three server-side legs of #1371:
    registry's gates + a measured current_n, so zero-states render a computed
    trigger ("first correlations at n≥10 — currently 3/10"), never authored copy.
 3. /api/source_freshness stamps cross-cycle provenance (carried +
-   carried_from_cycle from the record's ADR-077 cycle stamp) and the experiment
-   anchor, so a Day-1 board labels a 110-day-old chip "carried from attempt 7"
-   instead of rendering an unexplained ghost.
+   carried_from_cycle, derived as a PURE function of the record's date against
+   the CYCLE_GENESES ledger — #2002; the original #1371 read of an ADR-077
+   `cycle` attribute was structurally dead because no reset-pipeline writer
+   ever stamps raw partitions) and the experiment anchor, so a Day-1 board
+   labels a 110-day-old chip "carried from attempt 7" instead of rendering an
+   unexplained ghost.
 4. The mandatory AI phase block carries the reset-aware no-scold clause in the
    early-phase window — day-1 coach output must never frame reset-manufactured
    gaps ("zero food logs") as the person's failure.
@@ -133,19 +136,27 @@ def test_correlations_count_failure_serves_null_not_zero(monkeypatch):
 # ── 3. Freshness board: cross-cycle provenance ────────────────────────────────
 
 
-def _freshness_with(monkeypatch, latest_date, record_extra=None):
+# #2002: a pinned ledger — the derivation is pure date-vs-genesis, so the test
+# must not drift as restart_pipeline appends real cycles to CYCLE_GENESES.
+_TEST_GENESES = {1: "2026-04-01", 7: "2026-07-18", 8: "2026-07-19"}
+
+
+def _freshness_with(monkeypatch, latest_sk_date, record_extra=None, latest_sk=None):
     from web import site_api_data as sad
 
     pk = "USER#matthew#SOURCE#testsrc"
-    record = {"pk": pk, "sk": f"DATE#{latest_date}", **(record_extra or {})}
+    sk = latest_sk or f"DATE#{latest_sk_date}"
+    record = {"pk": pk, "sk": sk, **(record_extra or {})}
 
     def query_hook(table, **kwargs):
-        return {"Items": [{"sk": f"DATE#{latest_date}"}]}
+        return {"Items": [{"sk": sk}]}
 
     fake = FakeDdbTable(rows=[record], query_hook=query_hook)
     monkeypatch.setattr(sad, "table", fake)
     monkeypatch.setattr(sad, "_FRESHNESS_SOURCES", {"testsrc": {"label": "Test Source", "desc": "d", "category": "Body"}})
     monkeypatch.setattr(sad, "_FRESHNESS_PAUSED", {})
+    monkeypatch.setattr(sad, "CYCLE_GENESES", dict(_TEST_GENESES))
+    monkeypatch.setattr(sad, "EXPERIMENT_START", "2026-07-19")  # cycle 8 genesis
     from coach import coach_checkin
 
     monkeypatch.setattr(coach_checkin, "read_cycle", lambda ssm_client=None: 8)
@@ -154,17 +165,38 @@ def _freshness_with(monkeypatch, latest_date, record_extra=None):
 
 def test_pre_genesis_source_carries_cycle_provenance(monkeypatch):
     # Newest record's CONTENT date (never tombstoned_at) predates genesis → the
-    # chip is labeled carried history, numbered from the ADR-077 cycle stamp.
-    sad = _freshness_with(monkeypatch, "2020-01-01", record_extra={"cycle": 7})
+    # chip is labeled carried history, numbered by DATE against CYCLE_GENESES
+    # (#2002): 2026-07-18 falls in cycle 7's [genesis, next-genesis) span. The
+    # stored record deliberately has the REAL raw shape — phase tag only, NO
+    # `cycle` attribute (no reset-pipeline writer ever stamps one).
+    sad = _freshness_with(monkeypatch, "2026-07-18", record_extra={"phase": "pilot"})
     body = _body(sad.handle_source_freshness())
     (entry,) = body["sources"]
     assert entry["carried"] is True
     assert entry["carried_from_cycle"] == 7
-    assert body["experiment"]["genesis"] == sad.EXPERIMENT_START
+    assert body["experiment"]["genesis"] == "2026-07-19"
     assert body["experiment"]["cycle"] == 8
 
 
-def test_pre_genesis_source_without_stamp_still_marks_carried(monkeypatch):
+def test_hevy_subrecord_shape_still_gets_numeric_cycle(monkeypatch):
+    # #2002: hevy has NO plain DATE#{date} item — only DATE#…#WORKOUT#<uuid>
+    # sub-records — which made the old get_item stamp-read structurally
+    # unreachable. The date derivation numbers it from the sk's date alone.
+    sad = _freshness_with(
+        monkeypatch,
+        "2026-07-18",
+        record_extra={"phase": "pilot"},
+        latest_sk="DATE#2026-07-18#WORKOUT#0a1b2c3d-4e5f",
+    )
+    body = _body(sad.handle_source_freshness())
+    (entry,) = body["sources"]
+    assert entry["carried"] is True
+    assert entry["carried_from_cycle"] == 7
+
+
+def test_pre_cycle_one_record_stays_unnumbered(monkeypatch):
+    # A record predating cycle 1's genesis has no attempt to name — the honest
+    # unnumbered "a previous attempt" fallback (ADR-104), never a fabricated 1.
     sad = _freshness_with(monkeypatch, "2020-01-01")
     body = _body(sad.handle_source_freshness())
     (entry,) = body["sources"]

@@ -157,6 +157,77 @@ def check_ddb_freshness():
 
 
 # ---------------------------------------------------------------------------
+# CHECK 1b — HAE days-dark truth (#2001)
+# ---------------------------------------------------------------------------
+# The D-4/#468 honesty surface exists to say "dark N days" — but the liveness
+# scan's newest-N window used to LOSE the number exactly when the lapse was
+# longest (BP ~114d / SoM ~122d rendered unnumbered while in-window lapses
+# carried numbers). The checker now deep-scans past its window; this guard
+# asserts the contract holds: any dark datatype whose partition holds ANY
+# historical record for its fields must carry a numeric age. Unnumbered dark is
+# only honest when the partition truly has nothing inside the deep horizon.
+
+
+def _hae_record_exists_within(fields, floor_date, max_pages=10):
+    """True if any apple_health DATE# record in [floor_date, now] carries any of
+    `fields` non-None. Bounded newest-first filtered pagination — read-only."""
+    kwargs = {
+        "KeyConditionExpression": "pk = :pk AND sk BETWEEN :lo AND :hi",
+        "ExpressionAttributeValues": {":pk": USER_PREFIX + "apple_health", ":lo": f"DATE#{floor_date}", ":hi": "DATE#~"},
+        "FilterExpression": " OR ".join(f"attribute_exists({f})" for f in fields),
+        "ScanIndexForward": False,
+        "ProjectionExpression": "sk, " + ", ".join(fields),
+    }
+    for _ in range(max_pages):
+        resp = table.query(**kwargs)
+        if any(any(it.get(f) is not None for f in fields) for it in resp.get("Items", [])):
+            return True
+        lek = resp.get("LastEvaluatedKey")
+        if not lek:
+            return False
+        kwargs["ExclusiveStartKey"] = lek
+    return False
+
+
+def check_hae_liveness_truth():
+    """#2001: a dark:true HAE datatype with days_dark null while its partition
+    holds a findable historical record = the honesty surface lost its number."""
+    c = Check("HAE:days-dark-truth", "Data Freshness", CONTENT_TRUTH)
+    try:
+        from emails.freshness_checker_lambda import HAE_LIVENESS_MAX_LOOKBACK_DAYS as _lookback
+    except Exception:  # packaging drift — fall back to the checker's env-var default
+        _lookback = int(os.environ.get("HAE_LIVENESS_MAX_LOOKBACK_DAYS", "400"))
+    try:
+        from ingestion.source_registry import hae_datatype_thresholds
+
+        sent = table.get_item(Key={"pk": USER_PREFIX + "apple_health", "sk": "DATATYPE_LIVENESS"}).get("Item")
+    except Exception as e:
+        return [c.warn(f"HAE liveness sentinel read failed: {e}")]
+    if not sent:
+        return [c.warn("no DATATYPE_LIVENESS sentinel yet (freshness checker has not run)")]
+    fields_by_key = {d["key"]: d["fields"] for d in hae_datatype_thresholds()}
+    floor_date = (pt_now().date() - timedelta(days=_lookback)).isoformat()
+    violations = []
+    for d in sent.get("datatypes", []):
+        if not d.get("dark") or d.get("age_days") is not None:
+            continue  # numbered dark (or not dark) — honest
+        fields = fields_by_key.get(str(d.get("key")), [])
+        try:
+            if fields and _hae_record_exists_within(fields, floor_date):
+                violations.append(str(d.get("key")))
+        except Exception as e:
+            logger.warning("HAE days-dark truth probe failed for %s: %s", d.get("key"), e)
+    if violations:
+        return [
+            c.fail(
+                f"dark datatype(s) {', '.join(sorted(violations))} render days_dark:null while the partition holds a "
+                f"findable record within {_lookback}d — the liveness scan lost the 'dark N days' number (#2001)"
+            )
+        ]
+    return [c.ok("every dark HAE datatype carries a numeric days_dark (or truly has no record in the deep horizon)")]
+
+
+# ---------------------------------------------------------------------------
 # CHECK 2 — S3 output file freshness
 # ---------------------------------------------------------------------------
 
@@ -1063,6 +1134,7 @@ def lambda_handler(event, context):
 
         all_checks = []
         all_checks += check_ddb_freshness()
+        all_checks += check_hae_liveness_truth()  # #2001: dark HAE datatypes must carry a numeric days_dark when one is findable
         all_checks += check_s3_freshness()
         all_checks += check_score_sanity()
         all_checks += check_lambda_secrets()

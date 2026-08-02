@@ -280,9 +280,10 @@ export function renderPipeline(d) {
     let txt = badge[s.status] || s.status;
     if (s.manual && s.days_dark != null && s.days_dark > 0) txt += ` · dark ${s.days_dark}d`;
     let html = esc(txt);
-    // #1371: cycle-stamp provenance — this source's newest record predates the
-    // current genesis, so its age is carried history from an earlier attempt,
-    // not a live-cycle outage. Numbered from the record's ADR-077 cycle stamp.
+    // #1371/#2002: cross-cycle provenance — this source's newest record predates
+    // the current genesis, so its age is carried history from an earlier attempt,
+    // not a live-cycle outage. Numbered server-side from the record's date against
+    // the cycle-genesis ledger (no stamp dependency); null = predates cycle 1.
     if (s.carried) {
       const from = s.carried_from_cycle != null ? `attempt ${esc(String(s.carried_from_cycle))}` : "a previous attempt";
       html += ` <span class="rd-badge wu-carried">carried from ${from}</span>`;
@@ -297,7 +298,11 @@ export function renderPipeline(d) {
     let html = esc(s.desc || "");
     const dark = s.dark_datatypes || [];
     if (dark.length) {
-      const parts = dark.map((d) => `${esc(d.label)}${d.days_dark != null ? ` dark ${d.days_dark}d` : " dark"}${d.manual ? "" : " (device)"}`);
+      // #2001: days_dark is now numeric even for months-long lapses (the checker
+      // deep-scans past its window); days_dark_floor is the honest ">Nd" bound for
+      // a stream with no record inside even the deep horizon (ADR-104).
+      const darkTxt = (d) => (d.days_dark != null ? ` dark ${d.days_dark}d` : d.days_dark_floor != null ? ` dark >${d.days_dark_floor}d` : " dark");
+      const parts = dark.map((d) => `${esc(d.label)}${darkTxt(d)}${d.manual ? "" : " (device)"}`);
       html += `<span class="rd-meta label" style="display:block">${parts.join(" · ")}</span>`;
     }
     return html;

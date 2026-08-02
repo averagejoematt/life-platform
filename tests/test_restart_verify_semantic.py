@@ -187,3 +187,52 @@ def test_find_poisoned_ignores_pilot_and_genesis_day_rows():
         {"pk": "USER#matthew#SOURCE#whoop", "sk": "DATE#2026-07-20", "phase": "experiment"},
     ]
     assert sem.find_poisoned(rows, GENESIS) == []
+
+
+# ── 5b. carried provenance is NUMBERED (#2002) ────────────────────────────────
+
+
+def test_carried_all_numbered_passes():
+    payload = {
+        "sources": [
+            {"id": "strava", "carried": True, "carried_from_cycle": 9},
+            {"id": "hevy", "carried": True, "carried_from_cycle": 10},
+            {"id": "whoop", "status": "fresh"},
+        ]
+    }
+    assert sem.check_carried_provenance_numbered(payload) == []
+
+
+def test_carried_one_numbered_one_precycle_none_passes():
+    # A pre-cycle-1-dated source is honestly unnumbered; one numeric chip proves
+    # the derivation is alive.
+    payload = {
+        "sources": [
+            {"id": "todoist", "carried": True, "carried_from_cycle": None},
+            {"id": "measurements", "carried": True, "carried_from_cycle": 9},
+        ]
+    }
+    assert sem.check_carried_provenance_numbered(payload) == []
+
+
+def test_carried_all_null_fails():
+    # The #2002 dead state: every chip fell back to "a previous attempt".
+    payload = {
+        "sources": [
+            {"id": "strava", "carried": True, "carried_from_cycle": None},
+            {"id": "hevy", "carried": True, "carried_from_cycle": None},
+        ]
+    }
+    problems = sem.check_carried_provenance_numbered(payload)
+    assert len(problems) == 1 and "NONE carries a numeric" in problems[0]
+
+
+def test_no_carried_sources_post_reset_fails():
+    problems = sem.check_carried_provenance_numbered({"sources": [{"id": "whoop", "status": "fresh"}]})
+    assert len(problems) == 1 and "no carried source" in problems[0]
+
+
+def test_boolean_true_is_not_a_cycle_number():
+    # isinstance(True, int) is True in Python — a bool must not satisfy "numeric".
+    payload = {"sources": [{"id": "strava", "carried": True, "carried_from_cycle": True}]}
+    assert sem.check_carried_provenance_numbered(payload) != []
