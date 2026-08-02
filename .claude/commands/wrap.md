@@ -188,8 +188,14 @@ block said `main GREEN (1c641b6a)` while that sha's own push run had FAILED).
   - Exit 1: either fix main now, or write the explicit decode line into the handover —
     `**Main:** red — <one-line cause>` (e.g. "pre-existing Withings DLQ transient") —
     then re-run with `--decoded`. **Silent omission is not an outcome.**
-- The handover carries one line either way: `**Main:** green (<sha>)` or
-  `**Main:** red — <decode>`.
+  - The gate also classifies the two STRANDED deploy states (#1901,
+    CONVENTIONS.md §4d) — a run parked `waiting` at the production approval gate
+    (> ~2h), or the R8-ST6 Plan-red/Deploy-skipped shape. These are NOT ordinary
+    reds: the decode line names the class and the pending recovery step
+    (`deploy/approve_deployment.sh` / the CDK deploy + `deploy_all=true` dispatch),
+    e.g. `**Main:** stranded — run <id> waiting at the production gate, #1901 class`.
+- The handover carries one line either way: `**Main:** green (<sha>)`,
+  `**Main:** red — <decode>`, or `**Main:** stranded — <decode>`.
 
 ### (e3) Incident gate — a wrap gate, same shape as (d)/(e)/(e2) (#1332)
 
