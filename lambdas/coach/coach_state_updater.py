@@ -152,6 +152,20 @@ def _build_prediction_eval_spec(metric_hint, direction, window_days):
 # _LIVENESS_MIN_POINTS matches the evaluator's EWMA minimum (a directional
 # grade needs >= 5 points). Fail-OPEN on read errors: an AWS hiccup must never
 # silently downgrade a whole run's predictions to qualitative.
+#
+# #2023: the liveness read is CROSS-PHASE (include_pilot=True) — a #1203-class fix.
+# Every source in METRIC_SOURCES is classed RAW_TIMESERIES or CROSS_PHASE by
+# phase_taxonomy ("Kept forever; current-experiment views are GENESIS-ANCHORED …
+# not hidden. Phase tags are harmless/optional"), so those rows survive a reset by
+# design — but the reset tags every pre-genesis row phase=pilot, and a phase-filtered
+# 30-day lookback therefore sees only the days elapsed since genesis. In the opening
+# week of a cycle that is 0-6 points, so essentially every metric fell under the
+# 5-point bar and correctly-extracted metric predictions were downgraded to
+# qualitative (cycle-11 gradable share ~1.4% vs the ~9% pilot baseline) — precisely
+# when a reader is watching a fresh cycle start. Liveness asks "is this pipe
+# producing data", which is a question about the sensor, not about the experiment
+# generation; the 30-day window is the whole answer. Guarded by
+# tests/test_gradability_liveness_cross_phase_2023.py.
 _LIVENESS_LOOKBACK_DAYS = 30
 _LIVENESS_MIN_POINTS = 5
 
@@ -182,7 +196,7 @@ def _metric_has_recent_data(metric_key, liveness_cache):
         }
         n = 0
         while True:
-            resp = table.query(**with_phase_filter(kwargs))
+            resp = table.query(**with_phase_filter(kwargs, include_pilot=True))  # #2023: cross-phase liveness
             for item in resp.get("Items", []):
                 val = item.get(base)
                 if val is not None:
