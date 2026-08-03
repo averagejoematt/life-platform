@@ -46,6 +46,14 @@ try:
 except ImportError:  # pragma: no cover — layer-module fallback (local tooling)
     urlopen_with_retry = urllib.request.urlopen
 
+try:
+    from common.auth_breaker import mark_as_auth_failure
+except ImportError:  # pragma: no cover — layer-module fallback (local tooling)
+
+    def mark_as_auth_failure(exc):
+        return exc
+
+
 from ingestion.ingestion_framework import IngestionConfig, run_ingestion
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
@@ -98,6 +106,17 @@ _cw = boto3.client("cloudwatch", region_name=REGION)
 
 
 def _refresh_access_token(client_id: str, client_secret: str, refresh_token: str) -> tuple:
+    """POST the token exchange. #2069: on-call retry (429/5xx, same policy as
+    the data endpoints below) — the 2026-08-03 12:00 UTC incident's FIRST
+    failure was a bare 502 on this exact call with no retry, which meant a
+    single transient gateway blip cost an entire refresh attempt with no
+    chance to recover within the run. Retrying here is safe: a 502/503/504
+    from Whoop's edge is the common case where the backend never actually
+    processed (and therefore never rotated) the single-use refresh_token, so
+    a retry with the SAME token typically just succeeds; in the rarer case
+    where the backend DID rotate before failing to respond, the retry gets an
+    immediate, correctly-classified 400 (see `authenticate`) in THIS
+    invocation instead of silence until the next hourly run."""
     payload = urllib.parse.urlencode(
         {
             "grant_type": "refresh_token",
@@ -113,9 +132,51 @@ def _refresh_access_token(client_id: str, client_secret: str, refresh_token: str
         method="POST",
         headers={"Content-Type": "application/x-www-form-urlencoded", "User-Agent": "WhoopIngestion/1.0"},
     )
-    with urllib.request.urlopen(req) as resp:
+    with urlopen_with_retry(req, timeout=30) as resp:
         data = json.loads(resp.read())
     return data["access_token"], data["refresh_token"]
+
+
+def _persist_refreshed_secret(secret: dict) -> bool:
+    """Write the rotated credentials to Secrets Manager IMMEDIATELY — inside
+    `authenticate()`, before it returns, before any fetch/transform work, and
+    before control even returns to `ingestion_framework.run_ingestion` (which
+    also writes back on `enable_secret_writeback`, redundantly-but-safely,
+    since it re-writes the identical already-persisted dict).
+
+    Why here specifically (#2069): Whoop invalidates the OLD refresh_token
+    server-side the instant it issues the token response — the single-use
+    rotation is consumed at that moment, not when WE finish processing it. So
+    the durability window is bounded below by network latency (irreducible)
+    and bounded above by how much of OUR OWN code runs between "we have the
+    new token" and "it's durably stored." Persisting here, in the same
+    function that just received the token, collapses that upper bound to
+    (approximately) the write itself — no fetch_day, no transform, not even a
+    second function's worth of unrelated logic, can get between rotation and
+    persistence.
+
+    Retries once (mirrors ingestion_framework's own writeback shape, #481/A-9)
+    A second failure is logged at ERROR ('re-auth likely needed') but does
+    NOT raise — an otherwise-successful token exchange must not fail the run
+    over a transient Secrets Manager hiccup; the framework's own writeback
+    step gets a second chance right after `authenticate` returns. Returns
+    True iff the write landed here.
+    """
+    secrets_client = boto3.client("secretsmanager", region_name=REGION)
+    for attempt in (1, 2):
+        try:
+            secrets_client.update_secret(SecretId=SECRET_NAME, SecretString=json.dumps(secret))
+            logger.info("Whoop rotated refresh_token persisted immediately post-refresh")
+            return True
+        except Exception as e:
+            if attempt == 1:
+                logger.warning(f"Whoop immediate secret writeback failed (attempt 1/2, retrying): {e}")
+                time.sleep(1)
+            else:
+                logger.error(
+                    f"Whoop immediate secret writeback FAILED twice — rotated refresh_token may be stranded; " f"re-auth likely needed: {e}"
+                )
+    return False
 
 
 def _fetch_endpoint(access_token: str, endpoint: str, start_dt: str, end_dt: str) -> dict:
@@ -345,7 +406,11 @@ def authenticate(secret_data: dict) -> dict:
     (briefly retrying to cover the winner's secret-writeback window) — if a
     concurrent invocation already rotated it, we adopt the winner's tokens rather
     than fail (a raise here DLQs a benign race + false-fires the error alarm).
-    A 400 with an *unchanged* refresh_token is a genuine auth failure and raises.
+    A 400 with an *unchanged* refresh_token is a genuine auth failure and raises
+    — marked via `mark_as_auth_failure` (#2069) so the breaker's classifier
+    (which only recognizes 401/403 + keywords, deliberately NOT a bare '400'
+    — a data-fetch 400 is not auth) can latch on THIS specific, call-site-
+    confirmed case without over-broadening what counts as "auth" globally.
     """
     secret = dict(secret_data)
     try:
@@ -367,10 +432,15 @@ def authenticate(secret_data: dict) -> dict:
                 _secret_cache["access_token"] = fresh["access_token"]
                 return secret
         logger.error("Whoop refresh 400 with unchanged refresh_token — genuine auth failure.")
+        mark_as_auth_failure(e)
         raise
     secret["access_token"] = access_token
     secret["refresh_token"] = new_refresh
     _secret_cache["access_token"] = access_token
+    # #2069: persist BEFORE returning — see _persist_refreshed_secret's docstring
+    # for why this closes the crash window instead of relying solely on the
+    # framework's post-authenticate() writeback.
+    _persist_refreshed_secret(secret)
     return secret
 
 
@@ -615,15 +685,12 @@ def _reconcile(event: dict, context) -> dict:
         except ImportError:
             secret_data = json.loads(secrets_client.get_secret_value(SecretId=SECRET_NAME)["SecretString"])
 
+        # #2069: authenticate() now persists a rotated refresh_token itself
+        # (_persist_refreshed_secret), immediately, before returning — this
+        # reconcile invocation no longer needs its own separate writeback
+        # step; it would only be a redundant re-write of the identical dict
+        # authenticate() already wrote.
         secret = authenticate(secret_data)
-        # Whoop rotates the single-use refresh_token on refresh — persist it or the
-        # next ingestion run's refresh fails on a stale token (same as ingestion's
-        # enable_secret_writeback path, mirrored for the reconcile invocation).
-        if secret.get("refresh_token") != secret_data.get("refresh_token"):
-            try:
-                secrets_client.update_secret(SecretId=SECRET_NAME, SecretString=json.dumps(secret))
-            except Exception as e:
-                logger.warning("reconcile secret writeback failed (non-fatal): %s", e)
 
         token = secret["access_token"]
         today = datetime.now(timezone.utc).date()

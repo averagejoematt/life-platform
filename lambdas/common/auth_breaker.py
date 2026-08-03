@@ -116,8 +116,44 @@ def _emit_auth_health(healthy: int, source_name: str, logger) -> None:
             logger.warning(f"auth_breaker_metric_failed source={source_name}: {e}")
 
 
+def mark_as_auth_failure(exc: Exception) -> Exception:
+    """Attach an EXPLICIT, call-site-asserted auth-failure classification to
+    `exc` and return it (typical use: `mark_as_auth_failure(e); raise` —
+    mutate then bare-`raise` so the original traceback is preserved).
+
+    #2069: the generic 401/403 + keyword heuristic below is deliberately NOT
+    extended to recognize a bare '400' — a data-fetch 400 is not an auth
+    failure, and adding '400' to the code list would misclassify it. But some
+    call sites know MORE than the status code: whoop_lambda.authenticate()
+    gets a 400 from the TOKEN endpoint, re-reads the stored secret to rule out
+    a concurrent invocation having already rotated it, and only THEN concludes
+    "genuine auth failure" — logging exactly that. That conclusion is real
+    information the generic heuristic can't see from the exception alone, so
+    the call site marks it explicitly instead of the classifier guessing.
+
+    `looks_like_auth_failure` checks for this marker FIRST, before falling
+    back to the generic heuristic. Best-effort: some exception types may
+    reject attribute assignment (e.g. a class using `__slots__`); a failure to
+    mark is swallowed rather than raised — the caller's real exception must
+    still propagate.
+    """
+    try:
+        exc.auth_context = True  # type: ignore[attr-defined]
+    except Exception:
+        pass
+    return exc
+
+
 def looks_like_auth_failure(exc: Exception) -> bool:
-    """Heuristic: does this exception indicate an OAuth/API auth failure?"""
+    """Heuristic: does this exception indicate an OAuth/API auth failure?
+
+    Checks, in order:
+      1. An explicit call-site classification via `mark_as_auth_failure` —
+         see that function's docstring for why this exists (#2069).
+      2. The generic 401/403 + keyword heuristic (unchanged).
+    """
+    if getattr(exc, "auth_context", False):
+        return True
     msg = str(exc).lower()
     if any(code in msg for code in _AUTH_FAIL_HTTP_CODES):
         return True
