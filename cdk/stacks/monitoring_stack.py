@@ -47,6 +47,16 @@ Covers:
   reader-truth AI QA pass (both the CI/local harness and the nightly qa_smoke
   hook — lambdas/reader_truth_qa.emit_budget_pause_metric()):
     qa-paused-by-budget    LifePlatform/QA QAPausedByBudget Sum >= 1, 86400s (digest)
+
+  #1951 (growth-1: /subscribe/ promised "every Wednesday" while every
+  subscriber-facing weekly send was kill-switched, undetected for ~3
+  months): one metric filter + alarm per subscriber-facing sender on the
+  "[kill-switch] ... skipping ... subscriber send" INFO log line, so a
+  paused send is a visible state, not a silent green (3):
+    life-platform-chronicle-email-sender-kill-switch-skip  LifePlatform/Email
+      SubscriberSendSkippedByKillSwitch Sum >= 1, 86400s (digest)
+    life-platform-weekly-signal-kill-switch-skip            (same metric, digest)
+    life-platform-between-chronicle-kill-switch-skip        (same metric, digest)
 """
 
 from aws_cdk import (
@@ -1145,6 +1155,55 @@ class MonitoringStack(Stack):
         # log group (/aws/lambda/site-api) are in us-east-1; MonitoringStack is
         # in us-west-2. Cross-region MetricFilter is not supported.
         # Implement in a separate us-east-1 monitoring construct when needed.
+
+        # ══════════════════════════════════════════════════════════════
+        # #1951: subscriber-send kill-switch visibility. Each subscriber-facing
+        # weekly sender logs a specific INFO line
+        # ("[kill-switch] EXTERNAL_EMAILS_ENABLED=false — skipping ... send")
+        # the moment it no-ops on the switch — and before this alarm, NOTHING
+        # watched that line. That is exactly how EXTERNAL_EMAILS_ENABLED stayed
+        # pinned "false" for ~3 months (since 2026-04-23, commit 0e7abd03) while
+        # /subscribe/ kept promising "every Wednesday": every nightly qa-smoke
+        # and every CloudWatch dashboard stayed green because a skipped send
+        # was never a FAILURE from the Lambda's own point of view, only a
+        # quiet no-op. One metric filter + digest alarm per sender makes a
+        # paused send a VISIBLE state regardless of which direction the switch
+        # is set — this alarm fires whether the pause is deliberate (a future
+        # privacy-mode decision) or a regression, same as
+        # operational/qa_check_subscriber_promise.py's promise-vs-switch guard
+        # covers the /subscribe/ page side of the same defect. 86400s window
+        # matches each sender's own at-most-weekly cadence; NOT_BREACHING
+        # treat-missing keeps a normal (unskipped) day silent, as intended.
+        # ══════════════════════════════════════════════════════════════
+        # Inline literal tuple (not a separately-assigned list name) — deploy/sync_doc_metadata.py's
+        # alarm-count/alarm-name AST discoverers only multiply/bind through a for-loop whose
+        # iterable is a literal Tuple/List/Set node in the `for` statement itself (mirrors the
+        # ingest-consecutive-failures loop a few hundred lines above); a Name reference to a
+        # module/local list variable resolves to a x1 fallback and an unresolved f-string name.
+        for _ks_fn in ("chronicle-email-sender", "weekly-signal", "between-chronicle"):
+            _ks_id = "".join(p.capitalize() for p in _ks_fn.split("-"))
+            _ks_lg = logs.LogGroup.from_log_group_name(self, f"KillSwitchLg{_ks_id}", f"/aws/lambda/{_ks_fn}")
+            _ks_mf = logs.MetricFilter(
+                self,
+                f"KillSwitchMf{_ks_id}",
+                log_group=_ks_lg,
+                filter_pattern=logs.FilterPattern.all_terms("[kill-switch]", "skipping", "subscriber send"),
+                metric_name="SubscriberSendSkippedByKillSwitch",
+                metric_namespace="LifePlatform/Email",
+                metric_value="1",
+                dimensions={"FunctionName": _ks_fn},
+            )
+            _ks_alarm = cloudwatch.Alarm(
+                self,
+                f"KillSwitchAlarm{_ks_id}",
+                alarm_name=f"life-platform-{_ks_fn}-kill-switch-skip",
+                metric=_ks_mf.metric(period=Duration.hours(24), statistic="Sum"),
+                evaluation_periods=1,
+                threshold=1,
+                comparison_operator=GTE,
+                treat_missing_data=NB,
+            )
+            _ks_alarm.add_alarm_action(cw_actions.SnsAction(digest))
 
         # ══════════════════════════════════════════════════════════════
         # SiteAPI EMF dashboard (BACKLOG.md:252 — closes P3.4 observability loop)
