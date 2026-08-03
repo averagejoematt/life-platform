@@ -1,4 +1,4 @@
-"""#1103/#1211/#1212 — the CSS token guard, enforced.
+"""#1103/#1211/#1212/#1974 — the CSS token guard, enforced.
 
 The seven CONSUMER sheets (story/evidence/cockpit/mind/fonts/section_toc/subscribe)
 must draw every font-size from the --fs-* type triad (or carry an explicit inline
@@ -6,7 +6,10 @@ must draw every font-size from the --fs-* type triad (or carry an explicit inlin
 reference must resolve to a token that actually exists — a reference to an undefined
 token means its fallback is silently always active (the story.css:351 bug class).
 Every (max|min)-width breakpoint across site/assets/css must be one of the nine
-sanctioned §10.1 numbers (#1212). Offline, repo-only: safe in the CI unit-test job.
+sanctioned §10.1 numbers (#1212) — and, since #1974, so must every breakpoint in the
+inline `<style>` blocks the v4 page generators emit (and in the built pages they write),
+which is where the drift class had migrated once the stylesheets were policed.
+Offline, repo-only: safe in the CI unit-test job.
 """
 
 import sys
@@ -68,3 +71,64 @@ def test_breakpoint_check_is_non_vacuous():
         assert not check_css_tokens.breakpoint_findings_in("x.css", f"@media ({prefix}-width: {bp}px) {{}}"), bp
     # A breakpoint inside a comment is not a live query.
     assert not check_css_tokens.breakpoint_findings_in("x.css", "/* was (max-width: 520px) */ @media (max-width: 600px) {}")
+
+
+# ---------------------------------------------------------------------------
+# #1974 — the gate reaches the GENERATED surface: the inline <style> blocks the
+# v4 page generators emit, and the built pages they write. Before this the sweep
+# was stylesheet-only and six generators shipped five rogue breakpoints
+# (560/620/640/720/900) + a font-size:64px drop cap straight to live pages.
+# ---------------------------------------------------------------------------
+
+_ROGUE_BUILDER = '''\
+"""A v4 page generator."""
+
+STYLE = """
+<style>
+.zz-grid { display: grid; gap: var(--sp-5); }
+@media (min-width: 720px) { .zz-grid { grid-template-columns: repeat(2, 1fr); } }
+.zz-cap::first-letter { font-size: 64px; }
+</style>"""
+'''
+
+
+def test_generated_inline_style_sweep_is_non_vacuous():
+    """A generator emitting an unsanctioned breakpoint (or a raw font-size) inside its
+    inline <style> FAILS the gate — the exact pre-fix v4_build_eyeball.py:82 (720px) and
+    v4_build_journal.py:76 (64px drop cap) shapes."""
+    findings = check_css_tokens.inline_style_findings("scripts/v4_build_zz.py", _ROGUE_BUILDER)
+    joined = "\n".join(findings)
+    assert "rogue breakpoint `720px`" in joined, findings
+    assert "raw font-size `64px`" in joined, findings
+    # Real file line numbers, not block-relative ones (the <style> body starts at line 5).
+    assert "v4_build_zz.py:6:" in joined and "v4_build_zz.py:7:" in joined, findings
+
+
+def test_generated_inline_style_sweep_ignores_everything_outside_style():
+    """Only the <style> body is CSS. A `font-size: 12px` in a docstring or a
+    `(max-width: 520px)` in prose is not a live declaration — masking it is what keeps
+    the gate deterministic rather than a grep over whole Python sources."""
+    prose = '"""Notes: the old layout used (max-width: 520px) and font-size: 12px."""\n'
+    assert check_css_tokens.inline_style_findings("scripts/v4_build_zz.py", prose) == []
+    # …and the same literals inside a <style> ARE caught.
+    assert check_css_tokens.inline_style_findings("scripts/v4_build_zz.py", "<style>@media (max-width: 520px) {}</style>")
+    # The sanctioned neighbours pass, and an fs-ok sanction is honoured.
+    assert not check_css_tokens.inline_style_findings("x.py", "<style>@media (min-width: 761px) { .a { color: red; } }</style>")
+    assert not check_css_tokens.inline_style_findings("x.py", "<style>.a::first-letter { font-size: 3.4em; /* fs-ok: drop cap */ }</style>")
+
+
+def test_generated_surface_is_derived_not_enumerated():
+    """The swept set is DERIVED (glob over scripts/v4_build_*.py + rglob over non-legacy
+    site/**/*.html), so a new generator or a new built page joins the gate the moment it
+    lands. Guard the SET, not the instance."""
+    labels = [label for label, _ in check_css_tokens.generated_style_sources()]
+    # Every v4 generator on disk is in the swept set — nothing hand-listed.
+    on_disk = sorted(p.name for p in (check_css_tokens.REPO / "scripts").glob("v4_build_*.py"))
+    assert on_disk, "no v4 generators found — the glob went vacuous"
+    for name in on_disk:
+        assert f"scripts/{name}" in labels, name
+    # The built pages the fix regenerated are swept too…
+    for page in ["site/method/eyeball/index.html", "site/story/theme-river/index.html", "site/gear/index.html"]:
+        assert page in labels, page
+    # …and site/legacy (the frozen pre-v4 site) is excluded by construction.
+    assert not [x for x in labels if x.startswith("site/legacy/")]

@@ -73,7 +73,7 @@ STYLE = """
 <style>
 .td-wrap { max-width: var(--container); margin-inline: auto; padding: 0 var(--gutter) var(--sp-9); }
 .td-grid { display: grid; gap: var(--sp-5); margin-top: var(--sp-5); min-width: 0; }
-@media (min-width: 900px) { .td-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 901px) { .td-grid { grid-template-columns: repeat(3, 1fr); } }
 .td-card { border: var(--border-hair); border-radius: var(--radius); padding: var(--sp-5); background: var(--surface-raised); min-width: 0; display: flex; flex-direction: column; }
 .td-name { font-family: var(--font-serif); font-weight: var(--weight-med); font-size: var(--fs-h3); color: var(--ink); margin: 0; }
 .td-summary { margin-top: var(--sp-2); color: var(--ink-muted); line-height: var(--lh-relaxed); }

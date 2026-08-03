@@ -73,13 +73,13 @@ STYLE = """  <style>
     .post-body { padding:var(--sp-7) 0 var(--sp-8); }
     .post-body .prose { font-family:var(--font-serif);max-width:none; }
     .post-body .prose p { max-width:none;line-height:var(--lh-relaxed); }
-    .post-body .prose > p:first-of-type::first-letter { font-size:64px;line-height:0.8;float:left;margin-right:var(--sp-2);margin-top:6px;color:var(--ember);font-family:var(--font-serif); }
+    .post-body .prose > p:first-of-type::first-letter { font-size:3.4em; /* fs-ok: drop cap, scales with its paragraph */ line-height:0.8;float:left;margin-right:var(--sp-2);margin-top:6px;color:var(--ember);font-family:var(--font-serif); }
     .post-body .prose blockquote { border-left:2px solid var(--ember);padding:var(--sp-3) var(--sp-5);background:var(--ember-wash);margin:var(--sp-6) 0;font-style:italic;color:var(--ink); }
     .post-body .prose h2 { max-width:none; }
     .post-body .prose hr { border:none;border-top:var(--border-hair);margin:var(--sp-7) 0; }
     .post-body .prose strong { color:var(--ink);font-weight:var(--weight-med); }
     .post-body .prose ol { max-width:none; }
-    .post-body .prose code { font-family:var(--font-mono);font-size:0.82em;color:var(--ink-muted);word-break:break-word; }
+    .post-body .prose code { font-family:var(--font-mono);font-size:0.82em; /* fs-ok: relative code de-emphasis, scales with its paragraph */ color:var(--ink-muted);word-break:break-word; }
     .post-receipts { font-family:var(--font-mono);font-size:var(--fs-label);color:var(--ink-faint);letter-spacing:var(--tracking-label);margin-top:var(--sp-6);border-top:var(--border-hair);padding-top:var(--sp-4); }
     .post-receipts a { color:var(--ember);text-decoration:none;border-bottom:1px solid var(--ember-line); }
     .post-cta { margin:var(--sp-6) 0 var(--sp-7);padding:var(--sp-6);border:var(--border-hair);border-radius:var(--radius);background:var(--ember-wash);text-align:center; }
