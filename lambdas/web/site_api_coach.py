@@ -1876,7 +1876,15 @@ _PREDICTION_PROJECTION_FIELDS = (
 )
 
 
-def _query_partition(pk, sk_prefix, projection_fields=None):
+# #2063: pagination ceiling for the opt-in paginated read below. Bounds the
+# worst case at this function's 256MB (~1/6 vCPU) — DynamoDB caps a query page at
+# 1MB, so this is ~24MB / a few tens of thousands of small rows, ~50x the live
+# calibration ledger. Hitting it logs LOUD rather than silently truncating, which
+# is the failure mode #2063 exists to end.
+_MAX_QUERY_PAGES = 24
+
+
+def _query_partition(pk, sk_prefix, projection_fields=None, paginate=False):
     """ONE unfiltered, newest-first, Limit-1500 fetch of pk/sk_prefix — the ONE
     call shape both the real path and the test fakes' query hooks parse.
 
@@ -1888,6 +1896,18 @@ def _query_partition(pk, sk_prefix, projection_fields=None):
     per-thread boto3 Sessions are GIL-serialized pure-Python setup (12–16s at
     origin), and the resource-derived `meta.client` auto-transforms values, so
     hand-built typed AttributeValues mis-parse as Maps (ValidationException).
+
+    `paginate=True` follows LastEvaluatedKey to the end of the partition. Default
+    stays OFF: the 8 coach PREDICTION# partitions are 217–372 projected rows each
+    and fit one page with room to spare, so paying an extra round trip per coach
+    would buy nothing and re-open the #1527 latency regression.
+
+    #2063 — what `Limit=1500` actually bounds. It is NOT the cap that bites: a
+    DynamoDB query page is capped at **1MB of items**, whichever comes first. The
+    CALIB# ledger's ~1.1KB rows hit 1MB at ~977 rows, so after the #1978 reconcile
+    wrote its void backfill the "Limit-1500" read was returning 977 of 1,731 rows
+    and dropping the OLDEST — raising Limit would not have moved it one row. Only
+    following LastEvaluatedKey returns the whole ledger.
     """
     kwargs = {
         "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with(sk_prefix),
@@ -1899,7 +1919,19 @@ def _query_partition(pk, sk_prefix, projection_fields=None):
         kwargs["ProjectionExpression"] = ", ".join(names)
         kwargs["ExpressionAttributeNames"] = names
     resp = table.query(**kwargs)
-    return [_decimal_to_float(r) for r in resp.get("Items", [])]
+    items = list(resp.get("Items", []))
+    if paginate:
+        pages = 1
+        while resp.get("LastEvaluatedKey"):
+            if pages >= _MAX_QUERY_PAGES:
+                logger.error(
+                    f"[partition-fetch] {pk}/{sk_prefix}: hit the {_MAX_QUERY_PAGES}-page ceiling at {len(items)} rows — TRUNCATED"
+                )
+                break
+            resp = table.query(**kwargs, ExclusiveStartKey=resp["LastEvaluatedKey"])
+            items.extend(resp.get("Items", []))
+            pages += 1
+    return [_decimal_to_float(r) for r in items]
 
 
 def _fetch_prediction_partition(coach_pk):
@@ -1999,7 +2031,17 @@ def handle_calibration(event):
             # resolution date, the same "genesis anchors the current run"
             # convention RAW_TIMESERIES reads use. Unprojected: CALIB# rows are
             # small and their consumed fields vary by record_type.
-            return _query_partition(USER_PREFIX + "calibration", "CALIB#")
+            #
+            # #2063: PAGINATED, and it is the only fetch here that is. Being
+            # CROSS_PHASE is exactly why — this partition never resets, it only
+            # accretes (every reset stamps one void row per open bet; the #1978
+            # reconcile alone wrote 1,435), so it is the one partition on this
+            # endpoint that outgrew a single 1MB DynamoDB page. It served
+            # voided.n=971 of 1,708 and, because the read is newest-first, the
+            # rows it dropped were the OLDEST graded bets — silently shrinking
+            # the lifetime Brier denominator on the surface whose subtitle is
+            # "the honesty moat, made public".
+            return _query_partition(USER_PREFIX + "calibration", "CALIB#", paginate=True)
 
         jobs = {cid: (lambda pk=f"COACH#{_CALIB_COACH_ID_MAP[cid]}": _fetch_prediction_partition(pk)) for cid in _CALIB_COACH_NAMES}
         jobs["hypothesis-ledger"] = _fetch_hyp_ledger
