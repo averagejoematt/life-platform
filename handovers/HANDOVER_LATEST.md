@@ -1,146 +1,94 @@
-# HANDOVER — Backlog blitz + the merged-is-not-live catch — 2026-08-02 (evening)
+# HANDOVER — Frugal paydown: driver-only waves, 16 PRs — 2026-08-02 (late night)
 
-> Instruction thread: execute the pre-approved plan `~/.claude/plans/elegant-zooming-teapot.md`
-> (Track A backlog paydown in worktree-implementer waves + Track B verification sweep of the
-> 07-28→08-02 ships), with the mirror-session deltas applied. Preflight confirmed: deploys still
-> stranded (R8-ST6) → merge-only session, no fleet deploys, DDB mutations owner-gated.
+> Instruction thread: execute the pre-prepared plan `~/.claude/plans/frugal-sweeping-lantern.md`
+> — day 1/7 of the weekly window with Fable at ~50%, so **Fable drives only** (preflight, briefs,
+> merge queue, reconciles, union checks, wrap); every implementer ran as a `worktree-implementer`
+> with the issue's own `model:*` label (5 sonnet + backfills, then 5 opus), two waves, ≤5
+> concurrent. Preflight confirmed the deploy queue NEVER flushed (Plan still red, R8-ST6) →
+> merge-only session, post-flush verification pass skipped, numbered ask re-surfaced below.
 
-## The headline: 17 PRs merged, and the sweep caught a live honesty failure
+## The headline: 16 PRs merged closing 14 backlog issues, on driver-only economics
 
-**Track A: 17 PRs merged in one evening**, closing 19 issues — every planned Wave-1/2/3 item plus
-the full coach lane:
+The Next queue's actionable stories went from 19 to 5. Every implementer ran on its issue's
+labeled model, so the Fable pool paid only for the merge queue and two driver fix-PRs.
 
 | PR | issue | what |
 |---|---|---|
-| #2016 | #1989 | cockpit scope buttons meet WCAG AA both themes; baseline row removed, axe gate re-armed (site-deploy ✅ → **live**) |
-| #2017 | #1977 | observatory_week genesis clamp → honest absence, tie = flat |
-| #2018 | #2005 | /deploy function→source table generated from lambda_map + drift gate |
-| #2020 | #1994 #1995 | Day-1-safe hero sentence + honest brief-line kicker (site-deploy ✅ → **live**) |
-| #2021 | #1945 | PII guard endpoint arm — derived route set; live sweep 118 payloads / 0 violations |
-| #2022 | #1965 | check_doc_index strict by default — local == CI |
-| #2024 | #1956 | canary grades against the ask pipeline's own serving context (root-caused: it alarmed on the TRUE recovery value 96) |
-| #2025 | #1958 | chronic timing warns leave the alarmed WarnCount (floor was live-confirmed 5–9 vs threshold 1) |
-| #2026 | #1947 | countdown-gap sweep + owner-gated reconcile; live dry-run measured **379 escapees** (157 THREAD / 61 INSIGHT exact) |
-| #2027 | #2001 #2002 | HAE liveness deep-scan (true darkness: BP 2026-04-10, SoM 2026-04-02) + carried chips from the cycle ledger (site-deploy ✅) |
-| #2028 | #1902 | all 99 CodeQL alerts triaged: 14 fixed (+4 the new guard found), 85 dismissed with written reasons (**dismissals live via API regardless of PR**) |
-| #2029 | #1969 | every get_item in the generation path tombstone-guarded (28 AST-derived sites, 15 reasoned exemptions) |
-| #2030 | #2006 | CONVENTIONS §4 pin-grep works again + tests run the doc's commands verbatim |
-| #2031 | #1901 | check_main_green classifies the two stranded-deploy states (verified against the live stranded main) |
-| #2032 | #1971 | coaching door discloses the budget-pause (JS live + safe; API field awaits the flush) |
-| #2033 | #1949 | weather raw archive restored (IAM) + raw-archive failures unswallowed platform-wide (premise live-confirmed: newest object 2026-03-09) |
-| #2034 | #1993 | labs coach reads the draws that exist — schema-true fact block + "zero results" qa tripwire |
+| #2035 | #1963 | CQ-01 pin guard covers mypy/hypothesis/pytest/pytest-cov/boto3/botocore; real drift reconciled; derived-set test |
+| #2036 | #1975 | outcome semaphore → §4 ember/ink grammar; all 5 hex-ok sanctions deleted (site-deploy ✅ → **live**) |
+| #2037 | #1980 | sealed prereg linked from /method/calibration + /method/predictions (SHA-256 + verify cmd); site half **live**, API `prereg_seal` field dark until deploy |
+| #2038 | #1987 | deterministic voice-register guard (first-person + markdown strip, registry-derived domains) at both write paths — dark until fleet deploy |
+| #2039 | #1959 | wrap gate (e10): alarm red >72h must cite an issue — `check_alarm_citations.py` + curated registry |
+| #2041 | #1991 | a11y audit gains light theme (week-parity); first sweep recorded 25 real light-only findings in `pages_light` |
+| #2042 | #1937 | last 14 UTC anchors in site_api_vitals → PT (measured exactly); AST guard + 3 endpoints join reader-truth strict — dark until deploy |
+| #2044 | #1990 | dark axe ledger re-armed: 44 pages cleared, 22 shrunk, 7 kept measured, 0 added; /method/game/ measured clean (issue's ~60 claim stale) |
+| #2040 | #1972 | cron-derived next-installment line, chronicle + podcast; new `/api/content_cadence` — site **live**, route dark until deploy |
+| #2045 | #1967 | grounding gates structural: real inventory 15 surfaces (not ~10); freshness 15/15, dates 11/15; bidirectional derived wiring test — dark until deploy |
+| #2046 | #1960 | per-source OAuth alarms (registry-derived ×5) + dimensioned auth metric + ack-renewal ratchet (3 then needs-human) — needs cdk deploy |
+| #2047 | #1978 | collision-proof prereg void ledger + reset invariant (fires on live state: 33 hyp + 1,402 pred orphans — the filed 39 double-counted 6 slug collisions); `reconcile_prereg_voids.py` dry-run-default |
+| #2048 | #1957 | all 6 ARCHITECTURE claims measured false (secrets are 25, not 21/12) + 2 extra drifts; `doc_facts_ops.py` gate (4 derived rules) in Docs CI |
+| #2049 | #2019 | config/-twin deploy path: 35 twins derived, 7 live-drifted found, drift workflow + site-deploy wiring, cache TTLs |
+| #2050 | — | driver fix: defer `/api/content_cadence` smoke+visual expectations (dated re-arm) after the auto-rollback |
+| #2054 | — | driver fix: boto3 install in both new workflows + config-twin step check-only until the owner's first reviewed sync |
 
-Plus direct-to-main `30b3e5e2` (see incident 2 below) and issues **#2019 + #2023 filed**.
+**Verified:** serial squash-merges with per-merge reconcile verification (the bot pushed literal
+regen after every test-adding merge; #2042/#2044/#2048 needed driver rebases — conflicts were
+only the doc-sync literal files, resolved to main's side, and #2048's alarm-count union 81→86).
+Union checks on final main: module-size guard 8/8, `sync_doc_metadata --check` ✅,
+`check_doc_facts` ✅. Final site-deploy run (post-#2054, self-triggered): **deploy + smoke +
+visual/AI QA all green** against the live site. Local HTTP smoke 232/232 during the incident
+window. All 14 closed issues carry closure comments with complete/partial verdicts.
 
-**Track B: the verification sweep found and fixed a live reader-facing failure.** PR #1939's
-citation withdrawal (merged 03:38Z, site-deploy green) never reached readers — `/api/supplements`
-served **18 of the 20 fabricated PMIDs for ~13h** because the S3 root `config/` prefix the Lambda
-reads has **no deploy path** (S3 object dated 07-18; `experiment_library.json` equally stale), a
-no-TTL warm-container cache and CloudFront 3600s stacked on top. Remediated same session:
-explicit `aws s3 cp` of the two repo twins (never a prefix sync — root `config/` holds
-Lambda-written runtime state), a description-only site-api touch to recycle containers,
-CloudFront invalidation of the three affected paths, then **verified live: 0/20 forbidden PMIDs,
-explib clean**. Structural gap filed as **#2019** (P1, Now, epic #1890).
+## Two incidents, both contained (rows in docs/INCIDENT_LOG.md)
 
-Rest of Track B (per the shrunk scope): **B0 truth table** in the session scratchpad
-(`B0_truth_table.md`) — only site-api (15:53Z) + qa-smoke (16:23Z) carry Aug-2 merges; everything
-else is Aug-1 bytes awaiting the flush. **#1893/#1938 voided bets: PASS live** (273 exact on
-`/api/calibration`, JS binds at `/method/calibration/` — NOT `/data/`, and `/api/ledger` is a
-different surface; that's why the earlier spot-check found nothing). **B4 alarm sweep:** all 8 red
-alarms mapped to owners; the one unowned signal was verified (verdict CONFIRMED with corrections)
-and filed as **#2023** — the #813 gradability gate phase-filters its raw-source liveness query
-(genesis-blinded, #1203-class recurrence; cycle-11 gradable share ~1.4% vs the ~9% best).
+1. **#2040's site-deploy auto-rollback (P4):** the PR registered its new route as a hard smoke
+   `api_dep` while the route's Lambda sat behind the stranded fleet queue → smoke 404 →
+   rollback fired correctly; every future site-deploy would have failed the same way. PR #2050
+   deferred the expectations with dated re-arm markers (the #1404 landing-order precedent).
+   Memory rule: `reference_gate_registration_before_deploy`.
+2. **boto3 import crash mid-deploy (P4):** #2049's config-twin `--apply` step died on import
+   AFTER the site synced — smoke/QA skipped, no rollback armed (site verified green by local
+   smoke); the crash also pre-empted an un-reviewed first `--apply` over 7 live config objects.
+   PR #2054 fixed both workflows and encoded the owner gate (check-only + dated re-arm).
+   Memory rule: `reference_workflow_step_deps_and_first_apply`.
 
-## Blocked on you — the ONE numbered ask (updated; supersedes the overnight list)
+Also: the stalled-implementer pattern — two sonnet agents idled waiting on background children;
+one delegation race produced a near-duplicate #1987 attempt that recovered its own commit from
+the shared object store. Nudge-or-relaunch worked; nothing lost.
 
-1. **`bash deploy/cdk_deploy.sh LifePlatformOperational LifePlatformIngestion -- --require-approval never`**
-   — now carries: #2011 qa-smoke PutItem, #2012 digest/canary IAM, #2024 qa-smoke S3Read on
-   `ai-canary-log/*`, #2033 weather PutObject on `raw/weather/*` + qa-smoke ListBucket on `raw/*`.
-   Un-reds every ci-cd Plan (R8-ST6).
-2. **`deploy_all=true` dispatch + approve** — ships the whole stranded fleet: the #1941/#1942
-   coach-integrity gates, #2012 digest/canary code, og-image PT frame (#2013), #2024 canary
-   universe, #2025 chronic warns, #2027 freshness checker, #2029's nine coach/intelligence
-   functions, #2033 unswallow, #2034 labs extractor — plus `bash deploy/deploy_site_api.sh` for
-   the site-api half (#2027/#2032 field, #2017 clamp).
-3. **After 1+2, the DDB remediation pair** (dry-run first, both scripts print every mutation):
-   `python3 deploy/reconcile_countdown_gap.py` → review → `--apply` → re-run dry-run expecting 0
-   (#1947's 379 escapees; **3 flagged rows** need your per-row `--include-flagged` judgment). Then
-   the #1896 remainder: tombstone the fabricated `lunch_protein_prediction_miss` THREAD (my
-   dry-run script is in the session scratchpad; the countdown reconcile covers the other 16 of
-   its 17 rows). Then regenerate coach analyses + rerun the proof-builder so the noscript stops
-   asserting the false verdict (#1896 acceptance 3), and invoke the analyzer with
-   `{"expert":"labs"}` for #1993 acceptance 4.
-4. **The stray canary row delete** — unchanged from the overnight list (command in PR #2012's body).
-5. **PR #2012 revision-history purge** — unchanged (GitHub keeps public edit history).
-6. **#1934 Whoop OAuth** (`python3 setup/setup_whoop_auth.py --backfill`) — gap now ~2.5 days;
-   drives 3 of the 8 red alarms. (#2028 masked its token prints; the interactive flow is untouched.)
-7. Standing, still yours: PRE-13, #1927 ceiling number, growth-1/#1951, #1940 public correction.
+## NEXT — Matthew's numbered ask (ONE list; supersedes the previous handover's)
 
-## Gotchas hit
+1. `bash deploy/cdk_deploy.sh LifePlatformOperational LifePlatformIngestion LifePlatformMonitoring` (Monitoring added: #2046's 5 per-source OAuth alarms don't exist until it runs)
+2. `deploy_all=true` ci-cd dispatch + `bash deploy/deploy_site_api.sh` — activates the merged-but-dark halves: grounding gates (#1967), voice guard (#1987), PT anchors + strict reader-truth (#1937), `prereg_seal` field (#1980), `/api/content_cadence` (#1972), config cache TTLs (#2019), dimensioned auth metric (#1960)
+3. DDB remediation pair (carried): countdown reconcile `--apply` + #1896 THREAD tombstone + coach regen/noscript rebake
+4. Canary-row delete (carried)
+5. PR #2012 revision purge (carried — GitHub UI)
+6. #1934 Whoop interactive OAuth (`setup/setup_whoop_auth.py`) — **dark since 08-01 12:00Z, ~2.5d and counting**
+7. NEW: prereg void reconcile — `python3 deploy/reconcile_prereg_voids.py --show-plan`, review, then `--apply` (~1,435 voids; **public voided count jumps 273 → ~1,708**, the #1893 correction — land it deliberately). The reset invariant BLOCKS the next `restart_pipeline.py --apply` until this runs (#1978)
+8. NEW: config-twin first sync — `python3 deploy/config_twin_sync.py` (read-only), review the 7 drifted objects, `--apply`; then flip site-deploy's twin step back to `--apply` + `--strict` (dated marker in the workflow, #2019). The daily config-drift workflow reds until this runs — that's the alarm working
+9. NEW: dismiss the 3 CodeQL alerts on PR #2046 — the documented #1902 false-positive class (pre-existing SDK-exception logs pulled into the diff window); dismissal was classifier-reserved for you
+10. NEW post-deploy re-arm (after 2): `python3 deploy/capture_api_schemas.py` → commit the `/api/content_cadence` + `prereg_seal` baselines; restore both `api_deps` entries in `tests/qa_manifest.py`; empty `pending_deploy_apis` in `tests/visual_qa.py`; drop the dated `_exemptions.json` + SURFACE_DRIFT_EXEMPTIONS entries (#2050's checklist)
 
-- **Merged is not live** — the #2019 class above; the sweep exists for exactly this. When a PR
-  body carries a manual deploy note, that note has no owner once the PR merges.
-- **Concurrent PRs breach size gates in UNION** (memory rule filed): #2025+#2026+#2027 each green
-  alone put qa_smoke_lambda at 1296 and restart_pipeline at 1202 → main's Unit Tests red ~1.5h.
-  Fixed by a real extraction (`qa_check_outputs.py`, `30b3e5e2`), not an exception comment. Check
-  shared-file headroom before a wave; re-run the size guard on main after the union.
-- **The reconcile bot**: ci-cd's "Reconcile derived artifacts" job now auto-pushes the doc-sync
-  literal regeneration after every merge — the manual `/reconcile-branch` regen step is automated
-  (I verified the bot's commit byte-identical to a manual run). Conflict resolution and
-  linearize-before-squash are still manual (#2034 needed the full ritual after #2033 landed).
-- **The pre-commit hook auto-stages doc-sync literal bumps into implementer commits** — all nine
-  implementers hit it; the brief now has to say "restore from origin/main + amend --no-verify".
-- **#2028's 85 CodeQL dismissals are live API state** independent of the PR — if that PR had been
-  rejected, the dismissals would have needed revisiting.
-- **Watch item:** the 07-31 canary record carries a REAL `board_meta_pressure:no_vendor` alarm
-  (training_coach said "claude" under meta-pressure) — `not-work — single occurrence, out of
-  #1956's scope; file only if it recurs post-deploy`.
-
-## What to expect from tonight's automated runs
-
-Tonight's 22:30Z qa-smoke still runs the **old deployed bytes** (16:23Z): expect the truthful
-WARN on the dark predict widget (#1953 working — day 2 may FAIL, still correct), the Reader Truth
-FAILs on frozen coach text (321.1 vs 317.0 — clears only after ask 2+3's regeneration), and the
-warnings alarm still red (clears one window after ask 2 ships #2025). The `_30d` honesty FAILs
-should stop tonight — #1918's fix went live with today's site-api deploy.
-
-## Verified
-
-- Final main union: **only the Plan job red (R8-ST6, by design)** — Unit Tests/lint/
-  deploy-critical green on `cddf2f82`; doc-sync CHECK PASSED after the last bot reconcile; module
-  size guard green on the union; all four site-deploys green (no rollbacks).
-- Every implementer PR negative-tested its guard; three measure-first premises checked live
-  before building (#1949 S3 listing, #1958 CloudWatch, #1993 line 533) — all three held.
-- #1939 remediation verified on the live payloads (0/20); #1938 verified by live render + real
-  fetch; #2031's classifier verified against the actual stranded state.
-- All implementer worktrees removed, branches deleted (local + remote), tree clean on main.
-
-**Main:** stranded — every run fails only Plan (R8-ST6 IAM-review); clears with ask 1; #1901's
-classifier now decodes this state by name.
-**Build beat:** 2026-08-02-merged-is-not-live.
-**Docs:** INCIDENT_LOG (+2 rows), CONVENTIONS §4/§4d + deploy.md table (landed in the PRs
-themselves); no other pages invalidated — the ships are code-level fixes under existing contracts.
-**Decisions:** none needed — no governance posture changed; the qa_check_outputs extraction is
-the established #1665 split idiom.
-**Incidents:** 2 rows added — the config-prefix 13h stale serve (+#2019), the union size-gate red.
-**Closures:** #1901 #1902 #1945 #1947 #1949 #1956 #1958 #1965 #1969 #1971 #1977 #1989 #1993
-#1994 #1995 #2001 #2002 #2005 #2006 commented (19, per the ADR-099 two-line contract; honest
-partial verdicts where behavior proof waits on the flush).
-**Stash/hooks:** clean (empty stash; hook 🟢).
-**Backlog:** Now live at 3 actionable (#1896-remainder, #1927, #2019); no stale Later issues;
-hygiene 0 violations / 2 pre-existing advisories (#1677/#1679 class).
+Then the post-flush verification pass (#2010) — after 1+2 it cheaply validates the ~12 merged-but-dark fixes from 08-02 plus tonight's lambda-side halves.
 
 ## Residual / next picks
 
-1. **Post-flush verification pass** (#2010 closes then): after asks 1–2, confirm the gates fire
-   on real generations (#1941/#1942), the canary stops false-alarming (#1956/#2024), the warnings
-   alarm clears (#1958), and no auto-rollback fired on stale smoke (#1915 class).
-2. **#2019** — the config/ deploy path (top actionable Now story after #1896).
-3. **#2023** — genesis-blinded gradability gate (Next; worst exactly when readers watch a fresh cycle).
-4. **#1937** — remaining UTC anchors in vitals (`not-work` tag not needed: filed issue).
-5. **/fullreview delta**: the ~55 banked findings from 07-28 await one clean filing pass
-   (`not-work — filing pass is its own session per the bank-and-delta convention, #1889 context`).
-6. Whoop dark >2 days now (#1934) — the longer it runs, the bigger the Mirror/readiness backfill.
-7. Standing-alarms checklist (#1329): 5 manual-rotation secrets stale >120d routed to the
-   remediation agent's needs-human digest (todoist 125d, ingestion-keys 122d, +3) — `not-work —
-   owner rotation ritual, surfaced by freshness-checker nightly`.
+- Post-flush verification pass — #2010 (unblocked by asks 1–2)
+- #2023 gradability genesis-blind (Next, 1.50) and #1979 prereg-seal completion gate (Next, 2.70) — the top remaining actionable Next stories with #1974, #1986 (#1986 needs Matthew's editorial read on the byline)
+- #2057 compute-written config mirrors (Next, 1.50 — filed tonight from #2049's residual)
+- #2051 / #2052 (Now) — auto-filed deploy-reliability issues from the overnight window; triage next session
+- #2056 grounding availability maps (Later) + #2058 advisory-workflow pins (Later) — filed tonight
+- #2043 auto-filed visual-qa red — dispositioned as the #1526 mid-deploy hash race; auto-closes on today's ~20:07Z green run; if it refires on a NON-race cause that's a real finding
+- Light-theme contrast burn-down (25 pages in `pages_light`) — not-work — tracked by the dated ledger itself (a recorded finding is the #1433 contract's backlog form); file a story when a slice is chosen
+
+## Wrap-gate lines
+
+**Build beat:** 2026-08-02-the-audit-learns-light-mode
+**Docs:** in-PR by implementers (MONITORING, PHASE_TAXONOMY §13, CONVENTIONS, ARCHITECTURE/INFRASTRUCTURE/SECRETS_MAP/DEPENDENCY_GRAPH truth pass) + INCIDENT_LOG 2 rows at wrap; all doc checkers green
+**Decisions:** none needed — tonight's choices (gate deferral pattern, check-only first-apply) are implementation postures under existing ADR-099/104/105; documented in-PR + memory
+**Main:** stranded — R8-ST6 class: Plan red / Deploy skipped on every push run; recovery = ask 1 (CDK deploy) + ask 2 (`deploy_all=true` dispatch), #1901 decode
+**Incidents:** 2 rows added — the #2040 auto-rollback (gate-registration-before-deploy) + the boto3 mid-deploy crash (QA-skipped window)
+**Closures:** #1963 #1975 #1980 #1987 #1959 #1991 #1937 #1990 #1972 #1967 #1978 #1960 #1957 #2019 all commented (complete/partial verdicts, live evidence cited); #2043 dispositioned open per its auto-close policy
+**Backlog:** Now live at 8 actionable (no promotions needed); Later sweep — hygiene rule prints no stale issues; 3 follow-ons filed (#2056 #2057 #2058)
+**Alarms:** all >72h reds cited (`check_alarm_citations.py` ✅ — the #2039 gate's first live wrap run)
+**Stash/hooks:** one stale stash from a prior session (settings.local pre-sync) inspected + dropped; hooks 🟢

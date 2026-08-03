@@ -2074,6 +2074,33 @@
         }
       ],
       "why_it_mattered": "The platform's whole pitch is that its numbers are checked, not asserted. A fix that merges green while readers keep getting the fabricated citations is exactly the failure the week's theme named — an off state printed as green — and it survives precisely because nothing re-reads the live surface after the merge celebration. The sweep exists so 'shipped' means what a reader would measure, not what CI concluded."
+    },
+    {
+      "id": "2026-08-02-the-audit-learns-light-mode",
+      "date": "2026-08-02",
+      "title": "The audit learns light mode — and 44 pages get their guards back",
+      "shipped": "Since the browser accessibility audit existed, it ran dark-only — both Playwright contexts hardcoded the dark theme, so a light-mode reader had zero automated contrast protection and no one could see what they were missing. Now light theme is a first-class audit dimension, and the first real light sweep found 25 pages with genuine light-only contrast failures — recorded in a dated ledger, visible, not gating until fixed. The companion pass re-measured the dark debt ledger against the live site: 44 pages that had quietly become clean got their deploy-blocking guards re-armed, 22 shrank to the one rule still genuinely live, and zero new debt was added. Around that pair, a sixteen-PR paydown night closing fourteen backlog issues: prediction outcomes now render in the site's own ember-and-ink grammar with all five raw-hex escape hatches deleted, the sealed pre-registration artifact got its first on-site links with SHA-256 and a copyable verify command, the last fourteen UTC date anchors in the vitals API run on Pacific time, and AI-narrative grounding-gate coverage went from convention to structure — a derived wiring test over all fifteen surfaces, not the ten the issue guessed.",
+      "gotcha": "The new cadence endpoint registered itself as a hard smoke dependency in the same PR that created it — while the Lambda that would serve it sat behind an owner-gated deploy queue. The site deploy failed on the 404 and auto-rolled back, exactly as designed, and every future site deploy would have failed the same way. The fix is a pattern, not a patch: register that a surface exists, but defer its must-be-200 expectations with dated re-arm markers until the deploy that makes them true.",
+      "honest_miss": "The 25 light-theme findings are recorded, not fixed — light-mode readers still see those contrast failures today. And the Lambda-side halves of the night — the grounding gates, the coach voice guard, the per-source OAuth alarms — are merged but dark until the owner's next fleet deploy.",
+      "prs": [
+        {
+          "label": "PR #2041",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2041"
+        },
+        {
+          "label": "PR #2044",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2044"
+        },
+        {
+          "label": "PR #2036",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2036"
+        },
+        {
+          "label": "PR #2045",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2045"
+        }
+      ],
+      "why_it_mattered": "An audit that only looks where the light is good isn't an audit — it's reassurance. Half the platform's readers see the light theme, and until tonight every automated promise about accessibility silently excluded them. The same honesty cut both ways: pages that had earned their guards back got them re-armed, and pages that are genuinely broken in light mode are now on the record instead of invisible."
     }
   ]
 }
