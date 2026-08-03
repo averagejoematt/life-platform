@@ -56,6 +56,7 @@ import os
 import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Any, Callable, Dict, List, NamedTuple, Optional
 
@@ -350,17 +351,25 @@ def rule_score_line_canonical(ctx: Dict[str, Any]) -> List[Finding]:
         )
     if score.effort_points:
         expected = score.impact * score.confidence / score.effort_points
-        if abs(expected - score.value) > 0.005:
+        # Score lines are written by hand at two decimal places, rounded half UP (0.375 → 0.38,
+        # 1.125 → 1.13). Agreement means "equal once both sides are rendered that way" — a
+        # float-epsilon compare (and float's own half-even `.2f`) false-fires on every exact
+        # half boundary, which real Impact × Confidence / Effort combinations hit routinely.
+        if _two_dp(expected) != _two_dp(score.value):
             out.append(
                 Finding(
                     "score_line_canonical",
                     ctx["number"],
-                    f"score value {score.value:.2f} disagrees with its own arithmetic ({score.impact} × {score.confidence} / "
-                    f"{score.effort_points} = {expected:.2f})",
+                    f"score value {_two_dp(score.value)} disagrees with its own arithmetic ({score.impact} × {score.confidence} / "
+                    f"{score.effort_points} = {_two_dp(expected)})",
                     ADVISORY,
                 )
             )
     return out
+
+
+def _two_dp(value: float) -> str:
+    return str(Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
 
 def rule_epic_link(ctx: Dict[str, Any]) -> List[Finding]:

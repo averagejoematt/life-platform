@@ -328,6 +328,16 @@ def test_score_line_value_checks_are_advisory_not_blocking():
     hits = hy.rule_score_line_canonical(_ctx(body=_body(score=bad_math)))
     assert any("disagrees with its own arithmetic" in f.message and f.severity == hy.ADVISORY for f in hits)
 
+    # Exact half boundaries, both binary-exact in float: 3 × 0.5 / 4 = 0.375 → 0.38 and
+    # 3 × 0.75 / 2 = 1.125 → 1.13 under the hand-written half-up convention. An epsilon
+    # compare false-fires on the first; float's half-even `.2f` rendering on the second.
+    for boundary in (
+        "**Score:** P3 · Impact 3 × Confidence 0.5 / Effort L(4) = 0.38 → Later",
+        "**Score:** P3 · Impact 3 × Confidence 0.75 / Effort M(2) = 1.13 → Later",
+    ):
+        hits = hy.rule_score_line_canonical(_ctx(milestone="Later", body=_body(score=boundary)))
+        assert not any("disagrees with its own arithmetic" in f.message for f in hits)
+
     p0 = "**Score:** P0 · Impact 3 × Confidence 1.0 / Effort S(1) = 3.00 → Now"
     assert any("P1–P3" in f.message and f.severity == hy.ADVISORY for f in hy.rule_score_line_canonical(_ctx(body=_body(score=p0))))
 
