@@ -87,6 +87,7 @@ class Twin:
     key: str  # S3 key, e.g. "config/supplement_registry.json"
     repo_path: str  # absolute path to the repo twin
     consumers: tuple[str, ...] = ()  # consumer modules that read this key
+    alias_of: str | None = None  # set when `key` is an ALIAS of another twin's key
 
     @property
     def consumed(self) -> bool:
@@ -105,6 +106,19 @@ class Registry:
     unresolved_writers: list[str] = field(default_factory=list)
     excluded_not_twin: list[str] = field(default_factory=list)
     bundled_into_lambda: list[str] = field(default_factory=list)
+    # Wildcard read patterns that reach an EXISTING twin's content through a
+    # second key (#2057) -> the repo twin key that backs them. Expanded to
+    # concrete keys against the live namespace by `expand_alias_twins`.
+    alias_patterns: dict[str, str] = field(default_factory=dict)
+    # Which modules read each alias pattern — carried onto the expanded Twin so
+    # `_is_serving` still decides invalidation/severity correctly.
+    alias_consumers: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    # Every `config/…` read pattern seen in the consumer tree -> the modules
+    # that read it. The coverage audit (#2057) needs the raw reader edges, not
+    # just the ones that resolved to a repo twin.
+    read_patterns: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    # Bare filename read edges (`_load_json("training_week.json")`).
+    bare_reads: dict[str, tuple[str, ...]] = field(default_factory=dict)
 
     def by_key(self) -> dict[str, Twin]:
         return {t.key: t for t in self.twins}
@@ -391,6 +405,121 @@ def bundled_config_keys(repo_root: str) -> set[str]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Alias keys (#2057)
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# A repo `config/x.json` is normally read from S3 at the SAME key, which is why
+# the twin map is `key = rel_path`. Some consumers instead read the same content
+# through a user-scoped key: `character_engine` and `site_api_vitals` both read
+# `config/{user_id}/character_sheet.json`, and `board_loader` reads
+# `config/{user_id}/board_of_directors.json`. Those objects are byte-identical
+# to their repo files (verified live 2026-08-03) — they are a SECOND KEY for an
+# existing twin, not a second writer.
+#
+# Because the map is 1:1 on the path, the alias key was invisible to the #2019
+# drift check by construction. That is not cosmetic: `restart_pipeline` rewrites
+# repo `config/character_sheet.json` on every experiment reset and the merge
+# syncs bucket-root only, so the serving path would keep reading the OUTGOING
+# cycle's baseline — the merged-looked-live class with a reset as its trigger.
+
+
+def _alias_patterns(reads: dict[str, set[str]], twin_keys: Iterable[str]) -> dict[str, str]:
+    """Wildcard read patterns that reach exactly one repo twin's content.
+
+    A pattern qualifies only when its FINAL segment is a literal filename that
+    resolves to exactly one repo twin. That single rule is what separates an
+    alias from a family:
+
+      * `config/*/character_sheet.json` — leaf is literal, one repo twin backs
+        it. An alias.
+      * `config/coaches/*.json` — the leaf itself is the wildcard, so it names a
+        FAMILY whose members each already have their own twin at their own key.
+        Never an alias; treating it as one would map eight distinct coach files
+        onto whichever twin happened to match.
+    """
+    by_basename: dict[str, list[str]] = {}
+    for key in twin_keys:
+        by_basename.setdefault(key.rsplit("/", 1)[-1], []).append(key)
+
+    aliases: dict[str, str] = {}
+    for pattern in reads:
+        if _UNBOUNDED not in pattern:
+            continue
+        basename = pattern.rsplit("/", 1)[-1]
+        if _UNBOUNDED in basename:
+            continue  # a family, not an alias
+        sources = by_basename.get(basename, [])
+        if len(sources) != 1 or sources[0] == pattern:
+            continue
+        aliases[pattern] = sources[0]
+    return aliases
+
+
+def _split_pattern(pattern: str) -> tuple[str, str] | None:
+    """`config/*/x.json` -> ("config/", "/x.json"). None if not single-wildcard."""
+    if pattern.count(_UNBOUNDED) != 1:
+        return None
+    head, tail = pattern.split(_UNBOUNDED, 1)
+    return head, tail
+
+
+def alias_segments(patterns: Iterable[str], live_keys: Iterable[str]) -> set[str]:
+    """Wildcard segments actually present in the live `config/` namespace.
+
+    Derived from the live keys rather than from a hardcoded user id, so a second
+    user prefix would join the checked set on its own. Segments are collected
+    across ALL alias patterns and then applied to all of them — otherwise an
+    alias object that has been DELETED from S3 would simply stop being checked,
+    which is the failure this whole class is about.
+    """
+    live = list(live_keys)
+    segments: set[str] = set()
+    for pattern in patterns:
+        split = _split_pattern(pattern)
+        if split is None:
+            continue
+        head, tail = split
+        for key in live:
+            if key.startswith(head) and key.endswith(tail) and len(key) > len(head) + len(tail):
+                segment = key[len(head) : len(key) - len(tail)]
+                if segment and "/" not in segment:
+                    segments.add(segment)
+    return segments
+
+
+def expand_alias_twins(registry: Registry, live_keys: Iterable[str]) -> list[Twin]:
+    """Concrete alias Twins for `registry.alias_patterns` × observed segments.
+
+    Each expanded Twin points at the SOURCE repo file, so the existing
+    byte-for-byte drift check and `--apply` upload work unchanged: the alias key
+    is simply a second destination for the same repo bytes.
+    """
+    by_key = registry.by_key()
+    segments = sorted(alias_segments(registry.alias_patterns, live_keys))
+    expanded: list[Twin] = []
+
+    for pattern, source_key in sorted(registry.alias_patterns.items()):
+        split = _split_pattern(pattern)
+        source = by_key.get(source_key)
+        if split is None or source is None:
+            continue
+        head, tail = split
+        for segment in segments:
+            key = f"{head}{segment}{tail}"
+            if key == source_key or key in by_key:
+                continue
+            expanded.append(
+                Twin(
+                    key=key,
+                    repo_path=source.repo_path,
+                    consumers=registry.alias_consumers.get(pattern, ()),
+                    alias_of=source_key,
+                )
+            )
+    return expanded
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Public entry point
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -421,6 +550,8 @@ def derive(repo_root: str, consumer_roots: Iterable[str] = CONSUMER_ROOTS) -> Re
     registry = Registry(
         runtime_written={k: tuple(sorted(v)) for k, v in sorted(writes.items())},
         unresolved_writers=sorted(unresolved),
+        read_patterns={k: tuple(sorted(v)) for k, v in sorted(reads.items())},
+        bare_reads={k: tuple(sorted(v)) for k, v in sorted(bare.items())},
     )
     bundled = bundled_config_keys(repo_root)
     registry.bundled_into_lambda = sorted(bundled)
@@ -447,4 +578,9 @@ def derive(repo_root: str, consumer_roots: Iterable[str] = CONSUMER_ROOTS) -> Re
         )
 
     registry.twins.sort(key=lambda t: t.key)
+
+    # Alias patterns are derived AFTER the twin set exists — an alias is defined
+    # by the twin it resolves to, so it cannot be computed before them (#2057).
+    registry.alias_patterns = _alias_patterns(reads, (t.key for t in registry.twins))
+    registry.alias_consumers = {pattern: tuple(sorted(reads.get(pattern, set()))) for pattern in registry.alias_patterns}
     return registry

@@ -38,7 +38,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from config_twin_registry import Twin, derive  # noqa: E402
+from config_twin_registry import S3_CONFIG_PREFIX, Twin, derive, expand_alias_twins  # noqa: E402
 
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 AWS_REGION = os.environ.get("AWS_REGION", "us-west-2")
@@ -101,6 +101,27 @@ def check_twin(twin: Twin, s3) -> dict:
 
 def _is_serving(twin: Twin) -> bool:
     return any(module.startswith(SERVING_PATH_PREFIX) for module in twin.consumers)
+
+
+def live_config_keys(s3) -> list[str]:
+    """Every live bucket-root `config/` key (paginated ListObjectsV2, read-only).
+
+    Only used to EXPAND alias patterns to concrete keys — the twin set itself is
+    still derived from the repo, so a stray S3 object can never invent a twin.
+    """
+    keys: list[str] = []
+    token: str | None = None
+    while True:
+        kwargs = {"Bucket": S3_BUCKET, "Prefix": S3_CONFIG_PREFIX}
+        if token:
+            kwargs["ContinuationToken"] = token
+        page = s3.list_objects_v2(**kwargs)
+        keys.extend(item["Key"] for item in page.get("Contents", []))
+        if not page.get("IsTruncated"):
+            return keys
+        token = page.get("NextContinuationToken")
+        if not token:
+            return keys
 
 
 def run_check(twins: list[Twin], s3) -> dict:
@@ -210,9 +231,16 @@ def main() -> int:
 
     repo_root = _repo_root()
     registry = derive(repo_root)
-    twins = [t for t in registry.twins if args.include_unconsumed or t.consumed]
-
     s3 = boto3.client("s3", region_name=AWS_REGION)
+
+    # #2057: alias keys (`config/{user}/character_sheet.json`) are a SECOND
+    # destination for an existing twin's bytes. They are expanded here rather
+    # than in `derive()` because the concrete segment comes from the live
+    # namespace, not the repo — and they are always checked regardless of
+    # --include-unconsumed, since an alias only exists because something reads it.
+    aliases = expand_alias_twins(registry, live_config_keys(s3))
+    twins = [t for t in registry.twins if args.include_unconsumed or t.consumed] + aliases
+
     report = run_check(twins, s3)
 
     if args.apply:

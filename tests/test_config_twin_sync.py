@@ -268,3 +268,133 @@ def test_apply_is_a_noop_when_nothing_drifted(fake_repo):
 
     assert actions["uploaded"] == []
     assert s3.puts == []
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Alias keys (#2057) — a second S3 key for an existing twin's bytes
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# `character_engine` and `site_api_vitals` read `config/{user}/character_sheet.json`,
+# but the twin map is `key = repo path`, so that key was invisible to the drift
+# check by construction. It matters on a schedule: `restart_pipeline` rewrites
+# repo `config/character_sheet.json` every experiment reset and the merge syncs
+# bucket-root only — the serving path would keep reading the OUTGOING cycle's
+# baseline while every gate printed green.
+
+
+@pytest.fixture
+def alias_repo(tmp_path):
+    """A repo whose serving path reads its twin through a user-scoped key."""
+    root = str(tmp_path)
+    _write(os.path.join(root, "config", "character_sheet.json"), json.dumps({"baseline": {"start_weight_lbs": 321}}))
+    _write(
+        os.path.join(root, "lambdas", "web", "fake_vitals.py"),
+        "import boto3\n"
+        's3 = boto3.client("s3")\n'
+        'USER_ID = "matthew"\n'
+        "def handler(event, ctx):\n"
+        '    return s3.get_object(Bucket="b", Key=f"config/{USER_ID}/character_sheet.json")\n',
+    )
+    return root
+
+
+def test_alias_pattern_is_derived_from_the_reader(alias_repo):
+    reg = registry_mod.derive(alias_repo)
+    assert reg.alias_patterns == {"config/*/character_sheet.json": "config/character_sheet.json"}
+    assert "lambdas/web/fake_vitals.py" in reg.alias_consumers["config/*/character_sheet.json"]
+
+
+def test_alias_expands_against_the_live_namespace(alias_repo):
+    """The concrete key comes from LIVE S3, never from a hardcoded user id."""
+    reg = registry_mod.derive(alias_repo)
+    live = ["config/character_sheet.json", "config/matthew/character_sheet.json"]
+    expanded = registry_mod.expand_alias_twins(reg, live)
+
+    assert [t.key for t in expanded] == ["config/matthew/character_sheet.json"]
+    assert expanded[0].alias_of == "config/character_sheet.json"
+    # It points at the SOURCE repo file, so sync/--apply need no special case.
+    assert expanded[0].repo_path == os.path.join(alias_repo, "config", "character_sheet.json")
+
+
+def test_a_second_user_segment_joins_the_set_automatically(alias_repo):
+    reg = registry_mod.derive(alias_repo)
+    live = ["config/matthew/character_sheet.json", "config/ada/character_sheet.json"]
+    assert {t.key for t in registry_mod.expand_alias_twins(reg, live)} == set(live)
+
+
+def test_a_deleted_alias_object_is_still_checked(alias_repo):
+    """A segment observed on ANY alias pattern is applied to all of them.
+
+    Deriving each alias's keys only from its own live matches would mean a
+    DELETED mirror silently stops being checked — which is the failure class
+    this whole mechanism exists to catch.
+    """
+    _write(os.path.join(alias_repo, "config", "board_of_directors.json"), json.dumps({"members": {}}))
+    _write(
+        os.path.join(alias_repo, "lambdas", "coach", "fake_board.py"),
+        "import boto3\n"
+        's3 = boto3.client("s3")\n'
+        'USER_ID = "matthew"\n'
+        "def load():\n"
+        '    return s3.get_object(Bucket="b", Key=f"config/{USER_ID}/board_of_directors.json")\n',
+    )
+    reg = registry_mod.derive(alias_repo)
+    # Only the character sheet mirror is live; the board mirror has been deleted.
+    expanded = registry_mod.expand_alias_twins(reg, ["config/matthew/character_sheet.json"])
+    assert "config/matthew/board_of_directors.json" in {t.key for t in expanded}
+
+
+def test_a_wildcard_FAMILY_is_not_treated_as_an_alias(alias_repo):
+    """`config/coaches/*.json` names eight distinct twins, not one aliased twin.
+
+    Collapsing a family onto a single source would make the sync upload one
+    coach's bytes over every other coach's key.
+    """
+    _write(os.path.join(alias_repo, "config", "coaches", "sleep_coach.json"), json.dumps({"voice": "x"}))
+    _write(os.path.join(alias_repo, "config", "coaches", "labs_coach.json"), json.dumps({"voice": "y"}))
+    _write(
+        os.path.join(alias_repo, "lambdas", "coach", "fake_loader.py"),
+        "import boto3\n"
+        's3 = boto3.client("s3")\n'
+        "def load(coach_id):\n"
+        '    return s3.get_object(Bucket="b", Key=f"config/coaches/{coach_id}.json")\n',
+    )
+    reg = registry_mod.derive(alias_repo)
+    assert "config/coaches/*.json" not in reg.alias_patterns
+
+
+def test_alias_drift_fires(alias_repo):
+    """THE negative test for the alias half: bucket-root synced, mirror stale."""
+    reg = registry_mod.derive(alias_repo)
+    live = ["config/character_sheet.json", "config/matthew/character_sheet.json"]
+    twins = [t for t in reg.twins if t.consumed] + registry_mod.expand_alias_twins(reg, live)
+
+    repo_bytes = open(os.path.join(alias_repo, "config", "character_sheet.json"), "rb").read()
+    s3 = _FakeS3({t.key: repo_bytes for t in twins})
+    assert sync_mod.run_check(twins, s3)["clean"] is True
+
+    # The reset rewrote the repo + bucket-root; the user-scoped mirror kept the
+    # OUTGOING cycle's baseline. Exactly what would have shipped on cycle 12.
+    s3.objects["config/matthew/character_sheet.json"] = json.dumps({"baseline": {"start_weight_lbs": 302}}).encode()
+
+    report = sync_mod.run_check(twins, s3)
+    assert report["clean"] is False
+    assert "config/matthew/character_sheet.json" in report["drifted"]
+    assert "config/matthew/character_sheet.json" in report["serving_drift"]
+
+
+def test_real_repo_derives_the_user_scoped_character_sheet_alias():
+    """The live pair, on the real tree — the mirrors #2057 was filed about."""
+    reg = registry_mod.derive(REPO_ROOT)
+    assert reg.alias_patterns == {
+        "config/*/board_of_directors.json": "config/board_of_directors.json",
+        "config/*/character_sheet.json": "config/character_sheet.json",
+    }
+    expanded = registry_mod.expand_alias_twins(
+        reg,
+        ["config/matthew/character_sheet.json", "config/matthew/board_of_directors.json"],
+    )
+    by_key = {t.key: t for t in expanded}
+    assert by_key["config/matthew/character_sheet.json"].alias_of == "config/character_sheet.json"
+    # The serving path reads it, so drift there is the FAIL class, not a warning.
+    assert any(m.startswith("lambdas/web/") for m in by_key["config/matthew/character_sheet.json"].consumers)

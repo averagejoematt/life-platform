@@ -494,6 +494,31 @@ Source: #382 (epic #342, "live infra matches code").
     "merged but not serving" alarms instead of printing green.
   Read-only check any time: `python3 deploy/config_twin_sync.py` (dry-run is the
   default; `--apply` is explicit).
+- **A repo twin can be read from a SECOND key — check the alias, not just the path
+  (#2057).** The twin map is `S3 key = repo path`, so any consumer that reads the same
+  content through a different key is invisible to the drift check *by construction*.
+  Three do: `character_engine`, `site_api_vitals` and `board_loader` read
+  `config/{user}/character_sheet.json` and `config/{user}/board_of_directors.json`,
+  which are byte-identical to the repo files at bucket root. That is not cosmetic —
+  `restart_pipeline` rewrites `config/character_sheet.json` on **every experiment
+  reset** and the merge syncs bucket-root only, so the serving path would have kept
+  reading the outgoing cycle's baseline. Alias *patterns* are now derived from the
+  reader AST and expanded to concrete keys against the live namespace, so both a new
+  aliased read and a new user segment join the checked set on their own.
+- **The twin check asks "does S3 match the repo?" — something must ask the inverse
+  (#2057).** Walking repo files can only ever see objects the repo authors; a
+  runtime-written or out-of-band `config/` object is not *clean* in that check, it is
+  *absent from it*. `deploy/config_mirror_audit.py` walks **live S3** instead and
+  requires every object a deployed module reads to have an owner — `repo_twin`,
+  `alias`, `repo_source` (a repo file outside `config/`, e.g. the `seeds/` originals),
+  or `writer` (AST-derived). Two rules worth keeping:
+  - a writer-owned object's max-age is read from **the writer's own declared TTL
+    constant**, never a number chosen in the checker (a freshness window encodes the
+    *writer's* cadence). Undeclared ⇒ no freshness assertion, rather than a guess;
+  - what gates is the **serving path, not the schedule**. A stale mirror is only a lie
+    to readers when `lambdas/web/` reads it, which is why
+    `config/hevy_template_cache.json` — a demand-driven cache legitimately weeks past
+    its 24h TTL — warns instead of redding the build every day.
 
 ---
 
@@ -633,6 +658,7 @@ read that section for the incident narrative and the exact mechanics.
 | The Unit Tests job's own wall-clock silently climbs (157s→294s, no reminder) | Suite-duration budget warning (#1349) | `scripts/coverage_gap_warn.py --duration-seconds` |
 | A visible page/component regresses (layout break, blank data-bind, JS error) | Visual-QA (Playwright + Bedrock vision) | §4b above |
 | A merged repo `config/` change never reaches the S3 object the API reads ("merged but not serving") | Config-twin sync on merge + daily drift check (#2019) | `deploy/config_twin_sync.py`; `.github/workflows/config-drift.yml`; §7 above |
+| A live `config/` object a Lambda reads is stale or unowned — a writer class the repo-twin check cannot see | Config mirror ownership + freshness audit (#2057) | `deploy/config_mirror_audit.py`; `.github/workflows/config-drift.yml`; §7 above |
 | A generator-owned artifact (doc-sync literals, ADR index, chrome block) goes stale across a merge queue | Merge-day reconcile job | §4c above |
 | A doc claims a stale count/version/cadence in any phrasing | `check_doc_facts.py` | §8 above |
 | A page references a retired concept | `check_doc_tombstones.py` + `docs/_lint/tombstones.txt` | §8 above |

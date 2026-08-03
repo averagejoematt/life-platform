@@ -67,6 +67,9 @@ jobs:
           print(f"derived twins: {len(reg.twins)} ({len(consumed)} read by a deployed module)")
           for t in consumed:
               print(f"  {t.key}")
+          print(f"alias patterns (#2057, expanded against live S3 at check time): {reg.alias_patterns}")
+          if not reg.alias_patterns:
+              print("::warning::no alias patterns derived — user-scoped config mirrors would go unchecked")
           print(f"runtime-written, excluded: {sorted(reg.runtime_written)}")
           print(f"bundled into the zip, excluded: {reg.bundled_into_lambda}")
           if reg.unresolved_writers:
@@ -80,3 +83,18 @@ jobs:
         run: |
           pip install --quiet boto3   # setup-ci installs no packages; without this the check dies on import, not on drift
           python3 deploy/config_twin_sync.py --strict
+
+      # #2057 — the inverse question. The drift check above walks REPO files and
+      # asks whether S3 matches; it is blind to any object the repo does not
+      # author, which is how a runtime-written or out-of-band mirror can serve
+      # stale forever while this workflow prints green. This step walks LIVE S3
+      # instead and asks what asserts each object a Lambda actually reads.
+      #
+      # Runs even when the drift check failed: the two answer different
+      # questions, and masking one behind the other is how #2019's residue
+      # stayed invisible in the first place.
+      - name: Mirror ownership + freshness audit (read-only, blocking)
+        if: always()
+        run: |
+          pip install --quiet boto3
+          python3 deploy/config_mirror_audit.py --strict
