@@ -2124,6 +2124,33 @@
         }
       ],
       "why_it_mattered": "A deploy that silently reverts is worse than one that fails loudly — it leaves the repository saying one thing and the running system doing another, which is the exact gap this project keeps paying for. Two things did work: the check that refused a stale local checkout stopped a bad deploy before it started, and verifying the actual deployed bytes (rather than trusting a green tick) is what revealed the revert at all."
+    },
+    {
+      "id": "2026-08-03-cycle-12-sealed-same-day",
+      "date": "2026-08-03",
+      "title": "Cycle 12 started sealed — and the seal machinery caught its own gaps on the way in",
+      "shipped": "The experiment re-anchored to a fresh Monday genesis, and for the first time the whole credibility apparatus went live the same day: the plan frozen and published as a content-addressed artifact, its SHA-256 printed on the page and served by the API, predict-the-week rebuilt against the frozen targets, and a brand-new completion gate — merged hours earlier — running its first live check and confirming all twelve cycles are now sealed or explicitly grandfathered. Around the reset, nineteen pull requests landed: a canary that can no longer revert a correct deploy over a stale test row, CI truth gates moved out of the first budget band to die, a fleet-level detector for the deploy wedge that had five prior recurrences, and a calibration page that finally counts every voided bet — the public number jumped from 273 to 1,708 because the honest denominator was always bigger than the page could read.",
+      "gotcha": "The reset's own preflight refused to run twice, correctly both times: once because a data family born mid-cycle had no classification, and once because an earlier cleanup had orphaned 69 pre-registered predictions from the void ledger — reconcile order matters, and the pipeline named its own cure. Then the prereg essay turned out to be hardcoded for publishing the night before: on genesis day itself it opened with 'Tomorrow morning' about a weigh-in that had already happened. Both ends of the essay now derive from one date-aware seam.",
+      "honest_miss": "Whoop went dark again overnight — a lost token rotation, invisible to the auth breaker because its classifier only knew two of the three failure codes — and after the re-auth it stayed dark another stretch because nothing clears the breaker's latch when the credential is fixed. The data all came back via backfill, and both gaps now have fixes, but the readiness surfaces spent genesis morning narrating around a hole.",
+      "prs": [
+        {
+          "label": "PR #2072",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2072"
+        },
+        {
+          "label": "PR #2075",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2075"
+        },
+        {
+          "label": "PR #2078",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2078"
+        },
+        {
+          "label": "PR #2065",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2065"
+        }
+      ],
+      "why_it_mattered": "A reset used to be the platform's least trustworthy moment — the day counters zero and every promise is briefly unverifiable. This one shipped with the receipts attached: any reader can hash the frozen plan from a terminal and match it against the page, and the gate that demands that proof now runs on every future cycle automatically. The honesty ledger got bigger too, deliberately — 1,435 bets that died ungraded at past resets are finally counted against the record instead of quietly shrinking the denominator."
     }
   ]
 }
