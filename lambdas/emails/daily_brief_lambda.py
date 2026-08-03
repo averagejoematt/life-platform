@@ -237,6 +237,80 @@ def fetch_range(source, start, end):
         return []
 
 
+# ── WR-48 "Data Status" banner: the per-source staleness scan (#2080) ──────────
+#
+# The source SET and the thresholds are module-level so they are derivable by a
+# guard (a list buried inside lambda_handler could not be checked against
+# phase_taxonomy) and so the scan itself is testable without running the brief.
+STALENESS_SOURCES = [
+    "whoop",
+    "withings",
+    "strava",
+    "todoist",
+    "apple_health",
+    "eightsleep",
+    "macrofactor",
+    "garmin",
+    "habitify",
+    "food_delivery",
+    "measurements",
+    "notion",
+]
+STALENESS_DEFAULT_THRESHOLD_DAYS = 2
+STALENESS_THRESHOLD_OVERRIDE_DAYS = {"food_delivery": 90, "measurements": 60}
+
+
+def scan_stale_sources(today_d, user_id=None):
+    """Return one dict per stale source: {source, age_days, last_date|label}.
+
+    The read is CROSS-PHASE on purpose (#2080 — a recurrence of the closed #1203).
+    DynamoDB applies `Limit` BEFORE `FilterExpression`, so a newest-first Limit:1
+    query with the ADR-058 phase filter attached reads the single newest row and
+    then discards it whenever it is pilot-tagged. Because the experiment reset tags
+    every pre-genesis row phase=pilot (ADR-077), on a fresh cycle every source whose
+    newest row predates genesis came back empty and was reported as "no data" —
+    indistinguishable from a genuinely dead pipe, and a guaranteed false alarm each
+    cycle for the long-threshold sources (food_delivery 90d, measurements 60d),
+    whose newest row is legitimately old.
+
+    Staleness asks "is this SENSOR still producing", which is a question about the
+    pipe, not about the experiment generation; every source in STALENESS_SOURCES is
+    classed RAW_TIMESERIES by phase_taxonomy (kept across resets by contract), and
+    the answer is bounded by the date arithmetic below, not by the phase tag — so a
+    genuinely stale source still alarms with its true age. This also restores parity
+    with freshness_checker_lambda, the canonical freshness path this block's comment
+    claims to mirror, which has never phase-filtered its recency reads.
+
+    Guarded by tests/test_genesis_blind_reads_2080_2081.py.
+    """
+    user_id = user_id or os.environ.get("USER_ID", "matthew")
+    stale = []
+    for src in STALENESS_SOURCES:
+        threshold_d = STALENESS_THRESHOLD_OVERRIDE_DAYS.get(src, STALENESS_DEFAULT_THRESHOLD_DAYS)
+        try:
+            kwargs = with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(f"USER#{user_id}#SOURCE#{src}") & Key("sk").begins_with("DATE#"),
+                    "Limit": 1,
+                    "ScanIndexForward": False,
+                },
+                include_pilot=True,  # #2080: cross-phase staleness
+            )
+            items = table.query(**kwargs).get("Items", [])
+            if not items:
+                stale.append({"source": src, "age_days": None, "label": "no data"})
+                continue
+            sk = items[0].get("sk", "")
+            date_part = sk.split("DATE#", 1)[1][:10] if sk.startswith("DATE#") else ""
+            last_d = datetime.strptime(date_part, "%Y-%m-%d").date()
+            age = (today_d - last_d).days
+            if age >= threshold_d:
+                stale.append({"source": src, "age_days": age, "last_date": last_d.isoformat()})
+        except Exception:
+            pass
+    return stale
+
+
 def fetch_hevy_workouts(date_str):
     """Fetch Hevy per-workout records for one date, mapped into the legacy
     macrofactor_workouts Training Report shape the html_builder renderer expects.
@@ -2023,50 +2097,7 @@ def lambda_handler(event, context):
     # query, no CloudWatch dependency (works even if metrics emission silently
     # fails like it did for 30 days).
     try:
-        from boto3.dynamodb.conditions import Key as _DDBKey
-
-        _SOURCES = [
-            "whoop",
-            "withings",
-            "strava",
-            "todoist",
-            "apple_health",
-            "eightsleep",
-            "macrofactor",
-            "garmin",
-            "habitify",
-            "food_delivery",
-            "measurements",
-            "notion",
-        ]
-        _STALE_OVERRIDE = {"food_delivery": 90, "measurements": 60}
-        _today_d = datetime.now(timezone.utc).date()
-        _stale = []
-        _user_id = os.environ.get("USER_ID", "matthew")
-        for _src in _SOURCES:
-            _threshold_d = _STALE_OVERRIDE.get(_src, 2)
-            _pk = f"USER#{_user_id}#SOURCE#{_src}"
-            try:
-                _kwargs = with_phase_filter(
-                    {
-                        "KeyConditionExpression": _DDBKey("pk").eq(_pk) & _DDBKey("sk").begins_with("DATE#"),
-                        "Limit": 1,
-                        "ScanIndexForward": False,
-                    }
-                )
-                _resp = table.query(**_kwargs)
-                _items = _resp.get("Items", [])
-                if not _items:
-                    _stale.append({"source": _src, "age_days": None, "label": "no data"})
-                    continue
-                _sk = _items[0].get("sk", "")
-                _date_part = _sk.split("DATE#", 1)[1][:10] if _sk.startswith("DATE#") else ""
-                _last_d = datetime.strptime(_date_part, "%Y-%m-%d").date()
-                _age = (_today_d - _last_d).days
-                if _age >= _threshold_d:
-                    _stale.append({"source": _src, "age_days": _age, "last_date": _last_d.isoformat()})
-            except Exception:
-                pass
+        _stale = scan_stale_sources(datetime.now(timezone.utc).date())
         if _stale:
             _row_parts = []
             for _s in _stale:

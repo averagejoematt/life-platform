@@ -196,8 +196,25 @@ def fetch_date(source, date_str):
 
 
 def fetch_range(source, start, end):
+    """Read a source's DATE# rows between `start` and `end`, CROSS-PHASE (#2081).
+
+    ADR-058 hides phase=pilot rows by default, and the experiment reset tags every
+    pre-genesis row phase=pilot (ADR-077) — so a phase-filtered read here saw only
+    the days elapsed since genesis. This function's only consumer is
+    compute_baseline(), which needs MIN_BASELINE_DAYS (7) points out of a 30-day
+    window: for the first week of every cycle it therefore got fewer than 7 and
+    returned None on every metric (anomaly detection entirely OFF), and from day 8
+    to day 30 it computed the SD over a truncated window — an artificially tight SD
+    that makes the detector over-fire on ordinary variance.
+
+    A rolling statistical baseline describes the BODY's variance, which does not
+    reset when the experiment does. Every source in METRICS is classed
+    RAW_TIMESERIES by phase_taxonomy (kept across resets by contract, "current
+    experiment views are GENESIS-ANCHORED … not hidden"), so what bounds this read
+    is the `sk BETWEEN` window below, not the phase tag. Guarded by
+    tests/test_genesis_blind_reads_2080_2081.py.
+    """
     try:
-        # ADR-058: phase=pilot hidden by default.
         from experiment.phase_filter import with_phase_filter
 
         r = table.query(
@@ -205,7 +222,8 @@ def fetch_range(source, start, end):
                 {
                     "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
                     "ExpressionAttributeValues": {":pk": f"USER#{USER_ID}#SOURCE#{source}", ":s": f"DATE#{start}", ":e": f"DATE#{end}"},
-                }
+                },
+                include_pilot=True,  # #2081: cross-phase rolling baseline
             )
         )
         return [d2f(item) for item in r.get("Items", [])]

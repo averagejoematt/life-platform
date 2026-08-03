@@ -296,6 +296,14 @@ _SANCTIONED_CURRENT_CYCLE_VIEWS: dict[str, str] = {
 # PR that introduced the guard: each touches a different Lambda with a different deploy
 # surface, and #2023 was scoped to the gradability gate ahead of a same-day reset.
 # Recorded rather than sanctioned so the debt is visible and reviewable, not blessed.
+#
+# The ledger is a ratchet, so entries LEAVE it as they are fixed — they do not get
+# re-marked in place. Cleared so far:
+#   * daily_brief_lambda's per-source staleness scan (#2080) — extracted to
+#     `scan_stale_sources` and read cross-phase;
+#   * anomaly_detector_lambda.fetch_range (#2081) — the rolling-baseline read.
+# Both are held cross-phase by `test_the_scan_sees_the_fixed_consumers_as_cross_phase`
+# below, plus tests/test_genesis_blind_reads_2080_2081.py for their behaviour.
 _KNOWN_CROSS_CYCLE_DEBT: dict[str, str] = {
     "lambdas/common/digest_utils.py::query_range": (
         "The shared paginated raw-source range reader exposes NO include_pilot parameter, so a "
@@ -304,16 +312,6 @@ _KNOWN_CROSS_CYCLE_DEBT: dict[str, str] = {
     ),
     "lambdas/common/digest_utils.py::query_range_list": (
         "Same chokepoint, the per-workout (hevy) variant — no include_pilot parameter to pass."
-    ),
-    "lambdas/emails/anomaly_detector_lambda.py::fetch_range": (
-        "Feeds a rolling 30-day statistical baseline (mean/SD/CV). With MIN_BASELINE_DAYS=7 every "
-        "baseline returns None for a cycle's first week — anomaly detection is off — then runs on a "
-        "truncated, artificially tight SD until day 30."
-    ),
-    "lambdas/emails/daily_brief_lambda.py::lambda_handler": (
-        "The per-source Limit:1 staleness scan is the #1203 shape exactly (DDB applies Limit BEFORE "
-        "the filter). On a fresh cycle every not-yet-written source reports age_days None / 'no data', "
-        "so a genuinely dead pipe is indistinguishable from a reset."
     ),
     "lambdas/emails/monthly_digest_lambda.py::fetch_range": (
         "Drives the prior-month comparison arm and a 60-day Strava window for CTL/ATL/TSB. In a reset "
@@ -432,13 +430,20 @@ def test_the_derivation_clears_a_cross_phase_read():
     assert _phase_filtered_raw_reads(fixed, "synthetic.py") == {"synthetic.py::_metric_has_recent_data": True}
 
 
-def test_the_scan_sees_the_fixed_consumer_as_cross_phase():
-    """The real repo end of the anchor: the site this issue fixed is in the derived
-    set, on the cross-phase side."""
+def test_the_scan_sees_the_fixed_consumers_as_cross_phase():
+    """The real repo end of the anchor: every site this class has fixed so far is in
+    the derived set, on the cross-phase side. A silent revert (or a refactor that
+    drops the site out of the derivation entirely) fails here rather than waiting
+    for the next reset to expose it."""
     derived = _derive_raw_source_phase_filtered_functions()
-    key = "lambdas/coach/coach_state_updater.py::_metric_has_recent_data"
-    assert key in derived, "the AST scan no longer sees the gradability gate — the derivation has drifted"
-    assert derived[key] is True, "the gradability liveness read must be cross-phase (#2023)"
+    fixed = {
+        "lambdas/coach/coach_state_updater.py::_metric_has_recent_data": "the gradability liveness read (#2023)",
+        "lambdas/emails/daily_brief_lambda.py::scan_stale_sources": "the brief's per-source staleness scan (#2080)",
+        "lambdas/emails/anomaly_detector_lambda.py::fetch_range": "the anomaly detector's rolling baseline (#2081)",
+    }
+    for key, what in fixed.items():
+        assert key in derived, f"the AST scan no longer sees {what} — the derivation has drifted"
+        assert derived[key] is True, f"{what} must be cross-phase"
 
 
 def test_every_raw_source_phase_filtered_read_is_classified():
