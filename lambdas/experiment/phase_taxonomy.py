@@ -141,6 +141,7 @@ SOURCE_CLASS: dict[str, str] = {
     "day_grade": RAW_TIMESERIES,  # ADR-077 dec C: keep series for Replay; GA clamps cockpit
     "state_of_mind": RAW_TIMESERIES,  # affect self-report series
     "mood": RAW_TIMESERIES,
+    "evening_ritual": RAW_TIMESERIES,  # ADR-124 one-tap connection self-report (born cycle 11; same class as state_of_mind)
     "travel": RAW_TIMESERIES,
     "interactions": RAW_TIMESERIES,
     "exposures": RAW_TIMESERIES,
