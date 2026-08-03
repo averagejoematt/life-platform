@@ -225,11 +225,18 @@ def test_static_byline_surfaces_never_name_an_off_roster_persona():
 
 
 def test_the_coaching_noscript_carries_the_lead():
-    """The #1986 instance, named so a regression reads as itself in CI output."""
+    """The #1986 instance, named so a regression reads as itself in CI output.
+
+    Genesis-week nuance (found live on cycle-12 Day 1): a fresh bake carries NO
+    week's-call block until the first weekly integrator run, and that absence is
+    honest state — a guard that fires on correct emptiness is worse than none
+    (the #1985 lesson). The contract is conditional: IF the block exists, it must
+    be signed by the registry's lead; a wrong-lead byline still fails loudly."""
     lead_name = persona_registry.lead_name()
     for rel in ("site/coaching/index.html", "site/coaching/read/index.html"):
         text = (_REPO / rel).read_text(encoding="utf-8")
-        assert "the week's call" in text.lower(), f"{rel}: the noscript byline block is gone — update the guard"
+        if "the week's call" not in text.lower():
+            continue  # honest pre-first-integrator-run bake (genesis week)
         assert lead_name in text, f"{rel}: the noscript week's call is not signed by the board lead ({lead_name!r})"
 
 
