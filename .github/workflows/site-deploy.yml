@@ -178,18 +178,13 @@ jobs:
       # twin set is derived — see deploy/config_twin_registry.py.
       - name: Sync bucket-root config/ twins (#2019)
         if: steps.supersede.outputs.superseded != 'true'
-        # CHECK-ONLY until the owner's first reviewed sync (numbered ask, 2026-08-02):
-        # the 7 pre-existing drifted objects deserve a human read before the first
-        # overwrite. Flip back to `--apply` + `--strict` right after that first run —
-        # a lingering check-only step recreates the merged-but-dark class this exists
-        # to kill. (First auto-run also crashed on a missing boto3 install — keep the
-        # pip line when re-arming.)
+        # Armed 2026-08-02 after the owner's first reviewed sync: 7 drifted objects
+        # read one by one — 6 applied repo→S3, and podcast_series_bible.json was
+        # backported S3→repo first (the live object was v2, newer than the repo's v1;
+        # a blind apply would have reverted an owner-approved correction).
         run: |
           pip install --quiet boto3
-          python3 deploy/config_twin_sync.py || {
-            echo "::warning::config/ twins drifted — expected until the owner's first reviewed sync (#2019); the daily config-drift workflow is the alarm"
-            true
-          }
+          python3 deploy/config_twin_sync.py --apply --strict
 
   # ════════════════════════════════════════════════════════════════
   # Job 2a: HTTP/content smoke of the live site
