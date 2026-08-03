@@ -450,8 +450,11 @@ def test_character_stats_pre_start_agrees_with_character(monkeypatch):
     # A stale prior-cycle sheet is still reachable via get_item (no phase filter) —
     # the served stamp must be the clamped "now", not the stale record's date, so
     # the two character endpoints stop disagreeing.
-    utc_today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    stale = {"pk": f"{vitals.USER_PREFIX}character_sheet", "sk": f"DATE#{utc_today}", "character_level": 13}
+    # #2060: handle_character_stats's get_item lookback is PT-clocked (today/yesterday
+    # in PT, matching handle_character's PT-based as_of), not UTC — keying the fixture
+    # off UTC drifts a day out of reach whenever PT and UTC straddle midnight.
+    today_pt = _iso(_today_pt())
+    stale = {"pk": f"{vitals.USER_PREFIX}character_sheet", "sk": f"DATE#{today_pt}", "character_level": 13}
     monkeypatch.setattr(vitals, "table", FakeDdbTable(rows=[stale]))
     b = _body(vitals.handle_character_stats())
     cs = b["character_stats"]
@@ -479,10 +482,12 @@ def test_character_zeroed_inert_when_genesis_past(monkeypatch):
 
 def test_character_stats_normal_when_genesis_past(monkeypatch):
     _past(monkeypatch)
-    utc_today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    # #2060: same PT-clocked lookback as above — the row must be keyed on the PT
+    # date handle_character_stats's today/yesterday loop actually queries.
+    today_pt = _iso(_today_pt())
     row = {
         "pk": f"{vitals.USER_PREFIX}character_sheet",
-        "sk": f"DATE#{utc_today}",
+        "sk": f"DATE#{today_pt}",
         "character_level": 5,
         "character_tier": "Momentum",
         "character_xp": 120,
@@ -492,7 +497,7 @@ def test_character_stats_normal_when_genesis_past(monkeypatch):
     cs = b["character_stats"]
     assert "pre_experiment" not in cs
     assert cs["level"] == 5
-    assert cs["as_of_date"] == utc_today
+    assert cs["as_of_date"] == today_pt
 
 
 # ── /api/forecast — the pre_start flag for the cockpit's warm-up frame ───────
