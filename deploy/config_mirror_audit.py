@@ -23,10 +23,20 @@ Owner classes, all derived
 ``alias``        A second key for a repo twin's bytes (`config/{user}/…`),
                  expanded from an AST-derived pattern. Also covered by
                  ``config_twin_sync`` since #2057.
-``repo_source``  A repo file OUTSIDE `config/` is its origin — the `seeds/`
-                 originals (`seeds/content_filter.json`). Ownership is real but
-                 weaker than a twin: someone can point at the source, nothing
-                 asserts the bytes still match. Reported, never silently green.
+``repo_source``  A repo file OUTSIDE `config/` is its origin — e.g. a catalog
+                 hand-copied once with `aws s3 cp`. Ownership is real but weaker
+                 than a twin: someone can point at the source, nothing asserts
+                 the bytes still match. Reported, never silently green.
+
+                 As of #2084 this class has **no live members**: both `seeds/`
+                 originals were promoted to `config/` twins after the audit's
+                 first run found one of them drifted (see below). The class stays
+                 because it is a *rule*, not a list — the next object someone
+                 `aws s3 cp`s into `config/` from elsewhere in the repo joins it
+                 on its own and warns, which is exactly what it is for. Its
+                 negative proof lives in `tests/test_config_mirror_audit.py`
+                 against a synthetic repo, so it cannot quietly stop working
+                 just because the live population is currently zero.
 ``writer``       An AST-derived runtime write from `lambdas/`/`mcp/`. Freshness
                  IS asserted here, with max-age read from the writer's own
                  declared TTL constant — never a number picked in this file.
@@ -44,6 +54,22 @@ cadence would make that a permanent false alarm while proving nothing.
 So ``--strict`` fails on a mirror that is **stale or unowned AND read from
 `lambdas/web/`**, and warns otherwise. The serving path, not the schedule, is
 what turns staleness into something a reader is told.
+
+What the first `repo_source` WARN turned out to be (#2084)
+---------------------------------------------------------
+The warn on `config/challenges_catalog.json` was worth having. Its `seeds/`
+origin still named six real, non-consenting clinicians; the live object named
+the fictional cast, so the divergence looked like "live evolved, seed is stale"
+— true, and not the whole story. The live object was itself a **pre-#1904**
+first-pass remap onto *retired* personas, superseded 2026-08-01 by the roster-
+clean catalog that reached only `site/config/`. `/api/challenges` (which reads
+bucket-root `config/`) was still serving 49 off-roster recommender names on
+2026-08-03 while `/api/challenge_catalog` (which reads `site/config/`) was
+clean — two endpoints, one catalog, two different casts.
+
+The lesson generalises past this file: "the live object diverges from its repo
+origin" says nothing about **which** is current. Both can be stale relative to
+a third copy. Promote to a twin and the question stops being askable.
 
 Read-only: ListObjectsV2 + HeadObject. Never writes, never invalidates.
 

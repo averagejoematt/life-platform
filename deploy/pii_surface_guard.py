@@ -10,7 +10,7 @@ fail-closed on a hit.
 
 Three arms:
   1. Blocked-vice leakage (always-on) — no `blocked_vice_keywords` from
-     seeds/content_filter.json (the policy-blocked categories) appears in published text.
+     config/content_filter.json (the policy-blocked categories) appears in published text.
   2. Structural PII (always-on) — US SSN, 16-digit card-like numbers, and
      non-allowlisted email addresses (the PII classes in DATA_GOVERNANCE.md).
   3. Literal denylist (best-effort) — partner name / employer / role / industry
@@ -89,11 +89,11 @@ _EMAIL_RE = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 
 def _blocked_vice_keywords() -> list:
     """The canonical public-content denylist, loaded ONLY from the committed
-    policy file (seeds/content_filter.json `blocked_vice_keywords`) — never
+    policy file (config/content_filter.json `blocked_vice_keywords`) — never
     hardcoded here, so the literal category terms live in exactly one place.
     Fail-closed: if the policy can't be read or is empty, raise rather than
     silently scan with the vice arm disabled."""
-    path = os.path.join(_ROOT, "seeds", "content_filter.json")
+    path = os.path.join(_ROOT, "config", "content_filter.json")
     with open(path) as f:
         kws = [k.lower() for k in json.load(f).get("blocked_vice_keywords", [])]
     if not kws:

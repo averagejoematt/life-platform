@@ -510,8 +510,8 @@ Source: #382 (epic #342, "live infra matches code").
   runtime-written or out-of-band `config/` object is not *clean* in that check, it is
   *absent from it*. `deploy/config_mirror_audit.py` walks **live S3** instead and
   requires every object a deployed module reads to have an owner — `repo_twin`,
-  `alias`, `repo_source` (a repo file outside `config/`, e.g. the `seeds/` originals),
-  or `writer` (AST-derived). Two rules worth keeping:
+  `alias`, `repo_source` (a repo file outside `config/`, hand-copied in once), or
+  `writer` (AST-derived). Two rules worth keeping:
   - a writer-owned object's max-age is read from **the writer's own declared TTL
     constant**, never a number chosen in the checker (a freshness window encodes the
     *writer's* cadence). Undeclared ⇒ no freshness assertion, rather than a guess;
@@ -519,6 +519,18 @@ Source: #382 (epic #342, "live infra matches code").
     to readers when `lambdas/web/` reads it, which is why
     `config/hevy_template_cache.json` — a demand-driven cache legitimately weeks past
     its 24h TTL — warns instead of redding the build every day.
+- **A registry published through two prefixes needs the two repo copies tied together
+  (#2084).** Several catalogs ship twice: `config/x.json` is what the site-api Lambda
+  reads from S3, `site/config/x.json` is the static asset the site sync publishes. Two
+  deploy paths, and nothing structurally connects them. That is how `/api/challenges`
+  and `/api/challenge_catalog` came to serve the *same* 82 challenges under two
+  different casts for three weeks — the #1904 roster fix reached only the `site/` copy,
+  and neither the twin check (which had no bucket-root repo file to compare) nor the
+  cast guard (which only knew the `site/` path) could see it. `tests/
+  test_config_site_mirror_parity.py` now asserts byte equality across **every** basename
+  present in both trees, derived from the trees. **Never introduce a JSON registry a
+  Lambda reads via a hand `aws s3 cp` from outside `config/`** — put it in `config/` and
+  it joins the derived twin set with a real byte assertion. `seeds/` is generators only.
 
 ---
 
@@ -659,6 +671,7 @@ read that section for the incident narrative and the exact mechanics.
 | A visible page/component regresses (layout break, blank data-bind, JS error) | Visual-QA (Playwright + Bedrock vision) | §4b above |
 | A merged repo `config/` change never reaches the S3 object the API reads ("merged but not serving") | Config-twin sync on merge + daily drift check (#2019) | `deploy/config_twin_sync.py`; `.github/workflows/config-drift.yml`; §7 above |
 | A live `config/` object a Lambda reads is stale or unowned — a writer class the repo-twin check cannot see | Config mirror ownership + freshness audit (#2057) | `deploy/config_mirror_audit.py`; `.github/workflows/config-drift.yml`; §7 above |
+| A registry published through two prefixes drifts between its copies — two endpoints, two answers | `config/` ↔ `site/config/` byte parity (#2084) | `tests/test_config_site_mirror_parity.py`; §7 above |
 | A generator-owned artifact (doc-sync literals, ADR index, chrome block) goes stale across a merge queue | Merge-day reconcile job | §4c above |
 | A doc claims a stale count/version/cadence in any phrasing | `check_doc_facts.py` | §8 above |
 | A page references a retired concept | `check_doc_tombstones.py` + `docs/_lint/tombstones.txt` | §8 above |

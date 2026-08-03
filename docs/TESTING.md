@@ -145,7 +145,7 @@ Editorial guardrails + `docs/DATA_GOVERNANCE.md` are *policy*; this is the
 **gating**, it runs the same scanner the deploy uses (`deploy/pii_surface_guard.py`)
 over the committed `site/` tree. Three arms:
 - **Blocked-vice** (always-on) — no `blocked_vice_keywords` from
-  `seeds/content_filter.json` (the policy-blocked categories) on the public surface.
+  `config/content_filter.json` (the policy-blocked categories) on the public surface.
 - **Structural PII** (always-on) — US SSN, 16-digit card-like numbers, and
   non-allowlisted email addresses (the PII classes in `DATA_GOVERNANCE.md`).
 - **Literal denylist** (best-effort) — partner name / employer / role / industry

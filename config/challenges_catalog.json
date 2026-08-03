@@ -1,6 +1,6 @@
 {
   "version": "2.0.0",
-  "updated": "2026-03-28",
+  "updated": "2026-08-01",
   "categories": [
     {
       "id": "movement",
@@ -80,7 +80,7 @@
       "difficulty": 2,
       "evidence_tier": "strong",
       "evidence_summary": "Morning sunlight resets circadian rhythm, improves cortisol awakening response",
-      "board_recommender": "Dr. Andrew Huberman",
+      "board_recommender": "Dr. Sarah Chen",
       "board_quote": "Morning sunlight within 30 minutes of waking is the single highest-ROI protocol.",
       "protocol": "Walk outdoors within 30 min of waking. Minimum 10 min. No sunglasses.",
       "status": "backlog"
@@ -95,7 +95,7 @@
       "difficulty": 3,
       "evidence_tier": "strong",
       "evidence_summary": "VO2max is the strongest predictor of all-cause mortality",
-      "board_recommender": "Dr. Peter Attia",
+      "board_recommender": "Dr. Victor Reyes",
       "board_quote": "Building cardiovascular capacity is non-negotiable for the centenarian decathlon.",
       "protocol": "Complete a 5K (3.1 miles) running continuously.",
       "status": "backlog",
@@ -111,7 +111,7 @@
       "difficulty": 3,
       "evidence_tier": "strong",
       "evidence_summary": "Grip strength is one of the strongest predictors of all-cause mortality",
-      "board_recommender": "Dr. Peter Attia",
+      "board_recommender": "Dr. Victor Reyes",
       "board_quote": "Centenarian decathlon benchmark.",
       "protocol": "Hang from a pull-up bar with both hands for 60 continuous seconds.",
       "status": "backlog",
@@ -188,7 +188,7 @@
       "difficulty": 2,
       "evidence_tier": "moderate",
       "evidence_summary": "Phone proximity disrupts sleep onset",
-      "board_recommender": "Dr. Andrew Huberman",
+      "board_recommender": "Dr. Lisa Park",
       "board_quote": "The phone is a dopamine slot machine. It does not belong where you sleep.",
       "protocol": "Phone charges in a different room. Use an alarm clock.",
       "status": "backlog"
@@ -203,7 +203,7 @@
       "difficulty": 3,
       "evidence_tier": "strong",
       "evidence_summary": "High protein preserves lean mass during deficit",
-      "board_recommender": "Dr. Layne Norton",
+      "board_recommender": "Dr. Marcus Webb",
       "board_quote": "Adherence is the best diet. But protein adherence is non-negotiable in a deficit.",
       "protocol": "190g protein minimum per day via MacroFactor.",
       "status": "backlog"
@@ -218,7 +218,7 @@
       "difficulty": 4,
       "evidence_tier": "moderate",
       "evidence_summary": "Food delivery associated with higher caloric intake",
-      "board_recommender": "Coach Maya Rodriguez",
+      "board_recommender": "Dr. Marcus Webb",
       "board_quote": "DoorDash is the avoidance pattern made frictionless.",
       "protocol": "No DoorDash, UberEats, Grubhub. Cook or eat out in person.",
       "status": "backlog"
@@ -233,7 +233,7 @@
       "difficulty": 2,
       "evidence_tier": "strong",
       "evidence_summary": "Higher vegetable intake reduces all-cause mortality",
-      "board_recommender": "Dr. Rhonda Patrick",
+      "board_recommender": "Dr. Amara Patel",
       "board_quote": "Micronutrient density starts at the plate.",
       "protocol": "Every meal includes at least one serving of vegetables.",
       "status": "backlog"
@@ -248,7 +248,7 @@
       "difficulty": 2,
       "evidence_tier": "strong",
       "evidence_summary": "Self-monitoring doubles weight loss outcomes",
-      "board_recommender": "Dr. Layne Norton",
+      "board_recommender": "Dr. Marcus Webb",
       "board_quote": "You can't manage what you don't measure. Logging IS the intervention.",
       "protocol": "Every meal logged at time of eating. No 'I'll log it later.'",
       "status": "backlog"
@@ -278,7 +278,7 @@
       "difficulty": 2,
       "evidence_tier": "strong",
       "evidence_summary": "Expressive writing reduces anxiety (Pennebaker, multiple RCTs)",
-      "board_recommender": "Dr. Paul Conti",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "The journal is where you meet yourself before the world tells you who to be today.",
       "protocol": "Write for at least 5 min every morning before any app or email.",
       "status": "backlog"
@@ -293,7 +293,7 @@
       "difficulty": 1,
       "evidence_tier": "strong",
       "evidence_summary": "Gratitude journaling improves wellbeing and sleep quality",
-      "board_recommender": "Dr. Paul Conti",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "Gratitude isn't toxic positivity. It's teaching the brain to notice what's already working.",
       "protocol": "Every night, write 3 specific things. Not 'family' but 'the way Partner laughed at dinner.'",
       "status": "backlog"
@@ -308,7 +308,7 @@
       "difficulty": 2,
       "evidence_tier": "strong",
       "evidence_summary": "NSDR improves dopamine by 65%, reduces stress",
-      "board_recommender": "Dr. Andrew Huberman",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "NSDR is the highest-ROI stress tool. Zero cost, 10 minutes.",
       "protocol": "10 min of NSDR or body scan meditation daily.",
       "status": "backlog"
@@ -323,7 +323,7 @@
       "difficulty": 2,
       "evidence_tier": "moderate",
       "evidence_summary": "Sustained attention to art improves focus, reduces rumination",
-      "board_recommender": "Dr. Paul Conti",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "Truly seeing something without judgment is meditation the anxious mind desperately needs.",
       "protocol": "Go to an art museum. Pick one painting. Sit with it 30+ min. No phone.",
       "status": "backlog",
@@ -339,7 +339,7 @@
       "difficulty": 1,
       "evidence_tier": "moderate",
       "evidence_summary": "Expressing gratitude increases wellbeing for writer and recipient",
-      "board_recommender": "Dr. Vivek Murthy",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "Vulnerability is the price of admission to meaningful connection.",
       "protocol": "Write a letter to someone who impacted your life. 200+ words. Sending optional.",
       "status": "backlog",
@@ -355,7 +355,7 @@
       "difficulty": 3,
       "evidence_tier": "moderate",
       "evidence_summary": "Social media breaks reduce anxiety and depression",
-      "board_recommender": "Dr. Andrew Huberman",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "A 7-day reset recalibrates your reward circuitry.",
       "protocol": "Delete social media apps. No IG, X, Reddit, TikTok. Messaging fine.",
       "status": "backlog"
@@ -385,7 +385,7 @@
       "difficulty": 3,
       "evidence_tier": "strong",
       "evidence_summary": "Regular social contact reduces mortality risk by 50%",
-      "board_recommender": "Dr. Vivek Murthy",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "Social connection is not a luxury. It is the foundation.",
       "protocol": "One in-person coffee/lunch/walk with a friend per week. Different person if possible.",
       "status": "backlog"
@@ -400,7 +400,7 @@
       "difficulty": 4,
       "evidence_tier": "moderate",
       "evidence_summary": "Brief social interactions boost mood, reduce social anxiety",
-      "board_recommender": "Dr. Vivek Murthy",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "Every conversation with a stranger is exposure therapy.",
       "protocol": "Initiate a brief exchange. Compliment, question, comment. Min 30 seconds.",
       "status": "backlog"
@@ -415,7 +415,7 @@
       "difficulty": 2,
       "evidence_tier": "strong",
       "evidence_summary": "Voice communication creates stronger social bonds than text",
-      "board_recommender": "Dr. Vivek Murthy",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "A text is a transaction. A phone call is a connection.",
       "protocol": "Call one person per day. Friend, family, or colleague. Must be voice.",
       "status": "backlog"
@@ -430,7 +430,7 @@
       "difficulty": 4,
       "evidence_tier": "moderate",
       "evidence_summary": "Exposure therapy for social anxiety through repeated engagement",
-      "board_recommender": "Coach Maya Rodriguez",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "Your default is 'no.' Flip the default and watch what happens.",
       "protocol": "Say yes to every social invitation. Only exception: genuine conflict.",
       "status": "backlog"
@@ -445,7 +445,7 @@
       "difficulty": 4,
       "evidence_tier": "strong",
       "evidence_summary": "Communal meals strengthen social bonds",
-      "board_recommender": "Dr. Vivek Murthy",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "Hosting creates belonging. It doesn't have to be fancy — it has to be real.",
       "protocol": "Host dinner at home for 4+ people. Cook or order — the gathering is the point.",
       "status": "backlog",
@@ -461,7 +461,7 @@
       "difficulty": 2,
       "evidence_tier": "emerging",
       "evidence_summary": "Prosocial behavior increases positive affect",
-      "board_recommender": "Dr. Vivek Murthy",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "A compliment costs nothing and creates genuine human connection.",
       "protocol": "One genuine face-to-face compliment to a stranger daily. Be specific.",
       "status": "backlog"
@@ -476,7 +476,7 @@
       "difficulty": 4,
       "evidence_tier": "strong",
       "evidence_summary": "Group membership reduces mortality risk comparable to quitting smoking",
-      "board_recommender": "Dr. Vivek Murthy",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "Your social muscle atrophies without group engagement.",
       "protocol": "One group activity per week. Class, club, meetup, sports league. Not the gym.",
       "status": "backlog"
@@ -491,7 +491,7 @@
       "difficulty": 4,
       "evidence_tier": "strong",
       "evidence_summary": "Keystone habit consistency creates identity reinforcement",
-      "board_recommender": "Coach Maya Rodriguez",
+      "board_recommender": "Dr. Eli Marsh",
       "board_quote": "14 days of T0 is proof you can close the knowing-doing gap.",
       "protocol": "Every T0 habit every day for 14 consecutive days. One miss resets.",
       "status": "backlog"
@@ -506,7 +506,7 @@
       "difficulty": 2,
       "evidence_tier": "emerging",
       "evidence_summary": "Snoozing fragments sleep architecture",
-      "board_recommender": "Coach Maya Rodriguez",
+      "board_recommender": "Dr. Eli Marsh",
       "board_quote": "The first decision of the day sets the tone.",
       "protocol": "Alarm goes off, feet on floor. Zero snooze presses.",
       "status": "backlog"
@@ -521,7 +521,7 @@
       "difficulty": 3,
       "evidence_tier": "strong",
       "evidence_summary": "Cold exposure increases norepinephrine 200-300%",
-      "board_recommender": "Dr. Andrew Huberman",
+      "board_recommender": "Dr. Eli Marsh",
       "board_quote": "Learning to lean into chosen discomfort transfers to every other domain.",
       "protocol": "End of every shower: coldest setting, 30 seconds minimum.",
       "status": "backlog"
@@ -536,7 +536,7 @@
       "difficulty": 1,
       "evidence_tier": "emerging",
       "evidence_summary": "Keystone habit research: small control acts cascade",
-      "board_recommender": "Coach Maya Rodriguez",
+      "board_recommender": "Dr. Eli Marsh",
       "board_quote": "You can't control the world but you can control your bed.",
       "protocol": "Make bed within 10 min of getting up. Every morning.",
       "status": "backlog"
@@ -551,7 +551,7 @@
       "difficulty": 1,
       "evidence_tier": "moderate",
       "evidence_summary": "Environmental order reduces cognitive load",
-      "board_recommender": "Coach Maya Rodriguez",
+      "board_recommender": "Dr. Eli Marsh",
       "board_quote": "Five minutes of tidying is five minutes of reclaiming control.",
       "protocol": "5-minute timer every evening. Tidy living space. Stop when timer ends.",
       "status": "backlog"
@@ -566,7 +566,7 @@
       "difficulty": 2,
       "evidence_tier": "strong",
       "evidence_summary": "Consistent early bedtime aligns with circadian cortisol drop and improves sleep onset latency",
-      "board_recommender": "Dr. Lena Johansson",
+      "board_recommender": "Dr. Lisa Park",
       "board_quote": "The most powerful sleep drug is a consistent bedtime. Nothing else comes close.",
       "protocol": "Lights off by 10:00pm PDT every night. Track with Whoop bedtime metric. 1 grace night allowed.",
       "status": "backlog"
@@ -581,7 +581,7 @@
       "difficulty": 3,
       "evidence_tier": "strong",
       "evidence_summary": "Caffeine half-life is 5-6 hours; afternoon intake elevates adenosine blocking at bedtime",
-      "board_recommender": "Dr. Lena Johansson",
+      "board_recommender": "Dr. Lisa Park",
       "board_quote": "Half-life means half is still circulating. At 6pm you're still 50% caffeinated from a 12pm coffee.",
       "protocol": "No coffee, tea, pre-workout, or caffeine supplements after 12:00pm. Decaf allowed. Track compliance daily.",
       "status": "backlog"
@@ -596,7 +596,7 @@
       "difficulty": 2,
       "evidence_tier": "strong",
       "evidence_summary": "Cool (65-68°F), dark, quiet sleep environments improve deep sleep % by 15-25%",
-      "board_recommender": "Dr. Lena Johansson",
+      "board_recommender": "Dr. Lisa Park",
       "board_quote": "Your bedroom should be a cave. Cool, dark, boring. That's the entire protocol.",
       "protocol": "Blackout curtains or eye mask, thermostat to 65°F or Eight Sleep cooling, phone charges outside bedroom. Measure deep sleep % change.",
       "status": "backlog"
@@ -611,7 +611,7 @@
       "difficulty": 2,
       "evidence_tier": "moderate",
       "evidence_summary": "Consistent pre-sleep routines signal circadian system and reduce sleep onset latency",
-      "board_recommender": "Dr. Lena Johansson",
+      "board_recommender": "Dr. Lisa Park",
       "board_quote": "Routine is a signal. Your body learns 'these actions mean sleep is coming.'",
       "protocol": "Design a 30-min sequence (e.g. stretch, journal, read). Same order, same time, every night. Log compliance.",
       "status": "backlog"
@@ -626,8 +626,8 @@
       "difficulty": 1,
       "evidence_tier": "strong",
       "evidence_summary": "Morning light exposure anchors circadian clock, improves cortisol awakening response",
-      "board_recommender": "Dr. Lena Johansson",
-      "board_quote": "Huberman's #1: morning sunlight within 30 minutes sets your entire circadian day.",
+      "board_recommender": "Dr. Lisa Park",
+      "board_quote": "Morning sunlight within 30 minutes sets your entire circadian day.",
       "protocol": "Step outside within 30 minutes of waking. 10 min minimum, no sunglasses. Overcast days still count. Track daily.",
       "status": "backlog"
     },
@@ -641,7 +641,7 @@
       "difficulty": 3,
       "evidence_tier": "strong",
       "evidence_summary": "Laukkanen et al.: 4-7 sauna sessions/week associated with 40% reduction in all-cause mortality",
-      "board_recommender": "Dr. Lena Johansson",
+      "board_recommender": "Dr. Sarah Chen",
       "board_quote": "The Finnish data is staggering. Regular sauna use is one of the strongest longevity signals we have.",
       "protocol": "3 sessions/week, 170-190°F, 15-20 min. Cool down 5 min between rounds if doing multiple. Hydrate aggressively. Log sessions.",
       "status": "backlog"
@@ -656,7 +656,7 @@
       "difficulty": 4,
       "evidence_tier": "moderate",
       "evidence_summary": "Cold exposure increases norepinephrine 200-300%, improves mood, reduces inflammation markers",
-      "board_recommender": "Dr. Lena Johansson",
+      "board_recommender": "Dr. Sarah Chen",
       "board_quote": "The discomfort IS the mechanism. Deliberate cold trains your stress response system.",
       "protocol": "End every shower with 2+ minutes of cold (as cold as it goes), OR cold plunge 50-59°F for 2 min. Morning preferred. Log daily.",
       "status": "backlog"
@@ -671,7 +671,7 @@
       "difficulty": 3,
       "evidence_tier": "strong",
       "evidence_summary": "Progressive running programs build aerobic base safely; VO2max improvement 15-20%",
-      "board_recommender": "Dr. Lena Johansson",
+      "board_recommender": "Dr. Sarah Chen",
       "board_quote": "The evidence for running and all-cause mortality is bulletproof. Getting to a 5K is the single highest ROI fitness goal.",
       "protocol": "Follow structured C25K plan (3 runs/week, walk-run intervals progressing to continuous). Track with Strava. Target: run 5K without stopping.",
       "status": "backlog"
@@ -686,7 +686,7 @@
       "difficulty": 3,
       "evidence_tier": "strong",
       "evidence_summary": "WHO + Attia: 150 min/week moderate cardio is the longevity minimum. Zone 2 specifically improves mitochondrial function.",
-      "board_recommender": "Dr. Lena Johansson",
+      "board_recommender": "Dr. Sarah Chen",
       "board_quote": "Zone 2 is boring. It's also the single most important exercise modality for longevity.",
       "protocol": "150+ minutes per week in HR Zone 2 (roughly 60-70% max HR). Can be walking, cycling, rowing, swimming. Track via Whoop/Strava.",
       "status": "backlog"
@@ -701,7 +701,7 @@
       "difficulty": 2,
       "evidence_tier": "moderate",
       "evidence_summary": "Daily mobility work reduces injury risk, improves recovery, maintains joint range of motion",
-      "board_recommender": "Dr. Lena Johansson",
+      "board_recommender": "Dr. Sarah Chen",
       "board_quote": "Flexibility is the pillar people skip. It catches up with you after 40.",
       "protocol": "15 minutes daily: hip openers, thoracic spine, hamstrings, shoulders. Can be yoga, foam rolling, or structured routine. Track compliance.",
       "status": "backlog"
@@ -716,7 +716,7 @@
       "difficulty": 2,
       "evidence_tier": "strong",
       "evidence_summary": "Post-meal walking reduces glucose spike by 30-50% (CGM data); improves insulin sensitivity",
-      "board_recommender": "Dr. Lena Johansson",
+      "board_recommender": "Dr. Sarah Chen",
       "board_quote": "The cheapest glucose drug in the world is a 10-minute walk after dinner.",
       "protocol": "Walk 10+ minutes within 30 min of each main meal. All 3 meals ideal, minimum 1/day (dinner). Track with steps + CGM correlation.",
       "status": "backlog"
@@ -731,7 +731,7 @@
       "difficulty": 2,
       "evidence_tier": "strong",
       "evidence_summary": "Grip strength is the single strongest predictor of all-cause mortality in exercise science",
-      "board_recommender": "Dr. Lena Johansson",
+      "board_recommender": "Dr. Sarah Chen",
       "board_quote": "If you can only measure one physical attribute for longevity prediction, measure grip strength.",
       "protocol": "3x/week: 3 sets max dead hang + 2 sets farmer carry (heavy, 30 sec). Track hang time progression.",
       "status": "backlog"
@@ -746,7 +746,7 @@
       "difficulty": 4,
       "evidence_tier": "strong",
       "evidence_summary": "Added sugar drives insulin resistance, inflammation, and triglyceride elevation",
-      "board_recommender": "Dr. Lena Johansson",
+      "board_recommender": "Dr. Marcus Webb",
       "board_quote": "Two weeks without added sugar resets your palate and your insulin sensitivity.",
       "protocol": "No foods with added sugar in ingredients. Whole fruit OK. Read every label. Track compliance + CGM response.",
       "status": "backlog"
@@ -761,7 +761,7 @@
       "difficulty": 3,
       "evidence_tier": "moderate",
       "evidence_summary": "16:8 TRE improves insulin sensitivity, may reduce inflammation markers; mixed evidence on weight loss vs caloric restriction alone",
-      "board_recommender": "Dr. Lena Johansson",
+      "board_recommender": "Dr. Marcus Webb",
       "board_quote": "The evidence is nuanced. TRE probably helps via calorie control and circadian alignment, not magic.",
       "protocol": "Eating window 12pm-8pm (or similar 8-hour window). Water, black coffee, tea allowed outside. Track window compliance.",
       "status": "backlog"
@@ -776,7 +776,7 @@
       "difficulty": 2,
       "evidence_tier": "moderate",
       "evidence_summary": "Meal prepping correlates with higher diet quality, lower impulse eating, and reduced food delivery reliance",
-      "board_recommender": "Sofia Herrera",
+      "board_recommender": "Dr. Marcus Webb",
       "board_quote": "DoorDash is the enemy. Sunday prep is the fortress.",
       "protocol": "Every Sunday: prep 4+ meals for the week. Protein + veg + complex carb. Photograph and log. Track DoorDash orders (target: zero).",
       "status": "backlog"
@@ -791,7 +791,7 @@
       "difficulty": 2,
       "evidence_tier": "moderate",
       "evidence_summary": "Adequate hydration improves cognitive function, exercise performance, and satiety signals",
-      "board_recommender": "Dr. Lena Johansson",
+      "board_recommender": "Dr. Marcus Webb",
       "board_quote": "Most people are chronically mildly dehydrated. It affects everything from focus to hunger.",
       "protocol": "100oz (3L) water daily. Coffee/tea don't count. Use marked water bottle. Log intake.",
       "status": "backlog"
@@ -806,7 +806,7 @@
       "difficulty": 2,
       "evidence_tier": "strong",
       "evidence_summary": "Eating fiber before carbohydrates reduces glucose spike by 30-40% (Jesse Inchauspé / CGM studies)",
-      "board_recommender": "Dr. Lena Johansson",
+      "board_recommender": "Dr. Marcus Webb",
       "board_quote": "Same meal, different order, dramatically different glucose response. The data is clear.",
       "protocol": "At every meal with carbs, eat the vegetables and protein first, carbs last. Track with CGM.",
       "status": "backlog"
@@ -821,7 +821,7 @@
       "difficulty": 1,
       "evidence_tier": "strong",
       "evidence_summary": "Cyclic sighing / box breathing reduces cortisol and improves HRV within a single session (Huberman Lab)",
-      "board_recommender": "Dr. Lena Johansson",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "Five minutes of structured breathing does more for acute stress than any supplement.",
       "protocol": "5 min daily: 4-count inhale, 4-count hold, 4-count exhale, 4-count hold. Morning or before bed. Track HRV response.",
       "status": "backlog"
@@ -836,7 +836,7 @@
       "difficulty": 2,
       "evidence_tier": "strong",
       "evidence_summary": "Expressive writing and structured journaling reduce anxiety and depressive symptoms (Pennebaker, multiple RCTs)",
-      "board_recommender": "Dr. Lena Johansson",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "Journaling isn't therapy. But it uses the same mechanism: externalizing thought patterns makes them examinable.",
       "protocol": "Daily 10-min journal using format: Situation → Thought → Emotion → Evidence For/Against → Reframe. Track mood before/after.",
       "status": "backlog"
@@ -851,7 +851,7 @@
       "difficulty": 3,
       "evidence_tier": "strong",
       "evidence_summary": "8-week meditation programs show measurable changes in amygdala reactivity and prefrontal cortex thickness",
-      "board_recommender": "Dr. Lena Johansson",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "The evidence base for meditation is now enormous. 10 minutes daily is the minimum effective dose.",
       "protocol": "10 min daily: guided (Waking Up, Headspace) or unguided. Same time each day preferred. Track streak and subjective calm rating.",
       "status": "backlog"
@@ -866,7 +866,7 @@
       "difficulty": 2,
       "evidence_tier": "strong",
       "evidence_summary": "Shinrin-yoku research: 30 min in nature reduces cortisol 12-16%, lowers blood pressure, improves NK cell activity",
-      "board_recommender": "Dr. Lena Johansson",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "The Japanese have known this for decades. Nature exposure is a legitimate clinical intervention.",
       "protocol": "3x/week: 30+ min outdoors in green space. Phone on airplane mode. Walk, sit, or hike. Log location and subjective mood shift.",
       "status": "backlog"
@@ -881,7 +881,7 @@
       "difficulty": 3,
       "evidence_tier": "moderate",
       "evidence_summary": "Stimulus control for worry (scheduled worry time) reduces generalized anxiety symptoms (CBT literature)",
-      "board_recommender": "Dr. Lena Johansson",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "Paradoxically, giving yourself permission to worry at a set time reduces total worry time.",
       "protocol": "Pick a 15-min window each day (not before bed). Write all worries during that window. Outside the window, defer: 'I'll worry about that at 5pm.' Track worry frequency outside window.",
       "status": "backlog"
@@ -896,7 +896,7 @@
       "difficulty": 2,
       "evidence_tier": "moderate",
       "evidence_summary": "Phone presence reduces conversation depth and empathy even when not in use (Przybylski & Weinstein, 2013)",
-      "board_recommender": "Raj Mehta",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "The phone on the table is a third person in the conversation. Remove it.",
       "protocol": "Phone stays in another room during dinner. Both partners/all household members commit. Track compliance and conversation quality.",
       "status": "backlog"
@@ -911,7 +911,7 @@
       "difficulty": 2,
       "evidence_tier": "moderate",
       "evidence_summary": "Weak ties reactivation improves wellbeing and social network resilience (Granovetter + Murthy)",
-      "board_recommender": "Raj Mehta",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "The friends you've drifted from aren't gone. One text reopens the door.",
       "protocol": "One text/call per week to someone you haven't spoken to in 3+ months. No agenda, just reconnecting. Log the interaction.",
       "status": "backlog"
@@ -926,7 +926,7 @@
       "difficulty": 4,
       "evidence_tier": "strong",
       "evidence_summary": "Vulnerability in relationships deepens trust and connection (Brené Brown research; Murthy loneliness framework)",
-      "board_recommender": "Dr. Lena Johansson",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "Depth of connection matters more than frequency. One vulnerable conversation outweighs ten surface ones.",
       "protocol": "Once per week: share something real (a fear, a struggle, a hope) with someone you trust. Can be in person, phone, or letter. Journal about it after.",
       "status": "backlog"
@@ -941,7 +941,7 @@
       "difficulty": 3,
       "evidence_tier": "strong",
       "evidence_summary": "Regular group participation is the strongest predictor of social wellbeing (Murthy, Holt-Lunstad meta-analysis)",
-      "board_recommender": "Raj Mehta",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "Belonging requires showing up. Not once. Repeatedly. Same place, same people.",
       "protocol": "Pick one: running club, gym class, book club, volunteer group, church, coding meetup. Attend weekly, same time. Track attendance.",
       "status": "backlog"
@@ -956,7 +956,7 @@
       "difficulty": 1,
       "evidence_tier": "strong",
       "evidence_summary": "Expressing gratitude improves both sender and receiver wellbeing; strengthens social bonds (Emmons & McCullough)",
-      "board_recommender": "Sofia Herrera",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "This is the highest ROI social habit. 30 seconds, one text, two people feel better.",
       "protocol": "One text per day to a different person: specific, genuine thanks for something they did or are. Not generic. Track who and what.",
       "status": "backlog"
@@ -971,7 +971,7 @@
       "difficulty": 3,
       "evidence_tier": "strong",
       "evidence_summary": "Consistent wake time is the single strongest circadian anchor; social jet lag disrupts metabolic health",
-      "board_recommender": "Dr. Lena Johansson",
+      "board_recommender": "Dr. Eli Marsh",
       "board_quote": "Your body doesn't know it's Saturday. Social jet lag is real jet lag.",
       "protocol": "Set one wake time. Hit it within 15 min every day including weekends. No snooze. Track with Whoop wake time.",
       "status": "backlog"
@@ -986,7 +986,7 @@
       "difficulty": 4,
       "evidence_tier": "moderate",
       "evidence_summary": "Temporary abstinence from high-dopamine stimuli restores baseline sensitivity and improves capacity for delayed gratification",
-      "board_recommender": "Dr. Lena Johansson",
+      "board_recommender": "Dr. Eli Marsh",
       "board_quote": "Seven days without superstimuli makes everything else feel interesting again. Books, walks, conversations.",
       "protocol": "Delete social media apps, no YouTube/TikTok/Netflix/gaming for 7 days. News OK via text only. Replace with books, walks, conversation. Journal daily.",
       "status": "backlog"
@@ -1001,7 +1001,7 @@
       "difficulty": 2,
       "evidence_tier": "moderate",
       "evidence_summary": "Mindful eating location reduces caloric intake by removing distraction-based overconsumption",
-      "board_recommender": "Sofia Herrera",
+      "board_recommender": "Dr. Eli Marsh",
       "board_quote": "Eating at your desk or on the couch is invisible consumption. The kitchen table makes every bite intentional.",
       "protocol": "All meals and snacks consumed seated at the kitchen/dining table. No eating at desk, in car, on couch, or standing. Track compliance.",
       "status": "backlog"
@@ -1017,7 +1017,7 @@
       "difficulty": 1,
       "evidence_tier": "strong",
       "evidence_summary": "Morning light anchors the cortisol awakening response, calibrates circadian timing, and cascades into HRV, sleep architecture, and metabolic rate. Free. Zero cost.",
-      "board_recommender": "Dr. Andrew Huberman",
+      "board_recommender": "Dr. Lisa Park",
       "board_quote": "Morning sunlight is the single highest-ROI protocol. You missed it 70% of the time. That ends now.",
       "protocol": "Within 30 minutes of waking, 10 minutes of outdoor light or Luminette glasses. Log it before 9am.",
       "status": "available"
@@ -1049,7 +1049,7 @@
       "difficulty": 1,
       "evidence_tier": "moderate",
       "evidence_summary": "Voluntary sensory decompression without algorithm-driven engagement lowers ambient cortisol, restores directed attention, and creates the processing window where emotional integration occurs.",
-      "board_recommender": "Dr. Paul Conti",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "This is self-companionship. Sitting with yourself without distraction is harder than it sounds. Start with one hour.",
       "protocol": "One hour per day — any hour — with zero screens. Walk, cook, sketch, sit outside, read physical pages. Log the hour and what you did with it.",
       "status": "available"
@@ -1081,7 +1081,7 @@
       "difficulty": 2,
       "evidence_tier": "emerging",
       "evidence_summary": "Variable-ratio reinforcement loops (Reddit's scroll model) suppress dopamine baseline by training the brain to seek micro-rewards constantly. A 7-day break measurably resets tonic dopamine levels.",
-      "board_recommender": "Coach Maya Rodriguez",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "Motivation follows action. But first you have to clear the noise that's substituting for it.",
       "protocol": "Delete Reddit from phone for 7 days. Desktop research use fine. Leisure scroll is not. First 5 minutes of any urge: physical action — walk to another room, glass of water, open a book.",
       "status": "available"
@@ -1097,7 +1097,7 @@
       "difficulty": 1,
       "evidence_tier": "moderate",
       "evidence_summary": "Fiction uniquely activates theory of mind and narrative imagination — cognitive modes that problem-solving and self-help content suppress. For someone in isolation, fiction is practice inhabiting another's inner life.",
-      "board_recommender": "Dr. Paul Conti",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "Fiction is the one context where you're allowed to fully inhabit someone else's inner life. That's not entertainment. That's practice.",
       "protocol": "20 minutes of fiction (book, audiobook, Kindle) before any non-fiction, self-help, or productivity content. Rule is sequence, not duration. Log the title.",
       "status": "available"
@@ -1113,7 +1113,7 @@
       "difficulty": 1,
       "evidence_tier": "moderate",
       "evidence_summary": "Self-esteem is built from accurate self-perception, not performance or praise. Two constrained sentences prevent rumination while building the evidence base of clear self-seeing.",
-      "board_recommender": "Coach Maya Rodriguez",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "The most underrated challenge on this entire list. You already journal. This focuses it.",
       "protocol": "Each evening before 9pm: exactly two sentences in your journal. One on what you did well (not perfectly — well). One on what you want differently tomorrow. No more, no less.",
       "status": "available"
@@ -1129,7 +1129,7 @@
       "difficulty": 1,
       "evidence_tier": "strong",
       "evidence_summary": "NSDR (Yoga Nidra protocol) triggers parasympathetic dominance without crossing into sleep staging. The fastest zero-cost intervention for autonomic dysregulation. HRV 29.56 — this is indicated now.",
-      "board_recommender": "Dr. Andrew Huberman",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "Your recovery score is 40. NSDR is the fastest zero-cost reversal. There is no downside.",
       "protocol": "1pm–3pm daily: 10–20 minutes Yoga Nidra script (free on YouTube), eyes closed, horizontal. Not napping. Log each session.",
       "status": "available"
@@ -1145,7 +1145,7 @@
       "difficulty": 4,
       "evidence_tier": "moderate",
       "evidence_summary": "Murthy: vulnerability is the price of admission to meaningful connection. Surface-level contact doesn't meet the social connection threshold for wellbeing. Depth requires practice, not talent.",
-      "board_recommender": "Dr. Vivek Murthy",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "You can spend 150 hours in shallow proximity. The challenge is depth, not quantity.",
       "protocol": "Once per week, in a conversation with someone you care about, say one thing you'd normally hold back. Not a confession — one degree deeper than comfortable. Log what you said (private).",
       "status": "available"
@@ -1161,7 +1161,7 @@
       "difficulty": 4,
       "evidence_tier": "emerging",
       "evidence_summary": "Expressive writing about avoidance periods reduces their psychological grip and creates the narrative distance needed to understand what was actually happening rather than just that it happened.",
-      "board_recommender": "Dr. Paul Conti",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "Before you build the platform further, you need to know what you actually needed in March. Write the letter.",
       "protocol": "One unsent, private letter to March 17th-Matthew. Three paragraphs: what happened, what you needed that you didn't give yourself, what you want April-Matthew to know. Store in journal. Don't share.",
       "status": "available"
@@ -1241,7 +1241,7 @@
       "difficulty": 3,
       "evidence_tier": "emerging",
       "evidence_summary": "After a 10-day complete zero period, the urge to overcommit is the exact pattern that creates the next crash. MVD builds the evidence base that the bar is still there — without requiring heroics.",
-      "board_recommender": "Coach Maya Rodriguez",
+      "board_recommender": "Dr. Eli Marsh",
       "board_quote": "The goal isn't a lowered bar. It's proving to your nervous system that the bar still exists.",
       "protocol": "For 14 days, win the day by completing exactly three things: Walk 5k steps. Log food (even imperfectly). No alcohol. Everything else is a bonus. 12 of 14 days required.",
       "status": "available"
@@ -1257,7 +1257,7 @@
       "difficulty": 3,
       "evidence_tier": "moderate",
       "evidence_summary": "Discomfort tolerance correlates directly with dopamine baseline. People with higher tolerance don't feel more pleasure — they require less stimulus to feel it. Each rep is a vote for the identity: I do hard things.",
-      "board_recommender": "Dr. Andrew Huberman",
+      "board_recommender": "Dr. Eli Marsh",
       "board_quote": "Effort before reward. That's the sequence that rewires the motivational architecture.",
       "protocol": "Once per day, one mildly uncomfortable act on purpose: cold shower 90s, take stairs, eat the planned meal when easier is available, have a hard conversation. Log what you chose (one line).",
       "status": "available"
@@ -1273,7 +1273,7 @@
       "difficulty": 3,
       "evidence_tier": "emerging",
       "evidence_summary": "Avoidance override is a learnable skill. 10 days of doing the most avoided task first builds the evidence base that avoidance can be overridden — the psychological muscle everything else depends on.",
-      "board_recommender": "Coach Maya Rodriguez",
+      "board_recommender": "Dr. Eli Marsh",
       "board_quote": "The gap between knowing and doing is where the real work lives. This is the practice.",
       "protocol": "Each morning: identify the single most avoided (not most urgent) task. Complete it before anything else. Log what it was in one line.",
       "status": "available"
@@ -1288,7 +1288,7 @@
       "difficulty": 2,
       "evidence_tier": "emerging",
       "evidence_summary": "Home cooking is associated with higher diet quality, lower calorie intake, and better nutrient profiles. Breaking the delivery habit builds meal-prep discipline.",
-      "board_recommender": "Marcus Webb",
+      "board_recommender": "Dr. Marcus Webb",
       "board_quote": "Every delivery order is a vote against the person you're trying to become. Seven days resets the default.",
       "protocol": "Zero food delivery orders (DoorDash, Uber Eats, Grubhub, etc.) for 7 consecutive days. Meal prep or cook every meal. Restaurant dine-in is allowed.",
       "status": "available"

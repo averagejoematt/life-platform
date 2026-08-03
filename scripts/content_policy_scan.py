@@ -1,7 +1,7 @@
 """
 scripts/content_policy_scan.py — repo-wide content-policy gate (#354).
 
-Scans public-facing content files for blocked terms from seeds/content_filter.json.
+Scans public-facing content files for blocked terms from config/content_filter.json.
 Exits 1 on any match not covered by the allowlist.
 
 Scope: site/ pages, email lambdas, MCP tools — the surfaces that reach readers.
@@ -67,8 +67,8 @@ TEXT_EXTENSIONS = {
 
 
 def load_blocked_terms() -> list[str]:
-    """Load blocked keywords from seeds/content_filter.json."""
-    path = os.path.join(REPO_ROOT, "seeds", "content_filter.json")
+    """Load blocked keywords from config/content_filter.json."""
+    path = os.path.join(REPO_ROOT, "config", "content_filter.json")
     with open(path, encoding="utf-8") as f:
         cf = json.load(f)
     terms = cf.get("blocked_vice_keywords", [])
@@ -116,7 +116,7 @@ def scan_file(path: str, rel_path: str, patterns: list[tuple[str, re.Pattern]]) 
 def main() -> int:
     blocked = load_blocked_terms()
     if not blocked:
-        print("[content-policy-scan] No blocked terms loaded — check seeds/content_filter.json")
+        print("[content-policy-scan] No blocked terms loaded — check config/content_filter.json")
         return 1
 
     patterns = [(term, build_term_pattern(term)) for term in blocked]
