@@ -224,7 +224,10 @@ def test_s3_publish_refuses_to_overwrite_different_published_bytes(tmp_path, mon
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def test_page_carries_hash_url_and_verify_command():
+def test_page_carries_hash_url_and_verify_command(monkeypatch):
+    # Pin the framing seam, never the wall clock (golden-test discipline): the
+    # eve branch is the canonical fixture shape regardless of the real date.
+    monkeypatch.setattr(publisher, "_publishing_on_or_after_genesis", lambda: False)
     frozen = _fixture_frozen()
     sha = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     stamp = _fixture_stamp(frozen, sha=sha, stamped_at="2026-07-19T05:00:00+00:00")
@@ -242,6 +245,23 @@ def test_page_carries_hash_url_and_verify_command():
     assert md.strip().endswith("*Elena Voss, the day before Day 1*")
     # presentation rule holds with the seal present
     assert not _CYCLE_LANGUAGE.findall(md)
+
+
+def test_same_day_genesis_framing_is_honest(monkeypatch):
+    """#931/#939 sanction a same-day genesis; publishing eve copy on Day 1 lied
+    twice ('Tomorrow morning…', 'the weigh-in is tomorrow'). Both ends of the
+    essay must flip together via the ONE framing seam."""
+    monkeypatch.setattr(publisher, "_publishing_on_or_after_genesis", lambda: True)
+    frozen = _fixture_frozen()
+    stamp = _fixture_stamp(frozen, stamped_at="2026-07-19T05:00:00+00:00")
+    md = publisher.build_body_markdown(GOALS, frozen, stamp)
+    assert "Tomorrow morning" not in md
+    assert "weigh-in is tomorrow" not in md
+    assert md.lstrip().startswith("This morning")
+    assert md.strip().endswith("*Elena Voss, Day 1*")
+    # presentation + seal rules hold identically on the Day-1 branch
+    assert not _CYCLE_LANGUAGE.findall(md)
+    assert "shasum -a 256" in md
 
 
 def test_page_seal_states_both_dates_when_stamp_postdates_freeze():

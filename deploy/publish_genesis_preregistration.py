@@ -142,9 +142,15 @@ def build_body_markdown(goals: dict, frozen: dict, stamp: dict = None) -> str:
     phase = t["training"]["phases"][0]
     slp = t["sleep"]
 
+    same_day = _publishing_on_or_after_genesis()
     lines = [
         (
-            f"Tomorrow morning — {day1} — a scale in a quiet bathroom records the first number of a "
+            f"This morning — {day1} — a scale in a quiet bathroom recorded the first number of a "
+            "twelve-month experiment. The plan below was written down before that number existed — "
+            "the thing that separates a documented experiment from a highlight reel: the whole plan, "
+            "in public, before any data exists to flatter it."
+            if same_day
+            else f"Tomorrow morning — {day1} — a scale in a quiet bathroom records the first number of a "
             "twelve-month experiment. Today, while that number is still a blank, we are doing the thing "
             "that separates a documented experiment from a highlight reel: writing the whole plan down, "
             "in public, before any data exists to flatter it."
@@ -212,10 +218,7 @@ def build_body_markdown(goals: dict, frozen: dict, stamp: dict = None) -> str:
     ]
     if stamp:
         lines += seal_lines(stamp)
-    # Same-day genesis is a sanctioned path (#931/#939) — on Day 1 itself the
-    # eve framing ("tomorrow", "the day before") would be false the moment it
-    # published. Derive the sign-off from today vs genesis; never backdate.
-    if date.today().isoformat() >= EXPERIMENT_START_DATE:
+    if same_day:
         lines += [
             "The first weigh-in is already on the record. From here on, the data does the talking.",
             "*Elena Voss, Day 1*",
@@ -226,6 +229,14 @@ def build_body_markdown(goals: dict, frozen: dict, stamp: dict = None) -> str:
             "*Elena Voss, the day before Day 1*",
         ]
     return "\n\n".join(lines)
+
+
+def _publishing_on_or_after_genesis() -> bool:
+    """Same-day genesis is a sanctioned path (#931/#939) — on Day 1 itself the
+    eve framing ("tomorrow", "the day before") would be false the moment it
+    published. One helper so the opening and the sign-off can never disagree;
+    tests patch THIS seam instead of the wall clock (golden-test discipline)."""
+    return date.today().isoformat() >= EXPERIMENT_START_DATE
 
 
 def build_stats_line(goals: dict, n_predictions: int) -> str:
