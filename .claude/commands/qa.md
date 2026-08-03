@@ -80,7 +80,8 @@ python3 tests/visual_qa.py --screenshot --ai-qa
 ```
 The untiered AI-vision pass over every swept page (what the standalone workflow runs
 Sundays). Summarize every non-"ok" `ai_verdict` with its screenshot path. Skips itself
-with a SKIPPED-BY-BUDGET line at budget tier >= 1 (ADR-125) — report that honestly.
+with a SKIPPED-BY-BUDGET line at budget tier 3 (ADR-125 as amended by #1927 — the
+gate moved out of the first band to die) — report that honestly.
 
 ### Mode: `audit` — recompute the coverage map (#1450)
 ```bash

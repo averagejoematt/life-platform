@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 # days BETWEEN deploys with nothing looking at it — the post-deploy CI pass
 # (#1095) only fires on a deploy. This check fetches a small surface set over
 # HTTPS and runs the SAME rubric (lambdas/reader_truth_qa.py, Haiku per ADR-049).
-# Posture: budget-aware (internal QA pauses first, tier >= 1 per ADR-125 —
-# reported as an explicit ⏸ skip, never silent green) and fail-SOFT on Bedrock/
+# Posture: budget-aware (operator-truth band, tier 3 only per ADR-125 as amended by
+# #1927 — reported as an explicit ⏸ skip, never silent green) and fail-SOFT on Bedrock/
 # fetch errors (a Bedrock outage must never red the nightly). Only a HIGH truth
 # finding is a failure (lands in the alert email); med/low are warnings.
 
@@ -195,7 +195,7 @@ def check_reader_truth():
     # the Haiku batch (cost) nor be judged by prose rules written for live pages.
     surfaces = [s for s in surfaces if not s.get("frozen")]
 
-    # Budget gate — internal QA pauses first (ADR-125). Explicit ⏸, never silent.
+    # Budget gate — operator-truth band, tier 3 only (ADR-125/#1927). Explicit ⏸, never silent.
     try:
         from ai import budget_guard
 
@@ -209,7 +209,7 @@ def check_reader_truth():
             # check (lambda_handler only emails on a real FAILURE; a pause alone
             # would otherwise never leave CloudWatch Logs).
             reader_truth_qa.emit_budget_pause_metric("qa_smoke", tier)
-            checks.append(verdict.pause(f"Reader Truth AI skipped — budget tier {tier} (internal QA pauses first, ADR-125)"))
+            checks.append(verdict.pause(f"Reader Truth AI skipped — budget tier {tier} (operator-truth band, ADR-125/#1927)"))
             return checks
     except Exception as e:
         # Import/SSM blip: same fail-open posture as budget_guard itself — but if

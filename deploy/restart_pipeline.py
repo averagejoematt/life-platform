@@ -53,7 +53,7 @@ Steps (each can be skipped with --skip-<name>):
        reader-truth pass (the SAME #1140 rubric as CI --reader-truth + the
        nightly qa_smoke, lambdas/reader_truth_qa.py) over the reset-critical
        surfaces. A HIGH finding blocks exactly like the render gate; a budget
-       pause (tier >= 1, ADR-125) or Bedrock outage SKIPS LOUDLY, never a
+       pause (tier 3, ADR-125/#1927) or Bedrock outage SKIPS LOUDLY, never a
        silent green. Standalone-runnable for the #1094 reset drill.
    13. post-verify hooks (#1092 — the former manual Sunday-queue steps, now inside
        the one command; each respects --apply vs dry-run + fail-fast):

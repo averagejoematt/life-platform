@@ -438,6 +438,35 @@ def _svg_text_floor_findings(page, width):
         return []
 
 
+def gha_paused_gate_annotation(gate, status, env=None, stream=None):
+    """Emit a GitHub Actions `::warning::` when an AI gate was budget-paused (#1927).
+
+    The stdout line and the job summary both already say SKIPPED-BY-BUDGET, but
+    both live INSIDE the job log — a reviewer reading the checks list sees only a
+    green ✔ and has no way to know the gate never ran. An annotation is the one
+    surface that renders next to the check itself, so a paused gate can never
+    present as a clean gate. Same instrument ADR-147 chose for `content_truth`
+    findings, for the same reason.
+
+    Returns the emitted line (or "" when nothing was emitted) so the CI-output
+    contract is directly testable — no-op unless GITHUB_ACTIONS is set, so a
+    local run stays free of CI noise.
+    """
+    env = os.environ if env is None else env
+    if not (status or {}).get("status") == "skipped_by_budget":
+        return ""
+    if not env.get("GITHUB_ACTIONS"):
+        return ""
+    tier = (status or {}).get("tier")
+    line = (
+        f"::warning title={gate} SKIPPED-BY-BUDGET::"
+        f"{gate} did NOT run — paused by budget guard at tier {tier} (ADR-125). "
+        f"This check is not evidence about this deploy."
+    )
+    print(line, file=stream or sys.stdout)
+    return line
+
+
 def _write_step_summary(path, passed, failed, warns, results, reader_truth_status=None, ai_vision_status=None):
     """Append a Markdown summary to $GITHUB_STEP_SUMMARY (CI job summary)."""
     lines = [f"## Visual + AI-vision QA — {passed} passed, {failed} failed, {warns} warnings\n"]
@@ -1092,6 +1121,11 @@ def run_sweep(
         print(f"AI-vision QA: SKIPPED-BY-BUDGET (tier {ai_vision_status['tier']}) — not run, not a pass")
     if reader_truth_status and reader_truth_status.get("status") == "skipped_by_budget":
         print(f"Reader-truth QA: SKIPPED-BY-BUDGET (tier {reader_truth_status['tier']}) — not run, not a pass")
+    # #1927: …and once more as a CI ANNOTATION, the only one of the three surfaces
+    # that is visible without opening the job log. Both gates now pause at tier 3
+    # only (ADR-125 amendment), so this fires when Bedrock is stopped fleet-wide.
+    gha_paused_gate_annotation("AI-vision QA", ai_vision_status)
+    gha_paused_gate_annotation("Reader-truth QA", reader_truth_status)
     # #1990: a dedicated, hard-to-miss tally for baselined a11y debt that's no
     # longer live — the consumer the shrink warnings previously lacked.
     shrink_candidates = a11y_audit.shrink_candidates({r["path"]: r["a11y"] for r in results if r.get("a11y")})
