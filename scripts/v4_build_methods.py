@@ -103,7 +103,7 @@ STYLE = """
 .mr-module { border: var(--border-hair); border-radius: var(--radius); padding: var(--sp-4); min-width: 0; }
 .mr-module h3 { margin: 0; font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink); }
 .mr-module p { margin-top: var(--sp-2); color: var(--ink-muted); font-size: var(--fs-small); line-height: var(--lh-relaxed); }
-.mr-module code { color: var(--ink-faint); }
+.mr-module code { color: var(--ink-faint); overflow-wrap: anywhere; }
 </style>
 """
 
