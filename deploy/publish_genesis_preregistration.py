@@ -212,10 +212,19 @@ def build_body_markdown(goals: dict, frozen: dict, stamp: dict = None) -> str:
     ]
     if stamp:
         lines += seal_lines(stamp)
-    lines += [
-        "The first weigh-in is tomorrow. From here on, the data does the talking.",
-        "*Elena Voss, the day before Day 1*",
-    ]
+    # Same-day genesis is a sanctioned path (#931/#939) — on Day 1 itself the
+    # eve framing ("tomorrow", "the day before") would be false the moment it
+    # published. Derive the sign-off from today vs genesis; never backdate.
+    if date.today().isoformat() >= EXPERIMENT_START_DATE:
+        lines += [
+            "The first weigh-in is already on the record. From here on, the data does the talking.",
+            "*Elena Voss, Day 1*",
+        ]
+    else:
+        lines += [
+            "The first weigh-in is tomorrow. From here on, the data does the talking.",
+            "*Elena Voss, the day before Day 1*",
+        ]
     return "\n\n".join(lines)
 
 
