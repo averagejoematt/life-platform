@@ -625,6 +625,23 @@ from operational.qa_check_content_cadence import (  # noqa: F401,E402
 )
 
 # ---------------------------------------------------------------------------
+# CHECK 10d — Subscriber promise <-> kill-switch agreement (#1951)
+# ---------------------------------------------------------------------------
+# /subscribe/ and the confirmation email promise a weekly send unconditionally;
+# delivery is gated behind each subscriber-facing sender's EXTERNAL_EMAILS_ENABLED
+# env var. FAILS when the page is live-soliciting AND confirmed subscribers > 0
+# AND any subscriber-facing weekly sender is not enabled — the growth-1 class
+# (docs/reviews/FULLREVIEW_2026-08-02_DELTA.md) where the switch was pinned off
+# for ~3 months with nothing coupling it to the live promise. Lives in
+# operational/qa_check_subscriber_promise.py (module-size ceiling split idiom,
+# #1665/#1944/#1972/#1993); re-exported here so qa_smoke_lambda.check_subscriber_promise_truth
+# and .assess_subscriber_promise_truth are valid public entrypoints for tests and callers.
+from operational.qa_check_subscriber_promise import (  # noqa: F401,E402
+    assess_subscriber_promise_truth,
+    check_subscriber_promise_truth,
+)
+
+# ---------------------------------------------------------------------------
 # CHECK 11 — Legacy redirect spot-check (#1430)
 # ---------------------------------------------------------------------------
 # 84 legacy pages 301 via the CloudFront v4-redirects function, generated 1:1
@@ -913,6 +930,8 @@ def lambda_handler(event, context):
         all_checks += check_coach_labs_truth()  # #1993: no served coach text may narrate an empty labs store against real draws
         # #1972: chronicle/podcast lists must carry a next-date OR an honest-pending line, never neither
         all_checks += check_content_cadence()
+        # #1951: the /subscribe/ weekly-send promise must agree with each sender's live kill switch
+        all_checks += check_subscriber_promise_truth()
         all_checks += weight_truth_qa.checks(Check, SITE_BASE_URL, CONTENT_TRUTH)  # #1894: home/cockpit vs the coaching door
         all_checks += check_receipt_replay()  # #1373: progression-receipt drift alarm (deterministic replay)
         all_checks += check_redirect_spotcheck()  # #1430: weekly legacy-redirect sample, rotates over redirects.map

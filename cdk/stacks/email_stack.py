@@ -303,7 +303,17 @@ class EmailStack(Stack):
 
         # EXTERNAL_EMAILS_ENABLED kill switch — flip to "true" to resume sending to
         # non-Matthew recipients (Partner, confirmed subscribers). Used by
-        # partner-weekly-email, chronicle-email-sender, weekly-signal.
+        # partner-weekly-email, chronicle-email-sender, weekly-signal, between-chronicle.
+        # #1951 (owner decision 2026-08-02, recorded on the issue): the three
+        # SUBSCRIBER-facing senders (chronicle-email-sender, weekly-signal,
+        # between-chronicle) are to be LIFTED to "true" — /subscribe/'s "every
+        # Wednesday" promise becomes true rather than being disclosed as paused.
+        # That flip is an infra/owner act taken outside this PR (see the PR body);
+        # operational/qa_check_subscriber_promise.py (#1951) is the durable guard
+        # that fires if the promise and the live switch state ever disagree again,
+        # regardless of which direction each is set. partner-weekly-email is a
+        # separate, still-open privacy-mode posture (single private recipient, not
+        # a subscriber promise) and is unaffected by this decision.
         # The recipient address is PII and lives OUT of the repo: SSM parameter
         # /life-platform/partner-email (created via CLI; on the managed-where
         # ledger). The lambda reads it at runtime with a cached client and falls
