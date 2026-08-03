@@ -1,17 +1,20 @@
 # Secrets Map — central reference for source → secret mapping
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-11
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-02
 > **Sources of truth:** `aws secretsmanager list-secrets --region us-west-2` (inventory) · `grep -rln "life-platform/<name>" lambdas/ mcp/ cdk/` (consumers) · `cdk/stacks/role_policies.py` (IAM grants)
 
-**Reconciled against AWS Secrets Manager on 2026-07-10** (wiki-3 access/accounts pass).
+**Reconciled against AWS Secrets Manager on 2026-08-02** (#1957 — re-read live via
+`python3 deploy/sync_doc_metadata.py --refresh-secrets`, which also rewrites the
+`secret_count` literal + its `live-verified` stamp; `scripts/check_doc_facts.py` reds CI
+when that stamp passes 90 days).
 
-**Current state (2026-07-10): 21 active secrets, 0 in deletion window.**
+**Current state (2026-08-02): 25 active secrets, 0 in deletion window.**
 The 2026-05-19 state (12 active + 3 pending deletion) is history: `dropbox` and
 `anthropic-api-key` completed deletion; `notion` was kept (restored 2026-05-24, the
 day its deletion was due — it exists live, last accessed 2026-03-09; ingestion reads
-the bundle, so it's a retire-candidate, see Cleanup below); and 9 secrets were added
-since (site tokens, Hevy write, TTS, Pexels, GitHub dispatch, origin secret, …) — all
-rows below.
+the bundle, so it's a retire-candidate, see Cleanup below); and the site tokens, Hevy
+write key, TTS, Pexels, GitHub dispatch + billing PATs, the origin secret, YouTube,
+Bluesky and the digest recipient list were added since — all rows below.
 
 ---
 
@@ -69,7 +72,7 @@ Last reconciled: **2026-07-10**. 21 active, 0 in deletion window, all under `lif
 |---|---|---|---|
 | Anthropic — legacy main pool | `life-platform/ai-keys` | API key. **Runtime inference is Bedrock/IAM (ADR-062)** — this is the direct-API fallback path (`AI_SECRET_NAME` default in `lambdas/intelligence/intelligence_common.py`); still referenced by many Lambdas (`grep -lrn life-platform/ai-keys lambdas/`) | ✅ 2026-07-10 |
 | Anthropic — site-api isolated | `life-platform/site-api-ai-key` | API key, isolated per R17-04 | ✅ 2026-07-10 |
-| MCP bearer token | `life-platform/mcp-api-key` | HMAC-derived bearer; 90-day auto-rotation via `mcp-key-rotator` Lambda | ✅ 2026-07-10 |
+| MCP bearer token | `life-platform/mcp-api-key` | HMAC-derived bearer; 90-day auto-rotation via `life-platform-key-rotator` Lambda | ✅ 2026-07-10 |
 | GitHub workflow dispatch | `life-platform/github-dispatch-token` | Repo-scoped GitHub PAT — lets `remediation_dispatcher_lambda` trigger GitHub Actions runs (ADR-064 self-healing loop) | ✅ 2026-07-10 |
 | Subscriber link signing | `life-platform/subscriber-token-secret` | HMAC signing secret for subscriber tokens (`lambdas/web/site_api_social.py`, `site_api_ai_lambda.py`) | ✅ 2026-07-10 |
 | Ritual check-in link signing | `life-platform/ritual-token-secret` | HMAC signing secret for evening-nudge ritual tokens (`lambdas/web/site_api_social.py`, `lambdas/emails/evening_nudge_lambda.py`) | ✅ 2026-07-10 |
@@ -107,7 +110,7 @@ Last reconciled: **2026-07-10**. 21 active, 0 in deletion window, all under `lif
 | Dropbox | OAuth2; refresh tokens | Re-auth Dropbox if MacroFactor pull stops |
 | HAE webhook | static URL + bearer | regenerate if exposed |
 | Anthropic (legacy keys) | API key, no expiry | rotate manually periodically |
-| MCP Bearer | auto-rotates every 90d | automated; `mcp-key-rotator` Lambda |
+| MCP Bearer | auto-rotates every 90d | automated; `life-platform-key-rotator` Lambda |
 | Token-signing trio | platform-minted HMAC | rotate = mass token invalidation; plan it |
 | GitHub dispatch PAT | GitHub PAT — expires per its GitHub setting | regenerate in GitHub → update secret |
 
@@ -121,26 +124,30 @@ Cache TTL note: COST-OPT-1 uses `secret_cache.py` (15-min in-memory TTL — a bu
 
 | Secret | Consumer Lambda(s) | Notes |
 |---|---|---|
-| `life-platform/whoop` | `whoop-data-ingestion`, `freshness-checker`, `pipeline-health-check` | OAuth tokens — Whoop Lambda refreshes on expiry |
-| `life-platform/withings` | `withings-data-ingestion`, `freshness-checker`, `pipeline-health-check` | OAuth tokens |
-| `life-platform/strava` | `strava-data-ingestion`, `freshness-checker`, `pipeline-health-check` | OAuth tokens |
-| `life-platform/garmin` | `garmin-data-ingestion`, `freshness-checker`, `pipeline-health-check` | garth OAuth tokens |
-| `life-platform/eightsleep` + `life-platform/eightsleep-client` | `eightsleep-data-ingestion`, `freshness-checker`, `pipeline-health-check` | creds + client ID |
+| `life-platform/whoop` | `whoop-data-ingestion`, `life-platform-freshness-checker`, `pipeline-health-check` | OAuth tokens — Whoop Lambda refreshes on expiry |
+| `life-platform/withings` | `withings-data-ingestion`, `life-platform-freshness-checker`, `pipeline-health-check` | OAuth tokens |
+| `life-platform/strava` | `strava-data-ingestion`, `life-platform-freshness-checker`, `pipeline-health-check` | OAuth tokens |
+| `life-platform/garmin` | `garmin-data-ingestion`, `life-platform-freshness-checker`, `pipeline-health-check` | garth OAuth tokens |
+| `life-platform/eightsleep` + `life-platform/eightsleep-client` | `eightsleep-data-ingestion`, `life-platform-freshness-checker`, `pipeline-health-check` | creds + client ID |
 | `life-platform/habitify` | `habitify-data-ingestion`, `pipeline-health-check` | API key |
-| `life-platform/hevy` | `hevy-data-ingestion` (via `hevy_common.py`), `pipeline-health-check` | read API key |
+| `life-platform/hevy` | `hevy-backfill` (via `hevy_common.py`), `pipeline-health-check` | read API key |
 | `life-platform/hevy-write` | `life-platform-mcp` (`tools_hevy_routine.py` via `hevy_write_client.py`) | routine/rest-seconds writes |
-| `life-platform/notion` | referenced by `freshness-checker` + `pipeline-health-check` only; **last accessed 2026-03-09** | ingestion reads the bundle — retire-candidate (below) |
-| `life-platform/todoist` | `life-platform-mcp` (via `mcp/tools_todoist.py`), `freshness-checker`, `pipeline-health-check` | MCP write tools |
-| `life-platform/ingestion-keys` | `todoist-data-ingestion`, `notion-journal-ingestion`, `dropbox-poll`, `health-auto-export-webhook`, `freshness-checker`, `pipeline-health-check` | bundled — multiple keys per source |
+| `life-platform/notion` | referenced by `life-platform-freshness-checker` + `pipeline-health-check` only; **last accessed 2026-03-09** | ingestion reads the bundle — retire-candidate (below) |
+| `life-platform/todoist` | `life-platform-mcp` (via `mcp/tools_todoist.py`), `life-platform-freshness-checker`, `pipeline-health-check` | MCP write tools |
+| `life-platform/ingestion-keys` | `todoist-data-ingestion`, `notion-journal-ingestion`, `dropbox-poll`, `health-auto-export-webhook`, `life-platform-freshness-checker`, `pipeline-health-check` | bundled — multiple keys per source |
 | `life-platform/ai-keys` | legacy direct-API fallback (`AI_SECRET_NAME` in `intelligence_common.py`); referenced across intelligence/email Lambdas — `grep -lrn life-platform/ai-keys lambdas/ mcp/` for the live list | Bedrock/IAM is the primary inference path (ADR-062) |
-| `life-platform/site-api-ai-key` | `life-platform-site-api`, `site-api-ai`, `site_api_social`, `freshness-checker`, `pipeline-health-check` | Isolated per R17-04 |
-| `life-platform/mcp-api-key` | `life-platform-mcp` (config), `canary-lambda`, `qa-smoke`, `mcp-key-rotator` | HMAC bearer; auto-rotates 90d |
-| `life-platform/github-dispatch-token` | `remediation-dispatcher` (`lambdas/operational/remediation_dispatcher_lambda.py`) | repo-scoped PAT |
-| `life-platform/subscriber-token-secret` | `life-platform-site-api` (`site_api_social.py`), `site-api-ai` | HMAC signing |
+| `life-platform/site-api-ai-key` | `life-platform-site-api`, `life-platform-site-api-ai`, `site_api_social`, `life-platform-freshness-checker`, `pipeline-health-check` | Isolated per R17-04 |
+| `life-platform/mcp-api-key` | `life-platform-mcp` (config), `life-platform-canary`, `life-platform-qa-smoke`, `life-platform-key-rotator` | HMAC bearer; auto-rotates 90d |
+| `life-platform/github-dispatch-token` | `life-platform-remediation-dispatcher` (`lambdas/operational/remediation_dispatcher_lambda.py`) | repo-scoped PAT |
+| `life-platform/subscriber-token-secret` | `life-platform-site-api` (`site_api_social.py`), `life-platform-site-api-ai` | HMAC signing |
 | `life-platform/ritual-token-secret` | `life-platform-site-api` (`site_api_social.py`), `evening-nudge` | HMAC signing |
 | `life-platform/site-api-origin-secret` | CDK-injected (CloudFront custom origin header ↔ site-api verification; `cdk/stacks/constants.py`) + runtime read by `life-platform-ai-quality-canary` (#1589 — probes present the header) | reference by NAME, not partial ARN |
 | `life-platform/google-tts` | podcast pipeline (`google_tts.py`, `gemini_tts.py`) | ADR-087 |
 | `life-platform/pexels` | editorial image fetcher (`editorial_image.py`) | free-tier API key |
+| `life-platform/youtube` | `youtube-social-ingestion` (`lambdas/ingestion/youtube_lambda.py`) | owner-provisioned channel id; RSS pull needs no paid token |
+| `life-platform/bluesky` | syndication (staged — `docs/RUNBOOK_SYNDICATION.md`) | handle + **scoped app password**, never the account password |
+| `life-platform/digest` | `milestone-digest` (`DIGEST_SECRET` env) | operator-configured recipient list, deliberately outside git |
+| `life-platform/github-billing` | `deploy/sentinel_quota.py` (local/CI tooling, not a Lambda) | user-scoped PAT for the Actions-minutes quota probe |
 
 ---
 

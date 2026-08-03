@@ -164,8 +164,8 @@ _FEATURE_CUTOFF = {
     # differentiating surface. Rate limits (5/hr/IP) + Haiku pricing bound the
     # worst case; the tier-3 hard stop keeps its honest 'paused' message.
     "website_ai": 3,
-    # daily_brief_ai: the 11 AM brief — "protect longest" by design. Falls back to
-    # a data-only brief at tier 3.
+    # daily_brief_ai: the 10 AM PT brief (cron(0 17 * * ? *)) — "protect longest" by
+    # design. Falls back to a data-only brief at tier 3.
     "daily_brief_ai": 3,
 }
 
