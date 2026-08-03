@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/fulfillment_ritual",
   "is_prefix_sample": false,
   "path": "/api/fulfillment_ritual",
@@ -29,20 +29,36 @@
         "type": "integer"
       },
       "trend_7d": {
-        "items": {
-          "keys": {
-            "connection": {
-              "type": "null"
+        "items": [
+          {
+            "keys": {
+              "connection": {
+                "type": "null"
+              },
+              "date": {
+                "type": "string"
+              },
+              "mood_valence": {
+                "type": "null"
+              }
             },
-            "date": {
-              "type": "string"
-            },
-            "mood_valence": {
-              "type": "null"
-            }
+            "type": "object"
           },
-          "type": "object"
-        },
+          {
+            "keys": {
+              "connection": {
+                "type": "number"
+              },
+              "date": {
+                "type": "string"
+              },
+              "mood_valence": {
+                "type": "null"
+              }
+            },
+            "type": "object"
+          }
+        ],
         "length_sample": 7,
         "type": "array"
       }

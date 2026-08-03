@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/vitals",
   "is_prefix_sample": false,
   "path": "/api/vitals",
@@ -63,6 +63,15 @@
             "type": "null"
           },
           "hrv_30d_n": {
+            "type": "null"
+          },
+          "hrv_avg_ms": {
+            "type": "number"
+          },
+          "hrv_avg_n": {
+            "type": "integer"
+          },
+          "hrv_avg_window_days": {
             "type": "integer"
           },
           "hrv_ms": {
@@ -93,13 +102,22 @@
             "type": "boolean"
           },
           "weight_as_of": {
-            "type": "null"
+            "type": "string"
           },
           "weight_delta_30d": {
             "type": "null"
           },
+          "weight_delta_lbs": {
+            "type": "number"
+          },
+          "weight_delta_window_days": {
+            "type": "integer"
+          },
           "weight_lbs": {
-            "type": "null"
+            "type": "integer"
+          },
+          "window_disclosure": {
+            "type": "string"
           }
         },
         "type": "object"

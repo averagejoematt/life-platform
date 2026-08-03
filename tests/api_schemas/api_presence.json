@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/presence",
   "is_prefix_sample": false,
   "path": "/api/presence",
@@ -26,34 +26,59 @@
         "type": "boolean"
       },
       "channels": {
-        "items": {
-          "keys": {
-            "gap_days": {
-              "type": "number"
+        "items": [
+          {
+            "keys": {
+              "gap_days": {
+                "type": "number"
+              },
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "last_log_date": {
+                "type": "null"
+              },
+              "primary": {
+                "type": "boolean"
+              },
+              "quiet": {
+                "type": "boolean"
+              }
             },
-            "id": {
-              "type": "string"
-            },
-            "label": {
-              "type": "string"
-            },
-            "last_log_date": {
-              "type": "null"
-            },
-            "primary": {
-              "type": "boolean"
-            },
-            "quiet": {
-              "type": "boolean"
-            }
+            "type": "object"
           },
-          "type": "object"
-        },
+          {
+            "keys": {
+              "gap_days": {
+                "type": "number"
+              },
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "last_log_date": {
+                "type": "string"
+              },
+              "primary": {
+                "type": "boolean"
+              },
+              "quiet": {
+                "type": "boolean"
+              }
+            },
+            "type": "object"
+          }
+        ],
         "length_sample": 5,
         "type": "array"
       },
       "channels_quiet_count": {
-        "type": "integer"
+        "type": "number"
       },
       "gap_days": {
         "type": "number"

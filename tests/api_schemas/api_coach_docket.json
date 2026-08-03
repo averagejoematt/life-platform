@@ -1,8 +1,7 @@
 {
-  "captured_at": "2026-07-25T00:00:00+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/coach_docket",
   "is_prefix_sample": false,
-  "note": "Hand-authored at #1386 open (graceful-empty shape) — the endpoint is dormant until the first docket opens; recapture with deploy/capture_api_schemas.py once live entries exist.",
   "path": "/api/coach_docket",
   "shape": {
     "keys": {
@@ -35,9 +34,13 @@
         "type": "string"
       },
       "open": {
+        "items": null,
+        "length_sample": 0,
         "type": "array"
       },
       "resolved": {
+        "items": null,
+        "length_sample": 0,
         "type": "array"
       },
       "withheld": {
@@ -45,5 +48,6 @@
       }
     },
     "type": "object"
-  }
+  },
+  "status": 200
 }

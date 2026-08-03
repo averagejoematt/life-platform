@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/predict_week",
   "is_prefix_sample": false,
   "path": "/api/predict_week",
@@ -21,56 +21,6 @@
       },
       "active": {
         "type": "boolean"
-      },
-      "metrics": {
-        "keys": {
-          "calories": {
-            "type": "string"
-          },
-          "steps": {
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "result": {
-        "type": "null"
-      },
-      "tallies": {
-        "keys": {
-          "calories": {
-            "keys": {
-              "down": {
-                "type": "integer"
-              },
-              "flat": {
-                "type": "integer"
-              },
-              "up": {
-                "type": "integer"
-              }
-            },
-            "type": "object"
-          },
-          "steps": {
-            "keys": {
-              "down": {
-                "type": "integer"
-              },
-              "flat": {
-                "type": "integer"
-              },
-              "up": {
-                "type": "integer"
-              }
-            },
-            "type": "object"
-          }
-        },
-        "type": "object"
-      },
-      "week_id": {
-        "type": "string"
       }
     },
     "type": "object"

@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/voice_fidelity",
   "is_prefix_sample": false,
   "path": "/api/voice_fidelity",
@@ -20,43 +20,148 @@
         "type": "object"
       },
       "accuracy_pct": {
-        "type": "null"
+        "type": "number"
       },
       "candidate_pool_size": {
-        "type": "null"
+        "type": "number"
       },
       "chance_accuracy_pct": {
-        "type": "null"
+        "type": "number"
       },
       "coaches": {
-        "items": null,
-        "length_sample": 0,
+        "items": {
+          "keys": {
+            "accuracy_pct": {
+              "type": "number"
+            },
+            "coach_id": {
+              "type": "string"
+            },
+            "correct": {
+              "type": "number"
+            },
+            "distinguishability": {
+              "type": "string"
+            },
+            "n": {
+              "type": "number"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 8,
         "type": "array"
       },
       "confusion": {
-        "keys": {},
+        "keys": {
+          "explorer_coach": {
+            "keys": {
+              "explorer_coach": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "glucose_coach": {
+            "keys": {
+              "explorer_coach": {
+                "type": "number"
+              },
+              "glucose_coach": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "labs_coach": {
+            "keys": {
+              "labs_coach": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "mind_coach": {
+            "keys": {
+              "mind_coach": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "nutrition_coach": {
+            "keys": {
+              "glucose_coach": {
+                "type": "number"
+              },
+              "nutrition_coach": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "physical_coach": {
+            "keys": {
+              "explorer_coach": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "sleep_coach": {
+            "keys": {
+              "sleep_coach": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "training_coach": {
+            "keys": {
+              "explorer_coach": {
+                "type": "number"
+              },
+              "training_coach": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          }
+        },
         "type": "object"
       },
       "correct": {
-        "type": "null"
+        "type": "number"
       },
       "disclosure": {
         "type": "string"
       },
       "n": {
-        "type": "integer"
+        "type": "number"
       },
       "run_month": {
-        "type": "null"
+        "type": "string"
       },
       "updated_at": {
-        "type": "null"
+        "type": "string"
       },
       "verdict": {
         "type": "string"
       },
       "worst_confused_pair": {
-        "type": "null"
+        "keys": {
+          "coaches": {
+            "items": {
+              "type": "string"
+            },
+            "length_sample": 2,
+            "type": "array"
+          },
+          "confusions": {
+            "type": "number"
+          }
+        },
+        "type": "object"
       }
     },
     "type": "object"

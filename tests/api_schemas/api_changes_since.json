@@ -1,6 +1,6 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
-  "fetch_path": "/api/changes-since?ts=1783883967",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "fetch_path": "/api/changes-since?ts=1785169123",
   "is_prefix_sample": false,
   "path": "/api/changes-since",
   "shape": {
@@ -23,7 +23,86 @@
         "type": "integer"
       },
       "deltas": {
-        "keys": {},
+        "keys": {
+          "hrv": {
+            "keys": {
+              "change": {
+                "type": "integer"
+              },
+              "from": {
+                "type": "integer"
+              },
+              "sparkline": {
+                "items": {
+                  "type": "integer"
+                },
+                "length_sample": 7,
+                "type": "array"
+              },
+              "to": {
+                "type": "integer"
+              },
+              "trend": {
+                "type": "string"
+              },
+              "unit": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "sleep": {
+            "keys": {
+              "change": {
+                "type": "number"
+              },
+              "from": {
+                "type": "number"
+              },
+              "sparkline": {
+                "items": {
+                  "type": "number"
+                },
+                "length_sample": 7,
+                "type": "array"
+              },
+              "to": {
+                "type": "number"
+              },
+              "trend": {
+                "type": "string"
+              },
+              "unit": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "weight": {
+            "keys": {
+              "change": {
+                "type": "number"
+              },
+              "from": {
+                "type": "number"
+              },
+              "sparkline": {
+                "items": {
+                  "type": "number"
+                },
+                "length_sample": 4,
+                "type": "array"
+              },
+              "to": {
+                "type": "number"
+              },
+              "unit": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        },
         "type": "object"
       },
       "events": {

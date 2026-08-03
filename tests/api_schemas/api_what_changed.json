@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/what_changed",
   "is_prefix_sample": false,
   "path": "/api/what_changed",
@@ -19,9 +19,6 @@
         },
         "type": "object"
       },
-      "computed_at": {
-        "type": "string"
-      },
       "deltas": {
         "items": null,
         "length_sample": 0,
@@ -31,46 +28,18 @@
         "type": "boolean"
       },
       "newly_unlocked": {
-        "items": {
-          "keys": {
-            "direction": {
-              "type": "string"
-            },
-            "first_seen": {
-              "type": "string"
-            },
-            "interpretation": {
-              "type": "string"
-            },
-            "label": {
-              "type": "string"
-            },
-            "metric_a": {
-              "type": "string"
-            },
-            "metric_b": {
-              "type": "string"
-            },
-            "n": {
-              "type": "number"
-            },
-            "r": {
-              "type": "number"
-            }
-          },
-          "type": "object"
-        },
-        "length_sample": 1,
+        "items": null,
+        "length_sample": 0,
         "type": "array"
       },
       "week": {
-        "type": "string"
+        "type": "null"
       },
       "window_end": {
-        "type": "string"
+        "type": "null"
       },
       "window_start": {
-        "type": "string"
+        "type": "null"
       }
     },
     "type": "object"

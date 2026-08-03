@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/training_overview",
   "is_prefix_sample": false,
   "path": "/api/training_overview",
@@ -45,15 +45,37 @@
               },
               "type": "object"
             },
-            "length_sample": 1,
+            "length_sample": 2,
             "type": "array"
           }
         },
         "type": "object"
       },
       "cardio_sessions": {
-        "items": null,
-        "length_sample": 0,
+        "items": {
+          "keys": {
+            "avg_hr": {
+              "type": "number"
+            },
+            "date": {
+              "type": "string"
+            },
+            "distance_mi": {
+              "type": "null"
+            },
+            "minutes": {
+              "type": "integer"
+            },
+            "source": {
+              "type": "string"
+            },
+            "sport": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 1,
         "type": "array"
       },
       "daily_modality_minutes_30d": {
@@ -92,12 +114,43 @@
           },
           "type": "object"
         },
-        "length_sample": 1,
+        "length_sample": 8,
         "type": "array"
       },
       "modality_breakdown": {
-        "items": null,
-        "length_sample": 0,
+        "items": {
+          "keys": {
+            "avg_duration_min": {
+              "type": "integer"
+            },
+            "avg_hr": {
+              "type": "integer"
+            },
+            "count_30d": {
+              "type": "integer"
+            },
+            "total_distance_mi": {
+              "type": "number"
+            },
+            "total_elevation_ft": {
+              "type": "integer"
+            },
+            "total_minutes_30d": {
+              "type": "integer"
+            },
+            "trend_vs_prior_30d": {
+              "type": "integer"
+            },
+            "type": {
+              "type": "string"
+            },
+            "z2_minutes": {
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 2,
         "type": "array"
       },
       "muscle_volume": {
@@ -111,27 +164,37 @@
             "type": "integer"
           },
           "avg_daily_steps": {
-            "type": "null"
+            "type": "integer"
           },
           "avg_strain": {
-            "type": "null"
+            "type": "number"
           },
           "strength_sessions_30d": {
             "type": "integer"
           },
           "top_activities": {
-            "items": null,
-            "length_sample": 0,
+            "items": {
+              "keys": {
+                "count": {
+                  "type": "integer"
+                },
+                "type": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 2,
             "type": "array"
           },
           "total_distance_mi": {
-            "type": "integer"
+            "type": "number"
           },
           "total_minutes_30d": {
             "type": "integer"
           },
           "weekly_avg": {
-            "type": "null"
+            "type": "number"
           },
           "whoop_workout_count": {
             "type": "integer"
@@ -143,7 +206,7 @@
             "type": "integer"
           },
           "z2_pct": {
-            "type": "null"
+            "type": "integer"
           },
           "z2_target_min": {
             "type": "integer"
@@ -152,7 +215,7 @@
             "type": "integer"
           },
           "z2_weekly_avg_min": {
-            "type": "null"
+            "type": "integer"
           }
         },
         "type": "object"
@@ -163,13 +226,13 @@
       "walking": {
         "keys": {
           "avg_daily_steps": {
-            "type": "null"
+            "type": "integer"
           },
           "avg_daily_steps_n": {
             "type": "integer"
           },
           "avg_daily_steps_reason": {
-            "type": "string"
+            "type": "null"
           },
           "avg_pace_min_per_mi": {
             "type": "null"
@@ -189,11 +252,11 @@
               },
               "type": "object"
             },
-            "length_sample": 1,
+            "length_sample": 8,
             "type": "array"
           },
           "total_miles_30d": {
-            "type": "integer"
+            "type": "number"
           },
           "total_rucks_30d": {
             "type": "integer"
@@ -208,13 +271,82 @@
         "type": "object"
       },
       "weekly_trend": {
-        "items": null,
-        "length_sample": 0,
+        "items": {
+          "keys": {
+            "minutes": {
+              "type": "integer"
+            },
+            "week": {
+              "type": "string"
+            },
+            "workouts": {
+              "type": "integer"
+            },
+            "z2_min": {
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 1,
         "type": "array"
       },
       "whoop_workouts": {
-        "items": null,
-        "length_sample": 0,
+        "items": [
+          {
+            "keys": {
+              "average_heart_rate": {
+                "type": "number"
+              },
+              "date": {
+                "type": "string"
+              },
+              "distance_meter": {
+                "type": "null"
+              },
+              "sport_name": {
+                "type": "string"
+              },
+              "strain": {
+                "type": "number"
+              },
+              "zone_2_minutes": {
+                "type": "null"
+              },
+              "zone_3_minutes": {
+                "type": "null"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "average_heart_rate": {
+                "type": "number"
+              },
+              "date": {
+                "type": "string"
+              },
+              "distance_meter": {
+                "type": "null"
+              },
+              "sport_name": {
+                "type": "string"
+              },
+              "strain": {
+                "type": "number"
+              },
+              "zone_2_minutes": {
+                "type": "number"
+              },
+              "zone_3_minutes": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          }
+        ],
+        "length_sample": 8,
         "type": "array"
       }
     },

@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/character_receipt",
   "is_prefix_sample": false,
   "path": "/api/character_receipt",
@@ -22,11 +22,876 @@
       "available": {
         "type": "boolean"
       },
-      "date": {
-        "type": "null"
+      "receipt": {
+        "keys": {
+          "computed_at": {
+            "type": "string"
+          },
+          "config_hash": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "digest": {
+            "type": "string"
+          },
+          "engine_version": {
+            "type": "string"
+          },
+          "input_rows": {
+            "items": [
+              {
+                "keys": {
+                  "pk": {
+                    "type": "string"
+                  },
+                  "sks": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 1,
+                    "type": "array"
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "keys": {
+                  "pk": {
+                    "type": "string"
+                  },
+                  "sks": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 5,
+                    "type": "array"
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "keys": {
+                  "pk": {
+                    "type": "string"
+                  },
+                  "sks": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 2,
+                    "type": "array"
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "keys": {
+                  "pk": {
+                    "type": "string"
+                  },
+                  "sks": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 7,
+                    "type": "array"
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "keys": {
+                  "pk": {
+                    "type": "string"
+                  },
+                  "sks": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 3,
+                    "type": "array"
+                  }
+                },
+                "type": "object"
+              }
+            ],
+            "length_sample": 9,
+            "type": "array"
+          },
+          "phase": {
+            "type": "string"
+          },
+          "receipt_schema_version": {
+            "type": "number"
+          },
+          "replay_verified": {
+            "type": "boolean"
+          },
+          "run_id": {
+            "type": "string"
+          },
+          "transitions": {
+            "keys": {
+              "day_number": {
+                "type": "number"
+              },
+              "headline": {
+                "keys": {
+                  "inputs": {
+                    "keys": {
+                      "prev_character_level": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "outputs": {
+                    "keys": {
+                      "character_level": {
+                        "type": "number"
+                      },
+                      "events": {
+                        "items": null,
+                        "length_sample": 0,
+                        "type": "array"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              },
+              "pillars": {
+                "keys": {
+                  "consistency": {
+                    "keys": {
+                      "inputs": {
+                        "keys": {
+                          "bonus_xp": {
+                            "type": "number"
+                          },
+                          "data_coverage": {
+                            "type": "number"
+                          },
+                          "level_score": {
+                            "type": "number"
+                          },
+                          "not_instrumented": {
+                            "type": "boolean"
+                          },
+                          "presence_dark": {
+                            "type": "boolean"
+                          },
+                          "prev": {
+                            "keys": {
+                              "level": {
+                                "type": "number"
+                              },
+                              "streak_above": {
+                                "type": "number"
+                              },
+                              "streak_below": {
+                                "type": "number"
+                              },
+                              "tier": {
+                                "type": "string"
+                              },
+                              "xp_buffer": {
+                                "type": "number"
+                              },
+                              "xp_debt": {
+                                "type": "number"
+                              },
+                              "xp_total": {
+                                "type": "number"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "raw_score": {
+                            "type": "number"
+                          },
+                          "raw_score_unblended": {
+                            "type": "number"
+                          },
+                          "unadjusted_level_score": {
+                            "type": "number"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "outputs": {
+                        "keys": {
+                          "coverage_hold": {
+                            "type": "boolean"
+                          },
+                          "events": {
+                            "items": null,
+                            "length_sample": 0,
+                            "type": "array"
+                          },
+                          "level": {
+                            "type": "number"
+                          },
+                          "streak_above": {
+                            "type": "number"
+                          },
+                          "streak_below": {
+                            "type": "number"
+                          },
+                          "tier": {
+                            "type": "string"
+                          },
+                          "xp_buffer": {
+                            "type": "number"
+                          },
+                          "xp_debt": {
+                            "type": "number"
+                          },
+                          "xp_delta": {
+                            "type": "number"
+                          },
+                          "xp_earned": {
+                            "type": "number"
+                          },
+                          "xp_total": {
+                            "type": "number"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "metabolic": {
+                    "keys": {
+                      "inputs": {
+                        "keys": {
+                          "bonus_xp": {
+                            "type": "number"
+                          },
+                          "data_coverage": {
+                            "type": "number"
+                          },
+                          "level_score": {
+                            "type": "number"
+                          },
+                          "not_instrumented": {
+                            "type": "boolean"
+                          },
+                          "presence_dark": {
+                            "type": "boolean"
+                          },
+                          "prev": {
+                            "keys": {
+                              "level": {
+                                "type": "number"
+                              },
+                              "streak_above": {
+                                "type": "number"
+                              },
+                              "streak_below": {
+                                "type": "number"
+                              },
+                              "tier": {
+                                "type": "string"
+                              },
+                              "xp_buffer": {
+                                "type": "number"
+                              },
+                              "xp_debt": {
+                                "type": "number"
+                              },
+                              "xp_total": {
+                                "type": "number"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "raw_score": {
+                            "type": "number"
+                          },
+                          "raw_score_unblended": {
+                            "type": "number"
+                          },
+                          "unadjusted_level_score": {
+                            "type": "number"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "outputs": {
+                        "keys": {
+                          "coverage_hold": {
+                            "type": "boolean"
+                          },
+                          "events": {
+                            "items": null,
+                            "length_sample": 0,
+                            "type": "array"
+                          },
+                          "level": {
+                            "type": "number"
+                          },
+                          "streak_above": {
+                            "type": "number"
+                          },
+                          "streak_below": {
+                            "type": "number"
+                          },
+                          "tier": {
+                            "type": "string"
+                          },
+                          "xp_buffer": {
+                            "type": "number"
+                          },
+                          "xp_debt": {
+                            "type": "number"
+                          },
+                          "xp_delta": {
+                            "type": "number"
+                          },
+                          "xp_earned": {
+                            "type": "number"
+                          },
+                          "xp_total": {
+                            "type": "number"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "mind": {
+                    "keys": {
+                      "inputs": {
+                        "keys": {
+                          "bonus_xp": {
+                            "type": "number"
+                          },
+                          "data_coverage": {
+                            "type": "number"
+                          },
+                          "level_score": {
+                            "type": "number"
+                          },
+                          "not_instrumented": {
+                            "type": "boolean"
+                          },
+                          "presence_dark": {
+                            "type": "boolean"
+                          },
+                          "prev": {
+                            "keys": {
+                              "level": {
+                                "type": "number"
+                              },
+                              "streak_above": {
+                                "type": "number"
+                              },
+                              "streak_below": {
+                                "type": "number"
+                              },
+                              "tier": {
+                                "type": "string"
+                              },
+                              "xp_buffer": {
+                                "type": "number"
+                              },
+                              "xp_debt": {
+                                "type": "number"
+                              },
+                              "xp_total": {
+                                "type": "number"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "raw_score": {
+                            "type": "number"
+                          },
+                          "raw_score_unblended": {
+                            "type": "number"
+                          },
+                          "unadjusted_level_score": {
+                            "type": "number"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "outputs": {
+                        "keys": {
+                          "coverage_hold": {
+                            "type": "boolean"
+                          },
+                          "events": {
+                            "items": null,
+                            "length_sample": 0,
+                            "type": "array"
+                          },
+                          "level": {
+                            "type": "number"
+                          },
+                          "streak_above": {
+                            "type": "number"
+                          },
+                          "streak_below": {
+                            "type": "number"
+                          },
+                          "tier": {
+                            "type": "string"
+                          },
+                          "xp_buffer": {
+                            "type": "number"
+                          },
+                          "xp_debt": {
+                            "type": "number"
+                          },
+                          "xp_delta": {
+                            "type": "number"
+                          },
+                          "xp_earned": {
+                            "type": "number"
+                          },
+                          "xp_total": {
+                            "type": "number"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "movement": {
+                    "keys": {
+                      "inputs": {
+                        "keys": {
+                          "bonus_xp": {
+                            "type": "number"
+                          },
+                          "data_coverage": {
+                            "type": "number"
+                          },
+                          "level_score": {
+                            "type": "number"
+                          },
+                          "not_instrumented": {
+                            "type": "boolean"
+                          },
+                          "presence_dark": {
+                            "type": "boolean"
+                          },
+                          "prev": {
+                            "keys": {
+                              "level": {
+                                "type": "number"
+                              },
+                              "streak_above": {
+                                "type": "number"
+                              },
+                              "streak_below": {
+                                "type": "number"
+                              },
+                              "tier": {
+                                "type": "string"
+                              },
+                              "xp_buffer": {
+                                "type": "number"
+                              },
+                              "xp_debt": {
+                                "type": "number"
+                              },
+                              "xp_total": {
+                                "type": "number"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "raw_score": {
+                            "type": "number"
+                          },
+                          "raw_score_unblended": {
+                            "type": "number"
+                          },
+                          "unadjusted_level_score": {
+                            "type": "number"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "outputs": {
+                        "keys": {
+                          "coverage_hold": {
+                            "type": "boolean"
+                          },
+                          "events": {
+                            "items": {
+                              "keys": {
+                                "new_level": {
+                                  "type": "number"
+                                },
+                                "old_level": {
+                                  "type": "number"
+                                },
+                                "pillar": {
+                                  "type": "string"
+                                },
+                                "type": {
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object"
+                            },
+                            "length_sample": 1,
+                            "type": "array"
+                          },
+                          "level": {
+                            "type": "number"
+                          },
+                          "streak_above": {
+                            "type": "number"
+                          },
+                          "streak_below": {
+                            "type": "number"
+                          },
+                          "tier": {
+                            "type": "string"
+                          },
+                          "xp_buffer": {
+                            "type": "number"
+                          },
+                          "xp_debt": {
+                            "type": "number"
+                          },
+                          "xp_delta": {
+                            "type": "number"
+                          },
+                          "xp_earned": {
+                            "type": "number"
+                          },
+                          "xp_total": {
+                            "type": "number"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "nutrition": {
+                    "keys": {
+                      "inputs": {
+                        "keys": {
+                          "bonus_xp": {
+                            "type": "number"
+                          },
+                          "data_coverage": {
+                            "type": "number"
+                          },
+                          "level_score": {
+                            "type": "number"
+                          },
+                          "not_instrumented": {
+                            "type": "boolean"
+                          },
+                          "presence_dark": {
+                            "type": "boolean"
+                          },
+                          "prev": {
+                            "keys": {
+                              "level": {
+                                "type": "number"
+                              },
+                              "streak_above": {
+                                "type": "number"
+                              },
+                              "streak_below": {
+                                "type": "number"
+                              },
+                              "tier": {
+                                "type": "string"
+                              },
+                              "xp_buffer": {
+                                "type": "number"
+                              },
+                              "xp_debt": {
+                                "type": "number"
+                              },
+                              "xp_total": {
+                                "type": "number"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "raw_score": {
+                            "type": "number"
+                          },
+                          "raw_score_unblended": {
+                            "type": "number"
+                          },
+                          "unadjusted_level_score": {
+                            "type": "number"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "outputs": {
+                        "keys": {
+                          "coverage_hold": {
+                            "type": "boolean"
+                          },
+                          "events": {
+                            "items": null,
+                            "length_sample": 0,
+                            "type": "array"
+                          },
+                          "level": {
+                            "type": "number"
+                          },
+                          "streak_above": {
+                            "type": "number"
+                          },
+                          "streak_below": {
+                            "type": "number"
+                          },
+                          "tier": {
+                            "type": "string"
+                          },
+                          "xp_buffer": {
+                            "type": "number"
+                          },
+                          "xp_debt": {
+                            "type": "number"
+                          },
+                          "xp_delta": {
+                            "type": "number"
+                          },
+                          "xp_earned": {
+                            "type": "number"
+                          },
+                          "xp_total": {
+                            "type": "number"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "relationships": {
+                    "keys": {
+                      "inputs": {
+                        "keys": {
+                          "bonus_xp": {
+                            "type": "number"
+                          },
+                          "data_coverage": {
+                            "type": "number"
+                          },
+                          "level_score": {
+                            "type": "number"
+                          },
+                          "not_instrumented": {
+                            "type": "boolean"
+                          },
+                          "presence_dark": {
+                            "type": "boolean"
+                          },
+                          "prev": {
+                            "keys": {
+                              "level": {
+                                "type": "number"
+                              },
+                              "streak_above": {
+                                "type": "number"
+                              },
+                              "streak_below": {
+                                "type": "number"
+                              },
+                              "tier": {
+                                "type": "string"
+                              },
+                              "xp_buffer": {
+                                "type": "number"
+                              },
+                              "xp_debt": {
+                                "type": "number"
+                              },
+                              "xp_total": {
+                                "type": "number"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "raw_score": {
+                            "type": "number"
+                          },
+                          "raw_score_unblended": {
+                            "type": "null"
+                          },
+                          "unadjusted_level_score": {
+                            "type": "number"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "outputs": {
+                        "keys": {
+                          "coverage_hold": {
+                            "type": "boolean"
+                          },
+                          "events": {
+                            "items": null,
+                            "length_sample": 0,
+                            "type": "array"
+                          },
+                          "level": {
+                            "type": "number"
+                          },
+                          "streak_above": {
+                            "type": "number"
+                          },
+                          "streak_below": {
+                            "type": "number"
+                          },
+                          "tier": {
+                            "type": "string"
+                          },
+                          "xp_buffer": {
+                            "type": "number"
+                          },
+                          "xp_debt": {
+                            "type": "number"
+                          },
+                          "xp_delta": {
+                            "type": "number"
+                          },
+                          "xp_earned": {
+                            "type": "number"
+                          },
+                          "xp_total": {
+                            "type": "number"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "sleep": {
+                    "keys": {
+                      "inputs": {
+                        "keys": {
+                          "bonus_xp": {
+                            "type": "number"
+                          },
+                          "data_coverage": {
+                            "type": "number"
+                          },
+                          "level_score": {
+                            "type": "number"
+                          },
+                          "not_instrumented": {
+                            "type": "boolean"
+                          },
+                          "presence_dark": {
+                            "type": "boolean"
+                          },
+                          "prev": {
+                            "keys": {
+                              "level": {
+                                "type": "number"
+                              },
+                              "streak_above": {
+                                "type": "number"
+                              },
+                              "streak_below": {
+                                "type": "number"
+                              },
+                              "tier": {
+                                "type": "string"
+                              },
+                              "xp_buffer": {
+                                "type": "number"
+                              },
+                              "xp_debt": {
+                                "type": "number"
+                              },
+                              "xp_total": {
+                                "type": "number"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "raw_score": {
+                            "type": "number"
+                          },
+                          "raw_score_unblended": {
+                            "type": "number"
+                          },
+                          "unadjusted_level_score": {
+                            "type": "number"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "outputs": {
+                        "keys": {
+                          "coverage_hold": {
+                            "type": "boolean"
+                          },
+                          "events": {
+                            "items": null,
+                            "length_sample": 0,
+                            "type": "array"
+                          },
+                          "level": {
+                            "type": "number"
+                          },
+                          "streak_above": {
+                            "type": "number"
+                          },
+                          "streak_below": {
+                            "type": "number"
+                          },
+                          "tier": {
+                            "type": "string"
+                          },
+                          "xp_buffer": {
+                            "type": "number"
+                          },
+                          "xp_debt": {
+                            "type": "number"
+                          },
+                          "xp_delta": {
+                            "type": "number"
+                          },
+                          "xp_earned": {
+                            "type": "number"
+                          },
+                          "xp_total": {
+                            "type": "number"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
       },
-      "reason": {
-        "type": "string"
+      "replay": {
+        "type": "null"
       }
     },
     "type": "object"

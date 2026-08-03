@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/vacation_fund",
   "is_prefix_sample": false,
   "path": "/api/vacation_fund",
@@ -67,7 +67,14 @@
         "type": "object"
       },
       "per_sport_type": {
-        "keys": {},
+        "keys": {
+          "Golf": {
+            "type": "number"
+          },
+          "Walk": {
+            "type": "number"
+          }
+        },
         "type": "object"
       },
       "pre_start": {

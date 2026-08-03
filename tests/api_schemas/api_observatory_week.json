@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/observatory_week",
   "is_prefix_sample": false,
   "path": "/api/observatory_week",
@@ -78,7 +78,7 @@
           "primary": {
             "keys": {
               "delta": {
-                "type": "number"
+                "type": "null"
               },
               "delta_label": {
                 "type": "string"
@@ -90,7 +90,7 @@
                 "items": {
                   "type": "number"
                 },
-                "length_sample": 1,
+                "length_sample": 7,
                 "type": "array"
               },
               "trend": {

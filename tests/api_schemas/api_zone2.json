@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/zone2",
   "is_prefix_sample": false,
   "path": "/api/zone2",
@@ -22,11 +22,149 @@
       "available": {
         "type": "boolean"
       },
-      "reason": {
-        "type": "string"
+      "current_week": {
+        "keys": {
+          "activity_count": {
+            "type": "integer"
+          },
+          "target_met": {
+            "type": "boolean"
+          },
+          "target_pct": {
+            "type": "integer"
+          },
+          "total_exercise_min": {
+            "type": "number"
+          },
+          "week_start": {
+            "type": "string"
+          },
+          "zone_2_minutes": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "period": {
+        "keys": {
+          "end_date": {
+            "type": "string"
+          },
+          "start_date": {
+            "type": "string"
+          },
+          "weeks_analyzed": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "sport_breakdown": {
+        "items": {
+          "keys": {
+            "activity_count": {
+              "type": "integer"
+            },
+            "sport_type": {
+              "type": "string"
+            },
+            "zone_2_minutes": {
+              "type": "number"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 1,
+        "type": "array"
+      },
+      "summary": {
+        "keys": {
+          "avg_weekly_zone_2_min": {
+            "type": "number"
+          },
+          "max_hr_used": {
+            "type": "number"
+          },
+          "target_hit_rate_pct": {
+            "type": "integer"
+          },
+          "total_activities": {
+            "type": "integer"
+          },
+          "total_zone_2_min": {
+            "type": "number"
+          },
+          "weeks_analyzed": {
+            "type": "integer"
+          },
+          "weeks_meeting_target": {
+            "type": "integer"
+          },
+          "zone_2_hr_range": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "trend": {
+        "type": "null"
       },
       "weekly_target_min": {
         "type": "integer"
+      },
+      "weeks": {
+        "items": {
+          "keys": {
+            "activity_count": {
+              "type": "integer"
+            },
+            "target_met": {
+              "type": "boolean"
+            },
+            "target_pct": {
+              "type": "integer"
+            },
+            "total_exercise_min": {
+              "type": "number"
+            },
+            "week_start": {
+              "type": "string"
+            },
+            "zone_2_minutes": {
+              "type": "number"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 1,
+        "type": "array"
+      },
+      "zone_distribution": {
+        "items": {
+          "keys": {
+            "activity_count": {
+              "type": "integer"
+            },
+            "hr_range": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "pct_of_training": {
+              "type": "number"
+            },
+            "total_minutes": {
+              "type": "number"
+            },
+            "zone": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 5,
+        "type": "array"
       }
     },
     "type": "object"

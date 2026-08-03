@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/fulfillment_index",
   "is_prefix_sample": false,
   "path": "/api/fulfillment_index",
@@ -25,7 +25,7 @@
       "channels_adopted": {
         "keys": {
           "connection_tap": {
-            "type": "null"
+            "type": "string"
           },
           "interactions": {
             "type": "null"
@@ -46,10 +46,10 @@
         "type": "string"
       },
       "mean_30d": {
-        "type": "null"
+        "type": "number"
       },
       "mean_7d": {
-        "type": "null"
+        "type": "number"
       },
       "n_scored_30d": {
         "type": "integer"
@@ -59,13 +59,59 @@
       },
       "today": {
         "keys": {
+          "channels": {
+            "keys": {
+              "connection_tap": {
+                "keys": {
+                  "adopted": {
+                    "type": "boolean"
+                  },
+                  "score": {
+                    "type": "number"
+                  },
+                  "weight": {
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              },
+              "interactions": {
+                "keys": {
+                  "adopted": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              },
+              "journal_presence": {
+                "keys": {
+                  "adopted": {
+                    "type": "boolean"
+                  },
+                  "score": {
+                    "type": "number"
+                  },
+                  "weight": {
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              },
+              "values_todoist": {
+                "keys": {
+                  "adopted": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
           "coverage": {
             "type": "number"
           },
           "date": {
-            "type": "string"
-          },
-          "reason": {
             "type": "string"
           },
           "resolution": {
@@ -76,6 +122,9 @@
             },
             "type": "object"
           },
+          "score": {
+            "type": "number"
+          },
           "state": {
             "type": "string"
           }
@@ -83,31 +132,107 @@
         "type": "object"
       },
       "trend_7d": {
-        "items": {
-          "keys": {
-            "coverage": {
-              "type": "number"
-            },
-            "date": {
-              "type": "string"
-            },
-            "reason": {
-              "type": "string"
-            },
-            "resolution": {
-              "keys": {
-                "level": {
-                  "type": "string"
-                }
+        "items": [
+          {
+            "keys": {
+              "coverage": {
+                "type": "number"
               },
-              "type": "object"
+              "date": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "resolution": {
+                "keys": {
+                  "level": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "state": {
+                "type": "string"
+              }
             },
-            "state": {
-              "type": "string"
-            }
+            "type": "object"
           },
-          "type": "object"
-        },
+          {
+            "keys": {
+              "channels": {
+                "keys": {
+                  "connection_tap": {
+                    "keys": {
+                      "adopted": {
+                        "type": "boolean"
+                      },
+                      "score": {
+                        "type": "number"
+                      },
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "interactions": {
+                    "keys": {
+                      "adopted": {
+                        "type": "boolean"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "journal_presence": {
+                    "keys": {
+                      "adopted": {
+                        "type": "boolean"
+                      },
+                      "score": {
+                        "type": "number"
+                      },
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "values_todoist": {
+                    "keys": {
+                      "adopted": {
+                        "type": "boolean"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              },
+              "coverage": {
+                "type": "number"
+              },
+              "date": {
+                "type": "string"
+              },
+              "resolution": {
+                "keys": {
+                  "level": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "score": {
+                "type": "number"
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        ],
         "length_sample": 7,
         "type": "array"
       }

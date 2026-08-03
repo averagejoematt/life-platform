@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/character_stats",
   "is_prefix_sample": false,
   "path": "/api/character_stats",
@@ -20,133 +20,16 @@
         "type": "object"
       },
       "character_stats": {
-        "keys": {
-          "as_of_date": {
-            "type": "string"
-          },
-          "level": {
-            "type": "integer"
-          },
-          "pre_experiment": {
-            "type": "boolean"
-          },
-          "tier": {
-            "type": "string"
-          },
-          "tier_emoji": {
-            "type": "string"
-          },
-          "xp_total": {
-            "type": "integer"
-          }
-        },
-        "type": "object"
+        "type": "null"
+      },
+      "computed": {
+        "type": "boolean"
       },
       "pillars": {
-        "keys": {
-          "consistency": {
-            "keys": {
-              "level": {
-                "type": "integer"
-              },
-              "raw_score": {
-                "type": "integer"
-              },
-              "tier": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          },
-          "metabolic": {
-            "keys": {
-              "level": {
-                "type": "integer"
-              },
-              "raw_score": {
-                "type": "integer"
-              },
-              "tier": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          },
-          "mind": {
-            "keys": {
-              "level": {
-                "type": "integer"
-              },
-              "raw_score": {
-                "type": "integer"
-              },
-              "tier": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          },
-          "movement": {
-            "keys": {
-              "level": {
-                "type": "integer"
-              },
-              "raw_score": {
-                "type": "integer"
-              },
-              "tier": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          },
-          "nutrition": {
-            "keys": {
-              "level": {
-                "type": "integer"
-              },
-              "raw_score": {
-                "type": "integer"
-              },
-              "tier": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          },
-          "relationships": {
-            "keys": {
-              "level": {
-                "type": "integer"
-              },
-              "raw_score": {
-                "type": "integer"
-              },
-              "tier": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          },
-          "sleep": {
-            "keys": {
-              "level": {
-                "type": "integer"
-              },
-              "raw_score": {
-                "type": "integer"
-              },
-              "tier": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          }
-        },
-        "type": "object"
+        "type": "null"
       },
-      "pre_start": {
-        "type": "boolean"
+      "reason": {
+        "type": "string"
       }
     },
     "type": "object"

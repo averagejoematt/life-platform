@@ -854,11 +854,11 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capt
                     pass
             _kept.append((s, u))
         failed_responses = _kept
-        # Routes merged on main but not yet deployed to site-api (owner-gated fleet
-        # deploy) — a 404 here is the known merged-but-dark window, not a broken page
-        # (the callers are fail-soft). Dated; EMPTY this set at the post-deploy schema
-        # capture — a lingering entry hides a genuinely dead route.
-        pending_deploy_apis = {"/api/content_cadence"}  # 2026-08-02, #1972
+        # Routes merged on main but not yet deployed to site-api — a 404 there is the
+        # known merged-but-dark window, not a broken page (the callers are fail-soft).
+        # Dated entries only; EMPTY this set at each post-deploy schema capture — a
+        # lingering entry hides a genuinely dead route.
+        pending_deploy_apis: set = set()  # emptied 2026-08-03 post-deploy (#2050 re-arm)
         _pending = [(s, u) for s, u in failed_responses if s == 404 and any(p in u for p in pending_deploy_apis)]
         for s, u in _pending:
             warnings.append(f"pending-deploy API 404 (known, #1972): {u.replace(SITE_URL, '')[:90]}")

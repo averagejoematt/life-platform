@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/circadian",
   "is_prefix_sample": false,
   "path": "/api/circadian",
@@ -21,6 +21,100 @@
       },
       "available": {
         "type": "boolean"
+      },
+      "category": {
+        "type": "string"
+      },
+      "components": {
+        "keys": {
+          "meal_timing": {
+            "keys": {
+              "max": {
+                "type": "number"
+              },
+              "measured": {
+                "type": "boolean"
+              },
+              "note": {
+                "type": "string"
+              },
+              "score": {
+                "type": "null"
+              }
+            },
+            "type": "object"
+          },
+          "morning_light": {
+            "keys": {
+              "max": {
+                "type": "number"
+              },
+              "measured": {
+                "type": "boolean"
+              },
+              "note": {
+                "type": "string"
+              },
+              "score": {
+                "type": "null"
+              }
+            },
+            "type": "object"
+          },
+          "screen_wind_down": {
+            "keys": {
+              "max": {
+                "type": "number"
+              },
+              "measured": {
+                "type": "boolean"
+              },
+              "note": {
+                "type": "string"
+              },
+              "score": {
+                "type": "null"
+              }
+            },
+            "type": "object"
+          },
+          "sleep_consistency": {
+            "keys": {
+              "max": {
+                "type": "number"
+              },
+              "measured": {
+                "type": "boolean"
+              },
+              "note": {
+                "type": "string"
+              },
+              "score": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "date": {
+        "type": "string"
+      },
+      "frame": {
+        "type": "string"
+      },
+      "measured_count": {
+        "type": "number"
+      },
+      "prescription": {
+        "type": "string"
+      },
+      "score": {
+        "type": "number"
+      },
+      "weakest_component": {
+        "type": "string"
       }
     },
     "type": "object"

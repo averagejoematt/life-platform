@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/journey_waveform",
   "is_prefix_sample": false,
   "path": "/api/journey_waveform",
@@ -23,28 +23,44 @@
         "type": "integer"
       },
       "days": {
-        "items": {
-          "keys": {
-            "color": {
-              "type": "string"
+        "items": [
+          {
+            "keys": {
+              "color": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string"
+              },
+              "score": {
+                "type": "number"
+              }
             },
-            "date": {
-              "type": "string"
-            },
-            "score": {
-              "type": "null"
-            }
+            "type": "object"
           },
-          "type": "object"
-        },
-        "length_sample": 1,
+          {
+            "keys": {
+              "color": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string"
+              },
+              "score": {
+                "type": "null"
+              }
+            },
+            "type": "object"
+          }
+        ],
+        "length_sample": 8,
         "type": "array"
       },
       "genesis": {
         "type": "string"
       },
       "max_score": {
-        "type": "integer"
+        "type": "number"
       },
       "pre_start": {
         "type": "boolean"

@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-22T00:00:00+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/broadcast",
   "is_prefix_sample": false,
   "path": "/api/broadcast",
@@ -23,36 +23,8 @@
         "type": "string"
       },
       "items": {
-        "items": {
-          "keys": {
-            "caption": {
-              "type": "string"
-            },
-            "channel": {
-              "type": "string"
-            },
-            "date": {
-              "type": "string"
-            },
-            "excerpt": {
-              "type": "string"
-            },
-            "id": {
-              "type": "string"
-            },
-            "link_out": {
-              "type": "string"
-            },
-            "permalink": {
-              "type": "string"
-            },
-            "thumbnail_url": {
-              "type": "string"
-            }
-          },
-          "type": "object"
-        },
-        "length_sample": 1,
+        "items": null,
+        "length_sample": 0,
         "type": "array"
       },
       "total": {

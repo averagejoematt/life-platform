@@ -1,8 +1,8 @@
 {
   "captured_at": "2026-08-03T16:18:34.590027+00:00",
-  "fetch_path": "/api/habit_streaks",
+  "fetch_path": "/api/content_cadence",
   "is_prefix_sample": false,
-  "path": "/api/habit_streaks",
+  "path": "/api/content_cadence",
   "shape": {
     "keys": {
       "_meta": {
@@ -19,22 +19,30 @@
         },
         "type": "object"
       },
-      "habit_streaks": {
+      "chronicle": {
         "keys": {
-          "aggregate_streak": {
-            "type": "integer"
-          },
-          "as_of_date": {
+          "display": {
             "type": "string"
           },
-          "tier0_done": {
-            "type": "integer"
+          "next_date": {
+            "type": "string"
           },
-          "tier0_pct": {
-            "type": "integer"
+          "paused": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "podcast": {
+        "keys": {
+          "display": {
+            "type": "string"
           },
-          "tier0_total": {
-            "type": "integer"
+          "next_date": {
+            "type": "string"
+          },
+          "paused": {
+            "type": "boolean"
           }
         },
         "type": "object"

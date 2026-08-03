@@ -1,56 +1,422 @@
 {
-  "captured_at": "2026-07-25T00:00:00+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/wall",
   "is_prefix_sample": false,
   "path": "/api/wall",
-  "status": 200,
   "shape": {
-    "type": "object",
     "keys": {
       "_meta": {
-        "type": "object",
         "keys": {
-          "cache_seconds": { "type": "integer" },
-          "generated_at": { "type": "string" },
-          "request_id": { "type": "string" }
-        }
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
       },
       "wall": {
-        "type": "object",
         "keys": {
-          "attempt_count": { "type": "integer" },
-          "living_cycle": { "type": "integer" },
-          "note": { "type": "string" },
+          "attempt_count": {
+            "type": "integer"
+          },
           "attempts": {
-            "type": "array",
-            "length_sample": 1,
-            "items": {
-              "type": "object",
-              "keys": {
-                "cycle": { "type": "integer" },
-                "genesis": { "type": "string" },
-                "ended": { "type": "string" },
-                "day_count": { "type": "integer" },
-                "alive": { "type": "boolean" },
-                "days": {
-                  "type": "array",
-                  "length_sample": 1,
-                  "items": {
-                    "type": "object",
-                    "keys": {
-                      "date": { "type": "string" },
-                      "day_number": { "type": "integer" },
-                      "svg": { "type": "string" },
-                      "warming_up": { "type": "boolean" },
-                      "earned": { "type": "number" }
-                    }
+            "items": [
+              {
+                "keys": {
+                  "alive": {
+                    "type": "boolean"
+                  },
+                  "cycle": {
+                    "type": "integer"
+                  },
+                  "day_count": {
+                    "type": "integer"
+                  },
+                  "days": {
+                    "items": {
+                      "keys": {
+                        "date": {
+                          "type": "string"
+                        },
+                        "day_number": {
+                          "type": "integer"
+                        },
+                        "earned": {
+                          "type": "number"
+                        },
+                        "svg": {
+                          "type": "string"
+                        },
+                        "warming_up": {
+                          "type": "boolean"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "length_sample": 61,
+                    "type": "array"
+                  },
+                  "ended": {
+                    "type": "string"
+                  },
+                  "genesis": {
+                    "type": "string"
+                  },
+                  "staged": {
+                    "type": "boolean"
                   }
-                }
+                },
+                "type": "object"
+              },
+              {
+                "keys": {
+                  "alive": {
+                    "type": "boolean"
+                  },
+                  "cycle": {
+                    "type": "integer"
+                  },
+                  "day_count": {
+                    "type": "integer"
+                  },
+                  "days": {
+                    "items": {
+                      "keys": {
+                        "date": {
+                          "type": "string"
+                        },
+                        "day_number": {
+                          "type": "integer"
+                        },
+                        "earned": {
+                          "type": "number"
+                        },
+                        "svg": {
+                          "type": "string"
+                        },
+                        "warming_up": {
+                          "type": "boolean"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "length_sample": 7,
+                    "type": "array"
+                  },
+                  "ended": {
+                    "type": "string"
+                  },
+                  "genesis": {
+                    "type": "string"
+                  },
+                  "staged": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "keys": {
+                  "alive": {
+                    "type": "boolean"
+                  },
+                  "cycle": {
+                    "type": "integer"
+                  },
+                  "day_count": {
+                    "type": "integer"
+                  },
+                  "days": {
+                    "items": {
+                      "keys": {
+                        "date": {
+                          "type": "string"
+                        },
+                        "day_number": {
+                          "type": "integer"
+                        },
+                        "earned": {
+                          "type": "number"
+                        },
+                        "svg": {
+                          "type": "string"
+                        },
+                        "warming_up": {
+                          "type": "boolean"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "length_sample": 6,
+                    "type": "array"
+                  },
+                  "ended": {
+                    "type": "string"
+                  },
+                  "genesis": {
+                    "type": "string"
+                  },
+                  "staged": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "keys": {
+                  "alive": {
+                    "type": "boolean"
+                  },
+                  "cycle": {
+                    "type": "integer"
+                  },
+                  "day_count": {
+                    "type": "integer"
+                  },
+                  "days": {
+                    "items": {
+                      "keys": {
+                        "date": {
+                          "type": "string"
+                        },
+                        "day_number": {
+                          "type": "integer"
+                        },
+                        "earned": {
+                          "type": "number"
+                        },
+                        "svg": {
+                          "type": "string"
+                        },
+                        "warming_up": {
+                          "type": "boolean"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "length_sample": 28,
+                    "type": "array"
+                  },
+                  "ended": {
+                    "type": "string"
+                  },
+                  "genesis": {
+                    "type": "string"
+                  },
+                  "staged": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "keys": {
+                  "alive": {
+                    "type": "boolean"
+                  },
+                  "cycle": {
+                    "type": "integer"
+                  },
+                  "day_count": {
+                    "type": "integer"
+                  },
+                  "days": {
+                    "items": {
+                      "keys": {
+                        "date": {
+                          "type": "string"
+                        },
+                        "day_number": {
+                          "type": "integer"
+                        },
+                        "earned": {
+                          "type": "number"
+                        },
+                        "svg": {
+                          "type": "string"
+                        },
+                        "warming_up": {
+                          "type": "boolean"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "length_sample": 1,
+                    "type": "array"
+                  },
+                  "ended": {
+                    "type": "string"
+                  },
+                  "genesis": {
+                    "type": "string"
+                  },
+                  "staged": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "keys": {
+                  "alive": {
+                    "type": "boolean"
+                  },
+                  "cycle": {
+                    "type": "integer"
+                  },
+                  "day_count": {
+                    "type": "integer"
+                  },
+                  "days": {
+                    "items": {
+                      "keys": {
+                        "date": {
+                          "type": "string"
+                        },
+                        "day_number": {
+                          "type": "integer"
+                        },
+                        "earned": {
+                          "type": "number"
+                        },
+                        "svg": {
+                          "type": "string"
+                        },
+                        "warming_up": {
+                          "type": "boolean"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "length_sample": 5,
+                    "type": "array"
+                  },
+                  "ended": {
+                    "type": "string"
+                  },
+                  "genesis": {
+                    "type": "string"
+                  },
+                  "staged": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "keys": {
+                  "alive": {
+                    "type": "boolean"
+                  },
+                  "cycle": {
+                    "type": "integer"
+                  },
+                  "day_count": {
+                    "type": "integer"
+                  },
+                  "days": {
+                    "items": {
+                      "keys": {
+                        "date": {
+                          "type": "string"
+                        },
+                        "day_number": {
+                          "type": "integer"
+                        },
+                        "earned": {
+                          "type": "number"
+                        },
+                        "svg": {
+                          "type": "string"
+                        },
+                        "warming_up": {
+                          "type": "boolean"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "length_sample": 2,
+                    "type": "array"
+                  },
+                  "ended": {
+                    "type": "string"
+                  },
+                  "genesis": {
+                    "type": "string"
+                  },
+                  "staged": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "keys": {
+                  "alive": {
+                    "type": "boolean"
+                  },
+                  "cycle": {
+                    "type": "integer"
+                  },
+                  "day_count": {
+                    "type": "integer"
+                  },
+                  "days": {
+                    "items": {
+                      "keys": {
+                        "date": {
+                          "type": "string"
+                        },
+                        "day_number": {
+                          "type": "integer"
+                        },
+                        "earned": {
+                          "type": "number"
+                        },
+                        "svg": {
+                          "type": "string"
+                        },
+                        "warming_up": {
+                          "type": "boolean"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "length_sample": 8,
+                    "type": "array"
+                  },
+                  "ended": {
+                    "type": "null"
+                  },
+                  "genesis": {
+                    "type": "string"
+                  },
+                  "staged": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
               }
-            }
+            ],
+            "length_sample": 11,
+            "type": "array"
+          },
+          "living_cycle": {
+            "type": "integer"
+          },
+          "note": {
+            "type": "string"
           }
-        }
+        },
+        "type": "object"
       }
-    }
-  }
+    },
+    "type": "object"
+  },
+  "status": 200
 }

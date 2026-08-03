@@ -1,13 +1,11 @@
 {
-  "captured_at": "2026-07-25T00:00:00+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/diary_reactions",
   "is_prefix_sample": false,
   "path": "/api/diary_reactions",
   "shape": {
-    "type": "object",
     "keys": {
       "_meta": {
-        "type": "object",
         "keys": {
           "cache_seconds": {
             "type": "integer"
@@ -18,50 +16,19 @@
           "request_id": {
             "type": "string"
           }
-        }
+        },
+        "type": "object"
       },
       "count": {
         "type": "integer"
       },
       "reactions": {
-        "type": "array",
-        "items": {
-          "type": "object",
-          "keys": {
-            "date": {
-              "type": "string"
-            },
-            "channel": {
-              "type": "string"
-            },
-            "coach_id": {
-              "type": "string"
-            },
-            "coach_name": {
-              "type": "string"
-            },
-            "tone": {
-              "type": "string"
-            },
-            "theme": {
-              "type": "string"
-            },
-            "tier": {
-              "type": "string"
-            },
-            "reaction": {
-              "type": "string"
-            },
-            "quote": {
-              "type": "string"
-            },
-            "generated_at": {
-              "type": "string"
-            }
-          }
-        },
-        "length_sample": 1
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
       }
-    }
-  }
+    },
+    "type": "object"
+  },
+  "status": 200
 }

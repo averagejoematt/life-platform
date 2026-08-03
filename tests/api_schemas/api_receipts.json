@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-21T19:01:46.943633+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/receipts",
   "is_prefix_sample": false,
   "path": "/api/receipts",
@@ -46,7 +46,7 @@
           },
           "type": "object"
         },
-        "length_sample": 21,
+        "length_sample": 3,
         "type": "array"
       },
       "month_end_date": {

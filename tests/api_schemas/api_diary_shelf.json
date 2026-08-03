@@ -1,8 +1,8 @@
 {
   "captured_at": "2026-08-03T16:18:34.590027+00:00",
-  "fetch_path": "/api/habit_streaks",
+  "fetch_path": "/api/diary_shelf",
   "is_prefix_sample": false,
-  "path": "/api/habit_streaks",
+  "path": "/api/diary_shelf",
   "shape": {
     "keys": {
       "_meta": {
@@ -19,21 +19,23 @@
         },
         "type": "object"
       },
-      "habit_streaks": {
+      "shelf": {
         "keys": {
-          "aggregate_streak": {
+          "count": {
             "type": "integer"
           },
-          "as_of_date": {
+          "entries": {
+            "items": null,
+            "length_sample": 0,
+            "type": "array"
+          },
+          "label": {
             "type": "string"
           },
-          "tier0_done": {
-            "type": "integer"
+          "note": {
+            "type": "string"
           },
-          "tier0_pct": {
-            "type": "integer"
-          },
-          "tier0_total": {
+          "withheld": {
             "type": "integer"
           }
         },

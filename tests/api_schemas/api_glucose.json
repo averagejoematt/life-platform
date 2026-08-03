@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/glucose",
   "is_prefix_sample": false,
   "path": "/api/glucose",
@@ -20,11 +20,92 @@
         "type": "object"
       },
       "glucose": {
-        "type": "null"
+        "keys": {
+          "30d_avg_mg_dl": {
+            "type": "null"
+          },
+          "30d_avg_optimal": {
+            "type": "null"
+          },
+          "30d_avg_std": {
+            "type": "null"
+          },
+          "30d_avg_tir": {
+            "type": "null"
+          },
+          "as_of_date": {
+            "type": "string"
+          },
+          "avg_mg_dl": {
+            "type": "number"
+          },
+          "avg_mg_dl_window": {
+            "type": "number"
+          },
+          "avg_optimal_window": {
+            "type": "number"
+          },
+          "avg_std_window": {
+            "type": "number"
+          },
+          "avg_tir_window": {
+            "type": "number"
+          },
+          "avg_window_days": {
+            "type": "integer"
+          },
+          "best_day": {
+            "type": "null"
+          },
+          "cgm_source": {
+            "type": "string"
+          },
+          "days_tracked": {
+            "type": "integer"
+          },
+          "std_dev": {
+            "type": "number"
+          },
+          "time_above_140_pct": {
+            "type": "null"
+          },
+          "time_in_optimal_pct": {
+            "type": "number"
+          },
+          "time_in_range_pct": {
+            "type": "number"
+          },
+          "tir_status": {
+            "type": "string"
+          },
+          "variability_status": {
+            "type": "string"
+          },
+          "worst_day": {
+            "type": "null"
+          }
+        },
+        "type": "object"
       },
       "glucose_trend": {
-        "items": null,
-        "length_sample": 0,
+        "items": {
+          "keys": {
+            "avg": {
+              "type": "number"
+            },
+            "date": {
+              "type": "string"
+            },
+            "std": {
+              "type": "number"
+            },
+            "tir": {
+              "type": "number"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 1,
         "type": "array"
       }
     },

@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/coach_team",
   "is_prefix_sample": false,
   "path": "/api/coach_team",
@@ -32,7 +32,45 @@
         "type": "string"
       },
       "dispute": {
-        "type": "null"
+        "keys": {
+          "coach_a": {
+            "type": "string"
+          },
+          "coach_b": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "topic": {
+            "type": "string"
+          },
+          "turns": {
+            "items": {
+              "keys": {
+                "kind": {
+                  "type": "string"
+                },
+                "line": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "speaker": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 3,
+            "type": "array"
+          },
+          "week": {
+            "type": "string"
+          }
+        },
+        "type": "object"
       },
       "huddle": {
         "items": [
@@ -102,6 +140,61 @@
                     "type": "string"
                   },
                   "lifetime_brier": {
+                    "type": "number"
+                  },
+                  "lifetime_scored_n": {
+                    "type": "integer"
+                  },
+                  "scored_n": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "emoji": {
+                "type": "string"
+              },
+              "graduation_gate": {
+                "type": "string"
+              },
+              "headline": {
+                "type": "string"
+              },
+              "held_since": {
+                "type": "null"
+              },
+              "name": {
+                "type": "string"
+              },
+              "persona_id": {
+                "type": "string"
+              },
+              "read_of_him": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              },
+              "stage_id": {
+                "type": "string"
+              },
+              "watch": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "calibration": {
+                "keys": {
+                  "brier": {
+                    "type": "null"
+                  },
+                  "calibration": {
+                    "type": "string"
+                  },
+                  "lifetime_brier": {
                     "type": "null"
                   },
                   "lifetime_scored_n": {
@@ -124,6 +217,61 @@
               },
               "held_since": {
                 "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "persona_id": {
+                "type": "string"
+              },
+              "read_of_him": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              },
+              "stage_id": {
+                "type": "string"
+              },
+              "watch": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "calibration": {
+                "keys": {
+                  "brier": {
+                    "type": "null"
+                  },
+                  "calibration": {
+                    "type": "string"
+                  },
+                  "lifetime_brier": {
+                    "type": "null"
+                  },
+                  "lifetime_scored_n": {
+                    "type": "integer"
+                  },
+                  "scored_n": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "emoji": {
+                "type": "string"
+              },
+              "graduation_gate": {
+                "type": "string"
+              },
+              "headline": {
+                "type": "string"
+              },
+              "held_since": {
+                "type": "null"
               },
               "name": {
                 "type": "string"
@@ -198,8 +346,31 @@
         "type": "array"
       },
       "tensions": {
-        "items": null,
-        "length_sample": 0,
+        "items": {
+          "keys": {
+            "coaches": {
+              "items": {
+                "type": "string"
+              },
+              "length_sample": 2,
+              "type": "array"
+            },
+            "position_a": {
+              "type": "string"
+            },
+            "position_b": {
+              "type": "string"
+            },
+            "resolution": {
+              "type": "string"
+            },
+            "topic": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 2,
         "type": "array"
       }
     },

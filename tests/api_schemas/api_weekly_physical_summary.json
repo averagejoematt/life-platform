@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/weekly_physical_summary",
   "is_prefix_sample": false,
   "path": "/api/weekly_physical_summary",
@@ -24,8 +24,18 @@
           {
             "keys": {
               "activities": {
-                "items": null,
-                "length_sample": 0,
+                "items": {
+                  "keys": {
+                    "minutes": {
+                      "type": "integer"
+                    },
+                    "type": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 1,
                 "type": "array"
               },
               "date": {
@@ -35,7 +45,7 @@
                 "type": "string"
               },
               "steps": {
-                "type": "null"
+                "type": "integer"
               },
               "total_active_minutes": {
                 "type": "integer"
