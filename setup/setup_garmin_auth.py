@@ -13,6 +13,8 @@ import sys
 import time
 import boto3
 
+from oauth_reauth_common import clear_breaker_after_reauth
+
 SECRET_NAME = "life-platform/garmin"
 REGION = "us-west-2"
 
@@ -150,6 +152,11 @@ def main():
             SecretString=json.dumps(secret),
         )
         print(f"\nSecret created: {SECRET_NAME}")
+
+    # #2085: garth.login() above already exited the process (sys.exit) on
+    # failure, so reaching here means the fresh credential is proven good —
+    # clear the auth-breaker latch so the next scheduled run proceeds.
+    clear_breaker_after_reauth("garmin")
 
     print()
     print("=" * 60)

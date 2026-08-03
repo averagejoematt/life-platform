@@ -24,6 +24,8 @@ import urllib.parse
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
+from oauth_reauth_common import clear_breaker_after_reauth
+
 SECRET_NAME = "life-platform/withings"
 REGION = "us-west-2"
 REDIRECT_URI = "http://localhost:3000/callback"
@@ -177,6 +179,12 @@ def main():
     print("\n[5/5] Saving tokens to Secrets Manager...")
     save_tokens(secret, token_body)
     print("  Saved!")
+
+    # #2085: exchange_code() above raises RuntimeError on a non-zero Withings
+    # `status` (see post_form/exchange_code) instead of returning, so reaching
+    # this line means the token exchange — the verification — succeeded.
+    # Clear the auth-breaker latch so the next scheduled run proceeds.
+    clear_breaker_after_reauth("withings")
 
     # Step 7: Test Lambda
     print("\n" + "=" * 60)
