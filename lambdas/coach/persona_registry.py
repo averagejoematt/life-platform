@@ -42,6 +42,14 @@ OPERATIONAL_SHORT_IDS = [c.replace("_coach", "") for c in OPERATIONAL_COACH_IDS]
 # tests/test_persona_registry.py).
 LEAD_PERSONA_ID = "eli_marsh"
 
+# Last-resort byline when the registry cannot be read at all (S3 down AND the
+# bundled config missing). A byline must never render empty or as a persona id —
+# #1986: the board-lead byline is the one field a reader uses to decide who runs
+# the board, so the fallback is pinned to the lead persona and asserted equal to
+# config/personas.json by tests/test_board_lead_single_character.py.
+LEAD_FALLBACK_NAME = "Dr. Eli Marsh"
+LEAD_FALLBACK_TITLE = "Principal Investigator — Program Lead"
+
 _S3_KEY = "config/personas.json"
 _cache = {"data": None, "ts": 0}
 _TTL_S = 300  # 5 minutes — matches board_loader
@@ -108,6 +116,32 @@ def operational_personas(s3_client=None, bucket=None):
 def board_personas(s3_client=None, bucket=None):
     """Non-operational personas (the broader Board — lives on /method/board/)."""
     return {k: v for k, v in personas(s3_client, bucket).items() if not v.get("operational")}
+
+
+def lead_persona(s3_client=None, bucket=None):
+    """The single ``lead: true`` persona — the head coach who runs the board.
+
+    #1986: two characters used to occupy this role (the integrator byline said
+    Dr. Kai Nakamura, the roster said Dr. Eli Marsh). There is now ONE, and it is
+    resolved here — every byline, prompt and noscript derives from this function
+    rather than restating a name, so the cast can never fork again.
+    """
+    return resolve(LEAD_PERSONA_ID, s3_client, bucket) or {}
+
+
+def lead_name(s3_client=None, bucket=None):
+    """Display name of the board lead (never empty — see LEAD_FALLBACK_NAME)."""
+    return lead_persona(s3_client, bucket).get("name") or LEAD_FALLBACK_NAME
+
+
+def lead_title(s3_client=None, bucket=None):
+    """Role title of the board lead, as it appears under the byline."""
+    return lead_persona(s3_client, bucket).get("board_role") or LEAD_FALLBACK_TITLE
+
+
+def lead_byline(s3_client=None, bucket=None):
+    """``(name, title)`` for the board lead — the one byline pair the API serves."""
+    return lead_name(s3_client, bucket), lead_title(s3_client, bucket)
 
 
 def _find(field, value, s3_client=None, bucket=None):

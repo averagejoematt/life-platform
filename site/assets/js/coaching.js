@@ -54,6 +54,11 @@ const SECTIONS = [
 const BYKEY = Object.fromEntries(SECTIONS.map((s) => [s.key, s]));
 // Coaches whose 7-day domain data is available via /api/observatory_week.
 const OBS_DOMAINS = new Set(["sleep", "training", "nutrition", "mind", "physical", "glucose"]);
+// #1986 — ONE character runs the board. Every byline on this page is served by the
+// API from config/personas.json's single `lead: true` persona; this constant is only
+// the render-time fallback for a payload that predates the byline field, and
+// tests/test_board_lead_single_character.py pins it equal to the registry's lead.
+const LEAD_BYLINE_FALLBACK = "Dr. Eli Marsh";
 const READ_SCOPES = [
   { id: "today", title: "Today", date: "the board's read right now" },
   { id: "week", title: "This week", date: "the week in each domain" },
@@ -529,7 +534,7 @@ async function renderReadWeek(read) {
   const [wp, som] = await Promise.all([tryJSON("/api/weekly_priority"), tryJSON("/api/state_of_matthew")]);
   let h = `<p class="dx-kicker label">the week · what each domain showed</p><h2 class="dx-title">This week</h2>`;
   if (wp && wp.weekly_priority) {
-    h += `<section class="read-priority"><p class="dx-kicker label">the week's call · ${esc(wp.coach_name || "the integrator")}</p><blockquote class="rp-text">${esc(wp.weekly_priority)}</blockquote></section>`;
+    h += `<section class="read-priority"><p class="dx-kicker label">the week's call · ${esc(wp.coach_name || LEAD_BYLINE_FALLBACK)}</p><blockquote class="rp-text">${esc(wp.weekly_priority)}</blockquote></section>`;
   }
   const notes = (wp && wp.cross_domain_notes) || {};
   const keys = Object.keys(notes);
@@ -567,7 +572,7 @@ async function renderReadMonth(read) {
   const mr = await tryJSON("/api/month_rollup");
   let h = `<p class="dx-kicker label">the month · the pattern across the weeks</p><h2 class="dx-title">This month</h2>`;
   if (mr && mr.narrative) {
-    h += `<section class="read-priority"><p class="dx-kicker label">the month's read · ${esc(mr.coach_name || "the integrator")}` +
+    h += `<section class="read-priority"><p class="dx-kicker label">the month's read · ${esc(mr.coach_name || LEAD_BYLINE_FALLBACK)}` +
       `${mr.window_label ? ` · ${esc(mr.window_label)}` : ""}</p>`;
     if (mr.headline) h += `<p class="exp-throughline">${esc(mr.headline)}</p>`;
     for (const para of String(mr.narrative).split(/\n\n+/).filter(Boolean)) h += `<p class="dx-prose">${esc(para)}</p>`;
@@ -588,12 +593,16 @@ async function renderReadExperiment(read) {
   const entries = (fn && fn.entries) || [];
   let h = `<p class="dx-kicker label">the experiment · the board's read, week by week</p><h2 class="dx-title">The experiment to date</h2>`;
   h += `<p class="dx-prose">How the board has read you across the whole run. Each week's lab note is the AI's read against how the week actually felt; the tone is how the board landed that week.</p>`;
-  // The board's cross-week synthesis (C-1) — Nakamura's read of the whole trajectory,
+  // The board's cross-week synthesis (C-1) — the lead's read of the whole trajectory,
   // written once >=2 weeks of lab notes exist. Sits above the week-by-week list.
+  // #1986: the byline comes from the API (persona registry's single lead), never from
+  // a name typed here — a second copy of the name is how the cast forked in the first
+  // place. LEAD_BYLINE_FALLBACK only covers a response served before the API ships.
   if (syn && syn.arc) {
     const chapMap = {};
     for (const c of syn.chapters || []) if (c && c.week_label) chapMap[c.week_label] = c.headline || "";
-    h += `<section class="exp-synth"><p class="exp-synth-k label">Dr. Kai Nakamura · the arc${syn.week_count ? ` · ${esc(syn.week_count)} weeks` : ""}</p>`;
+    const who = esc(syn.coach_name || LEAD_BYLINE_FALLBACK);
+    h += `<section class="exp-synth"><p class="exp-synth-k label">${who} · the arc${syn.week_count ? ` · ${esc(syn.week_count)} weeks` : ""}</p>`;
     if (syn.throughline) h += `<p class="exp-throughline">${esc(syn.throughline)}</p>`;
     for (const para of String(syn.arc).split(/\n\n+/).filter(Boolean)) h += `<p class="dx-prose">${esc(para)}</p>`;
     h += `</section>`;

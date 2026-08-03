@@ -111,6 +111,28 @@ def _registry():
     return persona_registry.load_registry(_S3, _S3_BUCKET)
 
 
+# Last-resort byline if the registry module itself failed to import. Pinned equal
+# to config/personas.json's lead by tests/test_board_lead_single_character.py.
+_LEAD_FALLBACK = ("Dr. Eli Marsh", "Principal Investigator — Program Lead")
+
+
+def _lead_byline():
+    """(name, title) of the board lead, from the persona registry (#1986).
+
+    The weekly call, the month rollup and the arc are all signed by ONE character —
+    the registry's single ``lead: true`` persona. These bylines used to be three
+    separate string literals naming a persona the roster did not serve, which is
+    how the cast forked. Fail-soft to the registry's pinned fallback so a byline
+    never renders empty.
+    """
+    try:
+        return persona_registry.lead_byline(_S3, _S3_BUCKET)
+    except Exception as _e:  # noqa: BLE001 — a byline lookup must never 500 an endpoint
+        # Also covers persona_registry being None (the defensive import above).
+        logger.warning(f"[lead_byline] {_e}")
+        return _LEAD_FALLBACK
+
+
 def _current_cycle():
     """Current experiment cycle (int) or None (#1376). Fail-soft SSM read via
     coach_checkin.read_cycle (cached once per warm container, same fail-soft
@@ -792,15 +814,26 @@ def _team_tensions():
                 continue
             coaches = d.get("coaches_involved") or d.get("coaches") or []
             # WQA-06: the integrator digest stores the argument as position_a/position_b
-            # + nakamura_call (the integrator's adjudication). Earlier code read the wrong
-            # field names, so the head-to-head came back empty. Read the real names first.
+            # + the lead's adjudication. Earlier code read the wrong field names, so the
+            # head-to-head came back empty. Read the real names first.
+            # #1986: the adjudication key is now `lead_call` (it used to be named after
+            # the character who signed it). Rows written before this ship still carry
+            # `nakamura_call`, so both are read — persisted history stays legible without
+            # a backfill, and the byline above it resolves from the registry either way.
             out.append(
                 {
                     "topic": d.get("topic") or d.get("domain") or "",
                     "coaches": coaches,
                     "position_a": d.get("position_a") or d.get("coach_a_position"),
                     "position_b": d.get("position_b") or d.get("coach_b_position"),
-                    "resolution": (d.get("nakamura_call") or d.get("resolution_suggested") or d.get("tension") or d.get("summary") or ""),
+                    "resolution": (
+                        d.get("lead_call")
+                        or d.get("nakamura_call")
+                        or d.get("resolution_suggested")
+                        or d.get("tension")
+                        or d.get("summary")
+                        or ""
+                    ),
                 }
             )
         return out
@@ -1503,6 +1536,10 @@ def handle_experiment_synthesis():
     if not singleton_visible(item):  # #946: honest-null while tombstoned from a reset
         return _ok({"arc": None, "throughline": None, "chapters": [], "week_count": 0, "generated_at": None}, cache_seconds=300)
     item = _decimal_to_float(item)
+    # #1986: the arc is signed by the same board lead as the weekly call and the
+    # month rollup. Served here so the front-end renders the registry's lead
+    # instead of carrying its own copy of a name.
+    _lead_name, _lead_title = _lead_byline()
     return _ok(
         {
             "arc": item.get("arc"),
@@ -1510,6 +1547,8 @@ def handle_experiment_synthesis():
             "chapters": item.get("chapters", []),
             "week_count": int(item.get("week_count") or 0),
             "generated_at": item.get("generated_at"),
+            "coach_name": _lead_name,
+            "coach_title": _lead_title,
         },
         cache_seconds=300,
     )
@@ -2539,14 +2578,15 @@ def handle_weekly_priority(event):
         _int_item = _integrator_digest()  # #946: tombstone/phase-guarded
         if not _int_item:
             return _ok({"weekly_priority": None, "cross_domain_notes": {}, "pre_start": False}, cache_seconds=300)
+        _lead_name, _lead_title = _lead_byline()
         return _ok(
             {
                 "weekly_priority": _int_item.get("analysis", ""),
                 "cross_domain_notes": _int_item.get("cross_domain_notes", {}),
                 "generated_at": _int_item.get("generated_at", ""),
                 "week_number": _int_item.get("week_number"),
-                "coach_name": "Dr. Kai Nakamura",
-                "coach_title": "Integrative Health Director",
+                "coach_name": _lead_name,
+                "coach_title": _lead_title,
                 "pre_start": False,
             },
             cache_seconds=300,
@@ -2574,6 +2614,7 @@ def handle_month_rollup():
         if not singleton_visible(item):
             return _ok({"narrative": None, "pre_start": False}, cache_seconds=300)
         item = _decimal_to_float(item)
+        _lead_name, _lead_title = _lead_byline()
         rec_days = item.get("days_in_experiment")
         if rec_days is not None:
             try:
@@ -2591,8 +2632,8 @@ def handle_month_rollup():
                 "week_count": item.get("week_count"),
                 "window_label": item.get("window_label") or None,
                 "generated_at": item.get("generated_at", ""),
-                "coach_name": "Dr. Kai Nakamura",
-                "coach_title": "Integrative Health Director",
+                "coach_name": _lead_name,
+                "coach_title": _lead_title,
                 "pre_start": False,
             },
             cache_seconds=3600,

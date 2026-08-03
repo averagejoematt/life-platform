@@ -2,7 +2,7 @@
   "_comment": "#1971 — /api/coaching-dashboard under a tier >= 2 budget pause (regeneration_paused: true). Shape mirrors the inline handler in lambdas/web/site_api_lambda.py; values are realistic-but-static and in-range for the accuracy rubric. The paused flag is the point: the gate asserts the roster cards render the 'refresh paused (budget guard)' kicker (.rd-paused).",
   "weekly_priority": {
     "text": "Protect the sleep window this week — the deficit only compounds when the nights hold.",
-    "coach_name": "Dr. Kai Nakamura",
+    "coach_name": "Dr. Eli Marsh",
     "generated_at": "2026-07-28T17:05:00Z"
   },
   "open_actions": [],

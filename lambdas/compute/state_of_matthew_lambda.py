@@ -201,7 +201,16 @@ def gather_coach_consensus_section(integrator_item: dict | None) -> dict | None:
             {
                 "topic": d.get("topic") or d.get("domain") or "",
                 "coaches": d.get("coaches_involved") or d.get("coaches") or [],
-                "resolution": (d.get("nakamura_call") or d.get("resolution_suggested") or d.get("tension") or d.get("summary") or ""),
+                # #1986: `lead_call` is the current key; `nakamura_call` is what rows
+                # written before the board-lead reconciliation carry. Read both.
+                "resolution": (
+                    d.get("lead_call")
+                    or d.get("nakamura_call")
+                    or d.get("resolution_suggested")
+                    or d.get("tension")
+                    or d.get("summary")
+                    or ""
+                ),
             }
         )
     return {

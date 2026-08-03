@@ -65,6 +65,7 @@ from web.site_api_cadence import handle_content_cadence  # #1972 — cron-derive
 # P1.1 Phase B extension (2026-05-27): coach + misc inline blocks extracted.
 from web.site_api_coach import (
     _integrator_digest,
+    _lead_byline,  # #1986 — the ONE board-lead byline, resolved from the persona registry
     _regeneration_paused,
     handle_ai_analysis,
     handle_calibration,
@@ -849,7 +850,10 @@ def lambda_handler(event, context):
             }
 
             # 1. Weekly priority from integrator
-            _cd_priority = {"text": None, "coach_name": "Dr. Kai Nakamura", "generated_at": None}
+            # #1986: the dashboard's weekly-call byline is the registry's board lead —
+            # the same character the roster one tab away bills as lead.
+            _cd_lead_name, _cd_lead_title = _lead_byline()
+            _cd_priority = {"text": None, "coach_name": _cd_lead_name, "coach_title": _cd_lead_title, "generated_at": None}
             try:
                 _cd_int = _integrator_digest()  # #946: tombstone/phase-guarded
                 if _cd_int:
