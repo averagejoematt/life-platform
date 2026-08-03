@@ -191,3 +191,128 @@ def assess_hero_weight(journey):
             f"N-day trend off one reading (#1225)"
         )
     return True, f"stat row reconciles (now {now} − start {start} → {lost} delta) · {n} weigh-in(s), span {span}d"
+
+
+# ── #1985: a superseded weight on a FROZEN artifact must carry its reconciliation ──
+#
+# Distinct from assess_cross_surface_weight above. That check asks "do two live
+# surfaces agree?". This one asks a question no live-vs-live comparison can:
+# a frozen document is *allowed* to quote a superseded figure — that is what
+# "frozen" means, and editing it would be the defect — but it must carry an
+# editor's note reconciling the number with the one the experiment runs on.
+#
+# The live failure (#1985): Prologue Part III, whose own text reads "Nothing
+# here can be quietly revised later", asserted 317.61 lbs with no note, while
+# the cockpit served 321.09. Part I already carried the reconciliation pattern.
+# The asymmetry was the defect, not the number.
+#
+# Guarded as a SET, not an instance: nothing here hardcodes 317.61. Any
+# bodyweight figure on a frozen artifact that diverges from the current
+# baseline by more than the tolerance needs an annotation, so the NEXT
+# supersede is caught without anyone remembering to add a literal.
+_EDITORS_NOTE_MARKERS = ("editor's note", "editor’s note", "editors note")
+
+# A frozen artifact reconciles by NAMING the governing figure near its note, so
+# the presence of the baseline anywhere in the prose is what clears the check.
+SUPERSEDED_ANNOTATION_TOL_LBS = CROSS_SURFACE_WEIGHT_TOL_LBS
+
+
+def is_annotated(prose: str) -> bool:
+    """True when the artifact carries an editor's-note reconciliation."""
+    low = (prose or "").lower()
+    return any(m in low for m in _EDITORS_NOTE_MARKERS)
+
+
+def assess_frozen_artifact_weights(surfaces, baseline_lbs, tol: float = SUPERSEDED_ANNOTATION_TOL_LBS):
+    """Frozen story artifacts quoting a superseded START weight must be annotated.
+
+    Deliberately narrow, and the narrowness is the point. A plan document is FULL
+    of legitimate bodyweights that are not the start: the 185 lb target, the
+    275/250/225/200 waypoints, a goal-weight aside. An earlier draft of this check
+    flagged all of them — firing on correct writing is how a gate teaches people to
+    ignore it (the #1924 lesson, one class over). So a figure counts only when the
+    prose presents it AS the starting weight, within a short window of the number.
+
+    ``surfaces`` is the qa-smoke shape: ``[{"name", "path", "prose"}, ...]``.
+    Returns a list of finding dicts (empty == clean). Pure — no network, no clock,
+    no AWS — so the rule is unit-testable offline and the fetching stays in
+    qa_check_reader_truth, matching this module's existing split.
+    """
+    findings = []
+    for s in surfaces or []:
+        prose = s.get("prose") or ""
+        cited = sorted({w for w in _start_weights_cited_in(prose) if abs(w - float(baseline_lbs)) > tol})
+        if not cited or is_annotated(prose):
+            continue
+        findings.append(
+            {
+                "page": s.get("path") or s.get("name"),
+                "category": "superseded_weight_unannotated",
+                "detail": (
+                    f"{s.get('name')} presents {', '.join(f'{w} lbs' for w in cited)} as the starting weight, but the "
+                    f"experiment runs on {baseline_lbs} lbs, and the page carries no editor's note reconciling them. A "
+                    f"frozen artifact may keep its original figure — it must not present it un-reconciled (#1985)."
+                ),
+            }
+        )
+    return findings
+
+
+# A bodyweight counts for #1985 only when the prose presents it AS the start.
+# Everything else on a plan page — targets, waypoints, goal asides — is correct
+# writing and must not trip the gate.
+#
+# Proximity alone is NOT enough, and the live page proves it: the stats line reads
+# "317.61 lbs at the start · 185 lbs the target", so any window wide enough to bind
+# "at the start" to 317.61 also reaches 185. So the test is NEAREST MARKER WINS —
+# a figure is a start claim only when a start marker sits closer to it than any
+# target marker does. That is what distinguishes the two numbers in one line.
+#
+# NB "destination" is deliberately NOT a target marker: the live prose reads
+# "The destination. 317.61 pounds on the morning of Day 1. 185 pounds twelve
+# months later." — there it is a section heading for the whole journey, and
+# counting it suppressed the very finding this check exists for.
+_START_CLAIM = re.compile(
+    r"(start(?:ing)?\s+weight|at\s+the\s+start|on\s+the\s+morning\s+of\s+day\s*1|"
+    r"day\s*1\s+weight|began\s+at|started\s+at|weight\s+at\s+day\s*1)",
+    re.IGNORECASE,
+)
+_TARGET_CLAIM = re.compile(
+    r"(target|goal|months?\s+later|by\s+month|twelve\s+months)",
+    re.IGNORECASE,
+)
+_START_WINDOW_CHARS = 60
+
+
+def _nearest(pattern, prose: str, at: int, window: int):
+    """Distance from `at` to the closest match of `pattern` within `window`, or None."""
+    lo = max(0, at - window)
+    hi = min(len(prose), at + window)
+    best = None
+    for m in pattern.finditer(prose[lo:hi]):
+        d = abs((lo + m.start()) - at)
+        if best is None or d < best:
+            best = d
+    return best
+
+
+def _start_weights_cited_in(prose: str) -> list[float]:
+    """Bodyweights the prose presents as the STARTING weight (see the note above)."""
+    prose = prose or ""
+    out = []
+    for m in _WEIGHT_IN_PROSE.finditer(prose):
+        try:
+            val = float(m.group(1))
+        except ValueError:
+            continue
+        if val < _BODYWEIGHT_FLOOR_LBS:
+            continue
+        at = m.start()
+        d_start = _nearest(_START_CLAIM, prose, at, _START_WINDOW_CHARS)
+        if d_start is None:
+            continue
+        d_target = _nearest(_TARGET_CLAIM, prose, at, _START_WINDOW_CHARS)
+        if d_target is not None and d_target <= d_start:
+            continue  # reads as a target/waypoint, not a start claim
+        out.append(val)
+    return out
