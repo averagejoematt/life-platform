@@ -687,7 +687,19 @@ class MonitoringStack(Stack):
         # source is missing coverage or is routed to the wrong topic. (Loop var is
         # `_auth_src`, not `_src` — test_source_enumeration_drift.py regex-matches the
         # first `for _src in (...)` and must keep finding the consec-failures tuple.)
-        for _auth_src in ("todoist", "habitify", "dropbox"):
+        #
+        # `whoop` added #1934: it was already "covered" per test_oauth_alarm_coverage's
+        # weaker bar (an `ingest-consecutive-failures-whoop` alarm exists — ER-01,
+        # 2026-06-12) but that family needs 3 consecutive failing runs (~2-3h) AND
+        # conflates auth failures with transport/parse/throttle ones, so a latched
+        # breaker reads only as generic "failing", never as "auth". habitify — the
+        # platform's OTHER qa_required OAuth source — already gets the dedicated,
+        # single-datapoint, auth-specific signal below; whoop (the only fully-passive
+        # daily source, feeding recovery/HRV/RHR/sleep) did not, purely because it
+        # predates #1960. Verified against the actual 2026-08-01 outage: the
+        # consecutive-failures alarm DID fire (dispatched 08-01T14:01Z, ~2h after the
+        # breaker latched at 12:00:28Z) — so this is a fix-in-place, not a new report.
+        for _auth_src in ("todoist", "habitify", "dropbox", "whoop"):
             _alarm(
                 f"IngestAuthUnhealthy{_auth_src.title()}",
                 f"ingest-auth-unhealthy-{_auth_src}",

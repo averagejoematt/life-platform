@@ -743,6 +743,26 @@ def qa_required() -> list:
     return [(k, v["desc"]) for k, v in SOURCE_REGISTRY.items() if v.get("qa_tier") == "required" and not v.get("paused")]
 
 
+def qa_required_oauth_source_ids() -> set:
+    """#1934: the intersection that matters for auth-breaker paging — a source
+    that is BOTH credentialed (auth can die, routes through auth_breaker) AND
+    qa_required (a missing day is never "just behavior", it's a platform QA
+    failure). A latched breaker on one of these must raise a DEDICATED
+    `ingest-auth-unhealthy-{source}` signal, not just the weaker
+    `ingest-consecutive-failures-{source}` family — that family needs 3
+    consecutive failing runs (~2-3h delay) and conflates auth failures with
+    transport/parse/throttle ones, so an operator can't tell "credential dead,
+    rotate it" from "the upstream API had a rough hour" without opening logs.
+
+    whoop was exactly this gap: qa_required, the platform's only fully-passive
+    daily source, previously covered only by ingest-consecutive-failures-whoop
+    (ER-01, 2026-06-12) — habitify (the other qa_required OAuth source) already
+    had the dedicated alarm via #1960. Authority for
+    tests/test_oauth_alarm_coverage.py."""
+    required = {k for k, _ in qa_required()}
+    return set(oauth_source_ids()) & required
+
+
 def qa_optional() -> list:
     """[(key, label)] checked but warn-only (event-driven / manual sources).
     Replaces qa_smoke.OPTIONAL."""
