@@ -111,6 +111,18 @@ def uncovered_oauth_sources(oauth_ids, covered):
     return sorted(set(oauth_ids) - set(covered))
 
 
+def uncovered_required_sources(required_ids, dedicated_covered):
+    """qa_required OAuth sources with no DEDICATED `ingest-auth-unhealthy-*`
+    alarm (#1934) — the stronger bar. Being present in `covered` (any family) is
+    not enough for these: `ingest-consecutive-failures-*` needs a 3-run failing
+    streak and can't tell an auth death from a transport/parse/throttle blip, so
+    it is not a durable "the breaker latched" signal on its own.
+
+    Pure function over already-extracted data so the negative test can drive it
+    with a synthetic set — no AWS, no CDK synth."""
+    return sorted(set(required_ids) - set(dedicated_covered))
+
+
 def _covered_map():
     families = alarm_names_by_prefix()
     covered = {}
@@ -149,6 +161,36 @@ def test_uncovered_source_is_detected():
     covered = {"whoop": "urgent", "garmin": "digest"}
     assert uncovered_oauth_sources(["whoop", "garmin", "brand_new_oauth_source"], covered) == ["brand_new_oauth_source"]
     assert uncovered_oauth_sources(["whoop", "garmin"], covered) == []
+
+
+def test_every_qa_required_oauth_source_has_a_dedicated_auth_unhealthy_alarm():
+    """#1934: "a latched auth breaker on a qa_required source raises its own
+    signal rather than waiting for a freshness window to roll." whoop was the
+    gap — qa_required, the platform's only fully-passive daily source, and (per
+    the actual 2026-08-01 outage) covered only by the weaker
+    `ingest-consecutive-failures-whoop` family, which needs a 3-run failing
+    streak and can't distinguish "credential dead" from a transient upstream
+    blip. habitify (the other qa_required OAuth source) already had the
+    dedicated alarm via #1960 — this closes the same gap for whoop."""
+    families, _ = _covered_map()
+    dedicated = set(families["ingest-auth-unhealthy-"])
+    required_oauth = reg.qa_required_oauth_source_ids()
+    assert required_oauth, "registry reports no qa_required OAuth sources — the facet combination vanished"
+    missing = uncovered_required_sources(required_oauth, dedicated)
+    assert not missing, (
+        "qa_required OAuth sources with no DEDICATED ingest-auth-unhealthy-* alarm — a latched breaker on "
+        f"these fires only the generic consecutive-failures signal (3-run delay, class-blind): {missing}. "
+        "Add them to the per-source urgent ingest-auth-unhealthy loop in cdk/stacks/monitoring_stack.py."
+    )
+
+
+def test_uncovered_qa_required_source_is_detected():
+    """PROVE IT FIRES. A synthetic qa_required OAuth source missing from the
+    dedicated auth-unhealthy family must be reported, even if it's "covered" by
+    some other alarm family."""
+    dedicated = {"habitify", "whoop"}
+    assert uncovered_required_sources({"habitify", "whoop", "brand_new_required_source"}, dedicated) == ["brand_new_required_source"]
+    assert uncovered_required_sources({"habitify", "whoop"}, dedicated) == []
 
 
 def test_digest_only_sources_do_not_page():
