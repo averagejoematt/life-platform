@@ -2101,6 +2101,29 @@
         }
       ],
       "why_it_mattered": "An audit that only looks where the light is good isn't an audit — it's reassurance. Half the platform's readers see the light theme, and until tonight every automated promise about accessibility silently excluded them. The same honesty cut both ways: pages that had earned their guards back got them re-armed, and pages that are genuinely broken in light mode are now on the record instead of invisible."
+    },
+    {
+      "id": "2026-08-03-a-test-row-undid-a-good-deploy",
+      "date": "2026-08-03",
+      "title": "A fake subscriber from twelve days ago was quietly undoing every deploy",
+      "shipped": "Four finished safety gates had been sitting merged-but-dark for a day, so the night started by clearing the IAM drift that was blocking the whole deploy path. The fleet deployed, I verified the new code was really in the running Lambdas — and then watched the pipeline tear it back out. The culprit wasn't the code. A health check writes a fake subscriber, reads it back, deletes it, and then asserts none survived; one such row had failed to clean up on 21 July and had been sitting in the table ever since. Database, storage, the tool server and the model API all passed. That single stale row failed the check, the check failed the smoke test, and the smoke test reverted a perfectly good deploy. The uncomfortable part is the blast radius: while that row existed, no deploy from anyone could survive — not mine, not the other session running in parallel. It was deleted under a condition that made it impossible to touch a real subscriber, the check went green, and the deploy went back out a different way.",
+      "gotcha": "The check that broke things wasn't wrong about anything. Every statement it made was true: there really was a leftover row, and it really shouldn't have been there. The design flaw is that a finding about *stored data* was wired into the same gate as a finding about *the code that just shipped* — and a rollback can only fix the second kind. This platform had already drawn exactly that line once, for a different check, and written down why. The lesson didn't travel one path over.",
+      "honest_miss": "It was found by accident. Nothing was watching for it — the row surfaced only because it broke an unrelated deploy twelve days later, and the fix for that is still an open issue rather than shipped code. Re-shipping then hit a separate CI queue bug for the fifth time in eleven days, and the workaround was to bypass CI entirely, which is a workaround and not a fix.",
+      "prs": [
+        {
+          "label": "PR #2053",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2053"
+        },
+        {
+          "label": "PR #2055",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2055"
+        },
+        {
+          "label": "PR #2059",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2059"
+        }
+      ],
+      "why_it_mattered": "A deploy that silently reverts is worse than one that fails loudly — it leaves the repository saying one thing and the running system doing another, which is the exact gap this project keeps paying for. Two things did work: the check that refused a stale local checkout stopped a bad deploy before it started, and verifying the actual deployed bytes (rather than trusting a green tick) is what revealed the revert at all."
     }
   ]
 }
