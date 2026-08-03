@@ -1200,10 +1200,12 @@ class MonitoringStack(Stack):
                 f"KillSwitchMf{_ks_id}",
                 log_group=_ks_lg,
                 filter_pattern=logs.FilterPattern.all_terms("[kill-switch]", "skipping", "subscriber send"),
-                metric_name="SubscriberSendSkippedByKillSwitch",
+                # Per-sender metric NAME, not a dimension: CloudWatch Logs rejects
+                # dimensions on plain-term filter patterns (deploy-time 400 that
+                # cdk synth does not catch) — dimensions need JSON/field patterns.
+                metric_name=f"SubscriberSendSkippedByKillSwitch{_ks_id}",
                 metric_namespace="LifePlatform/Email",
                 metric_value="1",
-                dimensions={"FunctionName": _ks_fn},
             )
             _ks_alarm = cloudwatch.Alarm(
                 self,
