@@ -83,6 +83,10 @@ CLEAN_FILES = [
     # #1993: the coach-labs-truth check pair (split from qa_smoke_lambda per the
     # module-size ceiling idiom) — clean from birth, named for the same reason.
     "lambdas/operational/qa_check_coach_labs.py",
+    # #2051: the canary's check→severity-lane registry (what gates a rollback
+    # vs. what only alarms). A stdlib-only leaf, clean from birth — named for
+    # the same reason as qa_check.py above (operational/ globs are non-recursive).
+    "lambdas/operational/canary_lanes.py",
     # #1949: the raw-archive liveness check — clean from birth, named for the
     # same reason as qa_check.py above (operational/ globs are non-recursive).
     "lambdas/operational/raw_archive_qa.py",
