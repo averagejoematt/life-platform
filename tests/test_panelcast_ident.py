@@ -154,8 +154,10 @@ def test_enabled_env_gate(monkeypatch):
     assert ident.enabled() is False
     monkeypatch.setenv("PANELCAST_IDENT", "on")
     assert ident.enabled() is True
+    # #1187: default flipped ON → OFF — the frozen brand open supersedes this
+    # ident, and two opens would stack on every episode.
     monkeypatch.delenv("PANELCAST_IDENT", raising=False)
-    assert ident.enabled() is True  # default ON
+    assert ident.enabled() is False  # default OFF since #1187
 
 
 def test_gain_env_clamped(monkeypatch):

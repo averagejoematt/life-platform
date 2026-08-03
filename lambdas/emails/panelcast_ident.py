@@ -57,8 +57,18 @@ _RESOLVE_CHORD = (_A3, _CS4, _E4)  # the held A-major chord the motif resolves i
 
 # ── env gates ────────────────────────────────────────────────────────────────────
 def enabled() -> bool:
-    """PANELCAST_IDENT — default ON; only an explicit off/0/false/no disables it."""
-    return os.environ.get("PANELCAST_IDENT", "on").strip().lower() not in ("off", "0", "false", "no")
+    """PANELCAST_IDENT — default OFF since #1187; only an explicit on/1/true/yes enables it.
+
+    The default flipped ON → OFF when the frozen V1 brand open landed
+    (``panelcast_brand_open``, #1187): every episode now opens with the recorded
+    Elena line over a licence-cleared bed, and the synthesized arpeggio would
+    otherwise stack a second ident on top of it.
+
+    NB: the flip is in code, not env. #1187 recorded the ident as "deliberately
+    OFF on the lambda", but ``PANELCAST_IDENT`` was set neither on
+    coach-panel-podcast nor in CDK — so this default was the live behaviour and
+    every episode carried the arpeggio. Setting ``PANELCAST_IDENT=on`` restores it."""
+    return os.environ.get("PANELCAST_IDENT", "off").strip().lower() in ("on", "1", "true", "yes")
 
 
 def _gain() -> float:
