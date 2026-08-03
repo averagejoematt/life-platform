@@ -11,7 +11,7 @@
     },
     "enforced_by": "tests/test_persona_registry.py (no orphans either direction)",
     "loader": "lambdas/coach/persona_registry.py",
-    "last_reviewed": "2026-06-30"
+    "last_reviewed": "2026-08-03"
   },
   "personas": {
     "sleep_coach": {
@@ -187,17 +187,6 @@
       "board_persona_key": "maya_rodriguez",
       "board_role": "Behavioural Performance Coach"
     },
-    "the_integrator": {
-      "name": "Dr. Kai Nakamura",
-      "type": "board",
-      "operational": false,
-      "domain": "integrative_health",
-      "short_bio": "Integrative health director. Connects findings across domains.",
-      "emoji": "🔬",
-      "color": "#6366f1",
-      "board_persona_key": "integrator",
-      "board_role": "Integrative Health Director"
-    },
     "andrew_huberman": {
       "name": "Dr. Kai Nakamura",
       "type": "board",
@@ -294,7 +283,10 @@
         "Translating data into a plan a human can actually live"
       ],
       "philosophy": "One experiment at a time. Correlation is a lead, not a verdict. The plan has to survive a bad week — if it only works when motivation is high, it isn't a plan. My job is to keep eight smart specialists pointed at the same goal and to make sure Matthew always knows the single next thing.",
-      "lead_briefing": "Where Matthew is, what the staff is focused on, and the one call for this phase — synthesized from the team's current stances."
+      "lead_briefing": "Where Matthew is, what the staff is focused on, and the one call for this phase — synthesized from the team's current stances.",
+      "lead_role_keys": [
+        "integrator"
+      ]
     },
     "cora_vance": {
       "name": "Dr. Cora Vance",

@@ -11,7 +11,8 @@ import { lineChart } from "/assets/js/charts.js";
 // The board — pick an expert, read their actual per-domain take + track record.
 // WQA-06 — surface the cross-coach DISAGREEMENTS (the moat), not eight parallel monologues.
 // Reads /api/coach_team tensions: topic + the two coaches' positions head-to-head + the
-// integrator's (Coach Nakamura's) call. Interpretation, never alarm; ember on the verdict.
+// board lead's call. Interpretation, never alarm; ember on the verdict. The lead is named
+// by the API from config/personas.json (#1986) — never spelled out in this file.
 export function boardDisagreements(tensions) {
   const ts = (tensions || []).filter((t) => t && (t.position_a || t.position_b));
   if (!ts.length) return "";
@@ -30,7 +31,7 @@ export function boardDisagreements(tensions) {
   }).join("");
   return sec("Where the coaches disagree — the argument, not the consensus",
     `<div class="dis-grid">${cards}</div>` +
-    `<p class="rd-meta label">The moat isn't eight assistants nodding along — it's that they don't, and the disagreement is surfaced instead of averaged away. Each is an AI persona arguing from its own discipline; the integrator (Coach Nakamura) adjudicates, but the tension is the point. Interpretation of the data, never an instruction.</p>`);
+    `<p class="rd-meta label">The moat isn't eight assistants nodding along — it's that they don't, and the disagreement is surfaced instead of averaged away. Each is an AI persona arguing from its own discipline; the board lead adjudicates, but the tension is the point. Interpretation of the data, never an instruction.</p>`);
 }
 
 export async function renderBoard(d) {

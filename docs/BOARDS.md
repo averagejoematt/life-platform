@@ -18,7 +18,7 @@
 
 Note on identity: the JSON config keeps **legacy keys** (e.g. `peter_attia`, `paul_conti`, `andrew_huberman`, `rhonda_patrick`) holding **fictional replacement personas** for backward-compatibility with existing prompts. The displayed name on every public surface is the fictional persona — never the real public figure. The legacy keys are mirrored by canonical keys (`victor_reyes`, `nathan_reeves`, `integrator`, `amara_patel`) used by observatory pages.
 
-### Active personas (22 distinct in the live config; representative set below)
+### Active personas (21 distinct in the live config; representative set below)
 
 | Display name | Title | Type | Config key(s) | Domains |
 |--------------|-------|------|---------------|---------|
@@ -29,7 +29,8 @@ Note on identity: the JSON config keeps **legacy keys** (e.g. `peter_attia`, `pa
 | Coach Maya Rodriguez | Behavioural Performance Coach | fictional | `maya_rodriguez` | Habit formation, motivation, knowing-doing gap |
 | Dr. Amara Patel | Micronutrients, Genome & Longevity | fictional (replaces Patrick) | `rhonda_patrick`, `amara_patel` | Nutrigenomics, supplementation, SNP analysis |
 | Dr. Victor Reyes | Metabolic Health & Longevity | fictional (replaces Attia) | `peter_attia`, `victor_reyes` | CGM, body composition, exercise medicine, DEXA |
-| Dr. Kai Nakamura | Neuroscience & Protocols / Integrator | fictional (replaces Huberman) | `andrew_huberman`, `integrator` | Circadian biology, dopamine, stress protocols, cross-domain integration |
+| Dr. Kai Nakamura | Neuroscience & Protocols | fictional (replaces Huberman) | `andrew_huberman` | Circadian biology, dopamine, stress protocols |
+| Dr. Eli Marsh | Principal Investigator — Program Lead | meta_role (**the board lead**) | `eli_marsh` | Cross-domain synthesis, experiment sequencing, weekly prioritization |
 | Dr. Nathan Reeves | Psychiatrist — Self-Structure | fictional (replaces Conti) | `paul_conti`, `nathan_reeves` | Defense mechanisms, grief, identity, self-compassion |
 | Dr. Vivek Murthy | Social Connection & Loneliness | real_expert | `vivek_murthy` | Male isolation, community health, belonging |
 | Dr. Henning Brandt | Biostatistician — N=1 Research | fictional | `henning_brandt` | Statistical rigor, confidence intervals, false-positive risk |
@@ -37,6 +38,17 @@ Note on identity: the JSON config keeps **legacy keys** (e.g. `peter_attia`, `pa
 | Margaret Calloway | Senior Editor — Longform | fictional | `margaret_calloway` | Edits Elena's work, narrative structure, prose craft |
 | Dr. Cora Vance | Reading Coach — The Mind Pillar | fictional (non-operational) | `cora_vance` | Periodized reading curriculum, difficulty calibration, two-clock retention, taste archaeology |
 | The Chair | Board Chair — Verdict & Priority | meta_role | `the_chair` | Cross-domain synthesis, one priority, verdict |
+
+**One board lead (#1986)**: the integrator role — the weekly call, the month rollup, the
+experiment arc — belongs to exactly ONE character, the single `lead: true` persona in
+`config/personas.json` (**Dr. Eli Marsh**). It used to be split: the roster billed Marsh
+as lead while the integrator byline, the three narrative prompts and the `/coaching/`
+noscript all signed "Dr. Kai Nakamura, Integrative Health Director" — a duplicate seat
+(`integrator`) held by the same character who also sits as `andrew_huberman`. That seat
+is retired; Nakamura keeps his Neuroscience & Protocols seat. Every byline, prompt and
+static shell now derives the name from `coach.persona_registry.lead_byline()`, and
+`tests/test_board_lead_single_character.py` fails if a second character ever claims the
+role or a name is retyped instead of derived.
 
 **Source of truth**: this table is derived from the live S3 config. To re-verify:
 ```bash

@@ -214,7 +214,7 @@ class TestCoachingReadBlock:
     shell."""
 
     READ = {
-        "weekly_priority": {"text": "Restart your logging this week — the system runs blind without it.", "coach_name": "Dr. Kai Nakamura"},
+        "weekly_priority": {"text": "Restart your logging this week — the system runs blind without it.", "coach_name": "Dr. Eli Marsh"},
         "coaches": [
             {
                 "name": "Dr. Nathan Reeves",
@@ -236,7 +236,7 @@ class TestCoachingReadBlock:
         html = v4_proof.coaching_read_block_html(self.READ)
         # the AC: actual coach voices are carried in the served no-JS HTML.
         assert "Restart your logging this week" in html
-        assert "Dr. Kai Nakamura" in html
+        assert "Dr. Eli Marsh" in html
         # #1115: the integrator's priority is labeled at its true (week) altitude,
         # never presented as today's line.
         assert "The week's call" in html
@@ -305,7 +305,7 @@ class TestCoachingReadBlock:
             "_fetch_json",
             lambda path, timeout=8: {
                 "_meta": {"generated_at": "2026-07-08T01:31:08+00:00"},
-                "weekly_priority": {"text": " the call ", "coach_name": "Dr. Kai Nakamura", "generated_at": "2026-07-07T14:03:02+00:00"},
+                "weekly_priority": {"text": " the call ", "coach_name": "Dr. Eli Marsh", "generated_at": "2026-07-07T14:03:02+00:00"},
                 "coaches": [
                     {"coach_id": "mind", "name": "Dr. Nathan Reeves", "title": "Psychiatrist", "position_summary": " a read "},
                     {"coach_id": "sleep", "name": "Dr. Lisa Park", "title": "Sleep", "position_summary": ""},  # empty -> dropped
@@ -313,7 +313,7 @@ class TestCoachingReadBlock:
             },
         )
         out = v4_proof.load_coaching_read()
-        assert out["weekly_priority"] == {"text": "the call", "coach_name": "Dr. Kai Nakamura"}
+        assert out["weekly_priority"] == {"text": "the call", "coach_name": "Dr. Eli Marsh"}
         # honest absence — the coach with an empty read is omitted, never fabricated.
         assert [c["coach_id"] for c in out["coaches"]] == ["mind"]
         assert out["coaches"][0]["position_summary"] == "a read"

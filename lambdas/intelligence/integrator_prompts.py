@@ -1,6 +1,13 @@
 """
-integrator_prompts.py — the integrator's (Dr. Kai Nakamura) narrative prompt
-builders, extracted from ai_expert_analyzer_lambda (#1115, ADR-080 size gate).
+integrator_prompts.py — the board lead's narrative prompt builders, extracted
+from ai_expert_analyzer_lambda (#1115, ADR-080 size gate).
+
+WHO SIGNS THESE (#1986). The integrator voice used to be hardcoded as "Dr. Kai
+Nakamura, Integrative Health Director" while the public roster billed Dr. Eli
+Marsh as the lead — two characters in one role, and a reader could not tell who
+ran the board. The name is now DERIVED from the persona registry's single
+``lead: true`` persona (config/personas.json → coach.persona_registry), so the
+prompt, the API byline and the static noscript cannot drift apart again.
 
 Three cross-domain narrative prompts, one per timeframe altitude:
 
@@ -22,6 +29,23 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _lead():
+    """(name, surname, title) of the registry's board lead (#1986).
+
+    Fail-soft to the registry's own pinned fallback constants — a narrative prompt
+    must never open with an empty byline or a persona id. The fallback is asserted
+    equal to config/personas.json by tests/test_board_lead_single_character.py.
+    """
+    try:
+        from coach import persona_registry
+
+        name, title = persona_registry.lead_byline()
+    except Exception as e:  # noqa: BLE001 — a byline lookup must never block generation
+        logger.warning("lead byline unavailable, using pinned fallback (non-blocking): %s", e)
+        name, title = "Dr. Eli Marsh", "Principal Investigator — Program Lead"
+    return name, name.split()[-1], title
+
+
 def _phase_context_block():
     """#1086/#1115: the ONE mandatory experiment-phase grounding block for every
     narrative prompt this module builds. No-arg build reads EXPERIMENT_START_DATE
@@ -40,7 +64,8 @@ def build_synthesis_prompt(coach_sections, goals_json, facts_block, presence_blo
     """The integrator (weekly-priority) prompt — extracted pure so the #1086
     phase-context coverage suite can drive it offline (#1115)."""
     phase_block = _phase_context_block()
-    return f"""You are Dr. Kai Nakamura, Integrative Health Director. You've just read assessments from all domain coaches. Your job: synthesize, resolve contradictions, and make ONE call.
+    lead_name, lead_surname, lead_title = _lead()
+    return f"""You are {lead_name}, {lead_title}. You've just read assessments from all domain coaches. Your job: synthesize, resolve contradictions, and make ONE call.
 
 Matthew's goals: {goals_json}
 {phase_block}
@@ -48,7 +73,7 @@ Matthew's goals: {goals_json}
 Coach assessments:
 {coach_sections}
 
-Write in first person. You are Nakamura — direct, decisive, and on Matthew's side.
+Write in first person. You are {lead_surname} — direct, decisive, and on Matthew's side.
 
 HOW TO JUDGE THE WEEK (read this before you write):
 - Judge progress against where Matthew STARTED, not only against the end goal. He is early in a long experiment; "not at the goal yet" is NOT failure. Distance-to-goal is context, never the verdict.
@@ -73,7 +98,7 @@ Produce EXACTLY this JSON structure (no markdown, no explanation):
       "coaches": ["coach_a", "coach_b"],
       "position_a": "what coach A recommends",
       "position_b": "what coach B recommends",
-      "nakamura_call": "your resolution — who is right and why"
+      "lead_call": "your resolution — who is right and why"
     }}
   ]
 }}
@@ -86,7 +111,8 @@ def build_month_rollup_prompt(weeks_text, goals_json, facts_block, n_weeks, wind
     as one pattern, sitting between the weekly priority (week lens) and the
     experiment arc (journey lens)."""
     phase_block = _phase_context_block()
-    return f"""You are Dr. Kai Nakamura, Integrative Health Director. You've read the board's weekly lab notes for the past month{f" ({window_label})" if window_label else ""}. Your job: name the MONTH'S pattern — not this week's call (that exists separately), not the whole experiment's arc (that exists separately) — the shape of the last ~{n_weeks} weeks taken together.
+    lead_name, lead_surname, lead_title = _lead()
+    return f"""You are {lead_name}, {lead_title}. You've read the board's weekly lab notes for the past month{f" ({window_label})" if window_label else ""}. Your job: name the MONTH'S pattern — not this week's call (that exists separately), not the whole experiment's arc (that exists separately) — the shape of the last ~{n_weeks} weeks taken together.
 
 Matthew's goals: {goals_json}
 {phase_block}
@@ -94,7 +120,7 @@ Matthew's goals: {goals_json}
 The board's read, week by week (oldest first, most recent last):
 {weeks_text}
 
-Write in first person as Nakamura — direct, warm, on Matthew's side.
+Write in first person as {lead_surname} — direct, warm, on Matthew's side.
 
 HOW TO READ THE MONTH (read before writing):
 - Speak at MONTH altitude: recurring patterns, trends across the weeks, what compounded and what stalled. Do NOT restate any single week's priority sentence — a reader sees the weekly call elsewhere; give them what only a month of distance shows.
@@ -113,7 +139,8 @@ def build_arc_prompt(weeks_text, goals_json, facts_block, n_weeks):
     """The journey-rollup (experiment-arc) prompt — extracted pure so the #1086
     phase-context coverage suite can drive it offline (#1115)."""
     phase_block = _phase_context_block()
-    return f"""You are Dr. Kai Nakamura, Integrative Health Director. You've read the board's weekly lab notes across Matthew's entire experiment so far. Your job: step back and tell the ARC — not this week, but the whole trajectory.
+    lead_name, lead_surname, lead_title = _lead()
+    return f"""You are {lead_name}, {lead_title}. You've read the board's weekly lab notes across Matthew's entire experiment so far. Your job: step back and tell the ARC — not this week, but the whole trajectory.
 
 Matthew's goals: {goals_json}
 {phase_block}
@@ -121,7 +148,7 @@ Matthew's goals: {goals_json}
 The board's read, week by week (oldest first):
 {weeks_text}
 
-Write in first person as Nakamura — direct, warm, on Matthew's side.
+Write in first person as {lead_surname} — direct, warm, on Matthew's side.
 
 HOW TO JUDGE THE ARC (read before writing):
 - Judge the trajectory against where Matthew STARTED, not the end goal. He is early in a long experiment; a slow-moving outcome is expected to lag and is NOT failure.

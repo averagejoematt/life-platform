@@ -35,6 +35,7 @@ from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
+from coach import persona_registry  # noqa: E402  (#1986 — the byline's single source)
 from fakes import FakeDdbTable  # noqa: E402
 from web import (  # noqa: E402
     site_api_coach as coach,
@@ -403,7 +404,8 @@ def test_weekly_priority_inert_when_genesis_past(monkeypatch):
     b = _body(coach.handle_weekly_priority({}))
     assert b["pre_start"] is False
     assert b["weekly_priority"] == "the wiped cycle's week's call"
-    assert b["coach_name"] == "Dr. Kai Nakamura"
+    # #1986: the byline is the persona registry's single board lead, not a literal.
+    assert b["coach_name"] == persona_registry.lead_name()
 
 
 # ── /api/journey_waveform ─────────────────────────────────────────────────────

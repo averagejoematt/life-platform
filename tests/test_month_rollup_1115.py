@@ -32,6 +32,7 @@ os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
+from coach import persona_registry  # noqa: E402  (#1986 — the byline's single source)
 from fakes import FakeDdbTable  # noqa: E402
 from web import site_api_coach as coach, site_api_common as common  # noqa: E402
 
@@ -125,7 +126,9 @@ def test_happy_path_serves_narrative_and_attribution(monkeypatch):
     assert b["headline"] == "A month of holding the line"
     assert b["week_count"] == 4
     assert b["window_label"] == "2026-06-15 to 2026-07-12"
-    assert b["coach_name"] == "Dr. Kai Nakamura"
+    # #1986: the byline is the persona registry's single board lead, not a literal.
+    assert b["coach_name"] == persona_registry.lead_name()
+    assert b["coach_title"] == persona_registry.lead_title()
 
 
 def test_route_registered():

@@ -25,7 +25,7 @@ Features (V2.1):
   - Intelligence preamble: goals, data inventory, data maturity, first-person voice
   - Thread persistence: position summaries, predictions, surprises, emotional investment
   - Validator Mode B: inline correction on factual errors
-  - Integrator synthesis: Dr. Nakamura's weekly priority + cross-domain notes + disagreements
+  - Integrator synthesis: the board lead's weekly priority + cross-domain notes + disagreements
   - Builder's Paradox: injected into mind coach prompt
 
 Trigger: EventBridge cron — weekly, Monday 6am PT (14:00 UTC)
@@ -1390,7 +1390,8 @@ def generate_and_cache(expert_key, shared_system=None):
 
 def generate_synthesis(all_coach_outputs):
     """
-    Second-pass synthesis: Dr. Kai Nakamura reads all coach outputs and produces
+    Second-pass synthesis: the board lead (persona registry's single lead:true persona,
+    #1986) reads all coach outputs and produces
     a single weekly priority + cross-domain context notes for each observatory page.
     """
     if not all_coach_outputs or len(all_coach_outputs) < 2:
@@ -1606,7 +1607,7 @@ def _week_behavioral_presence(iso_week):
 
 def generate_experiment_arc():
     """
-    Cross-week synthesis (C-1): Dr. Kai Nakamura reads the board's weekly lab notes
+    Cross-week synthesis (C-1): the board lead reads the board's weekly lab notes
     across the WHOLE run so far and writes the experiment's arc — where it started,
     the turns, where it stands, the throughline. Richer than the per-week tone list
     the Experiment view shows today. Reads field_notes WEEK# (chronological), writes
@@ -1760,7 +1761,7 @@ def generate_experiment_arc():
 
 def generate_month_rollup():
     """
-    #1115: the integrator's month rollup — Dr. Kai Nakamura reads the most recent
+    #1115: the integrator's month rollup — the board lead reads the most recent
     ~4 weekly lab notes and names the month's pattern, so the site's Month lens has
     a narrative at its own altitude instead of reusing the weekly priority. Writes
     EXPERT#integrator_month. Honest-skip when fewer than 2 week notes exist in the
