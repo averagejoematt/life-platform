@@ -288,10 +288,10 @@ regenerated page would be merged-but-not-deployed); and `plan` diffs from
 `${GITHUB_SHA}~1` to the reconciled HEAD, so the merged PR's own changes stay in the
 deploy plan even with a reconcile commit stacked on top.
 
-### 4d. Stranded deploy states — the approval gate + the R8-ST6 Plan-red (#1901)
+### 4d. Stranded deploy states — the approval gate, the R8-ST6 Plan-red, the phantom wedge (#1901/#2052)
 
-Two pipeline states leave main's deploy path wedged while nothing looks obviously
-broken. `scripts/check_main_green.py` (the /wrap gate) classifies both explicitly —
+Three pipeline states leave main's deploy path wedged while nothing looks obviously
+broken. `scripts/check_main_green.py` (the /wrap gate) classifies all three explicitly —
 never re-diagnose them as ordinary red/green:
 
 1. **Stranded production approval.** A run that reaches the `production` approval gate
@@ -319,9 +319,74 @@ never re-diagnose them as ordinary red/green:
    failed (e.g. Unit Tests) is an ordinary red — it owes a code fix; the CDK deploy
    alone will not clear it.
 
-Both states are surfaced at wrap time by `check_main_green.py` (a `waiting` run older
-than ~2h is reported loudly with its run id + sha; younger ones ride along as a
-notice). Fixture-pinned in `tests/test_stranded_deploy_1901.py`.
+3. **Phantom deploy wedge — the #2052 shape.** The run's `Deploy` job is blocked in the
+   `ci-cd-deploy-<ref>` concurrency group by an entry that corresponds to **no real
+   run**. Since #2009 moved that group from the workflow onto the `deploy` job, this no
+   longer presents as `0 jobs`: the run shows **five green jobs** and sits `pending`,
+   which reads as "waiting for approval". It is not. `pending_deployments` is empty and
+   **stays** empty, because GitHub evaluates a job's `concurrency` **before** its
+   environment protection rule — the deploy never reaches the gate, so the gate never
+   opens and there is nothing to approve. Waiting for it is waiting forever.
+
+   **Every tell written for the older phantom class keys on "0 jobs" and is now blind**
+   (`reference_push_ci_silent_death`, and state 1 above). Worse, state 1 and state 3 are
+   **byte-identical when you look at one run**:
+
+   | state | `run.status` | `Deploy` job `.status` | `pending_deployments` |
+   |---|---|---|---|
+   | awaiting/stranded approval | `waiting` | `waiting` | **non-empty** |
+   | queued behind a real holder | `pending` | `pending` | `[]` |
+   | **phantom wedge** | `pending` | `pending` | `[]` |
+
+   The last two rows cannot be told apart from a single run — the discriminator is
+   necessarily fleet-level and is exactly one question: **does any other in-flight run
+   on this ref actually HOLD the deploy group?** (i.e. has a `Deploy` job that is
+   `in_progress` or `waiting` — a job parked at the gate still occupies the slot). No
+   holder + blocked past the threshold = phantom.
+
+   Do not diagnose this by eye. Run **`python3 scripts/check_deploy_wedge.py`**, which
+   fetches the per-run job state `gh run list` does not carry. Recovery:
+   `--recover` (cancel the wedged run, re-dispatch `ci-cd.yml` with `deploy_all=true` —
+   a dispatch has no push diff, so change detection would otherwise deploy nothing).
+   **Do NOT salt the concurrency group** — see the ledger below.
+
+#### The recurrence ledger — five wedges, four fixes, what each one bought
+
+Kept here so the sixth is diagnosed in minutes instead of re-derived from scratch. Every
+fix before #2052 was shipped **blind**: nothing measured the wedge while it was happening.
+
+| # | Date | Presentation | Fix shipped | Outcome |
+|---|---|---|---|---|
+| 1 | 2026-07-24 | run `pending`, 0 jobs, workflow-level group | salt `-v2` | recurred in 3 days |
+| 2 | 2026-07-27 | same, after 2 supersede-cancellations | salt `-v3` | recurred in 6 days |
+| 3 | 2026-08-02 | same, group otherwise EMPTY | salt `-v4` | recurred same day |
+| 4 | 2026-08-02 | same, sole member of its group | **#2009 redesign** — workflow group per-`run_id`; the real invariant moved to a job-level group on `deploy` | moved the wedge, did not remove it |
+| 5 | 2026-08-02 | **5 green jobs**, `Deploy` blocked, gate never opens | **#2052** — detection + escape hatch (`check_deploy_wedge.py`, `deploy-wedge-watch.yml`) | measured for the first time |
+
+Two things the ledger settles. **Salting never worked** — three attempts, three
+recurrences, median 3 days; a `-v5` is not a fix. And **#2009's consolation was wrong**:
+it predicted a narrower phantom that would "at least be legible", but a wedged deploy
+reading as "waiting for approval" is *less* legible than the old `0 jobs`, which at
+least announced itself. #2009 was still right on the merits — validation jobs have no
+business queueing — it just moved the blast radius rather than shrinking it.
+
+**Why #2052 did not replace the concurrency group with an SSM/DDB lock** (issue #2052's
+first acceptance bullet, deliberately deferred): `cancel-in-progress: false` on the
+deploy group *is* the no-two-concurrent-deploys invariant, and the observed failure is a
+GitHub-side queue-entry leak, not a consequence of those semantics. A self-managed lock
+trades an opaque leak for one we can inspect — but introduces a strictly worse failure
+mode: a deploy job cancelled mid-flight (which is exactly what happens in the
+supersede-burst that triggers every one of these) leaves the lock **held**, and clearing
+it then needs an AWS write from a runner that holds deploy credentials. Five recurrences
+were "fixed" blind; the next structural change should be made against measurements from
+the detector, not ahead of them.
+
+All three states are surfaced at wrap time by `check_main_green.py` (a `waiting` run
+older than ~2h is reported loudly with its run id + sha; younger ones ride along as a
+notice; a phantom wedge outranks everything, including a green completed run — while it
+holds, "main GREEN" is a stale fact). Fixture-pinned in
+`tests/test_stranded_deploy_1901.py` and `tests/test_deploy_wedge_2052.py`, the latter
+against real captured API payloads for all three live states.
 
 ## 5. The CDK asset-staging trap — a 200 invoke is not proof of a good deploy
 
@@ -543,6 +608,7 @@ read that section for the incident narrative and the exact mechanics.
 | A shipped change invalidated a wiki page and nobody updated it | Doc-impact sweep, step (e) | `.claude/commands/wrap.md` step (e); mechanics in §8 above |
 | A governance-consequential decision landed with no ADR | Decisions gate (#1343), step (e) | `.claude/commands/wrap.md` step (e) |
 | A status block claims "main GREEN" without reading the badge | Green-main gate (#1327), step (e2) | `scripts/check_main_green.py` |
+| A deploy parks forever behind a phantom concurrency entry while its run reads "waiting for approval" | Deploy-wedge detector (#2052), folded into step (e2) | `scripts/check_deploy_wedge.py`; §4d above |
 | An incident-class event (rollback, main red >1h, data gap, budget-tier event) went unlogged | Incident gate (#1332), step (e3) | `docs/INCIDENT_LOG.md` + `.claude/commands/wrap.md` step (e3) |
 | A handover residual/next-picks bullet names real work with no issue number | Residual-queue gate (#1340), step (e4) | `scripts/check_residual_queue.py` |
 | A stale `git stash` entry or a dead pre-commit hook survives across sessions | Stash + hook hygiene gate (#1326), step (e5) | `deploy/session_postflight.py` |
