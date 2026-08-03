@@ -497,7 +497,10 @@ _TIER_LABELS = {
     0: "Normal — all AI features active",
     1: "Caution — internal/dev AI paused (ensemble, chronicle editor, coherence-semantic)",
     2: "Restrict — + reader narratives paused (coach commentary, State of Matthew, chronicle)",
-    3: "Hard stop — + ask endpoints (/api/ask, /api/board_ask) and daily-brief AI paused; brief is data-only",
+    3: (
+        "Hard stop — + ask endpoints (/api/ask, /api/board_ask), daily-brief AI, and the two AI CI gates "
+        "(reader-truth, visual-vision) paused; brief is data-only"
+    ),
 }
 
 

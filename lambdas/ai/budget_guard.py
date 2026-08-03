@@ -30,6 +30,15 @@ kept spending. This ladder inverts that.
               return honest 'paused' output; the brief falls back to data-only.
               These degrade LAST by design — a reader question and the morning
               brief are the platform's last two AI commitments to keep.
+              + the two OPERATOR-TRUTH CI gates (reader_truth_qa, visual_ai_qa —
+              ADR-125's 2026-08-03 amendment, #1927): they run whenever Bedrock
+              runs at all and stop only when everything stops, because a gate
+              that cannot run cannot tell an operator whether a deploy is safe.
+
+Adding a feature? Classify it into a band here AND in tests/test_budget_guard_ladder.py
+— an unlisted feature silently defaults to cutoff 3 and outlives every reader surface
+(the pre-ADR-125 coherence_semantic bug). CI_GATE_FEATURES below is the derived set the
+QA harnesses read; never hand-list those names at a call site.
 
 Fail-open: if SSM is unreadable (transient error, missing grant, param absent)
 we return tier 0 — a monitoring blip must never take AI down. The AWS Budgets
@@ -79,19 +88,6 @@ _FEATURE_CUTOFF = {
     # defaulted to cutoff 3 and outlived every reader surface — the exact inversion
     # ADR-125 fixes. An internal QA pass must pause before any reader content.
     "coherence_semantic": 1,
-    # reader_truth_qa (#1095/#1096): the phase-aware reader-truth judge — the CI
-    # post-deploy prose pass (visual_qa --reader-truth) + the nightly qa_smoke
-    # "Reader Truth" category. Internal QA like coherence_semantic: a paused run
-    # is reported as an explicit skip (⏸/warning), never silent green.
-    "reader_truth_qa": 1,
-    # visual_ai_qa (#1428): the Claude-vision screenshot QA pass (tests/visual_ai_qa.py
-    # assess_results) — the visual analogue of reader_truth_qa/coherence_semantic.
-    # Internal QA, pauses FIRST like the rest of band 1; a paused run reports an
-    # explicit SKIPPED-BY-BUDGET (never silent) and the deterministic Playwright
-    # checks still stand. Was previously UNLISTED (defaulted to the tier-3 hard-stop
-    # cutoff and only surfaced as a per-page "AI-QA error") — the same class of defect
-    # ADR-125 fixed for coherence_semantic.
-    "visual_ai_qa": 1,
     # eyeball_estimate (#1390): the meal-photo Haiku vision macro estimate — a self-grading
     # calibration probe (`lambdas/eyeball_calibration.py`), never a reader narrative and never
     # nutrition data. Internal/self-grading, so it pauses FIRST like the rest of band 1; a paused
@@ -158,7 +154,34 @@ _FEATURE_CUTOFF = {
     # audience order, not dollars. A paused call ⇒ no precedent block/card (the
     # coach reads exactly as it did before recall existed).
     "semantic_recall": 2,
-    # ── Band 3: the two IRREDUCIBLE reader promises — pause LAST (ADR-100/125).
+    # ── Band 3: the two IRREDUCIBLE reader promises + the two OPERATOR-TRUTH CI
+    #    gates — pause LAST (ADR-100/125, the latter added by the ADR-125
+    #    2026-08-03 amendment, #1927).
+    #
+    # reader_truth_qa (#1095/#1096) and visual_ai_qa (#1428) are the AI halves of
+    # the deploy pipeline's own QA: the CI post-deploy prose pass (visual_qa
+    # --reader-truth), the vision pass on the visual-qa job, and the nightly
+    # qa_smoke "Reader Truth" category. They sat at cutoff 1 as "internal QA" and
+    # were consequently DARK for 26 of 30 days (#1927's measurement) — while still
+    # reporting green, because a gate that does not run produces no findings.
+    #
+    # Why cutoff 3 and not a band of their own: ADR-125 orders the ladder by
+    # AUDIENCE, and these two serve the OPERATOR — the person deciding whether the
+    # deploy that just landed is safe. That answer is upstream of every reader
+    # surface below it, so it cannot be the first thing sacrificed. Their cost
+    # profile agrees: both are per-DEPLOY and bounded (one Haiku batch over <= 8
+    # surfaces; <= 3 images x 6 tier-1 doors at ~$0.001/image — pennies per run),
+    # not per-day and open-ended like their former band-mates, and their value
+    # peaks exactly when shipping, which is when a pause is most likely in force.
+    # At cutoff 3 they stop precisely when bedrock_client stops everything — "they
+    # run whenever Bedrock runs at all" — and the pause is then reported, not
+    # inferred: SKIPPED-BY-BUDGET in the run output, the CI job summary + a
+    # ::warning:: annotation, the QAPausedByBudget metric, and a qa_smoke ⏸ check.
+    # This is NOT the pre-ADR-125 coherence_semantic defect (an UNLISTED feature
+    # defaulting to 3 by accident): the placement is deliberate, documented, and
+    # pinned by tests/test_budget_guard_ladder.py's _OPERATOR_TRUTH band.
+    "reader_truth_qa": 3,
+    "visual_ai_qa": 3,
     #
     # website_ai: the PUBLIC /api/ask + /api/board_ask hook — the platform's most
     # differentiating surface. Rate limits (5/hr/IP) + Haiku pricing bound the
@@ -170,6 +193,12 @@ _FEATURE_CUTOFF = {
 }
 
 _HARD_STOP_TIER = 3
+
+# The AI gates the DEPLOY PIPELINE reports on (#1927). Exported so the harnesses,
+# the qa_smoke hook and the tests all read one list instead of re-typing the names
+# (the "guard the SET, not the instance" rule). Membership is asserted against
+# _FEATURE_CUTOFF in tests/test_budget_guard_ladder.py.
+CI_GATE_FEATURES = ("reader_truth_qa", "visual_ai_qa")
 
 _cache = {"tier": 0, "ts": 0.0}
 _ssm = None
@@ -211,6 +240,24 @@ def allow(feature: str) -> bool:
 def hard_stopped() -> bool:
     """True when all Bedrock calls must be refused (Tier 3)."""
     return current_tier() >= _HARD_STOP_TIER
+
+
+def paused_features(tier=None):
+    """The features currently disabled at `tier` (default: the live tier).
+
+    Derived from _FEATURE_CUTOFF, never hand-listed — #1927's whole finding was
+    that nobody could name what a tier had switched off. CI gates sort FIRST
+    (they are the ones an operator must know about before trusting a green
+    pipeline), then alphabetically, so the readout is deterministic.
+    """
+    if tier is None:
+        tier = current_tier()
+    try:
+        tier = int(tier)
+    except (TypeError, ValueError):
+        return []
+    paused = [f for f, cutoff in _FEATURE_CUTOFF.items() if tier >= cutoff]
+    return sorted(paused, key=lambda f: (f not in CI_GATE_FEATURES, f))
 
 
 # ── #822: budget-headroom readout (display-only) ──────────────────────────────
@@ -279,6 +326,30 @@ def format_headroom_line(breakdown) -> str:
         if breakdown.get("surge_active"):
             uniques = breakdown.get("recent_uniques")
             line += f" — SURGE mode ({uniques} uniques/7d, readers not spend)"
+        line += format_paused_clause(tier)
         return line
+    except Exception:
+        return ""  # fail-soft: a malformed field costs the line, nothing else
+
+
+def format_paused_clause(tier, max_names: int = 3) -> str:
+    """The ` · paused: N AI features (a, b, c +k more)` clause, or "" at tier 0.
+
+    #1927: the headroom line said WHICH tier, never WHAT that tier had switched
+    off — so the 26-day band-1 blackout was legible only to someone who could
+    recite _FEATURE_CUTOFF from memory. This puts the answer in the one budget
+    line the daily brief already renders. Names are truncated (a tier-2 pause is
+    13 features) but the COUNT is always exact, and CI gates sort first so they
+    can never be the ones truncated away.
+    """
+    try:
+        paused = paused_features(int(tier))
+        if not paused:
+            return ""
+        shown = ", ".join(paused[:max_names])
+        extra = len(paused) - len(paused[:max_names])
+        if extra > 0:
+            shown += f" +{extra} more"
+        return f" · paused: {len(paused)} AI feature{'s' if len(paused) != 1 else ''} ({shown})"
     except Exception:
         return ""  # fail-soft: a malformed field costs the line, nothing else

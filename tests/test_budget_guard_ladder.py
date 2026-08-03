@@ -1,16 +1,23 @@
 """
 ADR-100 + ADR-125 — the degradation ladder sacrifices by AUDIENCE, readers last.
 
-Simulated budget-tier escalation pins the three-band order (ADR-125):
-  band 1 INTERNAL/dev AI          (ensemble, coherence_semantic, chronicle_editor, reader_truth_qa)
-  band 2 reader NARRATIVE content (coach_narrative, state_of_matthew, chronicle)
+Simulated budget-tier escalation pins the band order (ADR-125, as amended
+2026-08-03 by #1927):
+  band 1 INTERNAL/dev AI          (ensemble, coherence_semantic, chronicle_editor, ...)
+  band 2 reader NARRATIVE content (coach_narrative, state_of_matthew, chronicle, ...)
   band 3 irreducible reader       (website_ai = /api/ask+board_ask, daily_brief_ai)
+       + OPERATOR-TRUTH CI gates  (reader_truth_qa, visual_ai_qa)
 
 The teeth: internal AI must pause a full tier before any reader-facing surface,
 and the PUBLIC ask endpoints (+ the daily brief) degrade LAST — so a future edit
 can't quietly make the reader product the first casualty of growth again (the
 pre-ADR-125 defect, where coach_narrative paused at tier 1 while dev re-runs, the
 actual June breach cause, kept spending).
+
+The #1927 teeth: the two AI CI gates must NOT sit in the first band to die. They
+were at cutoff 1 and therefore dark for 26 of 30 measured days while still
+reporting green — a gate whose availability is decided by month-boundary spend
+arithmetic is not a gate. They now pause only where Bedrock stops entirely.
 """
 
 import os
@@ -28,8 +35,6 @@ _INTERNAL = (
     "ensemble",
     "coherence_semantic",
     "chronicle_editor",
-    "reader_truth_qa",
-    "visual_ai_qa",
     "eyeball_estimate",
     "conversation_enrichment",  # #1577: conversational-corpus Haiku sweep — analysis layer, pauses first
 )
@@ -44,6 +49,12 @@ _READER_NARRATIVE = (
     "coach_nudge",  # #1382: proactive decision-moment nudge — band 2, tier ≥2 silences (AC2)
 )
 _IRREDUCIBLE_READER = ("website_ai", "daily_brief_ai")
+# #1927: the AI halves of the deploy pipeline's own QA. Not "internal QA" — they
+# answer the OPERATOR's question ("is the deploy that just landed safe?"), which is
+# upstream of every reader surface, and they are per-deploy + bounded rather than
+# per-day + open-ended. They pause at the hard stop, i.e. exactly when Bedrock
+# stops for everything.
+_OPERATOR_TRUTH = ("reader_truth_qa", "visual_ai_qa")
 
 
 def _at_tier(monkeypatch, tier):
@@ -63,6 +74,8 @@ def test_tier1_internal_ai_pauses_first(monkeypatch):
         assert not budget_guard.allow(f), f"{f} (internal) must pause at tier 1"
     for f in _READER_NARRATIVE + _IRREDUCIBLE_READER:
         assert budget_guard.allow(f), f"{f} (reader) must still run at tier 1"
+    for f in _OPERATOR_TRUTH:
+        assert budget_guard.allow(f), f"{f} (CI gate) must still run at tier 1 — #1927"
 
 
 def test_tier2_reader_narrative_pauses_but_readers_still_answered(monkeypatch):
@@ -73,6 +86,8 @@ def test_tier2_reader_narrative_pauses_but_readers_still_answered(monkeypatch):
         assert not budget_guard.allow(f), f"{f} must be paused by tier 2"
     for f in _IRREDUCIBLE_READER:
         assert budget_guard.allow(f), f"{f} must degrade last (ADR-100)"
+    for f in _OPERATOR_TRUTH:
+        assert budget_guard.allow(f), f"{f} (CI gate) must still run at tier 2 — #1927"
 
 
 def test_tier3_hard_stop_blocks_everything(monkeypatch):
@@ -97,7 +112,7 @@ def test_all_gated_features_are_classified():
     """No feature may drift back into the default (cutoff 3) bucket unclassified —
     the coherence_semantic bug (internal QA silently outliving readers) recurs
     exactly that way."""
-    classified = set(_INTERNAL + _READER_NARRATIVE + _IRREDUCIBLE_READER)
+    classified = set(_INTERNAL + _READER_NARRATIVE + _IRREDUCIBLE_READER + _OPERATOR_TRUTH)
     assert set(budget_guard._FEATURE_CUTOFF) == classified
 
 
@@ -107,6 +122,48 @@ def test_ask_endpoint_and_daily_brief_are_the_last_to_go():
     assert cut["daily_brief_ai"] == budget_guard._HARD_STOP_TIER
     for f in _INTERNAL + _READER_NARRATIVE:
         assert cut[f] < budget_guard._HARD_STOP_TIER, f"{f} must not survive to the hard stop"
+
+
+# ── #1927: the two AI CI gates are out of the first band to die ──────────────
+# The measured defect: cutoff 1 for both, tier >= 1 for 26 of 30 days, both
+# reporting green throughout because a gate that does not run finds nothing.
+
+
+def test_ci_gates_are_the_derived_set_not_a_hand_list():
+    """The names come from budget_guard.CI_GATE_FEATURES; both must be real
+    ladder entries (a typo'd name would silently gate nothing)."""
+    assert set(budget_guard.CI_GATE_FEATURES) == set(_OPERATOR_TRUTH)
+    for f in budget_guard.CI_GATE_FEATURES:
+        assert f in budget_guard._FEATURE_CUTOFF, f"{f} is not a classified feature"
+
+
+def test_ci_gates_outlive_every_internal_and_narrative_feature():
+    cut = budget_guard._FEATURE_CUTOFF
+    softest_gate = min(cut[f] for f in _OPERATOR_TRUTH)
+    assert softest_gate > max(cut[f] for f in _INTERNAL), "a CI gate must not pause with internal/dev AI (#1927)"
+    assert softest_gate > max(cut[f] for f in _READER_NARRATIVE), "a CI gate must outlive the reader narrative band"
+
+
+def test_ci_gates_run_at_every_tier_below_the_hard_stop(monkeypatch):
+    """The durable property: no budget state short of 'Bedrock is off entirely'
+    may silence a deploy gate. At the measured burn tier 1 is where the platform
+    lives, so anything below the hard stop means 'usually dark'."""
+    for tier in (0, 1, 2):
+        _at_tier(monkeypatch, tier)
+        for f in _OPERATOR_TRUTH:
+            assert budget_guard.allow(f), f"{f} must run at tier {tier}"
+    _at_tier(monkeypatch, 3)
+    for f in _OPERATOR_TRUTH:
+        assert not budget_guard.allow(f), f"{f} must pause at the hard stop (honestly, not by BudgetExceeded)"
+
+
+def test_ci_gates_are_listed_deliberately_not_defaulted():
+    """A feature absent from the map defaults to cutoff 3 too — that accident was
+    the pre-ADR-125 coherence_semantic bug. Assert these are PRESENT, so the
+    tier-3 placement is a decision the map records rather than an omission."""
+    for f in _OPERATOR_TRUTH:
+        assert f in budget_guard._FEATURE_CUTOFF
+        assert budget_guard._FEATURE_CUTOFF[f] == budget_guard._HARD_STOP_TIER
 
 
 # ── #1231: the cost_governor tier-change ALERT copy must mirror _FEATURE_CUTOFF ──

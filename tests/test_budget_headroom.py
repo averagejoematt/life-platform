@@ -168,21 +168,34 @@ def test_format_tier0_shows_headroom():
 
 def test_format_tier1_incident_matches_issue_example():
     """The 2026-07-06 fixture: projected over the ceiling → the slack clause
-    says plainly that reader growth has nowhere to land."""
+    says plainly that reader growth has nowhere to land.
+
+    #1927 appends the paused-feature clause after it: the tier number alone never
+    told the reader of this line WHAT had been switched off, which is half of why
+    a 26-day blackout of the cutoff-1 band went unnoticed."""
     line = budget_guard.format_headroom_line(TIER1_INCIDENT)
-    assert line == "Budget: tier 1 · projected $83 vs $75 ceiling · AI $1.79/day of the $2.68/day burn — near-zero slack for reader growth"
+    head, sep, paused = line.partition(" · paused: ")
+    assert head == "Budget: tier 1 · projected $83 vs $75 ceiling · AI $1.79/day of the $2.68/day burn — near-zero slack for reader growth"
+    assert sep, "a tier-1 line must name what tier 1 paused (#1927)"
+    assert paused.startswith("5 AI features (")
 
 
 def test_format_tier2_over_ceiling():
     line = budget_guard.format_headroom_line(TIER2)
     assert line.startswith("Budget: tier 2 · projected $90 vs $75 ceiling")
-    assert line.endswith("near-zero slack for reader growth")
+    assert "near-zero slack for reader growth · paused: 13 AI features (" in line
 
 
 def test_format_thin_slack_flagged():
     """Under the ceiling but <10% slack → still flagged as thin, not 'headroom'."""
     line = budget_guard.format_headroom_line(_breakdown(projected=70.0))
     assert "$5 slack, thin for reader growth" in line
+
+
+def test_format_tier0_has_no_paused_clause():
+    """#1927: nothing is paused at tier 0, so the line stays exactly as it was —
+    the readout is a disclosure, not decoration."""
+    assert "paused" not in budget_guard.format_headroom_line(TIER0)
 
 
 def test_format_is_decimal_safe():

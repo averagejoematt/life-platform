@@ -19,8 +19,9 @@ Phase ground truth is computed at runtime from constants.EXPERIMENT_START_DATE
 
 Model: Haiku (structured task per ADR-049/063 tiering), override via
 READER_TRUTH_MODEL. Budget: feature "reader_truth_qa" in budget_guard's ladder —
-internal QA, pauses FIRST (tier >= 1, ADR-125); both hooks report the skip
-honestly, never silent green.
+OPERATOR-TRUTH band, pauses at tier 3 only (ADR-125 as amended 2026-08-03 by #1927,
+which measured this gate dark 26 of 30 days at its old tier-1 cutoff); both hooks
+report the skip honestly, never silent green.
 
 Lives at lambdas/ root so it ships in every function bundle (#781) AND is
 importable by the CI-side harness (tests/ already puts lambdas/ on sys.path).
@@ -36,7 +37,7 @@ from html.parser import HTMLParser
 # Haiku by default — structured verdict task (ADR-049 tiering, ADR-063 budget).
 DEFAULT_MODEL = os.environ.get("READER_TRUTH_MODEL", "claude-haiku-4-5-20251001")
 
-# budget_guard._FEATURE_CUTOFF key — internal QA band, pauses at tier >= 1 (ADR-125).
+# budget_guard._FEATURE_CUTOFF key — operator-truth band, pauses at tier 3 (ADR-125/#1927).
 BUDGET_FEATURE = "reader_truth_qa"
 
 # #1440 (ADR-104 applied to the QA system itself): a budget-tier pause of this AI

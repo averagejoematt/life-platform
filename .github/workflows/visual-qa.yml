@@ -22,8 +22,8 @@
 # failed runs). Steps mirror the pipeline job exactly (same pinned Playwright,
 # same OIDC role github-actions-deploy-role, same scripts) so a red here means
 # the same thing as a red there. The AI-vision layer self-skips (SKIPPED-BY-BUDGET
-# warning) when bedrock:InvokeModel is absent or the budget guard is at tier >= 1
-# (internal QA pauses first, ADR-125).
+# warning) when bedrock:InvokeModel is absent or the budget guard is at tier 3
+# (operator-truth band, ADR-125 as amended by #1927) — plus a ::warning:: annotation.
 #
 # Cron: fixed UTC (repo convention — no DST drift). 20:07 UTC ≈ 12:07/13:07 PT,
 # after the 11 AM PT compute/email/OG-image cycle has refreshed the day's data,

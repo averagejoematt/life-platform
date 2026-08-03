@@ -11,7 +11,8 @@ Covers the ONE shared module (lambdas/reader_truth_qa.py) and both of its hooks:
     with a high verdict must flip the page to FAIL;
   - the nightly qa_smoke check (#1096) with mocked Bedrock: flag → FAIL check,
     clean → ok, Bedrock error → soft warn (never reds the nightly), budget
-    tier >= 1 → explicit ⏸ pause (ADR-125 internal-QA band).
+    tier 3 → explicit ⏸ pause (ADR-125's operator-truth band since #1927 —
+    tiers 1 and 2 must RUN the gate, which is what #1927 fixed).
 
 No wall-clock time bombs: every fixture date is DERIVED from
 constants.EXPERIMENT_START_DATE, which moves on each experiment reset.
@@ -288,11 +289,11 @@ def test_harness_med_finding_warns_but_does_not_fail(tmp_path, monkeypatch):
 def test_harness_budget_skip_is_explicit_and_makes_no_ai_call(tmp_path, monkeypatch):
     calls = []
     results = _harness_results(tmp_path, "anything")
-    _patch_harness(monkeypatch, _HIGH_VERDICT, tier=1, calls=calls)  # internal QA pauses at tier >= 1 (ADR-125)
+    _patch_harness(monkeypatch, _HIGH_VERDICT, tier=3, calls=calls)  # operator-truth band pauses at tier 3 (ADR-125/#1927)
     visual_ai_qa.assess_reader_truth(results)
     assert calls == []  # no Bedrock spend while paused
     assert results[0]["status"] == "PASS"
-    assert any("budget tier 1" in w for w in results[0]["warnings"])  # honest skip, never silent green
+    assert any("budget tier 3" in w for w in results[0]["warnings"])  # honest skip, never silent green
 
 
 def test_harness_budget_skip_returns_explicit_status_and_emits_metric(tmp_path, monkeypatch):
@@ -301,10 +302,10 @@ def test_harness_budget_skip_returns_explicit_status_and_emits_metric(tmp_path, 
     render as SKIPPED-BY-BUDGET instead of silently blending into "passed"."""
     cw = _patch_cw(monkeypatch)
     results = _harness_results(tmp_path, "anything")
-    _patch_harness(monkeypatch, _HIGH_VERDICT, tier=2)
+    _patch_harness(monkeypatch, _HIGH_VERDICT, tier=3)
     status = visual_ai_qa.assess_reader_truth(results)
 
-    assert status == {"status": "skipped_by_budget", "tier": 2}
+    assert status == {"status": "skipped_by_budget", "tier": 3}
 
     assert cw.calls, "a budget-tier pause must emit a CloudWatch metric (#1440)"
     call = cw.calls[-1]
@@ -375,7 +376,7 @@ def test_qa_smoke_budget_tier_pauses_explicitly(monkeypatch):
     def must_not_call(body, model_name=None):
         raise AssertionError("Bedrock must not be called while budget-paused")
 
-    for tier in (1, 2, 3):
+    for tier in (3,):  # #1927: only the hard stop pauses this gate now
         _patch_smoke(monkeypatch, tier=tier, invoke=must_not_call)
         checks = qa_check_reader_truth.check_reader_truth()
         # #1922: the deterministic pass STILL runs under a pause — only the LLM half skips.
@@ -384,6 +385,24 @@ def test_qa_smoke_budget_tier_pauses_explicitly(monkeypatch):
         assert f"budget tier {tier}" in paused[0].message  # explicit skip state, no silent green
         assert any(c.name == "reader_truth:plausibility" for c in checks)
         assert not any(c.passed is False for c in checks)
+
+
+def test_qa_smoke_reader_truth_runs_at_the_tiers_it_used_to_skip(monkeypatch):
+    """#1927 negative test: tier 1 and 2 are where this platform actually lives
+    (tier >= 1 for 26 of 30 measured days), and the nightly gate was paused
+    through all of them while reporting no findings. The gate must now RUN there
+    — proven by Bedrock actually being called, not by the absence of a pause."""
+    for tier in (0, 1, 2):
+        calls = []
+
+        def _invoke(body, model_name=None, _calls=calls):
+            _calls.append(body)
+            return {"content": [{"type": "text", "text": json.dumps({"findings": []})}]}
+
+        _patch_smoke(monkeypatch, tier=tier, invoke=_invoke)
+        checks = qa_check_reader_truth.check_reader_truth()
+        assert calls, f"the reader-truth gate must call Bedrock at tier {tier} (#1927)"
+        assert not any(c.paused for c in checks), f"no check may be paused at tier {tier}"
 
 
 def test_qa_smoke_budget_tier_pause_emits_qa_paused_metric(monkeypatch):
@@ -400,7 +419,7 @@ def test_qa_smoke_budget_tier_pause_emits_qa_paused_metric(monkeypatch):
         raise AssertionError("Bedrock must not be called while budget-paused")
 
     cw = _patch_cw(monkeypatch)
-    _patch_smoke(monkeypatch, tier=2, invoke=must_not_call)
+    _patch_smoke(monkeypatch, tier=3, invoke=must_not_call)
     checks = qa_check_reader_truth.check_reader_truth()
 
     assert any(c.paused for c in checks)  # #1922: deterministic check accompanies the pause

@@ -18,8 +18,8 @@ it directly and captures docs/restart/_verify_truth_report.txt.
 Failure semantics (mirrors both existing hooks, blocks like the render gate):
   - any HIGH finding            → FAIL, exit 1 (restart_pipeline aborts/re-runs)
   - med/low findings            → WARN, exit 0 (reported, never silent)
-  - budget tier pauses the pass → SKIP LOUDLY, exit 0 (internal QA pauses at
-    tier >= 1 per ADR-125; a paused budget must never block a reset, and a
+  - budget tier pauses the pass → SKIP LOUDLY, exit 0 (operator-truth band, so
+    tier 3 only per ADR-125/#1927; a paused budget must never block a reset, and a
     silent green here would be a lie — the skip is printed AND in the report)
   - Bedrock/fetch outage        → SKIP LOUDLY, exit 0 (a missing verdict is
     advisory, not a pass OR a fail — same posture as the nightly hook)
@@ -129,7 +129,7 @@ def main() -> int:
     day_label = f"{phase['days_until_start']}d pre-start" if phase["pre_start"] else f"Day {phase['day_n']}"
     print(f"\nrestart_verify_truth — genesis={phase['start_date']} today={phase['today']} ({day_label})\n")
 
-    # Budget gate — internal QA pauses first (ADR-125). LOUD skip, never silent:
+    # Budget gate — operator-truth band, tier 3 only (ADR-125/#1927). LOUD skip, never silent:
     # a paused budget must not block a reset, but it must be visible that the
     # truth layer did NOT run.
     try:
@@ -137,7 +137,7 @@ def main() -> int:
 
         if not budget_guard.allow(reader_truth_qa.BUDGET_FEATURE):
             tier = budget_guard.current_tier()
-            lines = [f"budget tier {tier} pauses feature {reader_truth_qa.BUDGET_FEATURE!r} (internal QA pauses first, ADR-125)"]
+            lines = [f"budget tier {tier} pauses feature {reader_truth_qa.BUDGET_FEATURE!r} (operator-truth band, ADR-125/#1927)"]
             print(f"  ⏸ SKIP — reader-truth AI paused at budget tier {tier}. The truth layer did NOT run this reset.")
             write_report(SKIP, lines, day_label)
             return 0

@@ -1452,7 +1452,7 @@ python3 deploy/restart_pipeline.py --genesis YYYY-MM-DD --override-weight-lbs <c
 # 2. The deterministic truth gate, standalone (7 assertion groups; #1093)
 python3 deploy/restart_verify_semantic.py
 
-# 3. The AI reader-truth gate, standalone (#1097; skips loudly at budget tier ≥ 1 —
+# 3. The AI reader-truth gate, standalone (#1097; skips loudly at budget tier 3 —
 #    for a full run: tier-0 override, run, restore the honest tier)
 python3 deploy/restart_verify_truth.py
 

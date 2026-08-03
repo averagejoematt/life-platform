@@ -129,7 +129,7 @@ GitHub Actions (`.github/workflows/ci-cd.yml`): Lint → Test → Plan → Deplo
 - **0** (<73% of ceiling): all AI runs normally.
 - **1** (73–87%): internal/dev AI paused (ensemble, chronicle editor, coherence-semantic).
 - **2** (87–97%): + reader narratives paused (coach commentary, State of Matthew, chronicle).
-- **3** (≥97%): hard cutoff — website AI returns "paused", daily brief skips AI; `bedrock_client.invoke()` raises `BudgetExceeded`.
+- **3** (≥97%): hard cutoff — website AI returns "paused", daily brief skips AI, and the two AI **CI gates** (`reader_truth_qa`, `visual_ai_qa`) pause here and ONLY here (ADR-125 amendment 2026-08-03, #1927 — they were in band 1 and consequently dark 26 of 30 days while still reporting green); `bedrock_client.invoke()` raises `BudgetExceeded`.
 
 Daily brief is "protect longest" by design. Manual reset for testing: `aws ssm put-parameter --name /life-platform/budget-tier --value 0 --type String --overwrite`.
 

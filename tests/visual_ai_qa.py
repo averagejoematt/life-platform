@@ -16,8 +16,9 @@ a structured JSON verdict. Verdicts merge back into the harness `results`:
 
 Degrades cleanly: if Bedrock/`bedrock_client` is unavailable, AI-QA is skipped with a
 warning — the deterministic checks still stand. Budget-aware (#1428): checks
-budget_guard feature "visual_ai_qa" (internal QA band, pauses at tier >= 1, ADR-125)
-UPFRONT and reports an explicit SKIPPED-BY-BUDGET status + CloudWatch metric — the
+budget_guard feature "visual_ai_qa" (OPERATOR-TRUTH band — pauses at tier 3 only since
+the ADR-125 2026-08-03 amendment, #1927; it was tier >= 1 and therefore dark 26 of 30
+days) UPFRONT and reports an explicit SKIPPED-BY-BUDGET status + CloudWatch metric — the
 same honest-pause contract #1440 gave reader_truth_qa, not a per-page "AI-QA error"
 from the bedrock_client Tier-3 hard-stop backstop.
 
@@ -38,9 +39,9 @@ the words/numbers CAN BE TRUE at the current experiment day (temporal contradict
 impossible numbers, duplicated narratives across surfaces, audience violations).
 The rubric lives in lambdas/reader_truth_qa.py — shared with the nightly qa_smoke
 hook (#1096) so the two nets can never drift apart. Verdicts merge exactly like
-AI-vision: "high" → FAIL, "med"/"low" → warning. Budget-aware: internal QA pauses
-first (budget_guard feature "reader_truth_qa", tier >= 1 per ADR-125) with an
-honest printed/warned skip, never silent green.
+AI-vision: "high" → FAIL, "med"/"low" → warning. Budget-aware: the gate pauses at
+tier 3 only (budget_guard feature "reader_truth_qa" — operator-truth band, ADR-125 as
+amended by #1927) with an honest printed/warned skip, never silent green.
 """
 
 import base64
@@ -53,8 +54,8 @@ import sys
 _VISION_MODEL = os.environ.get("VISUAL_AI_MODEL", "claude-haiku-4-5-20251001")
 _MAX_IMAGES_PER_PAGE = int(os.environ.get("VISUAL_AI_MAX_IMAGES", "3"))
 
-# budget_guard._FEATURE_CUTOFF key (#1428) — internal QA band, pauses at tier >= 1
-# (ADR-125), same posture as reader_truth_qa/coherence_semantic below.
+# budget_guard._FEATURE_CUTOFF key (#1428) — operator-truth band, pauses at tier 3
+# only (ADR-125 as amended by #1927), same posture as reader_truth_qa below.
 _BUDGET_FEATURE = "visual_ai_qa"
 
 _PROMPT = """You are a meticulous UI QA reviewer looking at screenshot(s) of ONE page of a \
@@ -163,8 +164,9 @@ def assess_results(results):
     Adds `ai_verdict` per page. High-severity → issue + status FAIL; med/low → warning.
     No-ops gracefully (per page) on any Bedrock error.
 
-    Budget-aware (#1428): checks budget_guard.allow("visual_ai_qa") UPFRONT — internal
-    QA pauses at tier >= 1 (ADR-125), same band as reader_truth_qa/coherence_semantic.
+    Budget-aware (#1428): checks budget_guard.allow("visual_ai_qa") UPFRONT — the
+    operator-truth band pauses at tier 3 only (ADR-125 as amended by #1927), same band
+    as reader_truth_qa.
     A paused run emits the QAPausedByBudget CloudWatch metric (shared with #1440's
     reader-truth hook — one alarm catches either) and returns an explicit
     {"status": "skipped_by_budget", "tier": N} so the caller can render SKIPPED-BY-BUDGET
@@ -192,7 +194,7 @@ def assess_results(results):
                 reader_truth_qa.emit_budget_pause_metric("visual_ai_qa", tier)
             except Exception:
                 pass  # metric emission is best-effort; the pause itself must still be honest
-            print(f"  ⏸ SKIPPED-BY-BUDGET — AI-vision QA paused at budget tier {tier} (internal QA pauses first, ADR-125)")
+            print(f"  ⏸ SKIPPED-BY-BUDGET — AI-vision QA paused at budget tier {tier} (operator-truth band, ADR-125/#1927)")
             for r in results:
                 r.setdefault("warnings", []).append(f"SKIPPED-BY-BUDGET: AI-vision QA — budget tier {tier} (ADR-125)")
             return {"status": "skipped_by_budget", "tier": tier}
@@ -263,7 +265,7 @@ def assess_reader_truth(results):
             r.setdefault("warnings", []).append(f"Reader-truth QA skipped — reader_truth_qa unavailable: {str(e)[:100]}")
         return {"status": "unavailable", "detail": f"reader_truth_qa unavailable: {str(e)[:100]}"}
 
-    # Budget gate — internal QA pauses FIRST (ADR-125). Honest skip, never silent.
+    # Budget gate — operator-truth band, tier 3 only (ADR-125/#1927). Honest skip, never silent.
     # #1440: emit the QAPausedByBudget metric + tag every warning SKIPPED-BY-BUDGET
     # (not just "skipped") so a paused run can never be mistaken for a clean one.
     try:
@@ -272,7 +274,7 @@ def assess_reader_truth(results):
         if not budget_guard.allow(reader_truth_qa.BUDGET_FEATURE):
             tier = budget_guard.current_tier()
             reader_truth_qa.emit_budget_pause_metric("visual_ai_qa", tier)
-            print(f"  ⏸ SKIPPED-BY-BUDGET — Reader-truth QA paused at budget tier {tier} (internal QA pauses first, ADR-125)")
+            print(f"  ⏸ SKIPPED-BY-BUDGET — Reader-truth QA paused at budget tier {tier} (operator-truth band, ADR-125/#1927)")
             for r in results:
                 r.setdefault("warnings", []).append(f"SKIPPED-BY-BUDGET: Reader-truth QA — budget tier {tier} (ADR-125)")
             return {"status": "skipped_by_budget", "tier": tier}

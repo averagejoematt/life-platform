@@ -162,12 +162,12 @@ def test_assess_results_med_verdict_warns_but_passes(tmp_path, monkeypatch):
 
 def test_assess_results_budget_paused_makes_no_bedrock_call(tmp_path, monkeypatch):
     calls = []
-    monkeypatch.setattr(budget_guard, "current_tier", lambda: 1)  # internal QA band cutoff
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 3)  # operator-truth band cutoff (#1927)
     monkeypatch.setattr(visual_ai_qa, "_import_bedrock", lambda: _fake_bedrock(_HIGH_VERDICT, calls=calls))
     results = [_result_with_shot(tmp_path)]
     status = visual_ai_qa.assess_results(results)
     assert calls == [], "no Bedrock spend while the internal-QA band is paused"
-    assert status == {"status": "skipped_by_budget", "tier": 1}
+    assert status == {"status": "skipped_by_budget", "tier": 3}
     assert results[0]["status"] == "PASS"  # never fabricated FAIL from a paused run
     assert "ai_verdict" not in results[0]  # never fabricated a verdict either
 
@@ -179,14 +179,14 @@ def test_assess_results_budget_paused_tags_results_skipped_by_budget(monkeypatch
         raise AssertionError("must not call Bedrock while budget-paused")
 
     monkeypatch.setattr(visual_ai_qa, "_import_bedrock", lambda: type("B", (), {"invoke": staticmethod(_boom)})())
-    monkeypatch.setattr(budget_guard, "current_tier", lambda: 2)
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 3)
     visual_ai_qa.assess_results(results)
     assert any(w.startswith("SKIPPED-BY-BUDGET:") for w in results[0]["warnings"])
 
 
 def test_assess_results_budget_paused_emits_qa_paused_metric(tmp_path, monkeypatch):
     cw = _patch_cw(monkeypatch)
-    monkeypatch.setattr(budget_guard, "current_tier", lambda: 1)
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 3)
     monkeypatch.setattr(visual_ai_qa, "_import_bedrock", lambda: _fake_bedrock(_HIGH_VERDICT))
     results = [_result_with_shot(tmp_path)]
     visual_ai_qa.assess_results(results)
@@ -204,11 +204,29 @@ def test_assess_results_no_bedrock_client_returns_unavailable_status(tmp_path, m
     assert any("bedrock_client unavailable" in w for w in results[0]["warnings"])
 
 
-# ── budget_guard ladder: visual_ai_qa classified in the internal (band-1) tier ──
+# ── budget_guard ladder: visual_ai_qa is an OPERATOR-TRUTH gate (#1927) ──────
+# It was cutoff 1 ("internal QA") and therefore did not run on 26 of 30 measured
+# days, while the visual-qa job still reported green.
 
 
-def test_visual_ai_qa_feature_is_band1_internal_cutoff():
-    assert budget_guard._FEATURE_CUTOFF["visual_ai_qa"] == 1
+def test_visual_ai_qa_feature_is_operator_truth_cutoff():
+    assert budget_guard._FEATURE_CUTOFF["visual_ai_qa"] == budget_guard._HARD_STOP_TIER
+    assert "visual_ai_qa" in budget_guard.CI_GATE_FEATURES
+
+
+def test_visual_ai_qa_runs_at_the_tiers_it_used_to_skip(tmp_path, monkeypatch):
+    """#1927 negative test: at tiers 1 and 2 — where the platform actually lives —
+    the vision gate must genuinely RUN (Bedrock called, verdict merged), not merely
+    fail to report a pause."""
+    for tier in (1, 2):
+        calls = []
+        monkeypatch.setattr(budget_guard, "current_tier", lambda t=tier: t)
+        monkeypatch.setattr(visual_ai_qa, "_import_bedrock", lambda: _fake_bedrock(_HIGH_VERDICT, calls=calls))
+        results = [_result_with_shot(tmp_path, name=f"Cockpit{tier}")]
+        status = visual_ai_qa.assess_results(results)
+        assert status == {"status": "ok"}, f"tier {tier} must not skip the vision gate"
+        assert calls, f"Bedrock must be called at tier {tier} (#1927)"
+        assert results[0]["status"] == "FAIL", "a real high verdict must still gate"
 
 
 # ── the advisory slop-lens (#1466): structurally incapable of gating ──────────
