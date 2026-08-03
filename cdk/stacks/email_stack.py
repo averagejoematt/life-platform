@@ -410,7 +410,7 @@ class EmailStack(Stack):
             environment={
                 "SITE_URL": "https://averagejoematt.com",
                 "SEND_RATE_PER_SEC": "14.0",
-                "EXTERNAL_EMAILS_ENABLED": "false",  # privacy mode kill switch
+                "EXTERNAL_EMAILS_ENABLED": "true",  # lifted 2026-08-03 — owner decision on #1951: make the weekly promise true
             },
             custom_policies=rp.email_weekly_signal(),
             **shared,
@@ -434,7 +434,7 @@ class EmailStack(Stack):
             environment={
                 "SITE_URL": "https://averagejoematt.com",
                 "SEND_RATE_PER_SEC": "14.0",
-                "EXTERNAL_EMAILS_ENABLED": "false",  # privacy mode kill switch
+                "EXTERNAL_EMAILS_ENABLED": "true",  # lifted 2026-08-03 — owner decision on #1951: make the weekly promise true
             },
             custom_policies=rp.email_chronicle_sender(),
             **shared,
@@ -458,7 +458,7 @@ class EmailStack(Stack):
             environment={
                 "SITE_URL": "https://averagejoematt.com",
                 "SEND_RATE_PER_SEC": "14.0",
-                "EXTERNAL_EMAILS_ENABLED": "false",  # same privacy-mode kill switch as the chronicle
+                "EXTERNAL_EMAILS_ENABLED": "true",  # lifted 2026-08-03 with the other two subscriber senders (#1951)
             },
             custom_policies=rp.email_between_chronicle(),
             **shared,
