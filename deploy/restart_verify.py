@@ -24,6 +24,13 @@ Checks (each pass/fail):
      the daily writers keep running through a future-genesis countdown window;
      cycle 11 leaked ~397 rows this way. Partition list derived from the wipe
      registries (guard-the-set); repairs via deploy/reconcile_countdown_gap.py.
+ 15. Pre-registration completion gate (#1979): every cycle in CYCLE_GENESES
+     (lambdas/web/site_api_data.py) is either sealed (live S3 artifact whose
+     SHA-256 matches its published stamp) or explicitly, dated-ly grandfathered
+     (deploy/prereg_seal_gate.py) — derived from the artifacts themselves, never
+     a hardcoded per-reset list. A fresh cycle fails here until the attended
+     seed -> publish -> genesis_prereg_stamp.py --apply sequence actually lands
+     a real artifact (#1092 posture: never auto-folded into the pipeline).
 
 Returns 0 if all checks pass, 1 if any fail.
 
@@ -282,6 +289,29 @@ def main():
         check("No countdown-gap escapees (wipe→genesis swept, #1947)", esc == 0, detail)
     except Exception as e:  # never let the verifier itself crash the post-reset check
         check("No countdown-gap escapees (wipe→genesis swept, #1947)", False, f"check could not run: {e}")
+
+    # 15. #1979 — pre-registration completion gate. "Pre-registered" is the
+    # platform's central credibility claim; nothing previously asserted a cycle's
+    # seal was actually published, and 3 of the last 6 cycles slipped through
+    # unsealed with nothing failing. Every genesis in CYCLE_GENESES must have a
+    # live S3 artifact + hash-matching stamp, OR an explicit dated grandfather
+    # record (deploy/prereg_seal_gate.py::GRANDFATHERED_UNSEALED_CYCLES) — so a
+    # reset is not "verified" until the new cycle is sealed or the gap is an
+    # owned, dated decision, never a silent one.
+    try:
+        sys.path.insert(0, str(REPO_ROOT / "lambdas"))
+        import prereg_seal_gate  # noqa: E402  (REPO_ROOT/deploy already on sys.path)
+        from web.site_api_data import CYCLE_GENESES  # noqa: E402  (needs lambdas/ on sys.path, see above)
+
+        s3_for_seal = boto3.client("s3", region_name=REGION)
+        problems = prereg_seal_gate.audit_seal_coverage(CYCLE_GENESES, prereg_seal_gate.make_s3_sealed_check(s3_for_seal))
+        check(
+            "Every cycle has a published prereg seal or a dated grandfather record (#1979)",
+            not problems,
+            "; ".join(problems) if problems else f"{len(CYCLE_GENESES)} cycles in CYCLE_GENESES, all covered",
+        )
+    except Exception as e:  # never let the verifier itself crash the post-reset check
+        check("Every cycle has a published prereg seal or a dated grandfather record (#1979)", False, f"check could not run: {e}")
 
     # Summary
     total = len(checks)

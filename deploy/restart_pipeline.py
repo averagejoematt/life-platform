@@ -695,6 +695,15 @@ def main():
         help="#1092 hook (b): re-land the frozen genesis pre-registration after the wipe "
         "(deploy/seed_genesis_preregistration.py). The PUBLIC publish step stays attended.",
     )
+    # #1979 AC2 (deliberate, recorded): --with-preregistration STAYS opt-in rather than
+    # flipping to default-ON. Flipping it would not by itself fix anything the #1979
+    # completion gate doesn't already catch (seeding alone never produces a published
+    # seal — publish + genesis_prereg_stamp.py --apply stay attended per #1092 either
+    # way), and an always-on seed would let an operator accumulate a frozen local
+    # pre-registration for a genesis they never intended to publicly commit to. The
+    # actual fix for #1979 is the verification half: deploy/restart_verify.py check 15
+    # (deploy/prereg_seal_gate.py) fails a reset that isn't sealed, regardless of how
+    # the frozen file got there.
     parser.add_argument(
         "--dedup-source",
         action="append",
