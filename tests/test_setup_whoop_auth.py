@@ -8,6 +8,7 @@ preserve-in-place secret write that whoop_lambda's refresh path depends on.
 
 import importlib.util
 import json
+import sys
 import urllib.parse
 from pathlib import Path
 from unittest import mock
@@ -15,6 +16,15 @@ from unittest import mock
 import pytest
 
 _MOD_PATH = Path(__file__).resolve().parents[1] / "setup" / "setup_whoop_auth.py"
+
+# #2085: setup_whoop_auth.py now does `from oauth_reauth_common import ...` — a
+# plain top-level import that relies on its OWN directory being on sys.path
+# (true automatically when run as `python3 setup/setup_whoop_auth.py`, since
+# Python adds the script's directory to sys.path[0]). Loading the module here
+# via spec_from_file_location does NOT get that for free, so add it explicitly.
+_SETUP_DIR = str(_MOD_PATH.parent)
+if _SETUP_DIR not in sys.path:
+    sys.path.insert(0, _SETUP_DIR)
 
 
 def _load():
@@ -166,3 +176,49 @@ def test_callback_handler_400_without_code(wa):
     handler.do_GET()
     assert wa.captured_code is None
     handler.send_response.assert_called_once_with(400)
+
+
+# ── #2085: verified re-auth clears the auth-breaker latch ─────────────────────
+
+
+def _drive_main(wa, monkeypatch, *, verified: bool, argv=("setup_whoop_auth.py", "--manual")):
+    """Run wa.main() end-to-end with every I/O boundary mocked except the
+    verify_token() gate under test. Returns (returncode, clear_mock,
+    save_tokens_mock)."""
+    monkeypatch.setattr(wa, "get_secret", lambda: {"client_id": "cid-123", "client_secret": "csec-456"})
+    monkeypatch.setattr(
+        "builtins.input",
+        lambda *_a, **_k: "http://localhost:3000/callback?code=the-code&state=lifeplatform-reauth",
+    )
+    monkeypatch.setattr(wa, "exchange_code", lambda *a, **k: {"access_token": "at-new", "refresh_token": "rt-new"})
+    monkeypatch.setattr(wa, "verify_token", lambda *_a, **_k: verified)
+    save_mock = mock.MagicMock()
+    monkeypatch.setattr(wa, "save_tokens", save_mock)
+    clear_mock = mock.MagicMock()
+    monkeypatch.setattr(wa, "clear_breaker_after_reauth", clear_mock)
+    monkeypatch.setattr(wa.sys, "argv", list(argv))
+
+    rc = wa.main()
+    return rc, clear_mock, save_mock
+
+
+def test_main_clears_the_breaker_after_a_verified_reauth(wa, monkeypatch):
+    """Acceptance box 1 (#2085): a verified re-auth (token confirmed against
+    /recovery) clears the source's AUTH_FAILURE breaker marker in the same
+    run of the setup script."""
+    rc, clear_mock, save_mock = _drive_main(wa, monkeypatch, verified=True)
+
+    assert rc == 0
+    save_mock.assert_called_once()
+    clear_mock.assert_called_once_with("whoop")
+
+
+def test_main_leaves_the_breaker_alone_on_failed_verification(wa, monkeypatch):
+    """Acceptance box 2 (#2085), the explicit negative test: a FAILED
+    verification must leave the marker untouched — the secret must not even
+    be saved, and clear_breaker_after_reauth must never be called."""
+    rc, clear_mock, save_mock = _drive_main(wa, monkeypatch, verified=False)
+
+    assert rc == 2
+    save_mock.assert_not_called()
+    clear_mock.assert_not_called()

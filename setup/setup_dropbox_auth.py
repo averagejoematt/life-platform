@@ -19,6 +19,8 @@ import urllib.error
 import base64
 import boto3
 
+from oauth_reauth_common import clear_breaker_after_reauth
+
 REGION = "us-west-2"
 SECRET_NAME = "life-platform/dropbox"
 
@@ -130,8 +132,15 @@ def main():
         return
 
     print("✅ Tokens received!")
-    verify_access(access_token)
+    verified = verify_access(access_token)
     store_secret(app_key, app_secret, refresh_token)
+    # #2085: only clear the auth-breaker latch once the fresh token has proven
+    # itself against a real Dropbox API call — a failed verification must
+    # leave the marker in place so scheduled runs keep short-circuiting.
+    if verified:
+        clear_breaker_after_reauth("dropbox")
+    else:
+        print("  ⚠ skipping breaker clear — verification failed, so the breaker (if tripped) stays active.")
 
     print()
     print("=" * 60)

@@ -33,6 +33,7 @@ except ImportError as e:
     print("  python3 -m playwright install chromium")
     sys.exit(1)
 
+from oauth_reauth_common import clear_breaker_after_reauth  # noqa: E402
 
 SECRET_NAME = "life-platform/garmin"
 REGION = "us-west-2"
@@ -246,6 +247,11 @@ def main():
     print("[6/6] Saving tokens...")
     save_to_secrets_manager(oauth1, oauth2, display_name)
     save_locally(oauth1, oauth2)
+
+    # #2085: verify_tokens() above already raised (aborting before this line)
+    # if the fresh token didn't validate, so reaching here means it's proven
+    # good — clear the auth-breaker latch so the next scheduled run proceeds.
+    clear_breaker_after_reauth("garmin")
 
     print()
     print("=" * 55)

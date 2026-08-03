@@ -16,6 +16,8 @@ import urllib.request
 
 import boto3
 
+from oauth_reauth_common import clear_breaker_after_reauth
+
 SECRET_NAME = "life-platform/eightsleep"
 REGION = "us-west-2"
 CLIENT_API = "https://client-api.8slp.net"
@@ -138,6 +140,12 @@ def main():
         )
 
     print(f"✓ Secret saved to {SECRET_NAME}")
+
+    # #2085: login() above already returned early (before this line) on a
+    # failed login, so reaching here means the fresh credential is proven
+    # good — clear the auth-breaker latch so the next scheduled run proceeds.
+    clear_breaker_after_reauth("eightsleep")
+
     print()
     print("Next steps:")
     print('  1. Test one night:  python3 -c "')

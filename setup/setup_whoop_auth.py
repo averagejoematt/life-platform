@@ -45,6 +45,8 @@ from urllib.parse import parse_qs, urlparse
 
 import boto3
 
+from oauth_reauth_common import clear_breaker_after_reauth
+
 REGION = "us-west-2"
 SECRET_ID = "life-platform/whoop"  # noqa: S105 — secret name, not a secret value
 AUTH_URL = "https://api.prod.whoop.com/oauth/oauth2/auth"
@@ -237,6 +239,12 @@ def main() -> int:
     print("\n[5/5] Saving tokens to Secrets Manager...")
     save_tokens(secret, tok)
     print("\n✅ Whoop re-authorized — secret updated and verified against /recovery.")
+
+    # #2085: the verify_token() call above already gated everything above this
+    # line — reaching here means the fresh token proved good against the real
+    # API. Clear the auth-breaker latch NOW so the very next scheduled run
+    # (not the next run after its 24h TTL) actually attempts the ingestion.
+    clear_breaker_after_reauth("whoop")
 
     if args.backfill:
         print("[triggering whoop-data-ingestion to backfill the gap…]")

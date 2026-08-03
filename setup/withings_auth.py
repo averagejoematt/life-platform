@@ -7,6 +7,8 @@ import boto3
 import urllib.request
 import urllib.parse
 
+from oauth_reauth_common import clear_breaker_after_reauth
+
 SECRET_NAME = "life-platform/withings"
 REGION = "us-west-2"
 WITHINGS_SIG_URL = "https://wbsapi.withings.net/v2/signature"
@@ -111,6 +113,12 @@ def main():
 
     print("Saving tokens to Secrets Manager...")
     saved = save_secret(secret, token_body)
+
+    # #2085: request_token() above raises RuntimeError on a non-zero Withings
+    # `status` instead of returning, so reaching this line means the token
+    # exchange — the verification — succeeded. Clear the auth-breaker latch
+    # so the next scheduled run proceeds.
+    clear_breaker_after_reauth("withings")
 
     print("\nSuccess! Saved to Secrets Manager:")
     print("  userid:        (stored)")
