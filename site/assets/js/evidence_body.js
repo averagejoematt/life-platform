@@ -7,6 +7,38 @@ import { esc, tryJSON, isBad, has, fmt, ttl, fmtShort, todayPT, dayBefore, fig, 
 import { dataFigure } from "/assets/js/evidence_datafigure.js";
 import { preStart, GENESIS_ISO } from "/assets/js/coach_popover.js"; // #978 pre-start signal · #1252 genesis for carry-forward markers
 
+// #1940 — the correction, stated rather than applied quietly.
+// #1892 withdrew citations that pointed at papers which did not support the claims
+// attached to them. The data was fixed the same day; the READER was never told —
+// and structurally could not be, because a withdrawn source carries no url by
+// design (the #1892 contract) and the card renderer filters sources on x.url.
+// So the fix landed and the page went silent about it.
+//
+// The count is DERIVED from the payload this function just rendered, never
+// written down here: the published number cannot drift from the data because it
+// IS the data. A test binds the same derivation to the config registries.
+const isWithdrawn = (x) => x && !x.url && /withdrawn/i.test(String(x.title || ""));
+
+function withdrawnCount(d) {
+  return Object.values(d.groups || {})
+    .flatMap((g) => g.items || [])
+    .flatMap((s) => s.sources || [])
+    .filter(isWithdrawn).length;
+}
+
+function correctionNotice(d) {
+  const n = withdrawnCount(d);
+  if (!n) return "";
+  return `<aside class="supp-correction" role="note"><p class="supp-correction-h label">Correction &middot; 2 August 2026</p>` +
+    `<p><strong>${n} citations on this page were withdrawn.</strong> They pointed to papers that did not support the claims ` +
+    `they were attached to &mdash; they were never verified when they were written. Two more were withdrawn from the ` +
+    `experiments registry the same day.</p>` +
+    `<p>Nothing was removed quietly: each withdrawn claim now reads &ldquo;Open question&rdquo; below, and the affected ` +
+    `compounds&rsquo; evidence ratings were downgraded to match what is actually cited &mdash; in two cases, nothing. ` +
+    `Every citation that survives now stores the resolved title of the paper it points to, and a test re-resolves each one ` +
+    `against PubMed, so a citation that does not say what it claims fails the build instead of sitting on the page.</p></aside>`;
+}
+
 export function renderSupplements(d) {
   const g = d.groups || {};
   const allItems = Object.values(g).flatMap((x) => x.items || []);
@@ -43,6 +75,15 @@ export function renderSupplements(d) {
       // listed first — a stack that only cites support isn't showing its work),
       // rationale/synergy/watching, genome flags.
       const srcs = (s.sources || []).filter((x) => x && x.url);
+      // #1940: withdrawn entries have no url, so the filter above drops them —
+      // render them explicitly or the card silently shows fewer claims than it made.
+      const withdrawn = (s.sources || []).filter(isWithdrawn);
+      const withdrawnList = withdrawn.length
+        ? `<p class="supp-srchead label supp-src-withdrawn">withdrawn ${withdrawn.length === 1 ? "citation" : "citations"} (#1892)</p><ul class="supp-srcs supp-srcs--withdrawn">${withdrawn.map((x) => `<li>${esc(x.title || "")}</li>`).join("")}</ul>`
+        : "";
+      const evNote = s.evidence_note && !isBad(s.evidence_note)
+        ? `<p class="rd-line supp-evnote"><span class="label">why this cites nothing</span> ${esc(s.evidence_note)}</p>`
+        : "";
       const against = srcs.filter((x) => /challeng|against|counter|skeptic/i.test(String(x.stance || "")));
       const forSrcs = srcs.filter((x) => !against.includes(x));
       const srcList = (list, cls, lbl) => list.length
@@ -52,9 +93,9 @@ export function renderSupplements(d) {
         .filter(([, v]) => v && !isBad(v))
         .map(([k, v]) => `<p class="rd-line"><span class="label">${k}</span> ${esc(v)}</p>`).join("");
       const sci = (s.science || []).length ? `<ul class="supp-sci">${s.science.slice(0, 6).map((b) => `<li>${esc(b)}</li>`).join("")}</ul>` : "";
-      const hasMore = sci || lines || srcs.length > 1 || against.length;
+      const hasMore = sci || lines || srcs.length > 1 || against.length || withdrawn.length || evNote;
       const more = hasMore
-        ? `<details class="supp-more"><summary class="label">the work — science, sources${against.length ? " (incl. the dissent)" : ""}, rationale</summary>${sci}${lines}${srcList(against, "supp-src-against", "challenges it")}${srcList(forSrcs, "supp-src-for", "supports it")}</details>`
+        ? `<details class="supp-more"><summary class="label">the work — science, sources${against.length ? " (incl. the dissent)" : ""}, rationale</summary>${sci}${lines}${srcList(against, "supp-src-against", "challenges it")}${srcList(forSrcs, "supp-src-for", "supports it")}${evNote}${withdrawnList}</details>`
         : "";
       // Containment, not equality: the registry names are richer than the SNP's
       // supplement key ("Vitamin D3 + K2" vs "Vitamin D3") — verified 1:1 on the
@@ -72,7 +113,7 @@ export function renderSupplements(d) {
     }).join("");
     return `<section class="rd-sec"><div class="rd-grouphead"><h2 class="rd-h">${esc(grp.name)}</h2>${grp.desc ? `<p class="rd-desc">${esc(grp.desc)}</p>` : ""}</div><div class="supp-grid">${cards}</div></section>`;
   }).join("");
-  return head + frame + secs + note("Evidence strength is the published research consensus — not a claim about Matthew.");
+  return head + frame + correctionNotice(d) + secs + note("Evidence strength is the published research consensus — not a claim about Matthew.");
 }
 
 export function renderLabs(d) { const L = d.labs || d; const bm = L.biomarkers || []; if (!bm.length) return empty("No bloodwork drawn yet — panels appear here as they're added."); const by = {}; for (const b of bm) (by[b.category || "Other"] ||= []).push(b); const secs = Object.entries(by).map(([cat, rows]) => sec(cat, `<table class="rd-tbl"><thead><tr><th>biomarker</th><th>value</th><th>reference</th><th>flag</th></tr></thead><tbody>${rows.map((b) => { const f = b.flag && String(b.flag).toLowerCase() !== "null"; return `<tr class="${f ? "rd-flag" : ""}"><td class="rd-name">${esc(b.name)}</td><td class="num">${esc(b.value)}${b.unit ? ` <span class="rd-unit">${esc(b.unit)}</span>` : ""}</td><td class="num rd-range">${esc(b.range || "—")}</td><td>${f ? `<span class="rd-flagmark">${esc(b.flag)}</span>` : ""}</td></tr>`; }).join("")}</tbody></table>`)).join(""); return figs([fig(L.total_draws ?? "—", "draws"), fig(bm.length, "biomarkers"), fig(L.flagged_count ?? 0, "flagged"), L.latest_draw_date && fig(L.latest_draw_date, "latest draw")]) + secs + note("Reference ranges are lab-provided; flags mark out-of-range."); }

@@ -872,6 +872,19 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .supp-srcs a { color: var(--ink-muted); }
 .supp-srcs a:hover { color: var(--ember); }
 
+/* #1940 — the citation correction, stated on the page rather than applied quietly.
+   Deliberately quiet styling: a correction should read as part of the record, not
+   as an alert banner. Uses the existing rule/ink tokens, no new colour. */
+.supp-correction { margin: var(--sp-5) 0 var(--sp-6); padding: var(--sp-4);
+  border: var(--border-hair); border-left: 2px solid var(--ink-faint);
+  border-radius: var(--radius-sm); }
+.supp-correction-h { display: block; color: var(--ink-faint); margin-bottom: var(--sp-2); }
+.supp-correction p + p { margin-top: var(--sp-2); }
+.supp-correction strong { color: var(--ink); }
+.supp-srchead.supp-src-withdrawn { color: var(--ink-faint); }
+.supp-srcs--withdrawn { color: var(--ink-muted); font-style: italic; list-style: "— "; }
+.supp-evnote { margin-top: var(--sp-2); color: var(--ink-muted); }
+
 /* ── Reader participation — votes, follows, check-ins, suggestions, findings
    (switch-on, 2026-07). Reuses the .df-btn pill language rather than inventing
    a new control; .ask-in-shaped inputs for the two forms. Real counts only —
