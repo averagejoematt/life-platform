@@ -44,6 +44,9 @@ on:
     branches: [main]
     paths:
       - 'site/**'
+      - 'config/**'                           # #2019 — bucket-root config/ twins deploy from here too
+      - 'deploy/config_twin_sync.py'
+      - 'deploy/config_twin_registry.py'
       - '.github/workflows/site-deploy.yml'   # workflow edits must exercise themselves
   workflow_dispatch: {}   # manual re-deploy of the current main tree (e.g. after a generated/ data fix)
 
@@ -110,7 +113,9 @@ jobs:
             # Does a replacement run genuinely exist? Only if the newer commits touch
             # a path this workflow triggers on.
             CHANGED="$(git diff --name-only HEAD origin/main -- \
-                        'site/' '.github/workflows/site-deploy.yml' 2>/dev/null || echo '')"
+                        'site/' 'config/' 'deploy/config_twin_sync.py' \
+                        'deploy/config_twin_registry.py' \
+                        '.github/workflows/site-deploy.yml' 2>/dev/null || echo '')"
             if [ -n "$CHANGED" ]; then
               SUPERSEDED=true
               echo "⏭ Superseded by ${MAIN_SHA:0:7} — it touches this workflow's trigger paths, so it has its own run deploying a superset. Skipping."
@@ -160,6 +165,24 @@ jobs:
             --cache-control "max-age=31536000, public, immutable" \
             --region ${{ env.AWS_REGION }}
           echo "✅ Fonts synced"
+
+      # #2019 — the THIRD deploy prefix. `site/` and `generated/` (ADR-046) each
+      # have a path; bucket-root `config/` had none, so a merged registry change
+      # never reached the site-api Lambda. Measured 2026-08-02: /api/supplements
+      # served withdrawn citations for ~13h after the withdrawal merged, green
+      # the whole time (no sync step + no-TTL container cache + 3600s CF TTL).
+      #
+      # This uploads EXPLICIT FILES ONLY (never `aws s3 sync`, never --delete,
+      # never a prefix operation): root config/ also holds Lambda-written runtime
+      # state and out-of-band objects a prefix sync would clobber or strip. The
+      # twin set is derived — see deploy/config_twin_registry.py.
+      - name: Sync bucket-root config/ twins (#2019)
+        if: steps.supersede.outputs.superseded != 'true'
+        run: |
+          python3 deploy/config_twin_sync.py --apply
+          # Verify the objects actually landed — "applied" is not "serving".
+          python3 deploy/config_twin_sync.py --strict
+          echo "✅ config/ twins in sync"
 
   # ════════════════════════════════════════════════════════════════
   # Job 2a: HTTP/content smoke of the live site

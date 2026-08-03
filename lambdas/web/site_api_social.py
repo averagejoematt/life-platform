@@ -27,6 +27,7 @@ import hmac as _hmac
 import json
 import os
 import re
+import time
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -48,6 +49,7 @@ from web.site_api_common import (
     _is_blocked_vice,
     _load_s3_json,
     _ok,
+    config_cache_valid,
     logger,
     table,
 )
@@ -74,6 +76,7 @@ _nudge_counts: dict = {}  # ACCT-2: category -> approximate count
 _finding_rate_store: dict = {}  # NEW-1: ip_hash -> list of timestamps for submit_finding
 # S3 config caches for experiment + challenge endpoints
 _challenges_cache = None
+_challenges_cache_at = None  # #2019 — TTL stamp; None = pinned (test injection)
 _challenge_catalog_cache = None
 
 # R17-04: separate Anthropic key for site-api (distinct from main ai-keys).
@@ -1128,9 +1131,10 @@ def handle_challenges() -> dict:
 
     # Overlay the catalog (always) — available + backlog the live partition lacks.
     catalog = []
-    global _challenges_cache
-    if _challenges_cache is None:
+    global _challenges_cache, _challenges_cache_at
+    if _challenges_cache is None or not config_cache_valid(_challenges_cache_at):
         _challenges_cache = _load_s3_json("config/challenges_catalog.json", "challenges_catalog")
+        _challenges_cache_at = time.monotonic()
     for c in (_challenges_cache or {}).get("challenges", []):
         if c.get("id") in live_ids:
             continue

@@ -32,6 +32,7 @@ Endpoints routed from this module (kept in sync by tests/test_site_api_data_spli
 
 import json
 import os
+import time
 from datetime import datetime, timezone
 
 import boto3
@@ -56,6 +57,7 @@ from web.site_api_common import (
     _is_blocked_vice,
     _load_s3_json,
     _query_source,
+    config_cache_valid,
     logger,
     pre_start_meta,
     table,
@@ -114,6 +116,7 @@ CYCLE_GENESES = {
 # #1066: container cache for the training-phase registry (read by the routine handler
 # via the `_g` hand-off; the routine test patches sad._load_phase_state).
 _phase_state_cache = None
+_phase_state_cache_at = None  # #2019 — TTL stamp; None = pinned (test injection)
 
 
 def _days_dark(last_update: str, now: datetime) -> int | None:
@@ -134,9 +137,10 @@ def _load_phase_state() -> dict:
     current block. Canonical root config/ prefix (not the site/config mirror —
     that one is purged by experiment resets). Container-cached like the other
     S3 config reads — phase flips are manual and rare."""
-    global _phase_state_cache
-    if _phase_state_cache is None:
+    global _phase_state_cache, _phase_state_cache_at
+    if _phase_state_cache is None or not config_cache_valid(_phase_state_cache_at):
         _phase_state_cache = _load_s3_json("config/training_phases.json", "training_phases")
+        _phase_state_cache_at = time.monotonic()
     return _phase_state_cache
 
 
