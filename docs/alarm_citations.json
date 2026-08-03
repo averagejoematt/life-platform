@@ -11,5 +11,13 @@
   "ingest-auth-unhealthy-24h": {
     "citation": "#1934",
     "note": "Whoop OAuth 401, auth breaker latched since 2026-08-01 12:00Z. Needs Matthew's interactive re-auth (setup/setup_whoop_auth.py --backfill) — gate:owner, cannot be automated."
+  },
+  "life-platform-ingestion-dlq-messages": {
+    "citation": "#2069",
+    "note": "ALARM since 2026-08-03T12:04:26Z (verified via describe-alarm-history) — the whoop-data-ingestion EventBridge events that failed every hour from 12:00Z onward (first a 502 on the token endpoint, then repeated 'genuine auth failure' 400s the pre-fix breaker classifier never recognized) land here. The alarm + its urgent SNS route ('life-platform-alerts') worked correctly the whole time — remediation-dispatcher logged 'dispatched urgent_alarm' at 12:04:59Z — this was never a missing-machinery gap. Messages clear once #2069's classifier/rotation fix is deployed AND the credential is interactively re-authorized (owner action, concurrent with this filing) restores clean hourly runs; until then they are an accounted-for, expected byproduct of the known root cause, not a separate incident."
+  },
+  "life-platform-dlq-depth-warning": {
+    "citation": "#2069",
+    "note": "Same underlying cause and same message set as life-platform-ingestion-dlq-messages above (duplicate alarm on the identical AWS/SQS ApproximateNumberOfMessagesVisible metric/dimension, routed to the digest topic instead of urgent) — ALARM since 2026-08-03T12:04:56Z, confirmed fired correctly."
   }
 }
