@@ -478,6 +478,20 @@ those nine numbers. **Enforced (#1212):** `scripts/check_css_tokens.py` turns th
 assertion (a rogue value fails the gate), alongside the raw-hex / font-size / undefined-token
 sweep over the seven consumer sheets; run in CI via `tests/test_css_tokens.py`.
 
+**The rule covers *generated* CSS too (#1974).** A page-scoped `<style>` block emitted by a
+`scripts/v4_build_*.py` generator is CSS on a live page, so the nine numbers and the `--fs-*`
+triad bind there identically — "it's in a Python string" is not an exemption. The gate had been
+stylesheet-only, and the drift class simply moved: six generators shipped 560/620/640/720/900
+plus a `font-size:64px` drop cap to `/method/grade-your-coach/`, `/method/mirror/`, `/gear/`,
+`/method/eyeball/`, `/method/registry/`, `/method/tone/`, `/story/theme-river/` and the essay
+pages. `check_css_tokens.py` now also sweeps the `<style>` blocks in **every**
+`scripts/v4_build_*.py` (glob) and **every** non-legacy `site/**/*.html` (rglob) — derived, so a
+new generator or page is covered the day it lands. Retarget by *job*, exactly as for a
+stylesheet: 720→761 (tablet 2-col), 620/640/560→601 (off the phone boundary), 900→901 (desktop);
+a raw drop-cap size becomes the relative-em `story.css` pattern (`3.4em` + an `fs-ok:` sanction).
+After changing a generator's `STYLE`, **regenerate the page and commit the output** — then run
+`python3 scripts/v4_apply_chrome.py`, which is the authoritative post-build chrome pass.
+
 ### 10.2 The bottom app-bar — @layer, not !important (#1007)
 
 On mobile (`≤600`) the five doors become a **fixed, thumb-reachable bottom app-bar**. It is

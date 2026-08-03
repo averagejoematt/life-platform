@@ -99,11 +99,11 @@ STYLE = """
    must break mid-token at 390px — the #1413 entry overflowed the viewport by 31px and
    redded the gating visual-QA (the wrap-deploy rollback, 2026-07-19). */
 .mr-modules { display: grid; gap: var(--sp-4); margin-top: var(--sp-4); min-width: 0; }
-@media (min-width: 640px) { .mr-modules { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 601px) { .mr-modules { grid-template-columns: 1fr 1fr; } }
 .mr-module { border: var(--border-hair); border-radius: var(--radius); padding: var(--sp-4); min-width: 0; }
 .mr-module h3 { margin: 0; font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink); }
 .mr-module p { margin-top: var(--sp-2); color: var(--ink-muted); font-size: var(--fs-small); line-height: var(--lh-relaxed); }
-.mr-module code { color: var(--ink-faint); }
+.mr-module code { color: var(--ink-faint); overflow-wrap: anywhere; }
 </style>
 """
 

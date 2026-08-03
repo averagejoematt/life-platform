@@ -85,7 +85,7 @@ STYLE = """
 <style>
 .gyc-wrap { max-width: var(--container); margin-inline: auto; padding: 0 var(--gutter) var(--sp-9); }
 .gyc-cols { display: grid; gap: var(--sp-5); margin-top: var(--sp-5); min-width: 0; align-items: start; }
-@media (min-width: 900px) { .gyc-cols { grid-template-columns: minmax(0, 4fr) minmax(0, 6fr); } }
+@media (min-width: 901px) { .gyc-cols { grid-template-columns: minmax(0, 4fr) minmax(0, 6fr); } }
 .gyc-pane { border: var(--border-hair); border-radius: var(--radius); padding: var(--sp-5); background: var(--surface-raised); min-width: 0; }
 .gyc-pane h2 { margin: 0 0 var(--sp-3); font-family: var(--font-serif); font-size: var(--fs-h3); color: var(--ink); }
 #gyc-input { width: 100%; min-height: 15rem; resize: vertical; box-sizing: border-box; padding: var(--sp-3);
@@ -100,7 +100,7 @@ STYLE = """
 .gyc-card { border: var(--border-hair); border-radius: var(--radius); padding: var(--sp-5); background: var(--surface-raised); min-width: 0; }
 .gyc-empty { color: var(--ink-muted); line-height: var(--lh-relaxed); }
 .gyc-figs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); }
-@media (min-width: 620px) { .gyc-figs { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 601px) { .gyc-figs { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .gyc-figs > .gyc-fig { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .gyc-fig-v { font-family: var(--font-mono); font-size: var(--fs-h3); color: var(--ink); }
 /* "skill vs base rate" is the only label that wraps to two lines, which pushed its
@@ -121,7 +121,7 @@ STYLE = """
    fits without scrolling at every breakpoint. */
 .gyc-chartwrap { display: grid; gap: var(--sp-4); margin-top: var(--sp-5); min-width: 0; }
 .gyc-chart { position: relative; min-width: 0; max-width: 340px; }
-@media (min-width: 900px) { .gyc-chart { max-width: 400px; } }
+@media (min-width: 901px) { .gyc-chart { max-width: 400px; } }
 .gyc-svg { width: 100%; height: auto; display: block; }
 .gyc-plot { fill: var(--surface-sunken); stroke: var(--rule); stroke-width: 1; }
 .gyc-ideal { stroke: var(--ink-faint); stroke-width: 1; stroke-dasharray: 4 4; }

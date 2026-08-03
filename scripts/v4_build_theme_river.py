@@ -100,8 +100,8 @@ STYLE = """
   padding: var(--sp-4) var(--sp-5); background: var(--surface-raised); color: var(--ink-muted); line-height: var(--lh-relaxed); }
 .tr-meta { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-faint); margin: var(--sp-5) 0 0; }
 .tr-grid { display: grid; gap: var(--sp-4); margin-top: var(--sp-4); min-width: 0; grid-template-columns: 1fr; }
-@media (min-width: 560px) { .tr-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (min-width: 900px) { .tr-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 601px) { .tr-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 901px) { .tr-grid { grid-template-columns: repeat(3, 1fr); } }
 .tr-card { border: var(--border-hair); border-radius: var(--radius); padding: var(--sp-5); background: var(--surface-raised); min-width: 0; }
 .tr-card--glow { border-color: var(--ember); box-shadow: inset 0 0 0 1px var(--ember-wash); }
 .tr-card h3 { margin: 0; font-family: var(--font-serif); font-size: var(--fs-h3); color: var(--ink); text-transform: capitalize; overflow-wrap: anywhere; }

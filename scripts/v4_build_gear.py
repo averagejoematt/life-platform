@@ -319,7 +319,7 @@ STYLE = """
 .gr-cat-head .rd-h { border-top: 0; padding-top: 0; margin-bottom: 0; }
 .gr-cat-count { color: var(--ink-faint); font-family: var(--font-mono); font-size: var(--fs-small); }
 .gr-grid { display: grid; gap: var(--sp-5); margin-top: var(--sp-4); min-width: 0; }
-@media (min-width: 720px) { .gr-grid { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 761px) { .gr-grid { grid-template-columns: 1fr 1fr; } }
 .gr-card { display: flex; flex-direction: column; border: var(--border-hair); border-radius: var(--radius);
   padding: var(--sp-5); background: var(--surface-raised); min-width: 0; }
 .gr-card-top { display: flex; align-items: flex-start; gap: var(--sp-3); }

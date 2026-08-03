@@ -48,6 +48,21 @@ known tokens.
    `(max-width: 520px)` class). The grep in §10.1 — the "(max|min)-width: Npx" sweep
    that returns only those nine numbers — is turned into this assertion.
 
+5. GENERATED INLINE `<style>` (#1974) — checks 1 and 4 again, over the page-scoped
+   `<style>` blocks the v4 page generators emit, and over the built pages themselves.
+   The stylesheet sweep above was a partial gate: the same drift class simply moved to
+   the surface it never reached, and six generators shipped five rogue breakpoints
+   (560/620/640/720/900) plus a `font-size:64px` drop cap to live pages. Both halves of
+   the surface are swept, and both are DERIVED, never enumerated:
+     * every `scripts/v4_build_*.py` (glob) — the generator, the real source of truth;
+     * every non-legacy `site/**/*.html` (rglob) — the built page, so a hand-edit that
+       drifts from its generator is caught too.
+   Only the breakpoint + font-size checks run here (the two whose sanctioned vocabulary
+   — the §10.1 nine numbers, the --fs-* triad — is unambiguous in a page-scoped block).
+   The hex/undefined-token checks stay stylesheet-only for now: generated blocks legitimately
+   reference runtime-set props, and retiring a live undefined-token reference is a palette
+   decision, not a mechanical retarget.
+
 Exit 0 clean, 1 with findings. Run:  python3 scripts/check_css_tokens.py
 Enforced by tests/test_css_tokens.py.
 """
@@ -81,6 +96,15 @@ RUNTIME_PROPS = {
     "--fill",  # meter fill fraction (various renderers)
     "--delay",  # generic stagger slot
 }
+
+# (#1974) The generated-CSS surface, DERIVED not enumerated — a new page generator or a
+# new built page joins the sweep the moment it lands, which is the whole point of the gate.
+GENERATOR_GLOB = "v4_build_*.py"
+BUILT_GLOB = "*.html"
+# site/legacy is the frozen pre-v4 site (private rollback, never linked) — out of scope.
+BUILT_EXCLUDE_DIRS = {"legacy"}
+
+STYLE_BLOCK = re.compile(r"<style[^>]*>(.*?)</style>", re.S | re.I)
 
 VAR_REF = re.compile(r"var\(\s*(--[\w-]+)")
 PROP_DEF = re.compile(r"(--[\w-]+)\s*:")
@@ -197,6 +221,43 @@ def breakpoint_findings_in(name: str, text: str) -> list:
     return findings
 
 
+def style_block_mask(text: str) -> str:
+    """(#1974) `text` with everything OUTSIDE a `<style>…</style>` body blanked, line
+    numbers preserved. Feeding this to the existing per-line checks makes them scan the
+    generated CSS only — a `font-size: 12px` in a Python comment or a `(max-width: 520px)`
+    in prose is not a live declaration — while every reported line number stays the real
+    line number in the real file."""
+    pieces = []
+    cursor = 0
+    for m in STYLE_BLOCK.finditer(text):
+        pieces.append("\n" * text.count("\n", cursor, m.start(1)))
+        pieces.append(m.group(1))
+        cursor = m.end(1)
+    pieces.append("\n" * text.count("\n", cursor, len(text)))
+    return "".join(pieces)
+
+
+def generated_style_sources() -> list:
+    """(#1974) Both halves of the generated surface, derived: every v4 page generator and
+    every non-legacy built page. Returned as (label, path) with a repo-relative label."""
+    sources = [(f"scripts/{p.name}", p) for p in sorted((REPO / "scripts").glob(GENERATOR_GLOB))]
+    for p in sorted((REPO / "site").rglob(BUILT_GLOB)):
+        if BUILT_EXCLUDE_DIRS & set(p.relative_to(REPO).parts):
+            continue
+        sources.append((str(p.relative_to(REPO)), p))
+    return sources
+
+
+def inline_style_findings(name: str, text: str) -> list:
+    """(#1974) The §10.1 breakpoint + type-scale checks over the `<style>` blocks in
+    `text` (a generator source or a built page). Returns finding strings with real
+    file line numbers."""
+    masked = style_block_mask(text)
+    if not STYLE_BLOCK.search(text):
+        return []
+    return breakpoint_findings_in(name, masked) + font_size_findings(name, masked)
+
+
 def defined_props(*files: Path) -> set:
     props = set()
     for f in files:
@@ -224,6 +285,10 @@ def check() -> list:
     # (breakpoints are constants used everywhere; there is no allowlist file for them).
     for sheet in sorted(CSS_DIR.glob("*.css")):
         findings.extend(breakpoint_findings_in(sheet.name, sheet.read_text()))
+    # (#1974) …and across the GENERATED surface the stylesheet sweep never reached: the
+    # inline <style> blocks the v4 generators emit, plus the built pages they write.
+    for label, path in generated_style_sources():
+        findings.extend(inline_style_findings(label, path.read_text(errors="replace")))
     return findings
 
 

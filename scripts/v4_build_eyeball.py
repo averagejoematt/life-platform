@@ -79,7 +79,7 @@ STYLE = """
 .eb-state { margin-top: var(--sp-5); border: var(--border-hair); border-radius: var(--radius); padding: var(--sp-6); background: var(--surface-raised); }
 .eb-empty { color: var(--ink-muted); line-height: var(--lh-relaxed); }
 .eb-grid { display: grid; gap: var(--sp-4); margin-top: var(--sp-5); min-width: 0; }
-@media (min-width: 720px) { .eb-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 761px) { .eb-grid { grid-template-columns: repeat(2, 1fr); } }
 .eb-macro { border: var(--border-hair); border-radius: var(--radius); padding: var(--sp-5); background: var(--surface-raised); min-width: 0; }
 .eb-macro h3 { margin: 0; font-family: var(--font-serif); font-size: var(--fs-h3); color: var(--ink); }
 .eb-macro .eb-n { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-faint); }
@@ -91,6 +91,7 @@ STYLE = """
 .eb-lown { margin-top: var(--sp-3); font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-faint); }
 .eb-trend { margin-top: var(--sp-2); font-size: var(--fs-small); color: var(--ink-muted); }
 .eb-disclaimer { margin-top: var(--sp-6); color: var(--ink-muted); line-height: var(--lh-relaxed); }
+.eb-disclaimer code { overflow-wrap: anywhere; }
 </style>
 """
 
