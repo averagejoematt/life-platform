@@ -1,0 +1,86 @@
+# Deploy-wedge watch (#2052) — the fifth-recurrence escape hatch.
+#
+# WHY THIS IS A SEPARATE WORKFLOW, NOT A JOB IN ci-cd.yml:
+# it has to observe ci-cd.yml from OUTSIDE. The wedged run is one whose own jobs can
+# never start — a job inside it could not report on it, and a job in a later ci-cd run
+# would queue behind the very same group. This workflow shares nothing with ci-cd.yml:
+# no concurrency group of its own (see below), no environment, no AWS.
+#
+# NO `concurrency:` BLOCK HERE, DELIBERATELY. A watchdog for a stuck concurrency queue
+# must not own a concurrency queue. Overlapping runs of this workflow are harmless —
+# it is read-only unless explicitly asked to recover.
+#
+# LOUDNESS: on a phantom wedge the job FAILS. A red scheduled workflow is the repo's
+# existing "email the owner" channel, and the failure body carries the full decode plus
+# the exact recovery command — the operator should never have to re-derive it at 2am.
+#
+# It does NOT deploy. The recovery path re-dispatches ci-cd.yml, which still stops at
+# the production approval gate like any other run.
+
+name: Deploy wedge watch
+
+on:
+  schedule:
+    # Every 15 minutes. The wedge is only harmful while the tree it would deploy is
+    # still current; the 2026-08-02 recurrence was cancelled at 17 minutes holding a
+    # stale sha. 15 minutes bounds the blind window below that.
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      recover:
+        description: 'Run the documented recovery if a phantom wedge is CONFIRMED (cancel + re-dispatch ci-cd.yml with deploy_all=true)'
+        required: false
+        type: boolean
+        default: false
+      threshold:
+        description: 'Minutes a Deploy may sit blocked with nothing holding the group before alarming'
+        required: false
+        type: string
+        default: '10'
+
+permissions:
+  contents: read
+  actions: write   # read run/job state; `recover` cancels the wedged run + re-dispatches
+
+jobs:
+  watch:
+    name: Detect a wedged deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Classify the in-flight deploy state
+        id: classify
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -o pipefail
+          python3 scripts/check_deploy_wedge.py --threshold "${{ github.event.inputs.threshold || '10' }}" | tee verdict.txt
+        continue-on-error: true
+
+      - name: Recover a confirmed phantom wedge
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.recover == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # --recover refuses to act on any verdict other than a confirmed phantom wedge.
+          python3 scripts/check_deploy_wedge.py --threshold "${{ github.event.inputs.threshold || '10' }}" --recover
+
+      - name: Fail loudly on a wedge
+        if: steps.classify.outcome == 'failure'
+        run: |
+          echo "::error title=Deploy wedge or stranded gate::CI/CD's deploy path is not progressing — see the decode below."
+          {
+            echo "## 🛑 CI/CD deploy path is not progressing"
+            echo
+            echo '```'
+            cat verdict.txt
+            echo '```'
+            echo
+            echo "Escape hatch: re-run this workflow via **Run workflow** with \`recover: true\`,"
+            echo "or locally: \`python3 scripts/check_deploy_wedge.py --recover\`."
+            echo
+            echo "Background: \`docs/CONVENTIONS.md\` §4d (five recurrences and what was tried each time)."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1

@@ -1,0 +1,54 @@
+{
+  "_provenance": "The 2026-08-02 fifth recurrence, run 30769861255 (workflow_dispatch, deploy_all=true), reconstructed at T+12min into the wedge — the moment the issue body records the operator observing it ('queued 12+ min, never started'). The completed record is still fetchable and pins every field here EXCEPT the live `status` of the Deploy job (the run has since been cancelled, so the API now reports status=completed/conclusion=cancelled). Pinned from the completed record: Deploy started_at=2026-08-02T22:27:18Z (== the second Plan deployments completed), steps=[] (it never ran a single step), runner_id=0/runner_name=\"\" (never assigned a runner), and cancelled at 22:44:40Z after 17m in the blocked state. The live Deploy status is set to \"pending\" here because that is what the API demonstrably reports for a concurrency-blocked deploy job on this exact workflow — captured live the next day in queued_behind.json. The issue body records the operator seeing the GitHub *UI* label \"queued\"; the classifier accepts both spellings for that reason. pending_deployments was observed EMPTY for the whole 12+ min, which is the substantive fact: the job never reached the environment gate, so there was never anything to approve. The other four runs of the burst (30769190998, 30769284130, 30769564973, 30769668905) had all reached completed/cancelled by 22:27:20Z, so NOTHING held the group.",
+  "now": "2026-08-02T22:39:30Z",
+  "runs": [
+    {
+      "id": 30769861255,
+      "status": "pending",
+      "conclusion": null,
+      "event": "workflow_dispatch",
+      "head_branch": "main",
+      "head_sha": "e8afac18fe306251c562a3faa4f0f70e825d9ba4",
+      "created_at": "2026-08-02T22:19:45Z"
+    },
+    {
+      "id": 30769668905,
+      "status": "completed",
+      "conclusion": "cancelled",
+      "event": "push",
+      "head_branch": "main",
+      "head_sha": "236f9c6dfbb1f755db9d3ef3984871e63c65b832",
+      "created_at": "2026-08-02T22:14:25Z"
+    },
+    {
+      "id": 30769564973,
+      "status": "completed",
+      "conclusion": "cancelled",
+      "event": "push",
+      "head_branch": "main",
+      "head_sha": "64226521e35083e3a4e5d5a9d4b51b11038cf185",
+      "created_at": "2026-08-02T22:11:37Z"
+    }
+  ],
+  "jobs": {
+    "30769861255": [
+      {"name": "Reconcile derived artifacts", "status": "completed", "conclusion": "success", "started_at": "2026-08-02T22:19:50Z"},
+      {"name": "lint / Lint + Syntax Check", "status": "completed", "conclusion": "success", "started_at": "2026-08-02T22:20:13Z"},
+      {"name": "Deploy-critical tests", "status": "completed", "conclusion": "success", "started_at": "2026-08-02T22:22:41Z"},
+      {"name": "test / Unit Tests", "status": "completed", "conclusion": "success", "started_at": "2026-08-02T22:22:47Z"},
+      {"name": "Plan deployments", "status": "completed", "conclusion": "success", "started_at": "2026-08-02T22:23:38Z"},
+      {"name": "Deploy", "status": "pending", "conclusion": null, "started_at": "2026-08-02T22:27:18Z"}
+    ],
+    "30769668905": [
+      {"name": "Plan deployments", "status": "completed", "conclusion": "cancelled", "started_at": "2026-08-02T22:18:40Z"},
+      {"name": "Deploy", "status": "completed", "conclusion": "cancelled", "started_at": "2026-08-02T22:27:20Z"}
+    ],
+    "30769564973": [
+      {"name": "Plan deployments", "status": "completed", "conclusion": "cancelled", "started_at": "2026-08-02T22:15:50Z"},
+      {"name": "Deploy", "status": "completed", "conclusion": "cancelled", "started_at": "2026-08-02T22:23:07Z"}
+    ]
+  },
+  "pending": {
+    "30769861255": []
+  }
+}

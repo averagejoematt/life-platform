@@ -1,0 +1,28 @@
+{
+  "_provenance": "The 2026-08-02/03 stranded-gate class, run 30768641759 — the SAME payload shape as awaiting_approval.json, only older. Pinned from the completed record: created 2026-08-02T21:46:46Z, Plan deployments completed 21:54:52Z, and the Deploy job did not start until 2026-08-03T02:29:10Z — i.e. it sat at the gate ~4.6h until a human ran deploy/approve_deployment.sh. `now` here is set inside that window. This is the class the detector must NOT confuse with the wedge: the gate was OPEN the whole time (pending_deployments non-empty), the human was simply absent. Recovery is approval, never cancel-and-redispatch.",
+  "now": "2026-08-03T00:30:00Z",
+  "runs": [
+    {
+      "id": 30768641759,
+      "status": "waiting",
+      "conclusion": null,
+      "event": "push",
+      "head_branch": "main",
+      "head_sha": "386a1e243cfce72a7a00131aec4b094df69fc02a",
+      "created_at": "2026-08-02T21:46:46Z"
+    }
+  ],
+  "jobs": {
+    "30768641759": [
+      {"name": "Reconcile derived artifacts", "status": "completed", "conclusion": "success", "started_at": "2026-08-02T21:46:55Z"},
+      {"name": "lint / Lint + Syntax Check", "status": "completed", "conclusion": "success", "started_at": "2026-08-02T21:47:16Z"},
+      {"name": "Deploy-critical tests", "status": "completed", "conclusion": "success", "started_at": "2026-08-02T21:49:47Z"},
+      {"name": "test / Unit Tests", "status": "completed", "conclusion": "success", "started_at": "2026-08-02T21:49:51Z"},
+      {"name": "Plan deployments", "status": "completed", "conclusion": "success", "started_at": "2026-08-02T21:50:37Z"},
+      {"name": "Deploy", "status": "waiting", "conclusion": null, "started_at": "2026-08-02T21:55:00Z"}
+    ]
+  },
+  "pending": {
+    "30768641759": [{"environment": {"name": "production"}, "current_user_can_approve": true}]
+  }
+}

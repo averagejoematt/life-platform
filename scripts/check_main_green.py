@@ -23,16 +23,36 @@ straight past:
     from main. This is not an ordinary red — every subsequent merge's deploy
     strands too, invisibly, until the CDK deploy clears it.
 
+#2052 adds the THIRD stranded state, which the two above cannot express:
+
+  * **Phantom deploy wedge** — the run's `Deploy` job is blocked in the
+    `ci-cd-deploy-<ref>` concurrency group by an entry that corresponds to no
+    real run. Since the #2009 redesign this no longer presents as `0 jobs`:
+    the run shows FIVE GREEN JOBS and sits `pending`, which reads as "waiting
+    for approval" — but `pending_deployments` is empty and will stay empty,
+    because GitHub evaluates concurrency BEFORE the environment rule, so the
+    gate never opens and there is nothing to approve. Every tell documented
+    for the older phantom class keys on "0 jobs" and is therefore now blind.
+    Detection lives in `scripts/check_deploy_wedge.py` (it needs per-run JOB
+    state, which `gh run list` does not carry); this gate consumes its verdict.
+    Distinguishing it from the stranded-approval class above is NOT possible
+    from a single run — the two are byte-identical — it turns entirely on
+    whether any other in-flight run actually holds the deploy group.
+
 Verdicts:
   * green                → exit 0
   * green + a YOUNG waiting run (< ~2h at the approval gate) → exit 0 with a
     notice (a manual production approval pending is the pipeline's normal
     post-merge state, not an incident — until it ages past the threshold)
-  * stranded-approval / stranded-plan / red / no-verdict → print the decode
-    contract and exit 1. The wrap may proceed ONLY by writing the one-line
-    decode into the handover (e.g. `**Main:** stranded — run 303… waiting at
-    the production gate since 03:06Z, #1901 class`) and re-running with
-    --decoded to acknowledge.
+  * stranded-approval / stranded-plan / stranded-deploy-wedge / red /
+    no-verdict → print the decode contract and exit 1. The wrap may proceed
+    ONLY by writing the one-line decode into the handover (e.g. `**Main:**
+    stranded — run 303… waiting at the production gate since 03:06Z, #1901
+    class`) and re-running with --decoded to acknowledge.
+
+A phantom deploy wedge outranks every other verdict INCLUDING green: while it
+holds, no deploy can start, so the last completed run's success is a stale
+fact about a pipeline that is no longer able to ship.
 
 Cancelled runs are skipped (superseded pushes carry no signal); the newest
 run that actually finished is the completed-run verdict.
@@ -56,6 +76,7 @@ GREEN = "green"
 RED = "red"
 STRANDED_APPROVAL = "stranded-approval"
 STRANDED_PLAN = "stranded-plan"
+STRANDED_DEPLOY_WEDGE = "stranded-deploy-wedge"
 NO_VERDICT = "no-verdict"
 
 
@@ -138,15 +159,22 @@ def classify_pipeline(
     runs: list[dict],
     latest_failure_jobs: list[dict] | None = None,
     now: datetime | None = None,
+    deploy_wedge: dict | None = None,
 ) -> dict:
-    """Classify main's pipeline state. Pure — fixture-tested offline (#1901).
+    """Classify main's pipeline state. Pure — fixture-tested offline (#1901/#2052).
 
-    Returns {"kind", "sha", "run", "waiting", "overdue_waiting"} where kind is
-    one of GREEN / RED / STRANDED_APPROVAL / STRANDED_PLAN / NO_VERDICT.
+    Returns {"kind", "sha", "run", "waiting", "overdue_waiting"} where kind is one of
+    GREEN / RED / STRANDED_APPROVAL / STRANDED_PLAN / STRANDED_DEPLOY_WEDGE / NO_VERDICT.
 
-    Precedence: an OVERDUE waiting run outranks everything (it blocks every
-    later run regardless of the last completed verdict). A young waiting run
-    does not change the verdict — it is reported alongside it.
+    `deploy_wedge` is the verdict dict from `check_deploy_wedge.classify_fleet` (the
+    caller supplies it — this gate reads `gh run list`, which carries no per-run job
+    state, so it cannot detect the wedge itself).
+
+    Precedence: a phantom deploy wedge outranks everything — while it holds, NO deploy
+    can start and no approval is even possible, so a green completed run is a stale
+    fact. Then an OVERDUE waiting run (it blocks every later run regardless of the last
+    completed verdict). A young waiting run does not change the verdict — it is
+    reported alongside it.
     """
     now = now or datetime.now(timezone.utc)
     waiting = waiting_runs(runs)
@@ -156,8 +184,12 @@ def classify_pipeline(
     if latest_failure_jobs:
         plan_failed, deploy_skipped, other_failed = _job_shape(latest_failure_jobs)
 
+    wedged = [v for v in (deploy_wedge or {}).get("verdicts", []) if v.get("kind") == "phantom-wedge"]
+
     completed = latest_completed_run(runs)
-    if overdue:
+    if wedged:
+        kind = STRANDED_DEPLOY_WEDGE
+    elif overdue:
         kind = STRANDED_APPROVAL
     elif completed is None:
         kind = NO_VERDICT
@@ -174,6 +206,7 @@ def classify_pipeline(
         "run": completed,
         "waiting": waiting,
         "overdue_waiting": overdue,
+        "wedged": wedged,
         # An ordinary red can STILL have a stranded deploy path (Plan red +
         # Deploy skipped alongside another failure, e.g. live 2026-08-02).
         "deploy_also_stranded": kind == RED and plan_failed and deploy_skipped,
@@ -192,6 +225,26 @@ def render(state: dict, now: datetime | None = None) -> tuple[int, str]:
     kind = state["kind"]
     sha8 = (state.get("sha") or "")[:8]
     lines: list[str] = []
+
+    if kind == STRANDED_DEPLOY_WEDGE:
+        lines.append("🛑 PHANTOM DEPLOY WEDGE (#2052 class) — main's deploy path is dead; a green completed run is a stale fact:")
+        for v in state.get("wedged", []):
+            lines.append(
+                f"   run {v.get('run_id')} sha {v.get('sha')} — Deploy blocked {v.get('blocked_minutes')}m with NOTHING holding the deploy group."
+            )
+        lines.append(
+            "   This is NOT the #1901 stranded-approval class even though it looks identical:\n"
+            "   `pending_deployments` is EMPTY and stays empty — GitHub evaluates the job's\n"
+            "   `concurrency` BEFORE the `production` environment rule, so the gate never opens\n"
+            "   and there is nothing to approve. Waiting for it is waiting forever. Since #2009\n"
+            "   moved the group onto the `deploy` job, the run shows five GREEN jobs, so every\n"
+            "   documented '0 jobs' tell for this class is blind.\n"
+            "   Recovery: `python3 scripts/check_deploy_wedge.py --recover` (cancels the wedged\n"
+            "   run, re-dispatches ci-cd.yml with deploy_all=true — a dispatch carries no push\n"
+            "   diff, so change detection would otherwise deploy nothing). Do NOT salt the\n"
+            "   concurrency group: three salts failed across recurrences 1-3 (CONVENTIONS §4d)."
+        )
+        return 1, "\n".join(lines)
 
     if kind == STRANDED_APPROVAL:
         lines.append("🛑 STRANDED PRODUCTION APPROVAL (#1901 class) — main is NOT green and NOT ordinarily red:")
@@ -279,7 +332,21 @@ def main() -> int:
         except Exception as e:
             print(f"⚠️  check_main_green: could not read jobs for run {completed['databaseId']} ({e}) — treating as ordinary red")
 
-    state = classify_pipeline(runs, latest_failure_jobs=jobs)
+    # #2052: the phantom deploy wedge needs per-run JOB state, which `gh run list`
+    # does not carry. Best-effort — a detector failure must never turn a readable
+    # green/red verdict into a hard error, so it degrades to "wedge unknown".
+    wedge = None
+    try:
+        import check_deploy_wedge  # noqa: PLC0415 - optional, same directory
+
+        in_flight, jobs_by_run, pending_by_run = check_deploy_wedge.collect()
+        wedge = check_deploy_wedge.classify_fleet(in_flight, jobs_by_run, pending_by_run)
+    except Exception as e:  # noqa: BLE001
+        print(
+            f"⚠️  check_main_green: deploy-wedge detection unavailable ({e}) — run scripts/check_deploy_wedge.py by hand if a deploy looks stuck."
+        )
+
+    state = classify_pipeline(runs, latest_failure_jobs=jobs, deploy_wedge=wedge)
     code, message = render(state)
     print(message)
     if code == 0:
