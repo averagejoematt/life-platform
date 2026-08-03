@@ -1,33 +1,86 @@
 {
-  "captured_at": "2026-07-25T00:00:00+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/fingerprint",
   "is_prefix_sample": false,
   "path": "/api/fingerprint",
-  "status": 200,
   "shape": {
-    "type": "object",
     "keys": {
       "_meta": {
-        "type": "object",
         "keys": {
-          "cache_seconds": { "type": "integer" },
-          "generated_at": { "type": "string" },
-          "request_id": { "type": "string" }
-        }
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
       },
       "fingerprint": {
-        "type": "object",
         "keys": {
-          "date": { "type": "string" },
-          "day_number": { "type": "integer" },
-          "svg": { "type": "string" },
-          "warming_up": { "type": "boolean" },
-          "earned_score": { "type": "number" },
-          "n": { "type": "integer" },
-          "metrics": { "type": "object", "keys": {} },
-          "mapping": { "type": "object", "keys": {} }
-        }
+          "date": {
+            "type": "string"
+          },
+          "day_number": {
+            "type": "integer"
+          },
+          "earned_score": {
+            "type": "number"
+          },
+          "mapping": {
+            "keys": {
+              "glow": {
+                "type": "string"
+              },
+              "hrv": {
+                "type": "string"
+              },
+              "recovery": {
+                "type": "string"
+              },
+              "sleep_hours": {
+                "type": "string"
+              },
+              "steps": {
+                "type": "string"
+              },
+              "strain": {
+                "type": "string"
+              },
+              "streak": {
+                "type": "string"
+              },
+              "warming_up": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "metrics": {
+            "keys": {
+              "steps": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "n": {
+            "type": "integer"
+          },
+          "svg": {
+            "type": "string"
+          },
+          "warming_up": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
       }
-    }
-  }
+    },
+    "type": "object"
+  },
+  "status": 200
 }

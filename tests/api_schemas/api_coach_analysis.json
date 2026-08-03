@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/coach_analysis",
   "is_prefix_sample": false,
   "path": "/api/coach_analysis",
@@ -49,13 +49,7 @@
       "domain": {
         "type": "string"
       },
-      "elena_quote": {
-        "type": "string"
-      },
       "generated_at": {
-        "type": "string"
-      },
-      "key_recommendation": {
         "type": "string"
       },
       "regeneration_paused": {

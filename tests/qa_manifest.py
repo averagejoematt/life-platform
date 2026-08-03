@@ -281,11 +281,7 @@ _CURATED = [
         "name": "Story · chronicle",
         "tier": 2,
         "content_class": "narrative",
-        # /api/content_cadence (#1972) is DEFERRED from api_deps until the site-api deploy
-        # lands the route (2026-08-02: registering it pre-deploy failed smoke → auto-rollback,
-        # blocking ALL site-deploys behind the owner-gated fleet deploy; the front-end is
-        # fail-soft on 404). Re-arm alongside the post-deploy schema capture.
-        "api_deps": ["/api/timeline"],
+        "api_deps": ["/api/timeline", "/api/content_cadence"],
         "js_modules": ["story.js"],
         "visual": {"checks": [{"selector": "main, [data-readout], article", "not_empty": True, "desc": "chronicle content"}]},
     },
@@ -366,10 +362,8 @@ _CURATED = [
         "name": "Story · panelcast",
         "tier": 3,
         "content_class": "narrative",
-        # /api/content_cadence (#1972) DEFERRED until the route deploys — see the
-        # chronicle entry above; re-arm both together at the post-deploy schema capture.
         # (The podcast has no independent cron — its cadence line rides the chronicle's.)
-        "api_deps": ["/panelcast/episodes.json"],
+        "api_deps": ["/panelcast/episodes.json", "/api/content_cadence"],
         "js_modules": [],
         "visual": {"checks": [{"selector": "main, [data-readout], article", "not_empty": True, "desc": "panelcast content"}]},
     },

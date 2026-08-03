@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/status",
   "is_prefix_sample": false,
   "path": "/api/status",
@@ -21,6 +21,9 @@
       },
       "cost": {
         "keys": {
+          "as_of": {
+            "type": "string"
+          },
           "budget": {
             "type": "number"
           },
@@ -34,6 +37,12 @@
             "type": "number"
           },
           "status": {
+            "type": "string"
+          },
+          "tier": {
+            "type": "integer"
+          },
+          "tier_semantics": {
             "type": "string"
           }
         },
@@ -177,7 +186,7 @@
                   {
                     "keys": {
                       "comment": {
-                        "type": "null"
+                        "type": "string"
                       },
                       "description": {
                         "type": "string"
@@ -207,7 +216,7 @@
                   {
                     "keys": {
                       "comment": {
-                        "type": "string"
+                        "type": "null"
                       },
                       "description": {
                         "type": "string"
@@ -333,26 +342,48 @@
           {
             "keys": {
               "components": {
-                "items": {
-                  "keys": {
-                    "comment": {
-                      "type": "null"
+                "items": [
+                  {
+                    "keys": {
+                      "comment": {
+                        "type": "null"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      }
                     },
-                    "description": {
-                      "type": "string"
-                    },
-                    "id": {
-                      "type": "string"
-                    },
-                    "name": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "string"
-                    }
+                    "type": "object"
                   },
-                  "type": "object"
-                },
+                  {
+                    "keys": {
+                      "comment": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  }
+                ],
                 "length_sample": 6,
                 "type": "array"
               },

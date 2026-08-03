@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/autonomic_balance",
   "is_prefix_sample": false,
   "path": "/api/autonomic_balance",
@@ -22,14 +22,170 @@
       "available": {
         "type": "boolean"
       },
-      "days_with_data": {
-        "type": "integer"
+      "current_state": {
+        "keys": {
+          "balance_score": {
+            "type": "integer"
+          },
+          "blurb": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "days_in_state": {
+            "type": "integer"
+          },
+          "energy_axis": {
+            "type": "number"
+          },
+          "label": {
+            "type": "string"
+          },
+          "quadrant": {
+            "type": "string"
+          },
+          "valence_axis": {
+            "type": "number"
+          }
+        },
+        "type": "object"
       },
-      "min_days": {
-        "type": "integer"
+      "daily_states": {
+        "items": {
+          "keys": {
+            "balance_score": {
+              "type": "integer"
+            },
+            "date": {
+              "type": "string"
+            },
+            "energy_axis": {
+              "type": "number"
+            },
+            "quadrant": {
+              "type": "string"
+            },
+            "valence_axis": {
+              "type": "number"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 7,
+        "type": "array"
       },
-      "reason": {
+      "methodology": {
         "type": "string"
+      },
+      "period": {
+        "keys": {
+          "days_with_data": {
+            "type": "integer"
+          },
+          "end_date": {
+            "type": "string"
+          },
+          "start_date": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "quadrants": {
+        "keys": {
+          "BURNOUT": {
+            "keys": {
+              "blurb": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "FLOW": {
+            "keys": {
+              "blurb": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "RECOVERY": {
+            "keys": {
+              "blurb": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "STRESS": {
+            "keys": {
+              "blurb": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "seven_day_trend": {
+        "keys": {
+          "avg_balance_score": {
+            "type": "number"
+          },
+          "dominant_state": {
+            "type": "string"
+          },
+          "state_distribution": {
+            "keys": {
+              "BURNOUT": {
+                "type": "integer"
+              },
+              "FLOW": {
+                "type": "integer"
+              },
+              "RECOVERY": {
+                "type": "integer"
+              },
+              "STRESS": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "transitions": {
+        "items": {
+          "keys": {
+            "date": {
+              "type": "string"
+            },
+            "from": {
+              "type": "string"
+            },
+            "to": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 6,
+        "type": "array"
       }
     },
     "type": "object"

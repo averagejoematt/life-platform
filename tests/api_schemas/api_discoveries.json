@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/discoveries",
   "is_prefix_sample": false,
   "path": "/api/discoveries",
@@ -54,8 +54,195 @@
                 "type": "array"
               },
               "evidence_for": {
+                "items": [
+                  {
+                    "keys": {
+                      "title": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "keys": {
+                      "resolved_title": {
+                        "type": "string"
+                      },
+                      "summary": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  }
+                ],
+                "length_sample": 2,
+                "type": "array"
+              },
+              "evidence_tier": {
+                "type": "string"
+              },
+              "hypothesis": {
+                "type": "string"
+              },
+              "metrics": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 2,
+                "type": "array"
+              },
+              "name": {
+                "type": "string"
+              },
+              "pillar": {
+                "type": "string"
+              },
+              "protocol": {
+                "type": "string"
+              },
+              "protocol_kind": {
+                "type": "string"
+              },
+              "rationale": {
+                "type": "string"
+              },
+              "why": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "active_since": {
+                "type": "string"
+              },
+              "carried_over": {
+                "type": "boolean"
+              },
+              "description": {
+                "type": "string"
+              },
+              "duration_days": {
+                "type": "integer"
+              },
+              "evidence_against": {
                 "items": {
                   "keys": {
+                    "summary": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "null"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 3,
+                "type": "array"
+              },
+              "evidence_for": {
+                "items": {
+                  "keys": {
+                    "resolved_title": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 2,
+                "type": "array"
+              },
+              "evidence_tier": {
+                "type": "string"
+              },
+              "hypothesis": {
+                "type": "string"
+              },
+              "metrics": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 2,
+                "type": "array"
+              },
+              "name": {
+                "type": "string"
+              },
+              "pillar": {
+                "type": "string"
+              },
+              "protocol": {
+                "type": "string"
+              },
+              "protocol_kind": {
+                "type": "string"
+              },
+              "rationale": {
+                "type": "string"
+              },
+              "why": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "active_since": {
+                "type": "string"
+              },
+              "carried_over": {
+                "type": "boolean"
+              },
+              "description": {
+                "type": "string"
+              },
+              "duration_days": {
+                "type": "integer"
+              },
+              "evidence_against": {
+                "items": {
+                  "keys": {
+                    "summary": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "null"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 2,
+                "type": "array"
+              },
+              "evidence_for": {
+                "items": {
+                  "keys": {
+                    "resolved_title": {
+                      "type": "string"
+                    },
                     "summary": {
                       "type": "string"
                     },
@@ -138,20 +325,33 @@
                 "type": "array"
               },
               "evidence_for": {
-                "items": {
-                  "keys": {
-                    "summary": {
-                      "type": "string"
+                "items": [
+                  {
+                    "keys": {
+                      "resolved_title": {
+                        "type": "string"
+                      },
+                      "summary": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
                     },
-                    "title": {
-                      "type": "string"
-                    },
-                    "url": {
-                      "type": "string"
-                    }
+                    "type": "object"
                   },
-                  "type": "object"
-                },
+                  {
+                    "keys": {
+                      "title": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  }
+                ],
                 "length_sample": 2,
                 "type": "array"
               },
@@ -199,8 +399,37 @@
         "type": "array"
       },
       "inner_life": {
-        "items": null,
-        "length_sample": 0,
+        "items": {
+          "keys": {
+            "actionable": {
+              "type": "boolean"
+            },
+            "body": {
+              "type": "string"
+            },
+            "category": {
+              "type": "string"
+            },
+            "confidence": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "pillars": {
+              "items": {
+                "type": "string"
+              },
+              "length_sample": 7,
+              "type": "array"
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 1,
         "type": "array"
       }
     },

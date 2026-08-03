@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/calibration",
   "is_prefix_sample": false,
   "path": "/api/calibration",
@@ -709,6 +709,66 @@
           },
           "skilled": {
             "type": "null"
+          }
+        },
+        "type": "object"
+      },
+      "prereg_seal": {
+        "keys": {
+          "artifact_url": {
+            "type": "string"
+          },
+          "genesis": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "stamp_url": {
+            "type": "string"
+          },
+          "stamped_at": {
+            "type": "string"
+          },
+          "verify": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "voided": {
+        "keys": {
+          "by_reset": {
+            "keys": {
+              "2026-07-13": {
+                "type": "integer"
+              },
+              "2026-07-18": {
+                "type": "integer"
+              },
+              "2026-07-19": {
+                "type": "integer"
+              },
+              "2026-07-20": {
+                "type": "integer"
+              },
+              "2026-07-22": {
+                "type": "integer"
+              },
+              "2026-07-27": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "hypotheses": {
+            "type": "integer"
+          },
+          "n": {
+            "type": "integer"
+          },
+          "predictions": {
+            "type": "integer"
           }
         },
         "type": "object"

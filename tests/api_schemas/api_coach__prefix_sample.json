@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/coach/sleep_coach",
   "is_prefix_sample": true,
   "path": "/api/coach/",
@@ -81,6 +81,22 @@
       "color": {
         "type": "string"
       },
+      "conversations": {
+        "keys": {
+          "count": {
+            "type": "integer"
+          },
+          "note": {
+            "type": "string"
+          },
+          "references": {
+            "items": null,
+            "length_sample": 0,
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "daily": {
         "type": "null"
       },
@@ -89,6 +105,101 @@
       },
       "domain": {
         "type": "string"
+      },
+      "dossier": {
+        "keys": {
+          "commitment_counts": {
+            "keys": {
+              "broken": {
+                "type": "integer"
+              },
+              "held": {
+                "type": "integer"
+              },
+              "kept": {
+                "type": "integer"
+              },
+              "pending": {
+                "type": "integer"
+              },
+              "unresolved": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "commitments": {
+            "items": {
+              "keys": {
+                "check": {
+                  "type": "null"
+                },
+                "date": {
+                  "type": "string"
+                },
+                "due_date": {
+                  "type": "string"
+                },
+                "evidence_link": {
+                  "type": "null"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "outcome": {
+                  "type": "null"
+                },
+                "outcome_date": {
+                  "type": "null"
+                },
+                "outcome_notes": {
+                  "type": "null"
+                },
+                "record_id": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 4,
+            "type": "array"
+          },
+          "degraded": {
+            "type": "boolean"
+          },
+          "disclosure": {
+            "type": "string"
+          },
+          "docket_positions": {
+            "items": null,
+            "length_sample": 0,
+            "type": "array"
+          },
+          "learnings": {
+            "items": null,
+            "length_sample": 0,
+            "type": "array"
+          },
+          "relationship": {
+            "type": "null"
+          },
+          "retracted": {
+            "type": "integer"
+          },
+          "verbatim": {
+            "type": "boolean"
+          },
+          "withheld": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
       },
       "emoji": {
         "type": "string"
@@ -111,25 +222,61 @@
         "type": "null"
       },
       "recent_outputs": {
-        "items": {
-          "keys": {
-            "date": {
-              "type": "string"
-            },
-            "summary": {
-              "type": "string"
-            },
-            "themes": {
-              "items": {
+        "items": [
+          {
+            "keys": {
+              "date": {
                 "type": "string"
               },
-              "length_sample": 8,
-              "type": "array"
-            }
+              "summary": {
+                "type": "string"
+              },
+              "themes": {
+                "items": null,
+                "length_sample": 0,
+                "type": "array"
+              }
+            },
+            "type": "object"
           },
-          "type": "object"
-        },
-        "length_sample": 1,
+          {
+            "keys": {
+              "date": {
+                "type": "string"
+              },
+              "summary": {
+                "type": "string"
+              },
+              "themes": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 11,
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "date": {
+                "type": "string"
+              },
+              "summary": {
+                "type": "string"
+              },
+              "themes": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 12,
+                "type": "array"
+              }
+            },
+            "type": "object"
+          }
+        ],
+        "length_sample": 6,
         "type": "array"
       },
       "relationships": {
@@ -261,7 +408,7 @@
             "items": {
               "type": "string"
             },
-            "length_sample": 3,
+            "length_sample": 4,
             "type": "array"
           },
           "grounding_flag": {

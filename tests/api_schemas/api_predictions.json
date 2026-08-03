@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/predictions",
   "is_prefix_sample": false,
   "path": "/api/predictions",
@@ -550,43 +550,103 @@
         "type": "object"
       },
       "predictions": {
-        "items": {
-          "keys": {
-            "coach_id": {
-              "type": "string"
+        "items": [
+          {
+            "keys": {
+              "coach_id": {
+                "type": "string"
+              },
+              "coach_name": {
+                "type": "string"
+              },
+              "confidence": {
+                "type": "number"
+              },
+              "date": {
+                "type": "string"
+              },
+              "eval_type": {
+                "type": "string"
+              },
+              "metric": {
+                "type": "null"
+              },
+              "outcome_notes": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "subdomain": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              }
             },
-            "coach_name": {
-              "type": "string"
-            },
-            "confidence": {
-              "type": "number"
-            },
-            "date": {
-              "type": "string"
-            },
-            "eval_type": {
-              "type": "string"
-            },
-            "metric": {
-              "type": "null"
-            },
-            "outcome_notes": {
-              "type": "string"
-            },
-            "status": {
-              "type": "string"
-            },
-            "subdomain": {
-              "type": "string"
-            },
-            "text": {
-              "type": "string"
-            }
+            "type": "object"
           },
-          "type": "object"
-        },
-        "length_sample": 23,
+          {
+            "keys": {
+              "coach_id": {
+                "type": "string"
+              },
+              "coach_name": {
+                "type": "string"
+              },
+              "confidence": {
+                "type": "number"
+              },
+              "date": {
+                "type": "string"
+              },
+              "eval_type": {
+                "type": "string"
+              },
+              "metric": {
+                "type": "string"
+              },
+              "outcome_notes": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "subdomain": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        ],
+        "length_sample": 50,
         "type": "array"
+      },
+      "prereg_seal": {
+        "keys": {
+          "artifact_url": {
+            "type": "string"
+          },
+          "genesis": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "stamp_url": {
+            "type": "string"
+          },
+          "stamped_at": {
+            "type": "string"
+          },
+          "verify": {
+            "type": "string"
+          }
+        },
+        "type": "object"
       }
     },
     "type": "object"

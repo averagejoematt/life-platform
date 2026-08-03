@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-25T00:00:00+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/journal_quotes",
   "is_prefix_sample": false,
   "path": "/api/journal_quotes",
@@ -29,33 +29,12 @@
         "type": "string"
       },
       "quotes": {
-        "items": {
-          "keys": {
-            "channel": {
-              "type": "string"
-            },
-            "date": {
-              "type": "string"
-            },
-            "label": {
-              "type": "string"
-            },
-            "marked_at": {
-              "type": "string"
-            },
-            "quote": {
-              "type": "string"
-            },
-            "receipts": {
-              "type": "string"
-            }
-          },
-          "type": "object"
-        },
-        "length_sample": 1,
+        "items": null,
+        "length_sample": 0,
         "type": "array"
       }
     },
     "type": "object"
-  }
+  },
+  "status": 200
 }

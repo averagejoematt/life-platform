@@ -1,111 +1,183 @@
 {
-  "captured_at": "2026-07-25T00:00:00+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/ladder_counts",
   "is_prefix_sample": false,
   "path": "/api/ladder_counts",
-  "status": 200,
   "shape": {
-    "type": "object",
     "keys": {
       "_meta": {
-        "type": "object",
         "keys": {
-          "cache_seconds": {"type": "integer"},
-          "generated_at": {"type": "string"},
-          "request_id": {"type": "string"}
-        }
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
       },
       "order": {
-        "type": "array",
-        "items": {"type": "string"},
-        "length_sample": 5
+        "items": {
+          "type": "string"
+        },
+        "length_sample": 5,
+        "type": "array"
       },
       "rungs": {
-        "type": "object",
         "keys": {
-          "reader": {
-            "type": "object",
+          "contributor": {
             "keys": {
-              "label": {"type": "string"},
-              "count": {"type": "null"},
-              "countable": {"type": "boolean"},
+              "count": {
+                "type": "integer"
+              },
+              "countable": {
+                "type": "boolean"
+              },
+              "credited": {
+                "items": null,
+                "length_sample": 0,
+                "type": "array"
+              },
+              "label": {
+                "type": "string"
+              },
               "provenance": {
-                "type": "object",
                 "keys": {
-                  "source": {"type": "string"},
-                  "method": {"type": "string"},
-                  "note": {"type": "string"}
-                }
+                  "method": {
+                    "type": "string"
+                  },
+                  "note": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
               }
-            }
-          },
-          "subscriber": {
-            "type": "object",
-            "keys": {
-              "label": {"type": "string"},
-              "count": {"type": "integer"},
-              "countable": {"type": "boolean"},
-              "provenance": {
-                "type": "object",
-                "keys": {
-                  "source": {"type": "string"},
-                  "method": {"type": "string"},
-                  "note": {"type": "string"}
-                }
-              }
-            }
+            },
+            "type": "object"
           },
           "predictor": {
-            "type": "object",
             "keys": {
-              "label": {"type": "string"},
-              "count": {"type": "integer"},
-              "countable": {"type": "boolean"},
+              "count": {
+                "type": "integer"
+              },
+              "countable": {
+                "type": "boolean"
+              },
+              "label": {
+                "type": "string"
+              },
               "provenance": {
-                "type": "object",
                 "keys": {
-                  "source": {"type": "string"},
-                  "method": {"type": "string"},
-                  "note": {"type": "string"}
-                }
+                  "method": {
+                    "type": "string"
+                  },
+                  "note": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
               }
-            }
+            },
+            "type": "object"
+          },
+          "reader": {
+            "keys": {
+              "count": {
+                "type": "null"
+              },
+              "countable": {
+                "type": "boolean"
+              },
+              "label": {
+                "type": "string"
+              },
+              "provenance": {
+                "keys": {
+                  "method": {
+                    "type": "string"
+                  },
+                  "note": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
           },
           "replicator": {
-            "type": "object",
             "keys": {
-              "label": {"type": "string"},
-              "count": {"type": "integer"},
-              "countable": {"type": "boolean"},
+              "count": {
+                "type": "integer"
+              },
+              "countable": {
+                "type": "boolean"
+              },
+              "label": {
+                "type": "string"
+              },
               "provenance": {
-                "type": "object",
                 "keys": {
-                  "source": {"type": "string"},
-                  "method": {"type": "string"},
-                  "note": {"type": "string"}
-                }
+                  "method": {
+                    "type": "string"
+                  },
+                  "note": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
               }
-            }
+            },
+            "type": "object"
           },
-          "contributor": {
-            "type": "object",
+          "subscriber": {
             "keys": {
-              "label": {"type": "string"},
-              "count": {"type": "integer"},
-              "countable": {"type": "boolean"},
-              "credited": {"type": "array", "items": null, "length_sample": 0},
+              "count": {
+                "type": "integer"
+              },
+              "countable": {
+                "type": "boolean"
+              },
+              "label": {
+                "type": "string"
+              },
               "provenance": {
-                "type": "object",
                 "keys": {
-                  "source": {"type": "string"},
-                  "method": {"type": "string"},
-                  "note": {"type": "string"}
-                }
+                  "method": {
+                    "type": "string"
+                  },
+                  "note": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
               }
-            }
+            },
+            "type": "object"
           }
-        }
+        },
+        "type": "object"
       }
-    }
-  }
+    },
+    "type": "object"
+  },
+  "status": 200
 }

@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/habits",
   "is_prefix_sample": false,
   "path": "/api/habits",
@@ -23,7 +23,7 @@
         "type": "string"
       },
       "best_day": {
-        "type": "null"
+        "type": "integer"
       },
       "causality_captured": {
         "type": "integer"
@@ -53,7 +53,7 @@
       },
       "day_of_week_avgs": {
         "items": {
-          "type": "null"
+          "type": "integer"
         },
         "length_sample": 7,
         "type": "array"
@@ -76,12 +76,94 @@
         "type": "object"
       },
       "group_90d_avgs": {
-        "keys": {},
+        "keys": {
+          "Data": {
+            "type": "integer"
+          },
+          "Discipline": {
+            "type": "integer"
+          },
+          "Growth": {
+            "type": "integer"
+          },
+          "Hygiene": {
+            "type": "integer"
+          },
+          "Nutrition": {
+            "type": "integer"
+          },
+          "Performance": {
+            "type": "integer"
+          },
+          "Recovery": {
+            "type": "integer"
+          },
+          "Supplements": {
+            "type": "integer"
+          },
+          "Wellbeing": {
+            "type": "integer"
+          }
+        },
         "type": "object"
       },
       "history": {
-        "items": null,
-        "length_sample": 0,
+        "items": {
+          "keys": {
+            "date": {
+              "type": "string"
+            },
+            "groups": {
+              "keys": {
+                "Data": {
+                  "type": "integer"
+                },
+                "Discipline": {
+                  "type": "integer"
+                },
+                "Growth": {
+                  "type": "integer"
+                },
+                "Hygiene": {
+                  "type": "integer"
+                },
+                "Nutrition": {
+                  "type": "integer"
+                },
+                "Performance": {
+                  "type": "integer"
+                },
+                "Recovery": {
+                  "type": "integer"
+                },
+                "Supplements": {
+                  "type": "integer"
+                },
+                "Wellbeing": {
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            },
+            "perfect": {
+              "type": "boolean"
+            },
+            "t0_done": {
+              "type": "integer"
+            },
+            "t0_total": {
+              "type": "integer"
+            },
+            "tier01_pct": {
+              "type": "integer"
+            },
+            "tier0_pct": {
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 7,
         "type": "array"
       },
       "keystone_correlations": {
@@ -90,10 +172,10 @@
         "type": "array"
       },
       "keystone_group": {
-        "type": "null"
+        "type": "string"
       },
       "keystone_group_pct": {
-        "type": "null"
+        "type": "integer"
       },
       "per_habit": {
         "items": {
@@ -116,7 +198,7 @@
                 },
                 "type": "object"
               },
-              "length_sample": 1,
+              "length_sample": 8,
               "type": "array"
             },
             "group": {
@@ -141,7 +223,7 @@
         "type": "array"
       },
       "worst_day": {
-        "type": "null"
+        "type": "integer"
       }
     },
     "type": "object"

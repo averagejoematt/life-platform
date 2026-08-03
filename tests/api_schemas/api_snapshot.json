@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/snapshot",
   "is_prefix_sample": false,
   "path": "/api/snapshot",
@@ -23,14 +23,42 @@
           },
           "character": {
             "keys": {
+              "active_effects": {
+                "items": null,
+                "length_sample": 0,
+                "type": "array"
+              },
               "as_of_date": {
                 "type": "string"
               },
-              "level": {
-                "type": "integer"
+              "character_mood": {
+                "type": "string"
               },
-              "pre_experiment": {
-                "type": "boolean"
+              "character_mood_inputs": {
+                "keys": {
+                  "composite_raw": {
+                    "type": "number"
+                  },
+                  "gap_days": {
+                    "type": "number"
+                  },
+                  "presence_class": {
+                    "type": "string"
+                  },
+                  "trend_7d": {
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              },
+              "composite_delta_1d": {
+                "type": "number"
+              },
+              "composite_score": {
+                "type": "number"
+              },
+              "level": {
+                "type": "number"
               },
               "tier": {
                 "type": "string"
@@ -38,41 +66,509 @@
               "tier_emoji": {
                 "type": "string"
               },
+              "time_travel": {
+                "type": "boolean"
+              },
+              "xp_debt": {
+                "type": "number"
+              },
               "xp_total": {
-                "type": "integer"
+                "type": "number"
               }
             },
             "type": "object"
           },
           "pillars": {
-            "items": {
-              "keys": {
-                "emoji": {
-                  "type": "string"
+            "items": [
+              {
+                "keys": {
+                  "absent_behaviors": {
+                    "items": null,
+                    "length_sample": 0,
+                    "type": "array"
+                  },
+                  "coverage_hold": {
+                    "type": "boolean"
+                  },
+                  "data_coverage": {
+                    "type": "number"
+                  },
+                  "drivers": {
+                    "keys": {
+                      "absent": {
+                        "items": null,
+                        "length_sample": 0,
+                        "type": "array"
+                      },
+                      "dragging": {
+                        "items": null,
+                        "length_sample": 0,
+                        "type": "array"
+                      },
+                      "no_data": {
+                        "items": null,
+                        "length_sample": 0,
+                        "type": "array"
+                      },
+                      "top": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 2,
+                        "type": "array"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "emoji": {
+                    "type": "string"
+                  },
+                  "level": {
+                    "type": "number"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "neglect_decay": {
+                    "type": "null"
+                  },
+                  "not_instrumented": {
+                    "type": "boolean"
+                  },
+                  "not_instrumented_note": {
+                    "type": "null"
+                  },
+                  "raw_score": {
+                    "type": "number"
+                  },
+                  "score_delta": {
+                    "type": "number"
+                  },
+                  "tier": {
+                    "type": "string"
+                  },
+                  "xp_debt": {
+                    "type": "number"
+                  },
+                  "xp_delta": {
+                    "type": "number"
+                  },
+                  "xp_earned": {
+                    "type": "number"
+                  }
                 },
-                "level": {
-                  "type": "integer"
-                },
-                "name": {
-                  "type": "string"
-                },
-                "raw_score": {
-                  "type": "integer"
-                },
-                "tier": {
-                  "type": "string"
-                },
-                "xp_delta": {
-                  "type": "integer"
-                }
+                "type": "object"
               },
-              "type": "object"
-            },
+              {
+                "keys": {
+                  "absent_behaviors": {
+                    "items": null,
+                    "length_sample": 0,
+                    "type": "array"
+                  },
+                  "coverage_hold": {
+                    "type": "boolean"
+                  },
+                  "data_coverage": {
+                    "type": "number"
+                  },
+                  "drivers": {
+                    "keys": {
+                      "absent": {
+                        "items": null,
+                        "length_sample": 0,
+                        "type": "array"
+                      },
+                      "dragging": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 2,
+                        "type": "array"
+                      },
+                      "no_data": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 2,
+                        "type": "array"
+                      },
+                      "top": {
+                        "items": null,
+                        "length_sample": 0,
+                        "type": "array"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "emoji": {
+                    "type": "string"
+                  },
+                  "level": {
+                    "type": "number"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "neglect_decay": {
+                    "type": "null"
+                  },
+                  "not_instrumented": {
+                    "type": "boolean"
+                  },
+                  "not_instrumented_note": {
+                    "type": "null"
+                  },
+                  "raw_score": {
+                    "type": "number"
+                  },
+                  "score_delta": {
+                    "type": "number"
+                  },
+                  "tier": {
+                    "type": "string"
+                  },
+                  "xp_debt": {
+                    "type": "number"
+                  },
+                  "xp_delta": {
+                    "type": "number"
+                  },
+                  "xp_earned": {
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "keys": {
+                  "absent_behaviors": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 4,
+                    "type": "array"
+                  },
+                  "coverage_hold": {
+                    "type": "boolean"
+                  },
+                  "data_coverage": {
+                    "type": "number"
+                  },
+                  "drivers": {
+                    "keys": {
+                      "absent": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 4,
+                        "type": "array"
+                      },
+                      "dragging": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 1,
+                        "type": "array"
+                      },
+                      "no_data": {
+                        "items": null,
+                        "length_sample": 0,
+                        "type": "array"
+                      },
+                      "top": {
+                        "items": null,
+                        "length_sample": 0,
+                        "type": "array"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "emoji": {
+                    "type": "string"
+                  },
+                  "level": {
+                    "type": "number"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "neglect_decay": {
+                    "type": "null"
+                  },
+                  "not_instrumented": {
+                    "type": "boolean"
+                  },
+                  "not_instrumented_note": {
+                    "type": "null"
+                  },
+                  "raw_score": {
+                    "type": "number"
+                  },
+                  "score_delta": {
+                    "type": "number"
+                  },
+                  "tier": {
+                    "type": "string"
+                  },
+                  "xp_debt": {
+                    "type": "number"
+                  },
+                  "xp_delta": {
+                    "type": "number"
+                  },
+                  "xp_earned": {
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "keys": {
+                  "absent_behaviors": {
+                    "items": null,
+                    "length_sample": 0,
+                    "type": "array"
+                  },
+                  "coverage_hold": {
+                    "type": "boolean"
+                  },
+                  "data_coverage": {
+                    "type": "number"
+                  },
+                  "drivers": {
+                    "keys": {
+                      "absent": {
+                        "items": null,
+                        "length_sample": 0,
+                        "type": "array"
+                      },
+                      "dragging": {
+                        "items": null,
+                        "length_sample": 0,
+                        "type": "array"
+                      },
+                      "no_data": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "top": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 1,
+                        "type": "array"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "emoji": {
+                    "type": "string"
+                  },
+                  "level": {
+                    "type": "number"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "neglect_decay": {
+                    "type": "null"
+                  },
+                  "not_instrumented": {
+                    "type": "boolean"
+                  },
+                  "not_instrumented_note": {
+                    "type": "null"
+                  },
+                  "raw_score": {
+                    "type": "number"
+                  },
+                  "score_delta": {
+                    "type": "number"
+                  },
+                  "tier": {
+                    "type": "string"
+                  },
+                  "xp_debt": {
+                    "type": "number"
+                  },
+                  "xp_delta": {
+                    "type": "number"
+                  },
+                  "xp_earned": {
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "keys": {
+                  "absent_behaviors": {
+                    "items": null,
+                    "length_sample": 0,
+                    "type": "array"
+                  },
+                  "coverage_hold": {
+                    "type": "boolean"
+                  },
+                  "data_coverage": {
+                    "type": "number"
+                  },
+                  "drivers": {
+                    "keys": {
+                      "absent": {
+                        "items": null,
+                        "length_sample": 0,
+                        "type": "array"
+                      },
+                      "dragging": {
+                        "items": null,
+                        "length_sample": 0,
+                        "type": "array"
+                      },
+                      "no_data": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "top": {
+                        "items": null,
+                        "length_sample": 0,
+                        "type": "array"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "emoji": {
+                    "type": "string"
+                  },
+                  "level": {
+                    "type": "number"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "neglect_decay": {
+                    "type": "null"
+                  },
+                  "not_instrumented": {
+                    "type": "boolean"
+                  },
+                  "not_instrumented_note": {
+                    "type": "string"
+                  },
+                  "raw_score": {
+                    "type": "number"
+                  },
+                  "score_delta": {
+                    "type": "number"
+                  },
+                  "tier": {
+                    "type": "string"
+                  },
+                  "xp_debt": {
+                    "type": "number"
+                  },
+                  "xp_delta": {
+                    "type": "number"
+                  },
+                  "xp_earned": {
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "keys": {
+                  "absent_behaviors": {
+                    "items": null,
+                    "length_sample": 0,
+                    "type": "array"
+                  },
+                  "coverage_hold": {
+                    "type": "boolean"
+                  },
+                  "data_coverage": {
+                    "type": "number"
+                  },
+                  "drivers": {
+                    "keys": {
+                      "absent": {
+                        "items": null,
+                        "length_sample": 0,
+                        "type": "array"
+                      },
+                      "dragging": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 2,
+                        "type": "array"
+                      },
+                      "no_data": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 1,
+                        "type": "array"
+                      },
+                      "top": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 1,
+                        "type": "array"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "emoji": {
+                    "type": "string"
+                  },
+                  "level": {
+                    "type": "number"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "neglect_decay": {
+                    "type": "null"
+                  },
+                  "not_instrumented": {
+                    "type": "boolean"
+                  },
+                  "not_instrumented_note": {
+                    "type": "null"
+                  },
+                  "raw_score": {
+                    "type": "number"
+                  },
+                  "score_delta": {
+                    "type": "number"
+                  },
+                  "tier": {
+                    "type": "string"
+                  },
+                  "xp_debt": {
+                    "type": "number"
+                  },
+                  "xp_delta": {
+                    "type": "number"
+                  },
+                  "xp_earned": {
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              }
+            ],
             "length_sample": 7,
             "type": "array"
-          },
-          "pre_start": {
-            "type": "boolean"
           }
         },
         "type": "object"
@@ -177,7 +673,39 @@
         "type": "boolean"
       },
       "readiness": {
-        "type": "null"
+        "keys": {
+          "as_of": {
+            "type": "string"
+          },
+          "band": {
+            "type": "string"
+          },
+          "components": {
+            "items": {
+              "keys": {
+                "key": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "score": {
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 4,
+            "type": "array"
+          },
+          "score": {
+            "type": "number"
+          },
+          "tsb_basis": {
+            "type": "string"
+          }
+        },
+        "type": "object"
       },
       "vitals": {
         "keys": {
@@ -239,6 +767,15 @@
                 "type": "null"
               },
               "hrv_30d_n": {
+                "type": "null"
+              },
+              "hrv_avg_ms": {
+                "type": "number"
+              },
+              "hrv_avg_n": {
+                "type": "integer"
+              },
+              "hrv_avg_window_days": {
                 "type": "integer"
               },
               "hrv_ms": {
@@ -269,13 +806,22 @@
                 "type": "boolean"
               },
               "weight_as_of": {
-                "type": "null"
+                "type": "string"
               },
               "weight_delta_30d": {
                 "type": "null"
               },
+              "weight_delta_lbs": {
+                "type": "number"
+              },
+              "weight_delta_window_days": {
+                "type": "integer"
+              },
               "weight_lbs": {
-                "type": "null"
+                "type": "integer"
+              },
+              "window_disclosure": {
+                "type": "string"
               }
             },
             "type": "object"

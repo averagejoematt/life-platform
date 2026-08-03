@@ -1,13 +1,11 @@
 {
-  "captured_at": "2026-07-25T00:00:00+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/decisions",
   "is_prefix_sample": false,
   "path": "/api/decisions",
   "shape": {
-    "type": "object",
     "keys": {
       "_meta": {
-        "type": "object",
         "keys": {
           "cache_seconds": {
             "type": "integer"
@@ -18,48 +16,19 @@
           "request_id": {
             "type": "string"
           }
-        }
+        },
+        "type": "object"
       },
       "count": {
         "type": "integer"
       },
       "decisions": {
-        "type": "array",
-        "items": {
-          "type": "object",
-          "keys": {
-            "date": {
-              "type": "string"
-            },
-            "decision": {
-              "type": "string"
-            },
-            "followed": {
-              "type": "boolean"
-            },
-            "note": {
-              "type": "string"
-            },
-            "note_at": {
-              "type": "string"
-            },
-            "override_reason": {
-              "type": "string"
-            },
-            "pillars": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "length_sample": 1
-            },
-            "source": {
-              "type": "string"
-            }
-          }
-        },
-        "length_sample": 1
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
       }
-    }
-  }
+    },
+    "type": "object"
+  },
+  "status": 200
 }

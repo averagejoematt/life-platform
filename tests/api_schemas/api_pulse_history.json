@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/pulse_history",
   "is_prefix_sample": false,
   "path": "/api/pulse_history",
@@ -20,45 +20,123 @@
         "type": "object"
       },
       "pulse_history": {
-        "items": {
-          "keys": {
-            "date": {
-              "type": "string"
+        "items": [
+          {
+            "keys": {
+              "date": {
+                "type": "string"
+              },
+              "day_number": {
+                "type": "integer"
+              },
+              "headline": {
+                "type": "string"
+              },
+              "hrv_ms": {
+                "type": "number"
+              },
+              "recovery_pct": {
+                "type": "integer"
+              },
+              "rhr_bpm": {
+                "type": "integer"
+              },
+              "sleep_hours": {
+                "type": "number"
+              },
+              "steps": {
+                "type": "integer"
+              },
+              "strain": {
+                "type": "number"
+              },
+              "weight_delta": {
+                "type": "number"
+              },
+              "weight_lbs": {
+                "type": "number"
+              }
             },
-            "day_number": {
-              "type": "integer"
-            },
-            "headline": {
-              "type": "string"
-            },
-            "hrv_ms": {
-              "type": "number"
-            },
-            "recovery_pct": {
-              "type": "integer"
-            },
-            "rhr_bpm": {
-              "type": "integer"
-            },
-            "sleep_hours": {
-              "type": "number"
-            },
-            "steps": {
-              "type": "integer"
-            },
-            "strain": {
-              "type": "number"
-            },
-            "weight_delta": {
-              "type": "null"
-            },
-            "weight_lbs": {
-              "type": "null"
-            }
+            "type": "object"
           },
-          "type": "object"
-        },
-        "length_sample": 1,
+          {
+            "keys": {
+              "date": {
+                "type": "string"
+              },
+              "day_number": {
+                "type": "integer"
+              },
+              "headline": {
+                "type": "string"
+              },
+              "hrv_ms": {
+                "type": "number"
+              },
+              "recovery_pct": {
+                "type": "integer"
+              },
+              "rhr_bpm": {
+                "type": "integer"
+              },
+              "sleep_hours": {
+                "type": "number"
+              },
+              "steps": {
+                "type": "integer"
+              },
+              "strain": {
+                "type": "number"
+              },
+              "weight_delta": {
+                "type": "null"
+              },
+              "weight_lbs": {
+                "type": "null"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "date": {
+                "type": "string"
+              },
+              "day_number": {
+                "type": "integer"
+              },
+              "headline": {
+                "type": "string"
+              },
+              "hrv_ms": {
+                "type": "null"
+              },
+              "recovery_pct": {
+                "type": "null"
+              },
+              "rhr_bpm": {
+                "type": "null"
+              },
+              "sleep_hours": {
+                "type": "null"
+              },
+              "steps": {
+                "type": "integer"
+              },
+              "strain": {
+                "type": "null"
+              },
+              "weight_delta": {
+                "type": "number"
+              },
+              "weight_lbs": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          }
+        ],
+        "length_sample": 8,
         "type": "array"
       }
     },

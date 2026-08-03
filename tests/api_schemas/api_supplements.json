@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T19:19:21.199516+00:00",
+  "captured_at": "2026-08-03T16:18:34.590027+00:00",
   "fetch_path": "/api/supplements",
   "is_prefix_sample": false,
   "path": "/api/supplements",
@@ -38,84 +38,183 @@
                 "type": "string"
               },
               "items": {
-                "items": {
-                  "keys": {
-                    "board": {
-                      "type": "string"
-                    },
-                    "cost_monthly": {
-                      "type": "integer"
-                    },
-                    "dose": {
-                      "type": "string"
-                    },
-                    "ev": {
-                      "type": "string"
-                    },
-                    "evPct": {
-                      "type": "integer"
-                    },
-                    "impact": {
-                      "type": "string"
-                    },
-                    "key": {
-                      "type": "string"
-                    },
-                    "name": {
-                      "type": "string"
-                    },
-                    "paused": {
-                      "type": "boolean"
-                    },
-                    "pausedReason": {
-                      "type": "string"
-                    },
-                    "questionReason": {
-                      "type": "string"
-                    },
-                    "questioning": {
-                      "type": "boolean"
-                    },
-                    "rationale": {
-                      "type": "string"
-                    },
-                    "science": {
-                      "items": {
+                "items": [
+                  {
+                    "keys": {
+                      "board": {
                         "type": "string"
                       },
-                      "length_sample": 3,
-                      "type": "array"
-                    },
-                    "sources": {
-                      "items": {
-                        "keys": {
-                          "stance": {
-                            "type": "string"
-                          },
-                          "title": {
-                            "type": "string"
-                          },
-                          "url": {
-                            "type": "string"
-                          }
-                        },
-                        "type": "object"
+                      "cost_monthly": {
+                        "type": "integer"
                       },
-                      "length_sample": 3,
-                      "type": "array"
+                      "dose": {
+                        "type": "string"
+                      },
+                      "ev": {
+                        "type": "string"
+                      },
+                      "evPct": {
+                        "type": "integer"
+                      },
+                      "impact": {
+                        "type": "string"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "paused": {
+                        "type": "boolean"
+                      },
+                      "pausedReason": {
+                        "type": "string"
+                      },
+                      "questionReason": {
+                        "type": "string"
+                      },
+                      "questioning": {
+                        "type": "boolean"
+                      },
+                      "rationale": {
+                        "type": "string"
+                      },
+                      "science": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "sources": {
+                        "items": {
+                          "keys": {
+                            "resolved_title": {
+                              "type": "string"
+                            },
+                            "stance": {
+                              "type": "string"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "url": {
+                              "type": "string"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "timing": {
+                        "type": "string"
+                      },
+                      "watching": {
+                        "type": "string"
+                      },
+                      "why": {
+                        "type": "string"
+                      }
                     },
-                    "timing": {
-                      "type": "string"
-                    },
-                    "watching": {
-                      "type": "string"
-                    },
-                    "why": {
-                      "type": "string"
-                    }
+                    "type": "object"
                   },
-                  "type": "object"
-                },
+                  {
+                    "keys": {
+                      "board": {
+                        "type": "string"
+                      },
+                      "cost_monthly": {
+                        "type": "integer"
+                      },
+                      "dose": {
+                        "type": "string"
+                      },
+                      "ev": {
+                        "type": "string"
+                      },
+                      "evPct": {
+                        "type": "integer"
+                      },
+                      "impact": {
+                        "type": "string"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "paused": {
+                        "type": "boolean"
+                      },
+                      "pausedReason": {
+                        "type": "string"
+                      },
+                      "questionReason": {
+                        "type": "string"
+                      },
+                      "questioning": {
+                        "type": "boolean"
+                      },
+                      "rationale": {
+                        "type": "string"
+                      },
+                      "science": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "sources": {
+                        "items": [
+                          {
+                            "keys": {
+                              "resolved_title": {
+                                "type": "string"
+                              },
+                              "stance": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "url": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          {
+                            "keys": {
+                              "stance": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          }
+                        ],
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "timing": {
+                        "type": "string"
+                      },
+                      "watching": {
+                        "type": "string"
+                      },
+                      "why": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  }
+                ],
                 "length_sample": 3,
                 "type": "array"
               },
@@ -180,6 +279,9 @@
                       "sources": {
                         "items": {
                           "keys": {
+                            "resolved_title": {
+                              "type": "string"
+                            },
                             "stance": {
                               "type": "string"
                             },
@@ -252,6 +354,9 @@
                       "sources": {
                         "items": {
                           "keys": {
+                            "resolved_title": {
+                              "type": "string"
+                            },
                             "stance": {
                               "type": "string"
                             },
@@ -322,15 +427,103 @@
                         "type": "array"
                       },
                       "sources": {
+                        "items": [
+                          {
+                            "keys": {
+                              "resolved_title": {
+                                "type": "string"
+                              },
+                              "stance": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "url": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          {
+                            "keys": {
+                              "stance": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          }
+                        ],
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "timing": {
+                        "type": "string"
+                      },
+                      "watching": {
+                        "type": "string"
+                      },
+                      "why": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "keys": {
+                      "board": {
+                        "type": "string"
+                      },
+                      "cost_monthly": {
+                        "type": "integer"
+                      },
+                      "dose": {
+                        "type": "string"
+                      },
+                      "ev": {
+                        "type": "string"
+                      },
+                      "evPct": {
+                        "type": "integer"
+                      },
+                      "evidence_note": {
+                        "type": "string"
+                      },
+                      "hoped_outcome": {
+                        "type": "string"
+                      },
+                      "impact": {
+                        "type": "string"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "measured_by": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "rationale": {
+                        "type": "string"
+                      },
+                      "science": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "sources": {
                         "items": {
                           "keys": {
                             "stance": {
                               "type": "string"
                             },
                             "title": {
-                              "type": "string"
-                            },
-                            "url": {
                               "type": "string"
                             }
                           },
@@ -390,24 +583,128 @@
                         "items": {
                           "type": "string"
                         },
+                        "length_sample": 4,
+                        "type": "array"
+                      },
+                      "sources": {
+                        "items": [
+                          {
+                            "keys": {
+                              "stance": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          {
+                            "keys": {
+                              "resolved_title": {
+                                "type": "string"
+                              },
+                              "stance": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "url": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          }
+                        ],
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "timing": {
+                        "type": "string"
+                      },
+                      "watching": {
+                        "type": "string"
+                      },
+                      "why": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "keys": {
+                      "board": {
+                        "type": "string"
+                      },
+                      "cost_monthly": {
+                        "type": "integer"
+                      },
+                      "dose": {
+                        "type": "string"
+                      },
+                      "ev": {
+                        "type": "string"
+                      },
+                      "evPct": {
+                        "type": "integer"
+                      },
+                      "hoped_outcome": {
+                        "type": "string"
+                      },
+                      "impact": {
+                        "type": "string"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "measured_by": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "rationale": {
+                        "type": "string"
+                      },
+                      "science": {
+                        "items": {
+                          "type": "string"
+                        },
                         "length_sample": 3,
                         "type": "array"
                       },
                       "sources": {
-                        "items": {
-                          "keys": {
-                            "stance": {
-                              "type": "string"
+                        "items": [
+                          {
+                            "keys": {
+                              "resolved_title": {
+                                "type": "string"
+                              },
+                              "stance": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "url": {
+                                "type": "string"
+                              }
                             },
-                            "title": {
-                              "type": "string"
-                            },
-                            "url": {
-                              "type": "string"
-                            }
+                            "type": "object"
                           },
-                          "type": "object"
-                        },
+                          {
+                            "keys": {
+                              "stance": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          }
+                        ],
                         "length_sample": 3,
                         "type": "array"
                       },
@@ -460,6 +757,9 @@
                       "evPct": {
                         "type": "integer"
                       },
+                      "evidence_note": {
+                        "type": "string"
+                      },
                       "hoped_outcome": {
                         "type": "string"
                       },
@@ -492,9 +792,6 @@
                               "type": "string"
                             },
                             "title": {
-                              "type": "string"
-                            },
-                            "url": {
                               "type": "string"
                             }
                           },
@@ -564,8 +861,105 @@
                         "type": "array"
                       },
                       "sources": {
+                        "items": [
+                          {
+                            "keys": {
+                              "resolved_title": {
+                                "type": "string"
+                              },
+                              "stance": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "url": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          {
+                            "keys": {
+                              "stance": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          }
+                        ],
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "timing": {
+                        "type": "string"
+                      },
+                      "watching": {
+                        "type": "string"
+                      },
+                      "why": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "keys": {
+                      "board": {
+                        "type": "string"
+                      },
+                      "cost_monthly": {
+                        "type": "integer"
+                      },
+                      "dose": {
+                        "type": "string"
+                      },
+                      "ev": {
+                        "type": "string"
+                      },
+                      "evPct": {
+                        "type": "integer"
+                      },
+                      "hoped_outcome": {
+                        "type": "string"
+                      },
+                      "impact": {
+                        "type": "string"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "measured_by": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "questionReason": {
+                        "type": "string"
+                      },
+                      "questioning": {
+                        "type": "boolean"
+                      },
+                      "rationale": {
+                        "type": "string"
+                      },
+                      "science": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "sources": {
                         "items": {
                           "keys": {
+                            "resolved_title": {
+                              "type": "string"
+                            },
                             "stance": {
                               "type": "string"
                             },
@@ -661,6 +1055,9 @@
                       "sources": {
                         "items": {
                           "keys": {
+                            "resolved_title": {
+                              "type": "string"
+                            },
                             "stance": {
                               "type": "string"
                             },
@@ -733,6 +1130,9 @@
                       "sources": {
                         "items": {
                           "keys": {
+                            "resolved_title": {
+                              "type": "string"
+                            },
                             "stance": {
                               "type": "string"
                             },
@@ -745,6 +1145,182 @@
                           },
                           "type": "object"
                         },
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "timing": {
+                        "type": "string"
+                      },
+                      "watching": {
+                        "type": "string"
+                      },
+                      "why": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "keys": {
+                      "board": {
+                        "type": "string"
+                      },
+                      "cost_monthly": {
+                        "type": "integer"
+                      },
+                      "dose": {
+                        "type": "string"
+                      },
+                      "ev": {
+                        "type": "string"
+                      },
+                      "evPct": {
+                        "type": "integer"
+                      },
+                      "hoped_outcome": {
+                        "type": "string"
+                      },
+                      "impact": {
+                        "type": "string"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "measured_by": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "rationale": {
+                        "type": "string"
+                      },
+                      "science": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "sources": {
+                        "items": [
+                          {
+                            "keys": {
+                              "resolved_title": {
+                                "type": "string"
+                              },
+                              "stance": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "url": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          {
+                            "keys": {
+                              "stance": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          }
+                        ],
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "timing": {
+                        "type": "string"
+                      },
+                      "watching": {
+                        "type": "string"
+                      },
+                      "why": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "keys": {
+                      "board": {
+                        "type": "string"
+                      },
+                      "cost_monthly": {
+                        "type": "integer"
+                      },
+                      "dose": {
+                        "type": "string"
+                      },
+                      "ev": {
+                        "type": "string"
+                      },
+                      "evPct": {
+                        "type": "integer"
+                      },
+                      "hoped_outcome": {
+                        "type": "string"
+                      },
+                      "impact": {
+                        "type": "string"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "measured_by": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "rationale": {
+                        "type": "string"
+                      },
+                      "science": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "sources": {
+                        "items": [
+                          {
+                            "keys": {
+                              "stance": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          {
+                            "keys": {
+                              "resolved_title": {
+                                "type": "string"
+                              },
+                              "stance": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "url": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          }
+                        ],
                         "length_sample": 3,
                         "type": "array"
                       },
@@ -809,20 +1385,36 @@
                         "type": "array"
                       },
                       "sources": {
-                        "items": {
-                          "keys": {
-                            "stance": {
-                              "type": "string"
+                        "items": [
+                          {
+                            "keys": {
+                              "stance": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              }
                             },
-                            "title": {
-                              "type": "string"
-                            },
-                            "url": {
-                              "type": "string"
-                            }
+                            "type": "object"
                           },
-                          "type": "object"
-                        },
+                          {
+                            "keys": {
+                              "resolved_title": {
+                                "type": "string"
+                              },
+                              "stance": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "url": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          }
+                        ],
                         "length_sample": 3,
                         "type": "array"
                       },
@@ -907,6 +1499,9 @@
                         "items": [
                           {
                             "keys": {
+                              "resolved_title": {
+                                "type": "string"
+                              },
                               "stance": {
                                 "type": "string"
                               },
@@ -992,20 +1587,36 @@
                         "type": "array"
                       },
                       "sources": {
-                        "items": {
-                          "keys": {
-                            "stance": {
-                              "type": "string"
+                        "items": [
+                          {
+                            "keys": {
+                              "stance": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              }
                             },
-                            "title": {
-                              "type": "string"
-                            },
-                            "url": {
-                              "type": "string"
-                            }
+                            "type": "object"
                           },
-                          "type": "object"
-                        },
+                          {
+                            "keys": {
+                              "resolved_title": {
+                                "type": "string"
+                              },
+                              "stance": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "url": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          }
+                        ],
                         "length_sample": 3,
                         "type": "array"
                       },
@@ -1070,20 +1681,36 @@
                         "type": "array"
                       },
                       "sources": {
-                        "items": {
-                          "keys": {
-                            "stance": {
-                              "type": "string"
+                        "items": [
+                          {
+                            "keys": {
+                              "stance": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              }
                             },
-                            "title": {
-                              "type": "string"
-                            },
-                            "url": {
-                              "type": "string"
-                            }
+                            "type": "object"
                           },
-                          "type": "object"
-                        },
+                          {
+                            "keys": {
+                              "resolved_title": {
+                                "type": "string"
+                              },
+                              "stance": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "url": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          }
+                        ],
                         "length_sample": 3,
                         "type": "array"
                       },
@@ -1154,6 +1781,9 @@
                         "items": [
                           {
                             "keys": {
+                              "resolved_title": {
+                                "type": "string"
+                              },
                               "stance": {
                                 "type": "string"
                               },
