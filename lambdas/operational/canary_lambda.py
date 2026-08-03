@@ -26,6 +26,21 @@ CloudWatch metrics emitted (namespace: LifePlatform/Canary):
 
 Alarm: life-platform-canary-failure — any Fail metric > 0 → SNS
 
+Severity lanes (#2051):
+  Checks report into TWO lanes, defined once in operational/canary_lanes.py:
+    • infra        — live round-trips (DDB/S3/MCP/Bedrock/subscribe flow). A
+                     failure here is plausible evidence about the code that
+                     just shipped, so it GATES the CI smoke oracle and can
+                     trigger the auto-rollback. Reflected in `statusCode`.
+    • stored_state — postconditions about data at rest (#1954 residue, the
+                     cleanup delete). These describe rows that may predate the
+                     deploy by weeks, and a rollback cannot delete a row —
+                     they alarm, email on FIRST occurrence, and are surfaced
+                     as a CI warning, but they never gate.
+  The response body carries both counts: `failed_deploy_health` (infra, the
+  same key qa-smoke publishes for #1921) and `failed_stored_state`. `all_pass`
+  and `failures` remain the honest UNION of both lanes.
+
 Lambda: life-platform-canary
 Schedule: rate(4 hours)
 IAM role: lambda-canary-role
@@ -45,6 +60,15 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 from common.mcp_url import resolve_mcp_url  # SEC-02 #780: discover the URL at runtime, not a committed env var
+
+from operational.canary_lanes import (  # #2051: one registry decides what gates a rollback
+    LANE_INFRA,
+    LANE_STORED_STATE,
+    label_for,
+    lane_counts,
+    lane_for,
+    lane_summary,
+)
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -389,15 +413,28 @@ def count_canary_subscriber_rows(ddb_client) -> int:
     return count
 
 
-def check_subscribe_flow(canary_ts: str) -> tuple[bool, str, float]:
+def check_subscribe_flow(canary_ts: str) -> tuple[bool, str, float, dict]:
     """Verify the subscriber-onboarding flow creates a DDB record in <5s.
 
     POSTs a throwaway email under the verified domain (canary+<ts>@mattsusername.com)
     to /api/subscribe via the live site-api Function URL, then verifies the
     USER#matthew#SOURCE#subscribers DDB partition has a new pending-confirmation
-    record within 5s. Cleans up by tombstone-overwriting the canary record.
+    record within 5s. Cleans up by deleting the canary record.
 
-    Returns (None, msg, 0) on environment misconfig (skip).
+    Returns ``(ok, msg, latency_ms, extras)``.
+
+    #2051 — the return is a 4-tuple because this one check answers TWO
+    different questions and they must not share a verdict:
+
+      * ``ok`` is the INFRA round-trip only: did the live /api/subscribe path
+        accept a subscriber and did the row appear? That gates.
+      * ``extras`` carries the STORED-STATE lane results keyed by check key
+        (``subscribe_cleanup``, ``subscribe_residue``) — postconditions about
+        rows sitting in the partition, possibly written weeks ago by an
+        earlier run. Those never gate; the handler routes them into their own
+        lane, metrics and first-occurrence alert.
+
+    Returns (None, msg, 0, {}) on environment misconfig (skip).
     """
     import hashlib as _h
 
@@ -422,7 +459,7 @@ def check_subscribe_flow(canary_ts: str) -> tuple[bool, str, float]:
                 api_status = resp.status
         except urllib.error.HTTPError as e:
             latency = (time.monotonic() - t0) * 1000
-            return False, f"subscribe API HTTP {e.code}", latency
+            return False, f"subscribe API HTTP {e.code}", latency, {}
 
         # Verify DDB record created
         ddb_client = boto3.client("dynamodb", region_name=REGION)
@@ -434,51 +471,82 @@ def check_subscribe_flow(canary_ts: str) -> tuple[bool, str, float]:
         latency = (time.monotonic() - t0) * 1000
 
         if not item:
-            return False, f"subscribe POST returned {api_status} but no DDB record for {sk[:40]}", latency
+            return False, f"subscribe POST returned {api_status} but no DDB record for {sk[:40]}", latency, {}
         status_attr = item.get("status", {}).get("S", "?")
         if status_attr != "pending_confirmation":
-            return False, f"subscribe record status='{status_attr}' (expected pending_confirmation)", latency
+            return False, f"subscribe record status='{status_attr}' (expected pending_confirmation)", latency, {}
+
+        # ── Everything below here is STORED STATE, not deploy health (#2051) ──
+        extras = {}
 
         # Cleanup: delete the canary record — the role has DeleteItem.
         # (The comment "IAM blocks DeleteItem" was wrong; the role has it since day 1.
         # The previous update_item approach was failing because UpdateItem is NOT granted.)
+        # #2051: a failure here is now a REPORTED check of its own, not a lone
+        # print. The silent cleanup failure is the root cause of the 12-day
+        # stray row — #1954's counter only ever saw the aftermath.
         try:
             ddb_client.delete_item(
                 TableName=TABLE_NAME,
                 Key={"pk": {"S": SUBSCRIBERS_PK}, "sk": {"S": sk}},
             )
+            extras["subscribe_cleanup"] = {"ok": True, "message": "canary subscriber row deleted"}
         except Exception as e:
-            # Not fatal on its own — the residue postcondition below is the
-            # authoritative verdict (the old silent `pass` here is exactly how
-            # the 2026-07-21 stray row went unseen for 12 days, #1954).
             print(f"[WARN] subscribe canary cleanup delete failed: {e}")
+            extras["subscribe_cleanup"] = {"ok": False, "message": f"cleanup delete failed — this run's synthetic row is now residue: {e}"}
 
         # #1954 postcondition: the partition must hold ZERO synthetic rows.
         # Fails loudly on any survivor (this run's or a previous run's) — and
         # fails too if the count itself is unreadable, because an unverifiable
         # assertion must never report green (ADR-104 posture).
+        #
+        # #2051: "loudly" now means alarm + first-occurrence email + a CI
+        # warning, NOT a rollback. A survivor may have been written weeks
+        # earlier by an unrelated run; reverting the code that just shipped
+        # neither caused it nor deletes it. An unreadable count stays in this
+        # lane for the same reason — what it asserts is about stored state.
         try:
             residue = count_canary_subscriber_rows(ddb_client)
         except Exception as e:
+            extras["subscribe_residue"] = {
+                "ok": False,
+                "message": f"residue count failed (postcondition unverifiable): {e}",
+                "residue_rows": None,
+            }
             latency = (time.monotonic() - t0) * 1000
-            return False, f"subscribe canary residue count failed (postcondition unverifiable): {e}", latency
-        emit("CanarySubscribeResidueRows", residue)  # positive confirmation: 0 on every clean run
-        latency = (time.monotonic() - t0) * 1000
-        if residue > 0:
-            return False, f"{residue} synthetic canary row(s) survived cleanup in the subscriber partition — delete them (#1954)", latency
+            return True, f"subscribe flow OK ({api_status}, DDB pending_confirmation in {round(latency)}ms)", latency, extras
 
-        return True, f"subscribe flow OK ({api_status}, DDB pending_confirmation in {round(latency)}ms, 0 residue rows)", latency
+        emit("CanarySubscribeResidueRows", residue)  # positive confirmation: 0 on every clean run
+        extras["subscribe_residue"] = {
+            "ok": residue == 0,
+            "message": (
+                "0 synthetic canary rows in the subscriber partition"
+                if residue == 0
+                else f"{residue} synthetic canary row(s) survived cleanup in the subscriber partition — delete them (#1954)"
+            ),
+            "residue_rows": residue,
+        }
+        latency = (time.monotonic() - t0) * 1000
+        return True, f"subscribe flow OK ({api_status}, DDB pending_confirmation in {round(latency)}ms)", latency, extras
     except Exception as e:
         latency = (time.monotonic() - t0) * 1000
-        return False, f"subscribe canary error: {e}", latency
+        return False, f"subscribe canary error: {e}", latency, {}
 
 
 def send_alert(failures: list[dict], canary_ts: str) -> None:
     rows = ""
     for f in failures:
+        # #2051: name the lane in the email. "Canary failed" was ambiguous
+        # between "the platform is down" and "a test row needs deleting" —
+        # and the reader of this email is the person who has to tell them apart.
+        lane = f.get("lane", LANE_INFRA)
+        lane_note = (
+            "infra — gates deploys" if lane == LANE_INFRA else "stored state — does NOT gate deploys; needs a data fix, not a rollback"
+        )
         rows += f"""
         <tr>
           <td style="padding:8px 12px;border-bottom:1px solid #333;">{f['check']}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #333;color:#888;font-size:12px;">{lane_note}</td>
           <td style="padding:8px 12px;border-bottom:1px solid #333;color:#ff6b6b;">{f['message']}</td>
         </tr>"""
 
@@ -495,7 +563,7 @@ def send_alert(failures: list[dict], canary_ts: str) -> None:
   <h2>🔴 Canary Failure — {len(failures)} check{'s' if len(failures) > 1 else ''} failed</h2>
   <p style="color:#aaa;">Synthetic health check at {canary_ts} UTC detected failures:</p>
   <table>
-    <tr><th>Check</th><th>Error</th></tr>
+    <tr><th>Check</th><th>Lane</th><th>Error</th></tr>
     {rows}
   </table>
   <div class="footer">
@@ -539,36 +607,42 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
         results = {}
         failures = []
 
+        def record(check_key: str, ok, message: str, latency_ms: float = 0.0) -> None:
+            """Store one check result + its lane, and enroll a failure.
+
+            #2051: the lane comes from operational/canary_lanes.py — the ONLY
+            place the gating question is answered. `ok is None` means skipped
+            (never a failure in either lane).
+            """
+            lane = lane_for(check_key)
+            results[check_key] = {"ok": ok, "message": message, "latency_ms": round(latency_ms), "lane": lane}
+            if ok is False:
+                failures.append({"check": label_for(check_key), "check_key": check_key, "lane": lane, "message": message})
+
         if not mcp_only:
             # ── DynamoDB check ──────────────────────────────────────────────────────
             ddb_ok, ddb_msg, ddb_ms = check_dynamodb(canary_ts, payload)
-            results["dynamodb"] = {"ok": ddb_ok, "message": ddb_msg, "latency_ms": round(ddb_ms)}
+            record("dynamodb", ddb_ok, ddb_msg, ddb_ms)
             print(f"  DDB:  {'✅' if ddb_ok else '❌'} {ddb_msg}")
             emit("CanaryDDBPass" if ddb_ok else "CanaryDDBFail", 1)
             emit("CanaryLatencyDDB_ms", ddb_ms, "Milliseconds")
-            if not ddb_ok:
-                failures.append({"check": "DynamoDB", "message": ddb_msg})
 
             # ── S3 check ────────────────────────────────────────────────────────────
             s3_ok, s3_msg, s3_ms = check_s3(canary_ts, payload)
-            results["s3"] = {"ok": s3_ok, "message": s3_msg, "latency_ms": round(s3_ms)}
+            record("s3", s3_ok, s3_msg, s3_ms)
             print(f"  S3:   {'✅' if s3_ok else '❌'} {s3_msg}")
             emit("CanaryS3Pass" if s3_ok else "CanaryS3Fail", 1)
             emit("CanaryLatencyS3_ms", s3_ms, "Milliseconds")
-            if not s3_ok:
-                failures.append({"check": "S3", "message": s3_msg})
 
         # ── MCP check ───────────────────────────────────────────────────────────
         mcp_ok, mcp_msg, mcp_ms = check_mcp(canary_ts)
         if mcp_ok is not None:  # None = skipped
-            results["mcp"] = {"ok": mcp_ok, "message": mcp_msg, "latency_ms": round(mcp_ms)}
+            record("mcp", mcp_ok, mcp_msg, mcp_ms)
             print(f"  MCP:  {'✅' if mcp_ok else '❌'} {mcp_msg}")
             emit("CanaryMCPPass" if mcp_ok else "CanaryMCPFail", 1)
             emit("CanaryLatencyMCP_ms", mcp_ms, "Milliseconds")
-            if not mcp_ok:
-                failures.append({"check": "MCP Lambda", "message": mcp_msg})
         else:
-            results["mcp"] = {"ok": None, "message": mcp_msg, "latency_ms": 0}
+            record("mcp", None, mcp_msg, 0)
             print(f"  MCP:  ⚪ {mcp_msg}")
 
         # ── Anthropic API check ─────────────────────────────────────────────────
@@ -578,14 +652,12 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
         if not mcp_only:
             ant_ok, ant_msg, ant_ms = check_anthropic(canary_ts)
             if ant_ok is not None:
-                results["anthropic"] = {"ok": ant_ok, "message": ant_msg, "latency_ms": round(ant_ms)}
+                record("anthropic", ant_ok, ant_msg, ant_ms)
                 print(f"  Anthropic: {'✅' if ant_ok else '❌'} {ant_msg}")
                 emit("CanaryAnthropicPass" if ant_ok else "CanaryAnthropicFail", 1)
                 emit("CanaryLatencyAnthropic_ms", ant_ms, "Milliseconds")
-                if not ant_ok:
-                    failures.append({"check": "Anthropic API", "message": ant_msg})
             else:
-                results["anthropic"] = {"ok": None, "message": ant_msg, "latency_ms": 0}
+                record("anthropic", None, ant_msg, 0)
                 print(f"  Anthropic: ⚪ {ant_msg}")
 
         # ── Subscribe flow check ────────────────────────────────────────────────
@@ -593,14 +665,31 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
         # Skipped on mcp_only runs — full pass is enough cadence to catch a broken
         # onboarding flow within 4h.
         if not mcp_only:
-            sub_ok, sub_msg, sub_ms = check_subscribe_flow(canary_ts)
+            sub_ok, sub_msg, sub_ms, sub_extras = check_subscribe_flow(canary_ts)
             if sub_ok is not None:
-                results["subscribe"] = {"ok": sub_ok, "message": sub_msg, "latency_ms": round(sub_ms)}
+                record("subscribe", sub_ok, sub_msg, sub_ms)
                 print(f"  Subscribe: {'✅' if sub_ok else '❌'} {sub_msg}")
                 emit("CanarySubscribePass" if sub_ok else "CanarySubscribeFail", 1)
                 emit("CanaryLatencySubscribe_ms", sub_ms, "Milliseconds")
-                if not sub_ok:
-                    failures.append({"check": "Subscribe flow", "message": sub_msg})
+
+            # ── Stored-state postconditions (#2051) ─────────────────────────
+            # Same subscribe probe, different question: what is sitting in the
+            # partition. Own results, own metrics, own alarms — and, crucially,
+            # own lane, so a row written twelve days ago cannot revert today's
+            # deploy (2026-08-02 incident).
+            for extra_key, extra_metric in (
+                ("subscribe_cleanup", "CanarySubscribeCleanup"),
+                ("subscribe_residue", "CanarySubscribeResidue"),
+            ):
+                extra = sub_extras.get(extra_key)
+                if not extra:
+                    continue
+                extra_ok = extra.get("ok")
+                record(extra_key, extra_ok, extra.get("message", ""))
+                if extra.get("residue_rows") is not None:
+                    results[extra_key]["residue_rows"] = extra["residue_rows"]
+                print(f"  {label_for(extra_key)}: {'✅' if extra_ok else '❌'} {extra.get('message', '')}")
+                emit(f"{extra_metric}Pass" if extra_ok else f"{extra_metric}Fail", 1)
 
         # ── Alert only if the SAME check has failed in 2 consecutive runs ──────
         # Persistence is what's load-bearing; transient blips (Anthropic 503,
@@ -626,23 +715,54 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
             print(f"[WARN] canary state read/write failed (defaulting to no-alert): {_se}")
             prev_failed = set()
 
+        # #2051: the two-consecutive-runs suppression is right for INFRA checks
+        # (a Bedrock 503 or an MCP cold start is genuinely transient) and wrong
+        # for stored state — a leftover row is not a blip, it is a fact that
+        # persists until someone deletes it, and it no longer has a rollback to
+        # make it loud. So stored-state failures alert on FIRST occurrence.
         persistent_failures = [f for f in failures if f["check"] in prev_failed]
-        if persistent_failures:
-            print(f"  Sending alert: {len(persistent_failures)} persistent failure(s) (failed in previous run too)")
-            send_alert(persistent_failures, canary_ts)
+        _persistent_keys = {f["check"] for f in persistent_failures}
+        first_occurrence_stored_state = [f for f in failures if f["lane"] == LANE_STORED_STATE and f["check"] not in _persistent_keys]
+        to_alert = persistent_failures + first_occurrence_stored_state
+        if to_alert:
+            print(
+                f"  Sending alert: {len(persistent_failures)} persistent + "
+                f"{len(first_occurrence_stored_state)} first-occurrence stored-state failure(s)"
+            )
+            send_alert(to_alert, canary_ts)
         elif failures:
-            print(f"  Suppressed first-occurrence alert ({len(failures)} new failure(s)); will alert if repeat next run")
+            print(f"  Suppressed first-occurrence alert ({len(failures)} new infra failure(s)); will alert if repeat next run")
 
+        # ── Lane verdicts (#2051) ───────────────────────────────────────────
+        # Derived from `results` itself, so the lane counts and the reported
+        # checks can never disagree.
+        counts = lane_counts(results)
+        infra_failed = counts.get(LANE_INFRA, 0)
+        stored_state_failed = counts.get(LANE_STORED_STATE, 0)
         all_ok = len(failures) == 0
-        print(f"Canary complete: {'ALL PASS ✅' if all_ok else f'{len(failures)} FAILURES ❌'}")
+        print(
+            f"Canary complete: {'ALL PASS ✅' if all_ok else f'{len(failures)} FAILURES ❌'} "
+            f"(infra {infra_failed}, stored-state {stored_state_failed})"
+        )
 
         return {
-            "statusCode": 200 if all_ok else 500,
+            # statusCode is the INFRA verdict: it is what the CI smoke oracle
+            # may act on, and the only thing a rollback could plausibly fix.
+            # The body below stays fully honest about both lanes.
+            "statusCode": 200 if infra_failed == 0 else 500,
             "body": json.dumps(
                 {
                     "canary_ts": canary_ts,
+                    # Union across both lanes — unchanged meaning, still false
+                    # whenever anything at all failed.
                     "all_pass": all_ok,
                     "failures": len(failures),
+                    # #1921's key, published by qa-smoke too: the ONLY count the
+                    # smoke oracle gates on.
+                    "failed_deploy_health": infra_failed,
+                    # Loud, alarmed, emailed — never gating.
+                    "failed_stored_state": stored_state_failed,
+                    "lanes": lane_summary(results),
                     "results": results,
                 }
             ),

@@ -12,6 +12,13 @@ check loudly if any survive.
 All offline — fake clients are plain classes with scripted dict responses,
 never MagicMock (a MagicMock feeding a pagination loop returns truthy
 LastEvaluatedKeys forever → OOM; the loop is also bounded for the same reason).
+
+#2051 moved WHERE that failure is reported, not WHETHER: the postcondition now
+returns in `check_subscribe_flow`'s `extras` (the stored-state lane) instead of
+flipping the flow's own verdict, because a row written twelve days ago is not
+evidence about the deploy in flight — it reverted a correct one on 2026-08-02.
+The assertions below follow it into the new lane; the lane's routing is guarded
+separately in tests/test_canary_lane_split.py.
 """
 
 import os
@@ -132,43 +139,58 @@ def _run_subscribe_flow(monkeypatch, ddb):
     monkeypatch.setattr(canary, "boto3", _FakeBoto3())
     emitted = []
     monkeypatch.setattr(canary, "emit", lambda *a, **k: emitted.append(a))
-    ok, msg, _ms = canary.check_subscribe_flow("2026-08-03T12:00:00Z")
-    return ok, msg, emitted
+    ok, msg, _ms, extras = canary.check_subscribe_flow("2026-08-03T12:00:00Z")
+    return ok, msg, extras, emitted
 
 
 def test_subscribe_flow_fails_loudly_when_a_synthetic_row_survives(monkeypatch):
     ddb = _FakeDDBClient(query_pages=[{"Count": 1}], get_item_response=_PENDING_ITEM)
-    ok, msg, emitted = _run_subscribe_flow(monkeypatch, ddb)
-    assert ok is False
-    assert "1 synthetic" in msg and "surviv" in msg
+    ok, _msg, extras, emitted = _run_subscribe_flow(monkeypatch, ddb)
+    residue = extras["subscribe_residue"]
+    assert residue["ok"] is False
+    assert "1 synthetic" in residue["message"] and "surviv" in residue["message"]
+    assert residue["residue_rows"] == 1
     assert ("CanarySubscribeResidueRows", 1) in [(e[0], e[1]) for e in emitted]
+    # #2051: the LIVE round-trip is unaffected — the subscribe API accepted the
+    # subscriber and the row appeared, which is the only part of this probe that
+    # is evidence about the code that just shipped.
+    assert ok is True
 
 
 def test_subscribe_flow_passes_when_partition_is_clean(monkeypatch):
     ddb = _FakeDDBClient(query_pages=[{"Count": 0}], get_item_response=_PENDING_ITEM)
-    ok, msg, emitted = _run_subscribe_flow(monkeypatch, ddb)
+    ok, _msg, extras, emitted = _run_subscribe_flow(monkeypatch, ddb)
     assert ok is True
+    assert extras["subscribe_residue"]["ok"] is True
+    assert extras["subscribe_cleanup"]["ok"] is True
     assert ("CanarySubscribeResidueRows", 0) in [(e[0], e[1]) for e in emitted]
 
 
 def test_subscribe_flow_fails_when_residue_count_unreadable(monkeypatch):
     """If the postcondition cannot be verified, the check fails honestly —
-    an unverifiable assertion must never report green (ADR-104 posture)."""
+    an unverifiable assertion must never report green (ADR-104 posture).
+    It fails in the stored-state lane: what it asserts is about stored data,
+    so it alarms and emails rather than reverting a deploy."""
 
     class _QueryBroken(_FakeDDBClient):
         def query(self, **kwargs):
             raise RuntimeError("AccessDenied: no Query")
 
     ddb = _QueryBroken(query_pages=[], get_item_response=_PENDING_ITEM)
-    ok, msg, _emitted = _run_subscribe_flow(monkeypatch, ddb)
-    assert ok is False
-    assert "residue" in msg.lower()
+    _ok, _msg, extras, _emitted = _run_subscribe_flow(monkeypatch, ddb)
+    residue = extras["subscribe_residue"]
+    assert residue["ok"] is False
+    assert "residue" in residue["message"].lower()
+    assert residue["residue_rows"] is None
 
 
 def test_subscribe_flow_cleanup_failure_is_caught_by_the_postcondition(monkeypatch):
-    """The old silent-`pass` hole: delete blows up, but the residue count now
-    sees the survivor and the check fails instead of returning green."""
+    """The old silent-`pass` hole: delete blows up. #2051 gives it a verdict of
+    its own (the CAUSE) on top of the residue counter (the AFTERMATH) — the
+    stray row sat for 12 days precisely because only the aftermath was watched."""
     ddb = _FakeDDBClient(query_pages=[{"Count": 1}], get_item_response=_PENDING_ITEM, fail_delete=True)
-    ok, msg, _emitted = _run_subscribe_flow(monkeypatch, ddb)
-    assert ok is False
-    assert "surviv" in msg
+    _ok, _msg, extras, _emitted = _run_subscribe_flow(monkeypatch, ddb)
+    assert extras["subscribe_cleanup"]["ok"] is False
+    assert "cleanup delete failed" in extras["subscribe_cleanup"]["message"]
+    assert extras["subscribe_residue"]["ok"] is False
+    assert "surviv" in extras["subscribe_residue"]["message"]

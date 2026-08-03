@@ -24,6 +24,13 @@ auto-rollback gate exists to catch. `decide()` now also treats a numeric
 status/statusCode >= 400 as FAIL, and parses the `body` (dict or JSON string)
 for `failed` (truthy/nonzero) or `all_pass: false`.
 
+#2051 — closes the fail-CLOSED path in the other direction: a finding that is
+not about the deploy at all must not revert it. A body that declares lanes
+(`failed_deploy_health` present, as qa-smoke does since #1921 and the canary
+does since #2051) is gated on that key ALONE; the union counters (`all_pass`,
+`failures`) no longer re-admit the non-gating lane. Bodies without a lane
+declaration are unaffected — every failure still gates.
+
 The parse/decision logic used to live inline in two shell steps of
 ci-cd.yml. It is extracted here so it is unit-testable (tests/
 test_smoke_oracle_decision.py) and shared byte-for-byte by both the qa-smoke
@@ -138,38 +145,74 @@ def decide(path, ok_extra=()):
         # canary — which has no partitions and whose every check IS deploy
         # health) we fall back to the total `failed`, i.e. exactly the
         # pre-#1921 behaviour. The oracle never fails open on a missing key.
+        #
+        # #2051 extends the same reasoning to the CANARY, which is where it was
+        # missing and where it cost a deploy. On 2026-08-02 every canary
+        # round-trip passed (DDB, S3, MCP, Bedrock) and the run still returned
+        # 500 because ONE synthetic subscriber row, written twelve days
+        # earlier, had survived cleanup (#1954's postcondition). The rollback
+        # fired and stripped out a verified-correct fleet deploy — and while
+        # that row existed no session's deploy could have survived. The canary
+        # now publishes `failed_deploy_health` (infra round-trips) alongside
+        # `failed_stored_state` (residue postconditions), so the two lanes land
+        # on opposite sides of this branch.
         if "failed_deploy_health" in body:
             gating = body.get("failed_deploy_health")
             if gating:
                 return "FAIL", f"body failed_deploy_health={gating!r} (status={status})"
+            # A LANE-AWARE body has already told us which failures are about
+            # this deploy. `all_pass` is the honest UNION across lanes, so
+            # consulting it here would re-admit exactly the non-gating findings
+            # the branch above just excluded — #1921's mistake, one path over.
         else:
             failed = body.get("failed")
             if failed:
                 return "FAIL", f"body failed={failed!r} (status={status})"
-        if body.get("all_pass") is False:
-            return "FAIL", f"body all_pass=false (status={status})"
+            # Legacy/unlaned bodies keep the pre-#2051 contract untouched: no
+            # lane declaration means every failure is treated as gating.
+            if body.get("all_pass") is False:
+                return "FAIL", f"body all_pass=false (status={status})"
 
     if s in ok or (s and "error" not in s and "fail" not in s):
         return "PASS", str(status)
     return "FAIL", str(status)
 
 
-def content_truth_count(path):
-    """#1921: how many CONTENT_TRUTH failures this oracle reported, or 0.
+def _body_count(path, key):
+    """Read one integer counter out of the oracle's body, or 0.
 
-    Read only for the CI annotation in main(). Kept out of `decide()` so that
+    Used for the non-gating CI annotations only. Kept out of `decide()` so that
     function's (verdict, detail) contract — and every test asserting on it —
-    stays byte-compatible. A content-truth failure no longer gates the pipeline,
-    which is precisely why it has to be shouted at the surface where the deploy
-    happened; the re-routing is only defensible if it is not also a mute.
+    stays byte-compatible.
     """
     try:
         with open(path) as f:
             result = json.load(f)
         body = _parse_body(result) if isinstance(result, dict) else None
-        return int(body.get("failed_content_truth") or 0) if isinstance(body, dict) else 0
+        return int(body.get(key) or 0) if isinstance(body, dict) else 0
     except Exception:  # noqa: BLE001 — annotation only; never affect the verdict
         return 0
+
+
+def content_truth_count(path):
+    """#1921: how many CONTENT_TRUTH failures this oracle reported, or 0.
+
+    A content-truth failure no longer gates the pipeline, which is precisely
+    why it has to be shouted at the surface where the deploy happened; the
+    re-routing is only defensible if it is not also a mute.
+    """
+    return _body_count(path, "failed_content_truth")
+
+
+def stored_state_count(path):
+    """#2051: how many STORED-STATE failures this oracle reported, or 0.
+
+    The canary's residue/cleanup postconditions. Same deal as content-truth:
+    de-gated, so it must be louder, not quieter. This is the annotation that
+    would have named the 2026-08-02 stray row in the run's own log instead of
+    letting "smoke failure" stand in for "a test row from twelve days ago".
+    """
+    return _body_count(path, "failed_stored_state")
 
 
 def main(argv=None):
@@ -196,6 +239,19 @@ def main(argv=None):
             "NOT gating this deploy (#1921: content findings describe published state, "
             "not the code that just shipped, and a rollback cannot un-publish them). "
             "The qa-smoke failure email and the ContentTruthFailCount alarm carry the detail."
+        )
+
+    # #2051: same treatment for the canary's stored-state postconditions
+    # (#1954 residue, cleanup failure). They describe rows at rest — a rollback
+    # cannot delete a row — so they do not gate, and therefore must be named
+    # here rather than hidden behind the word "smoke".
+    stored_fails = stored_state_count(args.result)
+    if stored_fails:
+        print(
+            f"::warning::{args.label}: {stored_fails} stored-state failure(s) — "
+            "NOT gating this deploy (#2051: a residue postcondition describes data written "
+            "possibly weeks ago, not the code that just shipped, and a rollback cannot delete a row). "
+            "Fix the DATA: the canary alert email and the canary-subscribe-residue alarm carry the detail."
         )
 
     if verdict == "PASS":

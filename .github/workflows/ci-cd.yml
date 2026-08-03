@@ -847,6 +847,19 @@ jobs:
 
           # #1345: same shared decision as the smoke step; canary additionally
           # accepts "healthy". PARSE_ERROR is GATING (exit 1), no longer fail-open.
+          #
+          # #2051: this exit code is lane-aware. The canary now reports
+          # `failed_deploy_health` (live round-trips: DDB/S3/MCP/Bedrock/the
+          # subscribe flow — gating, a rollback is a plausible fix) separately
+          # from `failed_stored_state` (#1954-class residue postconditions —
+          # loud but NOT gating: they describe rows that may predate this deploy
+          # by weeks, and a rollback cannot delete a row). On 2026-08-02 one
+          # twelve-day-old synthetic subscriber row failed the canary with all
+          # infra green, this step went red, and the rollback below stripped a
+          # verified-correct fleet deploy — for every concurrent session, not
+          # just the one that noticed. The lane mapping lives in ONE place,
+          # lambdas/operational/canary_lanes.py; nothing here string-matches
+          # check names.
           python3 deploy/lib/smoke_oracle_decision.py /tmp/canary.json "Canary" --ok-extra healthy
 
   # ════════════════════════════════════════════════════════════════
@@ -1066,6 +1079,14 @@ jobs:
     # skipped by default unless its `if` contains a status-check function — so
     # without always() this rollback never actually fires (#418/ADR-117 fix; the
     # bare condition here was previously dormant).
+    #
+    # #2051: WHAT can turn smoke-test red is the lane question, and it is
+    # answered upstream in smoke_oracle_decision.py, not here — deliberately, so
+    # this condition stays one line and both oracles share one contract. Only
+    # deploy-health failures (qa-smoke's `failed_deploy_health` since #1921, the
+    # canary's since #2051) reach this job; content-truth and stored-state
+    # findings warn, alarm and email instead. Neither can be fixed by reverting
+    # code, and each has reverted a healthy fleet at least once.
     if: always() && needs.smoke-test.result == 'failure' && needs.deploy.result == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

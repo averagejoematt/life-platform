@@ -568,6 +568,20 @@ class OperationalStack(Stack):
         # makes a $0.0001 Anthropic call per run, alarm fires within ≤4h of any 4xx.
         _canary_alarm("CanaryAnthropicFailureAlarm", "life-platform-canary-anthropic-failure", "CanaryAnthropicFail")
 
+        # ── Stored-state lane alarms (#2051) ──
+        # These two checks no longer gate the CI smoke oracle (a leftover row
+        # is not evidence about the code that just shipped, and a rollback
+        # cannot delete it — #1921's reasoning, one path over). De-gating is
+        # only defensible if the finding gets a signal of its own, so it gets
+        # these: digest-routed, not paging — nobody should be woken for a test
+        # row, but nobody should discover it twelve days later either, which is
+        # exactly what happened on 2026-07-21 → 2026-08-02.
+        #
+        # The residue counter detects the AFTERMATH; the cleanup alarm detects
+        # the CAUSE on the day it happens.
+        _canary_alarm("CanarySubscribeResidueAlarm", "life-platform-canary-subscribe-residue", "CanarySubscribeResidueFail")
+        _canary_alarm("CanarySubscribeCleanupFailureAlarm", "life-platform-canary-subscribe-cleanup-failure", "CanarySubscribeCleanupFail")
+
         # ── DLQ depth alarm ──
         dlq_depth = cloudwatch.Alarm(
             self,
