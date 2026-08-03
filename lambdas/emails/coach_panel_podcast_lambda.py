@@ -309,16 +309,27 @@ def _synthesize_dialogue(turns: list) -> bytes:
 def _publish_episode_audio(week, wav_audio: bytes) -> dict:
     """Compress + PUT the episode audio (#1018): the Gemini WAV (24 kHz PCM) is encoded
     to spoken-word MP3 via audio_encode (lameenc-layer), fail-open to the raw WAV. Before
-    encoding, the synthesized audio ident (intro jingle + fade-under + outro reprise,
-    #1179/#1082) is mixed in at the raw-PCM stage — the ONE hook covering both episode 0
-    and the weekly path. duration comes from the WAV header AFTER the mix (ident adds ~9s)."""
+    encoding, the FROZEN V1 brand open (#1187) is prepended at the raw-PCM stage — the ONE
+    hook covering both episode 0 and the weekly path. duration comes from the WAV header
+    AFTER the prepend (the open adds ~10.75s including its trailing beat).
+
+    #1187 supersedes #1179: the per-episode synthesized arpeggio ident is disabled by
+    default in ``panelcast_ident``, so the two can never both open an episode. The ident
+    mix is still invoked — it is a no-op while disabled, and remains the one place the
+    behaviour can be restored by env flag without a code change."""
     from ai import audio_encode
 
-    try:  # #1179: mix the audio ident; mix_into_wav is fully fail-open (speech-only on error)
+    try:  # #1179: no-op while PANELCAST_IDENT is off (superseded by #1187's frozen open)
         from emails import panelcast_ident
     except ImportError:
         import panelcast_ident
     wav_audio = panelcast_ident.mix_into_wav(wav_audio)
+
+    try:  # #1187: prepend the frozen brand open; fully fail-open (cold open on error)
+        from emails import panelcast_brand_open
+    except ImportError:
+        import panelcast_brand_open
+    wav_audio = panelcast_brand_open.prepend_into_wav(wav_audio)
     duration = max(1, audio_encode.wav_duration_sec(wav_audio))
     body, ext, mime = audio_encode.compress_wav(wav_audio)
     s3.put_object(Bucket=S3_BUCKET, Key=f"{PREFIX}/wk{week}.{ext}", Body=body, ContentType=mime, CacheControl="max-age=86400, public")
