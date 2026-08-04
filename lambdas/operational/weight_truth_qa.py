@@ -110,6 +110,147 @@ def assess_cross_surface_weight(vitals, coaches, tol: float = CROSS_SURFACE_WEIG
     return True, f"coach narratives agree with the cockpit weight ({truth} lb)"
 
 
+# ── #2113: the same cross-surface question, for the vitals coaches actually cite ──
+#
+# `assess_cross_surface_weight` above measured ONE number. Cycle 12's genesis proved
+# that was too narrow: the sleep and training cards published "a recovery score of
+# 59% ... and HRV of 42 ms" and "Day one of this experiment ... Your Whoop recovery
+# came in at 59%, HRV at 42 ms" while /api/vitals served 44% and 35 ms. The weight
+# check was green throughout — the contradiction was in metrics nothing compared, so
+# qa-smoke could not see it at all. Same defect, same shape, different column.
+#
+# Tolerances are per metric because the units are not comparable. Each is set to
+# absorb rounding and a same-day re-read, and nothing more — the live gaps were 15
+# points of recovery and 7 ms of HRV, an order of magnitude past any of these.
+VITALS_TOL = {
+    "recovery": 2.0,  # percentage points
+    "hrv": 1.5,  # ms
+    "rhr": 1.5,  # bpm
+    "sleep": 0.3,  # hours
+}
+
+# The cockpit field each coach-cited metric is judged against (/api/vitals).
+_VITALS_TRUTH_FIELD = {"recovery": "recovery_pct", "hrv": "hrv_ms", "rhr": "rhr_bpm", "sleep": "sleep_hours"}
+
+_VITALS_UNIT = {"recovery": "%", "hrv": " ms", "rhr": " bpm", "sleep": " h"}
+
+# A figure counts only when its OWN metric names it. Recovery is a percentage, but so
+# are REM share, deep share and sleep efficiency — all of which appear in the same
+# sentence on a real sleep card — so "recovery" (or "readiness") has to be the word
+# adjacent to the number, in either order. Bare units are never enough.
+_VITALS_PATTERNS = {
+    "recovery": (
+        re.compile(r"\b(?:recovery|readiness)\b[^.\n;]{0,40}?(\d{1,3}(?:\.\d+)?)\s*(?:%|percent)", re.IGNORECASE),
+        re.compile(r"(\d{1,3}(?:\.\d+)?)\s*(?:%|percent)\s*(?:whoop\s+)?(?:recovery|readiness)\b", re.IGNORECASE),
+    ),
+    "hrv": (
+        re.compile(r"\bhrv\b[^.\n;]{0,40}?(\d{1,3}(?:\.\d+)?)\s*(?:ms\b|milliseconds\b)", re.IGNORECASE),
+        re.compile(r"(\d{1,3}(?:\.\d+)?)\s*(?:ms\b|milliseconds\b)[^.\n;]{0,20}?\bhrv\b", re.IGNORECASE),
+    ),
+    "rhr": (
+        re.compile(r"\b(?:rhr|resting (?:heart rate|hr|pulse))\b[^.\n;]{0,40}?(\d{2,3}(?:\.\d+)?)\s*(?:bpm\b)?", re.IGNORECASE),
+        re.compile(r"(\d{2,3}(?:\.\d+)?)\s*bpm\b[^.\n;]{0,25}?\b(?:rhr|resting)\b", re.IGNORECASE),
+    ),
+    "sleep": (re.compile(r"\bslept?\b[^.\n;]{0,40}?(\d{1,2}(?:\.\d+)?)\s*(?:h\b|hr\b|hrs\b|hours?\b)", re.IGNORECASE),),
+}
+
+# Plausible ranges. A figure outside its metric's real domain is something else that
+# happened to sit near the word — a set count, a year, a percentage of a percentage.
+_VITALS_DOMAIN = {"recovery": (0, 100), "hrv": (5, 250), "rhr": (30, 120), "sleep": (0, 24)}
+
+# The #1985 lesson, reused rather than re-derived: a gate that fires on correct
+# writing teaches people to ignore it. A real card reads "The two targets embedded in
+# your plan — RHR 55 bpm and HRV 50 ms — aren't arbitrary numbers", which is honest,
+# clearly-labelled goal prose and must never be a finding. Nearest-marker-wins (the
+# weight version below) does NOT save it there — the metric word sits closer to the
+# number than "targets" does — so the exemption here is SENTENCE-scoped: a figure in
+# a sentence that frames targets is not a claim about the current reading.
+#
+# Deliberately asymmetric. It under-fires on "recovery is 44%, below the 60% target"
+# and that is the correct direction to be wrong in: the withheld-facts fix is what
+# makes the narrative honest, and this gate exists to catch the class escaping, not
+# to be the only thing standing between a reader and a wrong number.
+_VITALS_TARGET_SENTENCE = re.compile(
+    # Plurals and inflections matter here and the live prose proves it: the card reads
+    # "The two TARGETS embedded in your plan", which `\btarget\b` does not match.
+    r"\b(targets?|targeting|goals?|aims?|aiming|would put|by month|thresholds?|benchmarks?|ceilings?|floor of)\b",
+    re.IGNORECASE,
+)
+
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?;])\s+|\n+")
+
+
+def vitals_cited_in(prose: str) -> dict:
+    """Every vital a blob of prose asserts **as a current reading**, by metric.
+
+    Returns ``{metric: [values]}``. Excluded, by design: figures the prose anchors to
+    a past point (`_HISTORICAL_ANCHOR`, shared with the weight assessor so the dated
+    escape hatch is ONE seam), figures in a sentence that frames a target or goal,
+    and figures outside the metric's real domain.
+    """
+    out: dict[str, list[float]] = {}
+    for sentence in _SENTENCE_SPLIT.split(prose or ""):
+        if _VITALS_TARGET_SENTENCE.search(sentence):
+            continue
+        for metric, patterns in _VITALS_PATTERNS.items():
+            lo, hi = _VITALS_DOMAIN[metric]
+            for pat in patterns:
+                for m in pat.finditer(sentence):
+                    try:
+                        v = float(m.group(1))
+                    except (TypeError, ValueError):
+                        continue
+                    if not (lo <= v <= hi):
+                        continue
+                    if _HISTORICAL_ANCHOR.match(sentence[m.end() : m.end() + _ANCHOR_WINDOW_CHARS]):
+                        continue  # dated / prior-cycle framing — not a claim about now
+                    out.setdefault(metric, []).append(v)
+    return out
+
+
+def assess_cross_surface_vitals(vitals, coaches, tol: dict | None = None):
+    """Every recovery / HRV / resting-HR / sleep figure a coach asserts as current
+    must match the cockpit's.
+
+    Returns (ok, message). Absence is a clean pass (ADR-104) on BOTH sides: a null
+    cockpit field has nothing to contradict, and a coach that cites nothing is silent,
+    not wrong. Pure — no network, no clock — so the rule is unit-testable offline.
+    """
+    if not isinstance(vitals, dict):
+        return True, "no vitals payload — nothing to compare"
+    tol = tol or VITALS_TOL
+
+    truth = {}
+    for metric, field in _VITALS_TRUTH_FIELD.items():
+        raw = vitals.get(field)
+        if raw is None:
+            continue
+        try:
+            truth[metric] = float(raw)
+        except (TypeError, ValueError):
+            continue
+    if not truth:
+        return True, "cockpit vitals are all null (pre-start / no readings) — nothing to compare"
+
+    disagreements = []
+    for c in coaches or []:
+        if not isinstance(c, dict):
+            continue
+        name = c.get("name") or c.get("persona_id") or "coach"
+        prose = " ".join(str(c.get(k) or "") for k in _PROSE_FIELDS)
+        for metric, values in vitals_cited_in(prose).items():
+            if metric not in truth:
+                continue
+            unit = _VITALS_UNIT[metric]
+            for cited in values:
+                if abs(cited - truth[metric]) > tol[metric]:
+                    disagreements.append(f"{name} cites {metric} {cited:g}{unit} vs cockpit {truth[metric]:g}{unit}")
+
+    if disagreements:
+        return False, "coach-cited vitals disagree with the cockpit — " + "; ".join(sorted(set(disagreements))[:4])
+    return True, "coach narratives agree with the cockpit vitals (" + ", ".join(f"{k} {v:g}" for k, v in sorted(truth.items())) + ")"
+
+
 def checks(check_cls, site_base_url, partition, timeout=15):
     """The qa_smoke-facing entrypoint: fetch both surfaces and return [Check].
 
@@ -127,6 +268,10 @@ def checks(check_cls, site_base_url, partition, timeout=15):
     import urllib.request
 
     check = check_cls("cross_surface:weight", "Reader Truth", partition)
+    # #2113: the vitals leg rides the SAME fetch — one pair of requests, two Checks.
+    # Reported separately so a recovery/HRV contradiction is named as one, rather
+    # than folded into a check whose title says "weight".
+    vitals_check = check_cls("cross_surface:vitals", "Reader Truth", partition)
     try:
         payloads = {}
         for path in ("/api/vitals", "/api/coaching-dashboard"):
@@ -134,13 +279,18 @@ def checks(check_cls, site_base_url, partition, timeout=15):
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 payloads[path] = json.loads(r.read().decode("utf-8", "replace"))
     except Exception as e:
-        return [check.warn(f"cross-surface weight fetch failed (fail-soft): {str(e)[:120]}")]
+        msg = f"cross-surface fetch failed (fail-soft): {str(e)[:120]}"
+        return [check.warn(msg), vitals_check.warn(msg)]
 
-    ok, msg = assess_cross_surface_weight(
-        payloads.get("/api/vitals", {}).get("vitals", {}),
-        payloads.get("/api/coaching-dashboard", {}).get("coaches", []),
-    )
-    return [check.ok(msg) if ok else check.fail(msg)]
+    served_vitals = payloads.get("/api/vitals", {}).get("vitals", {})
+    served_coaches = payloads.get("/api/coaching-dashboard", {}).get("coaches", [])
+
+    ok, msg = assess_cross_surface_weight(served_vitals, served_coaches)
+    v_ok, v_msg = assess_cross_surface_vitals(served_vitals, served_coaches)
+    return [
+        check.ok(msg) if ok else check.fail(msg),
+        vitals_check.ok(v_msg) if v_ok else vitals_check.fail(v_msg),
+    ]
 
 
 # ── #1225: single-surface hero-weight arithmetic. Moved here from

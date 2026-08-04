@@ -119,21 +119,23 @@ def _get_api_key():
 
 
 from common.numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
+from experiment import phase_taxonomy as _phase_taxonomy  # noqa: E402 — #2113: ADR-077 read bound
 
 
 def _query_source(source, start_date, end_date):
     pk = f"{USER_PREFIX}{source}"
+    start_date = _phase_taxonomy.cycle_read_floor(pk, start_date)  # #2113: genesis floor, EXPERIMENT_SCOPED only
     resp = table.query(KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}"))
     return _decimal_to_float(resp.get("Items", []))
 
 
 def _latest_item(source):
     pk = f"{USER_PREFIX}{source}"
-    resp = table.query(
-        KeyConditionExpression=Key("pk").eq(pk),
-        ScanIndexForward=False,
-        Limit=1,
-    )
+    kce = Key("pk").eq(pk)
+    floor = _phase_taxonomy.cycle_read_floor(pk)  # #2113: None unless EXPERIMENT_SCOPED
+    if floor:
+        kce = kce & Key("sk").between(f"DATE#{floor}", "DATE#9999-12-31")
+    resp = table.query(KeyConditionExpression=kce, ScanIndexForward=False, Limit=1)
     items = _decimal_to_float(resp.get("Items", []))
     return items[0] if items else None
 

@@ -355,9 +355,15 @@ def note_contradiction_hits(analysis, metrics_record):
     except ImportError:  # pragma: no cover — flat sys.path (tests / bundle root)
         from grounding_guard import hard_canonical_contradictions
 
-    from experiment.canonical_facts import build_canonical_facts
+    from experiment.canonical_facts import observed_facts
 
-    facts = {k: v for k, v in build_canonical_facts(metrics_record).items() if k != "as_of"}
+    # #2113: the AS-MEASURED view, not the publication view. This detector asks "does
+    # the note contradict the record it was written from?", which the cycle boundary
+    # has no bearing on — a note claiming 25% against a record holding 55% is wrong in
+    # any cycle. Using build_canonical_facts here would make the detector go DARK for
+    # the days after each reset, when its facts are withheld. `observed_facts` also
+    # carries no provenance keys, so the old hardcoded `as_of` filter goes with it.
+    facts = observed_facts(metrics_record)
     hits = []
     for f in _NOTE_FIELDS:
         hits.extend(hard_canonical_contradictions(analysis.get(f) or "", facts))

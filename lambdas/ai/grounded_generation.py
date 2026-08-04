@@ -303,6 +303,28 @@ def authoritative_facts_block(facts: dict) -> str:
     Returns "" when no facts are available (caller simply omits the block).
     """
     facts = facts or {}
+    # #2113: when the record behind these facts predates the current cycle's genesis,
+    # canonical_facts has already WITHHELD its observed values (they are not this
+    # cycle's readings at any age). The withholding is the load-bearing half — the
+    # allow-list gate does the rest. This rider is the second half: without it the
+    # coach is merely handed a thinner fact set on Day 1 and is free to reach for a
+    # remembered figure, which is precisely how "Day one of this experiment ... your
+    # Whoop recovery came in at 59%" got published against a cockpit serving 44%.
+    # Rendered even when no numeric line survives, so silence is never the only
+    # instruction.
+    rider = ""
+    if facts.get("facts_are_pre_genesis"):
+        rider = (
+            "CYCLE BOUNDARY — READ BEFORE CITING ANY VITAL:\n"
+            f"  The experiment restarted on {facts.get('cycle_genesis')}. The most recent daily-metrics "
+            f"record available is from {facts.get('as_of')}, BEFORE that reset, so its recovery, HRV, "
+            "resting heart rate, weight and weight-rate figures belong to the PREVIOUS cycle and have "
+            "been withheld from the facts below on purpose. Do NOT state a 'latest' or 'current' "
+            "recovery, HRV, resting HR, weight or weekly rate, and never present a prior-cycle figure "
+            "as this cycle's — least of all under a 'day one' frame. If a current value does not appear "
+            "below, say plainly that the reading has not landed yet. Honest absence is the correct "
+            "answer; a recalled or inferred number is not.\n"
+        )
     lines = []
     if facts.get("protein_g_avg") is not None:
         lines.append(
@@ -351,8 +373,8 @@ def authoritative_facts_block(facts: dict) -> str:
             f"{facts['projected_goal_date_latest']} (never a single certain date)"
         )
     if not lines:
-        return ""
-    return (
+        return rider
+    return rider + (
         "AUTHORITATIVE FACTS (cite these EXACT numbers; do not invent, round away, or "
         "substitute a target/floor for an actual value):\n" + "\n".join(lines) + "\n"
         "HARD RULE for resting HR, HRV, and recovery: state ONLY the exact value above. "

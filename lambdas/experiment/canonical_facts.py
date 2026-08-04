@@ -37,6 +37,85 @@ FIELD_UNITS = {
 }
 NUMERIC_FIELDS = tuple(FIELD_UNITS)
 
+# ── #2113: which facts a PRIOR CYCLE's record may still speak for ─────────────
+#
+# `computed_metrics` is EXPERIMENT_SCOPED in phase_taxonomy (ADR-077) — it is
+# exactly the class the reset tombstones. But every consumer here reads it with a
+# bare newest-first `Limit: 1`, so in the hours after a genesis (before that day's
+# daily-metrics-compute has run) the "latest" record is the PREVIOUS cycle's, and
+# `authoritative_facts_block` renders it as "Latest Whoop recovery: 59%" under a
+# hard rule telling the narrator to state that exact value.
+#
+# The split below is the honest one, and it is a SPLIT rather than a blanket wipe
+# because the two halves are different kinds of number:
+#   * OBSERVED — a measurement of a body on a specific day. A pre-genesis one is
+#     not this cycle's reading at any age (the #2104 rule, one surface over).
+#   * CONFIGURED — a target or floor from the profile. It is not an observation of
+#     anything, does not belong to a cycle, and withholding it would make the coach
+#     unable to say what the target even is. It travels.
+#
+# The union is asserted against NUMERIC_FIELDS by tests/test_genesis_week_coach_vitals_2113.py,
+# so a field added to FIELD_UNITS later cannot silently escape classification —
+# guard the SET, not the instance.
+OBSERVED_FIELDS = (
+    "recovery_pct",
+    "hrv_ms",
+    "rhr_bpm",
+    "protein_g_avg",
+    "latest_weight",
+    "weekly_rate_lbs",
+    "weekly_rate_ci_low",
+    "weekly_rate_ci_high",
+)
+CONFIGURED_FIELDS = ("protein_g_target", "protein_g_floor")
+
+# Keys in the returned dict that are NOT facts about a metric — provenance and cycle
+# context for a renderer, never a value a narrative may cite. Consumers that feed the
+# dict to a grounding detector or a number allow-list must strip these.
+#
+# This exists because `as_of` used to be the only one and `field_notes_lambda` filtered
+# it by literal. #2113 added two more and the literal did not know — the extra keys
+# reached `hard_canonical_contradictions` as if they were metric readings and the
+# canary suite went from catching a planted wrong-RHR to missing it. A truth pass must
+# never get quieter as a side effect of a change made elsewhere, so the set is declared
+# here, next to the fields it shadows, and consumers import it rather than restate it.
+META_FIELDS = ("as_of", "facts_are_pre_genesis", "cycle_genesis")
+
+
+def numeric_facts(facts: dict) -> dict:
+    """`facts` with the META_FIELDS removed — the metric→value view a grounding
+    detector or a number allow-list should see."""
+    return {k: v for k, v in (facts or {}).items() if k not in META_FIELDS}
+
+
+def observed_facts(record) -> dict:
+    """The AS-MEASURED metric→value view. The cycle rule is deliberately NOT applied.
+
+    Two different questions get asked of a `computed_metrics` record and only one of
+    them is about cycles:
+
+      * "May a narrative present this as the current reading?" — that is
+        `build_canonical_facts`, and after a reset the answer for a pre-genesis
+        record is no, so the values are withheld.
+      * "Does this text CONTRADICT the record it was written from?" — that is this
+        function, and the cycle is irrelevant to it. A note claiming 25% recovery
+        against a record holding 55% is wrong no matter which cycle the record
+        belongs to.
+
+    Collapsing the two would have made the field-note contradiction detector go dark
+    for the days after every reset — the withheld facts leave nothing to contradict.
+    A truth pass must never get quieter as a side effect of a change made elsewhere
+    (ADR-104/105), so the detector keeps its own view.
+    """
+    record = record or {}
+    return {k: _num(record.get(k)) for k in NUMERIC_FIELDS}
+
+
+try:  # fail-soft, matching intelligence/weight_recency: a partial bundle must not
+    from common import constants as _constants  # break canonical-fact assembly.
+except Exception:  # noqa: BLE001
+    _constants = None
+
 
 def _num(v):
     """One rounding rule for every fact: float→1dp, or None."""
@@ -46,13 +125,69 @@ def _num(v):
         return None
 
 
-def build_canonical_facts(record) -> dict:
+def _resolve_genesis(genesis):
+    """The current cycle's genesis date, read at CALL time (#2113).
+
+    The import above binds the constants MODULE, never the value, so a re-anchor
+    (or a test's monkeypatch) is picked up without a reload — the import-time
+    frozen-globals trap this repo has been bitten by before.
+    """
+    if genesis is not None:
+        return str(genesis)
+    try:
+        return str(_constants.EXPERIMENT_START_DATE)
+    except Exception:  # noqa: BLE001 — see the fail-soft contract above
+        return None
+
+
+def _record_date(record):
+    """The day a `computed_metrics` record describes: its `date`/`as_of`, else its sk."""
+    d = record.get("date") or record.get("as_of")
+    if d:
+        return str(d)
+    sk = str(record.get("sk") or "")
+    return sk[len("DATE#") :][:10] if sk.startswith("DATE#") else None
+
+
+def build_canonical_facts(record, genesis=None) -> dict:
     """Extract the one authoritative facts dict from a `computed_metrics` record.
 
     `record` is the DDB item (Decimals already cast to float by the caller, or
     castable). Returns every NUMERIC_FIELD (float-1dp or None) plus `as_of` (the
-    record's date). This is the single extraction every consumer shares."""
+    record's date). This is the single extraction every consumer shares.
+
+    #2113 — A PRE-GENESIS RECORD DOES NOT SPEAK FOR THIS CYCLE. On cycle 12's
+    genesis the sleep and training coaches published "a recovery score of 59% ...
+    and HRV of 42 ms" and "Day one of this experiment ... Your Whoop recovery came
+    in at 59%, HRV at 42 ms" while /api/vitals served 44% and 35 ms. Nothing was
+    stale by any age rule and no per-surface guard fired: the numbers were simply
+    the 08-02 (pilot-phase) record, read by an unbounded newest-first query hours
+    before the genesis day's own record existed.
+
+    So when the record predates ``genesis``, every OBSERVED field is withheld —
+    set to None, not annotated. That is deliberate and it is what makes the rule
+    STRUCTURAL rather than advisory: the value never enters the fact set, so
+    ``grounded_generation.allowed_numbers`` never allows it and a narrative that
+    cites it anyway is caught as a fabricated number by the existing regen-once
+    harness. A prompt instruction alone could not guarantee that (ADR-104/105).
+
+    CONFIGURED fields (targets/floors) are not observations and travel unchanged.
+
+    ``genesis`` defaults to the live ``EXPERIMENT_START_DATE`` (resolved at call
+    time) so no caller can forget to arm it; pass it explicitly to pin a cycle.
+    """
     record = record or {}
     facts = {k: _num(record.get(k)) for k in NUMERIC_FIELDS}
-    facts["as_of"] = record.get("date") or record.get("as_of")
+    as_of = _record_date(record)
+    facts["as_of"] = as_of
+    genesis = _resolve_genesis(genesis)
+    # Lexicographic compare is exact for ISO dates and needs no parsing.
+    pre_genesis = bool(as_of and genesis and as_of < genesis)
+    if pre_genesis:
+        for k in OBSERVED_FIELDS:
+            facts[k] = None
+    # The two cycle facts travel so a renderer can name the boundary it is
+    # enforcing without a second lookup.
+    facts["facts_are_pre_genesis"] = pre_genesis
+    facts["cycle_genesis"] = genesis
     return facts
