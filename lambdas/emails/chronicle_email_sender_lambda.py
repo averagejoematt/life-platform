@@ -474,8 +474,13 @@ def _build_subscriber_email(installment: dict, subscriber: dict) -> tuple[str, s
 
 
 def lambda_handler(event, context):
+    event = event or {}
+    # #2111: {"dry_run": true} runs the full pipeline (installment lookup, subscriber
+    # load, render) and returns a preview — but sends nothing and skips the kill-switch
+    # gate below, so a diagnostic invoke is safe to run regardless of switch state.
+    dry_run = bool(event.get("dry_run"))
     try:
-        if os.environ.get("EXTERNAL_EMAILS_ENABLED", "true").lower() != "true":
+        if not dry_run and os.environ.get("EXTERNAL_EMAILS_ENABLED", "true").lower() != "true":
             logger.info("[kill-switch] EXTERNAL_EMAILS_ENABLED=false — skipping Chronicle subscriber send")
             return {"statusCode": 200, "body": "skipped: external emails disabled", "sent": 0, "skipped": True}
 
@@ -499,6 +504,25 @@ def lambda_handler(event, context):
 
         # Load confirmed subscribers
         subscribers = _get_confirmed_subscribers()
+
+        if dry_run:
+            preview_sub = subscribers[0] if subscribers else {"email": "preview@example.com"}
+            subject, html = _build_subscriber_email(installment, preview_sub)
+            logger.info(
+                "[DRY_RUN] Week %s would send to %d subscriber(s) — sending nothing",
+                week_num,
+                len(subscribers),
+            )
+            return {
+                "statusCode": 200,
+                "dry_run": True,
+                "subject": subject,
+                "recipient_count": len(subscribers),
+                "html_bytes": len(html),
+                "week_num": week_num,
+                "title": title,
+            }
+
         if not subscribers:
             logger.info("No confirmed subscribers yet — no-op")
             return {"statusCode": 200, "body": "No confirmed subscribers", "sent": 0}
