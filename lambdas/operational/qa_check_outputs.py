@@ -33,9 +33,9 @@ s3 = boto3.client("s3", region_name=REGION)
 
 
 def _yesterday_str():
-    from zoneinfo import ZoneInfo
+    from common.pacific_time import pacific_now  # #1964: the one Pacific frame (DST-aware)
 
-    return (datetime.now(ZoneInfo("America/Los_Angeles")) - timedelta(days=1)).strftime("%Y-%m-%d")
+    return (pacific_now() - timedelta(days=1)).strftime("%Y-%m-%d")
 
 
 # ---------------------------------------------------------------------------

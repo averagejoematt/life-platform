@@ -6,6 +6,7 @@ facade's injectable/monkeypatched state via `_g["<name>"]` — same object the t
 from datetime import datetime, timezone
 
 from boto3.dynamodb.conditions import Key
+from common.pacific_time import parse_iso_utc  # #1964: THE ISO parser (naive input == UTC)
 from experiment.phase_filter import singleton_visible, with_phase_filter
 
 from web.site_api_common import USER_PREFIX, _decimal_to_float, _error, _ok, logger
@@ -391,13 +392,10 @@ def device_agreement(*, _g) -> dict:
     )
 
 
-def _parse_iso_ts(ts):
-    """Best-effort ISO parse → aware UTC datetime, or None (never raises)."""
-    try:
-        dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
-        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
-    except Exception:
-        return None
+# #1964: the private `_parse_iso_ts` fork that lived here is gone — its
+# tzinfo-backfill semantic IS what `common.pacific_time.parse_iso_utc` adopted as
+# the canonical answer, so call sites below use the shared helper directly and
+# this module no longer carries a second, drift-capable ISO parser.
 
 
 def last_sync(*, _g) -> dict:
@@ -452,14 +450,14 @@ def last_sync(*, _g) -> dict:
         if last_write:
             last_seen, precision = last_write, "instant"
         elif last_date:
-            parsed = _parse_iso_ts(last_date)
+            parsed = parse_iso_utc(last_date)
             if parsed:
                 last_seen, precision = parsed.isoformat(), "day"
         if failed:
             status = "unknown"
         else:
             status = "behavioral-stale" if meta.get("behavioral") else "stale"
-            seen_dt = _parse_iso_ts(last_seen) if last_seen else None
+            seen_dt = parse_iso_utc(last_seen) if last_seen else None
             if seen_dt and (now - seen_dt).total_seconds() / 3600 <= stale_hours:
                 status = "fresh"
         sources.append(

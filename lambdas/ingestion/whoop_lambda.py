@@ -54,6 +54,8 @@ except ImportError:  # pragma: no cover — layer-module fallback (local tooling
         return exc
 
 
+from common.pacific_time import parse_iso_utc  # #1964: THE ISO parser (naive input == UTC, never runner-local)
+
 from ingestion.ingestion_framework import IngestionConfig, run_ingestion
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
@@ -353,13 +355,8 @@ def _extract_workout(workout: dict) -> dict:
 
 
 def _sleep_onset_minutes(iso_ts: str | None) -> int | None:
-    if not iso_ts:
-        return None
-    try:
-        dt = datetime.fromisoformat(iso_ts.replace("Z", "+00:00"))
-        return dt.hour * 60 + dt.minute
-    except (ValueError, AttributeError):
-        return None
+    dt = parse_iso_utc(iso_ts)  # #1964: the one parser
+    return dt.hour * 60 + dt.minute if dt else None
 
 
 def _compute_sleep_consistency(date_str: str, current_onset: int) -> float | None:
@@ -552,21 +549,19 @@ _config = IngestionConfig(
 RECONCILE_WINDOW_DAYS = int(os.environ.get("WHOOP_RECONCILE_WINDOW_DAYS", "14"))
 
 
-def _parse_iso(s) -> datetime | None:
-    """Parse a Whoop ISO-8601 UTC start ('...Z' or '+00:00') to an aware datetime."""
-    if not s or not isinstance(s, str):
-        return None
-    try:
-        return datetime.fromisoformat(s.replace("Z", "+00:00"))
-    except (ValueError, AttributeError):
-        return None
-
-
 def _utc_day(s) -> str | None:
     """The UTC calendar date (YYYY-MM-DD) a Whoop record is keyed under — the
     ingestion per-date loop fetches by [day T00:00Z, nextday T00:00Z), so a
-    record's DDB day is the UTC day of its ``start``."""
-    t = _parse_iso(s)
+    record's DDB day is the UTC day of its ``start``.
+
+    #1964: parses via the canonical ``parse_iso_utc``. The private ``_parse_iso``
+    this replaces left a tz-less stamp NAIVE, so ``.astimezone(timezone.utc)``
+    below would have interpreted it in the *runner's* local zone — correct only
+    by the coincidence that the Lambda runtime is UTC, and wrong under a local
+    pytest run or a laptop backfill. The canonical parser stamps naive input UTC,
+    which is what this function's own docstring already assumed.
+    """
+    t = parse_iso_utc(s)
     return t.astimezone(timezone.utc).strftime("%Y-%m-%d") if t else None
 
 
@@ -575,7 +570,7 @@ def _dedup_workouts(workouts: list, tolerance_seconds: int = 120) -> list:
     band can surface as two ids for one session) so a legitimately single stored
     record is not reported as a gap for the twin. Mirrors strava._dedup: keep one
     representative per overlap window."""
-    parsed = [(w, _parse_iso(w.get("start"))) for w in workouts]
+    parsed = [(w, parse_iso_utc(w.get("start"))) for w in workouts]
     kept: list = []
     kept_times: list = []
     for w, t in sorted(parsed, key=lambda p: (p[1] is None, p[1] or datetime.min.replace(tzinfo=timezone.utc))):
@@ -617,7 +612,7 @@ def _records_missing_from_store(
         d = _utc_day(w.get("start"))
         if wid and d and f"DATE#{d}#WORKOUT#{wid}" in stored_sks:
             continue
-        t = _parse_iso(w.get("start"))
+        t = parse_iso_utc(w.get("start"))
         if t is not None and any(abs((t - ts).total_seconds()) <= tolerance_seconds for ts in stored_workout_starts):
             continue  # near-duplicate of a stored workout (e.g. a deduped twin)
         missing.append({"kind": "workout", "id": wid, "date": d})
@@ -647,7 +642,7 @@ def _fetch_stored_records(table, start_date: str, end_date: str) -> tuple:
                 continue
             sks.add(sk)
             if "#WORKOUT#" in sk:
-                t = _parse_iso(item.get("start_time"))
+                t = parse_iso_utc(item.get("start_time"))
                 if t is not None:
                     workout_starts.append(t)
         lek = resp.get("LastEvaluatedKey")

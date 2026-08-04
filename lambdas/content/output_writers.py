@@ -1300,9 +1300,9 @@ def write_buddy_json(data, profile, yesterday, character_sheet=None):
 
         # Friendly timestamp
         try:
-            from zoneinfo import ZoneInfo
+            from common.pacific_time import pacific_now  # #1964: the one Pacific frame (DST-aware)
 
-            now_pt = datetime.now(ZoneInfo("America/Los_Angeles"))  # DST-aware (was fixed -8 = PST year-round)
+            now_pt = pacific_now()
             day_name = now_pt.strftime("%A")
             tod = "morning" if now_pt.hour < 12 else "afternoon" if now_pt.hour < 17 else "evening"
             month_day = now_pt.strftime("%B %-d")

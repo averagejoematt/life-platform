@@ -349,13 +349,19 @@ def pacific_today():
 
     Data is keyed by the Pacific day a behavior occurred; deriving "today" from a raw
     UTC ``now`` selects tomorrow's (empty) PT day for any caller in the UTC-evening
-    window. MCP single source of truth; mirrors ``lambdas/pacific_time.pacific_today``
-    (the MCP bundle resolves shared modules from the layer, not lambdas/). See
-    ``docs/reviews/PLATFORM_AUDIT_2026-06-30.md`` BUG-03.
-    """
-    from zoneinfo import ZoneInfo
+    window. See ``docs/reviews/PLATFORM_AUDIT_2026-06-30.md`` BUG-03.
 
-    return datetime.now(ZoneInfo("America/Los_Angeles")).strftime("%Y-%m-%d")
+    #1964: this is now a thin DELEGATE, not a mirror. The old docstring's premise
+    ("the MCP bundle resolves shared modules from the layer, not lambdas/") is
+    stale — under the one-bundle rule (#781) ``stage_mcp()`` stages the whole
+    ``lambdas/`` tree at the zip root, which is why this module already imports
+    ``common.digest_utils`` at the top. A re-implementation here was a second
+    Pacific frame that could drift from the canonical one; delegating means it
+    cannot. Kept as a named function because ~10 ``mcp/tools_*`` modules import it.
+    """
+    from common.pacific_time import pacific_today as _pacific_today
+
+    return _pacific_today()
 
 
 def resolve_field(source, field):

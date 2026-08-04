@@ -54,6 +54,7 @@ from decimal import Decimal
 
 import boto3
 from boto3.dynamodb.conditions import Key
+from common.pacific_time import pacific_now, parse_iso_utc  # #1964: the one Pacific frame + the one ISO parser
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -362,23 +363,15 @@ def maybe_react_to_diary(item, enrichment):
     return result
 
 
-def _parse_ts(value):
-    """Parse an ISO timestamp (Notion 'Z' suffix or stdlib '+00:00') to an aware datetime; None on failure."""
-    if not value:
-        return None
-    try:
-        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt
+# #1964: the private `_parse_ts` fork that lived here (a third copy of the
+# tzinfo-backfill parser, alongside site_api_freshness's and traffic_digest's) is
+# gone — call sites use `common.pacific_time.parse_iso_utc` directly.
 
 
 def edited_since_enrichment(item):
     """True when the Notion entry was edited after its last enrichment (#502)."""
-    enriched_ts = _parse_ts(item.get("enriched_at"))
-    edited_ts = _parse_ts(item.get("notion_last_edited"))
+    enriched_ts = parse_iso_utc(item.get("enriched_at"))
+    edited_ts = parse_iso_utc(item.get("notion_last_edited"))
     return bool(enriched_ts and edited_ts and edited_ts > enriched_ts)
 
 
@@ -493,8 +486,10 @@ def lambda_handler(event: dict, context) -> dict:
             start_date = event["date"]
             end_date = event["date"]
         else:
-            pacific = timezone(timedelta(hours=-8))
-            now_pacific = datetime.now(pacific)
+            # #1964: was `timezone(timedelta(hours=-8))` — PST pinned year-round, so
+            # for the ~8 months of PDT this derived a Pacific "now" an hour behind
+            # reality, shifting both `end_date` and the Sunday sweep's weekday test.
+            now_pacific = pacific_now()
             end_date = now_pacific.strftime("%Y-%m-%d")
             # Weekly safety net (#502): on Sundays sweep 30 days so anything the
             # 2-day window missed (late edits, outages, clobbered records) self-heals.

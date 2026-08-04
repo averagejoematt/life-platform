@@ -600,7 +600,12 @@ def run(table=None, start_date=None, end_date=None, force=False, caller=None, co
         table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE_NAME)
 
     if end_date is None:
-        end_date = datetime.now(timezone(timedelta(hours=-8))).strftime("%Y-%m-%d")
+        # #1964: was `timezone(timedelta(hours=-8))` — PST pinned year-round, an
+        # hour off for the ~8 months of PDT and therefore capable of selecting the
+        # wrong Pacific day. DST-aware via the canonical helper.
+        from common.pacific_time import pacific_today
+
+        end_date = pacific_today()
     if start_date is None:
         start_date = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=DEFAULT_LOOKBACK_DAYS - 1)).strftime("%Y-%m-%d")
 
