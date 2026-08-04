@@ -9,6 +9,7 @@ consumption seam's "declined to answer" framing.
 """
 
 import json
+import logging
 import os
 import sys
 
@@ -377,7 +378,9 @@ def test_recent_checkins_block_empty_and_fail_soft():
 # ── cycle stamp ──────────────────────────────────────────────────────────────
 
 
-def test_read_cycle_fail_soft_and_cached(monkeypatch):
+def test_read_cycle_failure_is_not_latched(monkeypatch):
+    """#1948: a failed SSM read must NOT be cached for the container lifetime
+    — each failed call retries rather than silently latching cycle=None."""
     monkeypatch.setattr(cc, "_cycle_cache", {"value": None, "read": False})
     calls = {"n": 0}
 
@@ -388,7 +391,45 @@ def test_read_cycle_fail_soft_and_cached(monkeypatch):
 
     assert cc.read_cycle(ssm_client=_Ssm()) is None
     assert cc.read_cycle(ssm_client=_Ssm()) is None
-    assert calls["n"] == 1  # container-lifetime cache
+    assert calls["n"] == 2  # no negative cache — every failed call re-reads
+
+
+def test_read_cycle_failure_logs_a_warning(monkeypatch, caplog):
+    """#1948 acceptance: a dropped stamp must be observable — at minimum a
+    WARN log, not buried at INFO."""
+    monkeypatch.setattr(cc, "_cycle_cache", {"value": None, "read": False})
+
+    class _Ssm:
+        def get_parameter(self, Name):
+            raise RuntimeError("ThrottlingException")
+
+    with caplog.at_level(logging.WARNING, logger=cc.logger.name):
+        assert cc.read_cycle(ssm_client=_Ssm()) is None
+    assert any(r.levelno >= logging.WARNING and "cycle read failed" in r.message for r in caplog.records)
+
+
+def test_read_cycle_recovers_after_a_failed_read(monkeypatch):
+    """#1948 regression guard: first read raises, second read succeeds — the
+    second write must carry the cycle stamp (fails against the old
+    container-lifetime negative cache)."""
+    monkeypatch.setattr(cc, "_cycle_cache", {"value": None, "read": False})
+
+    class _FlakySsm:
+        def __init__(self):
+            self.calls = 0
+
+        def get_parameter(self, Name):
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError("ThrottlingException")
+            return {"Parameter": {"Value": "9"}}
+
+    ssm = _FlakySsm()
+    assert cc.read_cycle(ssm_client=ssm) is None
+    assert cc.read_cycle(ssm_client=ssm) == 9
+    # a SUCCESSFUL read is still cached for the container lifetime
+    assert cc.read_cycle(ssm_client=ssm) == 9
+    assert ssm.calls == 2
 
 
 def test_read_cycle_parses_int(monkeypatch):

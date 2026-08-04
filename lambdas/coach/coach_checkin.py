@@ -193,11 +193,15 @@ _cycle_cache: dict = {"value": None, "read": False}
 
 def read_cycle(ssm_client=None):
     """Current experiment cycle (int) from SSM, fail-soft None (missing param,
-    missing grant, no AWS). Cached for the container lifetime — the cycle only
-    changes on a reset."""
+    missing grant, no AWS). Only a SUCCESSFUL read is cached for the container
+    lifetime — the cycle only changes on a reset, so a confirmed value never
+    needs re-reading. A FAILED read is deliberately NOT latched (#1948): a
+    transient SSM error (throttle, timeout) would otherwise silently drop the
+    cycle stamp off every write for the rest of the warm container's life. On
+    failure this returns None for THIS call only and leaves the cache unread
+    so the next call retries."""
     if _cycle_cache["read"]:
         return _cycle_cache["value"]
-    value = None
     try:
         if ssm_client is None:
             import boto3
@@ -206,7 +210,8 @@ def read_cycle(ssm_client=None):
         raw = ssm_client.get_parameter(Name=SSM_CYCLE_PARAM)["Parameter"]["Value"]
         value = int(raw)
     except Exception as e:  # noqa: BLE001 — fail-soft is the contract
-        logger.info("[coach_checkin] cycle read failed (%s) — writing without cycle stamp", type(e).__name__)
+        logger.warning("[coach_checkin] cycle read failed (%s) — writing without cycle stamp, will retry next call", type(e).__name__)
+        return None
     _cycle_cache["value"] = value
     _cycle_cache["read"] = True
     return value
