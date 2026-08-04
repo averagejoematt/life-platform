@@ -621,6 +621,62 @@ script's module docstring.
 ### Whoop/Withings/Strava: "Token expired" error
 These functions auto-refresh tokens and write back to Secrets Manager. If they fail with auth errors, the refresh token itself may have expired (rare but possible if the function didn't run for weeks). Resolution: re-authenticate via the source app and manually update the secret.
 
+### ingest-auth-unhealthy-24h: red on a verified-healthy fleet (#2004)
+
+**Symptom:** the `ingest-auth-unhealthy-24h` alarm (SNS urgent topic) is in ALARM,
+but every source looks fine — recent ingestion Lambda logs are clean and no
+credential actually needs rotating.
+
+**This is expected, by design, for up to 24h after the last unhealthy emission.**
+The alarm reads `LifePlatform/OAuth IngestAuthHealthy` (dimensionless, fleet-wide)
+with `Minimum` over a fixed `period=86400s` / `evaluation_periods=1` window
+(`cdk/stacks/monitoring_stack.py`, alarm id `IngestAuthUnhealthy`) — a single 0
+anywhere in the trailing 24h keeps the Minimum at 0 and the alarm red for the
+*entire* 24h window that datapoint is in, even if every subsequent run emitted a
+healthy 1. **Do not shorten this window** — it is the same load-bearing
+24h/Maximum-or-Minimum detection-window class as `qa-smoke-warnings` (see
+`reference_qa_smoke_alarm_window_load_bearing` memory); a shorter window would
+either miss a slow-building auth death or reintroduce false fires from a single
+transient blip. The alarm's `AlarmDescription` states this directly for anyone
+triaging it from the CloudWatch console.
+
+**Triage — confirm real state, don't trust alarm state:**
+
+1. Check for any *currently active* auth-breaker markers (the actual "is a
+   credential dead right now" signal) across sources — read-only:
+   ```bash
+   aws dynamodb query --table-name life-platform \
+     --key-condition-expression "pk = :pk AND sk = :sk" \
+     --expression-attribute-values '{":pk":{"S":"USER#matthew#SOURCE#<source>"},":sk":{"S":"AUTH_FAILURE"}}'
+   # repeat per credentialed source (see lambdas/ingestion/source_registry.py
+   # oauth_source_ids()) or scan for sk = AUTH_FAILURE if checking the whole fleet
+   ```
+   No item (or an item whose `marked_at` is >24h old) means the breaker is not
+   tripped for that source — `lambdas/common/auth_breaker.check_breaker()` treats
+   it the same way and lets the next run through.
+2. Check the metric's recent datapoints directly — if the last few hourly points
+   are all `1`, the fleet has recovered and the alarm is coasting out its window:
+   ```bash
+   aws cloudwatch get-metric-statistics \
+     --namespace LifePlatform/OAuth --metric-name IngestAuthHealthy \
+     --start-time "$(date -u -v-6H +%Y-%m-%dT%H:%M:%S)" --end-time "$(date -u +%Y-%m-%dT%H:%M:%S)" \
+     --period 3600 --statistics Minimum --region us-west-2
+   ```
+3. If either check shows a genuinely dead credential, triage by source using the
+   relevant entry below (Garmin, Whoop/Withings/Strava, Eight Sleep, etc.) — the
+   per-source `ingest-auth-unhealthy-{source}` alarms (#1960) name the culprit
+   directly, so check those first if this aggregate alarm is the only one red.
+4. If both checks are clean, no action is needed — the alarm self-clears once the
+   unhealthy datapoint ages out of the trailing 24h window. Do not silence or
+   re-threshold it to force an earlier clear.
+
+**Optional operator call (not implemented here):** the 24h coverage could be
+reshaped into 4×6h `Minimum` evaluation periods (same total 24h detection
+coverage, but each 6h period ages out independently, so a recovered fleet clears
+in ~6h instead of up to 24h). That is a real behavior change to a load-bearing
+alarm, so it is left as an explicit choice for the operator rather than applied
+here.
+
 ### Garmin: 429 Too Many Requests / OAuth1 expired (auth_breaker tripped)
 
 Garmin OAuth1 has a ~30-day lifetime; after the gap or rate-limit storm, the Lambda trips `auth_breaker` and stops attempting calls until cleared.

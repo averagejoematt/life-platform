@@ -246,6 +246,43 @@ def test_aggregate_alarm_still_reads_the_dimensionless_stream():
     raise AssertionError("ingest-auth-unhealthy-24h not found in monitoring_stack.py")
 
 
+def _find_alarm_call(alarm_name, path=_MONITORING):
+    """The ast.Call node that constructs the cloudwatch.Alarm with this
+    alarm_name= literal, or None. Mirrors the lookup shape
+    test_aggregate_alarm_still_reads_the_dimensionless_stream already uses —
+    factored out so a second property assertion doesn't re-walk by hand."""
+    tree = ast.parse(open(path, encoding="utf-8").read(), filename=path)
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        name_kw = next((kw.value for kw in node.keywords if kw.arg == "alarm_name"), None)
+        if isinstance(name_kw, ast.Constant) and name_kw.value == alarm_name:
+            return node
+    return None
+
+
+def test_aggregate_alarm_description_documents_the_clear_lag():
+    """#2004: `ingest-auth-unhealthy-24h` is a fixed 86400s/Minimum/1-eval-period
+    detect window (load-bearing — do not shorten it, see the
+    qa-smoke-alarm-window-load-bearing memory), which means the alarm can stay
+    ALARM for up to 24h after the fleet has fully recovered. Undocumented, a
+    standing red on a healthy fleet trains alarm fatigue. Any alarm of this
+    detect-window class (single-eval-period Minimum/Maximum over the full 24h,
+    treat_missing_data=NOT_BREACHING) must carry a clear-lag note in its
+    AlarmDescription so an operator triaging a red sees, in the CloudWatch
+    console itself, that alarm state alone doesn't prove the fleet is unhealthy
+    — a rebuilt stack that drops the kwarg must fail here, not silently ship a
+    null description again."""
+    node = _find_alarm_call("ingest-auth-unhealthy-24h")
+    assert node is not None, "ingest-auth-unhealthy-24h not found in monitoring_stack.py"
+    desc_kw = next((kw.value for kw in node.keywords if kw.arg == "alarm_description"), None)
+    assert desc_kw is not None, "ingest-auth-unhealthy-24h lost its alarm_description= (#2004 clear-lag note)"
+    desc = ast.literal_eval(desc_kw) if isinstance(desc_kw, (ast.Constant, ast.JoinedStr)) else None
+    assert isinstance(desc, str) and desc.strip(), "alarm_description must resolve to a non-empty string literal"
+    assert "24h" in desc, f"alarm_description must state the 24h clear-lag window, got: {desc!r}"
+    assert "AUTH_FAILURE" in desc, f"alarm_description must point triage at AUTH_FAILURE markers, not alarm state: {desc!r}"
+
+
 # ── The page payload actually names the source (#1960) ──────────────────────
 # The acceptance criterion is operator-facing, not structural: "an auth death on ANY
 # OAuth source produces a page that NAMES the source". So drive the real urgent
