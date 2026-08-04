@@ -57,5 +57,5 @@ test("population-prior with no label ⇒ falls back to the honest generic phrase
 
 test("output is escaped — a hostile/garbled label can't break out of the chip", () => {
   const html = chProvenance({ target_provenance: { source: "population_prior", label: "<script>alert(1)</script>" } });
-  assert.doesNotMatch(html, /<script>/);
+  assert.doesNotMatch(html, /<script/i);
 });
