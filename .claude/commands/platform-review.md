@@ -12,7 +12,7 @@
 
 Every lens brief MUST carry: (1) the platform one-paragraph + current state context (experiment phase, budget tier, anything mid-flight); (2) the evidence rule — no finding from docs alone; reproduce (file:line read, URL fetched, command run); (3) dedup-first — read `deploy/generate_review_bundle.py` §13b + open issues before finalizing; (4) the kill-on-sight list (decorative glow, causal claims, age/genome/substances, AI arithmetic, loop-irrelevant); (5) cap ≤10 findings + an honest `lens_notes` coverage statement; (6) read-only always — no Lambda/Bedrock invocation, no AWS mutation. Structured output schema: `{summary, evidence_pointer, dimension, sev_guess, effort_guess, outcome_if_fixed, suggested_model}`.
 
-**Phase 2 — Dedup barrier (driver judgment, no agents).** Flatten; merge same-defect-different-lens groups; drop known-open/§13b/owner-gated items; classify NEW/REGRESSION/PERSISTING. Write the disposition map to a scratch file *before* verification so filing is mechanical later.
+**Phase 2 — Dedup barrier (driver judgment, no agents).** Flatten; merge same-defect-different-lens groups; drop known-open/§13b/owner-gated items; classify NEW/REGRESSION/PERSISTING. A won't-do/gated verdict (ADR-101 monetization declines included) goes to the parked register (`docs/reviews/PLATFORM_PRODUCT_REVIEW_2026-07.md`, pointer issue #423) — never filed as a story. Write the disposition map to a scratch file *before* verification so filing is mechanical later.
 
 **Phase 3 — Adversarial verification.** finding-verifier agents, batched by area (~5–8 findings each). Verdicts CONFIRMED (verifier's own reproduction) / PLAUSIBLE / REFUTED, lean REFUTED. Proposals get premise-verification only. Only CONFIRMED + strong-PLAUSIBLE proceed.
 

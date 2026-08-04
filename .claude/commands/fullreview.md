@@ -68,7 +68,9 @@ queue before filing or shipping.
    - the **intentional-emptiness manifest** — post-reset, which surfaces are empty *by design*
      per `lambdas/experiment/phase_taxonomy.py` (graders grade the machinery; data-maturity caveats are
      noted, not penalized);
-   - the do-not-refile list: open issues + owner-gated/parked items from the handover.
+   - the do-not-refile list: open issues + owner-gated/parked items from the handover — a
+     won't-do/gated verdict goes to the parked register (`docs/reviews/PLATFORM_PRODUCT_REVIEW_2026-07.md`,
+     pointer issue #423), never filed as a story.
 
 ## Phase 1 — The panel (fan-out; Workflow tool explicitly authorized)
 
