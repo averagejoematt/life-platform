@@ -1,7 +1,27 @@
-# garmin-data-ingestion
-# Built via deploy/fix_garmin_deps.sh (platform linux/x86_64 wheels)
-# Do NOT use pip install -r for this file on macOS —
-# fix_garmin_deps.sh handles cross-platform build automatically.
+# garmin-data-ingestion — garth-layer (binary dependency layer, x86_64)
+# Layer ARN: cdk/stacks/constants.py::GARTH_LAYER_ARN (garth-layer:2, created 2026-03-29).
+#
+# VERIFIED 2026-08-03 against the live layer (read-only: `aws lambda
+# get-layer-version-by-arn --arn <GARTH_LAYER_ARN>`, then downloaded and inspected
+# the returned Content.Location zip's *.dist-info). garth-layer:2 actually ships
+# garminconnect-0.2.40 + garth-0.6.3 — NOT 0.2.23/0.4.47 as this file previously
+# pinned. This pin is now ground truth, not the stale MAINT-1-era estimate.
+#
+# STALE HEADER REMOVED: this file used to say "Built via deploy/fix_garmin_deps.sh
+# (platform linux/x86_64 wheels)". That script no longer exists in deploy/ — only
+# stale copies survive under old worktree archive dirs
+# (e.g. archive/20260309/deploy/fix_garmin_deps.sh in past worktrees). There is
+# currently NO build tooling in this repo to rebuild garth-layer.
+#
+# NOTE (dependency-bump triage, #1780): Dependabot proposed bumping garminconnect
+# to 0.3.5. Besides the missing build tooling above, 0.3.5 is a CODE-INCOMPATIBLE
+# major rewrite for this lambda's usage: it dropped the garth dependency entirely
+# in favor of its own curl_cffi-based client (`self.client`, only created inside
+# `Garmin.login()`). lambdas/ingestion/garmin_lambda.py never calls `.login()` —
+# it authenticates by loading garth tokens directly and doing `api.garth =
+# garth.client` — so on 0.3.5 every `get_*` call (get_sleep_data, get_stats, ...)
+# would raise AttributeError: 'Garmin' object has no attribute 'client'. See the
+# #1780 close comment for the full writeup.
 
-garminconnect==0.2.23
-garth==0.4.47
+garminconnect==0.2.40
+garth==0.6.3

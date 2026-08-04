@@ -8,10 +8,21 @@
 # manifest that pip-audit (deploy/run_pip_audit.sh + the scheduled pip_audit_lambda)
 # can scan. Before #1336 there was no manifest and Pillow was scanned by nothing.
 #
-# ⚠️ VERSION UNVERIFIED against the live layer. pillow-layer:1 was built offline and its
-# exact Pillow version could not be read without AWS access. The pin below is a
-# CONSERVATIVE (older-than-or-equal, fail-closed) estimate for the 2026-03-28 build date
-# so the scan errs toward RED, never a false GREEN. OWNER ACTION: confirm the real version
-# with `aws lambda get-layer-version-by-arn --arn <PILLOW_LAYER_ARN>` (download + inspect
-# the wheel), then correct this pin so pip-audit reflects what is actually deployed.
-Pillow==11.2.1
+# VERIFIED 2026-08-03 against the live layer (read-only: `aws lambda
+# get-layer-version-by-arn --arn <PILLOW_LAYER_ARN>`, then downloaded and inspected
+# the returned Content.Location zip's *.dist-info). pillow-layer:1 actually ships
+# pillow-11.3.0.dist-info — NOT 11.2.1 as this file previously pinned. The old pin
+# was a pre-#1336 conservative estimate that was never checked against the real
+# artifact. This pin is now ground truth (the #1336 OWNER ACTION this comment used
+# to ask for), not an estimate.
+#
+# NOTE (dependency-bump triage, #1778): Dependabot proposed bumping this pin to
+# 12.3.0. That edit alone would NOT change what's deployed — the layer is built
+# offline and this file has no install step wired to it (checked deploy/build_bundle.py
+# and deploy/deploy_lambda.sh: neither pip-installs from any lambdas/requirements/*.txt;
+# third-party code only reaches a running Lambda via these binary layers). Taking a
+# real Pillow upgrade requires rebuilding pillow-layer offline (linux/x86_64 wheels),
+# publishing a new layer version, and bumping PILLOW_LAYER_VERSION in
+# cdk/stacks/constants.py — no build script for this exists in deploy/ today. See the
+# #1778 close comment for the full writeup.
+Pillow==11.3.0

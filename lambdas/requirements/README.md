@@ -6,8 +6,8 @@ Pinned dependency files per Lambda group (MAINT-1, v2.99.0).
 
 | File | Lambda(s) | Notes |
 |------|-----------|-------|
-| `garmin.txt` | garmin-data-ingestion | Built via `fix_garmin_deps.sh` — cross-platform wheels; **also pins `garth` (the `garth-layer` binary layer)** |
-| `pillow.txt` | og-image-generator (+ web/operational PIL users) | **Binary layer** `pillow-layer` (`PILLOW_LAYER_ARN`). ⚠️ Version UNVERIFIED vs live layer — confirm + correct (#1336) |
+| `garmin.txt` | garmin-data-ingestion | **Binary layer** `garth-layer` (`GARTH_LAYER_ARN`) — also pins `garth`. Verified 2026-08-03 against the live layer (garminconnect 0.2.40 + garth 0.6.3). The `fix_garmin_deps.sh` rebuild script this row used to cite no longer exists in `deploy/` — there is currently no tooling to rebuild this layer |
+| `pillow.txt` | og-image-generator (+ web/operational PIL users) | **Binary layer** `pillow-layer` (`PILLOW_LAYER_ARN`). Verified 2026-08-03 against the live layer (Pillow 11.3.0) — #1336 |
 | `lameenc.txt` | coach-panel-podcast | **Binary layer** `lameenc-layer` (`LAMEENC_LAYER_ARN`). ⚠️ Version UNVERIFIED vs live layer — confirm + correct (#1336) |
 | `withings.txt` | withings-data-ingestion | withings-api SDK |
 | `strava.txt` | strava-data-ingestion | stdlib urllib only |
