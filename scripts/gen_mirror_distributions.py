@@ -19,6 +19,7 @@ attended session has. Re-run whenever the snapshot ages — the page displays it
 
 Run from repo root:  python3 scripts/gen_mirror_distributions.py [--days 365]
 """
+
 from __future__ import annotations
 
 import argparse

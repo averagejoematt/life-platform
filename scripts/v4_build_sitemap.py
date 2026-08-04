@@ -16,6 +16,7 @@ can follow the same links.
 
 Writes site/sitemap.xml. Run from repo root:  python3 scripts/v4_build_sitemap.py
 """
+
 from __future__ import annotations
 
 import json

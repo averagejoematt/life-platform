@@ -11,6 +11,7 @@ Usage:
     python3 deploy/sync_constants_from_config.py            # dry-run: print diff
     python3 deploy/sync_constants_from_config.py --apply    # write file
 """
+
 import argparse
 import json
 import sys

@@ -13,6 +13,7 @@ Usage:
     python3 scripts/character_simulate.py --end 2026-07-02
     python3 scripts/character_simulate.py --live-config   # S3 config instead of local
 """
+
 import argparse
 import json
 import os

@@ -31,6 +31,7 @@ real progress; restart_verify_rendered.py runs at reset time
 (days-since-genesis ~0), so it always uses the full FORBIDDEN_TOKENS list
 unchanged.
 """
+
 import re
 import sys
 import urllib.error

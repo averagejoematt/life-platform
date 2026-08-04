@@ -33,6 +33,7 @@ by path and the mechanisms/methods observed are unioned onto it.
 No AWS calls, no import of site_api_lambda.py itself (it pulls in boto3 clients
 inappropriate to load at doc-sync/test-collection time) — pure `ast.parse`.
 """
+
 from __future__ import annotations
 
 import ast

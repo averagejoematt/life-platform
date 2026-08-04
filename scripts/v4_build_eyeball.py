@@ -18,6 +18,7 @@ JSON, exactly like /method/data reads /data/data_sources.json):
 Run from repo root:  python3 scripts/v4_build_eyeball.py            (writes the empty-state artifact)
                      python3 scripts/v4_build_eyeball.py --live      (reads graded DDB records)
 """
+
 from __future__ import annotations
 
 import html

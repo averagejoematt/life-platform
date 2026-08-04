@@ -869,9 +869,7 @@ def call_board_of_directors(
             "Tone: direct, empathetic, no-BS."
         )
 
-    prompt = (
-        bod_intro
-        + f"""
+    prompt = bod_intro + f"""
 
 {journey_block}
 {health_ctx}
@@ -902,7 +900,6 @@ CROSS-PILLAR: If the trade-off analysis above identifies a limiting factor or op
 RED TEAM CHECK: If the analysis pass flagged a challenge (⚠️ above), consider it. If the correlation might be misleading or there's a confounding factor, adjust your coaching accordingly — don't give confident advice based on shaky signal. Intellectual honesty > false certainty.
 OPENING RULE: DO NOT open with a metric readout. The form 'Recovery was X%, HRV was Y, today do Z' is explicitly banned as an opener — it's a data dump, not coaching. Open instead with a pattern ("Three nights of short sleep are compounding..."), a direct challenge ("The T0 miss yesterday is the third this week..."), or a concrete observation that requires inference, not just reading. The metric data exists in the scorecard above — the BoD's job is to interpret it, not repeat it.
 DO NOT start with "Matthew". Max 60 words."""
-    )
 
     if brief_mode == "flourishing":
         prompt += "\n\nTONE: He is FLOURISHING — engagement is high, habits strong, trajectory improving. Lead with reinforcement. Be energising. Name what's working specifically. One brief forward-looking note."

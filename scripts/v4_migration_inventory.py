@@ -19,6 +19,7 @@ ported as-is, and need no redirect — so they don't appear here.
 Read-only except for redirects.map. Run from repo root:
     python3 scripts/v4_migration_inventory.py
 """
+
 from __future__ import annotations
 
 import sys

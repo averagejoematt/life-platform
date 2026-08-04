@@ -53,9 +53,7 @@ Append-only. One line per post: date · session · cut · surface · link · ent
 |---|---|---|---|---|---|
 | 2026-07-27 | 2026-07-26_retro_day-zero | 2026-07-26_day00_cut01_reel_more-day-ones.mp4 | reel | https://www.youtube.com/shorts/ZZZZZZZZZZZ | {notion} |
 | 2026-07-27 | 2026-07-26_retro_day-zero | 2026-07-26_day00_retro_day-zero__full.mp4 | yt | https://www.youtube.com/watch?v=YYYYYYYYYYY | — |
-""".format(
-    notion=NOTION_URL
-)
+""".format(notion=NOTION_URL)
 
 # The pre-#1845 five-column log — the file as it exists in the studio today.
 LEGACY_LOG = """| date | session | cut | surface | link |

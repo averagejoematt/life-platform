@@ -37,6 +37,7 @@ This module's TOP-LEVEL imports are stdlib-only on purpose, so the contract test
 can `from refresh_upstream_fixtures import scan_for_secrets` without dragging in
 boto3 / the ingestion Lambdas. Heavy imports happen lazily inside _fetch_live().
 """
+
 from __future__ import annotations
 
 import argparse

@@ -31,6 +31,7 @@ bakes last-known-good numbers rather than blanks):
   - coaching:  GET /api/coaching-dashboard   (the board's read — weekly priority + each coach's read — #804)
   - fallback:  scripts/proof_snapshot.json
 """
+
 from __future__ import annotations
 
 import datetime

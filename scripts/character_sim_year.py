@@ -26,6 +26,7 @@ Dark-day (raw, coverage) pairs are derived from the engine's own ADR-104 absence
 math (behavioral components score 0 at full weight, measured components drop out,
 confidence blend toward 50) using each pillar's behavioral weight share.
 """
+
 import copy
 import json
 import random

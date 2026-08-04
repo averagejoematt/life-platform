@@ -351,16 +351,13 @@ def _write_indexes(episodes: list) -> None:
         ContentType="application/json",
         CacheControl="max-age=3600, public",
     )
-    items = "\n".join(
-        f"""  <item>
+    items = "\n".join(f"""  <item>
     <title>{_xml(e["title"])}</title>
     <description>{_xml(e.get("excerpt") or e["title"])}</description>
     <enclosure url="{SITE}{e["url"]}" length="{e["bytes"]}" type="audio/mpeg"/>
     <guid isPermaLink="false">measured-life-debrief-{e["date"]}</guid>
     <pubDate>{_rfc822(e["date"])}</pubDate>
-  </item>"""
-        for e in episodes
-    )
+  </item>""" for e in episodes)
     feed = f"""<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
 <channel>

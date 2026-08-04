@@ -29,7 +29,7 @@ playwright==1.61.0
 # pin-parity guard's scope (tests/test_ci_pin_consistency.py), tracked separately.
 flake8==7.3.0
 ruff==0.14.14
-black==25.9.0
+black==26.3.1
 
 # Type checking (ENFORCED/blocking on the clean-module set, advisory elsewhere —
 # see tests/test_mypy_clean_modules.py + mypy.ini). Version MUST equal ci-lint.yml's

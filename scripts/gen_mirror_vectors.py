@@ -24,6 +24,7 @@ Run from repo root:  python3 scripts/gen_mirror_vectors.py
 Writes tests/vectors/mirror_vectors.json. Deterministic: no clock, no randomness, no I/O
 besides the output file — regenerating without an engine change is a no-op diff.
 """
+
 from __future__ import annotations
 
 import json

@@ -47,6 +47,7 @@ Read-only: GET requests only, serial (one endpoint at a time, courtesy sleep bet
 each), against https://averagejoematt.com (override with $QA_SITE_URL). Never issues
 POST/PUT/PATCH/DELETE — write-path endpoints are exempted, never probed.
 """
+
 from __future__ import annotations
 
 import argparse

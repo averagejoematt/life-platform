@@ -59,7 +59,7 @@ jobs:
         # unchanged: any red gate still fails the job (each step's own non-zero exit),
         # which still skips test-critical → plan → deploy.
         if: always()
-        run: pip install black==25.9.0 ruff==0.14.14
+        run: pip install black==26.3.1 ruff==0.14.14
 
       - name: Format gate (black — ENFORCED, config in pyproject.toml)
         if: always()

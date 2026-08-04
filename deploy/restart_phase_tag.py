@@ -25,6 +25,7 @@ Usage:
     python3 deploy/restart_phase_tag.py            # dry-run
     python3 deploy/restart_phase_tag.py --apply    # commit
 """
+
 import argparse
 import os
 import re

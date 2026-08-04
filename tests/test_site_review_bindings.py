@@ -8,6 +8,7 @@ to a tmp dir and exercises the pure comparison logic, so it can run in CI.
 
 Run: python3 -m pytest tests/test_site_review_bindings.py -v
 """
+
 import json
 import os
 import sys

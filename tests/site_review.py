@@ -28,6 +28,7 @@ Usage:
     python3 tests/site_review.py --from-report qa-screenshots   # augment a prior CI capture
     python3 tests/site_review.py --date 2026-06-20    # explicit run folder
 """
+
 from __future__ import annotations
 
 import argparse

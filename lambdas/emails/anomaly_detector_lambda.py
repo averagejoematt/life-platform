@@ -669,8 +669,7 @@ def build_sustained_alert_html(sustained_list, date_str):
         tc_html = ""
         if s.get("training_context"):
             tc_html = f'<p style="color:#92400e;font-size:13px;margin:6px 0 0 0;">' f'<em>{s["training_context"]}</em></p>'
-        rows.append(
-            f"""
+        rows.append(f"""
         <tr>
           <td style="padding:12px 16px;border-bottom:1px solid #fef3c7;">
             <strong style="color:#1f2937;">{s["label"]}</strong><br>
@@ -680,8 +679,7 @@ def build_sustained_alert_html(sustained_list, date_str):
             </span>
             {tc_html}
           </td>
-        </tr>"""
-        )
+        </tr>""")
 
     return f"""<!DOCTYPE html>
 <html>

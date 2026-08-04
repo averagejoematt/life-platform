@@ -395,8 +395,7 @@ def _write_indexes(episodes: list) -> None:
         ContentType="application/json",
         CacheControl="max-age=3600, public",
     )
-    items = "\n".join(
-        f"""  <item>
+    items = "\n".join(f"""  <item>
     <title>{_xml(e["title"])}</title>
     <description>{_xml(e.get("excerpt") or e["title"])}</description>
     <itunes:summary>{_xml(e.get("excerpt") or e["title"])}</itunes:summary>
@@ -408,9 +407,7 @@ def _write_indexes(episodes: list) -> None:
     <itunes:episodeType>full</itunes:episodeType>
     <itunes:explicit>false</itunes:explicit>
     <itunes:image href="{_xml(e.get("image_url") or COVER_URL)}"/>
-  </item>"""
-        for e in episodes
-    )
+  </item>""" for e in episodes)
     feed = f"""<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
 <channel>

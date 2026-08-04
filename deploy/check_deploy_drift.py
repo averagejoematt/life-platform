@@ -43,6 +43,7 @@ Exit 0 = safe to deploy. Exit 1 = blocked (see stdout for which check failed).
 Prefer the wrapper `bash deploy/cdk_deploy.sh <Stack...>`, which runs this guard
 then execs the real `cdk deploy` — see docs/CONVENTIONS.md for the guarded path.
 """
+
 from __future__ import annotations
 
 import argparse

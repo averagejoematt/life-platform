@@ -37,6 +37,7 @@ Returns 0 if all checks pass, 1 if any fail.
 Usage:
     python3 deploy/restart_verify.py
 """
+
 import json
 import subprocess
 import sys

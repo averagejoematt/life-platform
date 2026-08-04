@@ -30,6 +30,7 @@ deploy/sync_site_to_s3.sh so every deploy refreshes the numbers.
 Writes site/index.html. Run from repo root:
     python3 scripts/v4_build_home_proof.py
 """
+
 from __future__ import annotations
 
 import sys

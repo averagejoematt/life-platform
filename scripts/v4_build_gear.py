@@ -45,6 +45,7 @@ JS is the shared theme toggle + motion reveal.
 
 Run from repo root:  python3 scripts/v4_build_gear.py
 """
+
 from __future__ import annotations
 
 import html

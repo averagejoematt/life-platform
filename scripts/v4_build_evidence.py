@@ -16,6 +16,7 @@ embedded as window.__EVIDENCE_REGISTRY__ (filtered to the pillar's groups).
 Read-only inputs; writes under site/{data,protocols,method}/. Run from repo root:
     python3 scripts/v4_build_evidence.py
 """
+
 from __future__ import annotations
 
 import html

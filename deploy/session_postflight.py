@@ -31,6 +31,7 @@ a session wrap or run in CI.
 Run from the repo root:
     python3 deploy/session_postflight.py
 """
+
 from __future__ import annotations
 
 import hashlib

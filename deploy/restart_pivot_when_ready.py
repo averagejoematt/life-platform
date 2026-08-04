@@ -13,6 +13,7 @@ Usage (manual run):
     python3 deploy/restart_pivot_when_ready.py
     python3 deploy/restart_pivot_when_ready.py --genesis 2026-05-25 --max-minutes 360
 """
+
 import argparse
 import datetime as dt
 import subprocess

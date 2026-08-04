@@ -30,6 +30,7 @@ Usage:
     python3 deploy/fix_prologue_cycle_and_subscribe_ttl.py            # dry-run
     python3 deploy/fix_prologue_cycle_and_subscribe_ttl.py --apply    # commit
 """
+
 from __future__ import annotations
 
 import sys

@@ -20,6 +20,7 @@ story.css.
 Read-only; writes only under site/story/. Run from repo root:
     python3 scripts/v4_build_dispatches.py
 """
+
 from __future__ import annotations
 
 import sys

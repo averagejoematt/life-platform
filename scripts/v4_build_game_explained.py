@@ -23,6 +23,7 @@ v4_chrome partial (#1009), so v4_apply_chrome.py --check stays green.
 
 Run from repo root:  python3 scripts/v4_build_game_explained.py
 """
+
 from __future__ import annotations
 
 import hashlib

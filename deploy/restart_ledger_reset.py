@@ -31,6 +31,7 @@ CYCLE_TOTALS#005/cycle=5 while the wipe's tombstones said cycle=4). Pass
 --closing-cycle explicitly (the pipeline now does); the SSM read remains only
 as the standalone-invocation fallback.
 """
+
 from __future__ import annotations
 
 import sys

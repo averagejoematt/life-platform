@@ -26,6 +26,7 @@ After publishing, sync the site (the feed is static) is NOT required — the fee
 read live from S3 via CloudFront — but run an invalidation if you want it instant:
   aws cloudfront create-invalidation --distribution-id E3S424OXQZ8NBE --paths '/board_answers/*'
 """
+
 import argparse
 import json
 import os

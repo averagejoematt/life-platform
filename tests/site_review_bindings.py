@@ -25,6 +25,7 @@ character.character.*) — verified 2026-06-20.
 No third-party deps. Importable by tests/site_review.py and (later) the Phase-2 Lambda.
 Run directly for the drift self-check:  python3 tests/site_review_bindings.py
 """
+
 from __future__ import annotations
 
 import os

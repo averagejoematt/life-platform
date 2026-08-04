@@ -21,6 +21,7 @@ Usage:
     python3 deploy/restart_docs_update.py            # dry-run
     python3 deploy/restart_docs_update.py --apply    # write files
 """
+
 import argparse
 import sys
 from datetime import date

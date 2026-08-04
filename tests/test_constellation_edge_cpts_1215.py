@@ -106,8 +106,7 @@ def _read_constellation(story_js_override=None):
             page.goto(base_url + "/", wait_until="networkidle", timeout=30000)
             page.wait_for_selector(".constellation svg [data-edges] line", timeout=8000)
             page.wait_for_timeout(800)  # let the re-attach + motion.js observer settle
-            info = page.evaluate(
-                """() => {
+            info = page.evaluate("""() => {
                 const svg = document.querySelector('.constellation svg');
                 const raw = svg.getAttribute('data-cpts');
                 let cptsLen = null;
@@ -139,8 +138,7 @@ def _read_constellation(story_js_override=None):
                     tabindex: svg.getAttribute('tabindex'),
                     kbShown, kbText, tapShown,
                 };
-            }"""
-            )
+            }""")
             info["errors"] = errors
             page.close()
             browser.close()

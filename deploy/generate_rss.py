@@ -75,15 +75,13 @@ def build_rss(posts: list) -> str:
     items = []
     for p in posts:
         pub_date = datetime.strptime(p["date"], "%Y-%m-%d").strftime("%a, %d %b %Y 12:00:00 +0000")
-        items.append(
-            f"""    <item>
+        items.append(f"""    <item>
       <title>{escape(p['title'])}</title>
       <link>{escape(p['url'])}</link>
       <guid isPermaLink="true">{escape(p['url'])}</guid>
       <description>{escape(p['description'])}</description>
       <pubDate>{pub_date}</pubDate>
-    </item>"""
-        )
+    </item>""")
 
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">

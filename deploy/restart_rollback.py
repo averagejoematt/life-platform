@@ -31,6 +31,7 @@ What it does:
 
 Run this BEFORE re-running restart_pipeline.py with a corrected genesis.
 """
+
 import argparse
 import subprocess
 import sys

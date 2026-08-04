@@ -67,14 +67,12 @@ def _probe(css):
             pytest.skip(f"Chromium unavailable: {e}")
         page = browser.new_page(viewport={"width": 390, "height": 844})
         page.set_content(_harness(css), wait_until="load")
-        own = page.evaluate(
-            """() => {
+        own = page.evaluate("""() => {
             const b = document.querySelector('.wave a.bar');
             if (!b) return null;
             const r = b.getBoundingClientRect();
             return {w: r.width, h: r.height, n: document.querySelectorAll('.wave a.bar').length};
-        }"""
-        )
+        }""")
         small = VQ._tap_target_audit(page, ".wave a.bar")
         browser.close()
     return own, small

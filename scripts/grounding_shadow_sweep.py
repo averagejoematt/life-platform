@@ -16,6 +16,7 @@ Usage:
     python3 scripts/grounding_shadow_sweep.py            # last 14 days
     python3 scripts/grounding_shadow_sweep.py --days 21
 """
+
 import argparse
 import sys
 from datetime import datetime, timedelta, timezone
