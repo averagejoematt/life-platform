@@ -1,27 +1,48 @@
-# garmin-data-ingestion — garth-layer (binary dependency layer, x86_64)
-# Layer ARN: cdk/stacks/constants.py::GARTH_LAYER_ARN (garth-layer:2, created 2026-03-29).
+# garth-layer — binary dependency layer (python3.12, x86_64)
 #
-# VERIFIED 2026-08-03 against the live layer (read-only: `aws lambda
-# get-layer-version-by-arn --arn <GARTH_LAYER_ARN>`, then downloaded and inspected
-# the returned Content.Location zip's *.dist-info). garth-layer:2 actually ships
-# garminconnect-0.2.40 + garth-0.6.3 — NOT 0.2.23/0.4.47 as this file previously
-# pinned. This pin is now ground truth, not the stale MAINT-1-era estimate.
+# GENERATED — do not hand-edit. Regenerate with:
+#   python3 deploy/build_lambda_layer.py --promote garth --from-build <build.json> --layer-version <N>
+# Spec: deploy/build_lambda_layer.py::LAYERS['garth'] · drift gate: --check-manifest (#2099)
 #
-# STALE HEADER REMOVED: this file used to say "Built via deploy/fix_garmin_deps.sh
-# (platform linux/x86_64 wheels)". That script no longer exists in deploy/ — only
-# stale copies survive under old worktree archive dirs
-# (e.g. archive/20260309/deploy/fix_garmin_deps.sh in past worktrees). There is
-# currently NO build tooling in this repo to rebuild garth-layer.
+# garminconnect + garth — Garmin Connect OAuth and biometric/activity pulls.
+# Attached to: garmin-data-ingestion (CDK stack: LifePlatformIngestion).
+# Layer ARN: cdk/stacks/constants.py::GARTH_LAYER_ARN.
 #
-# NOTE (dependency-bump triage, #1780): Dependabot proposed bumping garminconnect
-# to 0.3.5. Besides the missing build tooling above, 0.3.5 is a CODE-INCOMPATIBLE
-# major rewrite for this lambda's usage: it dropped the garth dependency entirely
-# in favor of its own curl_cffi-based client (`self.client`, only created inside
-# `Garmin.login()`). lambdas/ingestion/garmin_lambda.py never calls `.login()` —
-# it authenticates by loading garth tokens directly and doing `api.garth =
-# garth.client` — so on 0.3.5 every `get_*` call (get_sleep_data, get_stats, ...)
-# would raise AttributeError: 'Garmin' object has no attribute 'client'. See the
-# #1780 close comment for the full writeup.
+# WHY THIS FILE EXISTS (#1336): third-party code reaches a running Lambda ONLY via
+# these binary layers — no deploy path pip-installs from lambdas/requirements/. So
+# this manifest is the sole surface pip-audit can scan for the layer's contents, and
+# editing it does NOT change what is deployed (#1778/#1780). A real upgrade is:
+#   build_lambda_layer.py build garth -> publish-layer-version -> bump
+#   GARTH_LAYER_VERSION -> cdk deploy LifePlatformIngestion -> --promote back to here.
+#
+# ── BUILD TARGET — top-level pins the next build installs (spec, hand-edited there)
+#   layer-build-target: garminconnect==0.2.40
+#   layer-build-target: garth==0.6.3
+#   layer-build-platform: manylinux2014_x86_64 manylinux_2_28_x86_64 · cp312
+#
+# PYSEC-2026-3467 survives any 0.2.x rebuild (fix is 0.3.5, code-incompatible —
+# see #1780). Its threat model is a world-readable garmin_tokens.json on a
+# SHARED multi-user host; this lambda holds tokens in Secrets Manager and writes
+# only to per-invocation /tmp, so the exposure does not apply. Retiring it needs
+# the 0.3.x auth migration, tracked separately — not a layer rebuild.
+#
+# ── DEPLOYED — the full resolved contents of the LIVE layer version below.
+#   garth-layer:2, measured 2026-08-04 read-only via
+#   `aws lambda get-layer-version-by-arn` + inspection of the returned zip's
+#   *.dist-info. Ground truth, not an estimate. Transitive packages are listed
+#   explicitly so pip-audit sees the WHOLE layer, not just its top-level pins.
 
+annotated-types==0.7.0
+certifi==2026.2.25
+charset-normalizer==3.4.6
 garminconnect==0.2.40
 garth==0.6.3
+idna==3.11
+oauthlib==3.3.1
+pydantic==2.12.5
+pydantic-core==2.41.5
+requests==2.33.0
+requests-oauthlib==2.0.0
+typing-extensions==4.15.0
+typing-inspection==0.4.2
+urllib3==2.6.3

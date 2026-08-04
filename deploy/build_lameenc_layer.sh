@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
 # build_lameenc_layer.sh — build + publish the standalone lameenc dependency layer (#1018).
 #
+# ⚠️ SUPERSEDED by `python3 deploy/build_lambda_layer.py build lameenc` (#2099).
+# Kept for reference only. Two reasons not to use it:
+#   1. It hardcodes a single `manylinux2014_x86_64` platform tag. That still resolves for
+#      lameenc today, but the same line silently resolves NOTHING for projects that have
+#      moved their manylinux baseline (Pillow 12.x publishes manylinux_2_27/_2_28 only) —
+#      the trap #2099 was opened to remove.
+#   2. It builds and PUBLISHES in one breath, and the zip is not reproducible (live mtimes),
+#      so you cannot diff a rebuild against what is deployed before mutating AWS.
+# The replacement pins the same version, records the resolved contents, writes a
+# byte-deterministic zip, and leaves publishing as an explicit owner step.
+#
 # lameenc is a ~250 KB LAME MP3 encoder wheel used by lambdas/audio_encode.py to
 # compress the Panel's Gemini-TTS WAV (~385 kbps, 16.6 MB per 6-min episode) to
 # spoken-word MP3 (~80 kbps mono, ~3.5 MB) before publishing. This is a

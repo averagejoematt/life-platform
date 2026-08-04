@@ -1,0 +1,30 @@
+{
+  "architecture": "x86_64",
+  "layer_name": "garth-layer",
+  "layer_version": 2,
+  "measured": "2026-08-04",
+  "packages": {
+    "annotated-types": "0.7.0",
+    "certifi": "2026.2.25",
+    "charset-normalizer": "3.4.6",
+    "garminconnect": "0.2.40",
+    "garth": "0.6.3",
+    "idna": "3.11",
+    "oauthlib": "3.3.1",
+    "pydantic": "2.12.5",
+    "pydantic-core": "2.41.5",
+    "requests": "2.33.0",
+    "requests-oauthlib": "2.0.0",
+    "typing-extensions": "4.15.0",
+    "typing-inspection": "0.4.2",
+    "urllib3": "2.6.3"
+  },
+  "platforms": null,
+  "provenance": "measured read-only from the LIVE layer via `aws lambda get-layer-version-by-arn` + inspection of the returned zip's *.dist-info (#2099). The original build inputs are unknown \u2014 these layers were hand-built offline before deploy/build_lambda_layer.py existed, which is the blind spot #2099 closes. platforms/zip_sha256 become real on the first --promote after a scripted rebuild.",
+  "runtime": "python3.12",
+  "target_pins": [
+    "garminconnect==0.2.40",
+    "garth==0.6.3"
+  ],
+  "zip_sha256": null
+}

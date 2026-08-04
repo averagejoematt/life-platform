@@ -39,7 +39,7 @@ from aws_cdk import (
 )
 
 from stacks import role_policies as rp
-from stacks.constants import TABLE_NAME  # CONF-01 / #936: one source for the table name (DR cutover)
+from stacks.constants import PILLOW_LAYER_ARN, TABLE_NAME  # CONF-01 / #936: one source for the table name (DR cutover)
 from stacks.lambda_helpers import create_platform_lambda
 
 # ── #793 (2026-07-08): the public serving path moved OUT of this stack ───────
@@ -672,11 +672,17 @@ class OperationalStack(Stack):
         # intentionally omitted. (NB: web_stack's us-east-1 life-platform-og-image points
         # at the SAME file via a stale `.handler` ref — a separate pre-existing bug; that
         # function has errored since 2026-03-20. Out of scope here; tracked in ADR-081.)
+        # #2099: this was a HARDCODED `...:layer:pillow-layer:1` literal, so bumping
+        # PILLOW_LAYER_VERSION in constants.py changed nothing here — a rebuilt layer could
+        # be published and the two functions that mount it would silently stay on v1. The
+        # ARN now flows from the single source (constants.py), which is what makes the
+        # build → publish → bump → `cdk deploy` runbook in deploy/build_lambda_layer.py
+        # actually land. (ingestion_stack already used GARTH_LAYER_ARN correctly.)
         pillow_layer = _lambda.LayerVersion.from_layer_version_arn(
             self,
             "PillowLayer",
             # Externally managed runtime layer (Pillow) — not the platform shared-utils layer.
-            "arn:aws:lambda:us-west-2:205930651321:layer:pillow-layer:1",
+            PILLOW_LAYER_ARN,
         )
         create_platform_lambda(
             self,
