@@ -33,7 +33,11 @@ class TestExtraction:
             "weekly_rate_lbs": -1.7,
             "date": "2026-06-27",
         }
-        f = cf.build_canonical_facts(rec)
+        # #2113: build_canonical_facts became cycle-aware, so a fixture replaying a
+        # specific day has to NAME the cycle it belongs to. Pinning it here is also
+        # what keeps this file from becoming a time bomb the next time
+        # EXPERIMENT_START_DATE moves past 2026-06-27.
+        f = cf.build_canonical_facts(rec, genesis="2026-06-01")
         assert f["recovery_pct"] == 30.0
         assert f["hrv_ms"] == 25.2
         assert f["protein_g_avg"] == 140.7  # intake, distinct from target/floor
@@ -50,8 +54,12 @@ class TestExtraction:
 
     def test_empty_record_is_all_none(self):
         f = cf.build_canonical_facts({})
-        assert set(f) == set(cf.NUMERIC_FIELDS) | {"as_of"}
+        # #2113 added the cycle-context keys. They are META, not facts: the key set is
+        # NUMERIC_FIELDS + META_FIELDS, and `numeric_facts()` is the view a grounding
+        # detector or a number allow-list must see.
+        assert set(f) == set(cf.NUMERIC_FIELDS) | set(cf.META_FIELDS)
         assert all(f[k] is None for k in cf.NUMERIC_FIELDS)
+        assert set(cf.numeric_facts(f)) == set(cf.NUMERIC_FIELDS)
 
     def test_units_documented_for_every_field(self):
         # Every numeric fact must carry a unit note (the HRV-ms / protein-distinct contract).

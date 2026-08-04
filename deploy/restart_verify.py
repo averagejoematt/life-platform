@@ -53,6 +53,14 @@ Checks (each pass/fail):
      stamp_compute_staleness_window() declared a genesis suppression window
      that is still active (an expected, dated, auto-clearing red) — an ALARM
      with no active declared window is a real, unpredicted problem and fails.
+ 19. Cross-surface VITALS honesty (#2113): no coach card on
+     /api/coaching-dashboard cites a recovery score, HRV, resting HR or sleep
+     duration the cockpit disagrees with. The sibling of the weight check —
+     cycle 12's sleep and training coaches narrated the previous cycle's 59%
+     recovery and 42 ms HRV under a "day one" frame while /api/vitals served
+     44% and 35 ms, and no gate compared those columns at all. Reuses
+     lambdas/operational/weight_truth_qa.assess_cross_surface_vitals, the same
+     assessor the nightly qa-smoke runs, so the rule cannot fork.
 
 Returns 0 if all checks pass, 1 if any fail.
 
@@ -366,6 +374,39 @@ def main():
         )
     except Exception as e:  # never let the verifier itself crash the post-reset check
         check("No coach card cites a weight the cockpit disagrees with (#2104)", False, f"check could not run: {e}")
+    # 19. #2113 — the vitals sibling of the weight check. A reset is the one moment a
+    # weekly-regenerating coach card and a daily cockpit are guaranteed to disagree,
+    # and weight is not the only number they disagree about: on cycle 12's genesis the
+    # sleep and training coaches published "a recovery score of 59% ... and HRV of 42
+    # ms" and "Day one of this experiment ... Your Whoop recovery came in at 59%, HRV
+    # at 42 ms" while /api/vitals served 44% and 35 ms. Every per-surface guard passed
+    # — the defect existed only in the comparison, and nothing compared those columns.
+    #
+    # Reuses the nightly's OWN assessor rather than re-deriving the rule.
+    try:
+        sys.path.insert(0, str(REPO_ROOT / "lambdas"))
+        from operational.weight_truth_qa import assess_cross_surface_vitals  # noqa: E402
+
+        def _get_v(path):
+            with urllib.request.urlopen(f"{API}{path}?cb=verify", timeout=15) as r:
+                return json.loads(r.read())
+
+        ok, msg = assess_cross_surface_vitals(
+            _get_v("/api/vitals").get("vitals", {}),
+            _get_v("/api/coaching-dashboard").get("coaches", []),
+        )
+        check(
+            "No coach card cites a vital the cockpit disagrees with (#2113)",
+            ok,
+            msg
+            + (
+                ""
+                if ok
+                else '  — regen that coach once the genesis day\'s metrics have computed (ai-expert-analyzer, {"expert": "<domain>"})'
+            ),
+        )
+    except Exception as e:  # never let the verifier itself crash the post-reset check
+        check("No coach card cites a vital the cockpit disagrees with (#2113)", False, f"check could not run: {e}")
 
     # 17. #1961 — the genesis rebuild token-alarm suppression window. Two parts:
     # (a) structural — the stamped window actually matches what window_for_genesis

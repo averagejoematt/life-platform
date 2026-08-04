@@ -524,6 +524,77 @@ def never_touch(cls: str) -> bool:
     return cls in (CROSS_PHASE, SYSTEM_STATE)
 
 
+# ── #2113: the read-side companion to is_wipeable ────────────────────────────
+#
+# `is_wipeable` answers "does the reset ARCHIVE this?". Nothing answered the
+# obvious sibling — "may a reader still present this as CURRENT?" — so every
+# generic reader in the codebase decided for itself, and one of them decided
+# wrong. `ai_expert_analyzer_lambda._latest_item` reads `computed_metrics` with an
+# unbounded newest-first `Limit: 1`, so in the hours after cycle 12's genesis
+# (before that day's daily-metrics-compute had run) it returned the pilot-tagged
+# 08-02 record. `grounded_generation.authoritative_facts_block` rendered it as
+# "Latest Whoop recovery: 59%" under a hard rule telling the narrator to state
+# that exact value, and the sleep and training cards published 59% recovery /
+# 42 ms HRV against a cockpit serving 44% / 35 ms — under a "day one" frame.
+#
+# The class registry already held the answer; the read never asked it. Putting the
+# rule HERE rather than in the caller is the point: a reader added later inherits
+# the right behaviour from the source's own class instead of from whoever wrote
+# the call, and there is exactly one definition to keep honest.
+#
+# The bound is a KEY floor, deliberately, never a FilterExpression. DynamoDB
+# applies `Limit` BEFORE a filter (#1203/#2089), so filtering a `Limit: 1` read
+# would drop the newest row for reasons unrelated to the cycle.
+#
+# Only EXPERIMENT_SCOPED is bounded:
+#   * EXPERIMENT_SCOPED is exactly what the reset tombstones — a pre-genesis row
+#     does not speak for this cycle.
+#   * CROSS_PHASE (labs, dexa) and SYSTEM_STATE (journal_analysis) are invisible
+#     to the phase machinery and are read across cycles BY DESIGN — the labs coach
+#     reads full draw history on purpose.
+#   * RAW_TIMESERIES keeps whatever window the caller asked for: the body's
+#     timeseries does not reset when the experiment does, and the date window is
+#     what bounds it, not the phase tag (#2089).
+
+
+def reads_current_cycle_only(pk: str, **kw) -> bool:
+    """True when a read for `pk` must be bounded to the current cycle (#2113).
+
+    Fail-soft and conservative in the SAFE direction: `classify` raises on an
+    unknown source by design, so nothing defaults silently — an unclassified
+    source keeps whatever window the caller asked for rather than being narrowed
+    by a rule that has not actually been applied to it.
+    """
+    try:
+        return classify(pk, **kw) == EXPERIMENT_SCOPED
+    except Exception:  # noqa: BLE001 — unknown/unclassifiable: leave the read alone
+        return False
+
+
+def cycle_read_floor(pk: str, floor: str | None = None, genesis: str | None = None) -> str | None:
+    """The earliest date a read of `pk` may return, or `floor` unchanged.
+
+    Returns the later of `floor` and the current cycle's genesis for
+    EXPERIMENT_SCOPED partitions; `floor` untouched for every other class. Pass
+    ``floor=None`` for an unbounded reader to get back either the genesis (bound
+    it) or None (leave it unbounded).
+
+    `genesis` is resolved at CALL time from the live ``EXPERIMENT_START_DATE`` so
+    a re-anchor — or a test's monkeypatch — lands without a module reload. ISO
+    dates compare correctly as strings, so no parsing is needed.
+    """
+    if not reads_current_cycle_only(pk):
+        return floor
+    if genesis is None:
+        try:
+            from common import constants as _c
+
+            genesis = str(_c.EXPERIMENT_START_DATE)
+        except Exception:  # noqa: BLE001 — fail-soft: never break a read over this
+            return floor
+    return max(floor, genesis) if floor else genesis
+
+
 # Convenience: the experiment-scoped SOURCE names (for the wipe's source iteration).
 SCOPED_SOURCES = tuple(sorted(s for s, c in SOURCE_CLASS.items() if c == EXPERIMENT_SCOPED))
 CROSS_PHASE_SOURCES = tuple(sorted(s for s, c in SOURCE_CLASS.items() if c == CROSS_PHASE))
