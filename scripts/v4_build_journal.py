@@ -35,6 +35,7 @@ stdlib only; run from the repo root:
     python3 scripts/v4_build_journal.py --write          # emit the permalink pages
     python3 scripts/v4_build_journal.py --check          # exit 1 if any page is out of date (CI)
 """
+
 from __future__ import annotations
 
 import argparse

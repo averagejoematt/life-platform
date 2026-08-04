@@ -18,6 +18,7 @@ provides the mount point (`[data-horizons]`) that assets/js/horizons.js fills.
 Read-only; writes only site/data/horizons/index.html. Run from repo root:
     python3 scripts/v4_build_horizons.py
 """
+
 from __future__ import annotations
 
 import sys

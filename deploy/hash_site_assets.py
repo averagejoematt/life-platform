@@ -33,6 +33,7 @@ Usage:  python3 deploy/hash_site_assets.py <build_dir>
 Exits non-zero on any error (import cycle, dangling ref) so a bad graph fails the
 deploy loudly instead of shipping.
 """
+
 import glob
 import hashlib
 import os

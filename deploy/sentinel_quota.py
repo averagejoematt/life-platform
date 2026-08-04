@@ -9,6 +9,7 @@ and lists the top wall-clock-consuming workflows as a same-scope proxy.
 See check_github_quota for the full warn semantics (visibility-aware 70%
 line, paid-overage-always-warns).
 """
+
 from __future__ import annotations
 
 import json

@@ -19,6 +19,7 @@ window.__COACHING_START__. Reuses the dx- and coach- styles from story.css.
 Read-only; writes only under site/coaching/. Run from repo root:
     python3 scripts/v4_build_coaching.py
 """
+
 from __future__ import annotations
 
 import sys

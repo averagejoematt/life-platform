@@ -64,6 +64,7 @@ Emitters (for the bash smoke script and ad-hoc use):
 No third-party deps. Importable by tests/* (sibling) and deploy/* scripts
 (insert REPO_ROOT/tests on sys.path).
 """
+
 from __future__ import annotations
 
 import argparse

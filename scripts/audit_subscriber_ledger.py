@@ -17,6 +17,7 @@ Run from repo root:
     python3 scripts/audit_subscriber_ledger.py
     python3 scripts/audit_subscriber_ledger.py --purge-synthetics
 """
+
 from __future__ import annotations
 
 import argparse

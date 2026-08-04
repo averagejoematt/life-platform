@@ -80,7 +80,7 @@ Lambda bundle or the published site.
 | `playwright==1.61.0` | Visual-QA browser automation | **Apache-2.0** |
 | `flake8==7.3.0` | Lint | **MIT** |
 | `ruff==0.14.14` | Lint + import-sort | **MIT** |
-| `black==25.9.0` | Formatter | **MIT** |
+| `black==26.3.1` | Formatter | **MIT** |
 | `mypy==2.3.0` | Type checker | **MIT** |
 | `pip-audit==2.10.1` (CI-installed) | CVE gate (`ci-lint.yml`) | **Apache-2.0** |
 | `syft` (CI-installed, #1661) | SBOM provenance | **Apache-2.0** |

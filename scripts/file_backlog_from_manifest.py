@@ -21,6 +21,7 @@ Usage:
   python3 scripts/file_backlog_from_manifest.py SPEC.json --dry-run   # preview
   python3 scripts/file_backlog_from_manifest.py SPEC.json             # file
 """
+
 import argparse
 import json
 import os

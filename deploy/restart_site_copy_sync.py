@@ -26,6 +26,7 @@ Usage:
     python3 deploy/restart_site_copy_sync.py            # dry-run / show diffs
     python3 deploy/restart_site_copy_sync.py --apply    # write files + S3 sync + invalidation
 """
+
 import argparse
 import json
 import re

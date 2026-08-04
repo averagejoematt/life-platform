@@ -91,11 +91,7 @@ def test_daily_line_carries_permanent_yesterday_scope():
 # ── #1252 — carried-from-prep marker only for pre-genesis dates (cockpit) ────────
 def test_carry_mark_pre_genesis_only():
     block = _extract(_read(_COCKPIT_JS), "CARRY_MARK_START", "CARRY_MARK_END")
-    harness = (
-        block
-        + "\n"
-        + _ASSERT
-        + """
+    harness = block + "\n" + _ASSERT + """
 const GEN = "2026-07-18";
 assert(/carried from prep/.test(carryMark("2026-06-26", GEN)), "pre-genesis date must co-render 'carried from prep'");
 assert(carryMark("2026-07-20", GEN) === "", "post-genesis date must NOT get the marker");
@@ -106,7 +102,6 @@ assert(_isPreGenesis("2026-06-26", GEN) === true, "isPreGenesis true for an earl
 assert(_isPreGenesis("2026-07-20", GEN) === false, "isPreGenesis false for a later date");
 console.log("CARRY_MARK_OK");
 """
-    )
     r = _run_node(harness)
     assert r.returncode == 0, f"carry-mark guard failed:\nSTDOUT {r.stdout}\nSTDERR {r.stderr}"
     assert "CARRY_MARK_OK" in r.stdout, r.stdout
@@ -135,11 +130,7 @@ def test_supplements_asof_carry_marker():
 # ── #1244 — self-hiding Home season-premiere beat ───────────────────────────────
 def test_cycle_beat_self_hides_by_window():
     block = _extract(_read(_STORY_JS), "CYCLE_BEAT_START", "CYCLE_BEAT_END")
-    harness = (
-        block
-        + "\n"
-        + _ASSERT
-        + """
+    harness = block + "\n" + _ASSERT + """
 const cyc = [1,2,3,4,5,6,7].map((n) => ({ cycle: n, genesis: "x" }));
 
 // Fresh cycle, day 4 -> VISIBLE, numbers derived from the API (never hardcoded).
@@ -168,7 +159,6 @@ assert(one && /1 start before/.test(one.h) && !/starts before/.test(one.h), "sin
 
 console.log("CYCLE_BEAT_OK");
 """
-    )
     r = _run_node(harness)
     assert r.returncode == 0, f"cycle-beat guard failed:\nSTDOUT {r.stdout}\nSTDERR {r.stderr}"
     assert "CYCLE_BEAT_OK" in r.stdout, r.stdout

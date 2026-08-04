@@ -30,6 +30,7 @@ Usage:
     python3 deploy/restart_intelligence_wipe.py            # dry-run
     python3 deploy/restart_intelligence_wipe.py --apply    # commit
 """
+
 import argparse
 import os
 import re

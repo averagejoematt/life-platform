@@ -25,6 +25,7 @@ re-run). Local filesystem only — NO S3, NO CloudFront. Fully reversible via gi
 Run from repo root:  python3 scripts/v4_relocate_legacy.py [--apply]
 Without --apply it prints the move plan and exits (dry run).
 """
+
 from __future__ import annotations
 
 import re

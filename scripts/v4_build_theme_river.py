@@ -25,6 +25,7 @@ no AI runs at render time.
 Run from repo root:  python3 scripts/v4_build_theme_river.py            (writes the empty-state artifact)
                      python3 scripts/v4_build_theme_river.py --live      (reads the live journal partition)
 """
+
 from __future__ import annotations
 
 import html

@@ -12,5 +12,3 @@
 # (the bump/PR that retires it) — an entry with no removal path is a bug, not a waiver.
 #
 # ─────────────────────────────────────────────────────────────────────────────
-PYSEC-2026-2120  # black 25.9.0 — psf/black GitHub Action `use_pyproject:true` RCE. NOT EXPLOITABLE here: CI pip-installs black and runs `black --check` directly; it does not use the psf/black Action or use_pyproject. Removal path: the CQ-01 coordinated black bump (requirements-dev.txt + ci-cd.yml black== pins, bumped together) to >=26.3.0 — Dependabot's dev-tooling group opens it.
-PYSEC-2026-2121  # black 25.9.0 — `--python-cell-magics` cache-file path traversal. NOT EXPLOITABLE here: CI never passes --python-cell-magics (default empty). Removal path: same CQ-01 black bump to >=26.3.1.

@@ -35,6 +35,7 @@ Usage:
     python3 deploy/restart_media_reset.py            # dry-run
     python3 deploy/restart_media_reset.py --apply    # commit
 """
+
 import argparse
 import json
 import sys
@@ -302,8 +303,7 @@ def _panel_feed_with_items(episodes: list[dict]) -> str:
     """feed.xml with episode items — item schema mirrors coach_panel_podcast_lambda.
     _write_indexes (guid measured-life-panel-wk{N}, RFC822 pubDate, itunes fields);
     the next real weekly publish overwrites this with its own full render."""
-    items = "\n".join(
-        f"""  <item>
+    items = "\n".join(f"""  <item>
     <title>{_xml_esc(e["title"])}</title>
     <description>{_xml_esc(e.get("excerpt") or e["title"])}</description>
     <itunes:summary>{_xml_esc(e.get("excerpt") or e["title"])}</itunes:summary>
@@ -315,9 +315,7 @@ def _panel_feed_with_items(episodes: list[dict]) -> str:
     <itunes:episodeType>full</itunes:episodeType>
     <itunes:explicit>false</itunes:explicit>
     <itunes:image href="{COVER_URL}"/>
-  </item>"""
-        for e in episodes
-    )
+  </item>""" for e in episodes)
     empty = _empty_panel_feed()
     return empty.replace("</channel>", f"{items}\n</channel>") if items else empty
 

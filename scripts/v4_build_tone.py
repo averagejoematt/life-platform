@@ -13,6 +13,7 @@ HTML, no evidence.js coupling, no /api dependency — so it can ship independent
 
 Run from repo root:  python3 scripts/v4_build_tone.py
 """
+
 from __future__ import annotations
 
 import html

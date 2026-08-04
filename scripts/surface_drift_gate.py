@@ -52,6 +52,7 @@ Exit 0 = clean (advisories allowed), exit 1 = at least one blocking finding.
 Runs in .github/workflows/surface-drift.yml on every PR touching a surface
 path. No AWS, no browser, stdlib only — seconds, not minutes.
 """
+
 from __future__ import annotations
 
 import argparse

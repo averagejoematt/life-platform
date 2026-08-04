@@ -101,15 +101,13 @@ _VENDOR_PATTERNS = [
     re.compile(r"\b(?:large\s+)?language\s+model\b", re.I),
 ]
 
-_STOPWORDS = frozenset(
-    """
+_STOPWORDS = frozenset("""
     a an the and or but if then so as of to in on at by for with from into over under
     is are was were be been being do does did has have had will would can could should
     this that these those it its your you his her their our we he she they i me my
     not no yes what which who whom when where why how than about up down out off more
     most less least very just also too still yet even much many few some any all each
-    """.split()
-)
+    """.split())
 
 
 # ── fixture loading ──────────────────────────────────────────────────────────

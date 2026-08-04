@@ -3,7 +3,7 @@
 # Tools: ruff (lint + import-sort) + black (format). Line length 140 to match
 # .flake8. flake8's E9/F-class is the hard CI floor; ruff + black are also
 # ENFORCED — CI's "Lint + Syntax Check" job runs `black --check` and `ruff check`
-# and FAILS the build on any violation (black pinned 25.9.0, ruff 0.14.0). Run
+# and FAILS the build on any violation (black pinned 26.3.1, ruff 0.14.0). Run
 # `make format` before committing; flake8 alone is not enough.
 #   make format        # apply ruff --fix + black
 #   make format-check  # verify (this is the CI gate)

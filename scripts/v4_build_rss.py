@@ -12,6 +12,7 @@ stdlib only (urllib — matches the repo's no-external-HTTP convention). Run fro
 the repo root, then deploy site/ (sync_site_to_s3.sh calls this automatically):
     python3 scripts/v4_build_rss.py
 """
+
 from __future__ import annotations
 
 import html

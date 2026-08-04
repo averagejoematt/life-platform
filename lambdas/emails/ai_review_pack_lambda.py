@@ -373,8 +373,7 @@ def _ranked_digest_section(ranking):
         claim = html.escape(analysis.get("checkable_claim") or "(no checkable claim extracted)")
         crit = analysis.get("critic")
         score_bits = f'score {analysis.get("score")}' + (f" (critic {crit})" if crit is not None else "")
-        rows.append(
-            f"""
+        rows.append(f"""
       <div style="background:#12162e;border:1px solid #2a2d4a;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
           <span style="font-size:13px;font-weight:700;color:#f59e0b;">#{n}</span>
@@ -383,8 +382,7 @@ def _ranked_digest_section(ranking):
         <div style="color:#9ca3af;font-size:11px;margin-bottom:4px;">{provenance} · <a href="{_console_url(entry['_key'])}" style="color:#6366f1;text-decoration:none;">open in S3 &rsaquo;</a></div>
         <div style="color:#d1d5db;font-size:12px;line-height:1.45;">{claim}</div>
         {_flags_html(analysis)}
-      </div>"""
-        )
+      </div>""")
     return f"""
     <div style="margin-bottom:26px;">
       <div style="font-size:14px;font-weight:700;color:#ffffff;border-bottom:1px solid #2a2d4a;padding-bottom:6px;margin-bottom:10px;">
@@ -411,8 +409,7 @@ def _promotion_section(proposals):
             f'<div style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#9ca3af;">{html.escape(r)}</div>'
             for r in (p.get("example_refs") or [])
         )
-        rows.append(
-            f"""
+        rows.append(f"""
       <div style="background:#12162e;border:1px solid #2a2d4a;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
           <span>{_tag_chip_html(p.get("error_class", "other"))}</span>
@@ -421,8 +418,7 @@ def _promotion_section(proposals):
         <div style="color:#d1d5db;font-size:12px;line-height:1.45;margin-bottom:4px;">{html.escape(p.get("statement", ""))}</div>
         <div style="color:#6b7280;font-size:11px;margin-bottom:2px;">coaches: {coaches}</div>
         {refs}
-      </div>"""
-        )
+      </div>""")
     return f"""
     <div style="margin-bottom:26px;">
       <div style="font-size:14px;font-weight:700;color:#ffffff;border-bottom:1px solid #2a2d4a;padding-bottom:6px;margin-bottom:10px;">

@@ -23,6 +23,7 @@ Usage:
   python3 deploy/backfill_recall_embeddings.py --apply --force    # re-embed unchanged docs
   BEDROCK_SHADOW_MODE=1 python3 deploy/backfill_recall_embeddings.py --apply  # no-spend end-to-end
 """
+
 import argparse
 import os
 import sys

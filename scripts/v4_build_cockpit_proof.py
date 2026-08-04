@@ -23,6 +23,7 @@ deploy/sync_site_to_s3.sh, so every site deploy refreshes the numbers.
 Writes site/cockpit/index.html. Run from repo root:
     python3 scripts/v4_build_cockpit_proof.py
 """
+
 from __future__ import annotations
 
 import sys

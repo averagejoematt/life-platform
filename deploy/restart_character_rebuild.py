@@ -17,6 +17,7 @@ Usage:
     python3 deploy/restart_character_rebuild.py            # dry-run
     python3 deploy/restart_character_rebuild.py --apply    # invoke Lambda
 """
+
 import argparse
 import json
 import sys

@@ -38,6 +38,7 @@ Usage
 Offline by default (repo-only, runs in seconds — the #1450 "~10 minutes
 standalone" bar with room to spare). No Playwright, no Bedrock, no writes ever.
 """
+
 from __future__ import annotations
 
 import argparse

@@ -30,6 +30,7 @@ Outputs:
 
 Run from repo root:  python3 scripts/v4_vendor_fonts.py
 """
+
 from __future__ import annotations
 
 import re

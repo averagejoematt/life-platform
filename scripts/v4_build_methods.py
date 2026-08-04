@@ -16,6 +16,7 @@ path with v4_build_evidence.py.
 
 Run from repo root:  python3 scripts/v4_build_methods.py
 """
+
 from __future__ import annotations
 
 import html

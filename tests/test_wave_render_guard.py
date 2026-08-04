@@ -78,9 +78,7 @@ assert(meaningfulSpread === false, "fixture must sit below the meaningfulSpread 
 def test_height_guard_1214():
     """#1214 — below-threshold, near-1 max/min ratio window: scored bar heights stay near-equal
     (max/min < 1.3), NOT the min-max 100/14 collapse. Proves non-vacuous vs the old formula."""
-    harness = (
-        _FIXTURE
-        + """
+    harness = _FIXTURE + """
 assert(ratio < 1.05, "fixture max/min ratio must be <1.05 (guard-1 window); got " + ratio);
 
 // NEW (extracted) heights must be near-equal below threshold.
@@ -95,7 +93,6 @@ assert(oMax / oMin >= 1.3, "pre-fix height must VIOLATE guard-1 (non-vacuous); g
 
 console.log("HEIGHT_GUARD_OK new=" + JSON.stringify(nH) + " old_ratio=" + (oMax / oMin).toFixed(2));
 """
-    )
     r = _run_node(harness)
     assert r.returncode == 0, f"height guard failed:\nSTDOUT {r.stdout}\nSTDERR {r.stderr}"
     assert "HEIGHT_GUARD_OK" in r.stdout, r.stdout
@@ -104,9 +101,7 @@ console.log("HEIGHT_GUARD_OK new=" + JSON.stringify(nH) + " old_ratio=" + (oMax 
 def test_tier_guard_1213():
     """#1213 — a below-threshold monotonic decline: no scored bar gets tier 'up'. Proves
     non-vacuous by re-deriving the old `: "up"` fallback and asserting it WOULD paint 'up'."""
-    harness = (
-        _FIXTURE
-        + """
+    harness = _FIXTURE + """
 // declining precondition
 for (let i = 1; i < scores.length; i++) assert(scores[i] < scores[i - 1], "fixture must be monotonically declining");
 
@@ -121,7 +116,6 @@ assert(oldT.includes("up"), "pre-fix tier must include 'up' (non-vacuous); got "
 
 console.log("TIER_GUARD_OK new=" + JSON.stringify(nT) + " old=" + JSON.stringify(oldT));
 """
-    )
     r = _run_node(harness)
     assert r.returncode == 0, f"tier guard failed:\nSTDOUT {r.stdout}\nSTDERR {r.stderr}"
     assert "TIER_GUARD_OK" in r.stdout, r.stdout

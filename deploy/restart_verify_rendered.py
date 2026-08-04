@@ -26,6 +26,7 @@ Exit code 0 if all checks pass; 1 otherwise.
 Usage:
     python3 deploy/restart_verify_rendered.py [--old-genesis YYYY-MM-DD]
 """
+
 import argparse
 import json
 import sys

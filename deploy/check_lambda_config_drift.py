@@ -24,6 +24,7 @@ Usage:
 Only literal kwargs are compared; calls that compute timeout/memory from a variable are
 listed as "unparseable" (informational, not a failure).
 """
+
 from __future__ import annotations
 
 import argparse

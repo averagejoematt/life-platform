@@ -12,6 +12,7 @@ Usage:
   python3 deploy/backfill_training_notes.py --apply         # write
   python3 deploy/backfill_training_notes.py --since 2026-06-01 --apply
 """
+
 import argparse
 import os
 import sys

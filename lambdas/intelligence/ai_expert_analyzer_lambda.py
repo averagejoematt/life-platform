@@ -1036,8 +1036,7 @@ def _build_shared_system_prompt():
         logger.warning("Presence block injection failed: %s", _pe)
 
     # Format instructions (identical for all experts)
-    parts.append(
-        """OBSERVATORY ANALYSIS FORMAT:
+    parts.append("""OBSERVATORY ANALYSIS FORMAT:
 Write a 2-3 paragraph analysis (200-300 words).
 
 STRUCTURE:
@@ -1060,8 +1059,7 @@ After your analysis, on separate lines write:
 KEY RECOMMENDATION: [One specific action for this week. 1-2 sentences.]
 ELENA QUOTE: [One sentence in Elena Voss's voice — third person, literary journalist. She names the cross-domain observation the expert missed.]
 
-Write only the analysis — no preamble, just paragraphs followed by tagged lines."""
-    )
+Write only the analysis — no preamble, just paragraphs followed by tagged lines.""")
 
     return "\n\n".join(parts)
 
