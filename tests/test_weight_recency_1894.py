@@ -44,7 +44,10 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 
-from intelligence import ai_expert_analyzer_lambda as ana  # noqa: E402
+from intelligence import (  # noqa: E402
+    ai_expert_analyzer_lambda as ana,
+    weight_recency as wr,
+)
 
 # A fixed instant, unrelated to whatever day this suite actually runs on. Every
 # fixture date in this file derives from it, and _physical() pins the analyzer's
@@ -79,11 +82,23 @@ def _rows(*pairs):
     return [{"sk": f"DATE#{d}", "weight_lbs": w} for d, w in pairs]
 
 
-def _physical(monkeypatch, rows, anchor=ANCHOR):
+def _physical(monkeypatch, rows, anchor=ANCHOR, genesis_days_before=60):
     """Run the physical branch against canned withings rows, with the analyzer's
     own clock pinned to `anchor` so its now() cannot diverge from fixture dates
-    also derived from `anchor`."""
+    also derived from `anchor`.
+
+    #2104: the cycle genesis is pinned relative to the SAME anchor for the same
+    reason the clock is. summarize_weight_readings now filters readings to the
+    current cycle, so leaving it on the live EXPERIMENT_START_DATE would make every
+    assertion below depend on where the constant happens to sit — the frozen-fixture
+    time bomb, one class over."""
     _freeze(monkeypatch, ana, anchor)
+    monkeypatch.setattr(
+        wr._constants,
+        "EXPERIMENT_START_DATE",
+        _ago(anchor, genesis_days_before),
+        raising=False,
+    )
     monkeypatch.setattr(ana, "_query_source", lambda source, start, end: rows if source == "withings" else [])
     monkeypatch.setattr(ana, "_latest_item", lambda source: None)
     return ana.gather_data_for_expert("physical")

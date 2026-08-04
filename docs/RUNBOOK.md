@@ -1407,7 +1407,16 @@ an omission):
   refuses to send on any Pacific date but genesis eve).
 - `deploy/restart_verify.py` — the **post-genesis Monday** health check (asserts `day_n >= 1`,
   a genesis weigh-in, a post-genesis character sheet); folding it would structurally fail at
-  reset time. Run it Monday morning.
+  reset time. Run it Monday morning. Check 16 (#2104) covers the **slow-regen narrative
+  class**: the coaching door regenerates on its own weekly-ish cadence, so on cycle 12's
+  genesis the physical coach ran at 17:38Z — before the Day-1 weigh-in ingested at 04:05Z the
+  next morning — and published the previous cycle's figure as the current weight while the
+  cockpit served the new baseline. If it fails, the repair is a targeted regen once the Day-1
+  weigh-in is in DynamoDB: `aws lambda invoke --function-name ai-expert-analyzer --payload
+  '{"expert":"physical"}' /dev/stdout` (any coach domain; `"all"` re-runs the board). The data
+  seam that makes the *next* card honest is `intelligence/weight_recency.py`, which now filters
+  weigh-ins to the current cycle — a pre-genesis reading is withheld from the fact set entirely
+  rather than dated, so the grounded-generation allow-list catches a coach that cites it.
 - `deploy/restart_integration_check.py` (#1559) — the **behavioral** leg: where
   `restart_verify.py` proves STATE, this proves the pipelines still FLOW. Four legs: ingestion
   (every `source_registry.py` source really invokes — the same bounded gap-aware runs the crons

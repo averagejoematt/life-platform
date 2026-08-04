@@ -31,6 +31,13 @@ Checks (each pass/fail):
      a hardcoded per-reset list. A fresh cycle fails here until the attended
      seed -> publish -> genesis_prereg_stamp.py --apply sequence actually lands
      a real artifact (#1092 posture: never auto-folded into the pipeline).
+ 16. Cross-surface weight honesty (#2104): no coach card on
+     /api/coaching-dashboard cites a bodyweight the cockpit disagrees with. The
+     reset is precisely when a weekly-regenerating narrative surface goes stale
+     against a daily one — cycle 12's physical coach ran before the Day-1 weigh-in
+     ingested and published the previous cycle's figure as current. Reuses
+     lambdas/operational/weight_truth_qa.assess_cross_surface_weight, the same
+     assessor the nightly qa-smoke runs, so the rule cannot fork.
 
 Returns 0 if all checks pass, 1 if any fail.
 
@@ -313,6 +320,37 @@ def main():
         )
     except Exception as e:  # never let the verifier itself crash the post-reset check
         check("Every cycle has a published prereg seal or a dated grandfather record (#1979)", False, f"check could not run: {e}")
+
+    # 16. #2104 — coach cards must not narrate a pre-genesis body. The reset is the
+    # exact moment a slow-regenerating narrative surface goes stale against a fast
+    # one: on cycle 12's genesis the physical coach ran before the Day-1 weigh-in had
+    # ingested, was handed the previous cycle's 316.97 (exactly at the age tolerance,
+    # so not "stale"), and published "I have one weight reading: 317.0 lbs" against a
+    # cockpit serving 322. Nothing in restart_verify looked at the coaching door at
+    # all, so the reset was "verified" with the contradiction already live and only
+    # the nightly qa-smoke found it, hours later.
+    #
+    # Reuses the nightly's OWN assessor rather than re-deriving the rule — one
+    # definition, now three hooks (qa_smoke, this, and the analyzer's fact assembly).
+    try:
+        sys.path.insert(0, str(REPO_ROOT / "lambdas"))
+        from operational.weight_truth_qa import assess_cross_surface_weight  # noqa: E402
+
+        def _get(path):
+            with urllib.request.urlopen(f"{API}{path}?cb=verify", timeout=15) as r:
+                return json.loads(r.read())
+
+        ok, msg = assess_cross_surface_weight(
+            _get("/api/vitals").get("vitals", {}),
+            _get("/api/coaching-dashboard").get("coaches", []),
+        )
+        check(
+            "No coach card cites a weight the cockpit disagrees with (#2104)",
+            ok,
+            msg + ("" if ok else '  — regen that coach once the Day-1 weigh-in has ingested (ai-expert-analyzer, {"expert": "<domain>"})'),
+        )
+    except Exception as e:  # never let the verifier itself crash the post-reset check
+        check("No coach card cites a weight the cockpit disagrees with (#2104)", False, f"check could not run: {e}")
 
     # Summary
     total = len(checks)

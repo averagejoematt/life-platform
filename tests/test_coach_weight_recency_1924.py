@@ -43,10 +43,16 @@ _TODAY = date(2026, 8, 1)
 _CYCLE = [_rec("2026-07-27", 321.1), _rec("2026-07-28", 316.3), _rec("2026-08-01", 317.0)]
 _ENDS_YESTERDAY = _CYCLE[:2]  # what fetch_range(..., yesterday) actually returns on 08-01
 
+# #2104: summarize_weight_readings became cycle-aware, so a fixture that replays a
+# specific cycle has to NAME that cycle's genesis. These rows are cycle 11's (the
+# incident's own dates); pinning it here is also what keeps this file from becoming
+# a time bomb the next time EXPERIMENT_START_DATE moves past 2026-08-01.
+_GENESIS = "2026-07-27"
+
 
 def test_the_live_failure_reproduces_without_the_date():
     """The bare number the coach was handed really was 316.3 — the bug is real."""
-    facts = weight_recency.summarize_weight_readings(_ENDS_YESTERDAY, _TODAY.isoformat())
+    facts = weight_recency.summarize_weight_readings(_ENDS_YESTERDAY, _TODAY.isoformat(), genesis=_GENESIS)
     assert facts["current_weight_lb"] == 316.3
     # ...and it is knowably stale: 4 days old, past the 2-day tolerance.
     assert facts["current_weight_as_of"] == "2026-07-28"
@@ -56,7 +62,7 @@ def test_the_live_failure_reproduces_without_the_date():
 
 def test_physical_coach_now_receives_the_reading_date_and_staleness():
     """The fix: the date travels with the number into the coach's fact set."""
-    facts = weight_recency.summarize_weight_readings(_ENDS_YESTERDAY, _TODAY.isoformat())
+    facts = weight_recency.summarize_weight_readings(_ENDS_YESTERDAY, _TODAY.isoformat(), genesis=_GENESIS)
     built = ai_context._build_physical_data({"latest_weight": 316.3, "weight_recency": facts})
 
     assert built["current_weight_lb"] == 316.3
@@ -70,7 +76,7 @@ def test_physical_coach_now_receives_the_reading_date_and_staleness():
 
 def test_a_fresh_weigh_in_stays_silent():
     """No nagging on healthy data — the rider is empty when the reading is current."""
-    facts = weight_recency.summarize_weight_readings(_CYCLE, _TODAY.isoformat())
+    facts = weight_recency.summarize_weight_readings(_CYCLE, _TODAY.isoformat(), genesis=_GENESIS)
     built = ai_context._build_physical_data({"latest_weight": 317.0, "weight_recency": facts})
     assert built["current_weight_lb"] == 317.0
     assert built["current_weight_is_stale"] is False
@@ -109,8 +115,14 @@ def test_stale_threshold_is_the_shared_one():
     facts = weight_recency.summarize_weight_readings(
         [_rec((_TODAY - timedelta(days=2)).isoformat(), 300.0)],
         _TODAY.isoformat(),
+        genesis=_GENESIS,
     )
     assert facts["current_weight_is_stale"] is False, "exactly at the threshold is still fresh"
+    # #2104: and it is fresh because of the AGE rule, not because the cycle filter
+    # silently emptied the window — without this the assertion above would pass for
+    # entirely the wrong reason the next time the genesis constant moves.
+    assert facts["current_weight_lb"] == 300.0
+    assert facts["current_weight_is_pre_genesis"] is False
 
 
 # ── the check side: a dated citation is not a contradiction ─────────────────

@@ -303,15 +303,23 @@
           <p class="cohort-foot label">Self-reported by participants, unverified. Never pooled into Matthew's own numbers.</p>
         </section>
 
-        <!-- Week scope: six instruments, seven days (S-03) — real /api/observatory_week reads -->
+        <!-- Week scope: six instruments over the week (S-03) — real /api/observatory_week reads.
+             #2104: the SHIPPED default must be the span-neutral copy. cockpit.js has spoken in
+             the filling-in voice since the #1094 drill, but the static shell still asserted
+             "seven days" — so on a fresh genesis the served HTML (what crawlers, no-JS readers
+             and the nightly reader-truth pass actually read) claimed a week the cycle had not
+             lived. One seam, both ends: JS promotes this to the seven-day copy only once
+             instruments actually report. -->
         <section class="weekview" data-weekview hidden aria-label="The week's instruments">
-          <p class="cap label" data-bind="week-cap">seven days, by instrument</p>
+          <p class="cap label" data-bind="week-cap">the week, by instrument</p>
           <ul class="wk-rows" data-bind="weekrows"></ul>
         </section>
 
-        <!-- Month scope: SS-08 "what changed" — real 30d-vs-prior deltas + newly-unlocked correlations -->
-        <section class="monthview" data-monthview hidden aria-label="What changed this month">
-          <p class="cap label" data-bind="month-cap">what changed this month</p>
+        <!-- Month scope: SS-08 "what changed" — real 30d-vs-prior deltas + newly-unlocked
+             correlations. #2104: same rule as the week cap above — no month-long span is
+             claimed until /api/what_changed returns month-over-month content. -->
+        <section class="monthview" data-monthview hidden aria-label="What changed">
+          <p class="cap label" data-bind="month-cap">what changed</p>
           <ul class="mo-rows" data-bind="month-deltas"></ul>
           <div class="mo-unlocks" data-bind="month-unlocks"></div>
         </section>
