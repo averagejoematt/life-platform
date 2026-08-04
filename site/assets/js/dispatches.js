@@ -18,6 +18,7 @@ import { ruleBand } from "/assets/js/texture.js"; // #1471 — the editorial tex
 import { wireTabList, markActiveTab } from "/assets/js/tabs.js"; // #579 — real ARIA tabs
 import { readAloudFor } from "/assets/js/read_aloud.js"; // #1121 — per-article, reset-safe audio join
 import { quotesArchiveHTML } from "/assets/js/journal_quotes.js"; // #1568 — consent-per-line pull-quotes (ADR-142)
+import { sortChronicleNewestFirst } from "/assets/js/chronicle_order.js"; // #1988 — same-date part-sequence tie-break, shared with the server manifest
 
 // NB (2026-06-20): "The Coaches" + "AI lab notes" moved OUT to their own top-level
 // door, /coaching/ (assets/js/coaching.js). The coach/fieldnotes renderer functions
@@ -126,14 +127,25 @@ function entriesFor(s, data) {
   if (s.kind === "fieldnotes") return (data.entries || []).map((e) => ({ id: e.week, title: `Week ${e.week} field note`, date: e.ai_generated_at ? String(e.ai_generated_at).slice(0, 10) : "" }));
   if (s.kind === "build") return (data.beats || []).slice().sort((a, b) => (a.date < b.date ? 1 : -1)).map((b) => ({ id: b.id || b.date, title: b.title || b.date, date: b.date }));
   if (s.kind === "posts") {
-    const ps = data.posts || data.entries || (Array.isArray(data) ? data : []);
+    // #1988 — render order is newest-first with the same-date part-sequence
+    // tie-break (never trust posts.json's own array order alone: a stale
+    // pre-regen manifest snapshot can still carry the old insertion-order
+    // scramble this list is named for).
+    const ps = sortChronicleNewestFirst(data.posts || data.entries || (Array.isArray(data) ? data : []));
     // Genesis-anchored labels (truth-audit Phase 4b): installments before the genesis
     // date are the Prologue (numbered by date); after it they're Week N counted from
     // genesis. The raw `week` field can repeat (two "Week 1" shipped), so it never
     // drives the displayed label.
     const GENESIS = "2026-08-03";
     const ROMAN = ["I", "II", "III", "IV", "V", "VI"];
-    const pre = ps.filter((p) => p.date && p.date < GENESIS).sort((a, b) => (a.date < b.date ? -1 : 1));
+    // #1988 — tie-break by the explicit `sequence` field (the same (date, sk)-derived
+    // ordinal the server numbers labels/URLs from), not by date alone: two Prologue
+    // posts can share a date (e.g. a rolled-forward lead-in re-dated onto genesis−1
+    // by a restart while keeping its original sk), and a date-only sort is stable —
+    // silently keeping whatever order the same-date pair arrived in.
+    const pre = ps
+      .filter((p) => p.date && p.date < GENESIS)
+      .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0) || (a.date < b.date ? -1 : 1));
     const partOf = new Map(pre.map((p, i) => [p, ROMAN[i] || String(i + 1)]));
     const labelOf = (p) => {
       // Chronicle-only derivation: "In my own words" (Matt's blog) carries its own
@@ -144,8 +156,14 @@ function entriesFor(s, data) {
       if (p.date < GENESIS) return pre.length > 1 ? `Prologue · Part ${partOf.get(p)}` : "Prologue";
       return `Week ${Math.max(1, Math.floor((Date.parse(p.date) - Date.parse(GENESIS)) / 6048e5) + 1)}`;
     };
-    // id = date (unique) for selection/routing; week kept separately for podcast lookup.
-    // The raw `week` repeated (two "Week 1"), so using it as the id collided two posts.
+    // id = date (unique in the common case) for selection/routing — several other
+    // surfaces (cockpit.js, dispatches.js's own podcast/timeline cross-links) build
+    // "/story/chronicle/#<date>" deep links assuming this, so it is NOT switched to
+    // `sequence` here even though a same-date multi-part run (#1988) means id can
+    // still collide for those two entries specifically; that narrower id-uniqueness
+    // gap is a separate, deferred concern (noted, not fixed, by #1988 — fixing it
+    // would mean re-keying every "#<date>" deep link across the site in one move).
+    // The raw `week` repeated too (two "Week 1" shipped), so it's only the last resort.
     return ps.map((p) => ({ id: p.date || String(p.week), week: p.week, label: labelOf(p), title: p.title || labelOf(p), date: p.date, excerpt: p.excerpt, meta: p.stats_line, word_count: p.word_count, url: p.url, image_url: p.image_url || "", image_credit: p.image_credit || "" }));
   }
   return [];

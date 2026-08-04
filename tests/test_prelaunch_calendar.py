@@ -459,6 +459,33 @@ def test_shared_date_installments_get_distinct_seq_and_labels(monkeypatch):
     assert all_keys[1] == ("2026-07-11", "DATE#2026-03-15")
 
 
+def test_1988_manifest_same_date_sort_matches_the_seq_not_scan_order(monkeypatch):
+    """#1988 parity: restart_leadin_pages.run()'s posts_manifest loop sorts by
+    leadin.manifest_sort_key — this calls that EXACT function (the one run() uses;
+    run() itself talks to live boto3, so it isn't unit-invoked here) and pins that
+    a same-date tie orders by the (date, sk)-derived `seq_for` ordinal — the same
+    one that already numbers the labels correctly — regardless of DDB scan order,
+    never by insertion order."""
+    monkeypatch.setattr(leadin, "EXPERIMENT_START_DATE", GENESIS)
+    installments = [
+        {"date": "2026-07-06", "sk": "DATE#2026-02-28", "week_number": 0},  # Part I
+        {"date": "2026-07-11", "sk": "DATE#2026-03-15", "week_number": 1},  # Part II (re-dated, older sk)
+        {"date": "2026-07-11", "sk": "DATE#2026-07-11", "week_number": 0},  # Part III (native sk)
+    ]
+    all_dates = sorted(x["date"] for x in installments)
+    all_keys = leadin.installment_keys(installments)
+
+    def _manifest_order(scan_order):
+        ordered = sorted(scan_order, key=lambda x: leadin.manifest_sort_key(x, all_dates, all_keys), reverse=True)
+        return [x["sk"] for x in ordered]
+
+    # Part III (native sk) must sort above Part II (re-dated, older sk) regardless
+    # of which order the two same-date records arrived in.
+    part2, part3, part1 = installments[1], installments[2], installments[0]
+    assert _manifest_order([part3, part2, part1]) == ["DATE#2026-07-11", "DATE#2026-03-15", "DATE#2026-02-28"]
+    assert _manifest_order([part2, part3, part1]) == ["DATE#2026-07-11", "DATE#2026-03-15", "DATE#2026-02-28"]
+
+
 def test_journal_post_ref_tie_safe_with_sk(monkeypatch):
     """chronicle_render.journal_post_ref parity: same tie, same answer."""
     import os

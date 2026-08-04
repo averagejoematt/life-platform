@@ -227,6 +227,19 @@ def seq_for(date_str, all_dates, week_num, sk="", all_keys=None):
     return (all_dates.index(date_str) + 1) if date_str in all_dates else int(week_num)
 
 
+def manifest_sort_key(item, all_dates, all_keys):
+    """(date, sequence) — the posts_manifest same-date tie-break. #1988: a bare date
+    key is stable-sort-ambiguous when two installments share a date (e.g. a rolled-
+    forward lead-in that kept its ORIGINAL sk alongside another part whose sk equals
+    its date) — same-date items then silently keep whatever order the DDB scan
+    handed them, independent of narrative part order. The tie-break reuses the same
+    (date, sk)-derived `seq_for` ordinal already driving the label/URL, so the
+    manifest can never order a Part III below a same-date Part II."""
+    date_str = item.get("date", "")
+    seq = seq_for(date_str, all_dates, int(item.get("week_number", 0) or 0), sk=item.get("sk", ""), all_keys=all_keys)
+    return (date_str, seq)
+
+
 _WEEK_SEG_RE = re.compile(r"(?i)^week\s+\d+\b")
 _PROLOGUE_HINT_RE = re.compile(r"(?i)prologue|before day 1")
 
@@ -477,15 +490,21 @@ def run(apply: bool = False, no_invalidate: bool = False) -> int:
         invalidation_paths.append(f"/journal/posts/week-{seq:02d}/*")
         print(f'  {date_str} · "{title}" → {key}  [{label}]  ({len(body_html.split())} words)')
 
-    # Manifest — newest-first by date, schema identical to publish_to_journal()
+    # Manifest — newest-first by date, then (same-date tie) by the explicit part
+    # SEQUENCE via manifest_sort_key, never by insertion order — schema + tie-break
+    # identical to publish_to_journal(). See manifest_sort_key's docstring for #1988.
     posts_manifest = []
-    for item in sorted(installments, key=lambda x: x.get("date", ""), reverse=True):
+    for item in sorted(installments, key=lambda x: manifest_sort_key(x, all_dates, all_keys), reverse=True):
         date_str = item.get("date", "")
         seq = seq_for(date_str, all_dates, int(item.get("week_number", 0) or 0), sk=item.get("sk", ""), all_keys=all_keys)
         posts_manifest.append(
             {
-                "week": int(item.get("week_number", 0) or 0),
+                # #1988 AC2 — a Prologue-dated record's week is always 0, never the raw
+                # (and, live, inconsistent) DDB week_number attribute.
+                "week": 0 if date_str < genesis else int(item.get("week_number", 0) or 0),
                 "label": series_label(date_str, all_dates, int(item.get("week_number", 0) or 0), sk=item.get("sk", ""), all_keys=all_keys),
+                # #1988 AC1 — explicit sequence field, parity with publish_to_journal()'s manifest.
+                "sequence": seq,
                 "title": item.get("title", ""),
                 "date": date_str,
                 "stats_line": display_stats_line(item.get("stats_line", ""), date_str),  # #949 — prologue-framed dek
