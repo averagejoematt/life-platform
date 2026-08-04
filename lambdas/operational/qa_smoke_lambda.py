@@ -834,6 +834,68 @@ def check_canary_precision():
     return [c.ok(line)]
 
 
+# ---------------------------------------------------------------------------
+# CHECK — #1970 phase-stamp coverage on the tagger-blind COACH#/ENSEMBLE# partitions
+# ---------------------------------------------------------------------------
+
+# ENSEMBLE#influence_graph is deliberately excluded — SYSTEM_STATE static config
+# (phase_taxonomy._PK_RULES), never an EXPERIMENT_SCOPED write, never phase-stamped.
+_PHASE_STAMP_ENSEMBLE_PKS = ("ENSEMBLE#digest", "ENSEMBLE#disagreements", "ENSEMBLE#dispute", "ENSEMBLE#docket")
+
+
+def check_coach_ensemble_phase_stamp_coverage():
+    """#1970: every row on the tagger-blind COACH#*/ENSEMBLE#* partitions should
+    carry a write-time phase attribute (experiment.phase_taxonomy.experiment_stamp,
+    #1233). restart_phase_tag.py (the reset-time tagger) only reaches
+    USER#matthew#SOURCE#* pks, never COACH#*/ENSEMBLE#* — and
+    PHASE_FILTER_EXPRESSION (phase_filter.py) admits attribute_not_exists(phase)
+    forever — so an unstamped row on these partitions survives every read filter
+    and silently leaks into the next reset cycle as if freshly current, instead
+    of being caught by the wipe's backstop pass.
+
+    Read-only: a paginated Query per known pk (no table Scan). WARN, not FAIL —
+    this is a known, low-severity data-hygiene gap with its own reviewed operator
+    tool (deploy/backfill_coach_ensemble_phase_stamps.py, dry-run by default); the
+    point of this check is to keep the gap visible nightly until that backfill
+    lands, not to fail the pipeline over data that predates the #1233 write-time
+    stamping precedent."""
+    from coach.persona_registry import OPERATIONAL_COACH_IDS
+
+    c = Check("data:coach_ensemble_phase_stamp_coverage", "Phase Stamping", CONTENT_TRUTH)
+    pks = [f"COACH#{cid}" for cid in OPERATIONAL_COACH_IDS] + ["COACH#computation"] + list(_PHASE_STAMP_ENSEMBLE_PKS)
+    unstamped = []
+    try:
+        for pk in pks:
+            lek = None
+            while True:
+                kw = {
+                    "KeyConditionExpression": Key("pk").eq(pk),
+                    "FilterExpression": "attribute_not_exists(#phase)",
+                    "ExpressionAttributeNames": {"#phase": "phase"},
+                }
+                if lek:
+                    kw["ExclusiveStartKey"] = lek
+                resp = table.query(**kw)
+                unstamped.extend(f"{pk}/{it.get('sk')}" for it in resp.get("Items", []))
+                lek = resp.get("LastEvaluatedKey")
+                if not lek:
+                    break
+    except Exception as e:
+        return [c.warn(f"phase-stamp coverage check errored: {e}")]
+
+    if unstamped:
+        sample = ", ".join(unstamped[:5])
+        more = f" (+{len(unstamped) - 5} more)" if len(unstamped) > 5 else ""
+        return [
+            c.warn(
+                f"{len(unstamped)} row(s) on tagger-blind COACH#/ENSEMBLE# partitions carry no phase attribute "
+                f"(#1970) — survives PHASE_FILTER_EXPRESSION forever until backfilled: {sample}{more}. Run "
+                "deploy/backfill_coach_ensemble_phase_stamps.py --apply."
+            )
+        ]
+    return [c.ok(f"all rows across {len(pks)} tagger-blind COACH#/ENSEMBLE# partitions carry a phase stamp")]
+
+
 def build_report_html(all_checks, run_time_str):
     fails = [c for c in all_checks if c.passed is False]
     warns = [c for c in all_checks if c.passed is None]
@@ -937,6 +999,7 @@ def lambda_handler(event, context):
         all_checks += check_redirect_spotcheck()  # #1430: weekly legacy-redirect sample, rotates over redirects.map
         all_checks += check_notion_template_schema()  # #1840: code TEMPLATE_SK vs live Notion schema drift gate
         all_checks += check_canary_precision()  # #1956: AI-canary grounded-check false-positive-rate line (sensor on the sensor)
+        all_checks += check_coach_ensemble_phase_stamp_coverage()  # #1970: tagger-blind COACH#/ENSEMBLE# phase-stamp gap
         # blog moved to /story/ in v4 — shown paused (not failed) so it's not forgotten.
         all_checks.append(
             Check("blog:links", "Blog Links", CONTENT_TRUTH).pause(

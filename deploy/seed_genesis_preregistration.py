@@ -579,12 +579,30 @@ def _to_decimal(obj):
     return obj
 
 
+def _stamped(item):
+    """Write-time experiment provenance (phase + cycle, #1233) — COACH#* is the
+    tagger-blind partition (phase_taxonomy.py: restart_phase_tag.py only reaches
+    USER#matthew#SOURCE#* pks, never COACH#*), so a PREDICTION# row written here
+    must self-describe its reset generation at write time or it survives every
+    PHASE_FILTER_EXPRESSION filter (attribute_not_exists(phase) passes forever)
+    until the wipe's backstop pass — a seeded leak for the next reset (#1970).
+    Same call pattern as coach_state_updater._put_item / dispute_docket._stamped:
+    the item's own keys win, and experiment_stamp() is itself fail-soft (never
+    raises), but the import is defensively wrapped too, matching the precedent."""
+    try:
+        from experiment.phase_taxonomy import experiment_stamp
+
+        return {**experiment_stamp(), **item}
+    except Exception:
+        return item
+
+
 def write_predictions(records):
     import boto3
 
     table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE_NAME)
     for rec in records:
-        table.put_item(Item=_to_decimal(rec))  # fixed sk → overwrite, idempotent
+        table.put_item(Item=_to_decimal(_stamped(rec)))  # fixed sk → overwrite, idempotent
         print(f"WROTE {rec['pk']} / {rec['sk']}")
 
 
