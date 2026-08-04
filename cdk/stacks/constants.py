@@ -29,17 +29,31 @@ SES_DOMAIN = os.environ.get("SES_DOMAIN", "mattsusername.com")
 # now ships inside every function's code bundle (deploy/build_bundle.py) — one
 # distribution channel, no version pin to drift.
 
+# ── Binary dependency layers ──────────────────────────────────────────────────
+# These three ARNs are the platform's ENTIRE third-party runtime surface (the Lambda
+# source tree is stdlib-only). Each is built by `deploy/build_lambda_layer.py`, whose
+# LAYERS registry holds the pinned inputs; `lambdas/requirements/*.txt` is generated
+# from the measured contents of the live version and is what pip-audit scans.
+# Bumping a *_LAYER_VERSION below is step 3 of 4 — publish, bump, `cdk deploy` the
+# owning stack, then `--promote` to re-derive the manifest (#2099).
+
 # Pillow image processing layer (HP-13: OG image generator)
+# Build: `python3 deploy/build_lambda_layer.py build pillow`. Consumers: og-image-generator,
+# reading-cover-pipeline (both in LifePlatformOperational, which reads PILLOW_LAYER_ARN —
+# it used to hardcode `pillow-layer:1`, so this constant was inert until #2099).
 PILLOW_LAYER_VERSION = 1
 PILLOW_LAYER_ARN = f"arn:aws:lambda:{REGION}:{ACCT}:layer:pillow-layer:{PILLOW_LAYER_VERSION}"
 
 # Garth + garminconnect layer (Garmin OAuth — native deps, x86_64)
+# Build: `python3 deploy/build_lambda_layer.py build garth`. Consumer: garmin-data-ingestion.
+# Pinned at the 0.2.x ceiling on purpose — garminconnect 0.3.x drops garth and breaks this
+# lambda's auth path (#1780); see the LAYERS['garth'] note before proposing a bump.
 GARTH_LAYER_VERSION = 2
 GARTH_LAYER_ARN = f"arn:aws:lambda:{REGION}:{ACCT}:layer:garth-layer:{GARTH_LAYER_VERSION}"
 
 # lameenc (LAME MP3 encoder) layer (#1018: the Panel compresses its Gemini-TTS WAV
 # to ~80 kbps spoken-word MP3 before publish — 16.6 MB → ~3.5 MB per episode).
-# Build + publish: deploy/build_lameenc_layer.sh. Attached only to
+# Build: `python3 deploy/build_lambda_layer.py build lameenc` (#2099). Attached only to
 # coach-panel-podcast; lambdas/audio_encode.py fails open to WAV without it.
 LAMEENC_LAYER_VERSION = 1
 LAMEENC_LAYER_ARN = f"arn:aws:lambda:{REGION}:{ACCT}:layer:lameenc-layer:{LAMEENC_LAYER_VERSION}"

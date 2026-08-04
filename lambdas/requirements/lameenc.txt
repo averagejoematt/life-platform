@@ -1,16 +1,32 @@
-# lameenc-layer (binary dependency layer, x86_64) — #1336
+# lameenc-layer — binary dependency layer (python3.12, x86_64)
 #
-# Attached to: coach-panel-podcast (lambdas/audio_encode.py — LAME MP3 compression of
-# the Panel's Gemini-TTS WAV; fails open to WAV when the layer is absent).
-# Layer ARN: cdk/stacks/constants.py::LAMEENC_LAYER_ARN (lameenc-layer:1).
-# Build: deploy/build_lameenc_layer.sh (downloads the lameenc wheel unpinned at build time).
+# GENERATED — do not hand-edit. Regenerate with:
+#   python3 deploy/build_lambda_layer.py --promote lameenc --from-build <build.json> --layer-version <N>
+# Spec: deploy/build_lambda_layer.py::LAYERS['lameenc'] · drift gate: --check-manifest (#2099)
 #
-# WHY THIS FILE EXISTS: lameenc is a compiled third-party wheel that ships INTO a running
-# Lambda via lameenc-layer, so it must be pinned in a manifest pip-audit can scan. Before
-# #1336 there was no manifest and lameenc was scanned by nothing.
+# lameenc — LAME MP3 encoder for spoken-word compression of Panel TTS audio.
+# Attached to: coach-panel-podcast (CDK stack: LifePlatformEmail).
+# Layer ARN: cdk/stacks/constants.py::LAMEENC_LAYER_ARN.
 #
-# ⚠️ VERSION UNVERIFIED against the live layer. build_lameenc_layer.sh pins nothing (it
-# installs whatever was PyPI-latest when the layer was published), so the deployed version
-# is unknown offline. Pinned to the current PyPI-latest below. OWNER ACTION: confirm with
-# `aws lambda get-layer-version-by-arn --arn <LAMEENC_LAYER_ARN>` and correct if it differs.
+# WHY THIS FILE EXISTS (#1336): third-party code reaches a running Lambda ONLY via
+# these binary layers — no deploy path pip-installs from lambdas/requirements/. So
+# this manifest is the sole surface pip-audit can scan for the layer's contents, and
+# editing it does NOT change what is deployed (#1778/#1780). A real upgrade is:
+#   build_lambda_layer.py build lameenc -> publish-layer-version -> bump
+#   LAMEENC_LAYER_VERSION -> cdk deploy LifePlatformEmail -> --promote back to here.
+#
+# ── BUILD TARGET — top-level pins the next build installs (spec, hand-edited there)
+#   layer-build-target: lameenc==1.8.4
+#   layer-build-platform: manylinux2014_x86_64 manylinux_2_28_x86_64 · cp312
+#
+# Adopted into this registry by #2099 so the layer SET is covered, not just the
+# two layers with CVEs. Supersedes deploy/build_lameenc_layer.sh, which hardcodes
+# a single manylinux2014 tag and publishes in the same breath as it builds.
+#
+# ── DEPLOYED — the full resolved contents of the LIVE layer version below.
+#   lameenc-layer:1, measured 2026-08-04 read-only via
+#   `aws lambda get-layer-version-by-arn` + inspection of the returned zip's
+#   *.dist-info. Ground truth, not an estimate. Transitive packages are listed
+#   explicitly so pip-audit sees the WHOLE layer, not just its top-level pins.
+
 lameenc==1.8.4

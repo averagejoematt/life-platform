@@ -1,0 +1,16 @@
+{
+  "architecture": "x86_64",
+  "layer_name": "lameenc-layer",
+  "layer_version": 1,
+  "measured": "2026-08-04",
+  "packages": {
+    "lameenc": "1.8.4"
+  },
+  "platforms": null,
+  "provenance": "measured read-only from the LIVE layer via `aws lambda get-layer-version-by-arn` + inspection of the returned zip's *.dist-info (#2099). The original build inputs are unknown \u2014 these layers were hand-built offline before deploy/build_lambda_layer.py existed, which is the blind spot #2099 closes. platforms/zip_sha256 become real on the first --promote after a scripted rebuild.",
+  "runtime": "python3.12",
+  "target_pins": [
+    "lameenc==1.8.4"
+  ],
+  "zip_sha256": null
+}

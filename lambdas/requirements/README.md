@@ -6,9 +6,9 @@ Pinned dependency files per Lambda group (MAINT-1, v2.99.0).
 
 | File | Lambda(s) | Notes |
 |------|-----------|-------|
-| `garmin.txt` | garmin-data-ingestion | **Binary layer** `garth-layer` (`GARTH_LAYER_ARN`) — also pins `garth`. Verified 2026-08-03 against the live layer (garminconnect 0.2.40 + garth 0.6.3). The `fix_garmin_deps.sh` rebuild script this row used to cite no longer exists in `deploy/` — there is currently no tooling to rebuild this layer |
-| `pillow.txt` | og-image-generator (+ web/operational PIL users) | **Binary layer** `pillow-layer` (`PILLOW_LAYER_ARN`). Verified 2026-08-03 against the live layer (Pillow 11.3.0) — #1336 |
-| `lameenc.txt` | coach-panel-podcast | **Binary layer** `lameenc-layer` (`LAMEENC_LAYER_ARN`). ⚠️ Version UNVERIFIED vs live layer — confirm + correct (#1336) |
+| `garmin.txt` | garmin-data-ingestion | **Binary layer** `garth-layer` (`GARTH_LAYER_ARN`). 🤖 GENERATED (#2099) — build spec `LAYERS['garth']`. Lists all 14 packages in the live layer, not just the 2 top-level pins |
+| `pillow.txt` | og-image-generator, reading-cover-pipeline | **Binary layer** `pillow-layer` (`PILLOW_LAYER_ARN`). 🤖 GENERATED (#2099) — build spec `LAYERS['pillow']` |
+| `lameenc.txt` | coach-panel-podcast | **Binary layer** `lameenc-layer` (`LAMEENC_LAYER_ARN`). 🤖 GENERATED (#2099) — build spec `LAYERS['lameenc']`. The #1336 "UNVERIFIED" flag is cleared: measured 2026-08-04 against the live layer, `lameenc==1.8.4` was already correct |
 | `withings.txt` | withings-data-ingestion | withings-api SDK |
 | `strava.txt` | strava-data-ingestion | stdlib urllib only |
 | `whoop.txt` | whoop-data-ingestion | stdlib urllib only |
@@ -43,6 +43,31 @@ enforces coverage**: `check_layer_manifest_coverage()` enumerates those ARNs and
 scan RED if any referenced layer has no matching manifest here — so a future layer added
 without a pinned manifest can't slip back into the unscanned state that #1336 fixed.
 
+## The three layer manifests are GENERATED (#2099)
+
+`garmin.txt`, `pillow.txt` and `lameenc.txt` are **derived artifacts** — do not hand-edit
+them. They are rendered by `deploy/build_lambda_layer.py::render_manifest()` from two
+inputs, and `tests/test_layer_build_manifest.py` fails if the file and the render disagree:
+
+| Input | Meaning | Who edits it |
+|---|---|---|
+| `LAYERS[key].requirements` in `deploy/build_lambda_layer.py` | the **target** pins the next build installs | a human taking an upgrade |
+| `deploy/layers/<key>.deployed.json` | the **measured** contents of the live layer version | `--promote`, after an owner deploy |
+
+Why this matters more than it looks: **editing a pin in these files deploys nothing.** No
+deploy path pip-installs from `lambdas/requirements/`; third-party code reaches a running
+Lambda only inside the pre-built layer zip. Dependabot #1778 (Pillow) and #1780
+(garminconnect) were both closed for exactly this reason. A real upgrade is
+build → `publish-layer-version` → bump `*_LAYER_VERSION` → `cdk deploy` → `--promote`.
+
+The uncommented pins are therefore the **deployed** versions — that is what pip-audit
+should alarm on. The next build's targets appear as `# layer-build-target:` comments in
+the same file, so both states are visible side by side.
+
+Manifests list the **whole transitive closure**. `garmin.txt` used to pin 2 of the 14
+packages inside `garth-layer:2`, which hid three fixable advisories (`idna` PYSEC-2026-215,
+`urllib3` PYSEC-2026-142/141) from every scan.
+
 ## Vulnerability scanning
 
 ```bash
@@ -57,6 +82,15 @@ pip-audit -r lambdas/requirements/withings.txt
 ```
 
 ## Adding new dependencies
+
+**For a binary layer** (`garmin.txt` / `pillow.txt` / `lameenc.txt` — generated):
+
+1. Edit the target pins in `deploy/build_lambda_layer.py::LAYERS[<key>].requirements`
+2. `python3 deploy/build_lambda_layer.py build <key>` — prints every packaged distribution
+3. `pip-audit -r <(...)` the build record's packages, then owner-publish + `cdk deploy`
+4. `--promote <key> --from-build <build.json> --layer-version <N>` to re-derive this manifest
+
+**For every other manifest** (stdlib/boto3 groups, hand-maintained):
 
 1. Add pinned version to the appropriate `.txt` file
 2. Update `deploy_lambda.sh` invocation to install from requirements
