@@ -29,7 +29,7 @@ function withdrawnCount(d) {
 function correctionNotice(d) {
   const n = withdrawnCount(d);
   if (!n) return "";
-  return `<aside class="supp-correction" role="note"><p class="supp-correction-h label">Correction &middot; 2 August 2026</p>` +
+  return `<aside class="supp-correction" role="note"><p class="supp-correction-h label">Correction &middot; 2 August 2026 &middot; updated 4 August 2026</p>` +
     `<p><strong>${n} citations on this page were withdrawn.</strong> They pointed to papers that did not support the claims ` +
     `they were attached to &mdash; they were never verified when they were written. Two more were withdrawn from the ` +
     `experiments registry the same day. On 4 August 2026 one of those two (Tongkat Ali) was re-resolved to a real ` +
