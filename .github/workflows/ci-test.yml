@@ -185,15 +185,32 @@ jobs:
         #  (1) #1206: parses coverage.xml's line-rate and emits a GitHub
         #      ::warning:: when the enforced floor (40) lags measured line
         #      coverage by >10 points, so the ratchet reminds a human to bump it.
-        #  (2) #1349: computes this job's own wall-clock from the start-epoch
-        #      stamped above and warns when it exceeds the 480s (8min) budget —
-        #      suite duration went 157s->294s over 6 days with no standing
-        #      reminder; same self-reminding-ratchet shape, applied to suite cost.
+        #  (2) #1349/#1966: computes this job's own wall-clock from the
+        #      start-epoch stamped above and warns when it exceeds the budget
+        #      below — same self-reminding-ratchet shape, applied to suite cost.
+        #      BUDGET DERIVATION (#1966, 2026-08-04 — measure-first, not plucked):
+        #      the suite grew 5,108->8,059->9,396+ tests in the ~3 weeks since
+        #      #1349 shipped, honestly and broadly (a `--durations=25` run that
+        #      same day showed no dominating outlier — the slowest single test
+        #      was 6.25s out of a 162s local run, ~3.9% of the total — so this is
+        #      per-test overhead compounding at scale, not a few pathological
+        #      sleeps/waits to trim). 6 sampled green-main "Unit Tests" job runs
+        #      that day measured 641s/649s/690s/701s/723s/725s (avg ~688s, max
+        #      725s) against the then-480s budget — already 33-51% over. 900s
+        #      (15min) = ~24% headroom above the observed max / ~31% above the
+        #      average, enough to absorb a few more weeks of the same honest
+        #      growth curve without flapping on every green run, while still
+        #      catching a genuine future regression (e.g. an unmocked wait a new
+        #      test accidentally introduces). The #1966 standing-warning triage
+        #      gate (`scripts/check_ci_warnings.py`, /wrap step (e11)) now also
+        #      obligates a same-session decision the next time this fires, so a
+        #      re-breach can no longer sit unactioned for a week like #1966's own
+        #      finding did.
         if: always()
         run: |
           DURATION_SECONDS=$(( $(date +%s) - "${UNIT_TESTS_START_EPOCH:-$(date +%s)}" ))
           python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 47 --gap-threshold 10 \
-              --duration-seconds "$DURATION_SECONDS" --duration-budget-seconds 480
+              --duration-seconds "$DURATION_SECONDS" --duration-budget-seconds 900
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
