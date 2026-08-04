@@ -142,6 +142,29 @@ def what_changed(*, _g) -> dict:
     )
 
 
+def _supplement_stack_match(exp_name: str, registry: dict) -> bool:
+    """#1984: does `exp_name` (an experiment_library.json entry name, e.g.
+    "Creatine Monohydrate — Strength") correspond to a currently non-paused entry
+    in config/supplement_registry.json? The two registries key their entries
+    differently (no shared id — e.g. the library's "creatine-strength" vs. the
+    registry's "creatine" key), so the match is on the substance name: the
+    segment before the em-dash, case-insensitively contained in (or containing)
+    a registry item's name. A registry read failure, an empty registry, or a
+    paused registry entry all safely return False — fail closed, never a false
+    "confirmed"."""
+    compound = (exp_name or "").split("—")[0].strip().lower()
+    if not compound:
+        return False
+    for group in (registry.get("groups") or {}).values():
+        for item in group.get("items", []) or []:
+            if item.get("paused"):
+                continue
+            item_name = (item.get("name") or "").strip().lower()
+            if item_name and (compound in item_name or item_name in compound):
+                return True
+    return False
+
+
 def discoveries(*, _g) -> dict:
     """
     GET /api/discoveries
@@ -161,12 +184,30 @@ def discoveries(*, _g) -> dict:
         s3_client = boto3.client("s3", region_name=S3_REGION)
         obj = s3_client.get_object(Bucket=S3_BUCKET, Key="config/experiment_library.json")
         lib = json.loads(obj["Body"].read())
+
+        # #1984: status=="active" pillar=="supplements" entries are a SECOND source of
+        # truth for "what's currently taken", independent of config/supplement_registry.json
+        # (the stack the /api/supplements page actually serves). Cross-check against it here
+        # so the page can't claim "under continuous measurement" for a compound the stack
+        # registry doesn't confirm. A registry read failure degrades every supplements-pillar
+        # entry to unconfirmed (fail closed) rather than crashing the whole hypotheses list.
+        supp_registry = {}
+        try:
+            supp_obj = s3_client.get_object(Bucket=S3_BUCKET, Key="config/supplement_registry.json")
+            supp_registry = json.loads(supp_obj["Body"].read())
+        except Exception as se:
+            logger.warning(f"[discoveries] supplement registry read failed: {se}")
+
         for exp in lib.get("experiments", []):
             if exp.get("status") != "active":
                 continue
+            exp_name = exp.get("name", "")
+            # Only supplements pillar entries have a second registry to cross-check
+            # against; every other pillar keeps the pre-#1984 unconditional framing.
+            stack_confirmed = exp.get("pillar") != "supplements" or _supplement_stack_match(exp_name, supp_registry)
             active_hypotheses.append(
                 {
-                    "name": exp.get("name", ""),
+                    "name": exp_name,
                     "description": exp.get("description", ""),
                     # Substitute the {duration} token (was leaking literally on /protocols/discoveries:
                     # "Tongkat Ali … for {duration} days"). Same fix the experiments handler already has.
@@ -188,7 +229,13 @@ def discoveries(*, _g) -> dict:
                     # current-cycle findings; the front-end must label them as carried
                     # protocols so the pre-start surface never reads like leaked findings.
                     "carried_over": True,
-                    "protocol_kind": "ongoing_protocol",
+                    # #1984: "ongoing_protocol" keeps the "under continuous measurement"
+                    # framing — reserved for entries the stack registry actually confirms.
+                    # "unconfirmed_protocol" is the honest alternative for a library entry
+                    # this site can't currently corroborate against the tracked stack —
+                    # NOT an assertion that it stopped or was never true, just that this
+                    # surface can't confirm it (ADR-104: no claim without grounding).
+                    "protocol_kind": "ongoing_protocol" if stack_confirmed else "unconfirmed_protocol",
                     "active_since": exp.get("promoted_date") or None,
                 }
             )

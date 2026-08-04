@@ -163,6 +163,15 @@ def _experiment_catalog(exclude_ids: set, exclude_names: set) -> list:
         if (exp.get("name") or "").strip().lower() in exclude_names:
             continue
         # library status: 'active' = promoted/ready to run → "available"; else backlog.
+        # #1984: in PRACTICE every status=="active" entry today is one of the standing
+        # supplement protocols /protocols/discoveries also surfaces (site_api_ledger.
+        # discoveries, #1089) — already running, not "available to start". This shelf
+        # label is deliberately left generic rather than special-cased for supplements:
+        # "active" can legitimately mean "promoted, ready to run" for a future non-
+        # standing entry, and this catalog has no way to tell the two meanings apart
+        # without the same registry cross-check discoveries() now does. See #1984 for
+        # the open question of whether the library needs a dedicated status distinct
+        # from "promoted, ready to run" for a carried standing protocol.
         shelf = "available" if exp.get("status") == "active" else "backlog"
         out.append(
             {
