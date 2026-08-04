@@ -206,6 +206,40 @@ def interpret_r(r, n=None):
     return raw
 
 
+# Rank order for comparing an n-gated label against the label |r| alone would earn
+# (interpret_r's raw-magnitude bands, before any n-gate downgrade is applied).
+_INTERP_RANK = {"insufficient_data": -1, "negligible": 0, "weak": 1, "moderate": 2, "strong": 3}
+
+
+def n_gate_gloss(r, n, interpretation):
+    """Legibility gloss for an n-gated interpretation downgrade (#1996, ADR-105).
+
+    interpret_r() deliberately DOWNGRADES a label when n is below the sample-size
+    floor |r| alone would earn (moderate needs n>=30, strong needs n>=50) — that
+    gating is real and correct, never re-derived here (see interpret_r's docstring).
+    But served bare next to a strong r ("r=0.88 ... weak") the downgrade reads as a
+    stats error to a skeptical reader, not as the rigor it actually is.
+
+    Returns a short explanatory string when the served `interpretation` sits BELOW
+    the band |r| alone would earn, else None — a label that already matches its r
+    (or a downgrade we can't evaluate, e.g. missing r/n) gets no invented gloss.
+    """
+    if r is None or n is None or not interpretation:
+        return None
+    abs_r = abs(r)
+    if abs_r >= 0.6:
+        raw = "strong"
+    elif abs_r >= 0.4:
+        raw = "moderate"
+    elif abs_r >= 0.2:
+        raw = "weak"
+    else:
+        raw = "negligible"
+    if _INTERP_RANK.get(interpretation, -1) < _INTERP_RANK.get(raw, -1):
+        return "evidence still thin"
+    return None
+
+
 # ==============================================================================
 # DATA ASSEMBLY
 # ==============================================================================
@@ -484,6 +518,7 @@ def compute_correlations(series):
             xs2, ys2 = stats_core.clean_pairs(xs, ys)
             n_eff = round(stats_core.effective_sample_size(xs2, ys2), 1)
             ci95 = stats_core.moving_block_bootstrap_ci(xs2, ys2)
+        _interpretation = interpret_r(r, n)  # n-gated: moderate≥30, strong≥50
         results[label] = {
             "metric_a": metric_a,
             "metric_b": metric_b,
@@ -493,7 +528,11 @@ def compute_correlations(series):
             "n_eff": n_eff,
             "ci95_low": round(ci95[0], 3) if ci95 else None,
             "ci95_high": round(ci95[1], 3) if ci95 else None,
-            "interpretation": interpret_r(r, n),  # n-gated: moderate≥30, strong≥50
+            "interpretation": _interpretation,
+            # #1996: legibility gloss for an n-gate downgrade — non-None only when the
+            # served interpretation sits below what |r| alone would earn (never a
+            # re-derivation of the label itself, see n_gate_gloss's docstring).
+            "gloss": n_gate_gloss(r, n, _interpretation),
             "direction": ("positive" if r > 0 else "negative") if r is not None else None,
             "correlation_type": correlation_type,  # Henning R12: cross_sectional vs lagged
             "lag_days": lag_days if lag_days > 0 else None,
@@ -997,15 +1036,20 @@ def diff_newly_unlocked(correlations, first_sig, end_date, *, window_days=30):
         except Exception:
             seen = end
         if seen >= cutoff:
+            _r, _n, _interp = data.get("pearson_r"), data.get("n_days"), data.get("interpretation")
             fresh.append(
                 {
                     "label": label,
                     "metric_a": data.get("metric_a"),
                     "metric_b": data.get("metric_b"),
-                    "r": data.get("pearson_r"),
-                    "n": data.get("n_days"),
+                    "r": _r,
+                    "n": _n,
                     "direction": data.get("direction"),
-                    "interpretation": data.get("interpretation"),
+                    "interpretation": _interp,
+                    # #1996: prefer the already-computed gloss (stored correlations),
+                    # but recompute as a fallback so a legacy pre-#1996 stored row
+                    # (no "gloss" key yet) still glosses correctly once re-served.
+                    "gloss": data.get("gloss") if "gloss" in data else n_gate_gloss(_r, _n, _interp),
                     "first_seen": first_sig[label],
                 }
             )

@@ -725,6 +725,7 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
              border-left: 2px solid var(--ember); }
 .mo-unlock-k { color: var(--ember); margin-right: var(--sp-1); }
 .mo-unlock-r { font-family: var(--font-mono); color: var(--ink-faint); }
+.mo-unlock-gloss { color: var(--ink-faint); font-style: italic; }
 @media (max-width: 480px) {
   .mo-row { grid-template-columns: 92px auto auto; }
   .mo-note { display: none; }

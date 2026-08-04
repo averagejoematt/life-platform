@@ -1275,9 +1275,14 @@ async function renderMonth() {
   bind("month-deltas").innerHTML = drows.join("");
 
   const urows = unlocks.map((u) => {
-    const r = typeof u.r === "number" ? ` <span class="mo-unlock-r">r=${escapeHTML(u.r.toFixed(2))}</span>` : "";
+    const nTxt = Number.isFinite(Number(u.n)) ? `, n=${escapeHTML(String(Math.round(u.n)))}` : "";
+    const r = typeof u.r === "number" ? ` <span class="mo-unlock-r">r=${escapeHTML(u.r.toFixed(2))}${nTxt}</span>` : "";
     const txt = u.interpretation || `${u.metric_a || ""} ↔ ${u.metric_b || ""}`;
-    return `<div class="mo-unlock"><span class="mo-unlock-k label">newly unlocked</span> ${escapeHTML(txt)}${r}</div>`;
+    // #1996: the engine's own n-gate can downgrade a strong-r pair's label (real
+    // rigor, ADR-105) — served bare it reads as a stats error. `gloss` is only set
+    // when a downgrade actually happened; never invented for an ungated label.
+    const gloss = u.gloss ? ` <span class="mo-unlock-gloss">— ${escapeHTML(u.gloss)}</span>` : "";
+    return `<div class="mo-unlock"><span class="mo-unlock-k label">newly unlocked</span> ${escapeHTML(txt)}${r}${gloss}</div>`;
   });
   bind("month-unlocks").innerHTML = urows.join("") + explainMount("what_changed");
 

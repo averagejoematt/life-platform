@@ -902,7 +902,12 @@ load();
         // r to 2 decimals — 4-decimal display is false precision (ADR-105); the
         // strength label stays the engine's own n-gated call, never re-derived here.
         const rDisp = Number.isFinite(Number(nu.r)) ? Number(nu.r).toFixed(2) : nu.r;
-        el.textContent = `newly unlocked this month: ${pretty} (r=${rDisp}, n=${Math.round(nu.n)}, ${nu.direction}${nu.interpretation ? " · " + nu.interpretation : ""}) — correlation, not cause; announced once.`;
+        // #1996: a small-n correlation legitimately downgrades its own label (n<50
+        // demotes "strong" to "moderate"/"weak" — real rigor, ADR-105's n-gate). Bare,
+        // a high r next to "weak" reads as a stats error; the engine's own `gloss`
+        // field (only set when the label was actually downgraded) makes it legible.
+        const gloss = nu.gloss ? ` — ${nu.gloss}` : "";
+        el.textContent = `newly unlocked this month: ${pretty} (r=${rDisp}, n=${Math.round(nu.n)}, ${nu.direction}${nu.interpretation ? " · " + nu.interpretation : ""}${gloss}) — correlation, not cause; announced once.`;
         el.hidden = false;
       }
     }
