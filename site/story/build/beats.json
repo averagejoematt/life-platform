@@ -2182,6 +2182,25 @@
         }
       ],
       "why_it_mattered": "A fresh cycle's first week is exactly when the operator most needs honest instruments, and it is exactly when phase-filtered reads are at their most dishonest. The class is now dead at every reader-facing call site the ratchet can see — and the one blind spot the ratchet has (keys built from module constants) is filed as its own issue rather than assumed away."
+    },
+    {
+      "id": "2026-08-04-a-pre-genesis-weigh-in-is-not-todays-weight",
+      "date": "2026-08-04",
+      "title": "A pre-genesis weigh-in is not today's weight — at any age",
+      "shipped": "On day one of cycle 12 a coach card told readers \"I have one weight reading: 317.0 lbs\" while the cockpit served 322. Every guard was age-based, and age was never the defect: the pre-genesis reading was exactly two days old — inside the staleness tolerance — and the Day-1 weigh-in didn't ingest until four in the morning. The fix is structural, not a prompt rule: when every reading in the window predates the cycle's genesis, no current-weight fact is emitted at all, so the grounded-generation gate treats a coach citing one as fabricating a number and regenerates it. The cockpit's static no-JS copy stopped claiming a week the cycle hadn't lived, and the reset verifier now reads the coaching page against the cockpit before declaring a reset done.",
+      "gotcha": "The issue's stated cause was wrong on both halves — the card was generated hours AFTER the reset, and the second surface's quote was the truth-pass LLM misquoting the cockpit ('seven days of life' for 'seven areas of life'). Measuring before believing the premise is the only reason the real defect got fixed instead of the described one.",
+      "honest_miss": "The same pilot-tagged row also fed recovery 59% and HRV 42 ms into two other coach cards under an explicit 'day one' frame — no gate compared those columns at all. That sibling fix is implemented and staged, but it wasn't live when this beat was written, and the stored stale cards stay wrong until their regen runs.",
+      "prs": [
+        {
+          "label": "PR #2108",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2108"
+        },
+        {
+          "label": "PR #2110",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2110"
+        }
+      ],
+      "why_it_mattered": "A fresh cycle's first week is exactly when new readers are watching, and a coach quoting a body that no longer exists is the fastest way to teach them the numbers here aren't real. Honest numbers aren't a caption style — they're whether the fact pipeline can say 'I don't know yet' instead of reaching for the last number it saw."
     }
   ]
 }
