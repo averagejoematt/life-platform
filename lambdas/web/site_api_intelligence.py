@@ -2135,7 +2135,65 @@ def _price_for_model(model_id: str):
 # derived from the governor's /life-platform/budget-breakdown param (#822) — it floats to
 # $100 in reader-traffic surge mode. This constant is ONLY the fail-closed fallback when
 # that read fails; never the retired $75.
+#
+# #1999: it is now a fallback in the strict sense. The breakdown payload carries
+# `base_ceiling`/`surge_ceiling`/`ceiling_window`, and the handlers below read the base
+# from there. This literal is reached only when the payload is missing, unreadable, or
+# predates that schema (old payloads persist until the governor's next 8h run rewrites
+# them) — never as the published number when the governor has stated one.
 _ADR133_BASE_CEILING_USD = 85.0
+
+
+def _ceiling_envelope(breakdown):
+    """(base_ceiling, surge_ceiling, ceiling_window) from a breakdown dict (#1999).
+
+    The base fails closed to `_ADR133_BASE_CEILING_USD` when the governor hasn't
+    stated one; surge and window stay None rather than being guessed, so a page
+    renders an honest gap instead of a fabricated envelope. Never raises — a
+    garbled field costs the envelope, never the receipt.
+    """
+    base, surge, window = _ADR133_BASE_CEILING_USD, None, None
+    if isinstance(breakdown, dict):
+        try:
+            if breakdown.get("base_ceiling") is not None:
+                base = float(breakdown["base_ceiling"])
+            if breakdown.get("surge_ceiling") is not None:
+                surge = float(breakdown["surge_ceiling"])
+        except (TypeError, ValueError):
+            base, surge = _ADR133_BASE_CEILING_USD, None
+        w = breakdown.get("ceiling_window")
+        if isinstance(w, dict) and w:
+            window = w
+    return base, surge, window
+
+
+def _ceiling_window_clause(window) -> str:
+    """Reader-facing prose for an active dated ceiling window, or "" (#1999).
+
+    This is the sentence whose absence was the defect: during the July 2026
+    window the receipt served the module base literal, a higher ceiling in
+    effect, and `surge_active: false` — three honest numbers and no mechanism
+    that explained the gap between them. Everything here is projected from the
+    governor's own descriptor; nothing is inferred, and an incomplete descriptor
+    yields "" rather than a half-sentence.
+    """
+    if not isinstance(window, dict):
+        return ""
+    try:
+        start = str(window["start"])
+        end = str(window["end_exclusive"])
+        win_base = float(window["base_ceiling"])
+        reverts = float(window["reverts_to_base_ceiling"])
+    except (KeyError, TypeError, ValueError):
+        return ""
+    clause = (
+        f" The base is temporarily ${win_base:.0f} rather than the usual ${reverts:.0f}, "
+        f"under a dated window running {start} until {end}."
+    )
+    reason = str(window.get("reason") or "").strip()
+    if reason:
+        clause += f" {reason}"
+    return clause
 
 
 def handle_inference_receipt() -> dict:
@@ -2318,12 +2376,16 @@ def handle_inference_receipt() -> dict:
         # base (never the retired $75) if the breakdown read fails.
         ceiling_usd = _ADR133_BASE_CEILING_USD
         surge_active = False
+        breakdown = None
         try:
             breakdown = json.loads(ssm.get_parameter(Name="/life-platform/budget-breakdown")["Parameter"]["Value"])
             ceiling_usd = float(breakdown["ceiling"])
             surge_active = bool(breakdown.get("surge_active", False))
         except Exception:
-            pass
+            breakdown = None
+        # #1999: the base comes from the governor's payload too — the literal above is
+        # the fail-closed fallback for a missing/pre-#1999 payload, not the published number.
+        base_ceiling_usd, _surge_ceiling_usd, ceiling_window = _ceiling_envelope(breakdown)
 
         # #1997: unpriced (e.g. Titan/embedding) rows contribute tokens, not dollars —
         # None rows are skipped rather than treated as $0 or guessed at Sonnet rates.
@@ -2342,14 +2404,18 @@ def handle_inference_receipt() -> dict:
             "Every Claude call routes through one audited chokepoint (ADR-062). "
             "Costs are estimated from token metrics (including cache read/write) x "
             "list prices, x1.15 — the same math and the same x1.15 safety buffer the "
-            f"budget governor enforces.{unpriced_clause} The ${_ADR133_BASE_CEILING_USD:.0f} "
+            f"budget governor enforces.{unpriced_clause} The ${base_ceiling_usd:.0f} "
             f"base ceiling (${ceiling_usd:.0f} in effect{surge_clause}) covers the WHOLE "
             "platform, not just AI."
+            f"{_ceiling_window_clause(ceiling_window)}"
         )
         return _ok(
             {
                 "as_of": now.isoformat(timespec="seconds"),
                 "budget_ceiling_usd": ceiling_usd,
+                "budget_base_ceiling_usd": base_ceiling_usd,
+                "budget_surge_ceiling_usd": _surge_ceiling_usd,
+                "budget_ceiling_window": ceiling_window,
                 "budget_surge_active": surge_active,
                 "budget_tier": tier,
                 "ai_month_to_date_usd": month_total,
@@ -2487,6 +2553,10 @@ def handle_receipts() -> dict:
         mtd = float(breakdown["mtd"]) if breakdown and breakdown.get("mtd") is not None else None
         projected = float(breakdown["projected"]) if breakdown and breakdown.get("projected") is not None else None
         surge_active = bool(breakdown.get("surge_active", False)) if breakdown else False
+        # #1999: the ADR-133 envelope (base/surge pair + any dated window) now comes from
+        # the governor rather than a literal, so the page can explain a raised base instead
+        # of serving an unattributed delta.
+        base_ceiling, surge_ceiling, ceiling_window = _ceiling_envelope(breakdown)
 
         payload = {
             "as_of": now.isoformat(timespec="seconds"),
@@ -2494,7 +2564,11 @@ def handle_receipts() -> dict:
             "stale_reason": stale_reason,
             "tier": tier,
             "tier_semantics": _TIER_SEMANTICS.get(tier) if tier is not None else None,
-            "base_ceiling_usd": _ADR133_BASE_CEILING_USD,
+            "base_ceiling_usd": base_ceiling,
+            "surge_ceiling_usd": surge_ceiling,
+            # The dated ADR-133 window in effect, or null. Present so the page can
+            # attribute a raised base instead of leaving the delta unexplained (#1999).
+            "ceiling_window": ceiling_window,
             "ceiling_usd": ceiling,
             "surge_active": surge_active,
             "surge_threshold_uniques": (breakdown or {}).get("surge_threshold"),
@@ -2519,6 +2593,7 @@ def handle_receipts() -> dict:
                 "One AWS budget covers the WHOLE platform, not just AI. The governor "
                 "reprojects month-end spend every 8 hours and writes the tier it "
                 "implies; every AI feature reads that tier before it runs."
+                f"{_ceiling_window_clause(ceiling_window)}"
             ),
         }
         if ceiling and projected is not None:

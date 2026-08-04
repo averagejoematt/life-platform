@@ -117,6 +117,37 @@ test("surge — names both ceilings and the traffic that floated it", () => {
   assert.ok(html.includes("ceiling (surge mode)"));
 });
 
+// ── the dated ceiling window (#1999) ─────────────────────────────────────────
+// A temp window used to render as a silent gap between the base figure and the
+// one in effect. The governor now names the window; the page must SAY it.
+const WINDOW = {
+  start: "2026-07-01",
+  end_exclusive: "2026-08-01",
+  base_ceiling: 115.0,
+  surge_ceiling: 135.0,
+  reverts_to_base_ceiling: 85.0,
+  reverts_to_surge_ceiling: 100.0,
+  reason: "A one-month raise approved on 2026-07-21 (ADR-133 amendment).",
+};
+
+test("dated window — the raised base is attributed, not left as a bare delta", () => {
+  const html = renderReceipts({ ...HEALTHY, base_ceiling_usd: 115.0, ceiling_usd: 115.0, ceiling_window: WINDOW });
+  assert.ok(html.includes("$115"), "the window's base");
+  assert.ok(html.includes("$85"), "what it reverts to — the delta is meaningless without it");
+  assert.ok(html.includes("2026-07-01") && html.includes("2026-08-01"), "the window's dates");
+  assert.ok(html.includes("ADR-133 amendment"), "the reason the governor supplied");
+});
+
+test("no window — no window prose at all", () => {
+  const html = renderReceipts({ ...HEALTHY, ceiling_window: null });
+  assert.ok(!html.includes("dated window"));
+});
+
+test("incomplete window descriptor renders nothing rather than a hole", () => {
+  const html = renderReceipts({ ...HEALTHY, ceiling_window: { start: "2026-07-01" } });
+  assert.ok(!html.includes("dated window"));
+});
+
 // ── the tier ladder ──────────────────────────────────────────────────────────
 test("tier ladder — the current band is lit and lower bands read as crossed", () => {
   const html = renderReceipts({ ...HEALTHY, tier: 2 });

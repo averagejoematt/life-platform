@@ -68,6 +68,17 @@ Three layers — `lambdas/ai/budget_guard.py`, `lambdas/operational/cost_governo
    **tier** to SSM `/life-platform/budget-tier` + the full projection breakdown to
    `/life-platform/budget-breakdown`. Alerts on tier change. Emits
    `LifePlatform/Budget::BudgetTier` every run — the tier-residence history used below.
+
+   The breakdown payload carries the ADR-133 **envelope**, not just the one number
+   in effect (#1999): `base_ceiling` / `surge_ceiling` (the pair `_active_ceilings()`
+   returns today, surge floored at the base) and `ceiling_window` — `null` normally,
+   or `{start, end_exclusive, base_ceiling, surge_ceiling, reverts_to_base_ceiling,
+   reverts_to_surge_ceiling, reason}` while a dated temp window is open. Consumers
+   (`/api/receipts`, `/api/inference_receipt`) publish those instead of a hardcoded
+   base literal, so a raised base explains itself on the public receipt instead of
+   showing an unattributed gap. Their literal is a **fail-closed fallback only** —
+   reached when the param is missing, unreadable, or predates this schema (an old
+   payload persists until the governor's next 8h run rewrites it).
 3. **budget_guard** (graceful degradation, audience-ordered per ADR-125 — the daily
    brief is protected longest). The bands are **fixed fractions of the effective
    ceiling** (≈73% / 87% / 97%), so they scale automatically between the $85 base and

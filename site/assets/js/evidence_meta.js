@@ -164,11 +164,20 @@ export function renderReceipts(d) {
     ? `<p class="rd-archive">Surge mode is active: the ceiling floats from $${fmt(d.base_ceiling_usd)} to $${fmt(d.ceiling_usd)} while reader traffic stays above ${esc(fmt(d.surge_threshold_uniques))} unique visitors over 7 days (currently ${esc(fmt(d.recent_uniques))}) — ADR-133.</p>`
     : "";
 
+  // #1999 — a dated ceiling window used to render as an unexplained gap between the
+  // base figure and the one in effect. The governor now names the window in the payload;
+  // this states it. Entirely absent when no window is active (the normal case).
+  const w = d.ceiling_window;
+  const window_ = (w && w.start && w.end_exclusive && w.base_ceiling != null)
+    ? `<p class="rd-archive">The base ceiling is temporarily $${fmt(w.base_ceiling)} rather than the usual $${fmt(w.reverts_to_base_ceiling)}, ` +
+      `under a dated window running ${esc(String(w.start))} until ${esc(String(w.end_exclusive))}${w.reason ? ` — ${esc(String(w.reason))}` : "."}</p>`
+    : "";
+
   const feat = d.per_feature_note
     ? `<p class="correlative">${esc(d.per_feature_note)} <a href="/method/inference/">See the per-model receipt →</a></p>`
     : "";
 
-  return head + breach + tierBlock + surge + curve + split + feat + prov +
+  return head + breach + tierBlock + surge + window_ + curve + split + feat + prov +
     `<p class="correlative">${esc(d.note || "")}</p>`;
 }
 

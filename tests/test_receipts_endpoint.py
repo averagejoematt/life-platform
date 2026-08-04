@@ -132,6 +132,102 @@ def test_ceiling_is_not_a_hardcoded_85(monkeypatch):
     assert _payload(sai.handle_receipts())["ceiling_usd"] == 100.0
 
 
+# ── 1b. the BASE ceiling comes from the payload too (#1999) ──────────────────
+# The residual of #1230: `ceiling_usd` was derived, `base_ceiling_usd` was still
+# the module literal. During the July-2026 dated window that shipped a receipt
+# reading base $85 / in-effect $115 / surge_active false — every number honest,
+# the $30 delta attributable to nothing the payload named.
+
+
+def _gov():
+    sys.path.insert(0, str(_REPO / "lambdas" / "operational"))
+    import cost_governor_lambda as gov
+
+    return gov
+
+
+def test_base_ceiling_comes_from_the_governor_not_the_literal(monkeypatch):
+    bd = _breakdown(ceiling=115.0, base_ceiling=115.0, surge_ceiling=135.0)
+    _install(monkeypatch, _ssm_with(bd))
+    d = _payload(sai.handle_receipts())
+
+    assert d["base_ceiling_usd"] == 115.0, "base_ceiling_usd is still the hardcoded literal"
+    assert d["base_ceiling_usd"] != sai._ADR133_BASE_CEILING_USD
+    assert d["surge_ceiling_usd"] == 135.0
+
+
+def test_dated_window_case_base_ceiling_matches_active_ceilings(monkeypatch):
+    """The issue's regression guard: build the payload the governor would ACTUALLY
+    write with a dated window in effect, and assert the receipt republishes that
+    base — i.e. `base_ceiling_usd == _active_ceilings()[0]`, not the literal."""
+    gov = _gov()
+    today = datetime.now(timezone.utc).date()
+    monkeypatch.setattr(gov, "_CEILING_ENV_OVERRIDE", False)
+    monkeypatch.setattr(gov, "_TEMP_CEILING_WINDOW", (today - timedelta(days=2), today + timedelta(days=5)))
+    monkeypatch.setattr(gov, "_TEMP_CEILING_USD", 115.0)
+    monkeypatch.setattr(gov, "_TEMP_SURGE_CEILING_USD", 135.0)
+
+    active_base, active_surge = gov._active_ceilings()
+    assert active_base == 115.0  # the window is in effect for this test
+
+    bd = _breakdown(
+        ceiling=active_base,
+        base_ceiling=active_base,
+        surge_ceiling=active_surge,
+        ceiling_window=gov._active_ceiling_window(),
+    )
+    _install(monkeypatch, _ssm_with(bd))
+    d = _payload(sai.handle_receipts())
+
+    assert d["base_ceiling_usd"] == active_base
+    win = d["ceiling_window"]
+    assert win and win["start"] and win["end_exclusive"]
+    assert win["reverts_to_base_ceiling"] == gov.MONTHLY_CEILING
+    # The window must be EXPLAINED in the reader-facing prose, not just present
+    # as a machine field — the unexplained delta is the whole defect.
+    assert f"${active_base:.0f}" in d["note"] and win["start"] in d["note"]
+    assert f"${gov.MONTHLY_CEILING:.0f}" in d["note"]
+
+
+def test_no_window_publishes_null_not_an_invented_one(monkeypatch):
+    _install(monkeypatch, _ssm_with(_breakdown(base_ceiling=85.0, surge_ceiling=100.0, ceiling_window=None)))
+    d = _payload(sai.handle_receipts())
+    assert d["ceiling_window"] is None
+    assert "dated window" not in d["note"]
+
+
+def test_pre_1999_payload_falls_closed_to_the_literal(monkeypatch):
+    """Backward compatibility: the payload SSM holds right now has none of the new
+    keys, and keeps having none until the governor's next 8h run rewrites it. The
+    receipt must fall back to the documented base, never to null or to zero."""
+    bd = _breakdown()  # no base_ceiling / surge_ceiling / ceiling_window
+    _install(monkeypatch, _ssm_with(bd))
+    d = _payload(sai.handle_receipts())
+
+    assert d["base_ceiling_usd"] == sai._ADR133_BASE_CEILING_USD == 85.0
+    assert d["surge_ceiling_usd"] is None, "a surge ceiling the governor never stated must not be invented"
+    assert d["ceiling_window"] is None
+
+
+def test_garbled_envelope_costs_the_envelope_not_the_receipt(monkeypatch):
+    bd = _breakdown(base_ceiling="not-a-number", surge_ceiling=[], ceiling_window="nope")
+    _install(monkeypatch, _ssm_with(bd))
+    d = _payload(sai.handle_receipts())
+
+    assert d["base_ceiling_usd"] == sai._ADR133_BASE_CEILING_USD
+    assert d["surge_ceiling_usd"] is None and d["ceiling_window"] is None
+    assert d["month_to_date_usd"] == 26.11  # the rest of the receipt survives
+
+
+def test_incomplete_window_descriptor_yields_no_half_sentence(monkeypatch):
+    """A window missing its revert target can't be explained — say nothing rather
+    than emit a sentence with a hole in it."""
+    bd = _breakdown(base_ceiling=115.0, ceiling_window={"start": "2026-07-01", "end_exclusive": "2026-08-01"})
+    _install(monkeypatch, _ssm_with(bd))
+    d = _payload(sai.handle_receipts())
+    assert "dated window" not in d["note"]
+
+
 # ── 2. stale / missing → omit the figures and SAY SO ─────────────────────────
 def test_stale_breakdown_omits_figures_and_explains(monkeypatch):
     """A 3-day-old breakdown must not be served as if it were current."""

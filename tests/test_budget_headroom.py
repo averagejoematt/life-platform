@@ -97,7 +97,96 @@ def test_governor_persists_breakdown_payload(gov, monkeypatch):
         "surge_active": False,
         "recent_uniques": None,
         "surge_threshold": gov.SURGE_UNIQUES_THRESHOLD,
+        # #1999: the ADR-133 envelope the effective ceiling was drawn from, so no
+        # consumer has to hardcode the base literal to describe it.
+        "base_ceiling": gov._active_ceilings()[0],
+        "surge_ceiling": max(gov._active_ceilings()[1], gov._active_ceilings()[0]),
+        "ceiling_window": gov._active_ceiling_window(),
     }
+
+
+# ── #1999: the payload carries the ADR-133 envelope, not just one number ─────
+# The defect: the payload named the EFFECTIVE ceiling only, so every consumer
+# hardcoded the base to describe it, and a dated temp window reached the public
+# receipt as an unattributed $85 → $115 delta with surge_active false.
+
+
+def _force_temp_window(gov, monkeypatch, base=115.0, surge=135.0):
+    """Put today inside a dated temp-ceiling window, whatever today is.
+
+    The real July-2026 window has already auto-reverted, so pinning the test to
+    it would make this a test of the calendar rather than of the mechanism —
+    green today for the wrong reason and silent on the next window.
+    """
+    today = datetime.now(timezone.utc).date()
+    monkeypatch.setattr(gov, "_CEILING_ENV_OVERRIDE", False)
+    monkeypatch.setattr(gov, "_TEMP_CEILING_WINDOW", (today - timedelta(days=3), today + timedelta(days=4)))
+    monkeypatch.setattr(gov, "_TEMP_CEILING_USD", base)
+    monkeypatch.setattr(gov, "_TEMP_SURGE_CEILING_USD", surge)
+    return today
+
+
+def test_breakdown_carries_the_active_pair_outside_any_window(gov, monkeypatch):
+    fake = _FakeSSM()
+    monkeypatch.setattr(gov, "_ssm", fake)
+    monkeypatch.setattr(gov, "_CEILING_ENV_OVERRIDE", False)
+    # A window that closed before today — the auto-revert case.
+    past = datetime.now(timezone.utc).date() - timedelta(days=40)
+    monkeypatch.setattr(gov, "_TEMP_CEILING_WINDOW", (past, past + timedelta(days=5)))
+
+    gov._write_breakdown(tier=0, mtd=1.0, projected=2.0, ai_daily=0.1, non_ai_daily=0.1, now=_NOW)
+    payload = json.loads(fake.puts[0]["Value"])
+
+    assert payload["base_ceiling"] == gov.MONTHLY_CEILING
+    assert payload["surge_ceiling"] == max(gov.SURGE_CEILING_USD, gov.MONTHLY_CEILING)
+    assert payload["ceiling_window"] is None, "a closed window must not be advertised as active"
+
+
+def test_breakdown_carries_the_dated_window_when_one_is_active(gov, monkeypatch):
+    fake = _FakeSSM()
+    monkeypatch.setattr(gov, "_ssm", fake)
+    _force_temp_window(gov, monkeypatch, base=115.0, surge=135.0)
+    start, end = gov._TEMP_CEILING_WINDOW
+
+    gov._write_breakdown(tier=1, mtd=40.0, projected=96.0, ai_daily=1.5, non_ai_daily=0.9, now=_NOW, ceiling=115.0)
+    payload = json.loads(fake.puts[0]["Value"])
+
+    assert (payload["base_ceiling"], payload["surge_ceiling"]) == gov._active_ceilings() == (115.0, 135.0)
+    win = payload["ceiling_window"]
+    assert win["start"] == start.isoformat() and win["end_exclusive"] == end.isoformat()
+    assert win["base_ceiling"] == 115.0 and win["surge_ceiling"] == 135.0
+    # What it reverts TO is the whole point — the delta is unexplained without it.
+    assert win["reverts_to_base_ceiling"] == gov.MONTHLY_CEILING
+    assert win["reverts_to_surge_ceiling"] == gov.SURGE_CEILING_USD
+    assert win["reason"] and isinstance(win["reason"], str)
+
+
+def test_operator_env_override_reports_no_window(gov, monkeypatch):
+    """An explicit MONTHLY_CEILING_USD defeats the window in _active_ceilings, so
+    the payload must not claim a window set today's ceiling — the same lie in the
+    other direction."""
+    fake = _FakeSSM()
+    monkeypatch.setattr(gov, "_ssm", fake)
+    _force_temp_window(gov, monkeypatch)
+    monkeypatch.setattr(gov, "_CEILING_ENV_OVERRIDE", True)
+
+    gov._write_breakdown(tier=0, mtd=1.0, projected=2.0, ai_daily=0.1, non_ai_daily=0.1, now=_NOW)
+    payload = json.loads(fake.puts[0]["Value"])
+    assert payload["ceiling_window"] is None
+    assert payload["base_ceiling"] == gov.MONTHLY_CEILING
+
+
+def test_published_surge_ceiling_is_never_below_the_base(gov, monkeypatch):
+    """_effective_ceiling floors surge at the base; the payload must publish the
+    same floored pair or it advertises an envelope enforcement would never use."""
+    fake = _FakeSSM()
+    monkeypatch.setattr(gov, "_ssm", fake)
+    _force_temp_window(gov, monkeypatch, base=120.0, surge=90.0)
+
+    gov._write_breakdown(tier=0, mtd=1.0, projected=2.0, ai_daily=0.1, non_ai_daily=0.1, now=_NOW)
+    payload = json.loads(fake.puts[0]["Value"])
+    assert payload["base_ceiling"] == 120.0
+    assert payload["surge_ceiling"] == 120.0
 
 
 def test_governor_breakdown_write_failure_is_nonfatal(gov, monkeypatch):
