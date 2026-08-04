@@ -8,12 +8,24 @@ Architecture decision (Board vote 4-0 — Marcus/Jin/Elena/Priya):
   Viktor guard: no installment found this week → clean no-op, never fail.
 
 Schedule: EventBridge cron(10 15 ? * WED *) — Wed 8:10 AM PT
-  Chronicle fires at 8:00 AM, writes installment to DDB.
-  This Lambda fires at 8:10 AM, reads latest installment, sends to subscribers.
+  Chronicle fires at 8:00 AM, writes a DRAFT installment to DDB (needs approval).
+  This Lambda fires at 8:10 AM, reads the latest PUBLISHED installment (within
+  the last 7 days), sends to subscribers. On an approval Wednesday the draft is
+  usually still unapproved at 8:10, so this trigger is really a catch-up guard
+  for whatever installment hasn't been delivered yet — chronicle-approve's own
+  post-publish invoke (chronicle_approve_lambda._invoke_email_sender) is the
+  trigger that normally delivers a fresh installment. #2112: both triggers used
+  to unconditionally send, causing a stale-then-fresh double-send on approval
+  Wednesdays — closed via the delivered_at marker (see _get_this_weeks_installment
+  / _mark_installment_delivered below); whichever trigger fires first delivers.
 
 DynamoDB reads:
-  SOURCE#chronicle    — latest installment (within last 7 days)
+  SOURCE#chronicle    — latest PUBLISHED, not-yet-delivered installment (within last 7 days)
   SOURCE#subscribers  — all confirmed subscribers (status=confirmed)
+
+DynamoDB writes:
+  SOURCE#chronicle    — delivered_at / sent_to_count stamped on the installment
+                        row after a successful send (#2112)
 
 SES delivery:
   Personalized unsubscribe link per email (CAN-SPAM compliance)
@@ -29,6 +41,7 @@ import os
 import time
 import urllib.parse
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
 import boto3
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
@@ -69,10 +82,35 @@ _s3 = boto3.client("s3", region_name=REGION)
 from common.digest_utils import d2f as _d2f  # shared bundled helpers (#970)
 
 
+def _fmt_week(week_num) -> str:
+    """Render week_number without a trailing '.0'. DDB stores it as a Decimal;
+    the shared d2f() round-trip (Decimal -> float) turns a whole number like 0 or
+    12 into 0.0 / 12.0, which then prints raw in an f-string (#2112 — the first
+    live send rendered "Week 0.0"). Falls back to str() for the "?" placeholder."""
+    try:
+        return str(int(week_num))
+    except (TypeError, ValueError):
+        return str(week_num)
+
+
 def _get_this_weeks_installment() -> dict | None:
     """
     Get the most recent Chronicle installment published within the last 7 days.
     Viktor Sorokin guard: return None if nothing found — always a clean no-op.
+
+    #2112: the Wednesday cron (10:15 UTC) and chronicle-approve's post-publish
+    invoke both land on this same installment on an approval Wednesday — the cron
+    fires first (drafts land 10 minutes earlier, before Matthew approves) and
+    finds LAST week's published row, sends it stale, then approval sends the
+    fresh one 10 minutes-to-hours later: two subscriber emails, one wrong. Rather
+    than retire either trigger (cron is the fail-safe catch-up for an approval
+    that lands hours/days later; the approve-invoke is the "send what was just
+    approved" path — both are legitimate), the fix is per-installment delivery
+    tracking: `delivered_at`/`sent_to_count` written by the handler after a
+    successful send, checked here. Whichever trigger fires first delivers; the
+    other one sees the marker and no-ops. The cron is thus demoted in practice to
+    a catch-up guard for anything approve hasn't already sent — no code change to
+    its schedule needed for that demotion to take effect.
     """
     today = datetime.now(timezone.utc).date()
     week_ago = (today - timedelta(days=7)).isoformat()
@@ -102,10 +140,45 @@ def _get_this_weeks_installment() -> dict | None:
         if installment.get("status") == "draft":
             logger.info("Most recent Chronicle installment is still a draft — no-op (awaiting approval)")
             return None
+        # #2112: already delivered by the other trigger (cron or approve-invoke,
+        # whichever fired first) — never re-send the same installment.
+        if installment.get("delivered_at"):
+            logger.info(
+                "Most recent Chronicle installment (week %s) already delivered at %s — no-op",
+                _fmt_week(installment.get("week_number", "?")),
+                installment.get("delivered_at"),
+            )
+            return None
         return installment
     except Exception as exc:
         logger.error("Failed to query Chronicle DDB: %s", exc)
         return None
+
+
+def _mark_installment_delivered(date_str: str, sent_count: int) -> None:
+    """#2112: stamp the installment as delivered right after a successful send so
+    the OTHER trigger (cron vs. approve-invoke) sees the marker and no-ops instead
+    of re-sending. Conditional on delivered_at not already existing — defense in
+    depth against a genuine concurrent double-invoke, though the two triggers in
+    practice fire minutes-to-hours apart, never truly concurrently. Fail-soft: a
+    failed marker write is logged, never raised — it must not fail an otherwise-
+    successful send."""
+    try:
+        table.update_item(
+            Key={"pk": CHRONICLE_PK, "sk": f"DATE#{date_str}"},
+            UpdateExpression="SET delivered_at = :now, sent_to_count = :n",
+            ConditionExpression="attribute_not_exists(delivered_at)",
+            ExpressionAttributeValues={
+                ":now": datetime.now(timezone.utc).isoformat(),
+                ":n": Decimal(int(sent_count)),
+            },
+        )
+        logger.info("DDB: installment %s marked delivered_at (sent_to_count=%d)", date_str, sent_count)
+    except Exception as exc:
+        # A ConditionalCheckFailedException here means the other trigger already
+        # marked it delivered between our read and this write — harmless, we
+        # already sent (or are about to), just log it.
+        logger.warning("Failed to mark installment %s delivered (non-fatal): %s", date_str, exc)
 
 
 def _get_confirmed_subscribers() -> list[dict]:
@@ -217,7 +290,7 @@ def _extract_chronicle_preview(content_html: str, max_paragraphs: int = 3) -> st
 def _build_subscriber_email(installment: dict, subscriber: dict) -> tuple[str, str]:
     """Build the 5-section Weekly Signal email. Returns (subject, html)."""
     title = installment.get("title", "The Weekly Signal")
-    week_num = installment.get("week_number", "?")
+    week_num = _fmt_week(installment.get("week_number", "?"))
     date_str = installment.get("date", "")
     body_html = installment.get("content_html", "")
 
@@ -420,7 +493,8 @@ def lambda_handler(event, context):
             }
 
         title = installment.get("title", "")
-        week_num = installment.get("week_number", "?")
+        week_num = _fmt_week(installment.get("week_number", "?"))
+        date_str = installment.get("date", "")
         logger.info('Installment found — Week %s: "%s"', week_num, title)
 
         # Load confirmed subscribers
@@ -465,6 +539,13 @@ def lambda_handler(event, context):
                 time.sleep(rate_delay)
 
         logger.info("Done — sent: %d, failed: %d, total: %d", sent, failed, len(subscribers))
+
+        # #2112: mark delivered on ANY successful send so the other trigger
+        # (cron vs. approve-invoke, whichever fires second) no-ops instead of
+        # re-sending. Left unmarked on a total failure (sent == 0) so a future
+        # trigger gets a genuine retry rather than a permanently-stuck installment.
+        if sent > 0 and date_str:
+            _mark_installment_delivered(date_str, sent)
 
         return {
             "statusCode": 200,
