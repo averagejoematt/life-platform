@@ -317,9 +317,16 @@ def _generate_memoir(persona, voice_rules, example, facts, quarter):
 
 def _write_memoir_record(table, coach_id, quarter, text, facts):
     """MEMOIR#{quarter} — the idempotency sentinel AND the durable record,
-    same COACH# partition as LEARNING#/PREDICTION#/STANCE# (ADR-047)."""
+    same COACH# partition as LEARNING#/PREDICTION#/STANCE# (ADR-047).
+
+    #2119: COACH#* is a tagger-blind partition — stamp write-time provenance
+    (experiment_stamp(), #1233) so this row self-describes its reset generation,
+    matching every other writer on this partition."""
+    from experiment.phase_taxonomy import experiment_stamp
+
     item = floats_to_decimal(
         {
+            **experiment_stamp(),
             "pk": f"COACH#{coach_id}",
             "sk": f"MEMOIR#{quarter}",
             "quarter": quarter,

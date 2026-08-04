@@ -26,6 +26,15 @@ in the issue": any other stray unstamped row on the same tagger-blind partitions
 (from before the #1233 write-time-stamping precedent existed at all) gets the
 same repair, so the qa-smoke guard can actually reach zero.
 
+#2119: `query_unstamped()` below queries the ENTIRE `pk` partition — it is NOT
+scoped to `PREDICTION#` (or any other) `sk` prefix — so this same run already
+repairs `BRIEF#` rows too (the class `coach_narrative_orchestrator._cache_brief`
+used to leak before its #2119 fix), and any other stray sk under the same
+COACH#<coach_id> pks, with zero code changes needed here: `target_pks()`'s
+`COACH#<coach_id>` entries were always the whole partition, not "PREDICTION#
+rows on that partition." Confirmed by
+`tests/test_backfill_coach_ensemble_phase_stamps_1970.py::test_query_unstamped_also_catches_a_brief_row_on_a_coach_partition`.
+
 SAFE / IDEMPOTENT: read-only (Query, no Scan) unless --apply. Each write is a
 single-item UpdateExpression guarded by `ConditionExpression=attribute_not_exists(
 phase)` — it can ONLY set phase+cycle where phase is currently absent, so a

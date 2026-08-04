@@ -941,7 +941,11 @@ def _write_board_interaction(pid: str, question: str, answer: str, grounded: boo
 
     #1441: also the board's generation-time archive point — BOTH publish paths
     (initial ask + follow-up turn) come through here with the final answer the
-    reader saw, so one call covers the whole surface."""
+    reader saw, so one call covers the whole surface.
+
+    #2119: COACH#* is a tagger-blind partition — stamp write-time provenance
+    (experiment_stamp(), #1233) so this episodic write-back self-describes its
+    reset generation, matching coach_state_updater._put_item."""
     try:
         from common import qa_archive
 
@@ -949,10 +953,13 @@ def _write_board_interaction(pid: str, question: str, answer: str, grounded: boo
     except Exception as e:  # noqa: BLE001 — the archive is never load-bearing
         logger.warning(f"[board_ask] qa_archive failed for {pid} (non-fatal): {e}")
     try:
+        from experiment.phase_taxonomy import experiment_stamp
+
         now = datetime.now(timezone.utc)
         qid = hashlib.sha256(question.encode()).hexdigest()[:8]
         table.put_item(
             Item={
+                **experiment_stamp(),
                 "pk": f"COACH#{pid}",
                 "sk": f"INTERACTION#{now.strftime('%Y-%m-%d')}#{qid}",
                 "interaction_type": "board_qa",

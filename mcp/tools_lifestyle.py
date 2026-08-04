@@ -1595,7 +1595,11 @@ def _write_field_note_interactions(week: str, week_label: str, agreement, notes:
     mirroring the #531 board-Q&A write-back, just broadcast instead of per-coach.
     Content-addressed on the week (not today's date) so re-logging a response
     for the same week overwrites rather than piling up. Fail-soft per coach: a
-    write failure never affects the saved field-note response."""
+    write failure never affects the saved field-note response.
+
+    #2119: COACH#* is a tagger-blind partition — stamp write-time provenance
+    (experiment_stamp(), #1233) so each broadcast row self-describes its reset
+    generation, matching coach_state_updater._put_item."""
     try:
         from coach import persona_registry
 
@@ -1603,6 +1607,8 @@ def _write_field_note_interactions(week: str, week_label: str, agreement, notes:
     except Exception as e:
         logger.warning(f"[field_notes] persona_registry unavailable for interaction write-back (non-fatal): {e}")
         return
+
+    from experiment.phase_taxonomy import experiment_stamp
 
     monday = _field_note_week_monday(week)
     now = datetime.now(timezone.utc).isoformat()
@@ -1620,7 +1626,7 @@ def _write_field_note_interactions(week: str, week_label: str, agreement, notes:
     }
     for coach_id in coach_ids:
         try:
-            table.put_item(Item={"pk": f"COACH#{coach_id}", **item_base})
+            table.put_item(Item={**experiment_stamp(), "pk": f"COACH#{coach_id}", **item_base})
         except Exception as e:
             logger.warning(f"[field_notes] interaction write-back failed for {coach_id} (non-fatal): {e}")
 

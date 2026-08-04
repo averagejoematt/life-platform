@@ -5,6 +5,14 @@ repair for the two known live unstamped PREDICTION# rows (and any other stray
 unstamped row on the same tagger-blind COACH#/ENSEMBLE# partitions). This file
 proves it entirely offline against fakes — never against a real table — matching
 the "no live AWS writes" constraint on the task that authored it.
+
+#2119: `coach_narrative_orchestrator._cache_brief` was a second, previously-missed
+writer to this same tagger-blind partition class (unstamped BRIEF# rows on
+COACH#<coach_id> pks). It's now fixed at the source (write-time provenance), but
+`test_query_unstamped_also_catches_a_brief_row_on_a_coach_partition` below proves
+this operator script's `query_unstamped()` — which scans the WHOLE pk partition,
+not a PREDICTION#-only sk prefix — already covers any BRIEF# rows written before
+that fix landed, with no code change to this script required.
 """
 
 from __future__ import annotations
@@ -68,6 +76,43 @@ def test_query_unstamped_filters_and_paginates():
     table = _FakeTable({pk: items}, page_size=1)
     found = backfill.query_unstamped(table, pk)
     assert {it["sk"] for it in found} == {"PREDICTION#a", "PREDICTION#c"}
+
+
+def test_query_unstamped_also_catches_a_brief_row_on_a_coach_partition():
+    """#2119: query_unstamped() queries the WHOLE pk partition (Key("pk").eq(pk)),
+    not a PREDICTION#-only sk prefix — so a leftover unstamped BRIEF# row (the
+    coach_narrative_orchestrator._cache_brief class, fixed at the source by
+    #2119) on the SAME COACH#<coach_id> pk is already caught by this existing
+    script, mixed in with PREDICTION#/other sk rows, with no code change here."""
+    pk = "COACH#sleep_coach"
+    items = [
+        {"sk": "PREDICTION#a"},
+        {"sk": "BRIEF#2026-08-01"},  # the #2119 class: unstamped, no PREDICTION# prefix
+        {"sk": "BRIEF#2026-08-02", "phase": "experiment"},  # already stamped — must be skipped
+        {"sk": "STANCE#latest", "phase": "experiment"},
+    ]
+    table = _FakeTable({pk: items})
+    found = backfill.query_unstamped(table, pk)
+    assert {it["sk"] for it in found} == {"PREDICTION#a", "BRIEF#2026-08-01"}
+
+
+def test_apply_backfills_a_brief_row_end_to_end(monkeypatch):
+    """#2119 AC2, non-vacuity: main(--apply) actually writes the stamp onto an
+    unstamped BRIEF# row, exercised through the same path a real operator run
+    would take — not just the query-level filter above."""
+    pk = "COACH#sleep_coach"
+    table = _FakeTable({pk: [{"sk": "BRIEF#2026-08-01"}, {"sk": "PREDICTION#already", "phase": "experiment", "cycle": 12}]})
+    monkeypatch.setattr(backfill.boto3, "resource", lambda *a, **kw: type("R", (), {"Table": lambda self, n: table})())
+    monkeypatch.setattr(backfill, "experiment_stamp", lambda: {"phase": "experiment", "cycle": 12})
+    monkeypatch.setattr(sys, "argv", ["backfill_coach_ensemble_phase_stamps.py", "--apply"])
+
+    rc = backfill.main()
+
+    assert rc == 0
+    assert len(table.updates) == 1
+    upd = table.updates[0]
+    assert upd["Key"] == {"pk": pk, "sk": "BRIEF#2026-08-01"}
+    assert upd["ExpressionAttributeValues"][":phase"] == "experiment"
 
 
 def test_update_kwargs_sets_phase_and_cycle_guarded_by_absence():
