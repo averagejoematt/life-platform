@@ -1,6 +1,6 @@
 # Coach Stance Engine + the Coach Quality Gate
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-03 (deps-black-26.3.1 re-verify — `ai_calls.py` was reformatted by the black 25.9.0→26.3.1 pin bump; a pure-formatting pass, `_enforce_quality_gate`'s body is byte-for-byte unchanged, only its line span shifted by a uniform -3 from an earlier collapsed line in the same file, corrected below. Stance/gate logic, the 8-coach roster and every threshold are unchanged. Prior verify 2026-08-02: #1896 — a new BLOCKING deterministic gate, `self_graded_verdict`, was added to the coach-narrative pipeline in `ai_calls.py` and is documented below; the ADR-108 quality gate, the stance engine, the 8-coach roster and every threshold are unchanged. Prior verify 2026-07-28: #1653 packaging re-verify — `coach_stance.py` moved to `lambdas/coach/` and `ai_calls.py` to `lambdas/ai/`; `coach_history_summarizer.py`/`coach_quality_gate.py` had imports rewritten only. Stance/gate logic, the 8-coach roster and every threshold are untouched. The two affected line citations DID drift by +1 from the import block and are corrected here (`ai_calls.py`:1214→1215, `coach_stance.py`:23-69→24-70); the other three were re-derived and are unchanged. Prior verify 2026-07-26: #1590 re-verify — line refs re-derived against live source; stance/gate logic, the 8-coach roster, and the ADR-108 fire-rate figure all confirmed unchanged since #390/#1138. 2026-07-26 re-verify: #1656 mypy churn in `coach_stance.py` + additive `structured_output_config` in `ai_calls.py` (#1385) since; stance/gate logic unchanged)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-04 (#1973 — a new BLOCKING deterministic gate, cycle-boundary framing, was added to the narrative path in `ai_calls.py`/`board_quality_gate.py` and is documented below; the ADR-108 quality gate, the stance engine, the 8-coach roster and every threshold are unchanged. Prior verify 2026-08-03: deps-black-26.3.1 re-verify — `ai_calls.py` was reformatted by the black 25.9.0→26.3.1 pin bump; a pure-formatting pass, `_enforce_quality_gate`'s body is byte-for-byte unchanged, only its line span shifted by a uniform -3 from an earlier collapsed line in the same file, corrected below. Stance/gate logic, the 8-coach roster and every threshold are unchanged. Prior verify 2026-08-02: #1896 — a new BLOCKING deterministic gate, `self_graded_verdict`, was added to the coach-narrative pipeline in `ai_calls.py` and is documented below; the ADR-108 quality gate, the stance engine, the 8-coach roster and every threshold are unchanged. Prior verify 2026-07-28: #1653 packaging re-verify — `coach_stance.py` moved to `lambdas/coach/` and `ai_calls.py` to `lambdas/ai/`; `coach_history_summarizer.py`/`coach_quality_gate.py` had imports rewritten only. Stance/gate logic, the 8-coach roster and every threshold are untouched. The two affected line citations DID drift by +1 from the import block and are corrected here (`ai_calls.py`:1214→1215, `coach_stance.py`:23-69→24-70); the other three were re-derived and are unchanged. Prior verify 2026-07-26: #1590 re-verify — line refs re-derived against live source; stance/gate logic, the 8-coach roster, and the ADR-108 fire-rate figure all confirmed unchanged since #390/#1138. 2026-07-26 re-verify: #1656 mypy churn in `coach_stance.py` + additive `structured_output_config` in `ai_calls.py` (#1385) since; stance/gate logic unchanged)
 > **Sources of truth:** `lambdas/coach/coach_history_summarizer.py` (stance engine, :940-1360), `lambdas/coach/coach_stance.py` (stage-ladder fallback), `lambdas/ai/ai_calls.py` (`_enforce_quality_gate`, :1353-1420), `lambdas/coach/coach_quality_gate.py`
 
 ## Purpose
@@ -86,6 +86,7 @@ Three zero-AI checks run over a generated coach section. They are cheap, never b
 | baseline-freshness (#1691) | does a stated baseline weight match the real one? | advisory |
 | ungrounded-behavioral (#1699) | is a same-day completed behavior backed by a log? | advisory |
 | **self-graded-verdict (#1896)** | **is a self-graded prediction outcome backed by a resolved record?** | **BLOCKING** |
+| **cycle-boundary framing (#1973)** | **on cycle days 1–3, does a graded-call reference carry explicit prior-cycle framing?** | **BLOCKING** |
 
 **self-graded-verdict** (`grounded_generation.self_graded_verdict_findings`, wired in
 `ai_calls._run_coach_v2_pipeline`). Every other gate checks claims about *Matthew*; this one
@@ -98,6 +99,16 @@ The input is a COUNT, not a judgment (ADR-105): `coach_narrative_orchestrator` p
 `evaluated_prediction_count` in the generation brief, computed where the whole `PREDICTION#`
 partition is already in hand (no extra query). `pending`/`confirming` are deliberately excluded
 — an open call is not a verdict, and counting them would make the gate permanently silent.
+
+**cycle-boundary framing** (`board_quality_gate.cycle_boundary_violations`, wired into the
+shared ADR-108 chokepoint `ai_calls._invoke_quality_gate_sync`, #1973). In the first three
+days of a cycle, graded-call language ("I called…", "I predicted…", "that hasn't
+materialized") with no cycle-marker phrase anywhere in the text ("last cycle", "cycle N",
+"before the reset", "pre-genesis") is a violation: the calls being referenced were graded
+in the PREVIOUS cycle, and premiere-week readers must never meet a verdict in present
+tense. Regex-based, precision-over-recall, day-gated via `common.constants.day_n`; flows
+through the same regenerate-or-hold mechanism as the ADR-108 scorer on both coach-voiced
+surfaces (`/board_ask` and the daily brief).
 
 It is **blocking** (regenerate once, then `CoachHold`) rather than advisory like the other two
 because its failure mode *persists*: an ungrounded behavioral line is wrong for a day; a
