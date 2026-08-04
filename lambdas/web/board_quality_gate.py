@@ -36,6 +36,7 @@ lower stakes, ADR-108's measurement doesn't transfer unmeasured) nor to
 
 import logging
 import os
+import re
 
 import boto3
 
@@ -47,6 +48,27 @@ REGION = os.environ.get("DYNAMODB_REGION", "us-west-2")
 QG_EVAL_MIN_REMAINING_MS = 14_000  # evaluate only with ≥14s left (gate ≈2-5s + response margin)
 QG_REGEN_MIN_REMAINING_MS = 12_000  # corrective rewrite only with ≥12s left (regen + re-ground ≈4-7s)
 QG_INVOKE_TIMEOUT_S = 10  # client-side cap — the gate lambda's internal retry backoff must never stall a reader
+
+# #1973 — Day<=3 cycle-boundary framing rule. A graded/prior-call reference in
+# present tense with no cycle marker; both regexes are deliberately narrow
+# (concrete self-referential prediction language, not any past-tense verb) to
+# keep false-positive risk low on a fail-closed rule.
+_GRADED_CALL_RE = re.compile(
+    r"\bi\s+(?:called|predicted|said|thought|expected)\b"
+    r"|\bmy\s+(?:call|prediction|read)\s+(?:was|is)\b"
+    r"|\b(?:that|it)\s+(?:hasn'?t|has\s+not)\s+materialized\b"
+    r"|\bi\s+was\s+(?:wrong|right)\s+about\b"
+    r"|\b(?:confirmed|refuted)\s+(?:my|the)\s+(?:call|prediction)\b",
+    re.IGNORECASE,
+)
+_CYCLE_FRAMING_RE = re.compile(
+    r"\b(?:last|prior|previous)\s+cycle\b"
+    r"|\bcycle\s+\d+\b"
+    r"|\bbefore\s+(?:the|this)\s+(?:reset|genesis|cycle)\b"
+    r"|\bpre-genesis\b"
+    r"|\bprior\s+to\s+(?:the\s+)?reset\b",
+    re.IGNORECASE,
+)
 
 _QG_LAMBDA_CLIENT = None
 _LAMBDA_CONTEXT = None  # set per-invocation via set_lambda_context()
@@ -107,7 +129,63 @@ def quality_findings(report: dict) -> list:
     for flag in report.get("cross_coach_similarity_flags") or []:
         if isinstance(flag, dict):
             findings.append({"type": "cross_coach_similarity", "detail": flag.get("reason", "")})
+    for v in report.get("cycle_boundary_violations") or []:  # #1973
+        if isinstance(v, dict):
+            findings.append({"type": "cycle_boundary", "detail": v.get("reason", "")})
     return findings
+
+
+def _day_n_today():
+    """Live Day-N under the current EXPERIMENT_START_DATE, resolved at CALL
+    time (never import-time-frozen — mirrors `weight_recency._resolve_genesis`,
+    #2104). Returns None if constants can't be read (fail-soft: the rule this
+    feeds is then skipped, never mis-armed on a bad day count)."""
+    try:
+        from datetime import date as _date
+
+        from common.constants import day_n as _day_n
+
+        return _day_n(_date.today().isoformat())
+    except Exception:
+        return None
+
+
+def cycle_boundary_violations(output_text: str, day_n: int = None) -> list:
+    """#1973: on an early-cycle day (1-3), a narrative that references a
+    graded/prior prediction in present tense MUST carry explicit prior-cycle
+    framing ("last cycle", "cycle N", "before the reset", ...).
+
+    Cross-cycle coach memory is deliberate design (ADR-108's verifier already
+    confirmed coaches should remember past cycles); the gap this closes is
+    narrower — a real record narrated with no cycle marker reads as
+    self-contradiction to a reader whose /api/predictions shows the new
+    cycle's own decided count at zero. Deterministic (regex, no LLM) so a
+    prompt instruction drifting under load can't silently stop enforcing it
+    — this repo's own "prompt rules can't guarantee structure" lesson.
+
+    `day_n` defaults to the LIVE Day-N (`_day_n_today()`, resolved at call
+    time); pass it explicitly to pin a day in tests. Returns `[]` (no
+    violation) when day_n is unknown, out of the 1-3 window, no graded-call
+    language is present, or cycle-boundary framing already appears anywhere
+    in the text.
+    """
+    if day_n is None:
+        day_n = _day_n_today()
+    if not output_text or day_n is None or not (1 <= day_n <= 3):
+        return []
+    match = _GRADED_CALL_RE.search(output_text)
+    if not match or _CYCLE_FRAMING_RE.search(output_text):
+        return []
+    excerpt = output_text[max(0, match.start() - 20) : match.end() + 60].strip()
+    return [
+        {
+            "excerpt": excerpt,
+            "reason": (
+                f"Day {day_n} of a new cycle: references a prior call/prediction in present tense "
+                'with no cycle-boundary framing (e.g. "last cycle", "cycle N").'
+            ),
+        }
+    ]
 
 
 def enforce(pid: str, answer: str, regenerate_fn, is_grounded_fn, retain_fn, endpoint: str = "board_ask") -> str:

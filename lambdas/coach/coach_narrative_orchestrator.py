@@ -37,7 +37,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import boto3
-from common.constants import EXPERIMENT_START_DATE  # ADR-058
+from common.constants import EXPERIMENT_START_DATE, day_n  # ADR-058
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 
 # Structured logger
@@ -213,6 +213,37 @@ def _track_record_block(coach_id: str) -> str:
         return "\n".join(lines)
     except Exception as _e:
         return "Track record unavailable this run."
+
+
+def _cycle_boundary_context(today: str):
+    """#1973: Day-N cycle-boundary context for early-cycle days (1-3).
+
+    `_track_record_block` above pulls resolved LEARNING# verdicts on a
+    60-DAY cutoff, not a cycle-scoped one (deliberate — cross-cycle coach
+    memory is the design, not the bug: ADR-108's verifier already confirmed
+    coaches SHOULD remember past cycles). Right after a reset, though, that
+    60-day window is almost entirely THE PREVIOUS cycle's calls, and a coach
+    that narrates one of them in present tense ("that hasn't materialized")
+    reads as self-contradiction to a reader with no context for which cycle
+    is meant — /api/predictions shows the new cycle's decided=0 the same
+    morning. This is the missing half: a Day-N marker telling the coach it
+    is in that exact window, so the deterministic gate rule in
+    `web.board_quality_gate.cycle_boundary_violations` has a matching
+    prompt-side instruction (see `_build_cycle_boundary_prompt_block` in
+    ai_calls.py) rather than relying on the model to infer it unprompted.
+
+    Day 0 (pre-genesis countdown, #931/#939) is deliberately out of scope —
+    there is no "this cycle" yet to bound a reference against. Returns None
+    outside days 1-3, so the brief is byte-identical to before on every
+    other day of the ~360-day cycle.
+    """
+    try:
+        n = day_n(today)
+    except Exception:
+        return None
+    if not (1 <= n <= 3):
+        return None
+    return {"day_n": n}
 
 
 def _call_haiku(system, user_message, max_tokens=6000, temperature=0.3):
@@ -1233,6 +1264,15 @@ def lambda_handler(event, context):
     stance = state.get("current_stance")
     if stance and isinstance(brief.get("generation_brief"), dict):
         brief["generation_brief"]["current_stance"] = _stance_for_brief(stance)
+
+    # Inject the Day-N cycle-boundary context DETERMINISTICALLY (same seam, #1973)
+    # so an early-cycle (day 1-3) brief always carries it — LLM-produced, cached-
+    # fallback, AND default-brief paths alike. See _cycle_boundary_context's
+    # docstring for why this window is exactly where cross-cycle coach memory
+    # needs explicit framing.
+    cycle_boundary = _cycle_boundary_context(today)
+    if cycle_boundary and isinstance(brief.get("generation_brief"), dict):
+        brief["generation_brief"]["cycle_boundary_context"] = cycle_boundary
 
     # Inject active site protocols DETERMINISTICALLY (same seam as the stance) so the
     # coach reacts to Matthew's real challenge/experiment commitments on every path,

@@ -1285,6 +1285,24 @@ def _invoke_quality_gate_sync(lambda_client, coach_id, output_text, generation_b
         if not isinstance(payload, dict):
             raise ValueError(f"non-dict quality gate payload: {type(payload)}")
         payload.setdefault("passed", True)
+        # #1973: the deterministic day<=3 cycle-boundary rule, merged into the
+        # SAME report/regenerate-or-hold path the LLM-scored findings above
+        # use — no parallel enforcement mechanism (ADR-108). Runs regardless
+        # of the LLM verdict: this is the fail-closed backstop for the prompt
+        # instruction in coach_narrative_orchestrator/ai_calls — a prompt rule
+        # alone can't guarantee structure (this repo's own lesson). Both board
+        # callers (board_quality_gate.enforce) and the daily-brief caller
+        # (_enforce_quality_gate below) route through this one function, so
+        # the rule covers both surfaces from a single definition.
+        try:
+            from web.board_quality_gate import cycle_boundary_violations as _cbv
+
+            _cb_findings = _cbv(output_text)
+            if _cb_findings:
+                payload["cycle_boundary_violations"] = _cb_findings
+                payload["passed"] = False
+        except Exception as _cbv_e:
+            print(f"[COACH-QUALITY-GATE:{coach_id}] cycle-boundary check unavailable (non-blocking): {_cbv_e}")
         return payload
     except Exception as e:
         print(f"[COACH-QUALITY-GATE:{coach_id}] sync invoke failed (fail-open, not blocking): {e}")
@@ -1312,6 +1330,12 @@ def _quality_gate_correction_note(report):
     for flag in report.get("cross_coach_similarity_flags") or []:
         if isinstance(flag, dict):
             lines.append(f"  - Too similar to {flag.get('similar_to', 'another coach')}: {flag.get('reason', '')}")
+    for v in report.get("cycle_boundary_violations") or []:  # #1973
+        if isinstance(v, dict):
+            lines.append(
+                f'  - Add explicit prior-cycle framing (e.g. "last cycle", "cycle N") around: '
+                f"\"{v.get('excerpt', '')}\" — {v.get('reason', '')}"
+            )
     for s in report.get("suggestions") or []:
         if s:
             lines.append(f"  - {s}")
@@ -1344,6 +1368,9 @@ def _retain_coach_brief_flag(coach_id, verdict, draft, final, report):
         for flag in report.get("cross_coach_similarity_flags") or []:
             if isinstance(flag, dict):
                 findings.append({"type": "cross_coach_similarity", "detail": flag.get("reason", "")})
+        for v in report.get("cycle_boundary_violations") or []:  # #1973
+            if isinstance(v, dict):
+                findings.append({"type": "cycle_boundary", "detail": v.get("reason", "")})
         eval_retention.retain(
             "coach_brief",
             verdict,
@@ -1422,6 +1449,36 @@ def _enforce_quality_gate(
     if fired:
         _retain_coach_brief_flag(coach_id, "flagged_corrected" if attempts else "flagged_kept_best", original_draft, output_text, report)
     return output_text, report
+
+
+def _build_cycle_boundary_prompt_block(cycle_boundary_context):
+    """#1973: render the Day-N cycle-boundary context (if present in the
+    generation brief) into a system-prompt block.
+
+    Pure function — no AWS, no new AI call. `cycle_boundary_context` is only
+    present in the brief on days 1-3 of a cycle (injected deterministically
+    by `coach_narrative_orchestrator._cycle_boundary_context`); for every
+    other day this returns "" and the block is a no-op. Paired with the
+    deterministic `web.board_quality_gate.cycle_boundary_violations` gate
+    rule the prompt instruction alone can't guarantee it's followed (this
+    repo's own "prompt rules can't guarantee structure" lesson) — the gate
+    is the fail-closed backstop, this is the fail-open steer.
+    """
+    if not cycle_boundary_context:
+        return ""
+    day = cycle_boundary_context.get("day_n")
+    if not day:
+        return ""
+    return (
+        f"\n\nCYCLE BOUNDARY: Today is Day {day} of a NEW cycle — early enough that most of what "
+        "you know (your track record, resolved predictions, past calls) is carryover from BEFORE "
+        "this cycle started. If you reference a call, prediction, or verdict you made previously, "
+        'you MUST explicitly frame it as being from last cycle — say "last cycle", name the prior '
+        "cycle, or otherwise mark it as pre-reset. Never narrate a prior-cycle call in the present "
+        "tense as if it just happened or just resolved THIS cycle — a reader meeting you this early "
+        f"has no context for an unframed verdict; /api/predictions shows this cycle's own count at "
+        "zero decided calls right now."
+    )
 
 
 def _build_journal_mood_prompt_block(journal_mood, voice_spec):
@@ -1637,6 +1694,10 @@ def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
         # existing generation call's context with #505's journal extraction.
         _journal_mood_block = _build_journal_mood_prompt_block(brief.get("journal_mood"), voice_spec)
 
+        # #1973: Day-N cycle-boundary context — only present in the brief on days
+        # 1-3 of a cycle (see coach_narrative_orchestrator._cycle_boundary_context).
+        _cycle_boundary_block = _build_cycle_boundary_prompt_block(brief.get("cycle_boundary_context"))
+
         # #1482 (epic #1476): conversation-derived platform memory — a bounded
         # block of what Matthew SHARED IN CHAT (life context, constraints/
         # preferences, calibration asks, narrated wins/failures) written through
@@ -1785,7 +1846,7 @@ ENGAGEMENT / PRESENCE: If the generation brief includes `engagement_signal`, Mat
 - If `returned` is true, he's BACK after `resumed_after_days` days. Acknowledge the return warmly, note any real `weight_delta_over_gap_lbs` plainly (regain is data, not a verdict), and be SUPPORTIVE about re-engaging — never punitive. The point is to help him restart, not to shame the lapse.
 - An absent SAME-DAY log is by-design lag (manual sources arrive end-of-day), never a gap — the signal already accounts for this, so trust `gap_days`.
 - If `severity` is "alarm": this is the single most important fact about this period. Address it in the opening paragraph. Do not narrate a normal week. (At "loud", the gap must be clearly acknowledged in your section; a draft that reads like a normal week will be regenerated or held.)
-{_journal_mood_block}{_memory_block}{(chr(10) + chr(10) + _recall_block) if _recall_block else ""}
+{_journal_mood_block}{_cycle_boundary_block}{_memory_block}{(chr(10) + chr(10) + _recall_block) if _recall_block else ""}
 
 DATA INTERPRETATION RULES:
 - If an activity count or log is ZERO, that means Matthew hasn't done that activity — say "no training logged this week" NOT "provide your training data"
