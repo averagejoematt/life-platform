@@ -11,6 +11,17 @@ hypothesis, pytest, pytest-cov, boto3, and botocore had all drifted (mypy 2.1.0 
 vs 2.3.0 dev; hypothesis 6.161.2 vs 6.163.0; pytest/pytest-cov/boto3/botocore
 entirely unpinned in ci-test.yml/ci-cd.yml) with nothing to catch it. Both the
 literal drift and the guard's blind spot are fixed here.
+
+Extended #2058: pr-checks.yml (advisory pre-merge lane) and fresh-eyes.yml
+(scheduled discovery workflow) pin hypothesis/boto3 too but sat outside
+_CI_FILES, so they could drift indefinitely with no signal — the exact
+"outside the guard's scope, not beyond its capability" shape #1963 named.
+Folding them in also forced a strictness fix: the old subset check (every dev
+pin must appear SOMEWHERE in the combined CI text) would have stayed green
+even with pr-checks.yml/fresh-eyes.yml's stale pins in the mix, because
+ci-cd.yml/ci-test.yml already carry the correct version — a stale pin can hide
+behind a correct one from another file. The check is now exact-set equality
+per tool across the whole _CI_FILES surface.
 """
 
 import os
@@ -19,9 +30,13 @@ import subprocess
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # The enforced tool pins live across the orchestrator + the reusable lint/test
-# workflows since #1655 split ci-cd.yml (black/ruff moved to ci-lint.yml). Read the
-# whole CI gate surface so the drift-guard follows the literal wherever it lives.
-_CI_FILES = [os.path.join(_REPO, ".github", "workflows", f) for f in ("ci-cd.yml", "ci-lint.yml", "ci-test.yml")]
+# workflows since #1655 split ci-cd.yml (black/ruff moved to ci-lint.yml), plus the
+# two advisory/scheduled workflows that install the same tools independently
+# (#2058: pr-checks.yml, fresh-eyes.yml — previously outside this guard's scope).
+# Read the whole surface so the drift-guard follows the literal wherever it lives.
+_CI_FILES = [
+    os.path.join(_REPO, ".github", "workflows", f) for f in ("ci-cd.yml", "ci-lint.yml", "ci-test.yml", "pr-checks.yml", "fresh-eyes.yml")
+]
 _CI = _CI_FILES[0]  # kept for messages/back-compat
 _REQ = os.path.join(_REPO, "requirements-dev.txt")
 
@@ -74,10 +89,15 @@ def _pin_mismatches(ci_text, tools):
     for tool in tools:
         ci = set(re.findall(rf"\b{tool}==([0-9][0-9A-Za-z.\-]*)", ci_text))
         dev = _versions(_REQ, tool)
-        assert ci, f"{tool} not pinned in the CI gate (ci-cd/ci-lint/ci-test.yml) — update this test's expectations"
+        assert ci, f"{tool} not pinned in the CI gate ({', '.join(os.path.basename(p) for p in _CI_FILES)})"
         assert dev, f"{tool} not pinned in requirements-dev.txt"
-        # Every dev pin must be a version CI actually installs (usually exactly one each).
-        if not dev <= ci:
+        # Exact equality, not just "every dev pin appears somewhere in ci" (#2058):
+        # a subset check lets a stale pin in one file hide behind a correct pin in
+        # another — the exact gap that would have let pr-checks.yml's stale
+        # hypothesis==6.161.2 and fresh-eyes.yml's stale boto3==1.43.41 stay
+        # invisible even after folding those files into _CI_FILES, since
+        # ci-cd.yml/ci-test.yml already carry the right version.
+        if dev != ci:
             mismatches.append(f"{tool}: requirements-dev={sorted(dev)} vs ci-gate={sorted(ci)}")
     return mismatches
 
