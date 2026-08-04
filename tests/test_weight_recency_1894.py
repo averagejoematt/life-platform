@@ -23,6 +23,17 @@ has to be established where the fact is assembled, not where the prose is checke
 The fix carries the reading's own date and age alongside the value, marks it stale,
 and — via `build_prompt` — instructs the coach not to attach a day label to it.
 These tests pin all three: the data shape, the staleness flag, and the prompt rule.
+
+#2093: the original version of this file computed `TODAY = _ago(0)` from the REAL
+wall clock at module import time, while gather_data_for_expert reads
+datetime.now(timezone.utc) at CALL time — a suite run that imports before UTC
+midnight and asserts after it compared yesterday-anchored fixtures against
+today-anchored code (the golden-test wall-clock class). The fix here is the same
+seam used in tests/test_pacific_date_selection.py and the #2063-era prereg-framing
+fix (12d82b49): pin `ana.datetime.now()` to ONE injected instant via monkeypatch,
+and derive every fixture date from that SAME instant. There is no real-clock read
+anywhere below, so import time vs. call time cannot diverge — structurally, not by
+timing luck.
 """
 
 import os
@@ -35,19 +46,32 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 
 from intelligence import ai_expert_analyzer_lambda as ana  # noqa: E402
 
-
-def _ago(days: int) -> str:
-    """A date N days before the analyzer's own 'today'.
-
-    Deliberately RELATIVE. gather_data_for_expert reads
-    datetime.now(timezone.utc) directly, so a hardcoded fixture date would make
-    every age assertion drift by one each midnight — the golden-test wall-clock
-    time bomb. Deriving from the same clock keeps these tests true on any day.
-    """
-    return (datetime.now(timezone.utc).date() - timedelta(days=days)).isoformat()
+# A fixed instant, unrelated to whatever day this suite actually runs on. Every
+# fixture date in this file derives from it, and _physical() pins the analyzer's
+# own clock to it too — so the two can never disagree.
+ANCHOR = datetime(2026, 9, 15, 12, 0, tzinfo=timezone.utc)
 
 
-TODAY = _ago(0)
+def _freeze(monkeypatch, module, instant):
+    """Pin `module.datetime.now()` to `instant` — the seam, not the wall clock
+    (tests/test_pacific_date_selection.py's pattern). gather_data_for_expert reads
+    datetime.now(timezone.utc) at call time; once this is patched, that read and
+    every fixture date derived from the same `instant` are the same clock."""
+
+    class _Frozen(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return instant.astimezone(tz) if tz else instant.replace(tzinfo=None)
+
+    monkeypatch.setattr(module, "datetime", _Frozen)
+
+
+def _ago(anchor: datetime, days: int) -> str:
+    """A date N days before `anchor` — never before the real wall clock."""
+    return (anchor.date() - timedelta(days=days)).isoformat()
+
+
+TODAY = _ago(ANCHOR, 0)  # derived from the fixed ANCHOR, not from real time — stable at any import moment
 
 
 def _rows(*pairs):
@@ -55,8 +79,11 @@ def _rows(*pairs):
     return [{"sk": f"DATE#{d}", "weight_lbs": w} for d, w in pairs]
 
 
-def _physical(monkeypatch, rows):
-    """Run the physical branch against canned withings rows."""
+def _physical(monkeypatch, rows, anchor=ANCHOR):
+    """Run the physical branch against canned withings rows, with the analyzer's
+    own clock pinned to `anchor` so its now() cannot diverge from fixture dates
+    also derived from `anchor`."""
+    _freeze(monkeypatch, ana, anchor)
     monkeypatch.setattr(ana, "_query_source", lambda source, start, end: rows if source == "withings" else [])
     monkeypatch.setattr(ana, "_latest_item", lambda source: None)
     return ana.gather_data_for_expert("physical")
@@ -67,21 +94,21 @@ def _physical(monkeypatch, rows):
 
 def test_current_weight_carries_its_reading_date(monkeypatch):
     """The value alone is not enough — the date must travel with it."""
-    d = _physical(monkeypatch, _rows((_ago(7), 320.0), (_ago(5), 317.61)))
+    d = _physical(monkeypatch, _rows((_ago(ANCHOR, 7), 320.0), (_ago(ANCHOR, 5), 317.61)))
     assert d["current_weight_lb"] == pytest.approx(317.61)
-    assert d["current_weight_as_of"] == _ago(5), "the reading date must reach the prompt"
+    assert d["current_weight_as_of"] == _ago(ANCHOR, 5), "the reading date must reach the prompt"
 
 
 def test_the_live_1894_shape_is_flagged_stale(monkeypatch):
     """Exactly the incident shape: the newest reading is 5 days old when the analyzer runs."""
-    d = _physical(monkeypatch, _rows((_ago(7), 320.0), (_ago(5), 317.61)))
+    d = _physical(monkeypatch, _rows((_ago(ANCHOR, 7), 320.0), (_ago(ANCHOR, 5), 317.61)))
     assert d["current_weight_is_stale"] is True
     assert d["current_weight_age_days"] == 5
 
 
 def test_a_todays_reading_is_not_stale(monkeypatch):
     """The guard must not cry wolf on fresh data."""
-    d = _physical(monkeypatch, _rows((_ago(2), 320.0), (TODAY, 321.09)))
+    d = _physical(monkeypatch, _rows((_ago(ANCHOR, 2), 320.0), (TODAY, 321.09)))
     assert d["current_weight_is_stale"] is False
     assert d["current_weight_age_days"] == 0
     assert d["current_weight_lb"] == pytest.approx(321.09)
@@ -89,7 +116,7 @@ def test_a_todays_reading_is_not_stale(monkeypatch):
 
 def test_newest_reading_wins_regardless_of_row_order(monkeypatch):
     """weights[-1] assumed the query returned sorted rows. Sort explicitly."""
-    d = _physical(monkeypatch, _rows((TODAY, 321.09), (_ago(7), 320.0), (_ago(5), 317.61)))
+    d = _physical(monkeypatch, _rows((TODAY, 321.09), (_ago(ANCHOR, 7), 320.0), (_ago(ANCHOR, 5), 317.61)))
     assert d["current_weight_lb"] == pytest.approx(321.09)
     assert d["current_weight_as_of"] == TODAY
 
@@ -97,7 +124,7 @@ def test_newest_reading_wins_regardless_of_row_order(monkeypatch):
 def test_delta_reports_its_real_span_not_an_assumed_four_weeks(monkeypatch):
     """The old field was named weight_change_4wk while spanning whatever existed —
     with two readings two days apart it still called itself a 4-week change."""
-    d = _physical(monkeypatch, _rows((_ago(2), 322.0), (TODAY, 321.0)))
+    d = _physical(monkeypatch, _rows((_ago(ANCHOR, 2), 322.0), (TODAY, 321.0)))
     assert d["weight_change_observed"] == pytest.approx(-1.0)
     assert d["weight_change_span_days"] == 2
     assert "weight_change_4wk" not in d, "the misleading fixed-window name must be gone"
@@ -109,6 +136,22 @@ def test_no_readings_is_honest_absence(monkeypatch):
     assert d["current_weight_as_of"] is None
     assert d["current_weight_is_stale"] is False
     assert d["weight_readings"] == 0
+
+
+def test_stale_weight_detection_is_stable_across_a_midnight_boundary(monkeypatch):
+    """#2093 itself: prove the class is impossible now, not just fixed by luck.
+    Pin the fake clock to two instants straddling UTC midnight and rebuild the
+    fixture dates from EACH pinned instant in turn — since both the fixtures and
+    gather_data_for_expert's own "now" derive from the same single `anchor`
+    argument, the assertions hold identically on both sides of the boundary."""
+    before_midnight = datetime(2026, 9, 15, 23, 59, tzinfo=timezone.utc)
+    after_midnight = datetime(2026, 9, 16, 0, 1, tzinfo=timezone.utc)
+    for anchor in (before_midnight, after_midnight):
+        rows = _rows((_ago(anchor, 7), 320.0), (_ago(anchor, 5), 317.61))
+        d = _physical(monkeypatch, rows, anchor=anchor)
+        assert d["current_weight_is_stale"] is True
+        assert d["current_weight_age_days"] == 5
+        assert d["current_weight_as_of"] == _ago(anchor, 5)
 
 
 # ── the prompt actually uses the flag ─────────────────────────────────────────
