@@ -121,6 +121,157 @@ def test_non_significant_never_unlocked():
     assert fresh == [] and "x_vs_y" not in ledger  # only FDR-significant pairs get stamped
 
 
+# ── #1996: n-gate gloss (a downgraded label reads as a stats error without it) ──
+
+
+def test_n_gate_gloss_present_on_downgrade():
+    # r=0.88 alone earns "strong" (|r|>=0.6), but n=20 is below the n>=50 floor for
+    # "strong" AND below the n>=30 floor for "moderate" — interpret_r downgrades
+    # two levels to "weak". That downgrade is real and correct; it must be glossed.
+    interp = wc.interpret_r(0.88, 20)
+    assert interp == "weak"
+    assert wc.n_gate_gloss(0.88, 20, interp) == "evidence still thin"
+
+
+def test_n_gate_gloss_absent_when_label_matches_r():
+    # r=0.65 at n=60 clears the "strong" floor outright — no downgrade, no gloss.
+    interp = wc.interpret_r(0.65, 60)
+    assert interp == "strong"
+    assert wc.n_gate_gloss(0.65, 60, interp) is None
+
+
+def test_n_gate_gloss_absent_for_genuinely_weak_r():
+    # r=0.25 earns "weak" on magnitude alone (not a downgrade) — no gloss invented.
+    interp = wc.interpret_r(0.25, 100)
+    assert interp == "weak"
+    assert wc.n_gate_gloss(0.25, 100, interp) is None
+
+
+def test_n_gate_gloss_present_on_double_downgrade_to_insufficient():
+    # r=0.5 alone earns "moderate", but n=5 is below even the "weak" floor (n>=10).
+    interp = wc.interpret_r(0.5, 5)
+    assert interp == "insufficient_data"
+    assert wc.n_gate_gloss(0.5, 5, interp) == "evidence still thin"
+
+
+def test_n_gate_gloss_tolerates_missing_inputs():
+    assert wc.n_gate_gloss(None, 20, "weak") is None
+    assert wc.n_gate_gloss(0.88, None, "weak") is None
+    assert wc.n_gate_gloss(0.88, 20, None) is None
+    assert wc.n_gate_gloss(0.88, 20, "") is None
+
+
+def test_newly_unlocked_carries_gloss_for_high_r_weak_pair():
+    # The regression guard's compute-layer half: a fresh high-r/small-n pair must
+    # carry the gloss field in what diff_newly_unlocked hands the writer.
+    pair = _corr(pearson_r=0.88, n_days=20, interpretation="weak")
+    fresh, _ = wc.diff_newly_unlocked({"hrv_vs_recovery": pair}, {}, "2026-06-30")
+    assert len(fresh) == 1
+    assert fresh[0]["gloss"] == "evidence still thin"
+
+
+def test_newly_unlocked_gloss_none_when_not_downgraded():
+    pair = _corr(pearson_r=0.65, n_days=60, interpretation="strong")
+    fresh, _ = wc.diff_newly_unlocked({"hrv_vs_recovery": pair}, {}, "2026-06-30")
+    assert fresh[0]["gloss"] is None
+
+
+def test_compute_correlations_results_carry_gloss_key():
+    # The primary write path (compute_correlations' results[label]) sets "gloss"
+    # directly from interpret_r's own verdict — proving the served payload's
+    # SOURCE, not just the diff helper, carries the field. compute_correlations
+    # always runs the full CORRELATION_PAIRS registry; a series that only carries
+    # hrv/recovery_score leaves every other pair at r=None/gloss=None, harmlessly.
+    from datetime import date, timedelta
+
+    end = date(2026, 6, 30)
+    series = {}
+    for i in range(20):  # n=20 — below the n>=50 floor "strong" would need
+        d = (end - timedelta(days=i)).isoformat()
+        series[d] = {"hrv": 50.0 + i, "recovery_score": 40.0 + i}  # perfectly correlated → high |r|
+    results = wc.compute_correlations(series)
+    row = results["hrv_vs_recovery"]
+    assert row["n_days"] == 20
+    assert abs(row["pearson_r"]) >= 0.6  # earns "strong" on magnitude alone
+    assert row["interpretation"] != "strong"  # n-gated down
+    assert row["gloss"] == "evidence still thin"
+
+
+# ── #1996 regression guard: served-label-matches-served-r invariant ─────────────
+# A served entry where the n-gate demoted the label below what |r| alone earns
+# MUST carry a non-empty `gloss` — otherwise a strong r next to a downgraded label
+# reads as a stats error, not the rigor it is. Applies to every endpoint that
+# serves a stored interpretation beside its r; /api/what_changed's newly_unlocked
+# (read by both the home ribbon and the cockpit month view) is the first.
+
+
+def _ngate_violations(entries):
+    """Return the served entries that are n-gate-downgraded but missing `gloss`."""
+    out = []
+    for e in entries:
+        r, n, interp = e.get("r"), e.get("n"), e.get("interpretation")
+        if r is None or n is None or not interp:
+            continue
+        if wc.n_gate_gloss(r, n, interp) and not e.get("gloss"):
+            out.append(e)
+    return out
+
+
+def test_ngate_gloss_invariant_flags_current_payload_shape():
+    # The pre-#1996 payload shape: a high-r/'weak' pair with no gloss at all —
+    # this is exactly "R=0.88, N=20, POSITIVE · WEAK" from the issue, and it
+    # must trip the invariant.
+    stale_entry = {"r": 0.88, "n": 20, "interpretation": "weak"}
+    assert _ngate_violations([stale_entry]) == [stale_entry]
+
+
+class _FakeTable:
+    """Minimal DDB table stand-in for a get_item-only reader (site_api_ledger.what_changed)."""
+
+    def __init__(self, item=None):
+        self.item = item
+
+    def get_item(self, Key=None, **kw):
+        return {"Item": self.item} if self.item is not None else {}
+
+
+def test_served_what_changed_satisfies_ngate_gloss_invariant():
+    # End-to-end through the ACTUAL serving handler (site_api_ledger.what_changed) —
+    # a high-r/small-n newly_unlocked entry, stored the way the fixed compute lambda
+    # now writes it (with `gloss`), must reach the wire with the invariant satisfied.
+    import json
+
+    from web import site_api_ledger
+
+    unlock = {
+        "label": "hrv_vs_recovery",
+        "metric_a": "hrv",
+        "metric_b": "recovery_score",
+        "r": 0.88,
+        "n": 20,
+        "direction": "positive",
+        "interpretation": "weak",
+        "gloss": "evidence still thin",
+        "first_seen": "2026-06-30",
+    }
+    item = {
+        "pk": "USER#matthew#SOURCE#what_changed",
+        "sk": "SNAPSHOT#current",
+        "week": "2026-W26",
+        "window_start": "2026-06-01",
+        "window_end": "2026-06-30",
+        "deltas": [],
+        "newly_unlocked": [unlock],
+        "honest_null": False,
+        "computed_at": "2026-06-30T18:30:00+00:00",
+    }
+    resp = site_api_ledger.what_changed(_g={"table": _FakeTable(item)})
+    served = json.loads(resp["body"])["newly_unlocked"]
+    assert served[0]["interpretation"] == "weak"  # the engine's own n-gated call, verbatim — never re-derived
+    assert abs(served[0]["r"]) >= 0.6  # "strong" by magnitude alone — the mismatch that reads as an error
+    assert _ngate_violations(served) == []
+
+
 # ── honest-null + reset safety ──────────────────────────────────────────────────
 
 
