@@ -48,14 +48,14 @@
         "workflow": "pr-checks.yml",
         "job": "fast-lane",
         "typical_seconds": 90,
-        "why": "ADR-139's fast lane: pytest --collect-only (the #1297 class), the deploy_critical marker subset (ADR-117), and black --check over the six enforced dirs. `on: pull_request: branches: [main]` with NO path filter and no job-level `if:` — it reports on every PR class including docs-only."
+        "why": "ADR-139's fast lane: pytest --collect-only (the #1297 class), the deploy_critical marker subset (ADR-117), and black --check over the six enforced dirs. Measured 1m26s on PR #2094. `on: pull_request: branches: [main]` with NO path filter and no job-level `if:` — it reports on every PR class including docs-only."
       },
       {
         "context": "gitleaks (PR commit range only, not full history)",
         "workflow": "secret-scan.yml",
         "job": "gitleaks",
-        "typical_seconds": 45,
-        "why": "#1659 credential-pattern scan, scoped to the PR's own commit range. `on: pull_request: branches: [main]` with NO path filter and no job-level `if:` — it reports on every PR class."
+        "typical_seconds": 15,
+        "why": "#1659 credential-pattern scan, scoped to the PR's own commit range. Measured 9s on PR #2094 (the run that also confirmed the trigger analysis live). `on: pull_request: branches: [main]` with NO path filter and no job-level `if:` — it reports on every PR class."
       }
     ],
     "advisory_not_required": [
