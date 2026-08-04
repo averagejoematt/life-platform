@@ -25,7 +25,7 @@ EXTERNAL APIs → INGESTION LAMBDAS → DDB PARTITIONS → COMPUTE LAMBDAS → C
 | Withings API | `withings_lambda` (SIMP-2) | `withings` | Hourly (active hours) |
 | Strava API | `strava_lambda` (SIMP-2) | `strava` | Hourly (active hours) |
 | Eight Sleep API | `eightsleep_lambda` (SIMP-2) | `eightsleep` | Hourly (active hours) |
-| Garmin (garth) | `garmin_lambda` (SIMP-2) | `garmin` | 4x daily (OAuth rate limits) |
+| Garmin (garth) | `garmin_lambda` (SIMP-2) | `garmin` | Paused (ADR-074) — no live rule |
 | Habitify API | `habitify_lambda` (SIMP-2) | `habitify`, `supplements` | Hourly (active hours) |
 | Todoist API | `todoist_lambda` (SIMP-2) | `todoist` | 2x daily |
 | Notion API | `notion_lambda` (pattern-exempt) | `notion` | Hourly (active hours) |

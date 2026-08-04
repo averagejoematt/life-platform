@@ -208,7 +208,7 @@ daily-brief-schedule                cron(0 17 * * ? *)
 | Source | Schedule | Lambda |
 |--------|----------|--------|
 | Whoop | 07:00 AM | whoop-data-ingestion |
-| Garmin | 4x daily (cron 0 0,6,14,22 UTC) | garmin-data-ingestion |
+| Garmin | Paused (ADR-074) — no live rule | garmin-data-ingestion |
 | Notion Journal | 07:00 AM | notion-journal-ingestion |
 | Withings | 07:15 AM | withings-data-ingestion |
 | Habitify | 07:15 AM | habitify-data-ingestion |

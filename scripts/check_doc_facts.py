@@ -892,6 +892,21 @@ def main():
     secret_count, secret_verified = ops.stamped_secret_fact()
     hits += ops.secret_inventory_hits(ops.ARCHITECTURE_PATH, secret_count, secret_verified, ops.cdk_granted_secrets())
 
+    # #2003: ingestion cadence claims — no doc states a paused source's schedule as
+    # live, and no doc hand-states a scheduled-ingestion-Lambda count that disagrees
+    # with the CDK's live schedule= definitions. Ground truth from source_registry.py
+    # + cdk/stacks/ingestion_stack.py (doc_facts_ops.py).
+    paused_sources = ops.ingestion_paused_sources()
+    if not paused_sources:
+        print("error: could not AST-read paused sources from lambdas/ingestion/source_registry.py", file=sys.stderr)
+        sys.exit(2)
+    scheduled_ingestion_count = ops.ingestion_scheduled_lambda_count()
+    if scheduled_ingestion_count is None:
+        print("error: could not AST-read the scheduled ingestion Lambda count from cdk/stacks/ingestion_stack.py", file=sys.stderr)
+        sys.exit(2)
+    hits += ops.ingestion_paused_cadence_hits(docs, paused_sources, line_is_exempt)
+    hits += ops.ingestion_scheduled_count_hits(docs, scheduled_ingestion_count, line_is_exempt)
+
     # #1351: DATA_GOVERNANCE.md-specific fact checks (repo visibility, deletion-lambda
     # status, Verified-header freshness).
     hits += _data_governance_hits(DATA_GOVERNANCE_PATH)

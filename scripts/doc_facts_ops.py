@@ -49,6 +49,8 @@ CDK_STACKS_DIR = ROOT / "cdk" / "stacks"
 ROLE_POLICIES_PATH = CDK_STACKS_DIR / "role_policies.py"
 SYNC_META_PATH = ROOT / "deploy" / "sync_doc_metadata.py"
 ARCHITECTURE_PATH = ROOT / "docs" / "ARCHITECTURE.md"
+INGESTION_STACK_PATH = CDK_STACKS_DIR / "ingestion_stack.py"
+SOURCE_REGISTRY_PATH = ROOT / "lambdas" / "ingestion" / "source_registry.py"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -78,6 +80,79 @@ def budget_tier_cutoffs(path: Path = BUDGET_GUARD_PATH) -> dict:
                     out[k.value] = v.value
         return out
     return {}
+
+
+def ingestion_paused_sources(path: Path = SOURCE_REGISTRY_PATH) -> dict:
+    """{key: label} for every `SOURCE_REGISTRY` entry carrying `"paused": True`
+    (#2003). AST-read, not imported — source_registry.py has no external deps, but
+    this keeps the "parse, don't import" rule uniform across this module.
+
+    Ground truth for the ingest-bullet check: a doc must never describe a paused
+    source's schedule as if it were a live EventBridge pull (the Garmin/ADR-074
+    defect this issue fixes).
+    """
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError):
+        return {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        names = [t.id for t in node.targets if isinstance(t, ast.Name)]
+        if "SOURCE_REGISTRY" not in names or not isinstance(node.value, ast.Dict):
+            continue
+        out = {}
+        for k, v in zip(node.value.keys, node.value.values):
+            if not (isinstance(k, ast.Constant) and isinstance(k.value, str) and isinstance(v, ast.Dict)):
+                continue
+            paused, label = False, k.value
+            for fk, fv in zip(v.keys, v.values):
+                if not isinstance(fk, ast.Constant):
+                    continue
+                if fk.value == "paused" and isinstance(fv, ast.Constant) and fv.value is True:
+                    paused = True
+                elif fk.value == "label" and isinstance(fv, ast.Constant) and isinstance(fv.value, str):
+                    label = fv.value
+            if paused:
+                out[k.value] = label
+        return out
+    return {}
+
+
+def ingestion_scheduled_lambda_count(path: Path = INGESTION_STACK_PATH) -> int | None:
+    """Count `create_platform_lambda(...)` calls in ingestion_stack.py that carry a
+    `schedule=` kwarg — the live EventBridge-scheduled ingestion fleet (#2003).
+
+    AST-parsed, not imported: the stack module drags in aws_cdk at import time. This
+    deliberately EXCLUDES:
+      * S3-triggered Lambdas (macrofactor / food_delivery / measurements — no
+        `schedule=` kwarg, an `add_permission` S3 invoke grant instead);
+      * the API-Gateway-triggered HAE webhook (a raw `_lambda.Function(...)`, not
+        `create_platform_lambda`);
+      * garmin — PAUSED (ADR-074): its `create_platform_lambda` call carries no
+        `schedule=` kwarg at all while paused, which is exactly the #2003 root
+        cause (CLAUDE.md counted it as scheduled anyway, two months after the
+        rule was removed).
+
+    Returns None if the file can't be parsed or no matching calls are found — the
+    caller must treat that as "ground truth unavailable", never trust a silent 0.
+    """
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError):
+        return None
+    total = scheduled = 0
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "create_platform_lambda"):
+            continue
+        total += 1
+        for kw in node.keywords:
+            if kw.arg == "schedule" and not (isinstance(kw.value, ast.Constant) and kw.value.value is None):
+                scheduled += 1
+                break
+    if total == 0:
+        return None
+    return scheduled
 
 
 _CDK_FUNC_RE = re.compile(r'function_name\s*=\s*["\']([a-z0-9_-]+)["\']')
@@ -342,6 +417,73 @@ def secret_inventory_hits(doc_path, count, verified, granted: set, today=None) -
             f"(ceiling {SECRET_VERIFY_MAX_AGE_DAYS}d). Re-verify: "
             f"`python3 deploy/sync_doc_metadata.py --refresh-secrets` (#1957)"
         )
+    return hits
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CHECK E — ingestion cadence claims: paused sources + the scheduled-Lambda count
+# ══════════════════════════════════════════════════════════════════════════════
+# The drift shape (#2003): CLAUDE.md's ingest bullet hand-stated Garmin as a live
+# "4x daily" EventBridge pull two months after ADR-074 paused it and the rule was
+# removed — while `lambdas/ingestion/source_registry.py` (`paused: True`, method
+# facet "…paused (ADR-074)") and `cdk/stacks/ingestion_stack.py` (no `schedule=`
+# on the garmin Lambda, with a comment explaining why) both already told the truth.
+# Two rules, both ground-truthed from source, never from an enumerated doc string:
+#   E1 no doc line names a PAUSED source next to live-cadence language ("4x daily",
+#      "hourly") without also saying so is paused;
+#   E2 no doc line hand-states a "N scheduled ingestion Lambda functions" count that
+#      disagrees with the live `schedule=` count in the CDK stack.
+_CADENCE_LANGUAGE = re.compile(r"\b\d+x\s*(?:daily|/\s*day|\s*a\s*day)\b|\bhourly\b", re.I)
+
+
+def ingestion_paused_cadence_hits(files, paused: dict, exempt) -> list:
+    """Doc lines naming a paused ingestion source next to live-cadence language."""
+    if not paused:
+        return []
+    needles = {v.lower() for v in paused.values()} | {k.lower() for k in paused}
+    hits = []
+    for doc in files:
+        rel = _rel(doc)
+        for lineno, line in enumerate(_lines(doc), 1):
+            if exempt(line):
+                continue
+            low = line.lower()
+            if "paused" in low or not _CADENCE_LANGUAGE.search(line):
+                continue
+            for needle in needles:
+                if needle in low:
+                    hits.append(
+                        f"{rel}:{lineno}: names paused source '{needle}' next to live cadence language, but "
+                        f"source_registry.py marks it paused — state the pause or drop the cadence claim (#2003)\n"
+                        f"      | {line.strip()[:120]}"
+                    )
+                    break
+    return hits
+
+
+_SCHEDULED_INGESTION_COUNT = re.compile(r"(?<![\w.])(\d+)\s+scheduled ingestion Lambda functions?\b", re.I)
+
+
+def ingestion_scheduled_count_hits(files, truth, exempt) -> list:
+    """Doc lines hand-stating a scheduled-ingestion-Lambda count that disagrees with
+    the live `schedule=` count in cdk/stacks/ingestion_stack.py. Exact match — this
+    is a registry-derived hard count, not an approximate prose figure."""
+    if truth is None:
+        return []
+    hits = []
+    for doc in files:
+        rel = _rel(doc)
+        for lineno, line in enumerate(_lines(doc), 1):
+            if exempt(line):
+                continue
+            for mo in _SCHEDULED_INGESTION_COUNT.finditer(line):
+                claim = int(mo.group(1))
+                if claim != truth:
+                    hits.append(
+                        f"{rel}:{lineno}: claims {claim} scheduled ingestion Lambda functions, but "
+                        f"cdk/stacks/ingestion_stack.py's live schedule= count is {truth} (#2003)\n"
+                        f"      | {line.strip()[:120]}"
+                    )
     return hits
 
 
