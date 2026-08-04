@@ -1,4 +1,4 @@
-"""#1103/#1211/#1212/#1974 — the CSS token guard, enforced.
+"""#1103/#1211/#1212/#1974/#1976 — the CSS token guard, enforced.
 
 The seven CONSUMER sheets (story/evidence/cockpit/mind/fonts/section_toc/subscribe)
 must draw every font-size from the --fs-* type triad (or carry an explicit inline
@@ -8,8 +8,13 @@ token means its fallback is silently always active (the story.css:351 bug class)
 Every (max|min)-width breakpoint across site/assets/css must be one of the nine
 sanctioned §10.1 numbers (#1212) — and, since #1974, so must every breakpoint in the
 inline `<style>` blocks the v4 page generators emit (and in the built pages they write),
-which is where the drift class had migrated once the stylesheets were policed.
-Offline, repo-only: safe in the CI unit-test job.
+which is where the drift class had migrated once the stylesheets were policed. Since
+#1976, a hex-ok/fs-ok sanction's reason must be self-contained/verifiable OR name an
+OPEN `#NNNN` issue — free text with no schema is exactly how the designer-2 hex-ok
+grandfathering ("a separate finding" that `gh` could never find) happened invisibly.
+Offline, repo-only: safe in the CI unit-test job. The live open/closed verification
+half (#1976) needs network and is deliberately NOT exercised here — see
+test_sanction_issue_ref_live_check_is_a_pure_function below for why that stays safe.
 """
 
 import sys
@@ -132,3 +137,86 @@ def test_generated_surface_is_derived_not_enumerated():
         assert page in labels, page
     # …and site/legacy (the frozen pre-v4 site) is excluded by construction.
     assert not [x for x in labels if x.startswith("site/legacy/")]
+
+
+# ---------------------------------------------------------------------------
+# #1976 — a sanction that defers work must name an OPEN issue. Two offline rules
+# (grammar-shape only, no network): every hex-ok needs a #NNNN ref (hex has no
+# self-contained form); an fs-ok only needs one when its reason reads as a deferral.
+# Plus a THIRD, live rule that verifies a cited #NNNN is actually still open — that
+# half is a pure function over an injected issue set, so it stays offline-testable
+# too, and is never wired into check() (what the pytest gate below actually runs).
+# ---------------------------------------------------------------------------
+
+
+def test_hex_ok_sanction_without_issue_ref_fails():
+    """The exact designer-2 shape: a free-text hex-ok reason with no #NNNN. This is
+    the planted violation the guard didn't catch before #1976 (issue's cited
+    tests/test_css_tokens.py:35 — proven permissive)."""
+    findings = check_css_tokens.sanction_issue_ref_findings("x.css", ".pl-lost { color: #dc2626; } /* hex-ok: status colour */")
+    assert findings, "a free-text hex-ok sanction with no issue ref must fail #1976's grammar gate"
+    assert "hex-ok" in findings[0] and "no issue reference" in findings[0]
+
+
+def test_hex_ok_sanction_with_issue_ref_passes():
+    """The sanctioned form: same hex-ok, now naming the issue tracking it."""
+    assert not check_css_tokens.sanction_issue_ref_findings(
+        "x.css", ".pl-lost { color: #dc2626; } /* hex-ok: status colour, tracked in #1234 */"
+    )
+
+
+def test_fs_ok_deferral_without_issue_ref_fails():
+    """The designer-2 phrase verbatim — 'a separate finding' that gh can never find —
+    must fail when it carries no #NNNN. This is the acceptance criterion's 'free-text
+    deferral sanction must fail' regression guard."""
+    findings = check_css_tokens.sanction_issue_ref_findings(
+        "x.css", ".a { font-size: 9px; /* fs-ok: a separate finding will retune this */ }"
+    )
+    assert findings, "an fs-ok deferral with no issue ref must fail"
+    assert "reads as a deferral" in findings[0]
+
+
+def test_fs_ok_deferral_with_issue_ref_passes():
+    assert not check_css_tokens.sanction_issue_ref_findings("x.css", ".a { font-size: 9px; /* fs-ok: retuning tracked in #1234 */ }")
+
+
+def test_fs_ok_self_contained_reason_needs_no_ref():
+    """The ~30 real fs-ok reasons in the swept sheets today (drop caps, book-spine
+    geometry, the #1210 SVG floor) are self-contained design rationale, not deferrals
+    — #1976 must not force-file an issue for a working, documented sanction."""
+    assert not check_css_tokens.sanction_issue_ref_findings("x.css", ".a { font-size: 0.62rem; /* fs-ok: micro-mono book-spine byline */ }")
+    assert not check_css_tokens.sanction_issue_ref_findings(
+        "x.css", ".a { font-size: 3.4em; /* fs-ok: drop cap, scales with its paragraph */ }"
+    )
+
+
+def test_current_swept_sheets_carry_no_deferral_sanctions():
+    """Measure-first: after the designer-2 tokenization, hex-ok is gone entirely
+    (0 live sanctions) and every remaining fs-ok reason is self-contained — so #1976's
+    rule change ships with nothing to file or rewrite. This test pins that fact so a
+    future PR that reintroduces a bare deferral sanction gets caught at the source."""
+    findings = check_css_tokens.check()
+    ref_findings = [f for f in findings if "no issue reference" in f]
+    assert not ref_findings, "unexpected unreferenced sanction(s):\n" + "\n".join(ref_findings)
+
+
+def test_sanction_issue_refs_extracts_cited_numbers():
+    refs = check_css_tokens.sanction_issue_refs(
+        "x.css", ".a { font-size: 9px; /* fs-ok: retuning tracked in #1234 */ }\n.b { color: red; }"
+    )
+    assert refs == {1234: ["x.css:1"]}
+
+
+def test_sanction_issue_ref_live_check_is_a_pure_function():
+    """#1976's live half (a cited #NNNN must be OPEN, not just present) takes the
+    open-issue set as a plain argument — so this test proves the rule fires WITHOUT
+    ever calling `gh` or touching the network. `main()`'s `--verify-issues` path is
+    the only place that supplies a real set (from `gh issue list`, skipped-advisory
+    if unreachable — see _fetch_open_issue_numbers)."""
+    refs = {1234: ["x.css:1"], 999: ["y.css:2", "y.css:9"]}
+    findings = check_css_tokens.verify_sanction_issue_refs(refs, open_issue_numbers={1234})
+    assert len(findings) == 2
+    assert all("#999" in f and "not an OPEN issue" in f for f in findings)
+    assert not any("#1234" in f for f in findings)
+    # Every ref open: no findings.
+    assert not check_css_tokens.verify_sanction_issue_refs(refs, open_issue_numbers={1234, 999})

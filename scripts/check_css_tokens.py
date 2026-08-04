@@ -63,15 +63,42 @@ known tokens.
    reference runtime-set props, and retiring a live undefined-token reference is a palette
    decision, not a mechanical retarget.
 
+6. SANCTION ISSUE REFS (#1976) — a `hex-ok:`/`fs-ok:` sanction's reason must be either
+   a self-contained, verifiable design rationale (geometry, a measured floor, a
+   deliberate relative de-emphasis — the reader can check it without leaving the file)
+   OR name the OPEN issue tracking deferred work as `#NNNN`. Free text with no schema
+   was exactly how the designer-2 hex-ok grandfathering happened invisibly: eight
+   `hex-ok: a separate finding`-style comments that `gh` could never find — untracked
+   forward work the backlog never saw. Two rules, offline (grammar-shape only, no
+   network — safe in the pytest gate):
+     * every `hex-ok:` sanction must carry a `#NNNN` ref. Hex has no legitimate
+       self-contained form — DESIGN_SYSTEM_V5 §4 forbids an off-palette literal
+       outright, so any surviving one is BY DEFINITION a tracked exception, never a
+       standing design decision.
+     * an `fs-ok:` sanction only needs a ref when its reason READS AS A DEFERRAL —
+       "a separate finding", "follow-up", "TODO", "pending", etc. (`_DEFERRAL_MARKERS`)
+       — so the ~30 existing self-contained fs-ok reasons (drop caps, book-spine
+       geometry, the #1210 SVG floor) keep working unchanged.
+   A THIRD, separate, live check — `verify_sanction_issue_refs()` / `main()`'s
+   `--verify-issues` — confirms every cited `#NNNN` is still an OPEN issue (`gh issue
+   list`, same graceful-skip-when-unreachable shape as check_backlog_hygiene.py's
+   `_fetch_live_issues`). That half needs network, so it is NEVER called from `check()`
+   (what the offline pytest gate runs) — only from `main()`, run directly.
+
 Exit 0 clean, 1 with findings. Run:  python3 scripts/check_css_tokens.py
+                                      python3 scripts/check_css_tokens.py --verify-issues  (+network)
 Enforced by tests/test_css_tokens.py.
 """
 
+import json
 import re
+import subprocess
 import sys
 from pathlib import Path
+from typing import Dict, List, Optional, Set, Tuple
 
 REPO = Path(__file__).resolve().parent.parent
+REPO_SLUG = "averagejoematt/life-platform"
 CSS_DIR = REPO / "site" / "assets" / "css"
 TOKENS = CSS_DIR / "tokens.css"
 # The CONSUMER sheets — swept for hex / font-size / undefined-var. tokens.css is the
@@ -113,6 +140,39 @@ FONT_SIZE = re.compile(r"font-size\s*:\s*([^;}]+)")
 HEX_COLOR = re.compile(r"#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})\b")
 # §10.1 breakpoint literal — the doc's grep, with the pixel value captured.
 BP_MEDIA = re.compile(r"\((?:max|min)-width:\s*([0-9]+)px\)")
+
+# (#1976) A hex-ok/fs-ok sanction's reason text — everything after the marker up to
+# the comment close (or end of line, for a one-line-comment `<style>` block).
+SANCTION_REASON = re.compile(r"(hex-ok|fs-ok):\s*(.*?)(?:\*/|$)")
+# An issue reference inside a sanction reason. Deliberately bare `#\d+` (not anchored
+# to word boundaries beyond \d) — a reason is free prose, not CSS, so there is no hex
+# literal to confuse it with.
+ISSUE_REF = re.compile(r"#(\d+)")
+
+# (#1976) Deferral language: a reason that points to work happening SOMEWHERE ELSE
+# rather than documenting its own rationale in place. This is the exact shape of the
+# designer-2 grandfathering — "a separate finding" that `gh` could never find. A
+# deferral-style reason with no #NNNN is a promise nobody filed; the gate must not
+# bless it silently. A self-contained reason (geometry, a measured floor, "deliberate
+# relative de-emphasis") needs no ref — it can be checked without leaving the file.
+_DEFERRAL_MARKERS = (
+    "separate finding",
+    "separate issue",
+    "follow-up",
+    "followup",
+    "future work",
+    "future fix",
+    " todo",
+    "todo:",
+    "fixme",
+    "will fix",
+    "to be fixed",
+    "pending",
+    "tbd",
+    "revisit",
+    "deferred",
+    "defer to",
+)
 
 
 def strip_comments(text: str) -> str:
@@ -191,6 +251,110 @@ def font_size_findings(name: str, text: str) -> list:
     return findings
 
 
+def _sanction_reason(line: str) -> Optional[Tuple[str, str]]:
+    """(kind, reason) for the first hex-ok/fs-ok sanction on `line`, or None. `kind`
+    is the literal marker text ("hex-ok" or "fs-ok"); `reason` is trimmed prose."""
+    m = SANCTION_REASON.search(line)
+    if not m:
+        return None
+    return m.group(1), m.group(2).strip()
+
+
+def _is_deferral_reason(reason: str) -> bool:
+    low = f" {reason.lower()} "
+    return any(marker in low for marker in _DEFERRAL_MARKERS)
+
+
+def sanction_issue_ref_findings(name: str, text: str) -> list:
+    """(#1976) Offline grammar half: every `hex-ok:` sanction, and every `fs-ok:`
+    sanction whose reason reads as a deferral, must cite an issue as `#NNNN`. Live
+    open/closed state of any cited issue is verified separately by
+    `verify_sanction_issue_refs` (network — never called from here or from `check()`,
+    so this stays safe in the offline pytest gate)."""
+    findings = []
+    for i, line in enumerate(text.splitlines(), 1):
+        parsed = _sanction_reason(line)
+        if not parsed:
+            continue
+        kind, reason = parsed
+        if not reason:
+            continue
+        deferral = _is_deferral_reason(reason)
+        if kind == "hex-ok":
+            requires_ref, why = True, "hex-ok always needs one — no off-palette literal has a self-contained rationale"
+        else:
+            requires_ref, why = deferral, "reads as a deferral to work tracked elsewhere"
+        if requires_ref and not ISSUE_REF.search(reason):
+            findings.append(
+                f"{name}:{i}: {kind} sanction with no issue reference ({why}): '{reason}' — "
+                "cite the OPEN issue as `#NNNN` in the reason, or rewrite as a self-contained, "
+                "verifiable reason that needs no ref (#1976)"
+            )
+    return findings
+
+
+def sanction_issue_refs(name: str, text: str) -> Dict[int, List[str]]:
+    """(#1976) {issue_number: ["name:line", …]} for every #NNNN cited inside a
+    hex-ok/fs-ok sanction reason in `text`. Feeds the live open/closed check."""
+    refs: Dict[int, List[str]] = {}
+    for i, line in enumerate(text.splitlines(), 1):
+        parsed = _sanction_reason(line)
+        if not parsed:
+            continue
+        _, reason = parsed
+        for m in ISSUE_REF.finditer(reason):
+            refs.setdefault(int(m.group(1)), []).append(f"{name}:{i}")
+    return refs
+
+
+def verify_sanction_issue_refs(refs: Dict[int, List[str]], open_issue_numbers: Set[int]) -> list:
+    """(#1976) Live half, but a PURE function — takes the open-issue set so it is
+    unit-testable with no network. A sanction citing #NNNN where NNNN is not open
+    (closed, or `gh` never heard of it) is a promise the backlog no longer honours;
+    the gate must not stay silent about that either. `main()` supplies the real set
+    from `gh issue list` (skipped, advisory, if `gh` can't be reached)."""
+    findings = []
+    for number in sorted(refs):
+        if number in open_issue_numbers:
+            continue
+        for loc in refs[number]:
+            findings.append(f"{loc}: sanction cites #{number}, which is not an OPEN issue — closed, or `gh` could not find it")
+    return findings
+
+
+def _fetch_open_issue_numbers() -> Optional[Set[int]]:
+    """`gh issue list --state open` numbers, or None if `gh` is unreachable/unauth'd —
+    graceful-skip, same shape as check_backlog_hygiene.py's _fetch_live_issues."""
+    try:
+        result = subprocess.run(
+            ["gh", "issue", "list", "-R", REPO_SLUG, "--state", "open", "--json", "number", "--limit", "1000"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if result.returncode != 0:
+            print(f"check_css_tokens: gh issue list exited {result.returncode}: {result.stderr[:300]}; skipping live issue-ref check.")
+            return None
+        return {item["number"] for item in json.loads(result.stdout or "[]")}
+    except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError) as e:
+        print(f"check_css_tokens: could not fetch live issues via gh ({e}); skipping live issue-ref check.")
+        return None
+
+
+def all_sanction_issue_refs() -> Dict[int, List[str]]:
+    """(#1976) sanction_issue_refs, merged across every swept sheet AND the generated
+    inline-<style> surface — the same two halves check() and the #1974 sweep cover."""
+    refs: Dict[int, List[str]] = {}
+    for name in SWEPT:
+        for number, locs in sanction_issue_refs(name, (CSS_DIR / name).read_text()).items():
+            refs.setdefault(number, []).extend(locs)
+    for label, path in generated_style_sources():
+        masked = style_block_mask(path.read_text(errors="replace"))
+        for number, locs in sanction_issue_refs(label, masked).items():
+            refs.setdefault(number, []).extend(locs)
+    return refs
+
+
 def undefined_var_findings(name: str, text: str, known: set) -> list:
     """var(--x) references that resolve to no known token. Returns finding strings."""
     findings = []
@@ -255,7 +419,7 @@ def inline_style_findings(name: str, text: str) -> list:
     masked = style_block_mask(text)
     if not STYLE_BLOCK.search(text):
         return []
-    return breakpoint_findings_in(name, masked) + font_size_findings(name, masked)
+    return breakpoint_findings_in(name, masked) + font_size_findings(name, masked) + sanction_issue_ref_findings(name, masked)
 
 
 def defined_props(*files: Path) -> set:
@@ -281,6 +445,9 @@ def check() -> list:
             )
         findings.extend(font_size_findings(name, text))
         findings.extend(undefined_var_findings(name, text, known))
+        # (#1976) A sanction that defers work must name an OPEN issue — offline
+        # grammar half only; live open/closed state is verify_sanction_issue_refs.
+        findings.extend(sanction_issue_ref_findings(name, text))
     # §10.1 breakpoint invariant (#1212) — swept across ALL sheets, tokens.css included
     # (breakpoints are constants used everywhere; there is no allowlist file for them).
     for sheet in sorted(CSS_DIR.glob("*.css")):
@@ -294,13 +461,32 @@ def check() -> list:
 
 def main() -> int:
     findings = check()
+    exit_code = 0
     if findings:
         print(f"check_css_tokens: {len(findings)} finding(s)")
         for f in findings:
             print("  " + f)
-        return 1
-    print("check_css_tokens: clean")
-    return 0
+        exit_code = 1
+    else:
+        print("check_css_tokens: clean")
+
+    # (#1976) Live half — opt-in (needs network + gh auth), so it stays out of the
+    # default offline run and out of the pytest gate entirely. Skips (advisory,
+    # exit unaffected) when gh is unreachable — a sanction citing a real, open issue
+    # must never be blocked by a CI runner with no `gh` auth.
+    if "--verify-issues" in sys.argv:
+        open_numbers = _fetch_open_issue_numbers()
+        if open_numbers is not None:
+            live_findings = verify_sanction_issue_refs(all_sanction_issue_refs(), open_numbers)
+            if live_findings:
+                print(f"check_css_tokens: {len(live_findings)} sanction issue-ref finding(s) (live)")
+                for f in live_findings:
+                    print("  " + f)
+                exit_code = 1
+            else:
+                print("check_css_tokens: all cited sanction issue refs are OPEN")
+
+    return exit_code
 
 
 if __name__ == "__main__":
