@@ -252,7 +252,7 @@ jobs:
 
       - name: Content-policy scan (ENFORCED — #354)
         # Scans public-facing surfaces (site/, email lambdas, mcp/) for blocked terms
-        # from seeds/content_filter.json — the same list the runtime filter enforces.
+        # from config/content_filter.json — the same list the runtime filter enforces.
         # Catches personal-content leaks before they reach the public repo.
         if: always()
         run: python3 scripts/content_policy_scan.py

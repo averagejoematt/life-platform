@@ -48,6 +48,12 @@ from coach import persona_registry  # noqa: E402
 # disappears, so a rename cannot silently drop a surface out of the guard.
 NAME_FIELDS = {
     "site/config/challenges_catalog.json": "board_recommender",
+    # #2084: the same catalog is ALSO published bucket-root as the twin
+    # `/api/challenges` reads. It is byte-identical to the `site/` copy above
+    # (enforced by tests/test_config_site_mirror_parity.py), so this entry is
+    # belt-and-braces — but it is the entry that would have caught the two
+    # endpoints serving two different casts for three weeks, so it stays.
+    "config/challenges_catalog.json": "board_recommender",
     "config/character_sheet.json": "owner",
 }
 
