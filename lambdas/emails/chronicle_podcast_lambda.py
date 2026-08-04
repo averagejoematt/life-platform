@@ -21,8 +21,21 @@ Served publicly at /podcast/* via the S3GeneratedOrigin CloudFront behavior.
 
 Idempotent: articles that already have an MP3 (by date key) are skipped
 (event {"force": true} re-renders everything — use this once after a voice
-swap to re-render the back catalogue). Scheduled Wed 15:40 UTC — after the
-chronicle publishes (15:00) and the email sends (15:10).
+swap to re-render the back catalogue).
+
+NOT on a schedule: the standing weekly Wed 15:40 UTC cron was retired
+2026-07-02 (SEASON-1 ZOMBIE RETIRED, cdk/stacks/email_stack.py — it kept
+re-indexing the dead season-1 feed against week-keyed mp3s). Invoked two ways
+now: (1) manual/one-off (back-catalogue re-render, feed repair), and (2) the
+restart pipeline's regen-lambda step (deploy/restart_site_copy_sync.py
+REGEN_LAMBDAS, #1243) — added because NEITHER retiring the cron NOR
+restart_media_reset.py's audio reset (which owns panelcast + podcast/debrief
+only, a separate surface) left anything to re-anchor a kept prologue's
+episode after a genesis move; the article moved forward but its audio kept
+narrating the old date until the next manual invoke, which is exactly the
+#1243 defect. A future revival of a standing cron for this lambda would still
+need to run AFTER generated/journal/posts.json reflects the current cycle
+(after restart_leadin_pages during a reset), same ordering constraint.
 
 Cost: Chirp 3: HD ≈ $30/1M chars with 1M chars/month free → effectively $0.
 """
@@ -148,13 +161,16 @@ def _write_indexes(episodes: list) -> None:
         ContentType="application/json",
         CacheControl="max-age=3600, public",
     )
-    items = "\n".join(f"""  <item>
+    items = "\n".join(
+        f"""  <item>
     <title>{_xml(e["title"])}</title>
     <description>{_xml(e.get("excerpt") or e["title"])}</description>
     <enclosure url="{SITE}{e["url"]}" length="{e["bytes"]}" type="audio/mpeg"/>
     <guid isPermaLink="false">measured-life-{e["date"]}</guid>
     <pubDate>{_rfc822(e["date"])}</pubDate>
-  </item>""" for e in episodes)
+  </item>"""
+        for e in episodes
+    )
     feed = f"""<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
 <channel>

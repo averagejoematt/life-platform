@@ -1357,7 +1357,11 @@ nonzero aborts the run and prints what already ran; `--continue-on-error` is the
 10. `restart_leadin_pages.py --apply` — rebuilds the public lead-in article pages + `/journal/posts.json`
     from the resurrected chronicle records (wired into the pipeline; S3-only writes; idempotent)
 11. `restart_character_rebuild.py --apply` — recomputes character sheets from new genesis
-12. `restart_site_copy_sync.py --apply --old-genesis <outgoing>` — JS/JSON/HTML genesis-literal sweep + CloudFront invalidate
+12. `restart_site_copy_sync.py --apply --old-genesis <outgoing>` — JS/JSON/HTML genesis-literal sweep + CloudFront invalidate;
+    its regen-lambda step also invokes `chronicle-podcast` (#1243) so any kept prologue's read-aloud episode re-anchors to
+    its new date — the article-only re-anchor in step 8/10 previously left the audio narrating the OLD genesis date, since
+    neither this step nor step 9's media reset ever regenerated `generated/podcast/episodes.json` (a third podcast surface,
+    distinct from panelcast/debrief). Idempotent by date-key; only renders episodes missing for the current manifest.
 13. `restart_docs_update.py --apply` — doc date/copy sync
 14. With `--sync-site` (opt-in, #1092): `bash deploy/sync_site_to_s3.sh` — the full-site
     content-hashed sync + rss.xml regen (deliberately NOT default: heavy + interactive;

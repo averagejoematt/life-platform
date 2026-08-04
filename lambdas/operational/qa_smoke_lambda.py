@@ -625,7 +625,24 @@ from operational.qa_check_content_cadence import (  # noqa: F401,E402
 )
 
 # ---------------------------------------------------------------------------
-# CHECK 10d — Subscriber promise <-> kill-switch agreement (#1951)
+# CHECK 10d — Podcast read-aloud orphan guard (#1243)
+# ---------------------------------------------------------------------------
+# The read_aloud.js join is honest-empty on a miss (#1121) — silence there is
+# indistinguishable from an orphaned episode (a re-anchored article whose
+# audio still carries the OLD publish date, the #1243 shape). This flags a
+# same-title/mismatched-date pair between /journal/posts.json and
+# /podcast/episodes.json at generation time. Purely deterministic (no
+# LLM/Bedrock), so it never pauses under the budget ladder. Lives in
+# operational/qa_check_podcast_parity.py (module-size ceiling split idiom,
+# #1665/#1944/#1972/#1993); re-exported here so qa_smoke_lambda.check_podcast_parity
+# and .assess_podcast_parity are valid public entrypoints for tests and callers.
+from operational.qa_check_podcast_parity import (  # noqa: F401,E402
+    assess_podcast_parity,
+    check_podcast_parity,
+)
+
+# ---------------------------------------------------------------------------
+# CHECK 10e — Subscriber promise <-> kill-switch agreement (#1951)
 # ---------------------------------------------------------------------------
 # /subscribe/ and the confirmation email promise a weekly send unconditionally;
 # delivery is gated behind each subscriber-facing sender's EXTERNAL_EMAILS_ENABLED
@@ -994,6 +1011,8 @@ def lambda_handler(event, context):
         all_checks += check_content_cadence()
         # #1951: the /subscribe/ weekly-send promise must agree with each sender's live kill switch
         all_checks += check_subscriber_promise_truth()
+        # #1243: a same-title episode in podcast/episodes.json must date-match its journal article
+        all_checks += check_podcast_parity()
         all_checks += weight_truth_qa.checks(Check, SITE_BASE_URL, CONTENT_TRUTH)  # #1894: home/cockpit vs the coaching door
         all_checks += check_receipt_replay()  # #1373: progression-receipt drift alarm (deterministic replay)
         all_checks += check_redirect_spotcheck()  # #1430: weekly legacy-redirect sample, rotates over redirects.map
