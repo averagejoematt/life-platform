@@ -21,6 +21,7 @@ arithmetic is not a gate. They now pause only where Bedrock stops entirely.
 """
 
 import os
+import re
 import sys
 
 _LAMBDAS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas")
@@ -219,3 +220,53 @@ def test_internal_tier_label_names_internal_ai():
     assert any(
         k in label for k in ("internal", "dev ai", "ensemble", "coherence")
     ), f"tier-{internal_tier} label must name the internal/dev AI pause: {label!r}"
+
+
+# ── #2000: best-effort prose guard — a docstring naming "feature X pauses at
+# tier N" must agree with the LIVE budget_guard._FEATURE_CUTOFF table. This is
+# the class behind the coach_memoir_lambda.py bug (comment said "tier-1 pause"
+# for coach_narrative while budget_guard has it at 2, ADR-125): a comment
+# citing a feature+tier pair goes stale silently because nothing re-checks it
+# against the table it's describing. Best-effort by design (a regex over
+# prose, not a parser) — it only asserts on the specific
+# `budget_guard.allow("<feature>")` ... `tier-N pause` phrasing this repo
+# actually uses; it does not claim to catch every possible stale-comment shape.
+
+_FEATURE_TIER_COMMENT_RE = re.compile(r'budget_guard\.allow\(\s*["\'](\w+)["\']\s*\)(.{0,160})', re.DOTALL)
+_TIER_MENTION_RE = re.compile(r"tier[- ](\d+)\+?\s*pause")
+
+
+def _scan_feature_tier_comments():
+    """Walk lambdas/ for `budget_guard.allow("feature")` followed (within a
+    short window of trailing prose) by a "tier-N pause" claim. Returns a list
+    of (path, feature, claimed_tier) tuples."""
+    found = []
+    for root, _dirs, files in os.walk(_LAMBDAS):
+        for fn in files:
+            if not fn.endswith(".py"):
+                continue
+            path = os.path.join(root, fn)
+            with open(path, encoding="utf-8") as fh:
+                text = fh.read()
+            for m in _FEATURE_TIER_COMMENT_RE.finditer(text):
+                feature, tail = m.groups()
+                tm = _TIER_MENTION_RE.search(tail)
+                if tm:
+                    found.append((os.path.relpath(path, _LAMBDAS), feature, int(tm.group(1))))
+    return found
+
+
+def test_feature_tier_prose_matches_live_cutoff_table():
+    """Every `budget_guard.allow("<feature>")` call whose nearby comment claims
+    a "tier-N pause" must name the tier that FEATURE_CUTOFF actually assigns
+    that feature — catches the coach_memoir_lambda.py class (#2000) where the
+    prose said tier-1 but the live table says tier-2."""
+    hits = _scan_feature_tier_comments()
+    assert hits, "expected to find at least one 'budget_guard.allow(...) ... tier-N pause' comment to check"
+    cut = budget_guard._FEATURE_CUTOFF
+    for path, feature, claimed_tier in hits:
+        assert feature in cut, f"{path}: comment names unclassified feature {feature!r}"
+        assert claimed_tier == cut[feature], (
+            f"{path}: comment claims {feature!r} pauses at tier-{claimed_tier}, "
+            f"but budget_guard._FEATURE_CUTOFF[{feature!r}] == {cut[feature]} — stale prose (#2000 class)"
+        )

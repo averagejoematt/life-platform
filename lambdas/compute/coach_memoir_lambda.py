@@ -10,8 +10,8 @@ outcomes — and gated so a memoir that only lists wins never publishes
 Cost & safety rails:
   * Sonnet (narrative tier, per CLAUDE.md's model-tiering rule) — this is
     long-form first-person prose, not a structured extraction.
-  * budget_guard.allow("coach_narrative") — tier-1 pause, same cutoff as
-    every other coach narrative surface (coach_narrative_orchestrator,
+  * budget_guard.allow("coach_narrative") — tier-2 pause (ADR-125), same
+    cutoff as every other coach narrative surface (coach_narrative_orchestrator,
     elena_state_updater).
   * Fires AT MOST once per coach per calendar quarter: a MEMOIR#{quarter}
     DynamoDB sentinel is checked before generating and written after a
@@ -51,7 +51,7 @@ S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 MODEL = os.environ.get("AI_MODEL", "claude-sonnet-4-6")  # narrative tier (CLAUDE.md model-tiering rule)
 OUTPUT_KEY = "generated/coach_memoirs.json"
-FEATURE = "coach_narrative"  # budget_guard cutoff: paused at tier 1, same as every other coach narrative
+FEATURE = "coach_narrative"  # budget_guard cutoff: paused at tier 2 (ADR-125), same as every other coach narrative
 
 _SYSTEM_RULES = (
     "You are an AI coach character writing your own quarterly memoir for a public "

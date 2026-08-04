@@ -398,3 +398,71 @@ def test_recent_unique_visitors_read_failure_returns_none(gov, monkeypatch):
 
     monkeypatch.setattr(gov, "_cw", _BrokenCW())
     assert gov._recent_unique_visitors(datetime(2026, 7, 8, tzinfo=timezone.utc)) is None
+
+
+# ── #1998: _alert_surge must format from the ACTIVE ceiling pair ────────────
+# _alert_surge predates _TEMP_CEILING_WINDOW and formatted every dollar figure
+# from the bare MONTHLY_CEILING/SURGE_CEILING_USD module constants — correct
+# out-of-window, wrong for the duration of any dated temp-ceiling raise (the
+# handler's real enforcement math goes through _active_ceilings()/
+# _effective_ceiling(), so a surge during a raised window would email "$85 ->
+# $100" while the guard was actually enforcing $115 -> $135). This freezes the
+# clock inside the July-2026 window and checks the emailed pair directly —
+# the test_budget_guard_ladder lockstep pattern, applied to the surge alert.
+
+
+class _FakeSNS:
+    def __init__(self):
+        self.calls = []
+
+    def publish(self, **kwargs):
+        self.calls.append(kwargs)
+
+
+def test_alert_surge_engage_uses_active_ceilings_in_temp_window(gov, monkeypatch):
+    # The autouse _pin_base_ceilings fixture pins _active_ceilings to the base
+    # pair for every OTHER test in this module; undo that here so _alert_surge
+    # sees the real, date-scoped resolution this test is about.
+    monkeypatch.setattr(gov, "_active_ceilings", gov._REAL_ACTIVE_CEILINGS)
+    monkeypatch.setattr(gov, "datetime", _clock_at(date(2026, 7, 21)))  # inside the $115/$135 window
+    fake_sns = _FakeSNS()
+    monkeypatch.setattr(gov, "_sns", fake_sns)
+
+    gov._alert_surge(active=True, recent_uniques=950, mtd=90.0, projected=120.0)
+
+    assert len(fake_sns.calls) == 1
+    subj = fake_sns.calls[0]["Subject"]
+    body = fake_sns.calls[0]["Message"]
+    assert "$115" in subj and "$135" in subj, f"subject must carry the ACTIVE pair, not the base constants: {subj!r}"
+    assert "$115" in body and "$135" in body, f"body must carry the ACTIVE pair, not the base constants: {body!r}"
+    assert "$85" not in subj and "$100" not in subj, f"subject must not fall back to the out-of-window base pair: {subj!r}"
+
+
+def test_alert_surge_disengage_uses_active_ceilings_in_temp_window(gov, monkeypatch):
+    monkeypatch.setattr(gov, "_active_ceilings", gov._REAL_ACTIVE_CEILINGS)
+    monkeypatch.setattr(gov, "datetime", _clock_at(date(2026, 7, 21)))
+    fake_sns = _FakeSNS()
+    monkeypatch.setattr(gov, "_sns", fake_sns)
+
+    gov._alert_surge(active=False, recent_uniques=850, mtd=90.0, projected=100.0)
+
+    assert len(fake_sns.calls) == 1
+    subj = fake_sns.calls[0]["Subject"]
+    body = fake_sns.calls[0]["Message"]
+    assert "$115" in subj, f"subject must revert to the ACTIVE base ($115 in this window), not $85: {subj!r}"
+    assert "$135" in body and "$115" in body, f"body must name the ACTIVE pair reverted from/to: {body!r}"
+
+
+def test_alert_surge_out_of_window_still_uses_the_default_base(gov, monkeypatch):
+    """Outside any temp window, _active_ceilings() resolves to the bare
+    MONTHLY_CEILING/SURGE_CEILING_USD constants anyway, so the alert copy is
+    unchanged there — this pins that the fix didn't just hardcode the window."""
+    monkeypatch.setattr(gov, "_active_ceilings", gov._REAL_ACTIVE_CEILINGS)
+    monkeypatch.setattr(gov, "datetime", _clock_at(date(2026, 9, 1)))  # well outside the window
+    fake_sns = _FakeSNS()
+    monkeypatch.setattr(gov, "_sns", fake_sns)
+
+    gov._alert_surge(active=True, recent_uniques=950, mtd=50.0, projected=80.0)
+
+    subj = fake_sns.calls[0]["Subject"]
+    assert "$85" in subj and "$100" in subj, f"outside any window the alert should use the base pair: {subj!r}"
