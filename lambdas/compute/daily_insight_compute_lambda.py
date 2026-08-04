@@ -60,7 +60,7 @@ from decimal import Decimal
 
 import boto3
 from common import stats_core  # bundled shared module (#529/#535): effective-n so drift significance isn't inflated by autocorrelation
-from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #2109
 from health import personal_baselines  # #543: percentile bands from Matthew's own distribution (ADR-105 r4)
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
@@ -128,14 +128,31 @@ def fetch_date(source, date_str):
 
 
 def fetch_range(source, start, end):
+    """Every record for `source` in [start, end], read PER-SOURCE cross-phase (#2109).
+
+    The insight engine's generic window reader. Its callers are the baseline-vs-recent
+    comparisons — the 14d-vs-28d biometric drift windows, the 14d withings/macrofactor
+    weight-and-intake windows, the 30d HRV baseline, the supplement-effect windows,
+    the changepoint series — plus a handful of EXPERIMENT_SCOPED reads
+    (`computed_metrics`, `habit_scores`) and a user-defined experiment metric whose
+    source is arbitrary.
+
+    Those two groups need OPPOSITE answers, which is why the decision is derived from
+    `phase_taxonomy` per source rather than fixed here (#2092's shape): a body's HRV
+    baseline does not reset when the experiment does, but the habit scores it is
+    compared against exist only inside the run that produced them. An arbitrary
+    experiment-metric source is unclassified and keeps the filter. See the block
+    comment on `experiment.phase_filter.source_reads_cross_phase`.
+    """
     try:
         records = []
+        cross_phase = source_reads_cross_phase(source)
         kwargs = {
             "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
             "ExpressionAttributeValues": {":pk": USER_PREFIX + source, ":s": "DATE#" + start, ":e": "DATE#" + end},
         }
         while True:
-            r = table.query(**with_phase_filter(kwargs))
+            r = table.query(**with_phase_filter(kwargs, include_pilot=cross_phase))
             records.extend(d2f(i) for i in r.get("Items", []))
             if "LastEvaluatedKey" not in r:
                 break

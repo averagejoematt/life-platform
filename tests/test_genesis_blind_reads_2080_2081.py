@@ -106,11 +106,14 @@ class PhaseAwareFakeTable:
                 items = [it for it in items if lo <= it["sk"] <= hi]
         else:  # the boto3 Key() condition object form
             expr = cond.get_expression() if cond is not None else None
-            for pk_val, sk_prefix in _flatten_key_condition(expr):
+            for pk_val, sk_prefix, sk_range in _flatten_key_condition(expr):
                 if pk_val is not None:
                     items = [it for it in items if it.get("pk") == pk_val]
                 if sk_prefix is not None:
                     items = [it for it in items if str(it["sk"]).startswith(sk_prefix)]
+                if sk_range is not None:
+                    lo, hi = sk_range
+                    items = [it for it in items if lo <= str(it["sk"]) <= hi]
 
         items.sort(key=lambda it: it["sk"], reverse=not kwargs.get("ScanIndexForward", True))
 
@@ -125,7 +128,15 @@ class PhaseAwareFakeTable:
 
 
 def _flatten_key_condition(expr):
-    """Yield (pk_value, sk_begins_with_prefix) pairs from a boto3 Key condition."""
+    """Yield (pk_value, sk_begins_with_prefix, sk_between_bounds) from a boto3 Key
+    condition — exactly one member of each triple is non-None.
+
+    `between` is honoured (#2109) because `intelligence_common.build_data_inventory`
+    expresses its 90-day sweep as `Key("sk").between(...)` in the Key-OBJECT form. A
+    fake that silently ignored the bound would return the whole partition, which would
+    make "the window still bounds the answer" untestable there — and, worse, would let
+    a COUNT assertion pass for the wrong reason.
+    """
     if expr is None:
         return
     operator = expr.get("operator")
@@ -137,9 +148,11 @@ def _flatten_key_condition(expr):
     attr, operand = values[0], values[1]
     name = getattr(attr, "name", None)
     if name == "pk" and operator == "=":
-        yield operand, None
+        yield operand, None, None
     elif name == "sk" and operator == "begins_with":
-        yield None, operand
+        yield None, operand, None
+    elif name == "sk" and operator == "BETWEEN":
+        yield None, None, (operand, values[2])
 
 
 def _rows(pk, field, values_by_date, genesis=_GENESIS):

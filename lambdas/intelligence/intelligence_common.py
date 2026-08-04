@@ -23,7 +23,7 @@ from boto3.dynamodb.conditions import Key
 from coach.voice_register_guard import sanitize_summary  # #1987: deterministic voice-register check
 from common.text_utils import truncate_at_word  # #1224: word-boundary summary truncation (no mid-word cut)
 from experiment import calibration_core  # #538: the shared prediction-calibration scorer (Brier + reliability)
-from experiment.phase_filter import with_phase_filter  # ADR-058
+from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #2109
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +84,23 @@ def build_data_inventory() -> dict:
 
     Returns dict of source → {exists, latest, records, days_of_data}.
     Used by data maturity, coach prompts, and the intelligence validator.
+
+    Read PER-SOURCE cross-phase (#2109). This is the #1203 liveness/recency shape at
+    its highest-leverage site: `days_of_data` is what `_MATURITY_THRESHOLDS` compares
+    against to decide whether a coach speaks in ORIENTATION, EMERGING or ESTABLISHED
+    voice, and `latest` is what the validator calls staleness. Phase-filtered, both
+    answered "the cycle's age" instead of "the pipe's history" — measured on cycle 12
+    Day 2, the 90-day COUNT over SOURCE#whoop returned 137 rows unfiltered and 1
+    filtered, so every coach was pushed back to "I have 1 night of data" the morning
+    after a reset, and the platform reported its own pipes as days old.
+
+    That is the exact question the phase tag must not answer: a maturity threshold is
+    a claim about how much of the BODY has been measured, and the body's record does
+    not reset when the experiment does (#2079/#2089). The window (90 days) is what
+    bounds it. Every partition in `_INVENTORY_SOURCES` is RAW_TIMESERIES or CROSS_PHASE
+    today, so all of them read cross-phase — but the decision is derived per partition
+    from `phase_taxonomy` (#2092's shape), so adding an EXPERIMENT_SCOPED partition to
+    the inventory later keeps its filter without anyone remembering to ask.
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     d90 = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d")
@@ -101,18 +118,24 @@ def build_data_inventory() -> dict:
 
         try:
             pk = f"{USER_PREFIX}{partition}"
-            # Count records in last 90 days (ADR-058: phase=pilot filtered)
+            # #2109: cross-phase unless the partition is EXPERIMENT_SCOPED — see the docstring.
+            cross_phase = source_reads_cross_phase(partition)
+            # Count records in last 90 days
             resp = table.query(
                 **with_phase_filter(
                     {
                         "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{d90}", f"DATE#{today}~"),
                         "Select": "COUNT",
-                    }
+                    },
+                    include_pilot=cross_phase,
                 )
             )
             count = resp.get("Count", 0)
 
-            # Get latest record (ADR-058: phase=pilot filtered)
+            # Get latest record. NB the Limit:1 half is the #1203 mechanism verbatim —
+            # DynamoDB applies Limit BEFORE FilterExpression, so a filtered read here
+            # returned the newest row, discarded it for being pilot-tagged, and reported
+            # `latest: None` for a partition ingesting normally.
             latest_resp = table.query(
                 **with_phase_filter(
                     {
@@ -120,7 +143,8 @@ def build_data_inventory() -> dict:
                         "ScanIndexForward": False,
                         "Limit": 1,
                         "ProjectionExpression": "sk",
-                    }
+                    },
+                    include_pilot=cross_phase,
                 )
             )
             latest_items = latest_resp.get("Items", [])
@@ -137,7 +161,8 @@ def build_data_inventory() -> dict:
                             "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{d90}", f"DATE#{today}~"),
                             "FilterExpression": "attribute_exists(blood_glucose_avg)",
                             "Select": "COUNT",
-                        }
+                        },
+                        include_pilot=cross_phase,
                     )
                 )
                 count = cgm_resp.get("Count", 0)

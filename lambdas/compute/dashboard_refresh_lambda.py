@@ -18,7 +18,7 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
-from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #2109
 from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
@@ -62,6 +62,14 @@ def fetch_date(source, date_str):
 
 
 def fetch_range(source, start, end):
+    """Every record for `source` in [start, end], read PER-SOURCE cross-phase (#2109).
+
+    Same trailing-window class as the metrics engine, one surface over: the 7/14-day
+    weight windows, the week and 60-day Strava/Hevy windows behind the dashboard's
+    Banister CTL/ATL/TSB, and the lookback block that pairs macrofactor/strava/habitify/
+    withings. All truncate to the cycle's age post-reset. Derived per source (#2092's
+    shape); see `experiment.phase_filter.source_reads_cross_phase`.
+    """
     try:
         r = table.query(
             **with_phase_filter(
@@ -72,7 +80,8 @@ def fetch_range(source, start, end):
                         ":s": "DATE#" + start,
                         ":e": "DATE#" + end,
                     },
-                }
+                },
+                include_pilot=source_reads_cross_phase(source),
             )
         )
         return [d2f(i) for i in r.get("Items", [])]

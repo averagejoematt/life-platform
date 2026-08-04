@@ -36,7 +36,7 @@ from decimal import Decimal
 import boto3
 from common import stats_core
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
-from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #2109
 
 try:
     from common.platform_logger import get_logger
@@ -86,7 +86,20 @@ from common.digest_utils import d2f  # shared bundled helpers (#970)
 
 
 def fetch_series(source, field, start, end):
-    """Date-ordered (date, value) list for one metric; days without the field drop out."""
+    """Date-ordered (date, value) list for one metric; days without the field drop out.
+
+    Read PER-SOURCE cross-phase (#2109). This series is the forecast's TRAINING data
+    and, via `actuals_by_source`, the ground truth every matured forecast is graded
+    against — so truncating it to the cycle's age fits ADR-105-graded forecasts on stub
+    windows at exactly the moment a fresh cycle is most watched. The EWMA simply
+    declines to issue below its minimum n, so the visible failure is silence rather
+    than a wrong number; the honest fix is to give it the history that exists.
+
+    Derived per source (#2092's shape) rather than flipped, so a metric added to
+    METRICS later inherits the right behaviour from its source's class instead of from
+    this line. See `experiment.phase_filter.source_reads_cross_phase`.
+    """
+    cross_phase = source_reads_cross_phase(source)
     kwargs = {
         "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
         "ExpressionAttributeValues": {
@@ -97,7 +110,7 @@ def fetch_series(source, field, start, end):
     }
     rows = []
     while True:
-        r = table.query(**with_phase_filter(dict(kwargs)))
+        r = table.query(**with_phase_filter(dict(kwargs), include_pilot=cross_phase))
         rows.extend(r.get("Items", []))
         if "LastEvaluatedKey" not in r:
             break
