@@ -106,14 +106,16 @@ def _payload(resp):
 
 
 def test_metric_reads_are_batched_into_a_single_call(cw):
-    """THE regression guard. 6 models + 19 lambdas is 50 metric series; pre-fix that was
-    ~62 serial round trips. It must now be ONE."""
+    """THE regression guard. 6 models x 4 metrics (in/out/cache_read/cache_write, #1997)
+    + 19 lambdas x 2 metrics is 62 metric series; pre-#1911 fix that was ~62 SERIAL round
+    trips. It must now be ONE batched call."""
     _payload(sad.handle_inference_receipt())
     assert cw.calls["get_metric_statistics"] == 0, "no serial per-metric fan-out may remain"
     assert cw.calls["get_metric_data"] == 1, f"expected exactly 1 batched read, got {cw.calls['get_metric_data']}"
     assert cw.calls["list_metrics"] == 2, "one discovery call per namespace"
-    # 6 models x 2 metrics + 19 lambdas x 2 metrics = 50 series, all in the one call.
-    assert cw.query_counts == [50], f"all series must ride the single call, got {cw.query_counts}"
+    # 6 models x 4 metrics (in/out/cache_read/cache_write) + 19 lambdas x 2 metrics = 62
+    # series, all in the one call.
+    assert cw.query_counts == [62], f"all series must ride the single call, got {cw.query_counts}"
 
 
 def test_total_cloudwatch_calls_stay_constant_as_metrics_grow(monkeypatch):
@@ -163,6 +165,110 @@ def test_empty_metrics_makes_no_batched_call(monkeypatch):
     body = _payload(sad.handle_inference_receipt())
     assert fake.calls["get_metric_data"] == 0, "no metrics → no batched call"
     assert body["models"] == [] and body["features"] == []
+
+
+# ── #1997: cache pricing, Titan exclusion, and the 1.15x buffer ────────────────
+_SONNET_ID = "us.anthropic.claude-sonnet-4-6-v1:0"  # substring-matches "sonnet"
+_TITAN_ID = "amazon.titan-embed-text-v2:0"  # matches no family key — must stay unpriced
+
+# Governor prices as of this writing (lambdas/operational/cost_governor_lambda.py
+# _PRICES["sonnet"] + _AI_SAFETY_BUFFER) — hand-copied here deliberately so this test
+# fails loudly if either drifts, rather than silently tracking a moving target.
+_SONNET_IN, _SONNET_OUT, _SONNET_CR, _SONNET_CW = 3.00, 15.00, 0.30, 3.75
+_BUFFER = 1.15
+
+_TOKENS = {
+    (_SONNET_ID, "InputTokenCount"): 1000.0,
+    (_SONNET_ID, "OutputTokenCount"): 200.0,
+    (_SONNET_ID, "CacheReadInputTokenCount"): 500.0,
+    (_SONNET_ID, "CacheWriteInputTokenCount"): 50.0,
+    (_TITAN_ID, "InputTokenCount"): 400.0,
+    (_TITAN_ID, "OutputTokenCount"): 0.0,
+    (_TITAN_ID, "CacheReadInputTokenCount"): 10.0,
+    (_TITAN_ID, "CacheWriteInputTokenCount"): 0.0,
+}
+
+
+class _PricingCW:
+    """One sonnet-family model + one unmatched (Titan) model, no lambda features."""
+
+    def __init__(self):
+        self.calls = {"list_metrics": 0, "get_metric_data": 0, "get_metric_statistics": 0}
+
+    def list_metrics(self, Namespace, MetricName, **kw):
+        self.calls["list_metrics"] += 1
+        if Namespace == "AWS/Bedrock":
+            return {"Metrics": [{"Dimensions": [{"Name": "ModelId", "Value": m}]} for m in (_SONNET_ID, _TITAN_ID)]}
+        return {"Metrics": []}
+
+    def get_metric_statistics(self, **kw):  # pragma: no cover
+        raise AssertionError("must not fan out serial calls")
+
+    def get_metric_data(self, MetricDataQueries, StartTime, EndTime, **kw):
+        self.calls["get_metric_data"] += 1
+        results = []
+        for q in MetricDataQueries:
+            stat = q["MetricStat"]["Metric"]
+            key = (stat["Dimensions"][0]["Value"], stat["MetricName"])
+            val = _TOKENS.get(key, 0.0)
+            # A single reading today — keeps "today" and "month" identical, isolating
+            # the pricing arithmetic from the day-bucketing logic (already covered above).
+            results.append({"Id": q["Id"], "Timestamps": [_NOW], "Values": [val]})
+        return {"MetricDataResults": results}
+
+
+@pytest.fixture
+def pricing_cw(monkeypatch):
+    fake = _PricingCW()
+    monkeypatch.setattr(sad.boto3, "client", lambda s, **k: fake if s == "cloudwatch" else _FakeSSM())
+    return fake
+
+
+def test_cache_tokens_and_buffer_priced_into_sonnet_row(pricing_cw):
+    """Acceptance bullet 1 + 3: cache read/write tokens are priced at the governor's
+    cache rates, and the x1.15 safety buffer is applied — matching cost_governor_lambda
+    _ai_cost() exactly."""
+    body = _payload(sad.handle_inference_receipt())
+    sonnet_row = next(r for r in body["models"] if r["model"] == _SONNET_ID)
+
+    expected_raw = (1000.0 * _SONNET_IN + 200.0 * _SONNET_OUT + 500.0 * _SONNET_CR + 50.0 * _SONNET_CW) / 1_000_000
+    expected_cost = round(expected_raw * _BUFFER, 4)
+
+    assert sonnet_row["today"]["est_cost_usd"] == expected_cost
+    assert sonnet_row["month"]["est_cost_usd"] == expected_cost
+    assert sonnet_row["today"]["cache_read_tokens"] == 500
+    assert sonnet_row["today"]["cache_write_tokens"] == 50
+
+
+def test_titan_shows_tokens_with_no_fabricated_price(pricing_cw):
+    """Acceptance bullet 2: an unmatched model (Titan/embeddings) shows real token
+    counts but est_cost_usd is None — never a silent Sonnet-rate guess."""
+    body = _payload(sad.handle_inference_receipt())
+    titan_row = next(r for r in body["models"] if r["model"] == _TITAN_ID)
+
+    assert titan_row["today"]["input_tokens"] == 400
+    assert titan_row["today"]["cache_read_tokens"] == 10
+    assert titan_row["today"]["est_cost_usd"] is None
+    assert titan_row["month"]["est_cost_usd"] is None
+
+
+def test_month_total_reflects_only_priced_rows(pricing_cw):
+    """ai_month_to_date_usd must never carry a Sonnet-rate guess for Titan's tokens —
+    it should equal exactly the sonnet row's contribution (month_total is rounded to
+    2dp for display, the per-row figure to 4dp — round before comparing)."""
+    body = _payload(sad.handle_inference_receipt())
+    sonnet_row = next(r for r in body["models"] if r["model"] == _SONNET_ID)
+    assert body["ai_month_to_date_usd"] == round(sonnet_row["month"]["est_cost_usd"], 2)
+
+
+def test_note_is_honest_about_unpriced_models(pricing_cw):
+    """Acceptance bullet 2: the note must say, in-line, that an unpriced model was
+    excluded and why — not silently omit it."""
+    body = _payload(sad.handle_inference_receipt())
+    assert _TITAN_ID in body["note"]
+    assert "no verified per-token price" in body["note"]
+    # the ceiling-figure substrings other tests pin must survive this change.
+    assert "$75" not in body["note"]
 
 
 def test_iam_grants_get_metric_data():

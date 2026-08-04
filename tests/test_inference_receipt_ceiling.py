@@ -31,6 +31,7 @@ _REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO / "lambdas"))
 sys.path.insert(0, str(_REPO / "lambdas" / "web"))
 
+from operational import cost_governor_lambda as cg  # noqa: E402  # #1997: drift guard needs the QUALIFIED import path
 from web import site_api_intelligence as sad  # noqa: E402  # #1240: handle_inference_receipt moved to site_api_intelligence
 
 
@@ -139,6 +140,39 @@ def test_receipt_falls_back_to_85_never_75_on_ssm_failure(monkeypatch):
     assert body["budget_ceiling_usd"] == 85.0
     assert body["budget_ceiling_usd"] != 75
     assert body["budget_surge_active"] is False
+
+
+# ── 1b. #1997 — the receipt's price table CANNOT drift from the governor's ────
+# Must use the QUALIFIED `from operational import cost_governor_lambda` path, matching
+# how site_api_intelligence.py itself imports it — the unqualified `import
+# cost_governor_lambda` some older tests use (test_receipts_endpoint.py,
+# test_budget_guard_ladder.py, both of which add lambdas/operational to sys.path
+# directly) creates a SEPARATE module object under a different sys.modules key, so a
+# comparison against that copy would prove nothing (known repo trap: a re-export via
+# the wrong import path is not the same object, silently).
+def test_receipt_prices_are_the_governors_prices_not_a_copy():
+    """The receipt's _BEDROCK_PRICES must be the governor's _PRICES object (imported,
+    never hand-copied) — key-for-key equal, including cache_read/cache_write for every
+    family, so the two tables cannot silently drift."""
+    assert sad._BEDROCK_PRICES is cg._PRICES
+    assert set(sad._BEDROCK_PRICES.keys()) == set(cg._PRICES.keys())
+    for family, price in cg._PRICES.items():
+        assert sad._BEDROCK_PRICES[family] == price
+        assert set(price.keys()) >= {"in", "out", "cache_read", "cache_write"}
+
+
+def test_receipt_safety_buffer_is_the_governors_safety_buffer():
+    assert sad._AI_SAFETY_BUFFER == cg._AI_SAFETY_BUFFER
+
+
+def test_price_for_model_never_guesses_for_an_unmatched_model():
+    """#1997 acceptance bullet 2: an unmatched model (e.g. Titan/embeddings) must
+    return None — never a fallback price (the old bug silently priced it at Sonnet)."""
+    assert sad._price_for_model("amazon.titan-embed-text-v2:0") is None
+    assert sad._price_for_model("some-future-unknown-model") is None
+    assert sad._price_for_model("") is None
+    # known families still resolve correctly.
+    assert sad._price_for_model("us.anthropic.claude-sonnet-4-6-v1:0") == cg._PRICES["sonnet"]
 
 
 # ── 2. bedrock_client message carries no literal figure ───────────────────────

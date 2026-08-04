@@ -32,6 +32,14 @@ from common import stats_core  # #1240: sanctioned stats implementation (ADR-105
 from experiment import experiment_gates  # #1371: arming thresholds served to zero-states — same objects the engines enforce
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1197
 
+# #1997: import (never hand-copy) the governor's price table + safety buffer so the
+# public inference receipt cannot silently drift from the number that actually gates
+# the budget tier. Importing the module executes its body — it constructs its own
+# cloudwatch/ssm/sns/ce boto3 clients (pure local object construction, no network call,
+# no new IAM requirement since site-api's role never calls their methods) — a deliberate,
+# informed cold-start tradeoff over a second hand-maintained copy that can drift.
+from operational.cost_governor_lambda import _AI_SAFETY_BUFFER, _PRICES as _BEDROCK_PRICES
+
 from web.site_api_common import (
     DDB_REGION,
     EXPERIMENT_BASELINE_WEIGHT_LBS,
@@ -2105,20 +2113,22 @@ def handle_state_of_matthew() -> dict:
 # LifePlatform/AI. This endpoint reads both, prices them with the same table
 # the cost governor enforces, and publishes the meter.
 # ══════════════════════════════════════════════════════════════════════════════
-_BEDROCK_PRICES = {  # USD per 1M tokens — keep in sync with cost_governor_lambda._PRICES
-    "fable": {"in": 10.00, "out": 50.00},
-    "sonnet": {"in": 3.00, "out": 15.00},
-    "haiku": {"in": 1.00, "out": 5.00},
-    "opus": {"in": 5.00, "out": 25.00},
-}
+# _BEDROCK_PRICES / _AI_SAFETY_BUFFER are imported above, straight from the governor —
+# see the #1997 comment at the import site. Nothing hand-maintained here anymore.
 
 
-def _price_for_model(model_id: str) -> dict:
+def _price_for_model(model_id: str):
+    """Match against the governor's own family keys (imported, not copied — #1997).
+    Returns None — never a fallback price — for a model outside those families (e.g.
+    amazon.titan-embed-text-v2, an embedding model with no verified per-token price
+    anywhere in this codebase). ADR-104 forbids inventing a number we can't ground;
+    the old Sonnet-rate fallback was exactly that. Callers treat None as: show token
+    counts, omit the dollar estimate — never silently price it."""
     m = (model_id or "").lower()
     for k, p in _BEDROCK_PRICES.items():
         if k in m:
             return p
-    return _BEDROCK_PRICES["sonnet"]
+    return None
 
 
 # #1230: the ADR-133 base ceiling (amendment 2026-07-08, $75→$85). The live ceiling is
@@ -2226,7 +2236,14 @@ def handle_inference_receipt() -> dict:
             if not mid:
                 continue
             model_ids.append(mid)
-            for field, metric_name in (("in", "InputTokenCount"), ("out", "OutputTokenCount")):
+            # #1997: cache read/write ride the same sweep as in/out — the governor's own
+            # _ai_cost() reads these four metrics per model; the receipt must match.
+            for field, metric_name in (
+                ("in", "InputTokenCount"),
+                ("out", "OutputTokenCount"),
+                ("cache_read", "CacheReadInputTokenCount"),
+                ("cache_write", "CacheWriteInputTokenCount"),
+            ):
                 qid = f"q{len(specs)}"
                 qid_map[("model", mid, field)] = qid
                 specs.append((qid, "AWS/Bedrock", metric_name, "ModelId", mid))
@@ -2246,19 +2263,41 @@ def handle_inference_receipt() -> dict:
         series = _batch_daily(specs)
 
         models = []
+        unpriced_models = set()
         for mid in model_ids:
             price = _price_for_model(mid)
             in_month, in_today = _split(series.get(qid_map[("model", mid, "in")], []))
             out_month, out_today = _split(series.get(qid_map[("model", mid, "out")], []))
+            cr_month, cr_today = _split(series.get(qid_map[("model", mid, "cache_read")], []))
+            cw_month, cw_today = _split(series.get(qid_map[("model", mid, "cache_write")], []))
             row = {"model": mid.split("/")[-1]}
-            for label, tin, tout in (("today", in_today, out_today), ("month", in_month, out_month)):
+            for label, tin, tout, tcr, tcw in (
+                ("today", in_today, out_today, cr_today, cw_today),
+                ("month", in_month, out_month, cr_month, cw_month),
+            ):
+                est_cost = None
+                if price is not None:
+                    raw = (tin * price["in"] + tout * price["out"] + tcr * price["cache_read"] + tcw * price["cache_write"]) / 1_000_000
+                    # #1997: buffer applied per-row (not just to the aggregate) so every
+                    # displayed dollar figure — today, month, and sum(rows) == total —
+                    # stays consistent, matching the governor's _ai_cost() x1.15.
+                    est_cost = round(raw * _AI_SAFETY_BUFFER, 4)
                 row[label] = {
                     "input_tokens": int(tin),
                     "output_tokens": int(tout),
-                    "est_cost_usd": round((tin * price["in"] + tout * price["out"]) / 1_000_000, 4),
+                    "cache_read_tokens": int(tcr),
+                    "cache_write_tokens": int(tcw),
+                    "est_cost_usd": est_cost,
                 }
-            if row["month"]["input_tokens"] or row["month"]["output_tokens"]:
+            if (
+                row["month"]["input_tokens"]
+                or row["month"]["output_tokens"]
+                or row["month"]["cache_read_tokens"]
+                or row["month"]["cache_write_tokens"]
+            ):
                 models.append(row)
+                if price is None:
+                    unpriced_models.add(row["model"])
 
         features = []
         for fn in fn_names:
@@ -2286,13 +2325,26 @@ def handle_inference_receipt() -> dict:
         except Exception:
             pass
 
-        month_total = round(sum(r["month"]["est_cost_usd"] for r in models), 2)
+        # #1997: unpriced (e.g. Titan/embedding) rows contribute tokens, not dollars —
+        # None rows are skipped rather than treated as $0 or guessed at Sonnet rates.
+        month_total = round(sum(r["month"]["est_cost_usd"] for r in models if r["month"]["est_cost_usd"] is not None), 2)
         surge_clause = " — reader-traffic surge mode" if surge_active else ""
+        unpriced_clause = ""
+        if unpriced_models:
+            plural = "s" if len(unpriced_models) != 1 else ""
+            unpriced_clause = (
+                f" {len(unpriced_models)} model{plural} this period ({', '.join(sorted(unpriced_models))}) "
+                "have no verified per-token price in this codebase (e.g. embedding models) — "
+                "token counts are shown, no dollar figure is estimated for them, and they are "
+                "excluded from the total below rather than guessed."
+            )
         note = (
             "Every Claude call routes through one audited chokepoint (ADR-062). "
-            "Costs are estimated from token metrics x list prices — the same math "
-            f"the budget governor enforces. The ${_ADR133_BASE_CEILING_USD:.0f} base ceiling "
-            f"(${ceiling_usd:.0f} in effect{surge_clause}) covers the WHOLE platform, not just AI."
+            "Costs are estimated from token metrics (including cache read/write) x "
+            "list prices, x1.15 — the same math and the same x1.15 safety buffer the "
+            f"budget governor enforces.{unpriced_clause} The ${_ADR133_BASE_CEILING_USD:.0f} "
+            f"base ceiling (${ceiling_usd:.0f} in effect{surge_clause}) covers the WHOLE "
+            "platform, not just AI."
         )
         return _ok(
             {
