@@ -2151,6 +2151,37 @@
         }
       ],
       "why_it_mattered": "A reset used to be the platform's least trustworthy moment — the day counters zero and every promise is briefly unverifiable. This one shipped with the receipts attached: any reader can hash the frozen plan from a terminal and match it against the page, and the gate that demands that proof now runs on every future cycle automatically. The honesty ledger got bigger too, deliberately — 1,435 bets that died ungraded at past resets are finally counted against the record instead of quietly shrinking the denominator."
+    },
+    {
+      "id": "2026-08-04-the-body-doesnt-reset-with-the-experiment",
+      "date": "2026-08-04",
+      "title": "The body doesn't reset with the experiment — three genesis-blind readers fixed before Day 2",
+      "shipped": "Cycle 12 was one day old when three readers that would have lied about it got fixed. The daily brief's staleness scan read the newest row, filtered it out for belonging to the old cycle, and would have reported every sensor dead on Day 1. The anomaly detector's 30-day baseline held only post-genesis days, so it would have been off for a week and then over-fired on a too-tight variance until day 30. And the brief's trend windows — HRV, training load, weight — would have computed on truncated data. All three now read across cycle boundaries, because heart-rate variance and body weight are properties of a body, not of an experiment generation; one read (weekly habit scores) deliberately stays cycle-scoped because habits genuinely do reset. Alongside: a re-authed credential now clears its own circuit-breaker latch instead of leaving the source dark for up to a day, and the public challenges catalog stopped crediting six retired coach personas on 49 cards — a fix that was live-verified at zero off-roster names.",
+      "gotcha": "The catalog fix nearly enshrined the wrong bytes. The plan said 'the live object is the truth, backport it' — but there were THREE copies, and the live one at the bucket root was itself a superseded first-pass from July. The newest truth lived in a third location, and only a consistency test that names every off-roster value caught it before the byte-equality gate would have locked the stale cast in as canon. Measuring one copy against one other copy proves nothing when a third exists.",
+      "honest_miss": "The catalog promotion broke a test that still read the old seed path — invisible to the pull request's fast checks, red on the main branch's full suite for about an hour before a one-line fix landed. And three stale dependency-bot PRs turned out to be bumping manifest files that deploy nothing: the real libraries ship inside pre-built layer archives, one of which carries known CVEs that now have a scripted rebuild path but still await the actual rebuild.",
+      "prs": [
+        {
+          "label": "PR #2088",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2088"
+        },
+        {
+          "label": "PR #2092",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2092"
+        },
+        {
+          "label": "PR #2086",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2086"
+        },
+        {
+          "label": "PR #2091",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2091"
+        },
+        {
+          "label": "PR #2100",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2100"
+        }
+      ],
+      "why_it_mattered": "A fresh cycle's first week is exactly when the operator most needs honest instruments, and it is exactly when phase-filtered reads are at their most dishonest. The class is now dead at every reader-facing call site the ratchet can see — and the one blind spot the ratchet has (keys built from module constants) is filed as its own issue rather than assumed away."
     }
   ]
 }

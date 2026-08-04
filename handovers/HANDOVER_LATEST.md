@@ -1,125 +1,146 @@
-# HANDOVER — Cycle 12, sealed same-day: the full flush + 19 PRs — 2026-08-02 evening → 08-03 afternoon
+# HANDOVER — Day-1 max paydown + the stale-PR flush: 11 PRs, 8 issues, queue emptied twice — 2026-08-03 evening → 08-04
 
-> Instruction thread: *"Execute the pre-prepared plan at ~/.claude/plans/swift-clearing-dawn.md"* —
-> Matthew AT the keyboard, owner actions requested live one at a time; Fable drives only (preflight,
-> owner liaison, merge queue, reconciles, union verification, the reset, wrap); every implementer a
-> `worktree-implementer` on its issue's own `model:*` label. Then: *"yes go"* (prereg voids), *"yes"*
-> (config-twin + bible backport), *"go on"* (countdown + 3 flagged), *"ok keep going"*, *"yes go on
-> reset, clean slate"*, *"weekly fable is at 60%"*, *"ok whoop re-auth done"*.
+> Instruction thread: *"maximum backlog paydown down the stored rank with the same operating
+> model that worked: Fable drives only … every implementer a worktree-implementer on its issue's
+> own model:* label; waves of ≤5 … deploy-per-merge, not end-batch"* — plus, mid-session:
+> *"i see these 5 open prs in git for a while, can you decide whether to close, merge, squash,
+> etc. these so they are cleared?"* and one live decision from Matthew: **#2084 → promote to
+> config/ twin**.
 
-**Main:** green (`5cdffde2` per `check_main_green.py`; tip `ab8b3673` is a docs-only follow-on) — see the decode note in Residuals for the two transient in-session reds.
-**Docs:** `docs/engines/CHARACTER.md` cycle-12 re-verify (baseline block only); CONVENTIONS §4d third
-stranded state + MONITORING/TESTING updates shipped in-PR by implementers; ADR index unchanged.
-**Decisions:** none needed — the two governance-flavoured moves were already owner-decided or in-PR
-amendments (the #1951 kill-switch lift was Matthew's recorded decision; the CI-gate re-band ships as a
-dated ADR-125 amendment inside PR #2066).
-**Incidents:** 3 rows added — the #2064 site auto-rollback (LCP transient, #1526/#1911 class), the
-Whoop rotation-loss outage (dark 12:00Z→20:00Z), the Monitoring stack failed update (metric-filter
-dimensions 400).
-**Build beat:** 2026-08-03-cycle-12-sealed-same-day.
-**Closures:** #1622 #1896 #1927 #1934 #1951 #1974 #1979 #1986 #2010 #2023 #2051 #2052 #2057 #2060
-#2063 #2069 all commented (ADR-099 two-line verdicts; honest partials where live evidence waits).
-**Backlog:** Now live at 3 actionable (#2080 #2081 #2085, all filed this session); #2084 → Next (source-of-truth call first); Later sweep — no stale issues printed; hygiene violators on session issues all fixed (Outcome sections, Acceptance boxes, milestone, epic link, score grammar).
-**Alarms:** clean per `check_alarm_citations.py` (whoop auth alarm cited via #2069's registry entry).
+**Main:** green (`2f120b5c` — final run completed success; every merge this session deployed and
+gate-verified through six production-gate approvals). Three mid-session runs (7f4d24c7, cd69f763,
+5fa8d52f) redded ONLY their Unit Tests job on the #2091 seed-path break — decoded below, fixed
+same-hour by #2095; their Deploy/smoke/QA jobs were all green, no rollback fired.
+**Docs:** ADR-148 + ADR-139 amendment + CONVENTIONS §4a0 + MANAGED_WHERE_LEDGER rows all landed
+in-PR (#2094); layer-build runbook lives in PR #2100's body; no additional wrap-time pages needed —
+the doc machinery is green.
+**Decisions:** ADR-148 filed in-PR (#2094) — fast-lane required checks + auto-merge posture
+(Option C), CodeQL settled as stays-advisory.
+**Incidents:** 1 row added — main's full test suite red ~55min (the #2091 seed-path break;
+deploy path unaffected).
+**Build beat:** 2026-08-04-the-body-doesnt-reset-with-the-experiment.
+**Closures:** #2085 #2080 #2081 #2084 #2089 #1662 #2093 #2099 all commented (ADR-099 two-line
+verdicts; honest partials on #1662 and #2099 where the live half waits on owner-run commands).
+**Backlog:** corpus fully contract-clean — `check_backlog_hygiene.py` prints **OK** (zero
+violations zero advisories, first time including the queue rules); Now refilled by stored rank to
+#2090/#1383/#1114 (all `model:fable`) plus **#2104** (opus, filed at wrap by the alarm gate);
+Later sweep — no stale issues printed.
+**Alarms:** 1 red >72h, cited — `qa-smoke-failures` is REAL genesis-week reader dishonesty
+(a coach card citing pre-genesis 317.0 lb vs cockpit 322.0; a Home Day-1 temporal contradiction)
+→ filed **#2104** (Now) + `docs/alarm_citations.json` entry; gate green.
 **Stash/hooks:** clean — stash empty, hook freshness 🟢.
 
 ---
 
-## The headline: every phase of the plan closed, and cycle 12 went live SEALED on genesis day
+## What shipped (11 PRs merged, all deployed; 8 issues closed, 5 filed)
 
-**Phase 1 (un-strand + owner batch, live):** six production-gate approvals through the night flushed
-the entire stranded deploy queue (the #1901 class, twice diagnosed with #2075's new classifier once it
-merged mid-session). Both DDB reconciles applied with Matthew reviewing each plan: **1,435 + 69 prereg
-voids** (public count 273 → **1,708**, the #1893 correction landed), **382 countdown-gap stamps**
-including the 3 flagged rows he approved per-row. The config-twin first sync caught its own trap:
-**`podcast_series_bible.json`'s live S3 object was NEWER than the repo** (the owner-approved v2
-authorship correction) — a blind `--apply` would have reverted it; backported S3→repo first, then
-synced 6, then re-armed the workflow step (`--apply --strict`, PR #2061) which passed its first live
-run. #1896's remediation chain completed end-to-end: fabricated-verdict THREAD tombstoned under a
-conditional write, nutrition + labs analyses regenerated at tier 0, noscript rebake merged (#2064) —
-and the deploy path's own proof-rebake made the fix self-healing on every future deploy.
+**The Day-1-bite pair + the class members found en route (the session's spine):**
+- **#2080 + #2081 → PR #2088** (one PR, one implementer): the brief's per-source staleness scan
+  and the anomaly detector's 30-day baseline both read cross-phase now. Premise check: both
+  defects held verbatim — but the brief's claimed shared enabler was FALSE (neither site touches
+  `digest_utils`; nothing was threaded). Non-vacuity proven by real revert (10/19 tests fail).
+- **#2089 → PR #2092** (filed mid-session from #2088's verified leftover): the brief's trend
+  windows (`_latest_item`/`fetch_range` — HRV, Banister CTL/ATL/TSB, weight, latest measurements)
+  go cross-phase via a **taxonomy-derived** `include_pilot` — not a blanket flip, because
+  `fetch_range` also serves `habit_scores` which is EXPERIMENT_SCOPED and must stay filtered.
+- **#2085 → PR #2086**: a verified re-auth clears the AUTH_FAILURE breaker latch in the same
+  script run — wired through `setup/oauth_reauth_common.py` into all six oauth-facet re-auth
+  scripts, set derived from the registry, coverage test guards future scripts.
+- **#2084 → PR #2091** (owner decision: promote to config/ twin): measuring changed the bytes —
+  the bucket-root "live" object was itself the superseded 2026-07-11 cast; the roster-clean
+  #1904 bytes (site/config) are the twin. **Live defect fixed:** `/api/challenges` served 49
+  off-roster names; post-merge twin sync → **0 off-roster, 39/39 twins match** (live-verified).
+- **#1662 → PR #2094**: branch protection Option C as settings-as-code (`apply_branch_protection.py`
+  dry-run/apply/check, github_posture.json, drift-sentinel GitHub legs, ADR-148). **The live
+  mutation did NOT apply** — needs a repo-admin token (`GH_POSTURE_TOKEN` unset; sandbox blocks
+  settings mutation). One owner command closes it (below).
+- **#2093 → PR #2096**: the weight-recency test's import-time `TODAY` vs call-time `now()` flake
+  (bit #2092's own suite run at UTC midnight) — pinned through the repo's frozen-datetime seam,
+  with an explicit midnight-boundary test.
+- **#2099 → PR #2100** (filed from the dependabot verification, below): scripted deterministic
+  builds for the binary Lambda layers + manifest drift gate + fixed the **inert
+  `PILLOW_LAYER_VERSION`** (operational_stack hardcoded the v1 ARN — env bumps deployed nothing).
+  Findings: Pillow 12.3.0 is fully audit-clean; garth layer really carries 6 advisories (rebuild
+  clears 5); the last one needs the 0.3.x auth migration → filed **#2101** (Later).
 
-**Phase 2 (paydown):** two waves of ≤5 `worktree-implementer`s + driver fix-PRs = **19 PRs merged
-closing 16 issues**, serial squash-merge queue with driver rebases (literal conflicts always resolved
-to main's side, bot regen verified per merge). Highlights: the canary's infra/stored-state lane split
-(#2065 — a stale data row can never again revert a correct deploy), the CI truth gates re-banded to
-cutoff 3 with the ADR-125 argument made explicitly (#2066), the phantom-wedge fleet-level classifier +
-15-min watchdog (#2075 — wedge and queued-behind are byte-identical single-run; the discriminator is
-whether anything holds the group), calibration's 1MB-page truncation fixed by paginating only the
-CROSS_PHASE ledger (#2072 — lifetime Brier n 33→50, voided 971→1,708 live-verified), and the Whoop
-rotation-durability + call-site auth classifier (#2076).
+**Driver fix-PRs:** **#2087** — the hygiene checker's score-arithmetic advisory false-fired on
+exact half boundaries (0.375→0.38 tripped the float epsilon; `.2f` would trip 1.125→1.13
+half-even); Decimal ROUND_HALF_UP on both sides. **#2095** — `test_privacy_guard` still opened
+`seeds/content_filter.json` after #2091 promoted it; redded main's full suite (the PR fast lane
+never runs that test).
 
-**Phase 3 (the reset):** `restart_pipeline.py --genesis 2026-08-03 --apply`, clean slate, baseline
-**321.6** from the real genesis-morning weigh-in. Two invariant catches en route, both the machinery
-working: the census preflight caught `evening_ritual` unclassified (now RAW_TIMESERIES), and the
-prereg-void invariant caught **69 predictions orphaned by the countdown reconcile running AFTER the
-void reconcile** — reconcile ordering matters; the pipeline's exit-6 said exactly what to run.
-Post-apply: prereg sealed + published + hash-verified end-to-end (artifact sha == printed stamp ==
-`/api/calibration.prereg_seal`), predict-the-week live (W32), Day-1 character sheet computed (Level 1
-Foundation, zeroed), rendered verify **95/95**, semantic gate all-PASS **0 poisoned rows**,
-`restart_verify` **16/17** — the 17th (countdown-gap sweep) is structurally n/a on a same-day genesis
-(window inverted; no pre-genesis gap exists), and the 16th passing check was **#1979's completion gate
-merged this session, live for the first time, reporting 12/12 cycles sealed-or-grandfathered**.
+**The stale-PR flush (owner ask, all 5 cleared):** #2096 was already merged; **#1768** (portrait
+option round) closed unmerged with the work preserved at `ff5c74fadcd7` — ADR-106 makes the pick
+owner-only, #1114 stays open; **#1779** superseded by **PR #2097** (black 26.3.1 taken atomically
+with the 79-file reformat + every pin location + two dead pip-audit waivers retired);
+**#1778/#1780** closed with measured rationale — pillow/garminconnect ship via **offline-built
+layers**, so the manifest bumps deploy nothing, the manifests were stale in the *opposite*
+direction (live: Pillow 11.3.0, garminconnect 0.2.40), and garminconnect 0.3.x is
+code-incompatible with the lambda's garth-injection auth. **PR #2098** corrected the manifests to
+the verified deployed versions.
 
-**Phase 4:** resolved honestly for free — the "banked Fable delta" my plan pointed at had ALREADY
-completed in the 2026-08-02 concurrent session (`FULLREVIEW_2026-08-02_DELTA.md`, run 2 complete
-17/17; security A-→F on the genome endpoint, fixed same night). The stale premise was my own plan +
-the MEMORY.md index line; index fixed, no run-3 due one day after run 2.
+## Verifications run
 
-## Three same-day-genesis defects found live (the class the future-genesis fix never met)
+- Cycle-12 wrap deploy + build beat confirmed live before starting (85 beats, all green runs).
+- **#2079 acceptance box 4: still not confirmable** — every 08-03 coach run (17:01–17:40Z,
+  reset-transition window) logs `0 gradable / N qualitative (0%)`; needs the first genuinely
+  post-genesis run. Check `coach-state-updater` CloudWatch logs on 08-04 (#2079 closure comment
+  already records this).
+- Day-1 brief sane: one real send 17:10Z (grade 40/F prices pre-genesis Aug 2), honest source
+  presence (macrofactor 0 = the 24h lag), `JOURNAL_COACH BLOCKED empty` = the known genesis-week
+  present-None class, brief still sent.
+- Worktree cleanup: **134 → 19** registered worktrees (112 pruned — merged-PR branches with clean
+  status only; 14 CLOSED-unmerged + 1 open-PR + 1 dirty + brand-marks all deliberately kept).
 
-1. **The prereg essay lied twice on Day 1** — "Tomorrow morning —" opening and "the weigh-in is
-   tomorrow / *the day before Day 1*" sign-off, hardcoded eve framing. Fixed through ONE seam
-   (`_publishing_on_or_after_genesis()`) so the two ends can never disagree; tests pin the seam, not
-   the wall clock (the golden-test trap caught before it shipped — my first fix used `date.today()`
-   in the assertion path).
-2. **The #1986 noscript guard fired on honest emptiness** — a fresh bake has no week's-call block
-   until Sunday's first integrator run; the guard's contract is now conditional (if present → must
-   carry the registry lead), the #1985 nearest-marker lesson one guard over.
-3. **The seeder/publisher refuse-and-archive path works** — cycle-11's frozen artifact archived per
-   convention (`genesis_preregistration_2026-07-27_cycle11.json`), claims regenerated, never silently
-   changed.
+## Gotchas worth carrying
 
-## Gotchas worth carrying (beyond the memory topics)
-
-- **Reconcile ordering:** the countdown-gap reconcile tombstones PREDICTION rows → run
-  `reconcile_prereg_voids.py --apply` AFTER it (or trust the reset's invariant to demand it).
-- **Re-auth does not clear the auth-breaker latch** (#2085): Whoop stayed dark ~40 min after a good
-  re-auth until the `AUTH_FAILURE` marker was hand-deleted; the next run then gap-filled 3 days
-  cleanly, 0 errors.
-- **A CONFLICTING PR shows "no checks reported"** — GitHub never builds the merge commit, so
-  PR-triggered workflows never fire; it mimics the push-CI silent-death class perfectly (#2070 burned
-  ~30 agent-minutes on this).
-- **Multi-file rebase conflict resolution must iterate files one at a time** — a newline-joined
-  pathspec broke `checkout --ours` mid-rebase and force-pushed main's tip onto PR #2078's branch
-  (auto-closing it); recovered from the still-live rebase worktree + reopen. No content lost.
-- **`cdk synth` does not validate metric-filter dimensions** — CloudWatch Logs rejects dimensions on
-  plain-term patterns at deploy time only (#2067's filters → Monitoring stack rollback → #2073's
-  per-sender metric names).
-- **The truth-pass HIGH on Day 1 was the Whoop outage wearing a costume** — `/api/vitals` served the
-  08-01 night's sleep because no newer night existed; the re-auth + backfill is the fix, not a vitals
-  code change.
+- **An implementer that reverts the doc-sync pre-commit stamp reds its own PR's wiki gate** — the
+  stamp is REQUIRED on the branch (the gate checks the merge preview). The working flow: implementer
+  commits what the hook stages; driver regenerates via `sync_doc_metadata.py --apply` at each
+  rebase. Three rebases this session, all clean under that flow.
+- **"Live is truth" needs ALL the copies on the table** — #2084's bucket-root object was newer
+  than the seed but older than the third copy (`site/config/`, the #1904 roster-clean). The
+  implementer's parity test caught it before the twin codified a live defect. Measure-first
+  premise falls this session: 3 (digest_utils enabler, live-is-truth, dependabot's
+  manifest-deploys-something assumption).
+- **The PR fast lane does not run the full suite** — #2091 broke a main-only test (seed-path
+  read in `test_privacy_guard`), invisible until the push run. With ADR-148's required checks
+  scoped to the fast lane, this class lands by design; the full suite stays the push-run's job
+  and the fix bar is same-hour (#2095 was one line).
+- **Dependabot watches manifests that may deploy nothing** — layer-shipped deps (pillow, garth)
+  are structurally invisible to it; #2100's drift gate + measured `.deployed.json` manifests are
+  the counter. The `pip-audit` coverage was also blind: `garmin.txt` pinned 2 of the 14 packages
+  actually in the layer.
+- **`gh pr merge` on a conflicted PR fails cleanly** (GraphQL "merge conflicts") — the doc-sync
+  literal is still the usual suspect; resolve at rebase one file at a time, then regen.
+- The exit-code-eats-pipe trap bit ME this session (`--check | tail; echo $?` read tail's exit) —
+  re-verified state read-only before believing the apply had run.
 
 ## Residual / next picks
 
-- **#2080** (P1) — daily brief's staleness scan is genesis-blinded (#1203 shape); bites every fresh
-  cycle's Day 1. **#2081** — anomaly detector off for each cycle's first week. Both filed from
-  #2079's derived call-site scan; both carry the `digest_utils.query_range include_pilot` threading.
-- **#2084** — `config/challenges_catalog.json` drifts from its seeds/ original (filed by the #2057
-  implementer; source-of-truth call needed before the new daily gate can own it).
-- **#2085** — re-auth must clear the auth-breaker latch (found live during today's recovery).
-- **#2079 acceptance box 4** — gradability at ~9% on cycle-12 Day 1+ needs the next coach run's
-  CloudWatch evidence; check `coach-state-updater` logs tomorrow. not-work — verification step on a
-  closed issue, recorded here + in its closure comment.
-- Owner (both still pending, in-UI): the 3 CodeQL dismissals on #2046's alerts (131–133) and PR
-  #2012's revision purge. not-work — owner-only acts, links in the session thread.
-- First live Wednesday subscriber send is **Aug 5** (the #1951/#2071 kill-switch lift) — owner review
-  of that first send per his own decision note. not-work — a dated owner ritual, not a backlog item.
-- Two transient in-session main reds, both fixed same-hour with guards: the prereg framing test
-  (wall-clock trap) and the board-lead guard (genesis-week emptiness). not-work — recorded for the
-  decode trail; main is green at wrap.
-- The S3-written journal pages (`chronicle_render.py`, `restart_leadin_pages.py`) carry the same 64px
-  drop-cap literal #2077 retired from the repo builders — out of the new gate's reach. not-work —
-  noted by the #1974 closure comment; file only if the class recurs on a served surface.
+- **Owner, one command:** `python3 scripts/apply_branch_protection.py --apply && python3
+  scripts/apply_branch_protection.py --check` from main with a repo-admin token
+  (`GH_POSTURE_TOKEN` or an admin gh login) — then watch the next merge-day's reconcile push
+  land (the bypass is the one production-only assertion). #1662's closure comment carries the
+  same runbook. not-work — owner-only act (token + settings mutation).
+- **Owner-approved deploy:** the layer rebuild (PR #2100's runbook: build zips → pip-audit →
+  publish → env-var bumps → `cdk_deploy.sh LifePlatformOperational` + `LifePlatformIngestion` →
+  `--promote` the manifests → watch the next Garmin run + one OG generation). #2099's boxes 2/4
+  stay open until then. not-work — CDK deploys are owner-ask-only per standing rule.
+- **#2079 box 4** — read `coach-state-updater` logs after the first post-genesis run (expect
+  gradability >0%); recorded on the closed issue. not-work — verification step on a closed issue.
+- **#2104 (P2, Now, opus) — genesis-week reader dishonesty**: coach cards cite pre-genesis
+  numbers until their weekly regen; Home Day-1 temporal contradiction. Found at wrap by the
+  alarm gate; qa-smoke has been honestly red on it since genesis. Top non-fable pick for the
+  next session.
+- **Now queue (model:fable):** #2090 (ratchet constant-key blind spot, 1.00), #1383 (Coach
+  Line channel, 0.94), #1114 (portrait art direction v2 — reopen from branch
+  `issue-1114-portrait-art-v2` @ `ff5c74fadcd7`, per the #1768 closure).
+- **#1872 blocking flip** — its precondition ("a clean ungroomed day") is now genuinely met: the
+  corpus prints OK with zero violations AND zero advisories including queue rules.
+- Prior-session owner items still pending: 3 CodeQL dismissals (#2046's alerts 131–133), PR
+  #2012's revision purge, review of the Aug-5 first live Wednesday subscriber send. not-work —
+  owner-only acts carried from the 08-03 handover.
 
-Full narrative for the next session: this file; plan was `~/.claude/plans/swift-clearing-dawn.md`.
+Full narrative of the prior session: `git show
+origin/session-archive:handovers/HANDOVER_2026-08-02_cycle-12-sealed.md`.

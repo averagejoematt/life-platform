@@ -19,5 +19,9 @@
   "life-platform-dlq-depth-warning": {
     "citation": "#2069",
     "note": "Same underlying cause and same message set as life-platform-ingestion-dlq-messages above (duplicate alarm on the identical AWS/SQS ApproximateNumberOfMessagesVisible metric/dimension, routed to the digest topic instead of urgent) — ALARM since 2026-08-03T12:04:56Z, confirmed fired correctly."
+  },
+  "qa-smoke-failures": {
+    "citation": "#2104",
+    "note": "Real content_truth findings since the 2026-08-03 genesis: coach cards cite pre-genesis weight until their weekly regen; Home Day-1 temporal contradiction. Clears when #2104 ships + 2 green nights."
   }
 }
