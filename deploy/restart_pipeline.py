@@ -37,7 +37,10 @@ Steps (each can be skipped with --skip-<name>):
     8b. restart_leadin_pages.py   (rebuild the public journal pages + posts.json
        for every visible chronicle record — the lead-ins' pages)
     9. restart_character_rebuild.py
-   10. restart_site_copy_sync.py --old-genesis <outgoing>  (JS/HTML literal sweep)
+   10. restart_site_copy_sync.py --old-genesis <outgoing>  (JS/HTML literal sweep; its
+       regen-lambda step also invokes chronicle-podcast, #1243 — re-anchors any kept
+       prologue's read-aloud episode to its new date; step 8's media reset covers
+       panelcast/debrief only, a separate podcast surface)
    11. restart_docs_update.py
    11b. --sync-site (opt-in): bash deploy/sync_site_to_s3.sh — the full-site
        content-hashed sync + rss.xml regen. Deliberately NOT default (#1092):
@@ -590,10 +593,14 @@ def build_sub_scripts(
 ) -> list[tuple[str, list[str]]]:
     """The restart sub-script sequence. Order matters (pre-launch content
     calendar, 2026-07-11): chronicle handler (untombstones + re-dates the
-    calendar's chronicle lead-ins) → media reset (archives ALL audio, then
-    resurrects the calendar's podcast prequel + writes episodes.json/feed.xml)
+    calendar's chronicle lead-ins) → media reset (archives the panelcast +
+    podcast/debrief audio, then resurrects the calendar's podcast prequel +
+    writes those two episodes.json/feed.xml pairs — NOT the chronicle
+    read-aloud feed at generated/podcast/episodes.json, a third podcast
+    surface restart_site_copy_sync's regen-lambda step covers instead, #1243)
     → leadin pages (rebuilds the public journal pages + posts.json from the
-    now-visible records) → character rebuild → site copy sync → docs update.
+    now-visible records) → character rebuild → site copy sync (also re-anchors
+    any kept prologue's read-aloud episode, #1243) → docs update.
 
     #951: the ledger reset receives the CLOSING cycle explicitly — the SSM bump
     fires right after the wipe (before the ledger reset), so an SSM read inside

@@ -88,11 +88,28 @@ ORPHAN_S3_FILES = [
 #     bare {} payload it ALSO sends the daily brief email (the dry_run gate wraps only
 #     the SES send at ~L2062; the JSON writes at ~L2080 run regardless). Without the
 #     flag, every reset would email Matthew a brief.
+#   - #1243: chronicle-podcast owns generated/podcast/episodes.json — the read-aloud
+#     feed a curated prologue's article regenerates its "listen" audio from. Its
+#     standing cron was retired 2026-07-02 (SEASON-1 ZOMBIE RETIRED, manual-invoke
+#     only since), and restart_media_reset.py never covered it either (that script
+#     only owns generated/panelcast/* + generated/podcast/debrief/* — a THIRD,
+#     separate podcast surface). Nothing else in the reset pipeline re-renders this
+#     feed, so every genesis move silently orphaned any kept prologue's episode: the
+#     audio kept narrating the OLD (pre-re-anchor) publish date while the article
+#     itself moved forward, and read_aloud.js's exact-date join (#1121, reset-safe by
+#     design) just rendered no player — the #1243 defect. Placed LAST in this list
+#     deliberately: restart_leadin_pages (an earlier pipeline step, #1243/build_sub_scripts)
+#     already rewrote generated/journal/posts.json with the re-anchored dates by the
+#     time this fires, so chronicle-podcast reads the CURRENT manifest, not the stale
+#     one. Idempotent by design (skips any date that already has an mp3, #1121) — a
+#     bare {} payload only renders what's missing, never re-billing already-correct
+#     audio.
 REGEN_LAMBDAS = [
     ("daily-brief", {"dry_run": True}),  # generated/public_stats.json + generated/pulse.json + dashboard/matthew/data.json
     ("character-sheet-compute", {}),  # generated/data/character_stats.json
     ("site-stats-refresh", {}),  # refreshes vitals in public_stats.json
     ("og-image-generator", {}),  # OG image PNGs for share cards
+    ("chronicle-podcast", {}),  # #1243: re-anchors any kept prologue's read-aloud episode to its new date
 ]
 
 
