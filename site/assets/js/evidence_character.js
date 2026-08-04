@@ -13,6 +13,8 @@ import { dfBody } from "/assets/js/evidence_datafigure.js";
 import { shareMount } from "/assets/js/share.js";
 // #1373: receipt drill-down renderer — DOM-free module (testable, evidence_router precedent)
 import { wireReceipts } from "/assets/js/evidence_receipts.js";
+// #1982: target-provenance chip — DOM-free module (same reason as evidence_receipts.js)
+import { chProvenance } from "/assets/js/evidence_character_provenance.js";
 
 export const CH_ORDER = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"];
 
@@ -401,7 +403,7 @@ export async function renderCharacter(d) {
         const compRows = comps.map(([cn, cv]) => {
           const w = Math.round((Number(cv.weight) || 0) * 100);
           const targets = Object.entries(cv).filter(([k, v]) => k !== "weight" && typeof v !== "object").map(([k, v]) => `${ttl(k)} ${fmt(v)}`).join(" · ");
-          return `<div class="ch-comp"><span class="ch-comp-n">${esc(ttl(cn))}</span><span class="ch-comp-bar"><i style="width:${w}%;background:var(--pillar-${esc(p.name)},var(--ember))"></i></span><span class="ch-comp-w num">${w}%</span>${targets ? `<span class="ch-comp-t label">${esc(targets)}</span>` : ""}</div>`;
+          return `<div class="ch-comp"><span class="ch-comp-n">${esc(ttl(cn))}</span><span class="ch-comp-bar"><i style="width:${w}%;background:var(--pillar-${esc(p.name)},var(--ember))"></i></span><span class="ch-comp-w num">${w}%</span>${targets ? `<span class="ch-comp-t label">${esc(targets)}</span>` : ""}${chProvenance(cv)}</div>`;
         }).join("");
         return `<details class="ch-feed"><summary><span class="ch-ric" style="color:var(--pillar-${esc(p.name)},var(--ember))">${domainIcon(p.name)}</span>${esc(ttl(p.name))} <span class="label">· ${Math.round(((weights[p.name] || 0) / wTotal) * 100)}% of the character</span></summary><div class="ch-feed-body">${compRows}</div></details>`;
       }).join("") + `</div>
