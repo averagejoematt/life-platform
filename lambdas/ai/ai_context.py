@@ -1266,13 +1266,21 @@ def _build_physical_data(data):
     withings = data.get("withings") or {}
     dexa = data.get("dexa") or {}
     meas = data.get("measurements") or {}
+    recency = data.get("weight_recency") or {}
+    # #2104: `latest_weight` is the bare newest number from a window that, on the days
+    # right after a reset, contains ONLY pre-genesis readings. Dating it is not enough
+    # there — a weigh-in from the previous cycle is not this cycle's weight at any age,
+    # so it is withheld from the fact set entirely (weight_recency.summarize_weight_readings
+    # does the same for `current_weight_lb`). `weight_lbs` above is today's own row and
+    # is left alone: when it exists it IS in-cycle by construction.
+    latest_weight = None if recency.get("current_weight_is_pre_genesis") else data.get("latest_weight")
     return {
         "weight_lbs": _safe_float(withings, "weight_lbs"),
         "body_fat_pct": _safe_float(dexa, "body_fat_pct") or _safe_float(withings, "body_fat_pct"),
         "lean_mass_lb": _safe_float(dexa, "lean_mass_lb"),
         "visceral_fat_lb": _safe_float(dexa, "visceral_fat_lb"),
         "waist_height_ratio": _safe_float(meas, "waist_height_ratio"),
-        "latest_weight": data.get("latest_weight"),
+        "latest_weight": latest_weight,
         # #1924: `latest_weight` and `weight_lbs` above are bare numbers. Handed to the
         # coach undated they get narrated as "the latest reading is X" — which is how
         # /api/coaching-dashboard published 316.3 lb beside a cockpit showing 317.0.
@@ -1280,8 +1288,8 @@ def _build_physical_data(data):
         # older than the cockpit's. These fields carry the reading's own date and its
         # staleness (intelligence/weight_recency, the #1894 contract) so the narrative
         # can date the claim instead of implying it is current.
-        **(data.get("weight_recency") or {}),
-        "weight_recency_note": weight_recency.weight_recency_prompt_block(data.get("weight_recency") or {}),
+        **recency,
+        "weight_recency_note": weight_recency.weight_recency_prompt_block(recency),
     }
 
 
