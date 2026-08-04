@@ -161,6 +161,7 @@ except ImportError:
 from ai import ai_calls  # -- Extracted module imports ---------------------------------------------------
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from content import html_builder, output_writers
+from experiment import phase_taxonomy  # ADR-077: the class registry the reads derive from (#2089)
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 from intelligence import weight_recency  # #1894/#1924: a weigh-in carries its own date
 from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
@@ -206,15 +207,67 @@ def fetch_date(source, date_str):
         return None
 
 
+# ── #2089: the brief's two shared raw-source readers go cross-phase by TAXONOMY ──
+#
+# `_latest_item` and `fetch_range` are the brief's generic readers — between them
+# they feed the "latest measurements" line (dexa/measurements/labs), the 7/30-day
+# HRV trend, the 60-day Strava window behind Banister CTL/ATL/TSB, and the
+# 14/30/90-day weight trends. Both applied the ADR-058 phase filter, and the
+# experiment reset tags every pre-genesis row phase=pilot (ADR-077), so on a fresh
+# cycle both saw ONLY days since genesis:
+#   * `_latest_item` is the #1203 shape exactly — newest-first `Limit: 1`, and
+#     DynamoDB applies `Limit` BEFORE `FilterExpression`, so it read the single
+#     newest row, discarded it for being pilot-tagged, and returned nothing. A
+#     pre-genesis DEXA/labs/measurements record vanished from the brief entirely.
+#   * `fetch_range` returned a window truncated at genesis, so a "7-day HRV trend"
+#     on Day 2 was one point and the Banister load model ran on a stub window.
+#
+# The contract is the one #2079/#2080/#2081 settled: the BODY's timeseries does not
+# reset when the experiment does, and the window (7/14/30/60/90d) is what bounds
+# recency — not the phase tag. Rather than hard-code `include_pilot=True` at these
+# two sites, the decision is DERIVED from phase_taxonomy per source, because these
+# are generic readers: `fetch_range` is also called with `habit_scores`, which is
+# EXPERIMENT_SCOPED (the weekly habit review is a current-cycle view by contract),
+# and a blanket flip would have silently widened that read too. Deriving it means a
+# future call site inherits the right behaviour from the source's own class instead
+# of from whoever wrote the call.
+#
+# Fail-soft and conservative: an unknown source (classify raises KeyError by design
+# so nothing defaults silently) keeps the current-cycle filter — the pre-#2089
+# behaviour — rather than silently widening a read the taxonomy has not classified.
+#
+# NB these two functions build the partition key from the module-level USER_PREFIX
+# constant, so the #2079 AST ratchet (which keys on a literal "#SOURCE#" inside the
+# function) cannot see them and never carried debt records for them — that blind
+# spot is #2090, a separate classification pass. They are pinned instead by direct
+# behavioural tests in tests/test_genesis_blind_brief_windows_2089.py.
+def _source_reads_cross_phase(source):
+    """True when a read for `source` must ignore the ADR-058 phase filter (#2089).
+
+    The phase filter is only meaningful for EXPERIMENT_SCOPED records — those are
+    what the reset tombstones. RAW_TIMESERIES is kept forever and genesis-ANCHORED
+    on read (date-clamped, not hidden); CROSS_PHASE and SYSTEM_STATE are invisible
+    to the phase machinery altogether.
+    """
+    try:
+        return phase_taxonomy.classify(USER_PREFIX + source) != phase_taxonomy.EXPERIMENT_SCOPED
+    except Exception:
+        return False
+
+
 def _latest_item(source):
-    """Fetch the most recent record for a source (e.g., dexa, labs, measurements)."""
+    """Fetch the most recent record for a source (e.g., dexa, labs, measurements).
+
+    Cross-phase for non-scoped sources (#2089) — see the block comment above.
+    """
     try:
         kwargs = with_phase_filter(
             {
                 "KeyConditionExpression": Key("pk").eq(USER_PREFIX + source) & Key("sk").begins_with("DATE#"),
                 "ScanIndexForward": False,
                 "Limit": 1,
-            }
+            },
+            include_pilot=_source_reads_cross_phase(source),
         )
         r = table.query(**kwargs)
         items = r.get("Items", [])
@@ -224,12 +277,18 @@ def _latest_item(source):
 
 
 def fetch_range(source, start, end):
+    """Fetch every record for a source in [start, end].
+
+    Cross-phase for non-scoped sources (#2089) — see the block comment above. The
+    date window is what bounds the answer; the phase tag is not.
+    """
     try:
         kwargs = with_phase_filter(
             {
                 "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
                 "ExpressionAttributeValues": {":pk": USER_PREFIX + source, ":s": "DATE#" + start, ":e": "DATE#" + end},
-            }
+            },
+            include_pilot=_source_reads_cross_phase(source),
         )
         r = table.query(**kwargs)
         return [d2f(i) for i in r.get("Items", [])]

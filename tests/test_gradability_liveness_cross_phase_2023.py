@@ -304,6 +304,15 @@ _SANCTIONED_CURRENT_CYCLE_VIEWS: dict[str, str] = {
 #   * anomaly_detector_lambda.fetch_range (#2081) — the rolling-baseline read.
 # Both are held cross-phase by `test_the_scan_sees_the_fixed_consumers_as_cross_phase`
 # below, plus tests/test_genesis_blind_reads_2080_2081.py for their behaviour.
+#
+# NB the same class was ALSO fixed in daily_brief_lambda's two shared readers,
+# `_latest_item` and `fetch_range` (#2089 — the trend windows and the "latest
+# measurements" line). They never appeared in either ledger and are absent from the
+# derived set below, because they build the partition key from the module-level
+# USER_PREFIX constant and this scan keys on a literal "#SOURCE#" INSIDE the function
+# body. That structural blind spot is #2090's job to close — deliberately not papered
+# over here with a hand-added entry, which would hide the gap rather than fix it.
+# Those two sites are pinned by tests/test_genesis_blind_brief_windows_2089.py.
 _KNOWN_CROSS_CYCLE_DEBT: dict[str, str] = {
     "lambdas/common/digest_utils.py::query_range": (
         "The shared paginated raw-source range reader exposes NO include_pilot parameter, so a "
