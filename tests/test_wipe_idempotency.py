@@ -120,3 +120,72 @@ def test_is_already_tombstoned_skips_any_prior_generation(monkeypatch):
     # A never-tombstoned (newly in-scope) record is still fair game.
     assert wipe.is_already_tombstoned({"pk": "x", "sk": "y"}) is False
     assert wipe.is_already_tombstoned({"tombstone": False}) is False
+
+
+# ── #1950: NARRATIVE#arc's semantic phase must survive the tombstone stamp ────
+# phase_taxonomy.py (~line 45-47) and coach_computation_engine.py's write-time
+# experiment_stamp(include_phase=False) are explicit that NARRATIVE#arc's `phase`
+# attribute is the narrative-arc STATE (early_baseline/plateau/setback/...), not
+# the taxonomy phase — but build_update's `#p = :phase` used to be an unconditional
+# SET, so every reset overwrote the closing cycle's arc state with the generic
+# 'pilot' tombstone value. This is provenance loss, not behavior breakage (the
+# #946 guard already hides tombstoned arcs by the `tombstone` attribute, never by
+# `phase`) — but ADR-077's "archive navigable by reset generation" promise extends
+# to "what arc state did cycle N end in", which this regressed.
+
+
+def test_build_update_preserves_phase_when_requested():
+    """preserve_phase=True wraps the phase SET in if_not_exists, mirroring the
+    #1202 generation-identity pattern — an existing semantic value always wins."""
+    expr, names, values = wipe.build_update({}, "2026-08-03T00:00:00+00:00", 12, preserve_phase=True)
+    assert "#p = if_not_exists(#p, :phase)" in expr
+    assert names["#p"] == "phase"
+    assert values[":phase"] == "pilot"  # only used as the never-taken fallback
+
+
+def test_build_update_default_still_overwrites_phase_unconditionally():
+    """Guard against a default-flip regression: every OTHER partition's `phase`
+    attribute really is the taxonomy phase and must stay unconditional SET."""
+    expr, _names, _values = wipe.build_update({}, "2026-08-03T00:00:00+00:00", 12)
+    assert "#p = :phase" in expr
+    assert "if_not_exists(#p" not in expr
+
+
+def test_narrative_arc_is_the_only_preserve_phase_label():
+    """Pin the carve-out to exactly the partition the issue describes — a silent
+    expansion (or shrink) of this set changes tombstone semantics for other
+    partitions without a corresponding taxonomy justification."""
+    assert wipe.PRESERVE_PHASE_LABELS == {"narrative_arc"}
+    labels = {label for _pk, label, _mode, _extra, _skp in wipe.FULL_PK_PARTITIONS}
+    assert wipe.PRESERVE_PHASE_LABELS <= labels
+
+
+def test_narrative_arc_tombstone_keeps_semantic_arc_state():
+    """The regression guard (fails against pre-#1950 build_update): tombstone a
+    NARRATIVE#arc STATE#current item carrying a semantic arc state — the archived
+    item must still carry that state, not the generic taxonomy 'pilot' value."""
+    item = {
+        "pk": "NARRATIVE#arc",
+        "sk": "STATE#current",
+        "phase": "setback",  # the narrative-arc STATE, not a taxonomy phase
+        "entered_date": "2026-07-03",
+        "previous_phase": "plateau",
+    }
+    preserve = "narrative_arc" in wipe.PRESERVE_PHASE_LABELS
+    expr, names, values = wipe.build_update({}, "2026-08-03T00:00:00+00:00", 12, preserve_phase=preserve)
+    _apply_update(item, expr, names, values)
+
+    assert item["tombstone"] is True  # still hidden from the current run (#946 guard)
+    assert item["cycle"] == 12
+    assert item["phase"] == "setback", "the closing cycle's arc state was overwritten by the generic tombstone stamp (#1950)"
+    assert item["phase"] != "pilot"
+
+
+def test_non_arc_partition_tombstone_still_gets_generic_phase():
+    """Sibling assertion: an ordinary EXPERIMENT_SCOPED item (e.g. insights) must
+    still flip to the taxonomy 'pilot' phase — the carve-out is per-partition, not
+    global."""
+    item = {"pk": "USER#matthew#SOURCE#insights", "sk": "INSIGHT#2026-07-01T00:00:00", "phase": "experiment"}
+    expr, names, values = wipe.build_update({}, "2026-08-03T00:00:00+00:00", 12, preserve_phase=False)
+    _apply_update(item, expr, names, values)
+    assert item["phase"] == "pilot"

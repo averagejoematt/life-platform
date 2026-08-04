@@ -187,9 +187,13 @@ FULL_PK_PARTITIONS = [
     # early_baseline, so a surviving 'setback' arc framed the new cycle's week 1
     # as a mid-stall. The engine + orchestrator + chronicle readers now also
     # guard tombstone/entered_date<genesis, so either layer alone is sufficient.
-    # NB: tombstoning overwrites this record's NARRATIVE phase attr with 'pilot'
-    # (the known attribute-name collision) — acceptable: the transition history
-    # lives in HISTORY# rows, and the next real transition rewrites it clean.
+    # #1950: tombstoning used to overwrite this record's NARRATIVE phase attr
+    # (the known attribute-name collision) with the generic 'pilot' taxonomy
+    # value, destroying the semantic arc state (plateau/setback/...) the
+    # taxonomy explicitly says to leave intact (phase_taxonomy.py, ~line 45-47).
+    # PRESERVE_PHASE_LABELS below carves this partition out of that SET so the
+    # closing cycle's arc state survives archival — the transition history in
+    # HISTORY# rows was always intact; this fixes the STATE#current singleton too.
     ("NARRATIVE#arc", "narrative_arc", "pregenesis", {}, ""),
     # Elena's narrative running state (#946 database-4): THREAD#/CALLBACK#/
     # MOTIF#state/STANCE# all reference the outgoing cycle's story arc — pending
@@ -231,6 +235,14 @@ COACH_RUNNING_STATE_CATEGORIES = set(taxonomy.MEMORY_SCOPED_CATEGORIES)
 # Idempotency: reason string includes the genesis date so re-runs after a
 # date change correctly recognise their own tombstones.
 TOMBSTONE_REASON = f"experiment_restart_{EXPERIMENT_START_DATE}"
+
+# #1950: source labels whose `phase` attribute is NOT the taxonomy phase and must
+# survive the tombstone SET (build_update's preserve_phase). Currently just
+# NARRATIVE#arc (label "narrative_arc" in FULL_PK_PARTITIONS above), which reuses
+# `phase` for the narrative-arc STATE — see phase_taxonomy.py's write-time analog
+# (experiment_stamp(include_phase=False)) for the sibling precedent. A per-partition
+# carve-out (not a hardcoded pk check) so a future collision case is a one-line add.
+PRESERVE_PHASE_LABELS = {"narrative_arc"}
 
 
 def extract_date(item: dict) -> str | None:
@@ -310,7 +322,7 @@ def is_already_tombstoned(item: dict) -> bool:
     return bool(item.get("tombstone"))
 
 
-def build_update(extra_attrs: dict, now_iso: str, cycle: int):
+def build_update(extra_attrs: dict, now_iso: str, cycle: int, preserve_phase: bool = False):
     """Construct UpdateItem args for a tombstone write.
 
     ADR-077: stamps `cycle=<closing run>` so the archive is navigable by reset
@@ -325,12 +337,23 @@ def build_update(extra_attrs: dict, now_iso: str, cycle: int):
     keeps the write itself correct regardless. ``tombstone`` and ``phase=pilot`` stay
     unconditional SET — they are the "hide it" flags and setting them on an
     already-hidden row is inert.
+
+    #1950: ``preserve_phase=True`` (NARRATIVE#arc only) wraps the `phase` SET in the
+    same ``if_not_exists`` pattern as the generation-identity attrs above. NARRATIVE#arc
+    reuses the `phase` attribute name for the narrative-arc STATE (early_baseline/
+    plateau/setback/...), not the taxonomy phase — phase_taxonomy.py's
+    ``experiment_stamp(include_phase=False)`` already documents and honors this
+    collision at write time; this is the read-time/tombstone-time analog. An
+    already-tombstoned NARRATIVE#arc row is skipped entirely by ``is_already_tombstoned``
+    before reaching here, so this only ever fires once per singleton — but if_not_exists
+    keeps the write correct regardless, mirroring the #1202 defence-in-depth rationale.
     """
+    phase_rhs = "if_not_exists(#p, :phase)" if preserve_phase else ":phase"
     sets = [
         "tombstone = :tomb",
         "tombstoned_at = if_not_exists(tombstoned_at, :ts)",
         "tombstoned_reason = if_not_exists(tombstoned_reason, :reason)",
-        "#p = :phase",
+        f"#p = {phase_rhs}",
         "#cyc = if_not_exists(#cyc, :cycle)",
     ]
     values = {
@@ -459,7 +482,7 @@ def main():
                 if len(samples[source]) < 3:
                     samples[source].append(item.get("sk", ""))
                 if args.apply:
-                    update_expr, names, values = build_update(extra, now_iso, cycle)
+                    update_expr, names, values = build_update(extra, now_iso, cycle, preserve_phase=source in PRESERVE_PHASE_LABELS)
                     try:
                         table.update_item(
                             Key={"pk": item["pk"], "sk": item["sk"]},
