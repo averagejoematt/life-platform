@@ -365,3 +365,129 @@ def test_decisions_md_records_the_scope_extension():
     decisions = open(os.path.join(ROOT, "docs/DECISIONS.md")).read()
     assert "Scope extension (2026-07-11, #968)" in decisions
     assert "ADR-108 coach quality gate — scope (#968)" in decisions
+
+
+# ── #1973: Day<=3 cycle-boundary framing rule ────────────────────────────────
+#
+# Early-cycle narratives cited last cycle's graded calls in present tense with
+# no framing (the live failure: "I called lunch wrong. I predicted it would be
+# your structural weak point. That hasn't materialized" on a Day-1 read, while
+# /api/predictions showed the new cycle's own decided count at zero). The
+# fix is deterministic (regex, no LLM) — a prompt instruction alone can't
+# guarantee structure — merged into the SAME `_invoke_quality_gate_sync`
+# report both board_quality_gate.enforce and the daily-brief
+# `ai_calls._enforce_quality_gate` already act on, so one rule definition
+# covers both coach-voiced surfaces.
+
+_UNFRAMED_GRADED_CALL = (
+    "I called lunch wrong. I predicted it would be your structural weak point. " "That hasn't materialized, and I want to own it plainly."
+)
+_FRAMED_GRADED_CALL = (
+    "Last cycle I called lunch wrong — I predicted it would be your structural weak point. "
+    "That hasn't materialized yet in this new cycle, but we're only three days in."
+)
+_NO_GRADED_CALL = "Recovery looks steady this week — nothing dramatic to report."
+
+
+def test_cycle_boundary_violations_flags_unframed_graded_call_on_day_one():
+    bqg = _bqg()
+    v = bqg.cycle_boundary_violations(_UNFRAMED_GRADED_CALL, day_n=1)
+    assert len(v) == 1
+    assert "Day 1" in v[0]["reason"]
+    assert "called" in v[0]["excerpt"].lower()
+
+
+def test_cycle_boundary_violations_clears_when_explicitly_framed():
+    bqg = _bqg()
+    assert bqg.cycle_boundary_violations(_FRAMED_GRADED_CALL, day_n=1) == []
+
+
+def test_cycle_boundary_violations_scoped_to_days_one_through_three():
+    bqg = _bqg()
+    assert bqg.cycle_boundary_violations(_UNFRAMED_GRADED_CALL, day_n=3) != []
+    assert bqg.cycle_boundary_violations(_UNFRAMED_GRADED_CALL, day_n=4) == []  # out of window
+    assert bqg.cycle_boundary_violations(_UNFRAMED_GRADED_CALL, day_n=0) == []  # pre-genesis, out of scope
+
+
+def test_cycle_boundary_violations_skips_when_day_n_is_unknowable(monkeypatch):
+    """day_n=None means 'resolve the live default' (see the defaults test
+    below) — the genuinely-unknowable case is the live helper itself
+    returning None (e.g. a constants read failure), which must fail-soft to
+    no violation rather than mis-arm on a bad day count."""
+    bqg = _bqg()
+    monkeypatch.setattr(bqg, "_day_n_today", lambda: None)
+    assert bqg.cycle_boundary_violations(_UNFRAMED_GRADED_CALL) == []
+
+
+def test_cycle_boundary_violations_never_fires_without_graded_call_language():
+    """No false positive on an ordinary Day-1 draft with no prediction talk."""
+    bqg = _bqg()
+    assert bqg.cycle_boundary_violations(_NO_GRADED_CALL, day_n=1) == []
+
+
+def test_cycle_boundary_violations_defaults_day_n_to_the_live_helper(monkeypatch):
+    bqg = _bqg()
+    monkeypatch.setattr(bqg, "_day_n_today", lambda: 2)
+    assert bqg.cycle_boundary_violations(_UNFRAMED_GRADED_CALL) != []
+    monkeypatch.setattr(bqg, "_day_n_today", lambda: 40)
+    assert bqg.cycle_boundary_violations(_UNFRAMED_GRADED_CALL) == []
+
+
+def test_enforce_fires_the_gate_on_an_unframed_graded_call_day_one(monkeypatch):
+    """Integration proof: the LLM-scored verdict alone says passed=True with
+    zero findings (the exact live-failure shape — nothing in the anti-pattern/
+    decision-class/similarity checks would have caught this). The
+    deterministic day<=3 rule is what fires the regenerate-once path."""
+    bqg = _bqg()
+    monkeypatch.setattr(bqg, "_day_n_today", lambda: 1)
+    retained, retain = _arm(
+        bqg,
+        monkeypatch,
+        _FakeContext(29_000),
+        _gate_client_returning({"statusCode": 200, "passed": True, "score": 95}),
+    )
+    notes = []
+
+    def _regen(note):
+        notes.append(note)
+        return _FRAMED_GRADED_CALL
+
+    out = bqg.enforce("physical_coach", _UNFRAMED_GRADED_CALL, _regen, lambda t: True, retain)
+    assert out == _FRAMED_GRADED_CALL
+    assert len(notes) == 1
+    assert "cycle" in notes[0].lower()  # the correction note names the missing framing
+    assert retained and retained[0][0][1] == "flagged_corrected"
+
+
+def test_enforce_leaves_a_correctly_framed_call_untouched(monkeypatch):
+    bqg = _bqg()
+    monkeypatch.setattr(bqg, "_day_n_today", lambda: 1)
+    retained, retain = _arm(
+        bqg,
+        monkeypatch,
+        _FakeContext(29_000),
+        _gate_client_returning({"statusCode": 200, "passed": True, "score": 95}),
+    )
+    out = bqg.enforce("physical_coach", _FRAMED_GRADED_CALL, lambda n: "unused", lambda t: True, retain)
+    assert out == _FRAMED_GRADED_CALL
+    assert retained == []
+
+
+def test_regression_guard_without_the_new_rule_the_llm_pass_alone_lets_it_through(monkeypatch):
+    """AC3's regression proof, made explicit: stub `cycle_boundary_violations`
+    back to a no-op — i.e. simulate the gate as it stood BEFORE #1973 — and
+    the identical Day-1 unframed draft, under the identical passing LLM
+    verdict, now sails through completely untouched. This is exactly the bug
+    #1973 fixes; the assertion below FAILS if the new rule is removed."""
+    bqg = _bqg()
+    monkeypatch.setattr(bqg, "cycle_boundary_violations", lambda *a, **k: [])
+    monkeypatch.setattr(bqg, "_day_n_today", lambda: 1)
+    retained, retain = _arm(
+        bqg,
+        monkeypatch,
+        _FakeContext(29_000),
+        _gate_client_returning({"statusCode": 200, "passed": True, "score": 95}),
+    )
+    out = bqg.enforce("physical_coach", _UNFRAMED_GRADED_CALL, lambda n: "unused", lambda t: True, retain)
+    assert out == _UNFRAMED_GRADED_CALL  # unchanged — the pre-#1973 gate never saw a problem
+    assert retained == []
