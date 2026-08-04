@@ -1,10 +1,17 @@
 """tests/test_premerge_lane.py — ADR-139's regression guard (#1344).
 
-The advisory pre-merge lane lives in git precisely because GitHub settings
-evaporate on visibility flips (#1319). This guard pins the lane's existence
-and its three checks so it can't silently vanish; the OTHER half of the
-posture (required-ness = none, owner toggle) is GET-verified weekly by
-deploy/drift_sentinel.py against deploy/github_posture.json.
+The pre-merge lane lives in git precisely because GitHub settings evaporate on
+visibility flips (#1319). This guard pins the lane's existence and its three
+checks so it can't silently vanish; the OTHER half of the posture is
+GET-verified weekly by deploy/drift_sentinel.py against
+deploy/github_posture.json.
+
+As of #1662 / ADR-148 this lane is no longer advisory — its `fast-lane` job is
+one of the two REQUIRED status checks on `main`. The additional invariants that
+required-ness imposes (unfiltered trigger, no job-level `if:`, job `name:` ==
+the required context string) are guarded by
+tests/test_branch_protection_spec.py, which reads the real YAML; this file
+stays deliberately stdlib-only.
 
 Deliberately stdlib-only (string asserts, no yaml dep) — the guard for the
 collection-error killer must never itself be a collection error.
