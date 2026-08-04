@@ -247,3 +247,82 @@ def test_frozen_genesis_mismatch_refuses(tmp_path, monkeypatch):
 
     with pytest.raises(SystemExit, match="never silently changes"):
         seeder.load_frozen()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# #1970: the seeder's PREDICTION# writes must carry the write-time phase stamp —
+# COACH#* is the tagger-blind partition (restart_phase_tag.py only reaches
+# USER#matthew#SOURCE#* pks), so an unstamped row survives PHASE_FILTER_EXPRESSION
+# forever and leaks into the next reset cycle. _stamped() is the seeder's own
+# call-site (same pattern as coach_state_updater._put_item / dispute_docket._stamped);
+# write_predictions() is where it must actually apply on every put_item.
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_stamped_merges_write_time_provenance(monkeypatch):
+    import experiment.phase_taxonomy as taxonomy
+
+    monkeypatch.setattr(taxonomy, "experiment_stamp", lambda **kw: {"phase": "experiment", "cycle": 12})
+    rec = {"pk": "COACH#sleep_coach", "sk": "PREDICTION#pred_x", "claim_natural": "x"}
+    stamped = seeder._stamped(rec)
+    assert stamped["phase"] == "experiment"
+    assert stamped["cycle"] == 12
+    # the item's own keys survive untouched
+    assert stamped["pk"] == "COACH#sleep_coach" and stamped["sk"] == "PREDICTION#pred_x"
+
+
+def test_stamped_never_clobbers_an_existing_phase(monkeypatch):
+    """The item's own keys win (matches the coach_state_updater/dispute_docket
+    precedent) — a caller-supplied phase is never overwritten by the stamp."""
+    import experiment.phase_taxonomy as taxonomy
+
+    monkeypatch.setattr(taxonomy, "experiment_stamp", lambda **kw: {"phase": "pilot", "cycle": 99})
+    rec = {"pk": "COACH#sleep_coach", "sk": "PREDICTION#pred_x", "phase": "experiment", "cycle": 12}
+    stamped = seeder._stamped(rec)
+    assert stamped["phase"] == "experiment" and stamped["cycle"] == 12
+
+
+def test_stamped_fails_soft_on_stamp_error(monkeypatch):
+    """experiment_stamp() itself never raises (fail-soft by contract), but _stamped
+    defensively wraps the import/call too, matching dispute_docket._stamped — a
+    provenance stamp must never break a write."""
+    import experiment.phase_taxonomy as taxonomy
+
+    def _boom(**kw):
+        raise RuntimeError("ssm down")
+
+    monkeypatch.setattr(taxonomy, "experiment_stamp", _boom)
+    rec = {"pk": "COACH#sleep_coach", "sk": "PREDICTION#pred_x"}
+    assert seeder._stamped(rec) == rec
+
+
+def test_write_predictions_stamps_every_item(monkeypatch):
+    """The regression this issue exists to prevent: every PREDICTION# row
+    write_predictions() puts must carry the write-time phase (+cycle) stamp."""
+    import boto3
+    import experiment.phase_taxonomy as taxonomy
+
+    class _FakeTable:
+        def __init__(self):
+            self.puts = []
+
+        def put_item(self, Item):
+            self.puts.append(Item)
+
+    fake_table = _FakeTable()
+
+    class _FakeResource:
+        def Table(self, name):
+            return fake_table
+
+    monkeypatch.setattr(boto3, "resource", lambda *a, **kw: _FakeResource())
+    monkeypatch.setattr(taxonomy, "experiment_stamp", lambda **kw: {"phase": "experiment", "cycle": 12})
+
+    records = seeder.build_prediction_records(FROZEN)
+    seeder.write_predictions(records)
+
+    assert len(fake_table.puts) == len(records) and records, "the fixture must actually produce records to prove anything"
+    for item in fake_table.puts:
+        assert item.get("phase") == "experiment", f"{item.get('sk')} missing phase — the #1970 regression"
+        assert item.get("cycle") == 12
+        assert item["pk"].startswith("COACH#") and item["sk"].startswith("PREDICTION#")
