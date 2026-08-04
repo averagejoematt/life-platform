@@ -100,7 +100,7 @@ import json
 import re
 import subprocess
 import sys
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import boto3
@@ -128,6 +128,16 @@ SITE_API_DATA = REPO_ROOT / "lambdas" / "web" / "site_api_data.py"
 RESET_LOG = REPO_ROOT / "docs" / "restart" / "RESET_LOG.md"
 TOKEN_ALARM_WINDOW_FILE = REPO_ROOT / "lambdas" / "common" / "token_alarm_window.py"
 SSM_CYCLE_PARAM = "/life-platform/experiment-cycle"
+
+# #1962: how many days past genesis the compute-pipeline-stale ops alarm stays
+# suppressed. Derived from the writer's own cadence, not a guess: daily-metrics-
+# compute runs once/day, and the cutover sequence (wipe tombstones "yesterday",
+# then the fleet needs one full cron cycle to write a fresh row under the new
+# genesis) reproduced the false red on BOTH cutover mornings in cycle 11
+# (2026-07-26 AND 07-27) before clearing 07-28 — i.e. up to 2 daily cron cycles
+# of legitimate catch-up. +1 day of buffer for a cutover that lands late in the
+# writer's cron window.
+GENESIS_ALARM_SUPPRESS_DAYS = 3
 
 # ── #1199/#1978: the void-open-bets ledger now lives in experiment/prereg_voids.py
 # (shared with deploy/reconcile_prereg_voids.py). Re-bound here so the pipeline's
@@ -438,6 +448,50 @@ def seed_grading_liveness_marker(target_date: str, apply: bool):
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
     )
+
+
+def stamp_compute_staleness_window(target_date: str, apply: bool) -> str:
+    """#1962: stamp a dated genesis alarm-suppression window for the
+    compute-pipeline-stale alarm (cdk/stacks/monitoring_stack.py
+    'compute-pipeline-stale', metric LifePlatform ComputePipelineStaleness).
+
+    The reset cutover (phase-tag/wipe + CDK deploy) reliably makes
+    lambdas/emails/daily_brief_lambda.py's staleness emitter find no fresh
+    computed_metrics for "yesterday" — cycle 11 fired this alarm red on BOTH
+    genesis-cutover mornings (2026-07-26, 2026-07-27) even though the compute
+    chain was healthy and had already caught up (verified live: DDB held a
+    populated computed_metrics DATE#2026-07-27 row while the alarm was red).
+    Honest at fire-time, entirely foreseeable every reset — the ack trail
+    calling it "transient scheduling delay during genesis" is the tell that
+    the condition is predicted, not a real failure.
+
+    Writes SYSTEM#alarm-windows / GENESIS#compute-pipeline-stale — SYSTEM_STATE
+    per phase_taxonomy.py's `pk.startswith("SYSTEM#")` rule, so it needs no
+    taxonomy change and the wipe never touches it. daily_brief_lambda.py reads
+    this marker every run and, while today is inside the window, reports 0.0
+    to the ops alarm instead of 1.0 when compute genuinely looks stale — the
+    reader-facing "data may be estimated" email banner is untouched (ADR-104:
+    only the ops alarm's false positive is suppressed, and only for the
+    declared, dated span). Idempotent — put_item overwrites on re-run.
+
+    Returns the computed suppress_until date (also useful for dry-run print).
+    """
+    suppress_until = (date.fromisoformat(target_date) + timedelta(days=GENESIS_ALARM_SUPPRESS_DAYS)).isoformat()
+    if not apply:
+        return suppress_until
+    ddb = boto3.resource("dynamodb", region_name=REGION)
+    t = ddb.Table(TABLE)
+    t.put_item(
+        Item={
+            "pk": "SYSTEM#alarm-windows",
+            "sk": "GENESIS#compute-pipeline-stale",
+            "genesis_date": target_date,
+            "suppress_until": suppress_until,
+            "reason": "reset cutover — compute chain has not caught up yet (#1962)",
+            "stamped_at": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+    return suppress_until
 
 
 def clear_predict_week_subject(apply: bool):
@@ -853,6 +907,19 @@ def main():
     # untouched by the wipe, so this seed is the only thing that resets its clock.
     seed_grading_liveness_marker(target, args.apply)
     print(f"    ({'seeded' if args.apply else 'would seed'} EVALUATOR#coach_prediction/STATE#last_decided = {target})")
+
+    # Step 2c2 (#1962): stamp a dated genesis alarm-suppression window for the
+    # compute-pipeline-stale alarm — the cutover sequence predictably reds it
+    # for the first day or two post-genesis even though the compute chain is
+    # healthy (verified live on cycle 11: 07-26/07-27 both fired while
+    # computed_metrics DATE#2026-07-27 already existed). Same SYSTEM_STATE
+    # pattern as the grading-liveness marker above; daily_brief_lambda.py
+    # consults it before emitting the staleness metric.
+    suppress_until = stamp_compute_staleness_window(target, args.apply)
+    print(
+        f"    ({'stamped' if args.apply else 'would stamp'} SYSTEM#alarm-windows/GENESIS#compute-pipeline-stale, "
+        f"suppress_until={suppress_until})"
+    )
 
     # Step 2d (#1198): retire the predict-the-week subject. current_challenge.json
     # is a manual, per-week S3 artifact that no lambda and no wipe touches — left

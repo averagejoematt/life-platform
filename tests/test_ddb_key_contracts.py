@@ -82,6 +82,13 @@ KNOWN_OPTIONAL: dict[tuple, str] = {
         "COUNT",
     ): "#1393 the engagement-ladder Replication-Kit completions aggregate — seeded on the first self-certified "
     "completion; _ladder_replicator_count tolerates absence (returns 0 for a missing item / empty cert_count)",
+    (
+        "SYSTEM#alarm-windows",
+        "GENESIS#compute-pipeline-stale",
+    ): "#1962 the compute-pipeline-stale alarm's genesis suppression window — stamped by "
+    "deploy/restart_pipeline.py's stamp_compute_staleness_window() on every reset; absent between resets and on "
+    "any platform that has never run one, which is the normal state. daily_brief_lambda's "
+    "_compute_staleness_alarm_suppressed tolerates absence (returns False — the alarm behaves exactly as before #1962).",
 }
 
 # Module-level constant values used to resolve f-strings statically.

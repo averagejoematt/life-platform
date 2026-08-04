@@ -48,6 +48,12 @@ Checks (each pass/fail):
      subscription) is unchanged by #1961 and isn't observable from this check —
      see token_alarm_window.py's docstring for the residual CDK-owner-gated gap.
 
+ 18. Reset-predictable alarm check (#1962): the compute-pipeline-stale alarm is
+     either not in ALARM, or it IS in ALARM but restart_pipeline.py's
+     stamp_compute_staleness_window() declared a genesis suppression window
+     that is still active (an expected, dated, auto-clearing red) — an ALARM
+     with no active declared window is a real, unpredicted problem and fails.
+
 Returns 0 if all checks pass, 1 if any fail.
 
 Usage:
@@ -413,6 +419,34 @@ def main():
         )
     except Exception as e:  # never let the verifier itself crash the post-reset check
         check("Token-alarm genesis window checks (#1961)", False, f"check could not run: {e}")
+    # 18. #1962 — the compute-pipeline-stale alarm is a reset-predictable false
+    # red (the cutover sequence tombstones "yesterday" before the new cycle's
+    # compute has had a cron cycle to write a fresh row — cycle 11 fired it red
+    # on BOTH 07-26 and 07-27). restart_pipeline.py's
+    # stamp_compute_staleness_window() declares a dated suppress_until when it
+    # runs; an ALARM state with no active declared window is a real problem,
+    # not the known reset artifact, and fails loudly.
+    try:
+        cw = boto3.client("cloudwatch", region_name=REGION)
+        alarms = cw.describe_alarms(AlarmNames=["compute-pipeline-stale"])["MetricAlarms"]
+        alarm_state = alarms[0]["StateValue"] if alarms else "MISSING"
+        if alarm_state != "ALARM":
+            check("compute-pipeline-stale is not a reset-predictable false red (#1962)", True, f"state={alarm_state}")
+        else:
+            marker = t.get_item(Key={"pk": "SYSTEM#alarm-windows", "sk": "GENESIS#compute-pipeline-stale"}).get("Item")
+            suppress_until = marker.get("suppress_until") if marker else None
+            in_window = bool(suppress_until) and today <= suppress_until
+            check(
+                "compute-pipeline-stale is not a reset-predictable false red (#1962)",
+                in_window,
+                (
+                    f"ALARM, but expected — declared genesis window through {suppress_until}, auto-clears then"
+                    if in_window
+                    else f"ALARM with no active declared genesis window (suppress_until={suppress_until}) — investigate for real"
+                ),
+            )
+    except Exception as e:  # never let the verifier itself crash the post-reset check
+        check("compute-pipeline-stale is not a reset-predictable false red (#1962)", False, f"check could not run: {e}")
 
     # Summary
     total = len(checks)
