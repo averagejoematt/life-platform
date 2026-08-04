@@ -78,6 +78,12 @@ for _var, _addr in [("EMAIL_RECIPIENT", RECIPIENT), ("EMAIL_SENDER", SENDER)]:
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 PROFILE_PK = f"USER#{USER_ID}"
+# #1962: reset-genesis alarm-suppression marker, stamped by
+# deploy/restart_pipeline.py's stamp_compute_staleness_window(). SYSTEM_STATE
+# per phase_taxonomy.py's `SYSTEM#` prefix rule — same non-USER# singleton-key
+# shape as dlq_consumer_lambda.py's LEDGER_PK.
+GENESIS_ALARM_WINDOW_PK = "SYSTEM#alarm-windows"
+GENESIS_ALARM_WINDOW_SK = "GENESIS#compute-pipeline-stale"
 
 # -- AWS clients ---------------------------------------------------------------
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
@@ -205,6 +211,52 @@ def fetch_date(source, date_str):
         return d2f(r.get("Item"))
     except Exception:
         return None
+
+
+def _compute_staleness_metric_value(compute_stale, today_str):
+    """#1962: the value the ComputePipelineStaleness metric should report.
+
+    `compute_stale` is the honest, user-facing signal (drives the email's own
+    "data may be estimated" banner and is never altered by this function). The
+    OPS ALARM METRIC additionally consults the declared genesis suppression
+    window — see `_compute_staleness_alarm_suppressed` — so a reset-predictable
+    false red doesn't page/digest as a real one. Returns (value, suppressed).
+    """
+    suppressed = bool(compute_stale) and _compute_staleness_alarm_suppressed(today_str)
+    value = 1.0 if (compute_stale and not suppressed) else 0.0
+    return value, suppressed
+
+
+def _compute_staleness_alarm_suppressed(today_str):
+    """#1962: is today inside a declared reset-cutover alarm-suppression window?
+
+    A reset (deploy/restart_pipeline.py) predictably makes computed_metrics
+    look stale for the first day or two post-genesis even when the compute
+    chain is healthy — the intelligence wipe tombstones the outgoing cycle's
+    "yesterday" row before the new cycle's compute has had a cron cycle to
+    write a fresh one. Cycle 11 fired compute-pipeline-stale red on BOTH
+    genesis-cutover mornings (2026-07-26, 2026-07-27) while DDB already held
+    a healthy computed_metrics DATE#2026-07-27 row — an honest-at-fire-time
+    but entirely foreseeable false red every future reset would reproduce.
+
+    restart_pipeline.py's stamp_compute_staleness_window() writes a dated,
+    auto-clearing marker at SYSTEM#alarm-windows / GENESIS#compute-pipeline-stale
+    (SYSTEM_STATE per phase_taxonomy.py's `SYSTEM#` prefix rule — untouched by
+    the wipe) with an explicit suppress_until date. This only gates the OPS
+    ALARM METRIC below; it never touches `_compute_stale` / the email's own
+    "data may be estimated" banner, so the reader-facing honesty contract
+    (ADR-104) is unaffected — only the alarm's false positive is suppressed,
+    and only for the declared span.
+    """
+    try:
+        r = table.get_item(Key={"pk": GENESIS_ALARM_WINDOW_PK, "sk": GENESIS_ALARM_WINDOW_SK})
+        item = r.get("Item")
+        if not item:
+            return False
+        return today_str <= item.get("suppress_until", "")
+    except Exception as _e:
+        logger.warning("REL-1/#1962: could not read genesis alarm-suppression marker: " + str(_e))
+        return False
 
 
 # ── #2089: the brief's two shared raw-source readers go cross-phase by TAXONOMY ──
@@ -1743,13 +1795,23 @@ def lambda_handler(event, context):
 
     # Risk-7: emit CloudWatch metric for compute pipeline staleness monitoring.
     # Alarm: LifePlatformComputeStaleness >= 1 for 1 datapoint within 1 day → alert.
+    # #1962: a reset cutover predictably makes this look stale for the first day
+    # or two post-genesis even though the compute chain is healthy — while a
+    # declared genesis suppression window is active, report 0.0 to the ALARM
+    # (the reader-facing "data may be estimated" banner above is untouched).
+    _staleness_metric_value, _staleness_suppressed = _compute_staleness_metric_value(_compute_stale, today.isoformat())
+    if _staleness_suppressed:
+        logger.warning(
+            "REL-1/#1962: compute staleness suppressed for the ops alarm — "
+            "within a declared post-reset genesis window (" + _compute_age_msg + ")"
+        )
     try:
         _cloudwatch.put_metric_data(
             Namespace="LifePlatform",
             MetricData=[
                 {
                     "MetricName": "ComputePipelineStaleness",
-                    "Value": 1.0 if _compute_stale else 0.0,
+                    "Value": _staleness_metric_value,
                     "Unit": "Count",
                     "Dimensions": [{"Name": "Source", "Value": "computed_metrics"}],
                 }
