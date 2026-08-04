@@ -15,6 +15,7 @@ for p in (os.path.join(_ROOT, "deploy"), os.path.join(_ROOT, "remediation")):
 
 import drift_report  # noqa: E402
 import drift_sentinel as ds  # noqa: E402
+import sentinel_github as sg  # noqa: E402  — the GitHub legs live here (#1665 split); a re-export is NOT a patch point
 import sentinel_quota as sq  # noqa: E402  — quota internals live here (#1665 split)
 
 # ── bucket-policy delete-protection (AC3) ────────────────────────────────────
@@ -494,6 +495,30 @@ _LIVE_RULESET = {  # LIVE-SHAPE: ruleset 19162901 as documented in CONVENTIONS.m
     "conditions": {"ref_name": {"exclude": [], "include": ["refs/heads/main"]}},
     "rules": [{"type": "deletion"}, {"type": "non_fast_forward"}],
 }
+_GITHUB_ACTIONS_APP = {"id": 15368, "slug": "github-actions", "name": "GitHub Actions"}  # LIVE-SHAPE: GET /apps/github-actions
+_RC_RULESET_ID = 20000001  # only knowable after the first apply — the sentinel matches this ruleset by NAME
+_RC_RULESET = {  # the #1662/ADR-148 fast-lane required-checks ruleset, as scripts/apply_branch_protection.py writes it
+    "id": _RC_RULESET_ID,
+    "name": "main-required-fast-lane",
+    "enforcement": "active",
+    "conditions": {"ref_name": {"exclude": [], "include": ["refs/heads/main"]}},
+    "bypass_actors": [{"actor_id": 15368, "actor_type": "Integration", "bypass_mode": "always"}],
+    "rules": [
+        {
+            "type": "required_status_checks",
+            "parameters": {
+                "strict_required_status_checks_policy": False,
+                "do_not_enforce_on_create": True,
+                "required_status_checks": [
+                    {"context": "Collect + deploy-critical + format", "integration_id": 15368},
+                    {"context": "gitleaks (PR commit range only, not full history)", "integration_id": 15368},
+                ],
+            },
+        }
+    ],
+}
+_REPO_AUTO_MERGE_ON = {"full_name": "averagejoematt/life-platform", "allow_auto_merge": True}
+_REPO_AUTO_MERGE_OFF = {"full_name": "averagejoematt/life-platform", "allow_auto_merge": False}  # LIVE-SHAPE 2026-08-03
 _VULN_DISABLED_ERR = {  # LIVE-SHAPE: the semantic 404 for disabled alerts
     "classification": "absent",
     "detail": '{"message":"Vulnerability alerts are disabled.","status":"404"} gh: Vulnerability alerts are disabled. (HTTP 404)',
@@ -510,15 +535,38 @@ def _fake_gh(monkeypatch, routes):
                 return resp
         raise AssertionError(f"unrouted gh api path in test: {path}")
 
+    # Patch the OWNING module: check_github_config lives in sentinel_github and resolves
+    # `_gh_api_result` as one of ITS globals — patching the drift_sentinel re-export alone
+    # would bind a name nothing reads and let the test hit real GitHub. Both, deliberately.
+    monkeypatch.setattr(sg, "_gh_api_result", fake)
     monkeypatch.setattr(ds, "_gh_api_result", fake)
 
 
-def _config_routes(env=None, ruleset=None, vuln=None):
+def _config_routes(env=None, ruleset=None, vuln=None, rc_list=None, rc_full=None, repo=None):
+    # ORDER MATTERS: _fake_gh returns the first substring match, so the id-qualified
+    # ruleset routes must precede the bare `rulesets` list route, and the bare
+    # `repos/<owner>/<repo>` route (which every other path also contains) goes LAST.
     return {
         "environments/production": env or (_LIVE_ENV_GATELESS, None),
         "rulesets/19162901": ruleset or (_LIVE_RULESET, None),
+        f"rulesets/{_RC_RULESET_ID}": rc_full or (_RC_RULESET, None),
+        "rulesets": rc_list if rc_list is not None else ([_LIVE_RULESET, _RC_RULESET], None),
         "vulnerability-alerts": vuln or ({}, None),  # 204 No Content = enabled
+        "/apps/github-actions": (_GITHUB_ACTIONS_APP, None),
+        "repos/": repo or (_REPO_AUTO_MERGE_ON, None),
     }
+
+
+def test_github_legs_are_owned_by_sentinel_github():
+    # The #1665-shaped split moved these into sentinel_github and re-exported them here.
+    # A re-export is NOT a patch point (reference_reexport_is_not_a_patch_point): a fake
+    # bound only on `ds` would leave the real function reading sentinel_github's globals
+    # and quietly hit live GitHub. This pins where they live so _fake_gh keeps patching
+    # the module that actually resolves the name.
+    assert ds._gh_api_result.__module__ == "sentinel_github"
+    assert ds.check_github_config.__module__ == "sentinel_github"
+    assert ds.check_github_push_runs.__module__ == "sentinel_github"
+    assert ds.check_github_config is sg.check_github_config
 
 
 def test_github_posture_file_loads_and_declares_all_surfaces():
@@ -527,8 +575,32 @@ def test_github_posture_file_loads_and_declares_all_surfaces():
     assert posture["main_ruleset"]["id"] == 19162901
     assert sorted(posture["main_ruleset"]["rule_types"]) == ["deletion", "non_fast_forward"]
     assert posture["vulnerability_alerts"]["enabled"] is True  # ADR-082 CVE channel claim
-    for key in ("environment_production", "main_ruleset", "vulnerability_alerts", "push_run_detector"):
+    assert posture["repo_settings"]["allow_auto_merge"] is True  # ADR-148 auto-merge posture
+    for key in (
+        "environment_production",
+        "main_ruleset",
+        "main_required_checks_ruleset",
+        "repo_settings",
+        "vulnerability_alerts",
+        "push_run_detector",
+    ):
         assert posture[key].get("source"), f"{key} must name the doc that makes the claim"
+
+
+def test_posture_required_checks_never_carry_a_review_rule():
+    # ADR-148: solo operator. A `pull_request` rule (required reviews) would make every
+    # merge un-landable by its own author. Pinned here as well as in the applier so the
+    # spec can't grow one out of band.
+    rc = ds._load_github_posture()["main_required_checks_ruleset"]
+    assert rc["name"] != "main-block-force-push-and-deletion", "must never manage the #1325 force-push/deletion ruleset"
+    assert rc["required_status_checks"], "an empty required set is a silent no-op gate"
+    assert rc["strict_required_status_checks_policy"] is False, "strict would force a rebase on every sibling merge"
+    for key in ("required_approving_review_count", "require_review", "required_pull_request_reviews"):
+        assert key not in rc, f"{key} in the spec would enable required reviews (ADR-148 refuses this)"
+    assert any(b["app"] == "github-actions" for b in rc["bypass_actors"]), (
+        "without the github-actions Integration bypass, ci-cd.yml's reconcile job — which pushes DIRECTLY to main, "
+        "not via a PR — is rejected by the required-checks rule on every merge day"
+    )
 
 
 def test_push_trigger_globs_match_workflows():
@@ -619,11 +691,94 @@ def test_github_config_ruleset_drift_when_deleted(monkeypatch):
     assert "GONE" in res["surfaces"]["main_ruleset"]["detail"]
 
 
+def test_github_config_required_checks_clean_when_applied(monkeypatch):
+    # Post-apply steady state: the ADR-148 ruleset exists with the documented contexts,
+    # strict off, the github-actions Integration bypass present, auto-merge on.
+    _fake_gh(monkeypatch, _config_routes(env=(_ENV_WITH_REVIEWERS, None)))
+    res = ds.check_github_config()
+    rc = res["surfaces"]["main_required_checks_ruleset"]
+    assert rc["status"] == "clean", rc
+    assert "Collect + deploy-critical + format" in rc["live_contexts"]
+    assert res["surfaces"]["repo_settings"]["status"] == "clean"
+
+
+def test_github_config_required_checks_drift_when_absent(monkeypatch):
+    # TODAY'S LIVE STATE (2026-08-03, pre-apply): only the #1325 ruleset exists and
+    # auto-merge is off, so BOTH new surfaces must fire. This is the guard-red the
+    # driver's post-merge `--apply` turns green — and it stays honest if that never runs.
+    _fake_gh(
+        monkeypatch,
+        _config_routes(
+            env=(_ENV_WITH_REVIEWERS, None),
+            rc_list=([_LIVE_RULESET], None),
+            repo=(_REPO_AUTO_MERGE_OFF, None),
+        ),
+    )
+    res = ds.check_github_config()
+    assert res["status"] == "drift"
+    rc = res["surfaces"]["main_required_checks_ruleset"]
+    assert rc["status"] == "drift" and "NO required status checks" in rc["detail"]
+    assert "apply_branch_protection.py --apply" in rc["detail"]
+    settings = res["surfaces"]["repo_settings"]
+    assert settings["status"] == "drift" and "allow_auto_merge" in settings["detail"]
+    # the pre-existing force-push/deletion ruleset is judged independently and stays clean
+    assert res["surfaces"]["main_ruleset"]["status"] == "clean"
+
+
+def test_github_config_required_checks_drift_when_a_context_is_dropped(monkeypatch):
+    weakened = json.loads(json.dumps(_RC_RULESET))
+    weakened["rules"][0]["parameters"]["required_status_checks"] = [
+        {"context": "Collect + deploy-critical + format", "integration_id": 15368}
+    ]
+    _fake_gh(monkeypatch, _config_routes(env=(_ENV_WITH_REVIEWERS, None), rc_full=(weakened, None)))
+    res = ds.check_github_config()
+    rc = res["surfaces"]["main_required_checks_ruleset"]
+    assert rc["status"] == "drift"
+    assert "gitleaks" in rc["detail"]
+
+
+def test_github_config_required_checks_drift_when_bot_bypass_removed(monkeypatch):
+    # Dropping the Integration bypass does not weaken the gate — it WEDGES the reconcile
+    # bot's direct push to main. Silent, and only visible on a merge day, so it drifts.
+    no_bypass = json.loads(json.dumps(_RC_RULESET))
+    no_bypass["bypass_actors"] = []
+    _fake_gh(monkeypatch, _config_routes(env=(_ENV_WITH_REVIEWERS, None), rc_full=(no_bypass, None)))
+    res = ds.check_github_config()
+    rc = res["surfaces"]["main_required_checks_ruleset"]
+    assert rc["status"] == "drift"
+    assert "bypass_actors" in rc["detail"] and "reconcile" in rc["detail"]
+
+
+def test_github_config_required_checks_drift_on_out_of_band_review_rule(monkeypatch):
+    # ADR-148 never applies a `pull_request` rule; if one appears, someone added it in
+    # the GitHub UI and every solo merge is about to need an approval that can't come.
+    with_review = json.loads(json.dumps(_RC_RULESET))
+    with_review["rules"].append({"type": "pull_request", "parameters": {"required_approving_review_count": 1}})
+    _fake_gh(monkeypatch, _config_routes(env=(_ENV_WITH_REVIEWERS, None), rc_full=(with_review, None)))
+    res = ds.check_github_config()
+    rc = res["surfaces"]["main_required_checks_ruleset"]
+    assert rc["status"] == "drift"
+    assert "approval-shaped" in rc["detail"]
+
+
+def test_github_config_required_checks_degrades_when_app_lookup_unavailable(monkeypatch):
+    # /apps lookup down → compare bypass by (actor_type, bypass_mode) and SAY so,
+    # rather than silently reporting a numeric match that was never made.
+    routes = _config_routes(env=(_ENV_WITH_REVIEWERS, None))
+    routes["/apps/github-actions"] = (None, {"classification": "error", "detail": "gh: timeout"})
+    _fake_gh(monkeypatch, routes)
+    res = ds.check_github_config()
+    assert res["surfaces"]["main_required_checks_ruleset"]["status"] == "clean"
+
+
 def test_github_config_scope_gap_is_needs_owner_not_red(monkeypatch):
     # The realistic CI state without the GH_POSTURE_TOKEN secret: admin-read surfaces
     # 403 for the workflow token → "unavailable" + ONE needs-owner line naming the
     # exact fine-grained-PAT permission; NEVER drift/error for a known scope gap.
-    _fake_gh(monkeypatch, _config_routes(env=(_ENV_WITH_REVIEWERS, None), ruleset=(None, _SCOPE_ERR), vuln=(None, _SCOPE_ERR)))
+    _fake_gh(
+        monkeypatch,
+        _config_routes(env=(_ENV_WITH_REVIEWERS, None), ruleset=(None, _SCOPE_ERR), rc_list=(None, _SCOPE_ERR), vuln=(None, _SCOPE_ERR)),
+    )
     res = ds.check_github_config()
     assert res["status"] == "unavailable"
     assert res["surfaces"]["main_ruleset"]["status"] == "unavailable"
@@ -650,7 +805,9 @@ def _push_routes(monkeypatch, commits, runs, files_by_sha=None):
             return {"workflow_runs": runs}, None
         raise AssertionError(f"unrouted gh api path in test: {path}")
 
+    monkeypatch.setattr(sg, "_gh_api_result", fake)  # owning module (#1665 split)
     monkeypatch.setattr(ds, "_gh_api_result", fake)
+    monkeypatch.setattr(sg, "_commit_files", lambda repo, sha: files_by_sha.get(sha, ["lambdas/x.py"]))
     monkeypatch.setattr(ds, "_commit_files", lambda repo, sha: files_by_sha.get(sha, ["lambdas/x.py"]))
 
 
@@ -755,6 +912,7 @@ def test_push_runs_scope_gap_is_needs_owner_not_red(monkeypatch):
             return [_commit("aaa", _iso_minutes_ago(60))], None
         return None, _SCOPE_ERR
 
+    monkeypatch.setattr(sg, "_gh_api_result", fake)  # owning module (#1665 split)
     monkeypatch.setattr(ds, "_gh_api_result", fake)
     res = ds.check_github_push_runs()
     assert res["status"] == "unavailable"

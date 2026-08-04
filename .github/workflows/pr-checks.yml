@@ -6,16 +6,26 @@
 #   2. the deploy_critical marker subset — ADR-117's fast offline lane
 #   3. black --check — the format gate (same pin as ci-cd.yml lint)
 #
-# ADVISORY BY DESIGN: this lane is deliberately NOT a required status check.
-# Required-ness is a GitHub branch-protection setting, and the #1319 incident
-# proved those silently drop on repo-visibility flips — so the durable control
-# is this file (in git), and flipping it to required is an explicit owner
-# toggle recorded in deploy/github_posture.json (drift_sentinel GET-verifies
-# weekly). Until then the merge ritual's compensating control stands: full
-# local suite, no -x, before every merge. See ADR-139.
+# REQUIRED since #1662 / ADR-148. This job's `name:` below IS the required
+# check-run context (`Collect + deploy-critical + format`) in the
+# `main-required-fast-lane` ruleset. Three edits to this file would silently
+# un-require it and leave every PR stuck on "Expected — Waiting for status to
+# be reported": renaming the job's `name:`, adding a `paths:` filter to the
+# pull_request trigger, or adding a job-level `if:`. Do none of those without
+# updating deploy/github_posture.json and re-running
+# `python3 scripts/apply_branch_protection.py --apply`.
+# tests/test_branch_protection_spec.py reds if you try.
 #
-# The reconcile bot pushes directly to main; PR checks never gate direct
-# pushes, so this lane is structurally compatible with it either way.
+# The durable control is still this file (in git) — the #1319 incident proved
+# GitHub-side settings silently drop on repo-visibility flips, which is exactly
+# why the required-ness is declared in deploy/github_posture.json and
+# GET-verified weekly by drift_sentinel rather than trusted to stay set.
+# ADR-139's advisory posture is superseded for THIS lane only; the full suite
+# stays post-merge and advisory.
+#
+# The reconcile bot pushes directly to main. A required-status-checks rule DOES
+# block direct pushes, so the ruleset carries a `github-actions` Integration
+# bypass for exactly that push — see ADR-148.
 
 name: PR checks
 

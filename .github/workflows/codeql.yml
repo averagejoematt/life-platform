@@ -40,12 +40,15 @@
 #   - No `os.system`, no `pickle`, no unsafe `yaml.load`, no disabled TLS verification
 #     found repo-wide — do not expect findings in those classes.
 #
-# POSTURE: ADVISORY ONLY (#1660's AC). `analyze`'s default behavior is to upload SARIF
-# to the repo's Security tab — it does NOT fail the job on any finding, and this
-# workflow deliberately adds no step that inspects the SARIF and exits non-zero.
-# Promoting to "blocking on high-severity" + adding this workflow as a required status
-# check is explicit owner territory — see #1662 (gate:owner, branch-protection/repo
-# settings) — do not flip this file's posture without that decision landing there first.
+# POSTURE: ADVISORY ONLY (#1660's AC), and #1662 SETTLED IT THAT WAY. `analyze`'s
+# default behavior is to upload SARIF to the repo's Security tab — it does NOT fail the
+# job on any finding, and this workflow deliberately adds no step that inspects the
+# SARIF and exits non-zero. ADR-148 (2026-08-03) decided this workflow stays OUT of the
+# required-status-check set for two reasons: `analyze` never exits non-zero on a
+# finding (requiring it buys latency and no verdict), and it is a matrix job that emits
+# one check-run per language, which a single required context string cannot name.
+# Promoting to "blocking on high-severity" would need a step that reads the SARIF, plus
+# an amendment to ADR-148 and a matching edit to deploy/github_posture.json.
 #
 # TRIGGERS: pull_request (the advisory PR-check signal, results land as PR annotations
 # + Security tab) + push to main (keeps Security-tab results current post-merge, since
@@ -60,7 +63,8 @@ on:
     branches: [main]
   push:
     branches: [main]
-    # Reuses path globs that already exist in PUSH_TRIGGER_GLOBS (deploy/drift_sentinel.py)
+    # Reuses path globs that already exist in PUSH_TRIGGER_GLOBS (deploy/sentinel_github.py,
+    # re-exported by deploy/drift_sentinel.py)
     # so this filter needs no update to that MAINTAINED-LITERAL union (test_drift_sentinel.py
     # ::test_push_trigger_globs_match_workflows enforces PUSH_TRIGGER_GLOBS == the union of
     # every push-to-main workflow's paths — a filter must exist, and it must be no more than

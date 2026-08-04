@@ -25,6 +25,51 @@
     ],
     "source": "docs/CONVENTIONS.md drift-discovery table + docs/MANAGED_WHERE_LEDGER.md (#1325): exactly main-block-force-push-and-deletion, rules [deletion, non_fast_forward] only, enforcement active, no pull_request/required_status_checks rule."
   },
+  "main_required_checks_ruleset": {
+    "name": "main-required-fast-lane",
+    "target": "branch",
+    "enforcement": "active",
+    "include_refs": [
+      "refs/heads/main"
+    ],
+    "strict_required_status_checks_policy": false,
+    "do_not_enforce_on_create": true,
+    "producer_app": "github-actions",
+    "bypass_actors": [
+      {
+        "app": "github-actions",
+        "bypass_mode": "always",
+        "why": "ci-cd.yml's `reconcile` job pushes one regenerated-artifact commit DIRECTLY to main with GITHUB_TOKEN (it is not a PR). A required-status-checks rule blocks any ref update whose head has no passing checks, so without this bypass every reconcile push is rejected and merge-day drift stops being repaired. github-actions[bot] is not a repo admin, so no admin/enforce_admins knob covers it."
+      }
+    ],
+    "required_status_checks": [
+      {
+        "context": "Collect + deploy-critical + format",
+        "workflow": "pr-checks.yml",
+        "job": "fast-lane",
+        "typical_seconds": 90,
+        "why": "ADR-139's fast lane: pytest --collect-only (the #1297 class), the deploy_critical marker subset (ADR-117), and black --check over the six enforced dirs. Measured 1m26s on PR #2094. `on: pull_request: branches: [main]` with NO path filter and no job-level `if:` — it reports on every PR class including docs-only."
+      },
+      {
+        "context": "gitleaks (PR commit range only, not full history)",
+        "workflow": "secret-scan.yml",
+        "job": "gitleaks",
+        "typical_seconds": 15,
+        "why": "#1659 credential-pattern scan, scoped to the PR's own commit range. Measured 9s on PR #2094 (the run that also confirmed the trigger analysis live). `on: pull_request: branches: [main]` with NO path filter and no job-level `if:` — it reports on every PR class."
+      }
+    ],
+    "advisory_not_required": [
+      "CodeQL analysis (python) / (javascript-typescript) — codeql.yml is unfiltered on PRs but its `analyze` step never exits non-zero on a finding, so requiring it buys latency and no verdict (ADR-148).",
+      "Dependabot Validate / validate — job-level `if:` restricts it to dependabot[bot] dev-tooling branches, so it reports `skipped` on every human PR; a skipped required check never satisfies the rule.",
+      "Wiki drift gates (docs-ci.yml), Surface-drift gate (surface-drift.yml), Migration coverage + HTML well-formedness / Render + accuracy gate (v4-gate.yml) — all PATH-FILTERED, so they simply do not report on PRs outside their globs and would block those PRs forever.",
+      "Unit Tests / Lint + Syntax Check (ci-cd.yml) and Visual + AI-vision QA — post-merge (push/scheduled) only; they emit no PR check-run to require."
+    ],
+    "source": "ADR-148 (branch protection: fast-lane required checks + auto-merge, #1662, epic #1648) + docs/CONVENTIONS.md drift-discovery table + docs/MANAGED_WHERE_LEDGER.md. Applied by scripts/apply_branch_protection.py --apply (driver-run, post-merge); until that runs the sentinel reports this surface as drift BY DESIGN, per rule (2) above."
+  },
+  "repo_settings": {
+    "allow_auto_merge": true,
+    "source": "ADR-148 (#1662): auto-merge is the mechanism that makes fast-lane required checks cost zero wall-clock — the operator arms the merge once and GitHub lands it when the required checks go green. Applied by scripts/apply_branch_protection.py --apply."
+  },
   "vulnerability_alerts": {
     "enabled": true,
     "source": "ci-cd.yml pip-audit advisory step ('Dependabot will open a bump PR for the affected package') + ADR-082 (Dependabot is the CVE remediation channel). RESOLVED 2026-07-20: alerts ENABLED live (owner toggle after the public flip; SDLC finding P2-4 closed)."

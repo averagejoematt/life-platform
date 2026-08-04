@@ -162,6 +162,24 @@ env -u AWS_PROFILE -u AWS_SESSION_TOKEN AWS_ACCESS_KEY_ID=FAKEKEY AWS_SECRET_ACC
 (Never set `AWS_PROFILE=` empty — boto3 raises `ProfileNotFound`; always `env -u`.)
 Source: `reference_ci_masking_and_creds`.
 
+### 4a0. What gates the MERGE (#1662, ADR-148)
+
+Distinct from §4a (which gates the *deploy*, on push to `main`). Two check-runs are
+**required** on every PR to `main` by the `main-required-fast-lane` ruleset:
+`Collect + deploy-critical + format` (`pr-checks.yml`) and
+`gitleaks (PR commit range only, not full history)` (`secret-scan.yml`) — the only two
+PR gates with no `paths:` filter and no job-level `if:`, so they report on every PR
+class including docs-only. Everything else (full `Unit Tests`, `Lint + Syntax Check`,
+CodeQL, visual QA, and the path-filtered gates) stays **advisory / post-merge**.
+Auto-merge is on: arm the PR once, GitHub lands it when those two go green.
+
+The trap to know: a required check matches by check-run *name*, and "never reported"
+is not distinguishable from "failed". Adding a `paths:` filter to either workflow,
+`if:`-gating its job, or renaming the job leaves PRs stuck on "Expected — Waiting for
+status to be reported". `tests/test_branch_protection_spec.py` reds on exactly that.
+Desired state: `deploy/github_posture.json`. Writer: `scripts/apply_branch_protection.py`
+(`--check` to verify, `--apply` to fix). Never edit the ruleset in the GitHub UI.
+
 ### 4a. The deploy-critical test lane — what gates the deploy (#416, ADR-117)
 
 Since ADR-117, `plan` (and therefore `deploy` + the reader-facing visual-QA gate)
@@ -267,16 +285,23 @@ still valid; the bot is the net under it, not a replacement for pre-merge hygien
    and classic branch protection on `main` is now **absent** —
    `gh api repos/<owner>/<repo>/branches/main/protection` returns 404
    "Branch not protected" (verified live, not residual). The only control on
-   `main` is the minimal **ruleset** added 2026-07-18 (#1325,
-   `main-block-force-push-and-deletion`, id `19162901`) — it blocks
-   **non-fast-forward pushes and branch deletion only**: no required checks, no
-   PR rule, `enforcement: active`, `bypass_actors: []`. A normal (fast-forward,
-   non-deleting) push from `github-actions[bot]` — including the reconcile bot's
-   commit and a squash-merge — is unaffected; only a force-push or a delete of
-   `main` is rejected. If the reconcile push is ever rejected, it means someone
-   force-pushed or the ruleset was misconfigured — check
-   `gh api repos/<owner>/<repo>/rulesets/19162901` before assuming a PR-gate
-   problem (there isn't one).
+   `main` is via **rulesets**, and there are two — check both before assuming a
+   PR-gate problem:
+   - `main-block-force-push-and-deletion` (id `19162901`, added 2026-07-18,
+     #1325) blocks **non-fast-forward pushes and branch deletion only**: no
+     required checks, no PR rule, `enforcement: active`, `bypass_actors: []`. A
+     normal (fast-forward, non-deleting) push from `github-actions[bot]` —
+     including the reconcile bot's commit and a squash-merge — is unaffected.
+   - `main-required-fast-lane` (#1662, **ADR-148**) carries one
+     `required_status_checks` rule scoped to the fast lane. A required-checks
+     rule blocks **any** ref update whose head has no passing checks, including
+     the reconcile bot's DIRECT push — which is why that ruleset carries a
+     `bypass_actors` entry for the `github-actions` Integration (`always`).
+     **If the reconcile push is rejected, check that bypass first**:
+     `gh api repos/<owner>/<repo>/rulesets --jq '.[] | {id,name}'` then read the
+     full record. Desired state is `deploy/github_posture.json`; re-assert with
+     `python3 scripts/apply_branch_protection.py --check` (and `--apply` to fix).
+   Otherwise a rejected push means someone force-pushed.
 3. **A generator crashed** — same failure the test suite would have shown; fix the
    generator like any red test. Reproduce locally: run the generators from repo root
    on a clean main checkout; `git status` must end clean (they are idempotent).
@@ -701,7 +726,8 @@ These values change and must **never** be hand-written in docs or memory. Read t
 | Live site build | `curl -s https://averagejoematt.com/version.json` → compare `build` to `git rev-parse --short HEAD`; a mismatch means the viewer's device is stale |
 | Open CodeQL alerts | `gh api '/repos/{owner}/{repo}/code-scanning/alerts?state=open&per_page=100' --paginate --jq length` → steady state **0** since the #1902 triage (every alert is fixed or dismissed-with-reason; a just-merged fix stays open until CodeQL re-analyzes main). `drift_sentinel.check_codeql_alerts` alarms on regrowth — an open alert is un-triaged by definition, so triage it, never let the list re-accumulate |
 | `main` classic branch protection | `gh api repos/<owner>/<repo>/branches/main/protection` → must 404 "Branch not protected" (removed 2026-07-13, #1173; a 200 here means protection was re-added out of band — reconcile the doc, don't assume this table is wrong) |
-| `main` ruleset posture | `gh api repos/<owner>/<repo>/rulesets` → must show exactly `main-block-force-push-and-deletion` (id `19162901`) with `rules: [deletion, non_fast_forward]` only, `enforcement: active`, no `pull_request`/`required_status_checks` rule (#1325). Full record: `gh api repos/<owner>/<repo>/rulesets/19162901` |
+| `main` ruleset posture | `gh api repos/<owner>/<repo>/rulesets` → must show `main-block-force-push-and-deletion` (id `19162901`) with `rules: [deletion, non_fast_forward]` only, `enforcement: active`, no `pull_request`/`required_status_checks` rule (#1325), **and** `main-required-fast-lane` (#1662, ADR-148). Full record: `gh api repos/<owner>/<repo>/rulesets/<id>` |
+| `main` required status checks + auto-merge | `python3 scripts/apply_branch_protection.py --check` → exit 0 and "clean" when live matches `deploy/github_posture.json` (ADR-148). It prints the required contexts, the `github-actions` bypass the reconcile bot depends on, and `allow_auto_merge`. Never hand-edit the ruleset in the GitHub UI — `--apply` is the only sanctioned writer, and the weekly drift sentinel reports any out-of-band edit |
 
 The pre-commit hook (`scripts/install_hooks.sh` — run once after cloning) runs
 `deploy/sync_doc_metadata.py --apply` directly and auto-stages every target file it
