@@ -32,7 +32,8 @@ function correctionNotice(d) {
   return `<aside class="supp-correction" role="note"><p class="supp-correction-h label">Correction &middot; 2 August 2026</p>` +
     `<p><strong>${n} citations on this page were withdrawn.</strong> They pointed to papers that did not support the claims ` +
     `they were attached to &mdash; they were never verified when they were written. Two more were withdrawn from the ` +
-    `experiments registry the same day.</p>` +
+    `experiments registry the same day. On 4 August 2026 one of those two (Tongkat Ali) was re-resolved to a real ` +
+    `supporting trial and restored &mdash; the original claim was sound, the link attached to it was not.</p>` +
     `<p>Nothing was removed quietly: each withdrawn claim now reads &ldquo;Open question&rdquo; below, and the affected ` +
     `compounds&rsquo; evidence ratings were downgraded to match what is actually cited &mdash; in two cases, nothing. ` +
     `Every citation that survives now stores the resolved title of the paper it points to, and a test re-resolves each one ` +

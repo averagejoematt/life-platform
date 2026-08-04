@@ -194,6 +194,8 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .supp-meta { margin-top: var(--sp-2); color: var(--ink-faint); text-transform: none; letter-spacing: 0; }
 .supp-ev-link { color: var(--ember); text-decoration: none; border-bottom: 1px solid color-mix(in oklch, var(--ember) 40%, transparent); }
 .supp-ev-link:hover { border-bottom-color: var(--ember); }
+/* #1983 — the honest counterpart to an evidence link: stated absence, not silence. */
+.supp-ev-nostudy { color: var(--ink-faint); border-bottom: 1px dotted color-mix(in oklch, var(--ink-faint) 50%, transparent); cursor: help; }
 
 /* Architecture diagram (the "how it's built" page) — hand-authored inline SVG. */
 .arch-fig { margin: var(--sp-4) 0 var(--sp-5); }

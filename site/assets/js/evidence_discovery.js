@@ -440,7 +440,14 @@ export async function renderExperiments(d) {
     // P2.1 — evidence_tier gets the evClass chip treatment (strong/moderate/emerging).
     const [tc, tl] = x.evidence_tier ? evClass(x.evidence_tier) : [null, null];
     const meta = [x.pillar, x.difficulty, x.evidence_citation && "src: " + x.evidence_citation].filter(Boolean).map(esc).join("  ·  ");
-    const link = x.source_url ? ` · <a class="supp-ev-link" href="${esc(x.source_url)}" target="_blank" rel="noopener">evidence ↗</a>` : "";
+    // #1983 — a citation is a clickable record or an explicit "no direct study",
+    // never bare prose. Silence used to mean both "we never linked it" and "no study
+    // exists"; the reader could not tell those apart.
+    const link = x.source_url
+      ? ` · <a class="supp-ev-link" href="${esc(x.source_url)}" target="_blank" rel="noopener">evidence ↗</a>`
+      : x.citation_status === "no-direct-study"
+        ? ` · <span class="supp-ev-nostudy" title="${esc(x.citation_note || "")}">no direct study</span>`
+        : "";
     // Reader participation: vote for which pipeline experiment runs next + get
     // notified when it does — wired to experiment_vote/experiment_follow.
     const votes = voteMap ? voteMap[x.id] : (x.votes != null ? x.votes : null);
