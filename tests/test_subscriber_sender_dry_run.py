@@ -30,7 +30,7 @@ def _derive_subscriber_facing_senders() -> list[str]:
     """Parse the function names out of email_stack.py's "SUBSCRIBER-facing senders
     (...)" comment — the SET, read from source, never a copy pasted into this file."""
     stack_src = open(os.path.join(_REPO, "cdk/stacks/email_stack.py")).read()
-    m = re.search(r"SUBSCRIBER-facing senders\s*\(((?:[^()]|\n)*?)\)", stack_src)
+    m = re.search(r"SUBSCRIBER-facing senders\s*\(([^()]*?)\)", stack_src)
     assert m, "email_stack.py's 'SUBSCRIBER-facing senders (...)' comment moved/changed — update the derivation regex"
     raw = re.sub(r"#", " ", m.group(1)).replace("\n", " ")
     names = [n.strip() for n in raw.split(",") if n.strip()]
