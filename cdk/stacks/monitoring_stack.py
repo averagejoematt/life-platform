@@ -793,6 +793,20 @@ class MonitoringStack(Stack):
         # Legitimate content-heavy days (weekly podcast/chronicle generation) peak
         # ~121k. 150000 clears those peaks and alerts only on a genuine ~2.5x runaway.
         # Future: swap to a CloudWatch anomaly-detection band (per ai-daily-spend-high).
+        #
+        # #1961: this fixed threshold has NO reset-window awareness — a genesis's
+        # predictable post-reset full-cycle rebuild spike (character sheet + compute
+        # + coach dossiers + chronicle backfill all regenerating at once) can clear
+        # 150000 and page exactly like an unexplained runaway (cycle 11 did, twice).
+        # `lambdas/operational/remediation_dispatcher_lambda.py` now consults
+        # `lambdas/common/token_alarm_window.py`'s stamped genesis window and skips
+        # the automated urgent-triage escalation for a breach inside it — but that
+        # fix is Lambda-side only. THIS alarm's SNS action is still a static CDK
+        # resource routed straight to the urgent topic (which also carries a direct
+        # human EmailSubscription, operational_stack.py) — it has no window
+        # awareness and still pages on a predicted spike until a follow-up gives
+        # this alarm itself dynamic, deploy-free window suppression (e.g. a
+        # composite alarm gated on a periodic genesis-window gauge metric).
         _alarm(
             "AiTokensPlatformTotal", "ai-tokens-platform-daily-total", "LifePlatform/AI", "AnthropicOutputTokens", 86400, "Sum", 150000, GTE
         )

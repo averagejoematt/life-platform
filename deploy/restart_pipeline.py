@@ -23,6 +23,10 @@ Steps (each can be skipped with --skip-<name>):
     2. write config/user_goals.json + config/character_sheet.json
     2b. --close-cycle (default ON): append the new genesis to CYCLE_GENESES
         in lambdas/web/site_api_data.py (drives /api/cycle_compare + /api/timeline)
+    2f. stamp the genesis rebuild token-alarm suppression window (#1961,
+        lambdas/common/token_alarm_window.py — the _TEMP_CEILING_WINDOW pattern;
+        consulted by remediation_dispatcher_lambda.py to keep the predicted
+        post-genesis token spike out of the urgent automated-triage path)
     3. regenerate lambdas/common/constants.py via sync_constants_from_config.py
     4. cdk deploy --all (full-tree bundles carry constants + CYCLE_GENESES)
     5. restart_phase_tag.py
@@ -122,6 +126,7 @@ CDK_CONSTANTS = REPO_ROOT / "cdk" / "stacks" / "constants.py"
 LAMBDA_CONSTANTS = REPO_ROOT / "lambdas" / "common" / "constants.py"
 SITE_API_DATA = REPO_ROOT / "lambdas" / "web" / "site_api_data.py"
 RESET_LOG = REPO_ROOT / "docs" / "restart" / "RESET_LOG.md"
+TOKEN_ALARM_WINDOW_FILE = REPO_ROOT / "lambdas" / "common" / "token_alarm_window.py"
 SSM_CYCLE_PARAM = "/life-platform/experiment-cycle"
 
 # ── #1199/#1978: the void-open-bets ledger now lives in experiment/prereg_voids.py
@@ -302,6 +307,37 @@ def append_cycle_genesis(new_cycle: int, genesis: str, apply: bool) -> str:
     if apply:
         SITE_API_DATA.write_text(text[: block_m.start(1)] + new_body + text[block_m.end(1) :])
     return "appended" if apply else "would-append"
+
+
+def stamp_token_alarm_window(genesis: str, apply: bool) -> str:
+    """#1961: stamp the genesis rebuild token-alarm suppression window into
+    lambdas/common/token_alarm_window.py (the `_TEMP_CEILING_WINDOW` pattern —
+    ADR-133). Text-substitution against the committed file (same style as
+    append_cycle_genesis), not an import, since the target module needs to stay
+    hand-readable/independently testable rather than generated wholesale.
+
+    Idempotent: no-op when the file already carries this genesis's window.
+    Must run BEFORE the CDK deploy step so the full-tree bundle (#781) ships the
+    updated window to remediation_dispatcher_lambda.py."""
+    from common.token_alarm_window import window_for_genesis
+
+    start, end = window_for_genesis(genesis)
+    text = TOKEN_ALARM_WINDOW_FILE.read_text()
+    m = re.search(r'TOKEN_ALARM_GENESIS_WINDOW\s*=\s*\(\s*"(\d{4}-\d{2}-\d{2})"\s*,\s*"(\d{4}-\d{2}-\d{2})"\s*\)', text)
+    if not m:
+        raise RuntimeError("Could not locate TOKEN_ALARM_GENESIS_WINDOW in lambdas/common/token_alarm_window.py")
+    if m.group(1) == start and m.group(2) == end:
+        return f"already-stamped ({start}, {end})"
+    new_line = f'TOKEN_ALARM_GENESIS_WINDOW = ("{start}", "{end}")'
+    # Also refresh the trailing "Stamped for genesis ..." comment line above it.
+    comment_re = re.compile(r"# Stamped for genesis \d{4}-\d{2}-\d{2}.*")
+    new_comment = f"# Stamped for genesis {genesis} by restart_pipeline.py."
+    if apply:
+        new_text = text[: m.start()] + new_line + text[m.end() :]
+        if comment_re.search(new_text):
+            new_text = comment_re.sub(new_comment, new_text, count=1)
+        TOKEN_ALARM_WINDOW_FILE.write_text(new_text)
+    return f"{'stamped' if apply else 'would-stamp'} ({start}, {end})"
 
 
 def bump_cycle_ssm(new_cycle: int, apply: bool) -> str:
@@ -860,6 +896,15 @@ def main():
         if status.startswith("CONFLICT"):
             print("    ABORT: fix CYCLE_GENESES by hand, then re-run.")
             sys.exit(3)
+
+    # Step 2f (#1961): stamp the genesis rebuild token-alarm suppression window
+    # (lambdas/common/token_alarm_window.py — the _TEMP_CEILING_WINDOW pattern).
+    # Unconditional (not gated on close_cycle): a re-converge of the CURRENT
+    # genesis should still refresh the window if it's drifted. Must run BEFORE
+    # the CDK deploy step so the full-tree bundle ships it to
+    # remediation_dispatcher_lambda.py.
+    token_window_status = stamp_token_alarm_window(target, args.apply)
+    print(f"\n[2f] Token-alarm genesis window (lambdas/common/token_alarm_window.py): {token_window_status}")
 
     # Step 3: regenerate constants
     log = []

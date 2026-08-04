@@ -38,6 +38,15 @@ Checks (each pass/fail):
      ingested and published the previous cycle's figure as current. Reuses
      lambdas/operational/weight_truth_qa.assess_cross_surface_weight, the same
      assessor the nightly qa-smoke runs, so the rule cannot fork.
+ 17. Genesis rebuild token-alarm window (#1961): lambdas/common/token_alarm_window.py
+     is stamped for the CURRENT genesis, and no un-suppressed (i.e. actually
+     dispatched/paged) remediation-dispatcher marker exists for the platform-total
+     token alarm inside that window — the literal "no urgent page fired for a
+     predicted condition" assertion the story's acceptance criteria ask for.
+     NOTE: this only proves the automated-triage layer behaved; the raw CloudWatch
+     alarm's SNS routing to the urgent topic (and its direct human email
+     subscription) is unchanged by #1961 and isn't observable from this check —
+     see token_alarm_window.py's docstring for the residual CDK-owner-gated gap.
 
 Returns 0 if all checks pass, 1 if any fail.
 
@@ -351,6 +360,59 @@ def main():
         )
     except Exception as e:  # never let the verifier itself crash the post-reset check
         check("No coach card cites a weight the cockpit disagrees with (#2104)", False, f"check could not run: {e}")
+
+    # 17. #1961 — the genesis rebuild token-alarm suppression window. Two parts:
+    # (a) structural — the stamped window actually matches what window_for_genesis
+    # would derive for the CURRENT genesis (catches "forgot to re-run the pipeline
+    # stamp step" and hand-edits alike); (b) live/read-only — no un-suppressed
+    # remediation-dispatcher dedupe marker exists for the platform-total token
+    # alarm inside the window, i.e. the literal "no urgent page fired for a
+    # predicted condition" acceptance criterion. A breach with NO marker at all is
+    # fine (nothing observed to have paged); a marker with suppressed=False means
+    # the dispatcher actually fired repository_dispatch — the thing this story
+    # exists to prevent.
+    try:
+        from lambdas.common.token_alarm_window import TOKEN_ALARM_GENESIS_WINDOW, window_for_genesis
+
+        expected_window = window_for_genesis(EXPERIMENT_START_DATE)
+        check(
+            "Token-alarm genesis window is stamped for the current genesis (#1961)",
+            tuple(TOKEN_ALARM_GENESIS_WINDOW) == expected_window,
+            f"stamped={TOKEN_ALARM_GENESIS_WINDOW} expected={expected_window} for genesis={EXPERIMENT_START_DATE} "
+            "(re-run: python3 deploy/restart_pipeline.py --apply to re-stamp)",
+        )
+
+        s3_tok = boto3.client("s3", region_name=REGION)
+        win_start_compact = expected_window[0].replace("-", "")
+        win_end_compact = expected_window[1].replace("-", "")
+        prefix = "remediation-log/dispatch-dedupe/ai-tokens-platform-daily-total-"
+        unsuppressed = []
+        scanned = 0
+        for page in s3_tok.get_paginator("list_objects_v2").paginate(Bucket="matthew-life-platform", Prefix=prefix):
+            for obj in page.get("Contents", []):
+                key = obj["Key"]
+                stamp = key[len(prefix) :].split(".")[0]  # YYYYMMDDHHmm bucket
+                day = stamp[:8]
+                if not (win_start_compact <= day < win_end_compact):
+                    continue
+                scanned += 1
+                try:
+                    body = json.loads(s3_tok.get_object(Bucket="matthew-life-platform", Key=key)["Body"].read())
+                except Exception:
+                    continue
+                if not body.get("suppressed", False):
+                    unsuppressed.append(key)
+        check(
+            "No urgent page fired for the platform-total token alarm inside the genesis window (#1961)",
+            not unsuppressed,
+            (
+                f"{scanned} marker(s) in-window, {len(unsuppressed)} NOT suppressed (paged): {unsuppressed[:3]}"
+                if scanned
+                else "no dispatch-dedupe markers in-window (nothing breached, or dispatcher never saw it — either way, no observed page)"
+            ),
+        )
+    except Exception as e:  # never let the verifier itself crash the post-reset check
+        check("Token-alarm genesis window checks (#1961)", False, f"check could not run: {e}")
 
     # Summary
     total = len(checks)

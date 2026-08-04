@@ -16,6 +16,17 @@ Dedupe: a 30-minute window marker is written to
 A duplicate alarm in the same window is skipped — prevents flap-storms from
 chaining workflow runs.
 
+#1961: the platform-total token alarm (`ai-tokens-platform-daily-total`) breaching
+inside the stamped genesis rebuild window (`common/token_alarm_window.py`) is a
+PREDICTED post-reset rebuild spike, not a runaway — it is logged and marked
+suppressed instead of dispatched, so it no longer triggers an automated urgent
+triage run. NOTE: this stops the automated-triage escalation only; the raw
+CloudWatch alarm still publishes to the `life-platform-alerts` topic (which also
+carries a directly-wired human EmailSubscription, IaC'd in operational_stack.py)
+regardless of this Lambda's decision — that raw routing is a static CDK resource
+and closing that gap needs a separate, larger change (see token_alarm_window.py's
+docstring).
+
 Operator setup (one-time, see RUNBOOK):
   1. Create a fine-grained GitHub PAT, Contents: Read & Write on
      averagejoematt/life-platform only.
@@ -47,6 +58,14 @@ try:
 except ImportError:
     logger = logging.getLogger("remediation-dispatcher")
     logger.setLevel(logging.INFO)
+
+try:
+    from common.token_alarm_window import is_within_token_alarm_window
+except ImportError:  # pragma: no cover - packaging drift; fail safe = still page
+
+    def is_within_token_alarm_window(check_date=None):
+        return False
+
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 REPO_OWNER = os.environ.get("REPO_OWNER", "averagejoematt")
@@ -91,6 +110,15 @@ _DEFAULT_PATTERNS = (
 )
 URGENT_PATTERNS = tuple(p.strip().lower() for p in os.environ.get("URGENT_PATTERNS", _DEFAULT_PATTERNS).split(",") if p.strip())
 
+# #1961: the substring identifying the platform-total AI token alarm specifically
+# (a SUBSET of the "ai-tokens-platform" URGENT_PATTERNS entry — deliberately not
+# "ai-tokens" alone, which would also match the daily-brief token alarm; that one
+# already routes to digest in monitoring_stack.py and isn't reachable here anyway).
+# During the stamped genesis rebuild window (token_alarm_window.py) a breach of
+# this specific alarm is a PREDICTED spike, not a runaway — see that module's
+# docstring for the full rationale and the residual CDK gap it does NOT close.
+TOKEN_PLATFORM_ALARM_PATTERN = "ai-tokens-platform"  # noqa: S105 — an alarm-name substring, not a secret
+
 _sm = boto3.client("secretsmanager", region_name=REGION)
 _s3 = boto3.client("s3", region_name=REGION)
 _token_cache = None
@@ -108,6 +136,16 @@ def _get_token():
 def _is_urgent(alarm_name):
     n = (alarm_name or "").lower()
     return any(p in n for p in URGENT_PATTERNS)
+
+
+def _is_expected_genesis_rebuild(alarm_name):
+    """#1961: True only for the platform-total token alarm, breaching during the
+    stamped genesis rebuild window — the narrow condition this story defines as
+    'predicted, not a runaway'. Every other urgent alarm (including the
+    daily-brief token alarm, which never reaches here — it's digest-routed) is
+    unaffected."""
+    n = (alarm_name or "").lower()
+    return TOKEN_PLATFORM_ALARM_PATTERN in n and is_within_token_alarm_window()
 
 
 def _dedupe_key(alarm_name):
@@ -162,7 +200,14 @@ def _parse_alarm(sns_message):
 
 
 def lambda_handler(event, context):
-    results = {"dispatched": 0, "skipped_filter": 0, "skipped_dedupe": 0, "skipped_state": 0, "errors": 0}
+    results = {
+        "dispatched": 0,
+        "skipped_filter": 0,
+        "skipped_dedupe": 0,
+        "skipped_state": 0,
+        "skipped_genesis_window": 0,
+        "errors": 0,
+    }
     try:
         for rec in event.get("Records", []):
             try:
@@ -180,12 +225,6 @@ def lambda_handler(event, context):
                     results["skipped_filter"] += 1
                     continue
 
-                key = _dedupe_key(name)
-                if _seen(key):
-                    logger.info(f"dedupe hit for '{name}' (key={key}) — skipping")
-                    results["skipped_dedupe"] += 1
-                    continue
-
                 payload = {
                     "alarm_name": name,
                     "state": state,
@@ -194,8 +233,27 @@ def lambda_handler(event, context):
                     "metric": alarm.get("Trigger", {}).get("MetricName"),
                     "namespace": alarm.get("Trigger", {}).get("Namespace"),
                 }
+
+                key = _dedupe_key(name)
+                if _seen(key):
+                    logger.info(f"dedupe hit for '{name}' (key={key}) — skipping")
+                    results["skipped_dedupe"] += 1
+                    continue
+
+                if _is_expected_genesis_rebuild(name):
+                    # #1961: a predicted post-genesis rebuild spike — digest-only,
+                    # not an automated urgent triage escalation. Still marked
+                    # (same dedupe key) so a flapping alarm within the 30-min
+                    # window doesn't re-log every evaluation, and the marker is
+                    # explicitly flagged so restart_verify / an operator can tell
+                    # "suppressed as expected" apart from "actually dispatched."
+                    _mark(key, {**payload, "suppressed": True, "suppressed_reason": "genesis_rebuild_window"})
+                    logger.info(f"'{name}' breached inside the genesis rebuild window (#1961) — routed digest-only, no dispatch")
+                    results["skipped_genesis_window"] += 1
+                    continue
+
                 _dispatch(payload)
-                _mark(key, payload)
+                _mark(key, {**payload, "suppressed": False})
                 logger.info(f"dispatched urgent_alarm for '{name}'")
                 results["dispatched"] += 1
             except urllib.error.HTTPError as e:
