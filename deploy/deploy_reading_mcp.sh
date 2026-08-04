@@ -6,9 +6,10 @@
 # Phase B adds 8 MCP tools (mcp/tools_reading.py) + the rules-based recommender
 # and onboarding (in the reading/ package). The MCP bundle now stages
 # lambdas/reading/ as a top-level package (mcp_stack.py) so `from reading import …`
-# resolves at runtime — numeric/retry_utils that reading depends on already come
-# from the shared layer, so there is **NO shared-layer bump and NO fleet redeploy**.
-# Just the MCP stack (the lambda + its warmer).
+# resolves at runtime — numeric/retry_utils that reading depends on are bundled
+# straight into the MCP zip via build_bundle.py, same as everything else (there is
+# no shared layer at all — #781/ADR-131 retired it — so there's no layer to bump).
+# Just the MCP stack (the lambda + its warmer); no fleet redeploy needed.
 #
 #   cdk diff LifePlatformMcp   — REVIEW (expect only the MCP code-asset re-hash;
 #                                no IAM change — mcp_server() already grants table

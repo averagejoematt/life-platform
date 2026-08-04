@@ -114,6 +114,64 @@ def test_makefile_tombstone_rule_fires_on_the_prefix_layer_target():
     assert not hits, f"replacement guidance trips tombstone rule(s): {hits}"
 
 
+def test_deploy_scripts_and_workflow_yaml_scanned_for_tombstones():
+    """#2007: the tombstone scanner used to stop at deploy/*.md and lambdas/mcp *.py
+    — it never opened a single deploy/*.sh or .github/workflows/*.yml, where the
+    retired shared layer (#781/ADR-131) was still asserted as current
+    (deploy/deploy_reading_mcp.sh, ci-cd.yml). Both surfaces must be on the live
+    scan set now."""
+    ts = _load("scripts/check_doc_tombstones.py")
+    scanned = {str(p.relative_to(ROOT)) for p in ts._scan_files(include_exempt=False)}
+    assert "deploy/deploy_reading_mcp.sh" in scanned
+    assert "deploy/deploy_reading_data.sh" in scanned
+    assert "deploy/audit_system_state.sh" in scanned
+    assert ".github/workflows/ci-cd.yml" in scanned
+
+
+def test_shadowed_negation_no_longer_exempts_an_adjacent_stale_claim():
+    """#2007 non-vacuity: the pre-fix deploy_reading_mcp.sh:9-10 line carried a
+    stale affirmative claim ("...already come from the shared layer") right next
+    to a negation ("**NO shared-layer bump**") that used to exempt the WHOLE line
+    via RETIREMENT_LINE_RE, hiding the stale claim beside it (the exact shape the
+    issue's verifier flagged: extending the scan set alone would still miss this
+    line). The tightened negative-lookahead must FIRE on the historical text."""
+    ts = _load("scripts/check_doc_tombstones.py")
+    rules = ts._rules()
+    pre_fix_line = "# from the shared layer, so there is **NO shared-layer bump and NO fleet redeploy**."
+    assert not ts.RETIREMENT_LINE_RE.search(pre_fix_line), "pre-fix shadowed line would still be exempted — the tightening is vacuous"
+    assert any(rx.search(pre_fix_line) for rx, _ in rules), "no tombstone rule fires on the shadowed pre-fix line"
+    # the actual corrected replacement (deploy/deploy_reading_mcp.sh, live) must stay exempt.
+    fixed_line = "# no shared layer at all — #781/ADR-131 retired it — so there's no layer to bump)."
+    assert ts.RETIREMENT_LINE_RE.search(fixed_line), f"corrected replacement wrongly un-exempted: {fixed_line}"
+
+
+def test_legitimate_shared_layer_negations_still_exempt():
+    """#2007 non-vacuity (the other direction): the negative-lookahead tightening
+    added to close the shadowing hole above must stay QUIET on every legitimate
+    "no shared layer"-shaped negation actually live in this repo — a blunter fix
+    (clause-splitting on comma/sentence punctuation) was tried first and broke two
+    of these exact lines (docs/ARCHITECTURE.md's multi-sentence Lambda-deletions
+    paragraph and docs/CONVENTIONS.md's own #1347 incident narrative), so this
+    pins the corpus lines that decision was rejected to protect."""
+    ts = _load("scripts/check_doc_tombstones.py")
+    legitimate_negations = [
+        # deploy/deploy_lambda.sh
+        '# siblings" incident class is structurally dead, and there is no shared layer',
+        # deploy/deploy_site_api.sh
+        "# modules are inside the bundle, so there is no shared layer to attach and no",
+        # deploy/deploy_fleet.sh
+        "# The shared layer is retired: shared modules ship inside each function's code",
+        # docs/ARCHITECTURE.md:129 — "retired" and a later bare "shared layer" share one
+        # multi-sentence blockquote line; a clause-scoped exemption broke this.
+        "> `tools_calendar.py` DELETED (ADR-030 retired, Google Calendar). " "`email_framework.py` DELETED from shared layer.",
+        # docs/CONVENTIONS.md:626-627 — same shape, "retired" precedes "shared-layer"
+        # across a comma inside one sentence.
+        'the identical shape a month earlier: the retired shared layer\'s old name survived as "shared-layer" (hyphen)',
+    ]
+    for line in legitimate_negations:
+        assert ts.RETIREMENT_LINE_RE.search(line), f"legitimate negation wrongly un-exempted: {line}"
+
+
 def test_deploy_docs_freshness_ceiling_is_not_vacuous():
     """#1322: check_deploy_docs must FLAG a headerless deploy doc (the exact pre-fix
     deploy/README.md shape) and a canonical doc unverified past the hard ceiling (the

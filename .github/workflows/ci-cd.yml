@@ -10,8 +10,9 @@
 #   3. Plan — validates lambda_map.json, detects changed files, maps to Lambda functions
 #   4. Deploy — requires manual approval (GitHub Environment: production)
 #   5. Smoke test — invokes qa-smoke + canary, checks structured output
-#   6. Auto-rollback — Lambda/MCP (smoke failure, TB7-25); shared-layer rollback
-#      surfaced as a runbook in the failure notification. The SITE deploy +
+#   6. Auto-rollback — Lambda/MCP (smoke failure, TB7-25) reverts each function to
+#      its prior S3 code artifact; there is no shared layer to roll back — it was
+#      retired by #781/ADR-131. The SITE deploy +
 #      auto-rollback (#393/#418) moved to .github/workflows/site-deploy.yml
 #      (#750): the site ships on merge WITHOUT the production approval gate —
 #      "merged but not deployed" was the drift class — with its own smoke +
@@ -25,7 +26,7 @@
 #   - Added py_compile syntax check step in Lint job
 #   - Added lambda_map.json structural validation in Plan job
 #   - Replaced sleep 10 with aws lambda wait function-updated (MCP + Lambda deploys)
-#   - Added layer version verification after shared layer rebuild
+#   - Added layer version verification after shared layer rebuild (pre-#781 — retired along with the shared layer itself)
 #   - Fixed smoke test and canary to parse JSON output, not grep for "error"
 #   - Added notify-failure job that posts to SNS life-platform-alerts on any failure
 # Changes (v3.7.9):
@@ -292,10 +293,11 @@ jobs:
   # Job 2a: Deploy-critical test lane (#416, ADR-117) — GATES the chain
   # ════════════════════════════════════════════════════════════════
   # The FAST, fully-offline subset that decides whether a deploy is SAFE:
-  # the deploy contract (Lambda handler names/signatures, shared-layer
-  # module presence + consumer wiring, MCP tool registration, IAM role
-  # policies, secret-name references, DDB key patterns, CDK↔source
-  # consistency) + the reader-facing AI-output honesty gate. `plan`
+  # the deploy contract (Lambda handler names/signatures, bundled-lambdas-tree
+  # module presence + consumer wiring (retired the shared layer — #781/ADR-131),
+  # MCP tool registration, IAM role policies, secret-name references, DDB key
+  # patterns, CDK↔source consistency) + the reader-facing AI-output honesty
+  # gate. `plan`
   # depends on THIS job, NOT the exhaustive `test` job below — so one
   # unrelated red unit test no longer skips deploy AND the reader-facing
   # visual-QA safety net (the "red main blacks out visual QA" failure).
@@ -940,7 +942,7 @@ jobs:
   # Job 5b: Post-deploy integration checks (I1 / I2 / I5)
   # Runs after deploy succeeds, parallel to smoke-test.
   # I1: handler names in live AWS match expected module names
-  # I2: shared layer version is current on all consumers
+  # I2: shared layer is retired — zero shared-utils references fleet-wide
   # I5: required secrets exist (needs secretsmanager:DescribeSecret on OIDC role)
   #
   # ⚠️  I5 requires the github-actions-deploy-role to have:
@@ -1180,10 +1182,10 @@ jobs:
           echo "✅ Rollback pass finished. Investigate smoke test failure before re-deploying."
 
       # #418/ADR-117: every rollback event must produce a notification (no silent
-      # revert). (#749/actionlint: the old shared-layer runbook branch here keyed on
-      # needs.plan.outputs.layer_changed — an output that no longer exists since the
-      # layer was retired (#781), so it could never fire. Removed as dead code; a
-      # fleet deploy rolls back per-function like any other code deploy.)
+      # revert). (#749/actionlint: the old, now-retired shared-layer runbook branch
+      # keyed on needs.plan.outputs.layer_changed — an output that no longer existed
+      # once the layer was retired (#781), so it could never fire. Removed as dead
+      # code; a fleet deploy rolls back per-function like any other code deploy.)
       - name: Notify Lambda/MCP rollback
         if: always()
         run: |
@@ -1232,9 +1234,10 @@ jobs:
           SHORT_COMMIT="${COMMIT:0:7}"
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
-          # (#749/actionlint: the old shared-layer runbook branch keyed on
-          # needs.plan.outputs.layer_changed — removed with the layer (#781);
-          # it compared an undefined output and could never fire.)
+          # (#749/actionlint: the old shared-layer runbook branch — retired along
+          # with the layer (#781), removed as dead code — keyed on
+          # needs.plan.outputs.layer_changed; it compared an undefined output and
+          # could never fire.)
           MESSAGE="CI/CD FAILURE
           Commit: $SHORT_COMMIT (${{ github.ref_name }})
           Run: $RUN_URL
