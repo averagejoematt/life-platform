@@ -77,7 +77,7 @@ def test_vice_keywords_superset_of_content_filter():
     in config/content_filter.json must be covered by privacy_guard.VICE_KEYWORDS."""
     import json
 
-    cf_path = os.path.join(os.path.dirname(__file__), "..", "seeds", "content_filter.json")
+    cf_path = os.path.join(os.path.dirname(__file__), "..", "config", "content_filter.json")
     with open(cf_path, encoding="utf-8") as f:
         configured = {k.lower() for k in json.load(f)["blocked_vice_keywords"]}
     gate = {k.lower() for k in pg.VICE_KEYWORDS}
