@@ -100,3 +100,48 @@ def test_v4_doors_link_tokens_first():
     for name, rel in V4_DOORS.items():
         html = _read(rel)
         assert "/assets/css/tokens.css" in html, f"{name} door does not load tokens.css"
+
+
+# ── #1992: the cockpit hero must live inside a landmark ─────────────────────
+# Live axe (both themes) flagged 4 nodes under the "region" rule — .ph-kicker,
+# .cockpit-fingerprint, .ph-attempt, .hero-instruments — because the whole
+# .page-hero.cockpit-hero block sat between </header> and <main>, unreachable
+# by landmark navigation. The (page, rule-id) axe-gate key intentionally
+# excludes node counts (#1428 anti-flake tradeoff, tests/a11y_audit.py:22-25),
+# so this instance-count growth was invisible to that gate by design — this is
+# a static structural regression guard, not a change to the axe tooling.
+COCKPIT_HERO_MARKERS = (
+    'class="ph-kicker label"',
+    'class="cockpit-fingerprint"',
+    'class="ph-attempt label"',
+    'class="hero-instruments"',
+)
+
+
+def _cockpit_main_span():
+    """Return (before_main, main_content) for site/cockpit/index.html."""
+    html = _read("cockpit/index.html")
+    main_start = html.index("<main")
+    main_open_end = html.index(">", main_start) + 1
+    main_end = html.index("</main>")
+    return html[:main_start], html[main_open_end:main_end]
+
+
+def test_cockpit_hero_lives_inside_main_landmark():
+    """The four axe-flagged nodes must be descendants of <main>, not siblings
+    of it — landmark navigation can only reach content INSIDE a landmark."""
+    before_main, main_content = _cockpit_main_span()
+    for marker in COCKPIT_HERO_MARKERS:
+        assert marker in main_content, f"{marker} is not inside <main> — landmark-orphaned (#1992)"
+        assert marker not in before_main, f"{marker} appears before <main> opens — still a landmark orphan (#1992)"
+
+
+def test_cockpit_hero_block_is_first_content_in_main():
+    """Matches the established v4 pattern (every other door: .page-hero is the
+    first child of <main>) rather than a one-off structure for cockpit."""
+    _, main_content = _cockpit_main_span()
+    hero_idx = main_content.index('class="page-hero cockpit-hero"')
+    # Only the sr-only <h1> may precede the hero block inside <main>.
+    prefix = main_content[:hero_idx]
+    assert prefix.count("<h1") <= 1, "unexpected content between <main> and the cockpit hero block"
+    assert "<article" not in prefix, "cockpit hero must precede the main panel content"

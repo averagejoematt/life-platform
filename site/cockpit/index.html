@@ -74,30 +74,32 @@
       </nav>
   </div>
 
-  <!-- #578: the loop spine, made literal — the cockpit is the live "Now" vantage
-       that watches the whole cycle. Slim by design (kicker + ribbon, no promise):
-       the big score below is the real headline. -->
-  <div class="page-hero cockpit-hero">
-    <p class="ph-kicker label">the cockpit · one life, measured live</p>
-    <!-- #1379: the Daily Fingerprint masthead — the day's deterministic mark (a pure
-         function of today's real numbers), injected by cockpit.js from /api/fingerprint.
-         Earned glow only; links through to the wall of every attempt. Self-hides. -->
-    <div class="cockpit-fingerprint" data-bind="fingerprint" hidden></div>
-    <!-- #1375: attempt framing — day-1 emptiness reads as stakes, not failure.
-         Derived live from /api/survival by cockpit.js; self-hides without data. -->
-    <p class="ph-attempt label" data-bind="attempt" hidden></p>
-    <nav class="loop-ribbon" aria-label="Where this sits in the loop"><span class="lr-here" aria-current="page">Now</span><span class="lr-sep" aria-hidden="true">&middot;</span><a href="/data/">Data</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/coaching/">Coaching</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/protocols/">Protocols</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/story/">Story</a><span class="lr-arrow" aria-hidden="true">&#8635;</span></nav>
-    <!-- #1106: the instrument strip — the first screen reads as a cockpit. Composed
-         from the EXISTING ring() primitive (charts.js) + the instrument mark
-         (sigils.js §8.5); populated by cockpit.js from the same /api/snapshot the
-         page already fetches. Earned glow only: ember strictly on the thresholds
-         the vitals page established; an absent reading is an honest "—", so the
-         pre-start / Day-1 state reads as staged instruments, never broken. -->
-    <div class="hero-instruments" data-bind="hero-instruments" hidden aria-label="Today's instruments at a glance"></div>
-  </div>
-
   <main id="cockpit" class="cockpit" data-state="loading">
     <h1 class="sr-only">The Cockpit — one life, measured live: today's whole-life score and the one thing that matters now.</h1>
+    <!-- #578: the loop spine, made literal — the cockpit is the live "Now" vantage
+         that watches the whole cycle. Slim by design (kicker + ribbon, no promise):
+         the big score below is the real headline.
+         #1992: moved inside the main landmark (was a landmark-orphan sibling of
+         header/main, unreachable by landmark navigation — axe region, 4 nodes)
+         to match every other v4 page's pattern of page-hero as main's first child. -->
+    <div class="page-hero cockpit-hero">
+      <p class="ph-kicker label">the cockpit · one life, measured live</p>
+      <!-- #1379: the Daily Fingerprint masthead — the day's deterministic mark (a pure
+           function of today's real numbers), injected by cockpit.js from /api/fingerprint.
+           Earned glow only; links through to the wall of every attempt. Self-hides. -->
+      <div class="cockpit-fingerprint" data-bind="fingerprint" hidden></div>
+      <!-- #1375: attempt framing — day-1 emptiness reads as stakes, not failure.
+           Derived live from /api/survival by cockpit.js; self-hides without data. -->
+      <p class="ph-attempt label" data-bind="attempt" hidden></p>
+      <nav class="loop-ribbon" aria-label="Where this sits in the loop"><span class="lr-here" aria-current="page">Now</span><span class="lr-sep" aria-hidden="true">&middot;</span><a href="/data/">Data</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/coaching/">Coaching</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/protocols/">Protocols</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/story/">Story</a><span class="lr-arrow" aria-hidden="true">&#8635;</span></nav>
+      <!-- #1106: the instrument strip — the first screen reads as a cockpit. Composed
+           from the EXISTING ring() primitive (charts.js) + the instrument mark
+           (sigils.js §8.5); populated by cockpit.js from the same /api/snapshot the
+           page already fetches. Earned glow only: ember strictly on the thresholds
+           the vitals page established; an absent reading is an honest "—", so the
+           pre-start / Day-1 state reads as staged instruments, never broken. -->
+      <div class="hero-instruments" data-bind="hero-instruments" hidden aria-label="Today's instruments at a glance"></div>
+    </div>
     <!-- cockpit-proof:start -->
     <noscript><section class="proof-static dx-prose" aria-label="Cockpit summary"><p class="label">The cockpit — one life, measured live · as of 2026-07-26</p><p><strong>Character level 1 · Foundation</strong> — a 1–100 score of the whole day: seven pillars, each from real data, rolled into one.</p><p>Body 0 · Mind 0 · Consistency 0</p><ul><li>Movement 0 · Foundation</li><li>Nutrition 0 · Foundation</li><li>Sleep 0 · Foundation</li><li>Metabolic 0 · Foundation</li><li>Mind 0 · Foundation</li><li>Relationships 0 · Foundation</li></ul><p>The live view (today's board read, trends, time travel) needs JavaScript. What a level means: <a href="/method/character/">the method</a>.</p></section></noscript>
     <!-- cockpit-proof:end -->
