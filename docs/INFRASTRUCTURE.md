@@ -3,7 +3,7 @@
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
 
 > Quick-reference for all URLs, IDs, and configuration. No secrets stored here.
-> Last updated: 2026-08-04 (v8.6.0 — 99 Lambdas, 25 active secrets, 76 MCP tools, ~92 alarms)
+> Last updated: 2026-08-05 (v8.6.0 — 99 Lambdas, 25 active secrets, 76 MCP tools, ~92 alarms)
 
 ---
 
