@@ -537,7 +537,7 @@
           "cost_monthly": 15,
           "why": "Lab work shows cardiovascular risk markers. Omega-3 is most likely to move your TG/HDL ratio over time.",
           "science": [
-            "Reduces systemic inflammation, improves TG/HDL ratio",
+            "May help reduce inflammation and improve TG/HDL ratio — the cited evidence is from CVD-outcome trials and is mixed (positive meta-analysis, null VITAL RCT), not a direct inflammation/lipid-marker RCT",
             "Supports cell membrane fluidity, cardioprotective",
             "EPA specifically has antidepressant effects at 1g+ doses"
           ],
@@ -649,8 +649,8 @@
           "why": "Glutathione support during deficit and high training load. Behavioral benefit (reducing rumination) may support discipline stack.",
           "science": [
             "Glutathione precursor — body's master antioxidant",
-            "Supports liver detoxification, reduces oxidative stress",
-            "Evidence for reducing rumination/compulsive behavior"
+            "Supports liver detoxification; may reduce oxidative stress (mechanistic, human RCT evidence limited)",
+            "Preliminary evidence for reduced rumination/compulsive behavior"
           ],
           "sources": [
             {
