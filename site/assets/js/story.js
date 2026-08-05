@@ -21,6 +21,7 @@ import { domainIcon } from "/assets/js/icons.js"; // #590 — pillar icon for th
 import { seasonBand } from "/assets/js/texture.js"; // #1471 — the season banner on the premiere beat
 import { featuredQuoteHTML } from "/assets/js/journal_quotes.js"; // #1568 — the weekly featured line (ADR-142)
 import { heroProofLine, BRIEF_LINE_KICKER } from "/assets/js/daily_line.js"; // #1994/#1995 — Day-1-safe hero sentence + the one honest brief-line label
+import { sortChronicleNewestFirst } from "/assets/js/chronicle_order.js"; // #1988 — same-date part-sequence tie-break, shared with the server manifest
 
 const $ = (s, r = document) => r.querySelector(s);
 const bind = (n, r = document) => r.querySelector(`[data-bind="${n}"]`);
@@ -634,7 +635,12 @@ function dxEntries(src, data) {
   if (!data) return [];
   if (src === "labnotes") return (data.entries || []).map((e) => { const lbl = e.week_label || `Week ${e.week}`; return ({ id: e.week, label: lbl, title: `${lbl} field note`, date: e.ai_generated_at ? String(e.ai_generated_at).slice(0, 10) : "", meta: e.ai_tone }); });
   const posts = data.posts || data.entries || (Array.isArray(data) ? data : []);
-  return posts.map((p) => { const lbl = p.label || `Week ${p.week}`; return ({ id: p.week, label: lbl, title: p.title || lbl, date: p.date, meta: p.stats_line, excerpt: p.excerpt, word_count: p.word_count, image_url: p.image_url || "", image_credit: p.image_credit || "" }); });
+  // #1988 — newest-first with the same-date part-sequence tie-break (never trust
+  // posts.json's own array order alone: a stale pre-regen snapshot can still carry
+  // the old insertion-order scramble). `id` prefers the unique `sequence` field so
+  // two same-date Prologue parts (which can share `week`, e.g. both 0) never
+  // collide on master-detail selection.
+  return sortChronicleNewestFirst(posts).map((p) => { const lbl = p.label || `Week ${p.week}`; return ({ id: p.sequence ?? p.week, label: lbl, title: p.title || lbl, date: p.date, meta: p.stats_line, excerpt: p.excerpt, word_count: p.word_count, image_url: p.image_url || "", image_credit: p.image_credit || "" }); });
 }
 
 async function dxRenderRead(src, id) {

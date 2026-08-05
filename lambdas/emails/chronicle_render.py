@@ -550,11 +550,23 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
 
     post_key = f"generated/journal/posts/week-{cur_seq:02d}/index.html"
 
-    # Update posts.json manifest — ordered newest-first by DATE (not by a week number, which now
-    # collides: a pre-genesis prologue and the genesis Week 1 can share a raw number). URLs are the
-    # stable sequential index; "label" carries the genesis-anchored truth (Prologue vs Week N).
+    # Update posts.json manifest — ordered newest-first by DATE, then (for a same-date
+    # tie) by the explicit part SEQUENCE — never by insertion/scan order. #1988: a date
+    # alone doesn't disambiguate a multi-part same-date run (e.g. a "rolling prologue"
+    # installment re-dated onto genesis-minus-1 by a restart while keeping its ORIGINAL
+    # sk, landing on the same date as another part whose sk equals its date) — a bare
+    # `sorted(..., key=date, reverse=True)` is stable, so same-date items silently kept
+    # whatever order they arrived in from DDB, independent of narrative part order. The
+    # tie-break reuses the SAME (date, sk)-derived ordinal `_seq_for` already computes for
+    # the label/URL (so "Prologue · Part III" — already numbered correctly — also SORTS
+    # above Part II, not just labeled after it). URLs are the stable sequential index;
+    # "label" carries the genesis-anchored truth (Prologue vs Week N).
     posts_manifest = []
-    for inst in sorted(all_installments, key=lambda x: x.get("date", ""), reverse=True):
+    for inst in sorted(
+        all_installments,
+        key=lambda x: (x.get("date", ""), _seq_for(x.get("date", ""), x.get("sk", ""))),
+        reverse=True,
+    ):
         idate = inst.get("date", "")
         seq = _seq_for(idate, inst.get("sk", ""))
         _u = f"/journal/posts/week-{seq:02d}/"
@@ -562,8 +574,17 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
         _im = cur_image if str(inst.get("sk", "")) == f"DATE#{date_str}" else _prior_imgs.get(_u, {})
         posts_manifest.append(
             {
-                "week": int(inst.get("week_number", 0) or 0),
+                # #1988 AC2 — a Prologue-dated record's week is always 0, never the raw (and,
+                # live, inconsistent — Part II carried week_number=1 while Parts I/III carried
+                # 0) DDB week_number attribute. The genesis-anchored `label` is the only
+                # truthful series marker pre-genesis; nothing should read a raw week off it.
+                "week": 0 if idate < _genesis else int(inst.get("week_number", 0) or 0),
                 "label": _series_label(idate, inst.get("sk", "")),
+                # #1988 AC1 — explicit sequence field: the same (date, sk)-derived ordinal used
+                # for the URL/label above, exposed so the manifest's own same-date sort (above)
+                # and story.js's client-side tie-break can never independently drift on how a
+                # same-date multi-part run orders.
+                "sequence": seq,
                 "title": inst.get("title", ""),
                 "date": idate,
                 "stats_line": display_stats_line(inst.get("stats_line", ""), idate, _g=_g),  # #949 — prologue-framed dek pre-genesis
