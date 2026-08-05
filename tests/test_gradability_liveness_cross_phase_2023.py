@@ -397,40 +397,19 @@ _SANCTIONED_CURRENT_CYCLE_VIEWS: dict[str, str] = {
 # from module-level constants now resolve, which surfaced ~30 previously invisible
 # sites. Each got the three-way classification; the defect-shaped ones below were
 # recorded as debt rather than silently fixed, per this ledger's contract.
+#
+# #2109 then cleared that whole #2090 batch — the seven compute-layer sites the
+# widened scan had surfaced left this ledger together:
+#   * daily_insight_compute / daily_metrics_compute / dashboard_refresh `fetch_range`
+#     and forecast_engine `fetch_series` — the trailing comparison, Banister and
+#     forecast-training windows, now taxonomy-derived per source (below in
+#     _PER_SOURCE_READS);
+#   * intelligence_common.build_data_inventory — the maturity/recency inventory;
+#   * site_api_ai_lambda._latest_item — the AI ask's recency context;
+#   * daily_brief_lambda.gather_daily_data — the SOURCE#travel TRIP# read, now a
+#     literal cross-phase read (held by test_the_scan_sees_the_fixed_consumers_as_cross_phase).
+# Their behaviour is pinned by tests/test_genesis_blind_compute_windows_2109.py.
 _KNOWN_CROSS_CYCLE_DEBT: dict[str, str] = {
-    "lambdas/compute/daily_insight_compute_lambda.py::fetch_range": (
-        "The insight engine's baseline-vs-recent comparison windows (HRV baseline, withings 14d, "
-        "supplement-effect windows) truncate to cycle age after a reset — the #2081 anomaly-"
-        "baseline class at the insight layer; wants the taxonomy-derived per-source treatment "
-        "#2092 gave the brief (#2109)."
-    ),
-    "lambdas/compute/daily_metrics_compute_lambda.py::fetch_range": (
-        "HRV 7/30d baselines, 60d Banister strava/hevy load windows and trailing weight windows "
-        "all truncate to cycle age post-reset, so the computed_metrics every reader surface "
-        "inherits are stub-windowed in a young cycle (#2109)."
-    ),
-    "lambdas/compute/dashboard_refresh_lambda.py::fetch_range": (
-        "Same trailing-window class for the dashboard refresh (withings 7/14d, strava/hevy 60d "
-        "Banister) — stub windows in a young cycle (#2109)."
-    ),
-    "lambdas/compute/forecast_engine_lambda.py::fetch_series": (
-        "The EWMA forecast training series truncates to cycle age post-reset, so ADR-105-graded "
-        "forecasts are fit on stub windows exactly when readers watch a fresh cycle (#2109)."
-    ),
-    "lambdas/emails/daily_brief_lambda.py::gather_daily_data": (
-        "Its direct filtered read is SOURCE#travel TRIP# rows, which carry no sk date and get "
-        "phase-tagged from ingested_at — a trip booked pre-genesis but occurring in-cycle is "
-        "hidden, so the brief loses travel awareness after a reset (#2109)."
-    ),
-    "lambdas/intelligence/intelligence_common.py::build_data_inventory": (
-        "The 90d exists/latest/records/days_of_data inventory is the #1203 liveness-recency shape, "
-        "phase-blind — after a reset it tells data maturity and coach prompts the pipes are "
-        "days old (#2109)."
-    ),
-    "lambdas/web/site_api_ai_lambda.py::_latest_item": (
-        "Recency reads (withings, whoop) for AI ask context — the #1203 newest-first class; wants "
-        "the per-source include_pilot treatment its site_api_common namesake has (#2109)."
-    ),
     "lambdas/common/digest_utils.py::query_range": (
         "The shared paginated raw-source range reader exposes NO include_pilot parameter, so a "
         "caller with cross-cycle intent (60d Banister load, 30d weight trend) physically cannot "
@@ -461,6 +440,38 @@ _PER_SOURCE_READS: dict[str, str] = {
         "habit_scores. Pinned by tests/test_genesis_blind_brief_windows_2089.py."
     ),
     "lambdas/emails/daily_brief_lambda.py::_latest_item": ("Same taxonomy-derived flag as fetch_range above (#2089/#2092), same pin."),
+    # #2109 — the same derivation, promoted to the shared read-path module
+    # (`experiment.phase_filter.source_reads_cross_phase`) so the six compute-layer
+    # readers below share ONE definition instead of six copies. All are pinned by
+    # tests/test_genesis_blind_compute_windows_2109.py, which asserts the decision
+    # equals "not EXPERIMENT_SCOPED" over the AST-derived set of sources each
+    # reader actually touches — the SET, not the instance.
+    "lambdas/compute/daily_insight_compute_lambda.py::fetch_range": (
+        "include_pilot=source_reads_cross_phase(source) — the baseline-vs-recent windows read "
+        "cross-phase for whoop/withings/macrofactor/apple_health/supplements/day_grade, while "
+        "computed_metrics and habit_scores keep the filter and an arbitrary user-defined "
+        "experiment metric falls back to it (#2109)."
+    ),
+    "lambdas/compute/daily_metrics_compute_lambda.py::fetch_range": (
+        "Same shared derivation (#2109). Every current caller (whoop/strava/hevy/withings/"
+        "habitify/macrofactor) is RAW_TIMESERIES and so reads cross-phase; the derivation is "
+        "what keeps that honest if an EXPERIMENT_SCOPED caller is added."
+    ),
+    "lambdas/compute/dashboard_refresh_lambda.py::fetch_range": ("Same shared derivation (#2109), same all-RAW_TIMESERIES caller set."),
+    "lambdas/compute/forecast_engine_lambda.py::fetch_series": (
+        "Same shared derivation (#2109) over the METRICS table's sources (whoop, withings), so a "
+        "metric added there inherits the right scope from its source's class."
+    ),
+    "lambdas/intelligence/intelligence_common.py::build_data_inventory": (
+        "include_pilot=source_reads_cross_phase(partition) across all three of its queries "
+        "(90d COUNT, newest-first Limit:1, the CGM COUNT) — every _INVENTORY_SOURCES partition "
+        "is RAW_TIMESERIES or CROSS_PHASE today, and a scoped one added later keeps its "
+        "filter without anyone remembering to ask (#2109)."
+    ),
+    "lambdas/web/site_api_ai_lambda.py::_latest_item": (
+        "Same shared derivation (#2109): withings/whoop recency reads go cross-phase, while "
+        "computed_metrics / computed_insights / adaptive_mode stay current-cycle."
+    ),
     "lambdas/web/site_api_common.py::_query_source": (
         "Explicit include_pilot pass-through parameter — the site-api family classifies phase per "
         "call site; test_site_api_raw_helpers_expose_include_pilot keeps the parameter honest."
@@ -759,6 +770,7 @@ def test_the_scan_sees_the_fixed_consumers_as_cross_phase():
         "lambdas/coach/coach_state_updater.py::_metric_has_recent_data": "the gradability liveness read (#2023)",
         "lambdas/emails/daily_brief_lambda.py::scan_stale_sources": "the brief's per-source staleness scan (#2080)",
         "lambdas/emails/anomaly_detector_lambda.py::fetch_range": "the anomaly detector's rolling baseline (#2081)",
+        "lambdas/emails/daily_brief_lambda.py::gather_daily_data": "the brief's SOURCE#travel TRIP# read (#2109)",
     }
     for key, what in fixed.items():
         assert key in derived, f"the AST scan no longer sees {what} — the derivation has drifted"

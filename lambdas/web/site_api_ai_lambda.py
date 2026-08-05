@@ -40,7 +40,7 @@ from ai.ai_context import (
 )  # R22-SEC-04 (#811): delimit untrusted reader text; #743: reader-facing receipts; #1086: mandatory phase block
 from boto3.dynamodb.conditions import Key
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
-from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1085
+from experiment.phase_filter import singleton_visible, source_reads_cross_phase, with_phase_filter  # ADR-058 / #946 / #1085 / #2109
 from ingestion.source_registry import public_board_sources, public_paused_sources  # #387: derived source count
 from privacy import privacy_guard  # deterministic real-name + vice scrub (layer module)
 
@@ -187,15 +187,37 @@ def _decimal_to_float(obj):
 
 
 def _latest_item(source: str) -> dict | None:
-    """Get the most recent item for a source."""
+    """Get the most recent item for a source, PER-SOURCE cross-phase (#2109).
+
+    The recency reader behind the AI ask's context block. It is the #1203 shape
+    verbatim — newest-first `Limit: 1` — and DynamoDB applies `Limit` BEFORE
+    `FilterExpression`, so a phase-filtered read took the single newest row, discarded
+    it for being pilot-tagged, and returned nothing at all. On a fresh cycle that is
+    the normal state of the `withings` and `whoop` partitions, so the ask lost the
+    reader's latest weigh-in and last night's recovery entirely.
+
+    Its other three callers read `computed_metrics`, `computed_insights` and
+    `adaptive_mode`, which are EXPERIMENT_SCOPED — derived intelligence the reset
+    tombstones, where the filter is load-bearing and must stay. That split is exactly
+    why this is derived per source (#2092's shape, and the treatment this function's
+    `site_api_common` namesake already gets via its explicit `include_pilot`
+    pass-through) rather than flipped.
+
+    NB the EXPERIMENT_SCOPED half still carries the `Limit`-before-filter mechanic, so
+    a scoped read here can return nothing in the hours after a genesis. That is the
+    honest answer for a scoped source (a prior cycle's row does not speak for this
+    one), and #2113's `phase_taxonomy.cycle_read_floor` is the key-floor treatment for
+    it — deliberately not duplicated here.
+    """
     pk = f"{USER_PREFIX}{source}"
     resp = table.query(
         **with_phase_filter(
-            {  # ADR-058: hide pilot records
+            {
                 "KeyConditionExpression": Key("pk").eq(pk),
                 "ScanIndexForward": False,
                 "Limit": 1,
-            }
+            },
+            include_pilot=source_reads_cross_phase(source),
         )
     )
     items = _decimal_to_float(resp.get("Items", []))

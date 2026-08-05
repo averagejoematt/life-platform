@@ -53,7 +53,7 @@ from decimal import Decimal
 
 import boto3
 from experiment import phase_taxonomy  # ADR-077/#1233: write-time provenance stamp for the first-earn ledger
-from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #2109
 from health import (
     achievement_rules,  # #1624: the ONE place badge thresholds live (shared with site_api_vitals)
     flourishing,  # #1843: entry_channel() — single source of truth for video_diary/solo_recording provenance
@@ -124,8 +124,25 @@ def fetch_date(source, date_str):
 
 
 def fetch_range(source, start, end):
+    """Every record for `source` in [start, end], read PER-SOURCE cross-phase (#2109).
+
+    This is the widest-blast-radius instance of the class: `computed_metrics` is what
+    this Lambda WRITES, and essentially every reader surface — cockpit, coach prompts,
+    the brief, the site API — inherits whatever it computes here. When the 7/30-day HRV
+    baselines, the 60-day Strava/Hevy Banister windows and the 7/14/28/30-day weight
+    windows truncate to the cycle's age, the stub windows are published everywhere at
+    once: on a fresh cycle the load model collapses to CTL = ATL = TSB = 0.0, which the
+    downstream bands read as perfect freshness rather than as no data.
+
+    Derived per source rather than flipped wholesale (#2092's shape) so a future call
+    site here inherits the right behaviour from the source's own class. Today every
+    caller is RAW_TIMESERIES, so this reads cross-phase throughout — but that is a
+    property of the current call list, not a licence, and the derivation is what keeps
+    it true when the list changes. See `experiment.phase_filter.source_reads_cross_phase`.
+    """
     try:
         records = []
+        cross_phase = source_reads_cross_phase(source)
         kwargs = {
             "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
             "ExpressionAttributeValues": {
@@ -135,7 +152,7 @@ def fetch_range(source, start, end):
             },
         }
         while True:
-            r = table.query(**with_phase_filter(kwargs))
+            r = table.query(**with_phase_filter(kwargs, include_pilot=cross_phase))
             records.extend(d2f(i) for i in r.get("Items", []))
             if "LastEvaluatedKey" not in r:
                 break

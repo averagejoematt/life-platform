@@ -712,14 +712,33 @@ def gather_daily_data(profile, yesterday):
     weather_yesterday = fetch_date("weather", yesterday)
     weather_today = fetch_date("weather", today.isoformat())
 
-    # Travel — check if currently traveling (v2.40.0)
+    # Travel — check if currently traveling (v2.40.0), read CROSS-PHASE (#2109).
+    #
+    # SOURCE#travel is RAW_TIMESERIES, and TRIP# rows are the one shape in it that
+    # carries NO date in its sort key. The tagger therefore falls through to its
+    # timestamp fallbacks (created_at/stored_at/ingested_at) and tags a trip by WHEN IT
+    # WAS BOOKED, not when it happens — so a trip booked before a genesis but occurring
+    # inside the cycle was tagged pilot and vanished from the brief, taking the brief's
+    # travel-aware sleep and circadian framing with it.
+    #
+    # Two things settle this. The row's own `start_date`/`end_date` are what decide
+    # whether the trip is active — the loop below does exactly that — so the phase tag
+    # was answering a question nobody asked. And the brief was the OUTLIER: the two
+    # sibling readers of this same partition, `anomaly_detector_lambda._check_travel`
+    # and `mcp/tools_lifestyle._is_traveling`, have always read it unfiltered. This
+    # aligns the brief with them rather than inventing a third behaviour.
+    #
+    # A literal include_pilot=True rather than the per-source derivation used elsewhere
+    # in this file, because the source is fixed at this call site — the derivation
+    # exists for readers that take a `source` argument.
     travel_active = None
     try:
         travel_kwargs = with_phase_filter(
             {
                 "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
                 "ExpressionAttributeValues": {":pk": USER_PREFIX + "travel", ":prefix": "TRIP#"},
-            }
+            },
+            include_pilot=True,
         )
         travel_resp = table.query(**travel_kwargs)
         for trip in travel_resp.get("Items", []):
