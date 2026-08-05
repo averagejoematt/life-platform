@@ -651,6 +651,13 @@ class MonitoringStack(Stack):
             self,
             "IngestAuthUnhealthy",
             alarm_name="ingest-auth-unhealthy-24h",
+            # #2004: the 86400s/Minimum/1-eval window is load-bearing (do not shorten —
+            # see the qa-smoke-alarm-window memory for the same class of window) but it
+            # means a fully-recovered fleet can sit ALARM for up to 24h after the last
+            # unhealthy emission. Undocumented, that reads as a standing false red and
+            # trains alarm fatigue — so the description says so, in the console, where
+            # an operator triaging this alarm will actually see it.
+            alarm_description=("clears up to 24h after last unhealthy emission — confirm via AUTH_FAILURE " "markers, not alarm state."),
             metric=cloudwatch.Metric(
                 namespace="LifePlatform/OAuth",
                 metric_name="IngestAuthHealthy",
