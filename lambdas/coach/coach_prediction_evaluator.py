@@ -987,6 +987,10 @@ def _write_learning_record(coach_id, today_str, evaluation):
     every track-record and hit-rate surface reading `COACH#` would then count. The claim's
     own record already carries its graded outcome, so there is nothing to lose by
     skipping, and a coach's calibration to corrupt by not.
+
+    #2119: COACH#* is a tagger-blind partition — stamp write-time provenance
+    (experiment_stamp(), #1233) so this LEARNING# row self-describes its reset
+    generation, matching this module's own _update_bayesian_confidence.
     """
     if not coach_id:
         return
@@ -997,7 +1001,10 @@ def _write_learning_record(coach_id, today_str, evaluation):
     sk = f"LEARNING#{today_str}#{slug}"
 
     try:
+        from experiment.phase_taxonomy import experiment_stamp
+
         item = {
+            **experiment_stamp(),
             "pk": pk,
             "sk": sk,
             "coach_id": coach_id,

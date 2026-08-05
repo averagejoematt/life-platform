@@ -1114,10 +1114,20 @@ def _build_user_message(state, coach_id, today):
 
 
 def _cache_brief(coach_id, brief, today):
-    """Cache the generation brief to DynamoDB for fallback use."""
+    """Cache the generation brief to DynamoDB for fallback use.
+
+    COACH#* is a tagger-blind partition (restart_phase_tag.py only reaches
+    USER#matthew#SOURCE#* pks) — stamp write-time provenance (phase + cycle, #1233)
+    so a cached brief self-describes its reset generation, matching
+    coach_state_updater._put_item / deploy/seed_genesis_preregistration.py._stamped
+    (#1970/#2119). experiment_stamp() is fail-soft; the item's own keys win.
+    """
+    from experiment.phase_taxonomy import experiment_stamp
+
     try:
         item = floats_to_decimal(
             {
+                **experiment_stamp(),
                 "pk": f"COACH#{coach_id}",
                 "sk": f"BRIEF#{today}",
                 "brief": brief,
