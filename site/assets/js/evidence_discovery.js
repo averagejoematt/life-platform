@@ -115,17 +115,29 @@ export async function renderDiscoveries(d) {
       ? armingLine + `<p class="rd-meta label">No discoveries from this cycle yet — correlations and graded findings appear here as the data accrues.</p>`
       : armingLine;
     const protoIntro = `<p class="rd-meta label">Standing supplement protocols, deliberately carried across cycle resets — long-horizon levers under continuous measurement, not findings of the current cycle.</p>`;
-    const protoCard = (h) => {
+    // #1984: the library (this section's source) and the tracked supplement stack
+    // (/protocols/supplements) are two unreconciled sources of truth for "what's
+    // actually running" — a library entry only keeps the "under continuous
+    // measurement" framing when the API confirms it against the stack registry
+    // (protocol_kind "ongoing_protocol"). One that isn't confirmed there
+    // ("unconfirmed_protocol") is shown honestly as a carried hypothesis the site
+    // can't currently corroborate — never as a false claim of it having stopped.
+    const protoCard = (h, badge) => {
       const meta = [
         "carried across cycles",
         h.active_since && `active since ${String(h.active_since).slice(0, 10)}`,
         h.evidence_tier && `evidence ${h.evidence_tier}`,
       ].filter(Boolean).join("  ·  ");
       const body = h.hypothesis || h.description || "";
-      return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(h.name)}</h3><span class="rd-badge">ongoing protocol</span></header>${body ? `<p class="rd-why">${esc(body)}</p>` : ""}<p class="rd-meta label">${esc(meta)}</p></article>`;
+      return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(h.name)}</h3><span class="rd-badge">${esc(badge)}</span></header>${body ? `<p class="rd-why">${esc(body)}</p>` : ""}<p class="rd-meta label">${esc(meta)}</p></article>`;
     };
+    const confirmedHyp = hyp.filter((h) => h.protocol_kind !== "unconfirmed_protocol");
+    const unconfirmedHyp = hyp.filter((h) => h.protocol_kind === "unconfirmed_protocol");
+    const unconfirmedIntro = `<p class="rd-meta label">Carried in the protocol library as a standing hypothesis, but not currently confirmed against the tracked supplement stack — filed, not an active claim.</p>`;
+    const proto = (confirmedHyp.length ? protoIntro + `<div class="rd-cards">${confirmedHyp.map((h) => protoCard(h, "ongoing protocol")).join("")}</div>` : "") +
+      (unconfirmedHyp.length ? unconfirmedIntro + `<div class="rd-cards">${unconfirmedHyp.map((h) => protoCard(h, "unconfirmed in stack")).join("")}</div>` : "");
     hs = hyp.length
-      ? sec("Ongoing protocols — carried across cycles", noneYet + protoIntro + `<div class="rd-cards">${hyp.map(protoCard).join("")}</div>`)
+      ? sec("Ongoing protocols — carried across cycles", noneYet + proto)
       : "";
   }
   // Reader participation: submit a finding — a visitor-spotted correlation goes
