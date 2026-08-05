@@ -245,12 +245,12 @@ class OperationalStack(Stack):
         # metrics) and writes /life-platform/budget-tier to SSM. The AI features
         # read it (budget_guard) to degrade gracefully; bedrock_client enforces
         # the Tier-3 hard stop. AWS Budgets is the lagged backstop.
-        # Cadence: every 4h (was hourly). Each run makes one Cost Explorer
-        # GetCostAndUsage call ($0.01 each) — hourly was ~$2-4/mo of self-cost to
-        # poll a slow-moving non-AI bill. 6×/day keeps the tier fresh enough (the
-        # fast-moving AI half is priced from cheap CloudWatch token metrics, and
-        # public AI is rate-limited + the AWS Budget alerts independently) while
-        # cutting the CE-API line ~80%.
+        # Cadence: every 8h (was hourly, then 4h). Each run makes one Cost
+        # Explorer GetCostAndUsage call ($0.01 each) — hourly was ~$2-4/mo of
+        # self-cost to poll a slow-moving non-AI bill. 3×/day keeps the tier
+        # fresh enough (the fast-moving AI half is priced from cheap CloudWatch
+        # token metrics, and public AI is rate-limited + the AWS Budget alerts
+        # independently) while cutting the CE-API line further.
         create_platform_lambda(
             self,
             "CostGovernor",

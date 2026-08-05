@@ -529,26 +529,36 @@ def _alert(prev: int, new: int, mtd: float, projected: float, ceiling: float = N
 def _alert_surge(active: bool, recent_uniques, mtd: float, projected: float) -> None:
     """Edge-triggered alert when surge mode engages or disengages (#739 scope
     item 2: "alert Matthew when surge mode engages"). Reuses the same alerts
-    topic as the tier-change alert."""
+    topic as the tier-change alert.
+
+    Dollar figures are formatted from `_active_ceilings()` — the base/surge
+    pair actually in effect today — not from the bare MONTHLY_CEILING/
+    SURGE_CEILING_USD module constants. Those constants are the OUT-OF-WINDOW
+    default; during a dated temp-ceiling window (_TEMP_CEILING_WINDOW) the
+    real enforcement math floats to a different pair, and an alert that still
+    quotes the module constants would email the wrong dollars for the
+    duration of the window (#1998).
+    """
+    base, surge = _active_ceilings()
     if active:
-        subj = f"🚀 Surge mode ENGAGED — ceiling ${MONTHLY_CEILING:.0f} → ${SURGE_CEILING_USD:.0f}"
+        subj = f"🚀 Surge mode ENGAGED — ceiling ${base:.0f} → ${surge:.0f}"
         body = (
             f"Trailing 7-day unique visitors ({recent_uniques}) crossed the surge "
             f"threshold ({SURGE_UNIQUES_THRESHOLD}).\n\n"
-            f"Effective monthly ceiling floated: ${MONTHLY_CEILING:.0f} → ${SURGE_CEILING_USD:.0f} (ADR-133).\n"
+            f"Effective monthly ceiling floated: ${base:.0f} → ${surge:.0f} (ADR-133).\n"
             f"Month-to-date estimated total: ${mtd:.2f}\n"
             f"Projected month-end:           ${projected:.2f}\n\n"
             f"This is reader traffic, not spend creep — the extra headroom exists "
             f"specifically so the reader-facing AI doesn't outage at the moment of "
-            f"success. Auto-reverts to ${MONTHLY_CEILING:.0f} when uniques drop back "
+            f"success. Auto-reverts to ${base:.0f} when uniques drop back "
             f"below the threshold."
         )
     else:
-        subj = f"Surge mode ended — ceiling back to ${MONTHLY_CEILING:.0f}"
+        subj = f"Surge mode ended — ceiling back to ${base:.0f}"
         body = (
             f"Trailing 7-day unique visitors ({recent_uniques}) dropped back below "
             f"the surge threshold ({SURGE_UNIQUES_THRESHOLD}).\n\n"
-            f"Effective monthly ceiling reverted: ${SURGE_CEILING_USD:.0f} → ${MONTHLY_CEILING:.0f}."
+            f"Effective monthly ceiling reverted: ${surge:.0f} → ${base:.0f}."
         )
     try:
         _sns.publish(TopicArn=ALERTS_TOPIC, Subject=subj[:99], Message=body)
