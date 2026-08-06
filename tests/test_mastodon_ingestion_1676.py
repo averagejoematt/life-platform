@@ -126,10 +126,12 @@ def test_parse_entries_drops_non_public_and_boosts():
     a = entries[0]
     assert a["text"] == "Squats and a long walk. No links here."
     assert a["url"] == "https://mastodon.social/@mattsusername/111"
-    assert "averagejoematt.com" not in a["raw_content"]
+    # Domain-presence checked via the real membrane classifier (not a raw substring
+    # match) — same predicate transform()/_origin_for() apply in production.
+    assert not prov.has_self_backlink(a["raw_content"])
     b = entries[1]
-    assert "averagejoematt.com" in b["raw_content"]
-    assert "averagejoematt.com" not in b["text"]  # tags stripped, the link text alone wouldn't show the domain
+    assert prov.has_self_backlink(b["raw_content"])
+    assert not prov.has_self_backlink(b["text"])  # tags stripped, the link text alone wouldn't show the domain
 
 
 # ── Fetch-day date filtering (statuses monkeypatched — no network) ────────────────────
