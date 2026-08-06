@@ -16,6 +16,16 @@
 #
 # It does NOT deploy. The recovery path re-dispatches ci-cd.yml, which still stops at
 # the production approval gate like any other run.
+#
+# LAST-MILE ALERTING (#2149): a red scheduled run turned out to be a passive channel —
+# the 2026-08-05 wedge went red 6x over ~9h with no email/page. `--alert` (below) fires
+# on a CONFIRMED wedge only, via `repository_dispatch` `urgent_alarm` — the SAME event
+# `remediation-agent.yml` already listens for on urgent CloudWatch alarms, so it reuses
+# that curated-email path rather than adding one. Throttled to one alert per episode via
+# a GitHub issue marker (scripts/check_deploy_wedge.py's alert_candidate/should_fire_
+# alert/maybe_alert — offline-tested in tests/test_deploy_wedge_alert_2149.py); it holds
+# no AWS credentials for this and gains none — `contents: write` (dispatch the event) and
+# `issues: write` (the throttle marker) below are the only permission additions.
 
 name: Deploy wedge watch
 
@@ -39,8 +49,9 @@ on:
         default: '10'
 
 permissions:
-  contents: read
-  actions: write   # read run/job state; `recover` cancels the wedged run + re-dispatches
+  contents: write  # read run/job state; #2149: also required to POST repos/.../dispatches (repo scope equivalent)
+  actions: write   # `recover` cancels the wedged run + re-dispatches
+  issues: write    # #2149: create/comment/close the deploy-wedge-alert throttle marker
 
 jobs:
   watch:
@@ -56,7 +67,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -o pipefail
-          python3 scripts/check_deploy_wedge.py --threshold "${{ github.event.inputs.threshold || '10' }}" | tee verdict.txt
+          python3 scripts/check_deploy_wedge.py --threshold "${{ github.event.inputs.threshold || '10' }}" --alert | tee verdict.txt
         continue-on-error: true
 
       - name: Recover a confirmed phantom wedge
@@ -77,6 +88,10 @@ jobs:
             echo '```'
             cat verdict.txt
             echo '```'
+            echo
+            echo "(the last line of the block above is the #2149 alert-throttle outcome — "
+            echo "\`alert-fired\` means the curated remediation-agent email is on its way; "
+            echo "\`alert-throttled\` means this episode already paged once.)"
             echo
             echo "Escape hatch: re-run this workflow via **Run workflow** with \`recover: true\`,"
             echo "or locally: \`python3 scripts/check_deploy_wedge.py --recover\`."

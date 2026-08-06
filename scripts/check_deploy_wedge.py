@@ -330,6 +330,243 @@ def render(state: dict) -> tuple[int, str]:
     return (1 if kind in (PHANTOM_WEDGE, STRANDED_APPROVAL) else 0), "\n".join(lines)
 
 
+# ── Last-mile alerting (#2149) ───────────────────────────────────────────────
+#
+# Detection was proven by #2052; the last mile — getting a human alerted — was
+# missing. A red scheduled workflow is a passive channel (nobody has the tab
+# open). On a CONFIRMED wedge/stranded-approval this fires the SAME
+# `repository_dispatch` `urgent_alarm` event `remediation_dispatcher_lambda.py`
+# already fires for urgent CloudWatch alarms — `remediation-agent.yml` already
+# listens for exactly that event type and sends the curated triage email. This
+# piggybacks that existing channel; it does not invent a new one (no SES call,
+# no new listener workflow, no new AWS surface — this workflow holds no AWS
+# credentials at all and must not gain any just to write a marker).
+#
+# Throttle/dedup: this workflow runs every 15 minutes, so a single episode
+# would otherwise refire ~36 times over a 9h wedge (the 2026-08-05 incident: 6
+# reds over 9h even at the coarser hourly cadence a red run implies). State is
+# kept GitHub-native — an issue carrying the `deploy-wedge-alert` label, same
+# shape as the #1447 advisory-failure-issue pattern (`scripts/advisory_failure_
+# issue.py`) — rather than an AWS-written SSM/DDB marker, which is exactly what
+# that existing prior art already does for "don't re-notify every red run."
+
+ALERT_KINDS = frozenset({STRANDED_APPROVAL, PHANTOM_WEDGE})
+ALERT_EVENT_TYPE = "urgent_alarm"  # the exact type remediation-agent.yml already listens for
+ALERT_LABEL = "deploy-wedge-alert"
+ALERT_LABEL_COLOR = "B60205"
+ALERT_LABEL_DESCRIPTION = "Tracks the throttle state for an active CI/CD deploy-wedge alert (#2149) — auto-closed on recovery"
+# 24h re-arm: generous relative to the ~9h observed incident span, so ordinary
+# throttling (not this fallback) is what collapses the normal case to 1 alert.
+# The primary re-arm is immediate: a later HEALTHY/QUEUED_BEHIND run closes the
+# tracking issue, so the NEXT distinct wedge (a new run id) alerts right away
+# regardless of this window.
+ALERT_REARM_HOURS = 24.0
+ALERT_MARKER_PREFIX = "<!-- deploy-wedge-alert:"
+ALERT_MARKER_SUFFIX = "-->"
+
+
+def alert_candidate(state: dict) -> dict | None:
+    """The verdict that should page a human, or None. Pure."""
+    for v in state.get("verdicts", []):
+        if v.get("kind") in ALERT_KINDS:
+            return v
+    return None
+
+
+def build_alert_marker(run_id, alerted_at_iso: str) -> str:
+    """HTML-comment marker embedding throttle state in the tracking issue body —
+    same shape as advisory_failure_issue.py's dedup marker, carrying state
+    instead of only a slug."""
+    payload = json.dumps({"run_id": run_id, "alerted_at": alerted_at_iso})
+    return f"{ALERT_MARKER_PREFIX}{payload}{ALERT_MARKER_SUFFIX}"
+
+
+def parse_alert_marker(body: str | None) -> dict | None:
+    """Recover {"run_id", "alerted_at"} from a tracking issue body, or None if
+    absent or malformed. Never raises — a corrupt/foreign issue body must not
+    crash the classifier; it just reads as 'no prior state' (see
+    should_fire_alert: that fails toward ALERTING, not toward silence)."""
+    if not body:
+        return None
+    start = body.find(ALERT_MARKER_PREFIX)
+    if start == -1:
+        return None
+    end = body.find(ALERT_MARKER_SUFFIX, start)
+    if end == -1:
+        return None
+    raw = body[start + len(ALERT_MARKER_PREFIX) : end].strip()
+    try:
+        state = json.loads(raw)
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(state, dict) or "run_id" not in state or "alerted_at" not in state:
+        return None
+    return state
+
+
+def should_fire_alert(run_id, now: datetime, last_state: dict | None, rearm_hours: float = ALERT_REARM_HOURS) -> bool:
+    """The whole throttle decision. Pure, offline-tested.
+
+    Fires when:
+      - no marker exists yet (first alert of a fresh episode), OR
+      - the marker names a DIFFERENT run id (a new episode — the previous
+        wedge cleared/was recovered and a fresh one appeared), OR
+      - the marker is for the SAME run id but was last alerted >= rearm_hours
+        ago (the long-window fallback re-arm).
+
+    Does NOT fire when the same run id was already alerted within the window —
+    this is what collapses N reds over one episode into exactly 1 alert.
+    """
+    if last_state is None:
+        return True
+    if last_state.get("run_id") != run_id:
+        return True
+    alerted_at = _parse_iso(last_state.get("alerted_at"))
+    if alerted_at is None:
+        return True  # corrupt timestamp — fail toward alerting, not toward silence
+    return (now - alerted_at).total_seconds() / 3600.0 >= rearm_hours
+
+
+def build_dispatch_payload(verdict: dict, now: datetime) -> dict:
+    """The repository_dispatch client_payload. Same top-level shape
+    `remediation_dispatcher_lambda.py` already sends for a CloudWatch alarm
+    (alarm_name/state/reason/timestamp) — `remediation/agent.py`'s existing
+    `signals["urgent"]` handling needs no changes to consume this. `reason`
+    carries the EXACT text check_deploy_wedge.py already prints: the run id,
+    the gate age, and the one-line recovery command (`verdict["detail"]` —
+    built in classify_run above)."""
+    return {
+        "alarm_name": "deploy-wedge-watch",
+        "state": "ALARM",
+        "reason": verdict.get("detail", ""),
+        "timestamp": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "run_id": verdict.get("run_id"),
+        "kind": verdict.get("kind"),
+        "blocked_minutes": verdict.get("blocked_minutes"),
+    }
+
+
+# ── Alert I/O (thin `gh` wrappers — prose-verified, not unit tested; every
+# caller in maybe_alert() below is exception-safe so a filing hiccup can never
+# turn a correctly-detected wedge into a false "healthy" exit code). ──────────
+
+
+def _find_alert_issue():
+    issues = _gh_api(f"repos/{REPO}/issues?state=open&labels={ALERT_LABEL}&per_page=10")
+    for issue in issues:
+        if "pull_request" in issue:
+            continue
+        return issue
+    return None
+
+
+def _ensure_alert_label():
+    try:
+        _gh_api(f"repos/{REPO}/labels/{ALERT_LABEL}")
+    except subprocess.CalledProcessError:
+        subprocess.run(
+            [
+                "gh",
+                "api",
+                f"repos/{REPO}/labels",
+                "-f",
+                f"name={ALERT_LABEL}",
+                "-f",
+                f"color={ALERT_LABEL_COLOR}",
+                "-f",
+                f"description={ALERT_LABEL_DESCRIPTION}",
+            ],
+            check=False,
+            timeout=30,
+        )
+
+
+def _dispatch_urgent_alarm(payload: dict) -> None:
+    body = json.dumps({"event_type": ALERT_EVENT_TYPE, "client_payload": payload})
+    subprocess.run(
+        ["gh", "api", f"repos/{REPO}/dispatches", "--method", "POST", "--input", "-"],
+        input=body,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=True,
+    )
+
+
+def _upsert_alert_issue(verdict: dict, now: datetime, existing) -> None:
+    marker = build_alert_marker(verdict.get("run_id"), now.strftime("%Y-%m-%dT%H:%M:%SZ"))
+    title = "[auto-filed] CI/CD deploy wedge — production deploys are stalled"
+    body = (
+        "A CONFIRMED deploy wedge/stranded approval fired the urgent-alarm dispatch "
+        f"(#2149) — see the remediation-agent curated email for the triage.\n\n{verdict.get('detail', '')}\n\n{marker}\n"
+    )
+    if existing is None:
+        _ensure_alert_label()
+        subprocess.run(
+            ["gh", "api", f"repos/{REPO}/issues", "-f", f"title={title}", "-f", f"body={body}", "-f", f"labels[]={ALERT_LABEL}"],
+            check=False,
+            timeout=30,
+        )
+    else:
+        subprocess.run(
+            ["gh", "api", f"repos/{REPO}/issues/{existing['number']}", "--method", "PATCH", "-f", f"body={body}"],
+            check=False,
+            timeout=30,
+        )
+
+
+def _close_alert_issue(existing, now: datetime) -> None:
+    if existing is None:
+        return
+    stamp = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    subprocess.run(
+        [
+            "gh",
+            "api",
+            f"repos/{REPO}/issues/{existing['number']}/comments",
+            "-f",
+            f"body=Recovered — {stamp}. Deploy wedge cleared; re-armed for the next episode.",
+        ],
+        check=False,
+        timeout=30,
+    )
+    subprocess.run(
+        ["gh", "api", f"repos/{REPO}/issues/{existing['number']}", "--method", "PATCH", "-f", "state=closed"],
+        check=False,
+        timeout=30,
+    )
+
+
+def maybe_alert(state: dict, now: datetime | None = None) -> str:
+    """Best-effort — must NEVER raise. Alerting plumbing must not affect the
+    detector's own exit code (render() already decided that from `state`
+    alone). Returns a short status string for the run log."""
+    now = now or datetime.now(timezone.utc)
+    try:
+        existing = _find_alert_issue()
+    except Exception as e:  # noqa: BLE001 - read failure must not block detection
+        return f"alert-skipped: could not read tracking issue ({e})"
+
+    verdict = alert_candidate(state)
+    try:
+        if verdict is None:
+            if existing is not None:
+                _close_alert_issue(existing, now)
+                return "alert-rearmed: closed tracking issue"
+            return "alert-skip: healthy, no tracking issue"
+
+        last = parse_alert_marker(existing.get("body") if existing else None)
+        if not should_fire_alert(verdict.get("run_id"), now, last):
+            return f"alert-throttled: run {verdict.get('run_id')} already alerted this episode"
+
+        payload = build_dispatch_payload(verdict, now)
+        _dispatch_urgent_alarm(payload)
+        _upsert_alert_issue(verdict, now, existing)
+        return f"alert-fired: run {verdict.get('run_id')} ({verdict.get('kind')})"
+    except Exception as e:  # noqa: BLE001 - alerting is best-effort by design
+        return f"alert-error: {e}"
+
+
 def _gh_api(path: str):
     out = subprocess.run(["gh", "api", path], capture_output=True, text=True, timeout=60, check=True).stdout
     return json.loads(out)
@@ -375,6 +612,11 @@ def main() -> int:
     ap.add_argument("--threshold", type=float, default=DEFAULT_THRESHOLD_MIN, help="minutes blocked before alarming")
     ap.add_argument("--json", action="store_true", help="emit the verdict as JSON")
     ap.add_argument("--recover", action="store_true", help="cancel + re-dispatch on a CONFIRMED phantom wedge")
+    ap.add_argument(
+        "--alert",
+        action="store_true",
+        help="(#2149) on a CONFIRMED wedge, fire the throttled repository_dispatch urgent_alarm; no-op otherwise",
+    )
     args = ap.parse_args()
 
     try:
@@ -390,6 +632,11 @@ def main() -> int:
         print(json.dumps(state, indent=2, default=str))
     else:
         print(message)
+
+    if args.alert:
+        # Best-effort by construction (maybe_alert never raises) — the exit code
+        # below is decided from `state` alone, same as without this flag.
+        print(maybe_alert(state))
 
     if args.recover:
         return recover(state)
