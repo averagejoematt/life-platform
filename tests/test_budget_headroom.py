@@ -272,7 +272,11 @@ def test_format_tier1_incident_matches_issue_example():
 def test_format_tier2_over_ceiling():
     line = budget_guard.format_headroom_line(TIER2)
     assert line.startswith("Budget: tier 2 · projected $90 vs $75 ceiling")
-    assert "near-zero slack for reader growth · paused: 13 AI features (" in line
+    # DERIVED from the registry, not a hand-typed count: the literal 13 went stale the
+    # first time a feature was registered (#1675 made it 14). What is under test is that
+    # the line names the paused SET honestly, not that the set is a particular size.
+    expected = sum(1 for cutoff in budget_guard._FEATURE_CUTOFF.values() if cutoff <= 2)
+    assert f"near-zero slack for reader growth · paused: {expected} AI features (" in line
 
 
 def test_format_thin_slack_flagged():

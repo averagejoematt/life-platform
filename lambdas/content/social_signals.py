@@ -87,6 +87,19 @@ _LIST_KEYS = (
 )
 
 
+def post_text(post: dict) -> str:
+    """The enrichable/quotable public text of a social post: title + description.
+
+    THE single definition (#1675). The enricher grounds its causal hints against this
+    text (ADR-104) and ``privacy.social_consent`` grounds a coach-reaction quote against
+    it; two definitions would let a string ground against one and not the other. The
+    fields are the ones #1669's ingestion transform persists; the full raw payload stays
+    in S3. Pure — no AWS, no I/O.
+    """
+    parts = [str((post or {}).get("title") or ""), str((post or {}).get("description") or "")]
+    return "\n".join(p for p in parts if p).strip()
+
+
 def _first(enriched: dict, keys) -> object:
     for k in keys:
         v = (enriched or {}).get(k)

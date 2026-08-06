@@ -380,7 +380,24 @@ def ingestion_social_enrichment() -> list[iam.PolicyStatement]:
     """Social-post enrichment (#1671, epic #1668): Haiku extraction over ingested
     inbound-social posts (youtube …), written back in place. Same least-privilege shape as
     journal enrichment — DDB read/write to enrich the SAME record, ai-keys + Bedrock for
-    Haiku (ADR-062), no raw S3 write (the ingestion Lambda already archived the post)."""
+    Haiku (ADR-062), no raw S3 write (the ingestion Lambda already archived the post).
+
+    #1675 (the #1574 reaction mechanism extended to this channel, Option A — inline in
+    this pipeline, no new Lambda): the enrichment pass now also produces the coach
+    reaction to a membrane-cleared public post, which needs the SAME three grants #1756
+    added to the journal-enrichment role for the identical reason:
+      - ssm:GetParameter on budget-tier — budget_guard.allow("coach_social_reaction")
+        must actually READ the tier (it fails OPEN to tier 0 without the grant, which
+        would silently defeat the band-2 pause) — and on experiment-cycle, for the
+        ADR-077/#1233 cycle stamp on each stored reaction;
+      - lambda:InvokeFunction on coach-quality-gate — the ADR-108 blocking gate is a
+        SYNC invoke (ai_calls._enforce_quality_gate, max_regenerations=0: held ⇒ nothing
+        published). Fail-open on infra error, same as the journal-enrichment role;
+      - cloudwatch:PutMetricData (G1) — this role already called Bedrock WITHOUT it, so
+        the per-feature token/EstimatedCostUSD emits at the chokepoint were failing
+        AccessDenied fail-open and the enrichment cost telemetry was silently dropped.
+        Fixed here rather than left, since the reaction adds a second spender.
+    """
     return [
         iam.PolicyStatement(
             sid="DynamoDB",
@@ -398,6 +415,28 @@ def ingestion_social_enrichment() -> list[iam.PolicyStatement]:
             resources=[_secret_arn("life-platform/ai-keys")],
         ),
         _bedrock_statement(),  # ADR-062: AI-calling enrichment role → Bedrock invoke
+        iam.PolicyStatement(
+            sid="SSMRead",  # #1675: budget_guard tier gate + the ADR-077 cycle stamp
+            actions=["ssm:GetParameter"],
+            resources=[
+                f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/budget-tier",
+                f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle",
+            ],
+        ),
+        iam.PolicyStatement(
+            sid="QualityGateInvoke",  # #1675: the ADR-108 blocking gate (sync, fail-open)
+            actions=["lambda:InvokeFunction"],
+            resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:coach-quality-gate"],
+        ),
+        iam.PolicyStatement(
+            # G1: every AI-calling role needs PutMetricData — bedrock_client.invoke()
+            # emits per-feature token/EstimatedCostUSD at the chokepoint, and the
+            # ADR-108 gate emits CoachQualityGateHeld when it holds a reaction.
+            # PutMetricData only accepts "*" as a resource.
+            sid="AICostMetrics",
+            actions=["cloudwatch:PutMetricData"],
+            resources=["*"],
+        ),
         iam.PolicyStatement(
             sid="DLQ",
             actions=["sqs:SendMessage"],

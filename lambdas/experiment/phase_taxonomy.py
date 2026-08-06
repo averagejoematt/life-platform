@@ -261,14 +261,17 @@ SOURCE_CLASS: dict[str, str] = {
     # per-cycle record resets, and the wipe cycle-stamps it so cycle N's badges stay
     # navigable in the archive rather than being destroyed.
     "achievements": EXPERIMENT_SCOPED,
-    "diary_reactions": EXPERIMENT_SCOPED,  # #1574/#1756: the coach's short public reaction to a
-    # V3-consented Video Diary / Solo Recording entry (coach/coach_diary_reaction.py, sk
-    # DATE#<date>#<channel>#<entry_uid>). Derived coach NARRATIVE — same class as every other
-    # generated coach output (ai_analysis, chronicle, state_of_matthew): it is written against
-    # the current cycle's coaching voice and reads back through the phase-filtered
-    # /api/diary_reactions query, so it tags + tombstones + cycle-stamps at restart. NB the
-    # SOURCE ENTRY it reacts to (notion) is RAW_TIMESERIES and is kept forever — the human's
-    # words survive the reset; only the machine's reaction to them resets with the run.
+    "diary_reactions": EXPERIMENT_SCOPED,  # #1574/#1756/#1675: the coach's short public reaction to
+    # something Matthew said — a V3-consented Video Diary / Solo Recording entry, or (#1675) a
+    # membrane-cleared public social post (coach/coach_diary_reaction.py, sk
+    # DATE#<date>#<channel>#<entry_uid>). ONE partition for both channels, deliberately: the
+    # reaction machinery is shared, so its reset semantics are shared too and #1675 needed no new
+    # registration here. Derived coach NARRATIVE — same class as every other generated coach
+    # output (ai_analysis, chronicle, state_of_matthew): it is written against the current cycle's
+    # coaching voice and reads back through the phase-filtered /api/diary_reactions query, so it
+    # tags + tombstones + cycle-stamps at restart. NB the SOURCE RECORD it reacts to (notion, or
+    # the ingested social post) is RAW_TIMESERIES and is kept forever — the human's words survive
+    # the reset; only the machine's reaction to them resets with the run.
     "diary_claims": EXPERIMENT_SCOPED,  # #1841: the on-tape claims ledger — falsifiable claims the
     # SUBJECT made on camera, code-admitted by diary_claims.admit_claim and graded by the same daily
     # coach-prediction-evaluator as every coach prediction (sk PREDICTION#<stated_date>#<slug>).
