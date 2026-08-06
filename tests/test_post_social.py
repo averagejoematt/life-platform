@@ -114,3 +114,63 @@ def test_truncate_for_bluesky_stays_under_limit_and_keeps_link():
 def test_truncate_for_bluesky_is_a_no_op_under_limit():
     caption = "Short caption\n\nhttps://averagejoematt.com/journal/posts/week-02/"
     assert post_social.truncate_for_bluesky(caption, limit=300) == caption
+
+
+# ── #1402: the fingerprint candidate ─────────────────────────────────────────
+
+_FP_CAPTION = (
+    "The daily fingerprint — day 4, attempt 12, as of 2026-08-05.\n\n"
+    "Same numbers in, same mark out. 4 of 6 signals reported; the glow is earned, never added.\n\n"
+    "https://averagejoematt.com/moments/fingerprint/2026-08-05/?utm_source=bluesky&utm_medium=social&utm_campaign=fingerprint"
+)
+
+
+def _fp_payload(**overrides):
+    payload = {
+        "date": "2026-08-05",
+        "card_url": "/moments/assets/fingerprint-2026-08-05.png",
+        "permalink": "/moments/fingerprint/2026-08-05/",
+        "caption": _FP_CAPTION,
+        "syndicatable": True,
+        "automated_syndication": "denied — ADR-140 rule 5 / #1629",
+    }
+    payload.update(overrides)
+    return payload
+
+
+def _fake_index(monkeypatch, payload):
+    import json as _json
+
+    monkeypatch.setattr(post_social, "_get", lambda url, timeout=10: _json.dumps({"fingerprint": payload}))
+
+
+def test_fingerprint_candidate_is_offered_when_the_day_earned_its_mark(monkeypatch):
+    _fake_index(monkeypatch, _fp_payload())
+    candidates = post_social.list_fingerprint_candidates()
+    assert len(candidates) == 1
+    assert candidates[0]["path"] == "/moments/fingerprint/2026-08-05/"
+    assert candidates[0]["kit"]["caption"] == _FP_CAPTION
+
+
+def test_fingerprint_warming_up_day_is_never_offered(monkeypatch):
+    """#1629 non-negotiable 11 — a reset/thin week must not produce a post about a
+    hollow artifact, even though the artifact itself is published."""
+    _fake_index(monkeypatch, _fp_payload(syndicatable=False))
+    assert post_social.list_fingerprint_candidates() == []
+
+
+def test_fingerprint_absent_from_index_yields_no_candidate(monkeypatch):
+    _fake_index(monkeypatch, None)
+    assert post_social.list_fingerprint_candidates() == []
+
+
+def test_fingerprint_caption_with_a_body_claim_is_rejected_at_post_time(monkeypatch):
+    """The index arrives over the network; the ADR-140 rule-5 assertion is re-run locally
+    at the last point before an irreversible post, not trusted from the fetch."""
+    _fake_index(monkeypatch, _fp_payload(caption="Day 4 — down 13.4 lbs.\n\nhttps://averagejoematt.com/moments/fingerprint/2026-08-05/"))
+    assert post_social.list_fingerprint_candidates() == []
+
+
+def test_fingerprint_card_outside_the_public_moments_prefix_is_rejected(monkeypatch):
+    _fake_index(monkeypatch, _fp_payload(card_url="/private/fingerprint.png"))
+    assert post_social.list_fingerprint_candidates() == []

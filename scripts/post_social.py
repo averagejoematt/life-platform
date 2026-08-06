@@ -1,9 +1,18 @@
 #!/usr/bin/env python3
 """scripts/post_social.py — #1622: the manual social poster.
 
-Interactive, one post at a time. Lists published chronicle candidates (moments
-index + rss.xml), builds a deterministic caption via chronicle_share_kit.build_kit,
-posts the ONE the operator selects. No AWS API; keychain credentials only.
+Interactive, one post at a time. Lists published candidates, builds a deterministic
+caption, posts the ONE the operator selects. No AWS API; keychain credentials only.
+
+Two candidate kinds (`--kind`):
+  chronicle   (#1622, default) — a published installment, from the moments index +
+              rss.xml, captioned by chronicle_share_kit.build_kit.
+  fingerprint (#1402)          — today's dated Daily Fingerprint card, captioned by
+              content.fingerprint_broadcast. This is the ONLY sanctioned path for that
+              artifact: the mark is a pure function of Matthew's vitals, and ADR-140
+              rule 5 permanently forbids an AUTOMATED surface from posting it. The
+              human selecting it here IS the gate, and the full caption is printed for
+              approval before the choice.
 
 Platform scope (2026-08-02 owner decision): Bluesky posts live (#1629 gate:owner
 removed same day). X does not post — #1631 stays gated on dev-account/billing;
@@ -27,6 +36,7 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lambdas"))
+from content import fingerprint_broadcast as fb  # noqa: E402
 from content.chronicle_share_kit import SITE_BASE, build_kit  # noqa: E402
 
 MOMENTS_INDEX_URL = f"{SITE_BASE}/moments/index.json"  # CloudFront VIEWER path, not the S3 generated/ key
@@ -81,6 +91,36 @@ def list_candidates():
         )
         candidates.append({"path": path, "kit": kit})
     return candidates
+
+
+def list_fingerprint_candidates():
+    """#1402: today's Daily Fingerprint, if the sweep published a postable one.
+
+    At most one candidate — the day's mark. Three things are re-checked HERE rather than
+    trusted from the fetched index, because this is the last point before an irreversible
+    public post and the index arrived over the network:
+
+      1. `syndicatable` — a warming-up mark is published but never offered.
+      2. the caption carries no body claim and no engagement bait (ADR-140 rule 5 and the
+         no-gloss rule), re-run locally against the same assertions the builder used.
+      3. the card and permalink are allowlisted public /moments/ artifacts.
+
+    Any of the three failing drops the candidate silently rather than posting something
+    that half-passed.
+    """
+    payload = (json.loads(_get(MOMENTS_INDEX_URL)) or {}).get("fingerprint") or None
+    if not payload or not payload.get("syndicatable"):
+        return []
+    try:
+        fb.assert_no_body_claims(payload.get("caption"))
+        fb.assert_no_engagement_bait(payload.get("caption"))
+        fb.assert_public_artifact(payload.get("card_url"))
+        fb.assert_public_artifact(payload.get("permalink"))
+    except fb.BroadcastContentError as e:
+        print(f"Fingerprint candidate rejected: {e}")
+        return []
+    kit = {"title": f"The daily fingerprint — {payload.get('date')}", "caption": payload["caption"], "card_url": payload["card_url"]}
+    return [{"path": payload["permalink"], "kit": kit}]
 
 
 def truncate_for_bluesky(caption, limit=BSKY_LIMIT):
@@ -158,6 +198,12 @@ def print_usage_report():
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--platform", default="bluesky", choices=["bluesky", "x"])
+    parser.add_argument(
+        "--kind",
+        default="chronicle",
+        choices=["chronicle", "fingerprint"],
+        help="chronicle: a published installment (#1622). fingerprint: today's dated day-mark card (#1402).",
+    )
     parser.add_argument("--handle", default=DEFAULT_HANDLE)
     parser.add_argument("--report", action="store_true", help="print days-used-of-last-30 and exit")
     args = parser.parse_args(argv)
@@ -170,13 +216,20 @@ def main(argv=None):
         print("X posting isn't wired yet — see #1631 (gated on owner dev-account/billing setup). Nothing posted.")
         return 0
 
-    candidates = list_candidates()
+    candidates = list_fingerprint_candidates() if args.kind == "fingerprint" else list_candidates()
     if not candidates:
-        print("No candidates found (moments index / rss.xml have no matching published chronicle).")
+        if args.kind == "fingerprint":
+            print("No fingerprint candidate (today's mark is warming up, or the sweep has not published it yet).")
+        else:
+            print("No candidates found (moments index / rss.xml have no matching published chronicle).")
         return 1
 
     for i, c in enumerate(candidates):
         print(f"[{i}] {c['kit']['title']}  —  {c['path']}")
+    # The caption is shown in full before the choice: the human approves the exact words
+    # that will be posted, not a title standing in for them.
+    for c in candidates:
+        print(f"\n--- caption for {c['path']} ---\n{truncate_for_bluesky(c['kit']['caption'])}\n")
     choice = input("Select a candidate to post (number), or blank to cancel: ").strip()
     if not choice:
         print("Cancelled.")
@@ -187,7 +240,7 @@ def main(argv=None):
     password = get_keychain_password(args.handle)
     jwt, did = bluesky_login(args.handle, password)
     bluesky_post(jwt, did, text)
-    log_usage("bluesky", candidate["path"])
+    log_usage(f"bluesky:{args.kind}", candidate["path"])
     print(f"Posted to Bluesky: {candidate['path']}")
     return 0
 

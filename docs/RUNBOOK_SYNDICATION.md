@@ -1,8 +1,9 @@
 # Syndication Runbooks — token rotation + post recall
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-25
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-05
 
-Last updated: 2026-07-25 (#1630 — written BEFORE the first automated post, per the ADR-140
+Last updated: 2026-08-05 (#1402 — the artifact-class table below; the runbooks themselves
+are unchanged from #1630). Originally 2026-07-25 (#1630 — written BEFORE the first automated post, per the ADR-140
 requirement and the R22 precedent (#893): "how do I delete a bad post and rotate a leaked
 token" must be a document, not a 2am improvisation.)
 
@@ -24,6 +25,31 @@ Honesty note (`reference_docs_current_truth_only`) — this runbook is deliberat
 | SSM `/life-platform/syndication-mode` (`off \| shadow \| live`) | **Does not exist yet** — ships with #1629; until then there is no automated poster to switch off |
 | `life-platform/bluesky` in the freshness checker's `MANUAL_ROTATION_SECRETS` (`lambdas/emails/freshness_checker_lambda.py`) | **Not yet listed** — add the entry in the #1629 PR so staleness alerting starts when the consumer does |
 | `life-platform/x` secret / X developer-portal app | **Does not exist** — Phase 2 is do-not-build until the ADR-063 per-post-spend amendment is signed |
+| The daily-fingerprint broadcast artifact (`/moments/fingerprint/{date}/`, #1402) | **LIVE after the next og-image-generator run** — dated card + permalink + provenance caption, written by `og_moments._sweep_fingerprint`. Nothing posts it; see the class table below |
+
+## What may be posted by what — the artifact-class table (#1402)
+
+ADR-140 rule 5 excludes milestones, achievements, weigh-ins and anything
+body-composition-related from **automated** posting, permanently. #1629's owner-recorded
+non-negotiable is broader: no automated surface may post a claim about Matthew's body.
+The Daily Fingerprint is a pure function of his recovery, sleep, HRV and streak — so it is
+a vitals-derived artifact, and the row below is the consequence, not a preference.
+
+| Artifact class | Human post (`scripts/post_social.py`) | Automated post (the #1629 lambda, when built) |
+|---|---|---|
+| Chronicle / podcast / essay / build beat | **Yes** — `--kind chronicle` | **Yes**, once #1629 clears its 14-day / ≥90% shadow bar |
+| Daily fingerprint card (#1402) | **Yes** — `--kind fingerprint`, caption printed in full for approval before the choice | **NO — structurally denied.** `fingerprint_broadcast.AUTOMATED_SYNDICATION_ALLOWED = False`; the payload says so in-band and `tests/test_fingerprint_broadcast.py` pins it. Reversing needs a new three-board convening, not a code change |
+| Milestones / achievements / weigh-ins / body composition | Matthew's own account, by hand, outside this tooling | **NO — permanently denied** (ADR-140 rule 5) |
+
+**A warming-up day is published but never offered.** If fewer than `web.fingerprint.THIN_N`
+signals reported, the dated card and permalink are still written (the sparse mark is the
+honest render and the archive should have no holes) but the payload comes back
+`syndicatable: false`, and the poster shows no candidate. This is #1629's non-negotiable
+11, written from cycle 8's three present-None firings.
+
+**Recall for a fingerprint post** is Runbook 2 below, unchanged — the post is a normal
+Bluesky record. The dated artifact it links to is deliberately *not* deleted on recall:
+the permalink is an archive entry, and removing it would make the reader's back-link rot.
 
 ---
 

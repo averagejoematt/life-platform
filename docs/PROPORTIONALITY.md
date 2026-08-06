@@ -62,6 +62,7 @@ standing subsystem names what it costs, what it earns, and what would demote it.
 | fresh-eyes weekly survey workflow | Portfolio | $ (small) | Too new to grade; revisit at 3+ runs |
 | Personal/Product deliberation boards (BOARDS.md) | Portfolio | none (no runtime) | Decision-quality tooling demonstrated in public |
 | Social syndication poster (#1629, gated/unbuilt, ADR-140) | Portfolio | none yet | Dated retire trigger: 90 days live with no measured referral traffic |
+| Daily-fingerprint broadcast payload (#1402, `content/fingerprint_broadcast.py` + the `og_moments` fingerprint sweep) | Portfolio | S3 (one dated PNG + shell/day) | No new service: the card is the unchanged #1379 render and the sweep is one more class in the existing moments pass. Human-post-only by ADR-140 rule 5. Retire trigger: **90 days with no manual fingerprint post** (`post_social.py --report`) → drop the sweep class, keep the page card |
 | Social membrane inbound (youtube RSS ingestion, #1668) | Portfolio | surface (small) | Keyless by design; retire if no captures used by a public surface in 90 days |
 | /legacy preserved v3 site | Portfolio (archive) | none | Zero maintenance; retire only if storage/privacy cost appears |
 | State of Mind subsystem (HAE How-We-Feel) | Kept (load-bearing-pending-data) | mind | ADR-121: habit restart chosen over prune; flips to retire if habit not resumed by 2026-Q4 review |
