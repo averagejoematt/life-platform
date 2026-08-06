@@ -21,6 +21,12 @@ SCOPE:
   ALSO scans SOURCE docstrings/comments: lambdas/**/*.py + mcp/**/*.py (#781 taught
   us the shared-layer retirement reached tests + 2 docs but left 35+ stale "part of
   the shared layer" claims in code — the docs-only scan never opened lambdas/).
+  ALSO scans deploy/*.sh + .github/workflows/*.yml (#2007 — the operator-facing
+  deploy scripts and the pipeline's own prose comments are exactly the same class
+  of surface as deploy/*.md and lambdas/**/*.py, and #781 left affirmative "comes
+  from the shared layer" / "shared-layer rollback" claims live there — found by a
+  2026-07-28 fullreview pass because the scan stopped at *.py and never opened a
+  single *.sh or workflow YAML).
   EXEMPT (history may mention history): CHANGELOG, DECISIONS, INCIDENT_LOG, BACKLOG,
   MCP_TOOL_AUDIT, and docs/{archive,specs,reviews,audits,v2-audits,rca,restart,
   briefs,site-reviews}/, handovers/, docs/_lint/ itself.
@@ -66,11 +72,46 @@ EXEMPT_FILES = {
 # so "imports no shared-layer modules" is exempted exactly like "imports no shared
 # layer modules" always was — the negation is legitimate history either spelling;
 # only the RULES below (also hyphen-tolerant now) decide what's a stale claim.
+#
+# #2007 tightening (decision, not a restatement of #1347): deploy_reading_mcp.sh:10
+# pre-fix read "...already come from the shared layer, so there is **NO shared-
+# layer bump and NO fleet redeploy**" — a genuinely stale affirmative claim ("comes
+# from the shared layer") sitting right next to a negation that ALSO happened to
+# contain "no shared-layer", so the negation exempted the whole line and hid the
+# claim beside it. The obvious fix — scope the exemption to the clause containing
+# the match instead of the whole line — was tried and reverted: splitting on comma/
+# sentence punctuation broke two live, legitimate multi-clause lines in THIS repo
+# (docs/ARCHITECTURE.md:129's "`tools_calendar.py` DELETED (ADR-030 retired,
+# Google Calendar). ... `email_framework.py` DELETED from shared layer." and
+# docs/CONVENTIONS.md:627's "#781 hit the identical shape... the retired shared
+# layer's old name survived as `shared-layer`..." — both say "retired" in an
+# earlier clause of the SAME sentence/paragraph as a later bare "shared layer"
+# mention, exactly the shape #1189's non-vacuity lesson says a rule must stay
+# quiet on). A clause boundary is not a reliable proxy for "different claim" in
+# this corpus's prose. Narrower and safe: the shadowing negation is specifically
+# "shared-layer" used as a HYPHENATED COMPOUND MODIFIER on a following noun (a
+# "shared-layer bump/version/rebuild/rollback/redeploy/update" — a claim about
+# THAT noun, not about the layer's existence) — unlike the legitimate negations
+# ("no shared layer to attach", "not the shared layer", "there is no shared
+# layer"), which use "shared layer" as the bare head noun of the negated clause.
+# The negative lookahead below excludes exactly that compound-modifier shape, so
+# it can't launder an adjacent stale claim, while every legitimate negation in
+# this repo (checked corpus-wide, see the #2007 PR) still matches. Pinned by
+# test_shadowed_negation_no_longer_exempts_an_adjacent_stale_claim (plants the
+# exact pre-fix string) and test_legitimate_negations_still_exempt (the corpus
+# lines above), per the "prove it flags AND stays quiet" pattern this file's
+# other rules already follow (test_mcp_manual_zip_tombstones_fire_on_the_prefix_recipe).
+_LAYER_MODIFIER_SHADOW = r"(?!\s+(?:bump|version|rebuild|rollback|redeploy|update)\b)"
 RETIREMENT_LINE_RE = re.compile(
     r"retired|removed|superseded|no longer|banned|do (?:NOT|not)|never hand-roll|tombstone|was deleted"
-    r"|replaces?|replaced|no shared[- ]layer|without the shared[- ]layer|not the (?:retired )?shared[- ]layer",
+    r"|replaces?|replaced"
+    rf"|no shared[- ]layer{_LAYER_MODIFIER_SHADOW}"
+    rf"|without the shared[- ]layer{_LAYER_MODIFIER_SHADOW}"
+    rf"|not the (?:retired )?shared[- ]layer{_LAYER_MODIFIER_SHADOW}",
     re.I,
 )
+
+
 EXEMPT_DIRS = (
     "docs/archive/",
     "docs/specs/",
@@ -111,6 +152,8 @@ SOURCE_DIRS = ("lambdas", "mcp")
 def _scan_files(include_exempt: bool) -> list[Path]:
     candidates: list[Path] = [ROOT / "README.md", ROOT / "CLAUDE.md", ROOT / "Makefile"]
     candidates += sorted((ROOT / "deploy").glob("*.md"))  # #1322: the whole live deploy-doc surface, not just README
+    candidates += sorted((ROOT / "deploy").glob("*.sh"))  # #2007: the operator-facing deploy SCRIPTS, not just docs
+    candidates += sorted((ROOT / ".github" / "workflows").glob("*.yml"))  # #2007: the pipeline's own prose comments
     candidates += sorted((ROOT / ".claude" / "commands").glob("*.md"))
     candidates += sorted((ROOT / "docs").rglob("*.md"))
     for d in SOURCE_DIRS:

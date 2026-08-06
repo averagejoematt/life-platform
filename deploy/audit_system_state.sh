@@ -14,8 +14,17 @@ EAST_COUNT=$(aws lambda list-functions --region us-east-1 --query 'Functions[].F
 TOTAL_LAMBDAS=$((WEST_COUNT + EAST_COUNT))
 echo "Lambdas:      $TOTAL_LAMBDAS ($WEST_COUNT us-west-2 + $EAST_COUNT us-east-1)"
 
-# MCP tool count
-TOOL_COUNT=$(grep -c '"name":' mcp/registry.py 2>/dev/null || echo "?")
+# MCP tool count — top-level keys in the TOOLS dict via the same AST-shaped parse
+# deploy/sync_doc_metadata.py::_auto_discover_tool_count uses; a raw
+# `grep -c '"name":'` over-counts nested tool-schema fields (see docs/_lint/tombstones.txt).
+TOOL_COUNT=$(python3 -c "
+import re
+from pathlib import Path
+src = Path('mcp/registry.py').read_text(encoding='utf-8')
+i = src.find('TOOLS = {')
+names = re.findall(r'^    \"([a-z0-9_]+)\"\s*:\s*\{', src[i:], re.MULTILINE) if i != -1 else []
+print(len(names) if names else '?')
+" 2>/dev/null || echo "?")
 echo "MCP tools:    $TOOL_COUNT"
 
 # MCP module count

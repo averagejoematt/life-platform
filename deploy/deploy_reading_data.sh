@@ -9,9 +9,10 @@
 #   2. cdk diff LifePlatformOperational            (REVIEW before applying)
 #   3. cdk deploy LifePlatformOperational          (adds the reading-cover-pipeline Lambda)
 #
-# No layer rebuild (the reading modules bundle with the lambdas/ asset, not the
-# shared layer) and no other stack changes. The cover Lambda is on-demand only
-# (no EventBridge rule). Re-running is safe (GSIs idempotent; cdk is declarative).
+# No layer rebuild — there is no shared layer at all (#781/ADR-131 retired it);
+# the reading modules bundle with the lambdas/ asset like everything else — and
+# no other stack changes. The cover Lambda is on-demand only (no EventBridge
+# rule). Re-running is safe (GSIs idempotent; cdk is declarative).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
