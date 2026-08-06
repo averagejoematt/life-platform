@@ -2201,6 +2201,33 @@
         }
       ],
       "why_it_mattered": "A fresh cycle's first week is exactly when new readers are watching, and a coach quoting a body that no longer exists is the fastest way to teach them the numbers here aren't real. Honest numbers aren't a caption style — they're whether the fact pipeline can say 'I don't know yet' instead of reaching for the last number it saw."
+    },
+    {
+      "id": "2026-08-05-a-gated-run-is-a-lease-on-the-deploy-group",
+      "date": "2026-08-05",
+      "title": "A gated run is a lease on the deploy group — approve it or everything stops",
+      "shipped": "Twenty-two pull requests merged and deployed in one driver session — the Wednesday double-send fix landed a day before the first live subscriber send, the compute layer's trailing windows stopped truncating to cycle age after a reset (the measured defect: a 90-day recovery window held 137 rows unfiltered and 1 filtered), every experiment-library citation now resolves or honestly says 'no direct study' (59 verified against PubMed and Crossref, 8 relabelled, zero invented), three enrichment pipelines that had pinned PST year-round got the canonical Pacific frame, and both subscriber-facing email senders gained a dry-run gate so pre-flighting a send never again requires inventing risk.",
+      "gotcha": "Midway through, the pipeline silently froze for twenty-one hours. One CI run had been deliberately left waiting at the production approval gate on the theory a newer run would supersede it — but gated runs are never superseded; a run parked at the gate holds the deploy concurrency group like a lease, and thirteen merged PRs queued invisibly behind it. The wedge detector went red within fifteen minutes and stayed red six runs in a row; nothing consumed its redness, and the session's own watchers were polling a gate that could never materialize. The owner asking 'is anything actually moving?' was the alarm that worked.",
+      "honest_miss": "Detection was never the gap — the repo's own wedge checker named the exact recovery command in one call. The gap was that a red scheduled workflow reaches nobody, and the fix for that last mile is filed, not shipped. Two union-breach main reds (concurrent PRs each green alone) also cost about an hour of fix-forward work, and the chronicle-podcast regen surfaced a real defect: Google TTS rejects the prologue's longest sentence and the read-aloud chunker never splits it.",
+      "prs": [
+        {
+          "label": "PR #2120",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2120"
+        },
+        {
+          "label": "PR #2132",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2132"
+        },
+        {
+          "label": "PR #2144",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2144"
+        },
+        {
+          "label": "PR #2146",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2146"
+        }
+      ],
+      "why_it_mattered": "Throughput is easy to narrate and stalls are easy to hide. The honest version of a 22-PR day includes the twenty-one hours nothing deployed, why the machinery that saw it couldn't say so, and what now exists so the next silent lease gets surfaced instead of survived."
     }
   ]
 }
