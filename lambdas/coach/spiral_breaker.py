@@ -524,16 +524,15 @@ def _query_window(table, source, start_day, end_day):
 
 def _midpoint_pacific_hour(sleep_start, sleep_end):
     """Fractional Pacific-local hour of the sleep midpoint from two ISO-8601 UTC stamps."""
-    from zoneinfo import ZoneInfo
+    from common.pacific_time import PACIFIC, parse_iso_utc  # #1964: the one frame + one parser
 
-    try:
-        start = datetime.fromisoformat(str(sleep_start).replace("Z", "+00:00"))
-        end = datetime.fromisoformat(str(sleep_end).replace("Z", "+00:00"))
-    except ValueError:
+    start = parse_iso_utc(sleep_start)
+    end = parse_iso_utc(sleep_end)
+    if start is None or end is None:
         return None
     if end <= start:
         return None
-    mid = (start + (end - start) / 2).astimezone(ZoneInfo("America/Los_Angeles"))
+    mid = (start + (end - start) / 2).astimezone(PACIFIC)
     return mid.hour + mid.minute / 60.0 + mid.second / 3600.0
 
 

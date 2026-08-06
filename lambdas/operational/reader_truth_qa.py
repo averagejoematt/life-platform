@@ -31,7 +31,7 @@ Stdlib-only — safe to import anywhere.
 import json
 import os
 import re
-from datetime import date, datetime
+from datetime import date
 from html.parser import HTMLParser
 
 # Haiku by default — structured verdict task (ADR-049 tiering, ADR-063 budget).
@@ -116,9 +116,9 @@ def phase_context(today_iso=None):
     from common.constants import EXPERIMENT_START_DATE, day_n
 
     if today_iso is None:
-        from zoneinfo import ZoneInfo
+        from common.pacific_time import pacific_today  # #1964: the one Pacific frame
 
-        today_iso = datetime.now(ZoneInfo("America/Los_Angeles")).date().isoformat()
+        today_iso = pacific_today()
     n = day_n(today_iso)
     days_until = 0
     if n == 0:

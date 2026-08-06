@@ -54,10 +54,10 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from urllib.error import HTTPError
 from urllib.request import Request
-from zoneinfo import ZoneInfo
 
 import boto3
 from boto3.dynamodb.conditions import Key  # #476/E-6: deletion-reconcile query
+from common.pacific_time import pacific_date_of, pacific_now  # #1964: the one Pacific frame + ISO parse
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -491,10 +491,12 @@ def parse_page(page, api_key=None):
     if not date_str:
         created = page.get("created_time", "")
         if created:
-            # Convert UTC created_time to Pacific Time before extracting date
-            pt = ZoneInfo("America/Los_Angeles")
-            created_dt = datetime.fromisoformat(created.replace("Z", "+00:00")).astimezone(pt)
-            date_str = created_dt.strftime("%Y-%m-%d")
+            # Convert UTC created_time to Pacific Time before extracting date.
+            # #1964: the canonical parse+convert pair. Behavior change, deliberate:
+            # a malformed created_time used to raise ValueError out of this helper
+            # and abort the whole ingestion run; pacific_date_of returns None, so
+            # the one bad page falls through to the "no date" skip below.
+            date_str = pacific_date_of(created)
             logger.info(f"Page {page['id']}: no Date property, using created_time {created} → PT date {date_str}")
 
     if not date_str:
@@ -799,7 +801,7 @@ def lambda_handler(event, context):
             logger.info(f"Single date mode: {start_date}")
         else:
             # Default: last 2 days (captures late-night entries + today's morning)
-            now_pacific = datetime.now(ZoneInfo("America/Los_Angeles"))
+            now_pacific = pacific_now()  # #1964: the one Pacific frame (DST-aware)
             end_date = now_pacific.strftime("%Y-%m-%d")
             start_date = (now_pacific - timedelta(days=1)).strftime("%Y-%m-%d")
             logger.info(f"Scheduled mode: {start_date} → {end_date}")

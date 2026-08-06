@@ -4,7 +4,6 @@ Shared computation helpers: aggregation, training load, statistics, classificati
 
 import math
 from collections import defaultdict
-from datetime import datetime
 
 from common import stats_core  # bundled shared module (#529): the one sanctioned stats implementation
 
@@ -371,16 +370,16 @@ def normalize_whoop_sleep(item):
         """Extract decimal hour (Pacific local) from an ISO timestamp string."""
         if not ts_str:
             return None
-        try:
-            from zoneinfo import ZoneInfo
+        # #1964: the canonical parser already encodes "offset-less timestamps are
+        # UTC" (the Whoop convention this block hand-rolled) and the canonical
+        # PACIFIC frame replaces the inline ZoneInfo.
+        from common.pacific_time import PACIFIC, parse_iso_utc
 
-            dt = datetime.fromisoformat(str(ts_str).replace("Z", "+00:00"))
-            if dt.tzinfo is None:  # offset-less timestamps are UTC (Whoop convention)
-                dt = dt.replace(tzinfo=ZoneInfo("UTC"))
-            local = dt.astimezone(ZoneInfo("America/Los_Angeles"))
-            return round(local.hour + local.minute / 60 + local.second / 3600, 2)
-        except Exception:
+        dt = parse_iso_utc(ts_str)
+        if dt is None:
             return None
+        local = dt.astimezone(PACIFIC)
+        return round(local.hour + local.minute / 60 + local.second / 3600, 2)
 
     if item.get("sleep_start") and "sleep_onset_hour" not in item:
         out["sleep_onset_hour"] = _hour_from_iso(item["sleep_start"])

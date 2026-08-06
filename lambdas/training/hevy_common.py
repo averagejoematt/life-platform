@@ -66,14 +66,11 @@ except ImportError:
 
 # #475 / C-8: workouts are keyed by the PACIFIC calendar day they happened
 # (platform convention — the site is Pacific end-to-end; strava already keys by
-# start_date_local). pacific_time is the canonical helper; the inline zoneinfo
-# fallback keeps local tooling working without the shared bundle on sys.path.
-try:
-    from common.pacific_time import PACIFIC
-except ImportError:  # pragma: no cover — layer-module fallback (local tooling)
-    from zoneinfo import ZoneInfo
-
-    PACIFIC = ZoneInfo("America/Los_Angeles")
+# start_date_local). #1964: pacific_time is THE canonical helper — the old inline
+# `except ImportError: ZoneInfo(...)` fallback was a second Pacific frame that
+# could silently diverge, and it is dead under the one-bundle rule (#781, the
+# whole lambdas/ tree is staged at the zip root in every function bundle).
+from common.pacific_time import PACIFIC, parse_iso_utc
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -278,10 +275,11 @@ def normalize_workout(raw: dict) -> dict:
     start_iso = workout.get("start_time") or workout.get("start_at") or ""
     end_iso = workout.get("end_time") or workout.get("end_at") or ""
 
-    try:
-        start_dt = datetime.fromisoformat(start_iso.replace("Z", "+00:00"))
-    except Exception:
-        start_dt = datetime.now(timezone.utc)
+    # #1964: the canonical parser. Beyond de-forking, the naive→UTC backfill closes
+    # a real latent bug here — an offset-less start_time used to reach
+    # local_date_of_start() NAIVE, whose .astimezone(PACIFIC) would then read it in
+    # the runner's local zone and could key the workout to the wrong Pacific day.
+    start_dt = parse_iso_utc(start_iso) or datetime.now(timezone.utc)
     # #475 / C-8: key by the workout's LOCAL (Pacific) calendar day, not UTC —
     # mirrors strava_lambda's start_date_local keying so an evening lift and its
     # Strava echo land on the same platform day.
@@ -289,11 +287,9 @@ def normalize_workout(raw: dict) -> dict:
 
     duration_sec: Optional[int] = None
     if end_iso:
-        try:
-            end_dt = datetime.fromisoformat(end_iso.replace("Z", "+00:00"))
+        end_dt = parse_iso_utc(end_iso)
+        if end_dt is not None:
             duration_sec = int((end_dt - start_dt).total_seconds())
-        except Exception:
-            pass
 
     # Unit hint: Hevy account setting. Default to kg; if the payload tags otherwise,
     # respect it. Most user accounts in the US use lbs.

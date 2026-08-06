@@ -24,18 +24,18 @@ import re
 import time
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
-from zoneinfo import ZoneInfo
 
 import boto3
 from boto3.dynamodb.conditions import Key  # noqa: F401 — re-exported for downstream use
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE as EXPERIMENT_START
+from common.pacific_time import PACIFIC
 from experiment.phase_filter import with_phase_filter
 
 # ── Config ─────────────────────────────────────────────────
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
-PT = ZoneInfo("America/Los_Angeles")
+PT = PACIFIC  # canonical frame (#1964) — re-exported to fingerprint/fulfillment
 DDB_REGION = os.environ.get("DYNAMODB_REGION", "us-west-2")
 S3_REGION = os.environ.get("S3_REGION", "us-west-2")
 # Data query start: 1 day before experiment for sleep/recovery data
@@ -145,7 +145,7 @@ PLATFORM_STATS = {
     "review_grade": "A",
     "active_secrets": 21,
     "site_pages": 77,
-    "test_count": 7508,
+    "test_count": 7527,
     "board_technical": 12,
     "board_product": 8,
     "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,

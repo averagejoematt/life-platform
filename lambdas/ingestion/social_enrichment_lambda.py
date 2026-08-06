@@ -52,6 +52,7 @@ from decimal import Decimal
 
 import boto3
 from boto3.dynamodb.conditions import Key
+from common.pacific_time import pacific_now  # #1964: the one Pacific frame (DST-aware)
 from content import social_signals  # #1671: the deterministic coach router
 from privacy import social_provenance as prov  # #1670: the membrane (origin gate)
 
@@ -310,8 +311,10 @@ def lambda_handler(event: dict, context) -> dict:
         elif "date" in event:
             start_date = end_date = event["date"]
         else:
-            pacific = timezone(timedelta(hours=-8))
-            now_pacific = datetime.now(pacific)
+            # #1964: was `timezone(timedelta(hours=-8))` — PST pinned year-round, so
+            # for the ~8 months of PDT this derived a Pacific "now" an hour behind
+            # reality and rolled `end_date` over an hour late. DST-aware now.
+            now_pacific = pacific_now()
             end_date = now_pacific.strftime("%Y-%m-%d")
             start_date = (now_pacific - timedelta(days=LOOKBACK_DAYS)).strftime("%Y-%m-%d")
 

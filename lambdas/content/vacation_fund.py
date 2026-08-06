@@ -30,7 +30,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import date, datetime, timezone
+from datetime import date
 from decimal import Decimal
 from typing import Any
 
@@ -90,13 +90,18 @@ def _f(x) -> float:
 
 
 def _today_pt() -> str:
-    """Today's date in Pacific (the platform's user-facing zone)."""
-    try:
-        from zoneinfo import ZoneInfo
+    """Today's date in Pacific (the platform's user-facing zone).
 
-        return datetime.now(ZoneInfo("America/Los_Angeles")).date().isoformat()
-    except Exception:
-        return datetime.now(timezone.utc).date().isoformat()
+    #1964: delegates to the canonical helper. The old inline
+    ``ZoneInfo("America/Los_Angeles")`` carried a ``except Exception`` fallback to
+    the UTC day — which was the *wrong* day for the whole 5pm–midnight PT window,
+    i.e. a silent correctness failure dressed as resilience. The fallback is gone:
+    ``common.pacific_time`` ships in every bundle (#781) and constructs ``PACIFIC``
+    at import, so a missing tzdata is a loud import error, not a quietly wrong date.
+    """
+    from common.pacific_time import pacific_today
+
+    return pacific_today()
 
 
 def load_config() -> dict[str, Any]:

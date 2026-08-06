@@ -38,6 +38,7 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 from boto3.dynamodb.conditions import Key
+from common.pacific_time import parse_iso_utc  # #1964: THE ISO parser (naive input == UTC)
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -239,15 +240,8 @@ def aggregate(records):
 # count, so only this email would ever show a leak).
 
 
-def _parse_iso_utc(ts):
-    """Parse an ISO timestamp (with or without offset/Z) → aware UTC datetime, or None."""
-    if not ts:
-        return None
-    try:
-        dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
-        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
-    except (ValueError, TypeError):
-        return None
+# #1964: the private `_parse_iso_utc` fork that lived here — same name, same
+# semantics, separately maintained — is gone; call sites use the shared helper.
 
 
 def aggregate_subscriber_funnel(items, now=None):
@@ -270,8 +264,8 @@ def aggregate_subscriber_funnel(items, now=None):
             continue
         status = str(it.get("status") or "unknown")
         by_status[status] += 1
-        created = _parse_iso_utc(it.get("created_at"))
-        confirmed = _parse_iso_utc(it.get("confirmed_at"))
+        created = parse_iso_utc(it.get("created_at"))
+        confirmed = parse_iso_utc(it.get("confirmed_at"))
         if created and created >= cutoff:
             new_pending += 1
         if confirmed and confirmed >= cutoff:

@@ -151,11 +151,12 @@ def dedup_activities(activities):
         return activities
 
     def parse_start(a):
-        s = a.get("start_date_local") or a.get("start_date") or ""
-        try:
-            return datetime.fromisoformat(str(s).replace("Z", "+00:00"))
-        except (ValueError, TypeError):
-            return None
+        # #1964: the canonical parser. Same None-on-failure contract as the inline
+        # fork it replaces, plus the UTC backfill — which matters here because the
+        # results are COMPARED below, and a naive/aware mix raises TypeError.
+        from common.pacific_time import parse_iso_utc
+
+        return parse_iso_utc(a.get("start_date_local") or a.get("start_date") or "")
 
     def richness(a):
         score = 0

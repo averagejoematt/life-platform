@@ -63,10 +63,18 @@ def test_pacific_now_is_tz_aware_pacific(monkeypatch):
 
 
 def test_mcp_core_pacific_today_matches(monkeypatch):
+    """#1964: mcp.core.pacific_today is now a DELEGATE, not a mirror.
+
+    It used to re-implement the derivation with its own inline
+    ``ZoneInfo("America/Los_Angeles")``, and this test froze ``mcp.core``'s own
+    ``datetime`` to check the copy agreed. Freezing the CANONICAL module instead
+    is the stronger assertion: it can only pass if mcp.core actually resolves
+    through ``common.pacific_time``, i.e. the two can no longer drift apart.
+    """
     import mcp.core as core
 
-    _freeze(monkeypatch, core, EVENING_PT)
-    assert core.pacific_today() == "2026-06-30"
+    _freeze(monkeypatch, pacific_time, EVENING_PT)
+    assert core.pacific_today() == "2026-06-30" == pacific_time.pacific_today()
 
 
 # ── source-regression guards: consumers must not revert to a UTC default ────────
@@ -79,7 +87,10 @@ def _read(rel):
 
 def test_circadian_handler_uses_pacific_today():
     src = _read("lambdas/compute/circadian_compliance_lambda.py")
-    assert "from common.pacific_time import pacific_today" in src
+    # #1964: the import line now also pulls PACIFIC + parse_iso_utc (the module's
+    # own `_PT`/inline ISO parse were forks of the same helper), so match the
+    # imported NAME rather than one exact spelling of the import statement.
+    assert re.search(r"^from common\.pacific_time import .*\bpacific_today\b", src, re.M)
     assert 'today_str = event.get("date") or pacific_today()' in src
     # the buggy UTC default must be gone from the handler date derivation:
     assert 'event.get("date") or datetime.now(timezone.utc)' not in src

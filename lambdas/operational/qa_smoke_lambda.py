@@ -18,7 +18,7 @@ import logging
 import os
 import urllib.error
 import urllib.request
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -104,9 +104,9 @@ MCP_SECRET_NAME = os.environ.get("MCP_SECRET_NAME", "life-platform/mcp-api-key")
 
 
 def pt_now():
-    from zoneinfo import ZoneInfo
+    from common.pacific_time import pacific_now  # #1964: the one Pacific frame (DST-aware)
 
-    return datetime.now(ZoneInfo("America/Los_Angeles"))  # DST-aware (fixed -8 was PST year-round)
+    return pacific_now()
 
 
 def yesterday_str():
