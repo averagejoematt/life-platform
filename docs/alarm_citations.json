@@ -21,7 +21,7 @@
     "note": "Same underlying cause and same message set as life-platform-ingestion-dlq-messages above (duplicate alarm on the identical AWS/SQS ApproximateNumberOfMessagesVisible metric/dimension, routed to the digest topic instead of urgent) — ALARM since 2026-08-03T12:04:56Z, confirmed fired correctly."
   },
   "qa-smoke-failures": {
-    "citation": "#2104",
-    "note": "Real content_truth findings since the 2026-08-03 genesis: coach cards cite pre-genesis weight until their weekly regen; Home Day-1 temporal contradiction. Clears when #2104 ships + 2 green nights."
+    "citation": "#1934 + #1968",
+    "note": "#2104's findings are fixed (closed 2026-08-05) but the alarm never got its 2 green nights — the 2026-08-05 scheduled run failed 2 content_truth with NEW causes: (1) whoop freshness (no DATE#2026-08-04 row) — the auth breaker re-latched 2026-08-04T00:00Z with 'refresh 400, unchanged refresh_token' (third credential loss; same owner re-auth path as #1934, carried on the owner list); (2) reader_truth high findings that are evidence, not new work: /api/sleep_detail claims total_sleep_hours with no night label while the whoop-based trend rows sit null during the outage (the #1968 class, evidence commented there), and Home's static 'sixteen prior climbs' lifetime count needs Matthew's factual call (owner list). Clears when whoop re-auths + the two reader_truth items are addressed + 2 green scheduled nights."
   }
 }
