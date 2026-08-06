@@ -128,7 +128,7 @@ def query_range_list(table, source, start_date, end_date, user_id="matthew", inc
     default False.
     """
     pk = f"USER#{user_id}#SOURCE#{source}"
-    records = []
+    records: list[dict] = []
     kwargs = {
         "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
         "ExpressionAttributeValues": {
