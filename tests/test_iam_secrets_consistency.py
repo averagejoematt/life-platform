@@ -88,6 +88,8 @@ KNOWN_SECRETS = [
     "life-platform/ritual-token-secret",  # #769 (ADR-124): dedicated HMAC signing key for the evening-ritual one-tap links (mint: evening-nudge, verify: site-api). Must be created in Secrets Manager before deploy.
     "life-platform/site-api-origin-secret",  # #815 R22-SEC-03: the x-amj-origin CloudFront gate value. Resolved at CDK deploy time into serve/web env; #1589 added a runtime read by the AI-quality canary so its direct-invoke probes can present the header.
     "life-platform/youtube",  # #1669 (epic #1668): inbound-social YouTube channel id (key `channel_id`). Keyless RSS needs no token — this secret carries only the owner-supplied channel id. Must be created in Secrets Manager before the source goes live (GetSecretValue-only IAM).
+    "life-platform/bluesky",  # #1676 (epic #1668): inbound-social Bluesky handle (key `handle`). Keyless public AppView pull needs no token — this secret carries only the owner-supplied handle. Must be created in Secrets Manager before the source goes live (GetSecretValue-only IAM).
+    "life-platform/mastodon",  # #1676 (epic #1668): inbound-social Mastodon instance + handle (keys `instance`/`handle`). Keyless public REST pull needs no token — this secret carries only the owner-supplied instance/handle. Must be created in Secrets Manager before the source goes live (GetSecretValue-only IAM).
     "life-platform/digest",  # #1623 (2026-07-26): private milestone-digest recipient list + reply-to — real people's contact details, operator-provisioned, NEVER in git (DATA_GOVERNANCE). Digest runs disarmed (logged no-op) until Matthew creates it.
     "life-platform",  # Wildcard prefix — pipeline_health_check reads all secrets to verify they exist
 ]
@@ -230,7 +232,7 @@ def test_s4_known_secrets_count_matches_architecture():
     #   (CDK deploy-time env resolution since #815); first RUNTIME reader is the AI-quality
     #   canary, so it now needs registry membership.
     # Total = 22 actual secrets + 1 wildcard = 23.
-    EXPECTED_COUNT = 25  # #1623: +life-platform/digest (milestone-digest recipients)
+    EXPECTED_COUNT = 27  # #1676: +life-platform/bluesky +life-platform/mastodon (inbound social, epic #1668)
     actual = len(KNOWN_SECRETS)
     assert actual == EXPECTED_COUNT, (
         f"S4 FAIL: KNOWN_SECRETS has {actual} entries, expected {EXPECTED_COUNT}. "

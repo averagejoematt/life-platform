@@ -237,6 +237,43 @@ def ingestion_youtube() -> list[iam.PolicyStatement]:
     ) + [_bedrock_statement()]
 
 
+def ingestion_bluesky() -> list[iam.PolicyStatement]:
+    # #1676 (epic #1668): inbound social — Bluesky via the free, keyless public AppView
+    # feed. No paid token; the life-platform/bluesky secret holds only the handle
+    # (owner-provisioned) and is read GetSecretValue-only (the _ingestion_base default —
+    # no writeback). DDB GetItem (base default) is what the #1670 provenance membrane uses
+    # to cross-reference the BROADCAST_ORIGIN# ledger. Raw archive under raw/matthew/bluesky/*.
+    #
+    # #1673 (epic #1668): the fail-closed auto-publish sensitivity gate classifies every
+    # origin:human post at ingestion (broadcast_sensitivity_gate) before it can appear in
+    # the S4 feed. Its off-topic layer is a cheap Haiku pass via bedrock_client (ADR-062 —
+    # IAM auth, no raw key), budget-gated and fail-closed, so this role needs bedrock:InvokeModel.
+    return _ingestion_base(
+        "bluesky",
+        secret_name="life-platform/bluesky",
+        s3_prefix="raw/matthew/bluesky/*",
+    ) + [_bedrock_statement()]
+
+
+def ingestion_mastodon() -> list[iam.PolicyStatement]:
+    # #1676 (epic #1668): inbound social — Mastodon via each instance's free, keyless
+    # public REST API. No paid token; the life-platform/mastodon secret holds only the
+    # instance domain + handle (owner-provisioned) and is read GetSecretValue-only (the
+    # _ingestion_base default — no writeback). DDB GetItem (base default) is what the
+    # #1670 provenance membrane uses to cross-reference the BROADCAST_ORIGIN# ledger.
+    # Raw archive under raw/matthew/mastodon/*.
+    #
+    # #1673 (epic #1668): the fail-closed auto-publish sensitivity gate classifies every
+    # origin:human post at ingestion (broadcast_sensitivity_gate) before it can appear in
+    # the S4 feed. Its off-topic layer is a cheap Haiku pass via bedrock_client (ADR-062 —
+    # IAM auth, no raw key), budget-gated and fail-closed, so this role needs bedrock:InvokeModel.
+    return _ingestion_base(
+        "mastodon",
+        secret_name="life-platform/mastodon",
+        s3_prefix="raw/matthew/mastodon/*",
+    ) + [_bedrock_statement()]
+
+
 def ingestion_withings() -> list[iam.PolicyStatement]:
     # #499: OAuth token refresh writes back to the secret via ingestion_framework's
     # enable_secret_writeback path, which calls secretsmanager.update_secret()

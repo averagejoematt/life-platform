@@ -189,6 +189,46 @@ class IngestionStack(Stack):
             **{k: v for k, v in shared.items() if k != "alerts_topic"},
         )
 
+        # ── 3b. Bluesky — inbound social (#1676, epic #1668), hourly.
+        # Extends the youtube reference source to a second open platform: FREE, keyless
+        # public AppView feed (no paid token). The life-platform/bluesky secret
+        # (owner-provisioned) holds only the handle; until it exists the Lambda boots and
+        # no-ops cleanly. Every record is stamped `channel` + `origin` provenance (#1670
+        # membrane). UTC-fixed cron, no DST drift.
+        create_platform_lambda(
+            self,
+            "BlueskyIngestion",
+            function_name="bluesky-social-ingestion",
+            source_file="lambdas/ingestion/bluesky_lambda.py",
+            handler="ingestion.bluesky_lambda.lambda_handler",
+            schedule=f"cron(0 {INGEST_HOURLY} * * ? *)",
+            timeout_seconds=120,
+            environment={"BLUESKY_SECRET_NAME": "life-platform/bluesky"},
+            custom_policies=rp.ingestion_bluesky(),
+            alerts_topic=None,
+            **{k: v for k, v in shared.items() if k != "alerts_topic"},
+        )
+
+        # ── 3c. Mastodon — inbound social (#1676, epic #1668), hourly.
+        # Extends the youtube reference source to a third open platform: FREE, keyless
+        # public REST API (no paid token). The life-platform/mastodon secret
+        # (owner-provisioned) holds only the instance + handle; until it exists the
+        # Lambda boots and no-ops cleanly. Every record is stamped `channel` + `origin`
+        # provenance (#1670 membrane). UTC-fixed cron, no DST drift.
+        create_platform_lambda(
+            self,
+            "MastodonIngestion",
+            function_name="mastodon-social-ingestion",
+            source_file="lambdas/ingestion/mastodon_lambda.py",
+            handler="ingestion.mastodon_lambda.lambda_handler",
+            schedule=f"cron(0 {INGEST_HOURLY} * * ? *)",
+            timeout_seconds=120,
+            environment={"MASTODON_SECRET_NAME": "life-platform/mastodon"},
+            custom_policies=rp.ingestion_mastodon(),
+            alerts_topic=None,
+            **{k: v for k, v in shared.items() if k != "alerts_topic"},
+        )
+
         # ── 4. Withings — 5x daily (:05 stagger)
         withings = create_platform_lambda(
             self,
@@ -321,11 +361,12 @@ class IngestionStack(Stack):
 
         # ── 7a. Social Enrichment — 6:45 AM PT daily (#1671, epic #1668).
         # S3 of The Social Membrane: Haiku extraction over ingested inbound-social posts
-        # (youtube …) so Matthew's own public voice becomes a coach signal, riding the
-        # SAME journal enrichment path (no second pipeline). ONLY origin:human posts enter
-        # (the #1670 membrane filters platform echoes); each record is enriched IN PLACE and
-        # routed (training vs mind) by content. Runs after youtube ingestion + journal
-        # enrichment (14:30) and well before the 17:00 UTC brief. UTC-fixed, no DST drift.
+        # (youtube, bluesky, mastodon — #1676 extended the channel set) so Matthew's own
+        # public voice becomes a coach signal, riding the SAME journal enrichment path (no
+        # second pipeline). ONLY origin:human posts enter (the #1670 membrane filters
+        # platform echoes); each record is enriched IN PLACE and routed (training vs mind)
+        # by content. Runs after youtube/bluesky/mastodon ingestion + journal enrichment
+        # (14:30) and well before the 17:00 UTC brief. UTC-fixed, no DST drift.
         create_platform_lambda(
             self,
             "SocialEnrichment",
@@ -334,7 +375,7 @@ class IngestionStack(Stack):
             handler="ingestion.social_enrichment_lambda.lambda_handler",
             schedule="cron(45 14 * * ? *)",
             timeout_seconds=300,
-            environment={"ANTHROPIC_SECRET": "life-platform/ai-keys", "SOCIAL_CHANNELS": "youtube"},
+            environment={"ANTHROPIC_SECRET": "life-platform/ai-keys", "SOCIAL_CHANNELS": "youtube,bluesky,mastodon"},
             custom_policies=rp.ingestion_social_enrichment(),
             alerts_topic=None,
             **{k: v for k, v in shared.items() if k != "alerts_topic"},

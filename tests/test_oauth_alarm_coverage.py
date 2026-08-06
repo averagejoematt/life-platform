@@ -220,7 +220,7 @@ def test_oauth_facet_excludes_keyless_and_manual_sources():
     source can never emit IngestAuthHealthy=0, so alarming on it would be a sensor
     that structurally cannot fire — the dishonest-green class."""
     oauth_ids = set(reg.oauth_source_ids())
-    for keyless in ("weather", "youtube", "apple_health", "measurements", "food_delivery", "supplements"):
+    for keyless in ("weather", "youtube", "bluesky", "mastodon", "apple_health", "measurements", "food_delivery", "supplements"):
         assert keyless not in oauth_ids, f"{keyless} has no outbound credential — it must not carry the oauth facet"
     for credentialed in ("whoop", "withings", "strava", "eightsleep", "todoist", "habitify", "hevy", "garmin", "notion", "dropbox"):
         assert credentialed in oauth_ids, f"{credentialed} is a credentialed pull — it must carry the oauth facet"

@@ -546,6 +546,79 @@ SOURCE_REGISTRY = {
             "note": "per-post filename (many videos per day); a per-day feed snapshot (YYYY-MM-DD.json) is also written for audit",
         },
     },
+    # ── #1676 (epic #1668): inbound social ingestion — Bluesky, extending the youtube
+    #    reference source (#1669) to a second open platform. Same registry-resident,
+    #    facets-only shape until the owner provisions the handle (life-platform/bluesky
+    #    secret `handle` or BLUESKY_HANDLE env). Keeping freshness:False +
+    #    monitored:False + active_api:False keeps a not-yet-provisioned source off every
+    #    freshness/QA/liveness surface; flip active_api:True (and drop freshness:False)
+    #    once the handle is live and the first posts land. The raw_layout IS live from
+    #    day one because the ingestion Lambda writes per-post raw archives immediately.
+    "bluesky": {
+        "label": "Bluesky",
+        "checker_label": "Bluesky posts",
+        "desc": "Inbound social — Matthew's own Bluesky posts (public voice)",
+        "category": "Inputs",
+        "behavioral": True,  # public posting is the behavior
+        "stale_hours": None,
+        "freshness": False,  # registry-resident until the handle is provisioned (#1676)
+        "monitored": False,  # never paged; not on the public board yet
+        "active_api": False,  # keyless public AppView pull; flip True once the handle is live
+        "expected_days": None,  # sporadic — not a reconciliation source
+        "qa_tier": None,
+        "method": "Keyless public AppView pull (framework), hourly",
+        "metrics": "Posts — the outbound public voice, ingested back in",
+        "posture": "portfolio",
+        # Deliberately NO capture_channel — same #1682 rationale as youtube: a
+        # scheduled, keyless pull with no human in the capture loop must not carry
+        # one (would mislabel it a manual "you forgot to log" source).
+        # Not on the public /data/ + gear catalogues yet — the source is wired but
+        # awaits owner handle provisioning + the S4 display story (epic #1668).
+        "catalog": False,
+        # Suffixed per-post layout (many posts per day) — mirrors youtube.
+        "raw_layout": {
+            "prefix": "raw/matthew/bluesky",
+            "scheme": "date-tree",
+            "filename": "YYYY-MM-DD-<post_id>.json",
+            "note": "per-post filename (many posts per day); a per-day feed snapshot (YYYY-MM-DD.json) is also written for audit",
+        },
+    },
+    # ── #1676 (epic #1668): inbound social ingestion — Mastodon, extending the youtube
+    #    reference source (#1669) to a third open platform (alongside bluesky). Same
+    #    registry-resident, facets-only shape until the owner provisions the instance +
+    #    handle (life-platform/mastodon secret `instance`/`handle` or
+    #    MASTODON_INSTANCE/MASTODON_HANDLE env). Keeping freshness:False +
+    #    monitored:False + active_api:False keeps a not-yet-provisioned source off every
+    #    freshness/QA/liveness surface; flip active_api:True (and drop freshness:False)
+    #    once the account is live and the first posts land. The raw_layout IS live from
+    #    day one because the ingestion Lambda writes per-post raw archives immediately.
+    "mastodon": {
+        "label": "Mastodon",
+        "checker_label": "Mastodon posts",
+        "desc": "Inbound social — Matthew's own Mastodon posts (public voice)",
+        "category": "Inputs",
+        "behavioral": True,  # public posting is the behavior
+        "stale_hours": None,
+        "freshness": False,  # registry-resident until the instance/handle is provisioned (#1676)
+        "monitored": False,  # never paged; not on the public board yet
+        "active_api": False,  # keyless public REST pull; flip True once the account is live
+        "expected_days": None,  # sporadic — not a reconciliation source
+        "qa_tier": None,
+        "method": "Keyless public REST pull (framework), hourly",
+        "metrics": "Posts — the outbound public voice, ingested back in",
+        "posture": "portfolio",
+        # Deliberately NO capture_channel — same #1682 rationale as youtube.
+        # Not on the public /data/ + gear catalogues yet — the source is wired but
+        # awaits owner instance/handle provisioning + the S4 display story (epic #1668).
+        "catalog": False,
+        # Suffixed per-post layout (many posts per day) — mirrors youtube/bluesky.
+        "raw_layout": {
+            "prefix": "raw/matthew/mastodon",
+            "scheme": "date-tree",
+            "filename": "YYYY-MM-DD-<post_id>.json",
+            "note": "per-post filename (many posts per day); a per-day feed snapshot (YYYY-MM-DD.json) is also written for audit",
+        },
+    },
     "weather": {
         "label": "Weather",
         "checker_label": "Weather",

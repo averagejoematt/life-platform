@@ -1737,11 +1737,12 @@ def _handle_board_question(event: dict) -> dict:
 # filtered to the CLEARED, human-origin set. Modeled on handle_journey_timeline:
 # read-only, aggregate-only, fail-soft, one _ok() envelope.
 
-# The ingested-post partitions (#1669). Today only youtube ships (dormant until the
-# owner provisions a channel id); as more inbound channels land they append here and
-# the feed picks them up with no other change. pk = USER#matthew#SOURCE#<source>,
-# sk = DATE#<date>#<post_id>, one row per post (youtube_lambda.transform).
-_BROADCAST_SOURCES = ("youtube",)
+# The ingested-post partitions (#1669, extended #1676). All three are dormant until the
+# owner provisions their respective identity (channel id / handle / instance+handle); as
+# more inbound channels land they append here and the feed picks them up with no other
+# change. pk = USER#matthew#SOURCE#<source>, sk = DATE#<date>#<post_id>, one row per post
+# (youtube_lambda / bluesky_lambda / mastodon_lambda .transform — same shape).
+_BROADCAST_SOURCES = ("youtube", "bluesky", "mastodon")
 _BROADCAST_LIMIT = 60  # newest N cleared posts; the feed is a voice highlight, not an archive
 
 # ── S5 sensitivity gate seam — RECONCILED to #1673 (PR #1701) ────────────────────

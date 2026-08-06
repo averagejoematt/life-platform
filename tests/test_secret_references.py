@@ -75,6 +75,8 @@ KNOWN_SECRETS = {
     "life-platform/subscriber-token-secret",  # #106 (2026-05-30): dedicated HMAC signing key for subscriber tokens
     "life-platform/pexels",  # 2026-06-29: Pexels API key for editorial cover imagery (editorial_image.py)
     "life-platform/youtube",  # #1669 (epic #1668): inbound-social YouTube channel id (key `channel_id`); keyless RSS, owner-provisioned
+    "life-platform/bluesky",  # #1676 (epic #1668): inbound-social Bluesky handle (key `handle`); keyless public AppView pull, owner-provisioned
+    "life-platform/mastodon",  # #1676 (epic #1668): inbound-social Mastodon instance + handle (keys `instance`/`handle`); keyless public REST pull, owner-provisioned
     "life-platform/digest",  # #1623 (2026-07-26): milestone-digest recipients + reply-to; operator-provisioned, disarmed no-op until it exists
     # life-platform/google-calendar removed — retired ADR-030 (v3.7.46)
 }
