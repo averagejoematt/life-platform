@@ -33,7 +33,10 @@ import sys
 # PR, after verifying the suite clears the new value with headroom (a floor you
 # barely clear reds main intermittently). LOWERING it needs an explicit, justified
 # PR — coverage regressions do not get to slip in silently (ADR-080/ADR-107, #1658).
-RATCHET_FLOOR = 47
+# Ratcheted 47->53 by #2152 (2026-08-06): measured 57.1% on a green post-#2132
+# main run, 10.1pts above the old 47 floor (past the 10pt gap-warn threshold) —
+# 53 restores the same ~4pt headroom-under-measured margin #1658 used originally.
+RATCHET_FLOOR = 53
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)

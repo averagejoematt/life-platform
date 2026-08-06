@@ -705,9 +705,9 @@ read that section for the incident narrative and the exact mechanics.
 | A dependency/CDK toolchain version silently floats | Pinned-both-directions check | §4 above ("CDK toolchain is pinned both directions") |
 | A deprecated secret name still referenced | "Deprecated secrets scan" step | `.github/workflows/ci-cd.yml`, job `test` |
 | An upstream vendor API payload shape drifted | `test_upstream_contracts.py` (ER-02) | `.github/workflows/ci-cd.yml`, job `test` |
-| Line coverage regresses below the enforced floor | Coverage gate (`--cov-fail-under=40`, ADR-080) | `.github/workflows/ci-cd.yml`, job `test` |
+| Line coverage regresses below the enforced floor | Coverage gate (`--cov-fail-under=53`, ADR-080) | `.github/workflows/ci-test.yml`, job `test` |
 | The coverage floor silently lags measured coverage | Coverage-gap drift warning (#1206) | `scripts/coverage_gap_warn.py` |
-| The Unit Tests job's own wall-clock silently climbs (157s→294s→688s avg, budget raised 480→900s by #1966) | Suite-duration budget warning (#1349/#1966) | `scripts/coverage_gap_warn.py --duration-seconds`; ratchet in `tests/test_duration_budget_ratchet.py` |
+| The Unit Tests job's own wall-clock silently climbs (157s→294s→688s avg→830s avg, budget raised 480→900→1200s by #1966/#2152) | Suite-duration budget warning (#1349/#1966/#2152) | `scripts/coverage_gap_warn.py --duration-seconds`; ratchet in `tests/test_duration_budget_ratchet.py` |
 | A visible page/component regresses (layout break, blank data-bind, JS error) | Visual-QA (Playwright + Bedrock vision) | §4b above |
 | A merged repo `config/` change never reaches the S3 object the API reads ("merged but not serving") | Config-twin sync on merge + daily drift check (#2019) | `deploy/config_twin_sync.py`; `.github/workflows/config-drift.yml`; §7 above |
 | A live `config/` object a Lambda reads is stale or unowned — a writer class the repo-twin check cannot see | Config mirror ownership + freshness audit (#2057) | `deploy/config_mirror_audit.py`; `.github/workflows/config-drift.yml`; §7 above |
