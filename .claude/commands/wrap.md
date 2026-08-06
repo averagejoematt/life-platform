@@ -410,6 +410,34 @@ incident row in the session ledger; a new red could hide among the chronic ones.
   `**Alarms:** <M> uncited — named: <alarm names>`, or `**Alarms:** unverified — AWS
   unreachable`.
 
+### (e11) Standing-warning triage gate — a wrap gate, same shape as (d)/(e)/(e2)–(e10) (#1966)
+
+A `::warning::` on an otherwise-green main run is easy to normalize into background
+noise precisely BECAUSE main still reads green — #1966's own finding is the proof: the
+#1349 suite-duration warner tripped on a green run and the optimize-or-raise decision
+sat unactioned for a week with nothing obligated to look at it.
+
+- Run:
+  ```bash
+  python3 scripts/check_ci_warnings.py
+  ```
+  It reads the check-run annotations GitHub attached to the latest **green** completed
+  CI/CD run on main (read-only, no writes) and lists every `annotation_level ==
+  "warning"` it finds — e.g. the #1349 coverage-gap/duration-budget warnings, or any
+  future one. A not-yet-green newest run reads as "nothing to triage yet" (that's step
+  (e2)'s job, not this one's).
+- For each warning printed: file an issue for it (ADR-099 shape, cite it in the
+  handover) or make the deliberate no-action call THIS session and write the one-line
+  reason into the handover — then re-run with `--decoded` to close this step honestly
+  (same contract as (e2)'s `check_main_green.py --decoded`). Do not leave a printed
+  warning unfixed AND unacknowledged.
+- **GitHub-unreachable degrade:** if the API can't be reached, the script prints
+  `UNVERIFIED` and exits 0 on its own — note that in the handover rather than claiming a
+  clean board (mirrors (e10)'s AWS-unreachable shape).
+- The handover carries one line either way: `**CI warnings:** none`, `**CI warnings:**
+  <N> — <one-line triage per warning>`, or `**CI warnings:** unverified — GitHub
+  unreachable`.
+
 ### (f) Commit the wrap
 
 Stage the repo-tracked wrap artifacts only (memory-dir changes from step (c) are outside
@@ -471,3 +499,7 @@ session — status block, handover, build beat (9 R22 smalls #836–#845)`).
   before the wrap commit; an alarm printed uncited gets a `docs/alarm_citations.json`
   entry or an explicit named line in the handover — never left both unfixed and
   unacknowledged.
+- **A `::warning::` on green main gets triaged, or the wrap names it, never silence
+  (#1966).** Step (e11): `scripts/check_ci_warnings.py` must exit 0 (clean or
+  `--decoded`) before the wrap commit; a warning printed untriaged gets an issue or an
+  explicit named decision in the handover — never left both unfixed and unacknowledged.

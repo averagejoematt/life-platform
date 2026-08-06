@@ -1,6 +1,6 @@
 # CONVENTIONS — the load-bearing reflexes
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-02
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-04
 
 The single canonical home for the hard-won operational reflexes that keep a deploy
 from silently regressing production. Each one was learned from a real incident. When
@@ -680,6 +680,8 @@ read that section for the incident narrative and the exact mechanics.
 | `Now` sits at zero actionable stories, or a `Later` issue ages past 60d with nobody calling promote-or-close | Now-refill + `Later` sweep (#1870), step (e9) | `scripts/backlog_next.py`; `.claude/commands/wrap.md` step (e9) |
 | A memory topic file exists un-indexed from `MEMORY.md`/`project_shipped_archive.md` | Orphan/broken-link gate (#1259), step (c) | inline bash loop, `.claude/commands/wrap.md` step (c) |
 | A `MEMORY.md` index correction didn't carry through to the topic file's body | Body-follows-index gate (#1342), step (c) | `scripts/check_memory_body_facts.py` |
+| A CloudWatch alarm sits in ALARM >72h with no citation, normalizing among the chronic reds | Alarm-citation gate (#1959), step (e10) | `scripts/check_alarm_citations.py`; `docs/alarm_citations.json` |
+| A `::warning::` annotation on green main (e.g. the duration-budget warner below) goes untriaged | Standing-warning triage gate (#1966), step (e11) | `scripts/check_ci_warnings.py` |
 
 **CI gates** (`.github/workflows/ci-cd.yml` unless noted — every push to `main` or a PR):
 
@@ -692,7 +694,7 @@ read that section for the incident narrative and the exact mechanics.
 | An upstream vendor API payload shape drifted | `test_upstream_contracts.py` (ER-02) | `.github/workflows/ci-cd.yml`, job `test` |
 | Line coverage regresses below the enforced floor | Coverage gate (`--cov-fail-under=40`, ADR-080) | `.github/workflows/ci-cd.yml`, job `test` |
 | The coverage floor silently lags measured coverage | Coverage-gap drift warning (#1206) | `scripts/coverage_gap_warn.py` |
-| The Unit Tests job's own wall-clock silently climbs (157s→294s, no reminder) | Suite-duration budget warning (#1349) | `scripts/coverage_gap_warn.py --duration-seconds` |
+| The Unit Tests job's own wall-clock silently climbs (157s→294s→688s avg, budget raised 480→900s by #1966) | Suite-duration budget warning (#1349/#1966) | `scripts/coverage_gap_warn.py --duration-seconds`; ratchet in `tests/test_duration_budget_ratchet.py` |
 | A visible page/component regresses (layout break, blank data-bind, JS error) | Visual-QA (Playwright + Bedrock vision) | §4b above |
 | A merged repo `config/` change never reaches the S3 object the API reads ("merged but not serving") | Config-twin sync on merge + daily drift check (#2019) | `deploy/config_twin_sync.py`; `.github/workflows/config-drift.yml`; §7 above |
 | A live `config/` object a Lambda reads is stale or unowned — a writer class the repo-twin check cannot see | Config mirror ownership + freshness audit (#2057) | `deploy/config_mirror_audit.py`; `.github/workflows/config-drift.yml`; §7 above |
