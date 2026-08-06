@@ -17,7 +17,7 @@
 | Smoke (post-deploy) | `tests/smoke_test_site.sh` + `qa-smoke` Lambda | ~30s | Yes, after each deploy |
 | Manual | Browser checks, MCP tool dispatch | Variable | No |
 
-**Total tests:** 8712 `def test_` functions (auto-synced by `deploy/sync_doc_metadata.py`; do not hand-edit this number).
+**Total tests:** 8741 `def test_` functions (auto-synced by `deploy/sync_doc_metadata.py`; do not hand-edit this number).
 
 ---
 
@@ -38,7 +38,7 @@ python3 -m pytest tests/ --durations=20
 # Duration budget (#1847): the full offline suite runs in ~2.5 min locally
 # (7,544 tests, 2026-07-26); the slowest single test is ~18s. If a run blows
 # past ~5 min, something regressed — profile with --durations before merging.
-# CI's Unit-Tests job warns at 1200s via scripts/coverage_gap_warn.py (#1349/#2152).
+# CI's Unit-Tests job warns at 480s via scripts/coverage_gap_warn.py (#1349).
 # Known failure shape: a test that hangs SILENTLY while memory climbs is a
 # mock-fed infinite loop (e.g. DDB pagination on a truthy MagicMock
 # LastEvaluatedKey, #1847/#1849) — it OOM-kills CI runners with
@@ -112,17 +112,6 @@ there is no layer version to keep consistent). The surviving invariant:
 ### 9. Type/style ratchets
 - `test_handler_type_hints.py` — handlers have type hints (rolling allowlist of legacy handlers)
 - `test_logger_discipline.py` — Lambdas use `platform_logger` (not bare `print`)
-- `test_coverage_floor_ratchet.py` — the **two** coverage ratchets (ADR-080/ADR-107, #1658):
-  - `RATCHET_FLOOR` — the enforced `--cov-fail-under` gate, up-only, asserted equal
-    across `pyproject.toml`, the CI workflow, and the gap-warner's `--floor`.
-  - `RATCHET_HIGH_WATER` — **measured** line coverage as of the last raise. The floor
-    sits a few points below measured on purpose (anti-flap headroom), and that headroom
-    used to be a free hole: coverage could be deleted down into it with every gate green.
-    CI now feeds this mark to `coverage_gap_warn.py --high-water --fail-on-regression`,
-    which **exits 1** when measured drops >1.5pt below it. Going *above* the mark only
-    warns that it's stale — improving coverage is never blocked.
-  - To raise either: re-measure with CI's exact invocation, then bump the constant and
-    the workflow literal in the same PR (the test fails if they drift).
 
 ### 10. Site-API route tests (`test_site_api_routes.py`)
 - Every route in `_SIMPLE_ROUTES` and `ROUTES` is dispatched

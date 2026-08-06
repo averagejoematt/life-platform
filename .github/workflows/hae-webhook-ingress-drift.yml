@@ -1,0 +1,74 @@
+# health-ingest single-ingress gate (#1946).
+#
+# A pre-IaC console-created HTTP API (health-auto-export-api, id a76xwxt2wa,
+# "tags": {} — no CloudFormation owner) coexisted with the CDK-managed one for
+# months after the July IaC cutover, each holding its own apigateway-invoke
+# grant on the health-auto-export-webhook Lambda (the orphan's scoped to a
+# wildcard /*/*, the CDK one to the declared /*/*/ingest route). The cutover
+# itself was measured complete (zero traffic on the orphan, 7 days) — only the
+# teardown was never executed, leaving an unmanaged, untagged, unmonitored
+# public ingress for personal health data with no drift detection covering it.
+#
+# Read-only: the check only does lambda:GetPolicy and
+# cloudformation:ListStackResources. It never writes AWS. A red run is the
+# alarm — fix it with `python3 deploy/teardown_hae_orphan_api.py --apply`
+# (owner-run, dry-run by default) from main.
+#
+# Deliberately its own workflow rather than living inside the weekly drift
+# sentinel step in remediation-agent.yml — that step runs `continue-on-error:
+# true` (it triages, it doesn't gate) and only on Mondays. This mirrors
+# config-drift.yml instead: scheduled, blocking, narrow in scope.
+#
+# Role: github-actions-remediation-role, not the deploy role. #903 deliberately
+# shed the read-only diagnosis surface (including any lambda:Get*Policy-shaped
+# read) OUT of the deploy role — "this role keeps only deploy-mutate + the
+# reads a deploy/plan/post-deploy step actually makes" (infra/iam/README.md).
+# A resource-policy read for a drift GATE is diagnosis, so it belongs on the
+# remediation role (same identity drift_sentinel already runs under weekly),
+# scoped to just this one function's GetPolicy — see
+# infra/iam/github-actions-remediation-role.permissions.json's
+# HaeWebhookIngressCheck statement (STAGED — see infra/iam/README.md for the
+# one-line attended apply this PR does NOT execute).
+
+name: HAE webhook ingress drift
+
+on:
+  schedule:
+    - cron: '10 16 * * *'   # 09:10 PT — after the daily brief's ingestion window
+  workflow_dispatch: {}
+#
+# No `pull_request` trigger on purpose — same reasoning as config-drift.yml.
+# This checks LIVE AWS state (the deployed Lambda's resource policy + the
+# deployed CDK stack's API id), which a PR's repo bytes can't speak to before
+# it merges and deploys.
+
+env:
+  AWS_REGION: us-west-2
+  AWS_ACCOUNT_ID: "205930651321"
+
+permissions:
+  id-token: write   # OIDC token for AWS
+  contents: read
+
+concurrency:
+  group: hae-webhook-ingress-drift-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  drift:
+    name: health-auto-export-webhook single-ingress parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # setup-python + configure-aws-credentials via the shared composite (#1655).
+      # remediation-role, not deploy-role — see the note above.
+      - uses: ./.github/actions/setup-ci
+        with:
+          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-remediation-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Ingress parity check (read-only, blocking)
+        run: |
+          pip install --quiet boto3   # setup-ci installs no packages; without this the check dies on import, not on drift
+          python3 deploy/check_hae_webhook_ingress_drift.py --strict

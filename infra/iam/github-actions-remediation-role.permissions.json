@@ -45,6 +45,12 @@
       "Resource": "*"
     },
     {
+      "Sid": "HaeWebhookIngressCheck",
+      "Effect": "Allow",
+      "Action": "lambda:GetPolicy",
+      "Resource": "arn:aws:lambda:us-west-2:205930651321:function:health-auto-export-webhook"
+    },
+    {
       "Sid": "IAMRoleRead",
       "Effect": "Allow",
       "Action": [
