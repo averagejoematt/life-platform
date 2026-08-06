@@ -36,9 +36,13 @@ import re
 # #1966 (2026-08-04): raised 480 -> 900 after 6 sampled green-main runs measured
 # 641-725s (avg ~688s) against a 9,396+-test suite with no dominating outlier in
 # `pytest --durations=25` (honest broad growth, not a few slow tests) — 900s is
-# ~24% headroom above the observed max. See ci-test.yml's comment for the full
+# ~24% headroom above the observed max.
+# #2152 (2026-08-06): the 900s budget breached same-day (985s) after the same
+# session merged ~200 more tests — raised 900 -> 1200 after sampling ALL 8
+# green-main "Unit Tests" runs in the post-#2132 era: 704/945/745/745/922/764/
+# 985/833s (avg ~830s, max 985s). See ci-test.yml's comment for the full
 # derivation.
-BUDGET_SECONDS = 900
+BUDGET_SECONDS = 1200
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)

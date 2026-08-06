@@ -157,11 +157,12 @@ jobs:
       - name: Test coverage gate (regression floor, ADR-080)
         # ENFORCED regression floor. The codebase is integration-tested (handlers
         # run live; most offline tests are structural/contract), so measured offline
-        # line coverage is ~51% (6551-test suite, 2026-07-22 — up from the stale
-        # 45.6%/~3000-test figure). This floor (47%) prevents BACKSLIDING with ~4pt
-        # headroom under measured so normal fluctuation doesn't red main — it is not
-        # a quality bar. Ratcheted 40→47 by #1658 (lineage: #419 9%→25%, #1206 25→40);
-        # keep ratcheting up (ADR-080/ADR-107). The floor is CANONICAL in
+        # line coverage is 57.1% (post-#2132-era green-main run, 2026-08-06 — up
+        # from the stale 51%/6551-test figure). This floor (53%) prevents
+        # BACKSLIDING with ~4pt headroom under measured (same margin #1658 used at
+        # 47/51) so normal fluctuation doesn't red main — it is not a quality bar.
+        # Ratcheted 40→47 by #1658, 47→53 by #2152 (lineage: #419 9%→25%, #1206
+        # 25→40); keep ratcheting up (ADR-080/ADR-107). The floor is CANONICAL in
         # pyproject.toml `[tool.coverage.report] fail_under`; the explicit
         # `--cov-fail-under` below is belt-and-suspenders and MUST match it —
         # tests/test_coverage_floor_ratchet.py fails if the two (and the gap-warn
@@ -175,7 +176,7 @@ jobs:
               --cov=lambdas --cov=mcp \
               --cov-report=term-missing:skip-covered \
               --cov-report=xml:coverage.xml \
-              --cov-fail-under=47 \
+              --cov-fail-under=53 \
               -q 2>&1 | tail -100
           echo "::endgroup::"
 
@@ -183,34 +184,33 @@ jobs:
         # Advisory, fail-open. Two independent checks in one script (both never
         # fail the build; keep `if: always()`):
         #  (1) #1206: parses coverage.xml's line-rate and emits a GitHub
-        #      ::warning:: when the enforced floor (40) lags measured line
-        #      coverage by >10 points, so the ratchet reminds a human to bump it.
-        #  (2) #1349/#1966: computes this job's own wall-clock from the
+        #      ::warning:: when the enforced floor lags measured line coverage
+        #      by >10 points, so the ratchet reminds a human to bump it.
+        #  (2) #1349/#1966/#2152: computes this job's own wall-clock from the
         #      start-epoch stamped above and warns when it exceeds the budget
         #      below — same self-reminding-ratchet shape, applied to suite cost.
-        #      BUDGET DERIVATION (#1966, 2026-08-04 — measure-first, not plucked):
-        #      the suite grew 5,108->8,059->9,396+ tests in the ~3 weeks since
-        #      #1349 shipped, honestly and broadly (a `--durations=25` run that
-        #      same day showed no dominating outlier — the slowest single test
-        #      was 6.25s out of a 162s local run, ~3.9% of the total — so this is
-        #      per-test overhead compounding at scale, not a few pathological
-        #      sleeps/waits to trim). 6 sampled green-main "Unit Tests" job runs
-        #      that day measured 641s/649s/690s/701s/723s/725s (avg ~688s, max
-        #      725s) against the then-480s budget — already 33-51% over. 900s
-        #      (15min) = ~24% headroom above the observed max / ~31% above the
-        #      average, enough to absorb a few more weeks of the same honest
-        #      growth curve without flapping on every green run, while still
-        #      catching a genuine future regression (e.g. an unmocked wait a new
-        #      test accidentally introduces). The #1966 standing-warning triage
-        #      gate (`scripts/check_ci_warnings.py`, /wrap step (e11)) now also
-        #      obligates a same-session decision the next time this fires, so a
-        #      re-breach can no longer sit unactioned for a week like #1966's own
-        #      finding did.
+        #      BUDGET DERIVATION (#2152, 2026-08-06 — measure-first, not
+        #      plucked): #1966 raised 480->900s from a 6-run sample hours before
+        #      the same session merged ~200 more tests, breaching the new budget
+        #      (985s) within the day — proof a budget derived from one point-in-
+        #      time sample goes stale fast under this suite's growth rate. This
+        #      re-derivation samples EVERY green-main "Unit Tests" job run in the
+        #      post-#2132 era (8 runs, 2026-08-05/06, via the GitHub API):
+        #      704s/945s/745s/745s/922s/764s/985s/833s (avg ~830s, max 985s) —
+        #      the max alone already exceeds the 900s budget it's replacing.
+        #      1200s (20min) = ~22% headroom above the observed max / ~45% above
+        #      the average — enough to absorb several more weeks of the same
+        #      honest growth curve without flapping on every green run, while
+        #      still catching a genuine future regression (e.g. an unmocked
+        #      wait a new test accidentally introduces). The #1966
+        #      standing-warning triage gate (`scripts/check_ci_warnings.py`,
+        #      /wrap step (e11)) still obligates a same-session decision the
+        #      next time this fires.
         if: always()
         run: |
           DURATION_SECONDS=$(( $(date +%s) - "${UNIT_TESTS_START_EPOCH:-$(date +%s)}" ))
-          python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 47 --gap-threshold 10 \
-              --duration-seconds "$DURATION_SECONDS" --duration-budget-seconds 900
+          python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 53 --gap-threshold 10 \
+              --duration-seconds "$DURATION_SECONDS" --duration-budget-seconds 1200
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

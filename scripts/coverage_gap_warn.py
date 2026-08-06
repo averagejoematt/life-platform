@@ -22,7 +22,12 @@ THE PROBLEM THIS SOLVES:
   (deliberate headroom above the measured range, not a re-derivation of 480 from
   scratch) and #1966 also added the standing-warning triage gate
   (`scripts/check_ci_warnings.py`, /wrap step (e11)) so the NEXT breach can't sit
-  unactioned the way this one did.
+  unactioned the way this one did. It didn't hold long: the SAME session then
+  merged ~200 more tests and breached the new 900s budget too (985s), proof the
+  gate does its job (#2152, 2026-08-06). Re-derived from ALL 8 green-main runs in
+  the post-#2132 era (704-985s, avg ~830s) — budget moved to 1200s (~22%
+  headroom above the observed max / ~45% above the average). See ci-test.yml's
+  comment for the full derivation.
 
 WHAT IT DOES:
   (1) Coverage floor drift: parses the `line-rate` attribute off the <coverage>
@@ -31,11 +36,11 @@ WHAT IT DOES:
       and emits a GitHub Actions `::warning::` annotation when the gap exceeds a
       threshold (default 10 points) — so a human is reminded to ratchet the floor
       up.
-  (2) Suite-duration budget (optional, #1349, raised #1966): when
+  (2) Suite-duration budget (optional, #1349, raised #1966, re-raised #2152): when
       `--duration-seconds` is passed (the caller measures its own job
       wall-clock — this script has no way to observe it), emits a `::warning::`
       when the measured duration exceeds `--duration-budget-seconds` (default
-      900s / 15min, derived #1966 — see ci-test.yml's comment for the
+      1200s / 20min, derived #2152 — see ci-test.yml's comment for the
       measure-first derivation) — the same self-reminding-ratchet shape as (1),
       applied to suite cost instead of coverage.
   It NEVER fails the build: every error path (missing file, unparseable XML,
@@ -47,7 +52,7 @@ USAGE:
   python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 40
   python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 40 --gap-threshold 10
   python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 40 \
-      --duration-seconds 688 --duration-budget-seconds 900
+      --duration-seconds 830 --duration-budget-seconds 1200
 
 EXIT CODE: always 0 (advisory; a parse blip must never red the build).
 """
@@ -57,16 +62,16 @@ import sys
 import xml.etree.ElementTree as ET
 from typing import Optional
 
-# The suite-duration budget's canonical default (#1349, raised #1966 — see the
-# ci-test.yml comment and coverage_gap_warn.py's module docstring above for the
-# measure-first derivation). ci-test.yml always passes --duration-budget-seconds
-# explicitly, so this default only matters for a bare/manual invocation — but it
-# is also the THIRD literal in the #1349-style ratchet (mirrors the coverage
-# floor's three-literal pattern): tests/test_duration_budget_ratchet.py asserts
-# this constant, the ci-test.yml literal, and its own committed high-water mark
-# all agree, so the three can't silently drift apart the way the coverage floor
-# could before #1658.
-DEFAULT_DURATION_BUDGET_SECONDS = 900.0
+# The suite-duration budget's canonical default (#1349, raised #1966, re-raised
+# #2152 — see the ci-test.yml comment and coverage_gap_warn.py's module docstring
+# above for the measure-first derivation). ci-test.yml always passes
+# --duration-budget-seconds explicitly, so this default only matters for a
+# bare/manual invocation — but it is also the THIRD literal in the #1349-style
+# ratchet (mirrors the coverage floor's three-literal pattern):
+# tests/test_duration_budget_ratchet.py asserts this constant, the ci-test.yml
+# literal, and its own committed high-water mark all agree, so the three can't
+# silently drift apart the way the coverage floor could before #1658.
+DEFAULT_DURATION_BUDGET_SECONDS = 1200.0
 
 
 def parse_line_rate_pct(coverage_xml_path: str) -> Optional[float]:
@@ -118,7 +123,7 @@ def evaluate_duration(measured_seconds: Optional[float], budget_seconds: float) 
         return (
             f"Unit Tests job took {measured_seconds:.0f}s, over the {budget_seconds:.0f}s budget "
             f"({measured_seconds - budget_seconds:.0f}s over). Suite wall-clock has climbed before "
-            f"(157s -> 294s -> 688s avg, #1349/#1966) — this run's /wrap must triage it "
+            f"(157s -> 294s -> 688s avg -> 830s avg, #1349/#1966/#2152) — this run's /wrap must triage it "
             f"(scripts/check_ci_warnings.py, step (e11)): investigate slow tests, or raise the budget "
             f"deliberately again with the same measure-first rationale."
         )
