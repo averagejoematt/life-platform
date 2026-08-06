@@ -362,6 +362,93 @@ def _sweep_chronicles(s3):
     return out
 
 
+def _current_attempt():
+    """Which experiment attempt today belongs to — the highest key in the same
+    CYCLE_GENESES registry /api/wall renders from. Imported lazily and fail-soft: an
+    unavailable attempt number omits ", attempt N" from the caption, which is honest.
+    Guessing one would not be."""
+    try:
+        from web.site_api_data import CYCLE_GENESES
+
+        return max(CYCLE_GENESES) if CYCLE_GENESES else None
+    except Exception as e:  # pragma: no cover — import-environment guard
+        print(f"[moments] fingerprint attempt number unavailable ({e}); caption omits it")
+        return None
+
+
+def _fingerprint_metrics(stats):
+    """Indirection over the Pillow-carrying og module (mirrors `build_moment_card`), so
+    the sweep's contract — dating, captioning, the syndicatable flag — is testable
+    without PIL installed."""
+    from web import og_image_lambda as og
+
+    return og.fingerprint_metrics(stats)
+
+
+def _fingerprint_card(stats):
+    """The unchanged #1379 card, drawn by the same function the page card uses."""
+    from web import og_image_lambda as og
+
+    return og.build_fingerprint(stats)
+
+
+def _sweep_fingerprint(s3, stats):
+    """#1402: the day's Daily Fingerprint, dated and made postable.
+
+    The card itself is unchanged — `og_image_lambda.build_fingerprint` draws it, exactly
+    as it does for /assets/images/og-fingerprint.png. What this adds is permanence and a
+    caption: the page card is overwritten every day, so a share of it silently starts
+    pointing at a different day's mark. Here it gets a dated permalink and a dated PNG
+    that never move, plus the deterministic provenance caption from
+    `content.fingerprint_broadcast`.
+
+    A warming-up day (too few signals to earn the glow) still gets both artifacts — the
+    sparse mark IS the honest render and the archive should have no holes — but comes
+    back flagged `syndicatable: false` so no poster offers it (#1629 non-negotiable 11).
+
+    Posting stays a human act: nothing here posts, and the payload's
+    `automated_syndication` field records that ADR-140 rule 5 forbids an automated
+    surface from doing so. Fail-soft, like every other class: an error here never blocks
+    the daily page cards.
+    """
+    try:
+        from content import fingerprint_broadcast as fb
+
+        from web.fingerprint import SIGNAL_COUNT, build_mark
+
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        mark = build_mark(today, _fingerprint_metrics(stats))
+        payload = fb.build_broadcast(
+            date_str=today,
+            mark=mark,
+            stats=stats,
+            total_signals=SIGNAL_COUNT,
+            attempt=_current_attempt(),
+            generated_at=datetime.now(timezone.utc).isoformat(),
+        )
+
+        shell = _shell_html(
+            "the daily fingerprint",
+            f"The mark for {today}",
+            f"A deterministic mark of {today} — {payload['signals_reported']} of {payload['signals_tracked']} tracked signals reported.",
+            f"day mark · {today}",
+            fb.shell_body_html(payload),
+            payload["permalink"],
+            payload["card_url"],
+            f"{SITE_BASE}/data/wall/",
+        )
+        url = _put_moment(s3, "fingerprint", today, _fingerprint_card(stats), shell)
+        if url != payload["permalink"]:  # pragma: no cover — key/URL contract guard
+            print(f"[moments] fingerprint permalink mismatch: put {url} vs payload {payload['permalink']}")
+        print(
+            f"[moments] fingerprint {today}: {payload['signals_reported']}/{payload['signals_tracked']} signals, syndicatable={payload['syndicatable']}"
+        )
+        return payload
+    except Exception as e:
+        print(f"[moments] fingerprint sweep skipped: {e}")
+        return None
+
+
 def sweep_moments(s3, stats):
     """Run all moment classes; write the index the share buttons read."""
     index = {
@@ -371,11 +458,14 @@ def sweep_moments(s3, stats):
         "predictions": _sweep_predictions(s3),
         "chronicles": _sweep_chronicles(s3),
         "wrong": _sweep_wrong(s3),  # #1377 — the graded-failure obituary feed
+        "fingerprint": _sweep_fingerprint(s3, stats),  # #1402 — the day's dated mark + caption
     }
     _put(s3, f"{MOMENTS_PREFIX}index.json", json.dumps(index).encode("utf-8"), "application/json", cache="max-age=300")
     n = (1 if index["week"] else 0) + len(index["qa"]) + len(index["predictions"]) + len(index["chronicles"]) + len(index["wrong"])
+    n += 1 if index["fingerprint"] else 0
     print(
         f"[moments] swept {n} moment(s): week={bool(index['week'])} qa={len(index['qa'])} "
-        f"predictions={len(index['predictions'])} chronicles={len(index['chronicles'])} wrong={len(index['wrong'])}"
+        f"predictions={len(index['predictions'])} chronicles={len(index['chronicles'])} wrong={len(index['wrong'])} "
+        f"fingerprint={bool(index['fingerprint'])}"
     )
     return index
