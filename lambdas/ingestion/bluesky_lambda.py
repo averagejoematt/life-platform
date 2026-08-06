@@ -316,7 +316,7 @@ def transform(raw, date_str):
 # ── Lambda entry point ─────────────────────────────────────────────────────────────
 
 
-def lambda_handler(event, context):
+def lambda_handler(event: dict, context) -> dict:
     if isinstance(event, dict) and event.get("healthcheck"):
         return {"statusCode": 200, "body": "ok"}
     try:
