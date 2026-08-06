@@ -118,6 +118,14 @@ SSM_SURGE_PARAM = os.environ.get("SURGE_ACTIVE_PARAM", "/life-platform/surge-act
 _TEMP_CEILING_WINDOW = (date(2026, 7, 1), date(2026, 8, 1))  # [start, end)
 _TEMP_CEILING_USD = 115.0
 _TEMP_SURGE_CEILING_USD = 135.0
+# One sentence of WHY, carried in the breakdown payload so a public receipt can
+# explain its own raised ceiling instead of leaving the delta unattributed
+# (#1999). Reader-facing prose: no dollar figures (the payload carries those),
+# no operator jargon.
+_TEMP_CEILING_REASON = (
+    "A one-month raise Matthew approved on 2026-07-21 (ADR-133 amendment) so the reader-facing "
+    "AI would come back on for the rest of July instead of staying paused. It reverts on its own date."
+)
 # An explicit MONTHLY_CEILING_USD in the environment is an operator override and
 # defeats the window entirely — otherwise setting the env var during July would
 # silently do nothing, which is the sort of surprise that costs an afternoon.
@@ -356,6 +364,42 @@ def _active_ceilings() -> tuple[float, float]:
     return MONTHLY_CEILING, SURGE_CEILING_USD
 
 
+def _active_ceiling_window():
+    """Descriptor for the dated temp-ceiling window in effect today, or None.
+
+    #1999: `_active_ceilings()` returns the pair but not WHY it differs from the
+    module defaults, so a raised base rendered on the public receipt as an
+    unexplained delta (the module base literal, a higher ceiling in effect, and
+    surge_active false — every number honest, the mechanism invisible). This is
+    the missing attribution:
+    the window's dates, the pair it imposes, the pair it reverts to, and one
+    sentence of reason, all derived from the same constants `_active_ceilings()`
+    reads so the two can never disagree.
+
+    Returns None when no window is active — including when an operator
+    MONTHLY_CEILING_USD override has defeated the window entirely, matching
+    `_active_ceilings()` exactly (an override means the window is NOT what set
+    today's ceiling, so claiming it would be the same lie in the other
+    direction).
+    """
+    if _CEILING_ENV_OVERRIDE:
+        return None
+    start, end = _TEMP_CEILING_WINDOW
+    if not (start <= datetime.now(timezone.utc).date() < end):
+        return None
+    return {
+        "start": start.isoformat(),
+        # Exclusive by construction (the comparison above is `< end`); named so a
+        # consumer can't render an off-by-one last day.
+        "end_exclusive": end.isoformat(),
+        "base_ceiling": _TEMP_CEILING_USD,
+        "surge_ceiling": _TEMP_SURGE_CEILING_USD,
+        "reverts_to_base_ceiling": MONTHLY_CEILING,
+        "reverts_to_surge_ceiling": SURGE_CEILING_USD,
+        "reason": _TEMP_CEILING_REASON,
+    }
+
+
 def _effective_ceiling(recent_uniques) -> tuple[float, bool]:
     """(ceiling, surge_active) from the trailing 7-day unique-visitor count.
 
@@ -466,9 +510,19 @@ def _write_breakdown(
     rule (ADR-133, #739) — `ceiling` is the EFFECTIVE ceiling this run used
     (may be SURGE_CEILING_USD), so the brief's headroom line is always honest
     about what limit is actually in effect.
+
+    `base_ceiling`/`surge_ceiling`/`ceiling_window` (#1999) are the ADR-133
+    ENVELOPE the effective ceiling was drawn from. Without them the payload
+    stated a single number and left every consumer to hardcode the base
+    literal — which is how a raised July base reached the public receipt as an
+    unexplained ceiling delta with `surge_active: false`. Publishing the pair
+    plus the window descriptor makes the receipt self-explaining, and demotes
+    each consumer's literal to a fail-closed fallback for the window between a
+    ceiling change and the governor's next 8h run.
     """
     if ceiling is None:
         ceiling = MONTHLY_CEILING
+    base_ceiling, surge_ceiling = _active_ceilings()
     payload = {
         "tier": int(tier),
         "mtd": round(mtd, 2),
@@ -480,6 +534,14 @@ def _write_breakdown(
         "surge_active": bool(surge_active),
         "recent_uniques": recent_uniques,
         "surge_threshold": SURGE_UNIQUES_THRESHOLD,
+        "base_ceiling": base_ceiling,
+        # Floored at the base exactly as _effective_ceiling() floors it, so the
+        # payload can never advertise a surge ceiling BELOW the base — a pair the
+        # enforcement path would never actually use.
+        "surge_ceiling": max(surge_ceiling, base_ceiling),
+        # None when no dated window is in effect (the normal case) — the key is
+        # always present so a consumer distinguishes "no window" from "old payload".
+        "ceiling_window": _active_ceiling_window(),
     }
     try:
         _ssm.put_parameter(Name=SSM_BREAKDOWN_PARAM, Value=json.dumps(payload), Type="String", Overwrite=True)
