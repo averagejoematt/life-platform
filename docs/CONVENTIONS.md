@@ -375,6 +375,19 @@ never re-diagnose them as ordinary red/green:
    a dispatch has no push diff, so change detection would otherwise deploy nothing).
    **Do NOT salt the concurrency group** — see the ledger below.
 
+   **Last-mile alerting (#2149).** #2052 proved detection but a red scheduled workflow
+   is a passive channel — the 2026-08-05 stranded-approval recurrence (#5 in the
+   session-status block, distinct from this ledger's #5) went red 6× over ~9h with no
+   human paged until a manual run. `deploy-wedge-watch.yml`'s classify step now runs
+   `--alert`: on a CONFIRMED wedge/stranded-approval it fires the same
+   `repository_dispatch` `urgent_alarm` event `remediation_dispatcher_lambda.py`
+   already fires for urgent CloudWatch alarms, so `remediation-agent.yml`'s existing
+   curated-email path pages the operator — no new channel. Throttled to one alert per
+   episode via a GitHub issue marker (label `deploy-wedge-alert`), not an AWS-written
+   marker — this workflow holds no AWS credentials and gains none for this. Throttle/
+   payload logic: `alert_candidate`/`should_fire_alert`/`build_dispatch_payload`/
+   `maybe_alert` in `check_deploy_wedge.py`, tested in `tests/test_deploy_wedge_alert_2149.py`.
+
 #### The recurrence ledger — five wedges, four fixes, what each one bought
 
 Kept here so the sixth is diagnosed in minutes instead of re-derived from scratch. Every
