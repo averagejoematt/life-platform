@@ -105,16 +105,27 @@ CALORIE_TARGET = 1800
 
 
 def fetch_range(source, start, end):
+    """Every record for `source` in [start, end], read PER-SOURCE cross-phase (#2150).
+
+    Drives the 30d current-vs-prior-month comparison arms and the 60-day Strava
+    Banister window. In a reset month the prior-month arm sat entirely pre-genesis
+    and blanked, and the load model computed over a stub window — same defect class
+    as #2109's compute-layer readers, fixed the same way: the include_pilot decision
+    is derived per source from `phase_taxonomy` rather than fixed here, since this
+    function is also (indirectly, via its only caller's source list) never asked for
+    an EXPERIMENT_SCOPED source today but must not silently widen if it ever is.
+    """
     try:
-        # ADR-058: phase=pilot hidden by default.
-        from experiment.phase_filter import with_phase_filter
+        # ADR-058: phase=pilot hidden by default unless the source reads cross-phase.
+        from experiment.phase_filter import source_reads_cross_phase, with_phase_filter
 
         r = table.query(
             **with_phase_filter(
                 {
                     "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
                     "ExpressionAttributeValues": {":pk": f"USER#{USER_ID}#SOURCE#{source}", ":s": f"DATE#{start}", ":e": f"DATE#{end}"},
-                }
+                },
+                include_pilot=source_reads_cross_phase(source),
             )
         )
         return [d2f(i) for i in r.get("Items", [])]
