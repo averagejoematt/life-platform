@@ -450,10 +450,17 @@ export async function renderExperiments(d) {
     // #1983 — a citation is a clickable record or an explicit "no direct study",
     // never bare prose. Silence used to mean both "we never linked it" and "no study
     // exists"; the reader could not tell those apart.
+    // #2151 — a hover-only `title` never reaches a touch reader. Follows the
+    // Evidence Bar's established idiom (evidence_bar.js/evb-tip): a focusable
+    // wrapper + a panel shown on :hover/:focus/:focus-within (CSS only, no
+    // wiring) — tapping focuses the span exactly like tapping a link.
+    const noteTxt = x.citation_note && !isBad(x.citation_note) ? String(x.citation_note).trim() : "";
     const link = x.source_url
       ? ` · <a class="supp-ev-link" href="${esc(x.source_url)}" target="_blank" rel="noopener">evidence ↗</a>`
       : noStudy
-        ? ` · <span class="supp-ev-nostudy" title="${esc(x.citation_note || "")}">no direct study</span>`
+        ? (noteTxt
+            ? ` · <span class="supp-ev-nostudy" tabindex="0" role="img" aria-label="${esc(`no direct study — ${noteTxt}`)}">no direct study<span class="supp-tip" role="tooltip"><span class="supp-tip-l">${esc(noteTxt)}</span></span></span>`
+            : ` · <span class="supp-ev-nostudy">no direct study</span>`)
         : "";
     // Reader participation: vote for which pipeline experiment runs next + get
     // notified when it does — wired to experiment_vote/experiment_follow.
@@ -481,7 +488,12 @@ export async function renderExperiments(d) {
     ? sec("His calls, in his words", `<div class="rd-cards">${decisions.map(decCard).join("")}</div>` + note("The platform's recommendation, and what he actually decided — verbatim, dated. Only decisions he chose to publish appear here."))
     : "";
   const pipeline = [...avail, ...backlog];
-  const pipeSec = pipeline.length ? sec(`In the pipeline (${pipeline.length})`, `<div class="rd-cards">${pipeline.slice(0, 60).map(libCard).join("")}</div>`) : "";
+  // #2151 — the header count and the rendered list must derive from the SAME
+  // array so they can never drift again: a `pipeline.slice(0, 60)` here used to
+  // silently drop the tail (7 of 67 entries, including a no-direct-study marker)
+  // while the header above still printed the full length. Render every entry —
+  // 67 cards is not a real perf/URL problem for a static page.
+  const pipeSec = pipeline.length ? sec(`In the pipeline (${pipeline.length})`, `<div class="rd-cards">${pipeline.map(libCard).join("")}</div>`) : "";
   // Reader participation: suggest the next experiment — a moderated idea queue
   // (POST /api/experiment_suggest), not auto-published.
   const suggestSec = sec("Suggest an experiment", `<p class="rd-meta label">What should the platform test next? Matthew reviews every idea before it enters the pipeline.</p>` +

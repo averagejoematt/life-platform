@@ -192,10 +192,24 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .supp-meter i { display: block; height: 100%; }
 .supp-evpct { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-muted); width: 36px; text-align: right; }
 .supp-meta { margin-top: var(--sp-2); color: var(--ink-faint); text-transform: none; letter-spacing: 0; }
-.supp-ev-link { color: var(--ember); text-decoration: none; border-bottom: 1px solid color-mix(in oklch, var(--ember) 40%, transparent); }
-.supp-ev-link:hover { border-bottom-color: var(--ember); }
-/* #1983 — the honest counterpart to an evidence link: stated absence, not silence. */
-.supp-ev-nostudy { color: var(--ink-faint); border-bottom: 1px dotted color-mix(in oklch, var(--ink-faint) 50%, transparent); cursor: help; }
+/* #2151 — border-bottom sits at the edge of the inline box's line-height, not the
+   glyph baseline, so it visibly detaches from the text at narrow widths where
+   many links wrap onto their own short lines. A real text-decoration underline
+   hugs the baseline regardless of line-height, with text-underline-offset for
+   breathing room. */
+.supp-ev-link { color: var(--ember); text-decoration: underline; text-decoration-color: color-mix(in oklch, var(--ember) 40%, transparent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.supp-ev-link:hover { text-decoration-color: var(--ember); }
+/* #1983 — the honest counterpart to an evidence link: stated absence, not silence.
+   #2151 — the reason reaches touch too: a focusable wrapper + a tap/hover-revealed
+   panel, the same idiom as the Evidence Bar's tip (.evb-tip, tokens.css) — no
+   hover-only `title`. */
+.supp-ev-nostudy { position: relative; color: var(--ink-faint); text-decoration: underline dotted color-mix(in oklch, var(--ink-faint) 50%, transparent); text-underline-offset: 3px; cursor: help; }
+.supp-ev-nostudy[tabindex]:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs); }
+.supp-tip { display: none; position: absolute; bottom: calc(100% + 6px); left: 0; z-index: var(--z-overlay, 60); width: 240px; max-width: 74vw;
+  padding: var(--sp-2) var(--sp-3); background: var(--surface-raised); border: var(--border-hair); border-radius: var(--radius-sm);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.18); white-space: normal; text-transform: none; letter-spacing: normal; text-align: left; }
+.supp-ev-nostudy:hover .supp-tip, .supp-ev-nostudy:focus .supp-tip, .supp-ev-nostudy:focus-within .supp-tip { display: block; }
+.supp-tip-l { display: block; font-family: var(--font-sans); font-size: var(--fs-small); line-height: var(--lh-relaxed, 1.5); color: var(--ink); }
 
 /* Architecture diagram (the "how it's built" page) — hand-authored inline SVG. */
 .arch-fig { margin: var(--sp-4) 0 var(--sp-5); }
