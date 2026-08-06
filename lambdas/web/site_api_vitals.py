@@ -31,7 +31,7 @@ from typing import Any
 import boto3  # #1240: S3/DDB clients used by handle_labs / handle_glucose / handle_genome_risks
 from boto3.dynamodb.conditions import Key
 from common.pacific_time import pacific_day_n  # #1955 — THE one PT day-index formula (shared with scripts/v4_proof.py)
-from experiment.phase_filter import with_phase_filter  # ADR-058 — used by handle_timeline
+from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 — used by handle_timeline
 from health import (
     achievement_rules,  # #1624: the ONE place badge thresholds live (shared with daily-metrics-compute)
     weight_trend,  # shared weekly-rate + projection (layer module)
@@ -956,9 +956,13 @@ def handle_timeline() -> dict:
         key=lambda x: x["date"],
     )
 
-    # Life events (ADR-058: phase=pilot filtered)
+    # Life events (#2150: RAW_TIMESERIES — read cross-phase so pre-genesis captions
+    # survive a reset; the weight series above is already genesis-anchored via
+    # `start = EXPERIMENT_START`, so only the narrative annotations were truncating)
     life_pk = f"USER#{USER_ID}#SOURCE#life_events"
-    le_resp = table.query(**with_phase_filter({"KeyConditionExpression": Key("pk").eq(life_pk)}))
+    le_resp = table.query(
+        **with_phase_filter({"KeyConditionExpression": Key("pk").eq(life_pk)}, include_pilot=source_reads_cross_phase("life_events"))
+    )
     life_events = [
         {
             "date": i.get("date", ""),
@@ -969,23 +973,29 @@ def handle_timeline() -> dict:
         for i in _decimal_to_float(le_resp.get("Items", []))
     ]
 
-    # Experiments (ADR-058: phase=pilot filtered)
+    # Experiments (#2150: EXPERIMENT_SCOPED — stays current-cycle; source_reads_cross_phase
+    # resolves False here, so behaviour is unchanged, but the call is now derived rather
+    # than hard-coded blind, matching the taxonomy contract explicitly)
     exp_pk = f"USER#{USER_ID}#SOURCE#experiments"
-    exp_resp = table.query(**with_phase_filter({"KeyConditionExpression": Key("pk").eq(exp_pk)}))
+    exp_resp = table.query(
+        **with_phase_filter({"KeyConditionExpression": Key("pk").eq(exp_pk)}, include_pilot=source_reads_cross_phase("experiments"))
+    )
     experiments = [
         {"name": i.get("name", ""), "start": i.get("start_date", ""), "end": i.get("end_date"), "status": i.get("status", "active")}
         for i in _decimal_to_float(exp_resp.get("Items", []))
         if i.get("sk", "").startswith("EXP#")
     ]
 
-    # Character level history (ADR-058: phase=pilot filtered)
+    # Character level history (#2150: EXPERIMENT_SCOPED — stays current-cycle;
+    # source_reads_cross_phase resolves False here too, so behaviour is unchanged)
     cs_pk = f"{USER_PREFIX}character_sheet"
     cs_resp = table.query(
         **with_phase_filter(
             {
                 "KeyConditionExpression": Key("pk").eq(cs_pk) & Key("sk").begins_with("DATE#"),
                 "ScanIndexForward": True,
-            }
+            },
+            include_pilot=source_reads_cross_phase("character_sheet"),
         )
     )
     level_events = []

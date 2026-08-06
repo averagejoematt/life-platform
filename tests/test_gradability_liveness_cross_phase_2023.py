@@ -409,26 +409,24 @@ _SANCTIONED_CURRENT_CYCLE_VIEWS: dict[str, str] = {
 #   * daily_brief_lambda.gather_daily_data — the SOURCE#travel TRIP# read, now a
 #     literal cross-phase read (held by test_the_scan_sees_the_fixed_consumers_as_cross_phase).
 # Their behaviour is pinned by tests/test_genesis_blind_compute_windows_2109.py.
-_KNOWN_CROSS_CYCLE_DEBT: dict[str, str] = {
-    "lambdas/common/digest_utils.py::query_range": (
-        "The shared paginated raw-source range reader exposes NO include_pilot parameter, so a "
-        "caller with cross-cycle intent (60d Banister load, 30d weight trend) physically cannot "
-        "opt out. Root enabler rather than a defect in itself."
-    ),
-    "lambdas/common/digest_utils.py::query_range_list": (
-        "Same chokepoint, the per-workout (hevy) variant — no include_pilot parameter to pass."
-    ),
-    "lambdas/emails/monthly_digest_lambda.py::fetch_range": (
-        "Drives the prior-month comparison arm and a 60-day Strava window for CTL/ATL/TSB. In a reset "
-        "month the prior-month arm is entirely pre-genesis, so deltas blank and the load model is "
-        "computed over a stub window."
-    ),
-    "lambdas/web/site_api_vitals.py::handle_timeline": (
-        "The unbounded SOURCE#life_events query is RAW_TIMESERIES: those annotations exist to caption "
-        "the pre-genesis part of the transformation arc, so after a reset the timeline keeps its "
-        "weight line (date-clamped) but loses every narrative caption."
-    ),
-}
+#
+# #2150 then cleared the final three sites — the declared-debt remainder #2109
+# left behind on purpose (a different Lambda, a different deploy surface each):
+#   * digest_utils.query_range / query_range_list — the ROOT ENABLER gained an
+#     include_pilot pass-through parameter (default False, so every existing
+#     caller that never asked for cross-phase is unaffected), the same shape as
+#     site_api_common's helpers below;
+#   * monthly_digest_lambda.fetch_range — now derives include_pilot from
+#     source_reads_cross_phase(source), the #2109 idiom, so its 30d current-vs-
+#     prior-month arms and its 60d Strava Banister window all read cross-phase
+#     (every source in its call set is RAW_TIMESERIES or CROSS_PHASE);
+#   * site_api_vitals.handle_timeline — all three of its raw calls (life_events,
+#     experiments, character_sheet) now pass the taxonomy-derived flag; only
+#     life_events (RAW_TIMESERIES) actually changes behaviour — experiments and
+#     character_sheet are EXPERIMENT_SCOPED and stay current-cycle, unchanged.
+# Their behaviour is pinned by tests/test_genesis_blind_digest_and_readers_2150.py.
+# This empties the debt ledger — the ratchet's acceptance criterion.
+_KNOWN_CROSS_CYCLE_DEBT: dict[str, str] = {}
 
 # Sites whose include_pilot is a NON-LITERAL expression: the phase decision is made
 # per call or per source rather than fixed at the site. Recording them here is a
@@ -480,6 +478,29 @@ _PER_SOURCE_READS: dict[str, str] = {
     "lambdas/web/site_api_common.py::_latest_item_asof": (
         "Same pass-through contract; time-travel callers pass include_pilot=True so prior-cycle "
         "history stays visible (mirrors handle_character)."
+    ),
+    # #2150 — the declared-debt remainder #2109 left behind. Pinned by
+    # tests/test_genesis_blind_digest_and_readers_2150.py.
+    "lambdas/common/digest_utils.py::query_range": (
+        "include_pilot is now an explicit pass-through parameter (default False, unchanged for "
+        "every existing caller) — the same site_api_common shape, not a taxonomy call inside the "
+        "function itself, since this is the shared root reader many unrelated digests still call "
+        "expecting the old default-filtered behaviour (#2150)."
+    ),
+    "lambdas/common/digest_utils.py::query_range_list": (
+        "Same pass-through contract as query_range above, for the per-workout (hevy) variant " "(#2150)."
+    ),
+    "lambdas/emails/monthly_digest_lambda.py::fetch_range": (
+        "include_pilot=source_reads_cross_phase(source) — the #2109 idiom applied to the monthly "
+        "digest's own local reader: the 30d current-vs-prior-month arms and the 60d Strava Banister "
+        "window all read cross-phase today since every caller (whoop/withings/strava/eightsleep/"
+        "hevy/macrofactor/todoist/chronicling) is RAW_TIMESERIES or CROSS_PHASE (#2150)."
+    ),
+    "lambdas/web/site_api_vitals.py::handle_timeline": (
+        "All three raw calls (life_events, experiments, character_sheet) now pass "
+        "include_pilot=source_reads_cross_phase(<source>). Only life_events (RAW_TIMESERIES) "
+        "actually goes cross-phase — experiments and character_sheet are EXPERIMENT_SCOPED, so "
+        "the flag resolves False and behaviour there is unchanged (#2150)."
     ),
 }
 

@@ -75,13 +75,21 @@ def safe_float(rec, field, default=None):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def query_range(table, source, start_date, end_date, user_id="matthew"):
+def query_range(table, source, start_date, end_date, user_id="matthew", include_pilot: bool = False):
     """Query all DATE# records for a source in a date range, as a {date: record} dict.
 
     Paginates via LastEvaluatedKey (a single query silently truncates at DynamoDB's
     1MB page) and applies the ADR-058 phase filter. Values are d2f-converted.
     Records sharing a `date` collapse to the last one — use query_range_list for
     per-workout schemas (Hevy) where duplicates are legitimate.
+
+    `include_pilot` (#2150) is a plain pass-through, default False — the pre-#2150
+    behaviour every existing caller relies on. This was the ROOT ENABLER of the
+    #2150 debt: no caller could opt into a cross-phase read at all. Callers with
+    cross-cycle intent (a trailing Banister load window, a multi-cycle trend) should
+    pass `include_pilot=experiment.phase_filter.source_reads_cross_phase(source)`,
+    the same taxonomy-derived decision #2109 established for the compute layer's
+    generic `fetch_range` readers.
     """
     pk = f"USER#{user_id}#SOURCE#{source}"
     records = {}
@@ -94,7 +102,7 @@ def query_range(table, source, start_date, end_date, user_id="matthew"):
         },
     }
     while True:
-        resp = table.query(**with_phase_filter(kwargs))
+        resp = table.query(**with_phase_filter(kwargs, include_pilot=include_pilot))
         for item in resp.get("Items", []):
             date_str = item.get("date") or item["sk"].replace("DATE#", "")
             records[date_str] = d2f(item)
@@ -104,7 +112,7 @@ def query_range(table, source, start_date, end_date, user_id="matthew"):
     return records
 
 
-def query_range_list(table, source, start_date, end_date, user_id="matthew"):
+def query_range_list(table, source, start_date, end_date, user_id="matthew", include_pilot: bool = False):
     """Query all DATE# records for a source in a date range, as a flat list.
 
     Preserves duplicates for per-workout schemas like Hevy (#485) where (a) multiple
@@ -115,6 +123,9 @@ def query_range_list(table, source, start_date, end_date, user_id="matthew"):
     sk uses) fixes that boundary and is harmless for exact-sk sources.
 
     Paginates via LastEvaluatedKey and applies the ADR-058 phase filter.
+
+    `include_pilot` (#2150): same pass-through contract as query_range above,
+    default False.
     """
     pk = f"USER#{user_id}#SOURCE#{source}"
     records = []
@@ -127,7 +138,7 @@ def query_range_list(table, source, start_date, end_date, user_id="matthew"):
         },
     }
     while True:
-        resp = table.query(**with_phase_filter(kwargs))
+        resp = table.query(**with_phase_filter(kwargs, include_pilot=include_pilot))
         records.extend(d2f(item) for item in resp.get("Items", []))
         if "LastEvaluatedKey" not in resp:
             break
