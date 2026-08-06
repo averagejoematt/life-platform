@@ -45,4 +45,4 @@ requests==2.33.0
 requests-oauthlib==2.0.0
 typing-extensions==4.15.0
 typing-inspection==0.4.2
-urllib3==2.6.3
+urllib3==2.7.0
