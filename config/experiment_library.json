@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "updated": "2026-03-27",
+  "updated": "2026-08-04",
   "pillar_order": [
     "sleep",
     "movement",
@@ -86,7 +86,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/25535358/",
+      "source_resolved_title": "Evening use of light-emitting eReaders negatively affects sleep, circadian timing, and next-morning alertness."
     },
     {
       "id": "fixed-wake-time",
@@ -123,7 +126,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/16687322/",
+      "source_resolved_title": "Social jetlag: misalignment of biological and social time."
     },
     {
       "id": "cold-bedroom",
@@ -132,7 +138,7 @@
       "pillar": "sleep",
       "evidence_tier": "strong",
       "evidence_summary": "Core body temperature drop of 1-2°F is required for sleep onset. Cool environments increase deep sleep percentage.",
-      "evidence_citation": "Harding et al., Current Biology 2019",
+      "evidence_citation": "Harding et al., Frontiers in Neuroscience 2019",
       "suggested_duration_days": 14,
       "duration_tier": "7-day sprint",
       "difficulty": "easy",
@@ -158,7 +164,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/31105512/",
+      "source_resolved_title": "The Temperature Dependence of Sleep."
     },
     {
       "id": "morning-sunlight",
@@ -167,7 +176,7 @@
       "pillar": "sleep",
       "evidence_tier": "moderate",
       "evidence_summary": "Morning light exposure advances the circadian clock and suppresses melatonin, improving alertness and next-night sleep onset.",
-      "evidence_citation": "Blume et al., Sleep Medicine Reviews 2019",
+      "evidence_citation": "Blume et al., Somnologie 2019",
       "suggested_duration_days": 30,
       "duration_tier": "30-day trial",
       "difficulty": "medium",
@@ -194,7 +203,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/31534436/",
+      "source_resolved_title": "Effects of light on human circadian rhythms, sleep and mood."
     },
     {
       "id": "magnesium-before-bed",
@@ -230,7 +242,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/23853635/",
+      "source_resolved_title": "The effect of magnesium supplementation on primary insomnia in elderly: A double-blind placebo-controlled clinical trial."
     },
     {
       "id": "no-caffeine-after-noon",
@@ -267,7 +282,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/24235903/",
+      "source_resolved_title": "Caffeine effects on sleep taken 0, 3, or 6 hours before going to bed."
     },
     {
       "id": "consistent-bedtime-routine",
@@ -300,7 +318,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/19480226/",
+      "source_resolved_title": "A nightly bedtime routine: impact on sleep in young children and maternal mood."
     },
     {
       "id": "breathwork-before-sleep",
@@ -337,7 +358,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/28626434/",
+      "source_resolved_title": "The Effect of Diaphragmatic Breathing on Attention, Negative Affect and Stress in Healthy Adults."
     },
     {
       "id": "post-dinner-walk",
@@ -374,7 +398,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/35147898/",
+      "source_resolved_title": "The Acute Effects of Interrupting Prolonged Sitting Time in Adults with Standing and Light-Intensity Walking on Biomarkers of Cardiometabolic Health in Adults: A Systematic Review and Meta-analysis."
     },
     {
       "id": "morning-mobility",
@@ -407,7 +434,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/21373870/",
+      "source_resolved_title": "A review of the acute effects of static and dynamic stretching on performance."
     },
     {
       "id": "zone-2-minimum",
@@ -447,7 +477,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/30646252/",
+      "source_resolved_title": "Association of Cardiorespiratory Fitness With Long-term Mortality Among Adults Undergoing Exercise Treadmill Testing."
     },
     {
       "id": "daily-8k-steps",
@@ -483,7 +516,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/32207799/",
+      "source_resolved_title": "Association of Daily Step Count and Step Intensity With Mortality Among US Adults."
     },
     {
       "id": "cold-shower-daily",
@@ -519,7 +555,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/27631616/",
+      "source_resolved_title": "The Effect of Cold Showering on Health and Work: A Randomized Controlled Trial."
     },
     {
       "id": "grip-strength-training",
@@ -556,7 +595,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/25982160/",
+      "source_resolved_title": "Prognostic value of grip strength: findings from the Prospective Urban Rural Epidemiology (PURE) study."
     },
     {
       "id": "stretching-before-bed",
@@ -565,7 +607,7 @@
       "pillar": "movement",
       "evidence_tier": "emerging",
       "evidence_summary": "Light stretching may activate parasympathetic nervous system and reduce muscle tension. Limited controlled studies on sleep quality.",
-      "evidence_citation": "Banno et al., Scientific Reports 2018",
+      "evidence_citation": "Banno et al., PeerJ 2018",
       "suggested_duration_days": 14,
       "duration_tier": "7-day sprint",
       "difficulty": "easy",
@@ -591,7 +633,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/30018855/",
+      "source_resolved_title": "Exercise can improve sleep quality: a systematic review and meta-analysis."
     },
     {
       "id": "active-recovery-protocol",
@@ -600,7 +645,7 @@
       "pillar": "movement",
       "evidence_tier": "moderate",
       "evidence_summary": "Active recovery increases blood flow and lymphatic drainage vs passive rest. Heat exposure (sauna) enhances recovery markers.",
-      "evidence_citation": "Laukkanen et al., JAMA Internal Medicine 2015",
+      "evidence_citation": "No direct study verified",
       "suggested_duration_days": 30,
       "duration_tier": "30-day trial",
       "difficulty": "medium",
@@ -624,7 +669,11 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "no-direct-study",
+      "source_url": null,
+      "source_resolved_title": null,
+      "citation_note": "The sauna–mortality cohort previously cited here (Laukkanen et al., JAMA Internal Medicine 2015) measures cardiovascular mortality, not recovery markers, and does not support the active-recovery claim. No direct controlled trial of an active-recovery day protocol was verified for this entry."
     },
     {
       "id": "40g-protein-breakfast",
@@ -661,7 +710,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/25926512/",
+      "source_resolved_title": "The role of protein in weight loss and maintenance."
     },
     {
       "id": "intermittent-fasting-16-8",
@@ -700,7 +752,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/31813824/",
+      "source_resolved_title": "Ten-Hour Time-Restricted Eating Reduces Weight, Blood Pressure, and Atherogenic Lipids in Patients with Metabolic Syndrome."
     },
     {
       "id": "no-alcohol-30-days",
@@ -740,7 +795,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/25307588/",
+      "source_resolved_title": "Alcohol and the sleeping brain."
     },
     {
       "id": "fiber-30g-daily",
@@ -777,7 +835,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/30638909/",
+      "source_resolved_title": "Carbohydrate quality and human health: a series of systematic reviews and meta-analyses."
     },
     {
       "id": "pre-meal-vinegar",
@@ -786,7 +847,7 @@
       "pillar": "nutrition",
       "evidence_tier": "moderate",
       "evidence_summary": "Acetic acid slows gastric emptying and may reduce post-meal glucose spikes by 20-30%. Mechanism well-understood, clinical data moderate.",
-      "evidence_citation": "Shishehbor et al., Pakistan J Biological Sciences 2008",
+      "evidence_citation": "Shishehbor et al., Diabetes Research and Clinical Practice 2017",
       "suggested_duration_days": 14,
       "duration_tier": "7-day sprint",
       "difficulty": "easy",
@@ -812,7 +873,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/28292654/",
+      "source_resolved_title": "Vinegar consumption can attenuate postprandial glucose and insulin responses; a systematic review and meta-analysis of clinical trials."
     },
     {
       "id": "veggie-volume-loading",
@@ -821,7 +885,7 @@
       "pillar": "nutrition",
       "evidence_tier": "moderate",
       "evidence_summary": "Volume-based satiety from low-calorie-density foods reduces total caloric intake without hunger. Fiber and water content drive the effect.",
-      "evidence_citation": "Rolls et al., American Journal of Clinical Nutrition 2004",
+      "evidence_citation": "Rolls et al., Journal of the American Dietetic Association 2004",
       "suggested_duration_days": 30,
       "duration_tier": "30-day trial",
       "difficulty": "medium",
@@ -848,7 +912,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/15389416/",
+      "source_resolved_title": "Salad and satiety: energy density and portion size of a first-course salad affect energy intake at lunch."
     },
     {
       "id": "largest-meal-at-lunch",
@@ -886,7 +953,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/23357955/",
+      "source_resolved_title": "Timing of food intake predicts weight loss effectiveness."
     },
     {
       "id": "hydration-target",
@@ -918,7 +988,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/20646222/",
+      "source_resolved_title": "Water, hydration, and health."
     },
     {
       "id": "tongkat-ali-recovery",
@@ -950,7 +1023,10 @@
       ],
       "evidence_for": [
         {
-          "title": "Open question — no verified study found for: Effect of Tongkat Ali on stress hormones and psychological mood state (the citation previously here did not resolve to a supporting paper; withdrawn 2026-08-02, #1892)"
+          "title": "Tongkat Ali and stress hormones / mood state",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/23705671/",
+          "summary": "Randomized, double-blind, placebo-controlled trial in moderately stressed adults reporting improvements in stress-hormone profile and mood. Re-resolved and restored 2026-08-04 (#1983) after #1892 withdrew the URL that had been attached to this claim.",
+          "resolved_title": "Effect of Tongkat Ali on stress hormones and psychological mood state in moderately stressed subjects."
         },
         {
           "title": "Eurycoma longifolia for male sexual health",
@@ -976,7 +1052,10 @@
       "votes": 0,
       "promoted_date": "2026-02-09",
       "completed_runs": [],
-      "active_experiment_id": "tongkat-ali-recovery-optimization_2026-02-09"
+      "active_experiment_id": "tongkat-ali-recovery-optimization_2026-02-09",
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/23705671/",
+      "source_resolved_title": "Effect of Tongkat Ali on stress hormones and psychological mood state in moderately stressed subjects."
     },
     {
       "id": "nmn-nad-precursor",
@@ -1043,7 +1122,10 @@
       "votes": 0,
       "promoted_date": "2026-02-09",
       "completed_runs": [],
-      "active_experiment_id": "nmn-nad-precursor-stack_2026-02-09"
+      "active_experiment_id": "nmn-nad-precursor-stack_2026-02-09",
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/33888596/",
+      "source_resolved_title": "Nicotinamide mononucleotide increases muscle insulin sensitivity in prediabetic women."
     },
     {
       "id": "creatine-strength",
@@ -1105,7 +1187,10 @@
       "votes": 0,
       "promoted_date": "2026-02-14",
       "completed_runs": [],
-      "active_experiment_id": "creatine-monohydrate-strength-progression_2026-02-14"
+      "active_experiment_id": "creatine-monohydrate-strength-progression_2026-02-14",
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/28615996/",
+      "source_resolved_title": "International Society of Sports Nutrition position stand: safety and efficacy of creatine supplementation in exercise, sport, and medicine."
     },
     {
       "id": "berberine-glucose",
@@ -1169,7 +1254,10 @@
       "votes": 0,
       "promoted_date": "2026-02-09",
       "completed_runs": [],
-      "active_experiment_id": "berberine-postprandial-glucose-attenuation_2026-02-09"
+      "active_experiment_id": "berberine-postprandial-glucose-attenuation_2026-02-09",
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/18442638/",
+      "source_resolved_title": "Efficacy of berberine in patients with type 2 diabetes mellitus."
     },
     {
       "id": "ashwagandha-stress",
@@ -1205,7 +1293,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/23439798/",
+      "source_resolved_title": "A prospective, randomized double-blind, placebo-controlled study of safety and efficacy of a high-concentration full-spectrum extract of ashwagandha root in reducing stress and anxiety in adults."
     },
     {
       "id": "omega-3-high-dose",
@@ -1240,7 +1331,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/30415628/",
+      "source_resolved_title": "Cardiovascular Risk Reduction with Icosapent Ethyl for Hypertriglyceridemia."
     },
     {
       "id": "vitamin-d-optimization",
@@ -1273,7 +1367,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/17634462/",
+      "source_resolved_title": "Vitamin D deficiency."
     },
     {
       "id": "l-theanine-focus",
@@ -1308,7 +1405,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/18681988/",
+      "source_resolved_title": "The combined effects of L-theanine and caffeine on cognitive performance and mood."
     },
     {
       "id": "journaling-before-bed",
@@ -1317,7 +1417,7 @@
       "pillar": "mental",
       "evidence_tier": "moderate",
       "evidence_summary": "Expressive writing reduces intrusive thoughts, improves sleep onset, and may reduce cortisol. Structured gratitude journaling improves wellbeing.",
-      "evidence_citation": "Pennebaker & Beall, J Abnormal Psychology 1986; Scullin et al., J Experimental Psychology 2018",
+      "evidence_citation": "Scullin et al., J Experimental Psychology 2018; Pennebaker & Beall, J Abnormal Psychology 1986",
       "suggested_duration_days": 30,
       "duration_tier": "30-day trial",
       "difficulty": "easy",
@@ -1342,7 +1442,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/29058942/",
+      "source_resolved_title": "The effects of bedtime writing on difficulty falling asleep: A polysomnographic study comparing to-do lists and completed activity lists."
     },
     {
       "id": "reading-10-pages",
@@ -1373,7 +1476,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/27471129/",
+      "source_resolved_title": "A chapter a day: Association of book reading with longevity."
     },
     {
       "id": "meditation-10-min",
@@ -1410,7 +1516,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/24395196/",
+      "source_resolved_title": "Meditation programs for psychological stress and well-being: a systematic review and meta-analysis."
     },
     {
       "id": "gratitude-log",
@@ -1443,7 +1552,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/12585811/",
+      "source_resolved_title": "Counting blessings versus burdens: an experimental investigation of gratitude and subjective well-being in daily life."
     },
     {
       "id": "no-news-before-10am",
@@ -1452,7 +1564,7 @@
       "pillar": "mental",
       "evidence_tier": "emerging",
       "evidence_summary": "Morning information consumption hijacks the cortisol awakening response and sets a reactive (vs proactive) tone for the day. Limited formal studies.",
-      "evidence_citation": "Clinical consensus; Newport, Digital Minimalism 2019",
+      "evidence_citation": "No direct study verified — trade book: Newport, Digital Minimalism 2019",
       "suggested_duration_days": 14,
       "duration_tier": "7-day sprint",
       "difficulty": "hard",
@@ -1474,7 +1586,11 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "no-direct-study",
+      "source_url": null,
+      "source_resolved_title": null,
+      "citation_note": "The rationale rests on a trade book and practitioner consensus. No peer-reviewed trial of delaying morning news/social-media intake was verified."
     },
     {
       "id": "deep-work-block",
@@ -1505,7 +1621,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://doi.org/10.1145/1357054.1357072",
+      "source_resolved_title": "The cost of interrupted work"
     },
     {
       "id": "learn-something-new",
@@ -1536,7 +1655,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/24214244/",
+      "source_resolved_title": "The impact of sustained engagement on cognitive function in older adults: the Synapse Project."
     },
     {
       "id": "date-night-weekly",
@@ -1567,7 +1689,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://doi.org/10.1111/j.1741-3737.2010.00782.x",
+      "source_resolved_title": "If Momma Ain't Happy: Explaining Declines in Marital Satisfaction Among New Mothers"
     },
     {
       "id": "weekly-friend-call",
@@ -1598,7 +1723,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/20668659/",
+      "source_resolved_title": "Social relationships and mortality risk: a meta-analytic review."
     },
     {
       "id": "meaningful-conversation-daily",
@@ -1629,7 +1757,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/20424097/",
+      "source_resolved_title": "Eavesdropping on happiness: well-being is related to having less small talk and more substantive conversations."
     },
     {
       "id": "digital-free-dinner",
@@ -1661,7 +1792,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://doi.org/10.1177/0265407512453827",
+      "source_resolved_title": "Can you connect with me now? How the presence of mobile communication technology influences face-to-face conversation quality"
     },
     {
       "id": "weekly-appreciation-message",
@@ -1692,7 +1826,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/29949445/",
+      "source_resolved_title": "Undervaluing Gratitude: Expressers Misunderstand the Consequences of Showing Appreciation."
     },
     {
       "id": "community-event-monthly",
@@ -1701,7 +1838,7 @@
       "pillar": "social",
       "evidence_tier": "emerging",
       "evidence_summary": "Group belonging is a distinct predictor of wellbeing beyond individual friendships. Dunbar's research shows community-layer connections matter.",
-      "evidence_citation": "Dunbar, How Many Friends Does One Person Need? 2010",
+      "evidence_citation": "No direct study verified — trade book: Dunbar, How Many Friends Does One Person Need? 2010",
       "suggested_duration_days": 90,
       "duration_tier": "60-day deep dive",
       "difficulty": "hard",
@@ -1723,7 +1860,11 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "no-direct-study",
+      "source_url": null,
+      "source_resolved_title": null,
+      "citation_note": "Dunbar's social-layer work is summarised in a trade book here rather than cited to a specific paper. No peer-reviewed trial of monthly community-event attendance was verified."
     },
     {
       "id": "make-bed-on-waking",
@@ -1732,7 +1873,7 @@
       "pillar": "discipline",
       "evidence_tier": "emerging",
       "evidence_summary": "Keystone habit: small wins in the morning cascade into better decisions throughout the day. No direct biomarker evidence, strong behavioral theory.",
-      "evidence_citation": "Duhigg, The Power of Habit 2012; McRaven, Make Your Bed 2017",
+      "evidence_citation": "No direct study verified — trade books: Duhigg, The Power of Habit 2012; McRaven, Make Your Bed 2017",
       "suggested_duration_days": 30,
       "duration_tier": "30-day trial",
       "difficulty": "easy",
@@ -1754,7 +1895,11 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "no-direct-study",
+      "source_url": null,
+      "source_resolved_title": null,
+      "citation_note": "Both sources are trade books. As the entry's own summary states, there is no direct biomarker evidence for bed-making as a keystone habit."
     },
     {
       "id": "evening-shutdown-routine",
@@ -1763,7 +1908,7 @@
       "pillar": "discipline",
       "evidence_tier": "moderate",
       "evidence_summary": "Shutdown rituals create psychological closure between work and rest. Reduces rumination and improves next-day focus.",
-      "evidence_citation": "Newport, Deep Work 2016; Smit & Barber, J Occupational Health Psychology 2016",
+      "evidence_citation": "Smit & Barber, J Occupational Health Psychology 2016; Newport, Deep Work 2016",
       "suggested_duration_days": 30,
       "duration_tier": "30-day trial",
       "difficulty": "medium",
@@ -1785,7 +1930,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/26652268/",
+      "source_resolved_title": "Psychologically detaching despite high workloads: The role of attentional processes."
     },
     {
       "id": "single-tasking-blocks",
@@ -1816,7 +1964,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/19706386/",
+      "source_resolved_title": "Cognitive control in media multitaskers."
     },
     {
       "id": "vice-elimination-sprint",
@@ -1825,7 +1976,7 @@
       "pillar": "discipline",
       "evidence_tier": "moderate",
       "evidence_summary": "Abstinence from a specific vice builds self-regulation capacity and reveals dependency patterns. The clarity from removal is often more informative than the removal itself.",
-      "evidence_citation": "Baumeister & Tierney, Willpower 2011",
+      "evidence_citation": "No direct study verified — trade book: Baumeister & Tierney, Willpower 2011",
       "suggested_duration_days": 30,
       "duration_tier": "30-day trial",
       "difficulty": "hard",
@@ -1851,7 +2002,11 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "no-direct-study",
+      "source_url": null,
+      "source_resolved_title": null,
+      "citation_note": "The source is a trade book. No peer-reviewed trial of a fixed-length single-vice abstinence sprint was verified."
     },
     {
       "id": "box-breathing-5min",
@@ -1888,7 +2043,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/30245619/",
+      "source_resolved_title": "How Breath-Control Can Change Your Life: A Systematic Review on Psycho-Physiological Correlates of Slow Breathing."
     },
     {
       "id": "cold-exposure-breathwork-combo",
@@ -1925,7 +2083,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/24799686/",
+      "source_resolved_title": "Voluntary activation of the sympathetic nervous system and attenuation of the innate immune response in humans."
     },
     {
       "id": "track-everything-7-days",
@@ -1957,7 +2118,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/21185970/",
+      "source_resolved_title": "Self-monitoring in weight loss: a systematic review of the literature."
     },
     {
       "id": "cold-plunge-3x-week",
@@ -1966,7 +2130,7 @@
       "pillar": "mental",
       "evidence_tier": "strong",
       "evidence_summary": "Cold water immersion increases dopamine 250%, norepinephrine 530%",
-      "evidence_citation": "Sramek et al., 2000; Huberman Lab",
+      "evidence_citation": "Šrámek et al., European Journal of Applied Physiology 2000",
       "suggested_duration_days": 28,
       "difficulty": "hard",
       "experiment_type": "measurable",
@@ -1982,7 +2146,10 @@
         "dopamine",
         "mental"
       ],
-      "status": "backlog"
+      "status": "backlog",
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/10751106/",
+      "source_resolved_title": "Human physiological responses to immersion into water of different temperatures."
     },
     {
       "id": "zone2-150-min-week",
@@ -1991,7 +2158,7 @@
       "pillar": "movement",
       "evidence_tier": "strong",
       "evidence_summary": "Zone 2 training is the highest-evidence longevity modality — VO2max, mitochondrial density, fat oxidation",
-      "evidence_citation": "Attia, Outlive; WHO guidelines",
+      "evidence_citation": "Bull et al., British Journal of Sports Medicine 2020 (WHO physical-activity guidelines)",
       "suggested_duration_days": 56,
       "difficulty": "moderate",
       "experiment_type": "measurable",
@@ -2007,7 +2174,10 @@
         "cardio",
         "longevity"
       ],
-      "status": "backlog"
+      "status": "backlog",
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/33239350/",
+      "source_resolved_title": "World Health Organization 2020 guidelines on physical activity and sedentary behaviour."
     },
     {
       "id": "morning-sunlight-blue-blockers",
@@ -2016,7 +2186,7 @@
       "pillar": "sleep",
       "evidence_tier": "strong",
       "evidence_summary": "Morning light advances circadian phase; evening blue blockers preserve melatonin onset",
-      "evidence_citation": "Huberman Lab; Chang et al., PNAS 2015",
+      "evidence_citation": "Chang et al., PNAS 2015",
       "suggested_duration_days": 21,
       "difficulty": "moderate",
       "experiment_type": "measurable",
@@ -2032,7 +2202,10 @@
         "light",
         "sleep"
       ],
-      "status": "backlog"
+      "status": "backlog",
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/25535358/",
+      "source_resolved_title": "Evening use of light-emitting eReaders negatively affects sleep, circadian timing, and next-morning alertness."
     },
     {
       "id": "trf-12pm-8pm",
@@ -2041,7 +2214,7 @@
       "pillar": "nutrition",
       "evidence_tier": "strong",
       "evidence_summary": "TRF improves insulin sensitivity, reduces inflammation, supports circadian alignment",
-      "evidence_citation": "Panda, The Circadian Code; Sutton et al., Cell Metabolism 2018",
+      "evidence_citation": "Sutton et al., Cell Metabolism 2018",
       "suggested_duration_days": 28,
       "difficulty": "moderate",
       "experiment_type": "measurable",
@@ -2057,7 +2230,10 @@
         "fasting",
         "metabolic"
       ],
-      "status": "backlog"
+      "status": "backlog",
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/29754952/",
+      "source_resolved_title": "Early Time-Restricted Feeding Improves Insulin Sensitivity, Blood Pressure, and Oxidative Stress Even without Weight Loss in Men with Prediabetes."
     },
     {
       "id": "sauna-2x-week",
@@ -2094,7 +2270,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/25705824/",
+      "source_resolved_title": "Association between sauna bathing and fatal cardiovascular and all-cause mortality events."
     },
     {
       "id": "cold-plunge-daily",
@@ -2131,7 +2310,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/34755128/",
+      "source_resolved_title": "Altered brown fat thermoregulation and enhanced cold-induced thermogenesis in young, healthy, winter-swimming men."
     },
     {
       "id": "expressive-writing",
@@ -2168,7 +2350,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/3745650/",
+      "source_resolved_title": "Confronting a traumatic event: toward an understanding of inhibition and disease."
     },
     {
       "id": "morning-pages",
@@ -2177,7 +2362,7 @@
       "pillar": "mental",
       "evidence_tier": "moderate",
       "evidence_summary": "Julia Cameron's Artist's Way: morning freewriting clears mental clutter, reduces rumination, improves creative output.",
-      "evidence_citation": "Cameron, The Artist's Way 1992",
+      "evidence_citation": "No direct study verified — trade book: Cameron, The Artist's Way 1992",
       "suggested_duration_days": 30,
       "duration_tier": "30-day trial",
       "difficulty": "medium",
@@ -2204,7 +2389,11 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "no-direct-study",
+      "source_url": null,
+      "source_resolved_title": null,
+      "citation_note": "Morning Pages is a practice from a trade book. The adjacent expressive-writing literature (see the Expressive Writing entry) studies a different, prompted protocol."
     },
     {
       "id": "weekly-deep-conversation",
@@ -2213,7 +2402,7 @@
       "pillar": "social",
       "evidence_tier": "strong",
       "evidence_summary": "Murthy: loneliness epidemic driven by lack of depth, not lack of contact. One deep conversation/week correlates with wellbeing.",
-      "evidence_citation": "Murthy, Together 2020",
+      "evidence_citation": "No direct study verified — trade book: Murthy, Together 2020",
       "suggested_duration_days": 30,
       "duration_tier": "30-day trial",
       "difficulty": "medium",
@@ -2240,7 +2429,11 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "no-direct-study",
+      "source_url": null,
+      "source_resolved_title": null,
+      "citation_note": "The source is a trade book synthesising loneliness research rather than a specific trial. No peer-reviewed study of a weekly deep-conversation protocol was verified."
     },
     {
       "id": "stranger-conversation",
@@ -2275,7 +2468,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/25019381/",
+      "source_resolved_title": "Mistakenly seeking solitude."
     },
     {
       "id": "creatine-timing",
@@ -2312,7 +2508,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/29704637/",
+      "source_resolved_title": "Effects of creatine supplementation on cognitive function of healthy individuals: A systematic review of randomized controlled trials."
     },
     {
       "id": "fiber-first-meals",
@@ -2348,7 +2547,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/26106234/",
+      "source_resolved_title": "Food Order Has a Significant Impact on Postprandial Glucose and Insulin Levels."
     },
     {
       "id": "elimination-dairy",
@@ -2357,7 +2559,7 @@
       "pillar": "nutrition",
       "evidence_tier": "moderate",
       "evidence_summary": "Dairy sensitivity is common and underdiagnosed. Elimination + reintroduction is the gold standard for identifying food sensitivities.",
-      "evidence_citation": "Turnbull et al., Journal of the American College of Nutrition 2015",
+      "evidence_citation": "Turnbull et al., Alimentary Pharmacology & Therapeutics 2015",
       "suggested_duration_days": 28,
       "duration_tier": "28-day trial",
       "difficulty": "medium",
@@ -2385,7 +2587,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/25316115/",
+      "source_resolved_title": "Review article: the diagnosis and management of food allergy and food intolerances."
     },
     {
       "id": "sleep-consistency",
@@ -2422,7 +2627,10 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "verified",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/37738616/",
+      "source_resolved_title": "Sleep regularity is a stronger predictor of mortality risk than sleep duration: A prospective cohort study."
     },
     {
       "id": "dopamine-fast-weekend",
@@ -2431,7 +2639,7 @@
       "pillar": "discipline",
       "evidence_tier": "moderate",
       "evidence_summary": "Periodic abstinence from superstimuli restores dopamine receptor sensitivity and improves capacity for delayed gratification.",
-      "evidence_citation": "Lembke, Dopamine Nation 2021",
+      "evidence_citation": "No direct study verified — trade book: Lembke, Dopamine Nation 2021",
       "suggested_duration_days": 30,
       "duration_tier": "30-day trial",
       "difficulty": "hard",
@@ -2458,8 +2666,21 @@
       "status": "backlog",
       "votes": 0,
       "promoted_date": null,
-      "completed_runs": []
+      "completed_runs": [],
+      "citation_status": "no-direct-study",
+      "source_url": null,
+      "source_resolved_title": null,
+      "citation_note": "The source is a trade book. The receptor-sensitivity mechanism is extrapolated from addiction neuroscience; no trial of a weekend 'dopamine reset' was verified."
     }
   ],
-  "_updated": "2026-03-27"
+  "_updated": "2026-08-04",
+  "citation_policy": {
+    "rule": "Every experiment carries citation_status: 'verified' (source_url resolves to the paper evidence_citation names, and source_resolved_title stores that paper's title verbatim as returned by the resolver at verification time) or 'no-direct-study' (no source_url, and citation_note says why). Never store a URL that has not been resolved — see #1892.",
+    "verified_on": "2026-08-04",
+    "resolvers": [
+      "NCBI eutils esummary (PubMed)",
+      "Crossref REST API (DOI)"
+    ],
+    "issue": 1983
+  }
 }

@@ -129,6 +129,19 @@ def test_card_arm_ignores_float_mantissas_but_still_catches_a_card():
     assert any(arm == "pii-card" for arm, _ in dirty)
 
 
+def test_card_arm_ignores_doi_suffixes_but_not_a_card_beside_one():
+    """#1983: publisher DOI suffixes can be exactly 16 digits (Sage's
+    10.1177/0265407512453827). A DOI is a citation, and citations are the point of
+    the experiment library — but the masking is syntactic (`10.NNNN/` required), so
+    a real card sitting in the same document still fires."""
+    doi = '{"source_url": "https://doi.org/10.1177/0265407512453827"}'
+    assert not any(arm == "pii-card" for arm, _ in guard.scan_text(doi, vice=[], literals=[]))
+    both = doi + " card 4111111111111111 on file"
+    assert any(arm == "pii-card" for arm, _ in guard.scan_text(both, vice=[], literals=[]))
+    # A bare 16-digit run that merely LOOKS DOI-adjacent is not masked.
+    assert any(arm == "pii-card" for arm, _ in guard.scan_text("doi 0265407512453827", vice=[], literals=[]))
+
+
 def test_live_arm_unreachable_endpoint_is_a_violation_never_a_pass():
     """#1935: an endpoint the arm planned to scan but could not read must land as
     an endpoint-not-scanned violation — fail-closed, no silent pass tally."""

@@ -191,11 +191,16 @@ def _experiment_catalog(exclude_ids: set, exclude_names: set) -> list:
                 "planned_duration_days": exp.get("suggested_duration_days"),
                 "tags": exp.get("tags", []),
                 "votes": exp.get("votes", 0),
-                # Source attribution: where the idea came from (published study citation +
-                # first supporting evidence URL). Surfaced on the site so each experiment
-                # shows its provenance rather than appearing to arrive from nowhere.
+                # Source attribution: where the idea came from. #1983 — source_url is now
+                # an EXPLICIT, resolved field on the entry (it must point at the paper
+                # evidence_citation names), not the first evidence_for URL, which could
+                # silently serve a different paper under the citation's label. Entries with
+                # no verified source carry citation_status='no-direct-study' + a note, so a
+                # reader can tell "unlinked" from "no study exists".
                 "evidence_citation": exp.get("evidence_citation"),
-                "source_url": ((exp.get("evidence_for") or [{}])[0] or {}).get("url"),
+                "source_url": exp.get("source_url") or ((exp.get("evidence_for") or [{}])[0] or {}).get("url"),
+                "citation_status": exp.get("citation_status"),
+                "citation_note": exp.get("citation_note"),
             }
         )
     # most-voted backlog first, then alphabetical

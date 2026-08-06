@@ -76,14 +76,38 @@ def test_supplement_registry_still_carries_the_withdrawn_set():
     assert len(_supplement_withdrawn()) > 0
 
 
+# A withdrawal that was later re-resolved to a real supporting paper and restored.
+# It still counts toward the documented total — the withdrawal HAPPENED — but it is no
+# longer a live "Open question" in the registry, so the reconciliation has to carry it
+# explicitly rather than let the published number quietly shrink.
+_RESTORED_SINCE = {
+    # #1983, 2026-08-04 — Talbott et al., J Int Soc Sports Nutr 2013 resolves and does
+    # support the claim; #1892 withdrew the URL, not the underlying study.
+    "tongkat-ali-recovery",
+}
+
+
 def test_documented_total_reconciles_across_both_registries():
     """#1940 states 23. That number spans TWO registries — 21 on supplements and 2
     on experiments (tongkat-ali-recovery, berberine-glucose). Counting only the
     supplements payload understates it, which is precisely the drift this box
-    exists to prevent."""
+    exists to prevent. A restored withdrawal stays in the total and moves into
+    _RESTORED_SINCE, so the published number can only change deliberately."""
     sup, exp = _supplement_withdrawn(), _experiment_withdrawn()
-    assert len(sup) + len(exp) == 23, f"documented total is 23; registries now hold {len(sup)}+{len(exp)}"
-    assert len(exp) == 2, "the experiments half of the correction must not silently vanish"
+    total = len(sup) + len(exp) + len(_RESTORED_SINCE)
+    assert total == 23, f"documented total is 23; registries now hold {len(sup)}+{len(exp)} live + {len(_RESTORED_SINCE)} restored"
+    assert len(exp) + len(_RESTORED_SINCE) == 2, "the experiments half of the correction must not silently vanish"
+
+
+def test_a_restored_withdrawal_is_disclosed_to_the_reader():
+    """Un-withdrawing is itself a correction. If a claim moves back from 'Open
+    question' to cited, the notice has to say so — otherwise the page silently
+    walks back a published statement, which is the #1940 failure in reverse."""
+    js = open(JS, encoding="utf-8").read()
+    if not _RESTORED_SINCE:
+        return
+    assert "restored" in js, "a restored withdrawal must be disclosed in the correction notice"
+    assert "4 August 2026" in js, "the restoration must carry its own date, not hide under the original one"
 
 
 def test_the_notice_names_the_experiments_half():

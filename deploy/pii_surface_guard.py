@@ -84,6 +84,12 @@ _SSN_RE = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
 # `1.5714285714285714` carries 16 consecutive mantissa digits, which is a number's
 # tail, not a card (#1945 — found live on /api/character_receipt).
 _CARD_RE = re.compile(r"(?<![\d.])\d{16}(?![\d.])")
+# Same class of structural false positive, second instance (#1983): a DOI suffix is an
+# opaque publisher-assigned string that can be exactly 16 digits — Sage's
+# `doi.org/10.1177/0265407512453827` is one, and it is a citation, not a card. Masking
+# only text that is *syntactically a DOI* (the `10.NNNN/` registrant prefix is
+# mandatory) keeps the arm's teeth: a bare 16-digit run anywhere else still fires.
+_DOI_RE = re.compile(r"(?:https?://(?:dx\.)?doi\.org/|\bdoi:\s*)10\.\d{4,9}/\S+", re.I)
 _EMAIL_RE = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 
 
@@ -147,7 +153,7 @@ def scan_text(text: str, vice=None, literals=None) -> list:
         out.append(("blocked-vice", kw))
     if _SSN_RE.search(text):
         out.append(("pii-ssn", "SSN-shaped number"))
-    if _CARD_RE.search(text):
+    if _CARD_RE.search(_DOI_RE.sub(" ", text)):
         out.append(("pii-card", "16-digit number"))
     for m in _EMAIL_RE.findall(text):
         e = m.lower()
