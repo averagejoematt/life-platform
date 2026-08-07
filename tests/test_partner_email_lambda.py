@@ -1037,19 +1037,18 @@ def test_handler_still_sends_a_fallback_when_the_ai_call_fails(monkeypatch):
     assert ">This week</p>" not in html  # no lede was produced, so no lede card
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "BUG: lambda_handler reads _val.was_replaced / _val.final_text, but "
-        "ai_output_validator.AIValidationResult exposes .blocked / .block_reason / "
-        ".sanitized_text. The AttributeError is swallowed by the surrounding "
-        "`except Exception`, so clean Board commentary is silently discarded and "
-        "every partner email ships the canned 'Commentary unavailable' stub. "
-        "Remove this xfail once the attribute names are corrected."
-    ),
-)
 def test_handler_ships_clean_commentary_through_the_real_ai3_validator(monkeypatch):
-    """AI-3: commentary the real validator does not block must reach the email."""
+    """AI-3: commentary the real validator does not block must reach the email.
+
+    Fixed by #2173: lambda_handler used to read `_val.was_replaced` /
+    `_val.final_text`, but `AIValidationResult` exposes `.blocked` /
+    `.block_reason` / `.sanitized_text`. The AttributeError was swallowed by
+    the surrounding `except Exception`, so clean Board commentary was
+    silently discarded and every partner email shipped the canned
+    'Commentary unavailable' stub — this runs the REAL validator (not a
+    mock), against realistically-shaped clean input, to prove the fixed
+    attribute names actually round-trip end to end.
+    """
     fake_ses = _wire_handler(monkeypatch)
     partner.lambda_handler({}, None)
     html = fake_ses.sends[0]["Content"]["Simple"]["Body"]["Html"]["Data"]
@@ -1063,4 +1062,45 @@ def test_handler_ai3_validator_failure_degrades_to_the_stub_not_a_crash(monkeypa
     resp = partner.lambda_handler({}, None)
     assert resp["statusCode"] == 200
     assert len(fake_ses.sends) == 1
+
+
+def test_handler_stub_is_reachable_only_on_a_genuine_ai3_failure_and_logs_loudly(monkeypatch, caplog):
+    """The fallback stub must stay reachable if the AI-3 seam itself breaks again —
+
+    but this time the failure must not go quiet: #2173 was hidden for weeks
+    because the AttributeError only ever produced a generic one-line
+    `logger.warning("AI call failed: %s", e)`. Simulate a genuine validator
+    failure (distinct from a `build_commentary` failure, already covered by
+    `test_handler_still_sends_a_fallback_when_the_ai_call_fails`) and assert
+    both that the stub still ships AND that the failure is logged with a
+    traceback (`logger.exception`), not a swallowed one-liner.
+    """
+    fake_ses = _wire_handler(monkeypatch)
+    import ai.ai_output_validator as ai3
+
+    def _boom(text, output_type):
+        raise RuntimeError("AI-3 validator itself is broken")
+
+    monkeypatch.setattr(ai3, "validate_ai_output", _boom)
+
+    # partner.logger (common.platform_logger.PlatformLogger) sets propagate=False
+    # by design (OBS-1: JSON lines shouldn't double-emit via the root logger), so
+    # caplog's root-attached handler never sees it. Attach caplog's handler to the
+    # actual logger instance so this test observes exactly what CloudWatch would.
+    partner.logger.addHandler(caplog.handler)
+    try:
+        with caplog.at_level("ERROR", logger=partner.logger.name):
+            resp = partner.lambda_handler({}, None)
+    finally:
+        partner.logger.removeHandler(caplog.handler)
+
+    assert resp["statusCode"] == 200
+    html = fake_ses.sends[0]["Content"]["Simple"]["Body"]["Html"]["Data"]
+    assert "Commentary unavailable this week." in html
+    # logger.exception logs at ERROR level and (unlike the old logger.warning
+    # one-liner) attaches exc_info — the traceback is what makes a genuine
+    # validator bug findable instead of indistinguishable from a Bedrock hiccup.
+    exc_records = [r for r in caplog.records if r.levelname == "ERROR" and r.exc_info]
+    assert exc_records, "expected a loudly-logged (exc_info-attached) ERROR record"
+    assert any("AI-3 validation failed" in r.message or "AI-3 validation failed" in r.getMessage() for r in exc_records)
     assert fake_ses.sends[0]["Content"]["Simple"]["Body"]["Html"]["Data"].startswith("<!DOCTYPE html>")

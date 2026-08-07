@@ -799,13 +799,18 @@ def lambda_handler(event, context):
             from ai.ai_output_validator import AIOutputType, validate_ai_output
 
             _val = validate_ai_output(commentary, AIOutputType.WEEKLY_DIGEST)
-            if _val.was_replaced:
-                logger.warning("[AI-3] Partner commentary replaced with fallback: %s", _val.failure_reason)
-            commentary = _val.final_text
+            if _val.blocked:
+                logger.warning("[AI-3] Partner commentary replaced with fallback: %s", _val.block_reason)
+            commentary = _val.sanitized_text
         except ImportError:
             pass
-    except Exception as e:
-        logger.warning("AI call failed: %s", e)
+    except Exception:
+        # Log loudly (with traceback) — a swallowed AttributeError here once hid
+        # a genuine bug for weeks (#2173): every successful build_commentary()
+        # call was silently discarded because the AI-3 seam read the wrong
+        # attribute names, and the generic "AI call failed" warning gave no
+        # hint it wasn't actually a Bedrock/network failure.
+        logger.exception("AI call or AI-3 validation failed; falling back to the static stub")
         commentary = (
             "💚 HOW HE'S FEELING — COACH RODRIGUEZ\n"
             "Commentary unavailable this week.\n\n"
