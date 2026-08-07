@@ -36,6 +36,7 @@ from boto3.dynamodb.conditions import Key
 from common.client_ip import extract_client_ip  # #1221 — the ONE edge-observed client-IP helper
 from content.social_signals import coach_route_of  # #1671 — training/mind coach-route classifier, reused read-side (#1674)
 from experiment.phase_filter import with_phase_filter  # ADR-058
+from ingestion.source_registry import SOURCE_REGISTRY  # #1679 — inbound channel live/dormant, read from the canonical registry
 from privacy import social_provenance  # #1670 membrane — the origin:human predicate for the broadcast feed (#1672)
 
 from web.site_api_common import (
@@ -1798,13 +1799,15 @@ def _broadcast_card(post: dict) -> dict:
     }
 
 
-def _membrane_visible_rows() -> list:
-    """Query every ingested-post partition (#1669) and return the rows that pass the
-    ONE membrane predicate (origin:human + sensitivity-clear, fail-closed). Shared
-    by /api/broadcast (#1672) and /api/social_context (#1674) so there's exactly one
-    query + one gate, never two copies drifting apart. Fail-soft per source (a query
-    error on one channel never breaks either feed). Newest-first within each source;
-    callers that merge multiple sources re-sort on the merged set."""
+def _membrane_source_rows() -> list:
+    """Every ingested-post row (#1669), UNGATED — the raw read behind the membrane.
+
+    Split out of _membrane_visible_rows (#1679) because the membrane dashboard has to
+    report on what the gate REJECTED (how many platform-origin echoes it kept out),
+    which is unanswerable from the post-gate set. Everything reader-facing still goes
+    through _membrane_visible_rows below; this function is the shared QUERY, never a
+    second gate. Fail-soft per source (a query error on one channel never breaks a
+    feed). Newest-first within each source; callers merging sources re-sort."""
     rows: list = []
     for source in _BROADCAST_SOURCES:
         pk = f"{USER_PREFIX}{source}"
@@ -1816,7 +1819,15 @@ def _membrane_visible_rows() -> list:
             rows.extend(_decimal_to_float(resp.get("Items", [])))
         except Exception as e:  # noqa: BLE001 — one bad channel must not break the feed
             logger.warning("[site_api] social membrane: source %s query failed (non-fatal): %s", source, e)
-    return [r for r in rows if _is_broadcast_visible(r)]
+    return rows
+
+
+def _membrane_visible_rows() -> list:
+    """The ingested-post rows that pass the ONE membrane predicate (origin:human +
+    sensitivity-clear, fail-closed). Shared by /api/broadcast (#1672),
+    /api/social_context (#1674) and /api/membrane (#1679) so there's exactly one
+    query + one gate, never copies drifting apart."""
+    return [r for r in _membrane_source_rows() if _is_broadcast_visible(r)]
 
 
 def handle_broadcast() -> dict:
@@ -1885,6 +1896,154 @@ def _handle_social_context(event: dict) -> dict:
             "route": route,
             "items": cards,
             "total": len(cards),
+        },
+        cache_seconds=900,
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# The bidirectional membrane dashboard (#1679, epic #1668, story S11)
+# ═══════════════════════════════════════════════════════════════════════════════
+# GET /api/membrane — "what I said, where it went, what came back" in one payload.
+# The loop the epic describes has three stages and this endpoint reports each one
+# from ITS OWN system of record, never from a derived summary:
+#
+#   said / went  ← the BROADCAST_ORIGIN# ledger (#1670). One row per post the
+#                  platform's outbound syndication path created, keyed by
+#                  (channel, post_id). That ledger IS "where it went".
+#   came back    ← the SAME _membrane_visible_rows() the Broadcast feed reads.
+#                  Not a second query and not a second predicate — the dashboard
+#                  cannot disagree with /story/broadcast/ about what is human.
+#   the membrane ← the count of ingested rows the origin gate classified as
+#                  platform echoes. This is the join the epic asks to be visible:
+#                  an echo is displayed as an echo and never counted as inbound.
+#
+# NO vanity metrics (#1402's no-gloss ethos): no followers, no likes, no reach, no
+# impressions. Nothing here is an engagement number — every figure is a count of
+# records the platform itself wrote, which is the only thing it can honestly claim.
+#
+# HONEST ABSENCE (ADR-104). Today every partition below is empty, and "empty" has
+# two different meanings that must not be flattened into one 0:
+#   * a channel that is not wired yet is `dormant` — the absence of a pipe, not the
+#     absence of posting. Derived from the source registry's own `active_api` facet,
+#     never hand-stated here (the #2003 drift class).
+#   * a channel that IS wired and has no rows is `empty` — a real zero.
+# The payload carries the state, and the page renders the two differently.
+#
+# PRIVACY. Everything published here is already public by construction: outbound
+# rows describe posts the platform made in public, and inbound items are exactly the
+# membrane-cleared set /story/broadcast/ already serves. The sensitivity gate's HELD
+# set is deliberately NOT published — not the content and not the count. Publishing
+# "3 held" would disclose that flagged material exists, which is the one thing a
+# fail-closed gate is supposed to keep quiet. That is also why no raw ingested total
+# is returned: with a total, held would be derivable by subtraction.
+
+# The outbound channels whose ledger partition is queried. Mirrors _BROADCAST_SOURCES
+# above: adding a channel appends here and the dashboard picks it up with no other
+# change. Kept in sync by hand with the posting surface's own platform list
+# (scripts/post_social.py --platform), which is a local operator script the Lambda
+# cannot import.
+_OUTBOUND_CHANNELS = ("bluesky", "x")
+_MEMBRANE_LIMIT = 20  # newest N per side — a legible loop, not an archive
+
+
+def _outbound_ledger_rows(channel: str) -> list:
+    """The BROADCAST_ORIGIN# ledger rows for one channel (#1670). Fail-soft: a query
+    error on one channel returns [] rather than breaking the whole dashboard."""
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"BROADCAST_ORIGIN#{channel}") & Key("sk").begins_with("POST#"),
+            ScanIndexForward=False,
+        )
+        return _decimal_to_float(resp.get("Items", []))
+    except Exception as e:  # noqa: BLE001 — one bad channel must not break the dashboard
+        logger.warning("[site_api] membrane: outbound ledger %s query failed (non-fatal): %s", channel, e)
+        return []
+
+
+def _inbound_channel_live(source: str) -> bool:
+    """Is an inbound channel actually pulling yet? Read from the source registry's own
+    `active_api` facet — the canonical place a source's live/dormant state is recorded
+    (CLAUDE.md: read the registry, don't hand-state it). A source absent from the
+    registry is treated as not live."""
+    try:
+        return bool((SOURCE_REGISTRY.get(source) or {}).get("active_api"))
+    except Exception:  # noqa: BLE001 — a registry read must never break the dashboard
+        return False
+
+
+def _outbound_record(row: dict) -> dict:
+    """Reduce a ledger row to the public outbound record. Provenance fields only —
+    what was posted, to which channel, when it was recorded, and where it lives."""
+    return {
+        "id": str(row.get("post_id") or str(row.get("sk", "")).replace("POST#", "")),
+        "channel": row.get("channel", ""),
+        "url": row.get("url", ""),
+        "recorded_at": row.get("recorded_at", ""),
+    }
+
+
+def handle_membrane() -> dict:
+    """GET /api/membrane — the bidirectional membrane dashboard (#1679).
+
+    Read-only, aggregate + provenance only, fail-soft on every read. Returns the
+    three stages of the loop with an explicit state per side so the page can render
+    "not wired yet" differently from "wired and quiet"."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    # ── what I said → where it went (the outbound ledger) ──────────────────────
+    outbound_channels, outbound_rows = [], []
+    for channel in _OUTBOUND_CHANNELS:
+        rows = _outbound_ledger_rows(channel)
+        outbound_rows.extend(rows)
+        outbound_channels.append({"channel": channel, "recorded": len(rows)})
+    outbound_rows.sort(key=lambda r: str(r.get("recorded_at", "")), reverse=True)
+
+    # ── what came back (the SAME gate the Broadcast feed uses) ─────────────────
+    source_rows = _membrane_source_rows()
+    visible = [r for r in source_rows if _is_broadcast_visible(r)]
+    # The membrane join: rows the ORIGIN half of the predicate rejected. Counted from
+    # social_provenance's own predicate — the same one _is_broadcast_visible composes —
+    # so an echo can never be tallied as inbound. (Rows the SENSITIVITY half held are
+    # deliberately not counted or reported; see the privacy note above.)
+    echoes = sum(1 for r in source_rows if not social_provenance.is_displayable_voice(r))
+    visible.sort(key=lambda r: str(r.get("date", "")) + str(r.get("sk", "")), reverse=True)
+
+    inbound_channels = []
+    for source in _BROADCAST_SOURCES:
+        live = _inbound_channel_live(source)
+        inbound_channels.append(
+            {
+                "channel": source,
+                "live": live,
+                "state": "live" if live else "dormant",
+                # VISIBLE (cleared, human-origin) rows only — never the raw partition
+                # count, which would make the held set derivable by subtraction.
+                "visible": sum(1 for r in visible if r.get("channel") == source),
+            }
+        )
+
+    return _ok(
+        {
+            "as_of_date": today,
+            "outbound": {
+                "state": "recording" if outbound_rows else "empty",
+                "total": len(outbound_rows),
+                "channels": outbound_channels,
+                "posts": [_outbound_record(r) for r in outbound_rows[:_MEMBRANE_LIMIT]],
+            },
+            "inbound": {
+                # "dormant" while NO inbound channel is wired — the absence of a pipe,
+                # which is not the same claim as "nothing came back" (ADR-104).
+                "state": "live" if any(c["live"] for c in inbound_channels) else "dormant",
+                "visible": len(visible),
+                "channels": inbound_channels,
+                "items": [_broadcast_card(r) for r in visible[:_MEMBRANE_LIMIT]],
+            },
+            "membrane": {
+                "echoes_excluded": echoes,
+                "predicate": "origin:human AND sensitivity-cleared (fail-closed)",
+            },
         },
         cache_seconds=900,
     )

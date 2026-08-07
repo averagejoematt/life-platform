@@ -1137,3 +1137,51 @@ body { overflow-x: hidden; }
   .dsh-card { grid-template-columns: 1fr; }
   .dsh-mark { width: 44px; }
 }
+
+/* ── The bidirectional membrane (#1679, epic #1668 S11) ──────────────────────────
+   Three stages of one loop: what went out → the membrane → what came back. Laid out
+   as a single column that becomes three tracks on wide viewports, so the loop reads
+   left-to-right where there's room and top-to-bottom where there isn't. Tokens only;
+   no gloss — the join stage earns a hairline ember edge because it is the one thing
+   on the page that is a decision rather than a count. */
+.mb-loop { list-style: none; margin: var(--sp-6) 0 0; padding: 0;
+  display: grid; gap: var(--sp-4);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
+.mb-stage { border: var(--border-hair); border-radius: var(--radius-sm);
+  background: var(--surface); padding: var(--sp-4); display: flex; flex-direction: column;
+  gap: var(--sp-2); min-width: 0; }
+.mb-stage.is-join { border-color: var(--ember); }
+.mb-stage-k { margin: 0; color: var(--ink-faint); text-transform: uppercase;
+  letter-spacing: 0.1em; font-family: var(--font-mono); }
+.mb-stage-t { margin: 0; font-family: var(--font-serif); font-size: var(--fs-h3);
+  line-height: 1.2; color: var(--ink); overflow-wrap: anywhere; }
+.mb-figure { margin: var(--sp-2) 0 0; font-family: var(--font-mono);
+  font-size: var(--fs-h1); line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; }
+.mb-stage.is-join .mb-figure { color: var(--ember); }
+.mb-unit { margin: 0; color: var(--ink-muted); }
+/* Absence, stated as absence — deliberately NOT a numeral (ADR-104). */
+.mb-absent { margin: var(--sp-2) 0 0; font-family: var(--font-serif);
+  font-size: var(--fs-body); line-height: 1.4; color: var(--ink-muted); overflow-wrap: anywhere; }
+.mb-note { margin: 0; color: var(--ink-faint); font-size: var(--fs-small); line-height: 1.5;
+  overflow-wrap: anywhere; }
+.mb-note a { color: var(--ember); }
+.mb-rule { font-family: var(--font-mono); color: var(--ink-muted); overflow-wrap: anywhere; }
+.mb-chips { list-style: none; margin: var(--sp-2) 0 0; padding: 0;
+  display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.mb-chip { display: inline-flex; align-items: baseline; gap: var(--sp-2);
+  border: var(--border-hair); border-radius: var(--radius-sm);
+  padding: 2px var(--sp-2); font-family: var(--font-mono); color: var(--ink-muted); }
+.mb-chip-k { text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-faint); }
+.mb-chip-v { color: var(--ink); font-variant-numeric: tabular-nums; }
+.mb-chip[data-state="dormant"] .mb-chip-v { color: var(--ink-faint); }
+.mb-list { list-style: none; margin: var(--sp-3) 0 0; padding: 0;
+  display: flex; flex-direction: column; gap: 2px; }
+.mb-row { display: flex; justify-content: space-between; align-items: baseline;
+  gap: var(--sp-3); padding: var(--sp-2) 0; border-top: var(--border-hair);
+  text-decoration: none; color: inherit; min-width: 0; }
+a.mb-row:hover .mb-row-k { color: var(--ember); }
+.mb-row-k { font-family: var(--font-serif); color: var(--ink); min-width: 0;
+  overflow-wrap: anywhere; }
+.mb-row-v { color: var(--ink-faint); font-family: var(--font-mono); white-space: nowrap; }
+.mb-foot { margin: var(--sp-5) 0 0; color: var(--ink-faint); font-family: var(--font-mono);
+  line-height: 1.5; }

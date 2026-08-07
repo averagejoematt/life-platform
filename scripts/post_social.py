@@ -2,7 +2,11 @@
 """scripts/post_social.py — #1622: the manual social poster.
 
 Interactive, one post at a time. Lists published candidates, builds a deterministic
-caption, posts the ONE the operator selects. No AWS API; keychain credentials only.
+caption, posts the ONE the operator selects. Credentials come from the keychain, not
+AWS. The single exception (#1679) is the provenance write AFTER a successful post: the
+BROADCAST_ORIGIN# ledger row (#1670) that lets the membrane recognise the platform's
+own words if they later come back through an inbound channel. It is fail-soft — see
+record_outbound — so a provenance miss warns rather than failing an already-sent post.
 
 Two candidate kinds (`--kind`):
   chronicle   (#1622, default) — a published installment, from the moments index +
@@ -173,6 +177,46 @@ def bluesky_post(jwt, did, text):
     return _bsky_post_json("com.atproto.repo.createRecord", body, {"Authorization": f"Bearer {jwt}"})
 
 
+def bluesky_post_id(resp):
+    """The record key of a created post — the last segment of its at:// URI.
+
+    `com.atproto.repo.createRecord` returns {"uri": "at://<did>/app.bsky.feed.post/<rkey>"}.
+    The rkey is the stable per-post identifier that also appears in the public web URL,
+    so it is what the provenance ledger keys on."""
+    uri = str((resp or {}).get("uri") or "")
+    return uri.rsplit("/", 1)[-1] if uri else ""
+
+
+def record_outbound(channel, post_id, url):
+    """#1679: write the post's BROADCAST_ORIGIN# provenance row (#1670).
+
+    Why this exists. `social_provenance.record_broadcast_origin` was written for "the
+    outbound syndication path, when it lands" — and this script IS that path now: it is
+    the only surface that posts under the platform's name. Without this write the
+    membrane has no record of what the platform said, so a later inbound read cannot
+    recognise the platform's own words coming back (the "spanning tree of posting new
+    tweets to the website" the epic exists to prevent), and /api/membrane's outbound
+    side would stay permanently empty no matter how much was posted.
+
+    FAIL-SOFT and strictly after the fact. The post has already happened by the time
+    this runs and cannot be unsent, so a missing ledger row is reported and never
+    raised — a provenance write must not turn a successful post into a failure. This is
+    the script's only AWS call; everything else still runs on keychain credentials.
+    """
+    try:
+        import boto3  # local import: --report and the candidate listing need no AWS
+        from privacy.social_provenance import record_broadcast_origin
+
+        table = boto3.resource("dynamodb", region_name="us-west-2").Table("life-platform")
+        record_broadcast_origin(table, channel, post_id, url=url)
+        return True
+    except Exception as e:  # noqa: BLE001 — provenance must never fail an already-sent post
+        print(f"WARNING: posted, but the broadcast-origin ledger row was NOT written ({e}).")
+        print("  The membrane cannot recognise this post as the platform's own if it comes back inbound.")
+        print(f"  Channel {channel}, post id {post_id or '(unknown)'} — see /story/membrane/.")
+        return False
+
+
 def log_usage(platform, path):
     USAGE_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
     with USAGE_LOG_PATH.open("a") as fh:
@@ -239,9 +283,14 @@ def main(argv=None):
     text = truncate_for_bluesky(candidate["kit"]["caption"])
     password = get_keychain_password(args.handle)
     jwt, did = bluesky_login(args.handle, password)
-    bluesky_post(jwt, did, text)
+    resp = bluesky_post(jwt, did, text)
     log_usage(f"bluesky:{args.kind}", candidate["path"])
     print(f"Posted to Bluesky: {candidate['path']}")
+    # #1679: record the post in the provenance ledger the membrane reads. Fail-soft —
+    # the post is already sent; a ledger miss warns, it never fails the run.
+    rkey = bluesky_post_id(resp)
+    if record_outbound("bluesky", rkey, f"https://bsky.app/profile/{args.handle}/post/{rkey}" if rkey else ""):
+        print("Recorded in the broadcast-origin ledger (/story/membrane/).")
     return 0
 
 

@@ -211,6 +211,7 @@ from web.site_api_social import (
     handle_current_challenge,
     handle_experiment_library,
     handle_ladder_counts,
+    handle_membrane,
     handle_predict_week_tally,
     handle_subscriber_count,
 )
@@ -403,6 +404,11 @@ ROUTES = {
     # human-origin ingested posts (facade cards). Read-only; membrane filter in
     # site_api_social._is_broadcast_visible (S2 origin + S5 sensitivity seam).
     "/api/broadcast": handle_broadcast,
+    # The bidirectional membrane dashboard (#1679, epic #1668 S11): what I said
+    # (BROADCAST_ORIGIN# ledger) → where it went → what came back (the SAME
+    # _membrane_visible_rows gate the feed above reads). Read-only, aggregate +
+    # provenance only; no engagement metrics, no held-post counts.
+    "/api/membrane": handle_membrane,
     # The Engagement Ladder (#1393, epic #1366): public rung counts + provenance.
     # Read-only; the reader's OWN rung is computed client-side from the subscriber
     # token + localStorage (engagement_ladder.js). POST /api/replicate_certify (the

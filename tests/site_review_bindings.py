@@ -276,6 +276,16 @@ PAGE_BINDINGS = [
         "endpoints": [{"url": "/api/broadcast", "role": "primary", "metrics": []}],
     },
     {
+        # #1679 (epic #1668 S11) — the provenance view of the Broadcast feed above.
+        # narrative_order 90.55: between broadcast (90.5) and horizons (90.6), globally-unique.
+        "path": "/story/membrane/",
+        "name": "Story · membrane",
+        "door": "story",
+        "narrative_order": 90.55,
+        "story_intent": "the loop made observable — what went out under the platform's name, what came back as his own voice, and the origin membrane that keeps the second from being an echo of the first",
+        "endpoints": [{"url": "/api/membrane", "role": "primary", "metrics": []}],
+    },
+    {
         # #1707 (epic #1686 S3) — Horizons on the DATA door (near the reading shelf).
         # narrative_order 90.6: unused (broadcast=90.5, next is 91), globally-unique.
         "path": "/data/horizons/",

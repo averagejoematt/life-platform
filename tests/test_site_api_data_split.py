@@ -108,6 +108,7 @@ EXPECTED_ROUTE_MAP = {
     "/api/journey_timeline": "handle_journey_timeline",
     "/api/journey_waveform": "handle_journey_waveform",
     "/api/broadcast": "handle_broadcast",  # #1672 — The Social Membrane broadcast feed
+    "/api/membrane": "handle_membrane",  # #1679 — the bidirectional membrane dashboard (epic #1668 S11)
     "/api/ladder_counts": "handle_ladder_counts",  # #1393 — the Engagement Ladder public rung counts
     "/api/labs": "handle_labs",
     "/api/last_sync": "handle_last_sync",

@@ -389,6 +389,20 @@ _CURATED = [
         "visual": {"checks": [{"selector": "main, [data-readout], article", "not_empty": True, "desc": "broadcast content"}]},
     },
     {
+        # #1679 (The Social Membrane, epic #1668, S11): the bidirectional membrane —
+        # what I said (the BROADCAST_ORIGIN# ledger) → where it went → what came back
+        # (the same membrane gate /api/broadcast reads). Provenance counts only; the
+        # sensitivity gate's held set is never published. Unlisted from the story tab
+        # bar (linked from the Broadcast section), same posture as /story/build/.
+        "path": "/story/membrane/",
+        "name": "Story · membrane",
+        "tier": 2,
+        "content_class": "live-data",
+        "api_deps": ["/api/membrane"],
+        "js_modules": ["story.js"],
+        "visual": {"checks": [{"selector": "main, [data-readout], article", "not_empty": True, "desc": "membrane content"}]},
+    },
+    {
         # #1707 (epic #1686 S3): Horizons — the Mind coach's weekly media picks + their
         # grounded retrospectives, on the DATA door near the reading shelf. From the
         # read-only /api/horizons; degrades to an honest empty/"note coming" state at low n.
