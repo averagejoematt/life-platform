@@ -324,9 +324,12 @@ def _compute_trends(all_data, ewma_params):
             prior_values = values[:cutoff]
             prior_ewma = ewma(prior_values, decay) if len(prior_values) >= 2 else None
 
-            # Slope and direction
+            # Slope and direction. #2179: "insufficient_data" (not "flat") when there
+            # isn't enough history for the 7-day-ago EWMA (< ~9 points) — a metric
+            # that was never measured as flat must not vote as flat downstream in
+            # _detect_arc_transition's plateau tally (ADR-104 honest-absence semantics).
             slope = None
-            direction = "flat"
+            direction = "insufficient_data" if prior_ewma is None else "flat"
             if current_ewma is not None and prior_ewma is not None and prior_ewma != 0:
                 slope = (current_ewma - prior_ewma) / abs(prior_ewma)
                 if slope > 0.02:
@@ -726,6 +729,11 @@ def _detect_arc_transition(trends, guardrails, all_data, today_str):
             if not isinstance(metric_data, dict):
                 continue
             d = metric_data.get("direction", "flat")
+            if d == "insufficient_data":
+                # #2179: a metric with too little history to compute a 7-day-ago
+                # EWMA was never actually measured as flat — exclude it from the
+                # vote entirely rather than let it inflate flat_pct.
+                continue
             if d == "up":
                 up_count += 1
             elif d == "down":

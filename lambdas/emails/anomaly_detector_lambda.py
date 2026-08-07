@@ -111,6 +111,11 @@ RECIPIENT = "awsdev@mattsusername.com"
 SENDER = "awsdev@mattsusername.com"
 MIN_BASELINE_DAYS = 7
 
+# #2179: single source of truth for the detector version — both the DDB write and
+# the HTTP response body must reference this constant, never a hand-typed literal
+# (they had drifted to 2.5.0 vs 2.3.0).
+DETECTOR_VERSION = "2.5.0"
+
 # ── Adaptive threshold configuration ─────────────────────────────────────────
 # TB7-21 (2026-03-13): Raised floor from 1.5/1.75 to Z=2.0 across all CV buckets.
 # At 13 metrics, Z=1.5 floor yields ~42% daily FP rate. Z=2.0 floor drops it to ~2.3% per metric.
@@ -155,6 +160,14 @@ METRICS = [
     ("apple_health", "blood_pressure_systolic", "BP Systolic", False),
     ("apple_health", "blood_pressure_diastolic", "BP Diastolic", False),
 ]
+
+# #2179: sleep-metric dedup set for _check_sustained_streaks — deliberately hoisted
+# to a module constant (guard the SET, not one call site) so it's directly testable
+# against METRICS. Must name real fields METRICS actually emits — a prior version
+# named "sleep_score"/"sleep_performance", which METRICS never produces (the real
+# sleep fields are sleep_quality_score and sleep_efficiency_percentage), so the
+# dedup this set exists to perform could never fire.
+SLEEP_DEDUP_FIELDS = {"sleep_efficiency_percentage", "sleep_quality_score"}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -640,13 +653,12 @@ def _check_sustained_streaks(yesterday_str, today_flagged):
         )
 
     # ── 4. Park: deduplicate sleep metrics — keep most clinically meaningful ──
-    sleep_fields = {"sleep_efficiency_percentage", "sleep_score", "sleep_performance"}
-    sleep_hits = [s for s in sustained if s["metric"] in sleep_fields]
+    sleep_hits = [s for s in sustained if s["metric"] in SLEEP_DEDUP_FIELDS]
     if len(sleep_hits) > 1:
         # sleep_efficiency_percentage is most clinically meaningful; keep it, drop others
         priority_field = "sleep_efficiency_percentage"
         keep = next((s for s in sleep_hits if s["metric"] == priority_field), sleep_hits[0])
-        sustained = [s for s in sustained if s["metric"] not in sleep_fields or s is keep]
+        sustained = [s for s in sustained if s["metric"] not in SLEEP_DEDUP_FIELDS or s is keep]
 
     return sustained
 
@@ -781,7 +793,7 @@ def write_anomaly_record(
         "travel_destination": travel_dest,
         "sick_mode": sick_mode,
         "sick_reason": sick_reason,
-        "detector_version": "2.5.0",
+        "detector_version": DETECTOR_VERSION,
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "ttl": ttl_epoch,
     }
@@ -1065,7 +1077,7 @@ def lambda_handler(event, context):
                 "travel_destination": travel_dest,
                 "sustained_count": len(sustained_metrics),
                 "sustained_alert_sent": sustained_alert_sent,
-                "detector_version": "2.3.0",
+                "detector_version": DETECTOR_VERSION,
             }
         ),
     }

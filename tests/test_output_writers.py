@@ -1223,10 +1223,12 @@ def test_buddy_days_since_handles_strings_dates_and_junk():
     assert ow._buddy_days_since("2026-03-01", TODAY) == 3
     assert ow._buddy_days_since("2026-03-04", TODAY) == 0
     assert ow._buddy_days_since(date(2026, 2, 25), TODAY) == 7
-    # A missing or unparseable date must read as "ancient", never as "today".
-    assert ow._buddy_days_since(None, TODAY) == 99
-    assert ow._buddy_days_since("", TODAY) == 99
-    assert ow._buddy_days_since("last tuesday", TODAY) == 99
+    # #2179: a missing or unparseable date must read as "unknown" (None), never
+    # as a fabricated day count — the old 99 sentinel leaked into reader prose
+    # as "No weigh-in in 99+ days".
+    assert ow._buddy_days_since(None, TODAY) is None
+    assert ow._buddy_days_since("", TODAY) is None
+    assert ow._buddy_days_since("last tuesday", TODAY) is None
 
 
 def test_buddy_friendly_date_formats_and_passes_junk_through():
@@ -1408,12 +1410,33 @@ def test_write_buddy_json_all_signals_quiet_raises_the_red_beacon(_frozen_pacifi
     assert "reach out" in buddy["prompt_for_tom"]
     assert [line["status"] for line in buddy["status_lines"]] == ["red", "red", "red", "red"]
     by_area = {line["area"]: line["text"] for line in buddy["status_lines"]}
-    assert by_area["Food Logging"] == "No food logged in 99 days — might be off track"
+    # #2179: no data anywhere in the 7-day lookback window reads as an honest "no
+    # data" statement, never as the fabricated "99 days"/"99+ days" sentinel.
+    assert by_area["Food Logging"] == "No food logged in the last 7 days"
     # Wednesday is day 3 of the week, past the "too early to tell" grace window.
-    assert by_area["Exercise"] == "No exercise this week — last session 99 days ago"
-    assert by_area["Weight"] == "No weigh-in in 99+ days"
+    assert by_area["Exercise"] == "No exercise logged in the last 7 days"
+    assert by_area["Routine"] == "No habit data in the last 7 days — routine may have slipped"
+    assert by_area["Weight"] == "No weigh-in in the last 7 days"
     assert buddy["activity_highlights"] == []
     assert buddy["food_snapshot"] == ""
+
+
+def test_write_buddy_json_a_real_stale_log_still_prints_its_actual_day_count(_frozen_pacific):
+    # #2179 guard: the fix must not blur a genuinely-known stale date (still inside
+    # the 7-day lookback) into the generic "no data" message — only a true absence
+    # (nothing in the lookback at all) gets the honest-unknown text.
+    ranges = _buddy_ranges(
+        macrofactor=[{"sk": "DATE#2026-02-25", "total_calories_kcal": 2000}],  # exactly 7 days ago
+        strava=[],
+        habitify=[],
+        withings=[],
+    )
+    s3, _, _ = _init(fetch_range=ranges)
+    ow.write_buddy_json({}, PROFILE, YESTERDAY)
+
+    by_area = {line["area"]: line for line in s3.written(_BUDDY_KEY)["status_lines"]}
+    assert by_area["Food Logging"]["status"] == "red"
+    assert by_area["Food Logging"]["text"] == "No food logged in 7 days — might be off track"
 
 
 def test_write_buddy_json_single_amber_signal_yields_a_yellow_beacon(_frozen_pacific):
