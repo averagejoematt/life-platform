@@ -58,6 +58,16 @@ budget-breakdown JSON so the daily brief's headroom line can say so.
 IAM: ce:GetCostAndUsage, cloudwatch:GetMetricData, cloudwatch:PutMetricData,
      ssm:GetParameter, ssm:PutParameter, sns:Publish.
 Schedule: every 8h (EventBridge — cron(0 0/8 * * ? *)).
+
+#2116 (completes #1961): every run also publishes
+LifePlatform/AI::TokenAlarmGenesisWindowActive — a 1/0 gauge derived from
+`common/token_alarm_window.py`'s stamped genesis rebuild window. This Lambda's
+existing 8h cron is the "periodic gauge metric... from existing machinery, no
+new cron" the story calls for. `cdk/stacks/monitoring_stack.py` gates the raw
+`ai-tokens-platform-daily-total` alarm's urgent-topic SNS action behind a
+composite alarm keyed on this gauge, closing #1961's residual gap (the direct
+human EmailSubscription had no window awareness even after #2114 fixed the
+automated-triage path). See that module's docstring for the full rationale.
 """
 
 import calendar
@@ -75,6 +85,14 @@ try:
 except ImportError:
     logger = logging.getLogger("cost-governor")
     logger.setLevel(logging.INFO)
+
+try:
+    from common.token_alarm_window import is_within_token_alarm_window
+except ImportError:  # pragma: no cover - packaging drift; fail safe = gauge reads "not in window"
+
+    def is_within_token_alarm_window(check_date: date | None = None) -> bool:
+        return False
+
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 ACCT = os.environ.get("CDK_ACCOUNT", "205930651321")
@@ -705,6 +723,35 @@ def _emit_metrics(mtd: float, projected: float, tier: int, self_reported_mtd: fl
         logger.warning(f"PutMetricData failed: {e}")
 
 
+def _emit_token_alarm_window_gauge() -> None:
+    """#2116: publish whether TODAY falls inside the stamped genesis rebuild
+    window (`common/token_alarm_window.py`) as a periodic 1/0 gauge. This is
+    the "periodic gauge metric... from existing machinery, no new cron" the
+    story's acceptance criteria call for — this Lambda already runs every 8h.
+
+    `cdk/stacks/monitoring_stack.py`'s composite alarm reads this gauge (via a
+    sub-alarm on it) to decide whether the raw `ai-tokens-platform-daily-total`
+    threshold breach should route to the urgent topic or the digest topic —
+    closing the residual #1961 gap the raw CloudWatch alarm's SNS action had
+    (it kept paging on a predicted spike even after #2114 fixed the automated-
+    triage path). Namespace/metric match the alarm's own `LifePlatform/AI`
+    namespace so they read as one family in the console.
+
+    Never raises: a PutMetricData failure here must not fail the governor's
+    real job (budget-tier enforcement). A missing/stale gauge fails safe on
+    the ALARM side (NOT_BREACHING => "assume not in window" => the raw breach
+    still pages) — see monitoring_stack.py's comment at the gauge alarm.
+    """
+    try:
+        active = 1 if is_within_token_alarm_window() else 0
+        _cw.put_metric_data(
+            Namespace="LifePlatform/AI",
+            MetricData=[{"MetricName": "TokenAlarmGenesisWindowActive", "Value": active, "Unit": "None"}],
+        )
+    except Exception as e:
+        logger.warning(f"PutMetricData (TokenAlarmGenesisWindowActive) failed: {e}")
+
+
 def lambda_handler(event, context):
     try:
         now = datetime.now(timezone.utc)
@@ -753,6 +800,9 @@ def lambda_handler(event, context):
             f"surge_active={surge_active} effective_ceiling=${effective_ceiling:.0f}"
         )
         _emit_metrics(mtd, projected, computed_tier, self_reported)
+        # #2116: independent of OBSERVE_MODE/budget-tier enforcement — the
+        # genesis-window gauge is a pure calendar fact, not a spend decision.
+        _emit_token_alarm_window_gauge()
 
         # Phase B ships in OBSERVE mode: emit metrics + log the computed tier, but
         # do NOT write SSM or alert — lets us validate the estimate vs the real

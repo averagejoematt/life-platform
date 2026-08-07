@@ -801,22 +801,92 @@ class MonitoringStack(Stack):
         # ~121k. 150000 clears those peaks and alerts only on a genuine ~2.5x runaway.
         # Future: swap to a CloudWatch anomaly-detection band (per ai-daily-spend-high).
         #
-        # #1961: this fixed threshold has NO reset-window awareness — a genesis's
-        # predictable post-reset full-cycle rebuild spike (character sheet + compute
-        # + coach dossiers + chronicle backfill all regenerating at once) can clear
-        # 150000 and page exactly like an unexplained runaway (cycle 11 did, twice).
-        # `lambdas/operational/remediation_dispatcher_lambda.py` now consults
-        # `lambdas/common/token_alarm_window.py`'s stamped genesis window and skips
-        # the automated urgent-triage escalation for a breach inside it — but that
-        # fix is Lambda-side only. THIS alarm's SNS action is still a static CDK
-        # resource routed straight to the urgent topic (which also carries a direct
-        # human EmailSubscription, operational_stack.py) — it has no window
-        # awareness and still pages on a predicted spike until a follow-up gives
-        # this alarm itself dynamic, deploy-free window suppression (e.g. a
-        # composite alarm gated on a periodic genesis-window gauge metric).
-        _alarm(
-            "AiTokensPlatformTotal", "ai-tokens-platform-daily-total", "LifePlatform/AI", "AnthropicOutputTokens", 86400, "Sum", 150000, GTE
+        # #1961 -> #2116 (this block closes #1961's residual gap, flagged in
+        # PR #2114): a genesis's predictable post-reset full-cycle rebuild spike
+        # (character sheet + compute + coach dossiers + chronicle backfill all
+        # regenerating at once) can clear 150000 and page exactly like an
+        # unexplained runaway (cycle 11 did, twice). #2114 fixed the AUTOMATED
+        # remediation-triage escalation (Lambda-side,
+        # `lambdas/common/token_alarm_window.py`, consulted by
+        # remediation_dispatcher_lambda.py) but left the raw CloudWatch alarm's
+        # own SNS action — routed straight to the urgent topic, which ALSO
+        # carries a direct human EmailSubscription (operational_stack.py) — with
+        # no window awareness at all: a predicted spike still emailed the
+        # operator directly.
+        #
+        # Mechanism (the composite-alarm design #2114 flagged as the follow-up):
+        # `lambdas/operational/cost_governor_lambda.py` (already on its existing
+        # 8h cron — no new schedule, #781) now publishes a
+        # LifePlatform/AI::TokenAlarmGenesisWindowActive 1/0 gauge from the SAME
+        # stamped window the dispatcher consults. The raw threshold alarm below
+        # carries NO SNS action of its own anymore — it exists only as a signal
+        # two composite alarms combine with the window gauge:
+        #   ai-tokens-platform-daily-total-urgent          breach AND NOT in-window -> urgent topic
+        #   ai-tokens-platform-daily-total-genesis-window  breach AND     in-window -> digest topic
+        # so a genesis-week breach is still recorded (digest), never paged, and
+        # an out-of-window breach still pages exactly as before #2116. This is a
+        # CDK-only change — NEEDS `cdk deploy LifePlatformMonitoring` to take
+        # effect; until that deploy, the raw alarm's behavior (and the direct
+        # human email) is UNCHANGED from #1961's pre-fix state.
+        ai_tokens_platform_metric = cloudwatch.Metric(
+            namespace="LifePlatform/AI",
+            metric_name="AnthropicOutputTokens",
+            period=Duration.seconds(86400),
+            statistic="Sum",
         )
+        ai_tokens_platform_alarm = cloudwatch.Alarm(
+            self,
+            "AiTokensPlatformTotal",
+            alarm_name="ai-tokens-platform-daily-total",
+            metric=ai_tokens_platform_metric,
+            evaluation_periods=1,
+            threshold=150000,
+            comparison_operator=GTE,
+            treat_missing_data=NB,
+        )
+
+        # The window-gauge sub-alarm — NOT itself routed to any topic; it exists
+        # only to give the composite alarms below a boolean ALARM/OK state to
+        # combine with the threshold breach. Period matches cost_governor's 8h
+        # cadence. Missing data (gauge hasn't published recently) is
+        # NOT_BREACHING, i.e. "assume not in window" — the same fail-safe
+        # direction as token_alarm_window.py's own malformed-stamp handling: a
+        # missing/stale gauge must never silently suppress a real page.
+        genesis_window_metric = cloudwatch.Metric(
+            namespace="LifePlatform/AI",
+            metric_name="TokenAlarmGenesisWindowActive",
+            period=Duration.seconds(28800),
+            statistic="Maximum",
+        )
+        genesis_window_alarm = cloudwatch.Alarm(
+            self,
+            "TokenAlarmGenesisWindowActive",
+            alarm_name="token-alarm-genesis-window-active",
+            metric=genesis_window_metric,
+            evaluation_periods=1,
+            threshold=1,
+            comparison_operator=GTE,
+            treat_missing_data=NB,
+        )
+
+        _token_platform_breach = cloudwatch.AlarmRule.from_alarm(ai_tokens_platform_alarm, cloudwatch.AlarmState.ALARM)
+        _in_genesis_window = cloudwatch.AlarmRule.from_alarm(genesis_window_alarm, cloudwatch.AlarmState.ALARM)
+
+        ai_tokens_platform_urgent = cloudwatch.CompositeAlarm(
+            self,
+            "AiTokensPlatformUrgent",
+            composite_alarm_name="ai-tokens-platform-daily-total-urgent",
+            alarm_rule=cloudwatch.AlarmRule.all_of(_token_platform_breach, cloudwatch.AlarmRule.not_(_in_genesis_window)),
+        )
+        ai_tokens_platform_urgent.add_alarm_action(cw_actions.SnsAction(topic))
+
+        ai_tokens_platform_in_window = cloudwatch.CompositeAlarm(
+            self,
+            "AiTokensPlatformInGenesisWindow",
+            composite_alarm_name="ai-tokens-platform-daily-total-genesis-window",
+            alarm_rule=cloudwatch.AlarmRule.all_of(_token_platform_breach, _in_genesis_window),
+        )
+        ai_tokens_platform_in_window.add_alarm_action(cw_actions.SnsAction(digest))
 
         # G2: daily AI-spend ceiling — the anomaly guard. EstimatedCostUSD is
         # emitted (dimensionless) at the bedrock_client chokepoint (G1), so this

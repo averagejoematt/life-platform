@@ -9,11 +9,18 @@ approach): AST-parse monitoring_stack.py to derive, for every alarm construct,
 whether it is routed to the urgent (`topic`) or digest (`digest`) SNS topic —
 via the shared `_alarm()`/`_heartbeat_alarm()` helpers' `to_digest` kwarg, and
 via the handful of alarms built directly with `cloudwatch.Alarm(...)` +
-`.add_alarm_action(cw_actions.SnsAction(<topic-var>))`. Cross-checked once
-against the real `cdk synth` CloudFormation template (2026-07-18): the derived
-urgent set (13 static names, expanding to 17 concrete alarms once the
+`.add_alarm_action(cw_actions.SnsAction(<topic-var>))` — plus, since #2116,
+`cloudwatch.CompositeAlarm(...)` the same way (its name kwarg is
+`composite_alarm_name`, not `alarm_name`). Cross-checked once against the real
+`cdk synth` CloudFormation template (2026-07-18): the derived urgent set (13
+static names, expanding to 17 concrete alarms once the
 whoop/withings/strava/eightsleep/hevy `ingest-consecutive-failures-{src}`
-f-string loop is unrolled) matched exactly.
+f-string loop is unrolled) matched exactly. #2116 (verified against a fresh
+local synth, see that PR) replaced the raw `ai-tokens-platform-daily-total`
+alarm's direct SNS action with two composite alarms
+(`ai-tokens-platform-daily-total-urgent` -> urgent,
+`ai-tokens-platform-daily-total-genesis-window` -> digest) gated on a
+genesis-rebuild-window gauge; the raw alarm itself now carries no action.
 
 Both tests FAIL on the pre-#1444 tree: the alerts topic had no email
 subscription in IaC, and URGENT_PATTERNS's "canary" / "dlq-depth" /
@@ -38,6 +45,17 @@ def _kw(call, name):
     for k in call.keywords:
         if k.arg == name:
             return k.value
+    return None
+
+
+def _kw_first(call, names):
+    """First matching keyword value across a list of candidate kwarg names —
+    `cloudwatch.Alarm(...)` names its alarm via `alarm_name`, but
+    `cloudwatch.CompositeAlarm(...)` (#2116) uses `composite_alarm_name`."""
+    for name in names:
+        v = _kw(call, name)
+        if v is not None:
+            return v
     return None
 
 
@@ -98,8 +116,10 @@ def _extract_alarm_routing():
 
     routing = {}
 
-    # Step 2 + 3: alarms built directly with cloudwatch.Alarm(...) assigned to
-    # a variable, then routed via <var>.add_alarm_action(cw_actions.SnsAction(<topic-var>)).
+    # Step 2 + 3: alarms built directly with cloudwatch.Alarm(...) OR
+    # cloudwatch.CompositeAlarm(...) (#2116 — the token-alarm genesis-window
+    # composite) assigned to a variable, then routed via
+    # <var>.add_alarm_action(cw_actions.SnsAction(<topic-var>)).
     var_to_alarm_name = {}
     for stmt in _walk_no_nested_func(init.body):
         if (
@@ -107,9 +127,9 @@ def _extract_alarm_routing():
             and isinstance(stmt.value, ast.Call)
             and isinstance(stmt.targets[0], ast.Name)
             and isinstance(stmt.value.func, ast.Attribute)
-            and stmt.value.func.attr == "Alarm"
+            and stmt.value.func.attr in ("Alarm", "CompositeAlarm")
         ):
-            name_val = _render_name(_kw(stmt.value, "alarm_name"))
+            name_val = _render_name(_kw_first(stmt.value, ("alarm_name", "composite_alarm_name")))
             if name_val:
                 var_to_alarm_name[stmt.targets[0].id] = name_val
 
