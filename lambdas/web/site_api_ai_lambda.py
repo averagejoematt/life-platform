@@ -456,8 +456,16 @@ def _ask_fetch_computed_reads() -> dict:
         if facts.get("weekly_rate_lbs") is not None:
             reads["weekly_rate_lbs"] = facts["weekly_rate_lbs"]
         if facts.get("protein_g_avg") is not None:
+            # #1919 — MEASURED: `protein_g_avg` is computed in
+            # daily_metrics_compute_lambda.py from a 30-day cross-phase
+            # `fetch_range` window (RAW_TIMESERIES, #2109) — it has always been a
+            # real 30-day average, never a genesis-clamp casualty. The defect was
+            # the KEY, not the window: it published as `avg_7d_g` (and narrated
+            # "7-day avg") while the underlying computation was 30 days. Renamed
+            # to match reality rather than gated, because there is nothing to gate
+            # — the window is genuinely, permanently full.
             reads["protein"] = {
-                "avg_7d_g": facts["protein_g_avg"],
+                "avg_30d_g": facts["protein_g_avg"],
                 "target_g": facts.get("protein_g_target"),
                 "floor_g": facts.get("protein_g_floor"),
             }
@@ -598,7 +606,7 @@ def _ask_reads_block(reads: dict) -> str:
         lines.append(f"  Weight trend: {reads['weekly_rate_lbs']:+.1f} lbs/week (computed)")
     pr = reads.get("protein")
     if pr:
-        seg = f"  Protein: {pr['avg_7d_g']:.0f}g 7-day avg intake"
+        seg = f"  Protein: {pr['avg_30d_g']:.0f}g 30-day avg intake"
         if pr.get("target_g") is not None:
             seg += f" (target {pr['target_g']:.0f}g"
             seg += f", floor {pr['floor_g']:.0f}g)" if pr.get("floor_g") is not None else ")"

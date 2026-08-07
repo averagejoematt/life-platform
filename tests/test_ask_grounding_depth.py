@@ -39,7 +39,7 @@ _READS = {
     "strongest_habits": ["walk", "protein"],
     "weakest_habits": ["journal"],
     "weekly_rate_lbs": -1.4,
-    "protein": {"avg_7d_g": 152.0, "target_g": 170.0, "floor_g": 140.0},
+    "protein": {"avg_30d_g": 152.0, "target_g": 170.0, "floor_g": 140.0},
     "month_deltas": [
         {
             "label": "Recovery",
@@ -63,7 +63,7 @@ def test_reads_block_renders_every_read():
     assert "Improving (7d): hrv, sleep_duration" in block
     assert "Declining (7d): steps" in block
     assert "Weight trend: -1.4 lbs/week" in block
-    assert "152g 7-day avg intake (target 170g, floor 140g)" in block
+    assert "152g 30-day avg intake (target 170g, floor 140g)" in block
     assert "Recovery 62.1 vs 58.4 prior" in block
     assert "r=+0.61, n=45 days" in block
     assert "quiet stretch (quiet) — 5 days since the last manual log; passive devices still flowing" in block

@@ -99,9 +99,23 @@ def test_every_gated_intensive_registry_field_is_covered(key):
 
 
 def test_gap_declared_debt_is_exempt_and_stated():
-    # #1919's fields still publish under-filled — the registry carries the debt,
-    # so the checker must not double-report it (the overlap is stated, not duplicated).
-    assert pp.check_payload("/x", {"mean_7d": 4.5}, day_n=3) == []
+    # #1919: group_90d_avgs is deliberately left ungated (the #1919 PR explains
+    # why in window_registry.py — full-nulling would blank the /habits/ effort
+    # map for up to 90 days post-reset) — the registry carries the debt as a
+    # `gap` string, so the checker must not double-report it (the overlap is
+    # stated, not duplicated). mean_7d/mean_30d used to be this file's example
+    # of gap-declared debt; #1919 fully gated them (gap=None now), so they moved
+    # into `_GATED_INTENSIVE` above instead of illustrating this case.
+    assert pp.check_payload("/x", {"group_90d_avgs": 55}, day_n=3) == []
+
+
+def test_gap_exempt_not_debt_is_also_not_flagged():
+    # #1919: avg_30d_g / sleep_hours_30d_avg are INTENSIVE with a non-None gap
+    # for a DIFFERENT reason than group_90d_avgs above — they are provably never
+    # genesis-clamped (deliberately cross-phase reads, #2109), so a real,
+    # correct, permanently-full value must not trip the day_n gate either.
+    assert pp.check_payload("/x", {"avg_30d_g": 178.0}, day_n=3) == []
+    assert pp.check_payload("/x", {"sleep_hours_30d_avg": 7.4}, day_n=3) == []
 
 
 def test_extensive_counts_are_exempt_by_kind():

@@ -1368,8 +1368,11 @@ def board_grounding_receipts(ctx, limit=6):
         receipts.append({"label": "recovery", "value": f"{recovery:.0f}%"})
 
     protein = reads.get("protein") or {}
-    if isinstance(protein, dict) and isinstance(protein.get("avg_7d_g"), (int, float)):
-        receipts.append({"label": "protein", "value": f"7d avg {protein['avg_7d_g']:.0f}g"})
+    # #1919: renamed avg_7d_g -> avg_30d_g at the source (site_api_ai_lambda.py) —
+    # the computation was always a real 30-day cross-phase average (#2109); only
+    # the key/prose claimed 7 days.
+    if isinstance(protein, dict) and isinstance(protein.get("avg_30d_g"), (int, float)):
+        receipts.append({"label": "protein", "value": f"30d avg {protein['avg_30d_g']:.0f}g"})
 
     sleep_hours = ctx.get("sleep_hours")
     if isinstance(sleep_hours, (int, float)):
@@ -1403,7 +1406,7 @@ def board_grounding_receipts(ctx, limit=6):
 
 def board_grounding_footer(ctx, limit=6):
     """Render `board_grounding_receipts` as the reader-facing footer string,
-    e.g. "grounded in: recovery 48% · protein 7d avg 132g · presence quiet 9d".
+    e.g. "grounded in: recovery 48% · protein 30d avg 132g · presence quiet 9d".
     "" when there's nothing to show (an empty/partial brief) — the caller
     should omit the footer entirely rather than render an empty prefix."""
     receipts = board_grounding_receipts(ctx, limit=limit)

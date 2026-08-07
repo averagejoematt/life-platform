@@ -17,6 +17,7 @@ from web.site_api_common import (
     _is_blocked_vice,
     _ok,
     _scrub_blocked_terms,
+    _window_span,
     logger,
 )
 
@@ -454,6 +455,18 @@ def habits(*, _g) -> dict:
     group_90d_avgs = {g: round(group_90d_sums[g] / group_90d_counts[g]) for g in group_90d_sums if group_90d_counts.get(g, 0) > 0}
     keystone_group = max(group_90d_avgs, key=group_90d_avgs.get) if group_90d_avgs else None
     keystone_group_pct = group_90d_avgs.get(keystone_group) if keystone_group else None
+    # #1919 — `group_90d_avgs` IS a genesis-clamped mean (`ninety_days_ago` floors
+    # at EXPERIMENT_START) and under-fills its `_90d` name through Day 90 of every
+    # cycle, exactly the debt class #1917 fixed on /api/vitals. Left UNGATED here
+    # deliberately: unlike the other #1919 fields, this one is the PRIMARY series
+    # /habits/ renders (evidence_habits.js reads it directly for the effort map,
+    # group trends, and goal linkage, with no fallback) — nulling it would blank
+    # that page for up to ~90 days after every cycle restart, which is a worse
+    # reader outcome than a disclosed partial mean. This adds the disclosure half
+    # of the #1917 pattern (the real span, so a consumer CAN tell); gating the
+    # name itself is left as a deliberate follow-up that also migrates the
+    # front-end onto a window-generic key (see window_registry.py).
+    group_avgs_window_days = _window_span(ninety_days_ago, today, 90)["actual_days"]
 
     # ── HAB-3: Pearson correlation per habit group vs character score ──────────
     keystone_correlations = []
@@ -615,6 +628,7 @@ def habits(*, _g) -> dict:
             "best_day": best_dow,
             "worst_day": worst_dow,
             "group_90d_avgs": group_90d_avgs,
+            "group_avgs_window_days": group_avgs_window_days,
             "keystone_group": keystone_group,
             "keystone_group_pct": keystone_group_pct,
             # HAB-3: top 5 habit groups by |Pearson r| vs character score
