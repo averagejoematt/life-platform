@@ -35,6 +35,10 @@
     "category": "write-path",
     "reason": "POST-only — votes on an experiment (write)"
   },
+  "/api/membrane": {
+    "category": "capture-failed",
+    "reason": "#1679 (epic #1668 S11) — the bidirectional membrane dashboard's read-only endpoint, newly added and not yet deployed, so there is no live instance to capture a snapshot from. Takes no parameters. Remove this exemption and commit the real captured snapshot once this ships and `python3 deploy/capture_api_schemas.py` runs against the deployed endpoint."
+  },
   "/api/nudge": {
     "category": "write-path",
     "reason": "POST-only — evening nudge action (write)"

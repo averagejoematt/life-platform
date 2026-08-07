@@ -40,6 +40,13 @@ const SECTIONS = [
   // membrane (#1670) + the fail-closed sensitivity gate (#1673) filter server-side in
   // /api/broadcast, so the client renders exactly what it's given.
   { key: "broadcast", label: "Broadcast", kicker: "Matthew's own posts, self-hosted", kind: "broadcast", url: "/api/broadcast" },
+  // #1679 (epic #1668 S11): the bidirectional membrane — what I said, where it went,
+  // what came back, with the origin membrane as the visible join. `unlisted` for the
+  // same reason as the build log: it's the provenance/engineering view of the feed
+  // above, reached from Broadcast rather than from the reader's story tab bar. No
+  // engagement metrics of any kind (#1402's no-gloss ethos) — every figure is a count
+  // of records the platform itself wrote.
+  { key: "membrane", label: "The membrane", kicker: "what I said, where it went, what came back", kind: "membrane", url: "/api/membrane", unlisted: true },
   // #380 — the engineering exhaust, distilled. Each beat is written at session
   // close from the handover (docs/content/BUILD_DISPATCH_CHECKLIST.md), commits
   // with the code, and narrates ONLY merged + deployed work — never plans.
@@ -446,7 +453,10 @@ async function renderRead(s, id) {
       })
       .join("");
     const feedFoot =
-      `<p class="bc-subscribe label">Follow the broadcast via <a href="/story/broadcast/rss.xml">RSS</a> or <a href="/subscribe/">email</a>.</p>`;
+      `<p class="bc-subscribe label">Follow the broadcast via <a href="/story/broadcast/rss.xml">RSS</a> or <a href="/subscribe/">email</a>.</p>` +
+      // #1679 — the provenance view of this same feed: how it's filtered, and what
+      // the platform posted outward. The one inbound link to the membrane section.
+      `<p class="bc-subscribe label">How this feed is filtered, and what went out: <a href="/story/membrane/">the membrane</a>.</p>`;
     read.innerHTML = head + `<ul class="bc-feed">${cards}</ul>` + feedFoot;
     // Deep-link: if the URL carries #<id>, scroll that card into view.
     const targetId = (location.hash || "").replace("#", "");
@@ -454,6 +464,100 @@ async function renderRead(s, id) {
       const el = read.querySelector(`#${(window.CSS && CSS.escape) ? CSS.escape(targetId) : targetId}`);
       if (el) el.scrollIntoView({ block: "nearest" });
     }
+    return;
+  }
+  if (s.kind === "membrane") {
+    // #1679 — the loop made observable: what I said → where it went → what came back,
+    // with the origin membrane as the visible join. Two rules drive every branch below.
+    //
+    // 1. No vanity metrics (#1402). Nothing here is an engagement number. Every figure
+    //    is a count of records the platform itself wrote — posts it syndicated, posts
+    //    it ingested, echoes it filtered.
+    // 2. Absence is absence, not zero (ADR-104). A channel that isn't wired renders as
+    //    "not wired yet", NEVER as "0 came back" — those are different claims and the
+    //    API distinguishes them with an explicit `state`. A wired-and-quiet channel is
+    //    the one case that honestly renders a zero.
+    const head =
+      `<div class="imark-rail" aria-hidden="true">${instrumentMark()}</div>` +
+      `<p class="dx-kicker label">${esc(s.kicker)}</p>` +
+      `<h2 class="dx-title">The membrane</h2>` +
+      `<p class="dx-prose">The platform posts outward and reads back inward, and the same posts can travel both ways. This is the seam between them: what went out under the platform's name, what came back in as Matthew's own voice, and the <strong>origin membrane</strong> that keeps the second from being an echo of the first. No follower counts, no likes, no reach — every number here is a count of records this system wrote about itself.</p>`;
+    read.innerHTML = head + `<p class="dx-loading shimmer">Reading the membrane…</p>`;
+    const d = await secFetch(s);
+    if (!d) {
+      read.innerHTML = head + `<p class="dx-prose">The membrane readout is unavailable right now. It reads live from the platform, so this is a transient outage rather than an empty loop.</p>`;
+      return;
+    }
+    const out = d.outbound || {};
+    const inb = d.inbound || {};
+    const mem = d.membrane || {};
+
+    // Stage 1 — what I said → where it went (the outbound ledger).
+    const outChips = (out.channels || [])
+      .map((c) => `<li class="mb-chip label"><span class="mb-chip-k">${esc(c.channel)}</span><span class="mb-chip-v">${Number(c.recorded || 0)}</span></li>`)
+      .join("");
+    const outBody =
+      out.state === "recording"
+        ? `<p class="mb-figure">${Number(out.total || 0)}</p><p class="mb-unit label">post${Number(out.total) === 1 ? "" : "s"} recorded on the way out</p>` +
+          `<ul class="mb-list">${(out.posts || [])
+            .map((p) => {
+              const when = p.recorded_at ? String(p.recorded_at).slice(0, 10) : "";
+              const label = `${p.channel || "post"}${when ? " · " + when : ""}`;
+              return p.url
+                ? `<li><a class="mb-row" href="${esc(p.url)}" target="_blank" rel="noopener"><span class="mb-row-k label">${esc(label)}</span><span class="mb-row-v label">view →</span></a></li>`
+                : `<li><span class="mb-row"><span class="mb-row-k label">${esc(label)}</span></span></li>`;
+            })
+            .join("")}</ul>`
+        : `<p class="mb-absent">Nothing recorded on the way out yet.</p>` +
+          `<p class="mb-note">The outbound ledger holds one row per post the platform syndicates, so an inbound read can recognise the platform's own words when they come back. It is empty because no post has been recorded through it — not because posting is switched off.</p>`;
+
+    // Stage 2 — the membrane itself (the join).
+    const echoes = Number(mem.echoes_excluded || 0);
+    const joinBody =
+      inb.state === "live"
+        ? echoes
+          ? `<p class="mb-figure">${echoes}</p><p class="mb-unit label">echo${echoes === 1 ? "" : "es"} held back</p>` +
+            `<p class="mb-note">Posts the platform recognised as its own, arriving back through an inbound channel. They are counted here and nowhere else — an echo is never counted as something that came back.</p>`
+          : `<p class="mb-figure">0</p><p class="mb-unit label">echoes held back</p>` +
+            `<p class="mb-note">Every ingested post so far was Matthew's own. The membrane is running and has had nothing to filter.</p>`
+        : `<p class="mb-absent">Nothing to filter yet.</p>` +
+          `<p class="mb-note">The membrane runs on the way in, so it has no work until an inbound channel is wired. Its rule does not change when it does: <span class="mb-rule">${esc(mem.predicate || "origin:human")}</span>.</p>`;
+
+    // Stage 3 — what came back (the SAME gate the Broadcast feed reads).
+    const inChips = (inb.channels || [])
+      .map(
+        (c) =>
+          `<li class="mb-chip label" data-state="${esc(c.state || "")}"><span class="mb-chip-k">${esc(c.channel)}</span>` +
+          `<span class="mb-chip-v">${c.live ? Number(c.visible || 0) : "not wired"}</span></li>`,
+      )
+      .join("");
+    const inBody =
+      inb.state === "live"
+        ? `<p class="mb-figure">${Number(inb.visible || 0)}</p><p class="mb-unit label">post${Number(inb.visible) === 1 ? "" : "s"} back in his own voice</p>` +
+          `<ul class="mb-list">${(inb.items || [])
+            .map((it) => {
+              const when = it.date ? String(it.date) : "";
+              const cap = esc(it.caption || it.excerpt || "Untitled post");
+              return `<li><a class="mb-row" href="/story/broadcast/#${esc(it.id || "")}"><span class="mb-row-k">${cap}</span><span class="mb-row-v label">${esc(when)}</span></a></li>`;
+            })
+            .join("")}</ul>` +
+          `<p class="mb-note">The same set the <a href="/story/broadcast/">Broadcast feed</a> shows, read through the same gate — the two cannot disagree about what counts as his voice.</p>`
+        : `<p class="mb-absent">No inbound channel is wired yet.</p>` +
+          `<p class="mb-note">This is the absence of a pipe, not a quiet week: nothing is being read back in, so there is no number to report. The moment a channel goes live this side fills from the same gate the <a href="/story/broadcast/">Broadcast feed</a> reads.</p>`;
+
+    const stage = (cls, kicker, title, body, chips) =>
+      `<li class="mb-stage ${cls}"><p class="mb-stage-k label">${kicker}</p><h3 class="mb-stage-t">${title}</h3>${body}` +
+      (chips ? `<ul class="mb-chips">${chips}</ul>` : "") +
+      `</li>`;
+
+    read.innerHTML =
+      head +
+      `<ol class="mb-loop">` +
+      stage("is-out", "stage one", "What I said, and where it went", outBody, outChips) +
+      stage("is-join", "the join", "The membrane", joinBody, "") +
+      stage("is-in", "stage three", "What came back", inBody, inChips) +
+      `</ol>` +
+      `<p class="mb-foot label">Read live from the platform on ${esc(d.as_of_date || "")}. The gate is fail-closed: a post that has not cleared it is simply not here, and this page does not say how many those are.</p>`;
     return;
   }
   if (s.kind === "fieldnotes") {
@@ -718,7 +822,7 @@ async function selectSection(key, preId, push = true) {
   if (push) { try { history.pushState({ sec: key }, "", `/story/${key}/`); } catch (e) {} }
   document.title = `${s.label} — The Story — averagejoematt`;
   const listEl = $("[data-dx-list]");
-  if (s.kind === "about" || s.kind === "timeline" || s.kind === "broadcast") { listEl.innerHTML = `<li class="dx-empty">${esc(s.kicker)}</li>`; renderRead(s, null); return; }
+  if (s.kind === "about" || s.kind === "timeline" || s.kind === "broadcast" || s.kind === "membrane") { listEl.innerHTML = `<li class="dx-empty">${esc(s.kicker)}</li>`; renderRead(s, null); return; }
   listEl.innerHTML = `<li class="dx-empty"><span class="shimmer">Loading…</span></li>`;
   const data = await secFetch(s);
   const entries = entriesFor(s, data);

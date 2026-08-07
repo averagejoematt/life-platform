@@ -51,6 +51,12 @@ SECTIONS = [
     # #1672 (The Social Membrane, epic #1668): the Broadcast feed — Matthew's own
     # public voice, self-hosted as facade cards (cleared, origin:human posts only).
     ("broadcast", "Broadcast", "Matthew's own posts, self-hosted — the platform's copy of his public voice."),
+    # #1679 (The Social Membrane, epic #1668, S11): the bidirectional membrane — what
+    # I said, where it went, what came back, with the origin membrane as the visible
+    # join. `unlisted: true` in dispatches.js (same posture as the build log): a
+    # provenance/engineering view, reached from the Broadcast section rather than the
+    # reader-facing story tab bar. The entry stays HERE so the shell regenerates.
+    ("membrane", "The membrane", "The bidirectional membrane — what I said, where it went, and what came back."),
     # #380: engineering exhaust, distilled — merged + deployed work only.
     # #1110: `unlisted: true` in dispatches.js — OUT of the story sub-nav (the footer's
     # "The Technology" column links it); the entry stays HERE so /story/build/ keeps
