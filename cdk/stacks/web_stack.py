@@ -49,6 +49,11 @@ from stacks.constants import (
     S3_BUCKET as _CONSTANTS_BUCKET,  # CONF-01
     TABLE_NAME,  # #936: DR cutover — no hardcoded table names
 )
+from stacks.csp import (  # ADR-149 (#1678) — the CSP is built in one place, for both policies
+    NATIVE_EMBED_CONTEXT_KEY,
+    build_site_csp,
+    native_embeds_enabled,
+)
 from stacks.lambda_helpers import create_platform_lambda
 from stacks.secrets_helpers import site_api_origin_secret_value
 
@@ -96,6 +101,11 @@ class WebStack(Stack):
         local_dlq = dlq or sqs.Queue.from_queue_arn(self, "IngestionDLQ", INGESTION_DLQ_ARN)
         local_alerts = alerts_topic or sns.Topic.from_topic_arn(self, "AlertsTopic", ALERTS_TOPIC_ARN)
 
+        # ADR-149 (#1678): native social embeds — OFF unless cdk.json (or -c) says
+        # otherwise. Read ONCE and passed to both CSP builders so the two policies
+        # cannot disagree.
+        native_embeds = native_embeds_enabled(self.node.try_get_context(NATIVE_EMBED_CONTEXT_KEY))
+
         # ══════════════════════════════════════════════════════════════
         # Phase 2.3 (2026-05-16): Shared security headers policy for all
         # subdomain distributions (dash, blog, buddy). Originally only the
@@ -113,16 +123,10 @@ class WebStack(Stack):
                         # Dashboard pages fetch only relative paths (/public_stats.json,
                         # /api/*) — 'self' is sufficient. Allow main domain too for any
                         # cross-subdomain inclusion (e.g., shared site_api endpoints).
-                        content_security_policy=(
-                            "default-src 'self'; "
-                            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-                            "style-src 'self' 'unsafe-inline'; "
-                            "img-src 'self' data: https:; "
-                            "connect-src 'self' https://averagejoematt.com https://*.averagejoematt.com; "
-                            "font-src 'self' data:; "
-                            "frame-ancestors 'none'; "
-                            "base-uri 'self'; "
-                            "form-action 'self'"
+                        # ADR-149: built, not hand-written — see build_site_csp().
+                        content_security_policy=build_site_csp(
+                            connect_src="'self' https://averagejoematt.com https://*.averagejoematt.com",
+                            native_social_embeds=native_embeds,
                         ),
                         override=True,
                     ),
@@ -423,21 +427,13 @@ class WebStack(Stack):
                 name="life-platform-amj-security-headers",
                 security_headers_config=cloudfront.CfnResponseHeadersPolicy.SecurityHeadersConfigProperty(
                     content_security_policy=cloudfront.CfnResponseHeadersPolicy.ContentSecurityPolicyProperty(
-                        content_security_policy=(
-                            # SEC-05: 'unsafe-inline' kept intentionally — all JS/CSS is
-                            # first-party and server-rendered with no user-controlled content.
-                            # Nonce-based CSP would require per-request Lambda changes for a
-                            # static S3 site. Risk: low (no XSS vectors today). Revisit if
-                            # user-generated content is ever added.
-                            "default-src 'self'; "
-                            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-                            "style-src 'self' 'unsafe-inline'; "
-                            "img-src 'self' data: https:; "
-                            "connect-src 'self' https://averagejoematt.com; "
-                            "font-src 'self' data:; "
-                            "frame-ancestors 'none'; "
-                            "base-uri 'self'; "
-                            "form-action 'self'"
+                        # SEC-05 risk note: low (no XSS vectors today) — revisit if
+                        # user-generated content is ever added. ADR-149: the policy is
+                        # assembled by build_site_csp() so this block and the subdomain
+                        # block above cannot drift apart.
+                        content_security_policy=build_site_csp(
+                            connect_src="'self' https://averagejoematt.com",
+                            native_social_embeds=native_embeds,
                         ),
                         override=True,
                     ),
