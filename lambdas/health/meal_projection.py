@@ -13,6 +13,7 @@ module needs no AWS client of its own and stays unit-testable.
 
 from datetime import datetime, timezone
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from boto3.dynamodb.conditions import Key
 
@@ -25,17 +26,18 @@ RAW_SOURCE = "macrofactor"  # never written — provenance guard target
 try:
     from common.numeric import floats_to_decimal
 except ImportError:  # pragma: no cover - layer always provides numeric
+    if not TYPE_CHECKING:  # mypy sees ONE signature (the import); runtime unchanged (#1656)
 
-    def floats_to_decimal(obj):
-        if isinstance(obj, bool):
+        def floats_to_decimal(obj):
+            if isinstance(obj, bool):
+                return obj
+            if isinstance(obj, float):
+                return Decimal(str(obj))
+            if isinstance(obj, dict):
+                return {k: floats_to_decimal(v) for k, v in obj.items()}
+            if isinstance(obj, list):
+                return [floats_to_decimal(i) for i in obj]
             return obj
-        if isinstance(obj, float):
-            return Decimal(str(obj))
-        if isinstance(obj, dict):
-            return {k: floats_to_decimal(v) for k, v in obj.items()}
-        if isinstance(obj, list):
-            return [floats_to_decimal(i) for i in obj]
-        return obj
 
 
 def meals_pk(user="matthew"):

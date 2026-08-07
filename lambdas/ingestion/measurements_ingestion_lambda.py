@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 
 import boto3
+from boto3.dynamodb.conditions import Key
 
 try:
     from common.platform_logger import get_logger
@@ -155,7 +156,7 @@ def _existing_session_dates() -> set[str]:
     """All stored session dates (DATE#-keyed), for date-rank numbering."""
     dates = set()
     kwargs = {
-        "KeyConditionExpression": boto3.dynamodb.conditions.Key("pk").eq(PK) & boto3.dynamodb.conditions.Key("sk").begins_with("DATE#"),
+        "KeyConditionExpression": Key("pk").eq(PK) & Key("sk").begins_with("DATE#"),
         "ProjectionExpression": "sk",
     }
     while True:

@@ -25,11 +25,13 @@ stays the single owner of its boto3 clients and tests run fully offline.
 import json
 import os
 import re
+from typing import TYPE_CHECKING
 
 try:  # bundle stages lambdas/ at the zip root; tests add lambdas/emails/ to sys.path
     from emails.panelcast_qa import _QA_HOOK_MAX_WORDS, _QA_MAX_WORDS_PER_TURN
 except ImportError:
-    from panelcast_qa import _QA_HOOK_MAX_WORDS, _QA_MAX_WORDS_PER_TURN
+    if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
+        from panelcast_qa import _QA_HOOK_MAX_WORDS, _QA_MAX_WORDS_PER_TURN
 
 # Narrative tier (ADR-049): the script doctor is a creative rewrite → Sonnet, env-overridable.
 PUNCH_UP_MODEL = os.environ.get("AI_MODEL_SONNET", "claude-sonnet-4-6")

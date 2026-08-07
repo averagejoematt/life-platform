@@ -42,6 +42,7 @@ import time
 import urllib.parse
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from typing import Any
 
 import boto3
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
@@ -187,7 +188,7 @@ def _get_confirmed_subscribers() -> list[dict]:
     Uses FilterExpression (not GSI) — acceptable at <10K subscriber volume.
     Add GSI on (status, sk) when sub count exceeds ~10K.
     """
-    confirmed = []
+    confirmed: list[dict[str, Any]] = []
     try:
         kwargs = {
             "KeyConditionExpression": "pk = :pk",
@@ -305,14 +306,14 @@ def _build_subscriber_email(installment: dict, subscriber: dict) -> tuple[str, s
         display_date = date_str
 
     # Parse weekly signal data
-    signal_data = {}
+    signal_data: dict[str, Any] = {}
     try:
         raw = installment.get("weekly_signal_data", "{}")
         signal_data = json.loads(raw) if isinstance(raw, str) else (raw or {})
     except Exception:
         pass
 
-    wins_losses = {}
+    wins_losses: dict[str, Any] = {}
     try:
         raw = installment.get("weekly_signal_wins_losses", "{}")
         wins_losses = json.loads(raw) if isinstance(raw, str) else (raw or {})

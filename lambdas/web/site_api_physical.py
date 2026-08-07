@@ -10,6 +10,7 @@ site_api_common (identical binding semantics to the pre-split facade).
 """
 
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 from boto3.dynamodb.conditions import Key
 from experiment.phase_filter import with_phase_filter  # ADR-058
@@ -85,7 +86,7 @@ def weekly_physical_summary(*, _g) -> dict:
     # Flatten Strava activities by day, dedup by activity ID
     from collections import defaultdict
 
-    day_activities = defaultdict(list)
+    day_activities: dict[str, list[dict[str, Any]]] = defaultdict(list)
     _seen_activity_ids = set()
     for s in strava_items:
         d = s.get("date") or s.get("sk", "").replace("DATE#", "")[:10]

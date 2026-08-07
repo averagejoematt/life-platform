@@ -81,7 +81,7 @@ COMPUTED_PARTITIONS = [
 SOURCES = reconciliation_sources() + COMPUTED_PARTITIONS
 
 # Sources that DON'T use DATE# sk prefix (skip or handle differently)
-_SKIP_SOURCES = set()
+_SKIP_SOURCES: set[str] = set()
 
 
 # ── AWS clients ────────────────────────────────────────────────────────────────

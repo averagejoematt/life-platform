@@ -30,6 +30,7 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
+from typing import Any
 
 import boto3
 
@@ -331,7 +332,7 @@ def _find_stale_drafts(hours: float, max_days: float) -> list[dict]:
     now = datetime.now(timezone.utc).timestamp()
     stale_before = now - hours * 3600.0  # must be older than this
     too_old_before = now - max_days * 86400.0  # but newer than this
-    out = []
+    out: list[dict[str, Any]] = []
     try:
         resp = table.query(KeyConditionExpression=Key("pk").eq(CHRONICLE_PK) & Key("sk").begins_with("DATE#"))
     except Exception as exc:

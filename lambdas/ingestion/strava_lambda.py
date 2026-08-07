@@ -23,6 +23,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 import boto3
 
@@ -198,7 +199,7 @@ def _dedup(activities: list) -> list:
     if len(activities) <= 1:
         return activities
     sorted_a = sorted(activities, key=lambda x: x.get("start_date", ""))
-    kept = []
+    kept: list[dict[str, Any]] = []
     for act in sorted_a:
         replaced = False
         for i, existing in enumerate(kept):

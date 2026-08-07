@@ -22,6 +22,7 @@ import os
 import re
 import urllib.parse
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 import boto3
 from ai import google_tts
@@ -322,13 +323,15 @@ def _publish_episode_audio(week, wav_audio: bytes) -> dict:
     try:  # #1179: no-op while PANELCAST_IDENT is off (superseded by #1187's frozen open)
         from emails import panelcast_ident
     except ImportError:
-        import panelcast_ident
+        if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
+            import panelcast_ident
     wav_audio = panelcast_ident.mix_into_wav(wav_audio)
 
     try:  # #1187: prepend the frozen brand open; fully fail-open (cold open on error)
         from emails import panelcast_brand_open
     except ImportError:
-        import panelcast_brand_open
+        if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
+            import panelcast_brand_open
     wav_audio = panelcast_brand_open.prepend_into_wav(wav_audio)
     duration = max(1, audio_encode.wav_duration_sec(wav_audio))
     body, ext, mime = audio_encode.compress_wav(wav_audio)
@@ -668,37 +671,40 @@ try:
         _qa_review,
     )
 except ImportError:  # bundle stages lambdas/ at the zip root
-    from panelcast_qa import (  # noqa: F401
-        _CHALLENGE_RE,
-        _INTERROGATIVE_RE,
-        _INTRO_CRAFT_RUBRIC,
-        _INTRO_RUBRIC,
-        _QA_MAX_ATTEMPTS,
-        _QA_MAX_CONSECUTIVE,
-        _QA_MAX_CONSECUTIVE_INTRO,
-        _QA_MAX_WORDS_PER_TURN,
-        _WEEKLY_CRAFT_RUBRIC,
-        _WEEKLY_RUBRIC,
-        _continuity_check,
-        _craft_check,
-        _craft_judge,
-        _qa_gate,
-        _qa_review,
-    )
+    if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
+        from panelcast_qa import (  # noqa: F401
+            _CHALLENGE_RE,
+            _INTERROGATIVE_RE,
+            _INTRO_CRAFT_RUBRIC,
+            _INTRO_RUBRIC,
+            _QA_MAX_ATTEMPTS,
+            _QA_MAX_CONSECUTIVE,
+            _QA_MAX_CONSECUTIVE_INTRO,
+            _QA_MAX_WORDS_PER_TURN,
+            _WEEKLY_CRAFT_RUBRIC,
+            _WEEKLY_RUBRIC,
+            _continuity_check,
+            _craft_check,
+            _craft_judge,
+            _qa_gate,
+            _qa_review,
+        )
 
 # #1170/#1171/#1172 (ADR-135): the no-touch contract mechanics — deterministic seam
 # repair, convergent revision, per-attempt ledger, bounded escalation email.
 try:
     from emails import panelcast_repair as _repair
 except ImportError:  # bundle stages lambdas/ at the zip root
-    import panelcast_repair as _repair
+    if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
+        import panelcast_repair as _repair
 
 # #1178: free RSS zeitgeist — optional topical color, fetched ONCE per run; the
 # same list feeds the judge's ground truth (details in panelcast_zeitgeist.py).
 try:
     from emails import panelcast_zeitgeist as _zeitgeist
 except ImportError:  # bundle stages lambdas/ at the zip root
-    import panelcast_zeitgeist as _zeitgeist
+    if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
+        import panelcast_zeitgeist as _zeitgeist
 
 # #1182 (prep for #1180): the two big Sonnet prompt-builders live in panelcast_scripts.py
 # (ADR-080 size gate). The thin wrappers below inject this lambda's clients + helpers,
@@ -706,14 +712,16 @@ except ImportError:  # bundle stages lambdas/ at the zip root
 try:
     from emails import panelcast_scripts as _pscripts
 except ImportError:  # bundle stages lambdas/ at the zip root
-    import panelcast_scripts as _pscripts
+    if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
+        import panelcast_scripts as _pscripts
 
 # #1180 (epic #1082): the craft layer's punch-up pass (the "script doctor"). Thin wiring
 # only — the machinery lives in the module so the lambda stays under the ADR-080 size gate.
 try:
     from emails import panelcast_craft as _craft
 except ImportError:  # bundle stages lambdas/ at the zip root
-    import panelcast_craft as _craft
+    if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
+        import panelcast_craft as _craft
 
 
 def _pscripts_deps() -> dict:
@@ -1123,7 +1131,8 @@ def _build_weekly_script(beats: dict, bible: dict) -> dict:
 try:
     from emails import podcast_script_v2 as _psv2  # package import at runtime
 except ImportError:  # flat import under the test harness
-    import podcast_script_v2 as _psv2
+    if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
+        import podcast_script_v2 as _psv2
 
 
 def _psv2_deps() -> dict:
@@ -1753,7 +1762,7 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
     )
     # Editorial cover art (Part II — atmospheric, free-license; fail-soft, kill-switch
     # default OFF). Reuse this week's prior image if present; else fetch once. Never blocks.
-    _cover = {}
+    _cover: dict[str, str] = {}
     try:
         from content import editorial_image
 

@@ -485,7 +485,8 @@ def nutrition_overview(*, _g) -> dict:
             return None
 
     per_day_window = []
-    bucket_protein, bucket_cal = {}, {}
+    bucket_protein: dict[int, float] = {}
+    bucket_cal: dict[int, float] = {}
     total_meals_sum = 0
     pds_vals = []
     for i in items:
@@ -643,7 +644,8 @@ def nutrition_overview(*, _g) -> dict:
     if _DELIVERY_PUBLIC:
         fd_items = _query_source("food_delivery", d30, today)
         delivery_dates = {(fd.get("date") or fd.get("sk", "").replace("DATE#", "")) for fd in fd_items}
-        deliv_def, home_def = [], []
+        deliv_def: list[float] = []
+        home_def: list[float] = []
         for i in items:
             cal = _mf(i, "calories")
             if cal is None or not tdee:
@@ -852,7 +854,7 @@ def deficit_sustainability(*, _g) -> dict:
     t0_dir, t0_d = trend_dir(t0)
     t0_bad = t0_dir == "declining" and abs(t0_d) > 10
     # Channel 5 — training output (Strava kJ/day)
-    daily_kj = {}
+    daily_kj: dict[str, float] = {}
     for s in strava:
         d = s.get("sk", "").replace("DATE#", "")
         daily_kj[d] = daily_kj.get(d, 0) + (_f(s.get("total_kilojoules")) or 0)

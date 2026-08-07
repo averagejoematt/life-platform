@@ -12,6 +12,7 @@ site_api_common (identical binding semantics to the pre-split facade).
 import json
 import os
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 from boto3.dynamodb.conditions import Key
 from experiment.phase_filter import with_phase_filter  # ADR-058
@@ -187,7 +188,7 @@ def training_overview(*, _g) -> dict:
         return wa, pct
 
     # Flatten nested activities lists from day-level Strava records
-    all_activities_30d = []
+    all_activities_30d: list[dict[str, Any]] = []
     for s in strava_30d:
         acts = s.get("activities") or []
         if acts:
@@ -218,7 +219,7 @@ def training_overview(*, _g) -> dict:
 
     all_activities_30d = _dedup_whoop(all_activities_30d)
 
-    all_activities_90d = []
+    all_activities_90d: list[dict[str, Any]] = []
     for s in strava_items:
         acts = s.get("activities") or []
         if acts:
@@ -236,7 +237,7 @@ def training_overview(*, _g) -> dict:
     weekly_avg = round(total_workouts_30d / _win_weeks, 1) if _win_weeks is not None else None
 
     # Activity type breakdown (30d)
-    type_counts = {}
+    type_counts: dict[str, int] = {}
     for a in all_activities_30d:
         sport = a.get("sport_type") or a.get("type") or "Other"
         type_counts[sport] = type_counts.get(sport, 0) + 1
@@ -261,7 +262,7 @@ def training_overview(*, _g) -> dict:
     # ── Modality breakdown (30d) — group by sport_type with per-modality stats ──
     from collections import defaultdict as _dd2
 
-    modality_map = _dd2(
+    modality_map: dict[str, dict[str, float]] = _dd2(
         lambda: {
             "count": 0,
             "total_min": 0,
@@ -274,13 +275,13 @@ def training_overview(*, _g) -> dict:
     )
     # Also compute prior 30d for trend (days 31-60)
     d60 = _experiment_date(60)
-    prior_30d_acts = []
+    prior_30d_acts: list[dict[str, Any]] = []
     for s in strava_items:
         d = s.get("date") or s.get("sk", "").replace("DATE#", "")
         if d60 <= d < d30:
             acts = s.get("activities") or [s]
             prior_30d_acts.extend(acts)
-    prior_type_counts = {}
+    prior_type_counts: dict[str, int] = {}
     for a in prior_30d_acts:
         sport = a.get("sport_type") or a.get("type") or "Other"
         prior_type_counts[sport] = prior_type_counts.get(sport, 0) + 1
@@ -429,7 +430,7 @@ def training_overview(*, _g) -> dict:
         bw_sessions += _bs
         bw_minutes += _bw
     bw_weekly_trend = []
-    bw_week_map = _dd2(lambda: {"sessions": 0, "minutes": 0.0})
+    bw_week_map: dict[str, dict[str, float]] = _dd2(lambda: {"sessions": 0, "minutes": 0.0})
     for h in ah_30d:
         d = h.get("date") or h.get("sk", "").replace("DATE#", "")
         try:
@@ -466,7 +467,7 @@ def training_overview(*, _g) -> dict:
         "Soccer": "soccer",
         "Breathwork": "breathwork",
     }
-    _daily_mod = _dd2(lambda: _dd2(float))
+    _daily_mod: dict[str, dict[str, float]] = _dd2(lambda: _dd2(float))
     for a in all_activities_30d:
         _dm_date = a.get("_day_date", "")
         _dm_sport = a.get("sport_type") or a.get("type") or "Other"
@@ -490,7 +491,7 @@ def training_overview(*, _g) -> dict:
         _dm_entry = {"date": _dm_d}
         _dm_total = 0
         for _mk in _mod_keys:
-            _mv = round(_daily_mod.get(_dm_d, {}).get(_mk, 0))
+            _mv = round(_daily_mod.get(_dm_d, {}).get(_mk, 0.0))
             _dm_entry[_mk + "_min"] = _mv
             _dm_total += _mv
         _dm_entry["total_min"] = _dm_total
@@ -556,7 +557,7 @@ def training_overview(*, _g) -> dict:
     # Weekly trend (for chart) — use flattened activities
     from collections import defaultdict as _dd
 
-    week_buckets = _dd(lambda: {"workouts": 0, "minutes": 0, "z2_min": 0})
+    week_buckets: dict[str, dict[str, float]] = _dd(lambda: {"workouts": 0, "minutes": 0, "z2_min": 0})
     for a in all_activities_90d:
         d = a.get("_day_date") or ""
         try:
@@ -734,8 +735,8 @@ def strength_benchmarks(*, _g) -> dict:
         # Find max weight for each target lift, AND a per-session (per-day) estimated-1RM
         # history so the front-end can render the Lift Index trend (P0.1) — load moving up
         # over weeks, never a 1RM target/goal.
-        best = {}
-        history = {t: {} for t in targets}  # lift -> {date: best_e1rm_that_day}
+        best: dict[str, float] = {}
+        history: dict[str, dict[str, float]] = {t: {} for t in targets}  # lift -> {date: best_e1rm_that_day}
         for day in items:
             d = day.get("date") or day.get("sk", "").replace("DATE#", "")[:10]
             exercises = day.get("exercises") or day.get("workout_exercises") or []
@@ -806,9 +807,9 @@ def strength_deep_dive(*, _g) -> dict:
     from collections import Counter, defaultdict
 
     # Volume load per week (sets × reps × weight)
-    weekly_volume = defaultdict(float)
-    exercise_freq = Counter()
-    session_days = Counter()  # day of week
+    weekly_volume: dict[str, float] = defaultdict(float)
+    exercise_freq: Counter[str] = Counter()
+    session_days: Counter[str] = Counter()  # day of week
     Counter()  # hour of day
     total_sets_30d = 0
     exercises_30d = set()

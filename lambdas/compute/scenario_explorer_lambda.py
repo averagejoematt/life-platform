@@ -28,6 +28,7 @@ anyone reads the page.
 import json
 import os
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 import boto3
 from common import stats_core
@@ -194,7 +195,8 @@ def lambda_handler(event: dict, context) -> dict:
         try:
             from compute import hypothesis_engine_lambda as eng
         except ImportError:
-            import hypothesis_engine_lambda as eng
+            if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
+                import hypothesis_engine_lambda as eng
 
         today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         data = eng.gather_data(days=LOOKBACK_DAYS)

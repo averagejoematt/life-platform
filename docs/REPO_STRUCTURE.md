@@ -43,7 +43,7 @@ Run `make clean` to reclaim local build/cache cruft (chiefly `cdk/cdk.out`, ~6 G
 
 ## Where does X go?
 - **New Lambda** → `lambdas/<category>/<name>_lambda.py` → register in `ci/lambda_map.json` → define in the right `cdk/stacks/*.py` via `create_platform_lambda`.
-- **New shared module** → `lambdas/<domain>/<name>.py`, never the `lambdas/` root — `tests/test_lambdas_packaging_guard.py` fails the build on a loose root module (ADR-146). If it is covered by the mypy gate, add its package to `CLEAN_DIRS` (or the file to `CLEAN_FILES`) in `tests/mypy_clean_set.py` in the same PR; those globs are non-recursive.
+- **New shared module** → `lambdas/<domain>/<name>.py`, never the `lambdas/` root — `tests/test_lambdas_packaging_guard.py` fails the build on a loose root module (ADR-146). Since #1656 the mypy gate covers **every** package under `lambdas/` plus `mcp/`, so a NEW package must be added to `CLEAN_DIRS` in `tests/mypy_clean_set.py` in the same PR — those globs are non-recursive, and `test_every_first_party_package_is_in_the_clean_set` fails until you do.
 - **New MCP tool** → `mcp/tools_<domain>.py` → wire into `mcp/registry.py` (and `tests/test_wiring_coverage.py` will enforce it).
 - **Infra / IAM / schedule change** → `cdk/stacks/` only — never the AWS console.
 - **One-shot data fix** → `patches/patch_<desc>.py` (keep it; it's the audit trail).

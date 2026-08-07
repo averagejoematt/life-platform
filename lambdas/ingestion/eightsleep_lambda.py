@@ -82,6 +82,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from typing import TYPE_CHECKING, Any
 
 import boto3
 
@@ -150,6 +151,8 @@ def _tz_offset_hours(tz_name: str) -> float:
         from zoneinfo import ZoneInfo
 
         off = datetime.now(timezone.utc).astimezone(ZoneInfo(tz_name)).utcoffset()
+        if off is None:  # a tz-aware datetime always has one; be explicit rather than assume
+            return _TZ_OFFSETS.get(tz_name, _DEFAULT_TZ_OFFSET)
         return off.total_seconds() / 3600
     except Exception:
         return _TZ_OFFSETS.get(tz_name, _DEFAULT_TZ_OFFSET)
@@ -162,7 +165,7 @@ dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(DYNAMODB_TABLE)
 
 # COST-OPT-1: Cache secrets in warm Lambda containers (15-min TTL)
-_secret_cache = {}
+_secret_cache: dict[str, tuple[Any, float]] = {}
 
 
 def _cached_secret(client, secret_id):
@@ -181,17 +184,18 @@ def _cached_secret(client, secret_id):
 try:
     from common.numeric import floats_to_decimal  # noqa: F401
 except ImportError:
+    if not TYPE_CHECKING:  # mypy sees ONE signature (the import); runtime unchanged (#1656)
 
-    def floats_to_decimal(obj):
-        if isinstance(obj, bool):
+        def floats_to_decimal(obj):
+            if isinstance(obj, bool):
+                return obj
+            if isinstance(obj, float):
+                return Decimal(str(obj))
+            if isinstance(obj, dict):
+                return {k: floats_to_decimal(v) for k, v in obj.items()}
+            if isinstance(obj, list):
+                return [floats_to_decimal(v) for v in obj]
             return obj
-        if isinstance(obj, float):
-            return Decimal(str(obj))
-        if isinstance(obj, dict):
-            return {k: floats_to_decimal(v) for k, v in obj.items()}
-        if isinstance(obj, list):
-            return [floats_to_decimal(v) for v in obj]
-        return obj
 
 
 # ── Secrets ────────────────────────────────────────────────────────────────────

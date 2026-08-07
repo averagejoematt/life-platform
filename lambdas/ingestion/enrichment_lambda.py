@@ -28,6 +28,7 @@ import logging
 import os
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -59,17 +60,18 @@ from common.digest_utils import d2f as decimal_to_float  # shared bundled helper
 try:
     from common.numeric import floats_to_decimal  # noqa: F401
 except ImportError:
+    if not TYPE_CHECKING:  # mypy sees ONE signature (the import); runtime unchanged (#1656)
 
-    def floats_to_decimal(obj):
-        if isinstance(obj, bool):
+        def floats_to_decimal(obj):
+            if isinstance(obj, bool):
+                return obj
+            if isinstance(obj, float):
+                return Decimal(str(obj))
+            if isinstance(obj, dict):
+                return {k: floats_to_decimal(v) for k, v in obj.items()}
+            if isinstance(obj, list):
+                return [floats_to_decimal(v) for v in obj]
             return obj
-        if isinstance(obj, float):
-            return Decimal(str(obj))
-        if isinstance(obj, dict):
-            return {k: floats_to_decimal(v) for k, v in obj.items()}
-        if isinstance(obj, list):
-            return [floats_to_decimal(v) for v in obj]
-        return obj
 
 
 def query_source(source, start_date, end_date):

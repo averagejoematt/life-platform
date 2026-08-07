@@ -34,6 +34,7 @@ import json
 import os
 import time
 from datetime import datetime, timezone
+from typing import Any
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -149,7 +150,7 @@ def _experiment_catalog(exclude_ids: set, exclude_names: set) -> list:
     """experiment_library.json → display items tagged origin='library', so the page
     shows the pipeline (planned/backlog experiments) even when nothing is running."""
     S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
-    out = []
+    out: list[dict[str, Any]] = []
     try:
         s3_client = boto3.client("s3", region_name=S3_REGION)
         obj = s3_client.get_object(Bucket=S3_BUCKET, Key="config/experiment_library.json")

@@ -19,8 +19,10 @@ import json
 import logging
 import os
 from collections import OrderedDict, defaultdict
+from collections.abc import Callable
 from datetime import datetime, timezone
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 import boto3
 
@@ -112,17 +114,18 @@ COL_TO_FIELD = dict(NUTRIENT_COLUMNS)
 try:
     from common.numeric import floats_to_decimal  # noqa: F401
 except ImportError:
+    if not TYPE_CHECKING:  # mypy sees ONE signature (the import); runtime unchanged (#1656)
 
-    def floats_to_decimal(obj):
-        if isinstance(obj, bool):
+        def floats_to_decimal(obj):
+            if isinstance(obj, bool):
+                return obj
+            if isinstance(obj, float):
+                return Decimal(str(obj))
+            if isinstance(obj, dict):
+                return {k: floats_to_decimal(v) for k, v in obj.items()}
+            if isinstance(obj, list):
+                return [floats_to_decimal(i) for i in obj]
             return obj
-        if isinstance(obj, float):
-            return Decimal(str(obj))
-        if isinstance(obj, dict):
-            return {k: floats_to_decimal(v) for k, v in obj.items()}
-        if isinstance(obj, list):
-            return [floats_to_decimal(i) for i in obj]
-        return obj
 
 
 # #970 KEPT (deliberate): CSV-value coercion contract (val) with string sanitation
@@ -658,8 +661,11 @@ def lambda_handler(event, context):
         _use_validator = False
 
     # #482/X-6: standalone writer stamps phase like the framework does.
+    _pfd: Callable[[str], str] | None
     try:
-        from ingestion.ingestion_framework import phase_for_date as _pfd
+        from ingestion.ingestion_framework import phase_for_date
+
+        _pfd = phase_for_date
     except ImportError:  # pragma: no cover — layer unavailable locally
         _pfd = None
 

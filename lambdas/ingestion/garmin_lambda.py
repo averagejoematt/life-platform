@@ -75,6 +75,7 @@ import os
 import time
 from datetime import datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING, Any
 
 import boto3
 
@@ -108,17 +109,18 @@ table = dynamodb.Table(DYNAMODB_TABLE)
 try:
     from common.numeric import floats_to_decimal  # noqa: F401
 except ImportError:
+    if not TYPE_CHECKING:  # mypy sees ONE signature (the import); runtime unchanged (#1656)
 
-    def floats_to_decimal(obj):
-        if isinstance(obj, bool):
+        def floats_to_decimal(obj):
+            if isinstance(obj, bool):
+                return obj
+            if isinstance(obj, float):
+                return Decimal(str(obj))
+            if isinstance(obj, dict):
+                return {k: floats_to_decimal(v) for k, v in obj.items()}
+            if isinstance(obj, list):
+                return [floats_to_decimal(v) for v in obj]
             return obj
-        if isinstance(obj, float):
-            return Decimal(str(obj))
-        if isinstance(obj, dict):
-            return {k: floats_to_decimal(v) for k, v in obj.items()}
-        if isinstance(obj, list):
-            return [floats_to_decimal(v) for v in obj]
-        return obj
 
 
 # #970 KEPT (deliberate): value-coercion contract (val) -> rounded 2dp, not digest_utils'
@@ -435,7 +437,7 @@ def get_garmin_client(secret: dict):
 
 # ── Data extraction ────────────────────────────────────────────────────────────
 def extract_body_battery(api, date_str: str) -> dict:
-    result = {}
+    result: dict[str, Any] = {}
     try:
         data = api.get_body_battery(date_str, date_str)
         if not data:
@@ -459,7 +461,7 @@ def extract_body_battery(api, date_str: str) -> dict:
 
 
 def extract_hrv(api, date_str: str) -> dict:
-    result = {}
+    result: dict[str, Any] = {}
     try:
         data = api.get_hrv_data(date_str)
         if not data:
@@ -482,7 +484,7 @@ def extract_hrv(api, date_str: str) -> dict:
 
 
 def extract_stress(api, date_str: str) -> dict:
-    result = {}
+    result: dict[str, Any] = {}
     try:
         data = api.get_stress_data(date_str)
         if not data:
@@ -504,7 +506,7 @@ def extract_stress(api, date_str: str) -> dict:
 
 
 def extract_user_summary(api, date_str: str) -> dict:
-    result = {}
+    result: dict[str, Any] = {}
     try:
         data = api.get_user_summary(date_str)
         if not data:
@@ -523,7 +525,7 @@ def extract_user_summary(api, date_str: str) -> dict:
 
 
 def extract_respiration(api, date_str: str) -> dict:
-    result = {}
+    result: dict[str, Any] = {}
     try:
         data = api.get_respiration_data(date_str)
         if not data:
@@ -542,7 +544,7 @@ def extract_respiration(api, date_str: str) -> dict:
 
 
 def extract_spo2(api, date_str: str) -> dict:
-    result = {}
+    result: dict[str, Any] = {}
     try:
         data = api.get_spo2_data(date_str)
         if data:
@@ -560,7 +562,7 @@ def extract_spo2(api, date_str: str) -> dict:
 
 
 def extract_max_metrics(api, date_str: str) -> dict:
-    result = {}
+    result: dict[str, Any] = {}
     try:
         data = api.get_max_metrics(date_str)
         if data and isinstance(data, list) and data:
@@ -580,7 +582,7 @@ def extract_max_metrics(api, date_str: str) -> dict:
 
 
 def extract_training_status(api, date_str: str) -> dict:
-    result = {}
+    result: dict[str, Any] = {}
     try:
         data = api.get_training_status(date_str)
         if data:
@@ -663,7 +665,7 @@ def extract_sleep(api, date_str: str) -> dict:
     This makes Garmin a second complete sleep source alongside Eight Sleep,
     enabling cross-device validation via the existing get_device_agreement tool.
     """
-    result = {}
+    result: dict[str, Any] = {}
     try:
         data = api.get_sleep_data(date_str)
         logger.info(f"Sleep API response type={type(data).__name__} truthy={bool(data)}")
@@ -782,7 +784,7 @@ def extract_hr_zones(api, date_str: str) -> dict:
     Strava-only coverage forever. Not a functional change to what's written —
     still returns {} on failure, never fabricates zone data.
     """
-    result = {}
+    result: dict[str, Any] = {}
     try:
         data = api.get_heart_rates(date_str)
         if data:
@@ -809,7 +811,7 @@ def extract_hr_zones(api, date_str: str) -> dict:
 
 
 def extract_intensity_minutes(api, date_str: str) -> dict:
-    result = {}
+    result: dict[str, Any] = {}
     try:
         data = api.get_intensity_minutes_data(date_str)
         if data:
@@ -830,7 +832,7 @@ def extract_intensity_minutes(api, date_str: str) -> dict:
 
 
 def extract_stats(api, date_str: str) -> dict:
-    result = {}
+    result: dict[str, Any] = {}
     try:
         data = api.get_stats(date_str)
         if data:
@@ -857,7 +859,7 @@ def extract_stats(api, date_str: str) -> dict:
 
 def extract_activities(api, date_str: str) -> dict:
     """Garmin-proprietary per-activity fields not available via Strava."""
-    result = {}
+    result: dict[str, Any] = {}
     try:
         activities = api.get_activities_by_date(date_str, date_str)
         if not activities:

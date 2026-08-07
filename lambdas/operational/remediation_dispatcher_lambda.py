@@ -48,6 +48,7 @@ import os
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 import boto3
 
@@ -62,9 +63,10 @@ except ImportError:
 try:
     from common.token_alarm_window import is_within_token_alarm_window
 except ImportError:  # pragma: no cover - packaging drift; fail safe = still page
+    if not TYPE_CHECKING:  # mypy sees ONE signature (the import); runtime unchanged (#1656)
 
-    def is_within_token_alarm_window(check_date=None):
-        return False
+        def is_within_token_alarm_window(check_date=None):
+            return False
 
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
