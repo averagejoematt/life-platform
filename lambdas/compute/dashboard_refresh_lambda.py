@@ -381,17 +381,18 @@ def refresh_dashboard(profile, yesterday, today):
     try:
         week_start = today - timedelta(days=today.weekday())
         strava_week = fetch_range("strava", week_start.isoformat(), today.isoformat())
-        max_hr = profile.get("max_heart_rate", 184)
-        z2_lo = max_hr * 0.60
-        z2_hi = max_hr * 0.70
-        z2_total = 0.0
-        for day_rec in strava_week:
-            for act in day_rec.get("activities") or []:
-                avg_hr = safe_float(act, "average_heartrate")
-                dur_s = safe_float(act, "moving_time_seconds") or 0
-                if avg_hr and z2_lo <= avg_hr <= z2_hi:
-                    z2_total += dur_s / 60
-        existing["zone2_min"] = round(z2_total)
+        if strava_week:
+            max_hr = profile.get("max_heart_rate", 184)
+            z2_lo = max_hr * 0.60
+            z2_hi = max_hr * 0.70
+            z2_total = 0.0
+            for day_rec in strava_week:
+                for act in day_rec.get("activities") or []:
+                    avg_hr = safe_float(act, "average_heartrate")
+                    dur_s = safe_float(act, "moving_time_seconds") or 0
+                    if avg_hr and z2_lo <= avg_hr <= z2_hi:
+                        z2_total += dur_s / 60
+            existing["zone2_min"] = round(z2_total)
     except Exception:
         pass
 

@@ -534,7 +534,7 @@ EXISTING_DASHBOARD = {
     "day_grade_note": "morning AI text that must survive the merge",
     "weight": {"current": 999.9, "weekly_delta": 0.0, "phase": "stale", "journey_pct": 0, "sparkline": []},
     "glucose": {"avg": 1.0, "tir_pct": 2.0, "variability": 9.9, "fasting_proxy": 3.0},
-    "zone2_min": 0,
+    "zone2_min": 87,  # deliberately non-zero + distinct from any computed total below (#2174)
     "tsb": 5.5,
     "sources_active": 0,
 }
@@ -729,9 +729,9 @@ def test_refresh_dashboard_leaves_weight_and_tsb_untouched_when_nothing_new_arri
     assert doc["weight"] == EXISTING_DASHBOARD["weight"]  # stale-but-preserved, not zeroed
     assert doc["tsb"] == 5.5
     assert doc["sources_active"] == 0
-    # NOTE: zone2_min is recomputed unconditionally, so an empty read renders as 0.
-    # See the report attached to #1658 — absence and a genuine zero are indistinguishable here.
-    assert doc["zone2_min"] == 0
+    # #2174 (ADR-104): an empty strava_week must leave the morning brief's real zone2_min
+    # alone instead of clobbering it with the running total's zero start.
+    assert doc["zone2_min"] == EXISTING_DASHBOARD["zone2_min"]
 
 
 def test_refresh_dashboard_leaves_weekly_delta_null_without_a_week_old_reading(monkeypatch, s3, frozen_now):
