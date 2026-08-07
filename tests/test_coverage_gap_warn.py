@@ -163,3 +163,114 @@ def test_main_silent_duration_within_budget(tmp_path, capsys):
     # coverage is within threshold at floor=40 too, so no ::warning:: of any kind
     assert "::warning" not in out
     assert "OK" in out
+
+
+# ---- evaluate_high_water: the #1658 measured-coverage regression ratchet -----
+#
+# This is the check that closes the hole the other two leave: --cov-fail-under sits
+# deliberately BELOW measured coverage for anti-flap headroom, and nothing watched
+# that headroom. These tests pin the asymmetry that makes the ratchet up-only —
+# a drop past tolerance is an ERROR, a rise is only a nudge.
+
+
+def test_evaluate_high_water_regression_past_tolerance_is_an_error():
+    status, msg = cgw.evaluate_high_water(60.0, 64.5, 1.5)
+    assert status == "regress"
+    # The message must name both numbers and the shortfall so the CI annotation is
+    # actionable without opening the artifact.
+    assert "60.00" in msg and "64.50" in msg and "4.50" in msg
+
+
+def test_evaluate_high_water_drop_within_tolerance_is_ok():
+    """A 1.0pt dip under a 1.5pt tolerance is jitter, not deletion — must not trip."""
+    status, msg = cgw.evaluate_high_water(63.5, 64.5, 1.5)
+    assert status == "ok"
+    assert "OK" in msg
+
+
+def test_evaluate_high_water_boundary_exactly_at_tolerance_is_ok():
+    """Exactly at the tolerance is NOT a regression — the comparison is strict `>`,
+    matching evaluate()/evaluate_duration()'s boundary semantics."""
+    status, _ = cgw.evaluate_high_water(63.0, 64.5, 1.5)
+    assert status == "ok"
+
+
+def test_evaluate_high_water_just_past_tolerance_regresses():
+    status, _ = cgw.evaluate_high_water(62.99, 64.5, 1.5)
+    assert status == "regress"
+
+
+def test_evaluate_high_water_well_above_mark_asks_for_a_raise_not_a_failure():
+    """A PR that IMPROVES coverage must never be blocked — it gets a nudge to bank it."""
+    status, msg = cgw.evaluate_high_water(66.5, 64.5, 1.5)
+    assert status == "raise"
+    assert "RATCHET_HIGH_WATER" in msg
+
+
+def test_evaluate_high_water_exactly_at_mark_is_ok_not_raise():
+    status, _ = cgw.evaluate_high_water(64.5, 64.5, 1.5)
+    assert status == "ok"
+
+
+def test_evaluate_high_water_small_upward_drift_stays_silent():
+    """The deadband that keeps this from warning on every green run: coverage creeps up
+    by hundredths whenever a test is added, and a `::warning::` on each one would make
+    check_ci_warnings.py (/wrap step (e11)) triage noise forever."""
+    status, _ = cgw.evaluate_high_water(64.56, 64.5, 1.5)
+    assert status == "ok"
+
+
+def test_evaluate_high_water_raise_deadband_is_symmetric_with_the_regression_band():
+    """Exactly +tolerance is still OK; just past it asks for the re-bank — the same
+    strict-`>` boundary the regression side uses."""
+    assert cgw.evaluate_high_water(66.0, 64.5, 1.5)[0] == "ok"
+    assert cgw.evaluate_high_water(66.01, 64.5, 1.5)[0] == "raise"
+
+
+def test_evaluate_high_water_unmeasured_or_unconfigured_is_skip():
+    """Fail-open on both axes: no coverage.xml, or no --high-water passed."""
+    assert cgw.evaluate_high_water(None, 64.5, 1.5) == ("skip", None)
+    assert cgw.evaluate_high_water(64.5, None, 1.5) == ("skip", None)
+
+
+def test_main_high_water_check_is_opt_in(tmp_path, capsys):
+    """Omitting --high-water leaves pre-#1658 invocations behaviorally unchanged."""
+    path = _write_coverage_xml(tmp_path, "0.5719")
+    rc = cgw.main(["--coverage-xml", path, "--floor", "53"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "high-water" not in out.lower()
+
+
+def test_main_exits_1_on_regression_only_with_fail_flag(tmp_path, capsys):
+    path = _write_coverage_xml(tmp_path, "0.5000")
+    args = ["--coverage-xml", path, "--floor", "45", "--high-water", "57.19"]
+
+    # Advisory by default: the ::error:: annotation is emitted, but exit stays 0.
+    rc_advisory = cgw.main(args)
+    assert rc_advisory == 0
+    assert "::error" in capsys.readouterr().out
+
+    # Enforcing when the caller opts in — this is what ci-test.yml passes.
+    rc_enforced = cgw.main(args + ["--fail-on-regression"])
+    assert rc_enforced == 1
+    assert "::error" in capsys.readouterr().out
+
+
+def test_main_improving_coverage_never_fails_even_when_enforcing(tmp_path, capsys):
+    """The up-only guarantee: exceeding the mark is a warning and exit 0, never a red."""
+    path = _write_coverage_xml(tmp_path, "0.7000")
+    rc = cgw.main(["--coverage-xml", path, "--floor", "53", "--high-water", "62.64", "--fail-on-regression"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "::warning title=Coverage high-water mark is stale" in out
+    assert "::error" not in out
+
+
+def test_main_unreadable_coverage_xml_never_reds_the_build(tmp_path, capsys):
+    """A parse blip must stay fail-open even under --fail-on-regression — the gate
+    exists to catch deleted tests, not to red main on a missing artifact."""
+    rc = cgw.main(["--coverage-xml", str(tmp_path / "nope.xml"), "--floor", "53", "--high-water", "57.19", "--fail-on-regression"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "::error" not in out

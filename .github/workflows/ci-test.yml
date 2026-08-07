@@ -157,12 +157,16 @@ jobs:
       - name: Test coverage gate (regression floor, ADR-080)
         # ENFORCED regression floor. The codebase is integration-tested (handlers
         # run live; most offline tests are structural/contract), so measured offline
-        # line coverage is 57.1% (post-#2132-era green-main run, 2026-08-06 — up
-        # from the stale 51%/6551-test figure). This floor (53%) prevents
-        # BACKSLIDING with ~4pt headroom under measured (same margin #1658 used at
-        # 47/51) so normal fluctuation doesn't red main — it is not a quality bar.
-        # Ratcheted 40→47 by #1658, 47→53 by #2152 (lineage: #419 9%→25%, #1206
-        # 25→40); keep ratcheting up (ADR-080/ADR-107). The floor is CANONICAL in
+        # line coverage is 62.64% (re-measured 2026-08-06 with this job's exact
+        # invocation and pinned deps, after #1658's test tranche took it from
+        # 57.19% — +5.39pt / 3,789 newly-covered statements across 11 modules that
+        # had 0-25% coverage). This floor (58%) prevents BACKSLIDING with ~4.6pt
+        # headroom under measured so normal fluctuation doesn't red main — it is
+        # not a quality bar, and it is no longer the tightest gate either: step (3)
+        # below polices measured coverage directly at 62.64 - 1.5 = 61.14%.
+        # Ratcheted 40→47 by #1658, 47→53 by #2152, 53→58 by #1658's test tranche
+        # (lineage: #419 9%→25%, #1206 25→40); keep ratcheting up
+        # (ADR-080/ADR-107). The floor is CANONICAL in
         # pyproject.toml `[tool.coverage.report] fail_under`; the explicit
         # `--cov-fail-under` below is belt-and-suspenders and MUST match it —
         # tests/test_coverage_floor_ratchet.py fails if the two (and the gap-warn
@@ -176,13 +180,14 @@ jobs:
               --cov=lambdas --cov=mcp \
               --cov-report=term-missing:skip-covered \
               --cov-report=xml:coverage.xml \
-              --cov-fail-under=53 \
+              --cov-fail-under=58 \
               -q 2>&1 | tail -100
           echo "::endgroup::"
 
-      - name: Coverage + duration drift warnings (self-reminding ratchet, #1206/#1349)
-        # Advisory, fail-open. Two independent checks in one script (both never
-        # fail the build; keep `if: always()`):
+      - name: Coverage regression gate + drift warnings (ratchet, #1206/#1349/#1658)
+        # THREE checks in one script. (1) and (2) are advisory/fail-open and never
+        # fail the build; (3) is ENFORCING (`--fail-on-regression`) but still
+        # fail-open on a missing/unparseable coverage.xml, so keep `if: always()`:
         #  (1) #1206: parses coverage.xml's line-rate and emits a GitHub
         #      ::warning:: when the enforced floor lags measured line coverage
         #      by >10 points, so the ratchet reminds a human to bump it.
@@ -206,11 +211,26 @@ jobs:
         #      standing-warning triage gate (`scripts/check_ci_warnings.py`,
         #      /wrap step (e11)) still obligates a same-session decision the
         #      next time this fires.
+        #  (3) #1658: the MEASURED-coverage high-water ratchet — the only check
+        #      here that can red the build. `--cov-fail-under` above is set a few
+        #      points BELOW measured on purpose (anti-flap headroom), and until
+        #      now that headroom was unguarded: real coverage could be deleted
+        #      down to the floor with every gate green and check (1) silent (it
+        #      fires only when the gap GROWS). `--high-water` is measured line
+        #      coverage as of the PR that last raised it; the step exits 1 when
+        #      measured falls >1.5pt (the script's DEFAULT_HIGH_WATER_TOLERANCE_
+        #      POINTS — jitter absorption, not slack to spend) below it. Exceeding
+        #      the mark only WARNS that it is stale, so a coverage-improving PR is
+        #      never blocked by the ratchet protecting it. Bump this literal and
+        #      RATCHET_HIGH_WATER in tests/test_coverage_floor_ratchet.py
+        #      together — that test fails if they drift apart or if this step
+        #      loses --fail-on-regression.
         if: always()
         run: |
           DURATION_SECONDS=$(( $(date +%s) - "${UNIT_TESTS_START_EPOCH:-$(date +%s)}" ))
-          python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 53 --gap-threshold 10 \
-              --duration-seconds "$DURATION_SECONDS" --duration-budget-seconds 1200
+          python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 58 --gap-threshold 10 \
+              --duration-seconds "$DURATION_SECONDS" --duration-budget-seconds 1200 \
+              --high-water 62.64 --fail-on-regression
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

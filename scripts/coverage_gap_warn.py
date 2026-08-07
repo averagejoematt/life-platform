@@ -43,24 +43,43 @@ WHAT IT DOES:
       1200s / 20min, derived #2152 — see ci-test.yml's comment for the
       measure-first derivation) — the same self-reminding-ratchet shape as (1),
       applied to suite cost instead of coverage.
-  It NEVER fails the build: every error path (missing file, unparseable XML,
-  missing attribute, missing/invalid duration) is fail-open — it prints a note
-  and exits 0. The floor enforcement itself stays the job of `--cov-fail-under`;
-  both checks here are advisory only.
+  (3) MEASURED-coverage high-water ratchet (#1658, added 2026-08-06): the hole
+      the other two leave open. `--cov-fail-under` is deliberately set a few
+      points BELOW measured coverage so normal fluctuation doesn't red main —
+      but that headroom is completely unguarded. At the floor/measured values
+      this check was written against (53 / 57.19%), ~4.2 points of real
+      coverage — roughly 2,900 statements — could be deleted with every gate
+      still green and check (1) still silent (it only fires when the gap gets
+      BIGGER). This check compares measured coverage to a committed high-water
+      mark and, with `--fail-on-regression`, EXITS 1 when measured falls more
+      than `--high-water-tolerance` points below it. That is what makes the
+      ratchet up-only in the thing that actually matters (real coverage) rather
+      than only in the literal that describes it.
+
+  Checks (1) and (2) NEVER fail the build: every error path (missing file,
+  unparseable XML, missing attribute, missing/invalid duration) is fail-open —
+  it prints a note and exits 0. Check (3) is also fail-open by default and only
+  becomes enforcing when `--fail-on-regression` is passed (ci-test.yml passes
+  it); an unreadable coverage.xml still exits 0 even then, so a parse blip can
+  never red main. The floor enforcement itself stays the job of
+  `--cov-fail-under`.
 
 USAGE:
   python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 40
   python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 40 --gap-threshold 10
   python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 40 \
       --duration-seconds 830 --duration-budget-seconds 1200
+  python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 60 \
+      --high-water 64.4 --fail-on-regression
 
-EXIT CODE: always 0 (advisory; a parse blip must never red the build).
+EXIT CODE: 0, except when `--fail-on-regression` is passed AND measured coverage
+  is more than the tolerance below the high-water mark, in which case 1.
 """
 
 import argparse
 import sys
 import xml.etree.ElementTree as ET
-from typing import Optional
+from typing import Optional, Tuple
 
 # The suite-duration budget's canonical default (#1349, raised #1966, re-raised
 # #2152 — see the ci-test.yml comment and coverage_gap_warn.py's module docstring
@@ -72,6 +91,15 @@ from typing import Optional
 # literal, and its own committed high-water mark all agree, so the three can't
 # silently drift apart the way the coverage floor could before #1658.
 DEFAULT_DURATION_BUDGET_SECONDS = 1200.0
+
+# How far measured coverage may fall below the committed high-water mark before the
+# regression check (3) fails the build (#1658). This is NOT slack to spend — it
+# absorbs the honest jitter of a coverage number that moves whenever a test's own
+# import graph changes, so the gate catches real deletion instead of flapping on
+# noise. 1.5 points is ~1,050 statements at the current ~70k-statement base: far
+# more than jitter, far less than the ~4pt floor headroom this check exists to
+# close. Tighten it as the suite stabilises; do not widen it to dodge a red.
+DEFAULT_HIGH_WATER_TOLERANCE_POINTS = 1.5
 
 
 def parse_line_rate_pct(coverage_xml_path: str) -> Optional[float]:
@@ -130,6 +158,62 @@ def evaluate_duration(measured_seconds: Optional[float], budget_seconds: float) 
     return None
 
 
+def evaluate_high_water(measured_pct: Optional[float], high_water: Optional[float], tolerance: float) -> Tuple[str, Optional[str]]:
+    """Compare measured coverage to the committed high-water mark (#1658).
+
+    Returns a ``(status, message)`` tuple where status is one of:
+
+      "skip"     — nothing to say (no measurement, or no high-water configured).
+                   Fail-open: the caller must treat this as success.
+      "ok"       — measured is at/above the high-water minus tolerance.
+      "regress"  — measured fell MORE than ``tolerance`` points below the
+                   high-water mark. This is the up-only violation: real coverage
+                   was deleted. With --fail-on-regression the caller exits 1.
+      "raise"    — measured exceeds the mark by MORE than ``tolerance``, so the
+                   committed mark is meaningfully stale and should be ratcheted
+                   up. Advisory only: a PR that IMPROVES coverage must never be
+                   blocked by the ratchet, it just gets a nudge to bank the gain.
+
+    The asymmetry is the whole point — down is a failure, up is a reminder.
+
+    Note the deadband on the "raise" side is deliberate. Coverage drifts upward a
+    few hundredths of a point every time a test is added, so warning on ANY excess
+    would emit a `::warning::` on essentially every green run — and standing CI
+    warnings are not free here: `scripts/check_ci_warnings.py` (/wrap step (e11))
+    obligates a same-session triage decision for each one. A nudge that fires
+    constantly is a nudge nobody reads (the #1966 lesson). Requiring the SAME
+    tolerance band on both sides means the mark is treated as current while
+    measured sits within ±tolerance of it, and only a real accumulation of new
+    coverage asks for a re-bank.
+    """
+    if measured_pct is None or high_water is None:
+        return ("skip", None)
+    surplus = measured_pct - high_water
+    if surplus > tolerance:
+        return (
+            "raise",
+            f"Measured line coverage ({measured_pct:.2f}%) is {surplus:.2f} points ABOVE the committed "
+            f"high-water mark ({high_water:.2f}%), past the {tolerance:.2f}pt deadband. Bank the gain: bump "
+            f"RATCHET_HIGH_WATER in tests/test_coverage_floor_ratchet.py and the --high-water literal in "
+            f"ci-test.yml so the new level becomes the floor of the floor (#1658).",
+        )
+    shortfall = high_water - measured_pct
+    if shortfall > tolerance:
+        return (
+            "regress",
+            f"COVERAGE REGRESSION: measured line coverage ({measured_pct:.2f}%) is {shortfall:.2f} points "
+            f"below the committed high-water mark ({high_water:.2f}%), past the {tolerance:.2f}pt tolerance. "
+            f"Coverage is up-only (ADR-080/ADR-107, #1658): restore the deleted tests, or — if the drop is "
+            f"legitimate (e.g. a covered module was deleted wholesale) — lower RATCHET_HIGH_WATER in "
+            f"tests/test_coverage_floor_ratchet.py and the ci-test.yml --high-water literal in the SAME PR, "
+            f"with the reason in the PR body.",
+        )
+    return (
+        "ok",
+        f"coverage_gap_warn: measured {measured_pct:.2f}% within ±{tolerance:.2f}pt of the " f"{high_water:.2f}% high-water mark; OK.",
+    )
+
+
 def main(argv: Optional[list] = None) -> int:
     parser = argparse.ArgumentParser(
         description="Warn when the CI coverage floor lags measured coverage, and/or when the Unit "
@@ -151,6 +235,26 @@ def main(argv: Optional[list] = None) -> int:
         type=float,
         default=DEFAULT_DURATION_BUDGET_SECONDS,
         help=f"Emit a warning when --duration-seconds exceeds this (default: {DEFAULT_DURATION_BUDGET_SECONDS:.0f}s / 15min).",
+    )
+    parser.add_argument(
+        "--high-water",
+        type=float,
+        default=None,
+        help="Committed measured-coverage high-water mark, in percent (#1658). Omit to skip the regression check entirely.",
+    )
+    parser.add_argument(
+        "--high-water-tolerance",
+        type=float,
+        default=DEFAULT_HIGH_WATER_TOLERANCE_POINTS,
+        help=(
+            "How far measured coverage may fall below --high-water before the regression check trips "
+            f"(default: {DEFAULT_HIGH_WATER_TOLERANCE_POINTS}pt)."
+        ),
+    )
+    parser.add_argument(
+        "--fail-on-regression",
+        action="store_true",
+        help="Exit 1 when measured coverage regresses past the --high-water tolerance (#1658). Default is advisory-only.",
     )
     args = parser.parse_args(argv)
 
@@ -175,6 +279,18 @@ def main(argv: Optional[list] = None) -> int:
             print(f"::warning title=Unit Tests job is over its duration budget::{duration_message}")
         else:
             print(f"coverage_gap_warn: duration {args.duration_seconds:.0f}s within " f"{args.duration_budget_seconds:.0f}s budget; OK.")
+
+    # (3) #1658 — the measured-coverage high-water ratchet. Only this check can
+    # fail the build, and only when the caller opted in with --fail-on-regression.
+    status, hw_message = evaluate_high_water(measured_pct, args.high_water, args.high_water_tolerance)
+    if status == "regress":
+        print(f"::error title=Coverage regressed below the high-water mark::{hw_message}")
+        if args.fail_on_regression:
+            return 1
+    elif status == "raise":
+        print(f"::warning title=Coverage high-water mark is stale::{hw_message}")
+    elif status == "ok":
+        print(hw_message)
 
     return 0
 
