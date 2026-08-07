@@ -21,7 +21,7 @@ pagination loop has OOM'd this repo's CI runner before).
 
 import os
 import sys
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -1067,6 +1067,48 @@ class TestLambdaHandler:
         out = wc.lambda_handler({"week": "2026-W10", "force": True}, None)
         assert out["week"] == "2026-W10"
         assert [p["sk"] for p in fake.puts][0] == "WEEK#2026-W10"
+
+    def test_manual_week_round_trips_to_the_scheduled_end_date(self, monkeypatch):
+        # #2175: the manual override must derive target_monday the same way
+        # the scheduled path does (ISO 8601 weeks via isocalendar()/
+        # fromisocalendar()), not via strptime's %W (which is NOT ISO week
+        # numbering). Pin "now" to the Sunday that ends ISO week 2026-W01 —
+        # under the old %W parse this diverges by a full week (see the sibling
+        # test below); under the fix both paths land on the same end_date.
+        class _SundayOfWeek1(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return datetime(2026, 1, 4, 18, 30, 0, tzinfo=tz)
+
+        fake_scheduled = FakeTable()
+        self._wire(monkeypatch, fake_scheduled, self._rich_series())
+        monkeypatch.setattr(wc, "datetime", _SundayOfWeek1)
+        scheduled_out = wc.lambda_handler({"force": True}, None)
+        assert scheduled_out["week"] == "2026-W01"
+        assert scheduled_out["end_date"] == "2026-01-04"
+
+        fake_manual = FakeTable()
+        self._wire(monkeypatch, fake_manual, self._rich_series())
+        monkeypatch.setattr(wc, "datetime", _SundayOfWeek1)
+        manual_out = wc.lambda_handler({"week": "2026-W01", "force": True}, None)
+        assert manual_out["week"] == "2026-W01"
+        # The load-bearing assertion: a manual re-run of the SAME ISO week the
+        # scheduled path would have written must recompute the SAME date
+        # window, not a shifted one.
+        assert manual_out["end_date"] == scheduled_out["end_date"] == "2026-01-04"
+
+    def test_manual_week_pins_the_W01_divergence_against_regression(self, monkeypatch):
+        # #2175: 2026-01-01 is a Thursday, so ISO week 2026-W01 runs
+        # 2025-12-29 → 2026-01-04. strptime's "%Y-W%W-%w" instead resolves
+        # "2026-W01-1" to 2026-01-05 (the first Monday *numbered* within
+        # 2026), a full week later — end_date 2026-01-11 instead of the
+        # correct 2026-01-04. Pin this exact divergent week so any future
+        # regression back to %W trips this test immediately.
+        fake = FakeTable()
+        self._wire(monkeypatch, fake, self._rich_series())
+        out = wc.lambda_handler({"week": "2026-W01", "force": True}, None)
+        assert out["end_date"] == "2026-01-04"
+        assert out["start_date"] == (date(2026, 1, 4) - timedelta(days=wc.LOOKBACK_DAYS - 1)).strftime("%Y-%m-%d")
 
     def test_benchmark_and_month_stages_are_non_fatal(self, monkeypatch):
         fake = FakeTable()
