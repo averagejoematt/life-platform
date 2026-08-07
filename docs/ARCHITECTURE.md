@@ -254,12 +254,22 @@ Compute → store → read pattern. Standalone Lambdas run before Daily Brief, s
 | `lambdas/web/site_api_lambda.py` | 1,216 | `lambda_handler` entry point + `ROUTES`/`_SIMPLE_ROUTES` dispatch + 5 inline coach handlers |
 | `lambdas/web/site_api_common.py` | 320 | Shared helpers: `_ok`, `_error`, `_query_source`, `_latest_item`, `_decimal_to_float`, `_load_s3_json`, CORS, request-id state |
 | `lambdas/web/site_api_observatory.py` | 1,591 | 14 `/api/*_overview` + meal/strength/journal handlers |
-| `lambdas/web/site_api_intelligence.py` | ~2,230 | `/api/status` + `/api/pulse` + (#1240) the intelligence-adjacent domain handlers: correlations, forecast, scenarios, state_of_matthew, inference_receipt, wrong, pillar_coupling |
+| `lambdas/web/site_api_intelligence.py` | 179 | **Facade** (#1654): the 14 routed intelligence entrypoints, each a thin delegator to a sibling below. Keeps the router bindings, `handler.__module__`, and the test monkeypatch surface unchanged |
+| `lambdas/web/site_api_status.py` | 834 | (#1654) `/api/status`, `/api/status/summary` — the active pipeline probe, per-source freshness, component rollup, and the shared response cache |
+| `lambdas/web/site_api_pulse.py` | 643 | (#1654) `/api/pulse`, `/api/pulse_history` |
+| `lambdas/web/site_api_discovery.py` | 540 | (#1654) `/api/hypotheses`, `/api/intelligence_summary`, `/api/pillar_coupling`, `/api/correlations` — the statistical-discovery surface |
+| `lambdas/web/site_api_budget.py` | 609 | (#1654) `/api/inference_receipt`, `/api/receipts`, and the `/api/status` cost block — the AI-spend envelope, read from the governor's own numbers |
+| `lambdas/web/site_api_foresight.py` | 355 | (#1654) `/api/forecast`, `/api/scenarios`, `/api/state_of_matthew`, `/api/wrong` — predictions and their public reckoning |
 | `lambdas/web/site_api_social.py` | 1,168 | 15 subscriber/experiment/challenge/nudge handlers + token-HMAC machinery |
-| `lambdas/web/site_api_vitals.py` | ~2,720 | homepage/dashboard handlers (vitals, journey, character, achievements, snapshot) + (#1240) the vitals-adjacent domain handlers: glucose, sleep_detail, sleep_correlations, circadian, phenoage, labs, genome_risks |
+| `lambdas/web/site_api_vitals.py` | 222 | **Facade** (#1654): the 19 routed homepage/dashboard entrypoints, each a thin delegator to a sibling below |
+| `lambdas/web/site_api_body.py` | 407 | (#1654) `/api/vitals`, `/api/weight_progress`, `/api/snapshot` — the live body reading + the homepage fan-out |
+| `lambdas/web/site_api_journey.py` | 743 | (#1654) `/api/journey`, `/api/timeline`, `/api/journey_timeline`, `/api/journey_waveform`, `/api/achievements` — the progress record over time |
+| `lambdas/web/site_api_character.py` | 530 | (#1654) `/api/character`, `/api/character_config`, `/api/character_receipt`, `/api/character_stats` — the game layer |
+| `lambdas/web/site_api_sleep.py` | 631 | (#1654) `/api/sleep_detail`, `/api/sleep_correlations`, `/api/circadian` |
+| `lambdas/web/site_api_biomarkers.py` | 486 | (#1654) `/api/labs`, `/api/glucose`, `/api/phenoage`, `/api/genome_risks` — the measured chemistry and its privacy absolutes |
 | `lambdas/web/site_api_data.py` | ~2,740 | domain-data grab-bag after the #1240 split: habits, experiments, ledger/discoveries, pipeline freshness, cycle_compare/survival, protocols/domains (docstring lists the routed set; guarded by `tests/test_site_api_data_split.py`) |
 
-All 7 modules ship together via the standard `Code.from_asset("../lambdas")` zip. `/api/ask` + `/api/board_ask` are served by the separate `life-platform-site-api-ai` Lambda (ADR-036).
+All of these ship together via the standard `Code.from_asset("../lambdas")` zip. `/api/ask` + `/api/board_ask` are served by the separate `life-platform-site-api-ai` Lambda (ADR-036).
 
 **Routes served via CloudFront → site-api:**
 - `GET /api/vitals` — weight, HRV, recovery (TTL 300s)

@@ -496,7 +496,7 @@ _PER_SOURCE_READS: dict[str, str] = {
         "window all read cross-phase today since every caller (whoop/withings/strava/eightsleep/"
         "hevy/macrofactor/todoist/chronicling) is RAW_TIMESERIES or CROSS_PHASE (#2150)."
     ),
-    "lambdas/web/site_api_vitals.py::handle_timeline": (
+    "lambdas/web/site_api_journey.py::timeline": (  # #1654: was site_api_vitals.py::handle_timeline
         "All three raw calls (life_events, experiments, character_sheet) now pass "
         "include_pilot=source_reads_cross_phase(<source>). Only life_events (RAW_TIMESERIES) "
         "actually goes cross-phase — experiments and character_sheet are EXPERIMENT_SCOPED, so "

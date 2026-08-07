@@ -257,8 +257,12 @@ def test_threshold_logic_lives_only_in_achievement_rules():
     comparison, or they drift back into the #1624 failure mode."""
     import ast
 
-    tree = ast.parse((ROOT / "lambdas" / "web" / "site_api_vitals.py").read_text())
-    fn = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "handle_achievements")
+    # #1654: the achievements body moved to web/site_api_journey.py behind the
+    # unchanged site_api_vitals facade. resolve_handler follows the facade's own
+    # delegator to whichever module owns the logic, so this guard reads a real body.
+    from site_api_family import resolve_handler
+
+    _path, _src, fn = resolve_handler("site_api_vitals", "handle_achievements")
     # Drop the docstring — it DESCRIBES the old pattern, which must not trip this guard.
     stmts = fn.body[1:] if (fn.body and isinstance(fn.body[0], ast.Expr) and isinstance(fn.body[0].value, ast.Constant)) else fn.body
     body = "\n".join(ast.unparse(s) for s in stmts)

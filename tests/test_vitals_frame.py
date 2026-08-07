@@ -11,6 +11,8 @@ import json
 import os
 import sys
 
+from site_api_family import family_source
+
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
 from web import site_api_vitals as vitals  # noqa: E402
@@ -98,10 +100,10 @@ def test_vitals_trends_are_chronological_regardless_of_query_order(monkeypatch):
 def test_vitals_no_op_sort_is_gone():
     """Source-regression: the misleading `key=lambda _: 0` no-op sorts and the dead
     discarded comprehension must not return. See AUDIT BUG-04."""
-    src = open(
-        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas", "web", "site_api_vitals.py"),
-        encoding="utf-8",
-    ).read()
+    # #1654: handle_vitals' body moved to web/site_api_body.py behind the unchanged
+    # facade. Guard the SET, not the instance — scan the derived family so this keeps
+    # biting after the next split instead of passing vacuously.
+    src = family_source("site_api_vitals")
     assert "key=lambda _: 0" not in src
     assert "whoop_30d_sorted" in src
 

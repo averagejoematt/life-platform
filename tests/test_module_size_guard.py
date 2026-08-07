@@ -82,8 +82,13 @@ BASELINE = {
     # logic now lives in cohesive web/site_api_{nutrition,meals,training,physical,mind}.py
     # (each well under the ceiling). The pure-subset ratchet allows removing a shrunk entry.
     "lambdas/emails/daily_brief_lambda.py": "2472 lines",
-    "lambdas/web/site_api_intelligence.py": "2460 lines",
-    "lambdas/web/site_api_vitals.py": "2407 lines",
+    # site_api_intelligence.py (2831 by the time the slice ran) drained to a ~180-line
+    # facade by #1654's 4th and last named target — the handler logic now lives in
+    # cohesive web/site_api_{status,pulse,discovery,foresight,budget}.py, each well
+    # under the ceiling. The pure-subset ratchet allows removing a shrunk entry.
+    # site_api_vitals.py (2559 by the time the slice ran) drained to a ~220-line facade
+    # by #1654 — the handler logic now lives in cohesive
+    # web/site_api_{body,journey,character,sleep,biomarkers}.py, each under the ceiling.
     "lambdas/compute/daily_insight_compute_lambda.py": "2335 lines",
     "lambdas/emails/weekly_digest_lambda.py": "2195 lines",
     "lambdas/ai/ai_calls.py": "2164 lines",

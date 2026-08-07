@@ -34,6 +34,8 @@ import sys
 from datetime import date, timedelta
 from pathlib import Path
 
+from site_api_family import family_paths, family_source
+
 os.environ.setdefault("TABLE_NAME", "life-platform")
 os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
 os.environ.setdefault("USER_ID", "matthew")
@@ -105,7 +107,13 @@ def test_the_scan_finds_the_known_producer():
     """Guard the guard: a scan finding nothing would pass everything."""
     producers = _night_of_producers()
     assert producers, "AST scan found no night_of producers — the scan is broken or the field was renamed"
-    assert any(f == "site_api_vitals.py" for f, _, _ in producers)
+    # #1654: /api/vitals' body moved to web/site_api_body.py behind the unchanged
+    # site_api_vitals facade. The scan already walks all of lambdas/web/, so assert
+    # against the derived family rather than one filename.
+    family = {p.name for p in family_paths("site_api_vitals")}
+    assert any(
+        f in family for f, _, _ in producers
+    ), f"no night_of producer in the site_api_vitals family; found {sorted({f for f, _, _ in producers})}"
 
 
 def test_every_night_of_is_derived_from_the_shared_helper():
@@ -124,14 +132,14 @@ def test_every_night_of_is_derived_from_the_shared_helper():
 
 def test_vitals_binds_night_of_to_the_helper():
     """The one live producer, asserted concretely rather than only structurally."""
-    src = (WEB / "site_api_vitals.py").read_text()
+    src = family_source("site_api_vitals")
     assert "night_of_for(_as_of)" in src
     assert '"frame": NIGHT_OF_FRAME' in src, "the frame label must come from the shared module too"
 
 
 def test_no_stray_inline_one_day_offset_remains_in_vitals():
     """Negative control for the refactor: the old inline computation is gone."""
-    src = (WEB / "site_api_vitals.py").read_text()
+    src = family_source("site_api_vitals")
     assert "_night_of = (datetime.strptime" not in src
 
 

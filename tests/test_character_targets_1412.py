@@ -303,11 +303,15 @@ class TestLoadAndWiring:
         sites = {
             "compute": os.path.join(_ROOT, "lambdas", "compute", "character_sheet_lambda.py"),
             "qa_smoke": os.path.join(_ROOT, "lambdas", "operational", "qa_smoke_lambda.py"),
-            "site_api": os.path.join(_ROOT, "lambdas", "web", "site_api_vitals.py"),
         }
         for name, path in sites.items():
             with open(path) as f:
                 assert "effective_character_config" in f.read(), f"{name} does not build the effective config (#1412)"
+        # #1654: the site-api replay site moved to web/site_api_character.py behind the
+        # unchanged site_api_vitals facade — assert against the derived family, not a filename.
+        from site_api_family import family_source
+
+        assert "effective_character_config" in family_source("site_api_vitals"), "site_api does not build the effective config (#1412)"
 
 
 # ══════════════════════════════════════════════════════════════════════════════

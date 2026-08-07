@@ -267,9 +267,11 @@ def test_handle_timeline_routes_all_three_calls_through_the_shared_decision():
     behaviour from its source's own taxonomy class."""
     import ast
 
-    src = (REPO_ROOT / "lambdas" / "web" / "site_api_vitals.py").read_text()
-    tree = ast.parse(src)
-    func = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "handle_timeline")
+    # #1654: the timeline body moved to web/site_api_journey.py behind the unchanged
+    # site_api_vitals facade; resolve_handler follows the facade's delegator to it.
+    from site_api_family import resolve_handler
+
+    _path, src, func = resolve_handler("site_api_vitals", "handle_timeline")
     seg = (ast.get_source_segment(src, func) or "").replace(" ", "").replace("\n", "")
     assert seg.count("with_phase_filter(") == 3
     assert seg.count("source_reads_cross_phase(") == 3, "all three raw calls must derive include_pilot from the taxonomy"
