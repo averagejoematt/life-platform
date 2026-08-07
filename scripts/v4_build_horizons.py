@@ -44,7 +44,7 @@ def render() -> str:
     head_chrome = v4_chrome.head_chrome()
     doors = v4_chrome.doors_nav("/data/", with_follow=True)
     loop_fwd = v4_chrome.loop_forward("/data/", self_path="/data/horizons/")
-    footer = v4_chrome.site_footer()
+    footer = v4_chrome.site_footer(current_door="/data/")
     preloads = "\n  ".join(_PRELOADS)
     return f"""<!DOCTYPE html>
 <html lang="en" data-door="data">

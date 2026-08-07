@@ -141,3 +141,36 @@ drifts from the canonical partial.
 At the time of writing: 80 non-legacy HTML files in `site/`, 78 carry a doors nav (and
 now a loop-forward close), 2 are the redirect stubs (`/mind/`, `/subscribe.html`)
 correctly excluded by construction.
+
+## The wayfinding layer: the map behind the close (#1475)
+
+`loop_forward` gave every page a **decision** — one next station, argued. It deliberately
+did not give the reader a **map**: what the loop is, where they are on it, and what the
+other stations hold. That stayed the job of the `.site-foot` mega-menu, which is exactly
+where this doc's own finding landed — "a directory of ~30 links with no opinion".
+
+`scripts/v4_wayfinding.py` closes the other half. The canonical footer now opens with the
+`.wayfinder` — the loop's five stations, this page's station marked ember and
+`aria-current="page"`, the next one tagged `next`, the one the loop arrived from lifted —
+and the mega-menu below it is re-poured in loop order with each stage column keyed to its
+station. Both ship on every chrome-bearing page through the same `v4_apply_chrome.py`
+sweep, off the same detected door, so a reader is never more than one interaction from the
+loop no matter which page a Reddit link dropped them on.
+
+**Why a map AND a close, not one or the other.** They answer different questions and are
+pinned to never disagree: `tests/test_wayfinding.py::test_station_cycle_matches_the_loop_forward_map`
+asserts the station the ribbon tags `next` is the station `NEXT_STATION` argues for, on
+every door. The close makes the case for one step; the map shows the reader they're on a
+cycle and lets them jump.
+
+### Each journey's next station, through the wayfinding layer
+
+| Journey | Next station (from the close) | How the wayfinder carries it |
+|---|---|---|
+| 1. Reddit newcomers | `/` → the cockpit | Home has no door, so nothing is "here" and the cockpit is tagged **start here** — the map's invitation matches `DEFAULT_NEXT` exactly. Deep-linked newcomers get the same tag on `/gear/`, `/privacy/`, `/404`. |
+| 2. Matthew | cockpit → the data | On `/cockpit/` the vantage is ember and Data is tagged `next`; the Data column sits directly below it, so the drill-down from a summary number to its inputs is one interaction, not a scroll through a directory. |
+| 3. Friends & family | story → the cockpit | On any `/story/*` page Story is ember and the cockpit is tagged `next` — and, for the first time, the cockpit is reachable *from the footer at all*: before #1475 the loop's vantage had no footer link on any page. |
+| 4. QS enthusiasts | data → the coaching, protocols → the story | Deep `/data/*` and `/method/*` pages (which inherit the Data door) mark Data ember and tag Coaching `next`; Protocols pages tag Story. The rest of the causal chain is visible as a chain, which is what this audience arrived to audit. |
+
+The `from` state is the piece none of the four journeys asked for and all four use: a
+reader who followed the close forward can walk it back without hunting the top nav.

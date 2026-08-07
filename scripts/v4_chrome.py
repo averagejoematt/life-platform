@@ -17,6 +17,8 @@ else varies:
     footer base line; home only (story.js binds it from /api stats metadata, #1104).
   * `loop_forward`'s own `current_door` reuses the SAME detected door as the nav — see
     its docstring for why that's the right signal (not the `loop_ribbon` short-key one).
+    Since #1475 `site_footer` takes the same `current_door` for the footer wayfinder, so
+    nav, close and footer all state one position from one detected signal.
 
 The byte layout matches the canonical nav/footer that ships on the ~51 dominant pages
 exactly (HTML-entity apostrophes via `html.escape`, `&amp;`, single-line, no stray
@@ -26,6 +28,11 @@ whitespace) so regenerating a canonical page is a zero-diff no-op.
 from __future__ import annotations
 
 import html
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import v4_wayfinding  # noqa: E402 — the #1475 wayfinding layer (station registry + ribbon)
 
 # The five doors, in loop order: cockpit · data · coaching · protocols · story.
 # (href, label, sprite-key, title) — title becomes the hover tooltip, HTML-escaped.
@@ -138,55 +145,107 @@ SOCIAL_LINKS = (
 _SOCIAL_FOOT_HTML = "".join(f'<a href="{href}" target="_blank" rel="me noopener">{label}</a>' for href, label in SOCIAL_LINKS)
 
 
-def site_footer(with_asof: bool = False) -> str:
-    """The canonical `.site-foot` footer — one site map on every page.
+# The mega-menu, in LOOP ORDER (#1475). Before the wayfinding layer this was six
+# columns in arrival order (Story first) with every heading ember — a directory whose
+# accent carried no information. It is now the loop laid out left-to-right: the four
+# causal stages fill the first grid row (Data → Coaching → Protocols → Story), and the
+# two meta columns that sit OUTSIDE the loop — The Technology and Follow &amp; context —
+# fill the second. Each stage column is keyed to its station (`data-station`) so the
+# wayfinder ribbon above it can light the column it owns, and so the station the reader
+# is currently inside is the one and only ember thing in the menu.
+#
+# Every link is unchanged from the pre-#1475 footer — this is a re-pour of the same link
+# coverage onto the loop, not an IA edit (`tests/test_site_orphans.py` and
+# `tests/test_wayfinding.py::test_wayfinding_kept_every_footer_link` both pin that).
+#
+# IA notes (2026-07-12): "The Technology" column (#1110) is the menu home for the
+# platform-itself content — the /method/ hub, the build log (moved here OUT of the
+# story sub-nav; URL unchanged), the curated machine pages, and /gear/ (#1111 — the
+# devices behind the data). "The ledger" (#1109) and "The agents" (#1111) are footer-
+# linked so neither is an unaccounted orphan; the ledger stays OFF the /data/ tile
+# rail by explicit registry intent (`"unlisted"` in v4_build_evidence.REGISTRY).
+# The Coaching column is the FULLER set unified up in #1009 (The Read / By Coach /
+# Scorecard / The Team / AI lab notes), with /coaching/ correctly labelled "The Read".
+#   (station key or None, heading, links HTML)
+FOOTER_COLUMNS = (
+    (
+        "data",
+        "The Data",
+        '<a href="/data/">All topics</a><a href="/method/ask/">Ask the data</a>'
+        '<a href="/data/labs/">Labs</a><a href="/data/training/">Training</a>'
+        '<a href="/data/sleep/">Sleep</a><a href="/data/ledger/">The ledger</a>',
+    ),
+    (
+        "coaching",
+        "The Coaching",
+        '<a href="/coaching/">The Read</a><a href="/coaching/by-coach/">By Coach</a>'
+        '<a href="/coaching/scorecard/">Scorecard</a><a href="/coaching/team/">The Team</a>'
+        '<a href="/coaching/lab-notes/">AI lab notes</a>',
+    ),
+    (
+        "protocols",
+        "The Protocols",
+        '<a href="/protocols/">All protocols</a><a href="/protocols/supplements/">Supplements</a>'
+        '<a href="/protocols/experiments/">Experiments</a><a href="/protocols/challenges/">Challenges</a>',
+    ),
+    (
+        "story",
+        "The Story",
+        '<a href="/story/chronicle/">Chronicle</a><a href="/story/panel/">Podcast</a>'
+        '<a href="/story/journal/">In my own words</a><a href="/story/timeline/">Timeline</a>'
+        '<a href="/story/attempts/">The attempts</a>'
+        '<a href="/story/agents/">The agents</a><a href="/story/about/">About</a>',
+    ),
+    (
+        None,
+        "The Technology",
+        '<a href="/method/">The machine</a><a href="/story/build/">Build log</a>'
+        '<a href="/method/platform/">The platform</a><a href="/method/pipeline/">Pipeline status</a>'
+        '<a href="/method/cost/">Cost</a><a href="/gear/">The gear</a>',
+    ),
+    (
+        None,
+        "Follow &amp; context",
+        f'<a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a>{_SOCIAL_FOOT_HTML}'
+        '<a href="/story/about/">About</a>'
+        '<a href="/privacy/">Privacy</a>',
+    ),
+)
 
-    Based on the dominant footer (the ~51 data/method/protocols pages) but unified
-    UP for the coaching column: it carries the FULLER "The Coaching" set (The Read /
-    By Coach / Scorecard / The Team / AI lab notes) so no live coaching link is lost
-    site-wide, and it fixes the dominant footer's mislabel (/coaching/ is "The Read",
-    /coaching/team/ is "The Team"). Additive for the dominant pages (#1009 review).
+
+def site_footer(with_asof: bool = False, current_door: str | None = None) -> str:
+    """The canonical `.site-foot` footer — the wayfinding layer on every page (#1475).
+
+    Three stacked pieces, one source:
+      1. the **wayfinder** (`v4_wayfinding.wayfinder`) — the loop's five stations with
+         this page's station marked, the next one tagged, and the one it came from
+         lifted. This is what makes "no reader is ever more than one interaction from
+         the loop" structural rather than per-page: it ships inside the footer, and
+         `v4_apply_chrome.py` puts the footer on every chrome-bearing page;
+      2. the **mega-menu** (`FOOTER_COLUMNS`) — the same ~30 links as before, re-poured
+         in loop order and keyed to their stations;
+      3. the base line — brand, the optional live stamp, the home link.
+
+    `current_door` is the door href the doors nav marks (`"/data/"`, `"/story/"`, …) —
+    `v4_apply_chrome.py` detects it once per page and hands the SAME value to
+    `doors_nav`, `loop_forward` and here, so the three surfaces can never disagree about
+    where the reader is. `None` renders the unmarked ribbon (home, `/gear/`, utility).
 
     `with_asof` (home only, #1104) keeps the live "updated YYYY-MM-DD" stamp that
     home's old slim footer carried: `story.js` binds `data-bind="asof"` from the
     public-stats metadata, so the stamp rides in the base line between the brand
     and the home link (the `.sf-base` flex line spaces the three apart).
-
-    IA notes (2026-07-12): "The Technology" column (#1110) is the menu home for the
-    platform-itself content — the /method/ hub, the build log (moved here OUT of the
-    story sub-nav; URL unchanged), the curated machine pages, and /gear/ (#1111 — the
-    devices behind the data). "The ledger" (#1109) and "The agents" (#1111) are footer-
-    linked so neither is an unaccounted orphan; the ledger stays OFF the /data/ tile
-    rail by explicit registry intent (`"unlisted"` in v4_build_evidence.REGISTRY).
     """
     asof = ASOF_STAMP if with_asof else ""
+    here = v4_wayfinding.STATION_BY_DOOR.get(current_door) if current_door else None
+    cols = "".join(
+        v4_wayfinding.menu_column(heading, links, station=station, is_here=bool(station and station == here))
+        for station, heading, links in FOOTER_COLUMNS
+    )
     return (
-        '<footer class="site-foot"><nav class="site-foot-cols" aria-label="Site map">'
-        '<div class="sf-col"><p class="sf-h label">The Story</p>'
-        '<a href="/story/chronicle/">Chronicle</a><a href="/story/panel/">Podcast</a>'
-        '<a href="/story/journal/">In my own words</a><a href="/story/timeline/">Timeline</a>'
-        '<a href="/story/attempts/">The attempts</a>'
-        '<a href="/story/agents/">The agents</a><a href="/story/about/">About</a></div>'
-        '<div class="sf-col"><p class="sf-h label">The Data</p>'
-        '<a href="/data/">All topics</a><a href="/method/ask/">Ask the data</a>'
-        '<a href="/data/labs/">Labs</a><a href="/data/training/">Training</a>'
-        '<a href="/data/sleep/">Sleep</a><a href="/data/ledger/">The ledger</a></div>'
-        '<div class="sf-col"><p class="sf-h label">The Protocols</p>'
-        '<a href="/protocols/">All protocols</a><a href="/protocols/supplements/">Supplements</a>'
-        '<a href="/protocols/experiments/">Experiments</a><a href="/protocols/challenges/">Challenges</a></div>'
-        '<div class="sf-col"><p class="sf-h label">The Coaching</p>'
-        '<a href="/coaching/">The Read</a><a href="/coaching/by-coach/">By Coach</a>'
-        '<a href="/coaching/scorecard/">Scorecard</a><a href="/coaching/team/">The Team</a>'
-        '<a href="/coaching/lab-notes/">AI lab notes</a></div>'
-        '<div class="sf-col"><p class="sf-h label">The Technology</p>'
-        '<a href="/method/">The machine</a><a href="/story/build/">Build log</a>'
-        '<a href="/method/platform/">The platform</a><a href="/method/pipeline/">Pipeline status</a>'
-        '<a href="/method/cost/">Cost</a><a href="/gear/">The gear</a></div>'
-        '<div class="sf-col"><p class="sf-h label">Follow &amp; context</p>'
-        f'<a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a>{_SOCIAL_FOOT_HTML}'
-        '<a href="/story/about/">About</a>'
-        '<a href="/privacy/">Privacy</a></div>'
-        f'</nav><p class="sf-base label"><span>averagejoematt</span>{asof}<a href="/">← home</a></p>'
+        f'<footer class="site-foot">{v4_wayfinding.wayfinder(current_door)}'
+        f'<nav class="site-foot-cols" aria-label="Site map">{cols}</nav>'
+        f'<p class="sf-base label"><span>averagejoematt</span>{asof}<a href="/">← home</a></p>'
         f"{ATTRIBUTION_TAG}</footer>"
     )
 

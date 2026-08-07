@@ -404,7 +404,7 @@ def render(rec: dict) -> str:
     </section>
   </main>
   {loop_forward("/story/", CANONICAL)}
-  {site_footer()}
+  {site_footer(current_door="/story/")}
   {MOTION_SCRIPT}
   <script type="module">import {{ initTheme }} from "/assets/js/theme.js"; initTheme();</script>
 </body>

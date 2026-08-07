@@ -1146,14 +1146,79 @@ a.vg-lit:hover { background: var(--ember-wash); }
 .loop-forward a { color: var(--ember); text-decoration: none; border-bottom: 1px solid var(--ember-line); }
 .loop-forward a:hover { border-color: var(--ember); }
 
-/* ── Shared footer mega-menu (CC-05) — on all three doors ─────────────────── */
+/* ── The wayfinding layer (#1475) — the footer opens with the loop ──────────
+   `.wayfinder` is the persistent wayfinder that ships INSIDE the canonical footer
+   (scripts/v4_wayfinding.py), so the loop is one interaction away from any page —
+   including the eight that carry no page-hero `.loop-ribbon`. Five station cards in
+   loop order: the vantage (Now) set apart by a `·`, then the four causal stages joined
+   by arrows and closed by the cycle glyph.
+
+   Ember means exactly one thing here: YOU ARE HERE. The station you're on is ember and
+   is not a link; the next station carries a muted `next` tag; the one you came from is
+   lifted out of the faint tier. Everything else stays faint — the map should read as a
+   map, not a second nav competing with the doors.
+
+   NB the class is `.wf-ribbon`, deliberately NOT `.loop-ribbon`: the page-hero ribbon
+   owns `view-transition-name: loop-ribbon` (§12b) and a VT name must be unique per
+   document, so reusing the class would silently kill the cross-document transition on
+   all 81 pages that carry both. The footer ribbon gets its own name and morphs too. */
+.wayfinder { max-width: var(--container); margin: 0 auto var(--sp-6); }
+.wf-lede { color: var(--ink-faint); }
+.wf-ribbon { margin-top: var(--sp-3); display: flex; flex-wrap: wrap; align-items: stretch; gap: var(--sp-2); }
+.wf-stop { flex: 1 1 7rem; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-3); border: var(--border-hair); border-radius: var(--radius-sm);
+  background: var(--surface); text-decoration: none; }
+.wf-stop .wf-name { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label);
+  text-transform: uppercase; color: var(--ink-muted); }
+.wf-stop .wf-role { font-size: var(--fs-small); line-height: 1.35; color: var(--ink-faint); }
+.wf-stop .wf-tag { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label);
+  text-transform: uppercase; color: var(--ember); }
+a.wf-stop:hover { border-color: var(--ember-line); }
+a.wf-stop:hover .wf-name, a.wf-stop:hover .wf-role { color: var(--ink); }
+a.wf-stop:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+/* The current station is toned paper (§4a step 2), NOT an ember wash: the paper-elevation
+   ramp is where AA is guaranteed for --ember/--ink-muted (tests/test_paper_ramp_contrast.py),
+   and an ember-tinted surface measured as a serious axe color-contrast violation in the
+   light theme. Depth comes from neutral tonality; the accent stays on the border + name. */
+.wf-stop.is-here { border-color: var(--ember); background: var(--surface-2); }
+.wf-stop.is-here .wf-name { color: var(--ember); }
+.wf-stop.is-here .wf-role { color: var(--ink-muted); }
+.wf-stop.is-from .wf-name, .wf-stop.is-next .wf-name { color: var(--ink); }
+.wf-sep, .wf-arrow { align-self: center; flex: 0 0 auto; font-family: var(--font-mono); font-size: var(--fs-label); }
+.wf-arrow { color: var(--ember); opacity: 0.55; }
+.wf-sep { color: var(--ink-faint); opacity: 0.7; }
+/* Narrow: the arrows are decorative (aria-hidden) and only fight a wrapped row — drop
+   them and let the five stations sit 2-up in the same loop order. */
+@media (max-width: 600px) {
+  .wf-ribbon { display: grid; grid-template-columns: repeat(2, 1fr); }
+  .wf-sep, .wf-arrow { display: none; }
+}
+
+/* ── Shared footer mega-menu (CC-05) — re-poured on the loop (#1475) ────────
+   Row 1 is the four causal stages in loop order (Data → Coaching → Protocols → Story),
+   row 2 the two columns that sit outside the loop (The Technology, Follow & context).
+   Column headings are ink, not ember: six ember headings meant the accent carried no
+   information. The station you are inside keeps the ember rail + heading. */
 .site-foot { border-top: var(--border-hair); margin-top: var(--sp-7); padding: var(--sp-6) var(--gutter) var(--sp-5); }
 .site-foot-cols { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-5); max-width: var(--container); margin-inline: auto; }
 @media (min-width: 761px) { .site-foot-cols { grid-template-columns: repeat(4, 1fr); } }
-.sf-col { display: grid; gap: var(--sp-2); align-content: start; }
+.sf-col { display: grid; gap: var(--sp-2); align-content: start; border-inline-start: 1px solid transparent; padding-inline-start: var(--sp-3); }
 .sf-col a { font-size: var(--fs-small); color: var(--ink-muted); text-decoration: none; }
 .sf-col a:hover { color: var(--ember); }
-.sf-h { color: var(--ember); margin-bottom: var(--sp-1); }
+.sf-h { color: var(--ink); margin-bottom: var(--sp-1); }
+.sf-col.is-here { border-inline-start-color: var(--ember); }
+.sf-col.is-here .sf-h { color: var(--ember); }
+/* The spine lights its own destinations: hovering or keyboard-focusing a station on the
+   wayfinder raises the ember rail on the mega-menu column that station owns, so the
+   ribbon and the menu read as ONE object — the loop — instead of two lists. A station's
+   value can't be matched to a column's generically in CSS, so the four causal stages are
+   enumerated; a browser without `:has()` simply gets no cue and loses nothing. */
+.site-foot:has(.wf-stop[data-station="data"]:is(:hover, :focus-visible)) .sf-col[data-station="data"],
+.site-foot:has(.wf-stop[data-station="coaching"]:is(:hover, :focus-visible)) .sf-col[data-station="coaching"],
+.site-foot:has(.wf-stop[data-station="protocols"]:is(:hover, :focus-visible)) .sf-col[data-station="protocols"],
+.site-foot:has(.wf-stop[data-station="story"]:is(:hover, :focus-visible)) .sf-col[data-station="story"] {
+  border-inline-start-color: var(--ember-line);
+}
 .sf-base { max-width: var(--container); margin: var(--sp-5) auto 0; display: flex; justify-content: space-between; gap: var(--sp-3); color: var(--ink-faint); }
 .sf-base a { color: var(--ink-faint); text-decoration: none; }
 .sf-base a:hover { color: var(--ember); }
@@ -1475,13 +1540,24 @@ html { scroll-padding-top: calc(var(--sp-7) + var(--sp-2)); }
    document (one brand, one ribbon per page), which is what a VT name requires. */
 .brand { view-transition-name: site-brand; }
 .loop-ribbon { view-transition-name: loop-ribbon; }
+/* #1475 — the footer wayfinder persists across a door navigation for the same reason
+   the page-hero ribbon does: the loop is one continuous instrument, so its "you are
+   here" marker should SLIDE to the new station, not be re-drawn. Its own name (one
+   footer, therefore one ribbon, per document) so it can't collide with the hero's. */
+.wf-ribbon { view-transition-name: wayfinder-ribbon; }
 
 @media (prefers-reduced-motion: no-preference) {
   /* The ember marker settles as the new door arrives — a half-second confirm of
      "you landed here," on top of the ribbon morph. Opacity only, so it never
      shifts layout or fights the transition. */
-  .loop-ribbon .lr-here { animation: lr-settle 0.5s var(--ease-out) both; }
+  .loop-ribbon .lr-here, .wf-stop.is-here { animation: lr-settle 0.5s var(--ease-out) both; }
   @keyframes lr-settle { from { opacity: 0.35; } to { opacity: 1; } }
+
+  /* The wayfinder's cue eases rather than snapping — the rail is confirming which
+     column the station you're touching owns, and an instant flip reads as a glitch
+     rather than an answer. Colour only: nothing moves, nothing reflows. */
+  .sf-col, .wf-stop { transition: border-color 0.18s var(--ease-out), background-color 0.18s var(--ease-out); }
+  .wf-stop .wf-name, .wf-stop .wf-role { transition: color 0.18s var(--ease-out); }
 }
 
 /* Reduced-motion: keep the instant page swap, drop the cross-fade + morph. */

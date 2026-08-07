@@ -19,6 +19,13 @@ at all gets the canonical footer inserted before `</body>`. Home's live "updated
 or variant) and preserved via `site_footer(with_asof=True)`. Pages with NO doors nav —
 the `/mind/` and `/subscribe.html` redirect stubs — are untouched by construction.
 
+Wayfinding layer (#1475): the canonical footer now opens with the `.wayfinder` ribbon —
+the loop's five stations with THIS page's station marked, the next one tagged, and the
+mega-menu below re-poured in loop order and keyed to the same stations. It is keyed off
+the same detected door as the nav and the loop-forward close, which is what makes "the
+loop is navigable from anywhere" a structural sweep: every page that carries the footer
+carries the wayfinder, including the eight pages that have no page-hero `.loop-ribbon`.
+
 Loop-forward close (#1468): every doors-nav page also gets a canonical `.loop-forward`
 "next station on the loop" CTA inserted immediately before the footer, keyed off the SAME
 detected door as the nav — see `v4_chrome.loop_forward` for the mapping and why it's the
@@ -191,7 +198,7 @@ def rewrite(html: str, self_path: str | None = None):
     foot_m = FOOT_RE.search(html)
     if foot_m:
         old_foot = foot_m.group(0)
-        new_foot = v4_chrome.site_footer(with_asof=bool(ASOF_RE.search(old_foot)))
+        new_foot = v4_chrome.site_footer(with_asof=bool(ASOF_RE.search(old_foot)), current_door=door)
         if new_foot != old_foot:
             foot_changed = True
             html = html[: foot_m.start()] + new_foot + html[foot_m.end() :]
@@ -202,13 +209,13 @@ def rewrite(html: str, self_path: str | None = None):
         # footer at all, insert the canonical one just before </body>.
         var_m = VARIANT_FOOT_RE.search(html)
         if var_m:
-            new_foot = v4_chrome.site_footer(with_asof=bool(ASOF_RE.search(var_m.group(0))))
+            new_foot = v4_chrome.site_footer(with_asof=bool(ASOF_RE.search(var_m.group(0))), current_door=door)
             html = html[: var_m.start()] + new_foot + html[var_m.end() :]
         else:
             body_at = html.rfind("</body>")
             if body_at == -1:
                 raise RuntimeError("chrome-bearing page has no footer and no </body> — refusing to guess the insert point")
-            html = html[:body_at] + v4_chrome.site_footer() + "\n" + html[body_at:]
+            html = html[:body_at] + v4_chrome.site_footer(current_door=door) + "\n" + html[body_at:]
         foot_changed = foot_converted = True
 
     # #1639: flatten the <head> icon/manifest/theme-color chrome. Gated on the same

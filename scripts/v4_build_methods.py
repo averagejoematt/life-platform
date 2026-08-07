@@ -73,7 +73,7 @@ def topbar(active_key: str) -> str:
     )
 
 
-FOOTER = site_footer()
+FOOTER = site_footer(current_door="/data/")
 
 # Page-specific styling only — scoped under .mr-*, tokens-only (no hardcoded colour/
 # spacing), additive per DESIGN_SYSTEM_V5 §3 ("reuse what already exists" first: this

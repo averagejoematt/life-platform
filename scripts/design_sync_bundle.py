@@ -419,6 +419,27 @@ def _write_loop_diagram(out_dir: Path) -> None:
     (out_dir / "loop-diagram.html").write_text(_page("components", ".loop — the causal-loop card row", body), encoding="utf-8")
 
 
+def _write_wayfinder(out_dir: Path) -> None:
+    """The #1475 wayfinding layer — the footer's loop spine + the mega-menu it keys.
+
+    Sourced from `scripts/v4_chrome.site_footer()` itself (not re-implemented), so the
+    design project always previews the markup that actually ships. Rendered for the Data
+    station so all three states are visible at once: `here` (Data, ember, not a link),
+    `next` (Coaching) and `from` (Now). Absolute hrefs are neutralized like every other
+    preview so the bundle ships zero live refs.
+    """
+    sys.path.insert(0, str(SCRIPT_DIR))
+    import v4_chrome  # noqa: E402  (local import — scripts/ path added just above)
+
+    # Drop the UTM-capture <script>: a preview page must not run site JS, and its src is
+    # an absolute /assets/ ref the bundle sweep bans.
+    foot = v4_chrome.site_footer(current_door="/data/").replace(v4_chrome.ATTRIBUTION_TAG, "")
+    (out_dir / "wayfinder.html").write_text(
+        _page("components", ".wayfinder — the footer loop spine + mega-menu", _neutralize_nav_links(foot)),
+        encoding="utf-8",
+    )
+
+
 def _write_readout(out_dir: Path) -> None:
     body = (
         '<ul style="list-style:none;padding:0;display:flex;flex-direction:column;gap:var(--sp-3);">\n'
@@ -931,6 +952,7 @@ def build(repo_root: Path, out: Path) -> None:
     _write_provenance(out / "components")
     _write_tabset(out / "components")
     _write_loop_diagram(out / "components")
+    _write_wayfinder(out / "components")
     _write_readout(out / "components")
     _write_cb_cards(out / "components")
     _write_confidence_grammar(out / "components")
