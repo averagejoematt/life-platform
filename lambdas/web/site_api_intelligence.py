@@ -55,6 +55,7 @@ from web.site_api_common import (
     _ok,
     _query_source,
     logger,
+    night_of_for,
     pre_start_meta,
     table,
 )
@@ -1190,6 +1191,11 @@ def handle_pulse() -> dict:
             "rhr_bpm": round(_vr["rhr_bpm"], 1) if _vr["rhr_bpm"] is not None else None,
             "label": f"{round(recovery)}%" if recovery else None,
             "as_of": _vr["recovery_as_of"],
+            # #1968: recovery/HRV/RHR are wake-date-keyed, so `as_of` is the MORNING.
+            # Name the night too (via the one #1923 helper) — a glyph that publishes a
+            # figure with only a morning on it is what let two surfaces disagree about
+            # the same night in public.
+            "night_of": night_of_for(_vr["recovery_as_of"]),
         },
         "sleep": {
             "state": _sleep_state(),
@@ -1197,6 +1203,7 @@ def handle_pulse() -> dict:
             "hours": round(sleep_hrs, 1) if sleep_hrs else None,
             "label": f"{round(sleep_hrs, 1)}h" if sleep_hrs else None,
             "as_of": _vr["sleep_as_of"],
+            "night_of": night_of_for(_vr["sleep_as_of"]),  # #1968, same frame
         },
         "journal": {
             "state": "green" if journal_today else "gray",

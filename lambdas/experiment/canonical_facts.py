@@ -20,6 +20,8 @@ Pure (no boto3) — bundled with the lambdas/ asset, not the layer.
 
 from __future__ import annotations
 
+from datetime import date as _date_cls, timedelta as _timedelta_cls
+
 # Canonical numeric facts + their UNITS (documented once, authoritatively). The unit
 # notes are the contract: HRV is milliseconds (never bpm); protein avg/target/floor
 # are three DISTINCT numbers (intake is the avg, NOT the target or floor).
@@ -79,7 +81,21 @@ CONFIGURED_FIELDS = ("protein_g_target", "protein_g_floor")
 # canary suite went from catching a planted wrong-RHR to missing it. A truth pass must
 # never get quieter as a side effect of a change made elsewhere, so the set is declared
 # here, next to the fields it shadows, and consumers import it rather than restate it.
-META_FIELDS = ("as_of", "facts_are_pre_genesis", "cycle_genesis")
+# #1968: `night_of` joins them. The observed vitals here are WAKE-DATE-KEYED (#1923),
+# so `as_of` is the MORNING they were recorded against and the night they describe is
+# `as_of - 1`. Every narrative surface was handed the values with no way to name the
+# night, which is how "credits a 7.5-hour sleep" and "duration at 6.58 hours" got
+# published for the same night with no date on either. Carrying the night HERE rather
+# than deriving it per-renderer does two things at once: the renderer can label the
+# figure, and — because `allowed_numbers()` json.dumps this dict — the night's digits
+# are automatically in every caller's allow-list, so instructing a narrative to cite
+# the date cannot make the number gate flag it as fabricated. Meta, never a metric.
+META_FIELDS = ("as_of", "night_of", "facts_are_pre_genesis", "cycle_genesis")
+
+# The wake-date→night offset, mirroring web.site_api_common.NIGHT_OF_OFFSET_DAYS and
+# ai.grounded_generation.NIGHT_OF_OFFSET_DAYS. tests/test_night_scoped_vitals_1968.py
+# asserts all three agree so the frame cannot fork across the three bundles.
+NIGHT_OF_OFFSET_DAYS = 1
 
 
 def numeric_facts(facts: dict) -> dict:
@@ -140,6 +156,19 @@ def _resolve_genesis(genesis):
         return None
 
 
+def _night_of(as_of):
+    """The night a wake-date-keyed reading came from: `as_of - 1` (#1923/#1968).
+
+    None for a missing or unparseable date — a fact set publishes no night rather
+    than a guessed one, the same contract `web.site_api_common.night_of_for` uses.
+    """
+    try:
+        d = _date_cls.fromisoformat(str(as_of)[:10])
+    except (TypeError, ValueError):
+        return None
+    return (d - _timedelta_cls(days=NIGHT_OF_OFFSET_DAYS)).isoformat()
+
+
 def _record_date(record):
     """The day a `computed_metrics` record describes: its `date`/`as_of`, else its sk."""
     d = record.get("date") or record.get("as_of")
@@ -180,6 +209,7 @@ def build_canonical_facts(record, genesis=None) -> dict:
     facts = {k: _num(record.get(k)) for k in NUMERIC_FIELDS}
     as_of = _record_date(record)
     facts["as_of"] = as_of
+    facts["night_of"] = _night_of(as_of)
     genesis = _resolve_genesis(genesis)
     # Lexicographic compare is exact for ISO dates and needs no parsing.
     pre_genesis = bool(as_of and genesis and as_of < genesis)

@@ -2162,6 +2162,39 @@ def handle_sleep_detail() -> dict:
         hr12 = hr % 12 or 12
         return f"{hr12}:{mn:02d} {ampm}"
 
+    # ── #1968: name the night, and name the device ───────────────────────────
+    # Measured 2026-08-06: the summary published `total_sleep_hours: 8.4` for a night
+    # whose `sleep_trend` row read `hours: null`. Both were true. `total_sleep_hours`
+    # is EIGHT SLEEP's duration for `latest_date`; the trend's `hours` is WHOOP's for
+    # the same date, and whoop was in an auth outage. Nothing in the payload said
+    # either thing, so a reader (and the reader_truth judge, which raised it HIGH) saw
+    # one surface assert a duration its sibling reported as unknown.
+    #
+    # The fix is labels, not arithmetic: the night these figures describe (via the ONE
+    # #1923 helper — never an inline offset), and the device each duration came from.
+    # `recovery_night_of` stays exactly as it is — a DIFFERENT quantity (#495/M-9, the
+    # borrowed block's stored wake date), deliberately out of the frame rule's scope.
+    _night_of = night_of_for(latest_date)
+    _whoop_hours_present = whoop_latest.get("sleep_duration_hours") is not None
+    _eight_hours_present = latest.get("sleep_duration_hours") is not None
+    _figure_scope = {
+        "frame": NIGHT_OF_FRAME,
+        "night_of": _night_of,
+        "total_sleep_hours_source": "eightsleep" if _eight_hours_present else None,
+        "whoop_hours_source": "whoop" if _whoop_hours_present else None,
+        # The disclosure the payload owed a reader: this summary carries a duration
+        # from one device while the trend row for the same night carries none.
+        "divergence": (
+            (
+                f"total_sleep_hours is Eight Sleep's duration for the night of {_night_of}; "
+                f"Whoop has no sleep record for that night, so whoop_hours and the trend "
+                f"row's hours are null. The two are different devices, not a correction."
+            )
+            if (_eight_hours_present and not _whoop_hours_present)
+            else None
+        ),
+    }
+
     all_bed = bed_times_weekday + bed_times_weekend
     avg_bed = round(sum(all_bed) / len(all_bed), 2) if all_bed else None
     avg_bed_wd = round(sum(bed_times_weekday) / len(bed_times_weekday), 2) if bed_times_weekday else None
@@ -2211,6 +2244,12 @@ def handle_sleep_detail() -> dict:
                 "30d_avg_efficiency": avg(eff_vals) if _w30["full"] else None,
                 "days_tracked": len(eight_with_data),
                 "as_of_date": latest_date,
+                # #1968: the night every sleep figure above describes, plus which device
+                # each duration came from. Flat keys (front-ends read them directly) and
+                # the nested scope object (the qa/reader_truth pass reads that).
+                "frame": NIGHT_OF_FRAME,
+                "night_of": _night_of,
+                "figure_scope": _figure_scope,
                 "avg_bedtime": _fmt_hour(avg_bed) if avg_bed is not None else None,
                 "avg_bedtime_weekday": _fmt_hour(avg_bed_wd) if avg_bed_wd is not None else None,
                 "avg_bedtime_weekend": _fmt_hour(avg_bed_we) if avg_bed_we is not None else None,

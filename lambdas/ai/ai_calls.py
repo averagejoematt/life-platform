@@ -20,7 +20,7 @@ Exports:
 import json
 import os
 import time
-from datetime import date as _date_cls
+from datetime import date as _date_cls, timedelta as _timedelta_cls
 from typing import Any, Optional, Union
 
 import boto3
@@ -1611,6 +1611,61 @@ def _available_logs_for_today(data, brief, generation_date_iso):
     return logs
 
 
+def _nightly_vitals_for(data):
+    """#1968: {night_iso: {metric: value}} for the nights this render was given.
+
+    The caller-supplied input to `ai.night_scope.night_scoped_vitals_findings`.
+    Derived ONLY from records already loaded for this render (zero new I/O), the same
+    discipline as `_available_logs_for_today`.
+
+    The keys are NIGHTS, not wake dates. Whoop rows are wake-date-keyed (#1923), so the
+    row stored under 2026-07-31 is the night of 2026-07-30 — the conversion goes through
+    `night_of_for_wake_date` so this cannot fork the frame. Two nights are available:
+
+      * `data["whoop"]` / `data["sleep"]` are keyed to `data["date"]` (the brief's
+        `yesterday`), so they describe the night before that.
+      * `data["whoop_today"]` is fetched for `today`, and the brief builds `yesterday`
+        as `today - 1` — so today's wake date is `data["date"] + 1`, and its row
+        describes the night of `data["date"]`. That is the night a coach means by "last
+        night", and `primary_whoop` prefers exactly this row when it has finalized, so
+        omitting it would grade a CORRECT figure against the wrong night.
+
+    Any record that is missing simply contributes no night — an absent night is never a
+    finding (the gate treats an unknown night as unknown, ADR-104).
+    """
+    from ai.night_scope import night_of_for_wake_date
+
+    data = data or {}
+    wake_prev = str(data.get("date") or "")[:10]
+    out = {}
+
+    def _put(wake_date_iso, record):
+        night = night_of_for_wake_date(wake_date_iso)
+        if not night or not isinstance(record, dict):
+            return
+        vals = {
+            "recovery_pct": _safe_float(record, "recovery_score"),
+            "hrv_ms": _safe_float(record, "hrv"),
+            "rhr_bpm": _safe_float(record, "resting_heart_rate"),
+            "sleep_hours": _safe_float(record, "sleep_duration_hours"),
+            "sleep_score": _safe_float(record, "sleep_quality_score") or _safe_float(record, "sleep_score"),
+            "sleep_efficiency_pct": (_safe_float(record, "sleep_efficiency_pct") or _safe_float(record, "sleep_efficiency_percentage")),
+        }
+        vals = {k: v for k, v in vals.items() if v is not None}
+        if vals:
+            out.setdefault(night, {}).update(vals)
+
+    _put(wake_prev, data.get("whoop"))
+    _put(wake_prev, data.get("sleep"))
+    try:
+        wake_today = (_date_cls.fromisoformat(wake_prev) + _timedelta_cls(days=1)).isoformat()
+    except (TypeError, ValueError):
+        wake_today = None
+    if wake_today:
+        _put(wake_today, data.get("whoop_today"))
+    return out
+
+
 def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
     """
     Generic Coach Intelligence pipeline for any coach.
@@ -2142,6 +2197,37 @@ Write your {domain_label} coaching section now."""
         except Exception as _behav_e:  # noqa: BLE001 — advisory gate is never load-bearing
             print(f"[COACH-V2:{coach_id}] ungrounded-behavioral gate failed (non-blocking): {_behav_e}")
 
+        # #1968 (epic #1890): night-scope gate — ADVISORY. The THIRD deterministic gate,
+        # and the first that is meaningful AFTER generation. Every gate above compares the
+        # draft to one snapshot of the facts taken at generation time; on 2026-07-27 the
+        # whoop row finalized 20 minutes AFTER the coach rendered and the hourly ingestion
+        # revised the SAME night upward, so a "packet matched canonical at generation
+        # time" canary would have passed while the published card stayed wrong. Two
+        # findings come out of it: a sleep/recovery/HRV figure that names NO night (nobody
+        # can reconcile it — the integrator's "a 7.5-hour sleep"), and a figure that names
+        # its night and disagrees with that night's stored value. Advisory for now, and
+        # stamped into the qa_archive meta so the weekly pack can measure the real rate
+        # before anyone promotes it. PROMOTION HOOK: regenerate-or-hold on
+        # `_night_findings` exactly like the self-graded-verdict gate below — but the
+        # SERVE-side re-check (site_api_vitals' night labels + phase_plausibility R5) is
+        # the cheaper half and lands first by design: it costs no Bedrock spend and so is
+        # never dark at budget tier ≥1 (ADR-063/125). Fail-soft: never raises.
+        _night_findings = []
+        try:
+            from ai import night_scope as _gg_night
+
+            _night_findings = _gg_night.night_scoped_vitals_findings(
+                output or "",
+                nightly_vitals=_nightly_vitals_for(data),
+                generation_date_iso=_gen_date,
+            )
+            if _night_findings:
+                print(
+                    f"[COACH-V2:{coach_id}] night-scope gate (advisory) fired: " + "; ".join(f.get("detail", "") for f in _night_findings)
+                )
+        except Exception as _night_e:  # noqa: BLE001 — advisory gate is never load-bearing
+            print(f"[COACH-V2:{coach_id}] night-scope gate failed (non-blocking): {_night_e}")
+
         # Step 6.4 (#1896): self-graded-verdict gate — BLOCKING (regenerate once,
         # then hold), the same ADR-108 shape as presence-ack above. The other
         # deterministic gates check claims about MATTHEW; none checked a claim the
@@ -2195,6 +2281,11 @@ Write your {domain_label} coaching section now."""
                 # #1699: stamp point-in-time — the gate is log-aware, so historical
                 # available_logs can't be re-derived later; the pack reads these.
                 _qa_meta["ungrounded_behavioral_findings"] = _behavioral_findings
+            if _night_findings:
+                # #1968: stamp point-in-time for the same reason — the nightly-vitals map
+                # is what the render was GIVEN, and the wearable revises it afterwards, so
+                # it cannot be re-derived later.
+                _qa_meta["night_scope_findings"] = _night_findings
             qa_archive.archive_text(
                 "coach_brief",
                 output,
