@@ -27,8 +27,16 @@ INTENSIVE = "intensive"  # mean/delta/rate over the window — a short window MI
 
 # ── the registry ────────────────────────────────────────────────────────────
 # key -> (kind, gap). `gap` is None when the field is safe by kind (extensive) or
-# genuinely gated (intensive); otherwise it is an issue reference explaining why an
-# intensive field may still publish under a possibly-under-filled window name.
+# genuinely gated (intensive); otherwise it is an issue-referenced string
+# explaining either (a) the field is still-open debt — it may publish under a
+# possibly-under-filled window name — or (b) it is EXEMPT: an intensive field
+# that is provably never genesis-clamped (e.g. a deliberately cross-phase read,
+# #2109), so there is nothing to gate. Case (b) still needs a non-None gap
+# because `phase_plausibility.py` (#1922) treats `kind == INTENSIVE and gap is
+# None` as "gate this" — an exempt field left at gap=None would make the live
+# deterministic QA check flag its correct, permanently-full values as
+# impossible on a young cycle. Gap strings say which case with an
+# "EXEMPT (not debt)" prefix; read the per-entry comment for the reasoning.
 REGISTRY: dict[str, tuple[str, str | None]] = {
     # ── intensive + GATED by #1917 (the fix) ────────────────────────────────
     # These read None until the window they are named for is genuinely covered;
@@ -51,23 +59,76 @@ REGISTRY: dict[str, tuple[str, str | None]] = {
     "30d_avg_recovery": (INTENSIVE, None),
     "30d_avg_score": (INTENSIVE, None),
     "30d_avg_efficiency": (INTENSIVE, None),
-    # ── intensive, NOT yet gated — declared debt, not silence ───────────────
-    # Each publishes a mean/delta over a genesis-clamped window and so under-fills
-    # its name on Day 1..N-1 of a cycle, exactly as /api/vitals did. None is as
-    # reader-visible as the two qa-smoke caught: they are on lower-traffic
-    # surfaces and several already ship an explicit n beside the claim (ADR-105),
-    # which is a partial mitigation, not a fix.
-    "mean_7d": (INTENSIVE, "#1919 — ships n_scored_7d beside it (ADR-105 partial mitigation)"),
-    "mean_30d": (INTENSIVE, "#1919 — ships n_scored_30d beside it (ADR-105 partial mitigation)"),
-    "trend_7d": (INTENSIVE, "#1919 — a per-day series, not a scalar claim; lower risk"),
-    "trend_vs_prior_30d": (INTENSIVE, "#1919 — window-over-window comparison on a clamped window"),
-    "cal_7d_avg": (INTENSIVE, "#1919 — nutrition 7d mean over a clamped window"),
-    "pro_7d_avg": (INTENSIVE, "#1919 — nutrition 7d mean over a clamped window"),
-    "avg_7d_g": (INTENSIVE, "#1919 — protein 7d mean surfaced to the AI layer"),
-    "total_protein_30d_avg_g": (INTENSIVE, "#1919 — 30d mean over a clamped window"),
-    "sleep_hours_30d_avg": (INTENSIVE, "#1919 — written by daily_brief, carried by site_stats_refresh"),
-    "group_90d_avgs": (INTENSIVE, "#1919 — habit group means over a clamped 90d window"),
-    "uptime_90d": (INTENSIVE, "#1919 — a percentage; platform uptime, not experiment-scoped data"),
+    # ── #1919 resolution (measured against the live code, 2026-08-06) ───────
+    # Of the 11 fields #1919 declared, measuring found the debt was real for 6,
+    # already resolved by unrelated work for 2, one was never a genesis-clamp
+    # defect at all (a permanent size mislabel instead), one is a raw per-day
+    # series (self-documenting, not a scalar claim), and one is a deliberate
+    # UX trade-off left open — see each entry below.
+    #
+    # GATED (the #1917 pattern: real value ships unconditionally under a
+    # window-generic key; the `_Nd`-named key nulls until the window is real):
+    "mean_7d": (INTENSIVE, None),  # gated on pacific_day_n>=7; real value ships as recent_week_mean
+    "mean_30d": (INTENSIVE, None),  # gated on pacific_day_n>=30; real value ships as recent_month_mean
+    "trend_vs_prior_30d": (INTENSIVE, None),  # gated on _window_span(d60, d30, 30)["full"]
+    "cal_7d_avg": (INTENSIVE, None),  # gated on _window_span(d7, today, 7)["full"]; real value ships as cal_avg_recent
+    "pro_7d_avg": (INTENSIVE, None),  # gated on _window_span(d7, today, 7)["full"]; real value ships as pro_avg_recent_g
+    "total_protein_30d_avg_g": (INTENSIVE, None),  # gated on _window_span(d30, today, 30)["full"]; real value ships as total_protein_avg_g
+    # RECLASSIFIED EXTENSIVE — a raw per-day array, not a computed scalar. Its
+    # length already IS the honest window (never padded to 7 — see #1919's
+    # fulfillment_index.py fix, which also stopped the array from being
+    # extended with pre-genesis dates in the first place); a short array
+    # understates by being short, it never misstates a number as if it covered
+    # more days than it does. Same logic EXTENSIVE already applies to counts.
+    "trend_7d": (EXTENSIVE, None),
+    # EXEMPT — not experiment-scoped at all, so the genesis-clamp premise this
+    # whole registry is about does not apply. `_uptime_90d` (site_api_intelligence.py)
+    # windows off the PLATFORM epoch (2026-03-28), not EXPERIMENT_START, and is
+    # unaffected by any cycle reset; it is also a per-day status array (0/1/2),
+    # not an averaged rate, so it is EXTENSIVE by the same reasoning as trend_7d
+    # above — the registry's original "a percentage" description was wrong.
+    "uptime_90d": (EXTENSIVE, None),
+    # EXEMPT — measured NOT to be genesis-clamped. `avg_7d_g` (site_api_ai_lambda.py,
+    # sourced from daily_metrics_compute_lambda's `protein_g_avg`) reads via
+    # `fetch_range`, which is deliberately CROSS-PHASE for RAW_TIMESERIES sources
+    # (#2109) — the query window is a real, un-clamped 30 calendar days regardless
+    # of cycle age. The actual #1919-class defect here was different: the key (and
+    # its AI-prompt prose) claimed "7d" for a computation that has always run over
+    # 30 days. Fixed by renaming to `avg_30d_g` (site_api_ai_lambda.py, ai_context.py)
+    # so the name matches the real, permanently-full window.
+    #
+    # `gap` is intentionally NOT None even though this is not open debt: the
+    # phase_plausibility deterministic checker (#1922) reads `kind == INTENSIVE and
+    # gap is None` to mean "gate this — flag a non-null value before day N as
+    # impossible". avg_30d_g genuinely publishes non-null on Day 4 (it is real,
+    # cross-phase data), so gap=None here would make the live QA gate flag a
+    # CORRECT payload as a false positive — the opposite of what #1919 is for.
+    # The gap string marks "exempt", not "still under-filling".
+    "avg_30d_g": (INTENSIVE, "#1919 — EXEMPT (not debt): cross-phase RAW_TIMESERIES read (#2109), never genesis-clamped"),
+    # EXEMPT — measured NOT to be genesis-clamped, for the same reason as avg_30d_g:
+    # daily_brief_lambda's `fetch_range` reads whoop cross-phase (RAW_TIMESERIES,
+    # #2089/#2109) over a hard-coded `today - 30d` window with NO EXPERIMENT_START
+    # clamp at all. Unlike avg_7d_g, the name here was always accurate (a genuine
+    # 30-day rolling average) — this field predates #1919 and #2109 fixed the
+    # underlying read pattern before this issue was even measured. Same non-None
+    # gap reasoning as avg_30d_g above: this is a real, permanently-full value
+    # that must NOT trip the phase_plausibility day_n gate on a young cycle.
+    "sleep_hours_30d_avg": (INTENSIVE, "#1919 — EXEMPT (not debt): cross-phase RAW_TIMESERIES read (#2089/#2109), never genesis-clamped"),
+    # STILL OPEN — real debt, left open deliberately (not mechanically converted).
+    # group_90d_avgs (site_api_habits.py) IS a genesis-clamped mean (same shape as
+    # weight_delta_30d) and IS under-filled through Day 90 of every cycle — but
+    # unlike the other 10 fields, it is the PRIMARY signal /habits/ renders
+    # (evidence_habits.js: effort map, group trends, goal linkage all read this
+    # key directly, no fallback). Gating it null would blank that page for up to
+    # ~90 days after every cycle restart — a worse reader outcome than a
+    # correctly-disclosed partial mean, and the front-end has no consumer for a
+    # window-generic replacement key yet. #1919 adds the disclosure half
+    # (`group_avgs_window_days`, the real span) without the frontend migration;
+    # closing this one for real is a follow-up that touches evidence_habits.js.
+    "group_90d_avgs": (
+        INTENSIVE,
+        "#1919 — ships group_avgs_window_days beside it; full gate needs a frontend migration, deliberately deferred",
+    ),
     "composite_delta_1d": (INTENSIVE, None),  # a 1-day window is full from Day 2; nothing to under-fill
     # ── extensive: counts and sums. Safe by kind. ───────────────────────────
     "binge_days_30d": (EXTENSIVE, None),

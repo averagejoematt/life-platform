@@ -500,7 +500,7 @@ _INCIDENT_CTX = {
     "goal_weight": 185.0,
     "reads": {
         "weekly_rate_lbs": -1.4,
-        "protein": {"avg_7d_g": 178.0, "target_g": 205.0, "floor_g": 160.0},
+        "protein": {"avg_30d_g": 178.0, "target_g": 205.0, "floor_g": 160.0},
     },
 }
 

@@ -5,6 +5,7 @@ Reads facade state via `_g`."""
 from datetime import datetime, timedelta
 
 from boto3.dynamodb.conditions import Key
+from common.pacific_time import pacific_day_n
 from experiment.phase_filter import with_phase_filter
 
 from web.site_api_common import PT, USER_PREFIX, _decimal_to_float, _ok, logger
@@ -103,12 +104,24 @@ def fulfillment_index(*, _g) -> dict:
     """
     # Facade state injected via `_g` (the delegator's globals()) — same module the test patched.
     _experiment_date = _g["_experiment_date"]
+    EXPERIMENT_START = _g["EXPERIMENT_START"]
     table = _g["table"]
     from health import fulfillment_index as fi
 
     today = datetime.now(PT).strftime("%Y-%m-%d")
     window_start = _experiment_date(90)
-    trend_start = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=29)).strftime("%Y-%m-%d")
+    # #1919 — MEASURED DEFECT, not just the window-name gap the issue filed: this
+    # used to be an UNCLAMPED `today - 29d`, while `_window(...)` below queries a
+    # genesis-CLAMPED range (`window_start`). On a young cycle the two disagreed,
+    # so `days` grew entries for calendar dates that predate EXPERIMENT_START —
+    # dates with no queryable rows. A channel adopted in a PRIOR cycle (adoption
+    # is deliberately cross-cycle, see `_adoption_date`) then read as "adopted,
+    # no tap" on those pre-genesis dates, i.e. `score_connection_tap` returned a
+    # BEHAVIORAL 0 for a day that was never part of this cycle at all — dragging
+    # mean_7d/mean_30d toward 0 right after every reset. `_experiment_date` here
+    # clamps the day-loop to the same genesis floor the queries already use, so
+    # the fabricated pre-genesis zero days can no longer be constructed.
+    trend_start = _experiment_date(29)
 
     def _window(source, projection=None):
         kwargs = {
@@ -181,8 +194,20 @@ def fulfillment_index(*, _g) -> dict:
         days.append(day)
         cursor += timedelta(days=1)
 
-    mean_7d, n_7d = fi.window_mean(days[-7:])
-    mean_30d, n_30d = fi.window_mean(days)
+    recent_week_mean, n_7d = fi.window_mean(days[-7:])
+    recent_month_mean, n_30d = fi.window_mean(days)
+
+    # #1919 — the `_Nd`-named keys must gate on a REAL N-day window (#1917 rule),
+    # not merely on however many days happened to score. `n_scored_*` already
+    # discloses the real count (ADR-105) but the debt the issue flagged is that
+    # `mean_7d`/`mean_30d` kept their names on a genesis-clamped cycle regardless.
+    # Day N of the cycle (Day 1 == genesis) tells us whether the calendar window
+    # the name promises has actually elapsed; the real value is never hidden — it
+    # ships unconditionally under the window-generic `recent_week_mean` /
+    # `recent_month_mean` keys (the #1917 "clamped, not hidden" doctrine).
+    day_n = pacific_day_n(EXPERIMENT_START, on_date=today)
+    mean_7d = recent_week_mean if day_n >= 7 else None
+    mean_30d = recent_month_mean if day_n >= 30 else None
 
     return _ok(
         {
@@ -192,6 +217,10 @@ def fulfillment_index(*, _g) -> dict:
             "n_scored_7d": n_7d,
             "mean_30d": mean_30d,
             "n_scored_30d": n_30d,
+            # Window-generic companions — always real (never null-and-hidden),
+            # regardless of cycle age. Same computation `mean_7d`/`mean_30d` gate.
+            "recent_week_mean": recent_week_mean,
+            "recent_month_mean": recent_month_mean,
             "channels_adopted": adoption,
             "coverage_floor": fi.COVERAGE_FLOOR,
             "disclosure": fi.DISCLOSURE,

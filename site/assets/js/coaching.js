@@ -953,7 +953,7 @@ function renderDiaryReaction(read, id) {
   enhanceCoachNames(read);
 }
 
-// #743: "grounded in: recovery 48% · protein 7d avg 132g · presence quiet 9d" —
+// #743: "grounded in: recovery 48% · protein 30d avg 132g · presence quiet 9d" — (#1919: was 7d, the label was wrong)
 // the reader-facing receipt for what the coach actually read before answering.
 // `grounding` is the server's `[{label, value}, ...]` array — every value is
 // code-derived from the generation brief (site_api_ai_lambda / ai_context.py),

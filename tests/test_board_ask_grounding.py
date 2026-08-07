@@ -1,5 +1,5 @@
 """#743 — grounding receipts on board_ask: "grounded in: recovery 48% ·
-protein 7d avg 132g · presence quiet 9d".
+protein 30d avg 132g · presence quiet 9d".
 
 board_ask answers are genuinely grounded (every persona turn is built from a
 live-probed generation brief, ai_context / site_api_ai_lambda._ask_fetch_context)
@@ -44,7 +44,7 @@ FULL_CTX = {
     "character_tier": "Discipline",
     "tier0_streak": 12,
     "reads": {
-        "protein": {"avg_7d_g": 132.0, "target_g": 150.0, "floor_g": 120.0},
+        "protein": {"avg_30d_g": 132.0, "target_g": 150.0, "floor_g": 120.0},
         "weekly_rate_lbs": -1.2,
         "presence": {"class": "quiet_engaged", "gap_days": 9.0, "passive_still_flowing": True},
     },
@@ -64,7 +64,7 @@ def test_full_brief_yields_ordered_capped_receipts():
     ac = _ctx_mod()
     receipts = ac.board_grounding_receipts(FULL_CTX)
     assert receipts[0] == {"label": "recovery", "value": "48%"}
-    assert receipts[1] == {"label": "protein", "value": "7d avg 132g"}
+    assert receipts[1] == {"label": "protein", "value": "30d avg 132g"}
     # priority order is fixed, and the default cap (6) trims the rest
     assert len(receipts) <= 6
     labels = [r["label"] for r in receipts]
@@ -135,7 +135,7 @@ def test_presence_omitted_when_class_is_present():
 def test_footer_renders_the_expected_string():
     ac = _ctx_mod()
     footer = ac.board_grounding_footer(FULL_CTX, limit=3)
-    assert footer == "grounded in: recovery 48% · protein 7d avg 132g · sleep 7.2h last night"
+    assert footer == "grounded in: recovery 48% · protein 30d avg 132g · sleep 7.2h last night"
 
 
 def test_footer_is_empty_string_for_empty_brief():

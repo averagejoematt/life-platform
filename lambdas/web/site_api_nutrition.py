@@ -20,6 +20,7 @@ from common import (
 from web.site_api_common import (
     _get_profile,
     _ok,
+    _window_span,
     logger,
 )
 
@@ -212,6 +213,10 @@ def nutrition_overview(*, _g) -> dict:
                     "avg_deficit": None,
                     "cal_7d_avg": None,
                     "pro_7d_avg": None,
+                    "cal_avg_recent": None,
+                    "cal_avg_recent_window_days": 0,
+                    "pro_avg_recent_g": None,
+                    "pro_avg_recent_g_window_days": 0,
                     # Nutrition is a manual end-of-day upload, so it is ALWAYS ~24h
                     # behind by design — "live" nutrition is the latest COMPLETE day.
                     # Never assert today as the latest (the old `latest_date: today`
@@ -284,6 +289,12 @@ def nutrition_overview(*, _g) -> dict:
     items_7d = [i for i in items if (i.get("date") or i.get("sk", "").replace("DATE#", "")) >= d7]
     cal_7d = [_mf(i, "calories") for i in items_7d if _mf(i, "calories") is not None]
     pro_7d = [_mf(i, "protein_g", "total_protein_g") for i in items_7d if _mf(i, "protein_g", "total_protein_g") is not None]
+    # #1919: `d7` is genesis-clamped (_experiment_date), so `items_7d` can hold far
+    # fewer than 7 days early in a cycle while `cal_7d_avg`/`pro_7d_avg` kept the
+    # `_7d` name regardless. The real average is never hidden — it ships
+    # unconditionally as cal_avg_recent/pro_avg_recent_g; the legacy `_7d`-named
+    # keys gate on the window genuinely spanning 7 real days (the #1917 rule).
+    _w7 = _window_span(d7, today, 7)
 
     # TDEE from the most recent record carrying MacroFactor's adaptive expenditure (#484).
     # When none is present (no populated Expenditure column uploaded), fall back to a
@@ -697,8 +708,12 @@ def nutrition_overview(*, _g) -> dict:
                 "tdee": round(tdee) if tdee else None,
                 "tdee_source": tdee_source,
                 "avg_deficit": deficit,
-                "cal_7d_avg": round(sum(cal_7d) / len(cal_7d)) if cal_7d else None,
-                "pro_7d_avg": round(sum(pro_7d) / len(pro_7d), 1) if pro_7d else None,
+                "cal_7d_avg": (round(sum(cal_7d) / len(cal_7d)) if cal_7d else None) if _w7["full"] else None,
+                "pro_7d_avg": (round(sum(pro_7d) / len(pro_7d), 1) if pro_7d else None) if _w7["full"] else None,
+                "cal_avg_recent": round(sum(cal_7d) / len(cal_7d)) if cal_7d else None,
+                "cal_avg_recent_window_days": _w7["actual_days"],
+                "pro_avg_recent_g": round(sum(pro_7d) / len(pro_7d), 1) if pro_7d else None,
+                "pro_avg_recent_g_window_days": _w7["actual_days"],
                 "latest_date": latest_date,
                 # The latest COMPLETE day is the live nutrition state (manual end-of-day
                 # upload → always ~24h behind by design). today_pending true means the

@@ -16,6 +16,7 @@ from web.site_api_common import (
     CORS_HEADERS,
     _error,
     _ok,
+    _window_span,
     logger,
 )
 
@@ -56,6 +57,13 @@ def protein_sources(*, _g) -> dict:
             f["total_cal"] += float(entry.get("calories_kcal") or 0)
 
     total_protein_all = sum(f["total_protein"] for f in food_protein.values())
+    # #1919: `d30` is genesis-clamped, so `days_count` (already published beside
+    # this field, ADR-105) can be far fewer than 30 early in a cycle while
+    # `total_protein_30d_avg_g` kept the `_30d` name regardless. The real value
+    # is never hidden — it ships unconditionally as total_protein_avg_g; the
+    # legacy `_30d`-named key gates on the window genuinely spanning 30 real
+    # days (the #1917 rule).
+    _w30 = _window_span(d30, today, 30)
     sources = []
     for name, f in sorted(food_protein.items(), key=lambda x: -x[1]["total_protein"]):
         avg_daily = round(f["total_protein"] / days_count, 1) if days_count else 0
@@ -73,10 +81,13 @@ def protein_sources(*, _g) -> dict:
         if len(sources) >= 12:
             break
 
+    _total_protein_avg_g = round(total_protein_all / days_count, 1) if days_count else 0
     return _ok(
         {
             "protein_sources": sources,
-            "total_protein_30d_avg_g": round(total_protein_all / days_count, 1) if days_count else 0,
+            "total_protein_30d_avg_g": _total_protein_avg_g if _w30["full"] else None,
+            "total_protein_avg_g": _total_protein_avg_g,
+            "total_protein_avg_g_window_days": _w30["actual_days"],
             "days_analyzed": days_count,
         },
         cache_seconds=3600,

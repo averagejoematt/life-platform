@@ -22,6 +22,7 @@ from web.site_api_common import (
     _decimal_to_float,
     _error,
     _ok,
+    _window_span,
     logger,
 )
 
@@ -284,6 +285,16 @@ def training_overview(*, _g) -> dict:
         sport = a.get("sport_type") or a.get("type") or "Other"
         prior_type_counts[sport] = prior_type_counts.get(sport, 0) + 1
 
+    # #1919 — `trend_vs_prior_30d` is a window-OVER-window comparison, so it needs
+    # BOTH 30-day windows to be genuinely full, not just the current one: when the
+    # cycle is younger than 60 days, `d60` is genesis-clamped equal to (or past)
+    # `d30`, so `prior_30d_acts` is silently empty and every modality's "trend"
+    # collapses to its raw current-window count minus zero — a false "up from
+    # nothing" read, not an honest comparison. Gate the published field on the
+    # prior window actually spanning 30 real days; `count_30d` (already EXTENSIVE
+    # and unconditional) stays the real, always-published number.
+    _prior_window_full = _window_span(d60, d30, 30)["full"]
+
     for a in all_activities_30d:
         sport = a.get("sport_type") or a.get("type") or "Other"
         m = modality_map[sport]
@@ -313,7 +324,7 @@ def training_overview(*, _g) -> dict:
                 "total_distance_mi": round(m["total_mi"], 1),
                 "total_elevation_ft": round(m["total_elev_ft"]),
                 "z2_minutes": round(m["z2_min"]),
-                "trend_vs_prior_30d": trend,
+                "trend_vs_prior_30d": trend if _prior_window_full else None,
             }
         )
 
