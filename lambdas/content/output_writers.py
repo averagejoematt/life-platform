@@ -19,6 +19,7 @@ Exports:
 import json
 import re
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 
@@ -813,7 +814,8 @@ def write_clinical_json(data, profile, yesterday):
                     if val is None:
                         val = bm.get("value")
                     decimals = 0
-                    if isinstance(val, (int, float)):
+                    is_numeric_val = isinstance(val, (int, float, Decimal))
+                    if is_numeric_val:
                         if val != 0 and abs(val) < 1:
                             decimals = 2
                         elif abs(val) < 10:
@@ -822,7 +824,7 @@ def write_clinical_json(data, profile, yesterday):
                     by_cat[cat].append(
                         {
                             "name": key.replace("_", " ").title(),
-                            "value": _d2f(val) if isinstance(val, (int, float)) else val,
+                            "value": _d2f(val) if is_numeric_val else val,
                             "unit": bm.get("unit", ""),
                             "range": bm.get("ref_text", ""),
                             "flag": flag_code,

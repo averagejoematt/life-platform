@@ -21,6 +21,7 @@ and no assertion does fixture-date-plus-wall-clock arithmetic.
 
 import json
 from datetime import date, datetime, timezone
+from decimal import Decimal
 
 import pytest
 from content import output_writers as ow
@@ -1066,6 +1067,59 @@ def test_write_clinical_json_labs_are_ordered_by_category_then_name():
     assert by_name["Apob"]["decimals"] == 2
     # non-numeric biomarkers pass through verbatim
     assert by_name["Occult Blood"]["value"] == "negative"
+
+
+def test_write_clinical_json_labs_precision_survives_real_ddb_decimal_values():
+    # Regression for #2176: DynamoDB numeric attributes deserialize as Decimal (this
+    # repo's Decimal-before-DDB-write / Decimal-out-of-read convention), never as a
+    # plain int/float. The test above exercises the precision logic with plain floats,
+    # which passed even while `isinstance(val, (int, float))` silently excluded every
+    # real biomarker read back from DDB — decimals stuck at 0 and the raw Decimal rode
+    # through to json.dumps(..., default=str), which stringifies it ("0.85" instead of
+    # 0.85). This fixture hands the writer Decimal values exactly as boto3's DynamoDB
+    # resource would, so the dead path is caught if it ever regresses.
+    table = FakeTable(
+        responses={
+            "USER#matthew#SOURCE#dexa": [],
+            "USER#matthew#SOURCE#labs": [
+                {
+                    "draw_date": "2026-02-15",
+                    "lab_provider": "Quest",
+                    "out_of_range": ["ldl_c", "apob"],
+                    "biomarkers": {
+                        "ldl_c": {
+                            "category": "lipids",
+                            "value_numeric": Decimal("112.0"),
+                            "unit": "mg/dL",
+                            "ref_text": "<100",
+                            "flag": "high",
+                        },
+                        "hdl_c": {"category": "lipids", "value_numeric": Decimal("5.5"), "unit": "mg/dL", "flag": "normal"},
+                        "apob": {"category": "lipids_advanced", "value_numeric": Decimal("0.85"), "unit": "g/L", "flag": "low"},
+                    },
+                }
+            ],
+            "USER#matthew#SOURCE#genome": [],
+        }
+    )
+    s3 = _write_clinical(table=table, ranges=FakeRanges({}))
+    by_name = {b["name"]: b for b in s3.written(_CLINICAL_KEY)["labs"]["biomarkers"]}
+
+    # Precision logic fires exactly as it does for the plain-float fixture above.
+    assert by_name["Ldl C"]["decimals"] == 0
+    assert by_name["Hdl C"]["decimals"] == 1
+    assert by_name["Apob"]["decimals"] == 2
+
+    # `by_name` above already went through the real write path — `_write_clinical`
+    # calls `write_clinical_json`, which S3-puts `json.dumps(clinical, default=str)`,
+    # and `s3.written()` parses that Body back with `json.loads`. So the assertion
+    # below round-trips through the actual production serializer: pre-fix, the raw
+    # Decimal reached json.dumps and its `default=str` fallback stringified it, so
+    # `value` would decode back as the STRING "0.85", not the float 0.85.
+    for name, expected in (("Ldl C", 112.0), ("Hdl C", 5.5), ("Apob", 0.85)):
+        val = by_name[name]["value"]
+        assert val == expected
+        assert isinstance(val, float)
 
 
 def test_write_clinical_json_supplements_dedup_case_insensitively_and_sort_by_name():
