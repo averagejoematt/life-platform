@@ -630,8 +630,17 @@ def lambda_handler(event: dict, context) -> dict:
     if not data:
         return {"statusCode": 500, "body": "Failed to gather data"}
 
-    # Build narrative-ready data packet
-    data_packet, week_num = build_data_packet(data)
+    # Build narrative-ready data packet. #2177: build_data_packet is now guarded
+    # against the two known partial-record shapes (a day_grades row missing
+    # total_score, a macrofactor row missing total_protein_g) at the source —
+    # this try/except is the caller-side backstop so a FUTURE unguarded field
+    # degrades this week's chronicle (a visible, logged 500) instead of an
+    # uncaught exception aborting the run silently.
+    try:
+        data_packet, week_num = build_data_packet(data)
+    except Exception as e:
+        logger.error(f"build_data_packet raised: {e}")
+        return {"statusCode": 500, "body": f"Failed to build data packet: {e}"}
     logger.info(f"Data packet: {len(data_packet)} chars, Week {week_num}")
 
     # Build user message with previous installments for continuity

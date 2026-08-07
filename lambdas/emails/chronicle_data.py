@@ -440,6 +440,13 @@ def build_data_packet(data):
     for d in sorted(data["day_grades"].keys()):
         rec = data["day_grades"][d]
         score = safe_float(rec, "total_score")
+        # #2177: a missing total_score is ADR-104 absence, not zero — a partial
+        # day-grade record must degrade this one line, not crash the whole
+        # weekly packet (and with it the Wednesday chronicle + Friday Panel
+        # podcast, which reads this packet as its only input).
+        if score is None:
+            packet.append(f"{d}: no grade recorded")
+            continue
         grade = rec.get("letter_grade", "?")
         packet.append(f"{d}: {score:.0f}/100 ({grade})")
     packet.append("")
@@ -468,7 +475,10 @@ def build_data_packet(data):
         cal = safe_float(rec, "total_calories_kcal")
         prot = safe_float(rec, "total_protein_g")
         if cal:
-            packet.append(f"{d}: {cal:.0f} cal, {prot:.0f}g protein")
+            # #2177: protein absent (ADR-104: absence, not zero) must not crash
+            # a day that DID log calories — degrade that one clause honestly.
+            prot_str = f"{prot:.0f}g protein" if prot is not None else "protein not logged"
+            packet.append(f"{d}: {cal:.0f} cal, {prot_str}")
     packet.append(f"Targets: {profile.get('calorie_target', 1800)} cal, {profile.get('protein_target_g', 190)}g protein")
     packet.append("")
 
