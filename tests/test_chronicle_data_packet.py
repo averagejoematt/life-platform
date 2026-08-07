@@ -544,6 +544,35 @@ def test_packet_nutrition_skips_days_without_calories():
     assert "2026-08-06" not in section
 
 
+def test_packet_day_grades_missing_total_score_renders_no_grade_instead_of_crashing():
+    """#2177 regression: a day_grades row with calories/other fields but no
+    total_score must not raise — safe_float returns None (ADR-104 absence),
+    and f"{None:.0f}" is a TypeError. The row degrades to an honest line."""
+    data = _empty_data()
+    data["day_grades"] = {
+        "2026-08-05": {"letter_grade": "B"},  # no total_score — partial record
+        "2026-08-06": {"total_score": 91},  # unaffected sibling day still grades
+    }
+    text, _ = cd.build_data_packet(data)  # must not raise
+
+    assert "2026-08-05: no grade recorded" in text
+    assert "2026-08-06: 91/100 (?)" in text
+
+
+def test_packet_nutrition_missing_protein_renders_calories_with_a_not_logged_marker():
+    """#2177 regression: a macrofactor row with calories logged but no
+    total_protein_g must not raise the same TypeError the calories guard
+    already prevents — it degrades to an honest 'protein not logged' clause
+    rather than dropping the whole day or crashing the weekly packet build."""
+    data = _empty_data()
+    data["macrofactor"] = {
+        "2026-08-05": {"total_calories_kcal": 1800},  # no total_protein_g
+    }
+    text, _ = cd.build_data_packet(data)  # must not raise
+
+    assert "2026-08-05: 1800 cal, protein not logged" in text
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # build_data_packet — journal
 # ══════════════════════════════════════════════════════════════════════════════
