@@ -143,6 +143,7 @@ EXPECTED_ROUTE_MAP = {
     "/api/sleep_correlations": "handle_sleep_correlations",
     "/api/sleep_detail": "handle_sleep_detail",
     "/api/snapshot": "handle_snapshot",
+    "/api/social_context": "_handle_social_context",  # #1674 — contextual social embeds (training/mind routes)
     "/api/source_freshness": "handle_source_freshness",
     "/api/state_of_matthew": "handle_state_of_matthew",
     "/api/status": "handle_status",

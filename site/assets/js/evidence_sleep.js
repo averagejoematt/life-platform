@@ -4,7 +4,7 @@
 */
 import { lineChart, stackedBar, correlationChip, dualLineChart, sparkline, targetSpine, stackedDayColumns, dumbbell } from "/assets/js/charts.js";
 import { explainMount } from "/assets/js/explain.js";
-import { esc, tryJSON, isBad, has, fmt, ttl, fmtShort, lastNightDate, todayPT, fig, figs, sec, empty, note } from "/assets/js/evidence_shared.js";
+import { esc, tryJSON, isBad, has, fmt, ttl, fmtShort, lastNightDate, todayPT, fig, figs, sec, empty, note, socialContextSection } from "/assets/js/evidence_shared.js";
 
 // §0 Forecast hero (P0.1) — the circadian-compliance forecast, PROMOTED to lead. A 0→100
 // "tonight's odds" gauge + the four anchors (each with the lever to pull now) + two-voice.
@@ -273,6 +273,9 @@ export async function renderMind(d) {
   parts.push(await mindThirdWall()); // P0.4 — Third Wall centrepiece (the last word, held)
   parts.push(mindInvitingAbsence(m)); // P0.2 — the inviting absence (not a hollow axis)
   parts.push(mindPillarDecomposed(m)); // P0.3 — Mind pillar decomposed to its inputs
+  // #1674 (epic #1668 S6) — reflective posts, contextually, journal-adjacent.
+  const sc = await tryJSON("/api/social_context?route=mind");
+  parts.push(socialContextSection((sc && sc.items) || [], "From the broadcast — in his own words"));
   return parts.join("") || empty("The inner-life view fills in as restraint, mood, and reflection accrue.");
 }
 

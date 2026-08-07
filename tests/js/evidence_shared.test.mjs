@@ -7,7 +7,7 @@
 import "./support/loader.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { esc, isBad, has, fmt, ttl, fmtShort, nightOf, dayBefore, warmup, note, evClass, kvval, kvtable, fig, figs, sec, empty } from "../../site/assets/js/evidence_shared.js";
+import { esc, isBad, has, fmt, ttl, fmtShort, nightOf, dayBefore, warmup, note, evClass, kvval, kvtable, fig, figs, sec, empty, socialContextCards, socialContextSection } from "../../site/assets/js/evidence_shared.js";
 
 test("esc — escapes all five HTML-significant characters", () => {
   assert.equal(esc(`<a href="x">&y</a>`), "&lt;a href=&quot;x&quot;&gt;&amp;y&lt;/a&gt;");
@@ -131,4 +131,40 @@ test("fig/figs/sec/empty — the HTML micro-builders shape their markup as expec
   assert.equal(sec("T", ""), ""); // no section wrapper when there's nothing to show
   assert.match(sec("T", "<p>hi</p>"), /<section class="rd-sec"><h2 class="rd-h">T<\/h2><p>hi<\/p><\/section>/);
   assert.equal(empty("nothing"), '<p class="rd-archive">nothing</p>');
+});
+
+// #1674 (epic #1668 S6) — contextual social embeds: facade cards on the training /
+// Mind-pillar topic pages, sourced from GET /api/social_context. The client renders
+// exactly what the server gives it (same idiom as the Broadcast feed's .bc-* cards,
+// site/assets/js/dispatches.js) — these tests pin the card SHAPE + the empty case.
+test("socialContextSection — no items renders nothing (no empty section chrome)", () => {
+  assert.equal(socialContextSection([], "From the broadcast"), "");
+  assert.equal(socialContextSection(null, "From the broadcast"), "");
+});
+
+test("socialContextSection — wraps the card list in a titled rd-sec with a link back to the full feed", () => {
+  const out = socialContextSection([{ id: "1", channel: "youtube", date: "2026-08-01", caption: "Leg day", link_out: "https://youtube.com/1" }], "From the broadcast");
+  assert.match(out, /<section class="rd-sec"><h2 class="rd-h">From the broadcast<\/h2>/);
+  assert.match(out, /class="ctx-feed"/);
+  assert.match(out, /href="\/story\/broadcast\/"/);
+});
+
+test("socialContextCards — a facade card is a link-out, never an iframe (zero CSP change, #1674/#1678)", () => {
+  const out = socialContextCards([{ id: "1", channel: "youtube", date: "2026-08-01", caption: "Leg day <3", link_out: "https://youtube.com/1", thumbnail_url: "https://img.example/1.jpg" }]);
+  assert.doesNotMatch(out.toLowerCase(), /<iframe/);
+  assert.match(out, /<a class="ctx-link" href="https:\/\/youtube\.com\/1" target="_blank" rel="noopener">/);
+  assert.match(out, /<img class="ctx-thumb" src="https:\/\/img\.example\/1\.jpg"/);
+  assert.match(out, /Leg day &lt;3/); // caption is escaped
+  assert.match(out, /view on youtube/);
+});
+
+test("socialContextCards — a missing thumbnail renders a labelled placeholder, not a broken image", () => {
+  const out = socialContextCards([{ id: "2", channel: "youtube", caption: "No thumb" }]);
+  assert.match(out, /class="ctx-thumb ctx-thumb-empty label"/);
+  assert.doesNotMatch(out, /<img/);
+});
+
+test("socialContextCards — falls back to /story/broadcast/#id when link_out and permalink are both absent", () => {
+  const out = socialContextCards([{ id: "3", caption: "x" }]);
+  assert.match(out, /href="\/story\/broadcast\/#3"/);
 });

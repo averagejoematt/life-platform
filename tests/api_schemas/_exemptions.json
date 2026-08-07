@@ -47,6 +47,10 @@
     "category": "write-path",
     "reason": "GET-verb but MUTATING: one-tap evening-ritual write gated by a signed HMAC token (ADR-124, #769) — no read-only variant exists; there is no safe way to probe it that doesn't attempt a write"
   },
+  "/api/social_context": {
+    "category": "requires-path-param",
+    "reason": "#1674 — newly added, not yet deployed, so there is no live instance to capture a snapshot from. Requires ?route=training|mind; a sample query-param entry is already wired in deploy/capture_api_schemas.py's DYNAMIC_PARAM_LOOKUP (\"training\", no live lookup needed). Remove this exemption and commit the real captured snapshot once this ships and `python3 deploy/capture_api_schemas.py` runs against the deployed endpoint."
+  },
   "/api/submit_finding": {
     "category": "write-path",
     "reason": "POST-only — reader-submitted finding, writes to S3 (write)"

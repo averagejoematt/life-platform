@@ -34,6 +34,7 @@ from decimal import Decimal
 import boto3
 from boto3.dynamodb.conditions import Key
 from common.client_ip import extract_client_ip  # #1221 — the ONE edge-observed client-IP helper
+from content.social_signals import coach_route_of  # #1671 — training/mind coach-route classifier, reused read-side (#1674)
 from experiment.phase_filter import with_phase_filter  # ADR-058
 from privacy import social_provenance  # #1670 membrane — the origin:human predicate for the broadcast feed (#1672)
 
@@ -1797,14 +1798,13 @@ def _broadcast_card(post: dict) -> dict:
     }
 
 
-def handle_broadcast() -> dict:
-    """GET /api/broadcast — reverse-chron cleared, human-origin posts for /story/broadcast/.
-
-    Read-only; queries the ingested-post partitions, applies the ONE membrane
-    predicate (_is_broadcast_visible), and returns facade cards newest-first.
-    Fail-soft per source (a query error on one channel never breaks the feed).
-    Cache 900s — the feed is refreshed by hourly-ish ingestion, not per-request."""
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+def _membrane_visible_rows() -> list:
+    """Query every ingested-post partition (#1669) and return the rows that pass the
+    ONE membrane predicate (origin:human + sensitivity-clear, fail-closed). Shared
+    by /api/broadcast (#1672) and /api/social_context (#1674) so there's exactly one
+    query + one gate, never two copies drifting apart. Fail-soft per source (a query
+    error on one channel never breaks either feed). Newest-first within each source;
+    callers that merge multiple sources re-sort on the merged set."""
     rows: list = []
     for source in _BROADCAST_SOURCES:
         pk = f"{USER_PREFIX}{source}"
@@ -1815,10 +1815,19 @@ def handle_broadcast() -> dict:
             )
             rows.extend(_decimal_to_float(resp.get("Items", [])))
         except Exception as e:  # noqa: BLE001 — one bad channel must not break the feed
-            logger.warning("[site_api] /api/broadcast: source %s query failed (non-fatal): %s", source, e)
+            logger.warning("[site_api] social membrane: source %s query failed (non-fatal): %s", source, e)
+    return [r for r in rows if _is_broadcast_visible(r)]
 
-    # The membrane, applied in ONE place (origin:human + sensitivity-clear, fail-closed).
-    visible = [r for r in rows if _is_broadcast_visible(r)]
+
+def handle_broadcast() -> dict:
+    """GET /api/broadcast — reverse-chron cleared, human-origin posts for /story/broadcast/.
+
+    Read-only; queries the ingested-post partitions, applies the ONE membrane
+    predicate (_is_broadcast_visible), and returns facade cards newest-first.
+    Fail-soft per source (a query error on one channel never breaks the feed).
+    Cache 900s — the feed is refreshed by hourly-ish ingestion, not per-request."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    visible = _membrane_visible_rows()
     # Reverse-chron across all sources (the per-source query is already newest-first;
     # this re-sorts the merged set). sk carries the post id after the date, so sort on it.
     visible.sort(key=lambda r: str(r.get("date", "")) + str(r.get("sk", "")), reverse=True)
@@ -1827,6 +1836,53 @@ def handle_broadcast() -> dict:
     return _ok(
         {
             "as_of_date": today,
+            "items": cards,
+            "total": len(cards),
+        },
+        cache_seconds=900,
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Contextual social embeds (#1674, epic #1668, story S6)
+# ═══════════════════════════════════════════════════════════════════════════════
+# GET /api/social_context?route=training|mind — the SAME cleared, human-origin
+# membrane as /api/broadcast (_membrane_visible_rows), narrowed to the posts whose
+# ENRICHED content (#1671 social_signals.coach_route_of — the same router the
+# training/Mind coach surfaces already read, ai_context._social_posts_by_route)
+# routes to the requested surface. A training-flavoured post (exercise_context, or
+# a concrete training keyword in its themes/behaviors/entities) surfaces on
+# /data/training/; a reflective post surfaces on the Mind pillar (/data/mind/).
+#
+# Facade cards only — reuses _broadcast_card, so this is a pure narrowing of the
+# broadcast feed, never a second card shape. Zero CSP change: no third-party
+# iframe, same as #1672. #1678 (native embeds via a scoped frame-src/media-src
+# amendment) is a separate, owner-gated security decision — this endpoint stays a
+# facade regardless of how that lands.
+#
+# Only ACTUALLY-ENRICHED posts (enriched_at present) are eligible: an unenriched
+# post has no content signal to route on, so classify_coach_route's "mind" default
+# would silently misroute a training post that just hasn't been enriched yet. It
+# stays in the general /story/broadcast/ feed until enrichment stamps a route.
+_CONTEXT_ROUTES = frozenset({"training", "mind"})
+_CONTEXT_LIMIT = 6  # a contextual sidebar highlight, not the full archive — see /story/broadcast/ for that
+
+
+def _handle_social_context(event: dict) -> dict:
+    """GET /api/social_context?route=training|mind — contextual embeds for #1674."""
+    params = event.get("queryStringParameters") or {}
+    route = (params.get("route") or "").strip().lower()
+    if route not in _CONTEXT_ROUTES:
+        return _error(400, f"route query parameter is required and must be one of: {sorted(_CONTEXT_ROUTES)}")
+
+    enriched = [r for r in _membrane_visible_rows() if r.get("enriched_at")]
+    matched = [r for r in enriched if coach_route_of(r) == route]
+    matched.sort(key=lambda r: str(r.get("date", "")) + str(r.get("sk", "")), reverse=True)
+    cards = [_broadcast_card(r) for r in matched[:_CONTEXT_LIMIT]]
+
+    return _ok(
+        {
+            "route": route,
             "items": cards,
             "total": len(cards),
         },

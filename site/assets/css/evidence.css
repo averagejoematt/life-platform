@@ -353,6 +353,36 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .coach-tl li { padding: var(--sp-2) 0; border-top: var(--border-hair); font-size: var(--fs-small); color: var(--ink-muted); }
 .coach-tl .label { color: var(--ink-faint); margin-right: var(--sp-2); }
 
+/* ── Contextual social embeds (#1674, epic #1668 S6) ──────────────────────────────
+   Facade cards on the training / Mind-pillar topic pages — same visual language as
+   the Broadcast feed's .bc-* cards (site/assets/css/story.css), a distinct class
+   set because this is a compact, ≤6-card sidebar highlight inside an .rd-sec, not
+   the full reverse-chron archive. A link-out, never an iframe — zero CSP change. */
+.ctx-feed { list-style: none; margin: var(--sp-3) 0 0; padding: 0;
+  display: grid; gap: var(--sp-3);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); }
+.ctx-card { border: var(--border-hair); border-radius: var(--radius-sm);
+  overflow: hidden; background: var(--surface); display: flex; flex-direction: column;
+  transition: border-color var(--dur-fast); }
+.ctx-card:hover { border-color: var(--ember); }
+.ctx-link { text-decoration: none; color: inherit; display: flex; flex-direction: column; height: 100%; }
+.ctx-media { margin: 0; aspect-ratio: 16 / 9; background: var(--rule); overflow: hidden;
+  display: flex; align-items: center; justify-content: center; }
+.ctx-thumb { width: 100%; height: 100%; object-fit: cover; display: block; max-width: 100%; }
+.ctx-thumb-empty { color: var(--ink-faint); letter-spacing: 0.1em; text-transform: uppercase;
+  font-family: var(--font-mono); font-size: var(--fs-label); }
+.ctx-body { padding: var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-2); flex: 1; }
+.ctx-meta { display: flex; gap: var(--sp-2); align-items: baseline; flex-wrap: wrap; margin: 0; }
+.ctx-chan { color: var(--ember); text-transform: uppercase; letter-spacing: 0.1em; font-family: var(--font-mono); }
+.ctx-date { color: var(--ink-faint); font-family: var(--font-mono); }
+.ctx-caption { margin: 0; font-family: var(--font-serif); font-size: var(--fs-small);
+  line-height: 1.4; color: var(--ink); overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.ctx-cta { margin-top: auto; color: var(--ink-muted); font-family: var(--font-mono); }
+.ctx-link:hover .ctx-cta { color: var(--ember); }
+.ctx-foot { margin: var(--sp-3) 0 0; color: var(--ink-faint); }
+.ctx-foot a { color: var(--ember); }
+
 /* Hevy strength log — expandable session → exercises → sets×reps×weight */
 .wlog { border: var(--border-hair); border-radius: var(--radius); background: var(--surface); margin-top: var(--sp-2); overflow: hidden; }
 .wlog-sum { cursor: pointer; padding: var(--sp-3) var(--sp-4); display: flex; align-items: baseline; gap: var(--sp-2); flex-wrap: wrap; list-style: none; }
