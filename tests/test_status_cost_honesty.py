@@ -44,7 +44,21 @@ from ai import budget_guard  # noqa: E402
 from operational import cost_governor_lambda as cg  # noqa: E402
 from web import site_api_intelligence as sai  # noqa: E402
 
-_SRC = (_REPO / "lambdas" / "web" / "site_api_intelligence.py").read_text()
+# #1654 (god-module breakup): the cost block and its only caller no longer share a
+# file — `_budget_cost_block` moved to web/site_api_budget.py with the rest of the
+# AI-spend domain, and `/api/status` (its caller) to web/site_api_status.py, both
+# behind the unchanged site_api_intelligence facade. Guard the SET, not the instance:
+# scan the whole family so these assertions keep biting wherever inside it the code
+# lives, instead of passing vacuously the next time a module is split.
+_SRC_FILES = (
+    "site_api_intelligence.py",
+    "site_api_budget.py",
+    "site_api_status.py",
+    "site_api_pulse.py",
+    "site_api_discovery.py",
+    "site_api_foresight.py",
+)
+_SRC = "\n".join((_REPO / "lambdas" / "web" / name).read_text() for name in _SRC_FILES)
 
 
 def _status_cost_block():
