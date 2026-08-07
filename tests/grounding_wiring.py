@@ -51,6 +51,9 @@ GATE_CLASSES = {
     },
     # #1699 ungrounded-behavioral (same-day completed-action claim with no log).
     "behavioral": {"kwargs": ("available_logs",), "direct": ("ungrounded_behavioral_findings",)},
+    # #1968 night-scope (a sleep/recovery/HRV figure with no night name, or one that
+    # disagrees with that night's stored value after the wearable revised it).
+    "night": {"kwargs": ("nightly_vitals",), "direct": ("night_scoped_vitals_findings",)},
 }
 
 # The composite entrypoint whose kwargs are read, plus the standalone gate helpers.
@@ -81,6 +84,19 @@ _AUDITOR = (
     "has no prompt/allow-list to ground numbers or dates against and no generation-day "
     "log map. Freshness is the only class that is meaningful (and it is armed)."
 )
+_NO_NIGHT_MAP = (
+    "no night-keyed vitals map at this layer: `nightly_vitals` must be real stored "
+    "readings keyed by NIGHT (ai_calls' `_nightly_vitals_for` derives it from the whoop "
+    "rows the render already loaded). Passing a guessed or empty map would flag every "
+    "sleep/recovery/HRV figure on the surface as unlabeled, which is how a gate gets "
+    "switched off. Arming this class here waits on threading that map through — the "
+    "same contract `available_logs` (#1699) has, and not a default."
+)
+_NOT_A_VITALS_SURFACE = (
+    "this surface does not narrate night-scoped vitals — it has no sleep, recovery, HRV "
+    "or resting-HR figure to scope to a night, so arming the class would be a no-op "
+    "rather than coverage. Revisit if its subject matter widens."
+)
 
 _ALL = frozenset(GATE_CLASSES)
 
@@ -93,46 +109,46 @@ def _entry(required, exempt):
 SURFACES = {
     "lambdas/ai/ai_calls.py::_ground_legacy_output": _entry(
         ("numbers", "dates", "freshness"),
-        {"behavioral": _NO_LOG_MAP},
+        {"behavioral": _NO_LOG_MAP, "night": _NO_NIGHT_MAP},
     ),
     "lambdas/ai/ai_calls.py::_run_coach_v2_pipeline": _entry(
-        ("numbers", "freshness", "behavioral"),
+        ("numbers", "freshness", "behavioral", "night"),
         {"dates": _PRECEDENT_SCOPED_DATES},
     ),
     "lambdas/coach/coach_history_summarizer.py::_apply_grounding_gate": _entry(
         ("numbers", "dates", "freshness"),
-        {"behavioral": _NO_LOG_MAP},
+        {"behavioral": _NO_LOG_MAP, "night": _NO_NIGHT_MAP},
     ),
     "lambdas/coach/inter_coach_dialogue_lambda.py::generate_gated_turn": _entry(
         ("numbers", "dates", "freshness"),
-        {"behavioral": _NO_LOG_MAP},
+        {"behavioral": _NO_LOG_MAP, "night": _NO_NIGHT_MAP},
     ),
     "lambdas/compute/state_of_matthew_lambda.py::narration_gate": _entry(
         ("numbers", "dates", "freshness"),
-        {"behavioral": _NO_LOG_MAP},
+        {"behavioral": _NO_LOG_MAP, "night": _NO_NIGHT_MAP},
     ),
     "lambdas/content/review_pack_ranker.py::baseline_mismatch_findings": _entry(
         ("freshness",),
-        {"numbers": _AUDITOR, "dates": _AUDITOR, "behavioral": _AUDITOR},
+        {"numbers": _AUDITOR, "dates": _AUDITOR, "behavioral": _AUDITOR, "night": _AUDITOR},
     ),
     "lambdas/emails/ai_review_pack_lambda.py::_freshness_findings_for": _entry(
         ("freshness",),
-        {"numbers": _AUDITOR, "dates": _AUDITOR, "behavioral": _AUDITOR},
+        {"numbers": _AUDITOR, "dates": _AUDITOR, "behavioral": _AUDITOR, "night": _AUDITOR},
     ),
     "lambdas/emails/chronicle_prompt.py::installment_grounding_findings": _entry(
         ("numbers", "dates", "freshness"),
-        {"behavioral": _NO_LOG_MAP},
+        {"behavioral": _NO_LOG_MAP, "night": _NO_NIGHT_MAP},
     ),
     "lambdas/emails/coach_nudge_lambda.py::_gate": _entry(
         ("numbers", "dates", "freshness"),
-        {"behavioral": _NO_LOG_MAP},
+        {"behavioral": _NO_LOG_MAP, "night": _NO_NIGHT_MAP},
     ),
     "lambdas/emails/daily_debrief_lambda.py::narrate": _entry(
         ("numbers", "dates", "freshness"),
-        {"behavioral": _NO_LOG_MAP},
+        {"behavioral": _NO_LOG_MAP, "night": _NO_NIGHT_MAP},
     ),
     "lambdas/intelligence/ai_expert_analyzer_lambda.py::generate_and_cache": _entry(
-        ("numbers", "freshness"),
+        ("numbers", "freshness", "night"),
         {
             "dates": (
                 "the analyzer's allow-list is assembled from prompt + shared system + "
@@ -147,19 +163,19 @@ SURFACES = {
     ),
     "lambdas/reading/horizons_retrospective.py::_grounding_gate": _entry(
         ("numbers", "dates", "freshness"),
-        {"behavioral": _NO_LOG_MAP},
+        {"behavioral": _NO_LOG_MAP, "night": _NOT_A_VITALS_SURFACE},
     ),
     "lambdas/web/site_api_ai_lambda.py::board_grounding_findings": _entry(
         ("numbers", "dates", "freshness"),
-        {"behavioral": _NO_LOG_MAP},
+        {"behavioral": _NO_LOG_MAP, "night": _NO_NIGHT_MAP},
     ),
     "lambdas/web/site_api_ai_lambda.py::_handle_ask": _entry(
         ("numbers", "dates", "freshness"),
-        {"behavioral": _NO_LOG_MAP},
+        {"behavioral": _NO_LOG_MAP, "night": _NO_NIGHT_MAP},
     ),
     "lambdas/web/site_api_ai_lambda.py::_handle_explain": _entry(
         ("numbers", "dates", "freshness"),
-        {"behavioral": _NO_LOG_MAP},
+        {"behavioral": _NO_LOG_MAP, "night": _NO_NIGHT_MAP},
     ),
 }
 

@@ -67,6 +67,13 @@ except ImportError:  # pragma: no cover — environment-dependent
     except ImportError:
         _hard_contradictions = None
 
+# 6. Night-scope (#1968) lives in ai/night_scope.py — this file is at its §2 ceiling, and
+# that gate is the one callers want WITHOUT the generation harness (serve-time re-checks).
+try:
+    from ai import night_scope as _night_scope
+except ImportError:  # pragma: no cover — flat/layer bundle layout
+    import night_scope as _night_scope  # type: ignore[no-redef]
+
 _NUM_RE = re.compile(r"\d+(?:\.\d+)?")
 _THOUSANDS_RE = re.compile(r"(?<=\d),(?=\d{3}\b)")
 
@@ -325,7 +332,8 @@ def authoritative_facts_block(facts: dict) -> str:
             "below, say plainly that the reading has not landed yet. Honest absence is the correct "
             "answer; a recalled or inferred number is not.\n"
         )
-    lines = []
+    # #1968: name the night these wake-date-keyed vitals describe (see ai/night_scope.py).
+    lines = [ln for ln in (_night_scope.night_label_line(facts),) if ln]
     if facts.get("protein_g_avg") is not None:
         lines.append(
             f"  - Protein INTAKE averages {facts['protein_g_avg']:g} g/day "
@@ -1039,6 +1047,7 @@ def grounding_findings(
     weight_tolerance_lbs: float = 1.0,
     available_logs=None,
     evaluated_predictions=None,
+    nightly_vitals=None,
 ) -> list:
     """Deterministic grounding check. Returns [{type, detail, ...}] — empty = grounded.
 
@@ -1064,6 +1073,10 @@ def grounding_findings(
       ``available_logs`` is passed (an empty set means "no logs today"); callers that
       don't supply it keep the pre-#1699 behavior exactly — same optional-param
       discipline as ``allowed_dates`` / the #1691 params.
+    - "unlabeled_night_figure"/"night_value_mismatch": a vitals figure naming no night,
+      or naming one and disagreeing with what is stored for it NOW — #1968, and the one
+      class that also runs at serve time. Checked ONLY when ``nightly_vitals`` is passed
+      (night-keyed); see ``ai/night_scope.py``.
     """
     findings = []
     if facts and _hard_contradictions is not None:
@@ -1105,6 +1118,10 @@ def grounding_findings(
         findings.extend(ungrounded_behavioral_findings(text, available_logs=available_logs))
     if evaluated_predictions is not None:
         findings.extend(self_graded_verdict_findings(text, evaluated_predictions=evaluated_predictions))
+    if nightly_vitals is not None:
+        findings.extend(
+            _night_scope.night_scoped_vitals_findings(text, nightly_vitals=nightly_vitals, generation_date_iso=generation_date_iso)
+        )
     return findings
 
 
@@ -1144,6 +1161,8 @@ def correction_prompt(findings: list) -> str:
                 f"{i}. {f['detail']}. Remove the claim or hedge it (\"if you kept your window today\"), or cite the "
                 f"actual log — never assert a completed behavior with no record behind it."
             )
+        elif f.get("type") in _night_scope.FINDING_TYPES:  # #1968
+            lines.append(f"{i}. {_night_scope.correction_line(f)}")
         elif f.get("type") == "unresolvable_precedent":
             lines.append(
                 f"{i}. {f['detail']}. Cite ONLY a precedent date that was provided to you (with its link + similarity), "

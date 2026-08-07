@@ -50,6 +50,89 @@ _DAY_CLAIM_KEYS = {"day_n", "experiment_day", "cycle_day"}
 _DAY_PROSE_RE = re.compile(r"\bDay\s+(\d+)\b")
 
 
+# ── R5 (#1968): a night-scoped figure must name its night ────────────────────
+#
+# Measured on the live 2026-08-06 payload: `/api/sleep_detail`'s summary published
+# `total_sleep_hours: 8.4` while the `sleep_trend` row for the same `as_of_date` read
+# `hours: null` (Eight Sleep vs Whoop, mid auth-outage). Both numbers were true and the
+# payload said so nowhere — the summary named no night and no device, so the two
+# surfaces simply contradicted each other in public. reader_truth raised it HIGH on
+# 2026-08-05 and the LLM had to guess at the cause; this is the same finding, computed.
+#
+# The rule is a LABEL rule, not an arithmetic one, so unlike R1–R4 it does not depend on
+# the experiment day and runs at every phase: a figure with no scope is unreconcilable
+# on Day 1 and on Day 400 alike.
+_NIGHT_SCOPED_FIELDS = {
+    "total_sleep_hours",
+    "sleep_hours",
+    "whoop_hours",
+    "sleep_efficiency",
+    "sleep_efficiency_pct",
+    "sleep_score",
+    "whoop_quality",
+    "deep_sleep_hours",
+    "rem_sleep_hours",
+    "deep_pct",
+    "rem_pct",
+    "light_pct",
+    "recovery_score",
+    "recovery_pct",
+    "hrv",
+    "rhr",
+}
+# What counts as naming the night. `night_of` is the explicit answer. `frame` alongside a
+# wake date is the other legitimate one — it declares the convention (#1923's "last_night"
+# = as_of - 1) that converts the date the object DOES carry, which is exactly what
+# site_api_common.night_of_for exists to publish. A bare `as_of_date` is neither: it is a
+# morning, and the whole #1923 doc block exists because that ambiguity got re-litigated.
+_NIGHT_LABEL_KEYS = ("night_of", "frame")
+
+
+def _night_label_findings(page, payload):
+    """R5 — every object publishing a night-scoped vitals figure names its night.
+
+    Scope: dict objects that publish at least one non-null field from
+    `_NIGHT_SCOPED_FIELDS`. A row carrying its OWN `date` key is skipped — a dated row
+    inside a dated series is scoped by its key, and flagging all thirty of them would
+    bury the one summary object that genuinely floats free.
+    """
+    findings = []
+    for path, obj in _objects(payload):
+        if not isinstance(obj, dict) or "date" in obj:
+            continue
+        figures = sorted(k for k in _NIGHT_SCOPED_FIELDS if obj.get(k) is not None)
+        if not figures:
+            continue
+        if any(obj.get(k) for k in _NIGHT_LABEL_KEYS):
+            continue
+        findings.append(
+            {
+                "page": page,
+                "category": "temporal_contradiction",
+                "severity": "medium",
+                "note": (
+                    f"{path or '<root>'} publishes {len(figures)} night-scoped figure(s) "
+                    f"({', '.join(figures[:6])}{', …' if len(figures) > 6 else ''}) "
+                    f"with no night label (no `night_of`, no `frame`) — a reader cannot tell which "
+                    f"night they describe, so a sibling surface reporting that night differently "
+                    f"is indistinguishable from a contradiction (#1968)"
+                ),
+            }
+        )
+    return findings
+
+
+def _objects(obj, path=""):
+    """Yield (json_path, dict) for the payload and every nested dict, depth-first."""
+    if isinstance(obj, dict):
+        yield path, obj
+        for k, v in obj.items():
+            yield from _objects(v, f"{path}.{k}" if path else str(k))
+    elif isinstance(obj, list):
+        for i, v in enumerate(obj):
+            yield from _objects(v, f"{path}[{i}]")
+
+
 def _walk(obj, path=""):
     """Yield (json_path, key, value) for every dict entry, depth-first."""
     if isinstance(obj, dict):
@@ -76,12 +159,16 @@ def check_payload(page, payload, day_n, strict=False):
         strict: also apply the bare "Day N" prose rule to string values.
 
     Returns a list of {"page", "category", "severity", "note"} findings.
-    Pre-start (day_n == 0) returns [] — the countdown state has its own honest
-    copy and the LLM rubric already knows the pre-start phase line.
+    Pre-start (day_n == 0) returns only R5 — the phase rules R1–R4 have nothing to
+    compare against (the countdown state has its own honest copy and the LLM rubric
+    already knows the pre-start phase line), while R5's night-label question is
+    phase-independent (#1968).
     """
+    # R5 runs FIRST and outside the pre-start guard: it asks whether a figure names its
+    # night, which is not a question about the experiment day (see the block above).
+    findings = _night_label_findings(page, payload)
     if not day_n or day_n < 1:
-        return []
-    findings = []
+        return findings
     for path, key, value in _walk(payload):
         # R1 — a gated INTENSIVE window-named field carrying a value before its
         # window can exist. The registry (one source of truth, #1917) decides

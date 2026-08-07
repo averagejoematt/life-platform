@@ -204,6 +204,7 @@ except ImportError:  # pragma: no cover — flat sys.path (tests)
 # flow moved there (one implementation for every surface), plus the allow-list
 # number gate that catches fabricated trends ("from 58 to 64" with no 58 anywhere).
 from ai import grounded_generation as _gg
+from ai.night_scope import nightly_vitals_from_facts as _night_map  # #1968
 
 from intelligence import weight_recency
 
@@ -1321,6 +1322,7 @@ def generate_and_cache(expert_key, shared_system=None):
                     allowed=_allowed,
                     generation_date_iso=_gen_date_iso,
                     start_date_iso=EXPERIMENT_START,
+                    nightly_vitals=_night_map(_facts),  # #1968: the unlabeled "7.5-hour sleep"
                 )
 
             def _regen(_correction):
