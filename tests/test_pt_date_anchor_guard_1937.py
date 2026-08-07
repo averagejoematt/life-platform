@@ -41,8 +41,14 @@ formatting, never ``.isoformat()``.
 import ast
 import pathlib
 
+from site_api_family import family_paths
+
 _WEB = pathlib.Path(__file__).resolve().parent.parent / "lambdas" / "web"
-_VITALS = _WEB / "site_api_vitals.py"
+# #1654: the file this guard was written against is now a thin facade over
+# web/site_api_{body,journey,character,sleep,biomarkers}.py. The scope is the same
+# CODE, so scan the derived family — a filename-pinned scanner would have kept
+# reporting clean over an empty file.
+_VITALS_FAMILY = family_paths("site_api_vitals")
 
 # A strftime format that names a calendar DAY (year/month/day) with no clock
 # component. ``%Y-%m-%d`` is the idiom used throughout this codebase; the
@@ -118,8 +124,10 @@ def test_site_api_vitals_has_no_naked_utc_date_anchors():
     Pacific (#1937's acceptance criterion #1) — no `datetime.now(timezone.utc)`
     (or equivalent) formatted as a calendar day anywhere in the file.
     """
-    findings = naked_utc_date_anchors(_VITALS.read_text(), filename=_VITALS.name)
-    assert not findings, "naked UTC day-anchor(s) reintroduced in site_api_vitals.py:\n" + "\n".join(findings)
+    findings = []
+    for path in _VITALS_FAMILY:
+        findings += naked_utc_date_anchors(path.read_text(), filename=path.name)
+    assert not findings, "naked UTC day-anchor(s) reintroduced in the site_api_vitals family:\n" + "\n".join(findings)
 
 
 def test_site_api_vitals_still_anchors_instants_in_utc():
@@ -128,7 +136,7 @@ def test_site_api_vitals_still_anchors_instants_in_utc():
     fails if a future edit "fixes" `_today_iso`/`generated_at` into PT too,
     which would conflate an instant with a day claim.
     """
-    src = _VITALS.read_text()
+    src = "\n".join(p.read_text() for p in _VITALS_FAMILY)
     assert "datetime.now(timezone.utc).isoformat()" in src
 
 

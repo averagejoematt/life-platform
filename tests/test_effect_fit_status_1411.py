@@ -399,20 +399,18 @@ class TestWrongPagePublishesNullFits:
 class TestBadgeSurfaces:
     def test_character_endpoint_passes_fit_fields_through(self):
         """/api/character's active_effects projection must not strip the badge."""
-        import inspect
+        # #1654: the body moved to web/site_api_character.py behind the unchanged
+        # facade — follow the facade's own delegator to it, so this reads a real body.
+        from site_api_family import handler_source
 
-        from web import site_api_vitals as vitals
-
-        src = inspect.getsource(vitals.handle_character)
+        src = handler_source("site_api_vitals", "handle_character")
         for field in ("fit_status", "fit_badge"):
             assert field in src, f"handle_character strips {field} from active_effects (#1411)"
 
     def test_character_config_endpoint_serves_fit_fields(self):
-        import inspect
+        from site_api_family import handler_source
 
-        from web import site_api_vitals as vitals
-
-        src = inspect.getsource(vitals.handle_character_config)
+        src = handler_source("site_api_vitals", "handle_character_config")
         for field in ("fit_status", "fit_badge"):
             assert field in src, f"handle_character_config serves no {field} (#1411)"
 

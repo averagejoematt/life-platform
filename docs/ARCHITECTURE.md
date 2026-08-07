@@ -261,7 +261,12 @@ Compute → store → read pattern. Standalone Lambdas run before Daily Brief, s
 | `lambdas/web/site_api_budget.py` | 609 | (#1654) `/api/inference_receipt`, `/api/receipts`, and the `/api/status` cost block — the AI-spend envelope, read from the governor's own numbers |
 | `lambdas/web/site_api_foresight.py` | 355 | (#1654) `/api/forecast`, `/api/scenarios`, `/api/state_of_matthew`, `/api/wrong` — predictions and their public reckoning |
 | `lambdas/web/site_api_social.py` | 1,168 | 15 subscriber/experiment/challenge/nudge handlers + token-HMAC machinery |
-| `lambdas/web/site_api_vitals.py` | ~2,720 | homepage/dashboard handlers (vitals, journey, character, achievements, snapshot) + (#1240) the vitals-adjacent domain handlers: glucose, sleep_detail, sleep_correlations, circadian, phenoage, labs, genome_risks |
+| `lambdas/web/site_api_vitals.py` | 222 | **Facade** (#1654): the 19 routed homepage/dashboard entrypoints, each a thin delegator to a sibling below |
+| `lambdas/web/site_api_body.py` | 407 | (#1654) `/api/vitals`, `/api/weight_progress`, `/api/snapshot` — the live body reading + the homepage fan-out |
+| `lambdas/web/site_api_journey.py` | 743 | (#1654) `/api/journey`, `/api/timeline`, `/api/journey_timeline`, `/api/journey_waveform`, `/api/achievements` — the progress record over time |
+| `lambdas/web/site_api_character.py` | 530 | (#1654) `/api/character`, `/api/character_config`, `/api/character_receipt`, `/api/character_stats` — the game layer |
+| `lambdas/web/site_api_sleep.py` | 631 | (#1654) `/api/sleep_detail`, `/api/sleep_correlations`, `/api/circadian` |
+| `lambdas/web/site_api_biomarkers.py` | 486 | (#1654) `/api/labs`, `/api/glucose`, `/api/phenoage`, `/api/genome_risks` — the measured chemistry and its privacy absolutes |
 | `lambdas/web/site_api_data.py` | ~2,740 | domain-data grab-bag after the #1240 split: habits, experiments, ledger/discoveries, pipeline freshness, cycle_compare/survival, protocols/domains (docstring lists the routed set; guarded by `tests/test_site_api_data_split.py`) |
 
 All of these ship together via the standard `Code.from_asset("../lambdas")` zip. `/api/ask` + `/api/board_ask` are served by the separate `life-platform-site-api-ai` Lambda (ADR-036).

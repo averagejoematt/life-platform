@@ -88,8 +88,13 @@ def test_the_genome_endpoint_serves_aggregates_only():
     import sys
 
     sys.path.insert(0, str(_REPO / "lambdas"))
-    src = (_REPO / "lambdas" / "web" / "site_api_vitals.py").read_text()
-    handler = src.split("def handle_genome_risks()")[1].split("\ndef ")[0]
+    # #1654: the genome handler moved to web/site_api_biomarkers.py behind the
+    # unchanged site_api_vitals facade. This is a PRIVACY absolute — a guard that
+    # silently found nothing to object to would be the worst outcome — so it follows
+    # the facade's own delegator to whichever module owns the body.
+    from site_api_family import handler_source
+
+    handler = handler_source("site_api_vitals", "handle_genome_risks")
     for forbidden in ('"gene"', '"rsid"', '"summary"', '"implications"'):
         assert forbidden not in handler, f"handle_genome_risks emits {forbidden} — that identifies the variant"
     assert '"total_snps"' in handler and '"risk_levels"' in handler, "the aggregate shape must survive"
@@ -98,8 +103,19 @@ def test_the_genome_endpoint_serves_aggregates_only():
 
 def test_the_labs_absolute_is_still_enforced():
     """The sibling rule that already worked must not regress while fixing its twin."""
-    src = (_REPO / "lambdas" / "web" / "site_api_vitals.py").read_text()
-    assert "_GENETIC_TEXT_RE" in src and "_strip_genetic_biomarkers" in src
+    # #1654: the strip moved to web/site_api_biomarkers.py behind the site_api_vitals
+    # facade. Asserting the NAMES exist somewhere in the family is not enough — the
+    # facade re-exports both, so deleting the real implementation would leave this
+    # guard passing on a re-export that does nothing (verified: it did). Assert the
+    # CALL SITE inside the labs handler, which only the real thing satisfies.
+    from site_api_family import family_source, handler_source
+
+    labs = handler_source("site_api_vitals", "handle_labs")
+    assert "_strip_genetic_biomarkers(" in labs, "/api/labs no longer runs its panels through the genetic strip"
+
+    src = family_source("site_api_vitals")
+    assert "def _strip_genetic_biomarkers(" in src, "the genetic strip is gone from the serving family"
+    assert "_GENETIC_TEXT_RE = " in src and "_GENETIC_TEXT_RE.search(" in src, "the genetic text pattern is defined-and-used nowhere"
 
 
 def test_scanner_fires_on_an_injected_identifier_field(tmp_path):

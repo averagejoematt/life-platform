@@ -92,7 +92,9 @@ _ISO_IDIOM_RESIDUE = frozenset(
         # site_api_intelligence.py pruned by #1654: its one residual site was in
         # handle_receipts, which moved to web/site_api_budget.py and was converted
         # to common.pacific_time.parse_iso_utc on the way. The ratchet tightens.
-        "lambdas/web/site_api_vitals.py",
+        # site_api_vitals.py pruned by #1654: its residual sites were in
+        # handle_sleep_detail, which moved to web/site_api_sleep.py and was converted
+        # to common.pacific_time.parse_iso_utc on the way. The ratchet tightens.
         "lambdas/web/subscriber_onboarding_lambda.py",
     }
 )
