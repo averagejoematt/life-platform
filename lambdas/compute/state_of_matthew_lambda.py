@@ -46,6 +46,7 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
+from ai.behavior_logs import available_logs_from_presence  # #2056 — the #1699 availability map
 from ai.grounded_generation import allowed_dates, allowed_numbers, grounding_findings  # ADR-104 gate
 from ai.grounding_gate_params import cycle_gate_params  # #1967 — cycle anchors (#1691/#1897)
 from boto3.dynamodb.conditions import Key
@@ -413,7 +414,23 @@ def narration_gate(state: dict, text: str) -> tuple:
     if archive_text:
         allowed |= allowed_numbers(archive_text)
         allowed_date_set |= allowed_dates(archive_text)
-    findings = grounding_findings(text, facts=None, allowed=allowed, allowed_dates=allowed_date_set, **cycle_gate_params())
+    findings = grounding_findings(
+        text,
+        facts=None,
+        allowed=allowed,
+        allowed_dates=allowed_date_set,
+        # #2056: the #1699 ungrounded-behavioral class. `presence_signal` is the RAW
+        # engagement_state record `gather_presence_section` was trimmed from — it is
+        # already read once per weekly run, and its per-channel `last_log_date` is a
+        # real per-day fact, so the map costs no query. It is deliberately NOT in
+        # `_narration_payload`: it is a gate input, never allowed vocabulary.
+        # Coverage is partial and declared (food/training/journal); steps and the
+        # eating window have no engagement channel and stay UNKNOWN rather than being
+        # reported absent. A state assembled without it (fixtures, the golden-eval
+        # harness) leaves the class unarmed exactly as before.
+        available_logs=available_logs_from_presence(state.get("presence_signal"), state.get("as_of")),
+        **cycle_gate_params(),
+    )
     return findings, _causal_language(text)
 
 
@@ -674,7 +691,14 @@ def lambda_handler(event: dict, context) -> dict:
     state = assemble_state(forecast, hypotheses, coaches, calibration, today_str)
     # #914: presence rides the state so the narration must acknowledge a real
     # logging stall (and its numbers join the grounding allow-list). Fail-soft.
-    state["presence"] = gather_presence_section(fetch_engagement_signal())
+    _engagement = fetch_engagement_signal()
+    state["presence"] = gather_presence_section(_engagement)
+    # #2056: the RAW signal rides alongside the trimmed section — `gather_presence_section`
+    # drops `channel_detail` (and returns None entirely below the loud rung), and that is
+    # exactly the field the #1699 availability map is derived from. Gate input only; it is
+    # not in `_narration_payload`, so it never widens the allow-list, and not in
+    # `build_summary_item`, so it is never published.
+    state["presence_signal"] = _engagement
     # #1385: whole-life context — the full multi-cycle chronicle archive rides the
     # state as a 1-hour cached block (build_narration_body) and its numbers join the
     # grounding allow-list (narration_gate). Fail-soft to "" (no block, gate unchanged).

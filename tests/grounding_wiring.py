@@ -10,6 +10,12 @@ nothing failed when one was missed. The measured state at the time this landed w
 #1699 behavioral class — and the "seven days of an experiment" Day-1 leak (#1897) was
 the live consequence.
 
+#2056 moved the behavioral class from 1 of 15 to 5 of 15 and, more to the point, retired
+the blanket "no map at this layer" exemption that 12 surfaces cited — see the reason
+block below. Every surface still exempt from the class now carries a reason specific to
+IT, and the difference matters: a registry whose exemptions are all one sentence records
+that nobody has looked, while a registry of distinct reasons records what was measured.
+
 HOW IT'S GUARDED (guard the SET, not the instance)
 --------------------------------------------------
 The surface list is **derived**, never hand-maintained: ``scan_tree()`` AST-scans
@@ -66,12 +72,52 @@ PARAM_PROVIDERS = {"cycle_gate_params": frozenset({"freshness"})}
 PARAM_PROVIDER_MODULE = "lambdas/ai/grounding_gate_params.py"
 
 # ── Reusable exemption reasons (written once, cited per surface) ──────────────
-_NO_LOG_MAP = (
-    "no per-generation-date log-availability map at this layer: `available_logs` must be "
-    "the real set of log categories present for the generation date (ai_calls' "
-    "`_available_logs_for_today` derives it from the coach render payload). Passing a "
-    "guessed or empty set would flag EVERY same-day behavioral claim, so arming this "
-    "class here has to wait for that payload to be threaded through — not for a default."
+#
+# #2056 REPLACED THE BLANKET `_NO_LOG_MAP` EXEMPTION. It read "no per-generation-date
+# log-availability map at this layer" and was cited by 12 of the 15 surfaces, which made
+# it the registry's one un-actionable line: it named a missing input, not a reason, so it
+# could never be discharged surface by surface. Two things closed it.
+#
+#   1. `ai.behavior_logs` now owns the honest DERIVATIONS of the map — from a render
+#      payload, from the stored engagement signal's per-channel `last_log_date`, from a
+#      domain snapshot's `days_since_last_*`. Four more surfaces had the input all along
+#      and nobody had gone and got it.
+#   2. `LogAvailability` lets a caller declare WHICH categories it can answer for. The
+#      old bare-set contract read absence as "no log", so a surface that could see food
+#      but not steps had to stay dark or flag every step claim falsely. Declared partial
+#      coverage is what makes a partial-visibility surface armable *honestly*.
+#
+# What is left is not one excuse repeated; it is four distinct structural reasons, and
+# each says what would have to become true for the class to arm.
+_NOT_ABOUT_MATTHEW = (
+    "the #1699 gate checks a SECOND-PERSON same-day claim, and on this surface `you` is "
+    "not Matthew — it is the reader (the /api/explain system prompt says so in as many "
+    "words: 'The reader is NOT Matthew'), the other coach in the dialogue, or the "
+    "curator's own voice. Arming the class here would grade a claim about a stranger "
+    "against Matthew's log partitions. No map would fix that; the scoping is the point."
+)
+_THIRD_PERSON_SURFACE = (
+    "structurally out of scope: this surface is third person by construction — the "
+    "prompt's own rule is 'You write in third person. Matthew is your subject' — and the "
+    "#1699 gate only checks a second-person completed-action claim. Arming it would be a "
+    "no-op dressed as coverage. Revisit only if the voice rule changes."
+)
+_PRIOR_DAY_SCOPED_LOGS = (
+    "its one real availability fact is scoped to the WRONG DAY. The nudge shell probes "
+    "`macrofactor DATE#{yesterday}` (`nutrition_logged_yesterday`) because the trigger is "
+    "about yesterday's expected-complete nutrition day, while #1699 checks claims framed "
+    "for TODAY. Passing a prior-day map would grade a same-day claim against the previous "
+    "day's logs — a wrong answer, not a partial one. Arming this needs a same-day probe, "
+    "which is new I/O this once-a-day pipeline does not otherwise perform."
+)
+_HISTORY_ONLY_INPUT = (
+    "the only surface with a genuine missing-map residual after #2056. The stance writer "
+    "is handed the coach's own compressed HISTORY, track record and previous stance — no "
+    "day-scoped partition is read anywhere in this pipeline, so there is nothing already "
+    "loaded to derive a per-generation-date map from and `ai.behavior_logs` has no "
+    "derivation that fits. Arming it means adding a read (the engagement_state "
+    "STATE#current record `available_logs_from_presence` consumes), which is a deliberate "
+    "cost decision on a per-coach loop, not a wiring oversight."
 )
 _PRECEDENT_SCOPED_DATES = (
     "uses the framing-scoped precedent check (semantic_recall.precedent_citation_findings) "
@@ -108,8 +154,8 @@ def _entry(required, exempt):
 # ── The registry: policy per DERIVED surface ─────────────────────────────────
 SURFACES = {
     "lambdas/ai/ai_calls.py::_ground_legacy_output": _entry(
-        ("numbers", "dates", "freshness"),
-        {"behavioral": _NO_LOG_MAP, "night": _NO_NIGHT_MAP},
+        ("numbers", "dates", "freshness", "behavioral"),
+        {"night": _NO_NIGHT_MAP},
     ),
     "lambdas/ai/ai_calls.py::_run_coach_v2_pipeline": _entry(
         ("numbers", "freshness", "behavioral", "night"),
@@ -117,15 +163,15 @@ SURFACES = {
     ),
     "lambdas/coach/coach_history_summarizer.py::_apply_grounding_gate": _entry(
         ("numbers", "dates", "freshness"),
-        {"behavioral": _NO_LOG_MAP, "night": _NO_NIGHT_MAP},
+        {"behavioral": _HISTORY_ONLY_INPUT, "night": _NO_NIGHT_MAP},
     ),
     "lambdas/coach/inter_coach_dialogue_lambda.py::generate_gated_turn": _entry(
         ("numbers", "dates", "freshness"),
-        {"behavioral": _NO_LOG_MAP, "night": _NO_NIGHT_MAP},
+        {"behavioral": _NOT_ABOUT_MATTHEW, "night": _NO_NIGHT_MAP},
     ),
     "lambdas/compute/state_of_matthew_lambda.py::narration_gate": _entry(
-        ("numbers", "dates", "freshness"),
-        {"behavioral": _NO_LOG_MAP, "night": _NO_NIGHT_MAP},
+        ("numbers", "dates", "freshness", "behavioral"),
+        {"night": _NO_NIGHT_MAP},
     ),
     "lambdas/content/review_pack_ranker.py::baseline_mismatch_findings": _entry(
         ("freshness",),
@@ -137,45 +183,45 @@ SURFACES = {
     ),
     "lambdas/emails/chronicle_prompt.py::installment_grounding_findings": _entry(
         ("numbers", "dates", "freshness"),
-        {"behavioral": _NO_LOG_MAP, "night": _NO_NIGHT_MAP},
+        {"behavioral": _THIRD_PERSON_SURFACE, "night": _NO_NIGHT_MAP},
     ),
     "lambdas/emails/coach_nudge_lambda.py::_gate": _entry(
         ("numbers", "dates", "freshness"),
-        {"behavioral": _NO_LOG_MAP, "night": _NO_NIGHT_MAP},
+        {"behavioral": _PRIOR_DAY_SCOPED_LOGS, "night": _NO_NIGHT_MAP},
     ),
     "lambdas/emails/daily_debrief_lambda.py::narrate": _entry(
-        ("numbers", "dates", "freshness"),
-        {"behavioral": _NO_LOG_MAP, "night": _NO_NIGHT_MAP},
+        ("numbers", "dates", "freshness", "behavioral"),
+        {"night": _NO_NIGHT_MAP},
     ),
     "lambdas/intelligence/ai_expert_analyzer_lambda.py::generate_and_cache": _entry(
-        ("numbers", "freshness", "night"),
+        ("numbers", "freshness", "night", "behavioral"),
         {
             "dates": (
                 "the analyzer's allow-list is assembled from prompt + shared system + "
                 "canonical facts, but its narratives cite dates drawn from retrieved "
                 "blocks that are summarized rather than quoted into those sources — a "
-                "blanket date gate needs that source audit first. Tracked with the "
-                "module's ADR-080 split (it sits at the 2,000-line handler cap, so the "
-                "wiring lands with the extraction, not as an append)."
+                "blanket date gate needs that source audit first. (#2056 took the first "
+                "bite of the module's ADR-080 split — the DATE#-recency helpers moved to "
+                "intelligence/item_recency.py to make room under the 2,000-line handler "
+                "cap — but the date-source audit is still the blocker here, not space.)"
             ),
-            "behavioral": _NO_LOG_MAP,
         },
     ),
     "lambdas/reading/horizons_retrospective.py::_grounding_gate": _entry(
         ("numbers", "dates", "freshness"),
-        {"behavioral": _NO_LOG_MAP, "night": _NOT_A_VITALS_SURFACE},
+        {"behavioral": _NOT_ABOUT_MATTHEW, "night": _NOT_A_VITALS_SURFACE},
     ),
     "lambdas/web/site_api_ai_lambda.py::board_grounding_findings": _entry(
         ("numbers", "dates", "freshness"),
-        {"behavioral": _NO_LOG_MAP, "night": _NO_NIGHT_MAP},
+        {"behavioral": _NOT_ABOUT_MATTHEW, "night": _NO_NIGHT_MAP},
     ),
     "lambdas/web/site_api_ai_lambda.py::_handle_ask": _entry(
         ("numbers", "dates", "freshness"),
-        {"behavioral": _NO_LOG_MAP, "night": _NO_NIGHT_MAP},
+        {"behavioral": _NOT_ABOUT_MATTHEW, "night": _NO_NIGHT_MAP},
     ),
     "lambdas/web/site_api_ai_lambda.py::_handle_explain": _entry(
         ("numbers", "dates", "freshness"),
-        {"behavioral": _NO_LOG_MAP, "night": _NO_NIGHT_MAP},
+        {"behavioral": _NOT_ABOUT_MATTHEW, "night": _NO_NIGHT_MAP},
     ),
 }
 

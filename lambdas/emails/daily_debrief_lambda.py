@@ -38,6 +38,7 @@ from datetime import datetime, timezone
 
 import boto3
 from ai import google_tts
+from ai.behavior_logs import available_logs_from_presence  # #2056 — the #1699 availability map
 from ai.grounded_generation import allowed_dates, allowed_numbers, grounding_findings  # ADR-104 gate
 from ai.grounding_gate_params import cycle_gate_params  # #1967 — cycle anchors (#1691/#1897)
 from boto3.dynamodb.conditions import Key
@@ -150,15 +151,31 @@ def gather_facts(date_str: str) -> dict:
     return facts
 
 
-def _presence_block() -> str:
+def _presence_signal() -> dict:
+    """The raw engagement_state STATE#current record (written by adaptive_mode via
+    engagement_core). Fail-soft → {}. Split out from `_presence_block` for #2056: the
+    record's `channel_detail` carries a real per-day `last_log_date` per manual channel,
+    which is the honest per-generation-date availability map the #1699 gate needs — so
+    the ONE read now feeds both the prompt block and the gate, with no second query."""
+    try:
+        return table.get_item(Key={"pk": USER_PREFIX + "engagement_state", "sk": "STATE#current"}).get("Item") or {}
+    except Exception as e:
+        logger.warning("presence signal read failed (non-fatal): " + str(e))
+        return {}
+
+
+def _presence_block(sig: dict | None = None) -> str:
     """#967: the ONE shared presence / quiet-stretch block (engagement_core,
     written by adaptive_mode → STATE#current) — the same seam daily_brief uses
     (daily_brief_lambda.py Phase 2), so a dark stretch is never narrated as a
-    normal day over the silence. Empty when Matthew is present. Fail-soft."""
+    normal day over the silence. Empty when Matthew is present. Fail-soft.
+
+    `sig` lets the caller reuse a record it already read; omitted, it reads its own
+    (the zero-arg call is the shared four-lambda contract this helper is tested on)."""
     try:
         from content.engagement_core import presence_prompt_block
 
-        sig = table.get_item(Key={"pk": USER_PREFIX + "engagement_state", "sk": "STATE#current"}).get("Item") or {}
+        sig = _presence_signal() if sig is None else sig
         block = presence_prompt_block(sig)
         if block:
             logger.info("Presence block injected (class=" + str(sig.get("presence_class")) + ")")
@@ -248,13 +265,22 @@ def build_narration_body(facts: dict, presence_block: str = "") -> dict:
     return {"model": MODEL, "max_tokens": MAX_TOKENS, "system": system, "messages": [{"role": "user", "content": user}]}
 
 
-def narrate(facts: dict, presence_block: str = "") -> dict:
+def narrate(facts: dict, presence_block: str = "", presence_signal: dict | None = None) -> dict:
     """One Haiku call → grounded connecting prose. Budget-gated (tier ≥ 2, matching
     state_of_matthew), fail-soft to the deterministic template on a tier pause, a
     Bedrock error, an empty response, or a failed ADR-104 grounding/causal check.
     Never regenerates — one call per day. `presence_block` (#967) is the shared
     quiet-stretch steering block; its numbers (e.g. the gap length) were handed to
-    the model, so they join the grounding allow-list — honest, never fabricated."""
+    the model, so they join the grounding allow-list — honest, never fabricated.
+
+    `presence_signal` (#2056) is the raw STATE#current record the block was rendered
+    from. It carries a real `last_log_date` per manual channel, which is what arms the
+    #1699 ungrounded-behavioral class here — for the day this episode NARRATES
+    (`facts["date"]`, the latest fully-computed day), not for wall-clock today. Coverage
+    is partial and declared: food/training/journal are answerable from that record,
+    steps and the eating window are not, and an unanswerable category is left UNKNOWN
+    rather than reported absent (a guessed map would flag every same-day claim, which is
+    how a gate gets switched off). Omitted ⇒ the class stays unarmed, unchanged."""
     try:
         from ai.budget_guard import allow
 
@@ -284,6 +310,8 @@ def narrate(facts: dict, presence_block: str = "") -> dict:
         facts=None,
         allowed=allowed,
         allowed_dates=allowed_dates(facts, presence_block or None),
+        # #2056: the #1699 behavioral class, keyed to the day being narrated.
+        available_logs=available_logs_from_presence(presence_signal, facts.get("date")) if presence_signal else None,
         **cycle_gate_params(),
     )
     causal_hits = _causal_language(text)
@@ -436,7 +464,10 @@ def lambda_handler(event: dict, context) -> dict:
         logger.warning("[debrief] %s has no computed facts — skipping", date_str)
         return {"statusCode": 200, "body": json.dumps({"date": date_str, "skipped": "no facts"})}
 
-    narration = narrate(facts, _presence_block())
+    # #967 + #2056: ONE engagement_state read feeds both the steering block and the
+    # #1699 availability map — the gate costs no extra query.
+    _sig = _presence_signal()
+    narration = narrate(facts, _presence_block(_sig), presence_signal=_sig)
     if dry_run:
         return {
             "statusCode": 200,

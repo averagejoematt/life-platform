@@ -75,6 +75,12 @@ CLEAN_FILES = [
     # #1993: the labs coach's fact-block builder — a stdlib-only leaf, clean from
     # birth (intelligence/ as a directory is not in the clean set).
     "lambdas/intelligence/labs_facts.py",
+    # #2056: the DATE#-recency helpers extracted from ai_expert_analyzer_lambda to
+    # make room under the 2,000-line handler cap. A stdlib-only leaf, clean from
+    # birth — named here for the same reason as labs_facts.py: intelligence/ globs
+    # are non-recursive, so an extracted module would otherwise LEAVE the mypy gate
+    # merely by being moved, which is the ratchet regression CLEAN_DIRS warns about.
+    "lambdas/intelligence/item_recency.py",
     # #1921: the qa-smoke result vocabulary (Check + partitions + EMF reporting).
     # A stdlib-only leaf, clean from birth — listed here because operational/ as a
     # DIRECTORY is not in the clean set and CLEAN_DIRS globs are non-recursive, so

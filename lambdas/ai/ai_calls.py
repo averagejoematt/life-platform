@@ -390,7 +390,7 @@ def call_anthropic(  # type: ignore[return]  # loop always returns text or the A
 # ==============================================================================
 
 
-def _ground_legacy_output(label, output, regen_fn, *allow_sources):
+def _ground_legacy_output(label, output, regen_fn, *allow_sources, available_logs=None):
     """ADR-104 / #966: the allow-list grounding gate + regen_once for the 4
     legacy daily-brief calls (Board of Directors, training+nutrition, journal
     coach, TL;DR) — previously the highest-frequency narrative surface with NO
@@ -409,6 +409,13 @@ def _ground_legacy_output(label, output, regen_fn, *allow_sources):
     step): a broken gate never blocks the brief, it only stops gating.
     The R17-16 outage sentinel passes through untouched — it contains no
     numbers and callers already handle it.
+
+    #2056: `available_logs` arms the #1699 ungrounded-behavioral class here too. These
+    four surfaces are the SAME daily-brief render coach-v2 gates, with the same `data`
+    dict in scope, so the map is the real `_available_logs_for_today` one — not a
+    default, and not a guess. Callers pass it explicitly (rather than this helper
+    reaching for a global) because two of the four are also called from the golden-eval
+    harness with hand-built payloads, where "I cannot see the logs" must stay sayable.
     """
     if not output or not isinstance(output, str) or _is_ai_unavailable(output):
         return output
@@ -423,7 +430,14 @@ def _ground_legacy_output(label, output, regen_fn, *allow_sources):
         _allowed_dates = _gg.allowed_dates(*allow_sources)
 
         def _findings_fn(_t):
-            return _gg.grounding_findings(_t, facts=None, allowed=_allowed, allowed_dates=_allowed_dates, **cycle_gate_params())
+            return _gg.grounding_findings(
+                _t,
+                facts=None,
+                allowed=_allowed,
+                allowed_dates=_allowed_dates,
+                available_logs=available_logs,
+                **cycle_gate_params(),
+            )
 
         _pre = _findings_fn(output)
         if _pre:
@@ -521,6 +535,8 @@ Respond in EXACTLY this JSON format, no other text:
             lambda _corr: call_anthropic(prompt + "\n\n" + _corr, api_key, max_tokens=500, system=shared_system, cache_system=False),
             prompt,
             shared_system,
+            # #2056: the #1699 behavioral class, armed on the same render coach-v2 uses.
+            available_logs=_available_logs_for_today(data, None, None),
         )
         cleaned = raw.strip()
         if cleaned.startswith("```"):
@@ -612,6 +628,9 @@ No labels, no formatting. Natural voice. Max 80 words total."""
             ),
             prompt,
             shared_system,
+            # #2056: journal presence comes from `data["journal_entries"]` — the exact
+            # list this coach writes from, so "you journaled today" is checkable here.
+            available_logs=_available_logs_for_today(data, None, None),
         )
     except Exception as e:
         print("[WARN] Journal coach failed: " + str(e))
@@ -938,6 +957,9 @@ DO NOT start with "Matthew". Max 60 words."""
         ),
         prompt,
         shared_system,
+        # #2056: the #1699 behavioral class — the BoD's "name the gap directly" rule is
+        # exactly the prompt that invites an unlogged completed-behavior claim.
+        available_logs=_available_logs_for_today(data, None, None),
     )
 
 
@@ -1169,6 +1191,9 @@ Respond in EXACTLY this JSON format, no other text:
             ),
             prompt,
             shared_system,
+            # #2056: the #1699 behavioral class. This surface's rules demand items that
+            # "could ONLY apply to TODAY", which is the same-day framing the gate reads.
+            available_logs=_available_logs_for_today(data, None, None),
         )
         cleaned = raw.strip()
         if cleaned.startswith("```"):
@@ -1588,7 +1613,19 @@ def _available_logs_for_today(data, brief, generation_date_iso):
     category left OUT here is what lets a same-day behavioral claim in that category
     trip the (advisory) finding. Conservative by design — a category is marked PRESENT
     whenever its source has recent data, so the gate errs toward NOT flagging.
-    Vocabulary matches the gate's `_UB_CLAIM_PATTERNS` categories.
+    Vocabulary matches the gate's `behavior_logs.LOG_CATEGORIES`.
+
+    This render is the one place with FULL category visibility (it loads garmin,
+    macrofactor, strava and the journal), which is why #1699 shipped armed here and
+    nowhere else. The set is returned bare rather than as a `LogAvailability`, and a
+    bare iterable IS the full-coverage contract (#2056) — the partial-coverage shape
+    exists for the surfaces that can only answer for some categories.
+
+    #2056: `brief` is now optional. The four LEGACY coach surfaces
+    (`_ground_legacy_output`) sit inside this same render with `data` in hand but no
+    `brief`, so journal presence falls back to `data["journal_entries"]` — the very
+    list `call_journal_coach` writes from. Without that fallback, arming those surfaces
+    would have reported "no journal log" on a day Matthew demonstrably journaled.
     """
     logs = set()
     data = data or {}
@@ -1599,7 +1636,7 @@ def _available_logs_for_today(data, brief, generation_date_iso):
         logs.add("nutrition")
     if data.get("strava_7d"):
         logs.add("workout")
-    if brief.get("journal_mood"):
+    if brief.get("journal_mood") or data.get("journal_entries"):
         logs.add("journal")
     # eating_window / fasting have no standalone source — mark present only when the
     # nutrition payload carries an explicit window signal, so a bare "you maintained

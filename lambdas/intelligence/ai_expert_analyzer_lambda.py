@@ -204,40 +204,15 @@ except ImportError:  # pragma: no cover — flat sys.path (tests)
 # flow moved there (one implementation for every surface), plus the allow-list
 # number gate that catches fabricated trends ("from 58 to 64" with no 58 anywhere).
 from ai import grounded_generation as _gg
+from ai.behavior_logs import available_logs_from_recency as _avail_logs  # #2056 — the #1699 map
 from ai.night_scope import nightly_vitals_from_facts as _night_map  # #1968
 
 from intelligence import weight_recency
 
-
-def _latest_date(items):
-    """Newest DATE# present in a list of records (by sk), or None."""
-    dates = [str(i.get("sk", ""))[5:15] for i in items if str(i.get("sk", "")).startswith("DATE#")]
-    return max(dates) if dates else None
-
-
-def _item_dates(items):
-    """Distinct DATE# days in a list of records (by sk)."""
-    return {str(i.get("sk", ""))[5:15] for i in items if str(i.get("sk", "")).startswith("DATE#")}
-
-
-def _recency_stats(day_strings, today):
-    """(days_since_last, count_last_14d) over a set/list of 'YYYY-MM-DD' days.
-
-    #914 — kills aggregate dilution: whole-experiment totals ("9 sessions across
-    4 weeks") can mask "0 in the last 15 days", so every domain snapshot carries
-    a per-domain recency read alongside its totals. (None, 0) when no days."""
-    days = sorted(d for d in (day_strings or ()) if d)
-    if not days:
-        return None, 0
-    try:
-        base = datetime.strptime(today, "%Y-%m-%d").date()
-        latest = datetime.strptime(days[-1], "%Y-%m-%d").date()
-        since = max(0, (base - latest).days)
-        floor_14 = (base - timedelta(days=14)).isoformat()
-        last_14 = sum(1 for d in days if d >= floor_14)
-        return since, last_14
-    except ValueError:
-        return None, 0
+# #2056 (ADR-080 §2): the DATE#-recency helpers moved to intelligence/item_recency.py so
+# this handler stays under its 2,000-line cap while the grounding wiring lands. Private
+# aliases preserved — every internal call site and test reads `_recency_stats` unchanged.
+from intelligence.item_recency import item_dates as _item_dates, latest_date as _latest_date, recency_stats as _recency_stats
 
 
 def _read_movement_ingest_health(sources=("strava", "garmin")):
@@ -1323,6 +1298,18 @@ def generate_and_cache(expert_key, shared_system=None):
                     generation_date_iso=_gen_date_iso,
                     start_date_iso=EXPERIMENT_START,
                     nightly_vitals=_night_map(_facts),  # #1968: the unlabeled "7.5-hour sleep"
+                    # #2056: the #1699 behavioral class. The map comes from the snapshot's
+                    # own `days_since_last_*` fields — computed by `_recency_stats` from the
+                    # rows THIS render already queried, so zero extra I/O and no guessing.
+                    # Coverage is per-expert and declared: the nutrition snapshot answers
+                    # for food and stays silent about training, the mind snapshot for
+                    # journal, training for lifts. A category the expert cannot see is left
+                    # UNKNOWN, never reported absent — which is what makes arming honest on
+                    # a surface with partial visibility instead of noise that gets a gate
+                    # switched off. Unlike coach-v2 this one is BLOCKING-ish by inheritance:
+                    # a finding rides the existing keep-if-strictly-improved `regen_once`,
+                    # which makes at most one rewrite no matter how many classes fired.
+                    available_logs=_avail_logs(data),
                 )
 
             def _regen(_correction):
