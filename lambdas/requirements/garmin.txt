@@ -16,15 +16,32 @@
 #   GARTH_LAYER_VERSION -> cdk deploy LifePlatformIngestion -> --promote back to here.
 #
 # ── BUILD TARGET — top-level pins the next build installs (spec, hand-edited there)
-#   layer-build-target: garminconnect==0.2.40
+#   layer-build-target: garminconnect==0.3.8
 #   layer-build-target: garth==0.6.3
 #   layer-build-platform: manylinux2014_x86_64 manylinux_2_28_x86_64 · cp312
 #
-# PYSEC-2026-3467 survives any 0.2.x rebuild (fix is 0.3.5, code-incompatible —
-# see #1780). Its threat model is a world-readable garmin_tokens.json on a
-# SHARED multi-user host; this lambda holds tokens in Secrets Manager and writes
-# only to per-invocation /tmp, so the exposure does not apply. Retiring it needs
-# the 0.3.x auth migration, tracked separately — not a layer rebuild.
+# PYSEC-2026-3467 is live on the DEPLOYED 0.2.40 and clears on the next rebuild
+# (#2101). Its threat model is a world-readable garmin_tokens.json on a SHARED
+# multi-user host, written by a `Client.dump(path)` this lambda never calls (it
+# holds tokens in Secrets Manager and sets no tokenstore path), so the exposure
+# does not apply — the rebuild is hygiene, not incident response.
+# 
+# 0.3.x adds three transitive packages the 0.2.x line did not carry —
+# curl_cffi, cffi, ua-generator — and drops the pydantic/oauthlib set. All
+# resolve to cp312 manylinux2014 wheels (checked 2026-08-06), so the platform
+# tags above still suffice. Expect the promoted package list below to change
+# shape, not just versions.
+# 
+# REBUILD SEQUENCE (owner, one sitting — the code side already merged):
+#   1. python3 deploy/build_lambda_layer.py build garth
+#   2. aws lambda publish-layer-version --layer-name garth-layer ...
+#   3. bump GARTH_LAYER_VERSION in cdk/stacks/constants.py
+#   4. bash deploy/cdk_deploy.sh LifePlatformIngestion
+#   5. python3 deploy/build_lambda_layer.py --promote garth --from-build
+#      <build.json> --layer-version <N>   (re-derives this manifest)
+#   6. aws lambda invoke --function-name garmin-data-ingestion --payload
+#      '{"healthcheck": true}'   — Garmin stays PAUSED (ADR-074); do not add
+#      an EventBridge rule. A real data run needs the whoop-style re-auth first.
 #
 # ── DEPLOYED — the full resolved contents of the LIVE layer version below.
 #   garth-layer:2, measured 2026-08-04 read-only via

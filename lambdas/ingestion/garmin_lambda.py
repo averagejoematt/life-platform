@@ -55,8 +55,15 @@ DynamoDB item:
 Auth pattern:
   First-auth runs interactively via setup_garmin_auth.py on local machine.
   OAuth tokens stored in Secrets Manager life-platform/garmin as JSON.
-  Lambda loads stored garth tokens, calls login() to resolve display_name,
+  Lambda loads stored garth tokens, resolves display_name from the profile API,
   and saves refreshed tokens back to keep them alive between daily runs.
+
+  #2101: this module is garminconnect-generation-agnostic. It runs unchanged on
+  the deployed 0.2.40 and on >= 0.3.5 (the PYSEC-2026-3467 fix), which renamed
+  the transport seam `Garmin.garth` -> `Garmin.client` and dropped garth. It
+  also prefers garminconnect 0.3.x's own DI auth when a token bundle exists
+  under `garmin_di_tokens` — inert today, since that bundle cannot be derived
+  from the garth tokens we hold. See ingestion/garmin_client.py.
 
 IAM role: lambda-garmin-ingestion-role
 Schedule: 9:30 AM PT daily (17:30 UTC)
@@ -252,11 +259,28 @@ def _should_refresh(token, fraction: float = 0.25) -> bool:
 
 
 # ── Garmin auth ────────────────────────────────────────────────────────────────
+# The garminconnect-generation seam (0.2.x `Garmin.garth` vs 0.3.x
+# `Garmin.client`) and the native 0.3.x DI-token path live in
+# ingestion/garmin_client.py — see that module's header for the measurements
+# behind #2101. Token loading, proactive refresh and the 429 breaker stay here:
+# they are garth-lifecycle concerns, not client construction.
+from ingestion.garmin_client import attach_transport, native_garmin_client as _native_garmin_client, resolve_display_name
+
+
+def native_garmin_client(secret: dict):
+    """Thin seam over garmin_client.native_garmin_client that injects this
+    module's save_secret. Resolved at call time, so patching save_secret here
+    still reaches the writeback."""
+    return _native_garmin_client(secret, save_secret)
+
+
 def get_garmin_client(secret: dict):
     """
     Initialise garminconnect.Garmin using stored OAuth tokens from Secrets Manager.
 
-    Supports two token formats:
+    Prefers garminconnect 0.3.x's native DI auth when a bundle exists under
+    NATIVE_TOKEN_KEY (see native_garmin_client). Otherwise falls back to the
+    garth-backed path, which supports two token formats:
       1. Browser-auth (2026+): garth_tokens contains JSON with oauth1/oauth2 objects.
          Written by setup_garmin_browser_auth.py. Loaded via garth.resume() from /tmp.
       2. Legacy: garth_tokens contains garth.client.dumps() blob.
@@ -266,6 +290,10 @@ def get_garmin_client(secret: dict):
     and Garmin blocks programmatic SSO since March 2026).
     If tokens are expired, re-run setup_garmin_browser_auth.py locally.
     """
+    native = native_garmin_client(secret)
+    if native is not None:
+        return native
+
     import garth
     from garminconnect import Garmin
 
@@ -384,33 +412,15 @@ def get_garmin_client(secret: dict):
 
     _save_tokens()
 
-    # ── Wire garth into garminconnect ──
+    # ── Wire garth into garminconnect (generation-agnostic seam, #2101) ──
     api = Garmin()
-    api.garth = garth.client
+    seam = attach_transport(api, garth.client)
+    logger.info(f"garth transport attached via Garmin.{seam}")
 
     # ── Resolve display_name ──
-    # Prefer pre-stored display_name from browser auth
-    if secret.get("display_name"):
-        api.display_name = secret["display_name"]
-        logger.info("display_name resolved from stored secret")
-    else:
-        for profile_path in [
-            "/userprofile-service/socialProfile",
-            "/userprofile-service/userdisplayname",
-        ]:
-            try:
-                profile = garth.client.connectapi(profile_path)
-                name = None
-                if isinstance(profile, dict):
-                    name = profile.get("displayName") or profile.get("userName") or profile.get("fullName")
-                elif isinstance(profile, str):
-                    name = profile.strip()
-                if name:
-                    api.display_name = name
-                    logger.info(f"Resolved display_name: {name} (from {profile_path})")
-                    break
-            except Exception as e:
-                logger.info(f"Profile path {profile_path} failed: {e}")
+    # Read through garth directly: on 0.3.x the injected proxy is what api.client
+    # points at, and this call is identical either way.
+    resolve_display_name(api, garth.client.connectapi, secret)
 
     if not api.display_name:
         raise RuntimeError(

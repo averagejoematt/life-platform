@@ -174,25 +174,48 @@ LAYERS: dict[str, LayerSpec] = {
         layer_name="garth-layer",
         version_constant="GARTH_LAYER_VERSION",
         manifest="garmin.txt",
-        # TARGET: 0.2.40 is ALREADY the newest 0.2.x — there is no in-series upgrade.
-        # garminconnect 0.2.40 declares `garth<0.7.0,>=0.5.17`, and 0.6.3 is the newest
-        # garth under that ceiling, so the two top-level pins are pinned at their maxima.
-        # PYSEC-2026-3467 (CVE-2026-54447) is therefore NOT fixable by a rebuild: its fix
-        # lands in garminconnect 0.3.5, which drops garth for its own curl_cffi client and
-        # AttributeErrors on this lambda's `api.garth = garth.client` auth path (#1780).
-        # A rebuild is still worth doing: it refreshes the TWELVE transitive packages the
-        # manifest never listed, clearing idna PYSEC-2026-215 and urllib3
-        # PYSEC-2026-142/141 (6 advisories -> 1).
-        requirements=("garminconnect==0.2.40", "garth==0.6.3"),
+        # TARGET (#2101): garminconnect 0.3.8 — the first line that is OUTSIDE
+        # PYSEC-2026-3467 (CVE-2026-54447), whose affected range is `< 0.3.5` (measured
+        # from OSV, 2026-08-06). The prior note here said the fix was "code-incompatible";
+        # that was measured against the OLD lambda. #2101 made lambdas/ingestion/
+        # garmin_lambda.py generation-agnostic, so the incompatibility is gone: 0.3.x
+        # renamed the transport seam `Garmin.garth` -> `Garmin.client`, and all 13 reads
+        # this lambda makes funnel through one `connectapi(path, **kwargs)` call that
+        # garth 0.6.3's Client already satisfies.
+        #
+        # garth stays pinned and stays in the layer. 0.3.x no longer declares it, but the
+        # lambda still authenticates through it: 0.3.x's own DI token family is NOT
+        # derivable from the OAuth1/OAuth2 bundle in Secrets Manager (measured — its
+        # `Client.loads()` rejects the garth bundle outright), and re-minting one needs an
+        # interactive re-auth against a vendor mid anti-automation crackdown (ADR-074).
+        # 0.6.3 is retained rather than raised so this rebuild changes exactly one thing.
+        requirements=("garminconnect==0.3.8", "garth==0.6.3"),
         attached_to=("garmin-data-ingestion",),
         purpose="garminconnect + garth — Garmin Connect OAuth and biometric/activity pulls.",
         stack="LifePlatformIngestion",
         notes=(
-            "PYSEC-2026-3467 survives any 0.2.x rebuild (fix is 0.3.5, code-incompatible —",
-            "see #1780). Its threat model is a world-readable garmin_tokens.json on a",
-            "SHARED multi-user host; this lambda holds tokens in Secrets Manager and writes",
-            "only to per-invocation /tmp, so the exposure does not apply. Retiring it needs",
-            "the 0.3.x auth migration, tracked separately — not a layer rebuild.",
+            "PYSEC-2026-3467 is live on the DEPLOYED 0.2.40 and clears on the next rebuild",
+            "(#2101). Its threat model is a world-readable garmin_tokens.json on a SHARED",
+            "multi-user host, written by a `Client.dump(path)` this lambda never calls (it",
+            "holds tokens in Secrets Manager and sets no tokenstore path), so the exposure",
+            "does not apply — the rebuild is hygiene, not incident response.",
+            "",
+            "0.3.x adds three transitive packages the 0.2.x line did not carry —",
+            "curl_cffi, cffi, ua-generator — and drops the pydantic/oauthlib set. All",
+            "resolve to cp312 manylinux2014 wheels (checked 2026-08-06), so the platform",
+            "tags above still suffice. Expect the promoted package list below to change",
+            "shape, not just versions.",
+            "",
+            "REBUILD SEQUENCE (owner, one sitting — the code side already merged):",
+            "  1. python3 deploy/build_lambda_layer.py build garth",
+            "  2. aws lambda publish-layer-version --layer-name garth-layer ...",
+            "  3. bump GARTH_LAYER_VERSION in cdk/stacks/constants.py",
+            "  4. bash deploy/cdk_deploy.sh LifePlatformIngestion",
+            "  5. python3 deploy/build_lambda_layer.py --promote garth --from-build",
+            "     <build.json> --layer-version <N>   (re-derives this manifest)",
+            "  6. aws lambda invoke --function-name garmin-data-ingestion --payload",
+            "     '{\"healthcheck\": true}'   — Garmin stays PAUSED (ADR-074); do not add",
+            "     an EventBridge rule. A real data run needs the whoop-style re-auth first.",
         ),
     ),
     "lameenc": LayerSpec(
