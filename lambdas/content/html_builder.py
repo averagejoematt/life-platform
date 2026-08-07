@@ -11,6 +11,7 @@ Exports:
 """
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 
@@ -21,8 +22,10 @@ try:
 except ImportError:
     _HAS_CONFIDENCE = False
 
-    def compute_confidence(**kw):
-        return {"level": "MEDIUM", "reason": "digest_utils unavailable", "badge_html": ""}
+    if not TYPE_CHECKING:  # mypy sees ONE signature (the import); runtime unchanged (#1656)
+
+        def compute_confidence(**kw):
+            return {"level": "MEDIUM", "reason": "digest_utils unavailable", "badge_html": ""}
 
 
 # ==============================================================================

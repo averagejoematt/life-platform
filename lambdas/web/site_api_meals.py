@@ -11,6 +11,7 @@ site_api_common (identical binding semantics to the pre-split facade).
 
 import json
 from datetime import datetime, timezone
+from typing import Any
 
 from web.site_api_common import (
     CORS_HEADERS,
@@ -39,7 +40,7 @@ def protein_sources(*, _g) -> dict:
     from collections import defaultdict
 
     # Aggregate protein contribution by food name
-    food_protein = defaultdict(lambda: {"total_protein": 0.0, "frequency": 0, "total_cal": 0.0})
+    food_protein: dict[str, dict[str, float]] = defaultdict(lambda: {"total_protein": 0.0, "frequency": 0, "total_cal": 0.0})
     days_count = len(items)
 
     for day in items:
@@ -106,8 +107,8 @@ def frequent_meals(*, _g) -> dict:
 
     try:
         items = _query_source("macrofactor", start_date, end_date)
-        meal_counts = Counter()
-        meal_macros = defaultdict(lambda: {"cal": 0, "protein": 0, "carbs": 0, "fat": 0, "count": 0})
+        meal_counts: Counter[str] = Counter()
+        meal_macros: dict[str, dict[str, float]] = defaultdict(lambda: {"cal": 0, "protein": 0, "carbs": 0, "fat": 0, "count": 0})
 
         for day in items:
             food_log = day.get("food_log") or []
@@ -175,7 +176,7 @@ def meal_glucose(*, _g) -> dict:
                 daily_glucose[date] = {"avg": avg, "peak": peak, "baseline": baseline, "tir": tir}
 
         # Aggregate meals with glucose context
-        meal_data = defaultdict(
+        meal_data: dict[str, dict[str, Any]] = defaultdict(
             lambda: {"cal": 0, "protein": 0, "carbs": 0, "count": 0, "spike_sum": 0, "spike_count": 0, "category": "meal"}
         )
 
@@ -290,8 +291,8 @@ def food_delivery_overview(*, _g) -> dict:
 
     total_orders = len(items)
     total_spend = sum(float(i.get("amount") or 0) for i in items)
-    platform_counts = Counter()
-    weekly_counts = defaultdict(int)
+    platform_counts: Counter[str] = Counter()
+    weekly_counts: dict[str, int] = defaultdict(int)
     binge_days = 0
 
     for i in items:

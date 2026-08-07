@@ -358,7 +358,7 @@ def build_reference(idx, vals, episodes, activities, hevy_sets_by_date: dict) ->
     pos = {d: i for i, d in enumerate(idx)}
     # By-band covariates over the reference window (10-lb bands).
     bands = {}
-    band_acts = {}
+    band_acts: dict[str, list[str]] = {}
     for i, dd in enumerate(idx):
         if not (rstart <= dd <= rend):
             continue
@@ -467,7 +467,7 @@ def _load_inputs() -> tuple:
             if kind:
                 activities.append({"date": d, "kind": kind, "hours": (_f(a.get("moving_time_seconds")) or 0.0) / 3600.0})
 
-    hevy_sets_by_date = {}
+    hevy_sets_by_date: dict[str, float] = {}
     for it in _read_all_history("hevy"):
         d = _sk_date(it)
         sets = _f(it.get("set_count")) or _f(it.get("total_sets")) or 0.0

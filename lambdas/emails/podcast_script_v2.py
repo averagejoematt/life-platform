@@ -24,6 +24,7 @@ to v1: the show never dies to an upgrade.
 
 import json
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING, Any
 
 from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
 
@@ -31,7 +32,8 @@ from ai.ai_context import build_experiment_phase_context, format_experiment_phas
 try:
     from emails.panelcast_zeitgeist import zeitgeist_prompt_block
 except ImportError:  # bundle stages lambdas/ at the zip root
-    from panelcast_zeitgeist import zeitgeist_prompt_block
+    if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
+        from panelcast_zeitgeist import zeitgeist_prompt_block
 
 SHOW_MEMORY_SK = "SHOW#memory"
 MAX_CALLBACKS = 10
@@ -42,7 +44,7 @@ TURN_CAP = 22
 def load_show_memory(table, user_id, logger) -> dict:
     """The episode-memory ledger — callbacks + guest history. Absence = empty
     memory (seeded on the first v2 publish), never an error."""
-    memory = {"callbacks": [], "guest_history": []}
+    memory: dict[str, list[dict[str, Any]]] = {"callbacks": [], "guest_history": []}
     try:
         it = table.get_item(Key={"pk": f"USER#{user_id}#SOURCE#panelcast", "sk": SHOW_MEMORY_SK}).get("Item")
         if it:

@@ -124,7 +124,7 @@ def _gather_facts(table, coach_id: str, quarter: str):
     if not learnings:
         return None  # nothing graded this quarter yet — nothing real to reckon with
 
-    by_outcome = {}
+    by_outcome: dict[str, int] = {}
     for item in learnings:
         status = item.get("status", "unknown")
         by_outcome[status] = by_outcome.get(status, 0) + 1

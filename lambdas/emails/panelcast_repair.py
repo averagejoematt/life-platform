@@ -26,11 +26,13 @@ state, so the lambda stays the single owner of its boto3 clients and tests run o
 
 import json
 import os
+from typing import TYPE_CHECKING
 
 try:
     from emails.panelcast_qa import _QA_HOOK_MAX_WORDS, _QA_MAX_CONSECUTIVE, _QA_MAX_WORDS_PER_TURN, structural_seams
 except ImportError:  # bundle stages lambdas/ at the zip root
-    from panelcast_qa import _QA_HOOK_MAX_WORDS, _QA_MAX_CONSECUTIVE, _QA_MAX_WORDS_PER_TURN, structural_seams
+    if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
+        from panelcast_qa import _QA_HOOK_MAX_WORDS, _QA_MAX_CONSECUTIVE, _QA_MAX_WORDS_PER_TURN, structural_seams
 
 # #1172: the fixed attempt budget — panelcast_qa._QA_MAX_ATTEMPTS generations, each with
 # up to MAX_REVISIONS judge-feedback revisions. Exhaustion escalates; never a silent miss.

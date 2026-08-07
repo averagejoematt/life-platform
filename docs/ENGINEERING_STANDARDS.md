@@ -77,10 +77,12 @@ public platform's stated postures*," not "A for a 50-engineer org."
   naming idiom, same structure. Consistency beats personal preference.
 
 ### 4. Trustworthy gates (D4)
-- **Types mean something.** The target end-state is mypy strict-clean across `lambdas/`, `mcp/`,
-  `web/` with an **empty global `disable_error_code`** list; the clean-module test
-  (`tests/test_mypy_clean_modules.py`) covers the whole first-party surface. New code is written
-  type-clean; it does not add to a disable list.
+- **Types mean something.** The clean-module test (`tests/test_mypy_clean_modules.py`) covers
+  **the whole first-party surface** — every package under `lambdas/` plus `mcp/`, with an empty
+  denylist and no per-module `ignore_errors` (#1656). The remaining end-state is an **empty
+  global `disable_error_code`** list plus `check_untyped_defs`/`warn_return_any` on; the current
+  census for each is recorded in `mypy.ini`. New code is written type-clean; it does not add to
+  a disable list, re-add a module to the denylist, or introduce a per-module `ignore_errors`.
 - **No blanket waivers.** No directory-wide lint suppression (`ruff "<dir>/*" = [...]`) and no
   whole-dir `.flake8` excludes. A genuine registration/import pattern uses a **per-line `# noqa:<code>`
   with a reason**, at the specific site.
@@ -145,8 +147,9 @@ philosophy as the existing `reconcile` / doc-sync anti-drift machinery, extended
   file or carries a registered top-of-file exception comment (D2).
 - **Coverage up-only guard** — `--cov-fail-under` may rise, never fall; a PR that lowers measured
   coverage below the floor fails (D4/D8).
-- **mypy clean-set guard** — `tests/test_mypy_clean_modules.py` covers a set that only grows; a
-  PR may not shrink it or add a global disable code (D4).
+- **mypy clean-set guard** — `tests/test_mypy_clean_modules.py` covers the whole first-party
+  surface (empty denylist since #1656); a PR may not shrink it, re-add a denylist entry, add a
+  per-module `ignore_errors`, or add a global disable code (D4).
 
 ---
 

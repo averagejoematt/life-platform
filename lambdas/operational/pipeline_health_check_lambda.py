@@ -85,7 +85,7 @@ BEST_EFFORT_SOURCES = best_effort_source_ids()
 # Per-source attempt-gap overrides (minutes). Unlisted sources use the default in
 # ingest_health (~26h). Garmin runs only 4x/day but still attempts daily, so the
 # default holds; this map exists for future sources with sparser-than-daily cadence.
-SOURCE_MAX_GAP_MINUTES = {}
+SOURCE_MAX_GAP_MINUTES: dict[str, int] = {}
 
 try:
     from ingestion.ingest_health import SYSTEM_PK, evaluate_source_health

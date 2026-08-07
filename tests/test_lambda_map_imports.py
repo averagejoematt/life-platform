@@ -165,6 +165,28 @@ def _catches_import_error(try_node: ast.Try) -> bool:
     return False
 
 
+def _is_type_checking_guard(node: ast.AST) -> bool:
+    """True for `if not TYPE_CHECKING:` — the ONE wrapper this check sees through.
+
+    #1656 wraps the flat-import fallback of every dual-import in `if not TYPE_CHECKING:`
+    so mypy sees a single canonical module name (and a single function signature) while
+    runtime behaviour is unchanged: TYPE_CHECKING is False at runtime, so the body always
+    executes exactly as before. Treating it as transparent keeps this guard's meaning —
+    "this import only runs as a fallback" — instead of the wrapper reading as a new,
+    unguarded import. Deliberately narrow: only `not TYPE_CHECKING` qualifies, not any
+    other condition, so an import genuinely hidden behind a runtime flag still fails.
+    """
+    if not isinstance(node, ast.If):
+        return False
+    test = node.test
+    return (
+        isinstance(test, ast.UnaryOp)
+        and isinstance(test.op, ast.Not)
+        and isinstance(test.operand, ast.Name)
+        and test.operand.id == "TYPE_CHECKING"
+    )
+
+
 def _is_guarded(node: ast.AST, parents: dict) -> bool:
     """Is this Import/ImportFrom an intentionally-optional dependency?
 
@@ -176,8 +198,12 @@ def _is_guarded(node: ast.AST, parents: dict) -> bool:
       2. The import is a direct statement of a `try:` body whose handler(s)
          explicitly catch ImportError/ModuleNotFoundError (not a bare/Exception
          catch-all).
+    A single `if not TYPE_CHECKING:` wrapper is transparent for both (see
+    _is_type_checking_guard) — it changes what mypy sees, never what runs.
     """
     parent = parents.get(node)
+    if _is_type_checking_guard(parent):
+        parent = parents.get(parent)
     if isinstance(parent, ast.ExceptHandler):
         return True
     if isinstance(parent, ast.Try) and node in parent.body and _catches_import_error(parent):

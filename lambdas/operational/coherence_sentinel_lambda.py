@@ -25,6 +25,7 @@ import logging
 import os
 import urllib.request
 from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -83,9 +84,10 @@ V2_COACHES = [
 try:
     from experiment.phase_filter import with_phase_filter
 except ImportError:  # pragma: no cover
+    if not TYPE_CHECKING:  # mypy sees ONE signature (the import); runtime unchanged (#1656)
 
-    def with_phase_filter(kwargs, include_pilot=False):
-        return kwargs
+        def with_phase_filter(kwargs, include_pilot=False):
+            return kwargs
 
 
 def _today():

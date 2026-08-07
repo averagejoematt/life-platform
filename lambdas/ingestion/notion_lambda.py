@@ -52,6 +52,7 @@ import logging
 import os
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from typing import Any
 from urllib.error import HTTPError
 from urllib.request import Request
 
@@ -144,7 +145,7 @@ table = dynamodb.Table(TABLE_NAME)
 s3_client = boto3.client("s3", region_name="us-west-2")
 
 # COST-OPT-1: Cache secrets in warm Lambda containers (15-min TTL)
-_secret_cache = {}
+_secret_cache: dict[str, tuple[Any, float]] = {}
 
 
 def _cached_secret(client, secret_id):

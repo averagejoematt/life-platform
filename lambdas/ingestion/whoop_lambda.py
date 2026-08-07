@@ -29,6 +29,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from typing import TYPE_CHECKING, Any
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -49,9 +50,10 @@ except ImportError:  # pragma: no cover — layer-module fallback (local tooling
 try:
     from common.auth_breaker import mark_as_auth_failure
 except ImportError:  # pragma: no cover — layer-module fallback (local tooling)
+    if not TYPE_CHECKING:  # mypy sees ONE signature (the import); runtime unchanged (#1656)
 
-    def mark_as_auth_failure(exc):
-        return exc
+        def mark_as_auth_failure(exc):
+            return exc
 
 
 from common.pacific_time import parse_iso_utc  # #1964: THE ISO parser (naive input == UTC, never runner-local)
@@ -237,7 +239,7 @@ def _round(value, decimals):
 
 
 def _extract_recovery(recovery: dict) -> dict:
-    fields = {}
+    fields: dict[str, Any] = {}
     records = recovery.get("records", [])
     if not records:
         return fields
@@ -256,7 +258,7 @@ def _extract_recovery(recovery: dict) -> dict:
 
 
 def _extract_sleep(sleep: dict) -> dict:
-    fields = {}
+    fields: dict[str, Any] = {}
     records = sleep.get("records", [])
     main = next((r for r in records if not r.get("nap", False)), None)
     if not main or main.get("score_state") != "SCORED":
@@ -315,7 +317,7 @@ def _extract_sleep(sleep: dict) -> dict:
 
 
 def _extract_cycle(cycle: dict) -> dict:
-    fields = {}
+    fields: dict[str, Any] = {}
     records = cycle.get("records", [])
     if not records or records[0].get("score_state") != "SCORED":
         return fields

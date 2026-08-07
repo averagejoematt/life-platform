@@ -33,6 +33,7 @@ import os
 import time
 import urllib.parse
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 import boto3
 
@@ -95,7 +96,7 @@ def _scrub(text: str) -> str:
 def gather_digest() -> dict:
     """Assemble the between-chronicle content. Every value is read verbatim
     from a record a public endpoint already serves."""
-    digest = {"deltas": [], "unlocked": [], "decided": [], "stance_shifts": []}
+    digest: dict[str, list[Any]] = {"deltas": [], "unlocked": [], "decided": [], "stance_shifts": []}
 
     # 1. Monthly motion — the /api/what_changed record.
     try:
@@ -237,7 +238,7 @@ def build_email(digest: dict, sub_email: str) -> tuple:
 
 
 def _get_confirmed_subscribers() -> list:
-    confirmed = []
+    confirmed: list[dict[str, Any]] = []
     kwargs = {
         "KeyConditionExpression": "pk = :pk",
         "FilterExpression": "#s = :confirmed",

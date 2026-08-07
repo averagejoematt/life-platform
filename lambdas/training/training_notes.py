@@ -32,6 +32,7 @@ import hashlib
 import re
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from typing import TYPE_CHECKING, Any
 
 # pk SOURCE partition is `training_notes`; the projection's `source` label is the
 # locked `training_feedback_loop` (§13). Two names, deliberately (see brief §5 vs §13).
@@ -130,17 +131,18 @@ _LOAD_RE = re.compile(r"\b(\d{1,4}(?:\.\d+)?)\s*(lbs?|kg|kilos?|pounds?)\b", re.
 try:
     from common.numeric import floats_to_decimal
 except ImportError:  # pragma: no cover - layer always provides numeric
+    if not TYPE_CHECKING:  # mypy sees ONE signature (the import); runtime unchanged (#1656)
 
-    def floats_to_decimal(obj):
-        if isinstance(obj, bool):
+        def floats_to_decimal(obj):
+            if isinstance(obj, bool):
+                return obj
+            if isinstance(obj, float):
+                return Decimal(str(obj))
+            if isinstance(obj, dict):
+                return {k: floats_to_decimal(v) for k, v in obj.items()}
+            if isinstance(obj, list):
+                return [floats_to_decimal(i) for i in obj]
             return obj
-        if isinstance(obj, float):
-            return Decimal(str(obj))
-        if isinstance(obj, dict):
-            return {k: floats_to_decimal(v) for k, v in obj.items()}
-        if isinstance(obj, list):
-            return [floats_to_decimal(i) for i in obj]
-        return obj
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -278,7 +280,8 @@ def extract_signals(note_text: str, llm_fn=None) -> dict:
     raw = note_text or ""
     det = deterministic_pass(raw)
     pain_det = pain_lexicon_hit(raw)
-    llm, degraded, used_llm = [], False, False
+    llm: list[dict[str, Any]] = []
+    degraded, used_llm = False, False
     if llm_fn is not None:
         try:
             llm = llm_fn(raw, TAXONOMY) or []

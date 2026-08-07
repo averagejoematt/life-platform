@@ -1,144 +1,85 @@
 """Single source of truth for the mypy clean-module gate (#1656, eng-excellence #1648).
 
-The clean set is the WHOLE first-party shared-engine + serving + MCP surface —
-``lambdas/*.py``, ``lambdas/web/*.py`` and ``mcp/*.py`` (non-recursive) — MINUS a
-small, explicitly-documented ``DIRTY`` denylist. This is a ratchet: the denylist
-only shrinks (the clean set only grows). A newly-added top-level module is covered
-automatically and must pass mypy under ``mypy.ini`` or be added to ``DIRTY``
-with a reason in review.
+The clean set is now **the whole first-party Python surface**: every package under
+``lambdas/`` plus ``mcp/``, with an EMPTY ``DIRTY`` denylist. Nothing first-party is
+excluded from the type gate any more — a green mypy run covers all of it.
 
 Both consumers read this list so they can never drift:
   * ``tests/test_mypy_clean_modules.py`` (gating in the Test job)
-  * the ci-cd.yml "Mypy gate" step: ``python -m mypy --config-file mypy.ini
+  * the ci-lint.yml "Mypy gate" step: ``python -m mypy --config-file mypy.ini
     $(python tests/mypy_clean_set.py)``
 
-Scope note: the disable_error_code list in mypy.ini is being emptied
-incrementally (#1656 landed 10 of the original 14 codes; the mcp/ ratchet step
-added return/attr-defined/index. Four structural codes —
-assignment/arg-type/return-value/operator — plus check_untyped_defs/warn_return_any
-remain, each documented in mypy.ini). The clean set is "clean under the CURRENT
-mypy.ini", so it grows again with each future code the config removes.
+Scope note (the OTHER #1656 axis, still open): mypy.ini's ``disable_error_code`` list
+still carries four structural codes — assignment / arg-type / return-value / operator —
+and ``check_untyped_defs``/``warn_return_any`` are still False. "Clean" here means
+"clean under the CURRENT mypy.ini". Emptying those is a separate, measured tranche
+(census in the #1656 PR body); it is guarded up-only by
+``tests/test_mypy_clean_modules.py::test_global_disable_list_only_shrinks``.
 """
 
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# Directories whose top-level *.py form the clean surface (non-recursive:
-# subpackages like emails/, intelligence/, compute/, ingestion/ still have
-# unresolved cross-Lambda flat-copy imports and are a later ratchet step).
-# ``mcp`` (the ~37-module MCP tool package) joined the clean surface with the
-# #1656 mcp/ ratchet step: its Lambda-bundle dual-import fallbacks
-# (``except ImportError: from lambdas import X``) are guarded behind
-# ``if not TYPE_CHECKING:`` so mypy sees one canonical module name (no
-# "source file found twice") while runtime behavior is unchanged.
+# Directories whose top-level *.py form the clean surface.
 #
-# #1653 packaging: each domain subpackage carved out of the flat root is added here
-# in the SAME slice that creates it. These globs are non-recursive, so omitting the
-# new directory would silently shrink the clean surface — a module would leave the
-# mypy gate merely by being moved, which is exactly the ratchet regression this file
-# exists to prevent. Moving code must never reduce coverage.
+# ⚠️ These globs are NON-RECURSIVE. A new package under ``lambdas/`` that is not listed
+# here contributes ZERO modules to the gate — code would leave the type gate merely by
+# being moved (the #1653 packaging trap). ``tests/test_mypy_clean_modules.py::
+# test_every_first_party_package_is_in_the_clean_set`` now derives the real directory
+# set from the filesystem and fails if one is missing, so the omission cannot be silent.
 CLEAN_DIRS = [
-    "lambdas",
     "lambdas/ai",
     "lambdas/coach",
     "lambdas/common",
+    "lambdas/compute",
     "lambdas/content",
+    "lambdas/emails",
     "lambdas/experiment",
     "lambdas/health",
+    "lambdas/ingestion",
+    "lambdas/intelligence",
+    "lambdas/operational",
     "lambdas/privacy",
+    "lambdas/reading",
     "lambdas/training",
     "lambdas/web",
     "mcp",
 ]
 
-# Individual modules that belong to the clean surface but whose DIRECTORY does not.
-#
-# #1653's last slice moved eight shared modules into ingestion/, operational/ and
-# intelligence/ — subpackages that have never been in the clean set (they still carry
-# the unresolved cross-Lambda flat-copy imports named above, a later ratchet step that
-# #1656 deliberately deferred). Adding those three directories to CLEAN_DIRS to keep
-# the eight covered would have dragged in ~40 unrelated pre-existing modules and 39
-# pre-existing errors — scope this refactor has no business taking on, and debt it
-# would have looked like it created.
-#
-# Dropping them instead would have quietly shrunk the gate, which is the exact
-# regression the CLEAN_DIRS note above exists to prevent. So they are listed
-# individually: moving a module changes neither its coverage nor its neighbours'.
-CLEAN_FILES = [
-    "lambdas/ingestion/ingest_health.py",
-    "lambdas/ingestion/ingestion_framework.py",
-    "lambdas/ingestion/ingestion_validator.py",
-    "lambdas/ingestion/source_registry.py",
-    "lambdas/ingestion/source_state.py",
-    "lambdas/intelligence/intelligence_common.py",
-    # #1993: the labs coach's fact-block builder — a stdlib-only leaf, clean from
-    # birth (intelligence/ as a directory is not in the clean set).
-    "lambdas/intelligence/labs_facts.py",
-    # #2056: the DATE#-recency helpers extracted from ai_expert_analyzer_lambda to
-    # make room under the 2,000-line handler cap. A stdlib-only leaf, clean from
-    # birth — named here for the same reason as labs_facts.py: intelligence/ globs
-    # are non-recursive, so an extracted module would otherwise LEAVE the mypy gate
-    # merely by being moved, which is the ratchet regression CLEAN_DIRS warns about.
-    "lambdas/intelligence/item_recency.py",
-    # #1921: the qa-smoke result vocabulary (Check + partitions + EMF reporting).
-    # A stdlib-only leaf, clean from birth — listed here because operational/ as a
-    # DIRECTORY is not in the clean set and CLEAN_DIRS globs are non-recursive, so
-    # a new module there silently leaves the gate unless it is named.
-    "lambdas/operational/qa_check.py",
-    # #1993: the coach-labs-truth check pair (split from qa_smoke_lambda per the
-    # module-size ceiling idiom) — clean from birth, named for the same reason.
-    "lambdas/operational/qa_check_coach_labs.py",
-    # #2051: the canary's check→severity-lane registry (what gates a rollback
-    # vs. what only alarms). A stdlib-only leaf, clean from birth — named for
-    # the same reason as qa_check.py above (operational/ globs are non-recursive).
-    "lambdas/operational/canary_lanes.py",
-    # #1949: the raw-archive liveness check — clean from birth, named for the
-    # same reason as qa_check.py above (operational/ globs are non-recursive).
-    "lambdas/operational/raw_archive_qa.py",
-    "lambdas/operational/reader_truth_qa.py",
-    "lambdas/operational/redirect_spotcheck.py",
-]
+# Individual modules whose DIRECTORY is not in CLEAN_DIRS. Empty since #1656's
+# whole-surface step: every first-party package is now listed above, so there is
+# nothing left to name one-by-one. Kept as the escape hatch for a future module
+# that genuinely lives outside those trees.
+CLEAN_FILES: list[str] = []
 
-# Modules that do NOT yet pass under mypy.ini. Each MUST carry a reason. This
-# denylist only shrinks. Paths are repo-root-relative.
-DIRTY = {
-    # 3rd-party module with no stubs / unresolved sibling-Lambda imports
-    # (import-not-found). Would need an ignore_missing_imports section.
-    "lambdas/ai/audio_encode.py",  # imports lameenc (no type stubs)
-    "lambdas/coach/coach_correction_resolver.py",  # imports ai_review_pack_lambda (sibling lambda, unresolved from root)
-    # residual disabled-code / structural violations (need a dedicated pass):
-    "lambdas/privacy/broadcast_sensitivity_gate.py",  # union-attr
-    "lambdas/content/html_builder.py",  # misc
-    "lambdas/health/meal_projection.py",  # misc
-    "lambdas/training/training_notes.py",  # misc + var-annotated
-    # platform_logger's Logger subclass narrows msg: object -> str on every
-    # level method (LSP-violating override x6). Widely imported; fixing it is a
-    # shared-layer change tracked separately (see #419 / this file's history).
-    "lambdas/common/platform_logger.py",  # override (x6)
-    # The 3,000-line endpoint handlers — explicitly OUT of scope (var-annotated
-    # + misc + call-overload); the next ratchet step, not attempted here.
-    "lambdas/web/site_api_data.py",
-    # #1654 slice 3: site_api_observatory.py is now a mypy-clean facade (dropped from
-    # this denylist — the ratchet tightening). Its handler bodies moved verbatim into
-    # these cohesive siblings, carrying their pre-existing var-annotated debt with them
-    # (relocation, not new debt — the same next-ratchet-step as site_api_data).
-    "lambdas/web/site_api_nutrition.py",
-    "lambdas/web/site_api_meals.py",
-    "lambdas/web/site_api_training.py",
-    "lambdas/web/site_api_physical.py",
-    "lambdas/web/site_api_mind.py",
-}
+# Modules that do NOT pass under mypy.ini. **EMPTY since #1656's whole-surface step.**
+# This denylist only ever shrinks — re-adding an entry means a module regressed out of
+# the gate, which review should treat as a revert-or-fix, not a config change. What the
+# last thirteen entries needed, for the record:
+#   * the Lambda-bundle dual-import fallbacks (``except ImportError: import <flat>``)
+#     got the ``if not TYPE_CHECKING:`` guard the mcp/ step established, so mypy sees
+#     one canonical module name and one function signature — runtime unchanged;
+#   * empty-container declarations got element types (annotation only, no runtime change);
+#   * ``lameenc``/``garth``/``garminconnect``/``openpyxl`` got scoped
+#     ``ignore_missing_imports`` sections in mypy.ini — unstubbed third-party libs are a
+#     stub gap, never a reason to blanket-ignore one of OUR modules;
+#   * ``common/platform_logger.py``'s six LSP-violating overrides were fixed at the
+#     source: ``msg: str`` widened to ``msg: object``, which is what ``logging.Logger``
+#     itself declares (str is an object, so no caller changed).
+DIRTY: set[str] = set()
 
 # Crown-jewel modules that must ALWAYS be in the clean set (a guard against the
 # glob logic silently dropping them). Budget/auth/inference core + the split AI
-# modules + the tier-2 serving helpers.
+# modules + the tier-2 serving helpers + the formerly-DIRTY endpoint handlers.
 CORE = [
     "lambdas/common/secret_cache.py",
     "lambdas/common/retry_utils.py",
+    "lambdas/common/platform_logger.py",
     "lambdas/experiment/phase_filter.py",
     "lambdas/common/constants.py",
     "lambdas/ai/bedrock_client.py",
+    "lambdas/ai/budget_guard.py",
     "lambdas/health/scoring_engine.py",
     "lambdas/health/character_engine.py",
     "lambdas/intelligence/intelligence_common.py",
@@ -147,6 +88,7 @@ CORE = [
     "lambdas/ai/ai_summaries.py",
     "lambdas/web/site_api_common.py",
     "lambdas/web/site_api_coach.py",
+    "lambdas/web/site_api_data.py",
     "lambdas/web/site_api_intelligence.py",
     "lambdas/web/site_api_reading.py",
     "lambdas/web/site_api_vitals.py",
@@ -158,6 +100,24 @@ CORE = [
     "mcp/registry.py",
     "mcp/core.py",
 ]
+
+
+def first_party_package_dirs() -> list[str]:
+    """Every directory under ``lambdas/`` (plus ``mcp/``) that holds real modules.
+
+    Derived from the filesystem, NOT hand-listed — this is what makes the
+    "a new package can't silently leave the gate" ratchet real. ``lambdas/`` itself
+    is included only if it ever regains root-level modules (ADR-146/#1653 forbids it).
+    """
+    dirs: set[str] = set()
+    for path in sorted(ROOT.glob("lambdas/**/*.py")):
+        if path.name == "__init__.py":
+            continue
+        dirs.add(path.parent.relative_to(ROOT).as_posix())
+    for path in sorted(ROOT.glob("mcp/*.py")):
+        if path.name != "__init__.py":
+            dirs.add("mcp")
+    return sorted(dirs)
 
 
 def clean_modules() -> list[str]:

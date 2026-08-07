@@ -221,7 +221,7 @@ def transform(raw: dict, date_str: str) -> list[dict]:
 
     normalized = [normalize_completed_task(t, project_map) for t in completed_raw]
 
-    by_project = {}
+    by_project: dict[str, int] = {}
     for task in normalized:
         proj = task["project_name"]
         by_project[proj] = by_project.get(proj, 0) + 1

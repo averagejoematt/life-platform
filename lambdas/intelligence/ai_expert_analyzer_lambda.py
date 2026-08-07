@@ -40,6 +40,7 @@ import os
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING, Any
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -142,7 +143,7 @@ def _latest_item(source):
 
 from common.constants import EXPERIMENT_START_DATE as EXPERIMENT_START  # ADR-058
 
-_CANON_FACTS_CACHE = {}
+_CANON_FACTS_CACHE: dict[str, Any] = {}
 
 
 def _load_canonical_facts():
@@ -198,7 +199,8 @@ def _load_canonical_facts():
 try:
     from intelligence.grounding_guard import hard_canonical_contradictions as _hard_canonical_contradictions
 except ImportError:  # pragma: no cover — flat sys.path (tests)
-    from grounding_guard import hard_canonical_contradictions as _hard_canonical_contradictions  # noqa: F401
+    if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
+        from grounding_guard import hard_canonical_contradictions as _hard_canonical_contradictions  # noqa: F401
 
 # ADR-104: the shared grounded-generation harness — the regen-once keep-if-improved
 # flow moved there (one implementation for every surface), plus the allow-list
@@ -937,7 +939,8 @@ def _presence_block():
 try:
     from intelligence.integrator_prompts import build_arc_prompt, build_month_rollup_prompt, build_synthesis_prompt
 except ImportError:  # pragma: no cover — flat-staged runtime layout
-    from integrator_prompts import build_arc_prompt, build_month_rollup_prompt, build_synthesis_prompt  # noqa: F401
+    if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
+        from integrator_prompts import build_arc_prompt, build_month_rollup_prompt, build_synthesis_prompt  # noqa: F401
 
 
 def _build_shared_system_prompt():

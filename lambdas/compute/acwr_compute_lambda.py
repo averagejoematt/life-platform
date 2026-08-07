@@ -59,6 +59,7 @@ import os
 import time
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from typing import Any
 
 import boto3
 from common import stats_core  # #543: the sanctioned EWMA (stats_core.ewma_series), ADR-105
@@ -113,7 +114,7 @@ def _fetch_range(source: str, start: str, end: str) -> list:
     # 2026-06-06). include_pilot=True is a deliberate no-op annotation.
     from experiment.phase_filter import with_phase_filter
 
-    records = []
+    records: list[dict[str, Any]] = []
     kwargs = with_phase_filter(
         {
             "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",

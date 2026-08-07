@@ -38,6 +38,7 @@ import logging
 import os
 from datetime import datetime, timezone
 from decimal import Decimal
+from typing import TYPE_CHECKING
 from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request
@@ -58,10 +59,11 @@ from ingestion.ingestion_framework import IngestionConfig, run_ingestion
 try:
     from experiment.habit_causality import clip_note
 except ImportError:  # pragma: no cover — the bundle always ships lambdas/ at root
+    if not TYPE_CHECKING:  # mypy sees ONE signature (the import); runtime unchanged (#1656)
 
-    def clip_note(text, _max=500):
-        s = (text or "").strip()
-        return s[:_max].rstrip() + "…" if len(s) > _max else s
+        def clip_note(text, _max=500):
+            s = (text or "").strip()
+            return s[:_max].rstrip() + "…" if len(s) > _max else s
 
 
 SECRET_NAME = os.environ.get("HABITIFY_SECRET_NAME", "life-platform/habitify")
@@ -256,8 +258,8 @@ def transform(raw: dict, date_str: str) -> list[dict]:
 
     habits = {}
     habit_statuses = {}  # TD-11 Phase 1: structured per-habit state alongside binary
-    group_habits_done = {}
-    group_habits_possible = {}
+    group_habits_done: dict[str, list[str]] = {}
+    group_habits_possible: dict[str, list[str]] = {}
     skipped_count = 0
 
     # `date_str` is the date we're ingesting for (UTC-anchored). We compare it

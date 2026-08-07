@@ -21,9 +21,12 @@ from __future__ import annotations
 import logging
 import os
 from datetime import date, datetime, timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import boto3
+
+if TYPE_CHECKING:  # #1656: the annotation-only import (runtime import stays inside the function)
+    from training.routine_generator import GeneratorInputs
 
 try:
     from common.platform_logger import get_logger
@@ -70,7 +73,7 @@ def _target_date_for_event(event: dict[str, Any]) -> str:
     return date.today().isoformat()
 
 
-def _gates(event: dict[str, Any]) -> dict[str, str | bool]:
+def _gates(event: dict[str, Any]) -> dict[str, str | bool | int]:
     pause = _ssm_get(PAUSE_PARAM, "active").lower()
     cron_enabled = _ssm_get(CRON_ENABLED_PARAM, "false").lower() in ("1", "true", "yes")
     budget_tier_raw = _ssm_get(BUDGET_TIER_PARAM, "0")
@@ -89,7 +92,7 @@ def _gates(event: dict[str, Any]) -> dict[str, str | bool]:
     }
 
 
-def _gather_inputs(target_date: str, add_load_enabled: bool) -> "GeneratorInputs":  # noqa: F821
+def _gather_inputs(target_date: str, add_load_enabled: bool) -> "GeneratorInputs":
     """Pull recovery / acwr / volume / z2 / last-workout state for the generator.
 
     Day one: returns conservative defaults so the deterministic engine ships

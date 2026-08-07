@@ -45,7 +45,7 @@ def journal_analysis(*, _g) -> dict:
     items = _decimal_to_float(resp.get("Items", []))
 
     # Build theme frequency counts
-    theme_counts = {}
+    theme_counts: dict[str, int] = {}
     for item in items:
         for theme in item.get("themes", []):
             theme_counts[theme] = theme_counts.get(theme, 0) + 1

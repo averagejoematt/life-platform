@@ -32,6 +32,7 @@ import json
 import os
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from typing import Any
 
 import boto3
 from common import stats_core
@@ -65,7 +66,9 @@ COVERAGE_WINDOW_DAYS = 90
 
 # What we forecast. `frame` is the human phrasing for an h=1 target (the coach/
 # cockpit surfaces reuse it); weight is morning-weigh-in so "tomorrow morning".
-METRICS = [
+# Heterogeneous registry (str / tuple / None values) — annotated per the #1656
+# convention for engine registries so `cfg["source"]` reads as a value, not `object`.
+METRICS: list[dict[str, Any]] = [
     {"metric": "recovery_pct", "source": "whoop", "field": "recovery_score", "unit": "%", "frame_h1": "tomorrow", "bounds": (0.0, 100.0)},
     {
         "metric": "sleep_hours",
@@ -280,7 +283,7 @@ def lambda_handler(event: dict, context) -> dict:
     start = (today - timedelta(days=HISTORY_DAYS)).isoformat()
 
     # One prefetch per source powers both fitting and resolution.
-    actuals_by_source = {}
+    actuals_by_source: dict[str, dict[str, dict[str, Any]]] = {}
     series_by_metric = {}
     for cfg in METRICS:
         series = fetch_series(cfg["source"], cfg["field"], start, today_str)

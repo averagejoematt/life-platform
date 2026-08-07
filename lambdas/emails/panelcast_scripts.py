@@ -23,11 +23,13 @@ the weekly path (which DOES pass real headlines) shares this code unchanged.
 
 import json
 import re
+from typing import TYPE_CHECKING
 
 try:  # bundle stages lambdas/ at the zip root; tests add lambdas/emails/ to sys.path
     from emails.panelcast_qa import _QA_MAX_WORDS_PER_TURN
 except ImportError:
-    from panelcast_qa import _QA_MAX_WORDS_PER_TURN
+    if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
+        from panelcast_qa import _QA_MAX_WORDS_PER_TURN
 
 from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
 

@@ -103,6 +103,7 @@ import os
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from decimal import Decimal
+from typing import Any
 
 import boto3
 
@@ -162,7 +163,7 @@ table = dynamodb.Table(DYNAMODB_TABLE)
 secrets_client = boto3.client("secretsmanager", region_name=REGION)
 
 # COST-OPT-1: Cache secrets in warm Lambda containers (15-min TTL)
-_secret_cache = {}
+_secret_cache: dict[str, tuple[Any, float]] = {}
 
 
 def _cached_secret(client, secret_id):

@@ -53,6 +53,7 @@ import logging
 import os
 import sys
 from datetime import datetime, timezone
+from typing import Any
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
@@ -172,7 +173,7 @@ class PlatformLogger(logging.Logger):
 
     # ── Overridden log methods that accept keyword args ────────────────────────
 
-    def _log_with_extras(self, level: int, msg: str, args: tuple, kwargs: dict):
+    def _log_with_extras(self, level: int, msg: object, args: tuple, kwargs: dict) -> None:
         """Shared implementation — attach extra_fields to record.
 
         Supports both call styles:
@@ -184,7 +185,9 @@ class PlatformLogger(logging.Logger):
         # Interpolate %s args if provided (stdlib backward compat)
         if args:
             try:
-                msg = msg % args
+                # str(msg) first, exactly as stdlib's LogRecord.getMessage() does — the
+                # widened `msg: object` (below) is what stdlib's Logger declares (#1656).
+                msg = str(msg) % args
             except (TypeError, ValueError):
                 msg = f"{msg} {args}"  # fallback: append args if interpolation fails
 
@@ -214,22 +217,25 @@ class PlatformLogger(logging.Logger):
         record.extra_fields = kwargs  # all remaining kwargs become JSON fields
         self.handle(record)
 
-    def debug(self, msg: str, *args, **kwargs):
+    # `msg: object` (not `str`) matches logging.Logger's own declaration — narrowing it
+    # was the LSP-violating override x6 that kept this module off the mypy clean set
+    # (#419 → cleared by #1656). Callers are unaffected: str is an object.
+    def debug(self, msg: object, *args: Any, **kwargs: Any) -> None:
         self._log_with_extras(logging.DEBUG, msg, args, kwargs)
 
-    def info(self, msg: str, *args, **kwargs):
+    def info(self, msg: object, *args: Any, **kwargs: Any) -> None:
         self._log_with_extras(logging.INFO, msg, args, kwargs)
 
-    def warning(self, msg: str, *args, **kwargs):
+    def warning(self, msg: object, *args: Any, **kwargs: Any) -> None:
         self._log_with_extras(logging.WARNING, msg, args, kwargs)
 
-    def warn(self, msg: str, *args, **kwargs):
+    def warn(self, msg: object, *args: Any, **kwargs: Any) -> None:
         self._log_with_extras(logging.WARNING, msg, args, kwargs)
 
-    def error(self, msg: str, *args, **kwargs):
+    def error(self, msg: object, *args: Any, **kwargs: Any) -> None:
         self._log_with_extras(logging.ERROR, msg, args, kwargs)
 
-    def critical(self, msg: str, *args, **kwargs):
+    def critical(self, msg: object, *args: Any, **kwargs: Any) -> None:
         self._log_with_extras(logging.CRITICAL, msg, args, kwargs)
 
     # ── Convenience helpers for common patterns ────────────────────────────────
