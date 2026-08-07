@@ -323,16 +323,16 @@ def _draw_mark(draw, mark, box_cx, box_cy, scale):
         draw.ellipse([ccx - r, ccy - r, ccx + r, ccy + r], fill=TEXT)
 
 
-def build_fingerprint(stats):
-    """#1379: today's Daily Fingerprint as an OG share card. The mark is the SAME
-    deterministic artifact the cockpit masthead and /data/wall/ render — a pure
-    function of today's real vitals, earned glow only."""
-    from datetime import datetime, timezone
+def fingerprint_metrics(stats):
+    """public_stats.json → the metric dict `web.fingerprint.build_mark` consumes.
 
-    from web.fingerprint import build_mark
-
-    vitals = stats.get("vitals", {})
-    platform = stats.get("platform", {})
+    Extracted from build_fingerprint (#1402) so the moments sweep can build the SAME mark
+    the card draws without duplicating the mapping — a second copy would drift, and a
+    caption that disagreed with its own picture is exactly the failure this platform is
+    built to make impossible.
+    """
+    vitals = stats.get("vitals", {}) or {}
+    platform = stats.get("platform", {}) or {}
     metrics = {}
     if vitals.get("recovery_pct") is not None:
         metrics["recovery"] = vitals["recovery_pct"]
@@ -342,6 +342,18 @@ def build_fingerprint(stats):
         metrics["hrv"] = vitals["hrv_ms"]
     if platform.get("tier0_streak") is not None:
         metrics["streak"] = platform["tier0_streak"]
+    return metrics
+
+
+def build_fingerprint(stats):
+    """#1379: today's Daily Fingerprint as an OG share card. The mark is the SAME
+    deterministic artifact the cockpit masthead and /data/wall/ render — a pure
+    function of today's real vitals, earned glow only."""
+    from datetime import datetime, timezone
+
+    from web.fingerprint import build_mark
+
+    metrics = fingerprint_metrics(stats)
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     mark = build_mark(today, metrics)
 

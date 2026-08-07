@@ -44,6 +44,11 @@ _GOOD = [
     ("strain", 21.0),  # Whoop strain           → v/21
 ]
 
+# How many signals a day COULD report. `build_mark` returns how many actually did (`n`);
+# the pair is what makes "4 of 6 signals reported" a checkable statement rather than a
+# vibe, so #1402's broadcast caption reads the denominator from here instead of typing 6.
+SIGNAL_COUNT = len(_GOOD)
+
 _MASK64 = (1 << 64) - 1
 
 

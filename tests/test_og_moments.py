@@ -155,3 +155,68 @@ def test_share_affordance_exists_on_the_three_surfaces():
     assert "shareMount" in coaching and "qa-share" in coaching  # board answers
     assert "momentUrl(p)" in coaching  # graded predictions
     assert "shareMount(wk.current" in cockpit  # the weekly recap
+
+
+# ── #1402: the fingerprint moment ────────────────────────────────────────────
+
+_FP_STATS = {"platform": {"days_in": 4, "tier0_streak": 2}, "vitals": {"recovery_pct": 44.0, "sleep_hours": 7.2, "hrv_ms": 35.0}}
+
+# The card itself is the unchanged #1379 Pillow render; the sweep contract under test is
+# dating, captioning and the syndicatable flag, so both PIL-carrying hooks are stubbed
+# exactly as build_moment_card is above.
+om._fingerprint_card = lambda stats: _FakeImg()
+om._fingerprint_metrics = lambda stats: {
+    name: (stats.get(block) or {})[key]
+    for name, block, key in (
+        ("recovery", "vitals", "recovery_pct"),
+        ("sleep_hours", "vitals", "sleep_hours"),
+        ("hrv", "vitals", "hrv_ms"),
+        ("streak", "platform", "tier0_streak"),
+    )
+    if (stats.get(block) or {}).get(key) is not None
+}
+
+
+def test_fingerprint_moment_is_dated_and_immutable():
+    """The page card at /assets/images/og-fingerprint.png is overwritten daily — a share
+    of it silently repoints. The moment must be keyed by date so it never does."""
+    s3 = _FakeS3()
+    out = om._sweep_fingerprint(s3, _FP_STATS)
+    assert out and out["date"] in out["permalink"] and out["date"] in out["card_url"]
+    assert f"generated/moments/fingerprint/{out['date']}/index.html" in s3.puts
+    assert f"generated/moments/assets/fingerprint-{out['date']}.png" in s3.puts
+
+
+def test_fingerprint_moment_shell_carries_provenance_not_body_numbers():
+    s3 = _FakeS3()
+    out = om._sweep_fingerprint(s3, dict(_FP_STATS, vitals=dict(_FP_STATS["vitals"], weight_lbs=322)))
+    shell = s3.puts[f"generated/moments/fingerprint/{out['date']}/index.html"]["body"].decode()
+    assert "tracked signals reported" in shell and "cannot be faked" in shell
+    assert "322" not in shell and "lbs" not in shell.lower()
+
+
+def test_fingerprint_thin_day_is_published_but_not_offered():
+    s3 = _FakeS3()
+    out = om._sweep_fingerprint(s3, {"platform": {"days_in": 4}, "vitals": {"recovery_pct": 44.0}})
+    assert out["warming_up"] is True and out["syndicatable"] is False
+    assert f"generated/moments/fingerprint/{out['date']}/index.html" in s3.puts  # archive has no holes
+
+
+def test_fingerprint_sweep_is_fail_soft_and_lands_in_the_index():
+    s3 = _FakeS3()
+    index = om.sweep_moments(s3, _FP_STATS)
+    assert index["fingerprint"] and index["fingerprint"]["automated_syndication"].startswith("denied")
+    broken = om._fingerprint_metrics
+    om._fingerprint_metrics = lambda stats: (_ for _ in ()).throw(RuntimeError("no PIL"))
+    try:
+        assert om._sweep_fingerprint(_FakeS3(), _FP_STATS) is None  # never blocks the page cards
+    finally:
+        om._fingerprint_metrics = broken
+
+
+def test_current_attempt_is_the_registrys_highest_cycle():
+    """The attempt number is read from the same CYCLE_GENESES registry /api/wall renders
+    from — never typed, so a reset cannot leave the caption a cycle behind."""
+    from web.site_api_data import CYCLE_GENESES
+
+    assert om._current_attempt() == max(CYCLE_GENESES)
