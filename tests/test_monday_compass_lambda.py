@@ -331,6 +331,61 @@ class TestFetchProjects:
         assert mc._fetch_projects("tok") == {}
 
 
+class _FakeSecretsClient:
+    """Hand-written stand-in for boto3 secretsmanager — get_secret_value only."""
+
+    def __init__(self, secret_string=None, error=None):
+        self.secret_string = secret_string
+        self.error = error
+        self.calls = []
+
+    def get_secret_value(self, SecretId=None):
+        self.calls.append(SecretId)
+        if self.error is not None:
+            raise self.error
+        return {"SecretString": self.secret_string}
+
+
+class TestFetchTodoistToken:
+    """#2178: the real Secrets Manager fetch — was hardcoded to None, so
+    gather_todoist_data never ran and two of six sections narrated a
+    permanently-empty task load (ADR-104)."""
+
+    def test_reads_the_life_platform_todoist_secret(self, monkeypatch):
+        fake = _FakeSecretsClient(secret_string=json.dumps({"todoist_api_token": "tok-real"}))
+        monkeypatch.setattr(mc, "secrets", fake)
+        import common.secret_cache as secret_cache
+
+        secret_cache.invalidate(mc.TODOIST_SECRET_NAME)
+
+        assert mc._fetch_todoist_token() == "tok-real"
+        assert fake.calls == [mc.TODOIST_SECRET_NAME]
+
+    def test_falls_back_to_the_todoist_key(self, monkeypatch):
+        import common.secret_cache as secret_cache
+
+        secret_cache.invalidate(mc.TODOIST_SECRET_NAME)
+        monkeypatch.setattr(mc, "secrets", _FakeSecretsClient(secret_string=json.dumps({"todoist": "tok-alt"})))
+
+        assert mc._fetch_todoist_token() == "tok-alt"
+
+    def test_missing_token_key_returns_none(self, monkeypatch):
+        import common.secret_cache as secret_cache
+
+        secret_cache.invalidate(mc.TODOIST_SECRET_NAME)
+        monkeypatch.setattr(mc, "secrets", _FakeSecretsClient(secret_string=json.dumps({"other": "x"})))
+
+        assert mc._fetch_todoist_token() is None
+
+    def test_secrets_manager_failure_is_non_fatal(self, monkeypatch):
+        import common.secret_cache as secret_cache
+
+        secret_cache.invalidate(mc.TODOIST_SECRET_NAME)
+        monkeypatch.setattr(mc, "secrets", _FakeSecretsClient(error=RuntimeError("secret deleted")))
+
+        assert mc._fetch_todoist_token() is None
+
+
 class TestGatherTodoistData:
     def test_normalizes_and_removes_overdue_from_due_this_week(self, monkeypatch):
         monkeypatch.setattr(mc, "_fetch_projects", lambda token: {"10": "Health"})
@@ -712,6 +767,27 @@ class TestBuildUserMessage:
         assert "    ... +1 more" in payload
         assert "No tasks due this week" in payload
 
+    def test_unavailable_todoist_data_states_absence_not_a_fake_zero(self, frozen_clock):
+        """#2178 / ADR-104: `available=False` must produce an honest 'the fetch
+        didn't happen' statement, never the same '0 tasks' / 'clean slate' text
+        used for a genuinely empty-but-fetched result."""
+        todoist = {
+            "due_this_week": [],
+            "overdue": [],
+            "total_due_this_week": 0,
+            "total_overdue": 0,
+            "available": False,
+        }
+
+        payload, _ = mc.build_user_message(self._week_state(), todoist, {}, {}, self.PMAP, "")
+
+        assert "TASKS DUE THIS WEEK: UNAVAILABLE" in payload
+        assert "OVERDUE: UNAVAILABLE" in payload
+        assert "Todoist could not be reached this week" in payload
+        assert "0 tasks" not in payload
+        assert "None — clean slate" not in payload
+        assert "No tasks due this week" not in payload
+
     def test_habit_and_grade_lines_are_computed_from_records(self, frozen_clock):
         health = {
             "habit_scores_7d": [
@@ -904,6 +980,20 @@ class TestLambdaHandler:
             },
         )
         monkeypatch.setattr(mc, "call_anthropic", lambda system, user, max_tokens=3500: "<div>SECTION ONE</div>")
+        # #2178: the real Secrets-Manager-backed fetch, wired to a live token by
+        # default so the happy path exercises the fixed (non-stubbed) behavior.
+        monkeypatch.setattr(mc, "_fetch_todoist_token", lambda: "tok-wired")
+        monkeypatch.setattr(
+            mc,
+            "gather_todoist_data",
+            lambda token: {
+                "due_this_week": [{"id": "1", "content": "Ship it", "project_id": "1", "project_name": "Health"}],
+                "overdue": [{"id": "2", "content": "Old thing", "project_id": "1", "project_name": "Health"}],
+                "total_due_this_week": 1,
+                "total_overdue": 1,
+                "project_map": {},
+            },
+        )
         return ses, table
 
     def test_missing_profile_aborts_before_sending(self, monkeypatch, wired):
@@ -926,8 +1016,10 @@ class TestLambdaHandler:
         assert body["email"] == "🧭 Monday Compass · Jun 8 · Week 1"
         assert body["week_num"] == 1
         assert body["char_level"] == 6
-        assert body["tasks_due_this_week"] == 0  # no Todoist token wired (ADR-062)
-        assert body["overdue"] == 0
+        # #2178: the real Todoist fetch is wired (see `wired` fixture) and ran —
+        # these are no longer a permanently-empty stub (ADR-104).
+        assert body["tasks_due_this_week"] == 1
+        assert body["overdue"] == 1
 
         assert len(ses.sent) == 1
         sent = ses.sent[0]
@@ -940,6 +1032,89 @@ class TestLambdaHandler:
 
         # the status-page completion record is written after the send
         assert table.puts[0]["pk"] == "USER#matthew#SOURCE#email_log#monday_compass"
+
+    def test_gather_todoist_data_is_called_with_the_real_fetched_token(self, monkeypatch, wired):
+        """#2178 acceptance: a regression test confirming lambda_handler calls
+        gather_todoist_data with a real (non-None) token under normal conditions."""
+        ses, _ = wired
+        monkeypatch.setattr(mc, "_fetch_todoist_token", lambda: "tok-real-secret-value")
+
+        captured_tokens = []
+
+        def _spy(token):
+            captured_tokens.append(token)
+            return {"due_this_week": [], "overdue": [], "total_due_this_week": 0, "total_overdue": 0}
+
+        monkeypatch.setattr(mc, "gather_todoist_data", _spy)
+
+        mc.lambda_handler({}, None)
+
+        assert captured_tokens == ["tok-real-secret-value"]
+        assert captured_tokens[0] is not None
+        assert len(ses.sent) == 1
+
+    def test_no_token_skips_the_fetch_and_renders_honest_unavailable_state(self, monkeypatch, wired):
+        """#2178 acceptance: when Todoist genuinely can't be reached, the prompt
+        must state the absence rather than presenting '0 due, 0 overdue' as a
+        true reading (ADR-104)."""
+        ses, _ = wired
+        monkeypatch.setattr(mc, "_fetch_todoist_token", lambda: None)
+
+        def _boom_if_called(token):
+            raise AssertionError("gather_todoist_data must not run without a token")
+
+        monkeypatch.setattr(mc, "gather_todoist_data", _boom_if_called)
+
+        captured = {}
+
+        def _capture(system, user, max_tokens=3500):
+            captured["user"] = user
+            return "<div>SECTION ONE</div>"
+
+        monkeypatch.setattr(mc, "call_anthropic", _capture)
+
+        out = mc.lambda_handler({}, None)
+
+        assert out["statusCode"] == 200
+        body = json.loads(out["body"])
+        assert body["tasks_due_this_week"] == 0
+        assert body["overdue"] == 0
+        assert "TASKS DUE THIS WEEK: UNAVAILABLE" in captured["user"]
+        assert "OVERDUE: UNAVAILABLE" in captured["user"]
+        assert "Todoist could not be reached" in captured["user"]
+        # never a fabricated true-zero reading
+        assert "0 tasks" not in captured["user"]
+        assert "None — clean slate" not in captured["user"]
+        assert len(ses.sent) == 1
+
+    def test_todoist_gather_failure_is_non_fatal_and_marked_unavailable(self, monkeypatch, wired):
+        """The existing non-fatal except (line ~855 pre-fix) must still protect
+        the rest of the email when Todoist is reachable-token-wise but the fetch
+        itself blows up — AND the resulting state must be honest, not a fake zero."""
+        ses, _ = wired
+        monkeypatch.setattr(mc, "_fetch_todoist_token", lambda: "tok-wired")
+
+        def _boom(token):
+            raise RuntimeError("todoist 500")
+
+        monkeypatch.setattr(mc, "gather_todoist_data", _boom)
+
+        captured = {}
+
+        def _capture(system, user, max_tokens=3500):
+            captured["user"] = user
+            return "<div>SECTION ONE</div>"
+
+        monkeypatch.setattr(mc, "call_anthropic", _capture)
+
+        out = mc.lambda_handler({}, None)
+
+        assert out["statusCode"] == 200
+        body = json.loads(out["body"])
+        assert body["tasks_due_this_week"] == 0
+        assert body["overdue"] == 0
+        assert "TASKS DUE THIS WEEK: UNAVAILABLE" in captured["user"]
+        assert len(ses.sent) == 1
 
     def test_ai_failure_still_sends_a_degraded_email(self, monkeypatch, wired):
         ses, _ = wired

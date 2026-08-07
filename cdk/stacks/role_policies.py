@@ -1307,8 +1307,15 @@ def email_weekly_plate() -> list[iam.PolicyStatement]:
 
 
 def email_monday_compass() -> list[iam.PolicyStatement]:
-    """Monday Compass: DDB read, S3 config, ai-keys, SES."""
-    return _email_base()
+    """Monday Compass: DDB read, S3 config, ai-keys, todoist, SES.
+
+    #2178: the lambda now fetches the real Todoist token (life-platform/todoist)
+    instead of a hardcoded None — grant GetSecretValue on it or the fetch is a
+    silent AccessDenied in prod (caught by the non-fatal except, so it degrades
+    to the honest-unavailable state rather than erroring, but the fix wouldn't
+    actually take effect without this).
+    """
+    return _email_base(extra_secrets=["life-platform/todoist"])
 
 
 def email_ai_review_pack() -> list[iam.PolicyStatement]:
