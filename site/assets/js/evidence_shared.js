@@ -202,4 +202,45 @@ export function wireFollowForms(root = document) {
   });
 }
 
+/* ── Contextual social embeds (#1674, epic #1668 S6) ──────────────────────────
+   Facade cards (thumbnail + caption + link-out) for the cleared, origin:human,
+   enriched posts GET /api/social_context?route=training|mind returns — the SAME
+   card shape /api/broadcast emits (site/assets/js/dispatches.js), just narrowed
+   to the posts whose enriched content routes to this topic page. Zero CSP change:
+   a link-out, never an iframe (#1678 tracks the separate, owner-gated native-embed
+   upgrade — this stays a facade regardless of how that lands). Shared by the
+   training and Mind-pillar (reading) renderers so there is one card shape, not two. */
+export function socialContextCards(items) {
+  return items
+    .map((it) => {
+      const id = esc(it.id || "");
+      const linkOut = it.link_out || it.permalink || `/story/broadcast/#${it.id || ""}`;
+      const chan = it.channel ? `<span class="ctx-chan label">${esc(it.channel)}</span>` : "";
+      const date = it.date ? `<span class="ctx-date label">${esc(it.date)}</span>` : "";
+      const cap = esc(it.caption || it.excerpt || "Untitled post");
+      const media = it.thumbnail_url
+        ? `<img class="ctx-thumb" src="${esc(it.thumbnail_url)}" alt="" loading="lazy" decoding="async">`
+        : `<span class="ctx-thumb ctx-thumb-empty label" aria-hidden="true">${esc(it.channel || "post")}</span>`;
+      return (
+        `<li class="ctx-card" id="ctx-${id}">` +
+        `<a class="ctx-link" href="${esc(linkOut)}" target="_blank" rel="noopener">` +
+        `<figure class="ctx-media">${media}</figure>` +
+        `<div class="ctx-body"><p class="ctx-meta">${chan}${date}</p>` +
+        `<p class="ctx-caption">${cap}</p>` +
+        `<span class="ctx-cta label">view${it.channel ? " on " + esc(it.channel) : ""} →</span></div>` +
+        `</a></li>`
+      );
+    })
+    .join("");
+}
+
+export function socialContextSection(items, title) {
+  if (!items || !items.length) return "";
+  return sec(
+    title,
+    `<ul class="ctx-feed">${socialContextCards(items)}</ul>` +
+      `<p class="ctx-foot label">Matthew's own posts, self-hosted — each links out to where it lives. <a href="/story/broadcast/">The full broadcast →</a></p>`
+  );
+}
+
 /* ── Renderers (bound to real shapes) ─────────────────────────────────────── */

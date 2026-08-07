@@ -152,6 +152,13 @@ DYNAMIC_PARAM_LOOKUP = {
         "extract": lambda data: int(time.time()) - 7 * 86400,
         "query_param": "ts",
     },
+    "/api/social_context": {
+        # ?route=training|mind is a closed 2-value enum (site_api_social._CONTEXT_ROUTES,
+        # #1674) — no live lookup needed, just a fixed valid sample.
+        "lookup_path": None,
+        "extract": lambda data: "training",
+        "query_param": "route",
+    },
 }
 
 

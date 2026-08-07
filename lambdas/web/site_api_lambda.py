@@ -201,6 +201,7 @@ from web.site_api_social import (
     _handle_predict_week,
     _handle_replicate_certify,
     _handle_ritual_log,
+    _handle_social_context,
     _handle_submit_finding,
     _handle_verify_subscriber,
     handle_broadcast,
@@ -542,6 +543,9 @@ _SIMPLE_ROUTES = {
     "/api/challenge_vote": ({"POST"}, _handle_challenge_vote),
     "/api/challenge_follow": ({"POST"}, _handle_challenge_follow),
     "/api/experiment_detail": (None, _handle_experiment_detail),
+    # Contextual social embeds (#1674, epic #1668 S6): the broadcast membrane
+    # (_membrane_visible_rows) narrowed to a coach route via ?route=training|mind.
+    "/api/social_context": ({"GET", "OPTIONS"}, _handle_social_context),
     "/api/predict_week": ({"GET", "POST"}, _route_predict_week),
     "/api/board_question": ({"POST"}, _handle_board_question),
     "/api/replicate_certify": ({"POST"}, _handle_replicate_certify),  # #1393 — Replicator self-cert
