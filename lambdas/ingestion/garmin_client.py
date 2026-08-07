@@ -105,13 +105,19 @@ class GarthTransportAdapter:
             return False
 
     def connectapi(self, path, **kwargs):
-        from garminconnect import GarminConnectConnectionError
-
         try:
             return self._inner.connectapi(path, **kwargs)
         except Exception as e:
             if not self._is_garth_http_error(e):
                 raise
+            try:
+                # Lazy + guarded like _is_garth_http_error: on the layer this
+                # import always succeeds (the adapter exists to serve
+                # garminconnect); in CI the wheel is layer-shipped and absent,
+                # and with nothing to translate INTO we re-raise untranslated.
+                from garminconnect import GarminConnectConnectionError
+            except ImportError:
+                raise e
             # garth wraps the underlying requests exception on `.error`; the
             # status lives on its response. 0.3.x reads `.status_code` first.
             status = getattr(getattr(getattr(e, "error", None), "response", None), "status_code", None)
