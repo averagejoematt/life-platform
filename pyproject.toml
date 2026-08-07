@@ -82,5 +82,12 @@ combine-as-imports = true
 # never below the committed RATCHET_FLOOR — an UP-ONLY gate that can only rise.
 # To ratchet up: raise this number, the two CI literals, AND RATCHET_FLOOR in
 # the guard test, in one PR (verify the suite clears it with headroom first).
+#
+# NOTE (#1658): this floor is deliberately set BELOW measured coverage so normal
+# fluctuation doesn't red main. That headroom is guarded separately by the
+# measured-coverage high-water ratchet (`coverage_gap_warn.py --high-water
+# --fail-on-regression`, mark = RATCHET_HIGH_WATER in the same guard test), which
+# is what stops real coverage being deleted down into it. Raising this floor does
+# not replace raising that mark — they move together.
 [tool.coverage.report]
-fail_under = 53
+fail_under = 58
