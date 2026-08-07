@@ -41,7 +41,7 @@ v1.2.0 — 2026-07-27 (#1843) diary_sessions (video-diary/solo-recording count, 
 import logging
 import os
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
@@ -1080,8 +1080,11 @@ def lambda_handler(event, context):
         week_key = event["week"]
         # Derive end_date from week key
         year, week_num = week_key.split("-W")
-        # ISO week: Monday of that week
-        target_monday = datetime.strptime(f"{year}-W{week_num}-1", "%Y-W%W-%w")
+        # ISO week: Monday of that week. Must match the scheduled path's own
+        # isocalendar() derivation below — %W is NOT ISO 8601 week numbering
+        # (it counts weeks from the first Monday of the year, not the ISO
+        # week containing Jan 4th) and silently drifts by up to a week (#2175).
+        target_monday = date.fromisocalendar(int(year), int(week_num), 1)
         end_date = (target_monday + timedelta(days=6)).strftime("%Y-%m-%d")
     else:
         # Default: compute for the week ending today (Sunday run)
