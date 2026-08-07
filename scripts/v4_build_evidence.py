@@ -907,7 +907,10 @@ def prefill_main(start_slug: str, door: str) -> dict:
 
 
 # Shared footer — the single source of truth is v4_chrome.site_footer() (#1009).
-FOOTER = site_footer()
+# Per-pillar since #1475: the footer wayfinder marks the reader's loop station, so it
+# takes the SAME door the topbar's doors nav marks for this pillar.
+def footer_for(nav_key: str) -> str:
+    return site_footer(current_door=_ACTIVE_KEY_TO_DOOR.get(nav_key))
 
 
 # #420/#595: per-slug OG card. A slug with its own data-driven card (drawn daily by the
@@ -993,7 +996,7 @@ def shell(start_slug: str, canonical: str, title: str, desc: str, pillar, proof:
       </section>
     </div>
   </main>
-  {FOOTER}
+  {footer_for(pillar["nav_key"])}
   <script>window.__EVIDENCE_REGISTRY__ = {reg}; window.__START_SLUG__ = {json.dumps(start_slug)};
 window.__ARCHIVE_BASE__ = {json.dumps(pillar["base"])}; window.__ARCHIVE_DOOR__ = {json.dumps(pillar["door"])}; window.__ARCHIVE_TITLE__ = {json.dumps(pillar["title"])};</script>
   {MOTION_SCRIPT}

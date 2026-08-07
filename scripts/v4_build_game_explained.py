@@ -559,7 +559,7 @@ def _render_page(config: dict) -> str:
     </div>
   </main>
   {loop_forward("/data/", self_path="/method/game/")}
-  {site_footer()}
+  {site_footer(current_door="/data/")}
   {MOTION_SCRIPT}
 </body>
 </html>

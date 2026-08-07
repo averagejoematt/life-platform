@@ -406,7 +406,7 @@ def render(post: dict) -> str:
         nav_next_sub=_esc(nav_next.get("sub", "The story")),
         nav_next_label=_esc(nav_next.get("label", "Back to the writing →")),
         loop_forward=v4_chrome.loop_forward(STORY_DOOR, self_path=url),
-        site_footer=v4_chrome.site_footer(),
+        site_footer=v4_chrome.site_footer(current_door=STORY_DOOR),
     )
 
 

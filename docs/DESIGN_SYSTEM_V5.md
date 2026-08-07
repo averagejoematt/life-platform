@@ -75,7 +75,39 @@ gives you), and a `.loop-ribbon` showing the loop with the current door marked `
 
 ### `.loop` (diagram)
 The full causal-loop card row (`.loop-node` × 4 + `.loop-arrow`). Home + About use it to
-*teach* the loop; the footer can carry a compact version.
+*teach* the loop; the footer carries the compact version — see `.wayfinder` below.
+
+### `.wayfinder` — the wayfinding layer (#1475)
+The compact loop that ships **inside the canonical footer**, so the loop is one
+interaction away from any page — including the eight that carry no `.page-hero`
+ribbon. Five station cards in loop order (`Now · Data → Coaching → Protocols → Story ↻`),
+each with its loop role, in three reader-actionable states:
+
+| state | class | treatment |
+|---|---|---|
+| **here** | `.wf-stop.is-here` | ember + `--ember-wash`, `aria-current="page"`, **not a link** (same grammar as `.lr-here`) |
+| **next** | `.wf-stop.is-next` | a mono `next` tag — the SAME step `loop_forward` argues for, never a second opinion |
+| **from** | `.wf-stop.is-from` | lifted out of the faint tier, so the loop is walkable backwards |
+
+With no current door (home, `/gear/`, the utility pages) nothing is *here* and the
+cockpit is tagged **start here** (`v4_chrome.DEFAULT_NEXT`) — the ribbon still orients.
+
+Below it the `.site-foot` mega-menu is re-poured **on the loop**: row 1 is the four
+causal stages in loop order (each `.sf-col[data-station]`), row 2 the two columns that
+sit outside it (The Technology, Follow & context). **Ember in the footer now means
+exactly one thing — you are here.** Before this every column heading was ember, so the
+accent carried no information at all; headings are `--ink` and only the station you're
+inside keeps its ember rail + heading.
+
+The cockpit is a stop but not a column: it is the loop's *vantage* (today's slice of the
+whole loop) with no sub-pages, so `v4_kit.loop_ribbon`'s `·` grammar carries it. The
+wayfinder is consequently the first footer route to the cockpit the site has ever had.
+
+Source: `scripts/v4_wayfinding.py` (station registry + ribbon) → `v4_chrome.site_footer`
+→ `v4_apply_chrome.py`, keyed off the **same detected door** as the doors nav and the
+`.loop-forward` close, so all three surfaces state one position from one signal.
+`tokens.css` uses `.wf-ribbon`, never `.loop-ribbon` — the page-hero ribbon owns
+`view-transition-name: loop-ribbon` (§12b) and a VT name must be unique per document.
 
 ### `.provenance`
 Every number says where it came from and how fresh: `<p class="provenance"><span
@@ -223,6 +255,8 @@ Three shared entrance primitives (defined once in `tokens.css` §12d, reused eve
 | **Popovers** | provenance (#584) + coach-name (CC-04) disclosures rise + settle out of their trigger (`transform-origin: top left`) | `mi-pop` | A disclosure that blinks into existence is easy to miss; the rise draws the eye to where it landed, next to the chip you clicked. |
 | **Count-ups** | `[data-countup]` numbers tick 0 → value on reveal (`motion.js`; `window.__moCount(el)` re-triggers for values set after load) | JS (cubic ease-out, ~900ms) | A number that counts up says "this was measured and is moving," reinforcing the live-instrument feel — only on real values, never placeholders (`··` is left alone). |
 | **Page transitions** | cross-document View Transitions: the loop-ribbon persists and its ember "you are here" marker slides to the new door while content cross-fades (`tokens.css` §12b) | native VT + `lr-settle` | The site navigates as ONE continuous instrument — the causal loop made continuous, not re-drawn each page. Pure progressive enhancement; a browser without `@view-transition` just navigates. |
+| **Wayfinder cue** (#1475) | hovering/keyboard-focusing a `.wf-stop` raises the ember rail on the `.sf-col[data-station]` that station owns; the stop's own name/role lift out of the faint tier (`tokens.css` §11, pure CSS `:has()` — no JS) | `transition` on colour only | The footer ribbon and the mega-menu are **one object** — the loop. Touching a station has to show you what it owns, or the menu reads as a second, unrelated list. Colour only: nothing moves, nothing reflows, and a browser without `:has()` simply gets no cue and loses no link. |
+| **Wayfinder arrival** (#1475) | `.wf-stop.is-here` reuses `lr-settle`; `.wf-ribbon` carries its own `view-transition-name` | `lr-settle` | Same reason as the hero ribbon: the "you landed here" marker should *slide* to the new station, not be re-drawn — the loop is continuous. |
 
 ### Headroom (not yet done)
 Every SVG/div chart is now interactive (`data-cpts`, #582). The identity swing was kept deliberately restrained.

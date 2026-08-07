@@ -20,6 +20,15 @@ footer's "The Technology" column (#1110: the /method/ hub, the build log, platfo
 /gear/) + About. The build log lives at `/story/build/` (URL unchanged) but is menu-homed under
 The Technology, not the story sub-nav. Old `/evidence/*` URLs 301 to their new pillar homes.
 
+**Wayfinding (#1475):** every chrome-bearing page's footer opens with the `.wayfinder` —
+this registry's five stations in loop order, with the page's own station marked, the next
+one tagged, and the mega-menu below re-poured on the loop. It is generated from
+`scripts/v4_wayfinding.py` off the same detected door as the doors nav and the
+`.loop-forward` close, so **this registry is the thing the wayfinding mirrors**: change a
+station's loop role here and change it there. Method pages carry the Data station (they
+are a deeper cut of the Data door, not a sixth door). See `docs/DESIGN_SYSTEM_V5.md` §3
+for the component and `docs/design/JOURNEYS.md` for the per-journey path it serves.
+
 Three pillars (`/data/`, `/protocols/`, `/method/`) are served by **one base-aware engine**
 (`site/assets/js/evidence.js` + `scripts/v4_build_evidence.py`, split by registry group).
 Coaching (`/coaching/`) and Story (`/story/`) are their own master-detail apps

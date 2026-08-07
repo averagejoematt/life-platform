@@ -68,7 +68,7 @@ def topbar() -> str:
     )
 
 
-FOOTER = site_footer()
+FOOTER = site_footer(current_door="/data/")
 
 STYLE = """
 <style>
