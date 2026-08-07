@@ -2228,6 +2228,33 @@
         }
       ],
       "why_it_mattered": "Throughput is easy to narrate and stalls are easy to hide. The honest version of a 22-PR day includes the twenty-one hours nothing deployed, why the machinery that saw it couldn't say so, and what now exists so the next silent lease gets surfaced instead of survived."
+    },
+    {
+      "id": "2026-08-06-the-sentence-google-would-not-say",
+      "date": "2026-08-06",
+      "title": "The sentence Google would not say — a fix that deployed green and still failed",
+      "shipped": "The chronicle's read-aloud feed can finally voice its own house style: the episode that had been orphaned since August 2 now renders (regen verified: 1 rendered, 0 errors). The first fix — splitting text into compliant 4,500-character requests — merged, deployed, and failed live with the identical error, because Google's speech engine re-segments the text itself and rejects individual sentences far below the request cap; the failing em-dash sentence measured 489 characters. The real fix caps sentences at 200 characters, splitting at clause boundaries and stamping terminal punctuation so the synthesizer sees complete short sentences. Same overnight session: the discoveries page stopped silently dropping 7 of its 67 entries, a wayfinding loop-ribbon landed in the footer of all 89 pages, and the reset-blind trailing-window debt ledger emptied.",
+      "gotcha": "A deploy can be green, the tests can pass, and the artifact can still be broken — the only proof was invoking the regeneration and checking the MP3 exists. The first fix looked complete by every gate the pipeline has; the measured live failure was the one test that mattered.",
+      "honest_miss": "The double-send guard shipped last week is currently inert in production — its marker write has been failing on a missing database permission since the first live send. The send itself went out exactly once, but the guard protecting future sends waits on an IAM deploy.",
+      "prs": [
+        {
+          "label": "PR #2154",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2154"
+        },
+        {
+          "label": "PR #2166",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2166"
+        },
+        {
+          "label": "PR #2155",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2155"
+        },
+        {
+          "label": "PR #2164",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2164"
+        }
+      ],
+      "why_it_mattered": "The read-aloud feed is a public artifact — a reader who taps play on the chronicle should get the current chronicle, not a three-week-old episode. And the two-stage failure is the platform's whole thesis in miniature: a green pipeline is a claim, not a verification; only the measured live artifact settles it."
     }
   ]
 }

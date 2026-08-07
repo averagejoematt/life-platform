@@ -8,6 +8,18 @@
     "citation": "#1958 (closed 2026-08-02)",
     "note": "WarnCount's honest daily floor is 4-11 against a >=1 threshold, so red carried no information (15 consecutive red nights). Reclassification fix merged 2026-08-02 but not yet deployed live as of this filing — the alarm clears once the deploy ships (cdk_deploy.sh / deploy_all)."
   },
+  "ingest-auth-unhealthy-whoop": {
+    "citation": "#1934",
+    "note": "Same event as ingest-liveness-unhealthy below — whoop's third credential loss, latched 2026-08-04T00:00Z; clears on the owner re-auth (owner-list item 1, HANDOVER_LATEST 2026-08-06)."
+  },
+  "ingest-consecutive-failures-whoop": {
+    "citation": "#1934",
+    "note": "Same event — the hourly ConsecutiveFailures counter on the latched whoop breaker; clears on the owner re-auth + backfill."
+  },
+  "ingest-liveness-unhealthy": {
+    "citation": "#1934",
+    "note": "Whoop's THIRD credential loss: breaker latched 2026-08-04T00:00Z ('refresh 400, unchanged refresh_token' — the post-#2076 classifier reading it correctly), ConsecutiveFailures climbing hourly, no data since 08-03. Same owner re-auth path as the citation (setup_whoop_auth.py --backfill + delete the AUTH_FAILURE marker row, #2085). Owner-list item 1 on HANDOVER_LATEST 2026-08-06; a fourth loss makes the rotation root-cause its own issue."
+  },
   "ingest-auth-unhealthy-24h": {
     "citation": "#1934",
     "note": "Whoop OAuth 401, auth breaker latched since 2026-08-01 12:00Z. Needs Matthew's interactive re-auth (setup/setup_whoop_auth.py --backfill) — gate:owner, cannot be automated."
