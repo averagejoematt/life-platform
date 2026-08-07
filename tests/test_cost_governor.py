@@ -466,3 +466,58 @@ def test_alert_surge_out_of_window_still_uses_the_default_base(gov, monkeypatch)
 
     subj = fake_sns.calls[0]["Subject"]
     assert "$85" in subj and "$100" in subj, f"outside any window the alert should use the base pair: {subj!r}"
+
+
+# ── #2116: the TokenAlarmGenesisWindowActive gauge ───────────────────────────
+# `_emit_token_alarm_window_gauge` is the "periodic gauge metric... from
+# existing machinery, no new cron" the story's acceptance criteria call for —
+# it rides cost_governor's existing 8h cron. `cdk/stacks/monitoring_stack.py`'s
+# composite alarm reads this gauge to decide whether a platform-total token
+# breach routes urgent or digest; these tests pin the PUBLISHER side only
+# (pure — no CDK/AWS involved) since the composite-alarm wiring itself is
+# covered by tests/test_urgent_alarm_routing.py + a local `cdk synth`.
+
+
+class _RecordingCW:
+    def __init__(self):
+        self.calls = []
+
+    def put_metric_data(self, **kwargs):
+        self.calls.append(kwargs)
+
+
+def test_emit_token_alarm_window_gauge_publishes_1_inside_window(gov, monkeypatch):
+    monkeypatch.setattr(gov, "is_within_token_alarm_window", lambda check_date=None: True)
+    fake_cw = _RecordingCW()
+    monkeypatch.setattr(gov, "_cw", fake_cw)
+
+    gov._emit_token_alarm_window_gauge()
+
+    assert len(fake_cw.calls) == 1
+    call = fake_cw.calls[0]
+    assert call["Namespace"] == "LifePlatform/AI"
+    assert call["MetricData"] == [{"MetricName": "TokenAlarmGenesisWindowActive", "Value": 1, "Unit": "None"}]
+
+
+def test_emit_token_alarm_window_gauge_publishes_0_outside_window(gov, monkeypatch):
+    monkeypatch.setattr(gov, "is_within_token_alarm_window", lambda check_date=None: False)
+    fake_cw = _RecordingCW()
+    monkeypatch.setattr(gov, "_cw", fake_cw)
+
+    gov._emit_token_alarm_window_gauge()
+
+    assert fake_cw.calls[0]["MetricData"] == [{"MetricName": "TokenAlarmGenesisWindowActive", "Value": 0, "Unit": "None"}]
+
+
+def test_emit_token_alarm_window_gauge_never_raises_on_put_failure(gov, monkeypatch):
+    """A CloudWatch outage must not fail the governor's real job (budget-tier
+    enforcement) — mirrors _emit_metrics' own try/except."""
+
+    class _BrokenCW:
+        def put_metric_data(self, **kwargs):
+            raise RuntimeError("boom")
+
+    monkeypatch.setattr(gov, "is_within_token_alarm_window", lambda check_date=None: True)
+    monkeypatch.setattr(gov, "_cw", _BrokenCW())
+
+    gov._emit_token_alarm_window_gauge()  # must not raise

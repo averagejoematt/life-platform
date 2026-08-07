@@ -45,8 +45,17 @@ Checks (each pass/fail):
      predicted condition" assertion the story's acceptance criteria ask for.
      NOTE: this only proves the automated-triage layer behaved; the raw CloudWatch
      alarm's SNS routing to the urgent topic (and its direct human email
-     subscription) is unchanged by #1961 and isn't observable from this check —
-     see token_alarm_window.py's docstring for the residual CDK-owner-gated gap.
+     subscription) was unchanged by #1961 alone — closed by #2116's composite
+     alarm below (a CDK-owner-gated deploy; this check tolerates it not being
+     deployed yet — see the #2116 sub-checks appended right after this one).
+ 17b. #2116 (completes #1961): the composite-alarm half. Read-only
+     `cloudwatch.describe_alarms` — if `ai-tokens-platform-daily-total-urgent` /
+     `-genesis-window` don't exist yet, this is a benign SKIP (the CDK deploy is
+     owner-gated and this check must never fail before that window). Once
+     deployed: the raw `ai-tokens-platform-daily-total` alarm must carry NO
+     `AlarmActions` of its own (only the composites route anywhere), and if it's
+     currently in ALARM, exactly one of the two composites — the one matching
+     today's in/out-of-window status — must also be in ALARM.
 
  18. Reset-predictable alarm check (#1962): the compute-pipeline-stale alarm is
      either not in ALARM, or it IS in ALARM but restart_pipeline.py's
@@ -460,6 +469,63 @@ def main():
         )
     except Exception as e:  # never let the verifier itself crash the post-reset check
         check("Token-alarm genesis window checks (#1961)", False, f"check could not run: {e}")
+
+    # 17b. #2116 (completes #1961) — the composite-alarm half. Read-only
+    # cloudwatch.describe_alarms only; never mutates AWS. Deliberately tolerant
+    # of the composites not existing yet (the CDK deploy is owner-gated) — this
+    # check must be able to run clean BEFORE that deploy, same as every other
+    # check in this file.
+    try:
+        from lambdas.common.token_alarm_window import TOKEN_ALARM_GENESIS_WINDOW as _TAW
+
+        cw_tok = boto3.client("cloudwatch", region_name=REGION)
+        composite = cw_tok.describe_alarms(
+            AlarmNames=["ai-tokens-platform-daily-total-urgent", "ai-tokens-platform-daily-total-genesis-window"]
+        ).get("CompositeAlarms", [])
+        by_name = {a["AlarmName"]: a for a in composite}
+        urgent = by_name.get("ai-tokens-platform-daily-total-urgent")
+        in_window_composite = by_name.get("ai-tokens-platform-daily-total-genesis-window")
+
+        if not urgent or not in_window_composite:
+            check(
+                "Token-alarm composite (#2116) is deployed",
+                True,
+                "not deployed yet — needs `cdk deploy LifePlatformMonitoring` (owner-gated); "
+                "the raw alarm's direct urgent-topic routing is unchanged from #1961's pre-fix state until then",
+            )
+        else:
+            raw = cw_tok.describe_alarms(AlarmNames=["ai-tokens-platform-daily-total"]).get("MetricAlarms", [])
+            raw_actions = raw[0].get("AlarmActions", []) if raw else None
+            check(
+                "Raw ai-tokens-platform-daily-total alarm carries no SNS action of its own (#2116)",
+                raw_actions == [],
+                (
+                    f"AlarmActions={raw_actions} — only the two composites should route anywhere"
+                    if raw_actions
+                    else f"raw alarm missing: {raw}"
+                ),
+            )
+
+            raw_state = raw[0].get("StateValue") if raw else "MISSING"
+            in_window_today = date.fromisoformat(_TAW[0]) <= date.today() < date.fromisoformat(_TAW[1])
+            if raw_state != "ALARM":
+                check(
+                    "Composite routing matches genesis-window status when the raw alarm breaches (#2116)",
+                    True,
+                    f"raw alarm state={raw_state} (not ALARM) — nothing to route, composites correctly quiet",
+                )
+            else:
+                expected_urgent_alarm = not in_window_today
+                actual = {"urgent": urgent["StateValue"] == "ALARM", "in_window": in_window_composite["StateValue"] == "ALARM"}
+                ok = actual["urgent"] == expected_urgent_alarm and actual["in_window"] == in_window_today
+                check(
+                    "Composite routing matches genesis-window status when the raw alarm breaches (#2116)",
+                    ok,
+                    f"today_in_window={in_window_today} expected_urgent_alarm={expected_urgent_alarm} actual={actual}",
+                )
+    except Exception as e:  # never let the verifier itself crash the post-reset check
+        check("Token-alarm composite checks (#2116)", False, f"check could not run: {e}")
+
     # 18. #1962 — the compute-pipeline-stale alarm is a reset-predictable false
     # red (the cutover sequence tombstones "yesterday" before the new cycle's
     # compute has had a cron cycle to write a fresh row — cycle 11 fired it red
