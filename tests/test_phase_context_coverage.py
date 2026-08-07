@@ -183,7 +183,10 @@ def _patch_ai_calls(monkeypatch, response="ok || ok"):
 
     monkeypatch.setattr(ai_calls, "call_anthropic", _fake_call)
     monkeypatch.setattr(ai_calls, "_run_analysis_pass", lambda *a, **k: {})
-    monkeypatch.setattr(ai_calls, "_ground_legacy_output", lambda label, output, regen_fn, *allow: output)
+    # **kw so the stub keeps absorbing gate params the real signature grows (#2056 added
+    # `available_logs`). A test double that pins the signature turns a wiring change into
+    # a TypeError the surrounding try/except then swallows on 2 of these 4 callers.
+    monkeypatch.setattr(ai_calls, "_ground_legacy_output", lambda label, output, regen_fn, *allow, **kw: output)
     monkeypatch.setattr(ai_calls, "_build_daily_bod_intro_from_config", lambda *a, **k: "")
     return calls
 
