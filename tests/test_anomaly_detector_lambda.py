@@ -680,19 +680,33 @@ def test_sustained_streaks_ignores_history_entries_with_no_field_or_direction(mo
 
 def test_sleep_metric_deduplication_keeps_efficiency(monkeypatch):
     """Park's rule: when several sleep metrics streak together only the most clinically
-    meaningful one (sleep_efficiency_percentage) survives."""
+    meaningful one (sleep_efficiency_percentage) survives.
+
+    #2179: uses the REAL field name METRICS emits (sleep_quality_score) — the dedup
+    set used to name "sleep_score"/"sleep_performance" instead, fields METRICS never
+    produces, so this rule could never actually fire in production even though a
+    test exercising the mechanism directly (with the wrong field name) stayed green.
+    """
     metrics = [
         _hist_metric(field="sleep_efficiency_percentage", label="Sleep Efficiency"),
-        _hist_metric(field="sleep_score", label="Sleep Score"),
+        _hist_metric(field="sleep_quality_score", label="Sleep Score"),
     ]
     rows = [_history_row("2026-08-01", metrics), _history_row("2026-07-31", metrics)]
     _install(monkeypatch, FakeTable(rows=rows))
     today = [
         _flag(field="sleep_efficiency_percentage", label="Sleep Efficiency"),
-        _flag(field="sleep_score", label="Sleep Score"),
+        _flag(field="sleep_quality_score", label="Sleep Score"),
     ]
     sustained = anomaly._check_sustained_streaks("2026-08-02", today)
     assert [s["metric"] for s in sustained] == ["sleep_efficiency_percentage"]
+
+
+def test_sleep_dedup_field_set_names_only_real_metrics_fields():
+    """Guard the SET, not one call site: every field named in the sleep dedup set
+    must be a field METRICS actually emits, or the dedup silently goes inert again."""
+    real_fields = {field for (_source, field, _label, _low_is_bad) in anomaly.METRICS}
+    assert anomaly.SLEEP_DEDUP_FIELDS <= real_fields
+    assert anomaly.SLEEP_DEDUP_FIELDS == {"sleep_efficiency_percentage", "sleep_quality_score"}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -859,7 +873,9 @@ def test_write_anomaly_record_shape_ttl_and_decimals(monkeypatch):
     assert item["source_count"] == 2
     assert item["alert_sent"] is True
     assert item["severity"] == "high"
-    assert item["detector_version"] == "2.5.0"
+    # #2179: single source of truth — was hardcoded "2.5.0" here vs "2.3.0" in the
+    # HTTP response body (see test_lambda_handler_response_body_detector_version_matches_ddb).
+    assert item["detector_version"] == anomaly.DETECTOR_VERSION
     assert item["travel_mode"] is False and item["sick_mode"] is False
     # 90-day investigative TTL, measured from the record's own date (R17-17):
     # 2026-08-02 + 90 days == 2026-10-31 00:00 UTC
@@ -957,6 +973,21 @@ def test_handler_multi_source_sends_alert_and_writes_record(monkeypatch, ses):
     assert record["severity"] == "high"
     assert record["alert_sent"] is True
     assert any(p["pk"].endswith("email_log#anomaly_detector") for p in table.puts)
+
+
+def test_lambda_handler_response_body_detector_version_matches_ddb_write(monkeypatch, ses):
+    """#2179: detector_version drifted — the DDB record said "2.5.0" but the HTTP
+    response body said "2.3.0" (a version bump that only updated one call site).
+    Both must now read the same module constant."""
+    table = _install(monkeypatch, FakeTable())
+    monkeypatch.setattr(anomaly, "check_anomalies", lambda *_a, **_k: [_flag(source="whoop")])
+
+    body = _body(anomaly.lambda_handler({}, None))
+
+    assert body["detector_version"] == anomaly.DETECTOR_VERSION
+    record = next(p for p in table.puts if p["pk"] == ANOM_PK)
+    assert record["detector_version"] == anomaly.DETECTOR_VERSION
+    assert body["detector_version"] == record["detector_version"]
 
 
 def test_handler_moderate_severity_under_four_metrics(monkeypatch, ses):

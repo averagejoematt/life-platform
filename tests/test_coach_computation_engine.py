@@ -91,7 +91,7 @@ def _records(metric, values, start="2026-06-01"):
     return [{"pk": "USER#matthew#SOURCE#x", "sk": "DATE#" + (d0 + timedelta(days=i)).isoformat(), metric: v} for i, v in enumerate(values)]
 
 
-def _trends(up=0, down=0, flat=0):
+def _trends(up=0, down=0, flat=0, insufficient=0):
     metrics = {}
     for i in range(up):
         metrics[f"u{i}"] = {"direction": "up"}
@@ -99,6 +99,8 @@ def _trends(up=0, down=0, flat=0):
         metrics[f"d{i}"] = {"direction": "down"}
     for i in range(flat):
         metrics[f"f{i}"] = {"direction": "flat"}
+    for i in range(insufficient):
+        metrics[f"n{i}"] = {"direction": "insufficient_data"}
     return {"whoop": metrics}
 
 
@@ -286,7 +288,10 @@ class TestComputeTrends:
         assert t["n_points"] == 8
         assert t["ewma_7d_ago"] is None
         assert t["slope"] is None
-        assert t["direction"] == "flat"
+        # #2179: a metric with too little history to compute the 7-day-ago EWMA was
+        # never actually measured as flat -> honest "insufficient_data", not a
+        # fabricated "flat" that would silently vote toward a plateau transition.
+        assert t["direction"] == "insufficient_data"
 
 
 # =============================================================================
@@ -785,6 +790,24 @@ class TestArcTransition:
         t = engine._detect_arc_transition(_trends(up=1, flat=9), {}, {}, "2026-01-20")
         assert t["to"] == "plateau"
         assert t["reason"] == "9/10 metrics flat for 10+ days"
+
+    def test_insufficient_data_metrics_are_excluded_from_the_flat_vote(self, monkeypatch, frozen_clock):
+        # #2179: 7 metrics with too little history to have a real direction must not
+        # be counted toward the plateau tally at all. 1 up + 2 flat + 7 insufficient:
+        # if insufficient_data were still counted as flat (the old bug), flat_pct
+        # would be 9/10 = 90% and this would wrongly transition to plateau — with the
+        # fix, the vote is only over the 3 metrics that were actually measured
+        # (flat_pct = 2/3 = 67%, below the 70% bar), so no transition fires.
+        monkeypatch.setattr(engine, "table", self._table({"phase": "building_momentum", "entered_date": "2026-01-10"}))
+        assert engine._detect_arc_transition(_trends(up=1, flat=2, insufficient=7), {}, {}, "2026-01-20") is None
+
+    def test_insufficient_data_metrics_can_still_allow_a_genuine_plateau(self, monkeypatch, frozen_clock):
+        # Same shape, but the measured metrics really are 70%+ flat once the
+        # unmeasured ones are excluded from the denominator.
+        monkeypatch.setattr(engine, "table", self._table({"phase": "building_momentum", "entered_date": "2026-01-10"}))
+        t = engine._detect_arc_transition(_trends(flat=7, insufficient=5), {}, {}, "2026-01-20")
+        assert t["to"] == "plateau"
+        assert t["metrics_context"] == {"up": 0, "down": 0, "flat": 7, "total": 7}
 
     def test_plateau_requires_seven_days_in_phase(self, monkeypatch, frozen_clock):
         monkeypatch.setattr(engine, "table", self._table({"phase": "building_momentum", "entered_date": "2026-01-15"}))

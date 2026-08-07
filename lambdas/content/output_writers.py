@@ -1007,14 +1007,15 @@ _BUDDY_LOOKBACK_DAYS = 7
 
 
 def _buddy_days_since(date_str, ref_date):
-    """Days between a YYYY-MM-DD string and a date object."""
+    """Days between a YYYY-MM-DD string and a date object, or None if unknown (#2179:
+    honest absence — callers must not print None as a fabricated day count)."""
     if not date_str:
-        return 99
+        return None
     try:
         d = datetime.strptime(date_str, "%Y-%m-%d").date() if isinstance(date_str, str) else date_str
         return (ref_date - d).days
     except Exception:
-        return 99
+        return None
 
 
 def _buddy_friendly_date(date_str):
@@ -1132,7 +1133,12 @@ def write_buddy_json(data, profile, yesterday, character_sheet=None):
 
         days_since_food = _buddy_days_since(latest_mf_date, today_dt)
         food_logged_count = len(mf_logged_dates)
-        if days_since_food <= 1 and food_logged_count >= 5:
+        if days_since_food is None:
+            # #2179: no qualifying log anywhere in the lookback window — an honest
+            # "no data" statement, not the fabricated "None days" the sentinel used to produce.
+            food_status = "red"
+            food_text = f"No food logged in the last {_BUDDY_LOOKBACK_DAYS} days"
+        elif days_since_food <= 1 and food_logged_count >= 5:
             food_status = "green"
             food_text = f"Consistent — logged meals {food_logged_count} of last {_BUDDY_LOOKBACK_DAYS} days"
         elif days_since_food <= 2 and food_logged_count >= 3:
@@ -1206,6 +1212,11 @@ def write_buddy_json(data, profile, yesterday, character_sheet=None):
         elif days_into_week <= 2:
             exercise_status = "yellow"
             exercise_text = f"No sessions yet this week ({day_of_week})"
+        elif days_since_exercise is None:
+            # #2179: no activity anywhere in the lookback window — say so plainly
+            # instead of printing the "no data" sentinel as a fake day count.
+            exercise_status = "red"
+            exercise_text = f"No exercise logged in the last {_BUDDY_LOOKBACK_DAYS} days"
         else:
             exercise_status = "red"
             exercise_text = f"No exercise this week — last session {days_since_exercise} days ago"
@@ -1225,7 +1236,11 @@ def write_buddy_json(data, profile, yesterday, character_sheet=None):
                     latest_habit_date = date_str
 
         days_since_habits = _buddy_days_since(latest_habit_date, today_dt)
-        if days_since_habits <= 1 and habit_logged_count >= 4:
+        if days_since_habits is None:
+            # #2179: no qualifying habit data anywhere in the lookback window.
+            routine_status = "red"
+            routine_text = f"No habit data in the last {_BUDDY_LOOKBACK_DAYS} days — routine may have slipped"
+        elif days_since_habits <= 1 and habit_logged_count >= 4:
             routine_status = "green"
             routine_text = "In his routine — habits tracked consistently"
         elif days_since_habits <= 2:
@@ -1264,8 +1279,11 @@ def write_buddy_json(data, profile, yesterday, character_sheet=None):
             weight_status = "green" if days_since_weigh <= 3 else "yellow"
             weight_text = "Weighed in" + (f" {days_since_weigh} days ago" if days_since_weigh > 1 else " recently")
         else:
-            weight_status = "yellow" if days_since_weigh <= 7 else "red"
-            weight_text = f"No weigh-in in {days_since_weigh}+ days"
+            # #2179: no weigh-in anywhere in the lookback window -> days_since_weigh is
+            # always None here (the "<=7" yellow branch this replaced was already dead:
+            # a real weigh-in inside 7 days would have populated `weights` above).
+            weight_status = "red"
+            weight_text = f"No weigh-in in the last {_BUDDY_LOOKBACK_DAYS} days"
 
         # Beacon
         statuses = [food_status, exercise_status, routine_status, weight_status]
