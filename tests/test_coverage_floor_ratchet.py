@@ -57,7 +57,14 @@ import sys
 # modules); re-measured 62.64% after rebasing onto e3498ad7, which is the number
 # RATCHET_HIGH_WATER below records. 58 keeps the same ~4.6pt
 # headroom-under-measured convention at the new level.
-RATCHET_FLOOR = 58
+# Ratcheted 58->66 by #1658 TRANCHE 2 (2026-08-08): 17 more behavioral test files
+# moved MEASURED coverage 63.14% -> 70.50% on this branch's base (+7.36pt, 5,208
+# statements newly covered across 17 modules that sat at 4-56%). 66 keeps the same
+# ~4.4pt headroom-under-measured convention. NOTE for whoever ticks #1658's third
+# acceptance box: measured coverage is now PAST 70, but this enforced floor is
+# deliberately NOT 70 — a floor set 0.4pt under measured flaps on every ordinary
+# run. Enforcing 70 as the merge gate needs measured ~74.6 first.
+RATCHET_FLOOR = 66
 
 # ── THE MEASURED-COVERAGE HIGH-WATER MARK. UP-ONLY. (#1658) ──────────────────
 # Actual measured line coverage (lambdas/ + mcp/) as of the PR that last raised
@@ -67,7 +74,11 @@ RATCHET_FLOOR = 58
 # invocation, bump this + the ci-test.yml --high-water literal together. LOWERING
 # it is legitimate only when covered code is deliberately DELETED (the ratio, not
 # the tests, moved) — and then only in the same PR, with the reason in the body.
-RATCHET_HIGH_WATER = 62.64
+# Raised 62.64 -> 70.40 by #1658 tranche 2 (2026-08-08). Measured 70.50 with the
+# CI job's exact invocation and pinned deps after rebasing onto 367896b4; the mark
+# is banked a tenth of a point UNDER that. The mark is a floor for real coverage,
+# so rounding down costs nothing and buys jitter margin against main's churn.
+RATCHET_HIGH_WATER = 70.40
 
 # The regression tolerance CI runs with. Mirrors coverage_gap_warn.py's default;
 # asserted equal below so the two can't drift (the #1206 drift class again).
