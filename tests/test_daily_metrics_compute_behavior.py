@@ -992,19 +992,18 @@ class TestAssembleData:
         assert data["diary_sessions"] == 1
         assert len(data["journal_entries"]) == 1
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-2 discovery): week_ago_weight uses next(...) over an "
-            "ASCENDING 14-day window, so it selects the OLDEST weigh-in in that "
-            "window (~14 days ago) rather than the one nearest 7 days ago. "
-            "daily_brief_lambda and dashboard_refresh_lambda implement the same "
-            "concept with a last-wins loop and get the nearest reading; this module "
-            "is the one that diverges, and its value overwrites theirs via "
-            "computed_metrics. Effect: the published weekly weight delta is a "
-            "two-week delta."
-        ),
-    )
+    # FIXED by #2299 (2026-08-09) — marker removed, this is now a real assertion.
+    # The tranche-2 record said this module "diverges" from daily_brief and
+    # dashboard_refresh, implying two implementations to reconcile. The truth was
+    # narrower and the fix better: the compute Lambda's `next(...)` over an ASCENDING
+    # 14-day window was simply WRONG (it took the OLDEST weigh-in, so the published
+    # weekly delta was a two-week delta), and the brief was already right. Rather than
+    # align two copies, #2299 lifted ONE definition into intelligence.weight_recency and
+    # pointed both at it — which is why this stopped xfailing without anyone editing it.
+    #
+    # It survived one full session as a strict=False XPASS, which reports as a pass and
+    # is therefore invisible: `-rX` is what surfaces it. Worth remembering that a
+    # non-strict marker left behind by someone else's fix is silent debt.
     def test_week_ago_weight_is_the_reading_nearest_seven_days_ago(self, table, frozen_clock):
         seed(
             table,
