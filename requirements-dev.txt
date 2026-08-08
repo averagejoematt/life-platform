@@ -12,6 +12,15 @@ pytest-cov==7.1.0
 # stays fast; no browser/native deps. Version MUST equal the CI gate's pin (CQ-01,
 # #1963) — read from ci-test.yml / ci-cd.yml, not quoted here.
 hypothesis==6.165.0
+# PyYAML — scripts/apply_branch_protection.py's preflight_contexts() parses
+# .github/workflows/*.yml to verify every required check context actually exists
+# as an unfiltered, un-gated job (#1662/#2198). tests/test_branch_protection_spec.py
+# exercises that path, so the test lane needs the parser. Undeclared until 2026-08-08,
+# when #2200 merged those tests and reds main: the PR fast lane only COLLECTS them
+# (the `import yaml` sits inside the function, so collection succeeds) and the failure
+# surfaced only in the full Unit Tests job after merge. Version MUST equal the CI
+# gate's pin (CQ-01, #1963) — read from ci-test.yml, not quoted here.
+pyyaml==6.0.3
 
 # Visual QA — Playwright browser automation (tests/visual_qa.py).
 # After install: `playwright install --with-deps chromium`

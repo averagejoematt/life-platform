@@ -57,7 +57,7 @@ def _ci_gate_text():
 # membership from requirements-dev.txt itself, so a future Dependabot-managed pin
 # can't silently land outside this guard's coverage again (guard the SET, not the
 # instance).
-_GATED_TOOLS = ("black", "ruff", "mypy", "playwright", "hypothesis", "pytest", "pytest-cov", "boto3", "botocore")
+_GATED_TOOLS = ("black", "ruff", "mypy", "playwright", "hypothesis", "pytest", "pytest-cov", "boto3", "botocore", "pyyaml")
 
 # requirements-dev.txt pins deliberately OUTSIDE this guard's coverage, each with why:
 _UNGATED_DEV_PINS = {
