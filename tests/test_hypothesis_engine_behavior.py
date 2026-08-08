@@ -594,7 +594,10 @@ class TestSampleFloorsAreHonest:
 #   macrofactor_lambda.py   total_calories_kcal / total_protein_g / total_carbs_g / total_fat_g
 #   withings                weight_lbs
 #   health_auto_export      steps / active_calories / mindful_minutes / blood_glucose_avg / walking_speed_mph
-#   strava_lambda.transform activity_count / total_zone2_seconds  (no aggregate kilojoules field)
+#   strava_lambda.transform activity_count / total_zone2_seconds / total_kilojoules
+#                           (#2221 correction: the day-level `total_kilojoules` rollup the
+#                           tranche-2 marker called "never written" HAS been written since
+#                           PR #2288 — the reader was right and the fixture was stale)
 #   journal_enrichment      enriched_mood / enriched_energy / enriched_stress / enriched_social_quality
 #   eightsleep_lambda       time_to_sleep_min  (bed temperature RETIRED — ADR-118/#489)
 #   habitify_lambda         habits: {name: bool}
@@ -615,26 +618,20 @@ WRITER_TRUTH = {
     "macrofactor": {"total_calories_kcal": 1810, "total_protein_g": 182, "total_carbs_g": 140, "total_fat_g": 61},
     "withings": {"weight_lbs": 318.4},
     "apple_health": {"steps": 9800, "active_calories": 620, "mindful_minutes": 12, "blood_glucose_avg": 96, "walking_speed_mph": 3.1},
-    "strava": {"activity_count": 2, "total_zone2_seconds": 1800},
+    "strava": {"activity_count": 2, "total_zone2_seconds": 1800, "total_kilojoules": 900.0},
     "notion": {"enriched_mood": 7, "enriched_energy": 6, "enriched_stress": 3, "enriched_social_quality": "good"},
     "eightsleep": {"time_to_sleep_min": 14},
     "habitify": {"habits": {"a": True, "b": True, "c": True, "d": False, "e": False}},
     "computed_metrics": {"diary_sessions": 1},
 }
 
-# The names THIS module reads (the reader-side contract), for the internal-consistency test.
-READER_TRUTH = {
-    "whoop": WRITER_TRUTH["whoop"],
-    "garmin": {"average_stress_level": 34, "body_battery_high": 81, "total_steps": 9412},
-    "macrofactor": WRITER_TRUTH["macrofactor"],
-    "withings": WRITER_TRUTH["withings"],
-    "apple_health": WRITER_TRUTH["apple_health"],
-    "strava": {"activity_count": 2, "total_kilojoules": 900, "zone2_minutes": 30},
-    "notion": WRITER_TRUTH["notion"],
-    "eightsleep": {"time_to_sleep_min": 14, "bed_temp_f": 71.5},
-    "habitify": WRITER_TRUTH["habitify"],
-    "computed_metrics": WRITER_TRUTH["computed_metrics"],
-}
+# The names THIS module reads (the reader-side contract), for the internal-consistency
+# test. #2221: after the field-name fixes the reader-side contract IS the writer-side
+# contract — that identity is the point, so this alias must stay an alias. If a future
+# change makes the two diverge again, spell the divergence out here rather than in a
+# marker: a name only one side knows is a metric that can be pre-registered and never
+# measured.
+READER_TRUTH = WRITER_TRUTH
 
 DAY = "2026-08-01"
 
@@ -654,62 +651,32 @@ class TestVocabularyIsMeasurable:
         # (it is a free-text quality label, not a number).
         assert emitted - {"social"} == set(eng.SPEC_METRICS)
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-2 discovery): build_data_narrative reads field names no writer produces — "
-            "garmin 'average_stress_level' (writer: avg_stress), garmin 'total_steps' (writer: steps), "
-            "strava 'total_kilojoules' (never written), strava 'zone2_minutes' (writer: total_zone2_seconds), "
-            "eightsleep 'bed_temp_f' (ingestion RETIRED, ADR-118/#489). Those five vocabulary entries can be "
-            "pre-registered but never measured."
-        ),
-    )
     def test_every_vocabulary_metric_is_producible_from_what_its_writer_stores(self):
         row = eng.build_data_narrative(_data(WRITER_TRUTH))[0]
         assert set(eng.SPEC_METRICS) - set(row) == set()
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="DEFECT (tranche-2 discovery): garmin_lambda.extract_stress writes 'avg_stress'; this module reads "
-        "'average_stress_level', so the `stress` metric is never populated and any spec on it stays inconclusive forever.",
-    )
     def test_garmin_stress_is_read_from_the_field_garmin_writes(self):
         row = eng.build_data_narrative(_data({"garmin": WRITER_TRUTH["garmin"]}))[0]
         assert row["stress"] == 34.0
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="DEFECT (tranche-2 discovery): garmin_lambda.extract_summary writes 'steps'; this module reads "
-        "'total_steps', so the `steps_garmin` metric is never populated.",
-    )
     def test_garmin_steps_are_read_from_the_field_garmin_writes(self):
         row = eng.build_data_narrative(_data({"garmin": WRITER_TRUTH["garmin"]}))[0]
         assert row["steps_garmin"] == 9412.0
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="DEFECT (tranche-2 discovery): strava_lambda.transform writes 'total_zone2_seconds'; this module reads "
-        "'zone2_minutes', so the `zone2_min` metric is never populated (and the unit differs by 60x).",
-    )
     def test_strava_zone2_is_read_from_the_field_strava_writes(self):
         row = eng.build_data_narrative(_data({"strava": WRITER_TRUTH["strava"]}))[0]
-        assert row["zone2_min"] == 30.0
+        assert row["zone2_min"] == 30.0  # 1800 writer-side seconds, in the vocabulary's minutes
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="DEFECT (tranche-2 discovery): no writer stores a strava 'total_kilojoules' aggregate (transform emits "
-        "per-activity 'kilojoules' inside `activities` only), so the `training_load` metric is never populated.",
-    )
+    def test_zone2_is_absent_rather_than_zero_when_strava_stored_no_zone_data(self):
+        """ADR-104: a day whose activities carried no HR-zone breakdown has an absent
+        zone2 reading, not a measured 0 minutes that would drag a comparison arm down."""
+        row = eng.build_data_narrative(_data({"strava": {"activity_count": 1}}))[0]
+        assert "zone2_min" not in row
+
     def test_strava_training_load_is_read_from_a_field_some_writer_stores(self):
         row = eng.build_data_narrative(_data({"strava": WRITER_TRUTH["strava"]}))[0]
-        assert "training_load" in row
+        assert row["training_load"] == 900.0
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="DEFECT (tranche-2 discovery): Eight Sleep bed-temperature ingestion was RETIRED (ADR-118/#489) but "
-        "'bed_temp_f' is still advertised in SPEC_METRICS, so the generator can pre-register a structurally "
-        "unmeasurable hypothesis that can only ever expire undecided.",
-    )
     def test_bed_temperature_is_either_measurable_or_out_of_the_vocabulary(self):
         row = eng.build_data_narrative(_data({"eightsleep": WRITER_TRUTH["eightsleep"]}))[0]
         assert ("bed_temp_f" in row) or ("bed_temp_f" not in eng.SPEC_METRICS)
@@ -1060,13 +1027,6 @@ class TestPersistence:
         eng.store_hypothesis(_valid_hypothesis(effect_size_observed=None))
         assert "effect_size_observed" not in table.puts[0]
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="DEFECT (tranche-2 discovery): store_hypothesis splats the model-supplied dict LAST "
-        "(`**{k: v for k, v in hypothesis.items()}`), so an LLM-emitted `status`, `check_count`, `pk`, `sk`, "
-        "`created_at` or `pre_registered_at` silently overrides the engine-owned value — a generated hypothesis "
-        "can pre-declare itself confirmed, or redirect its own write to another partition.",
-    )
     def test_a_generated_hypothesis_cannot_overwrite_the_engine_owned_lifecycle_keys(self, table, frozen_clock):
         hostile = _valid_hypothesis(
             status="confirmed",
@@ -1273,14 +1233,11 @@ class TestGeneration:
         monkeypatch.setattr(retry_utils, "call_anthropic_raw", lambda *a, **k: {"stop_reason": "max_tokens"})
         assert eng.generate_hypotheses([{"date": DAY}], []) is None
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="DEFECT (tranche-2 discovery): generate_hypotheses catches (json.JSONDecodeError, KeyError) but an "
-        "EMPTY `content` list raises IndexError at resp['content'][0], which escapes the fail-soft handler and "
-        "propagates out of lambda_handler — the whole weekly run dies instead of skipping generation.",
-    )
     def test_an_empty_content_list_yields_nothing_rather_than_killing_the_run(self, monkeypatch):
         monkeypatch.setattr(retry_utils, "call_anthropic_raw", lambda *a, **k: {"content": []})
+        assert eng.generate_hypotheses([{"date": DAY}], []) is None
+        # A null payload is the same class of escape (TypeError, not KeyError).
+        monkeypatch.setattr(retry_utils, "call_anthropic_raw", lambda *a, **k: None)
         assert eng.generate_hypotheses([{"date": DAY}], []) is None
 
     def test_blocked_ai_output_is_discarded_rather_than_stored(self, monkeypatch):

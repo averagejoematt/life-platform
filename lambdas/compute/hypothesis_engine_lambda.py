@@ -162,7 +162,7 @@ SPEC_METRICS = frozenset(
         "energy",
         "journal_stress",
         "sleep_onset_min",
-        "bed_temp_f",
+        # #2221: no bed-temperature metric — Eight Sleep temp ingestion is RETIRED (ADR-118/#489), so a spec on it could only expire undecided.
         "habit_pct",  # #1843: Habitify tier-0/1 completion ratio (0-1) — the outcome
         # metric for the diary-intervention hypothesis; wasn't wired into this
         # vocabulary before even though habitify was already fetched by gather_data.
@@ -265,7 +265,10 @@ def store_hypothesis(hypothesis: dict):
     now = datetime.now(timezone.utc)
     sk = f"HYPOTHESIS#{now.isoformat()}"
 
+    # #2221: model fields splat FIRST so the engine-owned lifecycle keys below always win —
+    # splatting them last let an LLM-emitted `status` pre-declare a hypothesis confirmed.
     item = {
+        **{k: v for k, v in hypothesis.items() if v is not None},
         "pk": HYPOTHESES_PK,
         "sk": sk,
         "status": "pending",
@@ -274,7 +277,6 @@ def store_hypothesis(hypothesis: dict):
         "pre_registered_at": now.isoformat(),
         "engine_version": 2,
         "check_count": 0,
-        **{k: v for k, v in hypothesis.items() if v is not None},
     }
 
     # V2 P2.6 (2026-05-19): tag with run_id + computed_at for double-write detection
@@ -374,9 +376,9 @@ def build_data_narrative(data):
         # Garmin
         garmin = next((i for i in data.get("garmin", []) if i.get("date") == date), {})
         if garmin:
-            row["stress"] = safe_float(garmin, "average_stress_level")
+            row["stress"] = safe_float(garmin, "avg_stress")  # #2221: the writer's names — never average_stress_level/total_steps
             row["body_battery"] = safe_float(garmin, "body_battery_high")
-            row["steps_garmin"] = safe_float(garmin, "total_steps")
+            row["steps_garmin"] = safe_float(garmin, "steps")
 
         # MacroFactor
         mf = next((i for i in data.get("macrofactor", []) if i.get("date") == date), {})
@@ -390,8 +392,7 @@ def build_data_narrative(data):
 
         # Withings (weight)
         wi = next((i for i in data.get("withings", []) if i.get("date") == date), {})
-        if wi:
-            row["weight_lbs"] = safe_float(wi, "weight_lbs")
+        row["weight_lbs"] = safe_float(wi, "weight_lbs")
 
         # Apple Health
         ah = next((i for i in data.get("apple_health", []) if i.get("date") == date), {})
@@ -402,12 +403,12 @@ def build_data_narrative(data):
             row["glucose_avg"] = safe_float(ah, "blood_glucose_avg")
             row["walking_speed"] = safe_float(ah, "walking_speed_mph")
 
-        # Strava
+        # Strava — #2221: the writer stores total_zone2_seconds; the vocabulary metric is minutes, so convert (absent stays absent).
         st = next((i for i in data.get("strava", []) if i.get("date") == date), {})
         if st:
             row["workout"] = bool(safe_float(st, "activity_count", 0))
             row["training_load"] = safe_float(st, "total_kilojoules")
-            row["zone2_min"] = safe_float(st, "zone2_minutes")
+            row["zone2_min"] = round(safe_float(st, "total_zone2_seconds", 0.0) / 60.0, 1) if "total_zone2_seconds" in st else None
 
         # Notion journal
         nj = next((i for i in data.get("notion", []) if i.get("date") == date), {})
@@ -417,11 +418,9 @@ def build_data_narrative(data):
             row["journal_stress"] = safe_float(nj, "enriched_stress")
             row["social"] = nj.get("enriched_social_quality")
 
-        # Eight Sleep
+        # Eight Sleep — onset only; bed temperature is deliberately NOT read (RETIRED, ADR-118/#489, #2221).
         es = next((i for i in data.get("eightsleep", []) if i.get("date") == date), {})
-        if es:
-            row["sleep_onset_min"] = safe_float(es, "time_to_sleep_min")
-            row["bed_temp_f"] = safe_float(es, "bed_temp_f")
+        row["sleep_onset_min"] = safe_float(es, "time_to_sleep_min")
 
         # #1843: Habitify tier-0/1 completion ratio — mirrors weekly_correlation's
         # habit_pct calc (0-1 fraction) so the same concept means the same number
@@ -952,7 +951,7 @@ Context:
 - Calorie target: {cal_target} cal/day, protein target: {pro_target}g/day
 - 16:8 intermittent fasting (eating window ~11am-7pm)
 - Primary training: walking + strength training, building Zone 2 base
-- Data sources: Whoop (HRV/recovery), Eight Sleep (bed temp), Strava (activities), MacroFactor (nutrition), Habitify (habits), Apple Health (steps/glucose/gait), Notion journal (mood/stress/energy)
+- Data sources: Whoop (HRV/recovery), Eight Sleep (sleep onset), Strava (activities), MacroFactor (nutrition), Habitify (habits), Apple Health (steps/glucose/gait), Notion journal (mood/stress/energy)
 {existing_block}{candidates_block}
 
 Generate {MAX_NEW_HYPOTHESES} cross-domain hypotheses. Each should be:
@@ -1038,7 +1037,8 @@ test_spec field notes:
             if val_result.warnings:
                 logger.warning("[AI-3] generate_hypotheses warnings: %s", val_result.warnings)
         return json.loads(raw.strip())
-    except (json.JSONDecodeError, KeyError) as e:
+    # #2221: IndexError (empty `content`) / TypeError (null payload) escaped this handler and killed the weekly run.
+    except (json.JSONDecodeError, KeyError, IndexError, TypeError) as e:
         logger.error(f"Hypothesis parse error: {e}")
         return None
 

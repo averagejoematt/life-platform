@@ -50,8 +50,14 @@ COCKPIT_JS = open(os.path.join(_REPO, "site/assets/js/cockpit.js")).read()
 
 
 def test_hypothesis_rows_read_real_whoop_and_eightsleep_fields():
-    """Replay: a real whoop record (sleep_duration_hours) + a real eightsleep
-    record (bed_temp_f). Before the fix both columns silently never populated."""
+    """Replay: a real whoop record (sleep_duration_hours) + a real eightsleep record.
+
+    #2221: the original form of this test also asserted `bed_temp_f` was read. That
+    became wrong when ADR-118/#489 RETIRED Eight Sleep temperature ingestion — the
+    field has no writer, so reading it only kept an unmeasurable metric alive in the
+    pre-registration vocabulary. The A-5 intent (read what the writers emit) now cuts
+    the other way: onset is read, bed temperature is not.
+    """
     data = {
         "whoop": [{"date": "2026-07-01", "recovery_score": 70, "sleep_duration_hours": 7.4}],
         "eightsleep": [{"date": "2026-07-01", "time_to_sleep_min": 12, "bed_temp_f": 82.4}],
@@ -59,13 +65,16 @@ def test_hypothesis_rows_read_real_whoop_and_eightsleep_fields():
     rows = hyp.build_data_narrative(data)
     assert rows and rows[0]["date"] == "2026-07-01"
     assert rows[0]["total_sleep_hrs"] == 7.4
-    assert rows[0]["bed_temp_f"] == 82.4
+    assert rows[0]["sleep_onset_min"] == 12
+    assert "bed_temp_f" not in rows[0]
 
 
 def test_hypothesis_rows_no_dead_field_names_remain():
     src = open(os.path.join(_REPO, "lambdas/compute/hypothesis_engine_lambda.py")).read()
     assert "total_in_bed_time_hrs" not in src
     assert "avg_bed_temp_f" not in src
+    # #2221: retired ingestion must not survive as a pre-registerable metric (ADR-118/#489).
+    assert '"bed_temp_f"' not in src
 
 
 # ==============================================================================
