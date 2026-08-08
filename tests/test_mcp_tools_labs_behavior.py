@@ -301,6 +301,17 @@ def test_trends_honors_the_declared_start_date_window(labs_table):
     assert "start_date" in props and "end_date" in props  # the schema really does declare them
     out = tl.tool_get_labs({"view": "trends", "biomarker": "ldl_c", "start_date": "2026-05-01", "end_date": "2026-12-31"})
     assert out["trends"]["ldl_c"]["data_points"] == 1
+    assert out["trends"]["ldl_c"]["values"][0]["date"] == "2026-06-01"  # the 2026-01-01 draw is OUT
+    assert out["window"] == {"start_date": "2026-05-01", "end_date": "2026-12-31"}
+    assert out["total_draws"] == 1  # and the envelope's own counts describe the window, not the archive
+
+
+def test_trends_window_that_selects_nothing_says_so_rather_than_widening(labs_table):
+    """The failure mode a silent window has: answering the question that WASN'T asked."""
+    labs_table({LABS_PK: [_draw("2026-01-01", {"ldl_c": _bm(160)})]})
+    out = tl.tool_get_labs({"view": "trends", "biomarker": "ldl_c", "start_date": "2026-05-01"})
+    assert out["trends"] == {}
+    assert "No lab draws between 2026-05-01" in out["error"]
 
 
 def test_trends_biomarker_partial_match_as_documented(labs_table):
@@ -309,6 +320,29 @@ def test_trends_biomarker_partial_match_as_documented(labs_table):
     assert "partial match" in desc  # the promise being tested
     out = tl.tool_get_labs({"view": "trends", "biomarker": "cholesterol"})
     assert "error" not in out["trends"]["cholesterol"]
+    # The caller reads back the name it asked with, and is told what that resolved to —
+    # a partial match must never leave the reader guessing WHICH biomarker they got.
+    assert out["trends"]["cholesterol"]["resolved_biomarker"] == "cholesterol_total"
+    assert out["trends"]["cholesterol"]["values"][0]["value"] == 190
+
+
+def test_trends_ambiguous_partial_match_expands_rather_than_guessing(labs_table):
+    """Two biomarkers match 'cholesterol'. Picking one silently would be a wrong number."""
+    labs_table({LABS_PK: [_draw("2026-01-01", {"cholesterol_total": _bm(190), "non_hdl_cholesterol_calc": _bm(140)})]})
+    out = tl.tool_get_labs({"view": "trends", "biomarker": "cholesterol"})
+    note = out["trends"]["cholesterol"]
+    assert note["matched_biomarkers"] == ["cholesterol_total", "non_hdl_cholesterol_calc"]
+    assert "error" not in note
+    # …and both are actually reported, under their real keys.
+    assert out["trends"]["cholesterol_total"]["values"][0]["value"] == 190
+    assert out["trends"]["non_hdl_cholesterol_calc"]["values"][0]["value"] == 140
+
+
+def test_trends_unmatched_name_still_gets_the_no_data_envelope(labs_table):
+    """Partial matching must not swallow the honest 'never measured' answer."""
+    labs_table({LABS_PK: [_draw("2026-01-01", {"ldl_c": _bm(130)})]})
+    out = tl.tool_get_labs({"view": "trends", "biomarker": "selenium"})
+    assert out["trends"]["selenium"]["error"] == "No data for 'selenium'"
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -335,11 +369,53 @@ def test_results_summary_lists_every_draw_newest_last(labs_table):
     )
     out = tl.tool_get_labs({"view": "results"})
     assert out["total_draws"] == 2
-    # _query_all_lab_draws sorts by sk, so the summary is chronological.
+    # _query_all_lab_draws sorts by draw date, so the summary is chronological.
     assert [d["draw_date"] for d in out["draws"]] == ["2025-02-02", "2026-06-01"]
     assert out["draws"][0]["out_of_range"] == ["ldl_c"]
     assert out["draws"][0]["out_of_range_count"] == 1
     assert "hint" in out
+
+
+def test_draws_are_ordered_by_the_draw_date_not_the_import_key(labs_table):
+    """The sk is the IMPORT key; `draw_date` is when the blood was actually taken.
+
+    They agree on every row in the live archive, which is why this is latent rather
+    than a live wrong number — but a panel backfilled after a later draw files under
+    a LATER sk than the draw it contains, and EVERY reader here indexes [0]/[-1] as
+    earliest/latest. The sibling shape was live in `tools_cgm`, where an sk-ordered
+    fasting glucose of 88 -> 92 -> 101 was narrated as "trending down".
+    """
+    late_sk_early_draw = _draw("2026-01-05", {"ldl_c": _bm(160, flag="high")})
+    late_sk_early_draw["sk"] = "DATE#2026-09-30"  # imported last, drawn first
+    labs_table({LABS_PK: [late_sk_early_draw, _draw("2026-06-01", {"ldl_c": _bm(120)})]})
+
+    out = tl.tool_get_labs({"view": "results"})
+    assert [d["draw_date"] for d in out["draws"]] == ["2026-01-05", "2026-06-01"]
+
+    tr = tl.tool_get_labs({"view": "trends", "biomarker": "ldl_c"})["trends"]["ldl_c"]
+    assert tr["earliest"] == 160 and tr["latest"] == 120
+    assert tr["direction"] == "falling"  # sk order would have said "rising"
+
+
+def test_a_draw_missing_its_draw_date_recovers_the_date_from_its_sort_key(labs_table):
+    """The sk still carries the date, so an importer that dropped `draw_date` has
+    lost a field, not the chronology. Recovering it beats dropping the draw."""
+    undated = _draw("2026-01-01", {"ldl_c": _bm(130)})
+    undated.pop("draw_date")
+    labs_table({LABS_PK: [undated]})
+    assert lh._draw_date_of(undated) == "2026-01-01"
+    assert tl.tool_get_labs({"view": "results"})["draws"][0]["draw_date"] == "2026-01-01"
+
+
+def test_a_draw_with_no_recoverable_date_is_absent_from_the_time_axis(labs_table):
+    """…but when NEITHER the field nor the sk parses there is no date to invent."""
+    lost = _draw("2026-01-01", {"ldl_c": _bm(130)})
+    lost["draw_date"], lost["sk"] = "sometime in spring", "PROVIDER#function_health"
+    assert lh._draw_date_of(lost) is None
+    labs_table({LABS_PK: [lost, _draw("2026-03-02", {"ldl_c": _bm(110)})]})
+    tr = tl.tool_get_labs({"view": "trends", "biomarker": "ldl_c"})["trends"]["ldl_c"]
+    assert tr["data_points"] == 1  # the datable draw only…
+    assert tr["undated_draws_skipped"] == 1  # …and the omission is declared, not silent
 
 
 def test_results_paginates_the_draw_query(labs_table):
@@ -483,6 +559,21 @@ def test_trends_projection_stays_inside_the_biomarkers_physical_domain(labs_tabl
     assert tr["direction"] == "falling" and tr["data_points"] == 2
 
 
+def test_trends_an_in_domain_projection_from_two_points_ships_with_its_caveat(labs_table):
+    """ADR-105: a forecast the code IS willing to publish still says what n=2 cannot buy.
+
+    The two markers in this cluster disagree about n=2 — one asks for no projection at
+    all below an interval, its sibling pins `projected_1yr == latest + slope_per_year`
+    on exactly two draws. The reconciliation is to publish the number WITH the missing
+    uncertainty named, rather than to publish it bare or to withhold a projection the
+    sibling contract requires.
+    """
+    labs_table({LABS_PK: [_draw("2026-01-01", {"hdl": _bm(40)}), _draw("2026-03-02", {"hdl": _bm(52)})]})
+    tr = tl.tool_get_labs({"view": "trends", "biomarker": "hdl"})["trends"]["hdl"]
+    assert tr["projected_1yr"] == 125.05
+    assert "n=2" in tr["projection_caveat"] and "prediction interval" in tr["projection_caveat"]
+
+
 def test_trends_slope_per_year_and_projection_use_the_same_year_length(labs_table):
     labs_table(
         {
@@ -523,7 +614,13 @@ def test_trends_keeps_a_biomarker_measured_at_zero(labs_table):
         }
     )
     out = tl.tool_get_labs({"view": "trends", "biomarker": "crp_hs"})
-    assert out["trends"]["crp_hs"]["data_points"] == 2
+    tr = out["trends"]["crp_hs"]
+    assert tr["data_points"] == 2
+    # The zero is present AS A ZERO, not merely counted — and it is the earliest point,
+    # so it is the one the "total_change" and the slope both hinge on.
+    assert [p["value"] for p in tr["values"]] == [0.0, 1.2]
+    assert tr["earliest"] == 0.0
+    assert tr["total_change"] == 1.2
 
 
 def test_trends_survives_a_draw_with_no_draw_date(labs_table):
@@ -567,12 +664,13 @@ def test_trends_derived_ratios_are_hand_derived(labs_table):
 def test_trends_ratio_is_omitted_rather_than_divided_by_zero(labs_table):
     """A missing or zero HDL yields NO ratio — never a fabricated one (ADR-104).
 
-    Two independent mechanisms produce the same honest outcome here and both are
-    worth pinning: the explicit ``hdl_v > 0`` guard on lines 161/173 blocks the two
-    divisions, and the ``or`` value fallback on line 158 turns a stored 0 into
-    ``None`` so non-HDL drops out too. The second is the ``or 0`` pattern (see
-    ``test_trends_keeps_a_biomarker_measured_at_zero``) landing on the right answer
-    by accident — a real 0 HDL is not physiologic, so there is nothing to report.
+    This used to hold for two reasons, only ONE of them deliberate: an explicit
+    ``hdl_v > 0`` guard blocked the two divisions, and the truthiness ``or`` fallback
+    turned a stored 0 into ``None`` so non-HDL (a subtraction, needing no guard of its
+    own) dropped out by accident. Fixing the truthiness bug removed the accident —
+    a real 0 would have started producing ``non_hdl = 200 - 0 = 200``. The guard now
+    covers all three ratios on purpose: an HDL of 0 is not a physiologic measurement,
+    so nothing derived from it is a number worth publishing.
     """
     labs_table({LABS_PK: [_draw("2026-01-01", {"triglycerides": _bm(150), "hdl": _bm(0), "cholesterol_total": _bm(200)})]})
     out = tl.tool_get_labs({"view": "trends", "biomarker": "triglycerides"})
@@ -649,7 +747,30 @@ def test_out_of_range_does_not_call_a_single_observation_chronic(labs_table):
     out = tl.tool_get_labs({"view": "out_of_range"})
     row = out["flagged_biomarkers"][0]
     assert row["times_tested"] == 1
-    assert row["persistence"] != "chronic"
+    assert row["persistence"] == "single_observation"
+    # …and the downstream consequence, which is the reason the label matters: the
+    # "genetic baseline rather than lifestyle failure" narrative is keyed on chronic_flags.
+    assert out["chronic_flags"] == []
+    assert out["insight"] is None
+
+
+def test_out_of_range_persistence_appears_at_the_derived_minimum_n(labs_table):
+    """The threshold is derived from the module's own constant, not restated here."""
+    assert tl.MIN_DRAWS_FOR_PERSISTENCE == 2
+    draws = [
+        _draw(f"2026-0{i + 1}-01", {"ferritin": _bm(400, flag="high", category="minerals")}) for i in range(tl.MIN_DRAWS_FOR_PERSISTENCE)
+    ]
+    labs_table({LABS_PK: draws})
+    row = tl.tool_get_labs({"view": "out_of_range"})["flagged_biomarkers"][0]
+    assert row["times_tested"] == tl.MIN_DRAWS_FOR_PERSISTENCE
+    assert row["persistence"] == "chronic"
+
+
+def test_out_of_range_reports_a_biomarker_measured_at_zero_as_zero(labs_table):
+    """The same truthiness bug lived on the out_of_range value read (ADR-104)."""
+    labs_table({LABS_PK: [_draw("2026-01-01", {"testosterone_total": _bm(0.0, flag="low", category="hormones", unit="ng/dL")})]})
+    row = tl.tool_get_labs({"view": "out_of_range"})["flagged_biomarkers"][0]
+    assert row["occurrences"][0]["value"] == 0.0  # not None, not dropped
 
 
 def test_out_of_range_empty_when_nothing_ever_flagged(labs_table):
@@ -907,6 +1028,10 @@ def test_galleri_raw_signal_is_not_republished_beside_the_reframe(labs_table):
     labs_table(_cadence_draws())
     ct = tl.tool_get_labs({"view": "results"})["cadence_trackers"]
     assert "NO CANCER SIGNAL DETECTED" not in str(ct["galleri"])
+    # Whole-subtree, not just the `raw_signal` key the report named: the history
+    # entries republished the identical raw string one level down, so deleting
+    # `raw_signal` alone would have left the board's framing decision unenforced.
+    assert ct["galleri"]["history"][-1]["signal"] == "No signal detected at 24-month early-detection threshold"
 
 
 def test_galleri_non_standard_signal_is_passed_through_unreframed(labs_table):
@@ -1098,6 +1223,34 @@ def test_freshness_never_reports_green_about_a_source_it_could_not_read(freshnes
     reported = {r["source"] for r in out["stale_sources"] + out["fresh_sources"]}
     assert reported == {"whoop", "apple_health"}
     assert out["status"] != "green"
+
+
+def test_freshness_answers_about_every_requested_source_whatever_its_partition_holds(freshness_table):
+    """GUARD THE SET: the response covers every source asked about, not the readable ones.
+
+    Five partition shapes, four of them previously exiting the loop silently by three
+    different routes (bare `continue` x2, an `unknown` row no bucket selected). The
+    assertion is over the whole requested SET, so a fourth silent exit added later
+    fails here without anyone remembering to add a case.
+    """
+    shapes = {
+        "whoop": [_date_row("whoop", "2026-08-08")],  # fresh
+        "macrofactor": [_date_row("macrofactor", "2026-01-01")],  # stale
+        "strava": [],  # never wrote -> no_data
+        "apple_health": [{"pk": _src_pk("apple_health"), "sk": "SUMMARY#latest"}],  # non-DATE# sk
+        "eightsleep": [{"pk": _src_pk("eightsleep"), "sk": "DATE#2026-13-45"}],  # unparseable date
+    }
+    assert set(shapes) <= set(FRESH_SOURCES), "fixture drifted from the source registry"
+    freshness_table({_src_pk(s): rows for s, rows in shapes.items()}, raises_for={_src_pk("garmin")})
+    requested = sorted(shapes) + ["garmin"]  # + a partition read that throws
+
+    out = tl.tool_get_freshness_status({"sources": requested})
+    reported = {r["source"] for r in out["stale_sources"] + out["fresh_sources"]}
+    assert reported == set(requested)
+    assert out["fresh_count"] == 1  # whoop only
+    assert out["unreadable_count"] == 3  # apple_health, eightsleep, garmin
+    assert out["stale_count"] == len(out["stale_sources"])  # the counter and the list agree
+    assert out["status"] == "red"
 
 
 def test_freshness_macrofactor_drift_probe_reports_its_own_failure(freshness_table):

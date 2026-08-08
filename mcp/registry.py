@@ -730,7 +730,7 @@ TOOLS = {
                 "Unified lab intelligence. Use 'view' to select the analysis: "
                 "'results' (default) = latest blood work values across all 7 draws with reference ranges and trend direction. "
                 "'trends' = biomarker trajectory over time — slope, direction, clinical threshold crossings. "
-                "'out_of_range' = all historically out-of-range biomarkers with persistence classification (chronic/recurring/occasional). "
+                "'out_of_range' = out-of-range biomarkers with persistence (chronic/recurring/occasional/single_observation). "
                 "Use for: 'show my blood work', 'lab results', 'biomarker trends', 'what's out of range?', "
                 "'cholesterol history', 'which labs are chronic issues?'."
             ),
