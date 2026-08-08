@@ -218,19 +218,6 @@ def test_every_generic_type_is_recognised_on_its_own_and_after_every_prefix():
             assert en.is_generic_name(f"{prefix} {kind}"), f"{prefix} {kind}"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery): enrichment_lambda.py:129 is_generic_name() only "
-        "matches a TWO-token name (`len(parts) == 2`), but Strava auto-names "
-        "sport-qualified activities with three tokens — 'Morning Trail Run', "
-        "'Afternoon Mountain Bike Ride', 'Evening Weight Training'. Those are exactly "
-        "as generic as 'Morning Run', yet the location is appended as a suffix "
-        "instead of promoted to the primary identifier, so the site + digests show "
-        "'Morning Trail Run — Issaquah, WA' where the design says 'Issaquah, WA "
-        "TrailRun'. Hurts every reader of the four surfaces that render enriched_name."
-    ),
-)
 def test_a_three_token_strava_auto_name_is_also_generic():
     assert en.is_generic_name("Morning Trail Run") is True
 
@@ -339,39 +326,12 @@ def test_every_activity_across_every_day_reaches_the_population():
     assert distances == [1.0, 2.0, 3.0]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery): enrichment_lambda.py:148-151 gates the "
-        "percentile population on truthiness (`if elev:` / `if dist:`), so a "
-        "genuinely-flat activity (0 ft elevation gain — every treadmill run, pool "
-        "swim and flat city walk) is EXCLUDED from the all-time population rather "
-        "than ranked at the bottom of it. Removing the bottom of the distribution "
-        "shrinks the denominator, which UNDERSTATES every remaining activity's "
-        "percentile: with [0, 0, 100] the 100 ft climb is at the 66th percentile of "
-        "what Matthew has actually done, but the code ranks it against [100] alone "
-        "and returns 0.0. The published 'top N% ever' claim is therefore computed "
-        "over a population that silently excludes real efforts (ADR-104)."
-    ),
-)
 def test_a_genuinely_flat_effort_counts_as_a_zero_not_as_an_absence():
     days = [strava_day("2026-08-01", [activity(total_elevation_gain_feet=0), activity(total_elevation_gain_feet=100)])]
     elevations, _ = en.build_percentile_lookup(days)
     assert elevations == [0.0, 100.0]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery): enrichment_lambda.py:149-151 calls float(elev) "
-        "with no guard, and build_percentile_lookup() runs over the ENTIRE Strava "
-        "history before any day is enriched. One non-numeric elevation or distance "
-        "anywhere in the archive therefore raises ValueError out of "
-        "enrich_date_range() and out of lambda_handler() (which re-raises), so the "
-        "nightly run fails wholesale and NO activity is enriched — including the "
-        "thousands of clean ones. A per-value guard would cost the one bad row only."
-    ),
-)
 def test_one_unparseable_metric_in_the_archive_cannot_kill_the_whole_population():
     days = [strava_day("2026-08-01", [activity(total_elevation_gain_feet="n/a"), activity(total_elevation_gain_feet=100)])]
     elevations, _ = en.build_percentile_lookup(days)
@@ -528,35 +488,10 @@ def test_rebuilding_the_same_activity_produces_an_identical_label():
     assert en.build_enriched_name(act, 80, None, None, [], []) == en.build_enriched_name(dict(act), 80, None, None, [], [])
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery): enrichment_lambda.py:201 does "
-        "`activity.get('name', '').strip()` — the default only applies when the KEY "
-        "is absent, so a stored activity whose `name` is explicitly None raises "
-        "AttributeError. There is no per-activity try/except anywhere in "
-        "enrich_date_range(), and lambda_handler() re-raises, so ONE such row aborts "
-        "the entire nightly run and every other activity that night goes unenriched. "
-        "Same shape at line 214 for `sport_type` (`.title()` on None)."
-    ),
-)
 def test_an_activity_stored_without_a_name_degrades_rather_than_raising():
     assert isinstance(en.build_enriched_name({"name": None}, None, None, None, [], []), str)
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery): enrichment_lambda.py:214 renders the sport "
-        "with `.title()`, which lowercases every character after the first of each "
-        "word. Strava's `sport_type` values are CamelCase tokens — TrailRun, "
-        "MountainBikeRide, WeightTraining, VirtualRide — so the label published to "
-        "the site, both digest emails and the MCP search index reads 'Issaquah, WA "
-        "Trailrun'. It also makes the enriched label un-searchable by the real sport "
-        "token, which is the stated purpose of search_activities matching "
-        "enriched_name (docs/SCHEMA.md:365)."
-    ),
-)
 def test_the_sport_token_is_rendered_as_strava_spells_it():
     label = en.build_enriched_name(
         activity("Morning Run", location_city="Issaquah", location_state="WA", sport_type="TrailRun"), None, None, None, [], []
@@ -564,18 +499,6 @@ def test_the_sport_token_is_rendered_as_strava_spells_it():
     assert label == "Issaquah, WA TrailRun"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery): enrichment_lambda.py:214 defaults sport_type "
-        "to '' and then unconditionally concatenates it, so a generic-named activity "
-        "with no sport_type yields a label with a TRAILING SPACE — 'Seattle, WA '. "
-        "That string is written to DynamoDB and rendered verbatim by "
-        "site_api_autonomic.py:303, site_api_vitals_depth.py:237 and both digest "
-        "emails; it also defeats the label-equality idempotency check's intent by "
-        "storing whitespace as content."
-    ),
-)
 def test_a_generic_activity_with_no_sport_type_has_no_trailing_whitespace():
     label = en.build_enriched_name(activity("Morning Run", location_city="Seattle", location_state="WA"), None, None, None, [], [])
     assert label == label.strip()
@@ -808,17 +731,6 @@ def test_only_the_days_that_changed_are_written(table, frozen_clock):
     assert [u["Key"]["sk"] for u in table.updates] == ["DATE#2026-08-06"]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery): enrich_date_range() (enrichment_lambda.py:289) "
-        "has no per-activity error boundary, and lambda_handler() re-raises "
-        "(line 362). One malformed activity anywhere in the window therefore aborts "
-        "the run, so every LATER day in the batch is silently left unenriched while "
-        "the invocation reports a hard failure. Days already written stay written, so "
-        "the archive is left half-enriched with no record of where it stopped."
-    ),
-)
 def test_one_malformed_activity_does_not_abort_the_rest_of_the_batch(table, frozen_clock):
     _seed(
         table,
@@ -831,17 +743,6 @@ def test_one_malformed_activity_does_not_abort_the_rest_of_the_batch(table, froz
     assert [u["Key"]["sk"] for u in table.updates] == ["DATE#2026-08-06"]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery): a Strava day record that arrived without a "
-        "`date` attribute is invisible to enrichment. enrich_date_range() filters the "
-        "target window on `d.get('date', '')` (line 266) rather than on the `sk` it "
-        "already queried by, so '' never falls inside the window and the day is "
-        "skipped in silence — even though the sk-range query returned it. The two "
-        "notions of 'which day is this' should not be allowed to disagree."
-    ),
-)
 def test_a_day_identified_only_by_its_sort_key_is_still_enriched(table, frozen_clock):
     day = strava_day("2026-08-06", [activity("X", distance_miles=1.0)])
     del day["date"]
@@ -905,17 +806,6 @@ def test_a_failed_read_surfaces_as_a_failed_invocation(monkeypatch, frozen_clock
         en.lambda_handler({}, None)
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery): lambda_handler() (enrichment_lambda.py:339) "
-        "requires BOTH start_date and end_date to honour an explicit range. An event "
-        "carrying only `start_date` silently falls through to the nightly branch and "
-        "enriches yesterday instead — the operator's requested window is discarded "
-        "with no warning log and no error. Same shape as the #1917 window-honesty "
-        "class: the run reports a window it was never asked for."
-    ),
-)
 def test_a_one_sided_range_is_rejected_rather_than_silently_reinterpreted(table, frozen_clock):
     import json
 
@@ -924,16 +814,6 @@ def test_a_one_sided_range_is_rejected_rather_than_silently_reinterpreted(table,
     assert body["start_date"] == "2026-07-01"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery): `{'backfill': true}` with no start_date "
-        "defaults to 2020-01-01 (enrichment_lambda.py:336) while the percentile "
-        "context query already reaches back to 2000-01-01 (line 259). The docstring "
-        "calls this 'Full backfill', but any activity before 2020 is counted in the "
-        "ranking population and never enriched itself — a silently partial backfill."
-    ),
-)
 def test_a_full_backfill_covers_the_whole_archive_it_ranks_against(table, frozen_clock):
     import json
 
@@ -1117,18 +997,6 @@ def test_the_weekly_digest_renders_the_label_that_survived_the_re_ingest():
     assert block["activities"][0]["name"] == "Issaquah, WA Run · 3.0mi"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, docs): the module docstring "
-        "(enrichment_lambda.py:3) states 'EventBridge: 06:00 UTC = 10pm PT'. The live "
-        "schedule in cdk/stacks/ingestion_stack.py:427 is cron(30 15 * * ? *) — "
-        "15:30 UTC. Nine and a half hours of drift on the one line an operator reads "
-        "to decide when the nightly run happens, and it is the line that makes the "
-        "'runs after all daily syncs complete' claim (which the 15:30 slot does not "
-        "satisfy — Strava ingests hourly through 23:10 UTC)."
-    ),
-)
 def test_the_docstring_states_the_schedule_the_stack_actually_deploys():
     stack = open(os.path.join(ROOT, "cdk", "stacks", "ingestion_stack.py"), encoding="utf-8").read()
     marker = stack.split('function_name="activity-enrichment"', 1)[1]
