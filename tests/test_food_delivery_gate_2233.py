@@ -42,6 +42,19 @@ Two guards, matching the shape of #2209's own test (and the repo's now-standing
 
      A fourth reader added later anywhere in `lambdas/` without a gate reds this
      test automatically — no allowlist to remember to update.
+
+Updated by #2235 (landed just after this PR): the raw `table.get_item` call both
+functions used moved into one shared reader,
+`common.digest_utils.get_food_delivery_streak_state` (added there so a stale
+food_delivery source can't surface a frozen streak as current — a correctness
+concern, orthogonal to this file's disclosure concern). The derivation here now
+recognizes calls to that function by name (`_DEDICATED_FOOD_DELIVERY_READERS`)
+instead of only the raw `get_item` shape, and `common/digest_utils.py` itself
+joins the exemption list: it is the plumbing (like the generic `_query_source`
+readers below, never themselves required to gate), and the disclosure check
+stays the CALLER's job — verified by daily_brief_lambda/weekly_digest_lambda
+still gating BEFORE calling the shared reader, and character_sheet_lambda
+staying exempt for its internal-only use.
 """
 
 from __future__ import annotations
@@ -70,9 +83,23 @@ LAMBDAS = ROOT / "lambdas"
 _EXEMPT = {
     (LAMBDAS / "ingestion" / "food_delivery_lambda.py").resolve(),
     (LAMBDAS / "compute" / "character_sheet_lambda.py").resolve(),
+    # #2235: the shared low-level reader itself (common.digest_utils
+    # .get_food_delivery_streak_state) holds the ONE literal `table.get_item`
+    # call against STREAK#current, added so all three consumers share a
+    # single freshness check instead of each re-reading the record raw.
+    # Gating for DISCLOSURE is the CALLER's responsibility, same as the
+    # generic `_query_source` plumbing below is never itself required to
+    # gate — daily_brief_lambda/weekly_digest_lambda both check
+    # nutrition_delivery_public() BEFORE calling it (see the derived call
+    # sites for those two files); character_sheet_lambda calls it
+    # unconditionally for its internal-only scoring use, exempted above.
+    (LAMBDAS / "common" / "digest_utils.py").resolve(),
 }
 
 _QUERY_SOURCE_READERS = {"_query_source", "_latest_item", "_latest_item_asof"}
+# #2235: a dedicated reader, not a generic one — any call counts, no
+# first-arg-is-food_delivery check needed (it only ever reads that partition).
+_DEDICATED_FOOD_DELIVERY_READERS = {"get_food_delivery_streak_state"}
 _GATE_FN_NAME = "nutrition_delivery_public"
 
 
@@ -83,13 +110,24 @@ _GATE_FN_NAME = "nutrition_delivery_public"
 
 def _leaking_fake_table():
     """A get_item stub that WOULD leak a real-shaped streak record if the gate
-    were bypassed — a false-negative-proof fixture, not an empty stub."""
+    were bypassed — a false-negative-proof fixture, not an empty stub.
+
+    `updated_at` is pinned FRESH (real now) so this fixture exercises the
+    disclosure gate in isolation from the #2235 freshness gate added to
+    `common.digest_utils.get_food_delivery_streak_state` — the two are
+    orthogonal (this file/issue is about WHO can see the figure; #2235 is
+    about whether the figure is even current) and conflating them here would
+    make a "flag on" assertion depend on wall-clock staleness by accident.
+    """
+    from datetime import datetime, timezone
+
     fake = MagicMock()
     fake.get_item.return_value = {
         "Item": {
             "streak_days": 3,
             "last_order_date": "2026-03-25",
             "last_order_merchant": "DoorDash",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         }
     }
     return fake
@@ -202,6 +240,8 @@ def _get_item_targets_food_delivery(call: ast.Call) -> bool:
 def _reads_food_delivery_partition(call: ast.Call) -> bool:
     name = _callee_name(call)
     if name in _QUERY_SOURCE_READERS and _first_arg_is_food_delivery(call):
+        return True
+    if name in _DEDICATED_FOOD_DELIVERY_READERS:
         return True
     if name == "get_item" and _get_item_targets_food_delivery(call):
         return True

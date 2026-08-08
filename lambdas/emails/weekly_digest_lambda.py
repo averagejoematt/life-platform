@@ -54,6 +54,7 @@ from common.digest_utils import (
     dedup_activities,
     fmt,
     fmt_num,
+    get_food_delivery_streak_state,  # #2235: one read path for STREAK#current
     safe_float,
 )
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
@@ -2050,9 +2051,10 @@ def build_html(data, commentary, profile):
 def get_food_delivery_digest_line():
     """Returns a one-line summary for the weekly digest nutrition section.
 
-    Reads the food_delivery STREAK#current record and returns a contextual
-    digest line about the current delivery-free streak.
-    Non-fatal — returns None on any error.
+    Reads the food_delivery STREAK#current record via the shared #2235 read path
+    (get_food_delivery_streak_state) and returns a contextual digest line about the
+    current delivery-free streak — None once the source is stale, rather than a
+    frozen count from the last import. Non-fatal — returns None on any error.
 
     Gated by nutrition_delivery_public() (P2.3, #2209/#2210, discovered as an
     ungated latent door alongside #2233's fix to the sibling
@@ -2067,8 +2069,7 @@ def get_food_delivery_digest_line():
     if not nutrition_delivery_public():
         return None
     try:
-        resp = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#food_delivery", "sk": "STREAK#current"})
-        streak = resp.get("Item")
+        streak = get_food_delivery_streak_state(table, USER_ID, now=datetime.now(timezone.utc))
         if not streak:
             return None
         streak_days = int(streak.get("streak_days", 0))

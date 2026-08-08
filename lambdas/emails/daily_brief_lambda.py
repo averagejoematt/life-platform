@@ -187,7 +187,7 @@ ai_calls.init(
 # ==============================================================================
 
 
-from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
+from common.digest_utils import d2f, get_food_delivery_streak_state, safe_float  # shared bundled helpers (#970)
 
 
 def avg(vals):
@@ -1349,9 +1349,11 @@ def _init_output_writers():
 def get_food_delivery_brief_signal():
     """Returns a one-line signal for the daily brief nutrition section.
 
-    Reads the food_delivery STREAK#current record and returns a contextual
-    message about the current delivery-free streak or recent order.
-    Non-fatal — returns None on any error.
+    Reads the food_delivery STREAK#current record via the shared #2235 read path
+    (get_food_delivery_streak_state) and returns a contextual message about the
+    current delivery-free streak or recent order — None (no line at all) once the
+    source is stale, rather than a frozen count from the last import. Non-fatal —
+    returns None on any error.
 
     Gated by nutrition_delivery_public() (P2.3, #2209/#2210, this door #2233) —
     checked BEFORE the query, matching the sibling readers in
@@ -1367,8 +1369,7 @@ def get_food_delivery_brief_signal():
     if not nutrition_delivery_public():
         return None
     try:
-        resp = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#food_delivery", "sk": "STREAK#current"})
-        streak = resp.get("Item")
+        streak = get_food_delivery_streak_state(table, USER_ID, now=datetime.now(timezone.utc))
         if not streak:
             return None
         streak_days = int(streak.get("streak_days", 0))
