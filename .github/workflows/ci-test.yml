@@ -147,12 +147,24 @@ jobs:
           python3 -m pytest tests/test_upstream_contracts.py -v --tb=short
           echo "::endgroup::"
 
-      - name: Full test suite
-        # R20-F01: Run the complete pytest suite (excluding AWS integration tests)
-        run: |
-          echo "::group::Full pytest suite"
-          python3 -m pytest tests/ -v --tb=short --ignore=tests/test_integration_aws.py
-          echo "::endgroup::"
+      # #2259: the standalone "Full test suite" step that used to sit here ran the
+      # EXACT same selection as the coverage gate below (`tests/` minus
+      # test_integration_aws.py) — the whole suite, twice, 493s + 705s = 1228s against
+      # a 1200s budget. It was deleted rather than parallelised: no new dependency, no
+      # xdist, ~42% off this job's wall-clock.
+      #
+      # The pre-merge half of this pair lives in pr-checks.yml, which selects the
+      # `premerge` marker (tests/conftest.py auto-applies it to the behaviour suite +
+      # everything deploy_critical). Both lanes name that ONE marker on purpose:
+      # tests/test_premerge_lane.py fails if either stops referencing it, which is what
+      # stops the two lanes silently diverging the way they did before #2258.
+      #
+      # It was only safe to delete once the `pipefail` bug below was fixed. Until then
+      # the coverage step's `| tail -100` swallowed pytest's exit code (GitHub's default
+      # shell is `bash -e {0}` — `-e` does NOT imply pipefail), so the deleted step was
+      # the ONLY one on main whose test failures could actually red the build. Removing
+      # it without the fix would have left main with no test signal at all while
+      # continuing to report green.
 
       - name: Test coverage gate (regression floor, ADR-080)
         # ENFORCED regression floor. The codebase is integration-tested (handlers
@@ -179,6 +191,14 @@ jobs:
         # (up-only). The gap-warning step below reminds a human to ratchet when the
         # floor drifts >10pts under measured. Scope: lambdas/ + mcp/ only.
         run: |
+          # `set -o pipefail` is LOAD-BEARING (#2259). GitHub's default shell is
+          # `bash -e {0}`; `-e` does not imply pipefail, so `pytest … | tail -100`
+          # exited with tail's status (always 0). Both `--cov-fail-under=74` AND every
+          # test failure in this step were therefore silently discarded — this gate has
+          # never once failed a build. Proven locally:
+          #   bash -e -c 'python3 -c "import sys; sys.exit(1)" | tail -100'; echo $?  → 0
+          # Do not remove this line, and do not add another unguarded pipe below it.
+          set -o pipefail
           echo "::group::Coverage report + gate"
           python3 -m pytest tests/ \
               --ignore=tests/test_integration_aws.py \

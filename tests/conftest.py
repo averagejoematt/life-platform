@@ -113,3 +113,43 @@ def _hermetic_aws_credentials(request, monkeypatch):
     monkeypatch.setattr(boto3, "DEFAULT_SESSION", None)
     yield
     boto3.DEFAULT_SESSION = None
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# THE `premerge` MARKER  (#2258)
+# ══════════════════════════════════════════════════════════════════════════════
+# WHY. The pre-merge lane (pr-checks.yml) was a STRICT SUBSET of the post-merge
+# lane (ci-test.yml): pre-merge ran `--collect-only` plus the `deploy_critical`
+# marker subset, and ZERO `tests/*_behavior.py` tests carry that marker. So a PR
+# could be green pre-merge and red main the moment it landed. That gap red-mained
+# main THREE times in 24h on 2026-08-08 — once on an undeclared PyYAML dep, then
+# twice on the same collision shape: one PR's coverage tranche pins current
+# behaviour while a sibling PR's privacy gate turns that behaviour off. Each PR is
+# genuinely green alone; only their union is red, and only the post-merge lane
+# ever saw the union.
+#
+# The behaviour suite is what catches that class, and it is affordable: 34 files /
+# ~4,600 tests / ~22s locally (measured 2026-08-08), against a lane that took 117s
+# with a 10-minute timeout.
+#
+# DERIVED, NOT HAND-LISTED. Marking 34 files by hand would rot the moment someone
+# adds the 35th. This hook keys on the filename, so a new `*_behavior.py` joins the
+# pre-merge lane automatically — and `tests/test_premerge_lane.py` asserts both
+# workflows reference this one marker, so the two lanes cannot drift apart again.
+_PREMERGE_FILENAME_SUFFIX = "_behavior.py"
+
+
+def pytest_collection_modifyitems(config, items):
+    """Auto-apply `premerge` to the behaviour suite + everything deploy-critical.
+
+    Two sources, one marker:
+      - any test in a `tests/*_behavior.py` file (the union-breach detector), and
+      - any test already marked `deploy_critical` (ADR-117's deploy-gating subset),
+        so the pre-merge lane is a strict SUPERSET of what it checked before rather
+        than a swap.
+    """
+    for item in items:
+        if os.path.basename(str(getattr(item, "fspath", ""))).endswith(_PREMERGE_FILENAME_SUFFIX) or item.get_closest_marker(
+            "deploy_critical"
+        ):
+            item.add_marker(pytest.mark.premerge)
