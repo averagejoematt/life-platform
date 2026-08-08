@@ -145,7 +145,7 @@ PLATFORM_STATS = {
     "review_grade": "A",
     "active_secrets": 21,
     "site_pages": 77,
-    "test_count": 10983,
+    "test_count": 10987,
     "board_technical": 12,
     "board_product": 8,
     "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,
@@ -368,6 +368,19 @@ def _latest_item_asof(source: str, date: str, include_pilot: bool = False) -> di
     resp = table.query(**kwargs)
     items = _decimal_to_float(resp.get("Items", []))
     return items[0] if items else None
+
+
+def nutrition_delivery_public() -> bool:
+    """Shared parse of NUTRITION_DELIVERY_PUBLIC (P2.3, #2209) — the single source of
+    truth for whether the `food_delivery` DDB partition may be queried and published on
+    ANY public route. Every reader of that partition in lambdas/web/ must gate through
+    this helper (checked before querying — never query-then-filter) rather than
+    re-parsing the env var, so the two readers can never drift out of sync. Default OFF:
+    with the flag off, the delivery source is never queried and nothing private
+    (spend/binge figures) enters any response. Byte-identical parsing to the pre-#2209
+    inline check: `.strip().lower() in ("1", "true", "yes")`.
+    """
+    return os.environ.get("NUTRITION_DELIVERY_PUBLIC", "").strip().lower() in ("1", "true", "yes")
 
 
 def _get_profile() -> dict:
