@@ -32,6 +32,7 @@ sys.path.insert(0, os.path.join(_ROOT, "lambdas", "coach"))
 
 from experiment import measurable_metrics as mm  # noqa: E402
 from privacy import diary_claims as dc  # noqa: E402
+from site_api_family import family_source  # noqa: E402  # #1654: guard the SET, not the instance
 
 SESSION_DATE = "2026-07-26"
 SOURCE_SK = "DATE#2026-07-26#journal#video_diary#a1b2c3d4e5f6"
@@ -338,8 +339,15 @@ class TestTrackRecord:
     def test_public_prediction_surfaces_do_NOT_read_the_claims_partition(self):
         """Privacy: diary content is private by default. The public /api/predictions and
         /api/calibration path reads COACH# partitions only — a claim of his never crosses
-        to the website without an explicit consent marker (deliberately not wired)."""
-        src = open(os.path.join(_ROOT, "lambdas", "web", "site_api_coach.py")).read()
+        to the website without an explicit consent marker (deliberately not wired).
+
+        #1654 split site_api_coach.py into a thin facade plus cohesive siblings. Read
+        against the facade alone this absolute would have gone silently VACUOUS — the
+        prediction/calibration bodies moved one module sideways and the facade has
+        nothing left to object to. `family_source` derives the whole family from the
+        facade's own imports, so the next split needs no edit here either.
+        """
+        src = family_source("site_api_coach")
         assert "diary_claims" not in src
 
 

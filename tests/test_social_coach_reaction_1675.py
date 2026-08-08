@@ -22,8 +22,10 @@ quality gate, the phase/cycle stamp (#2119), per-post sk uniqueness, idempotency
 grants (without which budget_guard fails OPEN to tier 0), and fail-open wiring.
 """
 
+import ast
 import os
 import sys
+import textwrap
 import types
 from unittest.mock import MagicMock
 
@@ -427,12 +429,34 @@ def test_serve_shape_and_render_agree_on_the_field_names():
     """The classic silent drift: the serve layer renames a field and the reader keeps
     reading the old one, so the surface goes quietly blank. Pin the three #1675 fields
     across the boundary (coaching.js has no exports, so this is a source-level pair)."""
-    api = open(os.path.join(_REPO, "lambdas", "web", "site_api_coach.py"), encoding="utf-8").read()
-    shape = api.split("def handle_diary_reactions", 1)[1].split("\ndef ", 1)[0]
+    # #1654 split site_api_coach.py into a facade + siblings: `handler_source` follows
+    # the facade's thin delegator to the module that actually owns the body, so this
+    # pair keeps reading the real serve shape instead of a three-line delegator.
+    from site_api_family import handler_source
+
+    shape = handler_source("site_api_coach", "handle_diary_reactions")
+    assert shape, "handle_diary_reactions resolved to an empty body — the AST walk went inert"
     js = open(os.path.join(_REPO, "site", "assets", "js", "coaching.js"), encoding="utf-8").read()
 
+    # The EMITTED key names, not "the name appears somewhere in the body" — a substring
+    # scan could not tell `"kind": …` (what the reader gets) from `i.get("kind")` (what
+    # storage is called), so renaming the response key alone left the guard green. That
+    # rename IS the drift this test is named for, so the assertion is made against the
+    # payload keys: dict-literal keys plus `out["…"] = …` assignments.
+    tree = ast.parse(textwrap.dedent(shape))
+    emitted = {k.value for d in ast.walk(tree) for k in getattr(d, "keys", []) if isinstance(k, ast.Constant) and isinstance(k.value, str)}
+    emitted |= {
+        n.slice.value
+        for n in ast.walk(tree)
+        if isinstance(n, ast.Subscript)
+        and isinstance(n.ctx, ast.Store)
+        and isinstance(n.slice, ast.Constant)
+        and isinstance(n.slice.value, str)
+    }
+    assert emitted, "no response keys discovered — the AST scan went inert"
+
     for field in ("kind", "uid", "post_url"):
-        assert f'"{field}"' in shape, f"the serve shape must emit {field}"
+        assert field in emitted, f"the serve shape must emit {field}"
         assert f"r.{field}" in js or f"x.{field}" in js, f"the render must read {field}"
     # the list id must carry the per-record uid, or two same-day posts on one channel
     # collapse to one addressable entry (the render-layer twin of the #1756 sk collision)

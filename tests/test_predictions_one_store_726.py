@@ -23,6 +23,7 @@ sys.path.insert(0, _ROOT)
 sys.path.insert(0, os.path.join(_ROOT, "lambdas"))
 
 from fakes import FakeDdbTable  # noqa: E402
+from site_api_family import resolve_handler  # noqa: E402  # #1654: follow the facade to the owning module
 
 
 def _function_strings(path, func_name):
@@ -52,7 +53,12 @@ class TestOneStore:
         assert not any("coach_thread" in s for s in strings), "must NOT read the legacy coach_thread# store"
 
     def test_site_api_handle_predictions_reads_same_store(self):
-        path = os.path.join(_ROOT, "lambdas", "web", "site_api_coach.py")
+        # #1654 split site_api_coach.py into a facade + cohesive siblings. Both the
+        # handler and the fetch helper are now thin delegators on the facade, so this
+        # pin resolves through them to the module that owns each body — otherwise the
+        # canonical-store assertion would be reading a `return _ledger.…(…)` line and
+        # would have gone loudly (then, after a lazy "fix", silently) inert.
+        path, _, _ = resolve_handler("site_api_coach", "handle_predictions")
         strings = _function_strings(path, "handle_predictions")
         assert any("COACH#" in s for s in strings)
         assert not any("coach_thread" in s for s in strings)
@@ -60,7 +66,8 @@ class TestOneStore:
         # the PREDICTION#-store pin follows the indirection: the handler must
         # route through the helper, and the helper must read PREDICTION#.
         assert "_fetch_prediction_partition" in _function_names(path, "handle_predictions")
-        helper_strings = _function_strings(path, "_fetch_prediction_partition")
+        helper_path, _, _ = resolve_handler("site_api_coach", "_fetch_prediction_partition")
+        helper_strings = _function_strings(helper_path, "_fetch_prediction_partition")
         assert any("PREDICTION#" in s for s in helper_strings)
         assert not any("coach_thread" in s for s in helper_strings)
 

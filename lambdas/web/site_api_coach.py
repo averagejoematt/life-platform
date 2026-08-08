@@ -1,5 +1,5 @@
 """
-lambdas/web/site_api_coach.py — coach intelligence + miscellaneous handlers.
+lambdas/web/site_api_coach.py — coach intelligence + miscellaneous endpoint FACADE.
 
 Extracted from lambdas/web/site_api_lambda.py (P1.1 Phase B extension, 2026-05-27).
 
@@ -8,6 +8,31 @@ of lambda_handler. Each block did custom query-param parsing + DDB lookup,
 so they didn't fit the ROUTES dispatch pattern (which calls handlers
 with no args). Now they're proper functions taking event, callable from
 the dispatcher as `return handle_X(event)`.
+
+#1654 (god-module breakup): at 2,664 lines this was the largest remaining module
+in the serving path. The handler LOGIC was split, by concern, into cohesive sibling
+modules. The logic lives there; the 19 routed entrypoints stay HERE as thin
+delegators, so the router bindings, `handler.__module__`, and the test monkeypatch
+surface are all unchanged. No contract change.
+
+  web/site_api_coach_profile.py   — /api/coaches, /api/coach/{persona_id}
+      (who each coach IS: registry, authored character, report card, #1387 dossier)
+  web/site_api_coach_stance.py    — /api/coach_team
+      (what they think RIGHT NOW: STANCE#latest, the ladder scaffold, held-since,
+      the integrator digest, tensions, the live dispute)
+  web/site_api_coach_ledger.py    — /api/calibration, /api/predictions,
+      /api/coach_docket, /api/panel_ledger, /api/voice_fidelity
+      (calls with skin in the game, and how they turned out — one PREDICTION#/CALIB#
+      fetch spine so season stays a derived subset of career, #1376/#1527/#2063)
+  web/site_api_coach_narrative.py — /api/coach_analysis, /api/ai_analysis,
+      /api/coach_timeline, /api/recap, /api/experiment_synthesis,
+      /api/weekly_priority, /api/month_rollup
+      (guarded reads of pre-computed prose: the staleness refusal + the #802
+      regeneration-paused disclosure are what make these one concern)
+  web/site_api_thirdwall.py       — /api/field_notes, /api/decisions,
+      /api/journal_quotes, /api/diary_reactions
+      (the human voice on the record, all four screened all-or-nothing through the
+      one `_public_decision_note` rule — #1568/#1569/#1675)
 
 Endpoints:
   /api/coach_docket     — the Dispute Docket (#1386): open positions with frozen stakes + resolved history
@@ -20,27 +45,48 @@ Endpoints:
   /api/coach_timeline   — coach thread timeline (?coach_id= param)
   /api/weekly_priority  — integrator synthesis (cross-domain weekly priority)
   /api/month_rollup     — integrator month rollup (trailing ~4 weeks, #1115)
+
+How the split preserves the monkeypatch surface
+-----------------------------------------------
+Each delegator hands its own globals() to the split handler as `_g`; the handler
+reads the injectable/monkeypatched state back via `_g["<name>"]`. The split modules
+do NOT import this facade, so there is no import cycle.
+
+`_g` is wide here because this module's suite reaches deep into it. `table` alone is
+monkeypatched in 13 test files; `EXPERIMENT_START` is repointed by
+test_pre_start_contract_sweep's genesis sweep; `_load_s3_json`, `_parallel_fetch`,
+`_current_cycle`, `_current_day_n`, `_integrator_digest`, `_regeneration_paused` and
+`_stance_latest` are each stubbed by name and then reached through a handler that
+calls them. Every one of those fan-outs goes back through `_g` to THIS module, so
+the stubs land exactly as they did pre-split.
+
+For the same reason the cross-seam helpers below are WRAPPERS, not re-exports: a
+re-export is not a patch point (#2192's lesson). `_stance_block` is called by the
+coach page in `_profile` and by the team view in `_stance`; both reach it through
+`_g`, so `monkeypatch.setattr(site_api_coach, "_stance_latest", …)` still changes
+what `_stance_block` sees. Only genuinely pure helpers (`_reader_reason`,
+`_stance_from_latest`, `_public_decision_note`, `_regeneration_paused`,
+`_current_cycle`, `_parallel_fetch`) are plain re-exports — they read no facade
+state, so a re-export and a wrapper are the same object either way.
+
+Source-text/AST guards that used to read this ONE file now scan the whole family via
+tests/site_api_family.py — #1841's public-surface privacy absolute (no public read of
+the on-tape claims partition), #726's canonical-prediction-store pin, #1986's
+byline-fallback pin, #1675's serve/render field pair. Guard the SET, not the instance,
+so they keep biting after this split and the next one.
 """
 
-import json
 import os
-import re
-from concurrent.futures import ThreadPoolExecutor
+
+# `datetime` is imported here for ONE reason: it is the facade's clock hand-off —
+# every split handler that reads the wall clock takes it back off `_g`, so freezing
+# this binding still reaches them. Do not remove it because nothing here calls it.
 from datetime import datetime
-from decimal import Decimal  # noqa: F401
 
 import boto3
-from boto3.dynamodb.conditions import Key
-from coach import (
-    coach_corrections,  # #1689 ledger — reused by the dossier retract/correct path (#1387)
-    coach_dossier,  # #1387: the verbatim, privacy-filtered dossier projection (bundled module)
-    coach_traits,  # #1113: authored trait scores for the immersive bios (bundled module)
-)
-from experiment import calibration_core  # #538: the ONE prediction-calibration scorer (Brier + reliability)
-from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
-from privacy import diary_consent  # #1483 (ADR-142 tier 2): the conversation-allude projection (bundled module)
+from experiment.phase_filter import singleton_visible, with_phase_filter  # noqa: F401 — re-export surface (#946/ADR-058)
 
-# CC-00/CC-09 modules — bundled into the site-api code package like every other
+# ── CC-00/CC-09 modules — bundled into the site-api code package like every other
 # lambdas/ module (#781: one bundle, no separate layer, so there's no deploy-race
 # window for these to lag behind). Imported defensively anyway so a corrupted or
 # partial deploy can't break the whole handler — the coaches endpoints just serve
@@ -54,6 +100,34 @@ except Exception:  # pragma: no cover - defensive guard, not expected in practic
     persona_registry = None
     _COACH_MODULES = False
 
+# ── Split logic modules — the handler bodies live here; delegated to at call time. ──
+from web import (
+    site_api_coach_ledger as _ledger,
+    site_api_coach_narrative as _narrative,
+    site_api_coach_profile as _profile,
+    site_api_coach_stance as _stance,
+    site_api_thirdwall as _thirdwall,
+)
+
+# ── Re-exports: constants tests read off this module, plus the PURE helpers (they
+# read no facade state, so a re-export IS the patch point — see the module docstring).
+from web.site_api_coach_ledger import (  # noqa: F401 — re-export surface
+    _CALIB_COACH_ID_MAP,
+    _CALIB_COACH_NAMES,
+    _DOCKET_MAX_PAGES,
+    _MAX_QUERY_PAGES,
+    _PREDICTION_PROJECTION_FIELDS,
+    DOCKET_OPEN_LIMIT,
+    DOCKET_RESOLVED_LIMIT,
+    _current_cycle,
+    _parallel_fetch,
+)
+from web.site_api_coach_narrative import _regeneration_paused  # noqa: F401 — re-export surface
+from web.site_api_coach_profile import _DISCLOSURE, _LEAD_FALLBACK, _reader_reason  # noqa: F401 — re-export surface
+from web.site_api_coach_stance import _stance_from_latest  # noqa: F401 — re-export surface
+
+# ── Monkeypatch/injection surface — kept on the facade so `monkeypatch.setattr(coach, …)`
+# still lands here and the delegators can hand these to the split handlers via `_g`.
 from web.site_api_common import (
     EXPERIMENT_START,
     PT,
@@ -68,6 +142,7 @@ from web.site_api_common import (
     prereg_seal_meta,
     table,
 )
+from web.site_api_thirdwall import _public_decision_note  # noqa: F401 — re-export surface (imported by site_api_diary)
 
 try:
     from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS
@@ -78,2587 +153,282 @@ except Exception:  # pragma: no cover - constants.py ships in every bundle (#781
 _S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 _S3 = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-west-2"))
 
-_DISCLOSURE = (
-    "An AI character. Reads Matthew's real data and speaks in its own voice — "
-    "correlative, never causal. The personality is a lens on real numbers, not a real person."
+# These names have no direct in-file reference of their own — they are the facade's
+# monkeypatch/hand-off surface: the split handlers read them via `_g` (`_g["<name>"]`,
+# where `_g` is a delegator's globals()), and tests read/patch them on this module.
+# Referenced here so the linter counts them as used.
+__facade_state__ = (
+    table,
+    EXPERIMENT_START,
+    EXPERIMENT_BASELINE_WEIGHT_LBS,
+    USER_PREFIX,
+    PT,
+    _load_s3_json,
+    _decimal_to_float,
+    _error,
+    _ok,
+    _scrub_blocked_terms,
+    logger,
+    pre_start_meta,
+    prereg_seal_meta,
+    datetime,
+    persona_registry,
+    coach_stance,
+    _COACH_MODULES,
+    _S3,
+    _S3_BUCKET,
 )
 
 
-def _regeneration_paused(feature: str) -> bool:
-    """True if the budget-tier ladder (ADR-063/125) currently pauses regeneration
-    of `feature` narratives — i.e. any content still being served is a HELD, not a
-    live, read. Callers attach this alongside `generated_at` so the front-end can
-    give an honest "as of / refresh paused" disclosure instead of presenting a
-    stale narrative present-tense (R22-CONTENT-03, #802).
-
-    Only call this with a feature name actually registered in
-    budget_guard._FEATURE_CUTOFF AND actually checked by that feature's writer
-    Lambda — e.g. "chronicle" (wednesday_chronicle_lambda, recap included) and
-    "coach_narrative" (coach_narrative_orchestrator, the OUTPUT# records
-    /api/coach_analysis reads). Fail-open to False (not paused) on any error,
-    mirroring budget_guard's own fail-open design — an SSM blip must never
-    manufacture a false disclosure banner.
-    """
-    try:
-        from ai.budget_guard import allow
-
-        return not allow(feature)
-    except Exception:
-        return False
+# ── Helper wrappers — the pre-split signatures, kept so every caller and every
+#    `monkeypatch.setattr(site_api_coach, …)` in the suite lands unchanged. Each
+#    hands this module's globals() to the sibling as `_g`. ─────────────────────
 
 
 def _registry():
-    return persona_registry.load_registry(_S3, _S3_BUCKET)
-
-
-# Last-resort byline if the registry module itself failed to import. Pinned equal
-# to config/personas.json's lead by tests/test_board_lead_single_character.py.
-_LEAD_FALLBACK = ("Dr. Eli Marsh", "Principal Investigator — Program Lead")
+    """Delegated to web.site_api_coach_profile._registry."""
+    return _profile._registry(_g=globals())
 
 
 def _lead_byline():
-    """(name, title) of the board lead, from the persona registry (#1986).
-
-    The weekly call, the month rollup and the arc are all signed by ONE character —
-    the registry's single ``lead: true`` persona. These bylines used to be three
-    separate string literals naming a persona the roster did not serve, which is
-    how the cast forked. Fail-soft to the registry's pinned fallback so a byline
-    never renders empty.
-    """
-    try:
-        return persona_registry.lead_byline(_S3, _S3_BUCKET)
-    except Exception as _e:  # noqa: BLE001 — a byline lookup must never 500 an endpoint
-        # Also covers persona_registry being None (the defensive import above).
-        logger.warning(f"[lead_byline] {_e}")
-        return _LEAD_FALLBACK
-
-
-def _current_cycle():
-    """Current experiment cycle (int) or None (#1376). Fail-soft SSM read via
-    coach_checkin.read_cycle (cached once per warm container, same fail-soft
-    contract phase_taxonomy.experiment_stamp relies on) — a missing param/grant
-    must never break the calibration/predictions surfaces, only omit the label."""
-    try:
-        from coach.coach_checkin import read_cycle
-
-        return read_cycle()
-    except Exception:
-        return None
+    """Delegated to web.site_api_coach_profile._lead_byline."""
+    return _profile._lead_byline(_g=globals())
 
 
 def _latest_weight_lbs():
-    """Most recent Withings weight_lbs, or None (caller falls back to baseline)."""
-    try:
-        resp = table.query(
-            **with_phase_filter(
-                {
-                    "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}withings") & Key("sk").begins_with("DATE#"),
-                    "ScanIndexForward": False,
-                    "Limit": 5,
-                }
-            )
-        )
-        for it in resp.get("Items", []):
-            w = _decimal_to_float(it).get("weight_lbs")
-            if w:
-                return float(w)
-    except Exception as _e:
-        logger.warning(f"[coaches] weight read: {_e}")
-    return None
-
-
-def _reader_reason(raw):
-    """Reader-facing translation of machine-spec eval reasons (truth audit 2026-07-10).
-
-    ~32 LEARNING# records carry internal grader notation like
-    "[null-threshold machine spec re-routed to directional] recovery_score trend=down
-    (slope=-0.0480), predicted=up" — that leaked verbatim onto 6 of 8 public report
-    cards. Translate at the API boundary ONLY (storage untouched): the known
-    directional re-route form becomes plain reader copy; any other bracketed
-    machine-spec prefix is stripped."""
-    import re
-
-    txt = str(raw or "")
-    stripped = re.sub(r"^\s*\[[^\]]*\]\s*", "", txt).strip()
-    if stripped != txt.strip():  # a bracketed machine-spec prefix was present
-        m = re.match(r"^(\w+)\s+trend=(\w+)\s*\(slope=[-+\d.eE]+\)\s*,\s*predicted=(\w+)\s*$", stripped)
-        if m:
-            metric = m.group(1).replace("_", " ")
-            return f"graded on direction — no numeric threshold was set; {metric} trended {m.group(2)}, the call said {m.group(3)}"
-    return stripped
+    """Delegated to web.site_api_coach_profile._latest_weight_lbs."""
+    return _profile._latest_weight_lbs(_g=globals())
 
 
 def _track_record(coach_id):
-    """Confirmed/refuted hit-rate from the COACH#<id>/LEARNING# eval trail (CC-02).
-    Honest pre-D-05: empty -> hit_rate None, preliminary True. Always labelled
-    self-assessment, never external validation (ER-05)."""
-    confirmed = refuted = 0
-    recent = []
-    try:
-        resp = table.query(
-            **with_phase_filter(
-                {
-                    "KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with("LEARNING#"),
-                    "ScanIndexForward": False,
-                    "Limit": 60,
-                }
-            )
-        )
-        for it in resp.get("Items", []):
-            it = _decimal_to_float(it)
-            if (it.get("channel") or "data") == "conversation":
-                # ADR-141 privacy tier: conversation learnings quote Matthew's
-                # verbatim check-in answers — Matthew-private, never rendered
-                # publicly (their status is also outside confirmed/refuted).
-                continue
-            st = it.get("status")
-            if st == "confirmed":
-                confirmed += 1
-            elif st == "refuted":
-                refuted += 1
-            if st in ("confirmed", "refuted") and len(recent) < 6:
-                recent.append(
-                    {
-                        "date": it.get("date") or it.get("sk", "").replace("LEARNING#", "").split("#")[0],
-                        "status": st,
-                        "metric": it.get("metric"),
-                        "reason": _reader_reason(it.get("reason", "")),
-                    }
-                )
-    except Exception as _e:
-        logger.warning(f"[coaches] track_record {coach_id}: {_e}")
-    decided = confirmed + refuted
-    return {
-        "confirmed": confirmed,
-        "refuted": refuted,
-        "decided": decided,
-        "hit_rate_pct": round(confirmed / decided * 100, 1) if decided else None,
-        "preliminary": decided < 12,
-        "n_note": "preliminary — fewer than 12 decided predictions" if decided < 12 else f"n={decided} decided",
-        "recent": recent,
-        "caveat": "Self-assessment of this coach's own calls — not external validation.",
-    }
+    """Delegated to web.site_api_coach_profile._track_record."""
+    return _profile._track_record(coach_id, _g=globals())
 
 
 def _conversation_references(coach_id, limit=5):
-    """#1483 (ADR-142 theme-referenceable tier): the coach's recent check-in
-    conversations with Matthew, projected to SANCTIONED fields only — date,
-    coarse laundered theme, read direction/weight — via
-    diary_consent.conversation_reference. The verbatim conversation text
-    (answer_quote / takeaway / question on the ADR-141 LEARNING# rows —
-    Matthew-private) never enters this payload: the projection BUILDS from an
-    allowlist, it does not copy-and-filter. Honest-empty on no data or failure."""
-    refs = []
-    try:
-        resp = table.query(
-            **with_phase_filter(
-                {
-                    "KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with("LEARNING#"),
-                    "ScanIndexForward": False,
-                    "Limit": 60,
-                }
-            )
-        )
-        for it in resp.get("Items", []):
-            if (it.get("channel") or "data") != "conversation":
-                continue
-            ref = diary_consent.conversation_reference(_decimal_to_float(it))
-            if ref:
-                refs.append(ref)
-            if len(refs) >= limit:
-                break
-    except Exception as _e:
-        logger.warning(f"[coaches] conversation refs {coach_id}: {_e}")
-    return {
-        "references": refs,
-        "count": len(refs),
-        "note": "What was said stays private — these record only that a conversation happened, its coarse theme, and how it moved the coach's read (ADR-142).",
-    }
+    """Delegated to web.site_api_coach_profile._conversation_references."""
+    return _profile._conversation_references(coach_id, limit, _g=globals())
 
 
 def _quality_trend(coach_id):
-    """Quality-gate score trend if cached at COACH#<id>/QUALITY#, else empty.
-    Always labelled self-assessment (ER-05)."""
-    scores = []
-    try:
-        resp = table.query(
-            **with_phase_filter(
-                {
-                    "KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with("QUALITY#"),
-                    "ScanIndexForward": False,
-                    "Limit": 14,
-                }
-            )
-        )
-        for it in resp.get("Items", []):
-            it = _decimal_to_float(it)
-            if it.get("score") is not None:
-                scores.append({"date": it.get("sk", "").replace("QUALITY#", ""), "score": it.get("score")})
-    except Exception:
-        pass
-    return {
-        "scores": list(reversed(scores)),
-        "caveat": "Self-assessment, not external validation (ER-05).",
-    }
+    """Delegated to web.site_api_coach_profile._quality_trend."""
+    return _profile._quality_trend(coach_id, _g=globals())
 
 
 def _tuning_log_for(coach_id):
-    """Tuning-changelog entries relevant to this coach (CC-03), newest first."""
-    log = _load_s3_json("config/coaches/tuning_log.json", "tuning_log")
-    entries = [e for e in log.get("entries", []) if e.get("coach") in (coach_id, "all")]
-    return list(reversed(entries))[:10]
+    """Delegated to web.site_api_coach_profile._tuning_log_for."""
+    return _profile._tuning_log_for(coach_id, _g=globals())
 
 
 def _voice_subset(coach_config_key):
-    """Curated, public-safe slice of a coach's voice spec for the page."""
-    cfg = _load_s3_json(f"config/coaches/{coach_config_key}.json", "coach_cfg")
-    examples = cfg.get("few_shot_examples") or []
-    example = examples[0] if examples else None
-    if isinstance(example, dict):
-        example = example.get("output") or example.get("text") or example.get("example") or next(iter(example.values()), None)
-    return {
-        "decision_style": cfg.get("decision_style"),
-        "structural_voice_rules": cfg.get("structural_voice_rules"),
-        "few_shot_example": example,
-    }
+    """Delegated to web.site_api_coach_profile._voice_subset."""
+    return _profile._voice_subset(coach_config_key, _g=globals())
 
 
 def _relationships(coach_id):
-    """In/out influence-graph edges for this coach (top 3 each)."""
-    g = _load_s3_json("config/coaches/influence_graph.json", "influence_graph")
-    weights = g.get("weights", {})
-    out_edges, in_edges = [], []
-    for edge, w in weights.items():
-        if "→" not in edge:
-            continue
-        src, dst = [x.strip() for x in edge.split("→")]
-        if src == coach_id:
-            out_edges.append({"coach": dst, "weight": w})
-        elif dst == coach_id:
-            in_edges.append({"coach": src, "weight": w})
-    out_edges.sort(key=lambda e: -e["weight"])
-    in_edges.sort(key=lambda e: -e["weight"])
-    return {"leans_on": out_edges[:3], "leaned_on_by": in_edges[:3]}
+    """Delegated to web.site_api_coach_profile._relationships."""
+    return _profile._relationships(coach_id, _g=globals())
 
 
 def _character(p):
-    """Public-safe personality slice from board_of_directors.json — the fictional
-    background + traits that shape this coach's prompt. Config-only, no inference."""
-    key = p.get("board_persona_key")
-    if not key:
-        return {}
-    members = (_load_s3_json("config/board_of_directors.json", "board_dir") or {}).get("members", {})
-    m = members.get(key) or {}
-    if not m:
-        return {}
-    persn = m.get("personality") or {}
-    voice = m.get("voice") or {}
-    return {
-        "title": m.get("title"),
-        # #1113 prompt transparency: the real source list this coach's prompt reads
-        # (config-authored, public-safe source names — never values).
-        "data_sources": (m.get("data_sources") or [])[:8],
-        "principles": (m.get("principles") or [])[:5],
-        "voice": {k: voice.get(k) for k in ("tone", "style", "catchphrase") if voice.get(k)},
-        "tendencies": (persn.get("tendencies") or [])[:4],
-        "signature_behavior": persn.get("signature_behavior"),
-        "arc": persn.get("arc_seed"),
-        "relationship_to_matthew": m.get("relationship_to_matthew"),
-        "focus_areas": (m.get("focus_areas") or [])[:6],
-    }
+    """Delegated to web.site_api_coach_profile._character."""
+    return _profile._character(p, _g=globals())
 
 
 def _working_hypotheses(coach_id, limit=6):
-    """Live working hypotheses: open THREAD# (observation/prediction/concern) + pending
-    PREDICTION# claims. Already-computed by the coach engine; read-only here."""
-    out = []
-    try:
-        tr = table.query(
-            **with_phase_filter(
-                {"KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with("THREAD#"), "Limit": 25}
-            )
-        )
-        for it in tr.get("Items", []):
-            d = _decimal_to_float(it)
-            if (d.get("status") or "").lower() in ("open", "active") and d.get("summary"):
-                out.append({"claim": d["summary"], "kind": d.get("type") or "thread", "since": d.get("created_date")})
-    except Exception as _e:
-        logger.warning(f"[coach] threads: {_e}")
-    try:
-        pr = table.query(
-            **with_phase_filter(
-                {"KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with("PREDICTION#"), "Limit": 25}
-            )
-        )
-        for it in pr.get("Items", []):
-            d = _decimal_to_float(it)
-            if (d.get("status") or "").lower() in ("pending", "confirming") and d.get("claim_natural"):
-                out.append({"claim": d["claim_natural"], "kind": "prediction", "status": d.get("status"), "since": d.get("created_date")})
-    except Exception as _e:
-        logger.warning(f"[coach] predictions: {_e}")
-    return out[:limit]
+    """Delegated to web.site_api_coach_profile._working_hypotheses."""
+    return _profile._working_hypotheses(coach_id, limit, _g=globals())
 
 
 def _coach_daily(coach_id):
-    """CC-08: today's cached daily reflection for a coach (generated/coach_daily.json),
-    or None. Read-only over the batch-written artifact — never inferenced here."""
-    doc = _load_s3_json("generated/coach_daily.json", "coach_daily")
-    r = (doc.get("reflections") or {}).get(coach_id)
-    return r.get("text") if isinstance(r, dict) else None
+    """Delegated to web.site_api_coach_profile._coach_daily."""
+    return _profile._coach_daily(coach_id, _g=globals())
 
 
 def _coach_memoir(coach_id):
-    """#553: the coach's latest quarterly memoir (generated/coach_memoirs.json),
-    or None pre-first-quarter. Read-only over the batch-written artifact —
-    never inferenced here."""
-    doc = _load_s3_json("generated/coach_memoirs.json", "coach_memoirs")
-    m = (doc.get("memoirs") or {}).get(coach_id)
-    return m if isinstance(m, dict) else None
+    """Delegated to web.site_api_coach_profile._coach_memoir."""
+    return _profile._coach_memoir(coach_id, _g=globals())
 
 
-def _recent_outputs(coach_id, limit=25):  # CC-07: depth for the daily-journey timeline
-    out = []
-    try:
-        resp = table.query(
-            **with_phase_filter(
-                {
-                    "KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with("OUTPUT#"),
-                    "ScanIndexForward": False,
-                    "Limit": limit,
-                }
-            )
-        )
-        for it in resp.get("Items", []):
-            it = _decimal_to_float(it)
-            out.append(
-                {
-                    "date": it.get("sk", "").replace("OUTPUT#", "").split("#")[0],
-                    "summary": it.get("key_recommendation") or it.get("observatory_summary") or "",
-                    "themes": it.get("themes", []),
-                }
-            )
-    except Exception:
-        pass
-    return out
+def _recent_outputs(coach_id, limit=25):
+    """Delegated to web.site_api_coach_profile._recent_outputs."""
+    return _profile._recent_outputs(coach_id, limit, _g=globals())
 
 
 def _dossier_block(coach_id):
-    """#1387 — The Coach Dossier: what this coach knows, rendered VERBATIM from the
-    COACH# partitions. Deterministic build — no LLM anywhere in this path; every
-    line carries its date and, where derivable, an evidence link.
-
-    Privacy pass first (AC2): every free-text field crosses
-    coach_dossier.find_dossier_violations (journal_quotes/privacy_guard vocabularies
-    + genotype patterns) — a hit withholds the WHOLE record and the payload counts
-    it. ADR-141 §4: channel=conversation LEARNING# rows never enter this block.
-    Corrections reuse the #1689 ledger (surface=coach_dossier): retractions remove
-    a record here (counted, including RELATIONSHIP#state — #1794); correction
-    notes render dated under the original line. Per-SECTION fail-soft — a
-    commitments/learnings/relationship/docket query error yields that section's
-    honest empty, never a 500 (the dossier must not take the coach page down).
-    The CORRECTIONS read is different and deliberately fail-CLOSED (#1796): an
-    error there withholds every section corrections apply to (rather than
-    serving them unfiltered, which could republish a record under an unread
-    retraction) and sets `degraded=True` so the failure is disclosed, not
-    masked behind `retracted: 0`."""
-    withheld = 0
-
-    def _rows(sk_prefix, limit):
-        resp = table.query(
-            **with_phase_filter(
-                {
-                    "KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with(sk_prefix),
-                    "ScanIndexForward": False,
-                    "Limit": limit,
-                }
-            )
-        )
-        return [_decimal_to_float(i) for i in resp.get("Items", [])]
-
-    commitments = []
-    try:
-        for it in _rows("COMMITMENT#", 60):
-            entry, status = coach_dossier.commitment_entry(it)
-            if status == coach_dossier.WITHHELD:
-                withheld += 1
-            elif entry:
-                commitments.append(entry)
-    except Exception as _e:
-        logger.warning(f"[dossier] commitments {coach_id}: {_e}")
-    commitments.sort(key=lambda e: e.get("date") or "", reverse=True)
-
-    learnings = []
-    try:
-        for it in _rows("LEARNING#", 60):
-            entry, status = coach_dossier.learning_entry(it, reason_translator=_reader_reason)
-            if status == coach_dossier.WITHHELD:
-                withheld += 1
-            elif entry:
-                learnings.append(entry)
-    except Exception as _e:
-        logger.warning(f"[dossier] learnings {coach_id}: {_e}")
-    learnings = learnings[:25]
-
-    relationship = None
-    try:
-        rel_item = table.get_item(Key={"pk": f"COACH#{coach_id}", "sk": "RELATIONSHIP#state"}).get("Item")
-        if singleton_visible(rel_item):  # #946/#1085: a wiped cycle's state never serves pre-start
-            entry, status = coach_dossier.relationship_entry(_decimal_to_float(rel_item))
-            if status == coach_dossier.WITHHELD:
-                withheld += 1
-            else:
-                relationship = entry
-    except Exception as _e:
-        logger.warning(f"[dossier] relationship {coach_id}: {_e}")
-
-    docket_positions = []
-    try:
-        # #1799: phase-filter IN the query here too — tombstoned prior-cycle OPEN# rows
-        # (the reset tombstones, never deletes) must not consume this page either. The
-        # post-query singleton_visible check below stays as the belt to that suspenders.
-        for it in _docket_rows("OPEN#", 40, newest_first=False):
-            if not singleton_visible(it):
-                continue
-            entry, status = coach_dossier.docket_entry(_decimal_to_float(it), coach_id)
-            if status == coach_dossier.WITHHELD:
-                withheld += 1
-            elif entry:
-                docket_positions.append(entry)
-    except Exception as _e:
-        logger.warning(f"[dossier] docket {coach_id}: {_e}")
-    docket_positions.sort(key=lambda e: e.get("resolution_date") or "")
-
-    retracted = 0
-    degraded = False
-    try:
-        ledger = [_decimal_to_float(r) for r in coach_corrections.list_corrections(table, limit=500)]
-        corrections = coach_dossier.dossier_corrections(ledger, coach_id)
-        if corrections:
-            commitments, r1 = coach_dossier.apply_corrections(commitments, corrections)
-            learnings, r2 = coach_dossier.apply_corrections(learnings, corrections)
-            docket_positions, r3 = coach_dossier.apply_corrections(docket_positions, corrections)
-            # #1794: relationship is a single dict, not a list — round-trip it
-            # through the same list-shaped apply_corrections so RELATIONSHIP#state
-            # retractions are honored exactly like every other record class.
-            relationship_wrapped, r4 = coach_dossier.apply_corrections([relationship] if relationship else [], corrections)
-            relationship = relationship_wrapped[0] if relationship_wrapped else None
-            retracted = r1 + r2 + r3 + r4
-    except Exception as _e:
-        logger.warning(f"[dossier] corrections {coach_id}: {_e}")
-        # #1796: FAIL CLOSED. A corrections-read error must never let a possibly-
-        # retracted record slip out uncorrected — the corrected sections are
-        # withheld entirely (honest-empty) rather than served unfiltered, and the
-        # payload's own honesty ledger discloses the degradation instead of
-        # silently reporting retracted=0 while serving retracted content.
-        commitments, learnings, docket_positions, relationship = [], [], [], None
-        degraded = True
-
-    disclosure = (
-        "Rendered verbatim from this coach's memory records — deterministic build, no AI in the "
-        "render path. Every line carries its date. Lines that fail the standing privacy filter are "
-        "withheld and counted; records Matthew has retracted are removed and counted — the "
-        "retraction itself is a logged correction, never a silent edit."
-    )
-    if degraded:
-        disclosure += (
-            " The corrections ledger could not be read for this request, so commitments, learnings, "
-            "docket positions, and relationship state are withheld rather than risk serving a record "
-            "under an unread retraction."
-        )
-
-    return {
-        "verbatim": True,
-        "commitments": commitments,
-        "commitment_counts": coach_dossier.commitment_counts(commitments),
-        "learnings": learnings,
-        "relationship": relationship,
-        "docket_positions": docket_positions,
-        "withheld": withheld,
-        "retracted": retracted,
-        "degraded": degraded,
-        "disclosure": disclosure,
-    }
+    """Delegated to web.site_api_coach_profile._dossier_block."""
+    return _profile._dossier_block(coach_id, _g=globals())
 
 
 def _stance_latest(coach_id):
-    """The coach-opinion engine's current evidence-derived stance (STANCE#latest),
-    written weekly by coach_history_summarizer. None pre-data / during engine lag.
-
-    Honors the restart tombstone: the intelligence wipe stamps tombstone=true +
-    phase=pilot (tombstoned_reason=experiment_restart_<genesis>) on every COACH#
-    record, but get_item bypasses the query-level phase filter — without this guard
-    the old cycle's stance kept serving post-reset and the CC-09 pre-start ladder
-    fallback never engaged. The next weekly summarizer run overwrites the record
-    clean, so this is only the between-reset-and-first-compute window."""
-    try:
-        item = table.get_item(Key={"pk": f"COACH#{coach_id}", "sk": "STANCE#latest"}).get("Item")
-        if not singleton_visible(item):  # #946/#1085: tombstone + any non-current phase
-            return None
-        return _decimal_to_float(item)
-    except Exception:
-        return None
-
-
-def _integrator_digest():
-    """The integrator's cross-coach weekly digest (ai_analysis EXPERT#integrator),
-    written weekly by ai-expert-analyzer. None pre-data or while the record is
-    tombstoned from a reset.
-
-    #946 — same class as _stance_latest above: the intelligence wipe stamps
-    tombstone=true + phase=pilot on every ai_analysis record, but four get_item
-    call sites (weekly_priority, coaching-dashboard, coach_analysis cross-domain
-    note, coach_team tensions) bypassed the query-level phase filter, so
-    /coaching/ kept narrating the WIPED cycle as "the board's read on you ·
-    right now". One guarded accessor closes the get_item-bypass class on this
-    record; the first post-genesis integrator run overwrites it clean."""
-    try:
-        item = table.get_item(Key={"pk": f"{USER_PREFIX}ai_analysis", "sk": "EXPERT#integrator"}).get("Item")
-        if not singleton_visible(item):
-            return None
-        return _decimal_to_float(item)
-    except Exception:
-        return None
-
-
-def _latest_cycle_digest():
-    """The newest ENSEMBLE#digest CYCLE# record, or None while it's hidden.
-
-    #1085 (extends #946): experiment-scoped like ENSEMBLE#dispute, and this was the
-    one unguarded DDB read on the /api/coach_analysis route — between the reset and
-    the first post-genesis ensemble run, the WIPED cycle's active_disagreements
-    leaked into the response as cross_coach_reference. Newest-hidden means "no
-    current-cycle digest"; we don't skip past it to an older wiped one."""
-    try:
-        items = table.query(
-            KeyConditionExpression=Key("pk").eq("ENSEMBLE#digest") & Key("sk").begins_with("CYCLE#"),
-            ScanIndexForward=False,
-            Limit=1,
-        ).get("Items", [])
-        if not items or not singleton_visible(items[0]):
-            return None
-        return _decimal_to_float(items[0])
-    except Exception:
-        return None
+    """Delegated to web.site_api_coach_stance._stance_latest."""
+    return _stance._stance_latest(coach_id, _g=globals())
 
 
 def _stance_history(coach_id, limit=8):
-    """Recent STANCE# snapshots (newest first) for the 'how this read evolved' trail.
-    Skips the STANCE#latest pointer — the dated series IS the history."""
-    out = []
-    try:
-        resp = table.query(
-            **with_phase_filter(
-                {
-                    "KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with("STANCE#"),
-                    "ScanIndexForward": False,
-                    "Limit": limit + 1,  # +1: STANCE#latest sorts among the dated keys
-                }
-            )
-        )
-        for it in resp.get("Items", []):
-            it = _decimal_to_float(it)
-            sk = it.get("sk", "")
-            if sk == "STANCE#latest":
-                continue
-            out.append(
-                {
-                    "as_of": it.get("as_of") or sk.replace("STANCE#", ""),
-                    "headline_read": it.get("headline_read", ""),
-                    "stage": it.get("stage", {}),
-                    "how_my_read_changed": it.get("how_my_read_changed", ""),
-                }
-            )
-    except Exception:
-        pass
-    return out[:limit]
+    """Delegated to web.site_api_coach_stance._stance_history."""
+    return _stance._stance_history(coach_id, limit, _g=globals())
 
 
 def _stance_held_since(coach_id, current_stage_label):
-    """The honest 'held since' date for a coach's current stance — the earliest
-    consecutive STANCE# snapshot (walking newest→older) whose stage still matches
-    the current one. STANCE# records are written WEEKLY, so this resolves to a real
-    date / a count of weeks, NEVER a day count (ADR-104/105 — no fabricated
-    day-granularity). Returns an ISO date string or None (no history / fallback
-    ladder), and the front-end formats it as 'held since {date}' / '~N weeks'."""
-    if not current_stage_label:
-        return None
-    held = None
-    for snap in _stance_history(coach_id, limit=12):  # newest first
-        label = (snap.get("stage") or {}).get("label")
-        if label and label == current_stage_label:
-            held = snap.get("as_of")
-        else:
-            break
-    return held
-
-
-def _stance_from_latest(latest):
-    """Normalize a STANCE#latest record into the public stance shape (the
-    evidence-derived branch of _stance_block; split out so the lead-tier coach
-    page (#1112) can prefer a real stance without the staff ladder fallback)."""
-    return {
-        "source": "stance",
-        "headline_read": latest.get("headline_read", ""),
-        "focused_on_now": latest.get("focused_on_now", []),
-        "set_aside_for_now": latest.get("set_aside_for_now", []),
-        "stage": latest.get("stage", {}) or {},
-        "how_my_read_changed": latest.get("how_my_read_changed", ""),
-        "confidence_note": latest.get("confidence_note", ""),
-        "as_of": latest.get("as_of"),
-        "grounding_flag": bool(latest.get("grounding_flag")),
-    }
+    """Delegated to web.site_api_coach_stance._stance_held_since."""
+    return _stance._stance_held_since(coach_id, current_stage_label, _g=globals())
 
 
 def _stance_block(coach_id, weight_lbs):
-    """The coach's public read of Matthew, in a single normalized shape both the
-    coach page (CC-01) and the My Team view (CC-10) consume.
-
-    Prefers the evolving, evidence-derived STANCE#latest (the coach-opinion engine).
-    Falls back to the hand-authored weight-band ladder (CC-09) ONLY when no stance
-    exists yet — a silent scaffold so the page never blanks, never a parallel read.
-    """
-    latest = _stance_latest(coach_id)
-    if latest:
-        return _stance_from_latest(latest)
-
-    # ── Fallback: weight-band ladder, mapped into the same normalized keys ──
-    stance = coach_stance.load_stance(coach_id, _S3, _S3_BUCKET) if coach_stance else {}
-    ladder = stance.get("stage_ladder", [])
-    metric = stance.get("band_metric")
-    value = weight_lbs if metric == "weight_lbs" else None
-    rung = (coach_stance.resolve_stage(ladder, value) if coach_stance else None) or (ladder[0] if ladder else None)
-    rung = rung or {}
-    return {
-        "source": "ladder",
-        "headline_read": rung.get("read_of_him", ""),
-        "focused_on_now": rung.get("cares_most", []),
-        "set_aside_for_now": rung.get("cares_less_right_now", []),
-        "stage": {"label": rung.get("headline") or rung.get("stage_id"), "rationale": rung.get("read_of_him", "")},
-        "how_my_read_changed": "",
-        "confidence_note": "",
-        "as_of": None,
-        "grounding_flag": False,
-        # ladder-only extras (kept for the scaffold's graduation framing)
-        "graduation_gate": rung.get("graduation_gate"),
-        "band_metric": metric,
-        "current_value": value,
-        "rung": rung,
-        "ladder": [{"stage_id": s.get("stage_id"), "headline": s.get("headline")} for s in ladder],
-    }
+    """Delegated to web.site_api_coach_stance._stance_block."""
+    return _stance._stance_block(coach_id, weight_lbs, _g=globals())
 
 
-def handle_coaches(event):
-    """GET /api/coaches — the roster (CC-01). Shaped-empty 200 by design."""
-    if not _COACH_MODULES:
-        return _ok({"coaches": [], "count": 0, "disclosure": _DISCLOSURE}, cache_seconds=60)
-    try:
-        personas = _registry().get("personas", {})
-        ops = {k: v for k, v in personas.items() if v.get("operational")}
-        order = persona_registry.OPERATIONAL_COACH_IDS
-        coaches = []
-        for pid, p in ops.items():
-            tr = _track_record(pid)
-            headline = (
-                f"{tr['hit_rate_pct']:.0f}% hit-rate · n={tr['decided']}" if tr["hit_rate_pct"] is not None else "track record accruing"
-            )
-            coaches.append(
-                {
-                    "persona_id": pid,
-                    "name": p.get("name"),
-                    "domain": p.get("domain"),
-                    "short_bio": p.get("short_bio"),
-                    "emoji": p.get("emoji"),
-                    "color": p.get("color"),
-                    "board_role": p.get("board_role"),
-                    "headline_stat": headline,
-                    "tier": "staff",
-                }
-            )
-        coaches.sort(key=lambda c: order.index(c["persona_id"]) if c["persona_id"] in order else 99)
-        # #1112 — the head coach leads the roster (lead tier, the cast hierarchy).
-        # Non-operational: he files no domain reads and makes no graded calls, so
-        # his headline is his role — never a fabricated track-record line (ADR-104).
-        lead = personas.get(persona_registry.LEAD_PERSONA_ID)
-        if lead and lead.get("lead"):
-            coaches.insert(
-                0,
-                {
-                    "persona_id": persona_registry.LEAD_PERSONA_ID,
-                    "name": lead.get("name"),
-                    "domain": lead.get("domain"),
-                    "short_bio": lead.get("short_bio"),
-                    "emoji": lead.get("emoji"),
-                    "color": lead.get("color"),
-                    "board_role": lead.get("board_role"),
-                    "headline_stat": "runs the program",
-                    "tier": "lead",
-                },
-            )
-        return _ok({"coaches": coaches, "count": len(coaches), "disclosure": _DISCLOSURE}, cache_seconds=300)
-    except Exception as _e:
-        logger.warning(f"[/api/coaches] {_e}")
-        return _ok({"coaches": [], "count": 0}, cache_seconds=60)
+def _integrator_digest():
+    """Delegated to web.site_api_coach_stance._integrator_digest."""
+    return _stance._integrator_digest(_g=globals())
 
 
-def _team_tensions():
-    """Live cross-coach disagreements from the integrator digest (CC-10).
-    Same source as get_coach_disagreements; honest empty pre-data."""
-    try:
-        item = _integrator_digest()  # #946: tombstone/phase-guarded
-        if not item:
-            return []
-        raw = item.get("disagreements") or item.get("active_disagreements") or []
-        out = []
-        for d in raw if isinstance(raw, list) else []:
-            if not isinstance(d, dict):
-                continue
-            coaches = d.get("coaches_involved") or d.get("coaches") or []
-            # WQA-06: the integrator digest stores the argument as position_a/position_b
-            # + the lead's adjudication. Earlier code read the wrong field names, so the
-            # head-to-head came back empty. Read the real names first.
-            # #1986: the adjudication key is now `lead_call` (it used to be named after
-            # the character who signed it). Rows written before this ship still carry
-            # `nakamura_call`, so both are read — persisted history stays legible without
-            # a backfill, and the byline above it resolves from the registry either way.
-            out.append(
-                {
-                    "topic": d.get("topic") or d.get("domain") or "",
-                    "coaches": coaches,
-                    "position_a": d.get("position_a") or d.get("coach_a_position"),
-                    "position_b": d.get("position_b") or d.get("coach_b_position"),
-                    "resolution": (
-                        d.get("lead_call")
-                        or d.get("nakamura_call")
-                        or d.get("resolution_suggested")
-                        or d.get("tension")
-                        or d.get("summary")
-                        or ""
-                    ),
-                }
-            )
-        return out
-    except Exception as _e:
-        logger.warning(f"[coach_team] tensions: {_e}")
-        return []
-
-
-def _lead_block(team_focus):
-    """The Principal Investigator (Dr. Eli Marsh) — the lead above the 8 coaches.
-    A non-operational orchestrator persona; surfaced as the head of the team."""
-    lp = _registry().get("personas", {}).get("eli_marsh")
-    if not lp:
-        return None
-    return {
-        "persona_id": "eli_marsh",
-        "name": lp.get("name"),
-        "emoji": lp.get("emoji"),
-        "color": lp.get("color"),
-        "role": lp.get("board_role"),
-        "short_bio": lp.get("short_bio"),
-        "philosophy": lp.get("philosophy"),
-        "expertise": lp.get("expertise", []),
-        "staff_focus": (team_focus or [])[:3],  # what he's got the staff focused on
-    }
-
-
-def handle_panel_ledger(event):
-    """GET /api/panel_ledger — The Panel's running bet scoreboard (the proof-of-honesty
-    artifact) + the current open bet. Reads the podcast series_state (PANELCAST#).
-    Shaped-empty 200 before the first weekly episode."""
-    try:
-        it = table.get_item(Key={"pk": f"{USER_PREFIX}panelcast", "sk": "STATE#current"}).get("Item")
-        # #1085 (extends #946): panelcast is experiment-scoped — the wiped cycle's
-        # bet ledger kept serving pre-start because get_item bypasses the phase filter.
-        state = json.loads(it.get("state_json", "{}")) if singleton_visible(it) else {}
-    except Exception as _e:
-        logger.warning(f"[panel_ledger] {_e}")
-        state = {}
-    ledger = state.get("bet_ledger", [])
-    record = {o: sum(1 for b in ledger if b.get("outcome") == o) for o in ("won", "lost", "open")}
-    return _ok(
-        {
-            "open_bet": state.get("open_bet"),
-            "episode_count": state.get("episode_count", 0),
-            "ledger": list(reversed(ledger)),  # newest first
-            "record": record,
-            "disclosure": "The coaches make falsifiable calls; we score them against real data, hits and misses alike.",
-        },
-        cache_seconds=300,
-    )
-
-
-# Per-prefix page budgets for the two docket sub-queries (#1799) — never shared.
-DOCKET_OPEN_LIMIT = 60
-DOCKET_RESOLVED_LIMIT = 60
-_DOCKET_MAX_PAGES = 5
-
-
-def _docket_rows(prefix, limit, newest_first):
-    """One prefix-scoped page of ENSEMBLE#docket rows, phase-filtered IN the query.
-
-    #1799: OPEN# and RESOLVED# used to share ONE `Limit=80` descending page over the
-    whole partition. `RESOLVED#` sorts AFTER `OPEN#`, so descending order returns every
-    resolved row first — once ~80 resolved dockets existed the page held nothing else
-    and the endpoint reported `open: []` while each coach's dossier (which queries
-    `begins_with('OPEN#')` separately) still showed those very disputes. Worse, the
-    phase filter ran AFTER the query, so tombstoned prior-cycle rows — ENSEMBLE#docket is
-    EXPERIMENT_SCOPED and the reset tombstones rather than deletes — consumed the page
-    too, making the threshold ~80 LIFETIME rows across cycles.
-
-    Each prefix now gets its own budget, DynamoDB drops the wiped rows server-side, and
-    the loop keeps paging until the budget is filled or the partition is exhausted, so a
-    page full of tombstones can't starve the caller either.
-    """
-    rows, kwargs = [], {
-        "KeyConditionExpression": Key("pk").eq("ENSEMBLE#docket") & Key("sk").begins_with(prefix),
-        "ScanIndexForward": not newest_first,
-        "Limit": limit,
-    }
-    kwargs = with_phase_filter(kwargs)
-    for _ in range(_DOCKET_MAX_PAGES):
-        resp = table.query(**kwargs)
-        rows.extend(resp.get("Items", []))
-        lek = resp.get("LastEvaluatedKey")
-        if not lek or len(rows) >= limit:
-            break
-        kwargs["ExclusiveStartKey"] = lek
-    return rows[:limit]
-
-
-def handle_coach_docket(event):
-    """GET /api/coach_docket — The Dispute Docket (#1386): standing coach
-    disagreements with skin in the game.
-
-    Open positions carry each side's claim verbatim, the machine-checkable
-    criterion + resolution date FROZEN at open, and each coach's domain Brier
-    as the stake. Resolved history lists wins, losses, and no-data voids in the
-    SAME shape and order — a lost dispute renders with the same dignity as a
-    won one (no burying; ADR-104). Verdicts are computed by code in the
-    prediction evaluator's daily lane — no LLM ever grades an outcome
-    (ADR-105). Shaped-empty 200 until the first docket opens.
-
-    #1795 — privacy pass: `claims`/`topic`/`criterion.description`/`concession`
-    are LLM-authored (the ensemble digest's disagreement text, stored verbatim
-    by dispute_docket.open_docket / recorded verbatim on resolve). This is the
-    same free-text class the coach dossier withholds via
-    coach_dossier.find_dossier_violations — reused here, not forked, so this
-    public surface can't leak what the dossier is fail-closed to protect. A hit
-    anywhere in an entry withholds the WHOLE entry (never a partial redaction)
-    and the payload counts it.
-
-    #1799 — OPEN# and RESOLVED# are read as TWO prefix-scoped queries with independent
-    page budgets (see `_docket_rows`). They shared one descending page before, which let
-    resolved history crowd standing disputes clean off the endpoint while the dossiers
-    kept showing them."""
-    open_entries, resolved = [], []
-    withheld = 0
-    try:
-        items = _docket_rows("OPEN#", DOCKET_OPEN_LIMIT, newest_first=False) + _docket_rows(
-            "RESOLVED#", DOCKET_RESOLVED_LIMIT, newest_first=True
-        )
-        for it in items:
-            if not singleton_visible(it):  # ADR-058/#946: a wiped cycle's docket never serves pre-start
-                continue
-            it = _decimal_to_float(it)
-            sk = str(it.get("sk", ""))
-            claims = it.get("claims") or {}
-            criterion = it.get("criterion") or {}
-            concession = it.get("concession")
-            if not coach_dossier.dossier_safe(*claims.values(), it.get("topic"), criterion.get("description"), concession):
-                withheld += 1
-                continue
-            entry = {
-                "topic": it.get("topic"),
-                "topic_slug": it.get("topic_slug"),
-                "coach_a": it.get("coach_a"),
-                "coach_b": it.get("coach_b"),
-                "claims": claims,
-                "criterion": criterion,
-                "sides": it.get("sides") or {},
-                "resolution_date": it.get("resolution_date"),
-                "opened_date": it.get("opened_date"),
-                "stakes": it.get("stakes") or {},
-            }
-            if sk.startswith("OPEN#"):
-                open_entries.append(entry)
-            elif sk.startswith("RESOLVED#"):
-                verdict = it.get("verdict") or {}
-                entry.update(
-                    {
-                        "verdict": verdict,
-                        "winner": it.get("winner") or verdict.get("winner"),
-                        "loser": it.get("loser") or verdict.get("loser"),
-                        "actual_value": it.get("actual_value", verdict.get("actual_value")),
-                        "resolved_date": it.get("resolved_date"),
-                        "concession": concession,
-                    }
-                )
-                resolved.append(entry)
-    except Exception as _e:
-        logger.warning(f"[coach_docket] {_e}")
-    open_entries.sort(key=lambda e: (e.get("resolution_date") or "", e.get("topic_slug") or ""))
-    return _ok(
-        {
-            "open": open_entries,
-            "resolved": resolved,
-            "counts": {"open": len(open_entries), "resolved": len(resolved)},
-            "withheld": withheld,
-            "disclosure": (
-                "Standing disagreements between AI coaches, each with skin in the game: the stake is the "
-                "coach's own Brier record, frozen when the docket opened. The resolution criterion and date "
-                "are agreed at open and graded by deterministic code against real data — no AI writes the "
-                "verdict, and lost disputes stay on the record next to the wins. Claims and concessions cross "
-                "the same standing privacy filter as the coach dossier before publishing; any hit withholds "
-                "the whole entry and this payload counts it."
-            ),
-        },
-        cache_seconds=300,
-    )
+def _latest_cycle_digest():
+    """Delegated to web.site_api_coach_stance._latest_cycle_digest."""
+    return _stance._latest_cycle_digest(_g=globals())
 
 
 def _latest_dispute():
-    """#540: the most recent inter-coach dispute thread — an ACTUAL exchange
-    (coach B answered coach A's specific claim, gated turns), not a post-hoc
-    summary. None when nothing has aired; the page renders nothing rather than
-    inventing a fight.
+    """Delegated to web.site_api_coach_stance._latest_dispute."""
+    return _stance._latest_dispute(_g=globals())
 
-    #1085 (extends #946): the restart wipe stamps tombstone=true + phase=pilot on
-    every ENSEMBLE#dispute thread, but this reader queried the newest record with
-    no guard — /api/coach_team kept serving the WIPED cycle's argument pre-start.
-    The newest thread being hidden means "no current-cycle dispute" (we do NOT
-    skip past it to resurrect an even older one); coach_team serves dispute:null
-    and the front-end self-hides the section."""
-    try:
-        items = table.query(
-            KeyConditionExpression=Key("pk").eq("ENSEMBLE#dispute"),
-            ScanIndexForward=False,
-            Limit=1,
-        ).get("Items", [])
-        if not items or not singleton_visible(items[0]):
-            return None
-        t = _decimal_to_float(items[0])
-        return {
-            "topic": t.get("topic"),
-            "week": t.get("week"),
-            "coach_a": t.get("coach_a"),
-            "coach_b": t.get("coach_b"),
-            "turns": [
-                {"speaker": x.get("speaker"), "name": x.get("name"), "line": x.get("line"), "kind": x.get("kind")}
-                for x in (t.get("turns") or [])
-            ],
-            "created_at": t.get("created_at"),
-        }
-    except Exception as e:
-        logger.warning(f"[coach_team] dispute unavailable: {e}")
-        return None
 
+def _team_tensions():
+    """Delegated to web.site_api_coach_stance._team_tensions."""
+    return _stance._team_tensions(_g=globals())
 
-def handle_coach_team(event):
-    """GET /api/coach_team — the "My Team" view (CC-10): the team's collective read
-    on Matthew right now. Stance focus + per-coach huddle + the live tension map.
-    All from CC-09 stance + the integrator digest; no new inference. Shaped-empty 200."""
-    if not _COACH_MODULES:
-        return _ok({"huddle": [], "team_focus": [], "tensions": []}, cache_seconds=60)
-    try:
-        ops = {k: v for k, v in _registry().get("personas", {}).items() if v.get("operational")}
-        weight = _latest_weight_lbs() or EXPERIMENT_BASELINE_WEIGHT_LBS
-        huddle, focus, stages = [], [], {}
-        # #1527: the per-coach calibration reads below each walked a full
-        # PREDICTION# partition sequentially — prefetch them concurrently.
-        _cal_records = _prefetch_calibration_partitions(
-            [
-                pid.removesuffix("_coach")
-                for pid in persona_registry.OPERATIONAL_COACH_IDS
-                if pid.removesuffix("_coach") in _CALIB_COACH_NAMES
-            ]
-        )
-        for pid in persona_registry.OPERATIONAL_COACH_IDS:
-            p = ops.get(pid)
-            if not p:
-                continue
-            sb = _stance_block(pid, weight)
-            stage = sb.get("stage") or {}
-            # Canonical id for the cross-coach 'all same stage' check: the ladder's
-            # stage_id on the fallback (a shared id space), else the evidence stage
-            # label (stances have no shared id space — each coach's stage is its own).
-            stage_id = (sb.get("rung") or {}).get("stage_id") or stage.get("label")
-            stages[pid] = stage_id
-            cares = sb.get("focused_on_now") or []
-            if cares:
-                focus.append(cares[0])
-            # #538: the same calibration numbers the scoreboard shows — so a coach's
-            # confidence in the huddle is legible next to how well-calibrated it's been.
-            _bare = pid.removesuffix("_coach")
-            _cal = {}
-            if _bare in _CALIB_COACH_NAMES:
-                _summ, _, _lifetime_summ, _ = _score_coach_calibration(_bare, records=_cal_records.get(_bare, []))
-                _cal = {
-                    "brier": _summ["brier"],
-                    "calibration": _summ["calibration"],
-                    "scored_n": _summ["n"],
-                    # #1376: the huddle's confidence read shouldn't go dark on cycle
-                    # 1 of a fresh season — carry the career figure alongside.
-                    "lifetime_scored_n": _lifetime_summ["n"],
-                    "lifetime_brier": _lifetime_summ["brier"],
-                }
-            huddle.append(
-                {
-                    "persona_id": pid,
-                    "name": p.get("name"),
-                    "emoji": p.get("emoji"),
-                    "stage_id": stage_id,
-                    "headline": stage.get("label"),
-                    "read_of_him": sb.get("headline_read"),
-                    "watch": cares[0] if cares else None,
-                    "graduation_gate": sb.get("graduation_gate"),  # ladder-only; absent on stance
-                    "calibration": _cal,
-                    "source": sb.get("source"),
-                    # #591: honest stance age — the date this stage was first held
-                    # (weekly resolution; the cockpit renders "held since {date}").
-                    "held_since": _stance_held_since(pid, stage.get("label")),
-                }
-            )
-        seen = set()
-        team_focus = [f for f in focus if not (f in seen or seen.add(f))]
-        all_same = len(set(stages.values())) == 1 and bool(stages)
-        return _ok(
-            {
-                "as_of_weight_lbs": weight,
-                "lead": _lead_block(team_focus),
-                "team_focus": team_focus,
-                "huddle": huddle,
-                "tensions": _team_tensions(),
-                "dispute": _latest_dispute(),
-                "all_same_stage": all_same,
-                "current_stage": next(iter(stages.values())) if all_same else None,
-                "disclosure": _DISCLOSURE,
-            },
-            cache_seconds=300,
-        )
-    except Exception as _e:
-        logger.warning(f"[/api/coach_team] {_e}")
-        return _ok({"huddle": [], "team_focus": [], "tensions": []}, cache_seconds=60)
 
+def _lead_block(team_focus):
+    """Delegated to web.site_api_coach_stance._lead_block."""
+    return _stance._lead_block(team_focus, _g=globals())
 
-def handle_coach(event):
-    """GET /api/coach/{persona_id} (or ?id=) — one coach page (CC-01 + CC-02)."""
-    if not _COACH_MODULES:
-        return _ok({"persona_id": None, "stance": {}, "report_card": {}}, cache_seconds=60)
-    try:
-        path = event.get("rawPath") or (event.get("requestContext", {}).get("http", {}) or {}).get("path") or ""
-        qs = event.get("queryStringParameters") or {}
-        pid = (qs.get("id") or path.rstrip("/").split("/")[-1] or "").strip()
-        p = _registry().get("personas", {}).get(pid)
-        # #1112: the head coach (lead: true) gets a detail page too — every other
-        # non-operational persona (narrator, board-only figures) still 404s.
-        is_lead = bool(p and p.get("lead") and not p.get("operational"))
-        if not p or not (p.get("operational") or is_lead):
-            return _error(404, "Unknown coach")
-        weight = _latest_weight_lbs() or EXPERIMENT_BASELINE_WEIGHT_LBS
-        if is_lead:
-            # No weight-band ladder config exists for the lead and the opinion
-            # engine writes him no weekly stance — the staff ladder fallback would
-            # fabricate a scaffold. Serve an explicit source:"none" (honest-empty,
-            # ADR-104); if a STANCE#latest ever lands for him it wins, same as staff.
-            latest = _stance_latest(pid)
-            stance = _stance_from_latest(latest) if latest else {"source": "none", "headline_read": "", "stage": {}}
-        else:
-            stance = _stance_block(pid, weight)
-        return _ok(
-            {
-                "persona_id": pid,
-                "name": p.get("name"),
-                "domain": p.get("domain"),
-                "short_bio": p.get("short_bio"),
-                "emoji": p.get("emoji"),
-                "color": p.get("color"),
-                "board_role": p.get("board_role"),
-                "type": p.get("type"),
-                "tier": "lead" if is_lead else "staff",
-                # Lead-tier extras (config-authored persona fields; null for staff —
-                # their character block carries the equivalent material).
-                "philosophy": p.get("philosophy"),
-                "expertise": p.get("expertise", []),
-                "disclosure": _DISCLOSURE,
-                "character": _character(p),
-                # #1113: authored (deterministic, human-written) trait scores — the
-                # cast sheet, labelled as authored fiction-design by its own disclosure.
-                "trait_scores": coach_traits.traits_for(pid),
-                "working_hypotheses": _working_hypotheses(pid),
-                "stance": stance,
-                "stance_history": _stance_history(pid),
-                # The lead has no generation voice spec (config/coaches/{id}.json) —
-                # null is the honest value, and the front-end omits the section.
-                "voice": _voice_subset(p["coach_config_key"]) if p.get("coach_config_key") else None,
-                "relationships": _relationships(pid),
-                "report_card": {
-                    "track_record": _track_record(pid),
-                    "quality_trend": _quality_trend(pid),
-                    "tuning_log": _tuning_log_for(pid),
-                },
-                "recent_outputs": _recent_outputs(pid),
-                # #1483 (ADR-142 tier 2): semi-private conversation references —
-                # sanctioned fields only; the words exchanged never cross the wire.
-                "conversations": _conversation_references(pid),
-                # #1387: the dossier — what this coach knows, verbatim from COACH#
-                # memory (privacy-filtered, correction-aware, no LLM in the path).
-                "dossier": _dossier_block(pid),
-                "daily": _coach_daily(pid),
-                "memoir": _coach_memoir(pid),
-            },
-            cache_seconds=300,
-        )
-    except Exception as _e:
-        logger.warning(f"[/api/coach] {_e}")
-        return _ok({"persona_id": None, "stance": {}, "report_card": {}}, cache_seconds=60)
 
-
-def _current_day_n() -> int:
-    """Day-of-experiment (1-indexed) under the active EXPERIMENT_START_DATE.
-    Used by Stage0 Fix 3 freshness guard to refuse to serve generated
-    narrative that claims a day count newer than the live experiment."""
-    today = datetime.now(PT).date()
-    try:
-        start = datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()
-    except Exception:
-        return 0
-    return max((today - start).days + 1, 0)
-
-
-def handle_field_notes(event):
-    """GET /api/field_notes"""
-    qs = event.get("queryStringParameters") or {}
-    week_param = qs.get("week")
-    fn_pk = f"{USER_PREFIX}field_notes"
-
-    if week_param:
-        # Single entry mode. #1085 (extends #946): field_notes are experiment-scoped —
-        # list mode is phase-filtered but this get_item bypassed the filter, so a
-        # ?week= request kept serving the WIPED cycle's note verbatim.
-        item = table.get_item(Key={"pk": fn_pk, "sk": f"WEEK#{week_param}"}).get("Item")
-        if not singleton_visible(item):
-            return _ok({"entry": None, "week": week_param}, cache_seconds=300)
-        item = _decimal_to_float(item)
-        return _ok(
-            {
-                "entry": {
-                    "week": item.get("week", week_param),
-                    "week_label": item.get("week_label"),
-                    "ai_present": item.get("ai_present", ""),
-                    "ai_cautionary": item.get("ai_cautionary"),
-                    "ai_affirming": item.get("ai_affirming"),
-                    "ai_tone": item.get("ai_tone", "mixed"),
-                    "ai_generated_at": item.get("ai_generated_at"),
-                    "matthew_agreement": item.get("matthew_agreement"),
-                    "matthew_logged_at": item.get("matthew_logged_at"),
-                }
-            },
-            cache_seconds=300,
-        )
-    else:
-        # List mode — return all weeks (most recent first)
-        resp = table.query(
-            **with_phase_filter(
-                {  # ADR-058: hide pilot field notes
-                    "KeyConditionExpression": Key("pk").eq(fn_pk),
-                    "ScanIndexForward": False,
-                    "Limit": 52,
-                }
-            )
-        )
-        items = _decimal_to_float(resp.get("Items", []))
-        entries = [
-            {
-                "week": i.get("week", i.get("sk", "").replace("WEEK#", "")),
-                # Genesis-anchored display label (Week N / Prologue) — the raw `week` is an
-                # ISO calendar week (2026-W25) that read "w24/w25" on the site (#2). Producer
-                # writes week_label; falls back to the ISO week until the backfill lands.
-                "week_label": i.get("week_label"),
-                "ai_tone": i.get("ai_tone", "mixed"),
-                "ai_generated_at": i.get("ai_generated_at"),
-                "has_matthew_response": bool(i.get("matthew_agreement")),
-            }
-            for i in items
-        ]
-        return _ok({"entries": entries, "count": len(entries)}, cache_seconds=300)
-
-    # AI Analysis (GET with ?expert= query param)
-
-
-def handle_diary_reactions(event):
-    """GET /api/diary_reactions — coach reactions to things Matthew said (#1574/#1675).
-
-    The lab-notes counterpart of the field-note Third Wall, with the polarity
-    inverted: the HUMAN is the primary voice and the coach REACTS. Read-only. Only
-    reactions the producer stored are returned; the source record itself never lands
-    here — the producer (coach_diary_reaction) has already reduced it to a leak-proof
-    public context (theme + optional cleared quote) before anything was persisted, so
-    this endpoint serves stored fields verbatim.
-
-    #1675: the same partition now also carries reactions to Matthew's PUBLIC social
-    posts (the S2 origin membrane + the S5 sensitivity gate cleared them before any
-    reaction was produced). ``kind`` tells the two apart — a private recording he
-    cleared a sliver of, vs. a post he published himself — and a social row also
-    carries the post's own public ``post_url``. One partition, one endpoint, one
-    surface: no second reaction pipeline (the story's first acceptance criterion).
-
-    Absent → empty list (AC3: the site renders nothing, no empty shell). Phase-filtered
-    (ADR-058) so a wiped cycle's reactions don't resurface. Optional ?date= single mode,
-    else list (most recent first, ?limit= default 20 / max 50).
-    """
-    qs = event.get("queryStringParameters") or {}
-    dr_pk = f"{USER_PREFIX}diary_reactions"
-
-    def _shape(i):
-        out = {
-            "date": i.get("entry_date") or str(i.get("sk", "")).replace("DATE#", "").split("#")[0],
-            "channel": i.get("channel", "video_diary"),
-            # #1675: which side of the membrane the human half came from. Legacy rows
-            # (written before the social channel existed) carry no kind and are diary.
-            "kind": i.get("kind") or "diary",
-            # #1675: the per-record id segment of the sk. The front-end builds its list
-            # id from date+channel; without this, two same-day posts on one channel
-            # produce the SAME id and the second is unreachable — the render-layer twin
-            # of the sk collision #1756 fixed in storage.
-            "uid": i.get("entry_uid") or "",
-            "coach_id": i.get("coach_id"),
-            "coach_name": i.get("coach_name"),
-            "tone": i.get("tone", "reflective"),
-            "theme": i.get("theme"),
-            "tier": i.get("tier"),
-            # The coach's reaction — the MACHINE voice. Surgically scrubbed (defensive;
-            # it is platform-generated text, and its private-content boundary was already
-            # enforced at generation by diary_consent).
-            "reaction": _scrub_blocked_terms(str(i.get("reaction") or "")),
-            "generated_at": i.get("generated_at"),
-        }
-        # The single owner-cleared verbatim line (quote tier only) — the consented sliver
-        # of the HUMAN voice. All-or-nothing content screen (same as _public_decision_note):
-        # if scrubbing would alter it at all, drop it rather than serve a mangled quote.
-        q = i.get("quote")
-        if q:
-            note = _public_decision_note(q)
-            if note:
-                out["quote"] = note
-        # #1675 (social only): the public post's own URL, so "he posted" is a real link
-        # rather than a claim. Re-validated here as https — the serve layer never trusts
-        # a stored string it is about to put in an href.
-        url = str(i.get("post_url") or "").strip()
-        if url.startswith("https://") and " " not in url:
-            out["post_url"] = url
-        return out
-
-    date_param = qs.get("date")
-    if date_param:
-        resp = table.query(
-            **with_phase_filter(
-                {
-                    "KeyConditionExpression": Key("pk").eq(dr_pk) & Key("sk").begins_with(f"DATE#{date_param}"),
-                    "ScanIndexForward": False,
-                    "Limit": 5,
-                }
-            )
-        )
-        items = [i for i in _decimal_to_float(resp.get("Items", [])) if singleton_visible(i)]
-        if not items:
-            return _ok({"reaction": None, "date": date_param}, cache_seconds=300)
-        return _ok({"reaction": _shape(items[0]), "date": date_param}, cache_seconds=300)
-
-    try:
-        limit = max(1, min(50, int(qs.get("limit", 20))))
-    except (TypeError, ValueError):
-        limit = 20
-    try:
-        resp = table.query(
-            **with_phase_filter(
-                {
-                    "KeyConditionExpression": Key("pk").eq(dr_pk) & Key("sk").begins_with("DATE#"),
-                    "ScanIndexForward": False,
-                    "Limit": 100,
-                }
-            )
-        )
-        items = [i for i in _decimal_to_float(resp.get("Items", [])) if singleton_visible(i)]
-    except Exception as e:  # pragma: no cover — a query hiccup serves shaped-empty
-        logger.warning(f"[diary_reactions] query failed: {e}")
-        items = []
-    reactions = [_shape(i) for i in items][:limit]
-    return _ok({"reactions": reactions, "count": len(reactions)}, cache_seconds=300)
-
-
-def _public_decision_note(text):
-    """#1569: screen a VERBATIM decision note for public serving.
-
-    Same runtime content filter (marijuana/porn etc.) the CI content-policy scan
-    enforces. A verbatim quote is all-or-nothing: if the filter would alter it at all
-    (a blocked term excised, or the refuse-whole sentinel), the note is withheld
-    ENTIRELY — a decision whose note doesn't cleanly survive simply isn't shown."""
-    if not text or not str(text).strip():
-        return None
-    raw = str(text).strip()
-    scrubbed = _scrub_blocked_terms(raw)
-    if not scrubbed or re.sub(r"\s+", " ", scrubbed).strip() != re.sub(r"\s+", " ", raw).strip():
-        return None
-    return scrubbed.strip()
-
-
-def handle_decisions(event):
-    """GET /api/decisions — the widened Third Wall for logged decisions (#1569).
-
-    Renders `log_decision` rationale that Matthew chose to publish: ONLY decisions
-    carrying an opt-in verbatim `note` ("his call, in his words") are returned, each
-    dated, with the platform's recommendation as the machine voice beside it. A
-    decision with no note is private and never appears (AC3: absent renders nothing —
-    no nag). Phase-filtered (ADR-058) so a wiped cycle's decisions don't resurface.
-    Content-filtered at serve time (the same term list the CI scan enforces).
-
-    Read-only. Optional ?limit= (default 20, max 50).
-    """
-    qs = event.get("queryStringParameters") or {}
-    try:
-        limit = max(1, min(50, int(qs.get("limit", 20))))
-    except (TypeError, ValueError):
-        limit = 20
-
-    dec_pk = f"{USER_PREFIX}decisions"
-    try:
-        resp = table.query(
-            **with_phase_filter(
-                {  # ADR-058: hide pilot/other-cycle decisions
-                    "KeyConditionExpression": Key("pk").eq(dec_pk) & Key("sk").begins_with("DECISION#"),
-                    "ScanIndexForward": False,
-                    "Limit": 100,
-                }
-            )
-        )
-        items = _decimal_to_float(resp.get("Items", []))
-    except Exception as e:  # pragma: no cover - defensive; a query hiccup serves shaped-empty
-        logger.warning(f"[decisions] query failed: {e}")
-        items = []
-
-    entries = []
-    for i in items:
-        note = _public_decision_note(i.get("note"))
-        if not note:
-            continue  # opt-in: no publishable note = not shown
-        followed = i.get("followed")
-        entries.append(
-            {
-                "date": i.get("date"),
-                # The platform's recommendation — the MACHINE voice half of the wall.
-                # Surgically scrubbed (defensive; it's platform text, not a sacred
-                # verbatim quote, so a stray term is excised rather than blanking it).
-                "decision": _scrub_blocked_terms(str(i.get("decision") or "")),
-                "source": i.get("source"),
-                "followed": followed,
-                "override_reason": (_scrub_blocked_terms(str(i.get("override_reason"))) if i.get("override_reason") else None),
-                # The HUMAN voice — Matthew's verbatim, dated note.
-                "note": note,
-                "note_at": i.get("note_at"),
-                "pillars": i.get("pillars", []),
-            }
-        )
-        if len(entries) >= limit:
-            break
-
-    return _ok({"decisions": entries, "count": len(entries)}, cache_seconds=300)
-
-
-def handle_journal_quotes(event):
-    """GET /api/journal_quotes — consent-per-line verbatim journal pull-quotes (#1568, ADR-142).
-
-    "From the journal, in his words." Serves ONLY lines Matthew explicitly marked
-    publishable through the mark_journal_quote MCP tool (the per-line consent
-    channel; the taboo gate already ran fail-closed at mark time). An unmarked
-    journal line can never appear here — this endpoint reads the consent
-    partition (SOURCE#journal_quotes), never the journal itself. The chronicle's
-    never-quote rule is untouched.
-
-    Each quote is dated, labeled, and carries a receipts link to that day's data
-    (/cockpit/?date=). `featured` is the AT-MOST-ONE line home may show this ISO
-    week (AC2's volume cap — deterministic: first-marked line whose entry date
-    falls in the current PT week; stable for the whole week). Absent → honest
-    empty ({"quotes": [], "featured": null}) so the render stays dormant.
-
-    Deliberately NOT phase-filtered: like the journal it excerpts (cross-phase by
-    owner decision 2026-06-06), a consented quote is a durable archive entry —
-    it leaves this surface only by explicit unmark. Verbatim text is screened
-    all-or-nothing at serve time (_public_decision_note — the #1569 rule): a
-    quote the content filter would alter at all is withheld, never mangled.
-    """
-    from content import journal_quotes as jq
-
-    qs = event.get("queryStringParameters") or {}
-    try:
-        limit = max(1, min(50, int(qs.get("limit", 20))))
-    except (TypeError, ValueError):
-        limit = 20
-
-    jq_pk = f"{USER_PREFIX}journal_quotes"
-    try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(jq_pk) & Key("sk").begins_with("QUOTE#"),
-            ScanIndexForward=False,
-            Limit=100,
-        )
-        items = _decimal_to_float(resp.get("Items", []))
-    except Exception as e:  # pragma: no cover - defensive; a query hiccup serves shaped-empty
-        logger.warning(f"[journal_quotes] query failed: {e}")
-        items = []
-
-    quotes = []
-    for i in items:
-        # ADR-104 hardening (2026-07-26 review): only grounding="verified" serves.
-        # A mark made before the day's Notion ingestion lands is recorded honestly
-        # as pending_ingestion — it is WITHHELD here until the mark_journal_quote
-        # tool's list action re-verifies it against the ingested entry. Fail-closed:
-        # an absent/unknown grounding value never serves either.
-        if i.get("grounding") != "verified":
-            continue
-        # #1804: re-run the FULL taboo gate against the CURRENT vocabulary on every
-        # serve — guard_version is stamped at mark time but nothing enforced it
-        # retroactively, so a mark made before the taboo vocabulary widened (e.g.
-        # the beverage-noun family / edible additions) would otherwise keep
-        # serving forever even after the gate would refuse to mark it today.
-        # Fail-closed, same pattern as the grounding check above: withhold, never
-        # mangle. jq.find_mark_violations is the FULL vocabulary (privacy_guard's
-        # vice/real-name set plus substance_extra/family/private-event/age) —
-        # strictly wider than _public_decision_note's narrower scrub below.
-        if jq.find_mark_violations(i.get("quote")):
-            continue
-        screened = _public_decision_note(i.get("quote"))
-        if not screened:
-            continue  # all-or-nothing: a quote that wouldn't survive intact isn't shown
-        shaped = jq.shape_public(i)
-        shaped["quote"] = screened
-        quotes.append(shaped)
-
-    featured = jq.featured_for_week(quotes, datetime.now(PT).date())
-    return _ok(
-        {
-            "quotes": quotes[:limit],
-            "count": len(quotes[:limit]),
-            "featured": featured,
-            "label": jq.PUBLIC_LABEL,
-        },
-        cache_seconds=300,
-    )
-
-
-def handle_experiment_synthesis():
-    """GET /api/experiment_synthesis — the board's cross-week arc of the whole run (C-1).
-
-    Reads the precomputed EXPERT#experiment_arc record (written by ai-expert-analyzer
-    once >=2 weeks of lab notes exist). Honest-null before then; the Experiment view
-    falls back to its week-by-week tone list.
-    """
-    ai_pk = f"{USER_PREFIX}ai_analysis"
-    item = table.get_item(Key={"pk": ai_pk, "sk": "EXPERT#experiment_arc"}).get("Item")
-    if not singleton_visible(item):  # #946: honest-null while tombstoned from a reset
-        return _ok({"arc": None, "throughline": None, "chapters": [], "week_count": 0, "generated_at": None}, cache_seconds=300)
-    item = _decimal_to_float(item)
-    # #1986: the arc is signed by the same board lead as the weekly call and the
-    # month rollup. Served here so the front-end renders the registry's lead
-    # instead of carrying its own copy of a name.
-    _lead_name, _lead_title = _lead_byline()
-    return _ok(
-        {
-            "arc": item.get("arc"),
-            "throughline": item.get("throughline"),
-            "chapters": item.get("chapters", []),
-            "week_count": int(item.get("week_count") or 0),
-            "generated_at": item.get("generated_at"),
-            "coach_name": _lead_name,
-            "coach_title": _lead_title,
-        },
-        cache_seconds=300,
-    )
-
-
-def handle_recap():
-    """GET /api/recap — Elena's "previously on" cold-open (backend serial phase 3).
-
-    Reads the chronicle recap (`RECAP#latest`), written when a chronicle week is
-    published. Honest-null before the first recap exists; the timeline view then falls
-    back to its front-end-derived "story so far". Withholds a stale record (one that
-    survived a genesis re-anchor) the same way handle_ai_analysis does.
-    """
-    item = table.get_item(Key={"pk": f"{USER_PREFIX}chronicle", "sk": "RECAP#latest"}).get("Item")
-    # #1085 (extends #946): the wiped RECAP#latest was only being withheld by the
-    # day-count guard below (record claims day 7 > pre-start day 0) — it would have
-    # resurfaced on day 7 of the NEW cycle. Tombstone/phase guard closes it for good.
-    if not singleton_visible(item):
-        return _ok({"recap": None}, cache_seconds=300)
-    item = _decimal_to_float(item)
-    rec_days = item.get("experiment_day")
-    if rec_days is not None:
-        try:
-            if int(rec_days) > _current_day_n():
-                logger.info("[recap] record claims day %s but current is %s — withholding stale recap", rec_days, _current_day_n())
-                return _ok({"recap": None}, cache_seconds=300)
-        except (TypeError, ValueError):
-            pass
-    return _ok(
-        {
-            "recap": {
-                "story_so_far": item.get("story_so_far"),
-                "recent_beats": item.get("recent_beats", []),
-                "where_we_are_now": item.get("where_we_are_now"),
-                "threads_to_watch": item.get("threads_to_watch", []),
-                "as_of": item.get("as_of"),
-                "as_of_week": item.get("as_of_week"),
-                "author": item.get("author", "Elena Voss"),
-                "generated_at": item.get("generated_at"),
-                # #802: the Wednesday chronicle (and this recap, written at its
-                # publish time) skips entirely at budget tier >= 2 — a served
-                # recap can be a HELD read, not this week's. Honest disclosure.
-                "regeneration_paused": _regeneration_paused("chronicle"),
-            }
-        },
-        cache_seconds=300,
-    )
-
-
-def handle_ai_analysis(event):
-    """GET /api/ai_analysis"""
-    qs = event.get("queryStringParameters") or {}
-    expert_key = qs.get("expert", "mind")
-    if expert_key not in ("mind", "nutrition", "training", "physical", "explorer", "labs", "glucose", "sleep"):
-        return _error(400, "Invalid expert key")
-    ai_pk = f"{USER_PREFIX}ai_analysis"
-    ai_item = table.get_item(Key={"pk": ai_pk, "sk": f"EXPERT#{expert_key}"}).get("Item")
-    # #946: singleton_visible closes the tombstone gap the days_in_experiment
-    # guard below can't see (a wiped record whose day count is <= today's).
-    if not singleton_visible(ai_item):
-        return _ok({"expert_key": expert_key, "analysis": None, "generated_at": None}, cache_seconds=300)
-    ai_item = _decimal_to_float(ai_item)
-    # Stage0 Fix 3 (2026-05-30): freshness guard. The Brandt block on /explorer/
-    # was rendering "still 268 lbs over fifty-five days" because a pre-restart
-    # analysis record survived the genesis re-anchor. If the record's
-    # days_in_experiment is newer than the live experiment day count, the
-    # narrative is from a previous experiment cycle — refuse to serve it.
-    rec_days = ai_item.get("days_in_experiment")
-    if rec_days is not None:
-        try:
-            if int(rec_days) > _current_day_n():
-                logger.info(
-                    f"[ai_analysis] {expert_key} record claims day {rec_days} "
-                    f"but current is day {_current_day_n()} — withholding stale narrative"
-                )
-                return _ok(
-                    {
-                        "expert_key": expert_key,
-                        "analysis": None,
-                        "generated_at": None,
-                        "stale": True,
-                    },
-                    cache_seconds=300,
-                )
-        except (TypeError, ValueError):
-            pass
-    analysis_val = ai_item.get("analysis", "")
-    if "[AI_UNAVAILABLE]" in (analysis_val or ""):
-        analysis_val = None
-    resp_data = {
-        "expert_key": expert_key,
-        "analysis": analysis_val,
-        "generated_at": ai_item.get("generated_at", ""),
-    }
-    if ai_item.get("key_recommendation"):
-        resp_data["key_recommendation"] = ai_item["key_recommendation"]
-    if ai_item.get("journaling_prompt"):
-        resp_data["journaling_prompt"] = ai_item["journaling_prompt"]
-    if ai_item.get("elena_quote"):
-        resp_data["elena_quote"] = ai_item["elena_quote"]
-    if ai_item.get("week_number"):
-        resp_data["week_number"] = int(ai_item["week_number"])
-    if ai_item.get("days_in_experiment"):
-        resp_data["days_in_experiment"] = int(ai_item["days_in_experiment"])
-    return _ok(resp_data, cache_seconds=300)
-
-    # Coach Intelligence Analysis (GET with ?domain= query param)
-
-
-def handle_coach_analysis(event):
-    """GET /api/coach_analysis"""
-    qs = event.get("queryStringParameters") or {}
-    raw_domain = qs.get("domain", "sleep")
-    _coach_map = {
-        "sleep": "sleep_coach",
-        "nutrition": "nutrition_coach",
-        "training": "training_coach",
-        "mind": "mind_coach",
-        "physical": "physical_coach",
-        "glucose": "glucose_coach",
-        "labs": "labs_coach",
-        "explorer": "explorer_coach",
-    }
-    # The Cockpit (/cockpit/) discloses the 7 CHARACTER PILLARS, whose names differ from the
-    # coach-domain names above — alias them so a pillar click resolves to the right coach.
-    _pillar_alias = {"movement": "training", "metabolic": "glucose"}
-    # Pillars with no dedicated board coach: return a graceful empty read (200), not a 400,
-    # so the Cockpit shows its deterministic fallback without a console error.
-    _no_coach_pillars = {"relationships", "consistency"}
-    domain = _pillar_alias.get(raw_domain, raw_domain)
-    coach_id = _coach_map.get(domain)
-    if not coach_id:
-        if raw_domain in _no_coach_pillars:
-            return _ok({"coach_id": None, "domain": raw_domain, "analysis": None}, cache_seconds=600)
-        return _error(400, f"Invalid domain. Use one of: {', '.join(sorted(_coach_map))}")
-
-    _coach_display = {
-        "sleep_coach": {"name": "Dr. Lisa Park", "initials": "LP", "title": "Sleep & Circadian Rhythm Specialist", "color": "#818cf8"},
-        "nutrition_coach": {"name": "Dr. Marcus Webb", "initials": "MW", "title": "Evidence-Based Nutrition", "color": "#10b981"},
-        "training_coach": {"name": "Dr. Sarah Chen", "initials": "SC", "title": "Exercise Physiology & Strength", "color": "#3db88a"},
-        "mind_coach": {
-            "name": "Dr. Nathan Reeves",
-            "initials": "NR",
-            "title": "Psychiatrist \u2014 Behavioral Patterns",
-            "color": "#a78bfa",
-        },
-        "physical_coach": {"name": "Dr. Victor Reyes", "initials": "VR", "title": "Longevity & Body Composition", "color": "#f59e0b"},
-        "glucose_coach": {"name": "Dr. Amara Patel", "initials": "AP", "title": "Metabolic Health & CGM", "color": "#2dd4bf"},
-        "labs_coach": {"name": "Dr. James Okafor", "initials": "JO", "title": "Clinical Pathology & Preventive Labs", "color": "#5ba4cf"},
-        "explorer_coach": {"name": "Dr. Henning Brandt", "initials": "HB", "title": "Biostatistics & N=1 Research", "color": "#e879f9"},
-    }
-
-    try:
-        coach_pk = f"COACH#{coach_id}"
-
-        # 1. Most recent OUTPUT# record
-        out_resp = table.query(
-            **with_phase_filter(
-                {  # ADR-058: hide pilot coach outputs
-                    "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("OUTPUT#"),
-                    "ScanIndexForward": False,
-                    "Limit": 1,
-                }
-            )
-        )
-        out_items = out_resp.get("Items", [])
-        if not out_items:
-            return _ok({"coach_id": coach_id, "domain": domain, "analysis": None}, cache_seconds=300)
-
-        output = _decimal_to_float(out_items[0])
-        # Prefer observatory_summary over full content
-        analysis_text = output.get("observatory_summary") or output.get("content", "")
-        if "[AI_UNAVAILABLE]" in (analysis_text or ""):
-            analysis_text = None
-
-        # 2. Open threads
-        thread_reference = None
-        try:
-            thread_resp = table.query(
-                **with_phase_filter(
-                    {  # ADR-058: hide pilot coach threads
-                        "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("THREAD#"),
-                    }
-                )
-            )
-            threads = [_decimal_to_float(t) for t in thread_resp.get("Items", []) if t.get("status") == "open"]
-            if threads:
-                # Pick most recently referenced thread
-                threads.sort(key=lambda t: t.get("last_referenced", ""), reverse=True)
-                thread_reference = threads[0].get("summary", "")
-        except Exception:
-            pass
-
-        # 3. Ensemble digest — cross-coach references (#1085: tombstone/phase-guarded)
-        cross_coach_reference = None
-        try:
-            digest = _latest_cycle_digest()
-            if digest:
-                disagreements = digest.get("active_disagreements", [])
-                for d in disagreements:
-                    coaches = d.get("coaches", [])
-                    if coach_id in coaches:
-                        cross_coach_reference = d.get("topic", "")
-                        break
-        except Exception:
-            pass
-
-        # 4. Computation guardrails — data availability
-        data_availability = "preliminary"
-        try:
-            comp_resp = table.query(
-                **with_phase_filter(
-                    {  # ADR-058: hide pilot computation results
-                        "KeyConditionExpression": Key("pk").eq("COACH#computation") & Key("sk").begins_with("RESULTS#"),
-                        "ScanIndexForward": False,
-                        "Limit": 1,
-                    }
-                )
-            )
-            comp_items = comp_resp.get("Items", [])
-            if comp_items:
-                guardrails = _decimal_to_float(comp_items[0]).get("statistical_guardrails", {})
-                # Find the guardrail for this domain's primary source
-                for source_name, source_guardrails in guardrails.items():
-                    if isinstance(source_guardrails, dict):
-                        for metric, g in source_guardrails.items():
-                            if isinstance(g, dict):
-                                data_availability = g.get("data_availability", "preliminary")
-                                break
-                        break
-        except Exception:
-            pass
-
-        # 5. Revision signal — recent learning records
-        revision_signal = None
-        try:
-            learn_resp = table.query(
-                **with_phase_filter(
-                    {  # ADR-058: hide pilot coach learnings
-                        "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("LEARNING#"),
-                        "ScanIndexForward": False,
-                        "Limit": 3,
-                    }
-                )
-            )
-            for item in learn_resp.get("Items", []):
-                item = _decimal_to_float(item)
-                # ADR-141 §4 defense-in-depth (2026-07-26 review): conversation-channel
-                # learnings are Matthew-private — filter explicitly, don't rely on the
-                # type-field vocabulary alone. Also keeps conversation rows from
-                # crowding the Limit=3 window a real position_revision needs.
-                if (item.get("channel") or "data") == "conversation":
-                    continue
-                if item.get("type") == "position_revision":
-                    revision_signal = item.get("revised_position", "")[:100]
-                    break
-        except Exception:
-            pass
-
-        # 6. Confidence language
-        confidence_language = "preliminary"
-        try:
-            output.get("themes", [])
-            # Use the overall confidence from the generation if available
-            conf = output.get("confidence")
-            if conf is not None:
-                conf_f = float(conf)
-                if conf_f >= 0.85:
-                    confidence_language = "highly_confident"
-                elif conf_f >= 0.7:
-                    confidence_language = "fairly_confident"
-                elif conf_f >= 0.5:
-                    confidence_language = "moderate"
-                elif conf_f >= 0.3:
-                    confidence_language = "preliminary"
-                else:
-                    confidence_language = "uncertain"
-        except Exception:
-            pass
-
-        display = _coach_display.get(coach_id, {})
-        resp = {
-            "coach_id": coach_id,
-            "coach_name": display.get("name", ""),
-            "coach_initials": display.get("initials", ""),
-            "coach_title": display.get("title", ""),
-            "coach_color": display.get("color", ""),
-            "domain": domain,
-            "analysis": analysis_text,
-            "key_recommendation": output.get("key_recommendation") or (output.get("themes", [""])[0] if output.get("themes") else None),
-            "elena_quote": output.get("elena_quote"),
-            "journaling_prompt": output.get("journaling_prompt"),
-            "thread_reference": thread_reference,
-            "revision_signal": revision_signal,
-            "cross_coach_reference": cross_coach_reference,
-            "confidence_language": confidence_language,
-            "data_availability": data_availability,
-            "generated_at": output.get("created_at") or output.get("generated_at", ""),
-            "week_number": output.get("week_number"),
-            "days_in_experiment": output.get("days_in_experiment"),
-            # #802: coach_narrative_orchestrator skips this coach's OUTPUT# write
-            # entirely at budget tier >= 2 — a served analysis can be a HELD read
-            # from before the pause, not today's. Honest disclosure alongside
-            # generated_at rather than a silent present-tense stale read.
-            "regeneration_paused": _regeneration_paused("coach_narrative"),
-        }
-
-        # Add cross-domain context note from the integrator (if available)
-        try:
-            _int_item = _integrator_digest() or {}  # #946: tombstone/phase-guarded
-            _cdn = _int_item.get("cross_domain_notes", {})
-            if isinstance(_cdn, dict) and domain in _cdn:
-                resp["cross_domain_note"] = _cdn[domain]
-            if _int_item.get("analysis"):
-                resp["weekly_priority"] = _int_item["analysis"]
-        except Exception:
-            pass
-
-        # Strip None values for cleaner JSON
-        resp = {k: v for k, v in resp.items() if v is not None}
-        return _ok(resp, cache_seconds=300)
-    except Exception as _e:
-        logger.warning(f"[/api/coach_analysis] {_e}")
-        return _ok({"coach_id": coach_id, "domain": domain, "analysis": None}, cache_seconds=60)
-
-    # Coaching Dashboard (GET — assembled dashboard data)
-
-
-# Shared coach id/name maps for the calibration + predictions surfaces.
-_CALIB_COACH_NAMES = {
-    "sleep": "Dr. Lisa Park",
-    "nutrition": "Dr. Marcus Webb",
-    "training": "Dr. Sarah Chen",
-    "mind": "Dr. Nathan Reeves",
-    "physical": "Dr. Victor Reyes",
-    "glucose": "Dr. Amara Patel",
-    "labs": "Dr. James Okafor",
-    "explorer": "Dr. Henning Brandt",
-}
-_CALIB_COACH_ID_MAP = {c: f"{c}_coach" for c in _CALIB_COACH_NAMES}
-
-# ── #1527: parallel, projected PREDICTION#-partition fetch ────────────────────
-# /api/predictions and /api/calibration each walked all 8 coaches' full
-# PREDICTION# partitions SEQUENTIALLY once #1376 made both surfaces
-# career-backed (~3.6s at origin — /method/board/'s cold-cache LCP blew the
-# 2500ms QA budget). The fetch itself is unchanged — still ONE unfiltered query
-# per coach, so season stays a derived subset of career (the #1376
-# no-double-counting invariant) — the per-coach queries just run concurrently,
-# projected down to the fields either surface actually reads.
-
-# Every top-level attribute the predictions/calibration/team surfaces consume;
-# aliased wholesale because some (status) are DynamoDB reserved words.
-_PREDICTION_PROJECTION_FIELDS = (
-    "status",
-    "outcome",
-    "confidence",
-    "tombstone",
-    "phase",
-    "claim_natural",
-    "created_date",
-    "evaluation",
-    "outcome_notes",
-    "subdomain",
-)
-
-
-# #2063: pagination ceiling for the opt-in paginated read below. Bounds the
-# worst case at this function's 256MB (~1/6 vCPU) — DynamoDB caps a query page at
-# 1MB, so this is ~24MB / a few tens of thousands of small rows, ~50x the live
-# calibration ledger. Hitting it logs LOUD rather than silently truncating, which
-# is the failure mode #2063 exists to end.
-_MAX_QUERY_PAGES = 24
+def _docket_rows(prefix, limit, newest_first):
+    """Delegated to web.site_api_coach_ledger._docket_rows."""
+    return _ledger._docket_rows(prefix, limit, newest_first, _g=globals())
 
 
 def _query_partition(pk, sk_prefix, projection_fields=None, paginate=False):
-    """ONE unfiltered, newest-first, Limit-1500 fetch of pk/sk_prefix — the ONE
-    call shape both the real path and the test fakes' query hooks parse.
-
-    Called from worker threads against the SHARED module-global table handle,
-    deliberately: the underlying botocore client is thread-safe, and Table.query
-    is a stateless per-call request transform on top of it (no lazy attribute
-    loads on this path — `.name` resolves at construction). The two tempting
-    alternatives both failed live at this function's 256MB (~1/6 vCPU):
-    per-thread boto3 Sessions are GIL-serialized pure-Python setup (12–16s at
-    origin), and the resource-derived `meta.client` auto-transforms values, so
-    hand-built typed AttributeValues mis-parse as Maps (ValidationException).
-
-    `paginate=True` follows LastEvaluatedKey to the end of the partition. Default
-    stays OFF: the 8 coach PREDICTION# partitions are 217–372 projected rows each
-    and fit one page with room to spare, so paying an extra round trip per coach
-    would buy nothing and re-open the #1527 latency regression.
-
-    #2063 — what `Limit=1500` actually bounds. It is NOT the cap that bites: a
-    DynamoDB query page is capped at **1MB of items**, whichever comes first. The
-    CALIB# ledger's ~1.1KB rows hit 1MB at ~977 rows, so after the #1978 reconcile
-    wrote its void backfill the "Limit-1500" read was returning 977 of 1,731 rows
-    and dropping the OLDEST — raising Limit would not have moved it one row. Only
-    following LastEvaluatedKey returns the whole ledger.
-    """
-    kwargs = {
-        "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with(sk_prefix),
-        "ScanIndexForward": False,  # sk is date-prefixed → newest first
-        "Limit": 1500,
-    }
-    if projection_fields:
-        names = {f"#f{i}": f for i, f in enumerate(projection_fields)}
-        kwargs["ProjectionExpression"] = ", ".join(names)
-        kwargs["ExpressionAttributeNames"] = names
-    resp = table.query(**kwargs)
-    items = list(resp.get("Items", []))
-    if paginate:
-        pages = 1
-        while resp.get("LastEvaluatedKey"):
-            if pages >= _MAX_QUERY_PAGES:
-                logger.error(
-                    f"[partition-fetch] {pk}/{sk_prefix}: hit the {_MAX_QUERY_PAGES}-page ceiling at {len(items)} rows — TRUNCATED"
-                )
-                break
-            resp = table.query(**kwargs, ExclusiveStartKey=resp["LastEvaluatedKey"])
-            items.extend(resp.get("Items", []))
-            pages += 1
-    return [_decimal_to_float(r) for r in items]
+    """Delegated to web.site_api_coach_ledger._query_partition."""
+    return _ledger._query_partition(pk, sk_prefix, projection_fields, paginate, _g=globals())
 
 
 def _fetch_prediction_partition(coach_pk):
-    """ONE unfiltered fetch of a coach's whole PREDICTION# partition (career),
-    projected to the consumed fields. Raises on query failure — callers map
-    that to [] so a single bad partition degrades exactly as it did before."""
-    return _query_partition(coach_pk, "PREDICTION#", _PREDICTION_PROJECTION_FIELDS)
-
-
-def _parallel_fetch(jobs):
-    """Run {key: thunk} concurrently; a failed job logs and yields [] (the same
-    shaped-empty degradation the old sequential per-coach try/except gave)."""
-    out = {}
-    if not jobs:
-        return out
-    with ThreadPoolExecutor(max_workers=min(9, len(jobs))) as ex:
-        futures = {key: ex.submit(fn) for key, fn in jobs.items()}
-        for key, fut in futures.items():
-            try:
-                out[key] = fut.result()
-            except Exception as _e:
-                logger.warning(f"[coach-partition-fetch] {key}: {_e}")
-                out[key] = []
-    return out
+    """Delegated to web.site_api_coach_ledger._fetch_prediction_partition."""
+    return _ledger._fetch_prediction_partition(coach_pk, _g=globals())
 
 
 def _prefetch_calibration_partitions(cids):
-    """All requested coaches' PREDICTION# partitions, concurrently → {cid: records}."""
-    return _parallel_fetch({cid: (lambda pk=f"COACH#{_CALIB_COACH_ID_MAP[cid]}": _fetch_prediction_partition(pk)) for cid in cids})
+    """Delegated to web.site_api_coach_ledger._prefetch_calibration_partitions."""
+    return _ledger._prefetch_calibration_partitions(cids, _g=globals())
 
 
 def _score_coach_calibration(cid, records=None):
-    """Fetch a coach's resolved PREDICTION# records and score them (#538), split
-    into THIS SEASON (current cycle, phase-visible) and CAREER — every cycle
-    ever, tombstoned archives included (#1376: career vs season, sports-card
-    pattern).
+    """Delegated to web.site_api_coach_ledger._score_coach_calibration."""
+    return _ledger._score_coach_calibration(cid, records, _g=globals())
 
-    ONE unfiltered fetch of the whole COACH#…/PREDICTION# partition backs both
-    views — season is derived from it client-side via `singleton_visible`
-    (the exact predicate `with_phase_filter` applies server-side, #946), so it
-    is guaranteed to be a strict subset of the career records. A second,
-    independently-filtered query could drift or double-count if its own Limit
-    truncated differently; deriving season FROM the career fetch cannot.
 
-    Returns (season_summary, season_pairs, career_summary, career_pairs) — the
-    pairs are folded into the platform-wide aggregates so per-coach and
-    platform numbers (both season and career) always come from the same place.
+def _current_day_n() -> int:
+    """Delegated to web.site_api_coach_narrative._current_day_n."""
+    return _narrative._current_day_n(_g=globals())
 
-    `records` is the coach's already-fetched partition when the caller batched
-    the fetches concurrently (#1527); left None, this fetches it itself.
-    """
-    if records is None:
-        records = []
-        try:
-            records = _fetch_prediction_partition(f"COACH#{_CALIB_COACH_ID_MAP[cid]}")
-        except Exception as _e:
-            logger.warning(f"[calibration] {cid}: {_e}")
-    career_pairs = calibration_core.pairs_from_prediction_records(records)
-    career_summary = calibration_core.score_pairs(career_pairs)
 
-    season_records = [r for r in records if singleton_visible(r)]  # ADR-058: hide pilot/archived predictions
-    season_pairs = calibration_core.pairs_from_prediction_records(season_records)
-    season_summary = calibration_core.score_pairs(season_pairs)
+# ── Thin routed delegators — identical name/signature/__module__ to the pre-split
+#    handlers; each hands its own globals() to the split handler as `_g`. ───────
 
-    return season_summary, season_pairs, career_summary, career_pairs
+
+def handle_ai_analysis(event):
+    """GET /api/ai_analysis — delegated to web.site_api_coach_narrative."""
+    return _narrative.handle_ai_analysis(event, _g=globals())
 
 
 def handle_calibration(event):
-    """GET /api/calibration — the calibration scoreboard (#538).
-
-    Every forecast the platform makes, graded against what actually happened: a Brier
-    score + reliability curve per coach and platform-wide, folding in the hypothesis
-    engine's own calibration ledger. The honesty moat, made public and legible.
-
-    #1376: an experiment reset tags every EXPERIMENT_SCOPED PREDICTION# archived
-    (phase=pilot + cycle=<closing>, ADR-077) so `with_phase_filter` — correctly —
-    stops surfacing it, and a fresh season starts back at n=0. That's honest for
-    "this season", but the platform-wide `platform` block ALSO folded in the
-    CROSS_PHASE hypothesis/forecast ledger (never wiped, so it kept counting
-    every cycle) — the confirmed leak: platform read n=23 while every coach read
-    n=0 "nascent", career and season smashed into one number. Every block below
-    now carries BOTH: the top-level fields stay season-scoped (unchanged shape
-    for existing readers), and a nested `lifetime` object carries the same
-    shape for the career, all-cycles view — sports solved this decades ago.
-    """
-    # #1980: the current cycle's sealed pre-registration (link + SHA-256 + verify
-    # command) — independent of the DDB fetches below, computed first so it still
-    # renders on the exception fallback (prereg_seal_meta never raises).
-    seal = prereg_seal_meta()
-    try:
-        # #1527: all 8 coach partitions + the hypothesis ledger fetched
-        # concurrently — total fetch latency is max(single query), not the sum.
-        def _fetch_hyp_ledger():
-            # Hypothesis-engine calibration ledger (word confidences → same [0,1]
-            # axis). CROSS_PHASE (phase_taxonomy.py) — never wiped, so ONE fetch
-            # already holds every cycle; season is the current-cycle slice by
-            # resolution date, the same "genesis anchors the current run"
-            # convention RAW_TIMESERIES reads use. Unprojected: CALIB# rows are
-            # small and their consumed fields vary by record_type.
-            #
-            # #2063: PAGINATED, and it is the only fetch here that is. Being
-            # CROSS_PHASE is exactly why — this partition never resets, it only
-            # accretes (every reset stamps one void row per open bet; the #1978
-            # reconcile alone wrote 1,435), so it is the one partition on this
-            # endpoint that outgrew a single 1MB DynamoDB page. It served
-            # voided.n=971 of 1,708 and, because the read is newest-first, the
-            # rows it dropped were the OLDEST graded bets — silently shrinking
-            # the lifetime Brier denominator on the surface whose subtitle is
-            # "the honesty moat, made public".
-            return _query_partition(USER_PREFIX + "calibration", "CALIB#", paginate=True)
-
-        jobs = {cid: (lambda pk=f"COACH#{_CALIB_COACH_ID_MAP[cid]}": _fetch_prediction_partition(pk)) for cid in _CALIB_COACH_NAMES}
-        jobs["hypothesis-ledger"] = _fetch_hyp_ledger
-        fetched = _parallel_fetch(jobs)
-        hyp_rows = fetched.pop("hypothesis-ledger")
-
-        per_coach = []
-        platform_pairs = []  # season
-        platform_career_pairs = []  # career (all cycles, #1376)
-        for cid, name in _CALIB_COACH_NAMES.items():
-            summary, pairs, career_summary, career_pairs = _score_coach_calibration(cid, records=fetched[cid])
-            platform_pairs.extend(pairs)
-            platform_career_pairs.extend(career_pairs)
-            per_coach.append({"coach_id": cid, "coach_name": name, **summary, "lifetime": career_summary})
-        hyp_rows_season = [r for r in hyp_rows if str(r.get("resolved_at") or "")[:10] >= EXPERIMENT_START]
-
-        hyp_pairs = calibration_core.pairs_from_calibration_rows(hyp_rows_season)
-        hyp_career_pairs = calibration_core.pairs_from_calibration_rows(hyp_rows)
-        hypotheses = calibration_core.score_pairs(hyp_pairs)
-        hypotheses_lifetime = calibration_core.score_pairs(hyp_career_pairs)
-
-        # Interval forecasts (#1246): forecast_resolution rows live in the SAME CALIB#
-        # ledger but carry `covered` (did the 80% interval hold?), not an `outcome`
-        # word — a genuinely graded binary the scoreboard was silently dropping, so
-        # /api/calibration read platform n=0 while /api/forecast graded the same rows.
-        forecast_pairs = calibration_core.pairs_from_forecast_resolution_rows(hyp_rows_season)
-        forecast_career_pairs = calibration_core.pairs_from_forecast_resolution_rows(hyp_rows)
-        interval_forecasts = calibration_core.score_pairs(forecast_pairs)
-        interval_forecasts_lifetime = calibration_core.score_pairs(forecast_career_pairs)
-
-        platform = calibration_core.score_pairs(platform_pairs + hyp_pairs + forecast_pairs)
-        platform_lifetime = calibration_core.score_pairs(platform_career_pairs + hyp_career_pairs + forecast_career_pairs)
-        platform["lifetime"] = platform_lifetime
-
-        # #1893: the void ledger stops being write-only. Every reset stamps one
-        # voided_at_reset row per still-open pre-registered bet into this SAME
-        # CALIB# partition (already fetched above — zero extra queries); until
-        # now no surface read them, so the career denominator silently excluded
-        # ~85% of every bet the platform ever pre-registered. Counted and served
-        # so a reader can see the graded n is a subset, not the whole record.
-        voided = calibration_core.count_voided(hyp_rows)
-
-        # Rank coaches by Brier (best first); the never-graded fall to the bottom.
-        per_coach.sort(key=lambda c: (c["n"] == 0, c["brier"] if c["brier"] is not None else 1.0))
-
-        return _ok(
-            {
-                "platform": platform,
-                "coaches": per_coach,
-                "hypotheses": {**hypotheses, "lifetime": hypotheses_lifetime},
-                "interval_forecasts": {**interval_forecasts, "lifetime": interval_forecasts_lifetime},
-                "voided": voided,
-                "cycle": _current_cycle(),
-                "prereg_seal": seal,
-                "disclosure": (
-                    "Self-graded: every prediction here was resolved against the platform's own data by a "
-                    "deterministic evaluator — no human scoring. Brier score: 0 is perfect, 0.25 is the "
-                    "always-say-50% baseline, lower is better. Calibrated and skilled are different claims: "
-                    "calibrated means stated confidence matches how often calls turn out right (reliability); "
-                    "skilled means beating the base rate (Brier skill > 0). A surface can be reliable without "
-                    "being skillful — when skill is at or below zero it reads Not Yet Skillful, never Well "
-                    "Calibrated. Voided bets: a reset voids — never grades — every still-open pre-registered "
-                    "bet; each is recorded in the ledger and counted in `voided` so the graded denominator "
-                    "is honest. They are excluded from Brier because they never resolved."
-                ),
-                "as_of": datetime.now(PT).strftime("%Y-%m-%d"),
-            },
-            cache_seconds=300,
-        )
-    except Exception as e:
-        logger.error(f"[calibration] {e}")
-        return _ok({"platform": {}, "coaches": [], "hypotheses": {}, "interval_forecasts": {}, "prereg_seal": seal}, cache_seconds=60)
+    """GET /api/calibration — delegated to web.site_api_coach_ledger."""
+    return _ledger.handle_calibration(event, _g=globals())
 
 
-def handle_voice_fidelity(event):
-    """GET /api/voice_fidelity — the blind voice-fidelity scoreboard (#545).
-
-    Monthly, a 3-judge Haiku panel reads a blinded sample of each coach's own real
-    recent output (board answers, brief narratives — no synthetic foils) and guesses
-    which of the 8 operational coaches wrote it. voice_fidelity_harness.py does the
-    actual sampling + panel + deterministic scoring (voice_fidelity_core.score_run);
-    this endpoint only serves the pre-computed, cumulative scoreboard it persists at
-    VOICEFIDELITY#scoreboard/latest — the same "measure the platform's own honesty
-    claim, in public" framing as the calibration scoreboard (#538).
-    """
-    try:
-        item = table.get_item(Key={"pk": "VOICEFIDELITY#scoreboard", "sk": "latest"}).get("Item")
-        board = _decimal_to_float(item) if item else {}
-        return _ok(
-            {
-                "n": board.get("n", 0),
-                "correct": board.get("correct"),
-                "accuracy_pct": board.get("accuracy_pct"),
-                "chance_accuracy_pct": board.get("chance_accuracy_pct"),
-                "candidate_pool_size": board.get("candidate_pool_size"),
-                "coaches": board.get("per_coach", []),
-                "confusion": board.get("confusion", {}),
-                "worst_confused_pair": board.get("worst_confused_pair"),
-                "verdict": board.get("verdict", "insufficient_data"),
-                "run_month": board.get("run_month"),
-                "updated_at": board.get("updated_at"),
-                "disclosure": (
-                    "Self-measured: a 3-judge Haiku panel reads a blinded sample of each coach's own real "
-                    "recent output and guesses which of the 8 coaches wrote it — no attribution shown. "
-                    "Accuracy is scored deterministically against ground truth, never an LLM's opinion of "
-                    '"does this sound right." Chance accuracy at an 8-coach roster is 12.5% — a coach '
-                    "scoring near chance is confusable with the rest of the team, not genuinely distinct."
-                ),
-            },
-            cache_seconds=3600,
-        )
-    except Exception as e:
-        logger.error(f"[voice_fidelity] {e}")
-        return _ok({"n": 0, "coaches": [], "confusion": {}, "verdict": "insufficient_data"}, cache_seconds=60)
+def handle_coach(event):
+    """GET /api/coach/{persona_id} — delegated to web.site_api_coach_profile."""
+    return _profile.handle_coach(event, _g=globals())
 
 
-def handle_predictions(event):
-    """GET /api/predictions"""
-    # #1980: computed first (never raises) so the seal still renders on the
-    # exception fallback below — see handle_calibration for the same pattern.
-    seal = prereg_seal_meta()
-    try:
-        qs = event.get("queryStringParameters") or {}
-        status_filter = qs.get("status", "all")
-        coach_filter = qs.get("coach_id", "")
-        limit = min(int(qs.get("limit", "50")), 200)
+def handle_coach_analysis(event):
+    """GET /api/coach_analysis — delegated to web.site_api_coach_narrative."""
+    return _narrative.handle_coach_analysis(event, _g=globals())
 
-        _pred_coach_names = {
-            "sleep": "Dr. Lisa Park",
-            "nutrition": "Dr. Marcus Webb",
-            "training": "Dr. Sarah Chen",
-            "mind": "Dr. Nathan Reeves",
-            "physical": "Dr. Victor Reyes",
-            "glucose": "Dr. Amara Patel",
-            "labs": "Dr. James Okafor",
-            "explorer": "Dr. Henning Brandt",
-        }
-        _pred_coach_ids = list(_pred_coach_names.keys())
-        _pred_coach_id_map = {
-            "sleep": "sleep_coach",
-            "nutrition": "nutrition_coach",
-            "training": "training_coach",
-            "mind": "mind_coach",
-            "physical": "physical_coach",
-            "glucose": "glucose_coach",
-            "labs": "labs_coach",
-            "explorer": "explorer_coach",
-        }
 
-        if coach_filter and coach_filter not in _pred_coach_ids:
-            return _error(400, "Invalid coach_id")
+def handle_coach_docket(event):
+    """GET /api/coach_docket — delegated to web.site_api_coach_ledger."""
+    return _ledger.handle_coach_docket(event, _g=globals())
 
-        scan_coaches = [coach_filter] if coach_filter else _pred_coach_ids
-        # #1527: fetch every scanned coach's partition concurrently up front —
-        # the loop below stays purely computational.
-        fetched = _parallel_fetch(
-            {cid: (lambda pk=f"COACH#{_pred_coach_id_map[cid]}": _fetch_prediction_partition(pk)) for cid in scan_coaches}
-        )
-        all_predictions = []
-        by_coach = {}
-        # The real graded calls live in PREDICTION# records (status set by the daily
-        # coach-prediction-evaluator), NOT in OUTPUT#.predictions (which was a list of
-        # natural-language strings with no status — the old read returned all-zero).
-        _BUCKETS = ("confirmed", "refuted", "pending", "inconclusive", "expired")
 
-        _LIFETIME_ZERO = {"total": 0, "confirmed": 0, "refuted": 0, "pending": 0, "inconclusive": 0, "expired": 0, "decided": 0}
-
-        for cid in scan_coaches:
-            by_coach[cid] = {"total": 0, "confirmed": 0, "refuted": 0, "pending": 0, "inconclusive": 0, "expired": 0, "decided": 0}
-            # #1376: career (all cycles, tombstoned archives included) beside this
-            # season — same sports-card pattern as /api/calibration.
-            by_coach[cid]["lifetime"] = dict(_LIFETIME_ZERO)
-
-            try:
-                # ONE unfiltered fetch of the whole PREDICTION# partition (career,
-                # prefetched concurrently above — #1527); season is derived from it
-                # below via singleton_visible, the same predicate with_phase_filter
-                # applies server-side (ADR-058/#946) — so season can never diverge
-                # from or double-count against career.
-                for rec in fetched.get(cid, []):
-                    p_status = rec.get("status", "pending")
-                    if p_status not in _BUCKETS:
-                        p_status = "pending"
-
-                    by_coach[cid]["lifetime"]["total"] += 1
-                    by_coach[cid]["lifetime"][p_status] += 1
-                    if p_status in ("confirmed", "refuted"):
-                        by_coach[cid]["lifetime"]["decided"] += 1
-
-                    if not singleton_visible(rec):  # archived cycle — career-only, not this season
-                        continue
-
-                    by_coach[cid]["total"] += 1
-                    by_coach[cid][p_status] += 1
-                    if p_status in ("confirmed", "refuted"):
-                        by_coach[cid]["decided"] += 1
-
-                    if status_filter != "all" and p_status != status_filter:
-                        continue
-
-                    ev = rec.get("evaluation") or {}
-                    all_predictions.append(
-                        {
-                            "coach_id": cid,
-                            "coach_name": _pred_coach_names[cid],
-                            "text": rec.get("claim_natural", ""),
-                            "confidence": rec.get("confidence", "medium"),
-                            "status": p_status,
-                            "date": rec.get("created_date", ""),
-                            "metric": ev.get("metric"),
-                            "eval_type": ev.get("type"),
-                            "outcome_notes": rec.get("outcome_notes") or "",
-                            "subdomain": rec.get("subdomain", ""),
-                        }
-                    )
-            except Exception as _qe:
-                logger.warning(f"[/api/predictions] {cid}: {_qe}")
-
-            decided = by_coach[cid]["decided"]
-            by_coach[cid]["hit_rate_pct"] = round(by_coach[cid]["confirmed"] / decided * 100, 1) if decided else None
-            ldecided = by_coach[cid]["lifetime"]["decided"]
-            by_coach[cid]["lifetime"]["hit_rate_pct"] = (
-                round(by_coach[cid]["lifetime"]["confirmed"] / ldecided * 100, 1) if ldecided else None
-            )
-
-        # Surface decided calls first (the scorecard signal), then by recency.
-        _order = {"confirmed": 0, "refuted": 0, "pending": 1, "inconclusive": 1, "expired": 2}
-        all_predictions.sort(key=lambda x: (_order.get(x.get("status"), 1), x.get("date", "")), reverse=False)
-        all_predictions.sort(key=lambda x: x.get("date", ""), reverse=True)
-        all_predictions = all_predictions[:limit]
-
-        # Compute overall stats — season (unchanged shape) + career (#1376).
-        total = sum(c["total"] for c in by_coach.values())
-        confirmed = sum(c["confirmed"] for c in by_coach.values())
-        refuted = sum(c["refuted"] for c in by_coach.values())
-        pending = sum(c["pending"] for c in by_coach.values())
-        inconclusive = sum(c["inconclusive"] for c in by_coach.values())
-        expired = sum(c["expired"] for c in by_coach.values())
-        resolved = confirmed + refuted
-        accuracy_pct = round(confirmed / resolved * 100, 1) if resolved > 0 else None
-
-        l_total = sum(c["lifetime"]["total"] for c in by_coach.values())
-        l_confirmed = sum(c["lifetime"]["confirmed"] for c in by_coach.values())
-        l_refuted = sum(c["lifetime"]["refuted"] for c in by_coach.values())
-        l_pending = sum(c["lifetime"]["pending"] for c in by_coach.values())
-        l_inconclusive = sum(c["lifetime"]["inconclusive"] for c in by_coach.values())
-        l_expired = sum(c["lifetime"]["expired"] for c in by_coach.values())
-        l_resolved = l_confirmed + l_refuted
-        l_accuracy_pct = round(l_confirmed / l_resolved * 100, 1) if l_resolved > 0 else None
-
-        return _ok(
-            {
-                "overall": {
-                    "total": total,
-                    "confirmed": confirmed,
-                    "refuted": refuted,
-                    "pending": pending,
-                    "inconclusive": inconclusive,
-                    "expired": expired,
-                    "decided": resolved,
-                    "accuracy_pct": accuracy_pct,
-                    "lifetime": {
-                        "total": l_total,
-                        "confirmed": l_confirmed,
-                        "refuted": l_refuted,
-                        "pending": l_pending,
-                        "inconclusive": l_inconclusive,
-                        "expired": l_expired,
-                        "decided": l_resolved,
-                        "accuracy_pct": l_accuracy_pct,
-                    },
-                },
-                "by_coach": by_coach,
-                "predictions": all_predictions,
-                "cycle": _current_cycle(),
-                "prereg_seal": seal,
-            },
-            cache_seconds=300,
-        )
-    except Exception as _e:
-        logger.warning(f"[/api/predictions] {_e}")
-        return _ok({"overall": {}, "by_coach": {}, "predictions": [], "prereg_seal": seal}, cache_seconds=60)
-
-    # Coach Learning Timeline (GET with ?coach_id= query param)
+def handle_coach_team(event):
+    """GET /api/coach_team — delegated to web.site_api_coach_stance."""
+    return _stance.handle_coach_team(event, _g=globals())
 
 
 def handle_coach_timeline(event):
-    """GET /api/coach_timeline"""
-    try:
-        qs = event.get("queryStringParameters") or {}
-        coach_id = qs.get("coach_id", "")
-
-        _tl_coach_names = {
-            "sleep": "Dr. Lisa Park",
-            "nutrition": "Dr. Marcus Webb",
-            "training": "Dr. Sarah Chen",
-            "mind": "Dr. Nathan Reeves",
-            "physical": "Dr. Victor Reyes",
-            "glucose": "Dr. Amara Patel",
-            "labs": "Dr. James Okafor",
-            "explorer": "Dr. Henning Brandt",
-        }
-        _tl_coach_id_map = {
-            "sleep": "sleep_coach",
-            "nutrition": "nutrition_coach",
-            "training": "training_coach",
-            "mind": "mind_coach",
-            "physical": "physical_coach",
-            "glucose": "glucose_coach",
-            "labs": "labs_coach",
-            "explorer": "explorer_coach",
-        }
-
-        if coach_id not in _tl_coach_names:
-            return _error(400, "Invalid or missing coach_id")
-
-        coach_pk = f"COACH#{_tl_coach_id_map[coach_id]}"
-        milestones = []
-
-        # Query OUTPUT# records for stance_changes, predictions, surprises, emotional_investment
-        try:
-            out_resp = table.query(
-                **with_phase_filter(
-                    {  # ADR-058: hide pilot timeline outputs
-                        "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("OUTPUT#"),
-                        "ScanIndexForward": False,
-                        "Limit": 20,
-                    }
-                )
-            )
-            prev_investment = None
-            for out_item in out_resp.get("Items", []):
-                out_item = _decimal_to_float(out_item)
-                out_date = out_item.get("sk", "").replace("OUTPUT#", "")
-
-                # Stance changes
-                stance_changes = out_item.get("stance_changes", [])
-                if isinstance(stance_changes, list):
-                    for sc in stance_changes:
-                        if isinstance(sc, dict):
-                            milestones.append(
-                                {
-                                    "date": out_date,
-                                    "type": "stance_change",
-                                    "text": sc.get("topic", sc.get("text", "Position revised")),
-                                    "detail": sc.get("new_stance", sc.get("detail", "")),
-                                }
-                            )
-                        elif isinstance(sc, str):
-                            milestones.append(
-                                {
-                                    "date": out_date,
-                                    "type": "stance_change",
-                                    "text": sc,
-                                    "detail": "",
-                                }
-                            )
-
-                # Resolved predictions
-                preds = out_item.get("predictions", [])
-                if isinstance(preds, list):
-                    for p in preds:
-                        if isinstance(p, dict) and p.get("status") in ("confirmed", "refuted"):
-                            milestones.append(
-                                {
-                                    "date": out_date,
-                                    "type": "prediction_resolved",
-                                    "text": p.get("text", p.get("prediction", "")),
-                                    "detail": f"Status: {p['status']}",
-                                }
-                            )
-
-                # Surprises
-                surprises = out_item.get("surprises", [])
-                if isinstance(surprises, list):
-                    for s in surprises:
-                        if isinstance(s, dict):
-                            milestones.append(
-                                {
-                                    "date": out_date,
-                                    "type": "surprise",
-                                    "text": s.get("text", s.get("observation", "")),
-                                    "detail": s.get("detail", s.get("significance", "")),
-                                }
-                            )
-                        elif isinstance(s, str):
-                            milestones.append(
-                                {
-                                    "date": out_date,
-                                    "type": "surprise",
-                                    "text": s,
-                                    "detail": "",
-                                }
-                            )
-
-                # Emotional investment changes
-                current_investment = out_item.get("emotional_investment", "neutral")
-                if prev_investment and current_investment != prev_investment:
-                    milestones.append(
-                        {
-                            "date": out_date,
-                            "type": "investment_change",
-                            "text": f"Investment shifted: {prev_investment} -> {current_investment}",
-                            "detail": "",
-                        }
-                    )
-                prev_investment = current_investment
-
-                # Learning log entries
-                learning_log = out_item.get("learning_log", [])
-                if isinstance(learning_log, list):
-                    for entry in learning_log:
-                        if isinstance(entry, dict):
-                            milestones.append(
-                                {
-                                    "date": out_date,
-                                    "type": "stance_change",
-                                    "text": entry.get("lesson", entry.get("text", "")),
-                                    "detail": entry.get("detail", ""),
-                                }
-                            )
-        except Exception:
-            pass
-
-        # Also check LEARNING# records
-        try:
-            learn_resp = table.query(
-                **with_phase_filter(
-                    {  # ADR-058: hide pilot timeline learnings
-                        "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("LEARNING#"),
-                        "ScanIndexForward": False,
-                        "Limit": 20,
-                    }
-                )
-            )
-            for l_item in learn_resp.get("Items", []):
-                l_item = _decimal_to_float(l_item)
-                if (l_item.get("channel") or "data") == "conversation":
-                    # ADR-141 privacy tier: never surface conversation-learning
-                    # text (verbatim check-in quotes) on a public timeline.
-                    continue
-                l_date = l_item.get("sk", "").replace("LEARNING#", "")
-                l_type = l_item.get("type", "stance_change")
-                milestones.append(
-                    {
-                        "date": l_date,
-                        "type": (
-                            l_type
-                            if l_type in ("stance_change", "prediction_resolved", "surprise", "investment_change")
-                            else "stance_change"
-                        ),
-                        "text": l_item.get("lesson", l_item.get("revised_position", l_item.get("text", ""))),
-                        "detail": l_item.get("detail", l_item.get("evidence", "")),
-                    }
-                )
-        except Exception:
-            pass
-
-        # Sort by date descending, deduplicate by text
-        milestones.sort(key=lambda m: m.get("date", ""), reverse=True)
-        seen_texts = set()
-        unique_milestones = []
-        for m in milestones:
-            key = m.get("text", "")[:80]
-            if key and key not in seen_texts:
-                seen_texts.add(key)
-                unique_milestones.append(m)
-
-        return _ok(
-            {
-                "coach_id": coach_id,
-                "coach_name": _tl_coach_names[coach_id],
-                "milestones": unique_milestones[:50],
-            },
-            cache_seconds=600,
-        )
-    except Exception as _e:
-        logger.warning(f"[/api/coach_timeline] {_e}")
-        return _ok({"coach_id": "", "coach_name": "", "milestones": []}, cache_seconds=60)
-
-    # Weekly Priority (GET — integrator synthesis)
+    """GET /api/coach_timeline — delegated to web.site_api_coach_narrative."""
+    return _narrative.handle_coach_timeline(event, _g=globals())
 
 
-def handle_weekly_priority(event):
-    """GET /api/weekly_priority"""
-    try:
-        # PRE-START (#948, the #939 contract): any stored integrator record predates
-        # the staged genesis — serving it would present the wiped cycle's "week's
-        # call" as current. Honest null + the countdown fields; every consumer
-        # already renders the empty state. Inert (normal path, pre_start=False)
-        # once genesis <= today.
-        _pre = pre_start_meta()
-        if _pre:
-            return _ok({"weekly_priority": None, "cross_domain_notes": {}, **_pre}, cache_seconds=300)
-        _int_item = _integrator_digest()  # #946: tombstone/phase-guarded
-        if not _int_item:
-            return _ok({"weekly_priority": None, "cross_domain_notes": {}, "pre_start": False}, cache_seconds=300)
-        _lead_name, _lead_title = _lead_byline()
-        return _ok(
-            {
-                "weekly_priority": _int_item.get("analysis", ""),
-                "cross_domain_notes": _int_item.get("cross_domain_notes", {}),
-                "generated_at": _int_item.get("generated_at", ""),
-                "week_number": _int_item.get("week_number"),
-                "coach_name": _lead_name,
-                "coach_title": _lead_title,
-                "pre_start": False,
-            },
-            cache_seconds=300,
-        )
-    except Exception as _e:
-        logger.warning(f"[/api/weekly_priority] {_e}")
-        return _ok({"weekly_priority": None}, cache_seconds=60)
+def handle_coaches(event):
+    """GET /api/coaches — delegated to web.site_api_coach_profile."""
+    return _profile.handle_coaches(event, _g=globals())
+
+
+def handle_decisions(event):
+    """GET /api/decisions — delegated to web.site_api_thirdwall."""
+    return _thirdwall.handle_decisions(event, _g=globals())
+
+
+def handle_diary_reactions(event):
+    """GET /api/diary_reactions — delegated to web.site_api_thirdwall."""
+    return _thirdwall.handle_diary_reactions(event, _g=globals())
+
+
+def handle_experiment_synthesis():
+    """GET /api/experiment_synthesis — delegated to web.site_api_coach_narrative."""
+    return _narrative.handle_experiment_synthesis(_g=globals())
+
+
+def handle_field_notes(event):
+    """GET /api/field_notes — delegated to web.site_api_thirdwall."""
+    return _thirdwall.handle_field_notes(event, _g=globals())
+
+
+def handle_journal_quotes(event):
+    """GET /api/journal_quotes — delegated to web.site_api_thirdwall."""
+    return _thirdwall.handle_journal_quotes(event, _g=globals())
 
 
 def handle_month_rollup():
-    """GET /api/month_rollup — the integrator's month-altitude rollup (#1115).
+    """GET /api/month_rollup — delegated to web.site_api_coach_narrative."""
+    return _narrative.handle_month_rollup(_g=globals())
 
-    Reads the precomputed EXPERT#integrator_month record (written weekly by
-    ai-expert-analyzer from the trailing ~4 weekly lab notes; honest-skipped
-    while fewer than 2 week notes exist). Honest-null pre-start, while
-    tombstoned after a reset (#946), when nothing is written yet (the designed
-    early-cycle empty state — ADR-104), and when the stored record's day count
-    outruns the live experiment day (a prior cycle's rollup is never served).
-    """
-    try:
-        _pre = pre_start_meta()
-        if _pre:
-            return _ok({"narrative": None, **_pre}, cache_seconds=300)
-        item = table.get_item(Key={"pk": f"{USER_PREFIX}ai_analysis", "sk": "EXPERT#integrator_month"}).get("Item")
-        if not singleton_visible(item):
-            return _ok({"narrative": None, "pre_start": False}, cache_seconds=300)
-        item = _decimal_to_float(item)
-        _lead_name, _lead_title = _lead_byline()
-        rec_days = item.get("days_in_experiment")
-        if rec_days is not None:
-            try:
-                if int(rec_days) > _current_day_n():
-                    logger.info(
-                        "[month_rollup] record claims day %s but current is %s — withholding stale rollup", rec_days, _current_day_n()
-                    )
-                    return _ok({"narrative": None, "pre_start": False}, cache_seconds=300)
-            except (TypeError, ValueError):
-                pass
-        return _ok(
-            {
-                "narrative": item.get("narrative") or None,
-                "headline": item.get("headline") or None,
-                "week_count": item.get("week_count"),
-                "window_label": item.get("window_label") or None,
-                "generated_at": item.get("generated_at", ""),
-                "coach_name": _lead_name,
-                "coach_title": _lead_title,
-                "pre_start": False,
-            },
-            cache_seconds=3600,
-        )
-    except Exception as _e:
-        logger.warning(f"[/api/month_rollup] {_e}")
-        return _ok({"narrative": None}, cache_seconds=60)
+
+def handle_panel_ledger(event):
+    """GET /api/panel_ledger — delegated to web.site_api_coach_ledger."""
+    return _ledger.handle_panel_ledger(event, _g=globals())
+
+
+def handle_predictions(event):
+    """GET /api/predictions — delegated to web.site_api_coach_ledger."""
+    return _ledger.handle_predictions(event, _g=globals())
+
+
+def handle_recap():
+    """GET /api/recap — delegated to web.site_api_coach_narrative."""
+    return _narrative.handle_recap(_g=globals())
+
+
+def handle_voice_fidelity(event):
+    """GET /api/voice_fidelity — delegated to web.site_api_coach_ledger."""
+    return _ledger.handle_voice_fidelity(event, _g=globals())
+
+
+def handle_weekly_priority(event):
+    """GET /api/weekly_priority — delegated to web.site_api_coach_narrative."""
+    return _narrative.handle_weekly_priority(event, _g=globals())

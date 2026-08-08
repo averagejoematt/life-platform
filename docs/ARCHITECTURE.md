@@ -267,6 +267,12 @@ Compute → store → read pattern. Standalone Lambdas run before Daily Brief, s
 | `lambdas/web/site_api_character.py` | 530 | (#1654) `/api/character`, `/api/character_config`, `/api/character_receipt`, `/api/character_stats` — the game layer |
 | `lambdas/web/site_api_sleep.py` | 631 | (#1654) `/api/sleep_detail`, `/api/sleep_correlations`, `/api/circadian` |
 | `lambdas/web/site_api_biomarkers.py` | 486 | (#1654) `/api/labs`, `/api/glucose`, `/api/phenoage`, `/api/genome_risks` — the measured chemistry and its privacy absolutes |
+| `lambdas/web/site_api_coach.py` | 434 | **Facade** (#1654): the 19 routed coach/misc entrypoints, each a thin delegator to a sibling below, plus the shared monkeypatch/hand-off surface (`table`, `EXPERIMENT_START`, the cross-seam helper wrappers) |
+| `lambdas/web/site_api_coach_profile.py` | 674 | (#1654) `/api/coaches`, `/api/coach/{persona_id}` — who each coach IS: the persona registry read, authored character, self-assessed report card, and the #1387 verbatim dossier |
+| `lambdas/web/site_api_coach_stance.py` | 410 | (#1654) `/api/coach_team` — what the coaches think right now: `STANCE#latest`, the ladder scaffold, held-since, the integrator digest, tensions, the live dispute |
+| `lambdas/web/site_api_coach_ledger.py` | 720 | (#1654) `/api/calibration`, `/api/predictions`, `/api/coach_docket`, `/api/panel_ledger`, `/api/voice_fidelity` — calls with skin in the game, over ONE `PREDICTION#`/`CALIB#` fetch spine so season stays a derived subset of career |
+| `lambdas/web/site_api_coach_narrative.py` | 715 | (#1654) `/api/coach_analysis`, `/api/ai_analysis`, `/api/coach_timeline`, `/api/recap`, `/api/experiment_synthesis`, `/api/weekly_priority`, `/api/month_rollup` — guarded reads of pre-computed prose (staleness refusal + the #802 regeneration-paused disclosure) |
+| `lambdas/web/site_api_thirdwall.py` | 362 | (#1654) `/api/field_notes`, `/api/decisions`, `/api/journal_quotes`, `/api/diary_reactions` — the human voice on the record, all four screened all-or-nothing through one `_public_decision_note` |
 | `lambdas/web/site_api_data.py` | ~2,740 | domain-data grab-bag after the #1240 split: habits, experiments, ledger/discoveries, pipeline freshness, cycle_compare/survival, protocols/domains (docstring lists the routed set; guarded by `tests/test_site_api_data_split.py`) |
 
 All of these ship together via the standard `Code.from_asset("../lambdas")` zip. `/api/ask` + `/api/board_ask` are served by the separate `life-platform-site-api-ai` Lambda (ADR-036).
