@@ -1,4 +1,4 @@
-# HANDOVER — Overnight max paydown, Day 5: 20 PRs merged, 13 issues closed, the bug pipeline that ate its own tail — 2026-08-06 ~21:00 PT → 2026-08-07 ~15:45 PT
+# HANDOVER — Day 5 max paydown + the owner window, one session: 26 PRs merged, 19 issues closed, the owner list DRAINED — 2026-08-06 ~21:00 PT → 2026-08-07 ~19:50 PT
 
 > Instruction thread: *"overnight maximum-paydown, full autonomy, owner asleep — Fable drives
 > only, worktree-implementers on model:* labels, waves of ≤5, THE LEASE RULE, Now queue first
@@ -8,8 +8,9 @@
 > we can without sacrificing quality"** and **"Fable is at 85% usage"** (drove lean-driver mode:
 > implementers on the sonnet/opus pool, tight reconciles, auto-approver for gates).
 
-**Main:** green (`a0b57098` — check_main_green exit 0 at wrap; the #2193 merge run rode the
-auto-approver like the five before it).
+**Main:** green at wrap of the overnight half (`a0b57098`); the owner-window half added 3 more
+fix-forward commits (`67622779`-class lessons ×2 more: `4e0346a2` pk-blind fake, `0428b2ea`
+manifest-truth literals) — final runs in flight ride the auto-approver; wedge checker clean.
 **Docs:** ADR-149 filed in-PR (#2180) + index regenerated; `docs/engines/COACH_STANCE.md`
 re-verified honestly (night-scope addition documented, `_enforce_quality_gate` span corrected
 :1353-1420 → :1386-1453); `docs/ARCHITECTURE.md` site-api table corrected in #2192;
@@ -17,11 +18,11 @@ re-verified honestly (night-scope addition documented, `_enforce_quality_gate` s
 Wiki checkers green at the wrap commit.
 **Decisions:** ADR-149 filed (#2180) — one third-party frame origin (`www.youtube-nocookie.com`),
 bought-not-exercised, flag-off with byte-identical synth until the owner's one-sitting flip.
-**Incidents:** 1 row added — main red ~2.2h (P4): #2182's garmin adapter imported the
-layer-shipped `garminconnect` wheel on the happy path; CI has no layers, so the merge run and
-two followers redded until the guarded-import fix-forward (`67622779`). The deeper lesson made
-memory: the agent's local env HAD the real wheels, so its full green suite was structurally
-incapable of catching it.
+**Incidents:** 3 rows added, all P4 fix-forwards, all the same family: (1) the garmin adapter
+importing a layer-shipped wheel on the happy path (~2.2h, `67622779`); (2) #2161's new sources
+triplicating posts through a pk-blind test fake (~45min, `4e0346a2`); (3) the layer rebuild
+flipping deployed truth under version-literal tests (~35min, `0428b2ea`). Guard the SET — now
+proven in three different disguises in one session.
 **Build beat:** 2026-08-07-the-tests-that-filed-their-own-bugs.
 **Closures:** #1674 #1919 #1968 #2116 #1678 #1679 #2056 #2173 #2174 #2175 #2176 #2177 #2179 all
 commented in the ADR-099 two-line shape (evidence cited from live endpoints/deploys; #2056 and
@@ -138,37 +139,52 @@ mid-session with an **auto-approving monitor** (zombies excluded); it took the n
   expires them at 30d; cancelling risks the stranded-group class for zero benefit. not-work —
   deliberate leave-alone, documented here.
 
-## OWNER ACTIONS (Matthew — carried + new, one list)
+## THE OWNER WINDOW — EXECUTED (2026-08-07 evening, Matthew live)
 
-1. **Whoop re-auth (URGENT, carried — third credential loss, latched since Aug-4, no data since
-   Aug-3):** `python3 setup/setup_whoop_auth.py --backfill`, then delete the AUTH_FAILURE marker
-   row (#2085). Clears the qa-smoke freshness fail + the whoop alarm board.
-2. **The CDK/IAM window — now FIVE held PRs, one sitting:**
-   a. Merge **#2153** AND **#2184** → `cdk deploy LifePlatformEmail` (delivered-marker grant +
-      the monday-compass todoist grant ride the same stack deploy; #2184's code half then makes
-      the compass sections real).
-   b. Merge **#2163** → `cdk deploy LifePlatformIngestion` FIRST, then
-      `deploy_lambda.sh social-enrichment …` + `deploy_site_api.sh`.
-   c. Merge **#2161** → same Ingestion deploy; then the two secrets when accounts exist.
-   d. Merge **#2162** → `aws iam put-role-policy …` (staged JSON in `infra/iam/`), then the
-      teardown dry-run → `--apply`.
-   After: `deploy_all=true` dispatch + approve (clears the R8-ST6 window).
-3. **Layer rebuild (carried, PR #2100 runbook)** — now carries the urllib3/idna re-bumps AND
-   #2182's staged garminconnect 0.3.8 target (`garmin.txt` comment + `--promote` sequence in
-   the PR body). Clears PYSEC-2026-3467.
-4. **`cdk deploy LifePlatformMonitoring`** (carried) — now ALSO arms #2181's composite alarms
-   (the token-page email path goes genesis-aware) + synth drift from #2124/#2125/#2127.
-5. **ADR-149 exercise (optional, whenever there's content):** flip `native_social_embeds` in
-   `cdk/cdk.json` + `cdk deploy LifePlatformWeb` in ONE sitting, then re-stamp `LIVE_AMJ_CSP`.
-   Until then the header is byte-identical live.
-6. **Branch protection one-liner (carried):** `python3 scripts/apply_branch_protection.py --apply && … --check`.
-7. **Backfills (carried, dry-run-first):** coach-ensemble phase stamps; optional NARRATIVE#arc;
-   optional lead-in pages.
-8. **Two data/content calls (carried):** the #1984 stack decision; Home's "sixteen prior climbs"
-   count (`site/index.html:176`).
-9. **The #1402 governance decision (carried):** ADR-140 rule 5 vs the fingerprint card —
-   #2167's structural half is now merged, so the poster path exists human-gated either way.
-10. **Carried:** CodeQL dismissals ×3 (#2046), PR #2012 revision purge, the #1905 clinicians call.
+Matthew said "let's do it all" and stayed live; with his in-the-moment sanction the driver
+ran the CDK/IAM path directly. Everything on the list landed in one sitting:
+
+1. **Whoop re-auth** ✅ (Matthew, interactive) — backfill pulled Aug 4–7, gap CLOSED. Root
+   cause investigated same hour: single-use refresh tokens × ~22 exchanges/day × ~1% vendor
+   5xx-after-consume = a loss every 4–5 days (two losses proven in logs; #2076's retry
+   assumption empirically refuted; 08-01 wasn't a credential loss at all). **#2196 filed,
+   implemented (PR #2197), merged, and whoop-data-ingestion DEPLOYED** — expiry-gated
+   rotation, no blind retry on the token POST, lost-rotation urgent classification,
+   cache invalidation, breaker-aware reconcile. First `whoop_token_reused` log line is the
+   live proof (next scheduled run).
+2. **All five held PRs merged + stacks deployed:** #2153+#2184 → LifePlatformEmail (chronicle
+   delivered-marker guard ARMED before Aug 12; monday-compass reads real Todoist);
+   #2163+#2161 → LifePlatformIngestion (coach reactions live; bluesky/mastodon lambdas exist,
+   idle until accounts); #2162 merged → `put-role-policy` applied (verify_oidc_iam CLEAN) +
+   **orphan HAE API a76xwxt2wa DELETED**, wildcard grant revoked, ingress drift gate clean.
+3. **Layer rebuild** ✅ — pillow-layer:2 (12.3.0) + garth-layer:3 (garminconnect 0.3.8,
+   urllib3 2.7.0, idna 3.18); pip-audit both closures: **zero vulnerabilities** (was 25+6,
+   incl. PYSEC-2026-3467); stacks deployed; manifests promoted; #2099 gate clean.
+4. **LifePlatformMonitoring deployed** — #2181's composites live
+   (`ai-tokens-platform-daily-total-genesis-window` + `-urgent`); synth drift flushed.
+5. **Backfills:** 42 coach/ensemble phase stamps applied; lead-in pages restored (owner chose
+   lead-in-only; NARRATIVE#arc stays archived by his call).
+6. **Judgment calls made:** Home's climb count went PHRASAL (live); #1402 → **convene the
+   board** on the ADR-140 amendment (commented on the issue); #1984 + #1905 remain his
+   personal calls, no code waits.
+7. **`deploy_all` dispatched** to true up the R8-ST6 window; runs ride the auto-approver.
+
+**The one thing that resisted:** branch protection — the ruleset write 422s under BOTH auths
+(GitHub refuses the github-actions app as a bypass actor on a user-owned repo). Not an auth
+problem; a design gap in #1662's apply path. **#2198 filed** with the measured evidence.
+
+## OWNER ACTIONS (remaining — short list)
+
+1. **GitHub UI clicks:** CodeQL dismissals ×3 (#2046) · PR #2012 revision-history purge.
+2. **Personal calls, no deadline:** the #1984 stack decision · the #1905 clinicians call.
+3. **When accounts exist:** create Bluesky/Mastodon accounts + the two secrets
+   (`life-platform/bluesky`, `life-platform/mastodon`) — capture starts by itself.
+4. **Optional, when there's a video:** ADR-149 flag flip + `cdk deploy LifePlatformWeb`,
+   one sitting, then re-stamp `LIVE_AMJ_CSP`.
+5. **Passive watch:** first post-deploy whoop run logs `whoop_token_reused` (the #2196 proof);
+   Pillow 12 needs one OG-image generation (19:30 UTC) + a reading-cover invoke checked;
+   garmin stays paused (re-auth is a future interactive session with the 0.3.x-native script
+   still to write).
 
 Prior session's narrative: `git show
 origin/session-archive:handovers/HANDOVER_2026-08-05_day4-overnight-max-paydown.md`.
