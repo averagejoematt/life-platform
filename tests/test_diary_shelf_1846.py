@@ -42,7 +42,9 @@ os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "FAKE")
 
 import content_policy_scan as cps  # noqa: E402
 import pytest  # noqa: E402
+from coach.coach_dossier import find_dossier_violations  # noqa: E402
 from content import journal_quotes as jq  # noqa: E402
+from web import site_api_common as sac  # noqa: E402 — reuse the real normalizer, not a copy of it
 
 NOTION_PK = "USER#matthew#SOURCE#notion"
 QUOTES_PK = "USER#matthew#SOURCE#journal_quotes"
@@ -229,14 +231,61 @@ def test_a_typed_journal_entry_is_never_a_diary_card(shelf):
 def test_a_line_the_current_taboo_vocabulary_refuses_is_withheld_and_counted(shelf):
     """#1804's lesson, applied here: the screen re-runs on every serve against
     TODAY's vocabulary, and a failing line is withheld ENTIRE — never mangled —
-    with the withholding disclosed rather than silently swallowed."""
+    with the withholding disclosed rather than silently swallowed.
+
+    #2203 note: `_quotes_by_day` runs TWO screens in order — `find_dossier_violations`
+    (the wide screen: journal_quotes' full taboo vocabulary + genotype + PII) then
+    `_public_decision_note` (the narrower #1569 all-or-nothing filter). This fixture
+    trips the WIDE screen (a SUBSTANCE_EXTRA hit), so it pins that layer only — see
+    test_a_line_only_the_narrower_filter_would_alter_is_withheld_and_counted below
+    for a fixture that actually exercises the narrower one."""
     sd, ft = shelf
     ft.put_item(Item=_entry(public_reaction_consent="quote"))
     ft.put_item(Item=_quote("2026-07-27", "Two beers in and I said the quiet part out loud."))
+    # Precondition that motivates this being a wide-screen (not narrow-screen) test:
+    # the fixture trips find_dossier_violations itself.
+    assert find_dossier_violations("Two beers in and I said the quiet part out loud.")
     card = _call(sd)["entries"][0]
     assert card["quotes"] == []
     assert card["quotes_withheld"] == 1
     assert "beers" not in _flatten(card)
+
+
+def test_a_line_only_the_narrower_filter_would_alter_is_withheld_and_counted(shelf):
+    """Genuine second-layer pin (#2203) for `_quotes_by_day`'s `_public_decision_note`
+    call — the sibling of this defect class already found and fixed in
+    tests/test_journal_quotes_1568.py for the /api/journal_quotes handler.
+
+    `find_dossier_violations` matches its taboo vocabulary with \\b-anchored
+    word-boundary regexes, so a term broken up with letter-spacing never matches
+    (see the inline assertion — it clears outright). `_public_decision_note`'s
+    underlying scrub additionally normalizes the text (strips whitespace/
+    punctuation, lowercases) before checking for a long, unambiguous vice term,
+    and refuses the WHOLE text when one turns up only in that normalized form —
+    which is exactly what happens here, so this is the ONLY one of the two
+    screens this fixture exercises.
+
+    The vice term is pulled live from config/content_filter.json rather than
+    hardcoded, so the fixture tracks the real vocabulary instead of a copy of it."""
+    sd, ft = shelf
+    cf_path = os.path.join(_REPO, "config", "content_filter.json")
+    with open(cf_path, encoding="utf-8") as f:
+        cf = json.load(f)
+    term = min(
+        (kw for kw in cf["blocked_vice_keywords"] if len(sac._normalize_for_detection(kw)) >= 7),
+        key=len,
+    )
+    obfuscated_term = " ".join(term)
+    text = f"Almost reached for the {obfuscated_term} again tonight."
+
+    # Empirically confirm the premise inline: the wide screen clears this fixture.
+    assert find_dossier_violations(text) == []
+
+    ft.put_item(Item=_entry(public_reaction_consent="quote"))
+    ft.put_item(Item=_quote("2026-07-27", text))
+    card = _call(sd)["entries"][0]
+    assert card["quotes"] == []
+    assert card["quotes_withheld"] == 1
 
 
 def test_a_line_whose_grounding_is_not_verified_is_withheld(shelf):
