@@ -888,6 +888,70 @@ def test_write_anomaly_record_shape_ttl_and_decimals(monkeypatch):
     assert "sustained_alert_sent" not in item
 
 
+def test_the_daily_briefs_anomaly_block_renders_from_the_record_this_module_writes(monkeypatch):
+    """#2244 — the reader/writer contract, proved end to end rather than by two fixtures.
+
+    `write_anomaly_record` stores flagged metrics under `anomalous_metrics`;
+    `daily_brief_lambda.fetch_anomaly_record` returns the record verbatim; the brief's
+    ANOMALY ALERT block renders it. That block used to gate on `has_anomalies`, a key
+    nothing has ever written, so it never rendered. This takes the item this module
+    actually put to DynamoDB, floats it the way the fetch does, and asserts the renderer
+    lights up — so renaming the field on either side reds this test.
+    """
+    from content import html_builder
+
+    def _float(v):  # the Decimal->float pass fetch_anomaly_record applies
+        if isinstance(v, Decimal):
+            return float(v)
+        if isinstance(v, dict):
+            return {k: _float(x) for k, x in v.items()}
+        if isinstance(v, list):
+            return [_float(x) for x in v]
+        return v
+
+    table = _install(monkeypatch, FakeTable())
+    anomaly.write_anomaly_record("2026-08-02", [_flag(label="HRV")], True, "Hypothesis.", "high")
+    record = _float(table.puts[0])
+
+    html = html_builder._brief_journal_coaches(
+        bod_insight=None,
+        data={"date": "2026-08-02", "hrv": {}, "anomaly": record},
+        explorer_coach_v2_text=None,
+        glucose_coach_v2_text=None,
+        journal_coach_text=None,
+        labs_coach_v2_text=None,
+        mind_coach_v2_text=None,
+        nutrition_coach_v2_text=None,
+        physical_coach_v2_text=None,
+        profile={},
+        sleep_coach_v2_text=None,
+        training_coach_v2_text=None,
+        weekly_habit_review=None,
+    )
+    assert "ANOMALY ALERT" in html
+    assert "HRV" in html
+    assert "Anomaly Alert section unavailable" not in html
+
+    # and the quiet day writes a record that renders nothing
+    anomaly.write_anomaly_record("2026-08-03", [], False, "", "none")
+    quiet = html_builder._brief_journal_coaches(
+        bod_insight=None,
+        data={"date": "2026-08-03", "hrv": {}, "anomaly": _float(table.puts[1])},
+        explorer_coach_v2_text=None,
+        glucose_coach_v2_text=None,
+        journal_coach_text=None,
+        labs_coach_v2_text=None,
+        mind_coach_v2_text=None,
+        nutrition_coach_v2_text=None,
+        physical_coach_v2_text=None,
+        profile={},
+        sleep_coach_v2_text=None,
+        training_coach_v2_text=None,
+        weekly_habit_review=None,
+    )
+    assert "ANOMALY ALERT" not in quiet
+
+
 def test_write_anomaly_record_ttl_is_ninety_days_after_the_record_date(monkeypatch):
     table = _install(monkeypatch, FakeTable())
     anomaly.write_anomaly_record("2026-08-02", [], False, "", "none")
