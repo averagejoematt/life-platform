@@ -1071,52 +1071,43 @@ def test_recommendation_hrv_warning_compares_today_against_a_mean_that_includes_
     assert "33% below your 7-day average" in hrv_warning
 
 
-def test_recommendation_zone2_board_note_always_reports_zero_minutes(sources):
-    """OBSERVED: 120 genuine Zone-2 minutes in the window (avg HR 124 = 65% of
-    max, squarely inside the canonical 60-70% band) — the canonical breakdown
-    tool agrees — yet the recommendation's board note says "Only 0 of 150 Zone 2
-    minutes this week (0%)". mcp/tools_training.py:824-825 reads
-    ``total_zone2_minutes`` / ``weekly_target_minutes``; the tool it is reading
-    publishes ``total_zone_2_min`` / ``weekly_target_min``, so both ``.get``
-    defaults win, every time."""
+def test_recommendation_zone2_board_note_reports_the_real_minutes(sources):
+    """FIXED #2246. 60 genuine Zone-2 minutes in the window (avg HR 124 = 65% of
+    max, squarely inside the canonical 60-70% band) is 40% of the 150 min target,
+    so the deficit note fires — and it must quote the REAL figure, not the
+    hardcoded 0 the reader/writer key mismatch used to produce.
+
+    The expected minute count is DERIVED from the canonical producer
+    (``get_zone2_breakdown``'s ``summary.total_zone_2_min``) rather than restated,
+    so a future rename on either side fails here instead of silently reverting to
+    the ``.get`` default."""
     sources(
         whoop=[_recovery_day(TODAY, recovery=80)],
         eightsleep=[{"date": TODAY, "sleep_score": 80}],
         garmin=[],
-        strava=[
-            strava_day(_d(-1), activities=[activity("Run", minutes=60, avg_hr=124)], activity_count=1),
-            strava_day(_d(-2), activities=[activity("Ride", minutes=60, avg_hr=124)], activity_count=1),
-        ],
+        strava=[strava_day(_d(-1), activities=[activity("Run", minutes=60, avg_hr=124)], activity_count=1)],
         macrofactor_workouts=[],
         computed_metrics=[],
     )
     breakdown = TOOLS["get_zone2_breakdown"]["fn"]({"start_date": _d(-7), "end_date": TODAY})
-    assert breakdown["summary"]["total_zone_2_min"] == 120.0  # the real figure
+    real_min = breakdown["summary"]["total_zone_2_min"]
+    real_target = breakdown["summary"]["weekly_target_min"]
+    assert (real_min, real_target) == (60.0, 150)  # the producer's own numbers
 
     out = call("get_training", {"view": "recommendation", "date": TODAY})
     note = next(n for n in out["board_of_directors"] if "Zone 2 minutes this week" in n)
-    assert note.startswith("Attia: Only 0 of 150 Zone 2 minutes this week (0%)")
+    assert note == (
+        f"Attia: Only {real_min:.0f} of {real_target:.0f} Zone 2 minutes this week "
+        f"({round(100 * real_min / real_target)}%). Prioritize Zone 2 sessions."
+    )
+    assert note.startswith("Attia: Only 60 of 150 Zone 2 minutes this week (40%)")
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "READER/WRITER KEY MISMATCH P1 — mcp/tools_training.py:824-825 "
-        "(_get_training_recommendation) reads the nested Zone-2 result as "
-        '`z2_result["summary"].get("total_zone2_minutes", 0)` and '
-        '`.get("weekly_target_minutes", 150)`. The producer, '
-        "mcp/tools_correlation.py:257-258 (tool_get_zone2_breakdown, the registered "
-        "get_zone2_breakdown tool), publishes those as `total_zone_2_min` and `weekly_target_min`. "
-        "Neither key ever exists, so the `.get` defaults win unconditionally: z2_min is ALWAYS 0, "
-        "z2_pct is ALWAYS 0, the `if z2_pct < 50` gate ALWAYS passes, and the board note reads "
-        "'Attia: Only 0 of 150 Zone 2 minutes this week (0%). Prioritize Zone 2 sessions.' on every "
-        "single call — including weeks Matthew hit the target. It should read the published keys "
-        "(or the producer should publish the read ones). This is the ADR-104 failure in its worst "
-        "form: not a missing number, a confidently-stated wrong one, attributed to a named coach, "
-        "on a metric the platform treats as its highest-ROI longevity lever."
-    ),
-)
-def test_recommendation_zone2_note_should_reflect_the_real_zone2_minutes(sources):
+def test_recommendation_zone2_note_is_suppressed_once_half_the_target_is_met(sources):
+    """FIXED #2246, the other half. 120 Zone-2 minutes is 80% of the 150 min
+    target, above the tool's own ``z2_pct < 50`` gate, so the deficit note must
+    NOT appear. Before the fix z2_pct was unconditionally 0 and this note fired
+    on every call — including weeks Matthew beat the target."""
     sources(
         whoop=[_recovery_day(TODAY, recovery=80)],
         eightsleep=[{"date": TODAY, "sleep_score": 80}],
@@ -1128,9 +1119,10 @@ def test_recommendation_zone2_note_should_reflect_the_real_zone2_minutes(sources
         macrofactor_workouts=[],
         computed_metrics=[],
     )
+    assert TOOLS["get_zone2_breakdown"]["fn"]({"start_date": _d(-7), "end_date": TODAY})["summary"]["total_zone_2_min"] == 120.0
+
     out = call("get_training", {"view": "recommendation", "date": TODAY})
-    note = next((n for n in out["board_of_directors"] if "Zone 2 minutes this week" in n), None)
-    assert note is None or "Only 0 of" not in note
+    assert [n for n in out["board_of_directors"] if "Zone 2 minutes this week" in n] == []
 
 
 def test_recommendation_non_numeric_recovery_score_degrades_to_absent(sources):
