@@ -38,6 +38,7 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 from training import training_load  # shared TSS-like load model (layer module, #490) — basis_note
 
@@ -869,6 +870,7 @@ def record_email_send(table, lambda_name):
 
 
 def lambda_handler(event, context):
+    dry_run = is_dry_run(event)
     logger.info("Monday Compass v1.0.0 starting...")
 
     # #2178: real Todoist token from Secrets Manager (life-platform/todoist),
@@ -937,7 +939,9 @@ def lambda_handler(event, context):
 
     subject = f"🧭 Monday Compass · {subject_date} · Week {week_state.get('week_num', 1)}"
 
-    ses.send_email(
+    guarded_send_email(
+        ses,
+        dry_run,
         FromEmailAddress=SENDER,
         Destination={"ToAddresses": [RECIPIENT]},
         Content={

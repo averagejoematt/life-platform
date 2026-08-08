@@ -69,6 +69,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
+from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
 _logger_std = logging.getLogger()
 _logger_std.setLevel(logging.INFO)
@@ -745,7 +746,7 @@ def build_sustained_alert_html(sustained_list, date_str):
 </html>"""
 
 
-def send_sustained_alert_email(sustained_list, date_str):
+def send_sustained_alert_email(sustained_list, date_str, dry_run: bool = False):
     """Send sustained anomaly trend alert email."""
     metrics_summary = ", ".join(s["label"] for s in sustained_list[:3])
     if len(sustained_list) > 3:
@@ -754,7 +755,9 @@ def send_sustained_alert_email(sustained_list, date_str):
     subject = f"Trend Alert — {metrics_summary} elevated {sustained_list[0]['streak_days']} consecutive days"
     html = build_sustained_alert_html(sustained_list, date_str)
 
-    ses.send_email(
+    guarded_send_email(
+        ses,
+        dry_run,
         FromEmailAddress=SENDER,
         Destination={"ToAddresses": [RECIPIENT]},
         Content={
@@ -899,7 +902,7 @@ def build_alert_html(flagged, hypothesis, date_str):
 </html>"""
 
 
-def send_alert_email(flagged, hypothesis, date_str):
+def send_alert_email(flagged, hypothesis, date_str, dry_run: bool = False):
     try:
         dt = datetime.strptime(date_str, "%Y-%m-%d")
         day_short = dt.strftime("%a %b %-d")
@@ -910,7 +913,9 @@ def send_alert_email(flagged, hypothesis, date_str):
     subject = f"Warning Anomaly Alert - {day_short} - {len(flagged)} metrics flagged ({source_list})"
     html = build_alert_html(flagged, hypothesis, date_str)
 
-    ses.send_email(
+    guarded_send_email(
+        ses,
+        dry_run,
         FromEmailAddress=SENDER,
         Destination={"ToAddresses": [RECIPIENT]},
         Content={
@@ -948,6 +953,7 @@ def record_email_send(table, lambda_name):
 
 
 def lambda_handler(event, context):
+    dry_run = is_dry_run(event)
     if event.get("healthcheck"):
         return {"statusCode": 200, "body": "ok"}
     logger.info("Anomaly Detector v2.3.0 starting (adaptive thresholds + travel + sustained tracking)...")
@@ -1022,7 +1028,7 @@ def lambda_handler(event, context):
             hypothesis = "Multiple metrics flagged -- check your daily brief for details."
 
         try:
-            send_alert_email(flagged, hypothesis, yesterday)
+            send_alert_email(flagged, hypothesis, yesterday, dry_run=dry_run)
             alert_sent = True
         except Exception as e:
             logger.error(f"Alert email failed: {e}")
@@ -1053,7 +1059,7 @@ def lambda_handler(event, context):
     # ── Send sustained alert if streaks detected (separate from primary alert) ──
     if sustained_metrics and not travel_mode and not sick_mode:
         try:
-            send_sustained_alert_email(sustained_metrics, yesterday)
+            send_sustained_alert_email(sustained_metrics, yesterday, dry_run=dry_run)
             sustained_alert_sent = True
         except Exception as e:
             logger.error(f"Sustained alert email failed (non-fatal): {e}")

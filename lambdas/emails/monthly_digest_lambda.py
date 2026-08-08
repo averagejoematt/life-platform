@@ -20,6 +20,7 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
 _logger_std = logging.getLogger()
 _logger_std.setLevel(logging.INFO)
@@ -1034,6 +1035,7 @@ def build_html(data, goals, commentary, windows):
 def lambda_handler(event, context):
     # P1.6: Scheduler fires on the 1st of each month (America/Los_Angeles).
     # Guard: only send on Mondays so cadence matches original "1st Monday" intent.
+    dry_run = is_dry_run(event)
     from datetime import date
 
     today = date.today()
@@ -1071,7 +1073,9 @@ def lambda_handler(event, context):
     html = build_html(data, goals, commentary, windows)
 
     month = windows["month_label"]
-    ses.send_email(
+    guarded_send_email(
+        ses,
+        dry_run,
         FromEmailAddress=SENDER,
         Destination={"ToAddresses": [RECIPIENT]},
         Content={

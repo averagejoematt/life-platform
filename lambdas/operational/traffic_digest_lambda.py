@@ -39,6 +39,7 @@ from datetime import datetime, timedelta, timezone
 import boto3
 from boto3.dynamodb.conditions import Key
 from common.pacific_time import parse_iso_utc  # #1964: THE ISO parser (naive input == UTC)
+from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -673,7 +674,7 @@ def _load_logs(s3, start_dt):
     return texts, object_count
 
 
-def _emit_no_logs_alert(s3, cw, start_dt, now, green_html=""):
+def _emit_no_logs_alert(s3, cw, start_dt, now, green_html="", dry_run: bool = False):
     """Send a loud email + CloudWatch metric when the log source is empty."""
     cw.put_metric_data(
         Namespace="LifePlatform/Traffic",
@@ -693,7 +694,9 @@ and run <code>cdk deploy LifePlatformWeb</code>.</p>
 {green_html}
 </body></html>"""
     try:
-        boto3.client("sesv2", region_name=REGION).send_email(
+        guarded_send_email(
+            boto3.client("sesv2", region_name=REGION),
+            dry_run,
             FromEmailAddress=EMAIL_SENDER,
             Destination={"ToAddresses": [EMAIL_RECIPIENT]},
             Content={
@@ -709,6 +712,7 @@ and run <code>cdk deploy LifePlatformWeb</code>.</p>
 
 
 def lambda_handler(event, context):
+    dry_run = is_dry_run(event)
     try:
         if not LOG_BUCKET:
             logger.error("LOG_BUCKET not set — nothing to do")
@@ -744,7 +748,7 @@ def lambda_handler(event, context):
 
         if object_count == 0:
             # No log objects at all — logging is likely disabled, not just a quiet week.
-            _emit_no_logs_alert(s3, cw, start_dt, now, green_html)
+            _emit_no_logs_alert(s3, cw, start_dt, now, green_html, dry_run=dry_run)
             return {"statusCode": 200, "body": "no log objects — alert sent"}
 
         records = []
@@ -787,7 +791,9 @@ def lambda_handler(event, context):
             if quiet
             else f"Weekly traffic — {agg['page_views']} views, {agg['unique_visitors']} visitors · green report"
         )
-        boto3.client("sesv2", region_name=REGION).send_email(
+        guarded_send_email(
+            boto3.client("sesv2", region_name=REGION),
+            dry_run,
             FromEmailAddress=EMAIL_SENDER,
             Destination={"ToAddresses": [EMAIL_RECIPIENT]},
             Content={

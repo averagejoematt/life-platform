@@ -55,6 +55,7 @@ from urllib.parse import quote
 
 import boto3
 from common import qa_archive  # #1691 (epic #1687): re-run the baseline-freshness gate over each archived
+from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
 # coach_brief's TEXT so a stale-baseline/stale-phase brief surfaces a visible flag
 # to the human reader — even for historical entries (re-running over the archived
@@ -601,6 +602,7 @@ def lambda_handler(event, context):
 
 
 def _run(event, context):
+    dry_run = is_dry_run(event)
     logger.info("Weekly AI Review Pack starting...")
     dates = week_dates()
     by_surface, screenshots_by_date, read_errors = gather_week(dates)
@@ -641,7 +643,9 @@ def _run(event, context):
     subject = f"🗂️ Weekly AI Review Pack · {_fmt_date(dates[0])}–{_fmt_date(dates[-1])} · {total} generation(s)"
 
     ses = boto3.client("sesv2", region_name=REGION)
-    ses.send_email(
+    guarded_send_email(
+        ses,
+        dry_run,
         FromEmailAddress=SENDER,
         Destination={"ToAddresses": [RECIPIENT]},
         Content={

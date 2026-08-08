@@ -27,6 +27,7 @@ from datetime import datetime
 
 import boto3
 from common.pacific_time import pacific_today
+from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 from content.ritual_link import sign_ritual_token
 from ingestion.source_registry import manual_capture_sources
 
@@ -440,6 +441,7 @@ def _build_html(today_str: str, missing: list[dict], complete: list[dict], ritua
 
 
 def lambda_handler(event, context):
+    dry_run = is_dry_run(event)
     try:
         # Pacific day, not UTC: this lambda runs on an 8 PM PT cron (03:00 UTC), where
         # a UTC "today" is tomorrow in PT — so every manual source reads "not logged".
@@ -520,7 +522,9 @@ def lambda_handler(event, context):
         html = _build_html(today, missing, complete, ritual_html, quiet_html)
         subject = f"Evening nudge · {len(missing)} thing(s) to log before bed"
 
-        ses.send_email(
+        guarded_send_email(
+            ses,
+            dry_run,
             FromEmailAddress=SENDER,
             Destination={"ToAddresses": [RECIPIENT]},
             Content={

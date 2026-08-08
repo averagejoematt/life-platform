@@ -34,6 +34,7 @@ from datetime import datetime, timedelta, timezone
 import boto3
 from common import digest_utils  # shared query_range implementations (#970)
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
@@ -782,6 +783,7 @@ def build_html(data, commentary_text):
 
 
 def lambda_handler(event, context):
+    dry_run = is_dry_run(event)
     if hasattr(logger, "set_date"):
         logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
     if os.environ.get("EXTERNAL_EMAILS_ENABLED", "true").lower() != "true":
@@ -823,7 +825,9 @@ def lambda_handler(event, context):
     dates = data["dates"]
     subject = "Matthew's Week · " + dates["end"]
 
-    ses.send_email(
+    guarded_send_email(
+        ses,
+        dry_run,
         FromEmailAddress=SENDER,
         Destination={"ToAddresses": [_recipient()]},
         Content={

@@ -57,6 +57,7 @@ from common.digest_utils import (
     get_food_delivery_streak_state,  # #2235: one read path for STREAK#current
     safe_float,
 )
+from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # ── AWS clients ───────────────────────────────────────────────────────────────
@@ -2125,6 +2126,7 @@ def _gate_telemetry(data, profile, real_subscribers, attribution=None):
 
 
 def lambda_handler(event, context):
+    dry_run = is_dry_run(event)
     logger.info("Weekly Digest v4.0 starting...")
     result = gather_all()
     if result is None or result[0] is None:
@@ -2172,7 +2174,9 @@ def lambda_handler(event, context):
     dg = data["this"].get("day_grades")
     grade_str = f'{round(dg["avg_score"])} ({dg["days_graded"]}d)' if dg else "—"
 
-    ses.send_email(
+    guarded_send_email(
+        ses,
+        dry_run,
         FromEmailAddress=SENDER,
         Destination={"ToAddresses": [RECIPIENT]},
         Content={

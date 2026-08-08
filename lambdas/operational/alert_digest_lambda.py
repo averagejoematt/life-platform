@@ -24,6 +24,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 
 import boto3
+from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
 try:
     from common.platform_logger import get_logger
@@ -129,6 +130,7 @@ def _format_email(grouped):
 
 
 def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
+    dry_run = is_dry_run(event)
     try:
         alarms = _drain_queue()
         if not alarms:
@@ -138,7 +140,9 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
         grouped = _group_by_alarm(alarms)
         subject, body = _format_email(grouped)
 
-        ses.send_email(
+        guarded_send_email(
+            ses,
+            dry_run,
             FromEmailAddress=EMAIL_SENDER,
             Destination={"ToAddresses": [EMAIL_RECIPIENT]},
             Content={

@@ -42,6 +42,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import boto3
+from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -445,6 +446,7 @@ def _is_first_monday_of_month() -> bool:
 
 
 def lambda_handler(event, context):
+    dry_run = is_dry_run(event)
     scan_date = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
     # First-Monday guard (bypass with event={"force": true})
@@ -562,7 +564,9 @@ def lambda_handler(event, context):
     subject = f"{vuln_icon} Monthly pip-audit | {scan_date[:10]} | {'VULNERABLE — action required' if has_vulns else 'Clean'}"
 
     try:
-        ses.send_email(
+        guarded_send_email(
+            ses,
+            dry_run,
             FromEmailAddress=SENDER,
             Destination={"ToAddresses": [RECIPIENT]},
             Content={

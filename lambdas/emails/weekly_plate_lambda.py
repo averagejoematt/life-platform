@@ -29,6 +29,7 @@ from datetime import datetime, timedelta, timezone
 import boto3
 from common import digest_utils  # shared query_range implementations (#970)
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 _logger_std = logging.getLogger()
@@ -541,6 +542,7 @@ def record_email_send(table, lambda_name):
 
 
 def lambda_handler(event, context):
+    dry_run = is_dry_run(event)
     logger.info("The Weekly Plate v1.0.0 starting...")
 
     data = gather_data()
@@ -622,7 +624,9 @@ def lambda_handler(event, context):
         subject_date = dates["end"]
     subject = f"🍽️ The Weekly Plate · {subject_date}"
 
-    ses.send_email(
+    guarded_send_email(
+        ses,
+        dry_run,
         FromEmailAddress=SENDER,
         Destination={"ToAddresses": [RECIPIENT]},
         Content={

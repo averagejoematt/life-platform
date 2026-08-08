@@ -23,6 +23,7 @@ from datetime import date, timedelta
 import boto3
 from boto3.dynamodb.conditions import Key
 from common.mcp_url import resolve_mcp_url  # SEC-02 #780: discover the URL at runtime, not a committed env var
+from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -988,6 +989,7 @@ def build_report_html(all_checks, run_time_str):
 
 
 def lambda_handler(event, context):
+    dry_run = is_dry_run(event)
     try:
         run_time = pt_now()
         run_time_str = run_time.strftime("%A, %b %-d at %-I:%M %p PT")
@@ -1145,7 +1147,9 @@ def lambda_handler(event, context):
             f"({len(fails_deploy)} deploy-health, {len(fails_content)} content-truth) — {run_time.strftime('%b %-d')}"
         )
 
-        ses.send_email(
+        guarded_send_email(
+            ses,
+            dry_run,
             FromEmailAddress=SENDER,
             Destination={"ToAddresses": [RECIPIENT]},
             Content={
