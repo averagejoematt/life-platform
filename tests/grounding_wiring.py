@@ -221,7 +221,9 @@ SURFACES = {
         ("numbers", "dates", "freshness"),
         {"behavioral": _NOT_ABOUT_MATTHEW, "night": _NOT_A_VITALS_SURFACE},
     ),
-    "lambdas/web/site_api_ai_lambda.py::board_grounding_findings": _entry(
+    # #2276/#1654: moved to web/site_api_ai_prompt.py when site_api_ai_lambda crossed the
+    # god-module gate. Same function, same arms — only the module owning it changed.
+    "lambdas/web/site_api_ai_prompt.py::board_grounding_findings": _entry(
         ("numbers", "dates", "freshness"),
         {"behavioral": _NOT_ABOUT_MATTHEW, "night": _NO_NIGHT_MAP},
     ),
