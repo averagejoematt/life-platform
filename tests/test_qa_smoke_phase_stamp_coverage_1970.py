@@ -145,14 +145,6 @@ def test_check_is_partitioned_content_truth():
 
 
 def test_wired_into_lambda_handler():
-    """The check must actually run nightly."""
-    import ast
-    import inspect
-
-    tree = ast.parse(inspect.getsource(qa.lambda_handler))
-    calls = {
-        node.func.attr if isinstance(node.func, ast.Attribute) else getattr(node.func, "id", None)
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-    }
-    assert "check_coach_ensemble_phase_stamp_coverage" in calls
+    """The check must actually run nightly (#2307: via qa.check_steps(), the one
+    wiring point the handler loops over)."""
+    assert ("phase_stamp_coverage", qa.check_coach_ensemble_phase_stamp_coverage) in qa.check_steps()

@@ -142,6 +142,11 @@ def test_wired_into_lambda_handler():
 
     import qa_smoke_lambda as qa
 
-    tree = ast.parse(inspect.getsource(qa.lambda_handler))
-    attr_calls = {node.func.attr for node in ast.walk(tree) if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)}
-    assert "check_raw_archive_liveness" in attr_calls, "raw_archive_qa.check_raw_archive_liveness not wired into lambda_handler"
+    # #2307: the run list moved out of lambda_handler into check_steps(), the one
+    # place a check is wired in. Assert BOTH the live list and its source.
+    tree = ast.parse(inspect.getsource(qa.check_steps))
+    referenced = {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)} | {
+        n.id for n in ast.walk(tree) if isinstance(n, ast.Name)
+    }
+    assert "check_raw_archive_liveness" in referenced, "raw_archive_qa.check_raw_archive_liveness not wired into check_steps()"
+    assert "raw_archive_liveness" in [label for label, _fn in qa.check_steps()]

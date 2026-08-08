@@ -311,7 +311,7 @@ def check_mcp(canary_ts: str) -> tuple[bool, str, float]:
         # Verify response looks like a valid MCP tools/list response
         try:
             data = json.loads(body)
-            tools = data.get("result", {}).get("tools", [])
+            tools = (data.get("result") or {}).get("tools") or []
             tool_count = len(tools)
             # ER-04 #395 (2026-07-08): registry audited down to 60 tools (docs/MCP_TOOL_AUDIT.md).
             # Floor sits just below the audited count — a partial/broken deploy shows far fewer;

@@ -285,8 +285,8 @@ def audit_requirements_file(req_path: str, lambda_name: str) -> dict:
             }
 
         vulnerabilities = []
-        for dep in audit_data.get("dependencies", []):
-            for vuln in dep.get("vulns", []):
+        for dep in audit_data.get("dependencies") or []:
+            for vuln in dep.get("vulns") or []:
                 vulnerabilities.append(
                     {
                         "package": dep.get("name", "?"),

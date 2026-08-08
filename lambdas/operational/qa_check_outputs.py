@@ -5,14 +5,18 @@ qa_smoke_lambda back over the 1200-line hard ceiling. No contract change:
 qa_smoke_lambda re-exports every check here, and the run list calls them exactly
 as before.
 
-The five checks are one concern: everything qa-smoke validates by listing or
+The four checks are one concern: everything qa-smoke validates by listing or
 reading AWS resources directly (S3 outputs, the dashboard JSON's value sanity,
-blog object links, Lambda→Secrets references, avatar sprites) — as opposed to
-the site-fetch, MCP, and content-truth passes that stay in the main module.
+Lambda→Secrets references, avatar sprites) — as opposed to the site-fetch, MCP,
+and content-truth passes that stay in the main module.
+
+#2307 removed a fifth, ``check_blog_links``: qa_smoke_lambda imported it but its
+run list appended a hand-built PAUSED Check instead of calling it (the blog moved
+to /story/ in v4), so it was an orphan with tests but no caller. The paused
+``blog:links`` Check stays in the sweep as the honest "surface retired" signal.
 """
 
 import json
-import re
 from datetime import date, datetime, timedelta, timezone
 
 import boto3
@@ -145,7 +149,7 @@ def check_score_sanity():
     glucose = (data.get("glucose") or {}).get("avg")
     grade_l = (data.get("day_grade") or {}).get("letter")
     grade_s = (data.get("day_grade") or {}).get("score")
-    hydration = (data.get("day_grade", {}).get("components") or {}).get("hydration")
+    hydration = ((data.get("day_grade") or {}).get("components") or {}).get("hydration")
 
     # Pre-start/Day-1 weight grace (2026-07-26, first live catch of the #1831
     # strict oracle): a null weight before the first Withings sync IS the honest
@@ -196,54 +200,7 @@ def check_score_sanity():
 
 
 # ---------------------------------------------------------------------------
-# CHECK 4 — Blog link integrity
-# ---------------------------------------------------------------------------
-
-
-def check_blog_links():
-    checks = []
-
-    try:
-        resp = s3.get_object(Bucket=S3_BUCKET, Key="blog/index.html")
-        index_html = resp["Body"].read().decode("utf-8")
-    except Exception as e:
-        # Blog index may not exist yet — non-critical
-        return [Check("blog:index", "Blog Links", CONTENT_TRUTH).warn(f"blog/index.html not found (non-critical): {e}")]
-
-    try:
-        paginator = s3.get_paginator("list_objects_v2")
-        existing = set()
-        for page in paginator.paginate(Bucket=S3_BUCKET, Prefix="blog/"):
-            for obj in page.get("Contents", []):
-                existing.add(obj["Key"])
-    except Exception as e:
-        return [Check("blog:list", "Blog Links", CONTENT_TRUTH).fail(f"Cannot list blog/ objects: {e}")]
-
-    linked = set(re.findall(r'href="(week-[\w.]+\.html)"', index_html))
-
-    if not linked:
-        checks.append(Check("blog:links", "Blog Links", CONTENT_TRUTH).warn("No week-*.html links found in blog index"))
-        return checks
-
-    broken, ok_count = [], 0
-    for fname in sorted(linked):
-        if "blog/" + fname in existing:
-            ok_count += 1
-        else:
-            broken.append(fname)
-
-    c = Check("blog:links", "Blog Links", CONTENT_TRUTH)
-    if broken:
-        c.fail(f"{len(broken)} broken link(s): {', '.join(broken)} — linked from index but not in S3")
-    else:
-        c.ok(f"All {ok_count} blog post link(s) resolve")
-    checks.append(c)
-
-    return checks
-
-
-# ---------------------------------------------------------------------------
-# CHECK 5 — Lambda secret health
+# CHECK 4 — Lambda secret health
 # ---------------------------------------------------------------------------
 
 
@@ -283,7 +240,7 @@ def check_lambda_secrets():
 
 
 # ---------------------------------------------------------------------------
-# CHECK 6 — Avatar PNG assets
+# CHECK 5 — Avatar PNG assets
 # ---------------------------------------------------------------------------
 
 
