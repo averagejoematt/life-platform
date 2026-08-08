@@ -158,6 +158,27 @@ def test_the_structural_gates_run_pre_merge():
         "test_phase_context_coverage.py",
         "test_grounding_wiring_1967.py",
         "test_mypy_clean_modules.py",
+        # +18 on 2026-08-09 after test_time_invariant_helpers_1964 red-mained main hours
+        # after the first five landed. Deriving the real population (tree-sweeping,
+        # non-behaviour test files) found 20; these are the repo-shape ratchets among them.
+        "test_handler_type_hints.py",
+        "test_api_schema_completeness.py",
+        "test_og_card_coverage.py",
+        "test_hae_datatype_liveness_468.py",
+        "test_restart_pipeline_hooks.py",
+        "test_time_invariant_helpers_1964.py",
+        "test_raw_key_registry_guard.py",
+        "test_no_hardcoded_feature_tier.py",
+        "test_budget_guard_ladder.py",
+        "test_lambdas_packaging_guard.py",
+        "test_root_clutter_guard.py",
+        "test_no_conflict_markers.py",
+        "test_no_dead_intelligence_functions.py",
+        "test_hevy_compiler_isolation.py",
+        "test_public_surface_pii_guard.py",
+        "test_leak_token_sweep.py",
+        "test_csp_native_embeds_1678.py",
+        "test_archive_handover.py",
     }
     dropped = sorted(n for n in floor if n not in extra and (ROOT / "tests" / n).is_file())
     assert not dropped, (

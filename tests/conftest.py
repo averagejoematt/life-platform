@@ -147,20 +147,55 @@ _PREMERGE_FILENAME_SUFFIX = "_behavior.py"
 # driver time, and each was knowable from the PR's own diff.
 #
 # These are hand-listed on purpose, and that is the honest weak point: unlike
-# `*_behavior.py` there is no filename or marker these five share that a sixth would
-# inherit. What makes the hand-list safe is that it cannot rot silently —
-# tests/test_premerge_lane.py asserts every path here exists AND that the set covers
-# every guard whose failure is a pure function of the repo tree (see
-# `test_the_structural_gates_run_pre_merge`). Add to it whenever a new gate of that
-# shape lands; the marker is the ONE selection mechanism both lanes name, so the
-# workflow never needs a matching edit.
+# `*_behavior.py` there is no filename or marker they share that a new one would inherit.
+# What makes the hand-list safe is that it cannot rot silently —
+# tests/test_premerge_lane.py asserts every path here exists and that the set only ever
+# grows. The marker is the ONE selection mechanism both lanes name, so the workflow never
+# needs a matching edit when this list changes.
+#
+# THE LIST STARTED AT FIVE AND THAT WAS DEMONSTRABLY TOO NARROW. Hours after the first
+# five landed, #2339 red-mained main on `test_time_invariant_helpers_1964.py` — a ratchet
+# of exactly this shape that nobody had thought to include. Deriving the real population
+# (test files that sweep the source tree via `git ls-files`/`os.walk`, excluding the
+# behaviour suite) found **20**. Eighteen of them are listed below; measured together they
+# are **223 tests in 14.4s**, which is affordable against a lane budget of ten minutes.
+#
+# The two deliberately left out are `test_output_writers.py` (109 tests) and
+# `test_diary_publish_1845.py` (63) — they sweep the tree but are behaviour suites in
+# substance, not repo-shape ratchets, so they belong to the post-merge lane's job.
+#
+# The generalisable lesson, worth more than the list: **a guard whose verdict depends only
+# on the repo tree has no business running after the merge.** When you add one, add it
+# here in the same PR.
 _PREMERGE_EXTRA_FILES = frozenset(
     {
+        # ── size + type ceilings ──────────────────────────────────────────────
         "test_lambda_size_gate.py",  # ADR-080: *_lambda.py over 2,000 lines
         "test_module_size_guard.py",  # #1665: the 1,200-line ceiling + the BASELINE ratchet
-        "test_phase_context_coverage.py",  # the phase-context census a new module must join
-        "test_grounding_wiring_1967.py",  # the grounding-surface registry, likewise
         "test_mypy_clean_modules.py",  # tier-2 types (real only when mypy is installed — the lane installs it)
+        "test_handler_type_hints.py",
+        # ── registries a new module must join (none discoverable from the module) ──
+        "test_phase_context_coverage.py",  # the phase-context census
+        "test_grounding_wiring_1967.py",  # the grounding-surface registry
+        "test_api_schema_completeness.py",
+        "test_og_card_coverage.py",
+        "test_hae_datatype_liveness_468.py",
+        "test_restart_pipeline_hooks.py",
+        # ── one-idiom ratchets: the fork is invisible until someone edits one copy ──
+        "test_time_invariant_helpers_1964.py",  # the #2339 red that widened this whole list
+        "test_raw_key_registry_guard.py",  # #2286: no hand-built raw/ S3 keys
+        "test_no_hardcoded_feature_tier.py",
+        "test_budget_guard_ladder.py",
+        # ── tree hygiene + safety sweeps ──────────────────────────────────────
+        "test_lambdas_packaging_guard.py",  # ADR-146: no loose modules at the lambdas/ root
+        "test_root_clutter_guard.py",
+        "test_no_conflict_markers.py",  # a merge marker reached main once already
+        "test_no_dead_intelligence_functions.py",
+        "test_hevy_compiler_isolation.py",
+        "test_public_surface_pii_guard.py",  # privacy — the one most costly to catch late
+        "test_leak_token_sweep.py",
+        "test_csp_native_embeds_1678.py",
+        "test_archive_handover.py",  # a dated handover committed to main (#1650)
     }
 )
 
