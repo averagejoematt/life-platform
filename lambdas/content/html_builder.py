@@ -1653,6 +1653,68 @@ def _brief_lifestyle(data, profile, tldr_guidance):
     return out
 
 
+def _anomaly_alert_from_metric(metric):
+    """One flagged-metric dict (the `check_anomalies` shape) -> one {metric, message} alert.
+
+    The writer's shape is source/field/label/yesterday_val/baseline_mean/baseline_sd/
+    z_score/direction/pct_from_mean (+ threshold provenance). The brief's block has room
+    for one line per metric, so this renders the value against its baseline plus the two
+    numbers that make the flag legible: the % move and the Z. Every field is optional —
+    a partial record degrades to a shorter sentence rather than raising.
+    """
+    label = str(metric.get("label") or metric.get("field") or metric.get("source") or "metric")
+    val = metric.get("yesterday_val")
+    mean = metric.get("baseline_mean")
+    if val is not None and mean is not None:
+        msg = "{} vs {} baseline".format(val, mean)
+    elif val is not None:
+        msg = "{} (no baseline)".format(val)
+    else:
+        msg = "flagged {}".format(metric.get("direction") or "anomalous")
+    stats = []
+    pct = metric.get("pct_from_mean")
+    if pct is not None:
+        try:
+            stats.append("{}{}%".format("+" if float(pct) > 0 else "", pct))
+        except (TypeError, ValueError):
+            pass
+    z = metric.get("z_score")
+    if z is not None:
+        stats.append("Z = {}".format(z))
+    if stats:
+        msg += " (" + ", ".join(stats) + ")"
+    return {"metric": label, "message": msg}
+
+
+def _anomaly_alerts(anomaly):
+    """Normalise a fetched anomaly record into the {metric, message} list the block renders.
+
+    #2244: the record's writer (`anomaly_detector_lambda.write_anomaly_record`) stores the
+    flagged metrics under `anomalous_metrics` and has never written `has_anomalies` or
+    `alerts`; `daily_brief_lambda.fetch_anomaly_record` returns the record verbatim. The
+    old gate read `has_anomalies` directly, so it was always falsy and the ANOMALY ALERT
+    block had never rendered no matter how many metrics were flagged.
+
+    Both shapes are accepted, so this is additive rather than a swap: `has_anomalies` is
+    honoured when the caller supplies it (including an explicit False, which suppresses),
+    and derived from `anomalous_metrics` when it is absent; a pre-built `alerts` list wins
+    over the derivation. Alerts are passed through unmodified — a malformed entry still
+    degrades this one named section, which is the contract the rest of the brief follows.
+    """
+    if not anomaly:
+        return []
+    metrics = anomaly.get("anomalous_metrics") or []
+    has_anomalies = anomaly.get("has_anomalies")
+    if has_anomalies is None:
+        has_anomalies = bool(metrics)
+    if not has_anomalies:
+        return []
+    alerts = anomaly.get("alerts")
+    if alerts:
+        return list(alerts)
+    return [_anomaly_alert_from_metric(m) for m in metrics if isinstance(m, dict)]
+
+
 def _brief_journal_coaches(
     bod_insight,
     data,
@@ -1868,19 +1930,17 @@ def _brief_journal_coaches(
     # --- Anomaly Alert ---
     try:
         out += "<!-- S:anomaly -->"
-        anomaly = data.get("anomaly")
-        if anomaly and anomaly.get("has_anomalies"):
-            alerts = anomaly.get("alerts", [])
-            if alerts:
-                out += (
-                    '<div style="background:#1c0a0a;padding:16px 24px;border-bottom:1px solid #450a0a;">'
-                    '<p style="color:#f87171;font-size:10px;margin:0 0 8px;font-weight:700;letter-spacing:1px;">⚠ ANOMALY ALERT</p>'
-                )
-                for alert in alerts[:3]:
-                    metric = alert.get("metric", "")
-                    msg = alert.get("message", "")
-                    out += '<p style="color:#fca5a5;font-size:12px;margin:0 0 4px;">' "<strong>" + metric + ":</strong> " + msg + "</p>"
-                out += "</div>"
+        alerts = _anomaly_alerts(data.get("anomaly"))
+        if alerts:
+            out += (
+                '<div style="background:#1c0a0a;padding:16px 24px;border-bottom:1px solid #450a0a;">'
+                '<p style="color:#f87171;font-size:10px;margin:0 0 8px;font-weight:700;letter-spacing:1px;">⚠ ANOMALY ALERT</p>'
+            )
+            for alert in alerts[:3]:
+                metric = alert.get("metric", "")
+                msg = alert.get("message", "")
+                out += '<p style="color:#fca5a5;font-size:12px;margin:0 0 4px;">' "<strong>" + metric + ":</strong> " + msg + "</p>"
+            out += "</div>"
         out += "<!-- /S:anomaly -->"
     except Exception as _e:
         out += _section_error_html("Anomaly Alert", _e)

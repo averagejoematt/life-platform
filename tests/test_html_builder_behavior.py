@@ -1734,13 +1734,95 @@ def test_anomaly_alerts_capped_at_three():
 
 
 def test_anomaly_alerts_require_the_has_anomalies_flag():
-    """Alerts present but the flag absent -> nothing renders.
+    """A pre-built `alerts` list with no flag and no `anomalous_metrics` -> nothing renders.
 
-    A single missing boolean suppresses every alert; pinned because the flag and
-    the list are written by the same producer and can drift apart.
+    `has_anomalies` is absent here and there are no `anomalous_metrics` to derive it
+    from (#2244), so the record carries no evidence anything was flagged and the block
+    stays closed. This is the empty-derivation case, not a claim that anything in
+    production writes `alerts` without the flag — nothing writes either (see below).
     """
     alerts = [{"metric": "hrv", "message": "down 3 SD"}]
     assert "ANOMALY ALERT" not in _coaches(data=_data(anomaly={"alerts": alerts}))
+
+
+# ── #2244: the block reads the field the anomaly detector actually writes ──────
+#
+# `anomaly_detector_lambda.write_anomaly_record` stores the flagged metrics under
+# `anomalous_metrics` and has never written `has_anomalies`/`alerts`, and
+# `daily_brief_lambda.fetch_anomaly_record` hands the record to build_html verbatim —
+# so the old `anomaly.get("has_anomalies")` gate was always falsy and this block had
+# never rendered. These fixtures are the writer's real shape (kept in sync by
+# tests/test_anomaly_detector_lambda.py::
+# test_the_daily_briefs_anomaly_block_renders_from_the_record_this_module_writes,
+# which feeds an actually-written record through this same renderer).
+
+
+def _flagged_metric(**over):
+    """A `check_anomalies` flagged-metric dict, the shape stored in `anomalous_metrics`."""
+    m = {
+        "source": "whoop",
+        "field": "hrv",
+        "label": "HRV",
+        "yesterday_val": 40.0,
+        "baseline_mean": 65.6,
+        "baseline_sd": 13.6,
+        "z_score": -2.39,
+        "direction": "low",
+        "pct_from_mean": -39.0,
+        "z_threshold": 2.0,
+        "baseline_type": "rolling_30d",
+        "sample_size": 14,
+    }
+    m.update(over)
+    return m
+
+
+def test_anomaly_block_renders_from_the_writers_anomalous_metrics():
+    """The production record shape — no has_anomalies, no alerts — renders the block."""
+    record = {"date": DATE, "severity": "high", "anomalous_metrics": [_flagged_metric()]}
+    html = _coaches(data=_data(anomaly=record))
+    assert "ANOMALY ALERT" in html
+    assert "HRV" in html
+    # the derived message carries the value, its baseline and the two flag numbers
+    assert "40.0 vs 65.6 baseline" in html
+    assert "-39.0%" in html and "Z = -2.39" in html
+
+
+def test_anomaly_block_derived_alerts_are_capped_at_three_like_the_prebuilt_list():
+    metrics = [_flagged_metric(field=f"f{i}", label=f"L{i}") for i in range(5)]
+    html = _coaches(data=_data(anomaly={"anomalous_metrics": metrics}))
+    assert "L0" in html and "L2" in html
+    assert "L3" not in html
+
+
+@pytest.mark.parametrize(
+    "record",
+    [
+        {},
+        {"date": DATE, "severity": "none", "anomalous_metrics": []},
+        {"date": DATE, "severity": "none"},
+        {"date": DATE, "anomalous_metrics": None},
+    ],
+    ids=["empty-record", "empty-list", "key-absent", "null-list"],
+)
+def test_anomaly_block_stays_closed_when_nothing_was_flagged(record):
+    """No false positive: a quiet day renders no block at all."""
+    assert "ANOMALY ALERT" not in _coaches(data=_data(anomaly=record))
+
+
+def test_an_explicit_has_anomalies_false_suppresses_derived_alerts():
+    """A caller that DOES supply the flag still wins — False means silence."""
+    record = {"has_anomalies": False, "anomalous_metrics": [_flagged_metric()]}
+    assert "ANOMALY ALERT" not in _coaches(data=_data(anomaly=record))
+
+
+def test_a_partial_flagged_metric_degrades_to_a_shorter_line_not_an_error():
+    """Missing numbers shorten the sentence; the section must not fall over."""
+    record = {"anomalous_metrics": [{"field": "hrv", "direction": "low"}]}
+    html = _coaches(data=_data(anomaly=record))
+    assert "ANOMALY ALERT" in html
+    assert "Anomaly Alert section unavailable" not in html
+    assert "flagged low" in html
 
 
 def test_weekly_habit_review_is_appended_when_supplied():
