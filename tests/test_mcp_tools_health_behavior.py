@@ -385,21 +385,20 @@ def test_readiness_has_an_explicit_no_data_branch(monkeypatch):
     assert "readiness_score" not in out and "label" not in out
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (ADR-104, P1, mcp/tools_health.py:192-213 + 307 tool_get_readiness_score): on a "
-        "platform with NO data the `if not components: return {'error': ...}` guard is unreachable, "
-        "because the TSB fallback calls `_get_training_load`, whose Banister model over an "
-        "all-zeros load series yields ctl=atl=0 -> tsb_form 0.0 -> `clamp(70 + 0*2.5)` = a "
-        "training_form component scoring 70.0. Total weight 0.10, so raw_score = 70.0 exactly, "
-        "which clears the `>= 70` GREEN threshold. The tool answers a completely silent platform "
-        "with 'readiness 70.0 / GREEN / You're primed - go ahead with your planned hard session.' "
-        "A zero training load is an ABSENCE of training data, not measured freshness. Who it hurts: "
-        "the worst possible day to be told to train hard is the day nothing is measuring him."
-    ),
-)
 def test_readiness_on_a_platform_with_no_data_errors_rather_than_scoring_seventy(monkeypatch):
+    """REGRESSION (was an xfail; fixed in the #1658 burn-down).
+
+    The defect this test was written to report:
+
+    DEFECT (ADR-104, P1, mcp/tools_health.py:192-213 + 307 tool_get_readiness_score): on a platform with NO data the
+    `if not components: return {'error': ...}` guard is unreachable, because the TSB fallback calls
+    `_get_training_load`, whose Banister model over an all-zeros load series yields ctl=atl=0 -> tsb_form 0.0 ->
+    `clamp(70 + 0*2.5)` = a training_form component scoring 70.0. Total weight 0.10, so raw_score = 70.0 exactly,
+    which clears the `>= 70` GREEN threshold. The tool answers a completely silent platform with 'readiness 70.0 /
+    GREEN / You're primed - go ahead with your planned hard session.' A zero training load is an ABSENCE of training
+    data, not measured freshness. Who it hurts: the worst possible day to be told to train hard is the day nothing is
+    measuring him.
+    """
     install(monkeypatch, [])
     out = th.tool_get_readiness_score({})
     assert "error" in out, f"got readiness_score={out.get('readiness_score')} label={out.get('label')}"
@@ -426,20 +425,18 @@ def test_readiness_excludes_a_garmin_record_more_than_a_day_staler_than_whoop(mo
     assert out["data_completeness"] == "partial (95% weight covered)"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (P2, mcp/tools_health.py:253-302 tool_get_readiness_score): the staleness branch "
-        "builds `device_agreement = {'status': 'unavailable', 'reason': '<garmin date> is >1 day "
-        "older than whoop - stale data excluded'} ` and then the very next block, guarded only by "
-        "`if 'whoop_recovery' in components and garmin_today is not None`, OVERWRITES it with a "
-        "cross-check computed from that same excluded record. So a Garmin reading the tool just "
-        "refused to score at 5% weight is still used to publish 'device_agreement: available, "
-        "confidence: high' — the reliability signal for the whole score. The overwrite must also "
-        "be gated on `not garmin_stale`."
-    ),
-)
 def test_readiness_does_not_cross_check_against_a_record_it_declared_too_stale(monkeypatch):
+    """REGRESSION (was an xfail; fixed in the #1658 burn-down).
+
+    The defect this test was written to report:
+
+    DEFECT (P2, mcp/tools_health.py:253-302 tool_get_readiness_score): the staleness branch builds `device_agreement =
+    {'status': 'unavailable', 'reason': '<garmin date> is >1 day older than whoop - stale data excluded'} ` and then
+    the very next block, guarded only by `if 'whoop_recovery' in components and garmin_today is not None`, OVERWRITES
+    it with a cross-check computed from that same excluded record. So a Garmin reading the tool just refused to score
+    at 5% weight is still used to publish 'device_agreement: available, confidence: high' — the reliability signal for
+    the whole score. The overwrite must also be gated on `not garmin_stale`.
+    """
     rows = [r for r in _readiness_rows() if "garmin" not in r["pk"]]
     rows.append(garmin(d(TODAY, -2), body_battery_end=95, hrv_last_night=48))
     install(monkeypatch, rows)
@@ -534,100 +531,121 @@ def test_readiness_live_hrv_fallback_publishes_the_n_behind_both_averages(monkey
     assert raw["n_days_7d"] and raw["n_days_30d"]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (ADR-105, P2, mcp/tools_health.py:120-130 tool_get_readiness_score): the "
-        "PRE-COMPUTED hrv_trend branch publishes `hrv_7d_avg_ms` and `hrv_30d_baseline_ms` with "
-        "NO n, while the live-fallback branch 40 lines below publishes the identical field names "
-        "WITH `n_days_7d`/`n_days_30d`. Same reader, same key names, opposite rigor — so whether "
-        "Matthew can tell a 30-day baseline from a 2-day one depends on whether "
-        "daily-metrics-compute happened to run. It should carry the n stored beside the average."
-    ),
-)
 def test_readiness_precomputed_hrv_trend_also_publishes_its_n(monkeypatch):
+    """REGRESSION (was an xfail; fixed in the #1658 burn-down).
+
+    The defect this test was written to report:
+
+    DEFECT (ADR-105, P2, mcp/tools_health.py:120-130 tool_get_readiness_score): the PRE-COMPUTED hrv_trend branch
+    publishes `hrv_7d_avg_ms` and `hrv_30d_baseline_ms` with NO n, while the live-fallback branch 40 lines below
+    publishes the identical field names WITH `n_days_7d`/`n_days_30d`. Same reader, same key names, opposite rigor —
+    so whether Matthew can tell a 30-day baseline from a 2-day one depends on whether daily-metrics-compute happened
+    to run. It should carry the n stored beside the average.
+
+    CORRECTION to that last sentence: there IS no n stored beside the average.
+    `lambdas/compute/daily_metrics_compute_lambda.py` writes `hrv_7d` / `hrv_30d`
+    and nothing else, so the tool cannot read an n that was never persisted. The
+    fix is therefore ADR-104 honest ABSENCE — the key is published as an explicit
+    None with a note saying why — plus the forward path of reading a real
+    `hrv_7d_n` / `hrv_30d_n` the day the writer starts storing them. Both shapes
+    are asserted below so this cannot pass vacuously on a key that is merely
+    present.
+    """
     install(monkeypatch, _readiness_rows())
     raw = th.tool_get_readiness_score({})["components"]["hrv_trend"]["raw"]
     assert raw["source"] == "pre_computed_metrics"
-    assert "n_days_7d" in raw and "n_days_30d" in raw
+    # (a) writer stores no n today -> explicit absence, never a silent omission
+    assert raw["n_days_7d"] is None and raw["n_days_30d"] is None
+    assert "stores the HRV averages without the reading counts" in raw["n_note"]
+
+    # (b) the day the writer does store them, they are published as real numbers
+    rows = _readiness_rows()
+    rows[1] = cmetrics(TODAY, hrv_7d=44, hrv_30d=40, tsb=4, hrv_7d_n=7, hrv_30d_n=28)
+    install(monkeypatch, rows)
+    raw2 = th.tool_get_readiness_score({})["components"]["hrv_trend"]["raw"]
+    assert raw2["n_days_7d"] == 7 and raw2["n_days_30d"] == 28
+    assert "n_note" not in raw2
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (#1917 window-name honesty, P2, mcp/tools_health.py:41-42 tool_get_readiness_score): "
-        "`d7_start = end - timedelta(days=7)` is fed to `query_source`, whose key condition is an "
-        "INCLUSIVE `sk BETWEEN DATE#start AND DATE#end~` — so the '7-day' window spans 8 calendar "
-        "dates and the '30-day' baseline spans 31. The results are published as `hrv_7d_avg_ms`, "
-        "`hrv_30d_baseline_ms` and `n_days_7d`, all of which name a window they do not span. Should "
-        "be `days=6` / `days=29`. Who it hurts: the HRV trend ratio — the 20%-weighted component — "
-        "is computed over 8/31 days while being labelled 7/30."
-    ),
-)
 def test_readiness_seven_day_window_really_spans_seven_days(monkeypatch):
+    """REGRESSION (was an xfail; fixed in the #1658 burn-down).
+
+    The defect this test was written to report:
+
+    DEFECT (#1917 window-name honesty, P2, mcp/tools_health.py:41-42 tool_get_readiness_score): `d7_start = end -
+    timedelta(days=7)` is fed to `query_source`, whose key condition is an INCLUSIVE `sk BETWEEN DATE#start AND
+    DATE#end~` — so the '7-day' window spans 8 calendar dates and the '30-day' baseline spans 31. The results are
+    published as `hrv_7d_avg_ms`, `hrv_30d_baseline_ms` and `n_days_7d`, all of which name a window they do not span.
+    Should be `days=6` / `days=29`. Who it hurts: the HRV trend ratio — the 20%-weighted component — is computed over
+    8/31 days while being labelled 7/30.
+    """
     t = install(monkeypatch, _readiness_rows())
     th.tool_get_readiness_score({})
     lo, hi = t.window_for("whoop")
     assert span_days(lo, hi) == 7
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (ADR-104, P2, mcp/tools_health.py:231 tool_get_readiness_score): "
-        "`bb = garmin_today.get('body_battery_end') or garmin_today.get('body_battery_high')`. "
-        "A fully-depleted Body Battery of 0 is a REAL reading — and the strongest 'rest today' "
-        "signal Garmin produces — but it is falsy, so the `or` silently substitutes the day's "
-        "HIGH. Here end=0 becomes 95. The record-selection guard 13 lines above correctly uses "
-        "`is not None`; only the value read uses `or`. Who it hurts: Matthew is told GREEN/95 on "
-        "the day his own device measured total depletion."
-    ),
-)
 def test_readiness_treats_a_body_battery_of_zero_as_a_real_depleted_reading(monkeypatch):
+    """REGRESSION (was an xfail; fixed in the #1658 burn-down).
+
+    The defect this test was written to report:
+
+    DEFECT (ADR-104, P2, mcp/tools_health.py:231 tool_get_readiness_score): `bb = garmin_today.get('body_battery_end')
+    or garmin_today.get('body_battery_high')`. A fully-depleted Body Battery of 0 is a REAL reading — and the
+    strongest 'rest today' signal Garmin produces — but it is falsy, so the `or` silently substitutes the day's HIGH.
+    Here end=0 becomes 95. The record-selection guard 13 lines above correctly uses `is not None`; only the value read
+    uses `or`. Who it hurts: Matthew is told GREEN/95 on the day his own device measured total depletion.
+    """
     install(monkeypatch, [garmin(TODAY, body_battery_end=0, body_battery_high=95)])
     out = th.tool_get_readiness_score({})
     assert out["components"]["garmin_body_battery"]["score"] == 0.0
 
 
 def test_readiness_discloses_a_thin_component_set(monkeypatch):
-    """The honest half: a score built from Body Battery (5%) plus the always-present
-    zero-load training_form (10%) discloses 15% coverage and names what is missing."""
+    """A score built from Body Battery ALONE discloses 5% coverage and names all
+    four missing components.
+
+    This test previously asserted 15%, on the strength of "the always-present
+    zero-load training_form" — which was the very defect
+    ``test_readiness_on_a_platform_with_no_data_errors_rather_than_scoring_seventy``
+    reported. With no Strava data there is no measured training load, so
+    training_form is now ABSENT rather than a neutral 70 (ADR-104), and it
+    correctly appears in missing_components.
+    """
     install(monkeypatch, [garmin(TODAY, body_battery_end=95)])
     out = th.tool_get_readiness_score({})
-    assert out["data_completeness"] == "partial (15% weight covered)"
-    assert sorted(out["missing_components"]) == ["hrv trend", "sleep quality", "whoop recovery"]
+    assert out["data_completeness"] == "partial (5% weight covered)"
+    assert sorted(out["missing_components"]) == ["hrv trend", "sleep quality", "training form", "whoop recovery"]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (ADR-105, P2, mcp/tools_health.py:311-319 + 361-371 tool_get_readiness_score): the "
-        "GREEN/YELLOW/RED label — the single thing a reader quotes — is emitted with no uncertainty "
-        "marker whatsoever. `data_completeness` sits four keys away and is a free-text string, so a "
-        "score synthesised from ONE 5%-weight component reads exactly like a five-component score. "
-        "The label should carry its own confidence (e.g. `label_confidence`) derived from "
-        "total_weight. Who it hurts: 'readiness GREEN' quoted from a lone stale Body Battery."
-    ),
-)
 def test_readiness_label_carries_its_own_confidence_marker(monkeypatch):
+    """REGRESSION (was an xfail; fixed in the #1658 burn-down).
+
+    The defect this test was written to report:
+
+    DEFECT (ADR-105, P2, mcp/tools_health.py:311-319 + 361-371 tool_get_readiness_score): the GREEN/YELLOW/RED label —
+    the single thing a reader quotes — is emitted with no uncertainty marker whatsoever. `data_completeness` sits four
+    keys away and is a free-text string, so a score synthesised from ONE 5%-weight component reads exactly like a
+    five-component score. The label should carry its own confidence (e.g. `label_confidence`) derived from
+    total_weight. Who it hurts: 'readiness GREEN' quoted from a lone stale Body Battery.
+    """
     install(monkeypatch, [garmin(TODAY, body_battery_end=95)])
     out = th.tool_get_readiness_score({})
     assert out.get("label_confidence") is not None
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (ADR-104 honest dates, P2, mcp/tools_health.py:353-359 tool_get_readiness_score): "
-        "`_data_dates` is collected from ONLY whoop_recovery / sleep_quality / "
-        "garmin_body_battery. When the score is built purely from a pre-computed metrics row — the "
-        "hrv_trend + training_form components, which carry no `raw.date` — `as_of_date` falls back "
-        "to the REQUESTED date, `is_forward_dated` is False and no staleness_warning ships, even "
-        "though `_cm` may be the newest row in a 7-day lookback. Here a six-day-old record is "
-        "presented as today's readiness. Who it hurts: a stale score dated today."
-    ),
-)
 def test_readiness_from_a_stale_computed_metrics_row_reports_the_real_data_date(monkeypatch):
+    """REGRESSION (was an xfail; fixed in the #1658 burn-down).
+
+    The defect this test was written to report:
+
+    DEFECT (ADR-104 honest dates, P2, mcp/tools_health.py:353-359 tool_get_readiness_score): `_data_dates` is
+    collected from ONLY whoop_recovery / sleep_quality / garmin_body_battery. When the score is built purely from a
+    pre-computed metrics row — the hrv_trend + training_form components, which carry no `raw.date` — `as_of_date`
+    falls back to the REQUESTED date, `is_forward_dated` is False and no staleness_warning ships, even though `_cm`
+    may be the newest row in a 7-day lookback. Here a six-day-old record is presented as today's readiness. Who it
+    hurts: a stale score dated today.
+    """
     stale = d(TODAY, -6)
     install(monkeypatch, [cmetrics(stale, hrv_7d=44, hrv_30d=40, tsb=4)])
     out = th.tool_get_readiness_score({})
@@ -635,37 +653,34 @@ def test_readiness_from_a_stale_computed_metrics_row_reports_the_real_data_date(
     assert out["is_forward_dated"] is True
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (P2, mcp/tools_health.py:40-42 tool_get_readiness_score): `date` is taken straight "
-        "from args and handed to `datetime.strptime` with no validation and no try/except, so a "
-        "malformed date raises ValueError out of the tool (and an explicit `{'date': None}` raises "
-        "TypeError, because `args.get('date', default)` returns the stored None). The MCP caller "
-        "gets a stack-trace error instead of 'that date could not be parsed'. Every other bad-input "
-        "path in this module returns an error dict — `tool_get_daily_metrics` does exactly that for "
-        "an unknown view."
-    ),
-)
 @pytest.mark.parametrize("bad", ["last tuesday", "2026-13-45", "", None])
 def test_readiness_returns_an_error_dict_for_an_unparseable_date(monkeypatch, bad):
+    """REGRESSION (was an xfail; fixed in the #1658 burn-down).
+
+    The defect this test was written to report:
+
+    DEFECT (P2, mcp/tools_health.py:40-42 tool_get_readiness_score): `date` is taken straight from args and handed to
+    `datetime.strptime` with no validation and no try/except, so a malformed date raises ValueError out of the tool
+    (and an explicit `{'date': None}` raises TypeError, because `args.get('date', default)` returns the stored None).
+    The MCP caller gets a stack-trace error instead of 'that date could not be parsed'. Every other bad-input path in
+    this module returns an error dict — `tool_get_daily_metrics` does exactly that for an unknown view.
+    """
     install(monkeypatch, _readiness_rows())
     out = th.tool_get_readiness_score({"date": bad})
     assert isinstance(out, dict) and "error" in out
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (ADR-105 provenance, P3, mcp/tools_health.py:388-394 tool_get_readiness_score): "
-        "`_precomputed_cross_check` is presented as a drift check against 'daily-metrics-compute "
-        "(9:40 AM)', but `_cm` is selected as `next(exact-date match, newest-in-7-day-window)` — so "
-        "the cross-check value can be up to 7 days old and ships with no date. A drift detector "
-        "that compares today's live score against last week's stored one reports drift that isn't "
-        "there (or hides drift that is)."
-    ),
-)
 def test_readiness_cross_check_states_which_day_it_was_computed_for(monkeypatch):
+    """REGRESSION (was an xfail; fixed in the #1658 burn-down).
+
+    The defect this test was written to report:
+
+    DEFECT (ADR-105 provenance, P3, mcp/tools_health.py:388-394 tool_get_readiness_score): `_precomputed_cross_check`
+    is presented as a drift check against 'daily-metrics-compute (9:40 AM)', but `_cm` is selected as `next(exact-date
+    match, newest-in-7-day-window)` — so the cross-check value can be up to 7 days old and ships with no date. A drift
+    detector that compares today's live score against last week's stored one reports drift that isn't there (or hides
+    drift that is).
+    """
     rows = [whoop_full(TODAY), cmetrics(d(TODAY, -5), readiness_score=70.2, readiness_colour="GREEN")]
     install(monkeypatch, rows)
     out = th.tool_get_readiness_score({})
@@ -862,18 +877,17 @@ def test_weight_loss_detects_a_plateau_from_a_tight_recent_spread(monkeypatch):
     assert plateau["weight_range_lbs"] == pytest.approx(0.4, abs=1e-9)
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (#1917 window-name honesty, P1, mcp/tools_health.py:540-545 "
-        "tool_get_weight_loss_progress): `duration_days` is the HARDCODED literal 14 and the note "
-        "reads 'Scale has moved less than 1.5 lbs in 14 days' — regardless of how far the three "
-        "qualifying weigh-ins actually span. Here they span 4 days (TODAY-4 .. TODAY) and the tool "
-        "still asserts a 14-day plateau. Should report the real first-to-last span. Who it hurts: "
-        "Matthew reads a 14-day stall that never happened and cuts calories in response."
-    ),
-)
 def test_weight_loss_plateau_duration_is_the_real_span_not_a_literal_fourteen(monkeypatch):
+    """REGRESSION (was an xfail; fixed in the #1658 burn-down).
+
+    The defect this test was written to report:
+
+    DEFECT (#1917 window-name honesty, P1, mcp/tools_health.py:540-545 tool_get_weight_loss_progress): `duration_days`
+    is the HARDCODED literal 14 and the note reads 'Scale has moved less than 1.5 lbs in 14 days' — regardless of how
+    far the three qualifying weigh-ins actually span. Here they span 4 days (TODAY-4 .. TODAY) and the tool still
+    asserts a 14-day plateau. Should report the real first-to-last span. Who it hurts: Matthew reads a 14-day stall
+    that never happened and cuts calories in response.
+    """
     rows = [
         withings(d(TODAY, -4), weight_lbs=310.2),
         withings(d(TODAY, -2), weight_lbs=310.4),
@@ -884,20 +898,22 @@ def test_weight_loss_plateau_duration_is_the_real_span_not_a_literal_fourteen(mo
     assert plateau["duration_days"] == 4  # TODAY-4 .. TODAY
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (P2, mcp/tools_health.py:532-534 tool_get_weight_loss_progress): plateau detection "
-        "filters on `datetime.now(timezone.utc).date() - point_date <= 14` — a LIVE clock spliced "
-        "into a report whose window the caller chose. Ask for a historical `end_date` and "
-        "`recent_14` is empty, so a real plateau inside the requested window is invisible; the same "
-        "`<= 14` also admits FUTURE-dated points (negative day counts). The 14-day lookback must "
-        "hang off `end_date`, the report's own anchor."
-    ),
-)
 def test_weight_loss_plateau_lookback_hangs_off_the_requested_end_date(monkeypatch):
-    """The same three tight weigh-ins, moved into a historical window that the
-    caller explicitly asks about."""
+    """REGRESSION (was an xfail; fixed in the #1658 burn-down).
+
+    The defect this test was written to report:
+
+    DEFECT (P2, mcp/tools_health.py:532-534 tool_get_weight_loss_progress): plateau detection filters on
+    `datetime.now(timezone.utc).date() - point_date <= 14` — a LIVE clock spliced into a report whose window the
+    caller chose. Ask for a historical `end_date` and `recent_14` is empty, so a real plateau inside the requested
+    window is invisible; the same `<= 14` also admits FUTURE-dated points (negative day counts). The 14-day lookback
+    must hang off `end_date`, the report's own anchor.
+
+    Original note:
+
+    The same three tight weigh-ins, moved into a historical window that the
+        caller explicitly asks about.
+    """
     rows = [
         withings("2026-02-20", weight_lbs=310.2),
         withings("2026-02-22", weight_lbs=310.4),
@@ -908,19 +924,17 @@ def test_weight_loss_plateau_lookback_hangs_off_the_requested_end_date(monkeypat
     assert out["plateau_detected"] is not None
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (ADR-104, P1, mcp/tools_health.py:523 tool_get_weight_loss_progress): "
-        "`weeks_at_current_pace` divides by `max(mean(last 4 weekly rates), 0.1)`. When the recent "
-        "pace is a GAIN the mean is negative, the floor clamps it to 0.1 lb/wk, and the tool "
-        "publishes a confident finite ETA (here 11.8/0.1 = 118.0 weeks) for a milestone he is "
-        "currently moving AWAY from. The floor was meant to avoid a divide-by-zero; it manufactures "
-        "a direction instead. Should be None with the reversal stated. Who it hurts: a countdown "
-        "to a goal while gaining 2 lbs/week."
-    ),
-)
 def test_weight_loss_gives_no_eta_when_the_recent_pace_is_a_gain(monkeypatch):
+    """REGRESSION (was an xfail; fixed in the #1658 burn-down).
+
+    The defect this test was written to report:
+
+    DEFECT (ADR-104, P1, mcp/tools_health.py:523 tool_get_weight_loss_progress): `weeks_at_current_pace` divides by
+    `max(mean(last 4 weekly rates), 0.1)`. When the recent pace is a GAIN the mean is negative, the floor clamps it to
+    0.1 lb/wk, and the tool publishes a confident finite ETA (here 11.8/0.1 = 118.0 weeks) for a milestone he is
+    currently moving AWAY from. The floor was meant to avoid a divide-by-zero; it manufactures a direction instead.
+    Should be None with the reversal stated. Who it hurts: a countdown to a goal while gaining 2 lbs/week.
+    """
     rows = [
         withings("2026-04-01", weight_lbs=300.0),
         withings("2026-04-08", weight_lbs=302.0),
@@ -953,50 +967,47 @@ def test_weight_loss_omits_bmi_entirely_when_height_is_recorded_as_zero(monkeypa
     assert out["next_milestone"] is None
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (ADR-104, P1, mcp/tools_health.py:406 + 439-443 tool_get_weight_loss_progress): "
-        "`height_in = profile.get('height_inches', 70)` — when the profile cannot be loaded the "
-        "tool silently assumes 70in and publishes a BMI, a CLINICAL BMI CATEGORY, milestone "
-        "crossings and lbs-to-cross derived from that guess, with no note anywhere that the height "
-        "was assumed. At 311 lbs the assumed 70in gives BMI 44.6 vs 42.2 at his real 72in. Absent "
-        "input should yield an absent BMI, not a fabricated clinical classification."
-    ),
-)
 def test_weight_loss_omits_bmi_when_height_is_unknown(monkeypatch):
+    """REGRESSION (was an xfail; fixed in the #1658 burn-down).
+
+    The defect this test was written to report:
+
+    DEFECT (ADR-104, P1, mcp/tools_health.py:406 + 439-443 tool_get_weight_loss_progress): `height_in =
+    profile.get('height_inches', 70)` — when the profile cannot be loaded the tool silently assumes 70in and publishes
+    a BMI, a CLINICAL BMI CATEGORY, milestone crossings and lbs-to-cross derived from that guess, with no note
+    anywhere that the height was assumed. At 311 lbs the assumed 70in gives BMI 44.6 vs 42.2 at his real 72in. Absent
+    input should yield an absent BMI, not a fabricated clinical classification.
+    """
     install(monkeypatch, WEIGH_INS, profile={"pk": "USER#matthew", "sk": "PROFILE#v1"})
     out = th.tool_get_weight_loss_progress({})
     assert out["current_bmi"] is None and out["current_bmi_category"] is None
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (ADR-105, P2, mcp/tools_health.py:550 + 556-565 tool_get_weight_loss_progress): "
-        "`avg_weekly_loss_lbs` is a mean over `weekly_rates` and it — plus the projected goal date "
-        "and pct_complete derived from it — ships with no n. Three paired weigh-ins and thirty "
-        "produce identically-confident output. The projection block should state how many weekly "
-        "rates back the average."
-    ),
-)
 def test_weight_loss_projection_states_how_many_weekly_rates_it_averaged(monkeypatch):
+    """REGRESSION (was an xfail; fixed in the #1658 burn-down).
+
+    The defect this test was written to report:
+
+    DEFECT (ADR-105, P2, mcp/tools_health.py:550 + 556-565 tool_get_weight_loss_progress): `avg_weekly_loss_lbs` is a
+    mean over `weekly_rates` and it — plus the projected goal date and pct_complete derived from it — ships with no n.
+    Three paired weigh-ins and thirty produce identically-confident output. The projection block should state how many
+    weekly rates back the average.
+    """
     install(monkeypatch, WEIGH_INS)
     proj = th.tool_get_weight_loss_progress({})["projection"]
     assert proj.get("n_weekly_rates") == 3
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (P2, mcp/tools_health.py:555 tool_get_weight_loss_progress): the projected goal "
-        "date is `datetime.now(utc) + weeks_remaining` — anchored to the WALL CLOCK rather than to "
-        "the last weigh-in the projection was computed from. Request a historical `end_date` (or "
-        "just go three weeks without stepping on the scale) and the goal date silently slides "
-        "forward while the underlying rate never changed. Should be last-weigh-in + weeks_remaining."
-    ),
-)
 def test_weight_loss_projects_forward_from_the_last_weigh_in_not_from_now(monkeypatch):
+    """REGRESSION (was an xfail; fixed in the #1658 burn-down).
+
+    The defect this test was written to report:
+
+    DEFECT (P2, mcp/tools_health.py:555 tool_get_weight_loss_progress): the projected goal date is `datetime.now(utc)
+    + weeks_remaining` — anchored to the WALL CLOCK rather than to the last weigh-in the projection was computed from.
+    Request a historical `end_date` (or just go three weeks without stepping on the scale) and the goal date silently
+    slides forward while the underlying rate never changed. Should be last-weigh-in + weeks_remaining.
+    """
     install(monkeypatch, WEIGH_INS)
     proj = th.tool_get_weight_loss_progress({"end_date": "2026-04-22"})["projection"]
     # weeks_remaining 37.0 -> 259 days past the LAST weigh-in (2026-04-22), not past NOW
@@ -1113,20 +1124,18 @@ def test_energy_uses_day_level_kilojoules_when_the_field_is_present(monkeypatch)
     assert th.tool_get_daily_metrics({"view": "energy"})["exercise_kcal_7d_daily_avg"] == 129.0
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (reader/writer field mismatch, P2, mcp/tools_health.py:628 "
-        "_get_energy_expenditure — same class at mcp/tools_nutrition.py:646, mcp/helpers.py:75, "
-        "mcp/tools_lifestyle.py:1677): every one of them reads a DAY-LEVEL `total_kilojoules` off "
-        "the strava partition, and `ingestion/strava_lambda.py:300-311 transform()` never writes "
-        "it — it rolls up total_distance_miles / total_moving_time_seconds / "
-        "total_elevation_gain_feet / total_zone2_seconds and nothing else. The per-activity "
-        "`kilojoules` IS captured (strava_lambda.py:173), it just is never summed. This test calls "
-        "the real transform, so it cannot drift from the writer."
-    ),
-)
 def test_the_strava_writer_produces_the_day_level_kilojoules_field_these_tools_read():
+    """REGRESSION (was an xfail; fixed in the #1658 burn-down).
+
+    The defect this test was written to report:
+
+    DEFECT (reader/writer field mismatch, P2, mcp/tools_health.py:628 _get_energy_expenditure — same class at
+    mcp/tools_nutrition.py:646, mcp/helpers.py:75, mcp/tools_lifestyle.py:1677): every one of them reads a DAY-LEVEL
+    `total_kilojoules` off the strava partition, and `ingestion/strava_lambda.py:300-311 transform()` never writes it
+    — it rolls up total_distance_miles / total_moving_time_seconds / total_elevation_gain_feet / total_zone2_seconds
+    and nothing else. The per-activity `kilojoules` IS captured (strava_lambda.py:173), it just is never summed. This
+    test calls the real transform, so it cannot drift from the writer.
+    """
     from ingestion import strava_lambda
 
     produced = strava_lambda.transform(
@@ -1136,18 +1145,17 @@ def test_the_strava_writer_produces_the_day_level_kilojoules_field_these_tools_r
     assert "total_kilojoules" in produced
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (ADR-104 provenance, P2, mcp/tools_health.py:627-633 _get_energy_expenditure): the "
-        "consequence of the missing `total_kilojoules` rollup above. `total_kj` is always 0, so "
-        "every TDEE this tool has ever returned came from the `6 kcal/kg/h` duration proxy rather "
-        "than from the power/kJ data Strava supplied — and the payload says nothing about which "
-        "branch ran. 900 kJ of real work is reported as 599 proxy kcal. Fix either the writer or "
-        "read `sum(a['kilojoules'] for a in activities)`; either way label the basis."
-    ),
-)
 def test_energy_uses_the_measured_kilojoules_when_strava_supplied_them(monkeypatch):
+    """REGRESSION (was an xfail; fixed in the #1658 burn-down).
+
+    The defect this test was written to report:
+
+    DEFECT (ADR-104 provenance, P2, mcp/tools_health.py:627-633 _get_energy_expenditure): the consequence of the
+    missing `total_kilojoules` rollup above. `total_kj` is always 0, so every TDEE this tool has ever returned came
+    from the `6 kcal/kg/h` duration proxy rather than from the power/kJ data Strava supplied — and the payload says
+    nothing about which branch ran. 900 kJ of real work is reported as 599 proxy kcal. Fix either the writer or read
+    `sum(a['kilojoules'] for a in activities)`; either way label the basis.
+    """
     from ingestion import strava_lambda
 
     day = strava_lambda.transform({"activities": [{"kilojoules": 900, "moving_time_seconds": 3600}]}, TODAY)[0]
@@ -1158,20 +1166,18 @@ def test_energy_uses_the_measured_kilojoules_when_strava_supplied_them(monkeypat
     assert out["exercise_kcal_7d_daily_avg"] == 129.0
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (ADR-104 fabricated input, P1, mcp/tools_health.py:614-620 "
-        "_get_energy_expenditure): `age_years = (datetime.now(timezone.utc) - "
-        "datetime.strptime(dob_str, '%Y-%m-%d')).days / 365.25` subtracts a NAIVE datetime from an "
-        "AWARE one, which raises TypeError on every single call. The bare `except Exception: pass` "
-        "swallows it, so `age_years` is always None and always falls back to the hardcoded 35. The "
-        "profile's real date_of_birth can never reach the BMR — it is dead code that looks live. "
-        "Mifflin-St Jeor is 5 kcal per year of age, so at DOB 1980 the BMR is overstated by ~57 "
-        "kcal/day, and that error propagates into tdee, calorie_target and bmr_change_since_start."
-    ),
-)
 def test_energy_uses_the_profile_date_of_birth_for_the_bmr_age_term(monkeypatch):
+    """REGRESSION (was an xfail; fixed in the #1658 burn-down).
+
+    The defect this test was written to report:
+
+    DEFECT (ADR-104 fabricated input, P1, mcp/tools_health.py:614-620 _get_energy_expenditure): `age_years =
+    (datetime.now(timezone.utc) - datetime.strptime(dob_str, '%Y-%m-%d')).days / 365.25` subtracts a NAIVE datetime
+    from an AWARE one, which raises TypeError on every single call. The bare `except Exception: pass` swallows it, so
+    `age_years` is always None and always falls back to the hardcoded 35. The profile's real date_of_birth can never
+    reach the BMR — it is dead code that looks live. Mifflin-St Jeor is 5 kcal per year of age, so at DOB 1980 the BMR
+    is overstated by ~57 kcal/day, and that error propagates into tdee, calorie_target and bmr_change_since_start.
+    """
     dob = "1980-01-01"
     install(monkeypatch, ENERGY_ROWS, profile=dict(PROFILE, date_of_birth=dob))
     # age from the FIXTURE clock (never datetime.now): (2026-05-10 - 1980-01-01).days / 365.25
@@ -1180,35 +1186,33 @@ def test_energy_uses_the_profile_date_of_birth_for_the_bmr_age_term(monkeypatch)
     assert th.tool_get_daily_metrics({"view": "energy"})["bmr_kcal"] == expected
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (P1, mcp/tools_health.py:590-592 _get_energy_expenditure): `end_date` comes from "
-        "args but BOTH window starts are computed from `datetime.now()` — `d30_start = now - 30`, "
-        "`d7_start = now - 7`. Ask for a historical end_date and the tool issues `sk BETWEEN "
-        "DATE#<recent> AND DATE#<older>~`, which DynamoDB rejects with a ValidationException; the "
-        "result is stamped `as_of_date: <requested>` regardless. `start_date` is declared in the "
-        "registry schema for this tool and is ignored entirely. The window must hang off end_date."
-    ),
-)
 def test_energy_windows_hang_off_the_requested_end_date(monkeypatch):
+    """REGRESSION (was an xfail; fixed in the #1658 burn-down).
+
+    The defect this test was written to report:
+
+    DEFECT (P1, mcp/tools_health.py:590-592 _get_energy_expenditure): `end_date` comes from args but BOTH window
+    starts are computed from `datetime.now()` — `d30_start = now - 30`, `d7_start = now - 7`. Ask for a historical
+    end_date and the tool issues `sk BETWEEN DATE#<recent> AND DATE#<older>~`, which DynamoDB rejects with a
+    ValidationException; the result is stamped `as_of_date: <requested>` regardless. `start_date` is declared in the
+    registry schema for this tool and is ignored entirely. The window must hang off end_date.
+    """
     t = install(monkeypatch, ENERGY_ROWS)
     th.tool_get_daily_metrics({"view": "energy", "end_date": "2026-03-01"})
     assert all(lo <= hi for _, lo, hi in t.queries), f"inverted query window: {t.queries}"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (#1917, P2, mcp/tools_health.py:591-592 + 640-641 _get_energy_expenditure): the "
-        "windows are `now - 7` / `now - 30` fed to an INCLUSIVE `sk BETWEEN`, so they span 8 and 31 "
-        "dates — but the totals are then divided by the literals 7 and 30 and published as "
-        "`exercise_kcal_7d_daily_avg` / `exercise_kcal_30d_daily_avg`. An 8-day sum over a 7-day "
-        "divisor overstates the daily average by 1/7 (~14%), which flows straight into tdee_7d_avg "
-        "and the calorie target he eats to."
-    ),
-)
 def test_energy_seven_day_window_really_spans_seven_days(monkeypatch):
+    """REGRESSION (was an xfail; fixed in the #1658 burn-down).
+
+    The defect this test was written to report:
+
+    DEFECT (#1917, P2, mcp/tools_health.py:591-592 + 640-641 _get_energy_expenditure): the windows are `now - 7` /
+    `now - 30` fed to an INCLUSIVE `sk BETWEEN`, so they span 8 and 31 dates — but the totals are then divided by the
+    literals 7 and 30 and published as `exercise_kcal_7d_daily_avg` / `exercise_kcal_30d_daily_avg`. An 8-day sum over
+    a 7-day divisor overstates the daily average by 1/7 (~14%), which flows straight into tdee_7d_avg and the calorie
+    target he eats to.
+    """
     t = install(monkeypatch, ENERGY_ROWS)
     th.tool_get_daily_metrics({"view": "energy"})
     windows = [(lo, hi) for s, lo, hi in t.queries if s == "strava"]
@@ -1310,8 +1314,16 @@ def test_hydration_recommendations_name_the_gap_the_miss_rate_and_the_inversion(
     met_target needs >= 2700 -> 0 of 4 met -> 4 deficit days > 4*0.5 -> the miss-rate rec
     exercise days (>20 min) 05-01/05-02 avg 1550 vs rest days 05-03/05-04 avg 2450
       -> drinking LESS on training days -> the inversion rec
+
+    Note the MEASURED rest days: 05-03/05-04 carry a real Strava record showing a
+    10-minute walk. They used to carry no record at all and still counted as rest
+    days, because an unmeasured day was rendered as a factual 0 minutes — the
+    defect ``test_hydration_does_not_report_an_unmeasured_day_as_zero_exercise_minutes``
+    reported. An exercise-vs-rest split is only meaningful over days where
+    exercise was actually measured on both sides.
     """
     acts = [{"moving_time_seconds": 1800, "average_heartrate": 140}]
+    light = [{"moving_time_seconds": 600, "average_heartrate": 95}]
     rows = [
         apple("2026-05-01", water_intake_ml=1500),
         apple("2026-05-02", water_intake_ml=1600),
@@ -1319,6 +1331,8 @@ def test_hydration_recommendations_name_the_gap_the_miss_rate_and_the_inversion(
         apple("2026-05-04", water_intake_ml=2500),
         strava("2026-05-01", activities=acts),
         strava("2026-05-02", activities=acts),
+        strava("2026-05-03", activities=light),
+        strava("2026-05-04", activities=light),
     ]
     install(monkeypatch, rows)
     out = th.tool_get_daily_metrics({"view": "hydration"})
@@ -1330,36 +1344,33 @@ def test_hydration_recommendations_name_the_gap_the_miss_rate_and_the_inversion(
     assert "drinking LESS on training days" in recs
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (ADR-104, P2, mcp/tools_health.py:771 _get_hydration_score): "
-        "`'exercise_min': ex['total_min'] if ex else 0` renders a day with NO Strava record as a "
-        "factual zero minutes of exercise. Ten lines further down that fabricated 0 is used to "
-        "CLASSIFY the day: `rest_days = [r for r in daily_rows if r['exercise_min'] <= 20]`, so "
-        "every unmeasured day is counted as a rest day and the 'you drink LESS on training days' "
-        "recommendation is computed against a rest-day average made mostly of unknowns. Absence "
-        "should be None and excluded from the split."
-    ),
-)
 def test_hydration_does_not_report_an_unmeasured_day_as_zero_exercise_minutes(monkeypatch):
+    """REGRESSION (was an xfail; fixed in the #1658 burn-down).
+
+    The defect this test was written to report:
+
+    DEFECT (ADR-104, P2, mcp/tools_health.py:771 _get_hydration_score): `'exercise_min': ex['total_min'] if ex else 0`
+    renders a day with NO Strava record as a factual zero minutes of exercise. Ten lines further down that fabricated
+    0 is used to CLASSIFY the day: `rest_days = [r for r in daily_rows if r['exercise_min'] <= 20]`, so every
+    unmeasured day is counted as a rest day and the 'you drink LESS on training days' recommendation is computed
+    against a rest-day average made mostly of unknowns. Absence should be None and excluded from the split.
+    """
     install(monkeypatch, HYDRATION_ROWS)
     rows = th.tool_get_daily_metrics({"view": "hydration"})["daily_breakdown"]
     assert all(r["exercise_min"] is None for r in rows)
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (P2, mcp/tools_health.py:791-797 _get_hydration_score): `current_streak_days` walks "
-        "`reversed(daily_rows)`, but daily_rows contains only days that cleared the 500ml floor — "
-        "unlogged days were `continue`d out. The streak therefore jumps calendar gaps: two "
-        "on-target days in April and two in May read as a 4-day streak across a 17-day silence. It "
-        "is also not anchored to today, so a streak that ended weeks ago is still reported as "
-        "'current'. Should break on a missing calendar day and on staleness."
-    ),
-)
 def test_hydration_streak_breaks_across_a_gap_of_unlogged_days(monkeypatch):
+    """REGRESSION (was an xfail; fixed in the #1658 burn-down).
+
+    The defect this test was written to report:
+
+    DEFECT (P2, mcp/tools_health.py:791-797 _get_hydration_score): `current_streak_days` walks `reversed(daily_rows)`,
+    but daily_rows contains only days that cleared the 500ml floor — unlogged days were `continue`d out. The streak
+    therefore jumps calendar gaps: two on-target days in April and two in May read as a 4-day streak across a 17-day
+    silence. It is also not anchored to today, so a streak that ended weeks ago is still reported as 'current'. Should
+    break on a missing calendar day and on staleness.
+    """
     rows = [
         withings(TODAY, weight_lbs=220.0),
         apple("2026-04-20", water_intake_ml=3500),
@@ -1371,18 +1382,16 @@ def test_hydration_streak_breaks_across_a_gap_of_unlogged_days(monkeypatch):
     assert th.tool_get_daily_metrics({"view": "hydration"})["summary"]["current_streak_days"] == 2
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (P3, mcp/tools_health.py:719 + 833 _get_hydration_score): the target is "
-        "`max(2500, weight_kg * 35)` but `basis` is unconditionally the string "
-        "f'35ml/kg x {weight_kg}kg'. When the 2500ml floor wins, the stated basis multiplies out to "
-        "a DIFFERENT number than the target it claims to explain (120 lbs -> 54.4 kg -> 1904 ml, "
-        "reported as the basis for a 2500 ml target). Latent at Matthew's weight; wrong the moment "
-        "it is not."
-    ),
-)
 def test_hydration_basis_states_the_floor_when_the_floor_is_what_set_the_target(monkeypatch):
+    """REGRESSION (was an xfail; fixed in the #1658 burn-down).
+
+    The defect this test was written to report:
+
+    DEFECT (P3, mcp/tools_health.py:719 + 833 _get_hydration_score): the target is `max(2500, weight_kg * 35)` but
+    `basis` is unconditionally the string f'35ml/kg x {weight_kg}kg'. When the 2500ml floor wins, the stated basis
+    multiplies out to a DIFFERENT number than the target it claims to explain (120 lbs -> 54.4 kg -> 1904 ml, reported
+    as the basis for a 2500 ml target). Latent at Matthew's weight; wrong the moment it is not.
+    """
     rows = [withings(TODAY, weight_lbs=120.0), apple("2026-05-01", water_intake_ml=2000)]
     install(monkeypatch, rows)
     target = th.tool_get_daily_metrics({"view": "hydration"})["target"]
@@ -1390,16 +1399,16 @@ def test_hydration_basis_states_the_floor_when_the_floor_is_what_set_the_target(
     assert "2500" in target["basis"]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (P2, mcp/tools_health.py:691-692 _get_hydration_score): same class as the energy "
-        "view — `start_date` defaults to `now - 30` while `end_date` comes from args, so passing "
-        "only `end_date` (a documented registry parameter) yields an inverted `sk BETWEEN` window "
-        "that DynamoDB rejects. Two of the three views behind get_daily_metrics share this bug."
-    ),
-)
 def test_hydration_windows_hang_off_the_requested_end_date(monkeypatch):
+    """REGRESSION (was an xfail; fixed in the #1658 burn-down).
+
+    The defect this test was written to report:
+
+    DEFECT (P2, mcp/tools_health.py:691-692 _get_hydration_score): same class as the energy view — `start_date`
+    defaults to `now - 30` while `end_date` comes from args, so passing only `end_date` (a documented registry
+    parameter) yields an inverted `sk BETWEEN` window that DynamoDB rejects. Two of the three views behind
+    get_daily_metrics share this bug.
+    """
     t = install(monkeypatch, HYDRATION_ROWS)
     th.tool_get_daily_metrics({"view": "hydration", "end_date": "2026-03-01"})
     assert all(lo <= hi for _, lo, hi in t.queries), f"inverted query window: {t.queries}"
