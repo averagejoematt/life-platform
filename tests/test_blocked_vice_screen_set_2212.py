@@ -27,6 +27,11 @@ Structure:
        (_handle_board_question) already had behavioral coverage before this issue —
        tests/test_evidence_catalog.py and tests/test_reader_engagement.py respectively.
        Re-verified by the same neuter/restore process; no new test added for these two.
+  AC3b #2238 added the 12th and 13th sites — the check-in `note` screen at the write
+       door (`_handle_challenge_checkin`) and at the read door (`_screened_note`, reached
+       from `handle_challenges` via `_public_checkins`). Both satisfy AC1 structurally;
+       both are behaviourally mutation-proved in tests/test_site_api_social_behavior.py
+       (which owns this module's handler fixtures), same disposition as AC3.
   AC4  site_api_habits.py:241 (vice_streaks' `latest_vs` map) is structurally guarded
        (AC1) but is a genuine EQUIVALENT MUTANT today: `latest_vs` is only ever used as
        `.get(vice_name, ...)` for `vice_name` drawn from `vice_history` — which line 227
@@ -182,8 +187,18 @@ def _iter_blocked_vice_call_sites():
 def test_blocked_vice_call_sites_derivation_is_non_vacuous():
     """The AST probe must find real call sites today, at exactly the files this
     issue's investigation covers — otherwise AC2 below would pass by finding
-    nothing, which is not a guard at all. The COUNT (11) is the finding this
-    issue exists to correct: the original sweep named 6."""
+    nothing, which is not a guard at all. The COUNT was the finding this issue
+    exists to correct: the original sweep named 6, the derivation found 11.
+
+    Raised 11 -> 13 by #2238, deliberately and with the same bar: that issue added
+    the check-in `note` screen at BOTH ends of the module's only reader-free-text
+    path — `_handle_challenge_checkin` (the write door, rejects) and `_screened_note`
+    (the read door, called from `handle_challenges` via `_public_checkins`, withholds).
+    Both are structurally guarded (AC1 below) and both are behaviourally
+    mutation-proved in tests/test_site_api_social_behavior.py, which owns the
+    handler-level fixtures for this module — the AC3 disposition this file already
+    uses for sites covered elsewhere.
+    """
     sites = _iter_blocked_vice_call_sites()
     found_files = {p.name for (p, _ln) in sites}
     assert found_files == {
@@ -192,8 +207,8 @@ def test_blocked_vice_call_sites_derivation_is_non_vacuous():
         "site_api_social.py",
         "site_api_mind.py",
     }, f"expected _is_blocked_vice call sites in exactly these 4 modules, got {found_files}"
-    assert len(sites) == 11, (
-        f"expected 11 distinct _is_blocked_vice call sites (the issue's sweep found only 6 by hand), "
+    assert len(sites) == 13, (
+        f"expected 13 distinct _is_blocked_vice call sites (11 from #2212 + 2 from #2238), "
         f"got {len(sites)} — a call site was added or removed; update this pin AND give the changed "
         f"site the same mutation-proof treatment as the rest of this file"
     )
