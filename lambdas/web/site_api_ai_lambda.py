@@ -380,62 +380,116 @@ def _ask_rate_check(ip_hash: str, limit: int = 5) -> tuple:
     return True, limit - len(timestamps)
 
 
+def _soft_block(label: str, block) -> None:
+    """Run one context block fail-soft (#2277).
+
+    Every read behind /api/ask is degradable: a throttle on one secondary
+    partition should cost the reader that block, not the whole answer — which is
+    the position `_ask_fetch_computed_reads` already takes ("a missing compute
+    just omits that read; ask still answers from the vitals"). The blocks in
+    `_ask_fetch_context` are registered through this one helper so the property
+    is a property of the read SET, not of two hand-patched call sites.
+
+    MEASURED 2026-08-08 (#2277 named two): FOUR reads here were unguarded, not
+    two — the `character_sheet` get_item and the `habit_scores` query the issue
+    names, plus BOTH `_latest_item` vitals reads (withings, whoop), which are the
+    reads the answer actually leans on. `tests/test_site_api_ai_behavior.py`
+    derives the read set at runtime and fails each read in turn, so a fifth
+    unguarded read cannot ship unnoticed.
+    """
+    try:
+        block()
+    except Exception as e:
+        logger.warning(f"[ask ctx] {label} skipped: {e}")
+
+
 def _ask_fetch_context() -> dict:
-    """Fetch sanitized aggregate data for the AI prompt."""
+    """Fetch sanitized aggregate data for the AI prompt.
+
+    Every read is fail-soft (#2277) — see `_soft_block`. A blip degrades the
+    answer (the missing block is simply absent from the prompt); it never turns
+    into a blanket `500 AI service error` for a question the vitals could have
+    answered.
+    """
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     yesterday_str = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
-    ctx = {}
-    w = _latest_item("withings")
-    if w and w.get("weight_lbs"):
-        ctx["weight_lbs"] = float(w["weight_lbs"])
-    wh = _latest_item("whoop")
-    if wh:
-        if wh.get("hrv"):
-            ctx["hrv_ms"] = float(wh["hrv"])
-        if wh.get("resting_heart_rate"):
-            ctx["rhr_bpm"] = float(wh["resting_heart_rate"])
-        if wh.get("recovery_score"):
-            ctx["recovery_pct"] = float(wh["recovery_score"])
-        if wh.get("sleep_duration_hours"):
-            ctx["sleep_hours"] = float(wh["sleep_duration_hours"])
-    cs_pk = f"{USER_PREFIX}character_sheet"
-    for d in [today_str, yesterday_str]:
-        resp = table.get_item(Key={"pk": cs_pk, "sk": f"DATE#{d}"})
-        rec = _decimal_to_float(resp.get("Item"))
-        if rec:
-            ctx["character_level"] = float(rec.get("character_level", 1))
-            ctx["character_tier"] = rec.get("character_tier", "Foundation")
-            pillars = {}
-            for p in ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]:
-                pd = rec.get(f"pillar_{p}", {})
-                pillars[p] = {
-                    "level": float(pd.get("level", 1)),
-                    "raw_score": float(pd.get("raw_score", 0)),
-                    "tier": pd.get("tier", "Foundation"),
-                }
-            ctx["pillars"] = pillars
-            break
-    hs_pk = f"{USER_PREFIX}habit_scores"
-    hs_resp = table.query(
-        **with_phase_filter(  # ADR-058: hide pilot habit scores
-            {"KeyConditionExpression": Key("pk").eq(hs_pk), "ScanIndexForward": False, "Limit": 1}
+    ctx: dict = {
+        # Pre-seeded so a profile blip leaves the journey framing intact rather
+        # than undefined; the profile block overwrites both on success.
+        "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,
+        "goal_weight": 185,
+    }
+
+    def _withings() -> None:
+        w = _latest_item("withings")
+        if w and w.get("weight_lbs"):
+            ctx["weight_lbs"] = float(w["weight_lbs"])
+
+    def _whoop() -> None:
+        wh = _latest_item("whoop")
+        if not wh:
+            return
+        for src_key, out_key in (
+            ("hrv", "hrv_ms"),
+            ("resting_heart_rate", "rhr_bpm"),
+            ("recovery_score", "recovery_pct"),
+            ("sleep_duration_hours", "sleep_hours"),
+        ):
+            if wh.get(src_key):
+                ctx[out_key] = float(wh[src_key])
+
+    def _character_sheet() -> None:
+        cs_pk = f"{USER_PREFIX}character_sheet"
+        for d in [today_str, yesterday_str]:
+            resp = table.get_item(Key={"pk": cs_pk, "sk": f"DATE#{d}"})
+            rec = _decimal_to_float(resp.get("Item"))
+            if rec:
+                ctx["character_level"] = float(rec.get("character_level", 1))
+                ctx["character_tier"] = rec.get("character_tier", "Foundation")
+                pillars = {}
+                for p in ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]:
+                    pd = rec.get(f"pillar_{p}", {})
+                    pillars[p] = {
+                        "level": float(pd.get("level", 1)),
+                        "raw_score": float(pd.get("raw_score", 0)),
+                        "tier": pd.get("tier", "Foundation"),
+                    }
+                ctx["pillars"] = pillars
+                break
+
+    def _habit_scores() -> None:
+        hs_pk = f"{USER_PREFIX}habit_scores"
+        hs_resp = table.query(
+            **with_phase_filter(  # ADR-058: hide pilot habit scores
+                {"KeyConditionExpression": Key("pk").eq(hs_pk), "ScanIndexForward": False, "Limit": 1}
+            )
         )
-    )
-    hs_items = _decimal_to_float(hs_resp.get("Items", []))
-    if hs_items:
-        ctx["tier0_streak"] = int(hs_items[0].get("t0_perfect_streak", 0) or 0)
-    # Fetch start/goal from profile for dynamic prompt injection
-    try:
+        hs_items = _decimal_to_float(hs_resp.get("Items", []))
+        if hs_items:
+            ctx["tier0_streak"] = int(hs_items[0].get("t0_perfect_streak", 0) or 0)
+
+    def _profile() -> None:
+        # Fetch start/goal from profile for dynamic prompt injection.
         # Canonical profile key — the old {USER_PREFIX}profile/PROFILE item never
         # existed, so this read silently fell back to constants (found 2026-06-12).
         prof_resp = table.get_item(Key={"pk": "USER#matthew", "sk": "PROFILE#v1"})
         prof = _decimal_to_float(prof_resp.get("Item", {}))
         ctx["start_weight"] = float(prof.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))
         ctx["goal_weight"] = float(prof.get("goal_weight_lbs", 185))
-    except Exception:
-        ctx["start_weight"] = EXPERIMENT_BASELINE_WEIGHT_LBS
-        ctx["goal_weight"] = 185
-    ctx["reads"] = _ask_fetch_computed_reads()
+
+    def _computed_reads() -> None:
+        ctx["reads"] = _ask_fetch_computed_reads()
+
+    for _label, _block in (
+        ("withings", _withings),
+        ("whoop", _whoop),
+        ("character_sheet", _character_sheet),
+        ("habit_scores", _habit_scores),
+        ("profile", _profile),
+        ("computed_reads", _computed_reads),
+    ):
+        _soft_block(_label, _block)
+    ctx.setdefault("reads", {})
     return ctx
 
 
@@ -1400,18 +1454,74 @@ def _fetch_surface_json(surface: str):
 
 
 def _shrink_for_prompt(data, cap: int = 9000) -> str:
-    """Deterministically bound the JSON handed to the model: long lists are
-    trimmed (first 12 items) rather than the text being cut mid-token."""
+    """Deterministically bound the JSON handed to the model WITHOUT ever cutting
+    the text mid-token. The return value is always parseable JSON, and every
+    scalar in it is a scalar that exists in `data`.
 
-    def _trim(v):
+    #2276 — MEASURED: the old body trimmed long lists and then did an
+    unconditional `txt[:cap]`, contradicting its own docstring. A payload still
+    over `cap` after trimming was sliced anywhere: a 40-key payload at cap=200
+    came out ending `"value": 1234.567` — unparseable JSON AND a number that
+    exists nowhere in the source. That is not cosmetic. `_handle_explain` derives
+    the ADR-104 grounded-generation allow-list from this string, so the slice's
+    invented `1234.567` entered the gate's vocabulary and the gate *certified* it
+    as grounded. Shrinking now drops whole list elements, then whole top-level
+    entries — never characters.
+    """
+
+    def _trim(v, keep: int):
         if isinstance(v, list):
-            return [_trim(x) for x in v[:12]]
+            return [_trim(x, keep) for x in v[:keep]]
         if isinstance(v, dict):
-            return {k: _trim(x) for k, x in v.items()}
+            return {k: _trim(x, keep) for k, x in v.items()}
         return v
 
-    txt = json.dumps(_trim(data), default=str)
-    return txt[:cap]
+    shrunk = data
+    for keep in (12, 8, 4, 2, 1, 0):
+        shrunk = _trim(data, keep)
+        txt = json.dumps(shrunk, default=str)
+        if len(txt) <= cap:
+            return txt
+
+    # Still over cap with every list emptied: drop whole top-level entries, in
+    # order, until what remains fits. `json.dumps({k: v})[1:-1]` is the exact
+    # rendered width of one entry under the default separators, so the budget is
+    # measured rather than guessed — no trailing slice is ever needed.
+    if isinstance(shrunk, dict):
+        kept: dict = {}
+        size = 2  # "{}"
+        for k, v in shrunk.items():
+            entry = len(json.dumps({k: v}, default=str)) - 2
+            add = entry + (2 if kept else 0)  # ", " separator
+            if size + add > cap:
+                break
+            kept[k] = v
+            size += add
+        return json.dumps(kept, default=str)
+    # A single oversized scalar: refuse it whole rather than hand the model half
+    # of it. `null` is honest; a half-number is not.
+    return json.dumps(None)
+
+
+def _grounding_allow_lists(gg, payload, prompt_txt: str, day_ctx: str):
+    """Build the ADR-104 gate's vocabulary as a subset of the SOURCE data (#2276).
+
+    The allow-lists used to be derived from `prompt_txt` alone — the same string
+    `_shrink_for_prompt` had just bounded. Any corruption of that string silently
+    ENLARGED the gate's vocabulary, so the gate could vouch for a figure that
+    appears nowhere in the fetched JSON: exactly inverting its purpose.
+
+    Intersecting the prompt-derived set with the source-derived one makes the
+    invariant structural rather than a consequence of the truncator being
+    correct: `allowed ⊆ numbers(payload) ∪ numbers(day_ctx)` holds however
+    `prompt_txt` was produced. The intersection (rather than the union) is
+    deliberate — a number dropped from the prompt is one the model never saw, so
+    citing it is a hallucination even though the source contains it.
+    """
+    return (
+        gg.allowed_numbers(prompt_txt, day_ctx) & gg.allowed_numbers(payload, day_ctx),
+        gg.allowed_dates(prompt_txt, day_ctx) & gg.allowed_dates(payload, day_ctx),
+    )
 
 
 _EXPLAIN_SYSTEM = (
@@ -1501,9 +1611,10 @@ def _handle_explain(event: dict) -> dict:
             from ai import grounded_generation as _gg
             from ai.grounding_gate_params import cycle_gate_params  # #1967
 
-            _allowed = _gg.allowed_numbers(payload_txt, day_ctx)
+            # #2276: both allow-lists are intersected with the SOURCE payload, so a
+            # truncation of `payload_txt` can never enlarge the gate's vocabulary.
             # #1967: date allow-list from the SAME fetched JSON, plus the cycle anchors.
-            _allowed_dates = _gg.allowed_dates(payload_txt, day_ctx)
+            _allowed, _allowed_dates = _grounding_allow_lists(_gg, payload, payload_txt, day_ctx)
             if _gg.grounding_findings(explanation, allowed=_allowed, allowed_dates=_allowed_dates, **cycle_gate_params()):
                 logger.warning(f"[explain] ungrounded numbers for {surface} — refusing")
                 explanation = (

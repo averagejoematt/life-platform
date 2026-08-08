@@ -5,10 +5,12 @@ The AI endpoints a reader actually touches: /api/ask, /api/board_ask (+ its
 about what a READER (or Matthew) gets, and driven offline against the shared
 FakeDdbTable + a stubbed Bedrock — no AWS calls, no model spend.
 
-Where a test asserts the code is WRONG it is marked xfail(strict=False) with
-the file:line, the actual behaviour, the intended behaviour, and the reader
-consequence. Per the tranche contract this tranche REPORTS defects, it never
-fixes them.
+Per the tranche contract this tranche REPORTED defects rather than fixing them,
+marking each one xfail(strict=False). Both of this file's xfails have since been
+fixed and flipped to real assertions (#2276 the grounding gate vs. a
+truncation-corrupted number, #2277 fail-soft over the /api/ask read set) — there
+are no xfails left here, and a new one belongs in a follow-up issue, not a
+silent re-mark.
 """
 
 import base64
@@ -540,7 +542,11 @@ def test_trimming_reaches_nested_lists_too():
 def test_the_prompt_payload_is_hard_capped_so_one_page_cannot_blow_the_budget():
     ai = _ai()
     out = ai._shrink_for_prompt({"k%d" % i: "x" * 100 for i in range(500)}, cap=500)
-    assert len(out) == 500
+    # `<= cap`, not `== cap`: #2276 replaced the character slice that made the
+    # length exact with whole-entry dropping, so the budget is respected without
+    # the last entry ever being cut in half. Still within one entry of the cap.
+    assert 400 < len(out) <= 500
+    assert json.loads(out)  # and it is still valid JSON
 
 
 def test_the_public_json_envelope_is_unwrapped_before_the_model_sees_it(monkeypatch):
@@ -826,23 +832,9 @@ def test_a_missing_profile_row_falls_back_to_the_sealed_baseline_weight(monkeypa
     assert ctx["goal_weight"] == 185
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT — lambdas/web/site_api_ai_lambda.py:400-411. The character_sheet get_item "
-        "and the habit_scores query inside _ask_fetch_context are the ONLY reads in that "
-        "function with no try/except: the profile read (413-421) and every block of "
-        "_ask_fetch_computed_reads are explicitly fail-soft ('a missing compute just omits "
-        "that read; ask still answers from the vitals'). ACTUAL: a throttle or blip on "
-        "either single partition raises, propagates to _handle_ask's outer except (1340) "
-        "and returns a blanket 500 'AI service error'. SHOULD: degrade like every "
-        "neighbouring read — omit character_level/pillars/tier0_streak and answer from the "
-        "vitals it already fetched. CONSEQUENCE: a reader asking 'how is Matthew sleeping?' "
-        "gets a hard error instead of the answer, because an unrelated gamification "
-        "partition blipped."
-    ),
-)
 def test_a_blip_on_the_character_sheet_still_lets_the_reader_get_an_answer(monkeypatch):
+    """#2277 — a throttle on the gamification partition costs the reader the
+    character block, not the answer."""
     ai = _ai()
     monkeypatch.setattr(ai, "_latest_item", lambda s: {"weight_lbs": 314.2} if s == "withings" else None)
     monkeypatch.setattr(ai, "_ask_fetch_computed_reads", lambda: {})
@@ -856,29 +848,149 @@ def test_a_blip_on_the_character_sheet_still_lets_the_reader_get_an_answer(monke
     monkeypatch.setattr(ai, "table", _SheetDown(rows=[]))
     ctx = ai._ask_fetch_context()
     assert ctx["weight_lbs"] == 314.2, "the vitals were already read — they must still reach the prompt"
+    assert "character_level" not in ctx, "the blipped block is omitted, not faked"
+    assert ctx["start_weight"] == ai.EXPERIMENT_BASELINE_WEIGHT_LBS
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT — lambdas/web/site_api_ai_lambda.py:1402-1414 (_shrink_for_prompt). Its "
-        "docstring promises the JSON is bounded by trimming long lists 'rather than the "
-        "text being cut mid-token', but the final statement is an unconditional "
-        "`return txt[:cap]`. ACTUAL: when the trimmed payload still exceeds `cap` the "
-        "string is sliced mid-number — 1234.5678 arrives at the model as 1234.567 — and "
-        "the result is not even parseable JSON. SHOULD: drop whole keys/objects until the "
-        "payload fits, so every number the model sees is a number that exists. "
-        "CONSEQUENCE: /api/explain can narrate a silently WRONG figure to a reader, and "
-        "the ADR-104 grounding gate cannot catch it because it derives its allowed-number "
-        "list from the SAME truncated string (1466-1470) — so the wrong number is stamped "
-        "'grounded'."
-    ),
-)
+class _NthReadRaises(FakeDdbTable):
+    """A table that answers normally until read #`fail_at`, then throttles."""
+
+    def __init__(self, fail_at=None, **kw):
+        super().__init__(**kw)
+        self.fail_at = fail_at
+        self.reads = 0
+
+    def _tick(self):
+        n = self.reads
+        self.reads += 1
+        if self.fail_at is not None and n == self.fail_at:
+            raise RuntimeError(f"ProvisionedThroughputExceededException (read #{n})")
+
+    def get_item(self, Key=None, **kw):
+        self._tick()
+        return super().get_item(Key=Key, **kw)
+
+    def query(self, **kw):
+        self._tick()
+        return super().query(**kw)
+
+
+def test_no_single_ddb_read_behind_ask_can_turn_into_a_blanket_500(monkeypatch):
+    """#2277, the property — DERIVED over the read set rather than asserted about
+    two named call sites.
+
+    The read set is counted at runtime from a healthy build, then every read in
+    it is failed in turn. A fifth unguarded read added later fails this without
+    anyone remembering to extend a list.
+
+    MEASURED 2026-08-08: the issue said the character_sheet get_item and the
+    habit_scores query were "the only unguarded ones". They were not — both
+    `_latest_item` vitals reads (withings, whoop) were unguarded too, i.e. FOUR,
+    and the vitals are the reads the answer actually leans on. Before the fix
+    this loop failed on read #0.
+    """
+    ai = _ai()
+    rows = [{"weight_lbs": 314.2, "recovery_score": 64, "t0_perfect_streak": 9}]
+
+    healthy = _NthReadRaises(rows=rows)
+    monkeypatch.setattr(ai, "table", healthy)
+    baseline = ai._ask_fetch_context()
+    n_reads = healthy.reads
+    assert n_reads >= 5, f"expected the ask context builder to touch several partitions, saw {n_reads}"
+    assert baseline["weight_lbs"] == 314.2
+
+    for k in range(n_reads):
+        tbl = _NthReadRaises(fail_at=k, rows=rows)
+        monkeypatch.setattr(ai, "table", tbl)
+        ctx = ai._ask_fetch_context()  # must not raise — that is the whole property
+        assert isinstance(ctx, dict), f"read #{k} failing must still yield a context dict"
+        # The journey framing is never left undefined, whichever read blipped.
+        assert ctx["start_weight"] == ai.EXPERIMENT_BASELINE_WEIGHT_LBS or ctx["start_weight"] > 0
+        assert ctx["goal_weight"] == 185
+        assert isinstance(ctx.get("reads"), dict)
+
+
 def test_a_payload_too_big_to_trim_is_never_cut_through_the_middle_of_a_number():
+    """#2276 — shrinking drops whole entries, never characters."""
     ai = _ai()
     out = ai._shrink_for_prompt({"m%02d" % i: {"value": 1234.5678} for i in range(40)}, cap=200)
     json.loads(out)  # a mid-token cut leaves unparseable JSON
     assert "1234.567}" not in out and not out.rstrip().endswith("1234.567")
+    assert len(out) <= 200
+
+
+def test_every_number_the_model_is_shown_is_a_number_the_source_actually_holds():
+    """#2276, the general form — over several shapes and caps, the shrunk prompt
+    is parseable JSON whose numbers are a SUBSET of the source's numbers. The old
+    `txt[:cap]` manufactured numbers (1234.5678 → 1234.567) that were in neither."""
+    ai = _ai()
+    from ai import grounded_generation as gg
+
+    shapes = [
+        {"m%02d" % i: {"value": 1234.5678} for i in range(40)},
+        {"series": [{"d": "2026-08-0%d" % (i % 9 + 1), "v": 98765.4321} for i in range(200)]},
+        {"one_huge_key": {"nested": {"deep": 55555.9999}}, "b": 12.5},
+        [{"v": 314.15926} for _ in range(120)],
+    ]
+    for shape in shapes:
+        for cap in (40, 120, 200, 900):
+            out = ai._shrink_for_prompt(shape, cap=cap)
+            parsed = json.loads(out)  # never a mid-token cut
+            assert len(out) <= cap or parsed in ({}, None, []), f"{cap=} {out=}"
+            manufactured = gg.allowed_numbers(out) - gg.allowed_numbers(shape)
+            assert not manufactured, f"shrinking invented {sorted(manufactured)} at {cap=} for {type(shape).__name__}"
+
+
+def test_the_grounding_gate_cannot_certify_a_figure_the_prompt_string_corrupted():
+    """#2276, the property that matters — independent of HOW truncation is done.
+
+    Even handed a prompt string that was cut mid-number by something else, the
+    gate's allow-list stays a subset of the SOURCE data's numbers, so the
+    corrupted figure is flagged as ungrounded instead of certified.
+    """
+    ai = _ai()
+    from ai import grounded_generation as gg
+
+    payload = {"total_steps": 9876543, "weight_lbs": 314.2}
+    day_ctx = "Experiment day 6 (restarted 2026-08-03) — a young record is short by design."
+    # A prompt string cut mid-number, as the old `txt[:cap]` produced.
+    corrupted_txt = '{"total_steps": 98765'
+
+    naive = gg.allowed_numbers(corrupted_txt, day_ctx)
+    assert 98765 in naive, "precondition: the corrupted figure IS present in the truncated string"
+    assert not gg.fabricated_numbers(
+        "Matthew walked 98765 steps.", naive
+    ), "precondition: deriving the allow-list from the prompt string alone CERTIFIES the corrupted figure"
+
+    allowed, allowed_dates = ai._grounding_allow_lists(gg, payload, corrupted_txt, day_ctx)
+    assert allowed <= gg.allowed_numbers(payload, day_ctx), "allow-list must be a subset of the source's numbers"
+    assert 98765 not in allowed
+    assert gg.fabricated_numbers("Matthew walked 98765 steps.", allowed) == [98765.0]
+    # The real figure, and the day/date context, stay narratable.
+    assert 314.2 in ai._grounding_allow_lists(gg, payload, json.dumps(payload), day_ctx)[0]
+    assert "2026-08-03" in allowed_dates
+
+
+def test_explain_refuses_a_corrupted_figure_even_when_the_prompt_string_contains_it(monkeypatch):
+    """#2276 end-to-end — the wiring, not just the helper.
+
+    `_handle_explain` must build its allow-list from the SOURCE payload. With the
+    prompt string corrupted by (a stand-in for) truncation, the reader gets the
+    refusal, not a confidently-narrated wrong number.
+    """
+    ai = _ai()
+    payload = {"total_steps": 9876543}
+    _wire_explain(ai, monkeypatch, payload=payload)
+    # Stand in for any corruption of the prompt string — that is the point: the
+    # gate must hold however `payload_txt` was produced.
+    monkeypatch.setattr(ai, "_shrink_for_prompt", lambda d, cap=9000: '{"total_steps": 98765')
+    _wire_bedrock(monkeypatch, text="Matthew walked 98765 steps this week.")
+
+    resp = ai._handle_explain(_event("/api/explain", body={"surface": "what_changed"}))
+    assert resp["statusCode"] == 200
+    explanation = json.loads(resp["body"])["explanation"]
+    assert "rather not narrate numbers" in explanation, f"the corrupted figure was certified: {explanation!r}"
+    assert "98765" not in explanation
 
 
 def test_the_tier_zero_streak_reaches_the_prompt_when_habit_scores_exist(monkeypatch):
