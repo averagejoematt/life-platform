@@ -118,6 +118,7 @@
       "ingest_pattern": "file_transport",
       "behavioral": true,
       "paused": false,
+      "raw_scheme": "date-tree",
       "device": {
         "product": "MacroFactor (nutrition app)",
         "vendor": "MacroFactor",

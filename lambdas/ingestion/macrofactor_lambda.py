@@ -17,6 +17,7 @@ import csv
 import io
 import json
 import logging
+import math
 import os
 from collections import OrderedDict, defaultdict
 from collections.abc import Callable
@@ -131,29 +132,62 @@ except ImportError:
 # #970 KEPT (deliberate): CSV-value coercion contract (val) with string sanitation
 # ("-", "N/A", thousands commas), not digest_utils' record-field contract.
 def safe_float(val):
+    """A CSV cell → float, or None when the cell holds no usable number.
+
+    The export is HAND-UPLOADED, so every cell is untrusted input and this is the
+    single coercion chokepoint for the whole module (safe_int and every nutrient
+    total route through it). Non-finite literals are absence, not numbers:
+    'nan'/'inf' are what a pandas/spreadsheet round-trip writes for an empty cell,
+    `float()` accepts them silently, and a NaN then poisons the day total —
+    `common.numeric.floats_to_decimal` maps the non-finite result to None (#1207),
+    so ONE 'nan' cell stores a real logged day with total_calories_kcal = None.
+    """
     if val is None:
         return None
     s = str(val).strip()
     if s in ("", "-", "N/A", "n/a"):
         return None
     try:
-        return float(s.replace(",", ""))
+        parsed = float(s.replace(",", ""))
     except ValueError:
         return None
+    return parsed if math.isfinite(parsed) else None
+
+
+_DATE_FORMATS = ("%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y")
+
+
+def normalize_date(raw):
+    """A CSV date cell → ISO `YYYY-MM-DD`, or None when no known format matches.
+
+    ONE date contract for all three export formats. Before this existed the three
+    parsers disagreed on the same cell: the diary dropped an unparseable date, the
+    workout loop fell through and used it VERBATIM as the partition key
+    (sk='DATE#April 4, 2026' — the TD-19 mis-partition class), and the summary
+    parser only checked that positions 4 and 7 held dashes, so it accepted both a
+    trailing time component ('2026-08-05 00:00:00' — the usual XLSX round-trip
+    form) and an impossible month ('13/04/2026' → '2026-13-04'). A row keyed on
+    any of those is invisible to every `DATE#`-keyed reader.
+
+    A time component is stripped rather than rejected: the day is unambiguous, so
+    dropping the row would lose real logged data.
+    """
+    s = str(raw or "").strip()
+    if not s:
+        return None
+    stem = s.split("T", 1)[0].split(" ", 1)[0]
+    for fmt in _DATE_FORMATS:
+        try:
+            return datetime.strptime(stem, fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    return None
 
 
 def parse_entry(row):
-    date_str = row.get("Date", "").strip()
+    date_str = normalize_date(row.get("Date"))
     food_name = row.get("Food Name", "").strip()
     if not date_str or not food_name:
-        return None
-    for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y"):
-        try:
-            date_str = datetime.strptime(date_str, fmt).strftime("%Y-%m-%d")
-            break
-        except ValueError:
-            continue
-    else:
         return None
 
     nutrients = {COL_TO_FIELD[col]: safe_float(row.get(col)) for col in COL_TO_FIELD if safe_float(row.get(col)) is not None}
@@ -305,7 +339,13 @@ def build_day_items(rows):
     ingested_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     day_items = {}
     for date_str, data in days.items():
-        totals_prefixed = {f"total_{k}": round(v, 2) for k, v in data["totals"].items() if v != 0}
+        # ADR-104: a key exists in `totals` ONLY if some entry logged that nutrient
+        # (the accumulator above skips None), so absence is already absent and no
+        # value filter is needed. The old `if v != 0` filter dropped a genuinely
+        # logged zero — 0 g alcohol, 0 g added sugar — leaving readers unable to
+        # tell "logged none" from "never tracked": the exact inversion of the rule
+        # it was reaching for.
+        totals_prefixed = {f"total_{k}": round(v, 2) for k, v in data["totals"].items()}
         food_log = sorted(data["entries"], key=lambda e: e.get("time") or "00:00")
         # ── Protein distribution (Phase 1d) ──
         pds_score, pds_above, pds_total, pds_snacks = compute_protein_distribution(food_log)
@@ -339,35 +379,52 @@ def build_day_items(rows):
 
 
 def safe_int(val):
+    # int() is safe here only because safe_float rejects non-finite values —
+    # int(float('nan')) raises ValueError, so a 'nan' Reps/RIR cell used to
+    # abort the workout ingest from three call sites at once.
     v = safe_float(val)
     return int(v) if v is not None else None
 
 
 def parse_duration_min(val):
-    """Parse MacroFactor workout duration string → float minutes."""
-    if not val or not str(val).strip():
+    """Parse a MacroFactor workout duration cell → float minutes, or None.
+
+    Unparseable degrades to absence, NEVER to an exception. Only the final bare-
+    number coercion used to be guarded, so a cell that merely CONTAINED an 'h'/'m'
+    or a ':' took an unguarded path: '45 mins' became float('45 ins') and '1:ab'
+    became int('ab'). Either raised ValueError out of build_workout_day_items and
+    aborted the whole upload — one malformed cell losing every other workout in
+    the file.
+    """
+    if val is None:
         return None
     s = str(val).strip()
-    if "h" in s or "m" in s:
-        hours = minutes = 0
-        if "h" in s:
-            h_part = s.split("h")[0].strip()
-            hours = float(h_part) if h_part else 0
-            s = s.split("h")[1]
-        if "m" in s:
-            m_part = s.replace("m", "").strip()
-            minutes = float(m_part) if m_part else 0
-        return round(hours * 60 + minutes, 1)
-    if ":" in s:
-        parts = s.split(":")
-        if len(parts) == 3:
-            return round(int(parts[0]) * 60 + int(parts[1]) + int(parts[2]) / 60, 1)
-        if len(parts) == 2:
-            return round(int(parts[0]) + int(parts[1]) / 60, 1)
-    try:
-        return round(float(s), 1)
-    except ValueError:
+    if not s:
         return None
+    try:
+        if "h" in s or "m" in s:
+            hours = minutes = 0.0
+            rest = s
+            if "h" in rest:
+                h_part, rest = rest.split("h", 1)
+                hours = float(h_part.strip()) if h_part.strip() else 0.0
+            if "m" in rest:
+                m_part = rest.replace("m", "").strip()
+                minutes = float(m_part) if m_part else 0.0
+            total = hours * 60 + minutes
+        elif ":" in s:
+            parts = s.split(":")
+            if len(parts) == 3:
+                total = int(parts[0]) * 60 + int(parts[1]) + int(parts[2]) / 60
+            elif len(parts) == 2:
+                total = int(parts[0]) + int(parts[1]) / 60
+            else:
+                return None
+        else:
+            total = float(s)
+    except (ValueError, TypeError):
+        return None
+    return round(total, 1) if math.isfinite(total) else None
 
 
 def build_workout_day_items(rows):
@@ -377,16 +434,19 @@ def build_workout_day_items(rows):
         return {}
 
     workout_sets = defaultdict(list)
+    skipped_dates = 0
     for row in rows:
-        date_str = row["Date"].strip()
-        for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y"):
-            try:
-                date_str = datetime.strptime(date_str, fmt).strftime("%Y-%m-%d")
-                break
-            except ValueError:
-                continue
+        date_str = normalize_date(row["Date"])
+        if date_str is None:
+            # A date this parser cannot read must NEVER become the partition key:
+            # the old loop had no `else`, so it wrote sk='DATE#April 4, 2026' — a
+            # row no DATE#-keyed reader can ever see (the TD-19 class).
+            skipped_dates += 1
+            continue
         key = (date_str, row.get("Workout", "").strip(), row.get("Workout Duration", "").strip())
         workout_sets[key].append(row)
+    if skipped_dates:
+        print(f"Skipped {skipped_dates} workout rows with an unreadable Date.")
 
     day_workouts = defaultdict(list)
     for (date_str, workout_name, duration_raw), set_rows in workout_sets.items():
@@ -509,20 +569,16 @@ def build_summary_day_items(rows):
                 date_str = d.strftime("%Y-%m-%d")
         except (ValueError, TypeError):
             pass
-        # Normalize MM/DD/YYYY if MacroFactor decides to export human-readable
-        if "/" in date_str:
-            try:
-                parts = date_str.split("/")
-                if len(parts) == 3:
-                    m, d, y = parts
-                    date_str = f"{int(y):04d}-{int(m):02d}-{int(d):02d}"
-            except (ValueError, IndexError):
-                skipped += 1
-                continue
-        # Final sanity: must look like YYYY-MM-DD
-        if len(date_str) < 10 or date_str[4] != "-" or date_str[7] != "-":
+        # One date contract with the diary + workout parsers (normalize_date):
+        # slash forms, a trailing time component, and a real calendar check. The
+        # old inline handling built the ISO string with int() casts and then only
+        # asserted "length >= 10 with dashes at 4 and 7", so '2026-08-05 00:00:00'
+        # and '13/04/2026' -> '2026-13-04' both passed straight into the sort key.
+        iso_date = normalize_date(date_str)
+        if iso_date is None:
             skipped += 1
             continue
+        date_str = iso_date
 
         cal = safe_float(row.get("Calories (kcal)"))
         prot = safe_float(row.get("Protein (g)"))

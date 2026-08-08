@@ -390,7 +390,48 @@ SOURCE_REGISTRY = {
         "method": "Manual CSV export via Dropbox poller, ~24h behind by design",
         "metrics": "Calories, macros, meals",
         "posture": "load-bearing",
-        "raw_layout": None,  # CSVs land via the dropbox transport, not a raw/ archive
+        # The facet said None ("CSVs land via the dropbox transport, not a raw/
+        # archive") while macrofactor_lambda.archive_raw() has written a raw/ copy of
+        # EVERY upload since 2026-02 — verified 2026-08-08: 48 objects under this
+        # prefix. X-9's contract is that replay tooling READS the layout instead of
+        # guessing, and a facet that denies a live archive is worse than a wrong one.
+        # Documented, never moved (raw/* is delete-protected, ADR-046).
+        "raw_layout": {
+            "prefix": "raw/matthew/macrofactor",
+            "scheme": "date-tree",
+            "filename": "<uploaded-filename>.csv",
+            # No per-day key exists: the YYYY/MM partition is the INGEST month (the
+            # archive is stamped at upload time, not from the CSV's dates — one file
+            # carries many days), and the leaf keeps whatever MacroFactor named the
+            # export. raw_date_key() therefore raises on this source by design.
+            "note": "ingest-month tree, uploaded filename as the leaf — one CSV holds many days, so there is no per-day key",
+            # Each detected CSV format archives under its own subfolder (the nutrition
+            # diary at the root). `unknown` is the #469 forensic path.
+            "sub_layouts": {
+                "workouts": {
+                    "prefix": "raw/matthew/macrofactor/workouts",
+                    "scheme": "date-tree",
+                    "filename": "<uploaded-filename>.csv",
+                },
+                "daily_summary": {
+                    "prefix": "raw/matthew/macrofactor/daily_summary",
+                    "scheme": "date-tree",
+                    "filename": "<uploaded-filename>.csv",
+                },
+                "unknown": {
+                    "prefix": "raw/matthew/macrofactor/unknown",
+                    "scheme": "date-tree",
+                    "filename": "<uploaded-filename>.csv",
+                    "note": "#469 forensic archive for an unrecognised export format, written just before the handler raises",
+                },
+                "exports": {
+                    "prefix": "raw/matthew/macrofactor/exports",
+                    "scheme": "date-tree",
+                    "filename": "<uploaded-filename>.csv",
+                    "note": "historical — written by the 2026-02 one-off backfill, not by the current lambda",
+                },
+            },
+        },
         # #914: the PRIMARY presence anchor — the daily-expected manual channel and
         # the first, most reliable thing to stop when routine breaks.
         "engagement_channel": {"label": "food", "stale_days": 2, "primary": True},
