@@ -525,19 +525,6 @@ def test_whr_duplicate_date_records_inflate_the_window():
     assert hb._compute_weekly_habit_review(recs, _profile())["days"] == 3
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "lambdas/content/html_builder.py:135 _compute_weekly_habit_review — "
-        "`t0_pct = float(raw_pct) if raw_pct is not None else (t0_done / t0_total if t0_total else 0)`. "
-        "A day with zero applicable tier-0 habits (every T0 habit scoped `applicable_days: weekdays` "
-        "on a weekend; store_habit_scores strips tier0_pct because `t0.get('total')` is falsy) is "
-        "folded into the weekly mean as a hard 0.0. Should be EXCLUDED from the mean with n reported "
-        "(ADR-104/105) — the same function already gets this right for `perfect` on line 137 "
-        "(`(t0_total > 0) and ...`). Hurts Matthew: a week whose only measured day was 4/4 is "
-        "reported as '50% T0 — Needs attention' in Sunday's brief."
-    ),
-)
 def test_whr_a_day_with_no_applicable_tier0_habits_must_not_count_as_zero_percent():
     recs = [
         _hs("2026-06-09", 4, 4, "1.0"),  # measured: perfect
@@ -548,19 +535,6 @@ def test_whr_a_day_with_no_applicable_tier0_habits_must_not_count_as_zero_percen
     assert whr["avg_t0_pct"] == 1.0
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "lambdas/content/html_builder.py:165-172 _compute_weekly_habit_review — "
-        "`days_done = days - days_missed` treats 'not in missed_tier0' as 'done'. A tier-0 habit that "
-        "was NOT APPLICABLE on a day (weekday-only habit on a weekend, post_training habit with no "
-        "workout) never enters tier_status[0] in scoring_engine.score_habits_registry, so it never "
-        "enters missed_tier0 either — and is silently credited. Should count only the days the habit "
-        "was actually evaluated, with that n as the denominator (ADR-105). Hurts Matthew: a habit he "
-        "missed every single day it applied is reported at 4/7 in Sunday's Weekly Habit Review. "
-        "The fix likely needs store_habit_scores to persist the applicable set, not just the misses."
-    ),
-)
 def test_whr_a_habit_that_was_never_applicable_must_not_be_credited_as_done():
     reg = {"Weekday lift": {"tier": 0, "status": "active"}}
     recs = [
@@ -684,18 +658,6 @@ def test_render_whr_long_habit_name_is_truncated_at_32_chars():
     assert "A" * 33 not in html
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "lambdas/content/html_builder.py:216 (and 227/271/298-299/322) _render_weekly_habit_review — "
-        "percentages use `int(pct * 100)`, which TRUNCATES. `_compute_weekly_habit_review` line 135 "
-        "converts the stored Decimal to a float, so 0.29 * 100 == 28.999999999999996 in IEEE-754 and "
-        "the header renders '28% T0' for a 29% week (same for the per-habit rows, the perfect-day "
-        "percentage, the synergy chips and the tier-1 line). Should be `round(pct * 100)`. Hurts "
-        "Matthew: every percentage in Sunday's Weekly Habit Review is systematically biased low, "
-        "by a full point wherever the float lands just under."
-    ),
-)
 def test_render_whr_percentages_round_rather_than_truncate():
     # two measured days at 28% and 30% -> mean exactly 0.29
     recs = [_hs("2026-06-09", 28, 100, "0.28"), _hs("2026-06-10", 30, 100, "0.30")]
@@ -705,17 +667,6 @@ def test_render_whr_percentages_round_rather_than_truncate():
     assert '>29<span style="font-size:14px;">%</span> T0' in html
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "lambdas/content/html_builder.py:275/278 _render_weekly_habit_review — habit names are "
-        "interpolated into the row markup with no escaping, and the 32-char truncation can also slice "
-        "a multi-byte name mid-entity. Habit names come from `profile['habit_registry']` (config, "
-        "S3-hosted), so this is not attacker-controlled today — but an ampersand or an angle bracket "
-        "in a habit name silently corrupts the section for the one reader. Should escape via "
-        "html.escape before interpolation. Same class as the AI-narrative sites in §12."
-    ),
-)
 def test_render_whr_escapes_habit_names():
     html = hb._render_weekly_habit_review(_whr(t0_habits=[{"name": "Fish oil & <b>D3</b>", "days_done": 1, "days_total": 2, "pct": 0.5}]))
     assert "<b>D3</b>" not in html

@@ -35,6 +35,8 @@ except ImportError:
 
 from common.digest_utils import safe_float  # shared bundled helpers (#970; the local d2f copy was unused)
 
+from content.brief_format import esc, pct_int
+
 
 def avg(vals):
     """Return the mean of non-None values rounded to 1 decimal, or None if empty."""
@@ -132,7 +134,16 @@ def _compute_weekly_habit_review(habit_7d_records, profile):
         t0_done = int(rec.get("tier0_done", 0))
         t0_total = int(rec.get("tier0_total", 0))
         raw_pct = rec.get("tier0_pct")
-        t0_pct = float(raw_pct) if raw_pct is not None else (t0_done / t0_total if t0_total else 0)
+        # ADR-104: a day on which NO tier-0 habit was applicable (every T0 habit scoped
+        # `applicable_days: weekdays` on a weekend, say) carries no tier0_pct at all —
+        # store_habit_scores strips the key because `t0["total"]` is falsy. That is an
+        # unmeasured day, not a 0% day, and folding it in as 0.0 halves an honest week.
+        if raw_pct is not None:
+            t0_pct = float(raw_pct)
+        elif t0_total:
+            t0_pct = t0_done / t0_total
+        else:
+            t0_pct = None
         missed = rec.get("missed_tier0") or []
         perfect = (t0_total > 0) and (t0_done == t0_total)
         date_str = rec.get("date", rec.get("sk", "").replace("DATE#", ""))
@@ -141,9 +152,14 @@ def _compute_weekly_habit_review(habit_7d_records, profile):
                 "date": date_str,
                 "t0_done": t0_done,
                 "t0_total": t0_total,
-                "t0_pct": round(t0_pct, 3),
+                "t0_pct": round(t0_pct, 3) if t0_pct is not None else None,
                 "perfect": perfect,
                 "missed": missed,
+                # The habits actually evaluated that day. `tier0_applicable` is written by
+                # store_habit_scores; older rows have only the count, so fall back to
+                # "the day evaluated something" (tier0_total > 0).
+                "applicable": list(rec.get("tier0_applicable") or []),
+                "measured": bool(t0_total),
             }
         )
         for h in missed:
@@ -154,21 +170,28 @@ def _compute_weekly_habit_review(habit_7d_records, profile):
         return None
 
     perfect_days = sum(1 for d in daily if d["perfect"])
-    avg_t0_raw = [d["t0_pct"] for d in daily]
-    avg_t0_pct = round(sum(avg_t0_raw) / len(avg_t0_raw), 3) if avg_t0_raw else 0
+    # n is the number of MEASURED days; unmeasured days are excluded, not zeroed (ADR-105).
+    avg_t0_raw = [d["t0_pct"] for d in daily if d["t0_pct"] is not None]
+    avg_t0_pct = round(sum(avg_t0_raw) / len(avg_t0_raw), 3) if avg_t0_raw else None
+    measured_days = len(avg_t0_raw)
 
-    # Per T0 habit breakdown
+    # Per T0 habit breakdown — the denominator is the number of days the habit was
+    # actually evaluated, never the window length. scoring_engine.score_habits_registry
+    # `continue`s past a habit that was not applicable, so it never reaches tier_status[0]
+    # and never reaches missed_tier0 either; crediting that absence as "done" reported a
+    # habit missed every day it applied at 4/7.
     t0_habits = []
     for name, meta in registry.items():
         if meta.get("status") == "active" and meta.get("tier", 2) == 0:
-            days_missed = all_missed.get(name, 0)
-            days_done = days - days_missed
+            applied = [d for d in daily if (name in d["applicable"] if d["applicable"] else d["measured"])]
+            days_total = len(applied)
+            days_done = sum(1 for d in applied if name not in d["missed"])
             t0_habits.append(
                 {
                     "name": name,
                     "days_done": days_done,
-                    "days_total": days,
-                    "pct": round(days_done / days, 3) if days else 0,
+                    "days_total": days_total,
+                    "pct": round(days_done / days_total, 3) if days_total else 0,
                 }
             )
     t0_habits.sort(key=lambda x: -x["pct"])  # best first
@@ -187,6 +210,7 @@ def _compute_weekly_habit_review(habit_7d_records, profile):
 
     return {
         "days": days,
+        "measured_days": measured_days,  # ADR-105: the n behind avg_t0_pct
         "daily": daily,
         "perfect_days": perfect_days,
         "avg_t0_pct": avg_t0_pct,
@@ -207,32 +231,48 @@ def _render_weekly_habit_review(whr):
     days = whr.get("days", 7)
     perfect = whr.get("perfect_days", 0)
     avg_t0 = whr.get("avg_t0_pct", 0)
+    measured_days = whr.get("measured_days")
     t0_habits = whr.get("t0_habits", [])
     avg_t1 = whr.get("avg_t1_pct")
     synergy = whr.get("synergy", {})
     daily = whr.get("daily", [])
 
-    # Overall completion colour
-    t0_pct_int = int(avg_t0 * 100)
-    if t0_pct_int >= 85:
-        overall_col = "#22c55e"
-        overall_label = "Strong week"
-    elif t0_pct_int >= 65:
-        overall_col = "#f59e0b"
-        overall_label = "Mixed week"
+    # Overall completion colour. Percentages ROUND — int() truncates, and the float the
+    # compute layer produces lands just under (0.29 * 100 == 28.999999999999996), so every
+    # figure in this section was systematically a point low.
+    if avg_t0 is None:
+        t0_pct_int = None
+        t0_pct_str = "—"
+        overall_col = "#94a3b8"
+        overall_label = "No measured days"
     else:
-        overall_col = "#ef4444"
-        overall_label = "Needs attention"
+        t0_pct_int = pct_int(avg_t0)
+        t0_pct_str = str(t0_pct_int)
+        if t0_pct_int >= 85:
+            overall_col = "#22c55e"
+            overall_label = "Strong week"
+        elif t0_pct_int >= 65:
+            overall_col = "#f59e0b"
+            overall_label = "Mixed week"
+        else:
+            overall_col = "#ef4444"
+            overall_label = "Needs attention"
 
-    perfect_pct = int(perfect / days * 100) if days else 0
+    perfect_pct = pct_int(perfect / days) if days else 0
 
     # ── Daily mini-bars (Mon-Sun) ────────────────────────────────────────────
     bar_cells = ""
     DAY_ABBR = ["M", "T", "W", "T", "F", "S", "S"]
     for i, d in enumerate(daily):
-        pct_bar = max(8, int(d["t0_pct"] * 60))
-        bar_col = "#22c55e" if d["t0_pct"] >= 0.85 else "#f59e0b" if d["t0_pct"] >= 0.65 else "#ef4444"
-        done_str = str(d["t0_done"]) + "/" + str(d["t0_total"])
+        d_pct = d.get("t0_pct")
+        if d_pct is None:  # nothing was applicable that day — a grey stub, not a red 0
+            pct_bar = 8
+            bar_col = "#475569"
+            done_str = "—"
+        else:
+            pct_bar = max(8, int(d_pct * 60))
+            bar_col = "#22c55e" if d_pct >= 0.85 else "#f59e0b" if d_pct >= 0.65 else "#ef4444"
+            done_str = str(d["t0_done"]) + "/" + str(d["t0_total"])
         day_abbr = DAY_ABBR[i % 7]
         try:
             from datetime import datetime as _dt
@@ -268,11 +308,13 @@ def _render_weekly_habit_review(whr):
     # ── Per-habit breakdown rows ─────────────────────────────────────────────
     habit_rows = ""
     for h in t0_habits:
-        p = int(h["pct"] * 100)
+        p = pct_int(h["pct"])
         col = "#22c55e" if p >= 85 else "#f59e0b" if p >= 65 else "#ef4444"
         bar_w = max(4, p)
         flag = " &#9888;" if p <= 50 else ""
-        short_name = h["name"][:32] + ("…" if len(h["name"]) > 32 else "")
+        # Habit names come from the S3-hosted habit_registry config: an ampersand or an
+        # angle bracket silently corrupted the row.
+        short_name = esc(h["name"][:32]) + ("…" if len(h["name"]) > 32 else "")
         habit_rows += (
             "<tr>"
             '<td style="padding:5px 8px 5px 12px;font-size:12px;color:#e2e8f0;width:55%;">' + short_name + flag + "</td>"
@@ -296,7 +338,7 @@ def _render_weekly_habit_review(whr):
     if synergy:
         chips = ""
         for group, pct in sorted(synergy.items(), key=lambda x: -x[1]):
-            p_int = int(pct * 100)
+            p_int = pct_int(pct)
             col = "#22c55e" if p_int >= 75 else "#f59e0b" if p_int >= 50 else "#ef4444"
             chips += (
                 '<span style="display:inline-block;background:rgba(255,255,255,0.06);'
@@ -304,7 +346,7 @@ def _render_weekly_habit_review(whr):
                 "padding:3px 10px;font-size:10px;color:"
                 + col
                 + ';margin:2px 3px 2px 0;font-weight:600;">'
-                + group
+                + esc(group)
                 + " "
                 + str(p_int)
                 + "%</span>"
@@ -319,12 +361,17 @@ def _render_weekly_habit_review(whr):
     # ── T1 line ──────────────────────────────────────────────────────────────
     t1_html = ""
     if avg_t1 is not None:
-        t1_pct_int = int(avg_t1 * 100)
+        t1_pct_int = pct_int(avg_t1)
         t1_col = "#22c55e" if t1_pct_int >= 75 else "#f59e0b" if t1_pct_int >= 50 else "#94a3b8"
         t1_html = (
             '<p style="font-size:11px;color:#64748b;margin:6px 0 0;">'
             'Tier 1 avg: <span style="color:' + t1_col + ';font-weight:700;">' + str(t1_pct_int) + "%</span></p>"
         )
+
+    # ADR-105: when the window contains unmeasured days, the mean ships its own n.
+    n_note = ""
+    if measured_days is not None and measured_days != days:
+        n_note = " (n=" + str(measured_days) + " measured)"
 
     html = (
         "<!-- S2-T1-10: Weekly Habit Review (Sunday only) -->"
@@ -337,9 +384,9 @@ def _render_weekly_habit_review(whr):
         '<p style="font-size:24px;font-weight:800;color:'
         + overall_col
         + ';margin:0;line-height:1.1;">'
-        + str(t0_pct_int)
+        + t0_pct_str
         + '<span style="font-size:14px;">%</span> T0</p>'
-        '<p style="font-size:11px;color:' + overall_col + ';margin:2px 0 0;">' + overall_label + "</p>"
+        '<p style="font-size:11px;color:' + overall_col + ';margin:2px 0 0;">' + overall_label + n_note + "</p>"
         "</div>"
         '<div style="text-align:right;">'
         '<p style="font-size:10px;color:#64748b;margin:0 0 2px;">' + str(days) + "-day window</p>"
