@@ -278,46 +278,25 @@ def test_view_is_normalised_for_case_and_whitespace(sources):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def test_load_on_a_completely_empty_partition_returns_an_all_zero_fitness_model(sources):
-    """OBSERVED (ADR-104 P1): with NOTHING in the cardio partition the tool does
-    not take its own "No training data found" path — that guard is
-    `if not result_rows`, and result_rows is built from a generated calendar grid,
-    so it is non-empty for every valid window. The answer is a complete
-    fitness/fatigue model of zeros with an authoritative verdict attached."""
+def test_load_on_a_completely_empty_partition_returns_the_honest_empty_envelope(sources):
+    """FIXED (#2221, ADR-104 P1): with NOTHING in the cardio partition the tool used
+    to answer with a complete fitness/fatigue model of zeros — ctl 0.0 / atl 0.0 /
+    tsb 0.0 / injury_risk 'low' / form_status 'neutral' / peak_fitness 0.0 — because
+    its own empty-data guard (`if not result_rows`) tested a list built from a
+    GENERATED calendar grid, which is non-empty for every window where start <= end.
+    The guard now tests whether any record was actually read."""
     sources(strava=[])
     out = call("get_training", {"view": "load", "start_date": _d(-30), "end_date": TODAY})
-    assert "error" not in out
-    assert out["current_state"] == {
-        "date": TODAY,
-        "daily_load": 0.0,
-        "ctl_fitness": 0.0,
-        "atl_fatigue": 0.0,
-        "tsb_form": 0.0,
-        "acwr": None,
-        "injury_risk": "low",
-        "form_status": "neutral",
-    }
-    assert out["peak_fitness"] == {"ctl": 0.0, "date": _d(-30)}
-    assert out["monotony"]["training_monotony"] is None
+    assert out == {"error": "No training data found for the requested window."}
+    assert "current_state" not in out and "peak_fitness" not in out
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "ADR-104 P1 + DEAD GUARD — mcp/tools_training.py:78 (_get_training_load) guards the "
-        "empty-data case with `if not result_rows`, but result_rows is derived from a generated "
-        "day-by-day calendar grid (:32-35, `load_by_date.get(ds, 0.0)`), so it is non-empty for "
-        "every window where start <= end. The 'No training data found for the requested window.' "
-        "envelope is therefore UNREACHABLE, and a totally dark cardio partition — Strava deauthed, "
-        "or after a cycle reset, or Garmin paused (ADR-074) — answers with ctl 0.0 / atl 0.0 / tsb "
-        "0.0 / injury_risk 'low' / form_status 'neutral' / peak_fitness 0.0, i.e. a fully-formed "
-        "fitness model asserting zero fitness as measured fact. It should count the days that "
-        "actually had a record and return the honest-empty envelope (or a coverage figure) instead. "
-        "Matthew sees 'peak fitness 0.0' and a green-light 'neutral' form after an ingestion outage."
-    ),
-)
-def test_load_should_report_honest_empty_when_no_cardio_record_exists(sources):
-    sources(strava=[])
+def test_load_honest_empty_is_keyed_off_the_QUERIED_window_not_the_partition(sources):
+    """The guard must fire on a window with no records even when the partition has
+    plenty of them elsewhere — this is the shape an ingestion outage takes (history
+    intact, the recent window dark), and it is the case a partition-level
+    `if not day_records` check would answer with a zeros model."""
+    sources(strava=[strava_day(_d(-400), kilojoules=500)])
     out = call("get_training", {"view": "load", "start_date": _d(-30), "end_date": TODAY})
     assert out == {"error": "No training data found for the requested window."}
 
@@ -344,15 +323,14 @@ def test_load_series_is_hand_derivable_from_the_closed_form(sources):
     """Constant daily load L=100 kJ every day from the warm-up start.
 
     ``compute_ewa`` (mcp/helpers.py) delegates to ``stats_core.ewma_series`` with
-    seed 0 and alpha = 1 - exp(-1/tau), so after n days of constant L the smoothed
-    value is exactly  L * (1 - exp(-n/tau))  — each value rounded to 2dp.
+    alpha = 1 - exp(-1/tau) and, since #2221, the warm-start seed the training-load
+    model now supplies (the mean of the first 7 days of the warm-up — the same
+    warm-start ``acwr_compute_lambda._ewma_acwr`` uses). The closed form for a
+    constant series is ``L + (seed - L) * exp(-n/tau)``; with seed == L == 100 that
+    collapses to exactly 100.00 at every n, for both time constants.
 
-    The requested window is start=TODAY-180 .. end=TODAY, and the warm-up adds 84
-    days, so the FIRST reported row is day n = 85 of the series and the LAST is
-    n = 85 + 180 = 265.
-
-        CTL(85)  = 100*(1-exp(-85/42))  = 86.78     ATL(85)  = 100*(1-exp(-85/7))  = 100.00
-        CTL(265) = 100*(1-exp(-265/42)) = 99.82     ATL(265) = 100*(1-exp(-265/7)) = 100.00
+    So identical training yields an identical verdict at the head and the tail of the
+    window: ctl 100.00, atl 100.00, tsb 0.00, acwr 1.00 — no bias term at all.
     """
     start = _d(-180)
     rows = [strava_day(_d(-i, TODAY), kilojoules=100) for i in range(0, 181 + 84)]
@@ -363,33 +341,38 @@ def test_load_series_is_hand_derivable_from_the_closed_form(sources):
     assert len(series) == 181  # start..end inclusive
     first, last = series[0], series[-1]
 
-    # Independently recomputed closed form (not read off the tool's output).
-    assert first["ctl_fitness"] == round(100 * (1 - math.exp(-85 / 42)), 2) == 86.78
-    assert first["atl_fatigue"] == round(100 * (1 - math.exp(-85 / 7)), 2) == 100.0
-    assert last["ctl_fitness"] == round(100 * (1 - math.exp(-265 / 42)), 2) == 99.82
-    assert last["atl_fatigue"] == 100.0
-
-    assert first["acwr"] == round(100.0 / 86.78, 2) == 1.15
-    assert last["acwr"] == round(100.0 / 99.82, 2) == 1.0
-    assert first["tsb_form"] == round(86.78 - 100.0, 2) == -13.22
+    # Independently recomputed closed form (not read off the tool's output). n is the
+    # index into the series; the exp() term is multiplied by (seed - L) == 0.
+    for n, row in ((85, first), (265, last)):
+        assert row["ctl_fitness"] == round(100 + (100 - 100) * math.exp(-n / 42), 2) == 100.0
+        assert row["atl_fatigue"] == round(100 + (100 - 100) * math.exp(-n / 7), 2) == 100.0
+        assert row["acwr"] == 1.0 and row["tsb_form"] == 0.0
     assert out["current_state"] == last
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "SEED BIAS — mcp/helpers.py:95 compute_ewa calls stats_core.ewma_series WITHOUT the `seed` "
-        "argument that exists precisely to remove start-of-series bias, so mcp/tools_training.py:38 "
-        "_get_training_load starts its 42-day CTL at 0 and warms it up for only 84 days (2 time "
-        "constants, exp(-2)=13.5% residual). On a perfectly constant training load the FIRST row of "
-        "the reported window shows ctl=86.78 / acwr=1.15 / tsb=-13.22 ('fatigued — accumulated "
-        "training stress is high') while the LAST row of the SAME constant load shows ctl=99.82 / "
-        "acwr=1.00 / tsb=-0.18 ('neutral'). It should warm-start the seed (or extend the warm-up "
-        "past ~5 time constants) so identical training yields an identical verdict. Matthew reads "
-        "the head of the series as a real fitness/fatigue history and sees a fatigue cliff and a "
-        "~15% inflated injury ratio that never happened."
-    ),
-)
+def test_load_ewma_convergence_is_hand_derivable_when_the_seed_is_genuinely_zero(sources):
+    """The convergence half of the closed form, on a series whose warm-start seed is
+    a MEASURED zero rather than an artefact: 164 recorded days of no training (the
+    seed window included, so seed = 0), then 101 consecutive days at L=100 kJ.
+
+    From a true zero the closed form is the familiar ``L * (1 - exp(-k/tau))`` for k
+    days since the step:
+
+        CTL(101) = 100*(1-exp(-101/42)) = 90.97     ATL(101) = 100*(1-exp(-101/7)) = 100.00
+
+    Here the low CTL at the head of the block is honest — he really had not trained.
+    """
+    rows = [strava_day(_d(-i, TODAY), kilojoules=(100 if i <= 100 else 0)) for i in range(0, 181 + 84)]
+    sources(strava=rows)
+    out = call("get_training", {"view": "load", "start_date": _d(-180), "end_date": TODAY})
+
+    first, last = out["series"][0], out["series"][-1]
+    assert (first["ctl_fitness"], first["atl_fatigue"], first["acwr"]) == (0.0, 0.0, None)
+    assert last["ctl_fitness"] == round(100 * (1 - math.exp(-101 / 42)), 2) == 90.97
+    assert last["atl_fatigue"] == round(100 * (1 - math.exp(-101 / 7)), 2) == 100.0
+    assert last["acwr"] == round(100.0 / 90.97, 2) == 1.1
+
+
 def test_constant_training_should_not_produce_a_fabricated_early_fatigue_cliff(sources):
     rows = [strava_day(_d(-i, TODAY), kilojoules=100) for i in range(0, 181 + 84)]
     sources(strava=rows)
@@ -415,34 +398,38 @@ def test_load_form_bands_are_ordered_most_negative_first(sources):
 
 
 def test_load_reports_absence_as_a_factual_zero_daily_load(sources):
-    """A day with no cardio record contributes daily_load 0.0 — indistinguishable
-    from a genuine rest day. Pinned as OBSERVED behaviour; the honest-numbers
-    expectation is the xfail below."""
+    """A day with no cardio record still contributes daily_load 0.0 — the model is a
+    day grid and cannot represent a hole. That is why the coverage block below is the
+    fix rather than a change to the arithmetic: the series is unchanged, the payload
+    now says how much of it was observed."""
     sources(strava=[strava_day(TODAY, kilojoules=500)])
     out = call("get_training", {"view": "load", "start_date": _d(-6), "end_date": TODAY})
     loads = [r["daily_load"] for r in out["series"]]
     assert loads == [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 500.0]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "ADR-104 — mcp/tools_training.py:34 _get_training_load fills every gap in the day grid with "
-        "`load_by_date.get(ds, 0.0)`, so an ingestion outage is arithmetically identical to a rest "
-        "week: CTL decays, TSB climbs, and the tool reports 'fresh — good for key sessions or race'. "
-        "The payload carries no coverage field at all (no days_with_data, no ingested_days, no "
-        "source-freshness note), so nothing downstream can tell a quiet week from a dark one. It "
-        "should publish the observed-day count / coverage for the window (ADR-105 n-beside-the-"
-        "number) and refuse the form verdict below a coverage floor. Strava is not the only exposure "
-        "here — Garmin is PAUSED (ADR-074), so silence is the normal state for a whole source class. "
-        "Matthew trains hard off a 'fresh' verdict manufactured by missing data."
-    ),
-)
 def test_load_should_publish_the_data_coverage_behind_the_form_verdict(sources):
+    """FIXED (#2221, ADR-105 n-beside-the-number). One recorded day in a 7-day window
+    used to be reported with no coverage field of any kind, so nothing downstream could
+    tell a quiet week from a dark one — an ingestion outage is arithmetically identical
+    to a rest week (CTL decays, TSB climbs, verdict 'fresh — good for key sessions')."""
     sources(strava=[strava_day(TODAY, kilojoules=500)])
     out = call("get_training", {"view": "load", "start_date": _d(-6), "end_date": TODAY})
-    blob = str(out).lower()
-    assert any(k in blob for k in ("days_with_data", "coverage", "observed_days", "n_days"))
+    cov = out["coverage"]
+    assert cov["days_in_window"] == 7  # start..end inclusive
+    assert cov["days_with_data"] == 1  # only TODAY had a record
+    assert cov["coverage_pct"] == round(100 / 7, 1) == 14.3
+    assert cov["warmup_days"] == 84 and cov["warmup_days_with_data"] == 0
+
+
+def test_load_coverage_is_100_pct_when_every_day_in_the_window_has_a_record(sources):
+    """The other end of the same field — a coverage figure that is always low, or
+    always the same, would be decoration rather than a measurement."""
+    sources(strava=[strava_day(_d(-i), kilojoules=100) for i in range(0, 200)])
+    out = call("get_training", {"view": "load", "start_date": _d(-6), "end_date": TODAY})
+    assert out["coverage"]["days_with_data"] == 7
+    assert out["coverage"]["coverage_pct"] == 100.0
+    assert out["coverage"]["warmup_days_with_data"] == 84
 
 
 def test_load_monotony_requires_a_full_seven_day_tail(sources):
@@ -504,78 +491,82 @@ def test_periodization_drops_activities_under_ten_minutes(sources):
     assert out["weekly_breakdown"][-1]["sessions"] == 1
 
 
-def test_periodization_counts_a_recovery_walk_as_zone_2(sources):
-    """OBSERVED: mcp/tools_training.py:205 classifies ANY cardio at avg HR <= 70%
-    of max as Zone 2 — including Zone 1 and below. At max_hr 190 a 60-minute walk
-    at 95 bpm is 50% of max (Zone 1 by every 5-zone model) and lands in
-    zone2_minutes in full."""
+def test_periodization_does_not_count_a_recovery_walk_as_zone_2(sources):
+    """FIXED (#2221): the periodization view used to classify ANY cardio at avg HR
+    <= 70% of max as Zone 2 — Zone 1 and below included. At max_hr 190 a 60-minute
+    walk at 95 bpm is 50% of max (Zone 1 by every 5-zone model) and landed in
+    zone2_minutes in full. It is now classified through the canonical band, so it
+    counts as easy volume but not as Zone 2."""
     sources(strava=[strava_day(TODAY, activities=[activity("Walk", minutes=60, avg_hr=95)])], macrofactor_workouts=[])
     out = call("get_training", {"view": "periodization", "end_date": TODAY, "weeks": 2})
-    assert out["weekly_breakdown"][-1]["zone2_minutes"] == 60.0
-    assert out["zone2_status"]["current_week"] == 60.0
+    assert out["weekly_breakdown"][-1]["zone2_minutes"] == 0.0
+    assert out["zone2_status"]["current_week"] == 0.0
+    assert out["polarization"]["easy_pct"] == 100.0  # still easy volume, just not Zone 2
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "ZONE-2 DEFINITION DISAGREEMENT — mcp/tools_training.py:205 (_get_training_periodization) "
-        "counts every cardio minute at avg HR <= 70% of max as zone2_minutes, while the platform's "
-        "canonical Zone-2 tool, mcp/tools_correlation.py:38-72 (tool_get_zone2_breakdown, the one "
-        "get_zone2_breakdown is registered to), defines Zone 2 as 60-70% of max and classifies "
-        "anything below 60% as zone_1 / below_zone_1. The two tools therefore publish different "
-        "'Zone 2 minutes' for the identical activity, and periodization's inflated figure is what "
-        "drives its own 150 min/week Attia target check and the 'Attia: only hitting Zone 2 target "
-        "X% of weeks' board note. It should reuse the canonical band (and the same exclusive upper "
-        "bound: periodization uses <=70%, the breakdown uses <70%). Matthew asks the same question "
-        "two ways and gets two answers; the optimistic one tells him to do less Zone 2."
-    ),
-)
-def test_periodization_zone2_should_agree_with_the_canonical_zone2_tool(sources):
-    walk = strava_day(TODAY, activities=[activity("Walk", minutes=60, avg_hr=95)])
-    sources(strava=[walk], macrofactor_workouts=[])
+def test_periodization_zone2_agrees_with_the_canonical_zone2_tool(sources):
+    """FIXED (#2221). Both tools are driven over the same fixture and their published
+    Zone-2 minutes compared — DERIVED from the canonical producer, never restated.
+
+    Three activities that exercise the disagreements at once: a 50%-of-max walk (below
+    the canonical Zone-2 floor — periodization used to count it in full), a 65%-of-max
+    ride (genuinely Zone 2 in both), and a 74%-of-max run (Zone 3, which periodization
+    used to fold into easy). Expected Zone 2 = the 45-minute ride only. The upper bound
+    can no longer disagree either: both tools now classify through the one
+    `mcp.helpers.classify_hr_zone`, so `<= 70%` vs `< 70%` cannot drift apart again.
+    """
+    day = strava_day(
+        TODAY,
+        activities=[
+            activity("Walk", minutes=60, avg_hr=95),  # 50.0% — below zone 2
+            activity("Ride", minutes=45, avg_hr=124),  # 65.3% — zone 2
+            activity("Run", minutes=30, avg_hr=140),  # 73.7% — zone 3
+        ],
+    )
+    sources(strava=[day], macrofactor_workouts=[])
     periodization = call("get_training", {"view": "periodization", "end_date": TODAY, "weeks": 2})
     breakdown = TOOLS["get_zone2_breakdown"]["fn"]({"start_date": _d(-7), "end_date": TODAY})
-    assert periodization["zone2_status"]["current_week"] == breakdown["summary"]["total_zone2_minutes"]
+    # `total_zone_2_min` is the key the producer actually publishes (mcp/tools_correlation.py);
+    # `total_zone2_minutes` has never existed on it — the same reader/writer mismatch #2246 fixed.
+    assert periodization["zone2_status"]["current_week"] == breakdown["summary"]["total_zone_2_min"] == 45.0
+    assert periodization["weekly_breakdown"][-1]["moderate_minutes"] == 30.0  # the 70.0% run
 
 
-def test_periodization_middle_zone_pct_is_structurally_always_zero(sources):
-    """OBSERVED: polarization's denominator is easy+hard, so easy_pct+hard_pct is
-    100 by construction and middle_zone_pct = 100 - easy - hard can only be 0.0 —
-    even on a week that is entirely Zone 3."""
+def test_polarization_separates_zone_three_from_easy(sources):
+    """FIXED (#2221). Zone 3 (70-80% of max HR) used to be filed into `easy_minutes`
+    with the comment "Zone 3 counted as moderate", and the Seiler split was computed as
+    easy/(easy+hard) — so `middle_zone_pct` was 0.0 by construction and a week of pure
+    Zone 3 reported easy_pct 100.0 / status 'well_polarized'. The board note that warns
+    about exactly this could never fire, because the minutes that would have triggered
+    it had been relabelled easy. Zone 3 now has its own bucket and its own share."""
     sources(
         strava=[strava_day(TODAY, activities=[activity("Run", minutes=60, avg_hr=142)])],  # 142/190 = 74.7% → Zone 3
         macrofactor_workouts=[],
     )
     out = call("get_training", {"view": "periodization", "end_date": TODAY, "weeks": 2})
-    assert out["polarization"]["middle_zone_pct"] == 0.0
-    assert out["polarization"]["easy_pct"] == 100.0
+    assert out["polarization"]["middle_zone_pct"] == 100.0
+    assert out["polarization"]["easy_pct"] == 0.0 and out["polarization"]["hard_pct"] == 0.0
+    assert out["polarization"]["status"] == "too_much_moderate"
+    assert out["weekly_breakdown"][-1]["moderate_minutes"] == 60.0
+    assert any("no man's land" in n.lower() for n in out["board_of_directors"])
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "POLARIZATION MISREPORTS THE NO-MAN'S-LAND — mcp/tools_training.py:211 files Zone 3 "
-        "(70-80% of max HR) into `easy_minutes` with the comment 'Zone 3 counted as moderate', and "
-        "then :313-321 computes the Seiler split as easy/(easy+hard), so `middle_zone_pct` is 0.0 by "
-        "construction and a week of pure Zone 3 reports easy_pct 100.0 / status 'well_polarized'. "
-        "The board note at :401 warns about exactly this ('No man's land (Zone 3) generates fatigue "
-        "without proportional adaptation') and can never fire, because the minutes that would "
-        "trigger it were relabelled easy. It should keep a third bucket and report it. Matthew's "
-        "most-likely-wrong training pattern is the one the tool is structurally blind to."
-    ),
-)
 def test_polarization_should_separate_zone_three_from_easy(sources):
+    """The contract the marker asked for, kept as its own assertion: the middle zone
+    is reported and a pure-Zone-3 week is not called well polarized."""
     sources(strava=[strava_day(TODAY, activities=[activity("Run", minutes=60, avg_hr=142)])], macrofactor_workouts=[])
     out = call("get_training", {"view": "periodization", "end_date": TODAY, "weeks": 2})
     assert out["polarization"]["middle_zone_pct"] > 0
     assert out["polarization"]["status"] != "well_polarized"
 
 
-def test_periodization_rest_days_are_fabricated_for_a_partial_week(sources):
-    """OBSERVED: mcp/tools_training.py:237 computes rest_days = 7 - len(dates)
-    unconditionally. TODAY (2026-08-08) is a Saturday, so the current ISO week has
-    6 elapsed days; a week with 2 training days on the only 2 elapsed dates still
-    reports 5 rest days — including days that have not happened."""
+def test_periodization_rest_days_are_bounded_by_the_elapsed_part_of_the_week(sources):
+    """FIXED (#2221, #1917 window honesty): rest_days was `7 - len(dates)` for EVERY
+    week, including the in-progress one. TODAY (2026-08-08) is a Saturday, so the
+    current ISO week has 6 elapsed days; two training days on two of them used to
+    report 5 rest days — counting Sunday, which has not happened. The denominator is
+    now the days of that ISO week the query actually covers, published as
+    `days_in_window` so the n is visible beside the number."""
     assert datetime.strptime(TODAY, "%Y-%m-%d").isoweekday() == 6  # Saturday — 6 elapsed days this ISO week
     sources(
         strava=[
@@ -587,19 +578,22 @@ def test_periodization_rest_days_are_fabricated_for_a_partial_week(sources):
     out = call("get_training", {"view": "periodization", "end_date": TODAY, "weeks": 1})
     current = out["weekly_breakdown"][-1]
     assert current["sessions"] == 2
-    assert current["rest_days"] == 5  # 7 - 2, though only 6 days of the week exist
+    assert current["days_in_window"] == 6  # Mon 08-03 .. Sat 08-08
+    assert current["rest_days"] == 4  # 6 elapsed - 2 trained
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "#1917 WINDOW HONESTY — mcp/tools_training.py:237 (_get_training_periodization) sets "
-        "rest_days = 7 - len(dates) for EVERY week including the in-progress one and the window's "
-        "truncated first week, so unelapsed days are counted as rest taken. It should bound the "
-        "denominator by the elapsed/queried days in that week. Matthew reads 'rest_days: 5' mid-week "
-        "and concludes he has been under-training when he is two days into the week."
-    ),
-)
+def test_periodization_a_complete_past_week_still_gets_the_full_seven_day_denominator(sources):
+    """The bound is the queried window, not a blanket reduction: a week that is wholly
+    inside the window keeps all 7 days, so a real rest day is still counted as rest."""
+    sources(
+        strava=[strava_day(_d(-9), activities=[activity("Run", minutes=40, avg_hr=120)])],
+        macrofactor_workouts=[],
+    )
+    out = call("get_training", {"view": "periodization", "end_date": TODAY, "weeks": 4})
+    prior = next(w for w in out["weekly_breakdown"] if w["sessions"] == 1)
+    assert prior["days_in_window"] == 7 and prior["rest_days"] == 6
+
+
 def test_current_week_rest_days_should_not_count_days_that_have_not_happened(sources):
     sources(
         strava=[
@@ -613,14 +607,15 @@ def test_current_week_rest_days_should_not_count_days_that_have_not_happened(sou
 
 
 def test_periodization_a_day_of_only_sub_threshold_activity_is_not_a_rest_day(sources):
-    """OBSERVED: the date is added to the week's `dates` set BEFORE the <600s
-    filter, so a day whose only activity was a 5-minute stroll counts against
-    rest_days while contributing 0 sessions and 0 minutes."""
+    """OBSERVED (still true, and out of scope for #2221): the date is added to the
+    week's `dates` set BEFORE the <600s filter, so a day whose only activity was a
+    5-minute stroll counts against rest_days while contributing 0 sessions and 0
+    minutes. The denominator is now the 6 elapsed days of the current week."""
     sources(strava=[strava_day(TODAY, activities=[activity("Walk", minutes=5, avg_hr=95)])], macrofactor_workouts=[])
     out = call("get_training", {"view": "periodization", "end_date": TODAY, "weeks": 1})
     current = out["weekly_breakdown"][-1]
     assert current["sessions"] == 0 and current["total_minutes"] == 0
-    assert current["rest_days"] == 6  # 7 - 1, though nothing was trained
+    assert current["rest_days"] == 5  # 6 elapsed - 1 dated, though nothing was trained
 
 
 def test_periodization_progressive_overload_needs_four_volume_weeks(sources):
@@ -687,35 +682,52 @@ def _recovery_day(date: str, *, recovery=None, hrv=None, rhr=None, strain=None) 
     return rec
 
 
-def test_recommendation_with_no_recovery_data_at_all_invents_a_composite_of_50(sources):
-    """OBSERVED (ADR-104): with Whoop, Eight Sleep and Garmin all silent the tool
-    still publishes composite_readiness 50.0 and a YELLOW tier. The number is a
-    literal default at mcp/tools_training.py:649, not a measurement."""
+def test_recommendation_with_no_recovery_data_at_all_reports_absence(sources):
+    """FIXED (#2221, ADR-104 P1): with Whoop, Eight Sleep and Garmin all silent the
+    tool used to publish composite_readiness 50.0 and a confident YELLOW tier with a
+    Zone 2 prescription — a literal default presented in the same field, with the same
+    type, as a measured number. All-silent is a live state (Garmin is paused per
+    ADR-074; Whoop has latched AUTH_FAILURE repeatedly)."""
     sources(whoop=[], eightsleep=[], garmin=[], strava=[], macrofactor_workouts=[], computed_metrics=[])
     out = call("get_training", {"view": "recommendation", "date": TODAY})
     assert out["readiness_signals"] == {}
-    assert out["composite_readiness"] == 50.0
-    assert out["readiness_tier"] == "YELLOW"
+    assert out["composite_readiness"] is None
+    assert out["composite_readiness_n"] == 0
+    assert out["readiness_tier"] == "UNKNOWN"
+    assert out["recommendation"]["type"].startswith("No recommendation")
+    assert out["recommendation"]["hr_ceiling"] is None
+    assert any("ADR-104" in n for n in out["board_of_directors"])
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "ADR-104 P1 — mcp/tools_training.py:649 (_get_training_recommendation) does "
-        "`composite = _avg(signals) if signals else 50`, so a day with ZERO recovery signals returns "
-        "composite_readiness 50.0 and readiness_tier YELLOW: a fabricated mid-scale number presented "
-        "in the same field, with the same type, as a measured one. This is not hypothetical — Garmin "
-        "is PAUSED platform-wide (ADR-074) and Whoop has latched AUTH_FAILURE three times in the last "
-        "week, so all-silent is a live state. It should return None/absent for composite_readiness "
-        "and a tier of UNKNOWN (or refuse the recommendation) when signals is empty, and report the "
-        "n behind the composite when it is not. Matthew asks 'should I train today?' during an "
-        "ingestion outage and is handed a confident 50/YELLOW with a Zone 2 prescription."
-    ),
-)
 def test_recommendation_should_not_invent_a_readiness_score_from_no_signals(sources):
+    """The marker's own contract, kept as its own assertion."""
     sources(whoop=[], eightsleep=[], garmin=[], strava=[], macrofactor_workouts=[], computed_metrics=[])
     out = call("get_training", {"view": "recommendation", "date": TODAY})
     assert out["composite_readiness"] is None or out["readiness_tier"] not in ("GREEN", "YELLOW", "RED")
+
+
+def test_recommendation_unknown_tier_is_not_promoted_by_the_consecutive_day_floor(sources):
+    """The Meeusen 5-consecutive-day guard is a FLOOR on an existing verdict. Applied
+    to UNKNOWN it would manufacture a YELLOW — asserting a readiness level nothing
+    measured — so it is skipped, and the measured fact rides as a warning instead."""
+    strava = [strava_day(_d(-i), activities=[activity("Run", minutes=60, avg_hr=140)], activity_count=1) for i in range(1, 8)]
+    sources(whoop=[], eightsleep=[], garmin=[], strava=strava, macrofactor_workouts=[], computed_metrics=[])
+    out = call("get_training", {"view": "recommendation", "date": TODAY})
+    assert out["training_context"]["consecutive_training_days"] >= 5
+    assert out["readiness_tier"] == "UNKNOWN"
+    assert any("consecutive training days" in w for w in out["warnings"])
+
+
+def test_recommendation_measured_acwr_override_still_fires_with_no_recovery_signals(sources):
+    """The ACWR > 1.5 override comes from the load model, not from the recovery
+    signals, so it is a MEASURED fact and must survive a dark recovery side —
+    an UNKNOWN readiness tier must not swallow a real injury-risk verdict."""
+    rows = [strava_day(_d(-i), kilojoules=(2000 if i <= 6 else 50)) for i in range(0, 300)]
+    sources(whoop=[], eightsleep=[], garmin=[], strava=rows, macrofactor_workouts=[], computed_metrics=[])
+    out = call("get_training", {"view": "recommendation", "date": TODAY})
+    assert out["composite_readiness"] is None  # still no recovery measurement
+    assert out["training_context"]["training_load"]["acwr"] > 1.5
+    assert out["readiness_tier"] == "RED"
 
 
 def test_recommendation_composite_is_the_plain_mean_of_the_present_signals(sources):
@@ -734,9 +746,10 @@ def test_recommendation_composite_is_the_plain_mean_of_the_present_signals(sourc
     assert out["readiness_tier"] == "GREEN"
 
 
-def test_recommendation_composite_carries_no_n_for_its_average(sources):
-    """OBSERVED (ADR-105): a composite built from ONE signal and one built from
-    THREE are reported identically — same field, same type, no n."""
+def test_recommendation_composite_carries_the_n_behind_its_average(sources):
+    """FIXED (#2221, ADR-105): a composite built from ONE signal and one built from
+    THREE used to be reported identically — same field, same type, no n. The mean is
+    unchanged; what it was averaged over is now published beside it."""
     sources(whoop=[_recovery_day(TODAY, recovery=70)], eightsleep=[], garmin=[], strava=[], macrofactor_workouts=[], computed_metrics=[])
     one = call("get_training", {"view": "recommendation", "date": TODAY})
     sources(
@@ -749,10 +762,11 @@ def test_recommendation_composite_carries_no_n_for_its_average(sources):
     )
     three = call("get_training", {"view": "recommendation", "date": TODAY})
     assert one["composite_readiness"] == three["composite_readiness"] == 70.0
-    # No field anywhere in the envelope carries the signal count behind the mean.
-    assert not {"n", "signal_count", "signals_n", "composite_n"} & set(one)
-    # The signals dict is honest about absence (missing sub-fields are None, never 0),
-    # but the composite that averages them publishes no n of its own.
+    # Identical means, different n — and the payload now says so.
+    assert one["composite_readiness_n"] == 1 and three["composite_readiness_n"] == 3
+    assert one["composite_readiness_signals"] == ["whoop_recovery"]
+    assert three["composite_readiness_signals"] == ["whoop_recovery", "sleep_score", "body_battery"]
+    # The signals dict is honest about absence (missing sub-fields are None, never 0).
     present = lambda r: {k for k, v in r["readiness_signals"].items() if v is not None}  # noqa: E731
     assert present(one) == {"whoop_recovery"}
     assert present(three) == {"whoop_recovery", "sleep_score", "body_battery"}
@@ -1340,66 +1354,75 @@ def test_acwr_trend_is_absent_below_three_points(sources):
     assert call("get_acwr_status", {"date": YESTERDAY})["trend_7d"] is None
 
 
-def test_acwr_seven_day_fields_count_records_not_days(sources):
-    """OBSERVED (#1917): both `alerts_last_7d` and `trend_7d` slice history[:7],
-    which is the newest SEVEN RECORDS. With acwr-compute having produced one
-    record every 10 days, those 7 'last 7 days' records span 61 calendar days."""
+def test_acwr_seven_day_fields_count_days_not_records(sources):
+    """FIXED (#2221, #1917): both `alerts_last_7d` and `trend_7d` used to slice
+    history[:7] — the newest SEVEN RECORDS. With acwr-compute having produced one
+    record every 10 days, those 7 "last 7 days" records spanned 61 calendar days and
+    reported `alerts_last_7d: 7`, which reads as a catastrophic week. They are now
+    bounded by date, and the n actually covered rides beside them."""
     rows = [computed_metrics_day(_d(-10 * i, YESTERDAY), acwr=1.6, acwr_zone="danger", acwr_alert=True) for i in range(0, 7)]
     sources(computed_metrics=rows)
     out = call("get_acwr_status", {"date": YESTERDAY, "days_back": 90})
-    assert out["alerts_last_7d"] == 7
     span = (datetime.strptime(YESTERDAY, "%Y-%m-%d") - datetime.strptime(_d(-60, YESTERDAY), "%Y-%m-%d")).days
-    assert span == 60  # the 7 "last 7 days" records cover 61 calendar dates
+    assert span == 60  # the 7 records cover 61 calendar dates; only ONE is inside 7 days
+    assert out["alerts_last_7d"] == 1
+    assert out["records_last_7d"] == 1
+    assert out["history"] and len(out["history"]) == 7  # the full requested history is untouched
+    assert out["trend_7d"] is None and out["trend_7d_n"] == 1  # 1 point is not a trend
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "#1917 WINDOW HONESTY — mcp/tools_training.py:920 and :931 (tool_get_acwr_status) build "
-        "`trend_7d` and `alerts_last_7d` from `history[:7]`, i.e. the newest seven RECORDS, not the "
-        "newest seven DAYS. computed_metrics is written by a nightly Lambda that can and does miss "
-        "days (the tool's own error path exists for exactly that), so on a sparse partition those "
-        "fields silently describe a 60-day span while naming a 7-day one. They should filter by date "
-        ">= end_date - 6 and report the n actually covered. Matthew reads 'alerts_last_7d: 7' as a "
-        "catastrophic week when it is two sparse months."
-    ),
-)
 def test_acwr_seven_day_fields_should_be_bounded_by_calendar_days(sources):
+    """The marker's own contract, kept as its own assertion."""
     rows = [computed_metrics_day(_d(-10 * i, YESTERDAY), acwr=1.6, acwr_zone="danger", acwr_alert=True) for i in range(0, 7)]
     sources(computed_metrics=rows)
     out = call("get_acwr_status", {"date": YESTERDAY, "days_back": 90})
     assert out["alerts_last_7d"] <= 1  # only YESTERDAY falls inside a real 7-day window
 
 
-def test_acwr_returns_a_stale_record_as_the_answer_without_a_staleness_flag(sources):
-    """OBSERVED: asked for YESTERDAY with the newest record 12 days old, the tool
-    answers with that record. The `date` field is the only tell — no
-    days_stale/as_of/is_stale field exists, and the top-level acwr/zone/coaching
-    read as current."""
+def test_acwr_seven_day_alert_count_still_sees_a_genuinely_bad_week(sources):
+    """The bound must not simply suppress the field: seven consecutive alerting days
+    inside the real 7-day window still count seven."""
+    rows = [computed_metrics_day(_d(-i, YESTERDAY), acwr=1.6, acwr_zone="danger", acwr_alert=True) for i in range(0, 7)]
+    sources(computed_metrics=rows)
+    out = call("get_acwr_status", {"date": YESTERDAY, "days_back": 90})
+    assert out["alerts_last_7d"] == 7 and out["records_last_7d"] == 7
+
+
+def test_acwr_declares_how_old_a_stale_answer_is_and_withholds_live_coaching(sources):
+    """FIXED (#2221): `latest = history[0]` was hoisted to the top level with no
+    comparison against the REQUESTED date, so a 12-day-old record answered "what is my
+    ACWR?" with a live-voice verdict ("Increase training frequency this week"). The
+    record is still returned — it is the best available measurement — but its age is
+    published and the present-tense coaching is withheld.
+
+    The staleness floor is derived from the WRITER's cadence, not from a literature
+    default: acwr-compute runs nightly, so >= 2 days behind means a run was missed."""
     stale = _d(-12, YESTERDAY)
     sources(computed_metrics=[computed_metrics_day(stale, acwr=0.6, acwr_zone="detraining")])
     out = call("get_acwr_status", {"date": YESTERDAY, "days_back": 30})
-    assert out["date"] == stale and out["zone"] == "detraining"
-    assert not any(k in out for k in ("stale", "is_stale", "days_stale", "as_of_age_days"))
+    assert out["date"] == stale and out["zone"] == "detraining" and out["acwr"] == 0.6
+    assert out["days_stale"] == 12 and out["is_stale"] is True
+    assert "acwr-compute writes nightly" in out["staleness_note"]
+    assert out["coaching"] is None
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "STALENESS IS INVISIBLE — mcp/tools_training.py:917 (tool_get_acwr_status) takes "
-        "`latest = history[0]` and hoists its acwr/zone/alert/coaching to the top level with no "
-        "comparison against the REQUESTED date. If acwr-compute has been failing for 12 days the "
-        "tool answers 'what is my ACWR?' with a 12-day-old number and a live-voice coaching verdict "
-        "('Rest is not optional this week' / 'Increase training frequency this week'). It should "
-        "publish the age of the record (and refuse the present-tense coaching past a floor). Matthew "
-        "acts this week on last fortnight's load."
-    ),
-)
 def test_acwr_should_declare_how_old_the_answer_is(sources):
+    """The marker's own contract, kept as its own assertion."""
     stale = _d(-12, YESTERDAY)
     sources(computed_metrics=[computed_metrics_day(stale, acwr=0.6, acwr_zone="detraining")])
     out = call("get_acwr_status", {"date": YESTERDAY, "days_back": 30})
     assert any(k in out for k in ("stale", "is_stale", "days_stale", "as_of_age_days"))
+
+
+def test_acwr_a_fresh_record_is_not_flagged_stale_and_keeps_its_coaching(sources):
+    """The floor must not fire on the normal case: the tool's own declared default
+    `date` is YESTERDAY precisely because acwr-compute writes for yesterday, and a
+    one-day gap (today's run not yet done) is the writer's cadence, not a failure."""
+    sources(computed_metrics=[computed_metrics_day(_d(-1, YESTERDAY), acwr=1.6, acwr_zone="danger")])
+    out = call("get_acwr_status", {"date": YESTERDAY, "days_back": 30})
+    assert out["days_stale"] == 1 and out["is_stale"] is False
+    assert out["staleness_note"] is None
+    assert "Rest is not optional" in out["coaching"]
 
 
 def test_acwr_ships_its_method_coupling_and_proxy_caveats(sources):
