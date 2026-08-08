@@ -253,12 +253,20 @@ def test_every_fallback_literal_equals_the_registry_lead():
     assert persona_registry.LEAD_FALLBACK_NAME == name
     assert persona_registry.LEAD_FALLBACK_TITLE == title
 
-    for rel, needle in (
-        ("lambdas/web/site_api_coach.py", "_LEAD_FALLBACK = "),
-        ("lambdas/intelligence/integrator_prompts.py", 'name, title = "'),
-        ("site/assets/js/coaching.js", "const LEAD_BYLINE_FALLBACK = "),
+    # The site-api entry is read against the WHOLE site_api_coach family, not one file:
+    # #1654 moved `_LEAD_FALLBACK` out of the facade into a sibling, and a guard pinned
+    # to the facade would have failed on a rename it should not care about (or, after a
+    # future move in the other direction, passed over nothing at all).
+    from site_api_family import family_source
+
+    def _read(rel):
+        return (_REPO / rel).read_text(encoding="utf-8")
+
+    for rel, text, needle in (
+        ("the site_api_coach family", family_source("site_api_coach"), "_LEAD_FALLBACK = "),
+        ("lambdas/intelligence/integrator_prompts.py", _read("lambdas/intelligence/integrator_prompts.py"), 'name, title = "'),
+        ("site/assets/js/coaching.js", _read("site/assets/js/coaching.js"), "const LEAD_BYLINE_FALLBACK = "),
     ):
-        text = (_REPO / rel).read_text(encoding="utf-8")
         line = next((ln for ln in text.splitlines() if needle in ln), None)
         assert line, f"{rel}: fallback literal {needle!r} not found — it was renamed; re-pin it here"
         assert name in line, f"{rel}: fallback byline has drifted from the registry lead ({name!r}): {line.strip()}"

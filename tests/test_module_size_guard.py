@@ -96,7 +96,10 @@ BASELINE = {
     "mcp/registry.py": "2103 lines",
     "lambdas/content/html_builder.py": "2038 lines",
     "lambdas/intelligence/ai_expert_analyzer_lambda.py": "1972 lines",
-    "lambdas/web/site_api_coach.py": "1967 lines",
+    # site_api_coach.py (2664 by the time the slice ran) drained to a ~440-line facade by
+    # #1654 — the handler logic now lives in cohesive web/site_api_coach_{profile,stance,
+    # ledger,narrative}.py + web/site_api_thirdwall.py, each well under the ceiling. The
+    # pure-subset ratchet allows removing a shrunk entry.
     "mcp/tools_lifestyle.py": "1953 lines",
     "lambdas/web/site_api_ai_lambda.py": "1934 lines",
     "lambdas/emails/coach_panel_podcast_lambda.py": "1888 lines",
