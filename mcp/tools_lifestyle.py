@@ -11,6 +11,7 @@ from decimal import Decimal
 
 from boto3.dynamodb.conditions import Key
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
+from ingestion.source_registry import raw_date_key  # bundled shared module: the X-9 raw/ layout facts (#2278)
 
 from mcp.config import EXPERIMENTS_PK, INSIGHTS_PK, S3_BUCKET, TRAVEL_PK, USER_ID, USER_PREFIX, logger, s3_client, table
 from mcp.core import decimal_to_float, parallel_query_sources, query_source
@@ -228,16 +229,27 @@ def _fetch_weather_range(start_date, end_date):
 
 def _load_bp_readings(date_str):
     """Load individual BP readings from S3 for a given date.
-    Returns list of dicts with time, systolic, diastolic, pulse."""
+    Returns list of dicts with time, systolic, diastolic, pulse.
+
+    The key is resolved from the source registry's `raw_layout` facet (#2278),
+    never hand-built: this reader spent its whole life pointed at
+    `raw/blood_pressure/...`, a prefix nothing has ever written, because the
+    writer's user segment was dropped and the miss was swallowed below.
+    """
+    key = None
     try:
-        y, m, d = date_str.split("-")
-        key = f"raw/blood_pressure/{y}/{m}/{d}.json"
+        key = raw_date_key("apple_health", date_str, sub="blood_pressure")
         resp = s3_client.get_object(Bucket=S3_BUCKET, Key=key)
         return json.loads(resp["Body"].read())
     except s3_client.exceptions.NoSuchKey:
+        # A day with no cuff reading is normal — BP is spot-checked, not daily —
+        # so [] is the honest answer, not an error. But log the key: a silent []
+        # is exactly what hid the wrong prefix for this function's entire life,
+        # and a run of them against a wrong path should be visible in the logs.
+        logger.info("bp_no_readings key=%s", key)
         return []
     except Exception as e:
-        logger.warning(f"BP read failed for {date_str}: {e}")
+        logger.warning(f"BP read failed for {date_str} (key={key}): {e}")
         return []
 
 

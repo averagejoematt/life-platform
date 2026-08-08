@@ -52,6 +52,7 @@ MCP and site-api Lambdas resolve it; stacks that bundle lambdas/ get the same
 file at /var/task, which shadows the layer copy harmlessly.
 """
 
+from datetime import date
 from typing import Any, cast
 
 # Default staleness threshold when a source has no override (hours). The
@@ -96,7 +97,11 @@ DEFAULT_STALE_HOURS = 48
 #                  migration flipped the legacy 'DD.json' form to the full date mid-2026
 #                  IN-PLACE within the same date tree (#1256), so pre-2026 objects on the
 #                  flipped sources (todoist, garmin) still carry 'DD.json'. Read this
-#                  facet — never construct a key from the prefix alone.
+#                  facet — never construct a key from the prefix alone; `raw_date_key()`
+#                  builds the per-day key for you. A source that fans out into several
+#                  raw trees (apple_health's HAE datatypes) carries them as a
+#                  `sub_layouts` sub-dict, each with its own prefix/scheme/filename
+#                  (#2278 — a prose `note` is not something a reader can resolve).
 #   provider_reconcile
 #                  True = OPT-IN source-of-truth reconciliation (DI-2/TR-07): a
 #                  daily job diffs the PROVIDER API against stored records and
@@ -255,7 +260,20 @@ SOURCE_REGISTRY = {
         "raw_layout": {
             "prefix": "raw/matthew/health_auto_export",
             "scheme": "timestamped",
-            "note": "sub-datatypes also land at raw/matthew/{cgm_readings,blood_pressure,state_of_mind,workouts}/",
+            "note": "sub-datatypes also land at raw/matthew/{cgm_readings,blood_pressure,state_of_mind,workouts}/ — see sub_layouts",
+            # #2278: the note above was prose only, so every reader of an HAE
+            # sub-datatype hand-built its key from it — and one (the dormant BP
+            # reader in mcp/tools_lifestyle.py) dropped the user segment entirely
+            # and read a prefix nothing has ever written. These are the four
+            # sub-streams health_auto_export_lambda.py fans out to; each is its
+            # own date tree with a DD.json leaf (NOT the YYYY-MM-DD.json form the
+            # SIMP-2 framework sources flipped to). Resolve via raw_date_key().
+            "sub_layouts": {
+                "cgm_readings": {"prefix": "raw/matthew/cgm_readings", "scheme": "date-tree", "filename": "DD.json"},
+                "blood_pressure": {"prefix": "raw/matthew/blood_pressure", "scheme": "date-tree", "filename": "DD.json"},
+                "state_of_mind": {"prefix": "raw/matthew/state_of_mind", "scheme": "date-tree", "filename": "DD.json"},
+                "workouts": {"prefix": "raw/matthew/workouts", "scheme": "date-tree", "filename": "DD.json"},
+            },
         },
         # #746: the manual HAE capture channel. The partition itself is passive
         # (steps/water keep it alive), but the CGM/BP/State-of-Mind streams below
@@ -860,6 +878,58 @@ def raw_layouts() -> dict:
     """{key: raw_layout} for sources with a raw-S3 archive — the X-9 three-
     generation reality, documented instead of guessed. No mass-move."""
     return {k: v["raw_layout"] for k, v in SOURCE_REGISTRY.items() if v.get("raw_layout")}
+
+
+def raw_layout_for(source: str, sub: str | None = None) -> dict:
+    """The raw_layout facet for `source` (or one of its `sub_layouts`, e.g.
+    apple_health's per-datatype HAE trees).
+
+    Raises rather than guessing: an unknown source, a source with no raw
+    archive, or an unknown sub-stream is a caller bug, and the X-9 failure mode
+    (#1256/#2278) is precisely a plausible-looking key that resolves to nothing.
+    """
+    try:
+        entry = SOURCE_REGISTRY[source]
+    except KeyError:
+        raise KeyError(f"raw_layout_for: unknown source {source!r}") from None
+    layout = cast("dict[str, Any] | None", entry.get("raw_layout"))
+    if not layout:
+        raise ValueError(f"raw_layout_for: source {source!r} has no raw-S3 archive")
+    if sub is None:
+        return layout
+    subs = cast("dict[str, Any]", layout.get("sub_layouts") or {})
+    try:
+        return cast("dict[str, Any]", subs[sub])
+    except KeyError:
+        raise KeyError(f"raw_layout_for: source {source!r} has no raw sub-layout {sub!r} (have: {sorted(subs)})") from None
+
+
+def raw_date_key(source: str, date_str: str, sub: str | None = None) -> str:
+    """The ACTUAL raw-S3 key holding one day of `source` — X-9/#1256's cure.
+
+    The raw/ zone is three-generation fractured in BOTH the prefix (user-segmented
+    vs legacy vs flat) and the leaf filename (`YYYY-MM-DD.json` vs `DD.json`), so a
+    hand-built key is a coin flip. #2278 is what that costs: a reader that omitted
+    the user segment read a prefix nothing has ever written, and — because the
+    caller swallowed NoSuchKey — reported "no readings on file" instead of failing.
+
+    Every field here comes from the source's own `raw_layout`. `date_str` is
+    ISO `YYYY-MM-DD` and is validated, so a malformed date raises instead of
+    silently addressing a nonexistent object.
+    """
+    layout = raw_layout_for(source, sub)
+    scheme = layout.get("scheme")
+    if scheme != "date-tree":
+        raise ValueError(f"raw_date_key: {source!r}{'/' + sub if sub else ''} is {scheme!r}, not a date tree — no per-day key exists")
+    day = date.fromisoformat(date_str)
+    filename = layout.get("filename")
+    if filename == "YYYY-MM-DD.json":
+        leaf = f"{day:%Y-%m-%d}.json"
+    elif filename == "DD.json":
+        leaf = f"{day:%d}.json"
+    else:
+        raise ValueError(f"raw_date_key: unhandled leaf filename {filename!r} for {source!r}")
+    return f"{layout['prefix']}/{day:%Y}/{day:%m}/{leaf}"
 
 
 # ── #914: presence / quiet-stretch channels — registry-owned ───────────────────
