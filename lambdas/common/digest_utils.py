@@ -14,6 +14,7 @@ Consumers:
 Contents:
   - Pure scalar helpers: d2f, avg, fmt, fmt_num, safe_float
   - DDB range queries: query_range, query_range_list (paginated, phase-scoped — #970)
+  - get_food_delivery_streak_state (#2235 — the one read path for STREAK#current)
   - dedup_activities
   - _normalize_whoop_sleep
   - List-based extractors: ex_whoop_from_list, ex_whoop_sleep_from_list, ex_withings_from_list
@@ -24,6 +25,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from ingestion.source_registry import stale_hours_overrides  # #2235: one staleness threshold, not three copies
 from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -144,6 +146,67 @@ def query_range_list(table, source, start_date, end_date, user_id="matthew", inc
             break
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
     return records
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FOOD DELIVERY STREAK  (#2235 — ONE read path for STREAK#current)
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def get_food_delivery_streak_state(table, user_id="matthew", now=None):
+    """The single sanctioned read of `USER#{user}#SOURCE#food_delivery` / `STREAK#current`.
+
+    #2235 (ADR-104 honest numbers): `streak_days` / `last_order_date` are written ONCE,
+    at ingestion time, by `ingestion.food_delivery_lambda.ingest_food_delivery_rows` —
+    they are never recomputed relative to "today". Once the food_delivery source itself
+    goes stale (no import for longer than its `stale_hours` threshold in
+    `ingestion.source_registry`), the stored streak is a frozen snapshot from the last
+    import, not a live counter — presenting it as today's number is a live-sounding
+    claim about a source that is not live.
+
+    Why WITHHOLD rather than recompute `streak_days = today - last_order_date` (option
+    (a) in the issue): food_delivery is a MANUAL log — a hand-run CSV/statement import
+    (`capture_channel: "mcp"` in source_registry), not a continuously polled API. A gap
+    in imports does not mean "no orders happened"; it means "no import has run to tell
+    us either way" — exactly the behavioural-absence semantics ADR-104 already applies
+    to the character engine (absence of data is not evidence of absence of behavior).
+    Recomputing the elapsed-days figure would assert a specific, growing abstinence
+    streak this source has no way to back — the last import could be silent because
+    nothing happened, or because the statement just hasn't been dropped in yet. So once
+    the source is stale, every consumer gets None (no live-sounding number at all)
+    rather than either a frozen count or a fabricated live one.
+
+    ALL consumers — daily_brief, weekly_digest, character_sheet, and any future one —
+    must call this function rather than reading STREAK#current directly, so the
+    freshness check lives in exactly one place (tests/test_food_delivery_streak_freshness_2235.py
+    derives and enforces that set; it does not hand-enumerate the three known today).
+
+    Returns the raw DDB item (streak_days, last_order_date, last_order_merchant, ...)
+    when the record exists AND its `updated_at` is within the food_delivery
+    `stale_hours` threshold, else None. Non-fatal: returns None on any error (missing
+    item, bad/missing `updated_at`, table failure), matching the historical fail-open
+    behavior of the three read sites this replaces.
+    """
+    try:
+        resp = table.get_item(Key={"pk": f"USER#{user_id}#SOURCE#food_delivery", "sk": "STREAK#current"})
+        item = resp.get("Item")
+        if not item:
+            return None
+        updated_at = item.get("updated_at")
+        if not updated_at:
+            return None
+        updated_dt = datetime.fromisoformat(str(updated_at))
+        if updated_dt.tzinfo is None:
+            updated_dt = updated_dt.replace(tzinfo=timezone.utc)
+        now = now or datetime.now(timezone.utc)
+        stale_hours = stale_hours_overrides(["food_delivery"]).get("food_delivery")
+        if stale_hours is not None:
+            age_hours = (now - updated_dt).total_seconds() / 3600.0
+            if age_hours > stale_hours:
+                return None
+        return item
+    except Exception:
+        return None
 
 
 # ══════════════════════════════════════════════════════════════════════════════

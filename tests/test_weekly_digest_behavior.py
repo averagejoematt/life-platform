@@ -2089,7 +2089,14 @@ class TestBuildHtmlPrivacy:
     def test_the_delivery_free_streak_is_never_rendered_in_the_digest(self, table, delivery_public):
         """Pins today's behaviour: `get_food_delivery_digest_line` exists and
         returns a line, but nothing calls it — see the xfail below."""
-        table.add({"pk": "USER#matthew#SOURCE#food_delivery", "sk": "STREAK#current", "streak_days": 31})
+        table.add(
+            {
+                "pk": "USER#matthew#SOURCE#food_delivery",
+                "sk": "STREAK#current",
+                "streak_days": 31,
+                "updated_at": FROZEN_NOW.isoformat(),  # #2235: fresh
+            }
+        )
         assert wd.get_food_delivery_digest_line() == "Delivery-free streak: 31 days (nutrition bonus 1.10x active)"
         m = {"calories_avg": 1800.0, "protein_avg_g": 190.0, "calorie_target": 1800, "protein_target": 190, "days_logged": 7}
         html = wd.build_html(digest_data(this={"macrofactor": m}), BOARD_TEXT, profile_row())
@@ -2108,12 +2115,30 @@ class TestFoodDeliveryDigestLine:
         assert wd.get_food_delivery_digest_line() is None
 
     def test_a_zero_day_streak_is_absence_rather_than_a_zero_line(self, table, delivery_public):
-        table.add({"pk": "USER#matthew#SOURCE#food_delivery", "sk": "STREAK#current", "streak_days": 0})
+        # Keeps main's `delivery_public` gating fixture (023874f0) AND #2235's fresh
+        # `updated_at`: without the timestamp the read would return None for a
+        # STALENESS reason and this test would pass vacuously, asserting nothing
+        # about the zero-day case it is named for.
+        table.add(
+            {
+                "pk": "USER#matthew#SOURCE#food_delivery",
+                "sk": "STREAK#current",
+                "streak_days": 0,
+                "updated_at": FROZEN_NOW.isoformat(),
+            }
+        )
         assert wd.get_food_delivery_digest_line() is None
 
     def test_each_bonus_band_is_named_at_its_threshold(self, table, delivery_public):
         for days, marker in ((7, "1.02x"), (14, "1.05x"), (30, "1.10x")):
-            table.add({"pk": "USER#matthew#SOURCE#food_delivery", "sk": "STREAK#current", "streak_days": days})
+            table.add(
+                {
+                    "pk": "USER#matthew#SOURCE#food_delivery",
+                    "sk": "STREAK#current",
+                    "streak_days": days,
+                    "updated_at": FROZEN_NOW.isoformat(),
+                }
+            )
             assert marker in wd.get_food_delivery_digest_line()
 
     def test_a_failed_read_yields_no_line_rather_than_an_exception(self, table, delivery_public):
@@ -2135,10 +2160,54 @@ class TestFoodDeliveryDigestLine:
         ),
     )
     def test_the_streak_line_reaches_the_nutrition_section_it_is_written_for(self, table, monkeypatch):
-        table.add({"pk": "USER#matthew#SOURCE#food_delivery", "sk": "STREAK#current", "streak_days": 31})
+        table.add(
+            {
+                "pk": "USER#matthew#SOURCE#food_delivery",
+                "sk": "STREAK#current",
+                "streak_days": 31,
+                "updated_at": FROZEN_NOW.isoformat(),
+            }
+        )
         m = {"calories_avg": 1800.0, "protein_avg_g": 190.0, "calorie_target": 1800, "protein_target": 190, "days_logged": 7}
         html = wd.build_html(digest_data(this={"macrofactor": m}), BOARD_TEXT, profile_row())
         assert "Delivery-free streak: 31 days" in html
+
+
+class TestFoodDeliveryDigestFreshness2235:
+    """#2235: the weekly digest reads the SAME frozen-snapshot record as the daily
+    brief and the character engine. A record whose `updated_at` is past
+    food_delivery's stale_hours threshold (336h = 14 days, source_registry.py) must
+    not surface as a live streak here either."""
+
+    def test_a_stale_record_yields_no_line(self, table):
+        stale = (FROZEN_NOW - timedelta(hours=337)).isoformat()
+        table.add(
+            {
+                "pk": "USER#matthew#SOURCE#food_delivery",
+                "sk": "STREAK#current",
+                "streak_days": 40,
+                "last_order_date": "2026-01-01",
+                "updated_at": stale,
+            }
+        )
+        assert wd.get_food_delivery_digest_line() is None
+
+    def test_a_record_just_inside_the_threshold_still_reports(self, table):
+        fresh = (FROZEN_NOW - timedelta(hours=335)).isoformat()
+        table.add(
+            {
+                "pk": "USER#matthew#SOURCE#food_delivery",
+                "sk": "STREAK#current",
+                "streak_days": 40,
+                "last_order_date": "2026-01-01",
+                "updated_at": fresh,
+            }
+        )
+        assert "1.10x" in wd.get_food_delivery_digest_line()
+
+    def test_a_record_with_no_updated_at_is_withheld(self, table):
+        table.add({"pk": "USER#matthew#SOURCE#food_delivery", "sk": "STREAK#current", "streak_days": 40})
+        assert wd.get_food_delivery_digest_line() is None
 
 
 # ══════════════════════════════════════════════════════════════════════════════

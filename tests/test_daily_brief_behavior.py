@@ -1027,7 +1027,12 @@ class TestStoreHabitScores:
 
 class TestFoodDeliverySignal:
     def _streak(self, table, **fields):
-        table.store[(f"USER#{brief.USER_ID}#SOURCE#food_delivery", "STREAK#current")] = fields
+        # #2235: updated_at defaults FRESH (pinned to the frozen cron instant) so
+        # these tests exercise the signal-formatting logic, not the freshness gate
+        # — see TestFoodDeliveryStreakFreshness2235 below for the stale-source case.
+        row = {"updated_at": FROZEN_NOW.isoformat()}
+        row.update(fields)
+        table.store[(f"USER#{brief.USER_ID}#SOURCE#food_delivery", "STREAK#current")] = row
 
     def test_no_streak_record_is_no_signal(self, table, delivery_public):
         assert brief.get_food_delivery_brief_signal() is None
@@ -1055,6 +1060,39 @@ class TestFoodDeliverySignal:
 
     def test_a_failed_read_is_non_fatal(self, table, delivery_public):
         table.get_error = RuntimeError("throttled")
+        assert brief.get_food_delivery_brief_signal() is None
+
+
+class TestFoodDeliveryStreakFreshness2235:
+    """#2235: `streak_days`/`last_order_date` are written ONCE at ingestion time
+    (ingestion.food_delivery_lambda) and never recomputed relative to "today". A
+    record frozen past food_delivery's stale_hours threshold (336h = 14 days,
+    source_registry.py) must never surface as a live-sounding streak — this is the
+    exact bug the issue found live (a record 133 days stale still reporting
+    "streak_days: 3" as current)."""
+
+    def _streak_at(self, table, updated_at, **fields):
+        row = {"updated_at": updated_at}
+        row.update(fields)
+        table.store[(f"USER#{brief.USER_ID}#SOURCE#food_delivery", "STREAK#current")] = row
+
+    def test_a_stale_record_produces_no_signal_at_all(self, table):
+        stale = (FROZEN_NOW - timedelta(hours=337)).isoformat()
+        self._streak_at(table, stale, streak_days=40, last_order_date="2026-01-01")
+        assert brief.get_food_delivery_brief_signal() is None
+
+    def test_a_record_just_inside_the_threshold_still_reports(self, table):
+        fresh = (FROZEN_NOW - timedelta(hours=335)).isoformat()
+        self._streak_at(table, fresh, streak_days=40, last_order_date="2026-01-01")
+        assert "1.10x" in brief.get_food_delivery_brief_signal()
+
+    def test_a_record_with_no_updated_at_is_withheld_rather_than_assumed_fresh(self, table):
+        """A malformed/legacy row with no timestamp can't be proven fresh — the
+        honest default is to withhold, not to trust it."""
+        table.store[(f"USER#{brief.USER_ID}#SOURCE#food_delivery", "STREAK#current")] = {
+            "streak_days": 40,
+            "last_order_date": "2026-01-01",
+        }
         assert brief.get_food_delivery_brief_signal() is None
 
 
@@ -1946,7 +1984,15 @@ class TestPublicStatsTruth:
         The gate now lives inside the signal function itself, so this asserts on
         the SHIPPED default (flag unset) rather than a patched one — deliberately
         NOT taking the `delivery_public` fixture."""
-        handler_env["table"].store[(f"USER#{brief.USER_ID}#SOURCE#food_delivery", "STREAK#current")] = {"streak_days": Decimal("21")}
+        # #2235: `updated_at` pinned FRESH relative to the frozen cron instant, so the
+        # record survives the new freshness gate and this test keeps asserting the
+        # PRIVACY question it is named for. Without it the read returns None for a
+        # STALENESS reason and the assertion below passes vacuously — it would go on
+        # passing against a signal function whose gate had been deleted.
+        handler_env["table"].store[(f"USER#{brief.USER_ID}#SOURCE#food_delivery", "STREAK#current")] = {
+            "streak_days": Decimal("21"),
+            "updated_at": FROZEN_NOW.isoformat(),
+        }
         brief.lambda_handler({}, None)
         narratives = _published(handler_env)["group_narratives"]
         assert "delivery" not in str(narratives).lower(), f"delivery behaviour published: {narratives}"
