@@ -1,10 +1,20 @@
 # pr-checks.yml — the minimal ADVISORY pre-merge lane (ADR-139, #1344).
 #
-# Three fast checks (~1 min total) on every PR, killing the two documented
-# agent-merge failure classes at the door:
+# Fast checks (~2 min total) on every PR, killing the documented agent-merge
+# failure classes at the door:
 #   1. pytest --collect-only  — the #1297 collection-error class
-#   2. the deploy_critical marker subset — ADR-117's fast offline lane
-#   3. black --check — the format gate (same pin as ci-cd.yml lint)
+#   2. the `premerge` marker lane — the behaviour suite + deploy_critical + (since
+#      2026-08-09) the structural gates, all selected by ONE marker defined in
+#      tests/conftest.py so the two lanes cannot drift
+#   3. mypy on the tier-2 clean set — same command + pin as ci-lint.yml
+#   4. black --check and ruff check — the format/lint gates (same pins as ci-lint.yml)
+#
+# WHY 3 AND 4 ARE HERE (2026-08-09). Everything in ci-lint.yml and ci-test.yml runs
+# only AFTER a merge. On 2026-08-08 main went red four times in one session and every
+# red was one of these gates — a `var-annotated` mypy error twice, and two module-size
+# ceilings — each knowable from the PR's own diff, each costing 20-70 minutes of driver
+# time to find and fix on main. Cost of moving them left: ~0.3s (mypy, warm) + ~2s
+# (the structural gates) + ~1s (ruff).
 #
 # REQUIRED since #1662 / ADR-148. This job's `name:` below IS the required
 # check-run context (`Collect + deploy-critical + format`) in the
@@ -60,9 +70,14 @@ jobs:
       # ci-test.yml's install step (minus pytest-cov, which only the coverage job needs);
       # tests/test_premerge_lane.py asserts the two stay in sync.
       - name: Install lane dependencies
-        run: pip install pytest==9.1.1 boto3==1.43.62 botocore==1.43.62 black==26.3.1 hypothesis==6.165.0 pyyaml==6.0.3  # pinned to match requirements-dev.txt + ci-test.yml (CQ-01, #2058, #2258)
+        run: pip install pytest==9.1.1 boto3==1.43.62 botocore==1.43.62 black==26.3.1 hypothesis==6.165.0 pyyaml==6.0.3 mypy==2.3.0 ruff==0.14.14  # pinned to match requirements-dev.txt + ci-test.yml + ci-lint.yml (CQ-01, #2058, #2258)
 
+      # `if: always()` from here down — the #749 lesson, applied to this lane. Sequential
+      # gates mean the FIRST red masks every gate after it, so an agent fixes black,
+      # discovers mypy, fixes mypy, discovers the size ceiling: one push per layer. Each
+      # gate's own non-zero exit still fails the job, so gating is unchanged.
       - name: Collection gate (the #1297 class dies here)
+        if: always()
         run: python3 -m pytest tests/ --collect-only -q
 
       # #2258: the pre-merge lane must not be a strict SUBSET of the post-merge one.
@@ -70,8 +85,34 @@ jobs:
       # tests/*_behavior.py test PLUS everything deploy_critical — so this is a strict
       # superset of the old ADR-117 subset, not a swap. ~6,075 tests in ~30s (measured
       # 2026-08-08) against this job's timeout-minutes: 10.
-      - name: Pre-merge test lane (premerge marker — behaviour + deploy-critical)
+      #
+      # The marker's THIRD source (2026-08-09) is tests/conftest.py's
+      # `_PREMERGE_EXTRA_FILES` — the structural gates (both size ceilings, the two
+      # registries a new module must join, the mypy clean set) that ran nowhere until
+      # after a merge and red-mained main four times on 2026-08-08. They cost 1.98s
+      # locally for all 66 tests. No workflow edit was needed to add them: one marker,
+      # one selection, which is exactly the property #2258 bought.
+      - name: Pre-merge test lane (premerge marker — behaviour + deploy-critical + structural gates)
+        if: always()
         run: python3 -m pytest tests/ -m "premerge and not integration" -q --tb=short
 
+      # The SAME command ci-lint.yml's "Mypy gate" runs, against the same authoritative
+      # module list (tests/mypy_clean_set.py). It is duplicated as an explicit step rather
+      # than left to test_mypy_clean_modules.py because that test carries a
+      # `skipif(not _mypy_available())` — in a lane without mypy installed it would report
+      # green while checking nothing, which is the one failure shape this repo keeps
+      # re-learning. Measured 0.31s warm; ~30-60s cold on a runner.
+      - name: Mypy gate (tier-2 clean set — same command + pin as ci-lint.yml)
+        if: always()
+        run: python3 -m mypy --config-file mypy.ini $(python3 tests/mypy_clean_set.py)
+
       - name: Format gate (same pin as ci-cd lint)
+        if: always()
         run: black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
+
+      # Same class as the mypy gate above: ENFORCED in ci-lint.yml, invisible on a PR.
+      # The full six-directory set is load-bearing — running a subset locally is how a
+      # ruff red reaches main.
+      - name: Lint gate (ruff — same command + pin as ci-lint.yml)
+        if: always()
+        run: ruff check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/

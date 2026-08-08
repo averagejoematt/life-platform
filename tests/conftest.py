@@ -138,18 +138,45 @@ def _hermetic_aws_credentials(request, monkeypatch):
 # workflows reference this one marker, so the two lanes cannot drift apart again.
 _PREMERGE_FILENAME_SUFFIX = "_behavior.py"
 
+# THE THIRD SOURCE — the structural gates that only ever ran AFTER merge (2026-08-09).
+#
+# #2258 closed the *behaviour* half of the pre-merge gap. The other half stayed open:
+# main went red four more times in one session, and every one was a repo-shape gate that
+# no PR check runs — a module crossing a size ceiling, and a new module that has to join
+# a registry nothing points at from the module itself. Each red cost 20–70 minutes of
+# driver time, and each was knowable from the PR's own diff.
+#
+# These are hand-listed on purpose, and that is the honest weak point: unlike
+# `*_behavior.py` there is no filename or marker these five share that a sixth would
+# inherit. What makes the hand-list safe is that it cannot rot silently —
+# tests/test_premerge_lane.py asserts every path here exists AND that the set covers
+# every guard whose failure is a pure function of the repo tree (see
+# `test_the_structural_gates_run_pre_merge`). Add to it whenever a new gate of that
+# shape lands; the marker is the ONE selection mechanism both lanes name, so the
+# workflow never needs a matching edit.
+_PREMERGE_EXTRA_FILES = frozenset(
+    {
+        "test_lambda_size_gate.py",  # ADR-080: *_lambda.py over 2,000 lines
+        "test_module_size_guard.py",  # #1665: the 1,200-line ceiling + the BASELINE ratchet
+        "test_phase_context_coverage.py",  # the phase-context census a new module must join
+        "test_grounding_wiring_1967.py",  # the grounding-surface registry, likewise
+        "test_mypy_clean_modules.py",  # tier-2 types (real only when mypy is installed — the lane installs it)
+    }
+)
+
 
 def pytest_collection_modifyitems(config, items):
-    """Auto-apply `premerge` to the behaviour suite + everything deploy-critical.
+    """Auto-apply `premerge` to the behaviour suite + deploy-critical + the structural gates.
 
-    Two sources, one marker:
-      - any test in a `tests/*_behavior.py` file (the union-breach detector), and
+    Three sources, one marker:
+      - any test in a `tests/*_behavior.py` file (the union-breach detector),
       - any test already marked `deploy_critical` (ADR-117's deploy-gating subset),
         so the pre-merge lane is a strict SUPERSET of what it checked before rather
-        than a swap.
+        than a swap, and
+      - the `_PREMERGE_EXTRA_FILES` structural gates, whose verdict depends only on the
+        repo tree and which previously ran nowhere until after a merge.
     """
     for item in items:
-        if os.path.basename(str(getattr(item, "fspath", ""))).endswith(_PREMERGE_FILENAME_SUFFIX) or item.get_closest_marker(
-            "deploy_critical"
-        ):
+        name = os.path.basename(str(getattr(item, "fspath", "")))
+        if name.endswith(_PREMERGE_FILENAME_SUFFIX) or name in _PREMERGE_EXTRA_FILES or item.get_closest_marker("deploy_critical"):
             item.add_marker(pytest.mark.premerge)
