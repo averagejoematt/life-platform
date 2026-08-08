@@ -717,11 +717,16 @@ def _get_energy_expenditure(args):
     # starts 6 days back; `days=7`/`days=30` summed 8/31 dates and then divided by
     # the literals 7 and 30, overstating the daily average that sets his calorie
     # target by ~14%.
-    _explicit_start = args.get("start_date")
-    d30_start = _explicit_start or (_end_dt - timedelta(days=29)).strftime("%Y-%m-%d")
-    d7_start = _explicit_start or (_end_dt - timedelta(days=6)).strftime("%Y-%m-%d")
-    _d7_days = (_end_dt - datetime.strptime(d7_start, "%Y-%m-%d")).days + 1
-    _d30_days = (_end_dt - datetime.strptime(d30_start, "%Y-%m-%d")).days + 1
+    d30_start = (_end_dt - timedelta(days=29)).strftime("%Y-%m-%d")
+    d7_start = (_end_dt - timedelta(days=6)).strftime("%Y-%m-%d")
+    _d7_days = 7
+    _d30_days = 30
+    # `start_date` is declared in this tool's registry schema but the 7d/30d
+    # averages are fixed-width by definition — honouring an arbitrary start would
+    # make `exercise_kcal_7d_daily_avg` span something other than 7 days, which is
+    # the exact dishonesty being fixed here. Say it is ignored instead of
+    # silently dropping it.
+    _ignored_start = args.get("start_date")
     profile = get_profile()
 
     height_in = profile.get("height_inches")
@@ -777,11 +782,28 @@ def _get_energy_expenditure(args):
         about which branch ran."""
         total_kj = sum(float(d.get("total_kilojoules") or 0) for d in strava_items)
         total_time = sum(float(d.get("total_moving_time_seconds") or 0) for d in strava_items)
-        if total_kj > 0:
-            # kJ of mechanical work ≈ kcal expended at ~25% gross efficiency.
-            return round(total_kj * 1.0, 0), "measured_kilojoules"
-        hours = total_time / 3600
-        return round(6 * weight_kg * hours, 0), ("duration_proxy_6_kcal_per_kg_hour" if total_time > 0 else "no_activity_in_window")
+        if total_kj <= 0:
+            hours = total_time / 3600
+            return round(6 * weight_kg * hours, 0), ("duration_proxy_6_kcal_per_kg_hour" if total_time > 0 else "no_activity_in_window")
+        # Only power-equipped activities report kJ. Counting the day's kJ as the
+        # WHOLE day's expenditure would drop a run that shared the day with a
+        # ride, so the moving time NOT covered by a kJ reading still gets the
+        # proxy. Rows written before the writer recorded that split carry no
+        # covered-time field — for them, kJ is taken to cover the day (the old
+        # behaviour) rather than double-counting.
+        covered_s = sum(
+            float(
+                d.get("kilojoules_moving_time_seconds")
+                if d.get("kilojoules_moving_time_seconds") is not None
+                else (d.get("total_moving_time_seconds") or 0)
+            )
+            for d in strava_items
+            if float(d.get("total_kilojoules") or 0) > 0
+        )
+        uncovered_hours = max(0.0, total_time - covered_s) / 3600
+        # kJ of mechanical work ≈ kcal expended at ~25% gross efficiency.
+        kcal = total_kj * 1.0 + 6 * weight_kg * uncovered_hours
+        return round(kcal, 0), ("measured_kilojoules" if uncovered_hours <= 0 else "mixed_measured_kilojoules_and_duration_proxy")
 
     strava_7d = query_source("strava", d7_start, end_date)
     strava_30d = query_source("strava", d30_start, end_date)
@@ -820,7 +842,20 @@ def _get_energy_expenditure(args):
         "bmr_kcal": bmr,
         "bmr_age_years": round(age_years, 1),
         "bmr_age_basis": age_basis,
-        "window": {"d7_start": d7_start, "d7_days": _d7_days, "d30_start": d30_start, "d30_days": _d30_days, "end_date": end_date},
+        "window": {
+            "d7_start": d7_start,
+            "d7_days": _d7_days,
+            "d30_start": d30_start,
+            "d30_days": _d30_days,
+            "end_date": end_date,
+            "start_date_ignored": _ignored_start,
+            "note": (
+                "The 7d/30d averages are fixed-width windows anchored to end_date; an explicit start_date is "
+                "reported here rather than applied, so the field names keep matching the spans."
+                if _ignored_start
+                else None
+            ),
+        },
         "exercise_kcal_7d_daily_avg": ex_daily_7d_avg,
         "exercise_kcal_30d_daily_avg": ex_daily_30d_avg,
         "exercise_energy_basis_7d": ex_basis_7d,

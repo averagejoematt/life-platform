@@ -313,6 +313,11 @@ def transform(raw: dict, date_str: str) -> list[dict]:
             # a permanently-dark branch: every TDEE those tools returned came from
             # the 6 kcal/kg/h duration proxy, even on rides with a power meter.
             "total_kilojoules": round(sum(a.get("kilojoules") or 0 for a in activities), 1),
+            # How much of the day's moving time that kJ figure actually covers —
+            # only power-equipped activities report kilojoules, so without this a
+            # reader cannot tell a fully-measured day from a ride-plus-run day and
+            # would silently drop the run.
+            "kilojoules_moving_time_seconds": sum(a.get("moving_time_seconds") or 0 for a in activities if a.get("kilojoules")),
             "total_elevation_gain_feet": round(sum(a.get("total_elevation_gain_feet") or 0 for a in activities), 1),
             "sport_types": sorted(set(a.get("sport_type", "") for a in activities)),
             "total_zone2_seconds": sum(a.get("zone2_seconds") or 0 for a in activities),

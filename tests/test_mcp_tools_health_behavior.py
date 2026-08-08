@@ -541,11 +541,30 @@ def test_readiness_precomputed_hrv_trend_also_publishes_its_n(monkeypatch):
     publishes the identical field names WITH `n_days_7d`/`n_days_30d`. Same reader, same key names, opposite rigor —
     so whether Matthew can tell a 30-day baseline from a 2-day one depends on whether daily-metrics-compute happened
     to run. It should carry the n stored beside the average.
+
+    CORRECTION to that last sentence: there IS no n stored beside the average.
+    `lambdas/compute/daily_metrics_compute_lambda.py` writes `hrv_7d` / `hrv_30d`
+    and nothing else, so the tool cannot read an n that was never persisted. The
+    fix is therefore ADR-104 honest ABSENCE — the key is published as an explicit
+    None with a note saying why — plus the forward path of reading a real
+    `hrv_7d_n` / `hrv_30d_n` the day the writer starts storing them. Both shapes
+    are asserted below so this cannot pass vacuously on a key that is merely
+    present.
     """
     install(monkeypatch, _readiness_rows())
     raw = th.tool_get_readiness_score({})["components"]["hrv_trend"]["raw"]
     assert raw["source"] == "pre_computed_metrics"
-    assert "n_days_7d" in raw and "n_days_30d" in raw
+    # (a) writer stores no n today -> explicit absence, never a silent omission
+    assert raw["n_days_7d"] is None and raw["n_days_30d"] is None
+    assert "stores the HRV averages without the reading counts" in raw["n_note"]
+
+    # (b) the day the writer does store them, they are published as real numbers
+    rows = _readiness_rows()
+    rows[1] = cmetrics(TODAY, hrv_7d=44, hrv_30d=40, tsb=4, hrv_7d_n=7, hrv_30d_n=28)
+    install(monkeypatch, rows)
+    raw2 = th.tool_get_readiness_score({})["components"]["hrv_trend"]["raw"]
+    assert raw2["n_days_7d"] == 7 and raw2["n_days_30d"] == 28
+    assert "n_note" not in raw2
 
 
 def test_readiness_seven_day_window_really_spans_seven_days(monkeypatch):
