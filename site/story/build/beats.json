@@ -2282,6 +2282,33 @@
         }
       ],
       "why_it_mattered": "The platform's promise is honest numbers, and this session proved the machinery can audit itself: tests written to measure coverage instead caught the system lying to a real reader every week — then the same pipeline that found the lie repaired it before the next send. Quality work and throughput stopped being a trade-off for one night."
+    },
+    {
+      "id": "2026-08-08-the-guards-that-were-not-guarding",
+      "date": "2026-08-08",
+      "title": "Five privacy guards, and the mutation test that asked whether any of them actually fired",
+      "shipped": "A test that claimed to protect the second layer of a privacy screen on published journal quotes turned out to protect nothing: delete the layer entirely and all 55 tests in the file still passed, because the fixture was caught by an earlier gate and execution never reached the layer named in its own docstring. Fixing it opened a question worth asking of everything: how many other guards pass while guarding nothing? A systematic sweep neutered privacy and security screens one at a time and ran the full 10,900-test suite against each. Four more came back unguarded — including the genetic-category screen on the public labs endpoint (the full suite passes with it removed) and a blocked-term screen where four of six call sites could be deleted with a completely green build. One was worse than unguarded: a delivery-spend endpoint published its numbers with no privacy flag at all, while the module next door gated the identical data private-by-default with a comment explaining why. That one shipped a fix the same night, gated before the query rather than filtering after it, with a guard that walks the code for every reader of that data so a future third one fails the build automatically. The same session took measured test coverage from 63.14% to 70.50% and split a 2,664-line handler into five modules behind an unchanged facade.",
+      "gotcha": "Every one of these guards was green. That is the point: a test asserting the right thing about the wrong layer is indistinguishable from a working test until you break the code on purpose and check that it complains. Mutation — delete the protection, expect red — is the only question that gets an honest answer, and it is now the standard here: a guard that has not been proven to fire is not a guard.",
+      "honest_miss": "None of the four newly-found gaps was actually leaking. The screens are all present and running; what is missing is anything that would notice if they were removed. Saying otherwise would have been the more dramatic claim and the false one. Two self-inflicted breaks also landed on main and were fixed forward: a botched conflict resolution shipped literal merge-conflict markers into a doc while every gate reported green — the two sides of the conflict were identical, so the checker that reads that line saw exactly what it expected — and a test suite went red on a dependency that was never declared anywhere, invisible beforehand because the fast pre-merge lane only collects those tests without running them.",
+      "prs": [
+        {
+          "label": "PR #2205",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2205"
+        },
+        {
+          "label": "PR #2210",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2210"
+        },
+        {
+          "label": "PR #2208",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2208"
+        },
+        {
+          "label": "PR #2202",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2202"
+        }
+      ],
+      "why_it_mattered": "This platform publishes a real person's health data, and the privacy screens are the promise that some of it stays private. A screen nobody can prove still works is a promise on trust rather than on evidence. Asking the question properly — break it on purpose, demand that something complains — turned five green tests into an honest inventory: one fixed, one latent exposure closed the same night, three filed with the exact mutation that exposes each. The reassuring version of this story would have said the guards were failing and were now saved. The true version is duller and more useful: they were working, nothing was leaking, and until tonight nothing would have noticed if they stopped."
     }
   ]
 }
