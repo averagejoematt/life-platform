@@ -1201,16 +1201,14 @@ class TestHandlerAiDegradation:
 
 
 class TestHandlerDryRun:
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-2 discovery, #2111 class): weekly_plate_lambda.lambda_handler ignores "
-            "`event` entirely — there is no dry_run gate, unlike between_chronicle, "
-            "chronicle_email_sender, chronicle_approve and coach_panel_podcast, which all honour "
-            "`event.get('dry_run')`. Any regen/verification invoke of this function sends a real "
-            "email to the recipient AND burns a Sonnet call."
-        ),
-    )
     def test_a_dry_run_invoke_does_not_send_a_real_email(self, wired):
+        """FIXED by #2222 — this handler now honours a dry-run suppressor.
+
+        It was an `xfail` describing a real defect: the handler ignored `event`
+        entirely, so there was no safe way to exercise it and every verification
+        invoke mailed Matthew and burned a Sonnet call. #2222 put all 17 SES-sending
+        handlers behind one derived guard, which made this marker stale — it xpassed,
+        i.e. it was still asserting a defect that no longer exists. Flipped to a real
+        assertion so it now protects the fix instead of describing the bug."""
         wp.lambda_handler({"dry_run": True}, None)
         assert wired["ses"].sent == []

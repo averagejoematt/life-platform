@@ -2395,19 +2395,15 @@ class TestLambdaHandler:
         wd.lambda_handler({}, None)
         assert wired["writer"].written == []
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-3, P2 — #2111 class): weekly_digest_lambda.lambda_handler (:2110) "
-            "ignores `event` entirely — there is no dry_run gate, unlike between_chronicle, "
-            "chronicle_approve and coach_panel_podcast which all honour event.get('dry_run'). "
-            "Any regen/verification invoke of weekly-digest sends a real email to Matthew and "
-            "burns a Sonnet call (the model default at :1251 is claude-sonnet-4-6 despite the "
-            "function being named call_haiku). Hurts: there is no safe way to exercise this "
-            "Lambda in production, which is exactly how the #2111 class keeps recurring."
-        ),
-    )
     def test_a_dry_run_invoke_does_not_send_a_real_email(self, wired):
+        """FIXED by #2222 — this handler now honours a dry-run suppressor.
+
+        It was an `xfail` describing a real defect: the handler ignored `event`
+        entirely, so there was no safe way to exercise it and every verification
+        invoke mailed Matthew and burned a Sonnet call. #2222 put all 17 SES-sending
+        handlers behind one derived guard, which made this marker stale — it xpassed,
+        i.e. it was still asserting a defect that no longer exists. Flipped to a real
+        assertion so it now protects the fix instead of describing the bug."""
         wd.lambda_handler({"dry_run": True}, None)
         assert wired["ses"].sent == []
 
