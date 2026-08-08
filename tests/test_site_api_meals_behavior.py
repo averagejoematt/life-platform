@@ -471,14 +471,6 @@ def test_a_request_id_set_by_the_lambda_is_echoed_back_for_support_correlation(n
     """`set_request_id` is how a reader-reported "this page is wrong" is tied to a
     CloudWatch line. Every `_ok` response echoes it; meal_responses builds its
     headers by hand and drops it."""
-    if name == "meal_responses":
-        pytest.xfail(
-            "DEFECT (tranche-2 discovery): site_api_meals.meal_responses hand-rolls "
-            "`{**CORS_HEADERS, 'Cache-Control': ...}` instead of using site_api_common._ok, "
-            "so it emits neither the `x-request-id` response header nor `_meta.request_id`. "
-            "A reader complaint about /api/meal_responses cannot be correlated to a log line, "
-            "unlike all four sibling endpoints."
-        )
     sac.set_request_id("req-abc-123")
     resp = HANDLERS[name](_g=make_g())
     assert resp["headers"].get("x-request-id") == "req-abc-123"
@@ -505,39 +497,21 @@ def _data_keys(payload: dict) -> set[str]:
         "frequent_meals",
         "meal_glucose",
         "meal_responses",
-        pytest.param(
-            "protein_sources",
-            marks=pytest.mark.xfail(
-                strict=False,
-                reason=(
-                    "DEFECT (tranche-2 discovery): site_api_meals.protein_sources publishes a "
-                    "COMPLETELY DISJOINT empty-state payload. Populated it returns "
-                    "{protein_sources, total_protein_30d_avg_g, total_protein_avg_g, "
-                    "total_protein_avg_g_window_days, days_analyzed}; empty it returns "
-                    "{sources, as_of_date} — zero keys in common. The v4 binding survives only "
-                    "because evidence_nutrition.js defensively reads "
-                    "`ps.protein_sources || ps.sources || ps.proteins`; site/legacy/nutrition/"
-                    "index.html reads `d.protein_sources` alone and renders nothing, and the "
-                    "ADR-105 sample size `days_analyzed` disappears entirely on the empty path."
-                ),
-            ),
-        ),
-        pytest.param(
-            "food_delivery_overview",
-            marks=pytest.mark.xfail(
-                strict=False,
-                reason=(
-                    "DEFECT (tranche-2 discovery): site_api_meals.food_delivery_overview returns "
-                    "only {'food_delivery': None} when the 30-day window is empty, omitting the "
-                    "`platform_breakdown` and `weekly_trend` arrays it publishes when populated. "
-                    "Any consumer that iterates either array without a null guard throws on a "
-                    "quiet window — the Day-1-of-a-cycle case."
-                ),
-            ),
-        ),
+        "protein_sources",
+        "food_delivery_overview",
     ],
 )
 def test_the_empty_state_publishes_every_key_the_populated_state_does(delivery_public, name):
+    """FIXED (#2221). `protein_sources` used to publish a COMPLETELY DISJOINT
+    empty-state payload — populated `{protein_sources, total_protein_*,
+    days_analyzed}` vs empty `{sources, as_of_date}`, zero keys in common — and
+    `food_delivery_overview` dropped `platform_breakdown`/`weekly_trend` on a
+    quiet window. Both now build their payload through one shape.
+
+    NB this runs with the delivery gate ON. The gate-OFF payload is deliberately
+    the bare `{"food_delivery": None}` and is pinned as such by
+    tests/test_food_delivery_gate_2209.py — parity is a contract of the PUBLISHED
+    endpoint, not a licence to emit delivery-shaped keys while it is private."""
     empty = _data_keys(body_of(HANDLERS[name](_g=make_g())))
     populated = _data_keys(body_of(HANDLERS[name](_g=_populated_g(name))))
     missing = populated - empty
@@ -581,33 +555,22 @@ def test_a_meal_with_no_cgm_coverage_is_graded_unknown_rather_than_good():
     assert meal["grade"] == "?"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): site_api_meals.meal_glucose line ~263 publishes "
-        '`"spike": avg_spike if avg_spike is not None else 0` — an unmeasurable meal '
-        "(no CGM coverage, or carbs <= 5g so no spike sample was taken) ships spike=0, "
-        "which reads as 'this meal produced no glucose rise'. That is ADR-104's exact "
-        "prohibition: absence rendered as a factual zero. The grade field is honest ('?'), "
-        "so the same payload simultaneously says 'unknown' and '0 mg/dL rise'."
-    ),
-)
 def test_a_meal_with_no_glucose_sample_reports_an_absent_spike_not_a_zero_rise():
+    """FIXED (#2221). `meal_glucose` published `avg_spike if avg_spike is not None
+    else 0` — an unmeasurable meal (no CGM coverage that day, or carbs <= 5 g so no
+    spike sample was taken) shipped spike=0, i.e. "this meal produced no glucose
+    rise". The grade field was already honest ("?"), so one payload said both
+    "unknown" and "0 mg/dL rise"."""
     src = FakeSources(filter_window=False, macrofactor=[mf("2026-04-15", food("Oatmeal", calories_kcal=350, carbs_g=60))])
     meal = call("meal_glucose", src)["meals"][0]
     assert meal["spike"] is None, "an unmeasured spike must be absent, not 0"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): site_api_meals.meal_glucose assigns curve='gentle' "
-        "when avg_spike is None — the SAME curve string it assigns to a genuinely gentle "
-        "grade-B meal (spike 16-25 mg/dL). An unmeasured meal is therefore indistinguishable "
-        "from a measured-and-good one in the `curve` field a chart binds its shape to."
-    ),
-)
 def test_an_unmeasured_meal_does_not_borrow_the_curve_shape_of_a_good_one():
+    """FIXED (#2221): the unmeasured curve is now "unknown". It used to be
+    "gentle" — the SAME string a genuinely gentle grade-B meal (spike 16-25 mg/dL)
+    gets, so an unmeasured meal was indistinguishable from a measured-and-good one
+    in the field a chart binds its shape to."""
     src = FakeSources(
         filter_window=False,
         macrofactor=[
@@ -622,20 +585,17 @@ def test_an_unmeasured_meal_does_not_borrow_the_curve_shape_of_a_good_one():
     assert by_name["Unmeasured"]["curve"] != "gentle", "unknown must not share the shape word with a measured good meal"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): site_api_meals.protein_sources computes "
-        "`total_protein_avg_g = round(total_protein_all / days_count, 1)` over EVERY "
-        "macrofactor row in the window, including rows that carry no `food_log` at all "
-        "(a day the source synced but no meals were entered). Those days contribute 0 to "
-        "the numerator and 1 to the denominator, so a stretch of un-logged-but-synced days "
-        "publishes a *lower protein average as fact* rather than excluding them — ADR-104 "
-        "absence-as-zero, and it also drags the ADR-105 `days_analyzed` n away from the "
-        "number of days actually measured."
-    ),
-)
 def test_a_synced_day_with_no_food_logged_is_excluded_from_the_protein_average():
+    """FIXED (#2221). The denominator was `len(items)` — EVERY macrofactor row in
+    the window, including rows carrying no `food_log` at all (a day the source
+    synced but no meals were entered). Those days added 0 to the numerator and 1
+    to the denominator, publishing a lower protein average as fact and dragging
+    the ADR-105 n away from the days actually measured.
+
+    NB the exclusion is on `food_log` PRESENCE, not on qualifying protein: a day
+    on which only olive oil was logged IS a measured day that carried ~0 g of
+    qualifying protein, and it stays in the denominator (see
+    test_zero_protein_foods_are_dropped_rather_than_listed_as_zero_contributors)."""
     src = FakeSources(
         macrofactor=[
             mf("2026-04-15", food("Chicken Breast", protein_g=60, calories_kcal=300)),
@@ -650,18 +610,17 @@ def test_a_synced_day_with_no_food_logged_is_excluded_from_the_protein_average()
     assert b["total_protein_avg_g"] == 60.0
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): site_api_meals.protein_sources publishes "
-        "`protein_cal_pct: round((total_protein*4)/total_cal*100) if total_cal > 0 else 0`. "
-        "A food logged with protein but no calorie figure (common for hand-entered whole "
-        "foods) ships protein_cal_pct=0 — 'none of this food's calories are protein' — "
-        "which is the exact inverse of the truth for a pure-protein item. Absence must be "
-        "None, not 0."
-    ),
-)
 def test_a_food_with_no_calorie_figure_reports_an_absent_protein_calorie_share():
+    """FIXED (#2221): `... if total_cal > 0 else None`. It used to be `else 0` —
+    "none of this food's calories are protein", the exact inverse of the truth for
+    a hand-entered pure-protein whole food.
+
+    KNOWN SIBLING, deliberately NOT changed here: `frequent_meals` publishes its
+    own `protein_cal_pct` and still ships 0 for a calorie-less meal, pinned by
+    test_a_frequent_meal_with_no_calories_logged_reports_a_zero_protein_share_not_a_crash.
+    That one has a live reader — `site/legacy/nutrition/index.html:886` grades it
+    HIGH/MOD/LOW off `m.protein_cal_pct || 0` — so flipping it to None is a
+    front-end change, not an API-only one, and is out of this cluster's scope."""
     src = FakeSources(macrofactor=[mf("2026-04-15", {"food_name": "Chicken Breast", "protein_g": 40})])
     assert call("protein_sources", src)["protein_sources"][0]["protein_cal_pct"] is None
 
@@ -1270,19 +1229,10 @@ def test_frequent_meals_asks_for_a_thirty_day_span():
     assert span == timedelta(days=30)
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): site_api_meals.frequent_meals builds its lower bound as "
-        "`(now - timedelta(days=30))` with NO EXPERIMENT_START clamp, unlike protein_sources / "
-        "meal_glucose / food_delivery_overview which all go through `_g['_experiment_date']`. "
-        "It is the only meal endpoint that reaches past genesis. Today the ADR-058 phase filter "
-        "in _query_source masks most of the consequence, but any prior-cycle row not yet "
-        "phase-tagged (the reset tags asynchronously) surfaces on the new cycle's page, and the "
-        "endpoint has no genesis-derived clamp to fall back on."
-    ),
-)
 def test_frequent_meals_clamps_its_window_to_genesis_like_every_sibling(monkeypatch):
+    """FIXED (#2221): `frequent_meals` now goes through `_g["_experiment_date"]`
+    like every sibling. It used to build `(now - timedelta(days=30))` with no
+    EXPERIMENT_START clamp — the only meal endpoint that reached past genesis."""
     # Run on the REAL clock: frequent_meals cannot be frozen (see the test below),
     # so a frozen genesis would be compared against a live lookback and the result
     # would depend on the wall clock rather than on the code.
@@ -1296,19 +1246,12 @@ def test_frequent_meals_clamps_its_window_to_genesis_like_every_sibling(monkeypa
     assert start >= genesis, f"frequent_meals reached back to {start}, before genesis {genesis}"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): meal_glucose and frequent_meals publish "
-        "`period_days: 30` as an unconditional literal while their actual window is "
-        "genesis-clamped (meal_glucose) or fixed (frequent_meals). On Day 5 of a cycle the "
-        "payload says the meal table covers 30 days when it covers 5 — the #1917 reader-truth "
-        "class. It is invisible to tests/test_window_name_honesty_1917.py's AST guard because "
-        "that guard only matches `_Nd`-SUFFIXED key names, and `period_days` carries its "
-        "window in the VALUE instead of the key."
-    ),
-)
 def test_the_published_period_matches_the_window_actually_queried(monkeypatch):
+    """FIXED (#2221). Both handlers published `period_days: 30` as an
+    unconditional literal while the actual window was genesis-clamped, so on Day 5
+    of a cycle the payload claimed 30 days of meal table over 5 days of data. The
+    #1917 AST guard could not see it: that guard matches `_Nd`-SUFFIXED key names,
+    and `period_days` carries its window in the VALUE."""
     # Real clock (meal_glucose's `end` cannot be frozen — see the test below), with
     # genesis five days back, so this reproduces Day 5 of a cycle exactly.
     monkeypatch.setattr(sac, "datetime", datetime)
@@ -1321,19 +1264,12 @@ def test_the_published_period_matches_the_window_actually_queried(monkeypatch):
     assert body["period_days"] == actual, f"claims {body['period_days']}d, queried {actual}d"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): site_api_meals.frequent_meals and .meal_glucose each "
-        "re-import `from datetime import datetime, ... ` INSIDE the function body, shadowing "
-        "the module-level binding on line 13. The consequence is a broken test seam identical "
-        "in shape to the memory note 'a re-export is not a patch point': "
-        "`monkeypatch.setattr(meals, 'datetime', ...)` — the seam every #1084/#1917 window test "
-        "uses and the only way to pin a genesis-boundary window — silently no-ops for these two "
-        "handlers, so their date arithmetic cannot be tested at a boundary at all."
-    ),
-)
 def test_the_module_clock_can_be_frozen_for_every_handler_not_just_four_of_them():
+    """FIXED (#2221): the in-function `from datetime import ...` re-imports are
+    gone from both `frequent_meals` and `meal_glucose`. They shadowed the
+    module-level binding, so `monkeypatch.setattr(meals, "datetime", ...)` — the
+    seam every #1084/#1917 window test uses — silently no-opped for those two and
+    their date arithmetic could not be pinned at a boundary at all."""
     src = FakeSources(filter_window=False)
     meals.frequent_meals(_g=make_g(src))
     _start, end = src.window_for("macrofactor")
@@ -1507,18 +1443,11 @@ def test_one_unparseable_macro_value_does_not_take_down_the_frequent_meals_table
     assert meals.frequent_meals(_g=make_g(src))["statusCode"] == 503
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): site_api_meals.protein_sources has NO exception guard at "
-        "all (unlike frequent_meals and meal_glucose, which wrap the same arithmetic). Its "
-        "`float(entry.get('protein_g') or 0)` raises ValueError on one non-numeric value and the "
-        "exception escapes the handler and the facade delegator, so the Function URL returns a "
-        "502 for /api/protein_sources — which the site smoke test treats as a fleet-wide "
-        "regression and auto-rolls-back on. One malformed food row, ~100 Lambdas reverted."
-    ),
-)
 def test_one_unparseable_protein_value_does_not_five_hundred_the_protein_page():
+    """FIXED (#2221): protein_sources now degrades to a 503 like its two siblings.
+    It had NO exception guard at all, so one non-numeric `protein_g` escaped the
+    handler AND the facade delegator and the Function URL answered 502 — which the
+    site smoke test reads as a fleet-wide regression and auto-rolls-back on."""
     src = FakeSources(
         macrofactor=[
             mf("2026-04-15", {"food_name": "Broken Row", "protein_g": "n/a"}, food("Chicken Breast", protein_g=40, calories_kcal=200)),
@@ -1527,17 +1456,11 @@ def test_one_unparseable_protein_value_does_not_five_hundred_the_protein_page():
     assert meals.protein_sources(_g=make_g(src))["statusCode"] in (200, 503)
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): site_api_meals.food_delivery_overview has no exception "
-        "guard either. `sum(float(i.get('amount') or 0) for i in items)` raises ValueError on a "
-        "currency-formatted amount ('$24.50' — the shape a hand-entered or scraped record "
-        "takes), and the endpoint 502s. Note the module already guards the WEEK PARSE of the "
-        "same records with try/except, so the omission is inconsistent within one function."
-    ),
-)
 def test_one_currency_formatted_amount_does_not_five_hundred_the_delivery_page(delivery_public):
+    """FIXED (#2221). `sum(float(i.get("amount") or 0) ...)` raised ValueError on a
+    currency-formatted amount ("$24.50" — the shape a hand-entered or scraped
+    record takes) and 502'd. The module already guarded the WEEK PARSE of the same
+    records, so the omission was inconsistent inside one function."""
     src = FakeSources(food_delivery=[delivery("2026-04-15", amount="$24.50"), delivery("2026-04-16", amount=18.0)])
     assert meals.food_delivery_overview(_g=make_g(src))["statusCode"] in (200, 503)
 
