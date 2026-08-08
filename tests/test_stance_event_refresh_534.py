@@ -417,10 +417,15 @@ class TestEventStanceRefreshDispatch:
         monkeypatch.setattr(chs, "_query_begins_with", lambda pk, prefix: [])
         captured = {}
 
-        def fake_run_stance(coach_id, compressed, state, trigger="weekly", event_context=None):
+        # **kw deliberately (#2195): this double must not pin `_run_stance`'s signature.
+        # Adding the presence_signal kwarg failed loudly here and would have been
+        # SWALLOWED by the handler's own try/except on the weekly path — the same trap
+        # #2056 hit with `_ground_legacy_output`. The double asserts what it cares about.
+        def fake_run_stance(coach_id, compressed, state, trigger="weekly", event_context=None, **kw):
             captured["coach_id"] = coach_id
             captured["trigger"] = trigger
             captured["event_context"] = event_context
+            captured["presence_signal"] = kw.get("presence_signal")
             return {"written": True}
 
         monkeypatch.setattr(chs, "_run_stance", fake_run_stance)

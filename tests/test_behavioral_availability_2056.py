@@ -293,6 +293,8 @@ class TestSurfaceCensus:
             "lambdas/emails/daily_debrief_lambda.py::narrate",
             "lambdas/compute/state_of_matthew_lambda.py::narration_gate",
             "lambdas/intelligence/ai_expert_analyzer_lambda.py::generate_and_cache",
+            # #2195 — #2056's one recorded residual, armed once its cost was measured.
+            "lambdas/coach/coach_history_summarizer.py::_apply_grounding_gate",
         ):
             assert newly in armed, f"{newly} lost its #1699 wiring"
         # and the registry POLICY agrees with what the tree actually does

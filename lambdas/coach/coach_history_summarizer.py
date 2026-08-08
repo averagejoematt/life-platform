@@ -60,6 +60,9 @@ except ImportError:
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+# #2195: the USER# partition owner — same env-var idiom every other reader of the
+# engagement_state singleton uses (daily_brief, daily_debrief, monday_compass, …).
+USER_ID = os.environ.get("USER_ID", "matthew")
 
 ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
 AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
@@ -178,6 +181,22 @@ except ImportError:  # pragma: no cover — environment-dependent
 
     def cycle_gate_params(generation_date_iso=None):  # type: ignore[misc]
         return {}
+
+
+# #2195: the #1699 ungrounded-behavioral class joins the stance gate. #2056's census
+# left this surface as its ONE genuine residual — the stance pipeline reads only the
+# COACH# partition (OUTPUT#/THREAD#/PREDICTION#/CONFIDENCE#/RELATIONSHIP#/VOICE#/
+# INTERACTION#/LEARNING#), none of which is a behavior log, so there is nothing already
+# in hand to derive a per-generation-date map from and arming it needs a real read.
+# The measured cost of that read is ONE eventually-consistent GetItem PER INVOCATION —
+# hoisted to the handler and shared by all 8 coaches, so it does not scale with the
+# loop — on a weekly cron plus the ≤2/day platform-wide event-refresh cap. See
+# `_presence_signal` for the ordering fact that makes it a real map, not a guess.
+# Fails open exactly like the gate above: a missing module leaves the class unarmed.
+try:
+    from ai.behavior_logs import available_logs_from_presence
+except ImportError:  # pragma: no cover — environment-dependent
+    available_logs_from_presence = None
 
 
 # R22-SEC-04 (#811): the compression prompt replays stored public-board reader
@@ -322,6 +341,31 @@ def _get_item(pk, sk):
     except Exception as e:
         logger.warning("get_item(%s, %s) failed: %s", pk, sk, e)
         return None
+
+
+def _presence_signal():
+    """The engagement_state STATE#current record — the #1699 availability map's source (#2195).
+
+    ONE read per INVOCATION, hoisted above the 8-coach loop: the record is platform-wide,
+    not per-coach, so the marginal cost of arming the behavioral class on every coach's
+    stance is a single GetItem, not eight. Fail-soft to None (class stays unarmed).
+
+    Read through `_get_item` deliberately, not a bare `table.get_item`: engagement_state
+    is exactly the kind of singleton a restart wipes and TOMBSTONES (#1895), and
+    `singleton_visible` is the #1969 filter that stops a tombstoned record seeding a
+    fresh cycle. A stale map is worse than none here for the same reason a guessed one is.
+
+    WHY THE MAP IS REAL ON THE WEEKLY PATH (the ordering fact, not an assumption):
+    adaptive-mode writes this record at 16:35 UTC daily and the weekly compression runs
+    at 17:00 UTC Sunday — 25 minutes later — so the signal's own `date` equals the
+    stance's `as_of` and `available_logs_from_presence` can answer for the generation
+    day. On the mid-week event-refresh path (invoked by coach-prediction-evaluator's
+    16:00 UTC run, 35 minutes BEFORE adaptive-mode) the record still carries the previous
+    day, the derivation answers `LogAvailability.none()`, and the class correctly stays
+    dark rather than grading a same-day claim against yesterday's logs. That is the
+    designed fail-soft, and `tests/test_stance_behavioral_gate_2195.py` pins both halves.
+    """
+    return _get_item(f"USER#{USER_ID}#SOURCE#engagement_state", "STATE#current")
 
 
 def _put_item(item):
@@ -1325,7 +1369,7 @@ def _stance_prose_blob(stance):
     return json.dumps({k: stance.get(k) for k in _STANCE_PROSE_FIELDS}, default=str)
 
 
-def _apply_grounding_gate(coach_id, meta, compressed, prior_stance, user_message, result):
+def _apply_grounding_gate(coach_id, meta, compressed, prior_stance, user_message, result, presence_signal=None):
     """#534: the ADR-104 grounded-generation gate joins the STANCE# writer.
 
     grounding_findings() runs the shared allow-list number check over the
@@ -1334,6 +1378,19 @@ def _apply_grounding_gate(coach_id, meta, compressed, prior_stance, user_message
     pattern, reused rather than reinvented. Findings that survive the one
     regen are returned to the caller, which fail-keep-priors: a stance that
     still cites an ungrounded number is never written over a good one.
+
+    #2195: the #1699 ungrounded-behavioral class arms here too. The stance is a
+    second-person surface about Matthew BY PROMPT RULE ("Write in the FIRST PERSON
+    ('I'). Address him as 'you'"), and the prompt asks for "what I care most about
+    right now" — so a same-day completed-action claim ("you logged your meals today")
+    is a shape this surface really can emit, and it is precisely the claim class no
+    number or date gate can see. `presence_signal` is the engagement_state record the
+    caller read once for the whole invocation; the map is keyed to the stance's own
+    `as_of` (the generation date). Coverage is partial and DECLARED — food/training/
+    journal are answerable from that record, steps and the eating window are not, and
+    an unanswerable category stays UNKNOWN rather than being reported absent (ADR-104
+    behavioral-absence semantics; a guessed map is worse than none). Omitted, or read
+    back empty/tombstoned, the class stays unarmed exactly as before #2195.
     """
     if grounding_findings is None or regen_once is None or allowed_numbers is None:
         return result, []  # shared module unavailable — fail-open, matches its own design
@@ -1344,10 +1401,24 @@ def _apply_grounding_gate(coach_id, meta, compressed, prior_stance, user_message
     # phase-aware classes (#1691/#1897) — a stance that narrates a stale "Day N" or a
     # cycle-9 starting weight is the same failure class as a fabricated number.
     _dates = allowed_dates(user_message) if allowed_dates is not None else None
+    # #2195: the availability map, derived once per stance from the record the handler
+    # already read. `as_of` is the stance's own generation date, set before this call.
+    _logs = (
+        available_logs_from_presence(presence_signal, result.get("as_of"))
+        if (presence_signal and available_logs_from_presence is not None)
+        else None
+    )
     holder = {"latest": result}
 
     def _findings_fn(text):
-        return grounding_findings(text, facts=None, allowed=allowed, allowed_dates=_dates, **cycle_gate_params())
+        return grounding_findings(
+            text,
+            facts=None,
+            allowed=allowed,
+            allowed_dates=_dates,
+            available_logs=_logs,
+            **cycle_gate_params(),
+        )
 
     def _regen_fn(correction):
         strict_message = user_message + "\n\n" + correction
@@ -1372,7 +1443,7 @@ def _apply_grounding_gate(coach_id, meta, compressed, prior_stance, user_message
     return best, findings
 
 
-def _generate_stance(coach_id, compressed, track, prior_stance, event_context=None):
+def _generate_stance(coach_id, compressed, track, prior_stance, event_context=None, presence_signal=None):
     """Generate one coach's evolving stance via a grounded Haiku call.
 
     Self-corrects ONCE if raw vitals leak (mirrors ai_expert_analyzer), then
@@ -1385,6 +1456,9 @@ def _generate_stance(coach_id, compressed, track, prior_stance, event_context=No
     deterministic, already-computed description of the significant event that
     triggered a mid-week refresh (never LLM-generated, never raw numbers) so
     the model has something concrete to react to without inventing anything.
+
+    presence_signal (#2195, optional): the invocation-scoped engagement_state read
+    that arms the #1699 ungrounded-behavioral class. Omitted ⇒ unarmed, unchanged.
     """
     meta = _coach_meta(coach_id)
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -1424,7 +1498,9 @@ def _generate_stance(coach_id, compressed, track, prior_stance, event_context=No
     _sanitize_stance(result, compressed, prior_stance)
 
     # #534: ADR-104 gate — one corrective regen, fail-keep-prior on the caller.
-    result, adr104_findings = _apply_grounding_gate(coach_id, meta, compressed, prior_stance, user_message, result)
+    result, adr104_findings = _apply_grounding_gate(
+        coach_id, meta, compressed, prior_stance, user_message, result, presence_signal=presence_signal
+    )
     result["_adr104_findings"] = adr104_findings
     if result.get("grounding_flag"):
         logger.warning("[stance] %s retains raw-vital citations after correction — flagged", coach_id)
@@ -1441,7 +1517,7 @@ def _write_stance(coach_id, stance):
     return ok_hist and ok_latest
 
 
-def _run_stance(coach_id, compressed, state, trigger="weekly", event_context=None):
+def _run_stance(coach_id, compressed, state, trigger="weekly", event_context=None, presence_signal=None):
     """Gather track record + prior stance, generate, and persist. Returns a result
     dict for the handler summary. Fail-soft — never raises into the compression loop.
 
@@ -1455,7 +1531,7 @@ def _run_stance(coach_id, compressed, state, trigger="weekly", event_context=Non
     try:
         track = _summarize_track_record(_gather_learning(coach_id), state.get("confidence_records", []))
         prior_stance = _get_item(f"COACH#{coach_id}", "STANCE#latest")
-        stance = _generate_stance(coach_id, compressed, track, prior_stance, event_context=event_context)
+        stance = _generate_stance(coach_id, compressed, track, prior_stance, event_context=event_context, presence_signal=presence_signal)
         if not stance:
             return {"written": False, "reason": "generation_failed"}
 
@@ -1536,7 +1612,17 @@ def _handle_event_stance_refresh(event):
     state = {"confidence_records": _query_begins_with(f"COACH#{coach_id}", "CONFIDENCE#")}
 
     event_type = event_context.get("type", "unknown")
-    result = _run_stance(coach_id, compressed, state, trigger=f"event:{event_type}", event_context=event_context)
+    # #2195: the one presence read for this (single-coach) invocation. On this path it
+    # usually predates the stance's own day — see `_presence_signal` — and the
+    # derivation then answers nothing, which is the honest outcome, not a gap.
+    result = _run_stance(
+        coach_id,
+        compressed,
+        state,
+        trigger=f"event:{event_type}",
+        event_context=event_context,
+        presence_signal=_presence_signal(),
+    )
     logger.info("[event-stance] %s (%s) -> %s", coach_id, event_type, result)
     return {"statusCode": 200, "coach_id": coach_id, "event_type": event_type, "result": result}
 
@@ -1565,6 +1651,12 @@ def lambda_handler(event, context):
 
         results = {}
         errors = []
+
+        # #2195: ONE engagement_state read for the whole batch — the record is
+        # platform-wide, so arming the #1699 behavioral class on all 8 stances costs a
+        # single GetItem, not one per coach. Read before the loop so a mid-run write
+        # cannot make two coaches see different availability for the same day.
+        presence_signal = _presence_signal()
 
         for coach_id in coach_ids:
             try:
@@ -1602,7 +1694,7 @@ def lambda_handler(event, context):
 
                 # Stance engine (coach-opinion) — evolving evidence-derived read of
                 # Matthew. Fail-soft: a stance error never aborts the compression run.
-                results[coach_id]["stance"] = _run_stance(coach_id, compressed, state, trigger="weekly")
+                results[coach_id]["stance"] = _run_stance(coach_id, compressed, state, trigger="weekly", presence_signal=presence_signal)
 
             except Exception as e:
                 logger.error("Failed to compress %s: %s", coach_id, e, exc_info=True)

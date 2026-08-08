@@ -16,6 +16,11 @@ block below. Every surface still exempt from the class now carries a reason spec
 IT, and the difference matters: a registry whose exemptions are all one sentence records
 that nobody has looked, while a registry of distinct reasons records what was measured.
 
+#2195 took it to 6 of 15 by paying the one measured cost #2056 had written down rather
+than hidden — the stance writer's extra engagement_state read. The remaining 9
+exemptions are all structural (the surface is not about Matthew, is third person, is a
+post-hoc auditor, or has only a prior-day fact); none of them is discharged by wiring.
+
 HOW IT'S GUARDED (guard the SET, not the instance)
 --------------------------------------------------
 The surface list is **derived**, never hand-maintained: ``scan_tree()`` AST-scans
@@ -87,7 +92,21 @@ PARAM_PROVIDER_MODULE = "lambdas/ai/grounding_gate_params.py"
 #      but not steps had to stay dark or flag every step claim falsely. Declared partial
 #      coverage is what makes a partial-visibility surface armable *honestly*.
 #
-# What is left is not one excuse repeated; it is four distinct structural reasons, and
+# #2195 then closed #2056's ONE recorded residual, the stance writer
+# (`coach_history_summarizer::_apply_grounding_gate`). #2056 had correctly measured that
+# nothing in that pipeline is day-scoped — it reads only the COACH# partition — so
+# arming it needed a real read and #2056 deferred it as an explicit cost decision rather
+# than guessing a map. #2195 measured the cost and paid it: ONE eventually-consistent
+# GetItem on engagement_state STATE#current PER INVOCATION (hoisted above the 8-coach
+# loop, so it does not scale with the loop), on a weekly cron plus a ≤2/day
+# platform-wide event-refresh cap — ≤~780 reads a year, well under a cent, and no IAM
+# or CDK change since the table grant is already table-level. It arms only where it can
+# answer honestly: adaptive-mode writes that record 25 minutes before the weekly run, so
+# the map really is same-day there; on the mid-week event path the record predates the
+# stance's day and the derivation returns `LogAvailability.none()` rather than grading a
+# same-day claim against yesterday's logs.
+#
+# What is left is not one excuse repeated; it is three distinct structural reasons, and
 # each says what would have to become true for the class to arm.
 _NOT_ABOUT_MATTHEW = (
     "the #1699 gate checks a SECOND-PERSON same-day claim, and on this surface `you` is "
@@ -109,15 +128,6 @@ _PRIOR_DAY_SCOPED_LOGS = (
     "for TODAY. Passing a prior-day map would grade a same-day claim against the previous "
     "day's logs — a wrong answer, not a partial one. Arming this needs a same-day probe, "
     "which is new I/O this once-a-day pipeline does not otherwise perform."
-)
-_HISTORY_ONLY_INPUT = (
-    "the only surface with a genuine missing-map residual after #2056. The stance writer "
-    "is handed the coach's own compressed HISTORY, track record and previous stance — no "
-    "day-scoped partition is read anywhere in this pipeline, so there is nothing already "
-    "loaded to derive a per-generation-date map from and `ai.behavior_logs` has no "
-    "derivation that fits. Arming it means adding a read (the engagement_state "
-    "STATE#current record `available_logs_from_presence` consumes), which is a deliberate "
-    "cost decision on a per-coach loop, not a wiring oversight."
 )
 _PRECEDENT_SCOPED_DATES = (
     "uses the framing-scoped precedent check (semantic_recall.precedent_citation_findings) "
@@ -162,8 +172,8 @@ SURFACES = {
         {"dates": _PRECEDENT_SCOPED_DATES},
     ),
     "lambdas/coach/coach_history_summarizer.py::_apply_grounding_gate": _entry(
-        ("numbers", "dates", "freshness"),
-        {"behavioral": _HISTORY_ONLY_INPUT, "night": _NO_NIGHT_MAP},
+        ("numbers", "dates", "freshness", "behavioral"),
+        {"night": _NO_NIGHT_MAP},
     ),
     "lambdas/coach/inter_coach_dialogue_lambda.py::generate_gated_turn": _entry(
         ("numbers", "dates", "freshness"),
