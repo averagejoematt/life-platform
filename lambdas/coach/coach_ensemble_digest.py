@@ -32,6 +32,8 @@ from datetime import datetime, timezone
 import boto3
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1969
 
+from coach.persona_registry import OPERATIONAL_COACH_IDS
+
 # Structured logger
 try:
     from common.platform_logger import get_logger
@@ -52,17 +54,16 @@ S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
 AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 
-# All coach IDs in the system
-ALL_COACH_IDS = [
-    "sleep_coach",
-    "nutrition_coach",
-    "training_coach",
-    "mind_coach",
-    "physical_coach",
-    "glucose_coach",
-    "labs_coach",
-    "explorer_coach",
-]
+# All coach IDs in the system — DERIVED from the canonical registry, never
+# re-typed. persona_registry.OPERATIONAL_COACH_IDS is the list that MUST stay
+# equal to the `operational: true` personas in config/personas.json (enforced by
+# tests/test_persona_registry.py). This module's copy had already drifted in
+# ORDER (nutrition/training transposed), and dispute_docket imports this name as
+# its identity gate (#1797) — so a ninth operational coach added to the registry
+# would have been invisible to the digest AND rejected from its own docket.
+# A list() copy, not the registry object, so a caller mutating this name cannot
+# corrupt every other consumer of the registry.
+ALL_COACH_IDS = list(OPERATIONAL_COACH_IDS)
 
 # CloudWatch metrics
 _cw = boto3.client("cloudwatch", region_name=REGION)
@@ -163,7 +164,17 @@ def _call_haiku(system, user_message, max_tokens=6000, temperature=0.2):
     from common.retry_utils import call_anthropic_raw
 
     resp = call_anthropic_raw(req)
-    text = resp["content"][0]["text"].strip()
+    # An empty `content` list is what a max_tokens stop with no emitted text
+    # looks like. Indexing [0] raised IndexError, which the handler's blanket
+    # except swallowed into a fallback digest — the failure was real but
+    # unnamed. Treat "no completion" as its own explicit outcome (ADR-104: a
+    # failed model call must be distinguishable, never silently filed).
+    content = (resp or {}).get("content") or []
+    first = content[0] if content else None
+    text = (first.get("text") or "").strip() if isinstance(first, dict) else ""
+    if not text:
+        logger.warning("ensemble model returned an empty completion — treating as no response")
+        return ""
     try:
         return json.loads(text)
     except json.JSONDecodeError:
@@ -475,10 +486,19 @@ def _build_default_digest(coach_data, cycle_date):
         output = data.get("output", {}) or {}
         compressed = data.get("compressed", {}) or {}
 
+        # Reader/writer agreement: the ONLY writer of COACH#*/COMPRESSED#latest is
+        # coach_history_summarizer, whose schema stores `key_concerns`,
+        # `key_recommendations` and `recent_themes` — it has never written
+        # `key_themes` (that name is an in-memory default the narrative
+        # orchestrator synthesises for a coach with NO compressed state; it is
+        # never persisted). Reading `key_themes` here made the fallback's
+        # key_concerns permanently [] while the data it wanted sat unread in the
+        # record it had just fetched — and `ensemble` is a band-1 budget feature,
+        # so the fallback is the common path, not the rare one.
         summary = {
             "coach_id": coach_id,
-            "key_concerns": compressed.get("key_themes", [])[:3],
-            "key_recommendations": [],
+            "key_concerns": (compressed.get("key_concerns") or [])[:3],
+            "key_recommendations": (compressed.get("key_recommendations") or [])[:3],
             "predictions_active": [],
             "confidence_state": compressed.get("confidence_state", {}),
             "wants_team_input_on": [],
@@ -525,6 +545,23 @@ def _write_digest(digest, cycle_date):
     return success
 
 
+def _next_cycle_count(existing, cycle_date):
+    """How many distinct cycles this disagreement has persisted for.
+
+    Idempotent in `cycle_date`: writing the same cycle again — a retry, a
+    duplicate EventBridge delivery, or a second topic in the same run whose
+    slug collides — re-states the count rather than advancing it.
+    """
+    stored = existing.get("cycle_count") or 0
+    try:
+        stored = int(stored)
+    except (TypeError, ValueError):
+        stored = 0
+    if existing.get("last_cycle_date") == cycle_date:
+        return max(stored, 1)
+    return stored + 1
+
+
 def _write_disagreements(disagreements, cycle_date):
     """Write or update active disagreement records.
 
@@ -539,6 +576,23 @@ def _write_disagreements(disagreements, cycle_date):
         topic = disagreement.get("topic", "unnamed")
         slug = _slugify(topic)
         now_iso = datetime.now(timezone.utc).isoformat()
+
+        # #1797's identity gate, on THIS writer too. dispute_docket got it; the
+        # sibling writer on the same LLM input did not — and this partition is
+        # the one emails/podcast_script_v2 renders into the public Friday Panel
+        # script, so an invented coach id or a display name written where a
+        # canonical id belongs reaches a reader surface (ADR-104). Same rule as
+        # open_from_disagreements: two coaches minimum, every one of them a
+        # member of the house roster, checked before anything is stored.
+        coaches = [c for c in (disagreement.get("coaches") or []) if c]
+        non_members = [c for c in coaches if c not in ALL_COACH_IDS]
+        if len(coaches) < 2 or non_members:
+            logger.warning(
+                "Dropping disagreement %r — %s",
+                topic,
+                f"non-member coach id(s) {non_members!r}" if non_members else "fewer than two coaches named",
+            )
+            continue
 
         # Check if this disagreement already exists
         existing = _get_item("ENSEMBLE#disagreements", f"ACTIVE#{slug}")
@@ -555,7 +609,14 @@ def _write_disagreements(disagreements, cycle_date):
                 "data_needed_to_resolve": disagreement.get("data_needed_to_resolve", ""),
                 "first_seen": existing.get("first_seen", now_iso),
                 "last_seen": now_iso,
-                "cycle_count": (existing.get("cycle_count", 0) or 0) + 1,
+                # `cycle_count` is published verbatim by the Friday Panel as
+                # "OPEN ARGUMENT (cycle_count N)" — a claim about how many
+                # cycles the coaches have been arguing. It must count CYCLES,
+                # not writes. `last_cycle_date` was stored one line below and
+                # never read, so a retry, a manual re-invoke, an EventBridge
+                # duplicate delivery — or two topics in ONE run that slugify
+                # alike — each inflated a public number (ADR-104).
+                "cycle_count": _next_cycle_count(existing, cycle_date),
                 "last_cycle_date": cycle_date,
             }
         else:
@@ -623,6 +684,16 @@ def _update_coach_compressed_states(digest, coach_data, cycle_date):
             "team_input_requested": summary.get("wants_team_input_on", []),
             "updated_at": now_iso,
         }
+
+        # ADR-104: COMPRESSED#latest is dumped verbatim into the NEXT cycle's
+        # ensemble prompt (_build_user_message) and into the coach's own memory
+        # block on the website (site_api_ai_lambda). On a budget-paused or
+        # LLM-failed cycle the digest marks itself `_fallback` but this write-back
+        # did not, so a stub was replayed as the ensemble's genuine finding —
+        # and since `ensemble` is band-1, that is the common path. Carry the
+        # marker with the contribution, the same way the digest carries it.
+        if digest.get("_fallback"):
+            contribution["_fallback"] = True
 
         # Find disagreements involving this coach
         involved_disagreements = []
@@ -696,6 +767,14 @@ def lambda_handler(event, context):
             "unanimous_flags": [],
             "created_at": datetime.now(timezone.utc).isoformat(),
             "note": "No coach data available — coaches may not have generated outputs yet.",
+            # Every other empty-digest path in this module marks itself; this one
+            # was the outlier, carrying only a prose `note` no consumer parses.
+            # site_api_coach_stance._latest_cycle_digest and
+            # coach_observatory_renderer both take the NEWEST CYCLE# row, so an
+            # empty digest shadows the previous cycle's real cross-coach content.
+            # The marker is what lets a reader (or a future renderer) tell the
+            # two apart — see the PR note: the renderers do not check it YET.
+            "_fallback": True,
         }
         _write_digest(digest, cycle_date)
         return _decimal_to_float(digest)
@@ -749,15 +828,18 @@ def lambda_handler(event, context):
         logger.error("LLM call failed: %s — using fallback digest", e)
         digest = _build_default_digest(coach_data, cycle_date)
 
-    # Step 3: Write the digest
-    _write_digest(digest, cycle_date)
-
-    # Step 4: Write/update disagreement records
+    # Step 3: Write/update disagreement records
+    #
+    # This runs BEFORE the digest write on purpose. The docket pass below mutates
+    # `digest["docket"]`, and while it ran after _write_digest that field existed
+    # only in the Lambda's return value — an operator reading the stored digest
+    # could not tell whether the docket pass had run at all. Both writers are
+    # fail-soft, so nothing here can stop the digest from being stored.
     disagreements = digest.get("active_disagreements", [])
     if disagreements:
         _write_disagreements(disagreements, cycle_date)
 
-        # Step 4b (#1386): open Dispute Docket entries for machine-checkable
+        # Step 3b (#1386): open Dispute Docket entries for machine-checkable
         # divergences. dispute_docket.validate_criterion is the deterministic
         # gate; non-resolvable disagreements stay narrative. Fail-soft — a
         # docket error must never sink the digest.
@@ -771,6 +853,9 @@ def lambda_handler(event, context):
             }
         except Exception as e:
             logger.warning("dispute-docket open pass failed (non-fatal): %s", e)
+
+    # Step 4: Write the digest — with the docket outcome, when there was one
+    _write_digest(digest, cycle_date)
 
     # Step 5: Update each coach's compressed state with digest contribution
     _update_coach_compressed_states(digest, coach_data, cycle_date)
