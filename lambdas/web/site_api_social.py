@@ -40,13 +40,13 @@ from ingestion.source_registry import SOURCE_REGISTRY  # #1679 — inbound chann
 from privacy import social_provenance  # #1670 membrane — the origin:human predicate for the broadcast feed (#1672)
 
 from web.site_api_common import (
-    CORS_HEADERS,
     PT,
     S3_REGION,
     STATUS_CACHE_TTL,
     USER_ID,
     USER_PREFIX,
     _decimal_to_float,
+    _envelope,
     _error,
     _is_blocked_vice,
     _load_s3_json,
@@ -84,7 +84,34 @@ _nudge_counts: dict = {}  # ACCT-2: category -> approximate count
 # S3 config caches for experiment + challenge endpoints
 _challenges_cache = None
 _challenges_cache_at = None  # #2019 — TTL stamp; None = pinned (test injection)
-_challenge_catalog_cache = None
+_challenge_catalog_cache: dict | None = None
+_challenge_catalog_cache_at = None  # #2221 — TTL stamp; None = pinned (test injection)
+
+
+def _catalog_cached() -> dict:
+    """The `site/config/challenges_catalog.json` read, cached the way its sibling
+    `_challenges_cache` is (#2019).
+
+    Two bugs this closes (#2221). `_load_s3_json` returns `{}` on ANY failure and
+    `{}` is not None, so the old `if _challenge_catalog_cache is None:` guard PINNED
+    a warm container on an empty catalog after a single transient S3 error —
+    /api/challenge_catalog served `{"challenges": []}` and /api/challenge_vote 503'd
+    for the container's whole life. And with no expiry stamp at all, even a
+    SUCCESSFUL load was never refreshed, so a published correction (including one
+    that flips an entry to `public: false`) stayed dark until a recycle.
+    """
+    global _challenge_catalog_cache, _challenge_catalog_cache_at
+    if _challenge_catalog_cache and config_cache_valid(_challenge_catalog_cache_at):
+        return _challenge_catalog_cache
+    loaded = _load_s3_json("site/config/challenges_catalog.json", "challenge_catalog")
+    if not loaded:
+        # A miss is never cached — the next request retries instead of serving an
+        # empty catalog forever.
+        return {}
+    _challenge_catalog_cache = loaded
+    _challenge_catalog_cache_at = time.monotonic()
+    return _challenge_catalog_cache
+
 
 # R17-04: separate Anthropic key for site-api (distinct from main ai-keys).
 AI_SECRET_NAME = os.environ.get("AI_SECRET_NAME", "life-platform/site-api-ai-key")
@@ -100,6 +127,24 @@ NUDGE_LABELS = {
     "you_got_this": "You've got this 💪",
 }
 FINDING_RATE_LIMIT = 3  # per IP per hour
+FOLLOW_RATE_LIMIT = 10  # per IP per hour — shared by the experiment and challenge follow doors
+# A run is DONE (not still running) in any of these terminal states. Read by BOTH the
+# library pillar stats and the experiment-detail page so the two can't disagree (#2221).
+COMPLETED_RUN_STATUSES = ("completed", "partial", "failed")
+
+
+def _rate_limited(endpoint: str, message: str, retry_after=None, **extra) -> dict:
+    """The ONE 429 in this module — emits the OBS-03 abuse metric, then answers.
+
+    #2221: `_emit_rate_limit_metric` existed but only 3 of the module's 13 refusal
+    paths called it, so the `LifePlatform/SiteApi RateLimitHit` metric under-reported
+    abuse by ~77% and a flood against nudge/vote/follow/checkin/suggest/ritual/
+    predict/cohort was invisible. Emitting inside the builder makes "a 429 that
+    doesn't count" unexpressible; `tests/test_site_api_social_behavior.py` derives the
+    429 set from the AST and asserts nothing else builds one.
+    """
+    _emit_rate_limit_metric(endpoint)
+    return _envelope(429, {"error": message, **extra}, retry_after=retry_after)
 
 
 def handle_current_challenge() -> dict:
@@ -234,11 +279,7 @@ def _handle_verify_subscriber(event: dict) -> dict:
         # Rejected BEFORE the rate check on purpose: a malformed address costs no
         # DynamoDB operation (not even the limiter's UpdateItem) and can answer no
         # membership question, so metering it would only spend writes on garbage.
-        return {
-            "statusCode": 400,
-            "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-            "body": json.dumps({"error": "Valid email required"}),
-        }
+        return _envelope(400, {"error": "Valid email required"})
 
     # Metered through the module chokepoint (#2237) like every other public door.
     # Keyed on the IP alone — NOT on the address — or each new probe address would
@@ -252,36 +293,17 @@ def _handle_verify_subscriber(event: dict) -> dict:
         fail_open=False,
     )
     if not allowed:
-        _emit_rate_limit_metric("verify_subscriber")
-        return {
-            "statusCode": 429,
-            "headers": {
-                **CORS_HEADERS,
-                "Retry-After": str(retry_after or VERIFY_SUBSCRIBER_RATE_WINDOW),
-                "Cache-Control": "no-store",
-            },
-            "body": json.dumps({"error": "Too many verification attempts. Try again in a little while."}),
-        }
+        return _rate_limited(
+            "verify_subscriber",
+            "Too many verification attempts. Try again in a little while.",
+            retry_after=retry_after or VERIFY_SUBSCRIBER_RATE_WINDOW,
+        )
 
     if not _is_confirmed_subscriber(email):
-        return {
-            "statusCode": 404,
-            "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-            "body": json.dumps({"error": "Email not found. Subscribe at /subscribe/ to unlock more questions!"}),
-        }
+        return _envelope(404, {"error": "Email not found. Subscribe at /subscribe/ to unlock more questions!"})
 
     token = _generate_subscriber_token(email)
-    return {
-        "statusCode": 200,
-        "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-        "body": json.dumps(
-            {
-                "token": token,
-                "message": "Verified! You now have 20 questions per hour.",
-                "limit": 20,
-            }
-        ),
-    }
+    return _envelope(200, {"token": token, "message": "Verified! You now have 20 questions per hour.", "limit": 20})
 
 
 def handle_subscriber_count() -> dict:
@@ -300,9 +322,12 @@ def handle_subscriber_count() -> dict:
         )
         count = resp.get("Count", 0)
     except Exception as e:
+        # ADR-104 / #2221: a DDB blip used to publish `count: 0`, which the homepage
+        # and /subscribe/ render as the FACT that nobody has subscribed. Absence is
+        # None; both consumers already branch on `d.count != null`.
         logger.warning(f"[subscriber_count] DDB query failed: {e}")
-        count = 0
-    return _ok({"count": count}, cache_seconds=600)
+        count = None
+    return _ok({"count": count, "available": count is not None}, cache_seconds=600)
 
 
 # ── #2237: the ONE rate-limit chokepoint for this module ─────────────────────
@@ -419,28 +444,21 @@ def _handle_nudge(event: dict) -> dict:
     # nudge in one category doesn't consume another's budget.
     allowed, _rem, _retry = _rate_check(f"nudge:{category}", ip_hash, limit=1, window_seconds=3600)
     if not allowed:
-        return {
-            "statusCode": 429,
-            "headers": {**CORS_HEADERS, "Retry-After": "3600", "Cache-Control": "no-store"},
-            "body": json.dumps({"error": "Already sent this reaction recently. Come back later.", "category": category}),
-        }
+        return _rate_limited("nudge", "Already sent this reaction recently. Come back later.", retry_after=3600, category=category)
 
     # Increment in-memory count
     _nudge_counts[category] = _nudge_counts.get(category, 0) + 1
     logger.info(f"[nudge] category={category} ip_hash={ip_hash} total_this_session={_nudge_counts[category]}")
 
-    return {
-        "statusCode": 200,
-        "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-        "body": json.dumps(
-            {
-                "success": True,
-                "category": category,
-                "label": NUDGE_LABELS[category],
-                "message": "Reaction sent. Matthew will see this in his daily brief.",
-            }
-        ),
-    }
+    return _envelope(
+        200,
+        {
+            "success": True,
+            "category": category,
+            "label": NUDGE_LABELS[category],
+            "message": "Reaction sent. Matthew will see this in his daily brief.",
+        },
+    )
 
 
 def _handle_submit_finding(event: dict) -> dict:
@@ -457,12 +475,7 @@ def _handle_submit_finding(event: dict) -> dict:
     # cold starts; bounded in-memory fallback only, #2237).
     allowed, remaining, _retry = _rate_check("submit_finding", ip_hash, limit=FINDING_RATE_LIMIT, window_seconds=3600)
     if not allowed:
-        _emit_rate_limit_metric("submit_finding")
-        return {
-            "statusCode": 429,
-            "headers": {**CORS_HEADERS, "Retry-After": "3600"},
-            "body": json.dumps({"error": "Rate limit reached. 3 submissions per hour."}),
-        }
+        return _rate_limited("submit_finding", f"Rate limit reached. {FINDING_RATE_LIMIT} submissions per hour.", retry_after=3600)
 
     # Parse body
     try:
@@ -481,6 +494,12 @@ def _handle_submit_finding(event: dict) -> dict:
         return _error(400, "Finding description must be at least 10 characters.")
     if email and "@" not in email:
         return _error(400, "Invalid email format.")
+    # #2221: the sibling capture door (_handle_board_question) screens blocked-vice
+    # text AT THE DOOR; this one — same shape, same S3 moderation queue, same public
+    # POST — screened nothing. Both metric names are screened too: the finding is
+    # rendered next to them.
+    if _is_blocked_vice(finding) or _is_blocked_vice(metric_a) or _is_blocked_vice(metric_b):
+        return _error(400, "That finding can't be submitted.")
 
     # Build finding record
     timestamp = datetime.now(timezone.utc).isoformat()
@@ -515,18 +534,15 @@ def _handle_submit_finding(event: dict) -> dict:
         logger.error(f"[submit_finding] S3 write failed: {e}")
         return _error(503, "Unable to store finding. Try again later.")
 
-    return {
-        "statusCode": 200,
-        "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-        "body": json.dumps(
-            {
-                "success": True,
-                "finding_id": finding_id,
-                "message": "Finding submitted! Matthew will review it and may promote it to a Discovery or seed an Experiment.",
-                "remaining": remaining,
-            }
-        ),
-    }
+    return _envelope(
+        200,
+        {
+            "success": True,
+            "finding_id": finding_id,
+            "message": "Finding submitted! Matthew will review it and may promote it to a Discovery or seed an Experiment.",
+            "remaining": remaining,
+        },
+    )
 
 
 def handle_experiment_library() -> dict:
@@ -650,7 +666,7 @@ def handle_experiment_library() -> dict:
         s = exp.get("status", "backlog")
         if s == "active":
             group["stats"]["active"] += 1
-        elif s in ("completed", "partial", "failed"):
+        elif s in COMPLETED_RUN_STATUSES:
             group["stats"]["completed"] += 1
         else:
             group["stats"]["backlog"] += 1
@@ -747,11 +763,7 @@ def _handle_experiment_vote(event: dict) -> dict:
         )
     except Exception as e:
         if "ConditionalCheckFailedException" in str(e):
-            return {
-                "statusCode": 429,
-                "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-                "body": json.dumps({"error": "Already voted for this experiment in the last 24 hours"}),
-            }
+            return _rate_limited("experiment_vote", "Already voted for this experiment in the last 24 hours")
         logger.error(f"[experiment_vote] Rate limit check failed: {e}")
         return _error(500, "Vote rate limit check failed")
 
@@ -773,16 +785,7 @@ def _handle_experiment_vote(event: dict) -> dict:
         logger.error(f"[experiment_vote] Vote increment failed: {e}")
         return _error(500, "Failed to record vote")
 
-    return {
-        "statusCode": 200,
-        "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-        "body": json.dumps(
-            {
-                "library_id": library_id,
-                "new_count": new_count,
-            }
-        ),
-    }
+    return _envelope(200, {"library_id": library_id, "new_count": new_count})
 
 
 def _handle_experiment_follow(event: dict) -> dict:
@@ -810,7 +813,7 @@ def _handle_experiment_follow(event: dict) -> dict:
     ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
     now_epoch = int(datetime.now(timezone.utc).timestamp())
 
-    # Rate limit: 10 follows per IP per hour
+    # Rate limit: FOLLOW_RATE_LIMIT follows per IP per hour
     rate_pk = "VOTES#rate_limit"
     rate_sk = f"FOLLOW#{ip_hash}#{now_epoch // 3600}"
     try:
@@ -825,12 +828,11 @@ def _handle_experiment_follow(event: dict) -> dict:
             ReturnValues="UPDATED_NEW",
         )
         count = int(result.get("Attributes", {}).get("follow_count", 1))
-        if count >= 10:
-            return {
-                "statusCode": 429,
-                "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-                "body": json.dumps({"error": "Too many follow requests. Try again later."}),
-            }
+        # `>` not `>=` (#2221): the counter is incremented BEFORE it is read, so the
+        # first request already sees 1 and `>= FOLLOW_RATE_LIMIT` refused the TENTH
+        # of the ten follows the docstring advertises.
+        if count > FOLLOW_RATE_LIMIT:
+            return _rate_limited("experiment_follow", "Too many follow requests. Try again later.")
     except Exception as e:
         logger.error(f"[experiment_follow] Rate limit check failed: {e}")
         return _error(500, "Follow rate limit check failed")
@@ -852,19 +854,11 @@ def _handle_experiment_follow(event: dict) -> dict:
         )
     except Exception as e:
         if "ConditionalCheckFailedException" in str(e):
-            return {
-                "statusCode": 200,
-                "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-                "body": json.dumps({"already_following": True, "library_id": library_id}),
-            }
+            return _envelope(200, {"already_following": True, "library_id": library_id})
         logger.error(f"[experiment_follow] DDB put failed: {e}")
         return _error(500, "Failed to save follow")
 
-    return {
-        "statusCode": 200,
-        "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-        "body": json.dumps({"followed": True, "library_id": library_id}),
-    }
+    return _envelope(200, {"followed": True, "library_id": library_id})
 
 
 def _handle_experiment_detail(event: dict) -> dict:
@@ -983,7 +977,10 @@ def _handle_experiment_detail(event: dict) -> dict:
     lib_exp["runs"] = runs
     lib_exp["total_runs"] = len(runs)
     lib_exp["active_run"] = next((r for r in runs if r["status"] == "active"), None)
-    lib_exp["completed_runs_count"] = sum(1 for r in runs if r["status"] == "completed")
+    # #2221: the library pillar header counted a run as completed for any TERMINAL
+    # status; the detail page it links to counted only literal "completed", so a
+    # `failed` run made the two surfaces disagree about the same experiment.
+    lib_exp["completed_runs_count"] = sum(1 for r in runs if r["status"] in COMPLETED_RUN_STATUSES)
 
     return _ok(lib_exp, cache_seconds=900)
 
@@ -993,10 +990,7 @@ def _public_challenge_ids() -> set | None:
     (excludes public:false vice entries). Returns None when the catalog can't be
     loaded so callers fail *closed* (503) rather than accepting arbitrary ids.
     Shares handle_challenge_catalog's module cache."""
-    global _challenge_catalog_cache
-    if _challenge_catalog_cache is None:
-        _challenge_catalog_cache = _load_s3_json("site/config/challenges_catalog.json", "challenge_catalog")
-    cat = _challenge_catalog_cache
+    cat = _catalog_cached()
     if not cat or not cat.get("challenges"):
         return None
     return {
@@ -1045,11 +1039,7 @@ def _handle_challenge_vote(event: dict) -> dict:
         )
     except Exception as e:
         if "ConditionalCheckFailedException" in str(e):
-            return {
-                "statusCode": 429,
-                "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-                "body": json.dumps({"error": "Already voted for this challenge in the last 24 hours"}),
-            }
+            return _rate_limited("challenge_vote", "Already voted for this challenge in the last 24 hours")
         logger.error(f"[challenge_vote] Rate limit check failed: {e}")
         return _error(500, "Vote rate limit check failed")
 
@@ -1071,16 +1061,7 @@ def _handle_challenge_vote(event: dict) -> dict:
         logger.error(f"[challenge_vote] Vote increment failed: {e}")
         return _error(500, "Failed to record vote")
 
-    return {
-        "statusCode": 200,
-        "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-        "body": json.dumps(
-            {
-                "catalog_id": catalog_id,
-                "new_count": new_count,
-            }
-        ),
-    }
+    return _envelope(200, {"catalog_id": catalog_id, "new_count": new_count})
 
 
 def _handle_challenge_follow(event: dict) -> dict:
@@ -1106,7 +1087,7 @@ def _handle_challenge_follow(event: dict) -> dict:
     ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
     now_epoch = int(datetime.now(timezone.utc).timestamp())
 
-    # Rate limit: 10 follows per IP per hour
+    # Rate limit: FOLLOW_RATE_LIMIT follows per IP per hour
     rate_pk = "VOTES#rate_limit"
     rate_sk = f"CHFOLLOW#{ip_hash}#{now_epoch // 3600}"
     try:
@@ -1121,12 +1102,11 @@ def _handle_challenge_follow(event: dict) -> dict:
             ReturnValues="UPDATED_NEW",
         )
         count = int(result.get("Attributes", {}).get("follow_count", 1))
-        if count >= 10:
-            return {
-                "statusCode": 429,
-                "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-                "body": json.dumps({"error": "Too many follow requests. Try again later."}),
-            }
+        # `>` not `>=` (#2221): the counter is incremented BEFORE it is read, so the
+        # first request already sees 1 and `>= FOLLOW_RATE_LIMIT` refused the TENTH
+        # of the ten follows the docstring advertises.
+        if count > FOLLOW_RATE_LIMIT:
+            return _rate_limited("challenge_follow", "Too many follow requests. Try again later.")
     except Exception as e:
         logger.error(f"[challenge_follow] Rate limit check failed: {e}")
         return _error(500, "Follow rate limit check failed")
@@ -1148,19 +1128,11 @@ def _handle_challenge_follow(event: dict) -> dict:
         )
     except Exception as e:
         if "ConditionalCheckFailedException" in str(e):
-            return {
-                "statusCode": 200,
-                "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-                "body": json.dumps({"already_following": True, "catalog_id": catalog_id}),
-            }
+            return _envelope(200, {"already_following": True, "catalog_id": catalog_id})
         logger.error(f"[challenge_follow] DDB put failed: {e}")
         return _error(500, "Failed to save follow")
 
-    return {
-        "statusCode": 200,
-        "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-        "body": json.dumps({"followed": True, "catalog_id": catalog_id}),
-    }
+    return _envelope(200, {"followed": True, "catalog_id": catalog_id})
 
 
 def handle_challenge_catalog() -> dict:
@@ -1170,9 +1142,7 @@ def handle_challenge_catalog() -> dict:
     board recommenders, protocols) plus merged vote counts from DynamoDB.
     Dynamic status (active/completed/checkins) comes from /api/challenges.
     """
-    global _challenge_catalog_cache
-    if _challenge_catalog_cache is None:
-        _challenge_catalog_cache = _load_s3_json("site/config/challenges_catalog.json", "challenge_catalog")
+    catalog = _catalog_cached()
 
     # Merge vote counts from DynamoDB
     vote_counts = {}
@@ -1189,7 +1159,7 @@ def handle_challenge_catalog() -> dict:
         logger.warning(f"[challenge_catalog] Vote query failed (non-fatal): {e}")
 
     # Inject votes into each challenge (deep copy to avoid mutating the cache)
-    result = copy.deepcopy(_challenge_catalog_cache)
+    result = copy.deepcopy(catalog)
     # Filter out private challenges (public: false)
     challenges = [ch for ch in result.get("challenges", []) if ch.get("public", True) is not False]
     total_votes = 0
@@ -1218,11 +1188,33 @@ def handle_challenge_catalog() -> dict:
 # no backfill touches Matthew's own challenge records.
 
 
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _is_iso_date(value: str) -> bool:
+    """True only for a real YYYY-MM-DD calendar day ("2026-13-45" is not one)."""
+    if not _ISO_DATE_RE.match(value):
+        return False
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+    except ValueError:
+        return False
+    return True
+
+
+def _sanitise_text(raw, cap: int = 500) -> str:
+    """HTML-strip + length-cap one reader-supplied free-text field — the treatment
+    every capture door in this module gives its text (`finding` 500, `metric_a/b`
+    100, `question` 500, `note` 500, `idea`/`source` 500)."""
+    if not isinstance(raw, (str, int, float)) or isinstance(raw, bool):
+        return ""
+    return re.sub(r"<[^>]+>", "", str(raw)).strip()[:cap]
+
+
 def _sanitise_note(raw) -> str:
-    """HTML-strip + length-cap a reader-supplied check-in note — the identical
-    treatment `_handle_submit_finding` and `_handle_board_question` give their
-    free-text fields."""
-    return re.sub(r"<[^>]+>", "", str(raw or "")).strip()[:500]
+    """The check-in note's slice of `_sanitise_text` — kept as its own name because
+    `_screened_note` (the read-door re-screen) is written against it."""
+    return _sanitise_text(raw)
 
 
 def _screened_note(raw) -> str:
@@ -1304,8 +1296,13 @@ def handle_challenges() -> dict:
                     "checkin_days": len(checkins),
                     "completed_days": completed_days,
                     "duration_days": duration,
-                    "completion_pct": round(len(checkins) / duration * 100) if duration else 0,
-                    "success_rate": round(completed_days / len(checkins) * 100) if checkins else 0,
+                    # #2221: clamped — the check-in door dedups on `date`, so extra rows
+                    # really can exceed the duration and the progress bar ran past 100%.
+                    "completion_pct": min(100, round(len(checkins) / duration * 100)) if duration else 0,
+                    # ADR-104: a rate with an empty denominator is UNKNOWN, not 0%. Every
+                    # challenge is in that state on its first day. `completed_days: 0`
+                    # beside it is a genuine count and stays 0.
+                    "success_rate": round(completed_days / len(checkins) * 100) if checkins else None,
                 }
             live.append(ch)
             live_ids.add(ch["id"])
@@ -1380,6 +1377,12 @@ def _handle_challenge_checkin(event: dict) -> dict:
         return _error(400, "completed (true/false) required")
     if _is_blocked_vice(note):
         return _error(400, "That note can't be submitted.")
+    # #2221: `date` was written verbatim into Matthew's own challenge row with no
+    # format check and no length cap, and the dedup key IS that field — so every
+    # bogus value minted a NEW check-in row (which is how completion_pct got past
+    # 100). A supplied date must be a real ISO calendar day.
+    if date_str and not _is_iso_date(date_str):
+        return _error(400, "date must be YYYY-MM-DD")
 
     # Rate limit: 1 check-in per IP per challenge per day (#358). Applied
     # unconditionally via the module chokepoint (#2237) — never skipped.
@@ -1387,11 +1390,7 @@ def _handle_challenge_checkin(event: dict) -> dict:
     ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
     allowed, _rem, _retry = _rate_check(f"challenge_checkin:{challenge_id}", ip_hash, limit=1, window_seconds=86400)
     if not allowed:
-        return {
-            "statusCode": 429,
-            "headers": {**CORS_HEADERS, "Retry-After": "86400", "Cache-Control": "no-store"},
-            "body": json.dumps({"error": "Already checked in for this challenge today."}),
-        }
+        return _rate_limited("challenge_checkin", "Already checked in for this challenge today.", retry_after=86400)
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     if not date_str:
@@ -1452,7 +1451,7 @@ def _handle_challenge_checkin(event: dict) -> dict:
             "completed": bool(completed),
             "total_checkins": total,
             "duration_days": duration,
-            "completion_pct": round(total / duration * 100) if duration else 0,
+            "completion_pct": min(100, round(total / duration * 100)) if duration else 0,
         },
         cache_seconds=0,
     )
@@ -1548,11 +1547,7 @@ def _handle_ritual_log(event: dict) -> dict:
     ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
     allowed, _rem, _retry = _rate_check("ritual_log", ip_hash, limit=RITUAL_LOG_RATE_LIMIT, window_seconds=3600)
     if not allowed:
-        return {
-            "statusCode": 429,
-            "headers": {**CORS_HEADERS, "Retry-After": "3600", "Cache-Control": "no-store"},
-            "body": json.dumps({"error": "Too many taps recently. Try again in a bit."}),
-        }
+        return _rate_limited("ritual_log", "Too many taps recently. Try again in a bit.", retry_after=3600)
 
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
     # #1405: private-class metrics land in their own Matthew-private partition —
@@ -1624,17 +1619,26 @@ def _handle_experiment_suggest(event: dict) -> dict:
     ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
     allowed, _rem, _retry = _rate_check("experiment_suggest", ip_hash, limit=3, window_seconds=3600)
     if not allowed:
-        return {
-            "statusCode": 429,
-            "headers": {**CORS_HEADERS, "Retry-After": "3600", "Cache-Control": "no-store"},
-            "body": json.dumps({"error": "Too many suggestions. Please try again later."}),
-        }
+        return _rate_limited("experiment_suggest", "Too many suggestions. Please try again later.", retry_after=3600)
+    # #2221: this door was the module's only capture surface that (a) parsed with
+    # `event.get("body", "{}")` — the DEFAULT form, which never fires for a Function
+    # URL's `body: ""` — (b) applied a MINIMUM but no MAXIMUM length, (c) never
+    # HTML-stripped, and (d) never ran the blocked-vice screen its two siblings run.
+    # A malformed body therefore 500'd (5xx alarm noise for a reader's typo) and a
+    # single POST could park a ~400 KB item in Matthew's moderation partition.
     try:
-        body = json.loads(event.get("body", "{}"))
-        idea = body.get("idea", "").strip()
-        source = body.get("source", "").strip()
-        if not idea or len(idea) < 10:
-            return _error(400, "Idea must be at least 10 characters")
+        body = json.loads(event.get("body") or "{}")
+    except Exception:
+        return _error(400, "Invalid JSON body")
+    if not isinstance(body, dict):
+        return _error(400, "Invalid JSON body")
+    idea = _sanitise_text(body.get("idea"))
+    source = _sanitise_text(body.get("source"))
+    if not idea or len(idea) < 10:
+        return _error(400, "Idea must be at least 10 characters")
+    if _is_blocked_vice(idea) or _is_blocked_vice(source):
+        return _error(400, "That suggestion can't be submitted.")
+    try:
         table.put_item(
             Item={
                 "pk": "USER#matthew#SOURCE#experiment_suggestions",
@@ -1646,7 +1650,7 @@ def _handle_experiment_suggest(event: dict) -> dict:
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
         )
-        return {"statusCode": 200, "headers": CORS_HEADERS, "body": json.dumps({"status": "received"})}
+        return _envelope(200, {"status": "received"})
     except Exception as e:
         logger.error(f"[site_api] experiment_suggest failed: {e}")
         return _error(500, "Failed to submit suggestion")
@@ -1771,11 +1775,7 @@ def _handle_predict_week(event: dict) -> dict:
         )
     except Exception as e:
         if "ConditionalCheckFailedException" in str(e):
-            return {
-                "statusCode": 429,
-                "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-                "body": json.dumps({"error": "You already predicted this metric this week"}),
-            }
+            return _rate_limited("predict_week", "You already predicted this metric this week")
         logger.error(f"[predict_week] dedup check failed: {e}")
         return _error(500, "Prediction rate check failed")
 
@@ -1789,11 +1789,7 @@ def _handle_predict_week(event: dict) -> dict:
         logger.error(f"[predict_week] increment failed: {e}")
         return _error(500, "Failed to record prediction")
 
-    return {
-        "statusCode": 200,
-        "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-        "body": json.dumps({"week_id": week_id, "metric": metric, "tallies": _predict_tallies(week_id, metric)}),
-    }
+    return _envelope(200, {"week_id": week_id, "metric": metric, "tallies": _predict_tallies(week_id, metric)})
 
 
 def handle_predict_week_tally(event: dict) -> dict:
@@ -1842,12 +1838,7 @@ def _handle_board_question(event: dict) -> dict:
     # now shares the module chokepoint with every other door.
     allowed, remaining, _retry = _rate_check("board_question", ip_hash, limit=BOARD_QUESTION_RATE_LIMIT, window_seconds=3600)
     if not allowed:
-        _emit_rate_limit_metric("board_question")
-        return {
-            "statusCode": 429,
-            "headers": {**CORS_HEADERS, "Retry-After": "3600"},
-            "body": json.dumps({"error": "Rate limit reached. 3 questions per hour."}),
-        }
+        return _rate_limited("board_question", f"Rate limit reached. {BOARD_QUESTION_RATE_LIMIT} questions per hour.", retry_after=3600)
 
     try:
         body = json.loads(event.get("body") or "{}")
@@ -1888,18 +1879,15 @@ def _handle_board_question(event: dict) -> dict:
         logger.error(f"[board_question] S3 write failed: {e}")
         return _error(503, "Unable to store question. Try again later.")
 
-    return {
-        "statusCode": 200,
-        "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-        "body": json.dumps(
-            {
-                "success": True,
-                "id": qid,
-                "message": "Question received — Matthew reviews these and the board answers a selection.",
-                "remaining": remaining,
-            }
-        ),
-    }
+    return _envelope(
+        200,
+        {
+            "success": True,
+            "id": qid,
+            "message": "Question received — Matthew reviews these and the board answers a selection.",
+            "remaining": remaining,
+        },
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -2263,7 +2251,7 @@ _LADDER_REPLICATOR_PK = "VOTES#ladder_replicator"
 _PUBLISHED_FINDINGS_INDEX_KEY = "generated/findings/_published_index.json"
 
 
-def _ladder_subscriber_count() -> int:
+def _ladder_subscriber_count() -> int | None:
     """Confirmed-subscriber count — the same COUNT query behind /api/sub_count."""
     try:
         resp = table.query(
@@ -2275,11 +2263,14 @@ def _ladder_subscriber_count() -> int:
         )
         return int(resp.get("Count", 0))
     except Exception as e:
+        # ADR-104 / #2221: returning 0 here published, with a provenance block
+        # vouching for it, the FACT that nobody has ever subscribed — during an
+        # outage. None is absence; the `reader` rung already models it.
         logger.warning(f"[ladder] subscriber count failed: {e}")
-        return 0
+        return None
 
 
-def _ladder_predictor_count() -> int:
+def _ladder_predictor_count() -> int | None:
     """Distinct predict-the-week participants in the active window.
 
     Counts DISTINCT ip_hash across the predict dedup rows (pk VOTES#rate_limit,
@@ -2301,11 +2292,13 @@ def _ladder_predictor_count() -> int:
                 break
             kwargs["ExclusiveStartKey"] = lek
     except Exception as e:
+        # A partial page walk is not a count — absence, not a floor (ADR-104, #2221).
         logger.warning(f"[ladder] predictor count failed: {e}")
+        return None
     return len(seen)
 
 
-def _ladder_replicator_count() -> int:
+def _ladder_replicator_count() -> int | None:
     """Self-certified Replication Kit completions — the aggregate counter row."""
     try:
         resp = table.get_item(Key={"pk": _LADDER_REPLICATOR_PK, "sk": "COUNT"})
@@ -2313,7 +2306,7 @@ def _ladder_replicator_count() -> int:
         return int(item.get("cert_count", 0) or 0)
     except Exception as e:
         logger.warning(f"[ladder] replicator count failed: {e}")
-        return 0
+        return None
 
 
 def _ladder_contributors() -> tuple:
@@ -2361,6 +2354,7 @@ def handle_ladder_counts() -> dict:
             "label": "Subscriber",
             "count": subscribers,
             "countable": True,
+            "available": subscribers is not None,
             "provenance": {
                 "source": "ddb:USER#matthew#SOURCE#subscribers",
                 "method": "COUNT of confirmed (double-opt-in) subscriber records",
@@ -2371,6 +2365,7 @@ def handle_ladder_counts() -> dict:
             "label": "Predictor",
             "count": predictors,
             "countable": True,
+            "available": predictors is not None,
             "provenance": {
                 "source": "ddb:VOTES#rate_limit (PRED# dedup rows)",
                 "method": "distinct participants who cast a predict-the-week call",
@@ -2381,6 +2376,7 @@ def handle_ladder_counts() -> dict:
             "label": "Replicator",
             "count": replicators,
             "countable": True,
+            "available": replicators is not None,
             "provenance": {
                 "source": "ddb:VOTES#ladder_replicator",
                 "method": "self-certified Replication Kit completions, deduped per source",
@@ -2439,11 +2435,7 @@ def _handle_replicate_certify(event: dict) -> dict:
         if "ConditionalCheckFailedException" in str(e):
             # Idempotent: already counted this source. Report success so the reader's
             # own rung still resolves, but do NOT double-count.
-            return {
-                "statusCode": 200,
-                "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-                "body": json.dumps({"certified": True, "counted": False, "message": "Already counted — thanks for replicating."}),
-            }
+            return _envelope(200, {"certified": True, "counted": False, "message": "Already counted — thanks for replicating."})
         logger.error(f"[replicate_certify] dedup write failed: {e}")
         return _error(500, "Could not record certification")
     try:
@@ -2455,11 +2447,7 @@ def _handle_replicate_certify(event: dict) -> dict:
     except Exception as e:
         logger.error(f"[replicate_certify] counter increment failed: {e}")
         return _error(500, "Could not record certification")
-    return {
-        "statusCode": 200,
-        "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-        "body": json.dumps({"certified": True, "counted": True, "message": "Logged — you're on the Replicator rung."}),
-    }
+    return _envelope(200, {"certified": True, "counted": True, "message": "Logged — you're on the Replicator rung."})
 
 
 # ── #1394 (epic #1366): The Cohort Strip — "where do I sit this week?" ──────────
@@ -2580,11 +2568,7 @@ def _handle_cohort_submit(event: dict) -> dict:
     # unconditionally via the module chokepoint (#2237).
     allowed, _rem, _retry = _rate_check(f"cohort_submit:{week}", ip_hash, limit=1, window_seconds=COHORT_SUBMIT_WINDOW)
     if not allowed:
-        return {
-            "statusCode": 429,
-            "headers": {**CORS_HEADERS, "Retry-After": str(COHORT_SUBMIT_WINDOW), "Cache-Control": "no-store"},
-            "body": json.dumps({"error": "You've already added your number this week."}),
-        }
+        return _rate_limited("cohort_submit", "You've already added your number this week.", retry_after=COHORT_SUBMIT_WINDOW)
 
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
     try:

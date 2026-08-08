@@ -287,6 +287,7 @@ def transform(raw, date_str):
     for entry in raw.get("entries", []):
         _archive_post_raw(entry, date_str)
         origin = _origin_for(entry)
+        text = entry.get("text", "")
         record = {
             "source": SOURCE,
             "sk_suffix": f"#{entry['post_id']}",
@@ -296,8 +297,18 @@ def transform(raw, date_str):
             "post_type": "post",
             "date": date_str,
             "url": entry.get("url", ""),
-            "text": entry.get("text", ""),
+            "text": text,
             "embed_url": entry.get("embed_url", ""),
+            # #2221 — the broadcast card (`web/site_api_social._broadcast_card`) is
+            # channel-agnostic: it reads `title`/`description`/`thumbnail_url` off EVERY
+            # ingested-post row. A microblog post has no title, so the transform
+            # normalises here rather than teaching the reader three shapes: the caption
+            # is the post's own first line, the excerpt is its body. `thumbnail_url` is
+            # declared and left EMPTY on purpose — `embed_url` is an external LINK uri (record.embed.external.uri), not an image — and the front-end
+            # (site/assets/js/dispatches.js) puts thumbnail_url straight into <img src>.
+            "title": text.split("\n", 1)[0][:120],
+            "description": text,
+            "thumbnail_url": "",
             "published_at": entry.get("published", ""),
             "author": entry.get("author", ""),
         }

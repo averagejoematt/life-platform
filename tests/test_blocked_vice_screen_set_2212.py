@@ -27,6 +27,13 @@ Structure:
        (_handle_board_question) already had behavioral coverage before this issue —
        tests/test_evidence_catalog.py and tests/test_reader_engagement.py respectively.
        Re-verified by the same neuter/restore process; no new test added for these two.
+  AC3c #2221 added two more sites (24 -> 26; five CALLS, but this derivation keys on
+       (file, line) and each guard is one `or` chain on one line), both in
+       site_api_social.py and both at CAPTURE doors that had no screen at all while
+       their siblings did: `_handle_submit_finding` (`finding`, `metric_a`, `metric_b`)
+       and `_handle_experiment_suggest` (`idea`, `source`). Both satisfy AC1 structurally (each guards an immediate `return
+       _error(400, ...)`) and both are behaviourally covered in
+       tests/test_site_api_social_behavior.py, same disposition as AC3/AC3b.
   AC3b #2238 added the 12th and 13th sites — the check-in `note` screen at the write
        door (`_handle_challenge_checkin`) and at the read door (`_screened_note`, reached
        from `handle_challenges` via `_public_checkins`). Both satisfy AC1 structurally;
@@ -190,6 +197,10 @@ def test_blocked_vice_call_sites_derivation_is_non_vacuous():
     nothing, which is not a guard at all. The COUNT was the finding this issue
     exists to correct: the original sweep named 6, the derivation found 11.
 
+    Raised 13 -> 24 by #2240 and 24 -> 26 by #2221 (the two capture doors that
+    screened nothing: submit_finding's three fields and experiment_suggest's two —
+    two SITES, because the derivation keys on (file, line)).
+
     Raised 11 -> 13 by #2238, deliberately and with the same bar: that issue added
     the check-in `note` screen at BOTH ends of the module's only reader-free-text
     path — `_handle_challenge_checkin` (the write door, rejects) and `_screened_note`
@@ -211,8 +222,8 @@ def test_blocked_vice_call_sites_derivation_is_non_vacuous():
         "site_api_rollups.py",
         "site_api_social.py",
     }, f"expected _is_blocked_vice call sites in exactly these 8 modules, got {found_files}"
-    assert len(sites) == 24, (
-        f"expected 24 distinct _is_blocked_vice call sites (11 from #2212 + 2 from #2238 + 11 from #2240), "
+    assert len(sites) == 26, (
+        f"expected 26 distinct _is_blocked_vice call sites (11 from #2212 + 2 from #2238 + 11 from #2240 + 2 from #2221), "
         f"got {len(sites)} — a call site was added or removed; update this pin AND give the changed "
         f"site the same mutation-proof treatment as the rest of this file"
     )
