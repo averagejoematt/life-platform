@@ -61,7 +61,8 @@ def status(*, _g) -> dict:
     if now_ts - _status_cache_ts < STATUS_CACHE_TTL and _status_cache:
         return _ok(_status_cache, cache_seconds=60)
 
-    today_dow = datetime.now(timezone.utc).weekday()
+    # (#2221: `today_dow` lived here to feed the deleted schedule-aware idle state. The
+    # cadence check that replaced it measures days of silence, not the weekday.)
 
     # ── Pipeline health check results (active probe) ──
     health_check_failures = set()
@@ -462,7 +463,15 @@ def status(*, _g) -> dict:
     def _comp_status(last_date_str, yellow_h, red_h, source_id=None):
         if not last_date_str:
             return "green" if source_id == "genome" else "red", "never", "No records found in DynamoDB" if source_id != "genome" else None
-        last_dt = datetime.strptime(last_date_str[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        # #2221 / ADR-104: a freshness check that could not EVALUATE must read as
+        # unreadable, never as a pass — and never as a 500. This strptime was the one
+        # unguarded call of the four in this module, so a single malformed `DATE#` sort
+        # key anywhere in the table raised ValueError out of the handler and took down
+        # the whole status page AND the footer dot (status_summary delegates to status).
+        try:
+            last_dt = datetime.strptime(last_date_str[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        except (ValueError, TypeError):
+            return "yellow", "unknown", "Freshness unreadable — the newest record's date could not be parsed"
         now = datetime.now(timezone.utc)
         days_ago = (now.date() - last_dt.date()).days
 
@@ -482,19 +491,33 @@ def status(*, _g) -> dict:
         if source_id in _LAGGED_SOURCES and effective_days <= 1 and days_ago >= 1:
             rel = "current"
 
+        # NB (#2221): `yellow_h` is still not read here — see the standing finding on
+        # test_a_source_past_its_own_yellow_threshold_is_not_reported_green. Enforcing it
+        # as configured would contradict test_data_from_yesterday_is_still_green on the
+        # SAME source, and the picked 25h disagrees with the cadence-derived window in
+        # lambdas/ingestion/source_registry.py. Resolving that is a threshold decision,
+        # not a code fix, so the column stays inert rather than half-enforced.
+        _hours_ago = (now - last_dt).total_seconds() / 3600
+
         # Green: data is current (accounting for natural lag)
         if effective_days <= 1:
             return "green", rel, None
         elif effective_days <= 2:
             return "yellow", rel, f"Last data {rel} — monitoring"
-        else:
-            hours_ago = (now - last_dt).total_seconds() / 3600
-            if hours_ago <= red_h:
-                return "yellow", rel, f"Last data {rel} — expected within {red_h}h"
-            return "red", rel, f"STALE: last data {rel}. Threshold exceeded ({red_h}h)."
+        elif _hours_ago <= red_h:
+            return "yellow", rel, f"Last data {rel} — expected within {red_h}h"
+        return "red", rel, f"STALE: last data {rel}. Threshold exceeded ({red_h}h)."
 
-    def _uptime_90d(source_id, activity_dependent=False):
-        """Uptime bars including today. All sources use same window for visual alignment."""
+    def _uptime_90d(source_id, activity_dependent=False, field_check=None):
+        """Uptime bars including today. All sources use same window for visual alignment.
+
+        #2221: `field_check` mirrors _last_sync's sub-source filter. Several rows share
+        one partition (apple_health is written by cgm, water, steps, mindful minutes and
+        more), and without the filter every sub-source drew the SAME bars — a CGM feed
+        with no glucose reading in 90 days showed a fully green uptime chart built from
+        other sub-sources' rows. The filter runs server-side, before the projection, so
+        `ProjectionExpression="sk"` still returns only what the bars need.
+        """
         try:
             epoch_start = datetime(2026, 3, 28, tzinfo=timezone.utc).date()
             today = datetime.now(timezone.utc).date()
@@ -502,11 +525,16 @@ def status(*, _g) -> dict:
             if window_days < 1:
                 return [2]  # pre-epoch: neutral
 
-            resp = table.query(
-                KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{source_id}")
+            _q = {
+                "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}{source_id}")
                 & Key("sk").between(f"DATE#{epoch_start.isoformat()}", f"DATE#{today.isoformat()}"),
-                ProjectionExpression="sk",
-            )
+                "ProjectionExpression": "sk",
+            }
+            if field_check:
+                from boto3.dynamodb.conditions import Attr
+
+                _q["FilterExpression"] = Attr(field_check).exists()
+            resp = table.query(**_q)
             present = {item["sk"].replace("DATE#", "")[:10] for item in resp.get("Items", [])}
             bars = []
             for i in range(window_days - 1, -1, -1):
@@ -523,13 +551,36 @@ def status(*, _g) -> dict:
         except Exception:
             return [2]
 
-    def _sched_aware(status, rel, exp_dow):
-        if exp_dow < 0 or today_dow == exp_dow:
-            return status, rel
-        if status == "yellow":
-            names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-            return "gray", f"next: {names[exp_dow]}"
-        return status, rel
+    _DOW_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    # A day-scheduled sender (exp_dow >= 0) runs once a week; one cycle is 7 days.
+    _WEEKLY_CYCLE_DAYS = 7
+
+    def _missed_scheduled_run(last_date_str, exp_dow):
+        """#2221: has a day-scheduled sender gone longer than one whole cycle without
+        sending? Returns (missed, scheduled_day_name).
+
+        The window is the sender's OWN cadence — `exp_dow >= 0` means it runs once a
+        week, so one cycle is 7 days — not the row's red_h. That is the defect: with
+        red_h=400 the recovery branch rewrote everything up to ~17 days of silence to
+        "next run scheduled", so a sender that had already skipped a week published
+        green.
+
+        Cycle length, not "did it land exactly on its weekday", is deliberate. Today's
+        slot is never counted against a sender (the page is read at all hours, and a
+        Sunday sender at 06:00 on a Sunday has missed nothing yet), and a send that ran
+        a day early or late is still one send per week — the thing worth a colour is a
+        whole cycle with no delivery at all.
+
+        exp_dow < 0 means "daily"; those rows are governed by their own yellow_h/red_h.
+        """
+        if exp_dow < 0 or not last_date_str:
+            return False, None
+        try:
+            last_dt = datetime.strptime(last_date_str[:10], "%Y-%m-%d").date()
+        except (ValueError, TypeError):
+            return False, None
+        days_silent = (datetime.now(timezone.utc).date() - last_dt).days
+        return days_silent > _WEEKLY_CYCLE_DAYS, _DOW_NAMES[exp_dow]
 
     # Build data source components
     now = datetime.now(timezone.utc)
@@ -563,8 +614,14 @@ def status(*, _g) -> dict:
             # Board recommendation: labs every 6mo, DEXA every 12mo, food delivery every 3mo
             DUE_MONTHS = {"labs": 6, "dexa": 12, "food_delivery": 3, "bp_readings": 3, "measurements": 2}
             due_mo = DUE_MONTHS.get(sid, 6)
-            if last:
-                last_dt = datetime.strptime(last[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            # #2221: this was the SECOND unguarded strptime (the finding named only the
+            # one in _comp_status). A malformed DATE# key on a manual source would raise
+            # straight out of the handler exactly the same way.
+            try:
+                last_dt = datetime.strptime(last[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc) if last else None
+            except (ValueError, TypeError):
+                last_dt = None
+            if last_dt is not None:
                 days_ago = (datetime.now(timezone.utc).date() - last_dt.date()).days
                 months_ago = days_ago / 30.0
                 due_date = last_dt + timedelta(days=due_mo * 30)
@@ -594,7 +651,7 @@ def status(*, _g) -> dict:
             uptime = []  # No daily bars for infrequent sources
         else:
             status, rel, comment = _comp_status(last, yh, rh, source_id=sid)
-            uptime = _uptime_90d(sid, activity_dependent=activity_dep)
+            uptime = _uptime_90d(sid, activity_dependent=activity_dep, field_check=field_check)
 
             # Activity-dependent sources: distinguish "user didn't log" vs "pipeline broke"
             # If a source HAD regular data and suddenly stops, that's likely a pipeline issue
@@ -715,11 +772,18 @@ def status(*, _g) -> dict:
         last = _last_sync(f"email_log#{lid}")
         status, rel, comment = _comp_status(last, yh, rh, source_id=lid)
         uptime = _uptime_90d(f"email_log#{lid}", activity_dependent=True)  # scheduled emails — gaps aren't system failures
-        # Weekly/scheduled emails: if they've run within their expected window, they're fine
-        # Apply recovery BEFORE _sched_aware so yellow is not downgraded to gray first
-        if status in ("yellow",) and last and lid not in alarming_sources:
+        # Weekly/scheduled emails: if they've run within their expected window, they're
+        # fine. #2221 bounds "within its window" by the sender's OWN cadence instead of
+        # by red_h: the recovery branch used to fire on any `last`, so the whole stretch
+        # between "sent this week" and the ~17-day red threshold of a 400h red_h read
+        # "next run scheduled" for a sender that had already skipped a week.
+        _missed, _next_day = _missed_scheduled_run(last, exp_dow)
+        if status in ("yellow",) and last and lid not in alarming_sources and not _missed:
             status = "green"
             comment = f"Last sent: {rel} \u2014 next run scheduled"
+        elif _missed and lid not in alarming_sources and status != "red":
+            status = "yellow"
+            comment = f"More than a week since the last {_next_day} send \u2014 last delivery {rel}"
         # A sender with no send log has not sent. #2220 retired the pre-launch
         # "smoke-tested Mar 29" carve-out, which turned that red green, replaced the
         # measured age with rel="verified" and — worse — overwrote the whole uptime
@@ -730,10 +794,16 @@ def status(*, _g) -> dict:
         if lid in alarming_sources:
             status = "red"
             comment = "CloudWatch alarm firing \u2014 Lambda errors detected"
-        # Apply schedule-aware downgrade AFTER recovery — green emails stay green,
-        # only genuinely stale emails get grayed out on off-days
-        if status not in ("green", "red"):
-            status, rel = _sched_aware(status, rel, exp_dow)
+        # #2221: the schedule-aware "gray / next: <Day>" downgrade used to sit here. It
+        # was unreachable dead code — every earlier branch had already forced green or
+        # red, so `status not in ("green", "red")` was never true — and it is NOT
+        # restored, deliberately. Now that a missed slot survives as yellow (above), the
+        # only thing this branch could ever do is repaint that miss as "idle, next: Sun"
+        # on the six days a week that are not the send day: an honest signal turned into
+        # a shrug, which is the exact ADR-104 failure /api/status exists to avoid. A
+        # scheduled sender is fully described by green (sent within its cadence, and the
+        # comment already names the next run), yellow (skipped a slot) and red (past its
+        # threshold); there is no fourth state worth a colour.
         email_components.append(
             {
                 "id": lid,

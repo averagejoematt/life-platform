@@ -39,6 +39,28 @@ from experiment.phase_filter import singleton_visible  # ADR-058 / #946 / #1200
 _ELENA_PERSONA_PK = "PERSONA#elena"
 _MARGARET_PERSONA_PK = "PERSONA#margaret"
 
+# The sentinel week a promise with NO recorded deadline is pushed out to, so it
+# never reads as due. It is not a real week — only an "unset" marker.
+_NO_DEADLINE = 10**6
+
+
+def _week_or(value, default):
+    """Read a stored week number, falling back to `default` only when it is UNSET.
+
+    #2221: week 0 is a REAL week in this platform — the prologue (see
+    test_chronicle_prologue_order_1988, which reconciles a prologue's week_number
+    to 0). The previous `int(x or default)` idiom treated week 0 as missing, so a
+    promise due by week 0 was pushed out to the _NO_DEADLINE sentinel and could
+    never surface: the most overdue promise Elena could hold was the one the gate
+    could never show her. Test for absence, not for falsiness.
+    """
+    if value is None or value == "":
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ELENA — the persistent notebook (#537)
@@ -76,24 +98,21 @@ def _elena_notebook_block(current_week, *, _g):
         if open_threads:
             parts.append("OPEN STORY THREADS (advance, resolve, or complicate — a thread stuck 3+ weeks must move or close):")
             for t in open_threads:
-                opened = int(t.get("opened_week") or current_week)
-                last_ref = int(t.get("last_referenced_week") or opened)
+                opened = _week_or(t.get("opened_week"), current_week)
+                last_ref = _week_or(t.get("last_referenced_week"), opened)
                 stale = " [STALE — close it or complicate it THIS week]" if (current_week - last_ref) >= 3 else ""
                 parts.append(f"  - [opened wk {opened}, age {max(0, current_week - opened)} wk]{stale} {t.get('slug')}: {t.get('summary')}")
 
         resp = table.query(KeyConditionExpression=_Key("pk").eq(pk) & _Key("sk").begins_with("CALLBACK#"), ScanIndexForward=False, Limit=60)
         # #1200: a wiped cycle's promises must not be "paid off" in the new cycle's draft.
         pending = [c for c in resp.get("Items", []) if c.get("status") == "pending" and singleton_visible(c)]
-        due = sorted(
-            (c for c in pending if int(c.get("due_by_week") or 10**6) <= current_week), key=lambda c: int(c.get("due_by_week") or 0)
-        )
-        upcoming = sorted(
-            (c for c in pending if int(c.get("due_by_week") or 10**6) > current_week), key=lambda c: int(c.get("due_by_week") or 0)
-        )
+        _due_week = lambda c: _week_or(c.get("due_by_week"), _NO_DEADLINE)  # noqa: E731
+        due = sorted((c for c in pending if _due_week(c) <= current_week), key=_due_week)
+        upcoming = sorted((c for c in pending if _due_week(c) > current_week), key=_due_week)
         if due:
             parts.append("PROMISES DUE (you made these to readers — PAY EACH OFF this week, or explicitly extend it in-text):")
             for c in due[:5]:
-                overdue = current_week - int(c.get("due_by_week") or current_week)
+                overdue = current_week - _week_or(c.get("due_by_week"), current_week)
                 tag = f"OVERDUE by {overdue} wk" if overdue > 0 else "due now"
                 parts.append(f"  - [made wk {c.get('made_in_week')}, {tag}] {c.get('promise')}")
         if upcoming:
@@ -157,7 +176,7 @@ def _due_callback_promises(week_num, limit=5, *, _g):
         )
         # #1200: honor restart tombstones — a wiped cycle's promises aren't owed in the new cycle.
         pending = [c for c in resp.get("Items", []) if c.get("status") == "pending" and singleton_visible(c)]
-        due = [c for c in pending if int(c.get("due_by_week") or 10**6) <= week_num]
+        due = [c for c in pending if _week_or(c.get("due_by_week"), _NO_DEADLINE) <= week_num]
         return [c["promise"] for c in due[:limit] if c.get("promise")]
     except Exception as e:
         logger.warning(f"[margaret] due-callback query failed (fail-soft): {e}")

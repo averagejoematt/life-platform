@@ -260,10 +260,13 @@ def markdown_to_html(md: str) -> str:
             out.append(f"<h2>{_inline_md(stripped[3:].strip())}</h2>")
             i += 1
             continue
-        if stripped.startswith("> "):
+        # #2221: the blockquote marker is ">"; the space after it is optional in
+        # markdown. Requiring "> " rendered a Board interview written as ">Dr. Park
+        # said..." as a paragraph with a stray ">" on the public journal page.
+        if stripped.startswith(">"):
             buf = []
-            while i < n and lines[i].strip().startswith("> "):
-                buf.append(lines[i].strip()[2:])
+            while i < n and lines[i].strip().startswith(">"):
+                buf.append(lines[i].strip()[1:].lstrip())
                 i += 1
             out.append(f"<blockquote><p>{_inline_md(' '.join(buf))}</p></blockquote>")
             continue
