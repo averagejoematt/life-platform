@@ -29,6 +29,12 @@ from ai.grounded_generation import allowed_numbers as _allowed_numbers  # noqa: 
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CHRONICLE_SRC = open(os.path.join(ROOT, "lambdas/emails/wednesday_chronicle_lambda.py")).read()
+# #1654: Margaret's red pen moved to the emails/chronicle_personas.py split module
+# (the facade keeps a same-name, same-signature delegator). The WIRING assertions
+# below still read the facade — that is where the call order lives — while the
+# IMPLEMENTATION assertions read the module that now owns the code. Same checks,
+# repointed at their subject; nothing was weakened to accommodate the move.
+PERSONAS_SRC = open(os.path.join(ROOT, "lambdas/emails/chronicle_personas.py")).read()
 BUDGET_SRC = open(os.path.join(ROOT, "lambdas/ai/budget_guard.py")).read()
 # #781: the shared layer is retired — the full-tree bundle ships every module.
 
@@ -369,12 +375,14 @@ def test_chronicle_invokes_margaret_pass_after_adr104_before_ai3():
 
 
 def test_chronicle_margaret_pass_is_budget_gated():
-    block = CHRONICLE_SRC[CHRONICLE_SRC.index("def _run_margaret_edit_pass") : CHRONICLE_SRC.index("def lambda_handler")]
+    # #1654: `_run_margaret_edit_pass` is the last function in chronicle_personas.py,
+    # so the block runs to end-of-file (the old slice ended at `def lambda_handler`).
+    block = PERSONAS_SRC[PERSONAS_SRC.index("def _run_margaret_edit_pass") :]
     assert 'allow("chronicle_editor")' in block
 
 
 def test_chronicle_uses_haiku_for_margaret_not_sonnet():
-    block = CHRONICLE_SRC[CHRONICLE_SRC.index("def _margaret_haiku_call") : CHRONICLE_SRC.index("def _run_margaret_edit_pass")]
+    block = PERSONAS_SRC[PERSONAS_SRC.index("def _margaret_haiku_call") : PERSONAS_SRC.index("def _run_margaret_edit_pass")]
     assert "AI_MODEL_HAIKU" in block
 
 

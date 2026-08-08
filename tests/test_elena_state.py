@@ -27,6 +27,12 @@ from fakes import FakeDdbTable  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CHRONICLE_SRC = open(os.path.join(ROOT, "lambdas/emails/wednesday_chronicle_lambda.py")).read()
+# #1654: Elena's notebook block moved to the emails/chronicle_personas.py split
+# module (the facade keeps a same-name, same-signature delegator). The wiring
+# assertion — that the handler still calls it — stays on the facade; the block's
+# own contents are asserted against the module that now builds them. Same checks,
+# repointed at their subject.
+PERSONAS_SRC = open(os.path.join(ROOT, "lambdas/emails/chronicle_personas.py")).read()
 APPROVE_SRC = open(os.path.join(ROOT, "lambdas/emails/chronicle_approve_lambda.py")).read()
 BETWEEN_SRC = open(os.path.join(ROOT, "lambdas/emails/between_chronicle_lambda.py")).read()
 PODCAST_SRC = open(os.path.join(ROOT, "lambdas/emails/coach_panel_podcast_lambda.py")).read()
@@ -218,14 +224,14 @@ def test_both_publish_paths_invoke_the_updater():
 
 def test_chronicle_prompt_gains_the_notebook():
     assert "_elena_notebook_block(" in CHRONICLE_SRC
-    assert "YOUR NOTEBOOK" in CHRONICLE_SRC
-    assert "PROMISES DUE" in CHRONICLE_SRC
-    assert "OPEN STORY THREADS" in CHRONICLE_SRC
-    assert "RUNNING MOTIFS" in CHRONICLE_SRC
+    assert "YOUR NOTEBOOK" in PERSONAS_SRC
+    assert "PROMISES DUE" in PERSONAS_SRC
+    assert "OPEN STORY THREADS" in PERSONAS_SRC
+    assert "RUNNING MOTIFS" in PERSONAS_SRC
     # thread aging is enforced in the block
-    assert "STALE" in CHRONICLE_SRC
+    assert "STALE" in PERSONAS_SRC
     # a grounding-flagged stance is never served to the prompt
-    assert 'stance.get("grounding_flag")' in CHRONICLE_SRC
+    assert 'stance.get("grounding_flag")' in PERSONAS_SRC
 
 
 # ── E7: ADR-104 on the chronicle body ─────────────────────────────────────────
