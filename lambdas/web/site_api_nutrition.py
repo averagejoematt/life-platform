@@ -38,6 +38,51 @@ _RDO_MIN_OVERLAP_DAYS = 14
 
 _RDO_IMPACT_R = 0.15
 
+# Phase-1 "Ignition" rate target: 3 lb/week ≈ 1,500 kcal/day (matches the profile /
+# ai_calls Phase-1 target). Module scope so the genesis-week empty state publishes the
+# SAME loss_rate constants the populated branch does (#2221 shape parity).
+_TARGET_RATE_LB_WK = 3
+_KCAL_PER_LB = 3500
+_REQUIRED_DEFICIT_KCAL = round(_TARGET_RATE_LB_WK * _KCAL_PER_LB / 7)  # 1500
+
+
+def _num(v):
+    """``float(v)`` or ``None`` — never raises (#2221).
+
+    Both partitions this module reads are hand-uploaded exports: MacroFactor writes an
+    unpopulated Expenditure cell as ``"--"``, Withings can carry an empty weight. A bare
+    ``float(row["field"])` anywhere in the handler turns ONE malformed cell into a 500 on
+    the whole nutrition door — every other panel on the page included. ``_resolve_mf_tdee``
+    and ``_mifflin_tdee`` already guarded the identical coercion; the rest of the module
+    did not. An unreadable value is ABSENT (ADR-104 withhold-don't-recompute), never 0."""
+    if v is None or v == "":
+        return None
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _deficit_label(deficit_pct):
+    """The BS-12 deficit-intensity ladder, in ONE place (#2221).
+
+    A NEGATIVE percentage is a SURPLUS — eating above maintenance. Both ladders used to
+    fall through to ``maintenance``, so a reader running a 600 kcal/day surplus was told
+    they were holding steady. ``deficit_sustainability`` pairs its label with
+    ``in_deficit: False``; the ``loss_rate`` panel on /api/nutrition_overview carries no
+    such guard, so the label was the only thing the reader had."""
+    if deficit_pct is None:
+        return None
+    if deficit_pct > 25:
+        return "aggressive"
+    if deficit_pct > 15:
+        return "moderate"
+    if deficit_pct > 5:
+        return "mild"
+    if deficit_pct < -5:
+        return "surplus"
+    return "maintenance"
+
 
 def _resolve_mf_tdee(items):
     """Return (tdee_float, source_label) from the most recent MacroFactor record carrying
@@ -78,10 +123,7 @@ def _latest_weight_lbs(start, today, *, _g):
     if not wt:
         return None
     latest = sorted(wt, key=lambda x: x.get("sk", ""))[-1]
-    try:
-        return float(latest.get("weight_lbs"))
-    except (TypeError, ValueError):
-        return None
+    return _num(latest.get("weight_lbs"))
 
 
 def _recovery_deficit_overlay(deficit_by_date: dict, recovery_by_date: dict, start_date: str, end_date: str) -> dict:
@@ -178,11 +220,23 @@ def _mf(item, field, alt_field=None):
     ``nutrition_overview``); ``deficit_sustainability`` shares this single accessor
     instead of its own inline ``total_calories_kcal``-only extraction, which
     silently produced a fabricated ``avg_intake_kcal: 0`` / ``deficit_pct: 100.0``
-    on any day logged only under the legacy ``calories`` field."""
-    v = item.get(field) or item.get(alt_field or f"total_{field}")
-    if v is None and field == "calories":
-        v = item.get("total_calories_kcal")
-    return float(v) if v is not None else None
+    on any day logged only under the legacy ``calories`` field.
+
+    #2221 — resolves by PRESENCE, not truthiness. The old ``a or b`` chain made an
+    HONESTLY LOGGED ZERO indistinguishable from an absent field: a zero-fiber
+    carnivore/shake day dropped out of ``avg_fiber_g`` (inflating the published
+    average) and a fully-logged 0 kcal fast published ``latest_calories: None`` —
+    "not logged" for a day that WAS. Absence and zero are not the same value
+    (ADR-104). Coercion goes through ``_num``, so one malformed cell yields an
+    absent macro rather than a ValueError out of the whole handler."""
+    names = [field, alt_field or f"total_{field}"]
+    if field == "calories":
+        names.append("total_calories_kcal")
+    for name in names:
+        v = _num(item.get(name))
+        if v is not None:
+            return v
+    return None
 
 
 def nutrition_overview(*, _g) -> dict:
@@ -228,6 +282,10 @@ def nutrition_overview(*, _g) -> dict:
                     "protein_floor_hit_days": 0,
                     "days_logged": 0,
                     "tdee": None,
+                    # #2221: the populated block always publishes tdee_source (the
+                    # measured-vs-estimated label the front-end renders next to the
+                    # number); on a genesis week the key was simply absent.
+                    "tdee_source": None,
                     "avg_deficit": None,
                     "cal_7d_avg": None,
                     "pro_7d_avg": None,
@@ -249,6 +307,48 @@ def nutrition_overview(*, _g) -> dict:
                     "latest_protein_g": None,
                 },
                 "nutrition_trend": [],
+                # #2221 — SHAPE PARITY. The front-end binds one payload shape; this
+                # branch used to omit nine top-level keys the populated branch
+                # publishes, so `data.loss_rate.protein_hit_pct` threw for the whole
+                # first stretch of every cycle — exactly when the empty state is
+                # supposed to render gracefully. Every key below is present-and-empty,
+                # never fabricated. food_delivery / blueprint_benchmark are the
+                # flag-gated private panels: with the flags off the populated branch
+                # also publishes None and NEITHER branch queries the private
+                # partition, so shape parity costs nothing privacy-wise.
+                "loss_rate": {
+                    "target_rate_lb_wk": _TARGET_RATE_LB_WK,
+                    "required_deficit_kcal": _REQUIRED_DEFICIT_KCAL,
+                    "actual_deficit_kcal": None,
+                    "gap_kcal": None,
+                    "implied_rate_lb_wk": None,
+                    "deficit_pct": None,
+                    "deficit_label": None,
+                    "protein_hit_pct": 0,
+                    "protein_floor_hit_pct": 0,
+                    "protein_floor_g": 170,
+                },
+                "meal_rhythm": {
+                    "avg_protein_per_meal": None,
+                    "protein_distribution_score": None,
+                    "per_day_window": [],
+                    "time_distribution": [],
+                    "reference_window_hrs": 8,
+                    "days_with_meal_times": 0,
+                },
+                "electrolytes": {
+                    "avg_sodium_mg": None,
+                    "sodium_ref_low": 1500,
+                    "sodium_ref_high": 2300,
+                    "potassium_pct": None,
+                    "days_logged": 0,
+                },
+                "lean_mass": None,
+                "projection": None,
+                "reconciliation": {"days": [], "overlap_days": 0, "min_days": 14, "ready": False},
+                "food_delivery": None,
+                "blueprint_benchmark": None,
+                "micronutrients": {"sufficiency": {}, "avg_pct": None, "protein_distribution_score": None, "as_of": None},
                 "weekday_vs_weekend": {"weekday": dict(_empty_grp), "weekend": dict(_empty_grp)},
                 "eating_window": None,
                 "periodization": {"training_day": dict(_empty_grp), "rest_day": dict(_empty_grp)},
@@ -265,13 +365,6 @@ def nutrition_overview(*, _g) -> dict:
         )
 
     items.sort(key=lambda x: x.get("sk", ""))
-
-    def safe_avg(field):
-        vals = [float(i[field]) for i in items if i.get(field) is not None]
-        return round(sum(vals) / len(vals), 1) if vals else None
-
-    def safe_sum_avg(field):
-        return safe_avg(field)
 
     cal_vals = [_mf(i, "calories") for i in items if _mf(i, "calories") is not None]
     pro_vals = [_mf(i, "protein_g", "total_protein_g") for i in items if _mf(i, "protein_g", "total_protein_g") is not None]
@@ -296,8 +389,13 @@ def nutrition_overview(*, _g) -> dict:
     latest = items[-1] if items else {}
     latest_date = latest.get("date") or latest.get("sk", "").replace("DATE#", "")
 
-    # 7-day vs 30-day comparison
-    items_7d = [i for i in items if (i.get("date") or i.get("sk", "").replace("DATE#", "")) >= d7]
+    # 7-day vs 30-day comparison.
+    # #2221: the lower bound is EXCLUSIVE. `d7` is `today - 7`, so `>= d7` admitted
+    # EIGHT calendar dates (today-7 … today) into a figure `_window_span` reports as
+    # actual_days=7 and the payload names `cal_7d_avg` — an eighth day averaged into a
+    # seven-day label (#1917). `> d7` makes the set of dates and the published span the
+    # same seven days, and stays consistent when genesis clamps the window shorter.
+    items_7d = [i for i in items if (i.get("date") or i.get("sk", "").replace("DATE#", "")) > d7]
     cal_7d = [_mf(i, "calories") for i in items_7d if _mf(i, "calories") is not None]
     pro_7d = [_mf(i, "protein_g", "total_protein_g") for i in items_7d if _mf(i, "protein_g", "total_protein_g") is not None]
     # #1919: `d7` is genesis-clamped (_experiment_date), so `items_7d` can hold far
@@ -354,8 +452,13 @@ def nutrition_overview(*, _g) -> dict:
         return round(sum(vals) / len(vals), 1) if vals else None
 
     def _group_pro_hit(group):
-        hits = sum(1 for x in group if (_mf(x, "protein_g", "total_protein_g") or 0) >= protein_target)
-        return round(hits / len(group) * 100) if group else 0
+        # #2221: grade only the days that actually logged protein — the headline
+        # `nutrition.protein_hit_pct` divides by exactly that set. This one divided by
+        # EVERY day in the bucket and coerced a missing value to 0 via `(… or 0) >=`,
+        # so an unlogged macro counted as a MISS. One field name, two definitions: a
+        # reader comparing the panels saw 100% and 50%. Absence is not a miss (ADR-104).
+        vals = [v for v in (_mf(x, "protein_g", "total_protein_g") for x in group) if v is not None]
+        return round(sum(1 for v in vals if v >= protein_target) / len(vals) * 100) if vals else 0
 
     weekday_vs_weekend = {
         "weekday": {
@@ -455,20 +558,11 @@ def nutrition_overview(*, _g) -> dict:
     # ai_calls Phase-1 target). The full multi-channel sustainability early-warning (HRV,
     # sleep, recovery, habits, training) lives in the get_deficit_sustainability MCP tool;
     # here we surface only the rate chain + the deficit-intensity label (same BS-12 rubric).
-    TARGET_RATE_LB_WK = 3
-    KCAL_PER_LB = 3500
-    required_deficit = round(TARGET_RATE_LB_WK * KCAL_PER_LB / 7)  # 1500
+    TARGET_RATE_LB_WK = _TARGET_RATE_LB_WK
+    KCAL_PER_LB = _KCAL_PER_LB
+    required_deficit = _REQUIRED_DEFICIT_KCAL
     deficit_pct = round(deficit / tdee * 100, 1) if (deficit is not None and tdee) else None
-    if deficit_pct is None:
-        deficit_label = None
-    elif deficit_pct > 25:
-        deficit_label = "aggressive"
-    elif deficit_pct > 15:
-        deficit_label = "moderate"
-    elif deficit_pct > 5:
-        deficit_label = "mild"
-    else:
-        deficit_label = "maintenance"
+    deficit_label = _deficit_label(deficit_pct)
     loss_rate = {
         "target_rate_lb_wk": TARGET_RATE_LB_WK,
         "required_deficit_kcal": required_deficit,
@@ -499,6 +593,11 @@ def nutrition_overview(*, _g) -> dict:
     bucket_protein: dict[int, float] = {}
     bucket_cal: dict[int, float] = {}
     total_meals_sum = 0
+    # #2221: the numerator and the denominator of grams-per-meal must come from the SAME
+    # set of days. Protein used to be summed over EVERY day in the window while meals
+    # were summed only over days carrying `total_meals`, so a single day missing its meal
+    # count doubled the published figure.
+    protein_on_meal_days = 0.0
     pds_vals = []
     for i in items:
         d = i.get("date") or i.get("sk", "").replace("DATE#", "")
@@ -509,18 +608,22 @@ def nutrition_overview(*, _g) -> dict:
                 continue
             times.append(mins)
             b = (mins // 120) * 2  # 2-hour bucket start hour
-            bucket_protein[b] = bucket_protein.get(b, 0.0) + float(e.get("protein_g") or 0)
-            bucket_cal[b] = bucket_cal.get(b, 0.0) + float(e.get("calories_kcal") or 0)
+            bucket_protein[b] = bucket_protein.get(b, 0.0) + (_num(e.get("protein_g")) or 0.0)
+            bucket_cal[b] = bucket_cal.get(b, 0.0) + (_num(e.get("calories_kcal")) or 0.0)
         if len(times) >= 2:
             per_day_window.append({"date": d, "first_min": min(times), "last_min": max(times)})
-        if i.get("total_meals"):
-            total_meals_sum += int(i["total_meals"])
-        if i.get("protein_distribution_score") is not None:
-            pds_vals.append(float(i["protein_distribution_score"]))
+        _meals = _num(i.get("total_meals"))
+        if _meals:
+            total_meals_sum += int(_meals)
+            _day_protein = _mf(i, "protein_g", "total_protein_g")
+            if _day_protein is not None:
+                protein_on_meal_days += _day_protein
+        _pds = _num(i.get("protein_distribution_score"))
+        if _pds is not None:
+            pds_vals.append(_pds)
 
-    total_protein_window = sum(pro_vals) if pro_vals else 0
     meal_rhythm = {
-        "avg_protein_per_meal": round(total_protein_window / total_meals_sum, 1) if total_meals_sum else None,
+        "avg_protein_per_meal": round(protein_on_meal_days / total_meals_sum, 1) if total_meals_sum else None,
         "protein_distribution_score": round(sum(pds_vals) / len(pds_vals)) if pds_vals else None,
         "per_day_window": per_day_window[-14:],  # last 2 weeks for the ribbon
         "time_distribution": [
@@ -533,7 +636,7 @@ def nutrition_overview(*, _g) -> dict:
     # ── Electrolytes (P1.2): sodium (raw total — ingested but NOT in the sufficiency map,
     # since it's a range not a "more is better" nutrient) + potassium, framed as the
     # water-weight honesty check on a cut. NOT a bare hydration ring (off-brand, out of scope).
-    sodium_vals = [float(i["total_sodium_mg"]) for i in items if i.get("total_sodium_mg") is not None]
+    sodium_vals = [v for v in (_num(i.get("total_sodium_mg")) for i in items) if v is not None]
     _pot = ((latest or {}).get("micronutrient_sufficiency") or {}).get("potassium_mg") or {}
     electrolytes = {
         "avg_sodium_mg": round(sum(sodium_vals) / len(sodium_vals)) if sodium_vals else None,
@@ -549,8 +652,8 @@ def nutrition_overview(*, _g) -> dict:
     wt_items = _query_source("withings", _experiment_date(60), today)
     lean_lb = None
     for w in sorted(wt_items, key=lambda x: x.get("sk", ""), reverse=True):
-        if w.get("fat_free_mass_lbs") is not None:
-            lean_lb = float(w["fat_free_mass_lbs"])
+        lean_lb = _num(w.get("fat_free_mass_lbs"))
+        if lean_lb is not None:
             break
     if lean_lb is not None:
         lean_kg = lean_lb * 0.453592
@@ -564,10 +667,13 @@ def nutrition_overview(*, _g) -> dict:
         }
 
     # Latest weight (for the projection + reconciliation), from the same Withings query.
+    # #2221: coerced through `_num` like `_latest_weight_lbs` a few lines above — this
+    # copy of the identical read was unguarded, so ONE non-numeric Withings weight 500'd
+    # /api/nutrition_overview outright.
     cur_weight = None
     for w in sorted(wt_items, key=lambda x: x.get("sk", ""), reverse=True):
-        if w.get("weight_lbs") is not None:
-            cur_weight = float(w["weight_lbs"])
+        cur_weight = _num(w.get("weight_lbs"))
+        if cur_weight is not None:
             break
 
     # ── Standing self-grading prediction (P2.1): project the next weight crossing from the
@@ -576,7 +682,15 @@ def nutrition_overview(*, _g) -> dict:
     projection = None
     implied = loss_rate.get("implied_rate_lb_wk")
     if cur_weight is not None and implied and implied > 0:
-        target_w = int((cur_weight - 0.1) // 5) * 5  # next 5-lb mark below current
+        # Next 5-lb mark strictly below the current weight. #2221: this was
+        # `int((cur_weight - 0.1) // 5) * 5` — the 0.1 lb epsilon existed to stop a weight
+        # sitting exactly ON a mark from targeting itself, but it also created a 0.1 lb
+        # dead zone just above every mark, so 195.05 lb bet on 190 instead of 195: ten
+        # pounds further out than the real next crossing. Test the on-the-mark case
+        # exactly instead of nudging the input.
+        target_w = int(cur_weight // 5) * 5
+        if target_w == cur_weight:  # already standing on a mark — bet the next one down
+            target_w -= 5
         to_go = cur_weight - target_w
         now = datetime.now(timezone.utc)
 
@@ -602,15 +716,28 @@ def nutrition_overview(*, _g) -> dict:
     w_series = {}
     for w in wt_items:
         dd = w.get("date") or w.get("sk", "").replace("DATE#", "")
-        if w.get("weight_lbs") is not None:
-            w_series[dd] = float(w["weight_lbs"])
+        wv = _num(w.get("weight_lbs"))
+        if wv is not None:
+            w_series[dd] = wv
     recon_days = []
     start_actual = None
     if tdee:
+        # #2221 — ONE baseline for both trajectories. `cum_def` used to accumulate from
+        # the first LOGGED day while `start_actual` anchored to the first WEIGHED day, so
+        # when the scale started later than the food log every un-weighed prefix day was
+        # added to the projected line and to nothing on the actual line. The published
+        # `gap_lbs` — sold to the reader as "logging accuracy / TDEE drift" — was inflated
+        # by exactly that prefix. Accumulate from the first day carrying BOTH a logged
+        # intake and a weigh-in; earlier days have no baseline to be measured against, so
+        # they carry no projected value rather than a misleading one (ADR-104).
+        baseline_date = next((t["date"] for t in trend if t.get("calories") is not None and t["date"] in w_series), None)
         cum_def = 0.0
         for t in trend:
             cal = t.get("calories")
             if cal is None:
+                continue
+            if baseline_date is not None and t["date"] < baseline_date:
+                recon_days.append({"date": t["date"], "projected_loss_lbs": None, "actual_loss_lbs": None})
                 continue
             cum_def += tdee - cal
             aw = w_series.get(t["date"])
@@ -640,8 +767,9 @@ def nutrition_overview(*, _g) -> dict:
     recovery_by_date = {}
     for w in whoop_items:
         dd = w.get("date") or w.get("sk", "").replace("DATE#", "")
-        if w.get("recovery_score") is not None:
-            recovery_by_date[dd] = float(w["recovery_score"])
+        rv = _num(w.get("recovery_score"))
+        if rv is not None:
+            recovery_by_date[dd] = rv
     deficit_by_date = {}
     if tdee:
         for t in trend:
@@ -736,9 +864,14 @@ def nutrition_overview(*, _g) -> dict:
                 "today_pending": bool(latest_date and latest_date < today),
                 "lag_days": _nut_lag_days,
                 "stalled": _nut_stalled,
-                "latest_calories": round(_mf(latest, "calories")) if _mf(latest, "calories") else None,
+                # #2221: guarded on PRESENCE, like every average above. These two used to
+                # guard on truthiness, so a fully-logged 0 kcal fast day published
+                # `latest_calories: None` — "not logged" for a day that was.
+                "latest_calories": round(_mf(latest, "calories")) if _mf(latest, "calories") is not None else None,
                 "latest_protein_g": (
-                    round(_mf(latest, "protein_g", "total_protein_g"), 1) if _mf(latest, "protein_g", "total_protein_g") else None
+                    round(_mf(latest, "protein_g", "total_protein_g"), 1)
+                    if _mf(latest, "protein_g", "total_protein_g") is not None
+                    else None
                 ),
             },
             "nutrition_trend": trend,
@@ -794,11 +927,7 @@ def deficit_sustainability(*, _g) -> dict:
             cache_seconds=3600,
         )
 
-    def _f(x):
-        try:
-            return float(x)
-        except (TypeError, ValueError):
-            return None
+    _f = _num
 
     # #2217: read intake through the same _mf accessor nutrition_overview uses, so a
     # day logged only under the legacy `calories` field name (rather than the current
@@ -816,7 +945,7 @@ def deficit_sustainability(*, _g) -> dict:
     deficit_kcal = round(tdee - avg_cal)
     deficit_pct = round(deficit_kcal / tdee * 100, 1) if tdee else 0
     in_deficit = deficit_kcal > 200
-    deficit_label = "aggressive" if deficit_pct > 25 else "moderate" if deficit_pct > 15 else "mild" if deficit_pct > 5 else "maintenance"
+    deficit_label = _deficit_label(deficit_pct)  # #2221: one ladder, and it has a surplus branch
 
     src = {s: sorted(_query_source(s, start, today), key=lambda x: x.get("sk", "")) for s in ("whoop", "habitify", "strava")}
     whoop, habit, strava = src["whoop"], src["habitify"], src["strava"]
@@ -859,12 +988,23 @@ def deficit_sustainability(*, _g) -> dict:
     rec = [_f(w.get("recovery_score")) for w in whoop if w.get("recovery_score")]
     rec_dir, rec_d = trend_dir(rec)
     rec_bad = rec_dir == "declining" and abs(rec_d) > 10
-    # Channel 4 — Tier-0 habit completion
-    t0 = [
-        _f(h.get("tier_0_completion_rate") or h.get("t0_rate"))
-        for h in habit
-        if (h.get("tier_0_completion_rate") or h.get("t0_rate")) is not None
-    ]
+    # Channel 4 — habit completion.
+    # #2221 READER/WRITER AGREEMENT: `ingestion/habitify_lambda.py` writes
+    # `completion_pct` (pending-aware) and `completion_pct_strict`, plus `by_group[*].pct`
+    # over the nine P40 groups. There is no "Tier 0" group and NOTHING in the repo has
+    # ever written `tier_0_completion_rate` or `t0_rate`, so this channel was structurally
+    # dark: the list was always [], the direction always "insufficient_data", `t0_bad`
+    # always False. (`mcp/tools_nutrition.py` carried the identical dead read and was
+    # corrected the same way.) Presence, not truthiness: a 0% completion day is the
+    # single strongest sign the cut is costing something, and the old `or` dropped it
+    # from the series entirely (ADR-104).
+    t0 = []
+    for h in habit:
+        hv = _f(h.get("completion_pct"))
+        if hv is None:
+            hv = _f(h.get("completion_pct_strict"))
+        if hv is not None:
+            t0.append(hv)
     t0_dir, t0_d = trend_dir(t0)
     t0_bad = t0_dir == "declining" and abs(t0_d) > 10
     # Channel 5 — training output (Strava kJ/day)
@@ -908,7 +1048,11 @@ def deficit_sustainability(*, _g) -> dict:
         {
             "deficit_sustainability": {
                 "available": True,
-                "period": {"start": start, "end": today, "days": 14},
+                # #2221: `days` was the literal 14 while `start` is genesis-clamped by
+                # `_experiment_date` — three days into a cycle the payload claimed a
+                # 14-day period over a 3-day window. `_window_span` is the one place a
+                # window's real length is measured (#1917).
+                "period": {"start": start, "end": today, "days": _window_span(start, today, 14)["actual_days"]},
                 "deficit": {
                     "in_deficit": in_deficit,
                     "avg_intake_kcal": avg_cal,
