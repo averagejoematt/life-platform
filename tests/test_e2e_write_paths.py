@@ -347,8 +347,9 @@ class Harness:
         monkeypatch.setattr(social, "_challenges_cache", None)
         monkeypatch.setattr(social, "_library_ids_cache", (0.0, frozenset()))
         monkeypatch.setattr(social, "_nudge_counts", {})
-        monkeypatch.setattr(social, "_nudge_rate_store", {})
-        monkeypatch.setattr(social, "_finding_rate_store", {})
+        # #2237: one shared in-memory fallback store for every write door — it
+        # replaced the per-endpoint `_nudge_rate_store` / `_finding_rate_store`.
+        monkeypatch.setattr(social, "_FALLBACK_RATE_STORE", {})
 
         self.week_id = social._current_iso_week()  # derived from the frozen clock
         self._seed_configs()

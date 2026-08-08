@@ -33,7 +33,7 @@ Existing suites already pin `fetch_date`'s phase/tombstone semantics
 
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 os.environ.setdefault("AWS_REGION", "us-west-2")
@@ -375,7 +375,14 @@ class TestLoadRawScoreHistories:
 
 class TestFoodDeliveryModifier:
     def _table(self, monkeypatch, **streak):
-        row = {"pk": "USER#matthew#SOURCE#food_delivery", "sk": "STREAK#current"}
+        # #2235: updated_at defaults FRESH (real now) so these tests exercise the
+        # streak-threshold logic, not the freshness gate — see TestFoodDeliveryFreshness
+        # below for the stale-source behavior.
+        row = {
+            "pk": "USER#matthew#SOURCE#food_delivery",
+            "sk": "STREAK#current",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
         row.update(streak)
         return _install(monkeypatch, _PkTable([row]))
 
@@ -401,6 +408,34 @@ class TestFoodDeliveryModifier:
     def test_read_failure_is_neutral(self, monkeypatch):
         _install(monkeypatch, _PkTable(fail=True))
         assert csl.get_food_delivery_modifier(DATE) == 1.0
+
+    def test_a_stale_source_yields_the_neutral_modifier_not_a_frozen_streak(self, monkeypatch):
+        """#2235: a streak_days=40 row (would be the 1.10x bonus band) frozen at an
+        `updated_at` older than food_delivery's stale_hours threshold (336h = 14 days,
+        source_registry.py) must NOT reach the engine as a live bonus."""
+        stale_updated_at = (datetime.now(timezone.utc) - timedelta(hours=337)).isoformat()
+        row = {
+            "pk": "USER#matthew#SOURCE#food_delivery",
+            "sk": "STREAK#current",
+            "streak_days": 40,
+            "last_order_date": "2026-01-01",
+            "updated_at": stale_updated_at,
+        }
+        _install(monkeypatch, _PkTable([row]))
+        assert csl.get_food_delivery_modifier(DATE) == 1.0
+
+    def test_a_record_just_inside_the_threshold_still_counts(self, monkeypatch):
+        """Sanity companion: the freshness gate is bounded, not permanently closed."""
+        fresh_updated_at = (datetime.now(timezone.utc) - timedelta(hours=335)).isoformat()
+        row = {
+            "pk": "USER#matthew#SOURCE#food_delivery",
+            "sk": "STREAK#current",
+            "streak_days": 40,
+            "last_order_date": "2026-01-01",
+            "updated_at": fresh_updated_at,
+        }
+        _install(monkeypatch, _PkTable([row]))
+        assert csl.get_food_delivery_modifier(DATE) == 1.10
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -862,7 +897,12 @@ class TestHandlerFullCompute:
                 rows=[
                     _sheet_row("2026-07-28", 6),
                     _sheet_row("2026-08-04", 10),
-                    {"pk": "USER#matthew#SOURCE#food_delivery", "sk": "STREAK#current", "streak_days": Decimal("30")},
+                    {
+                        "pk": "USER#matthew#SOURCE#food_delivery",
+                        "sk": "STREAK#current",
+                        "streak_days": Decimal("30"),
+                        "updated_at": _NOW.isoformat(),  # #2235: fresh relative to frozen_clock's _NOW
+                    },
                 ],
                 key_cond_rows=[_challenge("CHALLENGE#a", domain="movement")],
             ),

@@ -70,7 +70,7 @@ s3 = boto3.client("s3", region_name=_REGION)
 # ==============================================================================
 
 
-from common.digest_utils import d2f  # shared bundled helpers (#970)
+from common.digest_utils import d2f, get_food_delivery_streak_state  # shared bundled helpers (#970)
 
 
 def fetch_date(source, date_str):
@@ -528,10 +528,14 @@ def get_food_delivery_modifier(target_date_str):
     drivers, and next-day EMA all see the modified value, with provenance.
     The delivery-day penalty compares against the date being SCORED, not the
     wall-clock date the lambda happens to run on.
+
+    #2235: reads via the shared get_food_delivery_streak_state read path, so a
+    stale food_delivery source (no import for longer than its stale_hours
+    threshold) yields the neutral 1.0 modifier rather than a frozen streak from
+    the last import.
     """
     try:
-        resp = table.get_item(Key={"pk": "USER#matthew#SOURCE#food_delivery", "sk": "STREAK#current"})
-        streak = resp.get("Item", {})
+        streak = get_food_delivery_streak_state(table, USER_ID, now=datetime.now(timezone.utc))
         if not streak:
             return 1.0
         streak_days = int(streak.get("streak_days", 0))

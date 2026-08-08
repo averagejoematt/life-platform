@@ -433,9 +433,10 @@ def _isolated(monkeypatch):
         ("_library_ids_cache", (0.0, frozenset())),
         ("_cohort_config_cache", {}),
         ("_cohort_config_cache_ts", 0.0),
-        ("_nudge_rate_store", {}),
         ("_nudge_counts", {}),
-        ("_finding_rate_store", {}),
+        # #2237: the ONE in-memory fallback store, shared by every write door
+        # (it replaced the per-endpoint `_nudge_rate_store` / `_finding_rate_store`).
+        ("_FALLBACK_RATE_STORE", {}),
     ):
         monkeypatch.setattr(social, name, value)
     yield
@@ -1666,30 +1667,116 @@ def test_a_checkin_date_that_is_not_a_calendar_date_is_rejected(monkeypatch):
     assert resp["statusCode"] == 400
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (privacy / unmoderated publication) — site_api_social.py:1190 "
-        "`_handle_challenge_checkin` accepts a free-text `note` from an anonymous POST, strips no "
-        "HTML (unlike `_handle_submit_finding`:376 and `_handle_board_question`:1683, which both "
-        "run `re.sub(r'<[^>]+>', ...)`), runs no `_is_blocked_vice` check, and stores it inside "
-        "`daily_checkins`. `handle_challenges`:1107 then returns the WHOLE live challenge item — "
-        "`daily_checkins` included — on the public `/api/challenges` route. So a stranger's raw "
-        "text reaches a public payload with no moderation step, while the two sibling capture "
-        "doors in this same file both sanitise AND hold for review. It should strip/vice-filter "
-        "the note, or `handle_challenges` should not publish notes. Hurts every reader of "
-        "/protocols and Matthew."
-    ),
-)
-def test_a_reader_supplied_checkin_note_is_not_published_raw_on_the_public_challenge_route(monkeypatch):
-    table, _s3, _sec = wire(monkeypatch, table=_active_challenge_table())
-    social._handle_challenge_checkin(
-        post({"challenge_id": "cold-shower-finish", "completed": True, "note": "<script>alert(1)</script> marijuana"})
-    )
+# ── #2238: the check-in `note` — the module's only reader free text that reaches
+#    a public payload. FIXED: HTML-stripped + vice-screened at the write door AND
+#    re-screened on the read door (rows stored before the fix are still in the
+#    table and no backfill rewrites Matthew's own challenge records).
+
+
+SENTINEL_VICE = "zzsyntheticvice"
+
+
+def _pin_synthetic_vice(monkeypatch) -> str:
+    """Replace the pinned content filter with a SYNTHETIC vocabulary.
+
+    Repo convention (#2203/#2230/#2253, public repo + permanent edit history): no
+    real blocked term is ever a source literal in a test. `_is_blocked_vice` is a
+    case-folded substring match over `blocked_vice_keywords`, so a synthetic
+    keyword drives the identical code path a real one would.
+    """
+    monkeypatch.setattr(sac, "_content_filter_cache", {"blocked_vices": [], "blocked_vice_keywords": [SENTINEL_VICE]})
+    monkeypatch.setattr(sac, "_content_filter_cache_at", None)
+    return SENTINEL_VICE
+
+
+def _published_challenges(monkeypatch) -> str:
+    """The public GET /api/challenges body, catalog overlay emptied so only the
+    live row (with its check-ins) is under test."""
     monkeypatch.setattr(social, "_challenges_cache", {"challenges": []})
     monkeypatch.setattr(social, "_challenges_cache_at", None)
-    published = json.dumps(ok_body(social.handle_challenges()))
-    assert "<script>" not in published and "marijuana" not in published
+    return json.dumps(ok_body(social.handle_challenges()))
+
+
+def test_a_checkin_note_containing_markup_is_html_stripped_before_storage(monkeypatch):
+    """Kills the write-door sanitise (`note = _sanitise_note(...)`). The two sibling
+    capture doors in this file have run this exact `re.sub` since they shipped."""
+    table, _s3, _sec = wire(monkeypatch, table=_active_challenge_table())
+    resp = social._handle_challenge_checkin(
+        post({"challenge_id": "cold-shower-finish", "completed": True, "note": "<script>alert(1)</script>felt strong"})
+    )
+    assert resp["statusCode"] == 200
+    stored = table.store[("USER#matthew#SOURCE#challenges", "CHALLENGE#cold-shower-finish")]["daily_checkins"]
+    assert "<script>" not in stored[0]["note"] and "felt strong" in stored[0]["note"]
+
+
+def test_a_checkin_note_carrying_blocked_vocabulary_is_refused_at_the_door(monkeypatch):
+    """Kills the write-door `if _is_blocked_vice(note): return _error(400, ...)` —
+    the `_handle_board_question`:1691 precedent, applied to the one free-text field
+    that was missing it."""
+    blocked = _pin_synthetic_vice(monkeypatch)
+    table, _s3, _sec = wire(monkeypatch, table=_active_challenge_table())
+    resp = social._handle_challenge_checkin(post({"challenge_id": "cold-shower-finish", "completed": True, "note": f"day 3 {blocked}"}))
+    assert resp["statusCode"] == 400
+    stored = table.store[("USER#matthew#SOURCE#challenges", "CHALLENGE#cold-shower-finish")].get("daily_checkins")
+    assert not stored, "a refused check-in must not have been written at all"
+
+
+def test_a_plain_text_checkin_note_still_round_trips(monkeypatch):
+    """The happy path the AC protects: an ordinary note is untouched by either screen."""
+    _pin_synthetic_vice(monkeypatch)
+    wire(monkeypatch, table=_active_challenge_table())
+    assert (
+        social._handle_challenge_checkin(post({"challenge_id": "cold-shower-finish", "completed": True, "note": "30 seconds cold"}))[
+            "statusCode"
+        ]
+        == 200
+    )
+    assert "30 seconds cold" in _published_challenges(monkeypatch)
+
+
+def test_a_reader_supplied_checkin_note_is_not_published_raw_on_the_public_challenge_route(monkeypatch):
+    """End-to-end, the shape the discovering agent drove: POST a note carrying both
+    markup and blocked vocabulary, then read the public route."""
+    blocked = _pin_synthetic_vice(monkeypatch)
+    wire(monkeypatch, table=_active_challenge_table())
+    social._handle_challenge_checkin(
+        post({"challenge_id": "cold-shower-finish", "completed": True, "note": f"<script>alert(1)</script>{blocked}"})
+    )
+    published = _published_challenges(monkeypatch)
+    assert "<script>" not in published and blocked not in published
+
+
+def test_a_note_stored_before_the_screen_landed_is_still_withheld_from_the_public_route(monkeypatch):
+    """Kills the READ-side screen (`_public_checkins` in `handle_challenges`).
+
+    The write door only protects notes submitted from now on. Rows already in
+    `USER#matthew#SOURCE#challenges` — written while the door was open — are
+    published by `handle_challenges` on every request, so the screen has to run on
+    the way out too. Fixture writes the row directly, bypassing the write door.
+    """
+    blocked = _pin_synthetic_vice(monkeypatch)
+    legacy = [{"date": TODAY, "completed": True, "note": f"<b>bold</b> {blocked} and some prose"}]
+    wire(monkeypatch, table=_active_challenge_table(checkins=legacy))
+    published = _published_challenges(monkeypatch)
+    assert blocked not in published, "a pre-existing blocked note is still published on /api/challenges"
+    assert "<b>" not in published, "a pre-existing markup note is still published on /api/challenges"
+
+
+def test_screening_a_stored_note_does_not_drop_the_checkin_day_itself(monkeypatch):
+    """The withheld thing is the stranger's text, not Matthew's progress: the
+    check-in day survives and the completion arithmetic is unchanged."""
+    blocked = _pin_synthetic_vice(monkeypatch)
+    legacy = [{"date": "2026-05-09", "completed": True, "note": blocked}, {"date": TODAY, "completed": True}]
+    wire(monkeypatch, table=_active_challenge_table(checkins=legacy))
+    live = json.loads(_published_challenges(monkeypatch))["challenges"][0]
+    assert live["progress"] == {
+        "checkin_days": 2,
+        "completed_days": 2,
+        "duration_days": 7,
+        "completion_pct": 29,  # round(2/7*100) == 29
+        "success_rate": 100,
+    }
+    assert [c.get("note") for c in live["daily_checkins"]] == [None, None]
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1697,31 +1784,61 @@ def test_a_reader_supplied_checkin_note_is_not_published_raw_on_the_public_chall
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def _handlers_gated_on_the_rate_limiter_flag() -> set:
-    """Every endpoint whose ONLY rate limit sits behind `if _RATE_LIMITER_READY:`.
+def _functions_reading_the_rate_limiter_flag() -> set:
+    """Every function in the module that reads `_RATE_LIMITER_READY` directly.
 
-    AST-derived from the source rather than hand-listed: the flag is set by an
-    import guard at module load, so this is exactly the set that goes UNLIMITED if
-    `common.rate_limiter` ever fails to import in the bundle. Handlers with an
-    in-memory `else:` fallback (nudge, submit_finding, board_question) are excluded
-    by construction — they appear in an `If` with an `orelse`.
+    AST-derived, never hand-listed. `_RATE_LIMITER_READY` is set False by an import
+    guard at module load (:73-76), so every function that branches on it for itself
+    is a function that can forget its fallback — which is precisely how #2237
+    happened: five of the seven doors that open-coded the flag either had no `else`
+    at all or an `else` that granted the write unconditionally.
+
+    #2237 collapsed the module to a single reader, `_rate_check`. The invariant is
+    now structural: a new write door CANNOT open-code the flag and CANNOT forget a
+    fallback, because there is exactly one fallback and one place to reach it.
     """
     tree = ast.parse(pathlib.Path(inspect.getfile(social)).read_text())
-    gated = set()
+    parents = {c: p for p in ast.walk(tree) for c in ast.iter_child_nodes(p)}
+    readers = set()
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Name) and node.id == "_RATE_LIMITER_READY" and isinstance(node.ctx, ast.Load)):
+            continue
+        cur = node
+        while cur in parents:
+            cur = parents[cur]
+            if isinstance(cur, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                readers.add(cur.name)
+                break
+        else:
+            readers.add("<module>")  # the import guard's own assignment site
+    return readers
+
+
+def test_the_rate_limiter_flag_is_read_in_exactly_one_function():
+    """#2237's structural fix, pinned. If this reds because a handler started
+    branching on the flag itself, that handler needs `_rate_check`, not an `else`."""
+    assert _functions_reading_the_rate_limiter_flag() == {"_rate_check"}, sorted(_functions_reading_the_rate_limiter_flag())
+
+
+def _handlers_using_the_rate_chokepoint() -> set:
+    """Every handler that calls `_rate_check` — the derived set of rate-limited
+    public write doors. A new door joins the mutation sweep below automatically."""
+    tree = ast.parse(pathlib.Path(inspect.getfile(social)).read_text())
+    users = set()
     for fn in ast.walk(tree):
         if not isinstance(fn, ast.FunctionDef):
             continue
         for node in ast.walk(fn):
-            if isinstance(node, ast.If) and isinstance(node.test, ast.Name) and node.test.id == "_RATE_LIMITER_READY" and not node.orelse:
-                gated.add(fn.name)
-    return gated
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "_rate_check":
+                users.add(fn.name)
+    return users
 
 
-GATED_ON_FLAG = _handlers_gated_on_the_rate_limiter_flag()
+RATE_LIMITED_DOORS = _handlers_using_the_rate_chokepoint()
 
 
-def test_the_rate_limiter_flag_gated_handler_set_is_discoverable():
-    assert GATED_ON_FLAG, "the AST scan found nothing — the technique has drifted from the source"
+def test_the_rate_limited_write_door_set_is_discoverable():
+    assert len(RATE_LIMITED_DOORS) >= 7, sorted(RATE_LIMITED_DOORS)
 
 
 _FLAG_DRIVERS = {
@@ -1729,46 +1846,53 @@ _FLAG_DRIVERS = {
     "_handle_experiment_suggest": lambda: post({"idea": "try a longer deload week please"}),
     "_handle_cohort_submit": lambda: post({"value": 55}),
     "_handle_ritual_log": lambda: get(_signed_ritual_params()),
+    "_handle_board_question": lambda: post({"question": "what should i read about zone 2"}),
+    "_handle_nudge": lambda: post({"category": "watching"}),
+    "_handle_submit_finding": lambda: post(GOOD_FINDING),
 }
 
 
-def test_every_flag_gated_handler_has_a_driver_registered():
-    """The derived-SET guard's own guard: a new flag-gated handler must be given a
-    driver here or the bypass test below would silently skip it."""
-    assert GATED_ON_FLAG <= set(_FLAG_DRIVERS), sorted(GATED_ON_FLAG - set(_FLAG_DRIVERS))
+def test_every_rate_limited_door_has_a_driver_registered():
+    """The derived-SET guard's own guard: a new write door must be given a driver
+    here or the mutation sweep below would silently skip it."""
+    assert RATE_LIMITED_DOORS <= set(_FLAG_DRIVERS), sorted(RATE_LIMITED_DOORS - set(_FLAG_DRIVERS))
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT — site_api_social.py:1199, :1442, :1365, :2406. Four public write endpoints "
-        "(`_handle_challenge_checkin`, `_handle_experiment_suggest`, `_handle_ritual_log`, "
-        "`_handle_cohort_submit`) wrap their ENTIRE rate limit in `if _RATE_LIMITER_READY:` with "
-        "no `else`. `_RATE_LIMITER_READY` is set False by an import guard at module load (:63-68), "
-        "so if `common.rate_limiter` is ever missing from the bundle these four accept UNLIMITED "
-        "anonymous writes while still returning 200 — the failure is completely silent. The two "
-        "older doors in the same file (`_handle_nudge`:301, `_handle_submit_finding`:352) have an "
-        "in-memory `else:` fallback for exactly this reason. Each should have the same fallback, "
-        "or fail closed. Hurts Matthew: four unmetered write paths into his DynamoDB table. "
-        "Proven here by MUTATING the flag — with it True every one of these limits fires."
-    ),
-)
-@pytest.mark.parametrize("name", sorted(GATED_ON_FLAG))
+@pytest.mark.parametrize("name", sorted(RATE_LIMITED_DOORS))
 def test_a_write_endpoint_still_limits_when_the_shared_rate_limiter_is_unavailable(name, monkeypatch):
+    """#2237, mutation-proved. Simulate the import failure (`_RATE_LIMITER_READY`
+    False — exactly what the module-load `except` sets) and drive 40 anonymous
+    writes at each derived door. Every one must refuse the excess.
+
+    Against pre-#2237 code this reds on five of the seven doors with 40x200.
+    """
     monkeypatch.setattr(social, "_RATE_LIMITER_READY", False)
     wire(monkeypatch, table=_active_challenge_table(), s3=_cohort_and_challenge_s3())
     statuses = {ENDPOINTS[name](_FLAG_DRIVERS[name]())["statusCode"] for _ in range(40)}
     assert 429 in statuses, f"{name} accepted 40 anonymous writes with no limit"
 
 
-@pytest.mark.parametrize("name", sorted(GATED_ON_FLAG))
+@pytest.mark.parametrize("name", sorted(RATE_LIMITED_DOORS))
 def test_the_same_write_endpoint_does_limit_while_the_shared_limiter_is_present(name, monkeypatch):
-    """The mutation's control arm: with the flag in its shipped state every one of
-    these endpoints refuses the excess. That is what makes the xfail above a real
-    finding about the FALLBACK rather than about the limiter."""
+    """The control arm: with the shared limiter present every door refuses the
+    excess too, so the test above measures the FALLBACK and not the limiter."""
     wire(monkeypatch, table=_active_challenge_table(), s3=_cohort_and_challenge_s3())
     statuses = {ENDPOINTS[name](_FLAG_DRIVERS[name]())["statusCode"] for _ in range(40)}
     assert 429 in statuses
+
+
+def test_the_degraded_limiter_refuses_rather_than_admits_once_its_store_is_full(monkeypatch):
+    """The in-memory fallback is per-container, so it can only be a bound if it is
+    itself bounded. At capacity it FAILS CLOSED — the distributed flood ends in
+    429s, not in an unmetered write path plus an ever-growing dict."""
+    monkeypatch.setattr(social, "_RATE_LIMITER_READY", False)
+    monkeypatch.setattr(social, "_FALLBACK_STORE_MAX_KEYS", 2)
+    wire(monkeypatch, table=_active_challenge_table())
+    # Two distinct IPs fill the store; a third finds it full and is refused.
+    for ip in ("198.51.100.1", "198.51.100.2"):
+        assert social._handle_challenge_checkin(post({"challenge_id": "cold-shower-finish", "completed": True}, ip=ip))["statusCode"] == 200
+    third = social._handle_challenge_checkin(post({"challenge_id": "cold-shower-finish", "completed": True}, ip="198.51.100.3"))
+    assert third["statusCode"] == 429
 
 
 def _post_endpoints() -> dict:
@@ -1980,9 +2104,8 @@ def test_a_non_numeric_matthew_value_hides_his_dot_rather_than_crashing_the_stri
 
 
 def test_the_nudge_door_still_limits_when_the_shared_rate_limiter_is_unavailable(monkeypatch):
-    """The positive control for the flag-mutation xfail above: `_handle_nudge` has
-    an in-memory `else:` fallback, so removing the shared limiter degrades it
-    rather than disabling it. That is the behaviour the four flag-gated doors lack."""
+    """`_handle_nudge` was one of only two doors with a working fallback before
+    #2237; it is the shape every door now shares — degraded, never disabled."""
     monkeypatch.setattr(social, "_RATE_LIMITER_READY", False)
     wire(monkeypatch)
     assert social._handle_nudge(post({"category": "watching"}))["statusCode"] == 200
@@ -1997,14 +2120,17 @@ def test_the_finding_door_still_limits_when_the_shared_rate_limiter_is_unavailab
     assert social._handle_submit_finding(post({**GOOD_FINDING, "finding": "one too many again"}))["statusCode"] == 429
 
 
-def test_the_board_question_door_stays_open_when_the_shared_rate_limiter_is_unavailable(monkeypatch):
-    """Documented fallback: `allowed, remaining = True, BOARD_QUESTION_RATE_LIMIT`.
-    Pinned as the shipped behaviour — capture stays available, unmetered — so the
-    trade-off is visible rather than accidental."""
+def test_the_board_question_door_is_metered_when_the_shared_rate_limiter_is_unavailable(monkeypatch):
+    """#2237's FIFTH door — the one the issue described as already having an
+    in-memory fallback. It did not: its `else` branch read
+    `allowed, remaining = True, BOARD_QUESTION_RATE_LIMIT` — an unconditional
+    allow, i.e. an unmetered S3 write path whenever the shared limiter was
+    unavailable. It now shares the module chokepoint, so the documented
+    3-per-IP-per-hour bar holds in the degraded mode too."""
     monkeypatch.setattr(social, "_RATE_LIMITER_READY", False)
     wire(monkeypatch)
     statuses = [social._handle_board_question(post({"question": f"a question number {i} for you"}))["statusCode"] for i in range(6)]
-    assert statuses == [200] * 6
+    assert statuses == [200] * social.BOARD_QUESTION_RATE_LIMIT + [429] * (6 - social.BOARD_QUESTION_RATE_LIMIT)
 
 
 @pytest.mark.xfail(

@@ -135,9 +135,9 @@ def test_submit_finding_id_is_content_stable(monkeypatch):
     monkeypatch.setattr(social, "_RATE_LIMITER_READY", False)
     body = {"metric_a": "sleep", "metric_b": "hrv", "finding": "more sleep tracks higher hrv over time"}
 
-    social._finding_rate_store.clear()
+    social._FALLBACK_RATE_STORE.clear()  # #2237: one shared fallback store, not a per-endpoint dict
     r1 = social._handle_submit_finding(_event(body))
-    social._finding_rate_store.clear()  # bypass the per-IP rate limit for the retry
+    social._FALLBACK_RATE_STORE.clear()  # bypass the per-IP rate limit for the retry
     r2 = social._handle_submit_finding(_event(body))
 
     id1 = json.loads(r1["body"])["finding_id"]
