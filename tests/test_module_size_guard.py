@@ -20,12 +20,42 @@ Ratchet semantics — the tree can only get better, never worse:
   * A NEW file over the ceiling with none of the three exemptions -> FAIL. Fix by splitting
     it, or (only for a real registry/generated case) add the top-of-file exception comment.
   * An EXISTING non-baselined file that crosses the ceiling -> FAIL (same fix).
+  * A BASELINED file that grows **past its own recorded count** -> FAIL (see below).
   * **Shrinking or deleting** a file is ALWAYS allowed. A ``BASELINE`` entry that no longer
-    exists, was renamed, or has dropped under the ceiling does **NOT** fail this guard — the
-    check is a pure subset assertion, never equality. This is deliberate: #1653 (lambdas/
-    packaging) will MOVE many of these paths and #1654 will SHRINK several god-modules, and
-    neither refactor may be blocked by a stale registry line. Prune the now-stale entry in
-    the same PR for hygiene, but nothing forces it (so the stories can't deadlock).
+    exists or was renamed does **NOT** fail this guard — the check stays a subset assertion
+    on existence. This is deliberate: #1653 (lambdas/ packaging) MOVED many of these paths
+    and #1654 SHRINKS god-modules, and neither refactor may be blocked by a stale line.
+    The one thing that IS forced is pruning an entry once the file drops back under the
+    ceiling — a one-line deletion, never a deadlock, and leaving it in would licence the
+    file to regrow to its old size unpoliced.
+
+THE PER-FILE RATCHET (2026-08-09) — why the recorded number is now an ``int``:
+
+Every ``BASELINE`` value used to be a prose note (``"3016 lines"``) and ``_offenders()``
+read ``if rel in BASELINE: continue``. Nothing anywhere compared a file against its own
+recorded count, so a baselined file's growth was **completely unpoliced** — the registry
+documented itself as shrink-only while 24 of its 28 entries had grown, several by 10-48%:
+
+    lambdas/web/site_api_social.py        1829 -> 2708   (+879, +48%)
+    cdk/stacks/role_policies.py           2848 -> 3211   (+363, +13%)
+    cdk/stacks/monitoring_stack.py        1298 -> 1623   (+325, +25%)
+    mcp/registry.py                       2103 -> 2409   (+306, +15%)
+    lambdas/coach/coach_history_summarizer.py 1458 -> 1731 (+273, +19%)
+    lambdas/emails/daily_brief_lambda.py  2472 -> 2737   (+265, +11%)
+    …19 more, total drift +3,565 lines across 24 files
+
+That is the same class as #2259's coverage gate: a number recorded in the repo that no
+gate ever read. Making it enforcing turns 28 dead entries into 28 live per-file ratchets
+and gives #1654 a mechanism instead of an aspiration.
+
+The counts below were **re-baselined at measured on 2026-08-09** rather than held at the
+2026-06 numbers — holding them would have demanded 24 module splits in one sitting. The
+drift is recorded above and in the landing commit so the debt is visible, not reset in
+silence. From here a baselined file may only shrink.
+
+A file shrinking below its recorded count does not auto-tighten the entry (that would make
+every line-removal PR edit this registry). Tightening a number after a real shrink is
+welcome and always allowed — it is the ratchet doing its job.
 
 Scope = git-tracked ``*.py`` under the first-party source roots (``lambdas/``, ``mcp/``,
 ``scripts/``, ``deploy/``, ``cdk/``) — matching what ENGINEERING_STANDARDS §2 scopes.
@@ -66,22 +96,35 @@ _EXCEPTION_SCAN_LINES = 40
 # ─────────────────────────────────────────────────────────────────────────────
 # THE BASELINE. Files already over the ceiling when this guard landed (#1665).
 # Accepted debt that #1653 (packaging) / #1654 (god-module breakup) are draining.
-# Keyed on repo-root-relative path; the note is the line count at baseline time.
+# Keyed on repo-root-relative path; the value is the file's MAXIMUM ALLOWED line
+# count — an int, and enforced (see test_baselined_files_do_not_grow).
 #
-# This registry only ever SHRINKS. Removing a line (because the file was split, shrunk,
-# renamed, or deleted) is the ratchet tightening and is always welcome. ADDING a line
-# means a NEW file crossed the ceiling — do not do that to silence the guard; split the
-# file, or (only for a genuine generated/registry case) use the top-of-file exception
-# comment instead.
+# It is an int rather than a prose note deliberately. As a note ("3016 lines") nothing
+# compared it against anything, and 24 of these 28 files grew a combined 3,565 lines
+# with the guard reporting green the whole time. A number a gate cannot read is not a
+# record, it is decoration.
+#
+# This registry only ever SHRINKS — both in membership and in the numbers. Lowering a
+# value after a real split is the ratchet tightening and is always welcome. RAISING one
+# is admitting the module grew: allowed only with a reason in the commit message, and
+# never as the reflex fix for a red gate. ADDING a line means a NEW file crossed the
+# ceiling — split it, or (for a genuine generated/registry case) use the top-of-file
+# exception comment instead.
+#
+# Counts re-baselined at measured 2026-08-09 (the `now` column of the drift table in
+# this module's docstring).
 # ─────────────────────────────────────────────────────────────────────────────
 BASELINE = {
-    "lambdas/web/site_api_data.py": "3016 lines",
+    # site_api_data.py (baselined 3016) drained to 362 lines — pruned 2026-08-09. Leaving a
+    # stale entry in would have licensed it to regrow 8x unpoliced, which is exactly the
+    # hole this ratchet closes; test_baseline_has_no_stale_entries now forces the prune.
     # wednesday_chronicle_lambda.py (2975) split into chronicle_* helpers + a <1,200-line facade (#1654) — pruned.
-    "cdk/stacks/role_policies.py": "2848 lines",
+    "cdk/stacks/role_policies.py": 3211,
     # site_api_observatory.py drained to a ~150-line facade by #1654 slice 3 — the handler
     # logic now lives in cohesive web/site_api_{nutrition,meals,training,physical,mind}.py
     # (each well under the ceiling). The pure-subset ratchet allows removing a shrunk entry.
-    "lambdas/emails/daily_brief_lambda.py": "2472 lines",
+    "lambdas/emails/daily_brief_lambda.py": 2737,
+    "lambdas/web/site_api_social.py": 2708,
     # site_api_intelligence.py (2831 by the time the slice ran) drained to a ~180-line
     # facade by #1654's 4th and last named target — the handler logic now lives in
     # cohesive web/site_api_{status,pulse,discovery,foresight,budget}.py, each well
@@ -89,35 +132,34 @@ BASELINE = {
     # site_api_vitals.py (2559 by the time the slice ran) drained to a ~220-line facade
     # by #1654 — the handler logic now lives in cohesive
     # web/site_api_{body,journey,character,sleep,biomarkers}.py, each under the ceiling.
-    "lambdas/compute/daily_insight_compute_lambda.py": "2335 lines",
-    "lambdas/emails/weekly_digest_lambda.py": "2195 lines",
-    "lambdas/ai/ai_calls.py": "2164 lines",
-    "lambdas/health/character_engine.py": "2112 lines",
-    "mcp/registry.py": "2103 lines",
-    "lambdas/content/html_builder.py": "2038 lines",
-    "lambdas/intelligence/ai_expert_analyzer_lambda.py": "1972 lines",
+    "lambdas/compute/daily_insight_compute_lambda.py": 2352,
+    "mcp/registry.py": 2409,
+    "lambdas/ai/ai_calls.py": 2396,
+    "lambdas/emails/weekly_digest_lambda.py": 2216,
+    "lambdas/health/character_engine.py": 2117,
+    "lambdas/content/html_builder.py": 2104,
+    "lambdas/web/site_api_ai_lambda.py": 1991,
+    "mcp/tools_lifestyle.py": 1989,
+    "lambdas/emails/coach_panel_podcast_lambda.py": 1904,
     # site_api_coach.py (2664 by the time the slice ran) drained to a ~440-line facade by
     # #1654 — the handler logic now lives in cohesive web/site_api_coach_{profile,stance,
     # ledger,narrative}.py + web/site_api_thirdwall.py, each well under the ceiling. The
     # pure-subset ratchet allows removing a shrunk entry.
-    "mcp/tools_lifestyle.py": "1953 lines",
-    "lambdas/web/site_api_ai_lambda.py": "1934 lines",
-    "lambdas/emails/coach_panel_podcast_lambda.py": "1888 lines",
-    "deploy/archive/onetime/daily_brief_lambda.py": "1881 lines",
-    "lambdas/web/site_api_social.py": "1829 lines",
-    "lambdas/ingestion/health_auto_export_lambda.py": "1772 lines",
-    "deploy/sync_doc_metadata.py": "1754 lines",
-    "lambdas/intelligence/intelligence_common.py": "1597 lines",
-    "lambdas/coach/coach_prediction_evaluator.py": "1543 lines",
-    "lambdas/coach/coach_history_summarizer.py": "1458 lines",
-    "lambdas/compute/hypothesis_engine_lambda.py": "1396 lines",
-    "lambdas/ai/ai_context.py": "1393 lines",
-    "lambdas/content/output_writers.py": "1367 lines",
-    "cdk/stacks/monitoring_stack.py": "1298 lines",
-    "lambdas/coach/coach_narrative_orchestrator.py": "1250 lines",
-    "lambdas/coach/coach_state_updater.py": "1228 lines",
-    "lambdas/compute/daily_metrics_compute_lambda.py": "1225 lines",
-    "mcp/tools_hevy_routine.py": "1218 lines",
+    "lambdas/intelligence/ai_expert_analyzer_lambda.py": 1886,
+    "deploy/archive/onetime/daily_brief_lambda.py": 1881,
+    "lambdas/ingestion/health_auto_export_lambda.py": 1779,
+    "deploy/sync_doc_metadata.py": 1807,
+    "lambdas/intelligence/intelligence_common.py": 1741,
+    "lambdas/coach/coach_history_summarizer.py": 1731,
+    "lambdas/coach/coach_prediction_evaluator.py": 1638,
+    "cdk/stacks/monitoring_stack.py": 1623,
+    "lambdas/compute/hypothesis_engine_lambda.py": 1556,
+    "lambdas/ai/ai_context.py": 1415,
+    "lambdas/content/output_writers.py": 1387,
+    "lambdas/compute/daily_metrics_compute_lambda.py": 1369,
+    "lambdas/coach/coach_narrative_orchestrator.py": 1315,
+    "lambdas/coach/coach_state_updater.py": 1268,
+    "mcp/tools_hevy_routine.py": 1218,
 }
 
 _REGISTER_HINT = (
@@ -196,21 +238,95 @@ def test_no_new_oversize_module():
 
 
 def test_baseline_entries_are_documented():
-    """Every BASELINE entry states its line count at baseline — a bare set rots silently."""
-    missing = sorted(p for p, note in BASELINE.items() if not (note and note.strip()))
-    assert not missing, "BASELINE entries need a non-empty note (line count at baseline): %s" % missing
+    """Every BASELINE value must be a positive int — the number the ratchet compares against.
+
+    This used to accept any non-empty string, which is how ``"3016 lines"`` sat in the
+    registry for months as decoration. A prose note cannot be enforced; an int can.
+    """
+    bad = sorted(p for p, cap in BASELINE.items() if not isinstance(cap, int) or isinstance(cap, bool) or cap <= 0)
+    assert not bad, "BASELINE values must be a positive int (the maximum allowed line count), not a note. " "Offending entries: %s" % bad
+
+
+def _grown():
+    """Baselined files that now exceed their own recorded count."""
+    over = []
+    for rel, cap in BASELINE.items():
+        path = os.path.join(_REPO, rel)
+        if not os.path.isfile(path):
+            continue  # moved/deleted — the subset semantics above; never a failure
+        n = _line_count(rel)
+        if n > cap:
+            over.append((rel, cap, n))
+    return sorted(over, key=lambda t: t[1] - t[2])
+
+
+def test_baselined_files_do_not_grow():
+    """A baselined file may shrink freely and may not grow past its recorded count.
+
+    This is the whole point of the registry and it was unenforced until 2026-08-09: the
+    old code read ``if rel in BASELINE: continue``, so membership alone was a permanent
+    exemption from any ceiling at all. 24 of 28 entries had drifted up a combined 3,565
+    lines while this file reported green.
+    """
+    over = _grown()
+    assert not over, (
+        "Baselined file(s) grew past their recorded ceiling (#1665, enforcing since 2026-08-09):\n"
+        + "\n".join(f"  {rel}: {n} lines, baseline {cap} (+{n - cap})" for rel, cap, n in over)
+        + "\n\nThese are accepted DEBT, not a licence to grow. Put the new code in a cohesive "
+        "helper module beside it (that is #1654's whole shape), or — if the growth is genuinely "
+        "unavoidable — raise this file's number and say why in the commit message. Do not raise "
+        "it reflexively to clear a red gate."
+    )
+
+
+def test_baseline_has_no_stale_entries():
+    """A baselined file that dropped back under the ceiling must be pruned.
+
+    Not hygiene — enforcement. site_api_data.py was baselined at 3016 and is now 362 lines;
+    while the entry stood, it could have regrown to 3016 with every gate green. Pruning is a
+    one-line deletion, so this can never deadlock a refactor the way an equality check would.
+    """
+    stale = sorted(
+        (rel, _line_count(rel)) for rel in BASELINE if os.path.isfile(os.path.join(_REPO, rel)) and _line_count(rel) <= HARD_CEILING
+    )
+    assert not stale, (
+        "BASELINE entr(ies) for file(s) now at/under the %d-line ceiling — delete the line(s), "
+        "the ratchet has tightened:\n" % HARD_CEILING + "\n".join(f"  {rel}: {n} lines" for rel, n in stale)
+    )
 
 
 # ── B. THE LOGIC (synthetic, guard-red) — proves the classifier actually bites ──────────
-def _classify(n_lines, *, in_baseline, has_exception):
-    """Pure decision function mirrored by _offenders, exercised without touching disk."""
+def _classify(n_lines, *, in_baseline, has_exception, baseline_cap=None):
+    """Pure decision function mirrored by _offenders + _grown, exercised without disk.
+
+    ``baseline_cap`` is the file's recorded maximum. Passing ``in_baseline=True`` without
+    a cap reproduces the pre-2026-08-09 behaviour (membership = blanket exemption) and is
+    only used by the regression test that pins the old hole shut.
+    """
     if n_lines <= HARD_CEILING:
         return "ok:under-ceiling"
     if in_baseline:
+        if baseline_cap is not None and n_lines > baseline_cap:
+            return "FAIL:grew-past-baseline"
         return "ok:baselined"
     if has_exception:
         return "ok:exception"
     return "FAIL"
+
+
+def test_baselined_file_that_grew_fails():
+    """The hole this ratchet closes: site_api_social.py's real 1829 -> 2708 drift."""
+    assert _classify(2708, in_baseline=True, has_exception=False, baseline_cap=1829) == "FAIL:grew-past-baseline"
+
+
+def test_baselined_file_that_shrank_passes():
+    """Shrinking is always allowed and never forces a registry edit."""
+    assert _classify(1500, in_baseline=True, has_exception=False, baseline_cap=1829) == "ok:baselined"
+
+
+def test_baselined_file_exactly_at_its_cap_passes():
+    """The comparison is strictly-greater — a file sitting on its number is not a red."""
+    assert _classify(1829, in_baseline=True, has_exception=False, baseline_cap=1829) == "ok:baselined"
 
 
 def test_new_oversize_file_fails():
