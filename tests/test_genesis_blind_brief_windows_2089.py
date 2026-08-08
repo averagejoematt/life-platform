@@ -166,12 +166,20 @@ def test_pre_fix_windows_come_back_empty_on_genesis_day(genesis_day, pre_fix):
 
 def test_pre_fix_hrv_trend_and_tsb_degenerate(genesis_day, pre_fix):
     """The two reader-facing numbers the issue names, computed the way the brief
-    computes them, on the pre-fix read: no trend, and a zeroed load model."""
+    computes them, on the pre-fix read: no trend, and no load model.
+
+    #2221: the TSB half used to assert 0.0 — the "zeroed load model" this issue was
+    about, where an empty window produced a number the readiness scorer read as
+    balanced form. `compute_tsb` now returns absence for an empty window, so the
+    degenerate read is degenerate all the way to the reader rather than arriving as
+    a fabricated mid-scale figure. The blindness this test pins is unchanged; only
+    what the blindness now LOOKS like has moved.
+    """
     hrv_7d = [float(r["hrv"]) for r in brief.fetch_range("whoop", *_win(7)) if "hrv" in r]
     hrv_30d = [float(r["hrv"]) for r in brief.fetch_range("whoop", *_win(30)) if "hrv" in r]
     assert hrv_7d == [] and hrv_30d == []
     assert html_builder.hrv_trend_str(None, None) == "no trend data"
-    assert brief.compute_tsb(brief.fetch_range("strava", *_win(60)), _TODAY) == 0.0
+    assert brief.compute_tsb(brief.fetch_range("strava", *_win(60)), _TODAY) is None
 
 
 # ══════════════════════════════════════════════════════════════════════════════

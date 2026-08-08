@@ -519,3 +519,33 @@ def _confidence_badge(level):
         "font-size:9px;font-weight:700;letter-spacing:0.08em;"
         'font-family:-apple-system,sans-serif;white-space:nowrap;">' + label + "</span>"
     )
+
+
+def coerce_int(value):
+    """int(float(value)) or None — absence and garbage both read as absence.
+
+    #2221: the daily brief's pre-computed read path used a bare `int(float(...))`
+    on cells written by another Lambda, so one "—" placeholder raised ValueError
+    out of lambda_handler and lost the whole morning email.
+    """
+    if value is None:
+        return None
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def rhr_trend_str(rhr_7d, rhr_30d):
+    """Resting-heart-rate trend phrase, 7-day average against 30-day (#2221).
+
+    RHR's polarity is the inverse of HRV's — a FALLING resting heart rate is the
+    improvement — so this cannot reuse `hrv_trend_str`. Bands at +/-2%, matching it.
+    Returns None (not a phrase) when either window is empty: `public_stats.json`
+    publishes this field, and ADR-104 wants absence to read as absence rather than
+    as the hard-coded "improving" that shipped here for the field's whole life.
+    """
+    if not rhr_7d or not rhr_30d or rhr_30d == 0:
+        return None
+    pct = round((rhr_7d / rhr_30d - 1) * 100)
+    return "improving" if pct <= -2 else "stable" if pct < 2 else "worsening"

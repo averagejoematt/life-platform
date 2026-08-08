@@ -83,6 +83,7 @@ try:
     from experiment import phase_taxonomy as tax  # noqa: E402
     from experiment.phase_filter import PHASE_FILTER_EXPRESSION  # noqa: E402
     from ingestion import source_registry as registry  # noqa: E402
+    from intelligence import weight_recency  # noqa: E402
 except ImportError as _e:  # pragma: no cover — only when the bundle layout changes
     _import_err = _e
     brief = None  # type: ignore
@@ -474,20 +475,6 @@ class TestNormaliseWhoopSleep:
         out = brief._normalize_whoop_sleep({"slow_wave_sleep_hours": 1.4})
         assert "deep_pct" not in out
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:498-503 (_normalize_whoop_sleep): the staging derivation reads "
-            "`float(out.get(src_field, 0))`, so a Whoop record that carries a duration but NO staging "
-            "breakdown (a partial sync, or a nap-only night) gets deep_pct/rem_pct/light_pct = 0.0 — a "
-            "fabricated factual zero for an absent measurement. It should leave the field unset. "
-            "This is not cosmetic: output_writers.write_clinical_json:882-889 averages deep_pct/rem_pct "
-            "over 30 days filtering on `is not None`, so every staging-less night silently drags the "
-            "clinical 30-day average deep-sleep % toward zero. Hurts: Matthew, and anyone reading the "
-            "clinical JSON. (The email itself is protected only by accident — html_builder.py:811 "
-            "tests truthiness, so 0.0 renders as an em dash.)"
-        ),
-    )
     def test_absent_staging_is_absence_not_zero_percent(self):
         out = brief._normalize_whoop_sleep({"sleep_duration_hours": 7.0})
         assert out.get("deep_pct") is None, f"fabricated deep_pct={out.get('deep_pct')}"
@@ -785,18 +772,6 @@ class TestHabitStreaks:
         out = brief.compute_habit_streaks(STREAK_PROFILE, YESTERDAY)
         assert out["vice_streaks"]["no_weed"] == 90
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:1210-1211 (compute_habit_streaks): `if not rec: break` treats a day "
-            "with NO habitify record as the end of history and stops the scan. A single ingestion gap "
-            "(Habitify API blip, a travel day, a phone left off) therefore silently truncates every "
-            "streak the reader is shown — a 40-day vice streak renders as 2 — and the number is "
-            "presented as a fact, with no marker that the scan hit a data gap rather than a miss. "
-            "It should distinguish 'no data' from 'not done' (carry the streak across an absent day, or "
-            "surface the gap). Hurts: Matthew, on the single most motivating number in the email."
-        ),
-    )
     def test_a_missing_habitify_day_does_not_silently_truncate_a_long_streak(self, table):
         # 40 clean days, one ingestion gap 3 days back, clean before and after.
         days = {_back(i): {"no_weed": 1} for i in range(40) if i != 3}
@@ -804,16 +779,6 @@ class TestHabitStreaks:
         out = brief.compute_habit_streaks(STREAK_PROFILE, YESTERDAY)
         assert out["vice_streaks"]["no_weed"] > 3, f"streak truncated at the gap: {out['vice_streaks']['no_weed']}"
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:1222/1240/1251 (compute_habit_streaks): `habits_map.get(h, 0)` maps an "
-            "ABSENT habit key to 0 — 'not done'. A habit added to the profile registry today, or one "
-            "Habitify simply did not return for a day, therefore reads as a miss and zeroes the tier "
-            "streak. Absence of a reading is not evidence of a miss (ADR-104). Hurts: Matthew — adding a "
-            "new tier-0 habit retroactively destroys the existing streak."
-        ),
-    )
     def test_a_habit_absent_from_the_days_record_is_not_counted_as_a_miss(self, table):
         _seed_habit_days(table, {_back(i): {"sleep_7h": 1, "no_weed": 1} for i in range(3)})  # 'protein' never reported
         assert brief.compute_habit_streaks(STREAK_PROFILE, YESTERDAY)["tier0_streak"] == 3
@@ -864,19 +829,6 @@ class TestComputeReadiness:
         score, _ = brief.compute_readiness(_readiness_data(primary_whoop={"recovery_score": 30}, whoop={"recovery_score": 86}))
         assert score == 30
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:1290-1292 (compute_readiness) reads `data['tsb']`, which "
-            "gather_daily_data:631 always populates from training_load.compute_ctl_atl_tsb — and that "
-            "returns 0.0, never None, for an EMPTY 60-day Strava window. So a period with no training "
-            "data at all contributes a readiness component of clamp(60 + 0×2) = 60, a fabricated "
-            "mid-scale 'neutral form' from no measurement (ADR-104). On a day when recovery and sleep "
-            "are also absent, readiness is reported as 60/yellow on the strength of nothing. It should "
-            "distinguish 'no training data' from 'balanced form'. Hurts: Matthew, and the public "
-            "site — the same value ships as `tsb_form` in public_stats.json."
-        ),
-    )
     def test_an_empty_training_window_does_not_manufacture_a_neutral_form_component(self):
         empty_tsb = brief.compute_tsb([], date(2026, 8, 7))
         assert empty_tsb is None, f"an empty Strava window produced tsb={empty_tsb} rather than absence"
@@ -1234,18 +1186,6 @@ class TestGatherDailyData:
             table.store[(r["pk"], r["sk"])] = r
         assert brief.gather_daily_data(PROFILE, YESTERDAY)["primary_whoop"]["recovery_score"] == 86.0
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:627-628 (gather_daily_data): "
-            "`[float(r['hrv']) for r in hrv_7d_recs if 'hrv' in r]` tests for KEY PRESENCE, not for a "
-            "value. A DynamoDB row that carries an explicit NULL `hrv` (boto3 returns it as None — a "
-            "shape whoop_lambda can write on a partial sync) makes float(None) raise TypeError inside "
-            "gather_daily_data, which lambda_handler does NOT wrap: the exception escapes and the "
-            "ENTIRE brief is lost for that day. It should filter on the value the way safe_float does. "
-            "Hurts: Matthew — one malformed cell costs the whole morning email. Severity P1 (crash)."
-        ),
-    )
     def test_one_null_hrv_cell_does_not_cost_the_whole_brief(self, table):
         good = whoop_row(YESTERDAY, hrv=Decimal("58"))
         bad = whoop_row("2026-08-05", hrv=None)
@@ -1254,45 +1194,37 @@ class TestGatherDailyData:
         data = brief.gather_daily_data(PROFILE, YESTERDAY)
         assert data["hrv"]["hrv_7d"] == 58.0
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:666-671 (gather_daily_data) picks week_ago_weight with a LAST-WINS "
-            "loop over an ascending 14-day window — the NEWEST weigh-in at or before day-7. "
-            "daily_metrics_compute_lambda.py:1030-1037 implements the same concept as `next(...)` over "
-            "the same ascending window — the OLDEST, i.e. a reading up to 14 days old. One concept, two "
-            "answers, and lambda_handler:1864-1865 lets the compute value overwrite the brief's whenever "
-            "computed_metrics exists — so the weekly weight delta the reader sees flips depending on "
-            "whether a pipeline ran, and the figure published as `weight_delta_7d` (#1917 renamed it for "
-            "honesty) can span up to 14 days on the compute path. One definition, one place. "
-            "Hurts: Matthew and every reader of public_stats.json / the weekly-signal email."
-        ),
-    )
     def test_week_ago_weight_agrees_with_the_compute_lambdas_definition(self, table):
+        """#2221 — one concept, one implementation.
+
+        The brief kept the LAST match of a loop over the ascending 14-day window
+        (the NEWEST weigh-in at or before day-7); daily_metrics_compute_lambda
+        took `next(...)` over the same window (the OLDEST — a reading up to 14
+        days old). lambda_handler lets the compute value overwrite the brief's
+        whenever a computed_metrics row exists, so the weekly delta flipped on
+        which pipeline ran, and `weight_delta_7d` — a name #1917 gave it FOR
+        honesty — could span 14 days on the compute path.
+
+        CORRECTION to the marker's implied remedy: it is the COMPUTE lambda that
+        was wrong, not the brief. The newest reading at or before the target is
+        the one closest to the seven-day mark, so both callers now resolve
+        through `weight_recency.week_ago_weight` and the compute lambda's
+        `next(...)` is gone. This asserts the shared definition AND that the
+        other caller really routes through it — a value-only assertion would
+        pass again the moment someone re-derived it locally.
+        """
         # Two weigh-ins at or before the day-7 target (2026-07-31): 07-26 and 07-30.
         for d, wt in (("2026-07-26", 325.0), ("2026-07-30", 320.0), (YESTERDAY, 317.0)):
             r = withings_row(d, wt)
             table.store[(r["pk"], r["sk"])] = r
         brief_value = brief.gather_daily_data(PROFILE, YESTERDAY)["week_ago_weight"]
         withings_14d = brief.fetch_range("withings", D14, YESTERDAY)
-        compute_value = next(
-            (float(w["weight_lbs"]) for w in withings_14d if w.get("sk", "").replace("DATE#", "") <= D7 and w.get("weight_lbs")),
-            None,
-        )
-        assert brief_value == compute_value, f"brief says {brief_value}, daily-metrics-compute says {compute_value}"
+        assert brief_value == weight_recency.week_ago_weight(withings_14d, D7) == 320.0
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:2482-2487 (lambda_handler) builds the /live/ nutrition narrative from "
-            "`data.get('cgm') or data.get('cgm_today')`, but gather_daily_data's returned dict "
-            "(daily_brief_lambda.py:832-872) contains NEITHER key — no CGM read happens anywhere in this "
-            "module. The reader/writer mismatch class: the CGM time-in-range narrative on the cockpit "
-            "has therefore never rendered, silently, since it was added. It should read the cgm "
-            "partition (or the apple_health CGM aggregate) and populate the key. "
-            "Hurts: every reader of averagejoematt.com's cockpit — a whole pillar narrative is dark."
-        ),
-    )
+        compute_src = (REPO_ROOT / "lambdas" / "compute" / "daily_metrics_compute_lambda.py").read_text()
+        assert "weight_recency.week_ago_weight(" in compute_src, "the compute lambda no longer shares the definition"
+        assert "week_ago_weight = next(" not in compute_src, "the compute lambda re-derived week_ago_weight locally"
+
     def test_the_gathered_data_carries_the_cgm_key_the_cockpit_narrative_reads(self, table):
         data = brief.gather_daily_data(PROFILE, YESTERDAY)
         assert "cgm" in data or "cgm_today" in data
@@ -1325,24 +1257,6 @@ class TestStalenessScanAgainstTheRegistry:
         for src in brief.STALENESS_SOURCES:
             assert tax.classify(brief.USER_PREFIX + src) in never_hidden, src
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:356-371: STALENESS_SOURCES / "
-            "STALENESS_DEFAULT_THRESHOLD_DAYS / STALENESS_THRESHOLD_OVERRIDE_DAYS are a hand-maintained "
-            "second opinion on freshness, while scan_stale_sources' own docstring (line 385 region) "
-            "claims it 'Reads the SAME freshness logic the freshness-checker Lambda + "
-            "get_freshness_status MCP tool use'. It does not: freshness_checker_lambda.py:45-48 derives "
-            "its set and its thresholds from ingestion/source_registry.py "
-            "(`checker_sources()` + `stale_hours_overrides()`), the canonical home per #2003. The two "
-            "disagree on most of the list — withings (registry 168h, brief 48h), todoist (72h vs 48h), "
-            "macrofactor (96h vs 48h — the registry says it is '~24h behind by design'), notion (336h vs "
-            "48h) and food_delivery (336h vs 2160h) — so the banner cries wolf on four sources that are "
-            "behaving normally and under-reports the one that is not. It should derive from the "
-            "registry. Hurts: Matthew — a banner that fires every morning is a banner he stops reading, "
-            "and it explicitly tells him his day grade may be wrong."
-        ),
-    )
     def test_the_scans_thresholds_agree_with_the_canonical_source_registry(self):
         overrides = registry.stale_hours_overrides(brief.STALENESS_SOURCES)
         mismatched = {}
@@ -1353,19 +1267,6 @@ class TestStalenessScanAgainstTheRegistry:
                 mismatched[src] = (brief_hours, canonical)
         assert not mismatched, f"brief-vs-registry threshold drift: {mismatched}"
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:356-369: STALENESS_SOURCES still lists `garmin`, which "
-            "source_registry marks `paused: True` (ADR-074 — no EventBridge rule, deliberately not "
-            "ingesting). The canonical freshness path excludes paused sources from "
-            "`checker_sources()` precisely so they cannot alarm. The brief therefore prints "
-            "'garmin — last update … (Nd ago)' in the ⚠️ Data Status banner EVERY morning, forever, for "
-            "a source that is off on purpose. It should derive the set from `checker_sources()`. "
-            "Hurts: Matthew — a permanent false line in the one banner that is supposed to mean "
-            "'today's grade may not be real'."
-        ),
-    )
     def test_the_scan_never_watches_a_deliberately_paused_source(self):
         watched = set(brief.STALENESS_SOURCES)
         paused = {k for k, v in registry.SOURCE_REGISTRY.items() if v.get("paused")}
@@ -1814,17 +1715,6 @@ class TestSickDayBrief:
         brief.lambda_handler({}, None)
         assert [p for p in handler_env["table"].puts if p.get("pk", "").endswith("day_grade")] == []
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:1766 (lambda_handler): the sick-day branch returns before "
-            "record_email_send at 2670, so no email_log row is written on a sick day even though a real "
-            "SES send happened. The row exists so 'the status page can track last send' (line 1378) and "
-            "a missing row is what monitoring reads as a missed brief — so every sick day produces a "
-            "false 'the daily brief did not send' signal. It should record the send it just made. "
-            "Hurts: Matthew, exactly on the days he is least able to investigate a false alarm."
-        ),
-    )
     def test_a_sick_day_send_is_still_recorded_for_the_status_page(self, handler_env):
         brief.lambda_handler({}, None)
         email_log = [p for p in handler_env["table"].puts if "email_log" in str(p.get("pk", ""))]
@@ -1865,19 +1755,6 @@ class TestComputeStaleness:
         assert metric["MetricName"] == "ComputePipelineStaleness"
         assert metric["Value"] == 1.0
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:1804-1805 (lambda_handler): when a computed_metrics row exists but "
-            "carries NO `computed_at`, the else-branch logs 'Using pre-computed metrics' and leaves "
-            "_compute_stale False — the row is declared fresh on the basis of nothing. The same happens "
-            "at 1802-1803 when computed_at is present but unparseable. Both are exactly the shapes a "
-            "partial write or a schema change produces, and both suppress the reader-facing 'data may "
-            "be estimated' banner AND report 0.0 to the ComputePipelineStaleness alarm. Unknown age "
-            "should be treated as stale, not as fresh. Hurts: Matthew — a brief built on a month-old "
-            "row presents itself as today's."
-        ),
-    )
     def test_a_row_with_no_timestamp_is_not_declared_fresh(self, handler_env):
         r = computed_row()
         del r["computed_at"]
@@ -1885,18 +1762,6 @@ class TestComputeStaleness:
         stale, _ = self._run_and_get_stale_flag(handler_env)
         assert stale is True, "a computed row of unknown age was presented as current"
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:1842-1847 (lambda_handler): the pre-computed branch is NOT wrapped in "
-            "a try — `int(float(_cm_score))` and the `component_scores` comprehension raise ValueError "
-            "on any non-numeric cell (an empty string, an '—' placeholder, a stringified None). The "
-            "exception escapes lambda_handler and the entire brief is lost, where the inline fallback "
-            "path immediately below (1887-1892) catches exactly this and degrades to defaults. One "
-            "malformed cell in a compute output should cost the day grade, not the email. "
-            "Hurts: Matthew. Severity P1 (crash)."
-        ),
-    )
     def test_a_malformed_pre_computed_cell_does_not_lose_the_whole_brief(self, handler_env):
         r = computed_row(day_grade_score="—")
         handler_env["table"].store[(r["pk"], r["sk"])] = r
@@ -1963,18 +1828,6 @@ class TestPublicStatsTruth:
         assert published["journey"]["lost_lbs"] is None
         assert published["journey"]["progress_pct"] is None
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:2395 (lambda_handler): `_acwr = float(_cm.get('acwr') or 1.1)` "
-            "substitutes a fabricated 1.1 — a healthy mid-band acute:chronic ratio — whenever the ACWR "
-            "compute has not run or produced no value. That number is published to "
-            "generated/public_stats.json and drawn on the daily OG share card "
-            "(og_image_lambda.py:145 renders training['acwr']). A reader cannot tell a measured 1.1 from "
-            "no measurement at all. ADR-104: it should publish null. "
-            "Hurts: every reader of the site and of the share cards."
-        ),
-    )
     def test_an_absent_acwr_is_published_as_null_not_as_a_healthy_looking_default(self, handler_env):
         r = computed_row()  # no `acwr` key at all
         handler_env["table"].store[(r["pk"], r["sk"])] = r
@@ -2014,47 +1867,16 @@ class TestPublicStatsTruth:
         training = _published(handler_env)["training"]
         assert training["injury_risk"] == "low"
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:2535 (lambda_handler): `'rhr_trend': 'improving'` is a hard-coded "
-            "string published to public_stats.json alongside a real, resolver-derived rhr_bpm. The site "
-            "renders it as a measured trend. It has never been computed, so it reads 'improving' on a "
-            "day resting heart rate rose. ADR-104 / ADR-105: a claim with no computation behind it "
-            "should not ship. Hurts: every reader of averagejoematt.com."
-        ),
-    )
     def test_the_published_rhr_trend_is_computed_rather_than_asserted(self, handler_env):
         brief.lambda_handler({}, None)
         first = _published(handler_env)["vitals"]["rhr_trend"]
         assert first != "improving", "rhr_trend is a hard-coded constant, not a measurement"
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:2571-2572 (lambda_handler): `'total_miles_30d': 0` and "
-            "`'activity_count_30d': 0` are hard-coded zeros published into public_stats.json's training "
-            "block. A reader (and the OG card generator) cannot distinguish 'we do not compute this' "
-            "from 'you did nothing for 30 days'. ADR-104: publish null, or compute it — the 60-day "
-            "Strava window needed is already in hand at this point in the handler. Hurts: every reader "
-            "of the site."
-        ),
-    )
     def test_uncomputed_training_totals_are_published_as_absence_not_as_zero(self, handler_env):
         brief.lambda_handler({}, None)
         training = _published(handler_env)["training"]
         assert training["total_miles_30d"] is None and training["activity_count_30d"] is None
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:2565-2567 (lambda_handler): ctl_fitness / atl_fatigue / tsb_form fall "
-            "back to a literal 0 when the computed values are absent (`float(data.get('ctl') if ... else "
-            "0)`, `float(data.get('tsb') or 0)`). Zero CTL is not 'unknown fitness', it is 'completely "
-            "detrained', and the site plots it on the same axis as a measured value. ADR-104: absence "
-            "should publish null. Hurts: every reader of the site's training block."
-        ),
-    )
     def test_absent_training_load_publishes_null_rather_than_a_detrained_zero(self, handler_env):
         r = computed_row()
         for k in ("ctl", "atl", "tsb"):
@@ -2120,39 +1942,11 @@ class TestCockpitGroupNarratives:
         assert "activity" not in n  # no Strava rows seeded
         assert "nutrition" not in n  # no CGM, no delivery streak
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:2497-2506 (lambda_handler): the habits narrative appends "
-            "'— N% completion today' from `streak_data.get('tier0_pct')` / "
-            "`streak_data.get('tier0_completion_pct')` / `_computed.get('tier0_pct')`. None of the three "
-            "is ever produced: compute_habit_streaks (daily_brief_lambda.py:1260-1264) returns exactly "
-            "{tier0_streak, tier01_streak, vice_streaks}, and daily_metrics_compute_lambda.py:857 writes "
-            "tier0_pct onto the SOURCE#habit_scores row, not onto computed_metrics. Reader/writer "
-            "mismatch: the completion clause has never rendered on either path. It should read the "
-            "habit_scores row. Hurts: readers of the cockpit habits pillar — the sentence is half the "
-            "story it was written to tell."
-        ),
-    )
     def test_the_habits_line_carries_todays_completion_percentage(self, handler_env):
         hs = day_row("habit_scores", YESTERDAY, tier0_pct=Decimal("0.75"), tier0_done=3, tier0_total=4)
         handler_env["table"].store[(hs["pk"], hs["sk"])] = hs
         assert "completion today" in self._narratives(handler_env)["habits"]
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:2366-2372 + 2477-2479 + 2573 (lambda_handler): `_z2_this_week` sums "
-            "the FULL moving time of every activity whose sport matches "
-            "run/walk/ride/swim/elliptical/workout — no heart-rate zone, no pace band, no intensity "
-            "filter of any kind — and then publishes it as `zone2_this_week_min` against a 150-minute "
-            "Zone 2 target, and narrates it as 'Zone 2 this week: N / 150 min (P% of target)'. A "
-            "max-effort interval session counts in full toward a Zone-2 goal. It is total aerobic "
-            "moving minutes, and it should be named that (or actually filtered by zone). "
-            "#1917 window/label-honesty class. Hurts: Matthew (a training target he can hit without "
-            "doing the work) and every reader of the cockpit activity pillar."
-        ),
-    )
     def test_zone_two_minutes_exclude_work_done_above_zone_two(self, handler_env):
         sprint = day_row(
             "strava",
@@ -2248,19 +2042,6 @@ class TestInlineFallbackPath:
         assert args[12] == 3  # mvp_streak — three clean tier-0 days back from the subject date
         assert args[14] == {"no_weed": 3}  # vice_streaks
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:1215-1229 (compute_habit_streaks): when the profile declares NO "
-            "active tier-0 habits and no mvp_habits — the state right after an experiment reset, and "
-            "the state of a fresh profile — `tier0_habits` is empty, so the inner `all(...)` loop is "
-            "vacuously true and the streak increments once for every day that merely HAS a habitify "
-            "record. The brief then renders a growing 'Tier 0 streak: N days' for a set of zero habits, "
-            "and publishes the same N to public_stats.json's platform block. A streak over an empty set "
-            "is not a streak; it should be absence. Hurts: Matthew and every reader of the cockpit — a "
-            "headline number that measures nothing."
-        ),
-    )
     def test_an_empty_habit_registry_produces_no_streak_rather_than_a_vacuous_one(self, handler_env):
         for i in range(3):
             r = habitify_row(_back(i), {"anything": 1})
@@ -2419,19 +2200,6 @@ class TestAiOutputOrdering:
         brief.lambda_handler({}, None)
         assert called.calls == []
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:2066-2076 vs 2078-2098 (lambda_handler): `_elena_hero_line` is sliced "
-            "out of `tldr_guidance` BEFORE the AI-3 output validator runs and replaces tldr_guidance "
-            "with its corrected version. The hero line is then published to "
-            "generated/public_stats.json (2602, `elena_hero_line=`) and rendered on the homepage — so "
-            "any sentence the validator strips or rewrites for a fabricated number still reaches the "
-            "PUBLIC page carrying the un-validated text, while the email shows the corrected one. The "
-            "slice should happen after validation. Hurts: every reader of the homepage; it is the one "
-            "AI sentence on the public site that bypasses the ADR-104 grounding gate. Severity P1."
-        ),
-    )
     def test_the_public_hero_line_is_taken_from_the_validated_text(self, handler_env, monkeypatch):
         def scrub(**kw):
             kw = dict(kw)
@@ -2444,20 +2212,6 @@ class TestAiOutputOrdering:
         hero = handler_env["public_stats"].calls[0][1]["elena_hero_line"]
         assert "12 hours" not in hero, f"un-validated model text reached the public homepage: {hero!r}"
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:1576-1587 (_run_ai_coach_pipeline): when the journal coach returns "
-            "empty or under 10 characters, a hard-coded stub ('Quieter journal day — no clear pattern "
-            "surfaced. || One small thing: …') is substituted and then flows on exactly like genuine "
-            "coaching — it is rendered in the email AND handed to "
-            "insight_writer.extract_daily_brief_insights at 2322-2329, which persists it into the "
-            "Insight Ledger where later briefs read it back as prior coaching. An AI-failure stub filed "
-            "as genuine content is the ADR-104 case the weekly-plate work already fixed elsewhere: it "
-            "should be marked so the ledger can exclude it. Hurts: Matthew — the compounding-insight "
-            "corpus is diluted with placeholder text he never received advice from."
-        ),
-    )
     def test_a_journal_coach_stub_is_not_filed_into_the_insight_ledger_as_real_coaching(self, handler_env, monkeypatch):
         from ai import ai_calls
 

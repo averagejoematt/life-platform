@@ -62,6 +62,7 @@ from health import (
     scoring_engine,
     weight_trend,  # shared weekly-rate + projection (layer module)
 )
+from intelligence import weight_recency  # #2221: ONE definition of the week-ago weigh-in
 from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
@@ -1017,8 +1018,11 @@ def assemble_data(yesterday_str, profile):
     # HRV averages
     hrv_7d_recs = fetch_range("whoop", (today - timedelta(days=7)).isoformat(), yesterday_str)
     hrv_30d_recs = fetch_range("whoop", (today - timedelta(days=30)).isoformat(), yesterday_str)
-    hrv_7d_vals = [float(r["hrv"]) for r in hrv_7d_recs if "hrv" in r]
-    hrv_30d_vals = [float(r["hrv"]) for r in hrv_30d_recs if "hrv" in r]
+    # #2221: key-presence, not value — an explicit NULL hrv cell raised TypeError.
+    # Same defect as daily_brief_lambda's; fixed on both readers, not just the one
+    # the issue named.
+    hrv_7d_vals = [v for v in (safe_float(r, "hrv") for r in hrv_7d_recs) if v is not None]
+    hrv_30d_vals = [v for v in (safe_float(r, "hrv") for r in hrv_30d_recs) if v is not None]
     hrv_7d_avg = avg(hrv_7d_vals)
     hrv_30d_avg = avg(hrv_30d_vals)
 
@@ -1039,14 +1043,11 @@ def assemble_data(yesterday_str, profile):
     withings_7d = fetch_range("withings", (today - timedelta(days=7)).isoformat(), yesterday_str)
     withings_14d = fetch_range("withings", (today - timedelta(days=14)).isoformat(), yesterday_str)
     target_7d_date = (today - timedelta(days=7)).isoformat()
-    week_ago_weight = next(
-        (
-            safe_float(w, "weight_lbs")
-            for w in withings_14d
-            if w.get("sk", "").replace("DATE#", "") <= target_7d_date and safe_float(w, "weight_lbs")
-        ),
-        None,
-    )
+    # #2221: was `next(...)` — the OLDEST reading in the 14-day window at or before
+    # day-7, i.e. a figure that could be 14 days old under a name (`weight_delta_7d`)
+    # that #1917 gave it FOR honesty — while daily_brief_lambda took the NEWEST such
+    # reading off the same window. Both now resolve through the one helper.
+    week_ago_weight = weight_recency.week_ago_weight(withings_14d, target_7d_date)
     # BUG-01 (#783): weigh-ins are sporadic — a >7-day gap is routine, not an outage
     # (source_registry: 'a missing week is a lapse, not an outage'). latest_weight feeds
     # the ADR-104 grounding/honesty gate via canonical_facts; with only a 7-day lookback it
