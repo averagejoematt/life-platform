@@ -171,6 +171,20 @@ def _recovery_deficit_overlay(deficit_by_date: dict, recovery_by_date: dict, sta
     }
 
 
+def _mf(item, field, alt_field=None):
+    """Resolve a MacroFactor macro field across both the legacy short field name
+    (``calories``, ``protein_g``, …) and the current ``total_*_kcal``/``total_*_g``
+    name. Module-scope (#2217 — was a closure duplicated per-call inside
+    ``nutrition_overview``); ``deficit_sustainability`` shares this single accessor
+    instead of its own inline ``total_calories_kcal``-only extraction, which
+    silently produced a fabricated ``avg_intake_kcal: 0`` / ``deficit_pct: 100.0``
+    on any day logged only under the legacy ``calories`` field."""
+    v = item.get(field) or item.get(alt_field or f"total_{field}")
+    if v is None and field == "calories":
+        v = item.get("total_calories_kcal")
+    return float(v) if v is not None else None
+
+
 def nutrition_overview(*, _g) -> dict:
     """
     GET /api/nutrition_overview
@@ -258,13 +272,6 @@ def nutrition_overview(*, _g) -> dict:
 
     def safe_sum_avg(field):
         return safe_avg(field)
-
-    # Support both old field names (calories) and new (total_calories_kcal)
-    def _mf(item, field, alt_field=None):
-        v = item.get(field) or item.get(alt_field or f"total_{field}")
-        if v is None and field == "calories":
-            v = item.get("total_calories_kcal")
-        return float(v) if v is not None else None
 
     cal_vals = [_mf(i, "calories") for i in items if _mf(i, "calories") is not None]
     pro_vals = [_mf(i, "protein_g", "total_protein_g") for i in items if _mf(i, "protein_g", "total_protein_g") is not None]
@@ -793,8 +800,11 @@ def deficit_sustainability(*, _g) -> dict:
         except (TypeError, ValueError):
             return None
 
-    cals = [_f(i.get("total_calories_kcal")) for i in mf]
-    cals = [c for c in cals if c]
+    # #2217: read intake through the same _mf accessor nutrition_overview uses, so a
+    # day logged only under the legacy `calories` field name (rather than the current
+    # `total_calories_kcal`) still contributes its real intake instead of silently
+    # dropping out and fabricating a 100%-deficit "aggressive" verdict from zero rows.
+    cals = [_mf(i, "calories") for i in mf if _mf(i, "calories") is not None]
     avg_cal = round(sum(cals) / len(cals)) if cals else 0
     tdee, tdee_source = _resolve_mf_tdee(mf)
     if not tdee:  # Fallback: profile-derived Mifflin estimate from the latest weigh-in (#484)

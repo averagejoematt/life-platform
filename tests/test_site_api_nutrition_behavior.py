@@ -1714,23 +1714,53 @@ def test_the_reported_period_length_matches_the_window_it_actually_covers(monkey
     assert ds["period"]["days"] == 7
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): deficit_sustainability reads intake ONLY from "
-        "`total_calories_kcal` (nutrition_overview also accepts the legacy `calories` field) "
-        "and then does `avg_cal = ... if cals else 0`. Seven logged days whose calorie field "
-        "is absent/legacy therefore yield avg_intake_kcal = 0, deficit = the whole TDEE, "
-        "deficit_pct = 100%, in_deficit = True and a fabricated 'aggressive' label — absence "
-        "rendered as a factual zero intake (ADR-104)."
-    ),
-)
 def test_days_with_no_readable_calorie_field_never_publish_a_zero_intake():
+    """#2217 (fixed): all 7 days carry only the legacy `calories` field name, never
+    `total_calories_kcal`. Before the fix, deficit_sustainability's inline
+    `_f(i.get("total_calories_kcal"))` extraction saw nothing on every row, so
+    avg_intake_kcal fabricated a 0, deficit_pct fabricated 100%, and the label
+    fabricated 'aggressive' out of a genuinely-logged, unremarkable week.
+
+    Hand-derived with the fix (uniform `calories`, all resolved via `_mf`):
+      avg_cal = 2000 (uniform) ; tdee = 3000 (expenditure_kcal, uniform)
+      deficit_kcal = round(3000 - 2000) = 1000
+      deficit_pct = round(1000 / 3000 * 100, 1) = 33.3  -> label "aggressive" (>25)
+    """
     days = [(datetime(2026, 5, 9) - timedelta(days=6 - i)).strftime("%Y-%m-%d") for i in range(7)]
     src = FakeSources(macrofactor=[mf(d, calories=2000, expenditure_kcal=3000) for d in days])
-    ds = sustainability(src)["deficit_sustainability"]
-    assert ds["deficit"]["avg_intake_kcal"] != 0
-    assert ds["deficit"]["deficit_pct"] != 100.0
+    deficit = sustainability(src)["deficit_sustainability"]["deficit"]
+    assert deficit["avg_intake_kcal"] == 2000
+    assert deficit["deficit_kcal"] == 1000
+    assert deficit["deficit_pct"] == 33.3
+    assert deficit["label"] == "aggressive"
+    assert deficit["in_deficit"] is True
+
+
+def test_a_week_split_between_the_legacy_and_current_calorie_field_names_averages_both():
+    """#2217: real MacroFactor history can straddle the field-name migration — some
+    days logged under the legacy `calories` name, others under the current
+    `total_calories_kcal` — within the SAME 14-day window. Both must resolve
+    through the one `_mf` accessor and land in the same average, not have the
+    legacy-named days silently drop out.
+
+    Hand-derived: 4 days at total_calories_kcal=2000, 3 days at calories=2600,
+    expenditure_kcal=3000 on every day.
+      avg_cal = round((4*2000 + 3*2600) / 7) = round(15800/7) = round(2257.142857) = 2257
+      deficit_kcal = round(3000 - 2257) = 743
+      deficit_pct = round(743 / 3000 * 100, 1) = round(24.7666..., 1) = 24.8  -> label "moderate" (>15, <=25)
+    """
+    days = [(datetime(2026, 5, 9) - timedelta(days=6 - i)).strftime("%Y-%m-%d") for i in range(7)]
+    records = [
+        mf(d, total_calories_kcal=2000, expenditure_kcal=3000) if i < 4 else mf(d, calories=2600, expenditure_kcal=3000)
+        for i, d in enumerate(days)
+    ]
+    src = FakeSources(macrofactor=records)
+    deficit = sustainability(src)["deficit_sustainability"]["deficit"]
+    assert deficit["avg_intake_kcal"] == 2257
+    assert deficit["deficit_kcal"] == 743
+    assert deficit["deficit_pct"] == 24.8
+    assert deficit["label"] == "moderate"
+    assert deficit["in_deficit"] is True
 
 
 def test_each_severity_carries_its_own_prose_verdict_rather_than_one_generic_line():
