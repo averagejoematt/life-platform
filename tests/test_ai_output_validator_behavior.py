@@ -78,6 +78,59 @@ def test_calorie_deficit_context_is_not_blocked():
     assert not r.blocked
 
 
+# ── #2215: per-item macro labelling vs. a daily starvation target ────────────
+# The low-calorie BLOCK could not tell a recipe card's per-serving macro line
+# apart from "eat 500 calories today", so every prompt-compliant Weekly Plate
+# edition was replaced by the nutritionist-warning fallback. These four pin the
+# distinction from BOTH sides — the permissive direction is only safe while the
+# blocking direction below still fires.
+
+
+def test_a_per_serving_macro_line_is_not_a_starvation_recommendation():
+    """The shape weekly_plate's own SYSTEM_PROMPT demands on every recipe card."""
+    r = validate_ai_output(
+        "<div><strong>Smoky Turkey Kofte Bowls</strong><div>520 cal · 42P / 30C / 18F · weeknight easy</div></div>",
+        AIOutputType.NUTRITION_COACH,
+        {},
+    )
+    assert not r.blocked, r.block_reason
+
+
+def test_an_explicit_per_serving_qualifier_is_not_a_starvation_recommendation():
+    r = validate_ai_output(
+        "Charred cabbage tacos come in around 450 kcal per serving and freeze well for lunches.",
+        AIOutputType.NUTRITION_COACH,
+        {},
+    )
+    assert not r.blocked, r.block_reason
+
+
+def test_a_daily_framing_still_blocks_even_when_dressed_as_a_macro_line():
+    """The exemption must not be buyable: annotating a starvation target with
+    macros is still a starvation target."""
+    r = validate_ai_output(
+        "Your target for today: 500 cal · 40P / 30C / 10F. Stick to it every day this week.",
+        AIOutputType.NUTRITION_COACH,
+        {},
+    )
+    assert r.blocked
+    assert "calorie" in r.block_reason.lower()
+
+
+def test_a_recipe_cards_macros_do_not_exempt_a_bare_low_target_on_the_next_line():
+    """The exemption is per-figure and segment-local: one card's macro line must
+    not launder a starvation figure written in the next element. No daily-intake
+    wording here on purpose — the segment clipping is what has to catch it."""
+    r = validate_ai_output(
+        "<div>Smoky Turkey Kofte Bowls — 520 cal · 42P / 30C / 18F</div>" "<div>And to speed things up, try 600 cal on rest days.</div>",
+        AIOutputType.NUTRITION_COACH,
+        {},
+    )
+    assert r.blocked
+    assert "600" in r.block_reason
+    assert "520" not in r.block_reason
+
+
 # ── WARN tier (used as-is, but flagged) ──────────────────────────────────────
 
 
