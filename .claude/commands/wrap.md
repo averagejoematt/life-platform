@@ -140,7 +140,10 @@ omission is not an outcome.
 - **If eligible:** add the beat (below) AND put `**Build beat:** <beat id>` in the
   handover, so every handover records the gate's outcome either way.
 - The beat itself: append one object to `beats` in `site/story/build/beats.json` with fields
-  `id`, `date`, `title`, `shipped`, `gotcha`, `honest_miss`, `prs` (schema + example in the
+  `id`, `date`, `title`, `shipped`, `why_it_mattered`, `gotcha`, `honest_miss`, `prs` — all FOUR
+  prose sections are required and `validate_beats.py` rejects a beat missing any (#1120); this
+  list omitted `why_it_mattered` until 2026-08-09, which cost a wrap one validation cycle
+  (schema + example in the
   checklist). **`prs` entries are `{"label": "PR #953", "url": "https://github.com/…/pull/953"}`
   objects, never bare strings** (string PRs redded `test_build_dispatches` for every
   concurrent session, 2026-07-10). Distill from the new `HANDOVER_LATEST.md` you just

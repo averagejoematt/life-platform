@@ -1,237 +1,259 @@
-# HANDOVER — Throughput first: 27 PRs, 27 closures, and three guards that caught me — 2026-08-08 ~15:38Z → ~20:00Z
+# HANDOVER — The gates paid for themselves the same day: 27 PRs, 250→28 xfails, and three reds caught *before* merge — 2026-08-08 20:13Z → 2026-08-09 ~00:00Z
 
 > Instruction thread: *"read the 2026-08-08 handover, then the plan at
-> `~/.claude/plans/elegant-toasting-hamster.md` and execute it. Opus driving, fully autonomous.
-> Phase 0 is the highest-leverage part — arm the gate monitor and write `deploy/agent_commit.sh`;
-> last session five implementers ran 4½ hours and landed zero PRs. Then Phase 1: land the five
-> salvaged drafts. Launch tranche 4 early. Never stall waiting for me. Hard limits: no
-> `model:fable`, no CDK deploys, no repo-settings changes, no OAuth re-auth, no CodeQL dismissals,
-> never invoke an email Lambda. Quality bar is the point, not the count. Start /wrap at 13:15Z at
-> the latest."*
+> `~/.claude/plans/elegant-noodling-blum.md` and execute it. Opus driving, fully autonomous.
+> **Compute your wrap deadline as T+6.5h from RIGHT NOW and state it back to me** — last session's
+> prompt carried a deadline already two hours past. Main should be green; if it's red that's the
+> only thing that preempts Phase 0. Phase 0: move mypy tier-2, both size guards and the two registry
+> guards into pr-checks.yml's fast lane. Then Phase 1: the BASELINE registry records a line count
+> nothing compares against — expect it to go red immediately on five or six files; that is the gate
+> working. Land the mechanism and the re-baselined counts in the same PR. Launch tranche 5 at the
+> START of Phase 2. Waves of 4 implementers, one xfail cluster each, largest first. Verify every fix
+> yourself before merging, and remember a mutation must actually mutate. Run the FULL suite locally
+> before wrap. Never stall waiting for me."*
 
-**A calibration note up front:** the session began at **15:38Z**, so the plan's literal 13:15Z wrap
-deadline was already two hours past when I read it. That figure was T+6.5h for a session starting
-06:45Z, so I adopted the same budget — wrap at 22:00Z — and started it at 19:40Z, two hours early.
-The plan's `12936` test-count figure I re-derived rather than trusted, as instructed; it was still
-correct at that moment.
+**Deadline discipline worked.** Computed and stated at the top of the first message: session start
+20:13Z → wrap 02:43Z. No inherited clock. Wrap started ~23:20Z, 3h20m early.
 
-**Main:** green (`e806d7e4`) — `check_main_green.py` exit 0, deploy wedge clean. The local full suite is clean at
-`e806d7e4` (**15,711 passed, 0 failed**). The last red (`e7025dd4`) was a coverage-gate failure I had
-already fixed two commits later — see Incidents.
-**Docs:** `docs/engines/CHARACTER.md`, `READINESS.md`, `SCORING.md` re-verified (not date-bumped);
-`docs/alarm_citations.json` gained the freshness entry. All four wiki checkers green.
-**Decisions:** none needed — no governance-shaped call. The two closest (splitting modules rather
-than grandfathering them; letting the monthly letter actually send) are recorded on the issues and
-below, and both follow existing ADRs rather than establishing new policy.
-**Incidents:** 2 rows — main red ~70min on a module-size ceiling crossed by two merges, and ~30min
-on a second size gate. Both mine, both structural-guard reds, no production defect shipped by either.
-**Build beat:** `2026-08-08-the-guards-that-caught-me`.
-**Closures:** 27 — #2222, #2234, #2235, #2237–#2250 (the tranche-3 census), #2254–#2259, #2271,
-#2276–#2278, and epic #1863. Every one carries an ADR-099 verdict naming what I mutation-proved and
-how the deploy was confirmed.
-**Backlog:** Now holds 4 actionable; corpus clean (52 open, 0 violations). No stale `Later`.
-9 new issues filed (#2271, #2276–#2278, #2286, #2287, #2289–#2291).
-**Alarms:** 7 red, all cited. `slo-source-freshness` newly cited with **measured** staleness rather
-than the prior handover's inherited list.
-**CI warnings:** 7 — **all one class and all already filed as #2213** (per-stack "Lambda config change
-that CI's code-deploy cannot ship", needs an owner CDK window; no new warning among them). Deliberate
-no-action this session: CDK deploys are out of scope by instruction. **#2259's duration warning is GONE** —
-the suite went 6:40 → 4:03, which is the Phase 2 result confirmed by the instrument rather than by me.
-**Stash/hooks:** clean — stash empty, hook freshness 🟢.
+**Main:** green (`585b1d58`) — `check_main_green.py` exit 0. It went red once for ~35 min on a
+transient I caused; see Incidents.
+**Docs:** `docs/engines/HYPOTHESIS.md` re-verified against #2328 (read the diff, not a date bump —
+the SPEC_METRICS *vocabulary* changed and nothing else did). All four wiki checkers green.
+**Decisions:** none needed — the one governance-shaped call (which surfaces get the exact grounding
+tolerance) is recorded on #2290 and in the test module's docstring, and follows ADR-104 rather than
+establishing new policy.
+**Incidents:** 2 rows — main red ~35 min on a **transient** visual-QA failure caused by my own
+deploy timing, and a CI/manual deploy race that shipped a site-api bundle missing a merged PR.
+**Build beat:** `2026-08-09-the-gates-that-caught-me-first`.
+**Closures:** 5 — #2286, #2287, #2290, #2307, and epic #1461. Each carries the ADR-099 two-line
+verdict; #1461's is honestly `partial` (six of its eight children were closed before the verdict
+convention existed, so its Slop-Litmus clause is unverifiable from the record).
+**Backlog:** 69 open, corpus clean (0 violations). 22 issues filed. `Now` was down to **2**
+actionable (the rest `gate:owner` or `model:fable`), so #2305, #2337 and #2343 were promoted from
+`Next` by stored rank — which then reds `score_line_canonical` until each score line's `→ Next` is
+repointed, a step worth knowing about before you promote. `Later` sweep: no stale issues.
+**Alarms:** 6 red, all cited, **none new** — the newest state change (`coherence-overall`, 18:46Z)
+predates this session's first commit.
+**CI warnings:** 8 — 7 are the known per-stack CDK config-drift class (**#2213**, needs an owner CDK
+window; deliberate no-action, CDK deploys are out of scope by instruction). The 8th carried **2 live
+reader-truth failures**, deliberately non-gating per ADR-147/#1921 and therefore easy to normalise —
+filed as **#2343** and **#2344**, and #2343 turned out to be the sharpest finding of the night.
+**Stash/hooks:** clean — stash empty (one entry created and dropped mid-session, verified identical
+to its commit first), hook freshness 🟢.
 
 ---
 
-## The headline: throughput was the constraint, and fixing it was worth more than any issue
+## The headline: Phase 0 was worth more than the 27 PRs, and it proved it the same day
 
-Last session's five implementers landed **zero** PRs in 4½ hours. This session landed **27 merged
-PRs and 27 closures**. The difference was almost entirely Phase 0, which cost ~25 minutes.
+The plan called Phase 0 "worth more than any single issue." That was right, but the argument in the
+plan was *prospective* — main had gone red four times last session on gates that only run after a
+merge. What actually happened is better evidence: **the gates moved left caught three separate reds
+within hours, and two of them were mine.**
 
-`deploy/agent_commit.sh` is the whole trick. The pre-commit hook runs `sync_doc_metadata.py --apply`
-and then `git add`s whatever it touched — correct for the driver on `main`, and wrong for an
-implementer on a branch, where it sweeps a global `test_count` literal into a feature PR and
-guarantees a conflict with every concurrent sibling. Agents hand-fought that loop. The script keeps
-the format gate, restores any literal file the agent did not name, stages only named paths, and
-commits `--no-verify`.
+1. **The module-size ratchet caught a +1-line union breach on main within the hour.** #2299 and
+   #2297 were each green alone; together `daily_metrics_compute_lambda.py` went 1369 → **1370**, one
+   line over its recorded ceiling. That line is a single `from intelligence.weight_recency import
+   week_ago_weight` — the import that gives the compute Lambda and the daily brief *one* definition
+   of last week's weight. Bumped to 1370 with the reason, which is the ratchet's sanctioned path.
+   This is the third instance of the concurrent-PR union-breach class in two sessions and the first
+   time a gate named it instead of a human noticing hours later.
 
-It also **refused me twice**, correctly: once on `docs/engines/CHARACTER.md` (real content edit —
-`ALLOW_DOC_LITERALS=1` is the deliberate override), and its format gate caught staged Python that
-would have red-mained lint.
+2. **Both size gates caught my own PR pre-merge.** #2323's first draft took
+   `site_api_ai_lambda.py` from 1991 to 2004, crossing the 1200-ceiling ratchet *and* the 2000-line
+   `*_lambda.py` gate. I did not bump either — my own commit message for the ratchet says raising is
+   "never the reflex fix for a red gate." The comment block was restating #2276/#1967 material
+   already documented at `_grounding_allow_lists`, so compressing it was a real improvement. Landed
+   back at exactly 1991.
 
-Second-order effect worth keeping: implementers stopped losing time and started **correcting their
-own issues**. Nine did, and those corrections are the best output of the session (below).
+3. **The grounding-wiring registry caught a regression in my own PR — and it had run only *after*
+   merge for its entire life.** Folding `cycle_gate_params()` into a local dict made the freshness
+   gate class invisible to the registry's call-site scan: it read as *"declares freshness, does not
+   arm it."* The behaviour was unchanged; the *declaration* had stopped being checkable, which is
+   the same defect shape as a guard that guards nothing. Fixed by passing the tolerance through a
+   tiny `**_tol` dict so `**cycle_gate_params()` stays literally at the call site.
 
-## What the implementers found that the issues had wrong
+Cost of moving them left, measured: mypy **0.31s warm** (379 modules), the five structural guards
+**1.98s** for 66 tests, ruff ~1s. The fast lane went 117s → ~3m. Mechanism note: no second hand-list
+in YAML — `tests/conftest.py` gained a *third source* for the `premerge` marker, so the workflow
+still selects one marker and the two lanes cannot drift (the property #2258 bought).
 
-Nine self-corrections. These are not nitpicks — several changed the fix:
+## Phase 1: a registry that documented itself as shrink-only, while 24 of its 28 entries grew
 
-- **#2242** named `daily_brief_lambda` as "the only writer" of the streak field. There are **two**,
-  and that one is the *fallback*. Patching the named file would have left the field unwritten on
-  every normal day.
-- **#2271** claimed a rename "left readers behind". `git log -S` proves `tasks_completed` has
-  **never been written in this repo's history** — every reader was wrong from the day it was
-  written. The set was **6, not 4**, and one of the two extra readers counted the length of an
-  *open* task list as tasks *completed*. It also dated the dark freshness monitor precisely:
-  **~147 days**.
-- **#2250** said the enrichment fields sit on the record. `enriched_name` is written **inside each
-  activity** in a nested list — a top-level preserve-list, the obvious reading, would have fixed
-  nothing.
-- **#2240** hand-listed 2 unscreened doors. AST-derivation found **9 across 6 modules**.
-- **#2239** called the endpoint "the only unmetered door". There are **11**; the accurate claim is
-  narrower (the only one taking a caller-supplied identifier). It also found the only client is a
-  page under `/legacy`, unlinked and unreachable.
-- **#2277** — mine — said two reads were unguarded. There are **four**, and the two I missed are the
-  ones the answer actually leans on.
-- **#2222** put the member set at 18. It is **27**, and the issue's own derivation rule returns a
-  module it never enumerated.
-- **#2254** filed three symptoms as one defect. They have **three separate root causes**, the 1MB
-  claim is real-but-not-firing (measured: 401 KB, ~40% of a page), and the issue's suggested fix for
-  the third would not have worked — the status page reads that partition with a projection, so
-  **the row's existence *is* the claim**.
-- **#2256** cited a line number that had shifted — "exactly the hand-listed-set rot the issue is
-  arguing against".
+`tests/test_module_size_guard.py` recorded each grandfathered file's line count as a **prose note**
+(`"3016 lines"`) and then did `if rel in BASELINE: continue`. Nothing compared a file against its
+own number. Measured on main:
 
-The xfail burn produced five more: markers that were **wrong about the remedy**, including two
-asking for wiring that #725/#726 had deliberately removed, and one whose prescription referenced a
-field no writer emits.
+| file | baseline | now | drift |
+|---|---:|---:|---:|
+| `lambdas/web/site_api_social.py` | 1829 | 2708 | **+879 (+48%)** |
+| `cdk/stacks/role_policies.py` | 2848 | 3211 | +363 |
+| `cdk/stacks/monitoring_stack.py` | 1298 | 1623 | +325 (+25%) |
+| `mcp/registry.py` | 2103 | 2409 | +306 |
+| …20 more | | | **+3,565 total** |
 
-## The two findings I'd most want carried forward
+Two shrank, two were unchanged. Same class as last session's pipefail finding: **a number recorded
+in the repo that no gate ever read.** Values are now `int` and enforced; a second check forces the
+prune once a file drops back under the ceiling (`site_api_data.py` was baselined at 3016 and is now
+**362** — while that entry stood it could have regrown 8× with every gate green).
 
-**1. The coverage gate could never fail a build.** #2259 asked me to delete a duplicated full-suite
-step. Before doing it I checked what the remaining step actually enforced:
+Re-baselined at measured rather than held, with the drift in the docstring and the commit so the
+debt stays visible. The mutation that mattered was appending **two real lines to `mcp/registry.py`**
+— proving the gate reacts to the tree, not just to registry edits.
 
-```
-$ bash -e -c 'python3 -c "import sys; sys.exit(1)" | tail -100'; echo $?
-0
-```
+**The ratchet then did the job it was built for, four more times**, and every implementer chose the
+right side of it: `weekly_digest` **lowered** its baseline 2216 → **1828** and dropped its
+`GRANDFATHERED` entry by extracting pure helpers; `tools_lifestyle` had **one line** of headroom and
+lowered 1989 → **1829** by lifting a tool into a sibling; the chronicle facade hit 1207 and moved
+two functions out to land at 1169; and `mcp/registry.py` hit 2410 and was **reworded to fit** rather
+than bumped. Zero reflex bumps in the whole session.
 
-The coverage step pipes `pytest … | tail -100`, GitHub's default shell is `bash -e {0}`, and `-e`
-does **not** imply `pipefail`. Its exit code was `tail`'s — always 0. So `--cov-fail-under=74` and
-every test failure inside it were silently discarded, and the step I was asked to delete was the
-**only** one on main whose failures could red the build. Deleting it as filed would have left main
-reporting green with no test signal at all.
+## Phase 2: the xfail corpus, 250 → 28
 
-`set -o pipefail` went in first. Within hours it caught three real reds that had been invisible: an
-engine-doc staleness gate, and two module-size ceilings. **That is the gate working, not the gate
-being noisy** — those files had been over the line and reporting green.
+Sixteen clusters, one PR each, all merged and deployed. Coverage **79.02% → 80.20%**. Suite
+**15,713 → 16,346 passing**.
 
-**2. #2234's monthly letter did not need the CDK deploy it was blocked on.** The cron fires the
-first *Sunday*; the handler only ran *Monday*. Rather than change the schedule, the implementer
-deleted the weekday guard and replaced it with an idempotency check — *"the cadence guard is
-IDEMPOTENCY, not the weekday"* — because the old check took the runtime's **local** date to make a
-weekday decision in a repo whose crons are fixed-UTC precisely so weekdays can't drift. A P1 that
-was filed as CDK-blocked closed without a CDK window.
+| cluster | fixed | PR | | cluster | fixed | PR |
+|---|---:|---|---|---|---:|---|
+| `mcp_tools_nutrition` | 21/22 | #2302 | | `mcp_tools_training` | 9 | #2322 |
+| `daily_brief` | 21 | #2299 | | `macrofactor_ingestion` | 9 | #2321 |
+| `html_builder` | 18 | #2298 | | `coach_ensemble_digest` | 9 | #2320 |
+| `mcp_tools_cgm` | 16 | #2300 | | `challenge_generator` | 8 | #2324 |
+| `site_api_social` | 21 cases | #2314 | | `hypothesis_engine` | 8 | #2328 |
+| `weekly_digest` | 14 | #2316 | | `nutrition_review` | 8 | #2325 |
+| `site_api_nutrition` | 14 | #2313 | | `mcp_tools_lifestyle` | 7 | #2340 |
+| `mcp_tools_labs` | 12 | #2312 | | `eightsleep_ingestion` | 7 | #2339 |
+| `enrichment_lambda` | 11/12 | #2317 | | `chronicle` + `status` | 10/11 | #2341 |
+| `site_api_meals` | 12 | #2318 | | tranche 5 (coverage) | +0.96pp | #2301 |
 
-## ⚠️ One thing Matthew should know
+### The corrections are the output — 50+ of them, and the shape is consistent
 
-**The monthly Coach's Letter will now actually send.** It has never delivered mail in its life.
-Next fire **2026-09-06** (first Sunday), to **one address** — the `EMAIL_RECIPIENT` env var, i.e.
-you, not the subscriber list. Merging alone did nothing; the deploy armed it, and that went out
-automatically. There is a month of runway if you'd rather it stayed quiet.
+**The marker named a real bug and the wrong repair.** Nearly every one. The ones that would have
+done harm:
 
-Relatedly: `weekly_plate_lambda` **now has a `dry_run` gate** (#2222). The standing "never invoke an
-email Lambda" rule was written partly because it had none. `chronicle-email-sender` still has none
-(#2111), so the rule holds for that one.
+- A remedy that would have **created** a fabricated clinical number: the truthiness bug being
+  removed was accidentally suppressing a divide-by-zero, so the fix *alone* starts publishing
+  `non_hdl = 200 − 0`.
+- A remedy that would have **breached the live #2209 privacy gate**, publishing keys the gated-OFF
+  path explicitly asserts are absent.
+- A marker demanding a default that turns six *unlogged* days into six recorded *misses* — the exact
+  ADR-104 error a sibling marker in the same file exists to remove.
+- A marker accusing a reader that was **already correct**: the writer had started emitting the field
+  in a PR that merged *after* the marker was written. The stale thing was the test fixture, and
+  patching the reader would have broken a working metric.
+- A per-candidate `except Exception` that passes the marker's test and silently breaks an
+  *already-passing* contract — a DynamoDB outage would become "completed week, wrote nothing."
 
-## What shipped — 27 PRs merged + ~13 direct commits, all deployed
+And **one marker was left in place as correct behaviour**, with the best argument of the session:
+the enrichment percentile marker's prescribed `bisect_right` remedy would have *manufactured* the
+ADR-104 violation it cites, contradicts three passing sibling contracts, is internally incoherent (a
+tie with the max would outrank an outright win), and its stated harm doesn't occur at scale — the
+n=3 reproduction is degenerate.
 
-| PR | Issue | What landed |
-|---|---|---|
-| #2264 | #2247, #2249 | Meeusen demotion fires (`min()` on tier strings is lexicographic); missing import restored |
-| #2262 | #2243 | ACWR alert renders — readers asked for bare `zone`/`alert`, writer emits `acwr_*`; + a derived reader/writer contract guard |
-| #2263 | #2248 | sodium/caffeine exceedances can register — the branch was nested under a flag those two nutrients don't carry |
-| #2260 | #2237, #2238 | one rate-limit chokepoint (4 of 7 doors had no fallback at all); check-in note screened both sides |
-| #2261 | #2235 | food-delivery streak withheld once the source goes stale — withhold, not recompute (ADR-104) |
-| #2266 | #2246 | Zone 2 board note reads the producer's real keys |
-| #2267 | #2245 | weekly digest reads `completed_count` |
-| #2270 | #2258, #2259 | **the pre-merge lane closed** + the coverage gate made real |
-| #2268 | #2244 | anomaly block renders — a 5-month regression a self-justifying test concealed |
-| #2269 | #2256 | `%G-W%V` across a derived set |
-| #2265 | #1658 | **tranche 4** — `site_api_ai_lambda` 63.66% → 88.19%; 3 defects filed |
-| #2272 | #2250 | Strava's re-fetch no longer wipes enrichment |
-| #2273 | #2242 | Tier-0 streak persisted — 11 awards become earnable |
-| #2274 | #2271 | 6 todoist readers + a derived contract guard |
-| #2275 | #2255 | `dry_run` suppresses the writes and the false success, not just SES |
-| #2279 | #2239 | subscriber-membership oracle metered, fail-closed |
-| #2280 | #2222 | 17 SES senders behind one derived suppressor, converged onto `common/dry_run` |
-| #2281 | #2240 | 9 experiment surfaces screened |
-| #2282 | #2241 | genome privacy notice wired at the dispatcher, structurally detected |
-| #2283 | #2278 | BP reader resolves from the registry; a vacuously-passing test killed |
-| #2284 | #2276, #2277 | grounding gate takes its vocabulary from the **source**, not the truncated prompt; fail-soft derived over the read set |
-| #2285 | #2254 | chronicle idempotency — three root causes |
-| #2288 | — | xfail burn: `tools_health` 24/24 |
-| #2292 | — | xfail burn: `intelligence_common` 13 fixed, 2 records corrected |
-| #2293 | #2234 | the monthly letter sends |
-| #2294, #2295 | — | two module splits back under the 1200-line ceiling |
+### What the burn actually fixed, in reader terms
 
-Coverage **78.24% → 79.00%**. Suite wall-clock **6:40 → 4:03**. xfail markers **327 → 259**.
+The three worth naming: absent CGM readings were published as a glucose **minimum of 0.0 mg/dL** and
+**0% time-in-range**, then averaged into summaries — turning a real 96% time-in-range into "48.0%"
+*with a fabricated clinical warning*. An unlogged nutrition day rendered a full row of zeros in
+**green**, because `0 ≤ target` clears trivially — an unlogged day read as a perfect deficit day. And
+`/api/frequent_meals` was publishing `period_days: 30` on **Day 5** of a 5-day-old cycle.
 
-## The three guards that caught me — the part I'd read first
+## ⚠️ The thing Matthew should act on
 
-1. **My own `agent_commit.sh` refused my `docs/` commit.** Exactly the override case, and it made me
-   state the intent rather than sweep the file in.
-2. **The blocking backlog-hygiene gate caught me twice.** Three issues I filed failed it for a
-   missing `## Outcome`, missing `## Acceptance` checkboxes, no `**Score:**` and no `**Epic:**` —
-   then failed *again* on my fix, for naming an audience outside the sanctioned five and for a
-   section-ordering mistake. A hygiene gate that only ever passes is evidence of nothing; this one
-   caught the person in a hurry. That is the strongest argument for closing epic #1863.
-3. **A `%s`-shaped mutation nearly gave me a false negative.** Verifying #2240 I neutered a privacy
-   screen by making its condition unreachable *while leaving the call text in place*. The SET guard
-   stayed green and I almost concluded it guarded nothing. Removing the screen **properly** failed
-   it. Same shape on #2285: a regex mutation missed its target entirely and I nearly recorded a real
-   guard as vacuous. **A mutation that doesn't change behaviour proves nothing — check that your
-   mutant actually mutates.**
+**MacroFactor has ingested nothing for 45 days, and cycle 12 therefore has zero nutrition data.**
+Measured three ways tonight: newest DynamoDB record **2026-06-24**, newest raw S3 object the same
+date, and the Dropbox poller **healthy** (53 invocations/day, no errors). The pipe is up; no CSV has
+been uploaded. Genesis was 2026-08-03, so every nutrition-derived claim in the running cycle is
+computed over an empty window. It is classified `behavioral: True`, which is *correct* and means it
+never pages — but "never pages" has also meant "never mentioned." Filed as **#2326** (`gate:owner`),
+which asks two things: upload an export, and decide whether a `load-bearing` behavioral source going
+quiet deserves a non-paging notice somewhere you actually read.
 
-## Gotchas worth carrying
+Today's `site_api_nutrition` / `site_api_meals` / `weekly_digest` burns made several of those
+surfaces honest about the absence, which is timely but is not the same as having data.
 
-- **`.venv-black` does not exist inside a worktree.** My first fix for the black pin-skew resolved
-  `.venv-black` from the worktree root — where it never exists, since it is untracked and lives only
-  in the primary clone. Every implementer silently fell back to PATH black 25.9.0 and reintroduced
-  the exact skew the guard was added to stop, *the same day*. `git rev-parse --git-common-dir` is
-  the fix.
-- **PR checks do not run mypy**, and `lambdas/common/`, `lambdas/emails/`, `lambdas/web/` are all in
-  the tier-2 clean set. Two PRs red-mained main's Lint job on a `var-annotated` error after merge.
-  Run it yourself before merging anything touching those trees.
-- **A new module lands in more than one registry.** My `site_api_ai_prompt.py` split needed the
-  phase-context census *and* the grounding-surface registry repointed. Both guards found it on the
-  first full-suite run; neither is discoverable from the module itself.
-- **The module-size ceiling has two independent guards** with different limits (2000 for
-  `*_lambda.py`, 1200 for everything) and different registries. A file can slip one and trip the
-  other.
-- **Two PRs carried the wrong `Fixes #N`**, closing a neighbour's issue and leaving their own open.
-  Every fix was merged; only the provenance was crossed. Corrected on both issues — but check the
-  line before merging, since `Fixes` fires silently.
+## Three things that caught *me*
+
+1. **zsh does not word-split unquoted parameters — three times.** A verification helper doing
+   `mods="$@"` … `for m in $mods` passed all three paths as ONE argument, so `git checkout` failed
+   and nothing was reverted. The suite came back green and I nearly recorded four PRs as
+   unmutation-proved. The same trap silently no-opped a four-Lambda deploy loop using `set -- $pair`.
+2. **`git checkout origin/main -- <file>` STAGES the revert**, so the follow-up `git diff --stat`
+   reads **empty** and looks exactly like "the mutation missed." I printed `EMPTY — MUTATION MISSED`
+   on four PRs whose reverts had in fact landed (the reds proved it: 22/20/22/16 failures). Three
+   implementers hit the same thing independently the same day. `git diff --cached --stat` is the
+   comparison that sees it.
+3. **`agent_commit.sh` refused me twice** — once on a ruff import-sort error, once with the size
+   ratchet red. Both correct. The `ALLOW_DOC_LITERALS=1` override was needed exactly once, for a real
+   content edit to `docs/engines/HYPOTHESIS.md`.
+
+Note the shape of (1) and (2): the *mutation* was fine and the *observation* lied. The standing rule
+is "a mutation must actually mutate" — the corollary is **check the harness, not just the mutant.**
+
+## What only the full local suite could find
+
+Two items, neither reachable from a per-PR run — which is exactly the argument for the instruction:
+
+- **A stale `XPASS` that had been invisible for a full session.** A `strict=False` marker whose test
+  starts passing reports as XPASS, which pytest counts as a **pass**; without `-rX` it is silent.
+  #2299 had fixed the defect and left the marker behind, and two implementers independently
+  reported it as "a pre-existing xpass elsewhere, not mine."
+- **The engine-doc staleness gate** on `HYPOTHESIS.md` — re-verified by reading #2328's diff. Worth
+  recording: the model's fields used to splat *last*, so an **LLM could pre-declare its own
+  hypothesis `confirmed`** — an ADR-062 boundary breach, fixed in that PR.
 
 ## Residual / next picks
 
-- **#2286** — three MCP readers still hand-build `raw/` keys (no live defect; `raw_date_key` already
-  covers them).
-- **#2287** — eight unaudited `FIELD_COMPLETENESS_CHECKS` entries; `habitify` is the suspicious one.
-  Same shape as the todoist monitor that was dark ~147 days. **The highest-value open item.**
-- **#2289** — 11 unmetered public read doors; framed as a decision (cache tier vs counter).
-- **#2290** — the grounding gate's numeric tolerance can absorb a corrupted trailing decimal.
-- **#2291** — whether the 3 event-driven SES senders want a suppressor.
+- **#2326** — MacroFactor 45 days quiet; cycle 12 has no nutrition data. **The top item**, `gate:owner`.
+- **#2333** — `_fallback` has no reader on either coach surface, so an empty AI cycle still shadows
+  as genuine coaching. Live: the ensemble is paused at budget tier ≥1, which is the default state.
+- **#2343** — a coach card cites HRV 42 ms / recovery 55% against the cockpit's 32 / 31%. **Read
+  this one before the others.** All three mechanisms I proposed when filing it were wrong, and the
+  measured shape is worse: the card is same-day fresh (not stale), and the cited numbers are
+  **2026-08-07's real readings, exact on both metrics** — not an average, not pre-genesis. The day
+  is wrong, not the values. Worse, the persona is the *nutrition* one, whose declared fact block
+  queries macrofactor only and emits no single-day Whoop reading on either branch — so a single-day
+  vital reached a fact set that does not contain it, by a path source-reading did not explain.
+  **A grounding check that asks "does this value appear in the fact set" structurally cannot catch
+  this** — it is an ADR-104 *day-correspondence* gap, not an existence gap, which is exactly why
+  widening a tolerance would be the wrong repair.
+- **#2344** — `as_of_date` contradictions inside single payloads, with a deterministic proof rather
+  than a code argument: `sleep_trend`'s last row is value-identical to the `sleep_detail` block, so
+  the array is wake-keyed and the same night reads as `2026-08-08` in the array and `night_of
+  2026-08-07` one level above, in one document. #1923's guard misses it because its AST scan matches
+  dict literals publishing a `night_of` key, and an array keyed by `date` is outside that set.
+- **Unfiled, needs its own measurement:** the same #2343 card opens with a specific day-count of
+  missed food logs, which is hard to reconcile with MacroFactor being quiet 45 days (#2326) *and*
+  with that fact block's empty-branch early return setting the field to `None`. Possibly a third
+  grounding defect on one card. not-work — a measurement to take, not yet a defect to file.
+- **#2329 / #2330 / #2337** — reader-facing nutrition/meals residuals from the burns.
+- **#2331** (Strava zero→null is a population-membership decision) · **#2338** (an N-day window
+  queries N+1 dates, repo-wide) · **#2310** (two published calorie figures disagree ~2×).
+- **#2334** — four modules hand-type the coach roster, not the two first reported.
+- **#2335** (`qa_smoke_lambda.py` at 1198/1200) · **#2336** (the null-coercion guard covers
+  `operational/` only) · **#2304–#2309** (the tranche-5 census).
+- **#2221** — the xfail tail tracker, updated with the full 250→28 burn. Remaining clusters are all
+  ≤5: `daily_insight_compute` (5), `weekly_plate` (4), `ai_expert_analyzer` (4).
+- **#2213** — 7-stack CDK config drift; still needs an owner CDK window (out of scope by instruction).
 - **#2204** — Whoop token lifetime vs cron interval; code half only, CDK-blocked.
-- **#2213** — 7-stack CDK config drift; still needs an owner CDK window.
-- **#2221** — the xfail tail tracker, updated with this session's burn. Remaining clusters:
-  `mcp_tools_nutrition` (22), `daily_brief` (21), `site_api_social` (19), `html_builder` (18).
-- **#2111** — `chronicle-email-sender` still has no `dry_run` gate.
-- **Whoop recovered on 2026-08-07** and has data through today — the inherited "latched since 08-04,
-  no data" state is **stale**. Its auth alarms are still red because the daily bucket still contains
-  failures. not-work — measured this session, no action needed beyond not repeating the stale claim.
-- Git worktrees continue to accumulate under `.claude/worktrees/` and `~/Documents/Claude/wt-*`.
+- Worktrees continue to accumulate under `.claude/worktrees/` and `~/Documents/Claude/wt-*`.
   not-work — housekeeping; no gate is affected.
 - The two zombie gated runs remain excluded by number in `deploy/watch_deploy_gate.sh`. not-work —
   documented leave-alone; GitHub expires them at 30d.
+- **Next wrap's archive slug must not be `throughput-first` or this session's** — both sessions ran
+  on UTC 2026-08-08 and `archive_handover.py` refuses to clobber an existing dated entry. not-work —
+  a naming note for the next wrap, not a defect.
 
 ## OWNER ACTIONS
 
-1. **The monthly letter now sends on 2026-09-06** — see the warning above. Say the word if you'd
-   rather it didn't.
-2. **A CDK deploy window** clears #2213's warnings and #2204's cron half.
-3. **GitHub UI clicks** (unchanged): CodeQL dismissals ×3 (#2046) · PR #2012 revision-history purge ·
+1. **Upload a MacroFactor export** — or cycle 12's nutrition pillar has nothing behind it (#2326).
+2. **The monthly Coach's Letter still sends 2026-09-06** to `EMAIL_RECIPIENT` (you) only —
+   unchanged from last session's warning, ~4 weeks of runway.
+3. **A CDK deploy window** clears #2213's 7 warnings and #2204's cron half.
+4. **GitHub UI clicks** (unchanged): CodeQL dismissals ×3 (#2046) · PR #2012 revision-history purge ·
    the 2 verified false positives from #2200.
-4. Personal calls, no deadline: the #1984 stack decision · the #1905 clinicians call.
-5. When accounts exist: Bluesky/Mastodon + the two secrets.
+5. Personal calls, no deadline: the #1984 stack decision · the #1905 clinicians call.
+6. When accounts exist: Bluesky/Mastodon + the two secrets. (Both ingestion Lambdas got a real fix
+   today — #2314 corrected their share-card writers — but they stay dormant until the accounts exist.)
 
 Prior session's narrative: `git show
-origin/session-archive:handovers/HANDOVER_2026-08-08_privacy-door-and-the-letter-that-never-sent.md`.
+origin/session-archive:handovers/HANDOVER_2026-08-08_throughput-first.md`.

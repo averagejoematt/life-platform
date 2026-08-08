@@ -2359,6 +2359,29 @@
         }
       ],
       "why_it_mattered": "A check that always passes is worse than no check, because it buys the confidence of one without the work. This one had been reporting success for its whole existence, and everything downstream — me included — read that as evidence. The three problems it caught in its first hours weren't new; they had been sitting in plain sight, behind a green tick. It's the same reason I publish the numbers here rather than a summary of them: a measurement nobody can fail is decoration."
+    },
+    {
+      "id": "2026-08-09-a-number-nobody-was-reading",
+      "date": "2026-08-09",
+      "title": "A number nobody was reading",
+      "shipped": "The project keeps a list of files that are allowed to be too big — old, sprawling ones that predate the size limit and are being broken up slowly. Each entry records how many lines that file had when it was let off. I went to look at those numbers today and found that nothing compares them against anything. The check was: is this file on the list? If yes, skip it. The recorded line count was a note to a human, and no human had read it in months. So I measured. Twenty-four of the twenty-eight files had grown, by three and a half thousand lines between them — one of them by 48% — on a list whose own documentation says it only ever shrinks. Making the number enforcing took an afternoon. Within the hour it caught two changes that were each fine on their own and one line too many together. Then it caught me, twice. Also shipped: about two hundred known-broken behaviours fixed across the data pipeline, including one where a glucose reading the sensor never took was being published as zero and averaged in, which turned a genuinely good day into a fabricated clinical warning.",
+      "gotcha": "The interesting failures today were not in the code, they were in how I was checking the code. I would break something on purpose to prove a test would catch it, run the test, see it pass, and start to conclude the test was worthless. Three times the real answer was that my sabotage had silently not happened — once because the shell I was using does not split a variable into separate arguments the way I assumed, so a command that was supposed to revert three files reverted none. The rule I already knew is 'a broken thing must actually be broken before its test passing means anything.' The version I did not know is that the thing lying to you can be your own measuring instrument rather than the test.",
+      "honest_miss": "MacroFactor has not received a food log in forty-five days. The pipeline is fine — the poller ran fifty-three times today without an error — I simply have not uploaded an export since June 24th. The current experiment cycle started August 3rd, which means every nutrition number in it is computed over nothing. Several pages now say so honestly, because of today's work. That is not the same as having the data. The system classifies this source as 'behavioural' — a gap means I didn't do something, not that a machine broke — and behavioural gaps deliberately never raise an alarm. Correct rule, and it also meant nobody told me for six weeks.",
+      "prs": [
+        {
+          "label": "PR #2297",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2297"
+        },
+        {
+          "label": "PR #2296",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2296"
+        },
+        {
+          "label": "PR #2300",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2300"
+        }
+      ],
+      "why_it_mattered": "A recorded number that nothing reads is not a record, it is decoration — and it is worse than having no number at all, because everyone downstream assumes someone is watching it. That list of oversized files looked like a debt being paid down. It was actually a debt growing, with a tidy ledger next to it that nobody reconciled. The same shape turned up in a build check yesterday that could never fail, and I expect it will turn up again, because it is easy to write a number down and hard to notice that nothing compares it to reality. The test I now apply: what would break if this figure were wrong? If the honest answer is nothing, it is not a measurement, it is a comment. That question is the same one this whole project is built on — a health metric nobody checks against an outcome is decoration too."
     }
   ]
 }
