@@ -5,6 +5,30 @@ wednesday_chronicle_lambda.py (#1654). Facade state via the `_g` hand-off."""
 import json
 from datetime import datetime, timezone
 
+# #2254: the statuses a stored installment can be in that a regenerating run must
+# NOT clobber. `draft` = awaiting Matthew's approval (its approval_token is live and
+# already in his inbox); `published` = already on the site and mailed. `changes_requested`
+# is deliberately absent — that status is the documented signal to re-run the generator
+# (see chronicle_approve_lambda: "Re-run the wednesday-chronicle Lambda"), so a put over
+# it must succeed.
+PROTECTED_STATUSES = ("draft", "published")
+
+
+def _is_conditional_check_failure(exc):
+    """True when a boto3 put_item failed its ConditionExpression.
+
+    Checked by name rather than by importing botocore: the DynamoDB *resource* API
+    raises `ClientError` with Error.Code == "ConditionalCheckFailedException", while the
+    generated client error factory raises a class of that name. This module has no boto3
+    import (the facade owns the clients), so both shapes are matched textually.
+    """
+    code = ""
+    try:
+        code = (getattr(exc, "response", None) or {}).get("Error", {}).get("Code", "")
+    except Exception:  # noqa: BLE001 — a non-dict response must not mask the real error
+        code = ""
+    return code == "ConditionalCheckFailedException" or type(exc).__name__ == "ConditionalCheckFailedException"
+
 
 def store_installment(
     date_str,
@@ -28,6 +52,7 @@ def store_installment(
     weekly_signal_data=None,
     weekly_signal_wins_losses=None,
     weekly_signal_board_quote=None,
+    allow_overwrite=False,
     *,
     _g,
 ):
@@ -35,6 +60,17 @@ def store_installment(
 
     FEAT-12: In preview mode, status="draft" with approval_token + pre-built HTML blobs stored
     so chronicle-approve Lambda can publish to S3 without re-generating content.
+
+    #2254: the put is CONDITIONAL by default — it is refused if a record already exists
+    for this week in one of PROTECTED_STATUSES. That is the last line of defence behind
+    lambda_handler's early idempotency gate: a re-run (retry, manual re-invoke, at-least-
+    once redelivery) must never overwrite an approved/published week's content or
+    invalidate the approval_token already sitting in Matthew's inbox. Pass
+    allow_overwrite=True for a deliberate regeneration.
+
+    Returns True if the item was written, False if it was refused or the write failed —
+    callers must not act as if a refused draft was stored (e.g. by mailing an approval
+    link for a token that was never persisted).
     """
     table = _g["table"]
     USER_ID = _g["USER_ID"]
@@ -85,7 +121,24 @@ def store_installment(
             )
         if weekly_signal_board_quote:
             item["weekly_signal_board_quote"] = weekly_signal_board_quote
-        table.put_item(Item=item)
+        put_kwargs = {"Item": item}
+        if not allow_overwrite:
+            # Allowed when: no row yet, the row carries no status at all, or the row is
+            # in a status outside PROTECTED_STATUSES (changes_requested, a legacy row).
+            put_kwargs["ConditionExpression"] = "attribute_not_exists(sk) OR attribute_not_exists(#s) OR NOT #s IN (:s0, :s1)"
+            put_kwargs["ExpressionAttributeNames"] = {"#s": "status"}
+            put_kwargs["ExpressionAttributeValues"] = {f":s{i}": v for i, v in enumerate(PROTECTED_STATUSES)}
+        try:
+            table.put_item(**put_kwargs)
+        except Exception as put_e:
+            if _is_conditional_check_failure(put_e):
+                logger.warning(
+                    f"[#2254] REFUSED to overwrite Week {week_num} ({date_str}) — a record already exists in a "
+                    f"protected status {PROTECTED_STATUSES}. Nothing was written; the existing draft/published "
+                    "installment and its approval token are intact."
+                )
+                return False
+            raise
         logger.info(f"Installment stored: Week {week_num} (status={status})")
         # #1441: generation-time archive — the final installment markdown (both
         # the draft/preview and direct-publish paths land here) to
@@ -100,8 +153,10 @@ def store_installment(
             )
         except Exception as qa_e:  # noqa: BLE001 — the archive is never load-bearing
             logger.warning(f"[chronicle] qa_archive failed (non-fatal): {qa_e}")
+        return True
     except Exception as e:
         logger.warning(f"Failed to store installment: {e}")
+        return False
 
 
 def _set_chronicle_pending(week_num, reason, display, *, _g):

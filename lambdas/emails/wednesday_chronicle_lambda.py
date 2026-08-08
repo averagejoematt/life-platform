@@ -366,6 +366,31 @@ def record_email_send(table, lambda_name):
         logger.info(f"[status-tracking] Non-fatal write failure: {e}")
 
 
+# #2254: hard stop on the installment-listing pagination loop. The chronicle partition
+# holds one row per week (~20 KB each, ~400 KB total as of 2026-08-08), so 25 pages is
+# orders of magnitude of headroom — it exists only so a malformed LastEvaluatedKey can
+# never spin this Lambda for its whole timeout.
+_MAX_INSTALLMENT_PAGES = 25
+
+
+def _existing_installment(date_str):
+    """#2254: read the already-stored installment for `date_str`, or None.
+
+    Fail-OPEN by design: if the read itself fails we return None and the run proceeds,
+    because a DDB blip must not silently stop the week from being written at all. The
+    conditional put in chronicle_store.store_installment is the fail-CLOSED backstop that
+    still refuses to clobber a protected row in that case.
+    """
+    if not date_str:
+        return None
+    try:
+        resp = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#chronicle", "sk": f"DATE#{date_str}"})
+        return resp.get("Item") or None
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[#2254] idempotency read failed (proceeding, conditional put still guards): {e}")
+        return None
+
+
 def _elena_notebook_block(current_week):
     """#537: Elena's persistent memory (PERSONA#elena, maintained post-publish by
     elena-state-updater) rendered as prompt obligations: open threads with ages,
@@ -629,6 +654,36 @@ def lambda_handler(event: dict, context) -> dict:
     data = gather_chronicle_data()
     if not data:
         return {"statusCode": 500, "body": "Failed to gather data"}
+
+    # ── #2254: generation-time idempotency ────────────────────────────────────
+    # This gate sits BEFORE build_data_packet and the Sonnet call, so a retry, a
+    # manual re-invoke or an EventBridge at-least-once redelivery on the same
+    # Wednesday costs nothing and, crucially, cannot mint a second approval_token
+    # over a draft already sitting in Matthew's inbox (which would silently kill
+    # the approve link he was mailed) or overwrite a week he already approved.
+    # `changes_requested` is NOT protected — that status is the documented signal
+    # to regenerate. {"force": true} is the deliberate-regeneration escape hatch.
+    # #2112 closed this class on the downstream sender; this is the generator's half.
+    _target_date = (data.get("dates") or {}).get("end")
+    if _target_date and not event.get("force"):
+        _existing = _existing_installment(_target_date)
+        _existing_status = (_existing or {}).get("status")
+        if _existing_status in _store.PROTECTED_STATUSES:
+            logger.info(
+                f"[#2254] Week ending {_target_date} already exists with status={_existing_status} — "
+                "no regeneration, no Bedrock spend, no email. Pass {'force': true} to regenerate."
+            )
+            return {
+                "statusCode": 200,
+                "body": json.dumps(
+                    {
+                        "status": "already_generated",
+                        "date": _target_date,
+                        "existing_status": _existing_status,
+                        "week": int(_existing.get("week_number", 0) or 0) if _existing else None,
+                    }
+                ),
+            }
 
     # Build narrative-ready data packet. #2177: build_data_packet is now guarded
     # against the two known partial-record shapes (a day_grades row missing
@@ -913,19 +968,35 @@ def lambda_handler(event: dict, context) -> dict:
         # ADR-058: phase=pilot hidden by default.
         from experiment.phase_filter import with_phase_filter
 
-        resp = table.query(
-            **with_phase_filter(
-                {
-                    "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
-                    "ExpressionAttributeValues": {
-                        ":pk": f"USER#{USER_ID}#SOURCE#chronicle",
-                        ":prefix": "DATE#",
-                    },
-                    "ScanIndexForward": False,
-                }
-            )
+        # #2254: this list is what publish_to_journal REGENERATES generated/journal/posts.json
+        # from — wholesale, not merged with the existing manifest — and it is also what
+        # derives every post's week-NN sequence. A single DynamoDB Query response is
+        # capped at 1 MB of items scanned BEFORE the phase FilterExpression is applied,
+        # so an un-paginated read silently drops the oldest installments once the archive
+        # outgrows one page: the manifest rewrite would delete those posts from the public
+        # listing AND renumber the survivors' URLs. Loop on LastEvaluatedKey.
+        _query_kwargs = with_phase_filter(
+            {
+                "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
+                "ExpressionAttributeValues": {
+                    ":pk": f"USER#{USER_ID}#SOURCE#chronicle",
+                    ":prefix": "DATE#",
+                },
+                "ScanIndexForward": False,
+            }
         )
-        all_installments = [d2f(i) for i in resp.get("Items", [])]
+        _pages = 0
+        while True:
+            resp = table.query(**_query_kwargs)
+            all_installments.extend(d2f(i) for i in resp.get("Items", []))
+            _pages += 1
+            _lek = resp.get("LastEvaluatedKey")
+            if not _lek or _pages >= _MAX_INSTALLMENT_PAGES:
+                if _lek:
+                    logger.warning(f"[#2254] installment query stopped at the {_MAX_INSTALLMENT_PAGES}-page cap — manifest may be short")
+                break
+            _query_kwargs = dict(_query_kwargs, ExclusiveStartKey=_lek)
+        logger.info(f"[chronicle] read {len(all_installments)} installments across {_pages} page(s)")
     except Exception as e:
         logger.warning(f"Failed to query all installments: {e}")
         # #1803: sk must be set so chronicle_render.publish_to_journal's sk-based
@@ -1045,7 +1116,7 @@ def lambda_handler(event: dict, context) -> dict:
         draft_email_html = build_email_html(title, stats_line, body_html, week_num, date_str, series_url)
 
         approval_token = _secrets.token_hex(32)
-        store_installment(
+        _stored = store_installment(
             date_str,
             week_num,
             title,
@@ -1064,7 +1135,22 @@ def lambda_handler(event: dict, context) -> dict:
             draft_email_html=draft_email_html,
             draft_recap_json=draft_recap_json,
             draft_share_kit_json=share_kit_json,
+            allow_overwrite=bool(event.get("force")),
         )
+
+        # #2254: the conditional put refused (a protected row raced in between the
+        # idempotency read and this write). The approval_token was never persisted, so
+        # mailing its approve link would hand Matthew a button that 403s — and the
+        # preview itself would be a second, different draft for a week he may have
+        # already approved. Stop here instead.
+        if not _stored:
+            logger.warning(f"[#2254] Week {week_num} draft NOT stored (protected row exists) — preview email suppressed")
+            return {
+                "statusCode": 200,
+                "body": json.dumps(
+                    {"status": "already_generated", "date": date_str, "week": week_num, "detail": "conditional put refused"}
+                ),
+            }
 
         _send_preview_email(title, week_num, date_str, approval_token, draft_email_html, kit_block=share_kit_block)
         logger.info(f"FEAT-12: Draft Week {week_num} stored — awaiting approval")
@@ -1082,6 +1168,7 @@ def lambda_handler(event: dict, context) -> dict:
             has_board,
             confidence_level=_conf_level,
             confidence_badge_html=_conf_badge_html,
+            allow_overwrite=bool(event.get("force")),
         )
 
         # This path publishes immediately → commit the recap now (fail-soft).
@@ -1144,7 +1231,14 @@ def lambda_handler(event: dict, context) -> dict:
         except Exception as e:
             logger.warning(f"IC-15 failed: {e}")
 
-    record_email_send(table, "wednesday_chronicle")
+    # #2254: the status page's "Wednesday chronicle — last sent" reads nothing but the
+    # PRESENCE of a row in email_log#wednesday_chronicle (site_api_status._last_sync
+    # projects `sk` only, and _uptime_90d likewise), so a "preview_sent" status field on
+    # the same partition would be invisible — the row itself IS the claim. In
+    # PREVIEW_MODE nothing was sent to a reader: a draft was stored and an approval email
+    # raised to Matthew. That belongs in its own partition. The real subscriber delivery
+    # is logged by chronicle-email-sender when a send actually succeeds.
+    record_email_send(table, "wednesday_chronicle_preview" if PREVIEW_MODE else "wednesday_chronicle")
     if PREVIEW_MODE:
         return {
             "statusCode": 200,
