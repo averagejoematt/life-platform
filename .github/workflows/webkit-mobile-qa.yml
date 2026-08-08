@@ -107,7 +107,7 @@ jobs:
           # Same pinned Playwright as the enforced ci-cd.yml gate (CQ-01 class:
           # a different version here would make a red mean "engine version",
           # not "iOS Safari breakage") — test_webkit_weekly_qa.py enforces.
-          python -m pip install playwright==1.61.0
+          python -m pip install playwright==1.62.0
           python -m playwright install --with-deps webkit
 
       - name: Run WebKit mobile sweep (deterministic only — no AI, $0)

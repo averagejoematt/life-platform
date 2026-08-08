@@ -54,7 +54,7 @@ jobs:
           python-cache: 'pip'
 
       - name: Install lane dependencies
-        run: pip install pytest boto3==1.43.57 botocore==1.43.57 black==26.3.1 hypothesis==6.163.0  # boto3/botocore/hypothesis pinned to match requirements-dev.txt (CQ-01, #2058)
+        run: pip install pytest boto3==1.43.62 botocore==1.43.62 black==26.3.1 hypothesis==6.165.0  # boto3/botocore/hypothesis pinned to match requirements-dev.txt (CQ-01, #2058)
 
       - name: Collection gate (the #1297 class dies here)
         run: python3 -m pytest tests/ --collect-only -q

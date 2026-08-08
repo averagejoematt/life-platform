@@ -322,7 +322,7 @@ jobs:
           python-cache: 'pip'
 
       - name: Install test dependencies
-        run: pip install pytest==9.1.1 boto3==1.43.57 botocore==1.43.57 hypothesis==6.163.0  # hypothesis: property tests (#1664) collected in this lane; pinned to match requirements-dev.txt (CQ-01, #1963)
+        run: pip install pytest==9.1.1 boto3==1.43.62 botocore==1.43.62 hypothesis==6.165.0  # hypothesis: property tests (#1664) collected in this lane; pinned to match requirements-dev.txt (CQ-01, #1963)
 
       - name: Run deploy-critical test lane
         run: |
@@ -907,7 +907,7 @@ jobs:
       - name: Install Playwright + Chromium
         run: |
           python -m pip install --upgrade pip
-          python -m pip install playwright==1.61.0
+          python -m pip install playwright==1.62.0
           python -m playwright install --with-deps chromium
 
       - name: Configure AWS credentials (OIDC — for Bedrock vision QA)
