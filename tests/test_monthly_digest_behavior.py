@@ -324,9 +324,17 @@ def test_each_arm_spans_exactly_thirty_days(frozen_monday):
         assert span == 30
 
 
-def test_the_prior_month_label_is_the_calendar_month_before_today(frozen_monday):
-    # today.replace(day=1) = 2026-08-01, minus one day = 2026-07-31 -> "July 2026"
-    assert m.get_date_windows()["prior_label"] == "July 2026"
+def test_the_labels_name_the_months_the_arms_cover_not_the_month_of_the_send(frozen_monday):
+    """Rewritten with the #1658 fix (this test used to pin the defect).
+
+    It asserted `prior_label == "July 2026"` on 2026-08-03 — i.e. "the calendar
+    month before today" — while the prior arm reads 2026-06-04..2026-07-03, which
+    is mostly JUNE. Labelling the month of the SEND rather than the month of the
+    DATA is what put July's numbers under an "August 2026" headline.
+    """
+    w = m.get_date_windows()
+    assert w["month_label"] == "July 2026"  # cur arm 2026-07-04..2026-08-02
+    assert w["prior_label"] == "June 2026"  # prior arm 2026-06-04..2026-07-03
 
 
 def test_the_windows_are_the_same_on_the_cron_slot_shifted_by_one_day(frozen_cron_sunday):
@@ -338,17 +346,11 @@ def test_the_windows_are_the_same_on_the_cron_slot_shifted_by_one_day(frozen_cro
     assert (w["prior_start"], w["prior_end"]) == ("2026-06-03", "2026-07-02")
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P1): monthly_digest_lambda.get_date_windows (lines 141-163) labels a ROLLING "
-        "30-DAY window with a CALENDAR month name. On its own fire slot (first Sunday, e.g. 2026-08-02) the current "
-        "arm is 2026-07-03..2026-08-01 — that is JULY's data — but month_label is today.strftime('%B %Y') = "
-        "'August 2026'. build_html then prints it as the <h1> and the subject line. The reader is handed July's "
-        "month under August's headline. It should label the completed calendar month the window actually covers "
-        "(and read that month's real first-to-last day, not today-30)."
-    ),
-)
+# FIXED #1658 (found as a tranche-3 xfail, P1): monthly_digest_lambda.get_date_windows (lines 141-163) labels a ROLLING 30-DAY
+# window with a CALENDAR month name. On its own fire slot (first Sunday, e.g. 2026-08-02) the current arm is
+# 2026-07-03..2026-08-01 — that is JULY's data — but month_label is today.strftime('%B %Y') = 'August 2026'. build_html then
+# prints it as the <h1> and the subject line. The reader is handed July's month under August's headline. It should label the
+# completed calendar month the window actually covers (and read that month's real first-to-last day, not today-30).
 def test_the_month_label_names_the_month_the_data_actually_covers(frozen_cron_sunday):
     w = m.get_date_windows()
     # 29 of the window's 30 days (2026-07-03..2026-08-01) are July days.
@@ -356,15 +358,9 @@ def test_the_month_label_names_the_month_the_data_actually_covers(frozen_cron_su
     assert w["month_label"] == covered  # "July 2026"; the module says "August 2026"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P1): the same off-by-one-month applies to prior_label. On 2026-08-02 the prior "
-        "arm is 2026-06-03..2026-07-02 (June's data) while prior_label reads 'July 2026'. build_html prints "
-        "'30-day review · Deltas vs July 2026' over June's numbers, so every delta in the email is attributed to the "
-        "wrong month."
-    ),
-)
+# FIXED #1658 (found as a tranche-3 xfail, P1): the same off-by-one-month applies to prior_label. On 2026-08-02 the prior arm is
+# 2026-06-03..2026-07-02 (June's data) while prior_label reads 'July 2026'. build_html prints '30-day review · Deltas vs July
+# 2026' over June's numbers, so every delta in the email is attributed to the wrong month.
 def test_the_prior_label_names_the_month_the_prior_arm_actually_covers(frozen_cron_sunday):
     w = m.get_date_windows()
     covered = datetime.strptime(w["prior_start"], "%Y-%m-%d").strftime("%B %Y")
@@ -425,16 +421,10 @@ def test_fetch_range_converts_dynamodb_decimals_to_numbers(monkeypatch):
     assert got == 312.4 and isinstance(got, float)
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P2 / ADR-104): monthly_digest_lambda.fetch_range (lines 132-133) swallows every "
-        "exception and returns []. A DynamoDB outage, a throttle, or a malformed key therefore renders as 'no data "
-        "this month' — and build_html turns that into confident figures (CTL 0.0 · TSB 0.0 (Neutral), '0%' hit "
-        "rates, 'Chronicling data not available'). A read failure must be distinguishable from a genuinely empty "
-        "month, and must not be published as measurement."
-    ),
-)
+# FIXED #1658 (found as a tranche-3 xfail, P2 / ADR-104): monthly_digest_lambda.fetch_range (lines 132-133) swallows every
+# exception and returns []. A DynamoDB outage, a throttle, or a malformed key therefore renders as 'no data this month' — and
+# build_html turns that into confident figures (CTL 0.0 · TSB 0.0 (Neutral), '0%' hit rates, 'Chronicling data not available').
+# A read failure must be distinguishable from a genuinely empty month, and must not be published as measurement.
 def test_a_failed_read_is_not_silently_reported_as_an_empty_month(monkeypatch):
     from fakes import raise_hook
 
@@ -525,17 +515,11 @@ def test_duplicate_activities_are_counted_once():
     assert m.ex_strava(recs)["activity_count"] == 1
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P2): monthly_digest_lambda.ex_strava (lines 188-205) counts Zone-2 minutes from "
-        "the DEDUPED per-activity list but divides by total_minutes summed from the day record's UNDEDUPED "
-        "`total_moving_time_seconds` (and reports total_miles from the equally undeduped `total_distance_miles`). On "
-        "a day with a Garmin->Strava duplicate the numerator is halved against the denominator, so zone2_pct is "
-        "reported as half its true value — and activity_count (deduped) disagrees with total_miles (not). Both sides "
-        "of the ratio must come from the same deduped set."
-    ),
-)
+# FIXED #1658 (found as a tranche-3 xfail, P2): monthly_digest_lambda.ex_strava (lines 188-205) counts Zone-2 minutes from the
+# DEDUPED per-activity list but divides by total_minutes summed from the day record's UNDEDUPED `total_moving_time_seconds` (and
+# reports total_miles from the equally undeduped `total_distance_miles`). On a day with a Garmin->Strava duplicate the numerator
+# is halved against the denominator, so zone2_pct is reported as half its true value — and activity_count (deduped) disagrees
+# with total_miles (not). Both sides of the ratio must come from the same deduped set.
 def test_the_zone_two_percentage_is_not_halved_by_a_duplicate_activity():
     dup = _act(hr=120, secs=1800, miles=2.0, start="2026-07-04T08:00:00")
     # the ingested day record double-counts the duplicate: 3600 s / 4.0 mi
@@ -566,15 +550,10 @@ def test_a_day_record_with_no_workouts_contributes_nothing():
     assert m.ex_hevy([{"workouts": []}, {}])["workout_count"] == 0
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P3): monthly_digest_lambda.ex_hevy (lines 217-224) builds a full per-workout "
-        "list with titles and `total_volume_lbs` and then throws it away, returning only {'workout_count': n}. A "
-        "MONTHLY strength review that reports the number of sessions but not a pound of the volume behind them is "
-        "the one number a lifter cares least about; the work is already done and discarded."
-    ),
-)
+# FIXED #1658 (found as a tranche-3 xfail, P3): monthly_digest_lambda.ex_hevy (lines 217-224) builds a full per-workout list
+# with titles and `total_volume_lbs` and then throws it away, returning only {'workout_count': n}. A MONTHLY strength review
+# that reports the number of sessions but not a pound of the volume behind them is the one number a lifter cares least about;
+# the work is already done and discarded.
 def test_the_monthly_strength_summary_reports_the_volume_it_computed():
     recs = [{"workouts": [{"title": "Push", "total_volume_lbs": 12000}, {"title": "Pull", "total_volume_lbs": 9000}]}]
     assert m.ex_hevy(recs)["total_volume_lbs"] == 21000  # 12000 + 9000
@@ -628,16 +607,11 @@ def test_missing_profile_targets_fall_back_to_the_module_defaults():
     assert (s["calorie_target"], s["protein_target"]) == (m.CALORIE_TARGET, m.PROTEIN_TARGET_G)
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P2 / ADR-104+105): monthly_digest_lambda.ex_macrofactor (lines 247-248) divides "
-        "the hit counts by `days = len(recs)` while the numerator only sees records that CARRY the field. A month "
-        "where MacroFactor wrote 30 rows but 10 carry no `total_protein_g` reports protein_hit_rate over n=30 when "
-        "it was measured over n=20 — the published rate is diluted by days that were never measured, and "
-        "`days_logged` counts unlogged rows as logged. Rate and n must be the same set."
-    ),
-)
+# FIXED #1658 (found as a tranche-3 xfail, P2 / ADR-104+105): monthly_digest_lambda.ex_macrofactor (lines 247-248) divides the
+# hit counts by `days = len(recs)` while the numerator only sees records that CARRY the field. A month where MacroFactor wrote
+# 30 rows but 10 carry no `total_protein_g` reports protein_hit_rate over n=30 when it was measured over n=20 — the published
+# rate is diluted by days that were never measured, and `days_logged` counts unlogged rows as logged. Rate and n must be the
+# same set.
 def test_a_hit_rate_is_computed_over_the_days_it_actually_measured():
     # 2 records carry protein (both hit), 2 records carry none at all
     recs = [_mf(1700, 200), _mf(1700, 200), _mf(1700), _mf(1700)]
@@ -645,15 +619,10 @@ def test_a_hit_rate_is_computed_over_the_days_it_actually_measured():
     assert s["protein_hit_rate"] == 100  # 2/2 measured days hit, not 2/4
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P2 / ADR-104): with records present but NO totals on any of them, "
-        "ex_macrofactor returns calories_avg=None (honest) alongside calorie_hit_rate=round(0/days*100)=0 — and "
-        "build_html renders that as a flat '0%' next to an em-dash average. A month nothing was logged in is "
-        "published as a month of 0% adherence. Absence must render as absence on BOTH figures."
-    ),
-)
+# FIXED #1658 (found as a tranche-3 xfail, P2 / ADR-104): with records present but NO totals on any of them, ex_macrofactor
+# returns calories_avg=None (honest) alongside calorie_hit_rate=round(0/days*100)=0 — and build_html renders that as a flat '0%'
+# next to an em-dash average. A month nothing was logged in is published as a month of 0% adherence. Absence must render as
+# absence on BOTH figures.
 def test_a_month_with_no_totals_logged_reports_absent_hit_rates_not_zero_percent():
     s = m.ex_macrofactor([_mf(), _mf(), _mf()])
     assert s["calories_avg"] is None
@@ -743,46 +712,29 @@ def test_a_malformed_pillar_block_is_skipped_without_crashing():
     assert pillars["sleep"]["level"] == 9.0
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P2 / ADR-104): monthly_digest_lambda.ex_character_sheet lines 263-266 iterate a "
-        "fixed seven-pillar tuple and coerce a MISSING pillar block with `latest.get(f'pillar_{p}') or {}` — an "
-        "empty dict is still a dict, so it passes the isinstance check and becomes "
-        "{'level': 0.0, 'tier': 'Foundation'}. build_html then prints a row reading 'Level 0 — Foundation' for every "
-        "pillar the character engine never scored. Behavioural absence is being rendered as a measured floor score "
-        "— exactly what ADR-104 forbids in the character engine."
-    ),
-)
+# FIXED #1658 (found as a tranche-3 xfail, P2 / ADR-104): monthly_digest_lambda.ex_character_sheet lines 263-266 iterate a fixed
+# seven-pillar tuple and coerce a MISSING pillar block with `latest.get(f'pillar_{p}') or {}` — an empty dict is still a dict,
+# so it passes the isinstance check and becomes {'level': 0.0, 'tier': 'Foundation'}. build_html then prints a row reading
+# 'Level 0 — Foundation' for every pillar the character engine never scored. Behavioural absence is being rendered as a measured
+# floor score — exactly what ADR-104 forbids in the character engine.
 def test_a_pillar_with_no_stored_block_is_omitted_rather_than_invented_at_level_zero():
     rec = _cs(MON_CUR_END, sleep=9)
     assert list(m.ex_character_sheet([rec])["pillars"]) == ["sleep"]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P2 / ADR-104): monthly_digest_lambda.ex_character_sheet line 267 builds the XP "
-        "series with `float(r.get('character_xp') or 0)`, so a day whose record is missing character_xp is read as "
-        "ZERO XP. If the window's FIRST record is such a day the reported xp_delta_30d becomes the athlete's entire "
-        "lifetime XP presented as one month's gain (here +5000 instead of +1000). A missing reading must be skipped, "
-        "not treated as a reading of zero."
-    ),
-)
+# FIXED #1658 (found as a tranche-3 xfail, P2 / ADR-104): monthly_digest_lambda.ex_character_sheet line 267 builds the XP series
+# with `float(r.get('character_xp') or 0)`, so a day whose record is missing character_xp is read as ZERO XP. If the window's
+# FIRST record is such a day the reported xp_delta_30d becomes the athlete's entire lifetime XP presented as one month's gain
+# (here +5000 instead of +1000). A missing reading must be skipped, not treated as a reading of zero.
 def test_a_day_missing_its_xp_reading_does_not_become_a_zero_xp_day():
     recs = [_cs("2026-07-04"), _cs("2026-07-20", xp=4000), _cs(MON_CUR_END, xp=5000)]
     del recs[0]["character_xp"]
     assert m.ex_character_sheet(recs)["xp_delta_30d"] == 1000  # 5000 - 4000, the two real readings
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P3): monthly_digest_lambda.ex_character_sheet line 256 sorts its argument IN "
-        "PLACE (`recs.sort(...)`). gather_all passes the caller's own list, so the extractor silently reorders data "
-        "its caller may read again. An extractor must not mutate its input."
-    ),
-)
+# FIXED #1658 (found as a tranche-3 xfail, P3): monthly_digest_lambda.ex_character_sheet line 256 sorts its argument IN PLACE
+# (`recs.sort(...)`). gather_all passes the caller's own list, so the extractor silently reorders data its caller may read
+# again. An extractor must not mutate its input.
 def test_the_character_extractor_does_not_reorder_its_callers_list():
     recs = [_cs(MON_CUR_END, level=14), _cs("2026-07-04", level=10)]
     before = [r["sk"] for r in recs]
@@ -826,15 +778,10 @@ def test_a_month_with_scores_but_no_groups_names_no_best_or_worst():
     assert s["best_group"] is None and s["worst_group"] is None
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P2 / ADR-105): monthly_digest_lambda.ex_chronicling (lines 292-298) publishes "
-        "`score_avg` (mean of the records that carry total_score) next to `days` = len(recs) — every record in the "
-        "window, scored or not. build_html shows the average as the month's headline P40 figure; the n it is "
-        "presented with is not the n it was computed over. Every statistical claim must carry ITS OWN n."
-    ),
-)
+# FIXED #1658 (found as a tranche-3 xfail, P2 / ADR-105): monthly_digest_lambda.ex_chronicling (lines 292-298) publishes
+# `score_avg` (mean of the records that carry total_score) next to `days` = len(recs) — every record in the window, scored or
+# not. build_html shows the average as the month's headline P40 figure; the n it is presented with is not the n it was computed
+# over. Every statistical claim must carry ITS OWN n.
 def test_the_habit_average_is_reported_with_the_number_of_days_it_averaged():
     recs = [{"total_score": 60}, {"total_score": 80}, {"note": "no score today"}]
     s = m.ex_chronicling(recs)
@@ -842,15 +789,9 @@ def test_the_habit_average_is_reported_with_the_number_of_days_it_averaged():
     assert s["days"] == 2  # not 3
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P2 / ADR-104): ex_chronicling line 291 sorts groups by `x[1] or 0`, so a group "
-        "whose average is None (present in the schema, never scored this month) sorts as ZERO and is named the "
-        "month's '⚠️ Weakest Group' in the email. An unmeasured group is being reported to the reader as the worst-"
-        "performing one."
-    ),
-)
+# FIXED #1658 (found as a tranche-3 xfail, P2 / ADR-104): ex_chronicling line 291 sorts groups by `x[1] or 0`, so a group whose
+# average is None (present in the schema, never scored this month) sorts as ZERO and is named the month's '⚠️ Weakest Group' in
+# the email. An unmeasured group is being reported to the reader as the worst-performing one.
 def test_a_group_that_was_never_scored_is_not_named_the_weakest():
     recs = [{"group_scores": {"sleep": 80, "food": 55}}, {"group_scores": {"mind": None}}]
     assert m.ex_chronicling(recs)["worst_group"] == "food"
@@ -911,15 +852,10 @@ def test_a_month_with_no_training_publishes_no_training_goal_numbers(frozen_mond
     assert "training_activities_30d" not in goals
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P3): monthly_digest_lambda.compute_annual_goals line 320 hard-codes "
-        "`days_in_year = 365`, so in a leap year every 'Year elapsed' figure is overstated (and on 2028-12-31 the "
-        "year reads as 100% elapsed with a day still to run — the progress bar is only saved by build_html's "
-        "min(100, ...) clamp). Derive the year length from the year itself."
-    ),
-)
+# FIXED #1658 (found as a tranche-3 xfail, P3): monthly_digest_lambda.compute_annual_goals line 320 hard-codes `days_in_year =
+# 365`, so in a leap year every 'Year elapsed' figure is overstated (and on 2028-12-31 the year reads as 100% elapsed with a day
+# still to run — the progress bar is only saved by build_html's min(100, ...) clamp). Derive the year length from the year
+# itself.
 def test_the_year_elapsed_percentage_uses_the_real_length_of_the_year(monkeypatch):
     # 2028 is a leap year (366 days). 2028-01-01 -> 2028-02-12 is 42 days elapsed:
     #   correct: round(42 / 366 * 100) = 11        module: round(42 / 365 * 100) = 12
@@ -1038,16 +974,11 @@ def test_an_advisor_with_no_configured_brief_is_still_given_a_default_instructio
     assert "Provide your monthly analysis." in m._build_monthly_prompt_from_config()
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P2 / ADR-104): the hardcoded CONTEXT paragraph in "
-        "_build_monthly_prompt_from_config (lines 402-405) tells the board 'lose ~117 lbs (302→185)' and '1800 "
-        "cal/day, 190g protein, 3 lbs/week target' as fact, while the SAME prompt's {goals_json} block carries the "
-        "real profile figures (journey start 321.6, goal 220). The board is handed two contradictory goal weights and "
-        "asked to reason about trajectory; the CONTEXT numbers should come from the profile, not a frozen literal."
-    ),
-)
+# FIXED #1658 (found as a tranche-3 xfail, P2 / ADR-104): the hardcoded CONTEXT paragraph in _build_monthly_prompt_from_config
+# (lines 402-405) tells the board 'lose ~117 lbs (302→185)' and '1800 cal/day, 190g protein, 3 lbs/week target' as fact, while
+# the SAME prompt's {goals_json} block carries the real profile figures (journey start 321.6, goal 220). The board is handed two
+# contradictory goal weights and asked to reason about trajectory; the CONTEXT numbers should come from the profile, not a
+# frozen literal.
 def test_the_board_context_does_not_hardcode_a_goal_weight_that_contradicts_the_profile(monkeypatch):
     _with_board(monkeypatch, BOARD)
     prompt = m._build_monthly_prompt_from_config()
@@ -1362,15 +1293,9 @@ def test_every_source_the_letter_fetches_reaches_the_letter(monkeypatch, frozen_
     assert fetched <= set(data["cur"])
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P3): gather_all lines 605-612 build `cur`/`prior` with every extractor and then "
-        "IMMEDIATELY overwrite the strava and macrofactor entries with profile-aware recomputations. ex_strava and "
-        "ex_macrofactor each run twice per arm — four wasted passes over the month's records (including a full "
-        "dedup_activities sweep) every run."
-    ),
-)
+# FIXED #1658 (found as a tranche-3 xfail, P3): gather_all lines 605-612 build `cur`/`prior` with every extractor and then
+# IMMEDIATELY overwrite the strava and macrofactor entries with profile-aware recomputations. ex_strava and ex_macrofactor each
+# run twice per arm — four wasted passes over the month's records (including a full dedup_activities sweep) every run.
 def test_each_extractor_runs_once_per_arm(monkeypatch, frozen_monday):
     monkeypatch.setattr(m, "table", _seeded_table())
     calls = []
@@ -1659,34 +1584,27 @@ def test_the_letter_renders_even_when_the_board_commentary_is_empty():
     assert _row(html, "Total Miles") is not None
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P2): build_html line 724 detects an advisor's section header by matching a "
-        "HARDCODED six-emoji tuple ('🏋️','🥗','😴','🩺','🧠','🎯'), while _build_monthly_prompt_from_config builds the "
-        "headers from whichever members the S3 board config assigns to `monthly_digest`, each with their OWN emoji. "
-        "An advisor added to the board (or one whose emoji lacks the exact VS16 variation selector) has their header "
-        "rendered as ordinary body prose — the section silently loses its heading. The renderer must derive the "
-        "header set from the same board config the prompt was built from."
-    ),
-)
+# FIXED #1658 (found as a tranche-3 xfail, P2): build_html line 724 detects an advisor's section header by matching a HARDCODED
+# six-emoji tuple ('🏋️','🥗','😴','🩺','🧠','🎯'), while _build_monthly_prompt_from_config builds the headers from whichever members
+# the S3 board config assigns to `monthly_digest`, each with their OWN emoji. An advisor added to the board (or one whose emoji
+# lacks the exact VS16 variation selector) has their header rendered as ordinary body prose — the section silently loses its
+# heading. The renderer must derive the header set from the same board config the prompt was built from.
 def test_an_advisor_added_to_the_board_still_gets_a_rendered_section_header():
     commentary = "🧬 DR. HENNING BRANDT — MONTHLY RIGOR REVIEW\nThe n behind each claim held up.\n"
     d = _data()
     html = m.build_html(d, GOALS, commentary, d["windows"])
-    header_para = [p for p in re.findall(r"<p[^>]*>(.*?)</p>", html, re.S) if "HENNING BRANDT" in p][0]
+    # NB the original assertion could never pass for ANY advisor, built-in ones
+    # included: it captured only the paragraph's INNER text, while the weight it
+    # asserted on lives in the <p> tag's own style attribute. Match the whole
+    # element (#1658).
+    header_para = [p for p in re.findall(r"<p[^>]*>.*?</p>", html, re.S) if "HENNING BRANDT" in p][0]
     assert "font-weight:700" in header_para
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P2 / ADR-104): build_html lines 833-839 render the CTL/TSB rows "
-        "unconditionally, outside the `if st_c:` guard. A month with no recorded activity at all still publishes "
-        "'CTL — 42-day Fitness: 0.0' and 'TSB — Current Form: 0.0 (Neutral)' — a confident fitness verdict computed "
-        "over no data. With nothing measured the rows should be absent, not zeroed."
-    ),
-)
+# FIXED #1658 (found as a tranche-3 xfail, P2 / ADR-104): build_html lines 833-839 render the CTL/TSB rows unconditionally,
+# outside the `if st_c:` guard. A month with no recorded activity at all still publishes 'CTL — 42-day Fitness: 0.0' and 'TSB —
+# Current Form: 0.0 (Neutral)' — a confident fitness verdict computed over no data. With nothing measured the rows should be
+# absent, not zeroed.
 def test_a_month_with_no_training_does_not_publish_a_fitness_verdict():
     d = _data()
     d["cur"]["strava"] = None
@@ -1695,15 +1613,10 @@ def test_a_month_with_no_training_does_not_publish_a_fitness_verdict():
     assert _row(html, "TSB — Current Form") is None
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P3): build_html's delta helpers are called as `delta(...) if prior_val else ''` "
-        "(sc_pill line 754, habits line 935, character line 958/983). A prior-month value of exactly 0 — zero "
-        "activities, a level-0 pillar, a 0% group — is falsy, so the month-over-month arrow is suppressed precisely "
-        "when the improvement is largest. The guard should test for None, not falsiness."
-    ),
-)
+# FIXED #1658 (found as a tranche-3 xfail, P3): build_html's delta helpers are called as `delta(...) if prior_val else ''`
+# (sc_pill line 754, habits line 935, character line 958/983). A prior-month value of exactly 0 — zero activities, a level-0
+# pillar, a 0% group — is falsy, so the month-over-month arrow is suppressed precisely when the improvement is largest. The
+# guard should test for None, not falsiness.
 def test_an_improvement_from_zero_still_shows_its_arrow():
     d = _data()
     d["prior"]["chronicling"]["group_avgs"]["food"] = 0
@@ -1758,8 +1671,11 @@ def test_the_letter_is_sent_once_to_the_configured_recipient(handler_env):
 
 
 def test_the_subject_line_names_the_month(handler_env):
+    """Rewritten with the #1658 label fix: on 2026-08-03 the letter reviews
+    2026-07-04..2026-08-02, so the subject that lands in the inbox says JULY.
+    It used to read "August 2026" over July's numbers."""
     m.lambda_handler({}, None)
-    assert _sent_subject(handler_env) == "Monthly Coach's Letter · August 2026"
+    assert _sent_subject(handler_env) == "Monthly Coach's Letter \u00b7 July 2026"
 
 
 def test_the_send_is_tagged_for_open_and_bounce_tracking(handler_env):
@@ -1839,25 +1755,33 @@ def test_board_output_with_warnings_is_still_delivered(handler_env):
     assert "Volume climbed steadily" in _text(_sent_html(handler_env))
 
 
-def test_the_letter_does_not_go_out_on_a_day_that_is_not_a_monday(monkeypatch, frozen_cron_sunday):
+@pytest.mark.parametrize("day", [1, 2, 3, 4, 5, 6, 7])  # 2026-08-01 (Sat) .. 2026-08-07 (Fri)
+def test_the_send_decision_does_not_depend_on_the_weekday(monkeypatch, day):
+    """Rewritten with the #1658 cadence fix (this test used to pin the defect).
+
+    It asserted the letter was SUPPRESSED on 2026-08-02 — the exact day the
+    letter's own EventBridge rule fires (`cron(0 16 ? * 1#1 *)` = first Sunday) —
+    because lambda_handler refused any day that was not a Monday. That guard is
+    why the letter had never been delivered. Cadence is now enforced by the
+    send log (at most one letter per calendar month), not by the weekday, so
+    every day of the week must be able to carry the send.
+    """
     ses = FakeSES()
+    monkeypatch.setattr(m, "datetime", _frozen_datetime_class(datetime(2026, 8, day, 16, 0, tzinfo=timezone.utc)))
     monkeypatch.setattr(m, "ses", ses)
+    monkeypatch.setattr(m, "table", _seeded_table())
+    monkeypatch.setattr(m, "call_haiku_monthly", lambda data, goals: COMMENTARY)
+    monkeypatch.setattr(m, "_HAS_INSIGHT_WRITER", False)
     resp = m.lambda_handler({}, None)
-    assert resp["body"] == "skipped — not Monday"
-    assert ses.sent == []
+    assert resp["statusCode"] == 200
+    assert len(ses.sent) == 1
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P1): the monthly letter can never be sent by its own schedule. "
-        "cdk/stacks/email_stack.py schedules monthly-digest on `cron(0 16 ? * 1#1 *)` and the module docstring reads "
-        "'Fires first Sunday of each month' — in EventBridge cron the day-of-week field is 1-7 = SUN-SAT, so 1#1 is "
-        "the FIRST SUNDAY. lambda_handler lines 1033-1036 then return 'skipped — not Monday' unless "
-        "date.today().weekday() == 0. Sunday is never Monday, so every scheduled invocation no-ops and Matthew "
-        "receives no monthly letter at all. The guard and the schedule must agree on one day."
-    ),
-)
+# FIXED #1658 (found as a tranche-3 xfail, P1): the monthly letter can never be sent by its own schedule.
+# cdk/stacks/email_stack.py schedules monthly-digest on `cron(0 16 ? * 1#1 *)` and the module docstring reads 'Fires first
+# Sunday of each month' — in EventBridge cron the day-of-week field is 1-7 = SUN-SAT, so 1#1 is the FIRST SUNDAY. lambda_handler
+# lines 1033-1036 then return 'skipped — not Monday' unless date.today().weekday() == 0. Sunday is never Monday, so every
+# scheduled invocation no-ops and Matthew receives no monthly letter at all. The guard and the schedule must agree on one day.
 def test_the_letter_is_sent_on_the_day_its_own_schedule_fires(monkeypatch, frozen_cron_sunday):
     ses = FakeSES()
     monkeypatch.setattr(m, "ses", ses)
@@ -1868,16 +1792,10 @@ def test_the_letter_is_sent_on_the_day_its_own_schedule_fires(monkeypatch, froze
     assert len(ses.sent) == 1
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P2): lambda_handler line 1033 reads `date.today()` — the runtime's LOCAL date "
-        "— to make a weekday decision, while every other date in this module comes from "
-        "`datetime.now(timezone.utc)`. All EventBridge crons in this repo are fixed-UTC by convention precisely so "
-        "the weekday can't drift; a local-time read reintroduces the drift the convention removes. It should be "
-        "datetime.now(timezone.utc).date()."
-    ),
-)
+# FIXED #1658 (found as a tranche-3 xfail, P2): lambda_handler line 1033 reads `date.today()` — the runtime's LOCAL date — to
+# make a weekday decision, while every other date in this module comes from `datetime.now(timezone.utc)`. All EventBridge crons
+# in this repo are fixed-UTC by convention precisely so the weekday can't drift; a local-time read reintroduces the drift the
+# convention removes. It should be datetime.now(timezone.utc).date().
 def test_the_weekday_guard_reads_the_clock_in_utc(monkeypatch):
     """Freeze only the module's UTC clock and leave date.today() alone: a
     UTC-derived guard follows the frozen clock, a local one does not."""
@@ -1889,48 +1807,32 @@ def test_the_weekday_guard_reads_the_clock_in_utc(monkeypatch):
     assert m.lambda_handler({}, None)["body"] != "skipped — not Monday"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P2 / #2111 class): monthly_digest_lambda.lambda_handler has NO dry_run gate. "
-        "Sibling email lambdas (between_chronicle, chronicle_approve, coach_panel_podcast) honour "
-        "{'dry_run': true}. Any manual or regeneration invoke on a Monday mails Matthew a real monthly letter — "
-        "there is no way to exercise this function against production data without sending."
-    ),
-)
+# FIXED #1658 (found as a tranche-3 xfail, P2 / #2111 class): monthly_digest_lambda.lambda_handler has NO dry_run gate. Sibling
+# email lambdas (between_chronicle, chronicle_approve, coach_panel_podcast) honour {'dry_run': true}. Any manual or regeneration
+# invoke on a Monday mails Matthew a real monthly letter — there is no way to exercise this function against production data
+# without sending.
 def test_a_dry_run_invocation_builds_the_letter_without_mailing_it(handler_env):
     resp = m.lambda_handler({"dry_run": True}, None)
     assert resp["statusCode"] == 200
     assert handler_env["ses"].sent == []
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P2): lambda_handler writes no send record and reads none, so nothing prevents "
-        "a double-send. Two invocations in the same month (a retry, a manual re-run, an EventBridge at-least-once "
-        "redelivery) mail two identical letters and file two identical insights. Every other email lambda in this "
-        "package calls record_email_send; this one does not, so the status page also cannot report the monthly "
-        "letter's last send at all. cf. #2112, the same class on chronicle-email-sender."
-    ),
-)
+# FIXED #1658 (found as a tranche-3 xfail, P2): lambda_handler writes no send record and reads none, so nothing prevents a
+# double-send. Two invocations in the same month (a retry, a manual re-run, an EventBridge at-least-once redelivery) mail two
+# identical letters and file two identical insights. Every other email lambda in this package calls record_email_send; this one
+# does not, so the status page also cannot report the monthly letter's last send at all. cf. #2112, the same class on chronicle-
+# email-sender.
 def test_the_monthly_letter_is_not_sent_twice_in_the_same_month(handler_env):
     m.lambda_handler({}, None)
     m.lambda_handler({}, None)
     assert len(handler_env["ses"].sent) == 1
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P2 / ADR-104): when the board call fails, lambda_handler substitutes the stub "
-        "'🎯 THE CHAIR — MONTHLY OVERVIEW\\nCommentary unavailable this month.' and then gates IC-15 on "
-        "`'unavailable' not in commentary[:50]`. The stub's first 50 characters end at '...Commentary unavail' — the "
-        "word 'unavailable' starts at index 42 and does not FIT in the slice, so the sentinel can never fire. The "
-        "failure stub is filed into the insight ledger as a genuine monthly coaching insight with "
-        "confidence='high', actionable=True. The same sentinel guards the AI-3 blocked path."
-    ),
-)
+# FIXED #1658 (found as a tranche-3 xfail, P2 / ADR-104): when the board call fails, lambda_handler substitutes the stub '🎯 THE
+# CHAIR — MONTHLY OVERVIEW\nCommentary unavailable this month.' and then gates IC-15 on `'unavailable' not in commentary[:50]`.
+# The stub's first 50 characters end at '...Commentary unavail' — the word 'unavailable' starts at index 42 and does not FIT in
+# the slice, so the sentinel can never fire. The failure stub is filed into the insight ledger as a genuine monthly coaching
+# insight with confidence='high', actionable=True. The same sentinel guards the AI-3 blocked path.
 def test_a_board_failure_stub_is_not_filed_as_a_genuine_monthly_insight(handler_env):
     handler_env["state"]["ai_error"] = RuntimeError("bedrock throttled")
     m.lambda_handler({}, None)
@@ -1948,17 +1850,11 @@ def test_the_unavailable_sentinel_cannot_see_the_word_it_looks_for():
     assert "unavailable" not in stub[:50]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P2, reader/writer mismatch): lambda_handler line 1093 files the monthly "
-        "insight with `date=month` — a display label like 'August 2026'. Every other writer stores a YYYY-MM-DD "
-        "date, and insight_writer.get_recent_insights filters with a STRING comparison "
-        "`i.get('date','') >= cutoff_date`. 'August 2026' > any '2026-..-..' cutoff because 'A' sorts above the "
-        "digits, so a monthly insight NEVER ages out of the 14/30/90-day windows — it is replayed into every "
-        "downstream AI prompt (daily brief, chronicle, nutrition review) until its 180-day TTL expires."
-    ),
-)
+# FIXED #1658 (found as a tranche-3 xfail, P2, reader/writer mismatch): lambda_handler line 1093 files the monthly insight with
+# `date=month` — a display label like 'August 2026'. Every other writer stores a YYYY-MM-DD date, and
+# insight_writer.get_recent_insights filters with a STRING comparison `i.get('date','') >= cutoff_date`. 'August 2026' > any
+# '2026-..-..' cutoff because 'A' sorts above the digits, so a monthly insight NEVER ages out of the 14/30/90-day windows — it
+# is replayed into every downstream AI prompt (daily brief, chronicle, nutrition review) until its 180-day TTL expires.
 def test_a_monthly_insight_is_dated_so_that_it_can_age_out_of_the_context_window(handler_env):
     m.lambda_handler({}, None)
     stored_date = handler_env["writer"].written[0]["date"]
