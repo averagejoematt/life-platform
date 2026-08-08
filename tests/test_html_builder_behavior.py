@@ -1726,7 +1726,12 @@ def test_board_confidence_badge_is_computed_from_the_wall_clock_not_the_brief_da
     """
     a = _coaches(bod_insight="x", data=_data())
     b = _coaches(bod_insight="x", data={"date": "2025-01-01", "hrv": {}})
-    strip = re.compile(r"<!--.*?-->")
+    # re.DOTALL matters: without it `.` skips newlines, so a multi-line HTML
+    # comment survives the strip and the two renders compare unequal for a
+    # reason that has nothing to do with the property under test. (CodeQL
+    # py/bad-tag-filter flags the newline-blind form; this is a test-local
+    # normaliser, not a sanitiser, but the correctness point stands.)
+    strip = re.compile(r"<!--.*?-->", re.DOTALL)
     assert strip.sub("", a) == strip.sub("", b)
 
 
