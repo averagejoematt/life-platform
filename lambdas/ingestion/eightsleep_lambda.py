@@ -85,6 +85,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 import boto3
+from common.pacific_time import parse_iso_utc  # bundled shared module: THE ISO-8601 parser (#1964)
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -333,10 +334,16 @@ def _hour_of_day(iso_ts: str, tz_offset: int = _DEFAULT_TZ_OFFSET) -> float | No
 
     Returns a float where 23.5 = 11:30 pm and 6.75 = 6:45 am.
     """
+    # #1964: the canonical parser, not an inline `.replace("Z", "+00:00")` fork. It
+    # already implements exactly the two semantics this docstring promises — Z/z and
+    # offset-bearing forms are honoured, and a tz-less stamp is UTC (never the runner's
+    # local time). Hand-rolling it here passed the behaviour tests and tripped the #1964
+    # ratchet on main, which is the guard doing its job: the fork is invisible until the
+    # day someone edits one copy.
+    dt = parse_iso_utc(iso_ts)
+    if dt is None:
+        return None
     try:
-        dt = datetime.fromisoformat(iso_ts.strip().replace("Z", "+00:00"))
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
         local = dt.astimezone(timezone(timedelta(hours=tz_offset)))
         return round(local.hour + local.minute / 60.0 + local.second / 3600.0, 2)
     except Exception:
