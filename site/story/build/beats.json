@@ -2309,6 +2309,33 @@
         }
       ],
       "why_it_mattered": "This platform publishes a real person's health data, and the privacy screens are the promise that some of it stays private. A screen nobody can prove still works is a promise on trust rather than on evidence. Asking the question properly — break it on purpose, demand that something complains — turned five green tests into an honest inventory: one fixed, one latent exposure closed the same night, three filed with the exact mutation that exposes each. The reassuring version of this story would have said the guards were failing and were now saved. The true version is duller and more useful: they were working, nothing was leaking, and until tonight nothing would have noticed if they stopped."
+    },
+    {
+      "id": "2026-08-08-the-door-nobody-enumerated",
+      "date": "2026-08-08",
+      "title": "The door nobody enumerated",
+      "shipped": "A test-coverage push found a privacy leak that three earlier sweeps had walked past. Two weeks ago I made food-delivery data private by default and closed the door on it. Last night, writing tests for unrelated code, the suite turned up a third door — a public JSON file the site serves to anyone, quietly publishing a delivery-derived line. Not the spend, not the counts, just a streak. But published, not merely unguarded, which is what the first two were. Fixed and deployed the same night. The fix hunts for doors instead of closing the one I found, and it immediately turned up a fourth nobody knew about. Also shipped: coverage 70.5% to 78.2%, and thirteen other bugs the same push exposed.",
+      "gotcha": "I nearly wrote 'deployed and verified' on the privacy fix off a deploy timestamp. The timestamp was newer than the merge, so it looked fine. I pulled the actual deployed code instead and the fix wasn't in it — when several deploys queue up, an older one lands after a newer merge. A fresh timestamp routinely carries stale code. That's a script now, not a thing I have to remember.",
+      "honest_miss": "I broke the build twice, and the second time was the same mistake as the first. A coverage test that pins how something behaves, plus a privacy gate that turns that behaviour off, equals a broken build — each change is fine alone and they only collide once both land. I fixed exactly that collision in the morning and then walked into it again in the evening with a different pair of files. No user ever saw a defect from either; it cost about an hour of build-red. Also: five agents were mid-commit when time ran out, so that work is parked unreviewed rather than finished.",
+      "prs": [
+        {
+          "label": "PR #2251",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2251"
+        },
+        {
+          "label": "PR #2229",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2229"
+        },
+        {
+          "label": "PR #2253",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2253"
+        },
+        {
+          "label": "PR #2232",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2232"
+        }
+      ],
+      "why_it_mattered": "Three separate sweeps closed this same data class and all three missed a door, because each time somebody wrote down the doors they could think of. The fix that worked derives the list from the code instead — and it found a fourth door in its first run. That's the difference between fixing a bug and fixing the reason the bug keeps coming back."
     }
   ]
 }

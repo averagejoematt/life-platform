@@ -1,158 +1,183 @@
-# HANDOVER — The guards that weren't guarding: a mutation sweep, a P1 privacy gate, and coverage past 70% — 2026-08-08 ~03:52Z → ~06:30Z
+# HANDOVER — A live privacy door nobody had enumerated, a letter that never sent, and two reds of my own making — 2026-08-08 ~06:45Z → ~14:00Z
 
-> Instruction thread: *"read the Day-5 handover, then run a maximum-paydown session over the open
-> issue corpus. Opus driving — all model:fable work OFF-LIMITS. Driver drives only; every
-> implementer is a worktree-implementer on its issue's own model:* label; waves of ≤5. Arm the
-> auto-approving monitor EARLY. Priorities: preflight → the whoop/Pillow verifications →
-> #2194/#2195/#2198 → the pre-scoped tranches (#1658/#1654/#1656) → straight down the stored rank;
-> if the actionable rank drains, a measured sweep that files new issues beats scraping 0.38s."*
-> Plus, emphasised: *"the whoop verification is the one thing I'd insist the session does even if
-> it's short on time."*
+> Instruction thread: *"read the Day-5 handover, then the plan at `~/.claude/plans/cozy-hugging-liskov.md`
+> and execute it. Opus driving. STEP 0: main is RED — fix the meals/delivery union breach first.
+> Then arm the auto-approving gate monitor, launch #1658 tranche 3 as the long pole, and run waves of
+> ≤5 worktree-implementers on each issue's own `model:*` label. Never stall waiting for me. Hard
+> limits: no `model:fable` work, no CDK deploys, no repo-settings changes, no OAuth re-auth, no CodeQL
+> dismissals, never invoke an email Lambda. Quality bar is the point, not the count."*
 
-**Main:** green (`e731ebef`) at the time of the (e2) gate; two fix-forwards this session, both
-mine, both detailed below.
-**Docs:** `docs/INCIDENT_LOG.md` (+2 rows, last-updated refreshed) · in-PR: `docs/CONVENTIONS.md`
-+ `docs/DECISIONS.md` ADR-148 amendment (#2200), new `docs/STACK_MANIFEST.md` indexed in
-`docs/README.md` (#2207), `docs/DEPENDENCY_GRAPH.md` stale-consumer correction (#2210),
-`docs/TESTING.md` literals. All four wiki checkers green at the wrap commit.
-**Decisions:** none needed — the one governance-shaped call (ADR-148's user-owned-repo bypass
-limitation) shipped as an amendment inside #2200; nothing else this session changed posture.
-**Incidents:** 2 rows added — (1) main red ~63min on an undeclared PyYAML; (2) unresolved
-conflict markers merged to main through my own #2200 reconcile with every gate green.
-**Build beat:** `2026-08-08-the-guards-that-were-not-guarding`.
-**Closures:** #2194, #2195, #2198, #2203, #2209 — all five commented in the ADR-099 two-line
-shape. #2198 carries an honest `partial` (the mechanism is designed and read-only-verified;
-`--apply` was never executed live, and whether GitHub accepts a `User` bypass actor here could
-not be settled without a write that was out of scope).
-**Backlog:** Now was at 2 actionable → promoted #2204 and #2206 by stored rank (both score 2.00,
-both sonnet); their score lines were corrected `→ Next` → `→ Now` to match, which the (e7) linter
-caught. Later sweep: no stale issues. Corpus clean — 60 open, 0 violations.
-**Alarms:** every alarm red >72h is cited. The whoop board is latched but **self-healing, not
-stuck** — `IngestAuthHealthy=1` for hours, `ConsecutiveFailures=0`, no stale #2085 latch; the
-24h `Minimum` window rolls past the last 0 around 01:00Z 08-09.
-**CI warnings:** 7 — all one class (`LifePlatformWeb/Mcp/Serve/Operational/Email/Compute/Ingestion`
-each carry a Lambda config change CI's code-deploy cannot ship). This **grew from 2 last session**
-despite the owner's CDK window running, so it is not the carried no-action call any more: filed as
-**#2213**, with the aws-cdk-lib 2.263.0 bump recorded as a *hypothesis, not a conclusion* (the
-per-stack `cdk diff` has not been measured). Clearing it needs an owner-gated CDK deploy.
-**Stash/hooks:** clean — stash empty at close, hook freshness 🟢.
+**Main:** green (`023874f0`) — verified via `check_main_green.py` after the second fix-forward landed.
+**Docs:** none needed — every merged change was code/tests; no deploy path, data model, algorithm, MCP
+tool, site page or secret changed. `sync_doc_metadata.py --check` green at the wrap commit; the only
+doc literals touched were the auto-maintained `test_count` pair, reconciled per merge.
+**Decisions:** none needed — no governance-shaped call. The one that came closest (#1872's
+advisory→blocking flip) shipped **as** a dated ADR-099 amendment inside that PR, which is the
+sanctioned home.
+**Incidents:** 2 rows — main red ~50min on a food-delivery/tranche union breach (`023874f0`), and the
+same class ~25min earlier at session start (`520a7c12`). Both mine, both test-only, no production
+defect shipped by either.
+**Build beat:** `2026-08-08-the-door-nobody-enumerated`.
+**Closures:** #2206, #2211, #2212, #2214, #2215, #2216, #2217, #2218, #2219, #2220, #2223, #2233,
+#1872 — all thirteen commented in the ADR-099 two-line shape.
+**Backlog:** Now holds 24 (22 addressable, 2 `model:fable`) — it *grew* because 24 verified issues were
+filed. No `Later` staleness. Corpus clean at 0 violations, which now **blocks** since #1872 landed.
+**Alarms:** 8 red, all cited (`check_alarm_citations.py` exit 0). `slo-source-freshness` is red because
+reality is red — 6 behavioural/paused sources stale (macrofactor 45d, hevy 44d, garmin 54d/paused,
+measurements 132d, food_delivery 133d, strava 5d). The instrument is correct; nothing to fix.
+**CI warnings:** 8 — 7 are #2213's CDK config drift (unchanged, needs an owner CDK window); the 8th is
+**new** and filed as **#2259** (Unit Tests 1221s vs a 1200s budget, caused by tranche 3's +1,900 tests,
+and coupled to #2258).
+**Stash/hooks:** clean — stash empty, hook freshness 🟢.
 
 ---
 
-## The owner's two must-do verifications
+## The headline: a live privacy door, found by the coverage engine
 
-**1. Whoop #2196 — the fix works, with a measured limitation.** Positively confirmed live:
-`whoop_token_reused remaining_s=2160 — no refresh_token rotation this run`. The expiry field
-self-healed after exactly one expected `no_stored_expiry` exchange; data flows (3 records/run,
-`RunSuccess=1`).
+`https://averagejoematt.com/public_stats.json` returns **HTTP 200 to anyone, unauthenticated**, and its
+`group_narratives.nutrition` was publishing a food-delivery-derived sentence. That is the same data class
+deliberately gated private-by-default in #2209/#2210 two weeks ago — reaching readers through a **third
+door that sweep never enumerated**, and unlike its two predecessors this one **was actually publishing,
+not merely unguarded**.
 
-**But the gate cannot engage on the path that produces nearly all the rotations.** Measured, then
-confirmed to the second: access-token lifetime **3599s**, cron interval **3600s**, skew 300s — so
-every scheduled run sees ~4s of life left and still exchanges (`whoop_token_exchange
-reason=expires_in_4s`, 05:00:16Z; predicted before it fired). The benefit is confined to
-duplicate/extra invocations, so the daily rotation count — and expected time-to-credential-death —
-is roughly unchanged. Filed **#2204** with the arithmetic. What #2197 *did* buy is real and not in
-question: no blind retry on the token POST, `WhoopRotationLost` classification, cache
-invalidation, breaker-aware reconcile.
+I verified it end-to-end before filing (#2233), fixed it (#2251), and confirmed the gate in the
+**deployed bundle**. Precisely what was exposed: an *abstinence streak*, positively framed — **not**
+spend, **not** binge counts, **not** platform names, all of which remained correctly gated. Real, but
+not the worst version of itself.
 
-**2. Pillow 12 — verified at the artifact level.** The last real generation (19:30Z 08-07)
-predated the 02:12Z layer rebuild, so this was genuinely untested. Manual invoke → 14/14 images,
-then three PNGs pulled back down and confirmed valid 1200×630 RGB with real content and differing
-byte sizes. Not just a 200.
+Two things make it worth carrying forward:
 
-## What shipped (8 PRs merged, all deployed)
+1. **The derived guard found a fourth door.** Rather than gate the one door, the implementer AST-walked
+   the whole `lambdas/` tree and turned up `weekly_digest_lambda.get_food_delivery_digest_line()` —
+   identically shaped, same partition, **completely ungated**. Dead code today with no call site, so it
+   never published, but wiring it up later would have reopened this exact door a third time. The gate now
+   lives *inside* both functions, so future callers are covered without anyone remembering.
+2. **The number was never true either.** The source record shows `streak_days: 3` frozen since
+   2026-03-28 — written once at ingestion, never recomputed. So the published figure was both ungated
+   *and* stale-to-false, understating a ~4-month real gap as 3 days. Filed as **#2235** (ADR-104), kept
+   deliberately separate from the disclosure fix.
 
-- **#2199** (#2194) — schema baselines for `/api/social_context` + `/api/membrane`; both exemption
-  ledgers cleared. The wholesale-capture trap was handled properly: 121 baselines rewritten, **119
-  reverted** (72 timestamp-only, 47 real diffs each inspected and explained by cycle-12 data
-  thinness or features shipped since the last capture). No handler regression among them.
-- **#2201** (#2195) — the #1699 gate armed on the stance writer. Cost *measured*, not asserted:
-  one platform-wide `GetItem` hoisted above the 8-coach loop, ≤782 reads/yr. Mutation-tested
-  twice, including a test that pins the cost claim itself.
-- **#2202** (#1654 slice) — `site_api_coach` 2,664 → 434 lines behind an unchanged facade, 5 new
-  modules. Deployed; 7/7 boundary endpoints 200; **235/235** smoke. Its guard-repointing exposed
-  the #2203 defect below.
-- **#2200** (#2198) — branch-protection bypass redesigned to a `User` actor. No repo-settings
-  mutations (owner's hard limit respected). Caused both of this session's reds.
-- **#2205** (#2203) — a genuine second-layer fixture for the journal-quotes screen.
-- **#2207** (#1401 slice 1) — `/data/stack.json` + schema, live (200). Sources are an **exact
-  match** to the already-public set; supplement fields a strict **subset** of `/api/supplements`.
-  Device/time costs honestly `null` with a stated basis rather than invented.
-- **#2208** (#1658 tranche 2) — measured coverage **63.14% → 70.50%**, ratchet 62.64 → 70.40. I
-  re-measured on the reconciled tree before merging (enforcing gate): **70.50%, 13,137 passed, 0
-  failed**, 121 `xfail`s deliberately encoding defects rather than asserting bugs as correct.
-- **#2210** (#2209, P1) — the delivery privacy gate. Deployed and verified live, including after
-  CI's redeploy raced my manual one.
+This also corrects a line in **#2209's own closure verdict**, which said "nothing was published in the
+interim." True of the endpoint it scoped; not true of the data class.
 
-## The session's spine: five guards that guarded nothing
+## The second headline: the monthly letter has never sent
 
-#2202's split work surfaced one, and every thread pulled found another. All five were
-**mutation-proven**, and I verified each myself rather than accept the report:
+**#2234.** `cdk/stacks/email_stack.py:128` schedules `cron(0 16 ? * 1#1 *)`. EventBridge day-of-week is
+`1-7 = SUN-SAT`, so `1#1` is the first **Sunday** — while the handler only runs on **Monday** and exits
+immediately. The log group holds exactly three streams — 2026-06-07, 2026-07-05, 2026-08-02 — every one
+a first Sunday, every one ~2ms, the last logging the skip verbatim.
 
-| # | screen | evidence | status |
-|---|---|---|---|
-| #2203 | journal-quotes all-or-nothing second layer | 55/55 passed with it deleted | fixed (#2205) |
-| #2209 | `/api/food_delivery_overview` — no flag gate at all | sibling module gates the identical data private-by-default | fixed (#2210) |
-| #2206 | `_claims_by_entry` — two screens, zero coverage on either | both fixtures benign | open |
-| #2211 | `/api/labs` genetic CATEGORY screen | full 10,930-test suite passed with it removed | open |
-| #2212 | `_is_blocked_vice` — 4+ of 6 call sites | each survives full-suite mutation, 3 public endpoints | open |
+Self-concealing: it is the one email Lambda with no `record_email_send`, so nothing ever recorded the
+absence. The cron fix needs a **CDK deploy** (owner-gated, out of scope), so it is filed with that
+dependency named. The filer confirmed this is the **only** `N#N` cron in the repo, so the set is one.
 
-**None was leaking**, and saying otherwise would have been the more dramatic claim and the false
-one. The screens are present and running; what was missing is anything that would notice if they
-were removed. The sweep also returned negative results worth banking — the other journal-quote
-screens, all three `find_dossier_violations` legs, and whole-module pass-throughs of
-`privacy_guard` / `broadcast_sensitivity_gate` / `diary_consent` are genuinely well-guarded.
+## What shipped — 14 PRs merged + 4 direct commits, all deployed
 
-## Gotchas hit (carry these)
+Every fix was **mutation-proven by me** before merge, not taken on report. Reverting each produced the
+exact predicted failure; restoring returned green.
 
-- **`sync_doc_metadata.py --apply` writes INSIDE an unresolved conflict block.** My #2200 reconcile
-  ran `checkout --theirs` on only one of **two** conflicted literal files; `--apply` then rewrote
-  the number on both sides of the other's conflict, making them byte-identical — so `--check`
-  passed, lint/mypy never read markdown, and `check_main_green.py` said GREEN. The failure mode is
-  specifically *a conflict whose two sides are identical*, i.e. the doc-literal class this repo
-  hits on nearly every concurrent PR. Now guarded by `tests/test_no_conflict_markers.py`
-  (set from `git ls-files`, self-mutation-proven, verified to fail against the real broken content).
-- **A collect-only lane cannot see an in-function import.** #2200's tests need PyYAML, declared
-  **nowhere**; the PR was green because the fast lane only *collects* them and `import yaml` sits
-  inside the function. Only the post-merge full suite executes it. Mirror image of the layer-dep
-  class. The CQ-01 parity guard then caught me adding the pin to only one of the two files — it
-  works.
-- **A guard must be mutation-proven or it is not a guard.** Three privacy screens passed while
-  guarding nothing, in one night, in three different disguises.
-- **Cross-session coordination is a real hazard.** A peer session, acting on my *superseded*
-  instruction, restored the conflict markers onto #2205's branch. I countermanded it and then
-  settled it by **test-merge rather than argument** — the branch made no change to that file
-  relative to the merge base, so main's fix won cleanly.
+| PR | Issue | What landed |
+|---|---|---|
+| #2224 | #2217 | `/api/deficit_sustainability` no longer fabricates a 100% deficit; hoisted the existing `_mf` accessor rather than writing a second |
+| #2225 | #2218 | an empty model response can't overwrite a cached analysis; status distinguishes "wrote nothing" from `ok` |
+| #2226 | #2211 | genetic **category** screen pinned + a derived third-screen guard |
+| #2227 | #2214 | `adaptive_mode` reads the fields writers actually write |
+| #2228 | #2219 | a confirmed threshold call credits alpha symmetrically |
+| #2229 | #1658 | **coverage 70.50% → 78.25%**, ratchet floor 66 → 74 — the bug engine |
+| #2230 | #2206 | both diary content screens pinned, each independently mutation-proven |
+| #2231 | #2215 | a per-serving recipe macro is no longer read as a starvation target |
+| #2232 | #2220 | `/api/status` can no longer report green on nothing — **verified live** (`76 tools`/`77 pages`, was `116`/`66`) |
+| #2236 | #2216 | nutrition_review's gates rekeyed + a real `dry_run` gate |
+| #2251 | #2233 | the live privacy door, plus the fourth door nobody knew about |
+| #2252 | #1872 | backlog hygiene flipped advisory → blocking |
+| #2253 | #2212 | blocked-vice screen SET — **11 call sites, not the filed "4+ of 6"** |
+| #2257 | #2223 | module-level wall-clock globals frozen + a derived AST guard |
+
+Plus direct to `main`: `520a7c12` and `023874f0` (the two fix-forwards), `b60eadd3`
+(`deploy/watch_deploy_gate.sh`), `3660f884` (`deploy/verify_deployed_symbol.sh`).
+
+## The implementers corrected their own issues five times — that is the result I most want
+
+- **#2214** — the claim that two field-name bugs caused the empty-platform "Rough Patch" was **false**;
+  on an empty table the score is 37.5 before *and* after. Needed a separate composite guard, flagged as
+  added scope rather than folded in silently.
+- **#2219** — real in code but **latent in production**: 0 of 2,458 prediction rows carry the required
+  field, and all 1,207 machine specs bypass the affected branch entirely. "Confidence can only fall" is
+  not what the live posteriors show.
+- **#2216** — the gate wasn't merely dark but **inverted**: the only thing that could reach the insight
+  ledger was the validator's *blocked-fallback* text, which then fed the next week's prompt. It also
+  caught a false positive before switching validation on — `"1,700 kcal"` read as a 700-kcal target.
+- **#2220** — severity **narrower** than filed (the only renderer is `/legacy`, unlinked), but it found
+  an unnamed live root cause: `_COMPUTE_SOURCES` used `insights` where the writer emits
+  `computed_insights`, so fixing the six defects without it would have turned a working component red.
+- **#2212** — the set was **11**, including one site the issue never mentioned; and it declined to claim
+  a kill on a proven **equivalent mutant** rather than pad the count.
+
+## The three things I got wrong
+
+1. **I reported the gate monitor as "armed and verified" when the verification was too weak.** It only
+   proved the watcher *skipped the zombies*, never that it would *fire*. When a real gated run appeared I
+   checked, and `gh run list --status waiting` **does not return live gated runs** (that run read
+   `in_progress` at run level) while it happily returns week-old zombies. Left alone it would have sat
+   silent all night, indistinguishable from "nothing needed approving." Rewritten to poll
+   `pending_deployments` — the same signal the approval script acts on. It then approved **6 runs**
+   unattended.
+2. **I nearly wrote a false "deployed and verified live" on the P1 privacy fix.** `daily-brief` reported
+   `LastModified` comfortably *after* the merge; the deployed bundle contained **no trace of the gate**.
+   With CI/CD runs queued behind each other, an earlier run routinely lands after a later merge. Now a
+   command, not a discipline: `deploy/verify_deployed_symbol.sh`.
+3. **The second red main was the same union breach I had fixed that morning, one layer over.** #2229's
+   tranche pinned the ungated food-delivery functions; #2251 then gated them. Having just fixed the
+   identical collision, I should have checked whether the tranche pinned those two functions before
+   merging the gate. Root cause filed as **#2258**.
+
+## Gotchas worth carrying
+
+- **The pre-merge lane is a strict subset of the post-merge one**, and that gap red-mained main **three
+  times in 24h** (PyYAML, then this gate-vs-tranche collision twice). Occurrences 2 and 3 are the same
+  two change types colliding: a coverage tranche that pins current behaviour, and a privacy gate that
+  turns it off. Both are routine here. **#2258**, coupled to **#2259**.
+- **A vacuously-passing test is the more dangerous half.** Six of the eleven tests I fixed in the second
+  fix-forward were still *passing* — with the flag off they asserted absence vacuously and would have
+  kept passing against a function stubbed to `return None`.
+- **A CodeQL "failure" is not always a finding.** One was a real weakness in a test-local regex (fixed
+  properly, not dismissed); another was an *Initialize* infrastructure failure with zero alerts. Neither
+  was dismissed — the hard limit held.
+- **ADR-062's chokepoint is intact** — a census finding claimed two AI paths bypassed it; neither
+  reproduced. I derived the whole set: **25 files reference `api.anthropic.com`, all 25 route through the
+  wrapper or Bedrock, zero bypasses.** Banked on #1658 so nobody re-hunts it.
 
 ## Residual / next picks
 
-- **#2211** — `/api/labs` genetic category screen unguarded (Now, P2, sonnet).
-- **#2212** — blocked-vice screen SET, 4+ of 6 call sites (Now, P2, sonnet); includes a sixth call
-  site (`site_api_social.py:1115`) the sweep never tested.
-- **#2206** — diary claims, zero coverage on either screen (Now, promoted this session).
-- **#2204** — the whoop cron/lifetime arithmetic; the lever is cadence, not skew (Now, promoted).
-- **#2213** — the 7-stack CDK config-drift warning board; needs an owner-gated CDK deploy.
-- **#2214–#2220** — seven P1 defects from #2208's tranche, each verified against source before
-  filing (adaptive_mode's unreachable "flourishing" and empty-platform Rough Patch is the worst).
-  **#2221** tracks the ~58-defect tail against the merged `xfail` markers.
-- **#1656 / #1658 / #1654** stay open with measured censuses; the next tranches are well-scoped.
-- **#1383 / #1114** stay Now for a Matthew-live session. not-work — need his interactive input.
-- Git worktrees have accumulated to 46, seven of them *inside* the repo under
-  `.claude/worktrees/` plus one on the lowercase case-twin path. not-work — no gate is affected
-  today (all target specific directories); flagged as housekeeping, not a defect.
-- The two zombie gated runs (30727225837, 30723876315) still sit waiting, deliberately excluded
-  from the auto-approver — approving them would deploy week-old code. not-work — documented
-  leave-alone, GitHub expires them at 30d.
+- **#2260–#2264 are five SALVAGED, UNVERIFIED draft PRs.** Five implementers were stopped at the wrap
+  deadline while *at the commit step*. The work exists and their branches are pushed, but **I never
+  received their reports, never re-ran their mutation proofs, and never confirmed a full suite on those
+  trees**. Covering #2237/#2238 (social security), #2235, #2243, #2247/#2249, #2248. Treat as starting
+  points, not reviewed work — re-run the gates before promoting out of draft.
+- **#2258** — the pre-merge/post-merge subset gap (P1). The highest-leverage item here; it caused three
+  reds in a day.
+- **#2259** — suite wall-clock over budget; decide **jointly** with #2258, which proposes running more
+  tests pre-merge.
+- **#2234** — the monthly letter (P1); needs an owner CDK window for the cron.
+- **#2242, #2244, #2245, #2246, #2250, #2254, #2255, #2256** — the rest of tranche 3's verified census.
+- **#2237–#2241** — the security half of the census.
+- **#2213** — 7-stack CDK config drift; still needs an owner CDK window.
+- **#1658 tranche 4** — opener is `lambdas/web/site_api_ai_lambda.py`, the one named target tranche 3
+  missed when its sub-agent died on an API stall. Not papered over.
+- Git worktrees have grown further under `.claude/worktrees/`. not-work — no gate is affected today;
+  housekeeping.
+- The two zombie gated runs (30727225837, 30723876315) remain excluded by number in
+  `deploy/watch_deploy_gate.sh`. not-work — documented leave-alone; GitHub expires them at 30d.
 
-## OWNER ACTIONS (unchanged, plus two)
+## OWNER ACTIONS
 
-1. **GitHub UI clicks:** CodeQL dismissals ×3 (#2046) · PR #2012 revision-history purge · **+2 new
-   from #2200**, both verified false positives (the code logs a secret's *name*; the API it calls
-   returns names only, never values — a 10-second informed dismissal, not an investigation).
-2. **Personal calls, no deadline:** the #1984 stack decision · the #1905 clinicians call.
-3. **When accounts exist:** Bluesky/Mastodon accounts + the two secrets — capture starts by itself.
-4. **Optional:** ADR-149 flag flip + `cdk deploy LifePlatformWeb`, one sitting.
-5. **A CDK deploy window** would clear #2213's seven warnings; measure `cdk diff` per stack first.
+1. **A CDK deploy window** clears #2213's 7 warnings and is the blocker for #2234's cron fix. Measure
+   `cdk diff` per stack first.
+2. **GitHub UI clicks** (unchanged): CodeQL dismissals ×3 (#2046) · PR #2012 revision-history purge · the
+   2 verified false positives from #2200.
+3. **Review or discard #2260–#2264** — five unverified drafts; they are inert as-is.
+4. Personal calls, no deadline: the #1984 stack decision · the #1905 clinicians call.
+5. When accounts exist: Bluesky/Mastodon + the two secrets.
 
 Prior session's narrative: `git show
-origin/session-archive:handovers/HANDOVER_2026-08-06_day5-max-paydown-owner-window.md`.
+origin/session-archive:handovers/HANDOVER_2026-08-08_guards-that-were-not-guarding.md`.
