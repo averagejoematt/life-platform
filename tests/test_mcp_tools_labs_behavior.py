@@ -804,26 +804,96 @@ def test_genome_context_absent_rather_than_empty_when_nothing_matches(labs_table
     assert out["genome_context"] is None
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "mcp/tools_labs.py lines 5-31 declare `_GENOME_PRIVACY_NOTICE` under a SEC-GENOME banner "
-        "whose own comment states 'This notice is appended to all genome-bearing tool outputs.' "
-        "The constant is referenced NOWHERE in the repo (grep: one hit, its own definition) while "
-        "`genome_context` really does ship gene names, rsIDs and genotypes ('FTO / rs9939609 / "
-        "A;T') on the results, trends and out_of_range views. What it should do: attach the "
-        "notice to any response carrying genome identifiers, or delete the constant and the claim. "
-        "Who it hurts: nothing leaks today — MCP is the owner-only surface and memory records "
-        "genome identifiers as Tier 2 owner-only — but the ONE declared control against those "
-        "identifiers being copied into a chronicle post or a public payload is inert, and reads "
-        "as active to anyone auditing the module. 'Guard exists but guards nothing'. P2."
-    ),
-)
 def test_genome_bearing_response_carries_the_privacy_notice(labs_table):
+    """#2241 — the module's SEC-GENOME banner claims the notice 'is appended to all
+    genome-bearing tool outputs'. Before the fix the constant was referenced nowhere:
+    the sole declared control on the one surface that really does return gene names,
+    rsIDs and genotypes was inert."""
     labs_table({LABS_PK: [_draw("2026-01-01", {"glucose": _bm(99, category="metabolic")})], GENOME_PK: GENOME_ROWS})
     out = tl.tool_get_labs({"view": "results", "draw_date": "2026-01-01"})
     assert out["genome_context"]["glucose"][0]["rsid"] == "rs9939609"  # identifiers really are returned
-    assert tl._GENOME_PRIVACY_NOTICE in str(out)
+    assert out[tl._GENOME_PRIVACY_NOTICE_KEY] == tl._GENOME_PRIVACY_NOTICE
+
+
+def test_trends_view_genome_response_carries_the_privacy_notice(labs_table):
+    labs_table({LABS_PK: [_draw("2026-01-01", {"glucose": _bm(99, category="metabolic")})], GENOME_PK: GENOME_ROWS})
+    out = tl.tool_get_labs({"view": "trends", "biomarker": "glucose"})
+    assert out["genome_context"]["glucose"][0]["genotype"] == "A;T"
+    assert out[tl._GENOME_PRIVACY_NOTICE_KEY] == tl._GENOME_PRIVACY_NOTICE
+
+
+def test_out_of_range_view_genome_response_carries_the_privacy_notice(labs_table):
+    # One draw, one flagged biomarker → flag_rate 100% → "chronic" → genome_drivers populated.
+    labs_table(
+        {
+            LABS_PK: [_draw("2026-01-01", {"glucose": _bm(126, flag="high", category="metabolic")})],
+            GENOME_PK: GENOME_ROWS,
+        }
+    )
+    out = tl.tool_get_labs({"view": "out_of_range"})
+    assert out["genome_drivers"]["glucose"][0]["gene"] == "FTO"
+    assert out[tl._GENOME_PRIVACY_NOTICE_KEY] == tl._GENOME_PRIVACY_NOTICE
+
+
+def test_response_without_genome_identifiers_carries_no_notice(labs_table):
+    """The notice is a signal, not boilerplate — a response with no identifiers in it
+    must not carry one, or the notice stops meaning anything."""
+    labs_table({LABS_PK: [_draw("2026-01-01", {"tsh": _bm(2.1, category="thyroid", unit="uIU/mL")})], GENOME_PK: GENOME_ROWS})
+    out = tl.tool_get_labs({"view": "results", "draw_date": "2026-01-01"})
+    assert out["genome_context"] is None
+    assert tl._GENOME_PRIVACY_NOTICE_KEY not in out
+
+
+def test_notice_detection_is_structural_not_keyed_on_todays_response_shape():
+    """DERIVED guard, not a restatement of the three call sites: the detector keys on the
+    identifier FIELDS, so a future view shipping them under a new container key is covered
+    without editing the module. Both directions are pinned."""
+    snp = {"gene": "FTO", "rsid": "rs9939609", "genotype": "A;T"}
+    assert tl._carries_genome_identifiers({"some_future_key": {"glucose": [snp]}}) is True
+    assert tl._carries_genome_identifiers({"deeply": {"nested": {"under": {"a": {"new": {"shape": snp}}}}}}) is True
+    # An empty/absent identifier is not "bearing" — `_genome_context_for_biomarkers`
+    # returns {} rather than a stub row when nothing matches.
+    assert tl._carries_genome_identifiers({"genome_context": None}) is False
+    assert tl._carries_genome_identifiers({"genome_context": {}}) is False
+    assert tl._carries_genome_identifiers({"biomarkers": {"ldl_c": {"value": 130, "flag": "high"}}}) is False
+
+
+def test_every_genome_producer_routes_through_the_notice_chokepoint():
+    """'Guard the SET, not the instance': the notice is attached once, at the
+    `tool_get_labs` dispatcher. This asserts that EVERY function calling
+    `_genome_context_for_biomarkers` is one of the dispatched views, so a fourth
+    view (or a new tool) cannot produce genome identifiers that bypass the chokepoint.
+    """
+    import ast
+    import pathlib
+
+    src = pathlib.Path(tl.__file__).with_suffix(".py").read_text()
+    tree = ast.parse(src)
+
+    producers = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            for sub in ast.walk(node):
+                if isinstance(sub, ast.Call) and isinstance(sub.func, ast.Name) and sub.func.id == "_genome_context_for_biomarkers":
+                    producers.add(node.name)
+    assert producers, "AST scan found no genome producers — the scan itself has broken"
+
+    dispatched = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == "tool_get_labs":
+            for sub in ast.walk(node):
+                if isinstance(sub, ast.Assign) and isinstance(sub.value, ast.Dict):
+                    dispatched.update(v.id for v in sub.value.values if isinstance(v, ast.Name))
+    assert producers <= dispatched, f"genome producers outside the tool_get_labs dispatcher: {sorted(producers - dispatched)}"
+
+    # And no OTHER mcp module pulls the producer in directly, which would route around it.
+    mcp_dir = pathlib.Path(tl.__file__).parent
+    importers = sorted(
+        p.name
+        for p in mcp_dir.glob("*.py")
+        if p.name not in ("tools_labs.py", "labs_helpers.py") and "_genome_context_for_biomarkers" in p.read_text()
+    )
+    assert importers == [], f"modules bypassing the SEC-GENOME chokepoint: {importers}"
 
 
 def test_trends_view_also_carries_the_genome_context(labs_table):
