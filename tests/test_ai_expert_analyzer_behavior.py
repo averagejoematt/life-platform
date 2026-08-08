@@ -1147,23 +1147,20 @@ class TestGenerateAndCache:
             az.generate_and_cache("sleep")
         assert gen_env.puts == []
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-2 discovery): when the model returns no text block (empty, "
-            "refusal-only or content-filtered response) generate_and_cache still writes an "
-            "EXPERT# record with analysis='' and a fresh generated_at, overwriting the previous "
-            "good analysis, and returns '' which lambda_handler reports as {'status': 'ok', "
-            "'chars': 0}. The observatory page then serves an empty coach section that looks "
-            "current. An empty generation must not overwrite the cache and must not report ok."
-        ),
-    )
     def test_an_empty_model_response_does_not_overwrite_the_cached_analysis(self, gen_env, model):
+        """#2218: an empty/refusal-shaped model response must not overwrite a good
+        cached analysis, and must not even touch `generated_at` on the surviving
+        record — a stamp update alone would make a stale-but-good analysis look
+        freshly regenerated."""
         gen_env.add_raw(az.CACHE_PK, "EXPERT#sleep", phase="experiment", analysis="last week's good analysis")
         model("")
-        az.generate_and_cache("sleep")
+        text = az.generate_and_cache("sleep")
         stored = gen_env.items[(az.CACHE_PK, "EXPERT#sleep")]
         assert stored["analysis"].strip() != "", "an empty generation was published over a good one"
+        assert stored["analysis"] == "last week's good analysis", "the cached record must be untouched, not just non-empty"
+        assert "generated_at" not in stored, "an empty generation must not stamp the surviving record as freshly generated"
+        assert gen_env.puts == [], "an empty generation must never reach put_item"
+        assert not text.strip(), "generate_and_cache should still return honestly (no text was produced)"
 
 
 class TestGroundingSelfCorrection:
@@ -1596,6 +1593,15 @@ class TestLambdaHandler:
     def test_a_full_run_reports_the_character_count_each_coach_produced(self, handler_env):
         body = _body(az.lambda_handler({}, None))
         assert body["sleep"] == {"status": "ok", "chars": len("sleep text")}
+
+    def test_an_empty_generation_is_reported_as_skipped_not_ok(self, monkeypatch, handler_env):
+        """#2218: `chars: 0` under `status: ok` reads as a successful run that wrote
+        nothing — the handler must report an empty generation distinguishably."""
+        monkeypatch.setattr(az, "generate_and_cache", lambda k, shared_system=None: "" if k == "sleep" else f"{k} text")
+        body = _body(az.lambda_handler({}, None))
+        assert body["sleep"] != {"status": "ok", "chars": 0}
+        assert body["sleep"]["status"] != "ok"
+        assert body["mind"] == {"status": "ok", "chars": len("mind text")}
 
     def test_a_single_expert_request_runs_only_that_expert(self, handler_env):
         az.lambda_handler({"expert": "sleep"}, None)
