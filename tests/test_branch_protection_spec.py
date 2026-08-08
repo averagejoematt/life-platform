@@ -135,7 +135,7 @@ def test_applier_refuses_to_manage_the_1325_ruleset():
 
 
 def test_built_payload_has_exactly_one_required_checks_rule(spec):
-    payload = abp.build_ruleset_payload(spec, {"github-actions": 15368})
+    payload = abp.build_ruleset_payload(spec, {"github-actions": 15368}, {"averagejoematt": 174924761})
     assert [r["type"] for r in payload["rules"]] == ["required_status_checks"]
     params = payload["rules"][0]["parameters"]
     assert params["strict_required_status_checks_policy"] is False, "strict forces a rebase on every sibling merge"
@@ -143,8 +143,22 @@ def test_built_payload_has_exactly_one_required_checks_rule(spec):
     assert all(
         c["integration_id"] == 15368 for c in params["required_status_checks"]
     ), "pin the producing app or any app can satisfy the check"
-    assert payload["bypass_actors"] == [{"actor_id": 15368, "actor_type": "Integration", "bypass_mode": "always"}]
+    # #2198: the bypass actor is a `User` (the repo owner), not an `Integration` — the
+    # Integration shape 422s on this personal-account-owned repo (measured, see the
+    # ADR-148 amendment). This is the EXACT payload shape the applier will POST/PUT.
+    assert payload["bypass_actors"] == [{"actor_id": 174924761, "actor_type": "User", "bypass_mode": "always"}]
     assert payload["conditions"]["ref_name"]["include"] == ["refs/heads/main"]
+
+
+def test_bypass_actor_resolver_dispatches_by_actor_type():
+    # Proof the generalized resolver actually routes each declared shape to the right
+    # lookup (guard-the-set: Integration by app slug, User by login) rather than only
+    # exercising whichever one the checked-in spec happens to declare today.
+    app_ids, user_ids = {"github-actions": 15368}, {"averagejoematt": 174924761}
+    assert abp.resolve_bypass_actor_id({"actor_type": "Integration", "app": "github-actions"}, app_ids, user_ids) == 15368
+    assert abp.resolve_bypass_actor_id({"actor_type": "User", "login": "averagejoematt"}, app_ids, user_ids) == 174924761
+    with pytest.raises(abp.SpecError, match="has no resolver"):
+        abp.resolve_bypass_actor_id({"actor_type": "Team", "id": 1}, app_ids, user_ids)
 
 
 def test_empty_required_set_is_refused():
@@ -153,7 +167,7 @@ def test_empty_required_set_is_refused():
 
 
 def test_diff_reports_absence_and_weakening(spec):
-    desired = abp.build_ruleset_payload(spec, {"github-actions": 15368})
+    desired = abp.build_ruleset_payload(spec, {"github-actions": 15368}, {"averagejoematt": 174924761})
     assert "does not exist" in " ".join(abp.diff_ruleset(None, desired))
     live = json.loads(json.dumps(desired)) | {"id": 1}
     assert abp.diff_ruleset(live, desired) == [], "an identical live record must diff clean (idempotency)"
@@ -178,3 +192,94 @@ def test_repo_constant_matches_the_drift_sentinel():
     import drift_sentinel
 
     assert abp.DEFAULT_REPO == drift_sentinel.DEFAULT_REPO
+
+
+# ── #2198: the `User` bypass actor + the reconcile-push-secret preflight ─────
+
+
+def test_reconcile_push_secret_provisioned_reads_the_secret_list(monkeypatch):
+    def fake_present(path, method="GET", payload=None):
+        assert path == "/repos/averagejoematt/life-platform/actions/secrets"
+        return {"secrets": [{"name": "GH_BILLING_TOKEN"}, {"name": "RECONCILE_PUSH_TOKEN"}]}, None
+
+    monkeypatch.setattr(abp, "gh_json", fake_present)
+    assert abp.reconcile_push_secret_provisioned("averagejoematt/life-platform", "RECONCILE_PUSH_TOKEN") is True
+
+    def fake_absent(path, method="GET", payload=None):
+        return {"secrets": [{"name": "GH_BILLING_TOKEN"}]}, None
+
+    monkeypatch.setattr(abp, "gh_json", fake_absent)
+    assert abp.reconcile_push_secret_provisioned("averagejoematt/life-platform", "RECONCILE_PUSH_TOKEN") is False
+
+    def fake_error(path, method="GET", payload=None):
+        return None, "gh: HTTP 403"
+
+    monkeypatch.setattr(abp, "gh_json", fake_error)
+    assert abp.reconcile_push_secret_provisioned("averagejoematt/life-platform", "RECONCILE_PUSH_TOKEN") is None
+
+
+class _FakeGh:
+    """Records every `gh_json` call `main()` makes and answers deterministically, so the
+    apply path can be exercised end-to-end (payload construction included) with zero
+    live network access — this is what "verified without a write" means for #2198: the
+    exact request `--apply` WOULD send is asserted, never actually POSTed."""
+
+    def __init__(self, secret_present, live_ruleset=None, repo_settings=None):
+        self.secret_present = secret_present
+        self.live_ruleset = live_ruleset
+        self.repo_settings = repo_settings or {"allow_auto_merge": True}
+        self.calls = []
+
+    def __call__(self, path, method="GET", payload=None):
+        self.calls.append((path, method, payload))
+        if path == "/apps/github-actions":
+            return {"id": 15368, "slug": "github-actions"}, None
+        if path == "/users/averagejoematt":
+            return {"id": 174924761, "login": "averagejoematt"}, None
+        if path.endswith("/actions/secrets"):
+            names = [{"name": "RECONCILE_PUSH_TOKEN"}] if self.secret_present else []
+            return {"secrets": names}, None
+        if path.endswith("/rulesets") and method == "GET":
+            return ([self.live_ruleset] if self.live_ruleset else []), None
+        if "/rulesets/" in path and method == "GET":
+            return self.live_ruleset, None
+        if path.endswith("/rulesets") and method == "POST":
+            return {"id": 999}, None
+        if "/rulesets/" in path and method == "PUT":
+            return {}, None
+        if path == "/repos/averagejoematt/life-platform" and method == "GET":
+            return self.repo_settings, None
+        if path == "/repos/averagejoematt/life-platform" and method == "PATCH":
+            return {}, None
+        raise AssertionError(f"unrouted gh_json call in test: {path} {method}")
+
+
+def test_apply_refuses_when_reconcile_secret_is_missing(monkeypatch, capsys):
+    fake = _FakeGh(secret_present=False, live_ruleset=None)
+    monkeypatch.setattr(abp, "gh_json", fake)
+    rc = abp.main(["--apply", "--repo", "averagejoematt/life-platform"])
+    assert rc == 2
+    assert "does not exist yet" in capsys.readouterr().err
+    # the load-bearing assertion: applying without the secret must never reach a write
+    assert not any(method in ("POST", "PUT", "PATCH") for _, method, _ in fake.calls)
+
+
+def test_apply_sends_the_exact_ruleset_payload_when_secret_is_present(monkeypatch):
+    fake = _FakeGh(secret_present=True, live_ruleset=None)
+    monkeypatch.setattr(abp, "gh_json", fake)
+    rc = abp.main(["--apply", "--repo", "averagejoematt/life-platform"])
+    assert rc == 0
+
+    posts = [(p, m, payload) for p, m, payload in fake.calls if m == "POST" and p.endswith("/rulesets")]
+    assert len(posts) == 1, f"expected exactly one ruleset POST, got {fake.calls}"
+    _, _, sent = posts[0]
+    assert sent["name"] == "main-required-fast-lane"
+    assert sent["bypass_actors"] == [{"actor_id": 174924761, "actor_type": "User", "bypass_mode": "always"}]
+    assert sent["conditions"] == {"ref_name": {"include": ["refs/heads/main"], "exclude": []}}
+    assert {c["context"] for c in sent["rules"][0]["parameters"]["required_status_checks"]} == {
+        "Collect + deploy-critical + format",
+        "gitleaks (PR commit range only, not full history)",
+    }
+    assert sent["rules"][0]["parameters"]["strict_required_status_checks_policy"] is False
+    # PATCH for repo settings must NOT fire — the fake's repo settings already match
+    assert not any(m == "PATCH" for _, m, _ in fake.calls)

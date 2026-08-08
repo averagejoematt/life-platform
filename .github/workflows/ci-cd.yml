@@ -146,10 +146,19 @@ jobs:
   #     explicitly (workflow_dispatch is the documented exception to the
   #     no-retrigger rule) — otherwise the regenerated page would be
   #     merged-but-not-deployed, the #750 drift class.
-  #   • PUSH PERMISSION: needs the `github-actions` app on the branch-protection
-  #     "require a pull request" bypass list (one-time repo setting — see
-  #     docs/CONVENTIONS.md §4). Until then a needed push fails loudly here,
-  #     which is the same red main would have had, plus the fix command.
+  #   • PUSH PERMISSION: once the `main-required-fast-lane` ruleset (#1662, ADR-148)
+  #     is live, a direct push needs a matching bypass_actor. Measured 2026-08-07
+  #     (#2198): the `github-actions` app CANNOT be that bypass actor on this
+  #     personal-account-owned repo — GitHub 422s an `Integration` bypass actor
+  #     off an org ("must be part of the ruleset source or owner organization").
+  #     The bypass actor is instead a `User` (the repo owner), which only covers a
+  #     push AUTHENTICATED as that account — hence `secrets.RECONCILE_PUSH_TOKEN`
+  #     below (a fine-grained PAT owned by that account, Contents: read-and-write
+  #     on this repo only) with a fallback to the default token so this workflow
+  #     is unaffected until the owner provisions that secret. See
+  #     docs/CONVENTIONS.md §4c and docs/DECISIONS.md's ADR-148 amendment (#2198).
+  #     Until the secret exists AND the ruleset is applied, this push behaves
+  #     exactly as before (GITHUB_TOKEN, no ruleset yet in effect).
   reconcile:
     name: Reconcile derived artifacts
     runs-on: ubuntu-latest
@@ -162,6 +171,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0   # pushing + the concurrent-push retry need real history
+          # #2198: authenticate the push as the `User` bypass actor the
+          # main-required-fast-lane ruleset trusts, once provisioned. Falls back to
+          # the default GITHUB_TOKEN (today's behavior, pre-secret / pre-`--apply`)
+          # so merging this change alone does not alter the push's identity.
+          token: ${{ secrets.RECONCILE_PUSH_TOKEN || github.token }}
 
       # setup-python (v7.0.0, no cache) via the shared composite (#1655)
       - uses: ./.github/actions/setup-ci
@@ -269,7 +283,7 @@ jobs:
 
             echo "::warning::push to main rejected (attempt $attempt of 2)"
             if [ "$attempt" = "2" ]; then
-              echo "::error::reconcile commit could not be pushed to main. Either a concurrent push raced this run twice (rare — the queued run will reconcile) or branch protection is blocking the github-actions[bot] push. This is a personal repo, so the classic-protection PR-bypass list is org-only and unavailable — the fix is to keep 'Require a pull request before merging' OFF on main (docs/CONVENTIONS.md §4c). Manual fallback: run the generators locally on main and push, exactly as before #1173."
+              echo "::error::reconcile commit could not be pushed to main. Either a concurrent push raced this run twice (rare — the queued run will reconcile) or branch protection is blocking the push. This is a personal repo: classic protection's PR-bypass list is org-only and unavailable (keep 'Require a pull request before merging' OFF on main, docs/CONVENTIONS.md §4c), and the main-required-fast-lane ruleset's bypass actor is a User (the repo owner, #2198) — this push authenticates as that user ONLY if the RECONCILE_PUSH_TOKEN secret is set; check that secret exists and the ruleset's bypass_actors match deploy/github_posture.json (python3 scripts/apply_branch_protection.py --check). Manual fallback: run the generators locally on main and push, exactly as before #1173."
               exit 1
             fi
           done

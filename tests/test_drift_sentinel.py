@@ -511,13 +511,16 @@ _LIVE_RULESET = {  # LIVE-SHAPE: ruleset 19162901 as documented in CONVENTIONS.m
     "rules": [{"type": "deletion"}, {"type": "non_fast_forward"}],
 }
 _GITHUB_ACTIONS_APP = {"id": 15368, "slug": "github-actions", "name": "GitHub Actions"}  # LIVE-SHAPE: GET /apps/github-actions
+_OWNER_USER = {"id": 174924761, "login": "averagejoematt", "type": "User"}  # LIVE-SHAPE: GET /users/averagejoematt
 _RC_RULESET_ID = 20000001  # only knowable after the first apply — the sentinel matches this ruleset by NAME
 _RC_RULESET = {  # the #1662/ADR-148 fast-lane required-checks ruleset, as scripts/apply_branch_protection.py writes it
     "id": _RC_RULESET_ID,
     "name": "main-required-fast-lane",
     "enforcement": "active",
     "conditions": {"ref_name": {"exclude": [], "include": ["refs/heads/main"]}},
-    "bypass_actors": [{"actor_id": 15368, "actor_type": "Integration", "bypass_mode": "always"}],
+    # #2198: the bypass actor is a `User` (the repo owner) — the `Integration` shape
+    # 422s off an org on this personal-account-owned repo (see the ADR-148 amendment).
+    "bypass_actors": [{"actor_id": 174924761, "actor_type": "User", "bypass_mode": "always"}],
     "rules": [
         {
             "type": "required_status_checks",
@@ -568,6 +571,7 @@ def _config_routes(env=None, ruleset=None, vuln=None, rc_list=None, rc_full=None
         "rulesets": rc_list if rc_list is not None else ([_LIVE_RULESET, _RC_RULESET], None),
         "vulnerability-alerts": vuln or ({}, None),  # 204 No Content = enabled
         "/apps/github-actions": (_GITHUB_ACTIONS_APP, None),
+        "/users/averagejoematt": (_OWNER_USER, None),
         "repos/": repo or (_REPO_AUTO_MERGE_ON, None),
     }
 
@@ -612,9 +616,15 @@ def test_posture_required_checks_never_carry_a_review_rule():
     assert rc["strict_required_status_checks_policy"] is False, "strict would force a rebase on every sibling merge"
     for key in ("required_approving_review_count", "require_review", "required_pull_request_reviews"):
         assert key not in rc, f"{key} in the spec would enable required reviews (ADR-148 refuses this)"
-    assert any(b["app"] == "github-actions" for b in rc["bypass_actors"]), (
-        "without the github-actions Integration bypass, ci-cd.yml's reconcile job — which pushes DIRECTLY to main, "
-        "not via a PR — is rejected by the required-checks rule on every merge day"
+    # #2198: the bypass actor is a `User` (the repo owner) — the `Integration` shape
+    # 422s off an org on this personal-account-owned repo, measured live 2026-08-07.
+    assert any(b.get("actor_type") == "User" and b.get("login") for b in rc["bypass_actors"]), (
+        "without a bypass actor the reconcile job's push AUTHENTICATES AS is covered, ci-cd.yml's reconcile job — "
+        "which pushes DIRECTLY to main, not via a PR — is rejected by the required-checks rule on every merge day"
+    )
+    assert rc.get("reconcile_push_secret"), (
+        "the spec must name the repo secret ci-cd.yml's reconcile job pushes with to match the User bypass actor "
+        "(#2198) — scripts/apply_branch_protection.py refuses --apply until this secret is provisioned"
     )
 
 
@@ -776,14 +786,33 @@ def test_github_config_required_checks_drift_on_out_of_band_review_rule(monkeypa
     assert "approval-shaped" in rc["detail"]
 
 
-def test_github_config_required_checks_degrades_when_app_lookup_unavailable(monkeypatch):
-    # /apps lookup down → compare bypass by (actor_type, bypass_mode) and SAY so,
-    # rather than silently reporting a numeric match that was never made.
+def test_github_config_required_checks_degrades_when_user_lookup_unavailable(monkeypatch):
+    # #2198: the checked-in spec's bypass actor is a `User`, resolved via /users/{login}
+    # — that lookup down should degrade the comparison to (actor_type, bypass_mode) and
+    # SAY so, rather than silently reporting a numeric match that was never made.
     routes = _config_routes(env=(_ENV_WITH_REVIEWERS, None))
-    routes["/apps/github-actions"] = (None, {"classification": "error", "detail": "gh: timeout"})
+    routes["/users/averagejoematt"] = (None, {"classification": "error", "detail": "gh: timeout"})
     _fake_gh(monkeypatch, routes)
     res = ds.check_github_config()
     assert res["surfaces"]["main_required_checks_ruleset"]["status"] == "clean"
+
+
+def test_resolve_want_bypass_actor_id_dispatches_and_degrades_by_actor_type(monkeypatch):
+    # Unit-level proof _resolve_want_bypass_actor_id routes EITHER actor_type to its own
+    # lookup and degrades gracefully on either one going unavailable (guard-the-set: not
+    # just the User shape the checked-in spec happens to declare today).
+    def fake(path, timeout=60):
+        if path == "/users/averagejoematt":
+            return _OWNER_USER, None
+        if path == "/apps/github-actions":
+            return None, {"classification": "error", "detail": "gh: timeout"}
+        raise AssertionError(f"unrouted gh api path in test: {path}")
+
+    monkeypatch.setattr(sg, "_gh_api_result", fake)
+    pair, degraded = sg._resolve_want_bypass_actor_id({"actor_type": "User", "login": "averagejoematt", "bypass_mode": "always"})
+    assert not degraded and pair == (174924761, "User", "always")
+    pair, degraded = sg._resolve_want_bypass_actor_id({"actor_type": "Integration", "app": "github-actions", "bypass_mode": "always"})
+    assert degraded and pair is None
 
 
 def test_github_config_scope_gap_is_needs_owner_not_red(monkeypatch):

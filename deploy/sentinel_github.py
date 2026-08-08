@@ -153,18 +153,35 @@ def _parse_gh_date(s):
     return datetime.fromisoformat((s or "").replace("Z", "+00:00"))
 
 
+def _resolve_want_bypass_actor_id(b):
+    """One posture bypass-actor entry → (live-comparable key, degraded?).
+
+    #2198: the bypass actor is a `User` (the repo owner), not an `Integration` — the
+    Integration shape 422s on a personal-account-owned repo. Both shapes are resolved
+    the same way as the applier (`scripts/apply_branch_protection.py::
+    resolve_bypass_actor_id`): `Integration` by app slug (`GET /apps/{slug}`, public),
+    `User` by login (`GET /users/{login}`, also public). If the lookup is unavailable
+    the comparison degrades to (actor_type, bypass_mode) and says so, rather than
+    pretending a numeric match it could not make."""
+    actor_type = b.get("actor_type", "Integration")
+    if actor_type == "User":
+        data, err = _gh_api_result(f"/users/{b.get('login')}")
+    else:
+        data, err = _gh_api_result(f"/apps/{b.get('app')}")
+    if err or not (data or {}).get("id"):
+        return None, True
+    return (int(data["id"]), actor_type, b.get("bypass_mode", "always")), False
+
+
 def _judge_required_checks(live, want):
     """Compare one live ruleset record against the `main_required_checks_ruleset` spec.
 
     Judges what actually decides whether the gate works: enforcement, the ref it covers,
     the exact required-context SET, the strict (branch-up-to-date) flag, and the presence
-    of the Integration bypass the reconcile bot's direct push to main depends on. Also
-    fails LOUD if an approval-shaped rule ever appears — ADR-148 never applies one, so
-    its presence means the ruleset was edited out of band.
-
-    App ids for bypass actors are resolved live (`GET /apps/{slug}` is public); if that
-    lookup is unavailable the comparison degrades to (actor_type, bypass_mode) and says
-    so, rather than pretending a numeric match it could not make."""
+    of the bypass actor the reconcile bot's direct push to main depends on (a `User` —
+    the repo owner — as of #2198; see `_resolve_want_bypass_actor_id`). Also fails LOUD
+    if an approval-shaped rule ever appears — ADR-148 never applies one, so its presence
+    means the ruleset was edited out of band."""
     problems = []
     if live.get("enforcement") != want.get("enforcement", "active"):
         problems.append(f"enforcement={live.get('enforcement')!r} (documented {want.get('enforcement', 'active')!r})")
@@ -197,12 +214,12 @@ def _judge_required_checks(live, want):
     degraded = False
     want_pairs = []
     for b in want_bypass:
-        app, err = _gh_api_result(f"/apps/{b['app']}")
-        if err or not (app or {}).get("id"):
+        pair, one_degraded = _resolve_want_bypass_actor_id(b)
+        if one_degraded:
             degraded = True
-            want_pairs.append(("Integration", b.get("bypass_mode", "always")))
+            want_pairs.append((b.get("actor_type", "Integration"), b.get("bypass_mode", "always")))
         else:
-            want_pairs.append((int(app["id"]), "Integration", b.get("bypass_mode", "always")))
+            want_pairs.append(pair)
     if degraded:
         live_pairs = sorted((b.get("actor_type"), b.get("bypass_mode")) for b in live_bypass)
         want_pairs = sorted((p if len(p) == 2 else (p[1], p[2])) for p in want_pairs)
@@ -239,7 +256,8 @@ def check_github_config():
       * main_required_checks_ruleset (#1662, ADR-148) — the fast-lane
         required-status-checks ruleset, matched by NAME (its id only exists
         after the first apply). Judges enforcement, ref, the exact context set,
-        the strict flag, and the Integration bypass the reconcile bot needs.
+        the strict flag, and the bypass actor the reconcile bot needs (a `User` — the
+        repo owner — as of #2198).
       * repo_settings (#1662, ADR-148) — repo-level merge toggles, currently
         `allow_auto_merge`, the mechanism that makes required checks cost the
         operator no wall-clock.

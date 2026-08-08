@@ -64,6 +64,7 @@ external = ["CDK_HANDLER_ORPHAN"]
 "cdk/stacks/role_policies.py" = ["F841", "S106"]   # secret_name="life-platform/..." is a Secrets Manager identifier
 "lambdas/ingestion/*_lambda.py" = ["S105", "S314"] # SECRET_NAME/*_TOKEN_URL constants + own-data (Apple Health / xlsx) XML
 "mcp/handler.py" = ["S105"]  # fail-closed bearer-token sentinel ("__NO_KEY_CONFIGURED__") — F401/F811/F841 retired (#1657)
+"scripts/apply_branch_protection.py" = ["S105"]    # RECONCILE_PUSH_SECRET_DEFAULT names a repo secret, not a value (#2198)
 "tests/*.py" = ["S105", "S106"]                    # dummy tokens/secrets in fixtures
 
 [tool.ruff.lint.isort]
