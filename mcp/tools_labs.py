@@ -17,7 +17,11 @@ Lab results, genome, DEXA tools.
 #   "MTHFR compound heterozygous"
 #   "SLCO1B1 C;T — 4.5x statin myopathy risk"
 #
-# This notice is appended to all genome-bearing tool outputs.
+# This notice is appended to all genome-bearing tool outputs — wired at the
+# `tool_get_labs` dispatcher via `_attach_genome_privacy_notice` (#2241), which
+# DETECTS the identifier fields structurally rather than listing the response
+# keys that happen to carry them today. A future view that ships genome
+# identifiers under a new key is covered without editing this module.
 # ─────────────────────────────────────────────────────────────────────────────
 _GENOME_PRIVACY_NOTICE = (
     "PRIVACY GUARDRAIL: This data contains raw genome identifiers (gene names, "
@@ -30,12 +34,58 @@ _GENOME_PRIVACY_NOTICE = (
     "private MCP use and Matthew's personal reference only."
 )
 
+# The response key the notice is attached under.
+_GENOME_PRIVACY_NOTICE_KEY = "privacy_notice"
+
+# The raw genome identifier fields produced by `labs_helpers._genome_context_for_biomarkers`.
+# Presence of ANY of these anywhere in a response is what makes it "genome-bearing" —
+# the detection is on the identifiers themselves, not on the container key, so a new
+# view/response shape cannot silently ship them un-noticed.
+_GENOME_IDENTIFIER_FIELDS = ("gene", "rsid", "genotype")
+
+# Recursion guard only. Today's genome identifiers sit at depth 3
+# (response → genome_context → biomarker list → snp dict).
+_GENOME_SCAN_MAX_DEPTH = 12
+
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
 from mcp.config import logger, table
 from mcp.helpers import _linear_regression
 from mcp.labs_helpers import _genome_context_for_biomarkers, _query_all_lab_draws
+
+
+def _carries_genome_identifiers(node, _depth=0):
+    """True when `node` contains a raw genome identifier anywhere inside it.
+
+    Structural, not key-name based: any nested mapping carrying a truthy
+    `gene` / `rsid` / `genotype` counts, wherever it sits in the response.
+    """
+    if _depth > _GENOME_SCAN_MAX_DEPTH:
+        return False
+    if isinstance(node, dict):
+        if any(node.get(f) for f in _GENOME_IDENTIFIER_FIELDS):
+            return True
+        return any(_carries_genome_identifiers(v, _depth + 1) for v in node.values())
+    if isinstance(node, (list, tuple)):
+        return any(_carries_genome_identifiers(v, _depth + 1) for v in node)
+    return False
+
+
+def _attach_genome_privacy_notice(out):
+    """Attach `_GENOME_PRIVACY_NOTICE` to any response that actually ships genome identifiers.
+
+    SEC-GENOME (#2241): this is the single chokepoint that makes the module's
+    declared control real. It is applied at the `tool_get_labs` dispatcher, so
+    every view — including ones added later — is covered; the notice is attached
+    only when identifiers are genuinely present, so it never becomes noise on a
+    response that carries none.
+    """
+    if not isinstance(out, dict):
+        return out
+    if _carries_genome_identifiers(out):
+        out[_GENOME_PRIVACY_NOTICE_KEY] = _GENOME_PRIVACY_NOTICE
+    return out
 
 
 def _get_lab_results(args):
@@ -266,7 +316,8 @@ def tool_get_labs(args):
             out["cadence_trackers"] = _build_cadence_trackers()
         except Exception as e:
             logger.warning(f"cadence_trackers build failed: {e}")
-    return out
+    # SEC-GENOME (#2241): last step, so it sees every augment above it too.
+    return _attach_genome_privacy_notice(out)
 
 
 # ── FH v2 augments (PR 4a, 2026-05-03) ───────────────────────────────────────
