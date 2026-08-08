@@ -15,6 +15,78 @@ from mcp.core import query_source
 # Used by _load_cgm_readings to prevent S3 path traversal via malformed date_str.
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
+# ── Dashboard thresholds — ONE source of truth for the published note AND the flags ──
+#
+# Everything here is mg/dL (or a percentage). The writer
+# (lambdas/ingestion/health_auto_export_lambda.py::process_blood_glucose) converts
+# mmol/L at ingest with the 18.0182 factor, so nothing stored is ever mmol/L.
+#
+# Two bars, deliberately distinct and both published: a TARGET (the optimal bar the
+# response prints) and a WARN bar (the clinically concerning one). Before #2221 the
+# note printed the target and the flag enforced the warn bar with no way for the
+# reader to tell which was the platform's actual line — a glucose SD of 22 was above
+# the printed target and produced no flag at all.
+_TARGET_MEAN = 100  # optimal mean glucose
+_TARGET_SD = 20  # optimal glucose variability (SD)
+_WARN_SD = 25  # SD above which the excursion is a warning, not a target miss
+_TARGET_TIR = 90  # % of time in 70-180
+_TARGET_TBR = 4  # % of time below 70 (international CGM consensus target)
+_TARGET_FASTING = 90  # optimal fasting proxy (the day's minimum)
+_WARN_FASTING = 100  # ADA impaired-fasting-glucose threshold
+_DEFAULT_DASHBOARD_DAYS = 30
+
+# First year the HAE webhook wrote raw/{user}/cgm_readings/ — a fixed PAST year, unlike
+# the old hard-coded end year, which silently emptied the fasting view on 2027-01-01.
+_CGM_FIRST_YEAR = 2024
+
+# ADR-105: a decile computed from fewer than ten observations is an order statistic
+# relabelled, not a percentile. Below this n the distribution's percentile curve is
+# withheld rather than fabricated.
+_MIN_N_FOR_PERCENTILES = 10
+
+_DASHBOARD_NOTE = (
+    f"Targets: mean <{_TARGET_MEAN}, SD <{_TARGET_SD}, TIR >{_TARGET_TIR}%, "
+    f"time below 70 <{_TARGET_TBR}%, fasting <{_TARGET_FASTING}. "
+    "Time above 140 triggers insulin + inflammation. "
+    f"Severity 'warning' marks the clinical bar (SD >{_WARN_SD}, fasting >{_WARN_FASTING}); "
+    "'advisory' marks a target miss short of it."
+)
+
+
+def _num(value):
+    """Coerce a stored DynamoDB attribute to ``float``, or ``None`` when it is absent
+    or unusable.
+
+    ADR-104 behavioural absence: a day the sensor did not measure is ABSENT. A glucose
+    minimum of 0 mg/dL is incompatible with life and a 0% time-in-range is a diabetic
+    emergency — neither is a fact about Matthew's blood, both are ``.get(key, 0)`` about
+    a missing attribute, and once one enters a mean it fabricates a clinical flag.
+
+    Returning ``None`` (rather than raising) also keeps one non-numeric row from taking
+    the whole dashboard down with a ValueError, the way ``_load_cgm_readings`` already
+    degrades per-reading.
+    """
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _rounded(value, digits=1):
+    return None if value is None else round(value, digits)
+
+
+def _mean_and_n(values):
+    """(mean, n) over the values that are actually present. ADR-105: every aggregate
+    carries the n behind it, and different fields on the same window legitimately have
+    different n."""
+    present = [v for v in values if v is not None]
+    if not present:
+        return None, 0
+    return round(sum(present) / len(present), 1), len(present)
+
 
 def _load_cgm_readings(date_str):
     """
@@ -65,8 +137,21 @@ def _load_cgm_readings(date_str):
 
 def _get_cgm_dashboard(args):
     """CGM glucose daily dashboard from DynamoDB aggregates."""
-    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    start_date = args.get("start_date")
+    if not start_date:
+        # `days` is DECLARED in mcp/registry.py's get_cgm inputSchema; before #2221 it was
+        # never read, so a model passing days=7 exactly as instructed was answered about a
+        # month. #1917 window-name honesty: query_source's `sk BETWEEN` is inclusive on
+        # BOTH bounds, so an N-day window subtracts N-1 — not N, which spans N+1 days.
+        span = _num(args.get("days"))
+        span = _DEFAULT_DASHBOARD_DAYS if span is None else max(1, min(int(span), 3650))
+        try:
+            anchor = datetime.strptime(end_date, "%Y-%m-%d")
+        except (TypeError, ValueError):
+            anchor = datetime.now(timezone.utc)
+            end_date = anchor.strftime("%Y-%m-%d")
+        start_date = (anchor - timedelta(days=span - 1)).strftime("%Y-%m-%d")
 
     items = query_source("apple_health", start_date, end_date)
     if not items:
@@ -78,55 +163,119 @@ def _get_cgm_dashboard(args):
 
     rows = []
     cgm_ct = 0
+    unusable = 0
     for item in glucose_days:
+        avg = _num(item.get("blood_glucose_avg"))
+        if avg is None:
+            # The mean is the one field the day cannot be published without.
+            unusable += 1
+            continue
+        readings = _num(item.get("blood_glucose_readings_count"))
         row = {
             "date": item.get("date"),
-            "avg": round(float(item["blood_glucose_avg"]), 1),
-            "min": round(float(item.get("blood_glucose_min", 0)), 1),
-            "max": round(float(item.get("blood_glucose_max", 0)), 1),
-            "std_dev": round(float(item.get("blood_glucose_std_dev", 0)), 1),
-            "readings": int(float(item.get("blood_glucose_readings_count", 0))),
-            "time_in_range_pct": round(float(item.get("blood_glucose_time_in_range_pct", 0)), 1),
-            "time_above_140_pct": round(float(item.get("blood_glucose_time_above_140_pct", 0)), 1),
-            "time_below_70_pct": round(float(item.get("blood_glucose_time_below_70_pct", 0)), 1),
+            "avg": round(avg, 1),
+            "min": _rounded(_num(item.get("blood_glucose_min"))),
+            "max": _rounded(_num(item.get("blood_glucose_max"))),
+            "std_dev": _rounded(_num(item.get("blood_glucose_std_dev"))),
+            "readings": None if readings is None else int(readings),
+            "time_in_range_pct": _rounded(_num(item.get("blood_glucose_time_in_range_pct"))),
+            "time_above_140_pct": _rounded(_num(item.get("blood_glucose_time_above_140_pct"))),
+            "time_below_70_pct": _rounded(_num(item.get("blood_glucose_time_below_70_pct"))),
             "source": item.get("cgm_source", "unknown"),
         }
         rows.append(row)
         if item.get("cgm_source") == "dexcom_stelo":
             cgm_ct += 1
 
+    if not rows:
+        return {"error": "No usable blood glucose values in range."}
+
     avg_vals = [r["avg"] for r in rows]
-    min_vals = [r["min"] for r in rows if r["min"] > 0]
-    sd_vals = [r["std_dev"] for r in rows]
-    tir_vals = [r["time_in_range_pct"] for r in rows]
-    a140 = [r["time_above_140_pct"] for r in rows]
+    min_vals = [r["min"] for r in rows if r["min"] is not None and r["min"] > 0]
+    sd_mean, n_sd = _mean_and_n([r["std_dev"] for r in rows])
+    tir_mean, n_tir = _mean_and_n([r["time_in_range_pct"] for r in rows])
+    a140_mean, n_a140 = _mean_and_n([r["time_above_140_pct"] for r in rows])
+    tbr_mean, n_tbr = _mean_and_n([r["time_below_70_pct"] for r in rows])
+
+    # ADR-105: a day built from one fingerstick is not the same observation as a day
+    # built from 288 sensor readings. When every day carries its reading count the mean
+    # is reading-weighted (the standard CGM mean-glucose definition); when any day's
+    # count is missing we fall back to the unweighted mean of daily means and SAY SO,
+    # rather than inventing a weight for the day we cannot count.
+    weights = [r["readings"] for r in rows]
+    if all(w is not None and w > 0 for w in weights):
+        total_readings = sum(weights)
+        avg_glucose = round(sum(r["avg"] * r["readings"] for r in rows) / total_readings, 1)
+        weighting = f"reading-weighted (n={total_readings} readings across {len(rows)} days)"
+    else:
+        total_readings = None
+        avg_glucose = round(sum(avg_vals) / len(avg_vals), 1)
+        missing = sum(1 for w in weights if w is None or w <= 0)
+        weighting = f"unweighted daily means (reading count missing on {missing} of {len(rows)} days)"
 
     summary = {
         "total_days": len(rows),
         "cgm_days": cgm_ct,
         "manual_days": len(rows) - cgm_ct,
-        "avg_glucose": round(sum(avg_vals) / len(avg_vals), 1),
+        "avg_glucose": avg_glucose,
+        "avg_glucose_weighting": weighting,
+        "total_readings": total_readings,
         "avg_fasting_proxy": round(sum(min_vals) / len(min_vals), 1) if min_vals else None,
-        "avg_variability_sd": round(sum(sd_vals) / len(sd_vals), 1),
-        "avg_time_in_range_pct": round(sum(tir_vals) / len(tir_vals), 1),
-        "avg_time_above_140_pct": round(sum(a140) / len(a140), 1),
+        "avg_variability_sd": sd_mean,
+        "avg_time_in_range_pct": tir_mean,
+        "avg_time_above_140_pct": a140_mean,
+        "avg_time_below_70_pct": tbr_mean,
+        # ADR-105: each aggregate's own n — they differ whenever a row is partial.
+        "n": {
+            "avg_glucose": len(rows),
+            "avg_fasting_proxy": len(min_vals),
+            "avg_variability_sd": n_sd,
+            "avg_time_in_range_pct": n_tir,
+            "avg_time_above_140_pct": n_a140,
+            "avg_time_below_70_pct": n_tbr,
+        },
     }
+    if unusable:
+        summary["days_dropped_unusable"] = unusable
 
     flags = []
-    if summary["avg_glucose"] > 100:
-        flags.append({"severity": "warning", "message": f"Mean glucose {summary['avg_glucose']} > 100 mg/dL optimal threshold."})
-    if summary["avg_variability_sd"] > 25:
+    mean_g = summary["avg_glucose"]
+    if mean_g is not None and mean_g > _TARGET_MEAN:
+        flags.append({"severity": "warning", "message": f"Mean glucose {mean_g} > {_TARGET_MEAN} mg/dL optimal threshold."})
+    sd = summary["avg_variability_sd"]
+    if sd is not None and sd > _WARN_SD:
+        flags.append({"severity": "warning", "message": f"Glucose variability SD {sd} > {_WARN_SD} target. Large postprandial spikes."})
+    elif sd is not None and sd > _TARGET_SD:
+        flags.append(
+            {
+                "severity": "advisory",
+                "message": f"Glucose variability SD {sd} above the <{_TARGET_SD} target (warning bar is {_WARN_SD}).",
+            }
+        )
+    tir = summary["avg_time_in_range_pct"]
+    if tir is not None and tir < _TARGET_TIR:
+        flags.append({"severity": "warning", "message": f"Time in range {tir}% < {_TARGET_TIR}% target."})
+    # Hypoglycemia is the only glucose excursion that is acutely dangerous, and until
+    # #2221 it was the one excursion the dashboard would not mention: time_below_70_pct
+    # was computed per-day and then read by nothing.
+    tbr = summary["avg_time_below_70_pct"]
+    if tbr is not None and tbr > _TARGET_TBR:
         flags.append(
             {
                 "severity": "warning",
-                "message": f"Glucose variability SD {summary['avg_variability_sd']} > 25 target. Large postprandial spikes.",
+                "message": f"Time below 70 mg/dL {tbr}% > {_TARGET_TBR}% target. Hypoglycemia is the acutely dangerous excursion.",
             }
         )
-    if summary["avg_time_in_range_pct"] < 90:
-        flags.append({"severity": "warning", "message": f"Time in range {summary['avg_time_in_range_pct']}% < 90% target."})
     fp = summary.get("avg_fasting_proxy")
-    if fp and fp > 100:
-        flags.append({"severity": "warning", "message": f"Fasting proxy {fp} > 100 mg/dL. Target <90."})
+    if fp is not None and fp > _WARN_FASTING:
+        flags.append({"severity": "warning", "message": f"Fasting proxy {fp} > {_WARN_FASTING} mg/dL. Target <{_TARGET_FASTING}."})
+    elif fp is not None and fp > _TARGET_FASTING:
+        flags.append(
+            {
+                "severity": "advisory",
+                "message": f"Fasting proxy {fp} above the <{_TARGET_FASTING} target (warning bar is {_WARN_FASTING}).",
+            }
+        )
 
     trend = None
     if len(avg_vals) >= 6:
@@ -147,7 +296,7 @@ def _get_cgm_dashboard(args):
         "trend": trend,
         "clinical_flags": flags or [],
         "daily": rows,
-        "note": "Targets: mean <100, SD <20, TIR >90%, fasting <90. Time above 140 triggers insulin + inflammation.",
+        "note": _DASHBOARD_NOTE,
     }
 
 
@@ -168,17 +317,48 @@ def _get_fasting_glucose_validation(args):
     import statistics
 
     # ── Parameters ────────────────────────────────────────────────────────
-    nadir_start = float(args.get("nadir_start_hour", 0))  # midnight
-    nadir_end = float(args.get("nadir_end_hour", 6))  # 6 AM
+    # These four window arguments are UNDECLARED in mcp/registry.py's get_cgm
+    # inputSchema, so nothing upstream validates them: a bare float()/int() here meant a
+    # malformed tool call returned a ValueError stack trace instead of the error envelope
+    # the dispatcher's own `valid_views` branch exists to produce, and an out-of-range
+    # window silently produced a nonsensical nadir set.
+    hours = {}
+    for name, default in (("nadir_start_hour", 0.0), ("nadir_end_hour", 6.0), ("deep_nadir_start_hour", 2.0), ("deep_nadir_end_hour", 5.0)):
+        raw = args.get(name, default)
+        val = _num(raw)
+        if val is None:
+            return {"error": f"Invalid {name}: {raw!r} is not a number.", "hint": f"{name} is an hour of day, 0-24."}
+        if not 0.0 <= val <= 24.0:
+            return {"error": f"Invalid {name}: {val} is outside the 0-24 hour range.", "hint": f"{name} is an hour of day, 0-24."}
+        hours[name] = val
+    nadir_start = hours["nadir_start_hour"]  # midnight
+    nadir_end = hours["nadir_end_hour"]  # 6 AM
     # 2-5 AM avoids dawn phenomenon cortisol rise (4-7 AM per Attia/Patrick)
-    deep_start = float(args.get("deep_nadir_start_hour", 2))  # 2 AM
-    deep_end = float(args.get("deep_nadir_end_hour", 5))  # 5 AM
-    min_readings = int(args.get("min_overnight_readings", 6))  # need ~30 min coverage
+    deep_start = hours["deep_nadir_start_hour"]  # 2 AM
+    deep_end = hours["deep_nadir_end_hour"]  # 5 AM
+    if nadir_start >= nadir_end:
+        return {"error": f"Invalid overnight window: nadir_start_hour ({nadir_start}) must be before nadir_end_hour ({nadir_end})."}
+    if deep_start >= deep_end:
+        return {"error": f"Invalid deep window: deep_nadir_start_hour ({deep_start}) must be before deep_nadir_end_hour ({deep_end})."}
+    min_readings_raw = _num(args.get("min_overnight_readings", 6))  # need ~30 min coverage
+    if min_readings_raw is None or min_readings_raw < 1:
+        return {
+            "error": f"Invalid min_overnight_readings: {args.get('min_overnight_readings')!r}.",
+            "hint": "min_overnight_readings is a positive integer count of readings.",
+        }
+    min_readings = int(min_readings_raw)
 
     # ── Discover all CGM days from S3 ─────────────────────────────────────
+    # The year list used to be hard-coded ["2024/", "2025/", "2026/"], which made this
+    # view a dated time bomb: every CGM day from 2027-01-01 onward would have been
+    # invisible and the view would have answered "No CGM data found in S3." for a sensor
+    # streaming normally. The range now runs from the first year the Stelo webhook wrote
+    # through NEXT year (the +1 covers the year boundary and any writer whose local day
+    # is ahead of UTC). Listing an empty prefix costs one cheap ListObjectsV2 call.
     paginator = s3_client.get_paginator("list_objects_v2")
     cgm_days = []  # list of "YYYY-MM-DD"
-    for prefix_year in ["2024/", "2025/", "2026/"]:
+    this_year = datetime.now(timezone.utc).year
+    for prefix_year in [f"{y}/" for y in range(_CGM_FIRST_YEAR, max(this_year + 1, _CGM_FIRST_YEAR) + 1)]:
         try:
             for page in paginator.paginate(Bucket=S3_BUCKET, Prefix=f"raw/{USER_ID}/cgm_readings/{prefix_year}"):
                 for obj in page.get("Contents", []):
@@ -253,22 +433,35 @@ def _get_fasting_glucose_validation(args):
     daily_mins = [r["daily_min"] for r in nadir_results if r["daily_min"] is not None]
 
     def dist_stats(vals, label):
+        """Distribution statistics that refuse to exist below the n they need.
+
+        ADR-104/105: an SD over one observation is UNDEFINED, not 0 — and the old
+        literal-0 substitution was read straight back out as "Very stable overnight
+        nadirs (SD 0 mg/dL) -- strong metabolic consistency", a clinical verdict derived
+        entirely from a single number equalling itself. Percentiles are withheld below
+        _MIN_N_FOR_PERCENTILES for the same reason.
+        """
         if not vals:
             return None
         vals_sorted = sorted(vals)
         n = len(vals_sorted)
+        pctiles = {"p10": None, "p25": None, "p75": None, "p90": None}
+        if n >= _MIN_N_FOR_PERCENTILES:
+            pctiles = {
+                "p10": round(vals_sorted[int(n * 0.1)], 1),
+                "p25": round(vals_sorted[int(n * 0.25)], 1),
+                "p75": round(vals_sorted[int(n * 0.75)], 1),
+                "p90": round(vals_sorted[int(n * 0.9)], 1),
+            }
         return {
             "label": label,
             "n": n,
             "mean": round(statistics.mean(vals_sorted), 1),
             "median": round(statistics.median(vals_sorted), 1),
-            "std_dev": round(statistics.stdev(vals_sorted), 1) if n > 1 else 0,
+            "std_dev": round(statistics.stdev(vals_sorted), 1) if n > 1 else None,
             "min": vals_sorted[0],
             "max": vals_sorted[-1],
-            "p10": round(vals_sorted[int(n * 0.1)], 1),
-            "p25": round(vals_sorted[int(n * 0.25)], 1),
-            "p75": round(vals_sorted[int(n * 0.75)], 1),
-            "p90": round(vals_sorted[int(n * 0.9)], 1),
+            **pctiles,
         }
 
     distributions = {
@@ -283,13 +476,23 @@ def _get_fasting_glucose_validation(args):
     from mcp.core import _apply_phase_filter  # ADR-058
 
     # ADR-058: longitudinal/clinical archive — cross-phase by design (owner decision 2026-06-06)
-    lab_resp = table.query(
-        **_apply_phase_filter(
-            {"KeyConditionExpression": Key("pk").eq(USER_PREFIX + "labs") & Key("sk").begins_with("DATE#")}, include_pilot=True
-        )
+    lab_kwargs = _apply_phase_filter(
+        {"KeyConditionExpression": Key("pk").eq(USER_PREFIX + "labs") & Key("sk").begins_with("DATE#")}, include_pilot=True
     )
+    # Paginate. The biomarker maps are large; a single-page read silently truncates the
+    # draw history the moment the partition crosses 1 MB, and every z-score, bias band and
+    # lab trend below would then be computed from a prefix with nothing in the response
+    # saying so. The S3 discovery above already paginates — this was the odd one out.
+    lab_items = []
+    while True:
+        lab_resp = table.query(**lab_kwargs)
+        lab_items.extend(lab_resp.get("Items", []))
+        last_key = lab_resp.get("LastEvaluatedKey")
+        if not last_key:
+            break
+        lab_kwargs["ExclusiveStartKey"] = last_key
     lab_draws = []
-    for item in lab_resp.get("Items", []):
+    for item in lab_items:
         glucose_bm = item.get("biomarkers", {}).get("glucose", {})
         val = glucose_bm.get("value_numeric")
         if val is not None:
@@ -300,6 +503,13 @@ def _get_fasting_glucose_validation(args):
                     "provider": item.get("lab_provider", "unknown"),
                 }
             )
+
+    # Sort on the DRAW date, which is the only chronology the trend below is entitled to
+    # read. DynamoDB returns sk order — the import/report date — and a backfilled older
+    # panel files under a LATER sk than the draw it contains, so `lab_draws[0]` was not
+    # the oldest draw. (The sibling reader mcp/labs_helpers._query_all_lab_draws sorts,
+    # but it sorts by `sk` too, so it does not actually solve this; only draw_date does.)
+    lab_draws.sort(key=lambda d: (d.get("draw_date") or ""))
 
     # ── Direct validation (same-day overlap) ─────────────────────────────
     nadir_by_date = {r["date"]: r for r in nadir_results}
@@ -331,10 +541,10 @@ def _get_fasting_glucose_validation(args):
     for draw in lab_draws:
         lab_val = draw["fasting_glucose_mg_dl"]
         z_overnight = None
-        if on_stats and on_stats["std_dev"] > 0:
+        if on_stats and on_stats["std_dev"]:  # None (n<2) and 0 both mean "no z-score is defined"
             z_overnight = round((lab_val - on_stats["mean"]) / on_stats["std_dev"], 2)
         z_deep = None
-        if deep_stats and deep_stats["std_dev"] > 0:
+        if deep_stats and deep_stats["std_dev"]:
             z_deep = round((lab_val - deep_stats["mean"]) / deep_stats["std_dev"], 2)
 
         pct = None
@@ -368,6 +578,11 @@ def _get_fasting_glucose_validation(args):
     bias = {}
     if on_stats and lab_draws:
         lab_mean = sum(d["fasting_glucose_mg_dl"] for d in lab_draws) / len(lab_draws)
+        # ADR-105: this block is the tool's verdict on whether the CGM can stand in for a
+        # venous draw, and it is the difference of two MEANS. Both n's ride with it — a
+        # single coincidence must not read like a year of paired data.
+        bias["n_lab_draws"] = len(lab_draws)
+        bias["n_nights"] = on_stats["n"]
         bias["lab_mean_fasting"] = round(lab_mean, 1)
         bias["cgm_overnight_nadir_mean"] = on_stats["mean"]
         bias["cgm_daily_min_mean"] = distributions["daily_minimum"]["mean"] if distributions["daily_minimum"] else None
@@ -401,6 +616,12 @@ def _get_fasting_glucose_validation(args):
             )
             bias["confidence"] = "very_low"
 
+        if bias["n_lab_draws"] < 2 or bias["n_nights"] < 3:
+            bias["interpretation"] += (
+                f" Provisional: computed from {bias['n_lab_draws']} lab draw(s) and {bias['n_nights']} night(s) "
+                "— too few paired observations to characterise agreement."
+            )
+
     # ── Insights ─────────────────────────────────────────────────────────
     insights = []
 
@@ -426,11 +647,11 @@ def _get_fasting_glucose_validation(args):
                 f"Dawn phenomenon may be raising late-night readings."
             )
 
-    if on_stats and on_stats["std_dev"] > 8:
+    if on_stats and on_stats["std_dev"] is not None and on_stats["std_dev"] > 8:
         insights.append(
             f"High overnight nadir variability (SD {on_stats['std_dev']} mg/dL). Factors: meal timing, alcohol, sleep quality, stress."
         )
-    elif on_stats and on_stats["std_dev"] < 4:
+    elif on_stats and on_stats["std_dev"] is not None and on_stats["std_dev"] < 4:
         insights.append(f"Very stable overnight nadirs (SD {on_stats['std_dev']} mg/dL) -- strong metabolic consistency.")
 
     if len(lab_draws) >= 3:
@@ -457,7 +678,12 @@ def _get_fasting_glucose_validation(args):
         },
         "distributions": distributions,
         "lab_draws": lab_draws,
-        "direct_validations": direct_validations if direct_validations else "No same-day overlap between CGM and lab draws.",
+        # Always a LIST. It used to degrade to a bare STRING when there was no same-day
+        # overlap, so a consumer taking len() got 48 single characters instead of zero
+        # validations — and the consumer here is an LLM reading the JSON. The explanation
+        # moved to a sibling note, the way cgm_coverage and bias_analysis already do it.
+        "direct_validations": direct_validations,
+        "direct_validations_note": (None if direct_validations else "No same-day overlap between CGM and lab draws."),
         "statistical_validations": stat_validations,
         "bias_analysis": bias,
         "insights": insights,
@@ -491,13 +717,16 @@ def tool_get_cgm(args):
     }
     view = (args.get("view") or "dashboard").lower().strip()
     if view not in VALID_VIEWS:
-        return {
+        result = {
             "error": f"Unknown view '{view}'.",
             "valid_views": list(VALID_VIEWS.keys()),
             "hint": "'dashboard' for time-in-range, variability, mean glucose, clinical flags. 'fasting' for overnight nadir-based fasting glucose validation.",
         }
-    result = VALID_VIEWS[view](args)
-    # R13-F09: Inject disclaimer into all CGM view responses
-    if isinstance(result, dict) and "error" not in result:
+    else:
+        result = VALID_VIEWS[view](args)
+    # R13-F09: the disclaimer rides on EVERY response, not only the successful ones.
+    # "No blood glucose data in range. Requires Dexcom Stelo + webhook." is itself a
+    # health statement, and it was the one response shipping without the qualifier.
+    if isinstance(result, dict):
         result["_disclaimer"] = _CGM_DISCLAIMER
     return result
