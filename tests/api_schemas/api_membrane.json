@@ -1,0 +1,108 @@
+{
+  "captured_at": "2026-08-08T03:57:06.304856+00:00",
+  "fetch_path": "/api/membrane",
+  "is_prefix_sample": false,
+  "path": "/api/membrane",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "as_of_date": {
+        "type": "string"
+      },
+      "inbound": {
+        "keys": {
+          "channels": {
+            "items": {
+              "keys": {
+                "channel": {
+                  "type": "string"
+                },
+                "live": {
+                  "type": "boolean"
+                },
+                "state": {
+                  "type": "string"
+                },
+                "visible": {
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 3,
+            "type": "array"
+          },
+          "items": {
+            "items": null,
+            "length_sample": 0,
+            "type": "array"
+          },
+          "state": {
+            "type": "string"
+          },
+          "visible": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "membrane": {
+        "keys": {
+          "echoes_excluded": {
+            "type": "integer"
+          },
+          "predicate": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "outbound": {
+        "keys": {
+          "channels": {
+            "items": {
+              "keys": {
+                "channel": {
+                  "type": "string"
+                },
+                "recorded": {
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 2,
+            "type": "array"
+          },
+          "posts": {
+            "items": null,
+            "length_sample": 0,
+            "type": "array"
+          },
+          "state": {
+            "type": "string"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

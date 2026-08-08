@@ -35,10 +35,6 @@
     "category": "write-path",
     "reason": "POST-only — votes on an experiment (write)"
   },
-  "/api/membrane": {
-    "category": "capture-failed",
-    "reason": "#1679 (epic #1668 S11) — the bidirectional membrane dashboard's read-only endpoint, newly added and not yet deployed, so there is no live instance to capture a snapshot from. Takes no parameters. Remove this exemption and commit the real captured snapshot once this ships and `python3 deploy/capture_api_schemas.py` runs against the deployed endpoint."
-  },
   "/api/nudge": {
     "category": "write-path",
     "reason": "POST-only — evening nudge action (write)"
@@ -50,10 +46,6 @@
   "/api/ritual_log": {
     "category": "write-path",
     "reason": "GET-verb but MUTATING: one-tap evening-ritual write gated by a signed HMAC token (ADR-124, #769) — no read-only variant exists; there is no safe way to probe it that doesn't attempt a write"
-  },
-  "/api/social_context": {
-    "category": "requires-path-param",
-    "reason": "#1674 — newly added, not yet deployed, so there is no live instance to capture a snapshot from. Requires ?route=training|mind; a sample query-param entry is already wired in deploy/capture_api_schemas.py's DYNAMIC_PARAM_LOOKUP (\"training\", no live lookup needed). Remove this exemption and commit the real captured snapshot once this ships and `python3 deploy/capture_api_schemas.py` runs against the deployed endpoint."
   },
   "/api/submit_finding": {
     "category": "write-path",
