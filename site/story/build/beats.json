@@ -2255,6 +2255,33 @@
         }
       ],
       "why_it_mattered": "The read-aloud feed is a public artifact — a reader who taps play on the chronicle should get the current chronicle, not a three-week-old episode. And the two-stage failure is the platform's whole thesis in miniature: a green pipeline is a claim, not a verification; only the measured live artifact settles it."
+    },
+    {
+      "id": "2026-08-07-the-tests-that-filed-their-own-bugs",
+      "date": "2026-08-07",
+      "title": "The tests that filed their own bugs — and the six fixes that shipped before morning",
+      "shipped": "A coverage push (57.19% to 62.64%, 776 real tests) did something better than raise a number: writing honest tests against eleven undertested modules surfaced seven real production bugs, which were filed as issues, verified against source, and — six of them — fixed, tested, and deployed in the same overnight session. The worst had been invisible for weeks: every partner weekly email was silently shipping 'Commentary unavailable this week' because the sender read two attribute names its validator never exposed, and a broad exception handler swallowed the crash. The same session merged 20 PRs in all: the entire first-party codebase entered the strict type gate (371 modules, zero errors), the two largest 2,800-line handlers were split into ten focused modules, and mutation-testing the split's guards exposed a privacy check that a deleted function could still satisfy.",
+      "gotcha": "A pull request with a merge conflict mints no CI checks at all — GitHub has no merged tree to build. During the previous session's real platform incident, that read as 'GitHub is broken'; tonight a one-line mergeable query decoded it in seconds and a rebase minted checks within minutes.",
+      "honest_miss": "One real red made it to main anyway: the garmin adapter imported a layer-shipped package on its happy path, and the implementing agent's local environment had the real wheels installed — so its fully green test suite was structurally incapable of catching what CI, which installs no layers, failed on immediately. Guarded import, fixed forward in under an hour.",
+      "prs": [
+        {
+          "label": "PR #2172",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2172"
+        },
+        {
+          "label": "PR #2185",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2185"
+        },
+        {
+          "label": "PR #2170",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2170"
+        },
+        {
+          "label": "PR #2192",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2192"
+        }
+      ],
+      "why_it_mattered": "The platform's promise is honest numbers, and this session proved the machinery can audit itself: tests written to measure coverage instead caught the system lying to a real reader every week — then the same pipeline that found the lie repaired it before the next send. Quality work and throughput stopped being a trade-off for one night."
     }
   ]
 }

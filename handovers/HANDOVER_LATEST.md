@@ -1,163 +1,174 @@
-# HANDOVER — Overnight max paydown, Day 4: 11 PRs merged (9 stand + 2 honestly reverted), 6 issues closed, the GitHub-Actions incident that ate the night — 2026-08-05 ~20:10 PT → 2026-08-06 ~19:00 PT
+# HANDOVER — Overnight max paydown, Day 5: 20 PRs merged, 13 issues closed, the bug pipeline that ate its own tail — 2026-08-06 ~21:00 PT → 2026-08-07 ~15:45 PT
 
 > Instruction thread: *"overnight maximum-paydown, full autonomy, owner asleep — Fable drives
-> only, worktree-implementers on model:* labels, waves of ≤5, THE LEASE RULE (approve every
-> gated run immediately, watchers poll check_deploy_wedge.py), Now queue first (#2149, #2148,
-> #2152, #2150, #2151), then stored rank; dependabot with judgment; batch owner actions into
-> ONE list."* Owner came live mid-morning ("how are we doing") and evening; no scope changes.
+> only, worktree-implementers on model:* labels, waves of ≤5, THE LEASE RULE, Now queue first
+> (#1919, #1968) then stored Later rank (#1656 #1658 #1674 #1678 #2056 #1654 #2116 #1679 #2101),
+> merge #2167 when checks mint, dependabot #2125/#2126 with the CQ-01 companion, batch owner
+> actions into ONE list."* Mid-session the owner added: **"58 open issues — complete as many as
+> we can without sacrificing quality"** and **"Fable is at 85% usage"** (drove lean-driver mode:
+> implementers on the sonnet/opus pool, tight reconciles, auto-approver for gates).
 
-**Main:** green (`36438d39` — full pipeline incl. Deploy, smoke, integration, visual-QA;
-`check_main_green.py` exit 0 at wrap). The #2164 merge run (`d3fbf495`, approved at its gate
-within seconds) was still in_progress at the wrap commit with zero failed jobs; its SITE half
-already deployed green and live (build `d3fbf49`, smoke + visual-QA green in site-deploy run
-31138909850) — the ci-cd half's only cargo is the doc-literal bump.
-**Docs:** `docs/alarm_citations.json` refreshed (qa-smoke-failures re-cited, PR #2158);
-INCIDENT_LOG rows added at wrap; everything else was in-PR. Wiki checkers green at commit.
-**Decisions:** none needed — every call reused an existing posture (R8-ST6 hold discipline for
-IAM/CDK PRs, the #2099 honest-manifest bar, ADR-140 structural denial inside PR #2167's design,
-ADR-099 closure shapes).
-**Incidents:** 4 rows added — the GitHub Actions platform incident (P3, the session's story);
-the #2157 mypy red on main (P4, fixed forward <1h); the honest-manifest red from the dependabot
-layer bumps (P4, reverted); whoop's third credential loss (P3, OPEN — owner re-auth).
-**Build beat:** 2026-08-06-the-sentence-google-would-not-say.
-**Closures:** #2148 #2149 #2150 #2151 #2152 #1475 commented in the ADR-099 two-line shape
-(all realized; #2148's records the two-stage fix + the verified regen) + #2165 (the #2149
-alert path's auto-filed episode marker — the mechanism fired live on its FIRST episode, one
-alert not six, self-re-armed on clear). #2112 (already closed) got its Aug-6 verification
-comment; #1968 got an evidence comment.
-**Backlog:** Now refilled to 4 actionable — promoted #1919 + #1968 by their stored 0.90 rank
-(Next holds only the gated #1629, so the path was Later→Now via the sweep's sanctioned
-promote call); Later sweep clean (later_staleness OK); in-flight issues (#1402 #1675 #1676
-#1946 via open PRs) stay put; corpus otherwise clean (58 open, labels OK).
-**Alarms:** all reds >72h cited — 3 NEW whoop entries added this wrap
-(ingest-liveness-unhealthy, ingest-auth-unhealthy-whoop, ingest-consecutive-failures-whoop,
-all → #1934, the third credential loss); gate exit 0 clean.
-**CI warnings:** 4 — all the carried owner-gated cdk config-drift warnings
-(Operational + Ingestion = the layer rebuild, PR #2100 runbook, owner item 3; Email + Compute
-= #2134's AlarmDescription, owner items 2a/4). Deliberate no-action this session — they clear
-with the owner's CDK window. The #2159 thresholds went live mid-session: duration/coverage
-warnings are QUIET on the latest green run, as #2152's closure predicted.
+**Main:** green (`a0b57098` — check_main_green exit 0 at wrap; the #2193 merge run rode the
+auto-approver like the five before it).
+**Docs:** ADR-149 filed in-PR (#2180) + index regenerated; `docs/engines/COACH_STANCE.md`
+re-verified honestly (night-scope addition documented, `_enforce_quality_gate` span corrected
+:1353-1420 → :1386-1453); `docs/ARCHITECTURE.md` site-api table corrected in #2192;
+`docs/qa/SURFACE_DRIFT_EXEMPTIONS.md` +2 dated route lines (#2168, #2186 — removal is #2194).
+Wiki checkers green at the wrap commit.
+**Decisions:** ADR-149 filed (#2180) — one third-party frame origin (`www.youtube-nocookie.com`),
+bought-not-exercised, flag-off with byte-identical synth until the owner's one-sitting flip.
+**Incidents:** 1 row added — main red ~2.2h (P4): #2182's garmin adapter imported the
+layer-shipped `garminconnect` wheel on the happy path; CI has no layers, so the merge run and
+two followers redded until the guarded-import fix-forward (`67622779`). The deeper lesson made
+memory: the agent's local env HAD the real wheels, so its full green suite was structurally
+incapable of catching it.
+**Build beat:** 2026-08-07-the-tests-that-filed-their-own-bugs.
+**Closures:** #1674 #1919 #1968 #2116 #1678 #1679 #2056 #2173 #2174 #2175 #2176 #2177 #2179 all
+commented in the ADR-099 two-line shape (evidence cited from live endpoints/deploys; #2056 and
+#1678 carry honest partial-notes inside realized verdicts where a residual exists).
+**Backlog:** 7 filed from #2172's discovery (#2173–#2179; 6 FIXED and closed same session) +
+2 residual follow-ups (#2194, #2195), both promoted to Now by stored rank at the (e9) refill —
+Now holds 4 (#1383, #1114 fable-live; #2194, #2195 session-startable). #2178 labeled gate:owner
+(its fix is HELD PR #2184, the owner's Email-stack sitting). Later sweep clean (no
+later_staleness findings). The linter's 2 score-line violations were on MY two filed issues —
+fixed to the canonical grammar before close; corpus otherwise advisory-clean.
+**Alarms:** whoop board unchanged (all >72h reds cited to #1934 per the standing registry);
+`ingest-reconciliation-whoop-heartbeat` (new 08-06 12:38 PT) is <72h — cite it to #1934 next
+wrap if the re-auth hasn't cleared it. Gate exit 0.
+**CI warnings:** 2 — both the carried owner-window cdk config-drift class: LifePlatformCompute
+and LifePlatformIngestion each carry a Lambda config change CI's code-deploy cannot ship
+(the layer rebuild → Ingestion; the #2134 AlarmDescription batch → Compute). Deliberate
+no-action this session — they clear with owner items 2–4; anything NEW would have gotten an
+issue. (The #2159 duration/coverage warnings stayed quiet — #2172's deadband did its job.)
 **Stash/hooks:** clean — stash empty, hook freshness 🟢.
 
 ---
 
-## What shipped (merged; deployed unless noted)
+## What shipped (20 PRs merged; deployed unless noted)
 
-**The Now queue, complete:**
-- **#2156 (#2149)** — wedge-watch active alerting: a CONFIRMED wedge fires
-  `check_deploy_wedge.py --alert` → `repository_dispatch` `urgent_alarm` → the remediation
-  agent's curated email; one alert per episode via a tracking-issue marker, re-armed on clear/24h.
-- **#2154 + #2166 (#2148, the session's best measured lesson)** — the TTS fix was TWO-stage:
-  #2154's 4500-char request chunking deployed and the regen STILL 400'd; measurement showed
-  Google segments sentences itself and rejects ~489-char ones regardless of chunk size. #2166
-  adds a 200-char per-sentence cap (clause-boundary splits, terminal punctuation stamped so
-  Google sees complete short sentences). **Regen then verified live:**
-  `{"rendered": 1, "errors": 0}`, `generated/podcast/ep-2026-08-02.mp3` (2.9 MB) exists —
-  the Aug-2 prologue orphan is cured.
-- **#2157 (#2150)** — genesis-blind remainder: `digest_utils.query_range/_list` gained
-  `include_pilot` (default-preserving, 9 callers pinned), monthly_digest + vitals timeline read
-  per-source via `source_reads_cross_phase`; the cross-cycle debt ledger is EMPTY.
-- **#2155 (#2151)** — /protocols/discoveries renders 67/67 (slice(0,60) removed, count and list
-  derive from one array), citation notes tap-reachable via the `.supp-tip` focus idiom. LIVE.
-- **#2159 (#2152)** — suite budget 900→1200s (8 green-run derivation, max 985s), coverage floor
-  47→53 vs 57.13% measured with CI pins.
+**The Now queue:** #2169 (#1919 — 6 _Nd fields window-gated with honest companions, 3 exempted
+by measurement, 1 deferred with disclosure, plus a real off-issue bug: unclamped trend-loop
+fabricated behavioral zeros after resets) · #2171 (#1968 — night labels + serve-time re-check on
+the ADR-104 harness, zero added Bedrock spend; the defect re-demonstrated itself mid-measurement,
+8.5→8.4).
 
-**Stored-rank wave 2:** **#2164 (#1475)** — the wayfinding layer: loop ribbon in the canonical
-footer on all 89 chrome-bearing pages (here/next/from station states), mega-menu re-poured on
-the loop, pure-CSS `:has()` cue; one real light-theme contrast bug found & fixed pre-merge.
-**LIVE at build d3fbf49.**
+**The Later rank, drained:** #2168 (#1674 facade embeds; `/api/social_context` live) ·
+#2170 (#1656 tranche — the WHOLE first-party surface into the strict mypy gate: 371 modules
+0 errors under CI-pinned 2.3.0, DIRTY emptied, ignore_errors gone, 3 up-only ratchets incl.
+filesystem-derived CLEAN_DIRS; 1,047-error strict-flags census recorded, issue stays open) ·
+#2172 (#1658 tranche — coverage 57.19→62.64% with 776 real tests + the measured-coverage
+high-water ratchet; 70% honestly out of one-PR reach, gap recorded) · #2181 (#2116 — composite
+alarm gates the token page's human-email path on a genesis-window gauge; cost-governor deployed,
+composites arm on the owner's Monitoring deploy) · #2180 (#1678/ADR-149 — measured the real CSP
+mechanism: TWO CDK ResponseHeadersPolicies; media-src and X-Frame-Options premises corrected;
+flag-off, zero cdk diff) · #2182 (#2101 code half — generation-agnostic garmin client, proven
+against real 0.2.40/0.3.8 wheels offline; manifest untouched, #2099 gate clean; CVE clears in
+the owner's layer rebuild) · #2187 (#2056 — #1699 gate armed 1→5 of 15 surfaces with
+LogAvailability UNKNOWN semantics, 12-surface blanket exemption replaced by per-surface reasons;
+two sanctioned splits: behavior_logs.py, item_recency.py) · #2186 (#1679 — `/story/membrane/` +
+`/api/membrane`; outbound provenance hook wired into post_social.py so the first real post
+lights the board; held-set never published, not even as a count) · #2192 (#1654 tranche — the
+two worst god-modules, 5,390 lines → 10 cohesive modules + 2 thin facades; guards repointed to
+follow the code and mutation-tested, which exposed the labs genetic-privacy guard passing on a
+re-export string; 24 offenders remain, census in the PR).
 
-**Fix-forwards on main:** `bfb980c0` (mypy annotation for #2157's accumulator — PR checks
-don't run the tier-2 gate, main's lint does) · `36438d39` (honest-manifest revert, below).
+**The bug pipeline that ate its own tail:** #2172's test-writing surfaced 7 real bugs → filed
+as #2173–#2179 (verified against source by the filer) → 6 fixed, merged and deployed the SAME
+session: #2185 (#2173 — partner weekly emails had been silently shipping "Commentary
+unavailable" instead of real Board commentary; wrong AIValidationResult fields swallowed by a
+broad except, now loud) · #2183 (#2177 chronicle partial-record crash) · #2189 (#2174 zone2
+fabricated-zero) · #2190 (#2176 Decimal guard dead in prod) · #2188 (#2175 %W-vs-isocalendar
+week keys; stored rows audited read-only, no wrong-keyed writes found) · #2191 (#2179 four-part
+absence-as-signal bundle). The 7th (#2178) is fixed in HELD PR #2184 (IAM grant — owner window).
 
-**Dependabot, judgment applied:** #2124 (constructs) + #2127 (actions) merged — cdk synth
-drift until the next owner cdk deploy (owner list). #2102/#2103 (urllib3/idna in the garmin
-layer manifest) merged then **REVERTED in `36438d39`**: the #2099 gate red-mained proving the
-manifest is a CLAIM about the deployed layer — the bumps ride the owner's layer rebuild
-instead, and dependabot re-proposes after. #2126 left open with the CQ-01 explanation (needs
-workflow pins bumped together). #2125 awaiting dependabot recreate after a same-file conflict.
+**Dependabot:** #2125 merged (aws-cdk-lib 2.263.0 — synth drift to the owner's CDK window) ·
+#2193 merged (the CQ-01 companion built as sanctioned: dependabot's 6 dev-tooling bumps + the
+8 workflow files' pins measured-and-moved in lockstep; supersedes #2126, which dependabot
+self-closed).
 
-**Held for the owner window (open PRs, deliberately NOT merged — each strands CI or defeats a
-gate if merged before its adjacent owner action):** #2153, #2161, #2162, #2163 — see OWNER
-ACTIONS. **#2167** (#1402 structural half; replaced #2160 whose branch never minted checks
-through four re-trigger attempts) — mergeable once GitHub mints its checks; content verified
-locally (42 tests green).
+**Fix-forward on main:** `67622779` (the garmin guarded-import, the session's one real red).
 
-## The incident (the session's story)
+**Deploys:** site-api ×4 (each within a minute of its merge — the #1704 race won twice on hard
+api_deps), cost-governor, wednesday-chronicle, partner-weekly-email, weekly-correlation-compute,
+dashboard-refresh, anomaly-detector, + the CI fleet deploys behind 6 auto-approved gates; 2 green
+site-deploys; CloudFront viewer-path invalidation for the 6 split-boundary API routes. All six
+spot-checked 200 live post-split.
 
-GitHub Actions had a platform incident spanning most of the session: (1) **~9h job-queue
-stall** (05:50→14:40Z — my 05:49Z gate approval registered but Deploy sat queued; the
-deploy-wedge-watch red overnight was an honest symptom, not a stranded gate); (2) **"Failed to
-resolve action download info" 500/503 reds** across ~6 runs mid-day; (3) **swallowed events**
-into the evening — pushes minting no CI/CD runs (the #781-era silent-death class), PR branches
-minting no check suites (#2160 never got checks across empty commits, the rerequest API,
-close/reopen, AND a fresh-branch PR). Recovery playbook that worked: `gh run rerun --failed`
-for infra reds · `deploy_all=true` dispatch when a push run never minted (used twice; second
-one deployed the whole fleet green) · fresh-branch PR swap for check-minting (partial). Two
-REAL reds hid inside the infra noise (the mypy annotation, the manifest drift) — each needed
-reading past "GitHub is sick" to find; both fixed forward within the hour.
+## The operating-model finding (the session's story)
+
+Three "GitHub is broken" symptoms decoded to three different non-incidents: (1) **#2167's
+"checks never mint" was a merge conflict all along** — a CONFLICTING PR mints NO check suites
+(no merge ref to build), and during Day 4's real platform incident that read as check-minting
+breakage; rebase → checks minted in minutes. (2) **Two zombie gated runs from Aug 1–2** sat
+"waiting" — approving them would have DEPLOYED 5-day-old code; the lease rule's letter (approve
+everything) conflicts with its intent on stale runs — left waiting, excluded by pin. (3) A 0.9h
+gate stall happened because MY approval loop batches notifications between turns — replaced
+mid-session with an **auto-approving monitor** (zombies excluded); it took the next 6 gates in
+<2 min each. The lease rule is now a mechanism, not a discipline.
 
 ## Gotchas hit (carry these)
 
-- **PR-level checks don't run the mypy tier-2 gate** — an implementer's mypy pass over its own
-  files isn't the union; a touched clean-set file (digest_utils) red-mained only at main's lint.
-  Run `mypy --config-file mypy.ini` on changed clean-set files during reconcile.
-- **The layer manifest is a deploy-truth claim, enforced** — `test_live_tree_has_no_manifest_drift`
-  reds main on any `lambdas/requirements/*.txt` bump that isn't a promoted rebuild. Dependabot
-  layer-manifest PRs must NOT merge ahead of the rebuild (stronger than "deploys nothing").
-- **Google TTS enforces a per-SENTENCE limit far below the request cap** — measured: a 489-char
-  em-dash sentence 400s even inside a compliant 4500-char chunk. Split to ~200 chars and stamp
-  terminal punctuation.
-- **A run-conclusion "failure" can be all-cancelled jobs** — during the incident, `fail` rows
-  decoded to `conclusion: cancelled` (supersession), not real failures. Read the job list
-  before diagnosing.
-- **An approved gate + queued Deploy looks exactly like a wedge** — the wedge checker said
-  "progressing" all night because nothing was *stranded*; the stall was runner starvation.
-  The lease rule held (every gate approved within seconds); the delay was upstream of us.
+- **A CONFLICTING PR mints no check suites at all.** Before diagnosing platform incidents or
+  swapping branches: `gh pr view N --json mergeable,mergeStateStatus`. (memory: new reference.)
+- **Layer-shipped wheels red CI at CALL time, not just collection.** A lazy import inside a
+  method body still fails in CI when tests exercise the path — and an implementer whose local
+  env has the real wheels CANNOT see it (its full suite is green by construction). Guard like
+  `_is_garth_http_error`: import inside the branch that needs it, fall back explicitly.
+- **The surface-drift gate's route deferral is the dated markdown ledger line**
+  (`docs/qa/SURFACE_DRIFT_EXEMPTIONS.md`), NOT `tests/api_schemas/_exemptions.json` — the JSON
+  feeds a different checker; both are needed for a new pre-deploy route.
+- **The doc-literal conflict is now a 30-second reflex:** checkout --theirs on the two literal
+  files → `sync_doc_metadata.py --apply` on the rebased tree → amend. It was the ONLY conflict
+  class in 11 of 13 rebases tonight.
+- **An engine doc's Verified stamp is a real gate on PR branches** — #2171 tripped
+  `check_doc_index.py --strict` (COACH_STANCE older than its source); the fix is an honest
+  re-verify note + corrected line citations, not a stamp bump.
 
 ## Residual / next picks
 
-- Merge **#2167** when GitHub mints its checks (#1402 stays open for the gated remainder —
-  the syndication-lambda half needs the ADR-140 amendment decision, owner list item 8).
-- **#2125** — dependabot recreate pending. not-work — automation completes it.
-- Aug-7+: first scheduled deploy-wedge-watch run exercises the #2149 alert path live;
-  the nightly podcast parity check should go quiet (#2148's verification is already in hand).
-  not-work — passive verification on closed issues.
+- #2194 — capture schema baselines for the two new routes, drop both exemption entries.
+- #2195 — the #2056 census residual (coach_history_summarizer arming cost decision).
+- #1656 / #1658 / #1654 stay open with measured censuses in their PR bodies — the next tranches
+  are well-scoped (strict-flags axis; coverage 62.64→70; 24 size offenders, `site_api_coach`
+  first and alone).
 - #1383 / #1114 stay Now for a Matthew-live session. not-work — need his interactive input.
-- qa-smoke citation removal still needs its two green scheduled nights (whoop re-auth is the
-  blocker for the freshness fail). not-work — dated bookkeeping per the citation's contract.
+- Aug-8+: watch the first post-#2149 scheduled wedge-watch nights stay quiet; the whoop
+  citation-removal clock starts at re-auth. not-work — passive verification.
+- The two zombie gated runs (30727225837, 30723876315, Aug 1–2) still sit "waiting" — GitHub
+  expires them at 30d; cancelling risks the stranded-group class for zero benefit. not-work —
+  deliberate leave-alone, documented here.
 
 ## OWNER ACTIONS (Matthew — carried + new, one list)
 
-1. **Whoop re-auth (URGENT — third credential loss, latched since Aug-4 00:00Z, no data since
-   Aug-3):** `python3 setup/setup_whoop_auth.py --backfill`, then delete the AUTH_FAILURE
-   marker row (#2085 — re-auth does NOT clear the latch). Clears the qa-smoke freshness fail
-   and two DLQ-alarm citations too.
-2. **The CDK/IAM window** — one sitting, merge-adjacent-to-deploy for the four held PRs:
-   a. Merge **#2153** → `cdk deploy LifePlatformEmail` (bundles carried #2134 AlarmDescription).
-      Restores the #2112 delivered-marker guard before the Aug-12 send.
-   b. Merge **#2163** → `cdk deploy LifePlatformIngestion` FIRST (SSM budget-tier grant; else
-      budget_guard fails open), then `deploy_lambda.sh social-enrichment …` + `deploy_site_api.sh`.
-   c. Merge **#2161** → same Ingestion deploy creates the Bluesky/Mastodon lambdas; then the two
-      secrets (`life-platform/bluesky`, `life-platform/mastodon`) when accounts exist.
-   d. Merge **#2162** → `aws iam put-role-policy …` (staged JSON in `infra/iam/`), then
-      `teardown_hae_orphan_api.py` dry-run → `--apply`. Its daily gate is red-by-design until then.
-   After the deploys: `deploy_all=true` dispatch + approve, which clears the R8-ST6 window.
-3. **Layer rebuild (carried, PR #2100 runbook)** — now ALSO the vehicle for the reverted
-   urllib3/idna bumps (#2102/#2103); dependabot re-proposes them after the rebuild.
-4. **`cdk deploy LifePlatformMonitoring`** (carried) + the synth drift from merged #2124/#2127.
-5. **Branch protection one-liner (carried):** `python3 scripts/apply_branch_protection.py --apply && … --check`.
-6. **Backfills (carried, dry-run-first):** `deploy/backfill_coach_ensemble_phase_stamps.py`
-   (qa-smoke still counts 42 unstamped COACH#/ENSEMBLE# rows); optional NARRATIVE#arc
-   restoration; optional `deploy/restart_leadin_pages.py --apply`.
-7. **Two data/content calls:** the #1984 stack decision (tongkat/NMN/berberine), and Home's
-   static "sixteen prior climbs, sixteen collapses" count (reader-truth flags it; only you know
-   the true lifetime number — `site/index.html:176`).
-8. **The #1402 governance decision:** automated posting of the vitals-derived fingerprint card
-   is structurally denied under ADR-140 rule 5 (PR #2167 implements the denial); either it stays
-   human-post-only permanently or a board convening amends the rule.
-9. **Carried:** #2126 pin-companion decision, CodeQL dismissals ×3 (#2046), PR #2012 revision
-   purge, the #1905 clinicians call.
+1. **Whoop re-auth (URGENT, carried — third credential loss, latched since Aug-4, no data since
+   Aug-3):** `python3 setup/setup_whoop_auth.py --backfill`, then delete the AUTH_FAILURE marker
+   row (#2085). Clears the qa-smoke freshness fail + the whoop alarm board.
+2. **The CDK/IAM window — now FIVE held PRs, one sitting:**
+   a. Merge **#2153** AND **#2184** → `cdk deploy LifePlatformEmail` (delivered-marker grant +
+      the monday-compass todoist grant ride the same stack deploy; #2184's code half then makes
+      the compass sections real).
+   b. Merge **#2163** → `cdk deploy LifePlatformIngestion` FIRST, then
+      `deploy_lambda.sh social-enrichment …` + `deploy_site_api.sh`.
+   c. Merge **#2161** → same Ingestion deploy; then the two secrets when accounts exist.
+   d. Merge **#2162** → `aws iam put-role-policy …` (staged JSON in `infra/iam/`), then the
+      teardown dry-run → `--apply`.
+   After: `deploy_all=true` dispatch + approve (clears the R8-ST6 window).
+3. **Layer rebuild (carried, PR #2100 runbook)** — now carries the urllib3/idna re-bumps AND
+   #2182's staged garminconnect 0.3.8 target (`garmin.txt` comment + `--promote` sequence in
+   the PR body). Clears PYSEC-2026-3467.
+4. **`cdk deploy LifePlatformMonitoring`** (carried) — now ALSO arms #2181's composite alarms
+   (the token-page email path goes genesis-aware) + synth drift from #2124/#2125/#2127.
+5. **ADR-149 exercise (optional, whenever there's content):** flip `native_social_embeds` in
+   `cdk/cdk.json` + `cdk deploy LifePlatformWeb` in ONE sitting, then re-stamp `LIVE_AMJ_CSP`.
+   Until then the header is byte-identical live.
+6. **Branch protection one-liner (carried):** `python3 scripts/apply_branch_protection.py --apply && … --check`.
+7. **Backfills (carried, dry-run-first):** coach-ensemble phase stamps; optional NARRATIVE#arc;
+   optional lead-in pages.
+8. **Two data/content calls (carried):** the #1984 stack decision; Home's "sixteen prior climbs"
+   count (`site/index.html:176`).
+9. **The #1402 governance decision (carried):** ADR-140 rule 5 vs the fingerprint card —
+   #2167's structural half is now merged, so the poster path exists human-gated either way.
+10. **Carried:** CodeQL dismissals ×3 (#2046), PR #2012 revision purge, the #1905 clinicians call.
 
 Prior session's narrative: `git show
-origin/session-archive:handovers/HANDOVER_2026-08-04_day3-daytime-max-paydown.md`.
+origin/session-archive:handovers/HANDOVER_2026-08-05_day4-overnight-max-paydown.md`.
