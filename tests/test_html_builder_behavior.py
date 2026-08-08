@@ -1343,8 +1343,10 @@ def test_habit_streaks_render_both_counters():
 
 
 def test_acwr_renders_when_given_the_field_names_this_module_reads():
-    """Control for the mismatch xfail below — the rendering logic itself works."""
-    cm = {"acwr": 1.42, "zone": "high", "alert": True, "alert_reason": "Acute load 42% above chronic."}
+    """#2243: the module reads the acwr_-prefixed names acwr_compute_lambda
+    actually writes — this is a plain (non-Decimal) control for the fuller
+    test below."""
+    cm = {"acwr": 1.42, "acwr_zone": "high", "acwr_alert": True, "acwr_alert_reason": "Acute load 42% above chronic."}
     html = _training(data=_data(computed_metrics=cm))
     assert "ACWR: " in html and ">1.42" in html
     assert "— HIGH" in html
@@ -1352,22 +1354,10 @@ def test_acwr_renders_when_given_the_field_names_this_module_reads():
     assert "Acute load 42% above chronic." in html
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "lambdas/content/html_builder.py:1078-1080 _brief_training_body — reads "
-        "computed_metrics['zone'], ['alert'] and ['alert_reason']. "
-        "lambdas/compute/acwr_compute_lambda.py:286-288 (_write_acwr) writes them onto the SAME "
-        "computed_metrics record as 'acwr_zone', 'acwr_alert' and 'acwr_alert_reason' — only the bare "
-        "'acwr' key (line 1077) matches. The sibling reader "
-        "lambdas/ai/ai_context.py:1059-1061 uses the acwr_-prefixed names, confirming the writer's "
-        "contract. Consequence: acwr_alert is ALWAYS False, so the TRAINING LOAD ALERT box has never "
-        "rendered; the zone label is always blank; and the ACWR colour can never go red-for-alert. "
-        "Hurts Matthew: an injury-risk warning computed daily and displayed never — a permanently "
-        "dark safety feature with no error anywhere."
-    ),
-)
 def test_acwr_alert_renders_for_a_record_written_by_acwr_compute_lambda():
+    """#2243 (fixed): html_builder now reads the acwr_-prefixed names that
+    acwr_compute_lambda._write_acwr actually writes, so the TRAINING LOAD ALERT
+    box renders on a real alert day instead of staying permanently dark."""
     cm = {
         "acwr": Decimal("1.42"),
         "acwr_zone": "high",

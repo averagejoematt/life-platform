@@ -1075,9 +1075,12 @@ def _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrit
         try:
             computed_metrics = data.get("computed_metrics") or {}
             acwr_val = computed_metrics.get("acwr")
-            acwr_zone = str(computed_metrics.get("zone", ""))
-            acwr_alert = computed_metrics.get("alert", False)
-            acwr_reason = str(computed_metrics.get("alert_reason", ""))
+            # #2243: the writer (acwr_compute_lambda._write_acwr) stores these as
+            # acwr_zone/acwr_alert/acwr_alert_reason, not the bare names — the bare
+            # names never existed on the record, so this block never rendered.
+            acwr_zone = str(computed_metrics.get("acwr_zone", ""))
+            acwr_alert = computed_metrics.get("acwr_alert", False)
+            acwr_reason = str(computed_metrics.get("acwr_alert_reason", ""))
             if acwr_val is not None:
                 _av = float(acwr_val)
                 acwr_color = "#ef4444" if acwr_alert else "#f59e0b" if _av > 1.3 or _av < 0.8 else "#22c55e"
