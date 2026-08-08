@@ -27,8 +27,10 @@ What these tests pin:
   * **Durability** — an enrichment that is overwritten by the next ingest of the
     same day is an enrichment that never existed.
 
-Tests marked xfail record defects discovered by this tranche; they are NOT
-fixed here (test-only change).
+Tests marked xfail record defects discovered by the #1658 tranche-3 sweep and
+still open. The durability defect (#2250 — every enrichment destroyed by the next
+Strava ingest of the same day) WAS fixed: its xfail is now a real assertion driven
+through `ingestion_framework._store_item`, not a simulated replace.
 """
 
 import ast
