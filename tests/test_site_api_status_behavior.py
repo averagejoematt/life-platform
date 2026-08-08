@@ -44,7 +44,10 @@ without it, the first test to run would serve its answer to every later one.
 
 Tests carrying `xfail(strict=False, reason="DEFECT (tranche-2 discovery): ...")`
 describe the contract the endpoint OUGHT to hold and currently does not. They are
-findings, not fixes: this is a test-only change.
+findings, not fixes. #2220 fixed six of the eleven — those markers are gone and the
+assertions are load-bearing now; five findings remain marked (the inert `yellow_h`
+column, the shared-partition uptime bars, the missed-weekly-run window, the
+unreachable gray idle state, and the unguarded `strptime`).
 """
 
 import ast
@@ -1146,20 +1149,15 @@ def test_a_throttled_history_probe_falls_back_instead_of_failing_the_page(monkey
     assert c["last_sync_relative"] == "5d ago", "the real age survives the degraded probe"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery, ADR-104): an activity-dependent source that has NEVER "
-        "produced a single record is rewritten from red to GREEN with the comment 'Pipeline ready "
-        "— no data recorded yet'. Green on the basis of nothing: the reader cannot distinguish a "
-        "working feed from one that was never wired up."
-    ),
-)
 def test_a_source_that_has_never_produced_data_is_not_reported_green(monkeypatch):
+    """ADR-104 / #2220: the "awaiting user activity" excuse needs a record to excuse.
+    A feed nothing has ever arrived on cannot be distinguished from a working one if
+    it publishes green."""
     row = _activity_source(group_is_api=False)
     table = healthy_platform().clear(row["id"]).build()
     c = by_name(Harness(monkeypatch, table).body(), "data_sources", row["name"])
     assert c["status"] != "green", f"published green with comment {c['comment']!r}"
+    assert c["last_sync_relative"] == "never"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1181,37 +1179,58 @@ def test_an_alarming_compute_component_is_red_whatever_its_freshness(monkeypatch
     assert "alarm firing" in c["comment"]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery, ADR-104): a compute Lambda that has stopped running is "
-        "rewritten from red to GREEN — 'Last computed: 45d ago — runs daily when new data "
-        "arrives'. Staleness can NEVER redden a compute component; only a CloudWatch alarm can. "
-        "A silently-failing (non-erroring) daily compute is invisible to the reader, and the "
-        "footer dot stays green while character-sheet/daily-metrics are 45 days stale."
-    ),
-)
 def test_a_compute_component_that_stopped_running_is_not_reported_green(monkeypatch):
+    """ADR-104 / #2220: a silently-failing (non-erroring) daily compute used to be
+    invisible — staleness could never redden a compute row, only a CloudWatch alarm
+    could. The "runs daily when new data arrives" excuse is now bounded by the row's
+    own red threshold."""
     row = pick_compute(lambda r: True, "any compute component")
     table = healthy_platform().clear(row["id"]).add_days(row["id"], range(45, 55)).build()
     c = by_id(Harness(monkeypatch, table).body(), "compute", row["id"])
     assert c["status"] != "green", f"45-day-old compute published green: {c['comment']!r}"
+    assert c["last_sync_relative"] == "45d ago", "the real age must survive"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery, ADR-104): a compute component with NO output ever is "
-        "published green with last_sync_relative='verified' and 'Smoke-tested OK — awaiting first "
-        "scheduled run (April 1+)'. 'verified' is not an observation, and the April 1 date is from "
-        "a superseded experiment cycle (constants now anchor 2026-08-03)."
-    ),
-)
+def test_a_compute_component_still_inside_its_threshold_keeps_the_ingestion_excuse(monkeypatch):
+    """The excuse itself is legitimate and survives #2220: compute follows ingestion,
+    so a gap shorter than the row's own red threshold is expected, not a failure."""
+    row = pick_compute(lambda r: True, "any compute component")
+    table = healthy_platform().clear(row["id"]).add_days(row["id"], range(2, 12)).build()
+    c = by_id(Harness(monkeypatch, table).body(), "compute", row["id"])
+    assert c["status"] == "green"
+    assert "runs daily when new data arrives" in c["comment"]
+
+
 def test_a_compute_component_that_never_ran_is_not_reported_green(monkeypatch):
+    """ADR-104 / #2220: 'verified' is not an observation. This row used to publish
+    green with last_sync_relative='verified' and 'Smoke-tested OK — awaiting first
+    scheduled run (April 1+)' — an assertion about a pre-launch smoke run of a
+    superseded experiment cycle, standing in for output that does not exist."""
     row = pick_compute(lambda r: True, "any compute component")
     table = healthy_platform().clear(row["id"]).build()
     c = by_id(Harness(monkeypatch, table).body(), "compute", row["id"])
     assert c["status"] != "green", f"published {c['last_sync_relative']!r} / {c['comment']!r}"
+    assert c["last_sync_relative"] == "never"
+
+
+def test_every_compute_row_names_a_partition_a_compute_lambda_actually_uses():
+    """#2220's root cause for the one live 'never ran' row. `_COMPUTE_SOURCES` carried
+    the id `insights`, but daily-insight-compute writes to `computed_insights` —
+    SOURCE#insights exists only as INSIGHT#<timestamp> records, so the DATE# freshness
+    probe could never match it. That row read "never" permanently, and the green
+    rewrite this issue removes is the only reason nobody saw it.
+
+    Guard the SET, not the instance: every id in the table must be a partition some
+    module under lambdas/compute/ names, in one of the two forms those modules build a
+    pk with. A typo'd or renamed partition reddens this test instead of silently
+    publishing a component that can never report."""
+    sources = sorted((ROOT / "lambdas" / "compute").glob("*.py"))
+    assert sources, "lambdas/compute/ is where the compute writers live"
+    texts = [p.read_text() for p in sources]
+    for sid, *_ in COMPUTE_SOURCES:
+        assert any(
+            f'USER_PREFIX + "{sid}"' in t or f'SOURCE#{sid}"' in t for t in texts
+        ), f"no module under lambdas/compute/ names SOURCE#{sid} — the freshness probe cannot ever match this row"
 
 
 def test_compute_gaps_are_drawn_neutral_because_compute_follows_ingestion(monkeypatch):
@@ -1272,20 +1291,16 @@ def test_an_alarming_email_sender_is_red(monkeypatch):
     assert "alarm firing" in c["comment"]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery, ADR-104): a sender with no send log at all publishes "
-        "`uptime_90d = [1] * 90` — ninety fabricated green bars for a Lambda that has never sent "
-        "anything. The reader sees a perfect three-month delivery record built from zero records "
-        "(and the 'Smoke-tested OK' wording dates from the pre-launch March 2026 cycle)."
-    ),
-)
 def test_a_never_sent_email_does_not_publish_a_fabricated_uptime_history(monkeypatch):
+    """ADR-104 / #2220: a sender with no send log used to publish `uptime_90d = [1] * 90`
+    — a perfect three-month delivery record built from zero records — plus a green dot
+    and last_sync_relative='verified'."""
     row = _weekly_email()
     table = healthy_platform().clear(f"email_log#{row['id']}").build()
     c = by_id(Harness(monkeypatch, table).body(), "email", row["id"])
     assert set(c["uptime_90d"]) != {1}, f"{len(c['uptime_90d'])} green bars invented from no send log"
+    assert c["status"] != "green"
+    assert c["last_sync_relative"] == "never"
 
 
 @pytest.mark.xfail(
@@ -1349,32 +1364,28 @@ def test_an_unreachable_queue_does_not_break_the_page(monkeypatch):
     assert by_id(h.body(), "infrastructure", "dlq")["status"] == "green"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): the infrastructure panel is excluded from the overall "
-        "rollup, so a red dead-letter queue — ingestion actively dropping messages — leaves the "
-        "footer dot green. The rollup's own comment only documents excluding blue/gray STATUSES, "
-        "not an entire panel."
-    ),
-)
 def test_a_red_dead_letter_queue_reaches_the_traffic_light(monkeypatch):
+    """#2220: the infrastructure panel was excluded from the rollup WHOLESALE, so
+    ingestion actively dropping messages left the footer dot green."""
     body = Harness(monkeypatch, healthy_platform().build(), dlq=250).body()
     assert by_id(body, "infrastructure", "dlq")["status"] == "red", "sanity: the DLQ really is red"
     assert body["overall"] != "green"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery, ADR-104 / reader truth): the infrastructure descriptions are "
-        "hand-typed literals that have drifted from the system they describe — the panel publishes "
-        "'MCP server · 116 tools' while mcp/registry.py's TOOLS dict holds 76 (pruned 143->60 by "
-        "#395 and grown back since). '66 pages' and '60+ endpoints' on the same panel are stale by "
-        "the same mechanism."
-    ),
-)
+def test_a_shallow_dead_letter_queue_does_not_move_the_traffic_light(monkeypatch):
+    """Proportionality survives: a handful of retryable messages is yellow, and yellow
+    has never driven the dot."""
+    body = Harness(monkeypatch, healthy_platform().build(), dlq=3).body()
+    assert by_id(body, "infrastructure", "dlq")["status"] == "yellow"
+    assert body["overall"] == "green"
+
+
 def test_the_published_mcp_tool_count_matches_the_registry(monkeypatch):
+    """#2220: the panel published a hand-typed 'MCP server · 116 tools' while the
+    registry held 76. The count now comes from PLATFORM_STATS, which
+    `deploy/sync_doc_metadata.py --apply` rewrites from this same AST parse — the site-api
+    bundle cannot import mcp/ at runtime (build_bundle stages only lambdas/), so
+    PLATFORM_STATS is the seam, and this test is what keeps the seam honest."""
     import re
 
     registry = ast.parse((ROOT / "mcp" / "registry.py").read_text())
@@ -1447,10 +1458,19 @@ def test_the_light_is_computed_only_from_red_components(monkeypatch):
 
 def test_never_imported_manual_and_onetime_components_never_drive_the_light(monkeypatch):
     """Blue is 'not applicable', and a platform whose optional imports are empty
-    is not a platform that is down."""
+    is not a platform that is down.
+
+    The skip is a fixture correction, not a loosened assertion (#2220). `clear()` is
+    PARTITION-level while the rows are field-level, so clearing the manual "Blood
+    Pressure Data" row — which shares the `apple_health` partition with seven automated
+    sub-feeds — also emptied all seven. That over-clear was invisible while an
+    activity-dependent source with zero records was rewritten green; now those seven
+    correctly report red, which is a different scenario from the one this test is about.
+    Both assertions below are unchanged."""
+    shared_with_auto = {r["id"] for r in DATA_ROWS if r["category"] == "auto"}
     b = healthy_platform()
     for row in DATA_ROWS:
-        if row["category"] in ("manual", "onetime"):
+        if row["category"] in ("manual", "onetime") and row["id"] not in shared_with_auto:
             b.clear(row["id"])
     body = Harness(monkeypatch, b.build()).body()
     blues = [c for c in components(body, "data_sources") if c["status"] == "blue"]
