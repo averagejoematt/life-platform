@@ -1078,17 +1078,6 @@ def test_the_archive_keeps_only_the_basename_of_a_nested_upload_key(monkeypatch)
     assert "uploads/" not in s3.puts[0]["Key"]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): SOURCE_REGISTRY['macrofactor']['raw_layout'] is "
-        "None, commented 'CSVs land via the dropbox transport, not a raw/ archive' — "
-        "but archive_raw() writes raw/<user>/macrofactor[/<subfolder>]/YYYY/MM/<file> "
-        "on EVERY ingest, including the unknown-format forensic path. X-9 says replay "
-        "tooling must read the layout from the registry instead of guessing; for this "
-        "source the registry hides an archive that exists."
-    ),
-)
 def test_the_registry_describes_the_raw_archive_this_lambda_actually_writes(monkeypatch):
     s3 = FakeS3()
     monkeypatch.setattr(mf, "s3_client", s3)
