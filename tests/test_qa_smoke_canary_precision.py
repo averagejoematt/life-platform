@@ -20,8 +20,6 @@ ALARM rate a nightly, queryable qa-smoke line:
 All offline — fake S3, no AWS.
 """
 
-import ast
-import inspect
 import io
 import json
 import os
@@ -166,9 +164,8 @@ def test_check_is_content_truth_partitioned(monkeypatch):
 
 
 def test_lambda_handler_runs_the_precision_check():
-    tree = ast.parse(inspect.getsource(qa.lambda_handler))
-    called = {n.func.id for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
-    assert "check_canary_precision" in called
+    # #2307: the nightly run list is qa.check_steps() — the one wiring point.
+    assert ("canary_precision", qa.check_canary_precision) in qa.check_steps()
 
 
 def test_qa_smoke_role_grants_the_canary_log_read():

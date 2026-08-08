@@ -2,7 +2,7 @@
 ``lambdas/operational/qa_check_outputs.py`` (#1658 coverage tranche 5).
 
 Measured 9.6% covered before this file (160 of 177 statements missing). This
-module is the AWS-surface half of qa-smoke: five checks that decide, nightly,
+module is the AWS-surface half of qa-smoke: the checks that decide, nightly,
 whether the platform's stored outputs are honest. Three fleet auto-rollbacks
 have fired off this sweep's verdicts, so the *partition* each check assigns
 (DEPLOY_HEALTH vs CONTENT_TRUTH, #1921) is not a label — it is the switch that
@@ -365,98 +365,36 @@ def test_score_sanity_grace_derivation_never_breaks_the_sweep(dashboard_s3, monk
     assert c.passed is False, "an unresolvable genesis must fall back to the strict frame"
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "DEFECT: a dashboard whose `day_grade` key is present but null crashes "
-        "the whole score-sanity sweep. Lines 146-147 read it defensively as "
-        "`(data.get('day_grade') or {})`, but line 148 reads "
-        "`data.get('day_grade', {}).get('components')` — the default only "
-        "applies to a MISSING key, so an explicit null raises "
-        "AttributeError: 'NoneType' object has no attribute 'get'. Because "
-        "qa_smoke_lambda accumulates `all_checks += check_score_sanity()` inside "
-        "one try, that single bad field aborts every remaining check in the "
-        "nightly sweep rather than reporting one red. Correct behaviour: the "
-        "same `or {}` guard the two adjacent lines already use, degrading to the "
-        "'Hydration null' warn. Reported by #1658 coverage tranche 5; not fixed here."
-    ),
-)
-def test_defect_score_sanity_survives_a_null_day_grade(dashboard_s3, no_grace):
+def test_score_sanity_survives_a_null_day_grade(dashboard_s3, no_grace):
+    """#2307 (was a strict xfail): a dashboard whose ``day_grade`` key is present
+    but NULL used to raise ``AttributeError: 'NoneType' object has no attribute
+    'get'`` out of ``data.get("day_grade", {}).get("components")`` — the default
+    fires only on a MISSING key. Because the handler accumulated every check
+    inside one try, that single field aborted the 16 checks downstream of
+    ``check_score_sanity``. Correct behaviour is the ``or {}`` form the two
+    adjacent lines already used: one honest "Hydration null" warn."""
     dashboard_s3(_dashboard(day_grade=None))
-    c = _by_name(qco.check_score_sanity())["score:hydration"]
-    assert c.passed is None and "didn't sync" in c.message
+    checks = _by_name(qco.check_score_sanity())
+    assert checks["score:hydration"].passed is None
+    assert "didn't sync" in checks["score:hydration"].message
+    # …and the grade itself is reported red rather than lost with the sweep.
+    assert checks["score:day_grade"].passed is False
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# check_blog_links
+# check_blog_links — DELETED by #2307
 # ──────────────────────────────────────────────────────────────────────────────
-
-INDEX_KEY = "blog/index.html"
-
-
-def test_blog_links_all_resolve(fake_s3):
-    # Historical slug shape, per redirects.map: /journal/posts/week-04/ …
-    html = b'<a href="week-04.html">one</a><a href="week-05.html">two</a>'
-    fake_s3(objects={INDEX_KEY: html}, listing={INDEX_KEY: 1, "blog/week-04.html": 1, "blog/week-05.html": 1})
-    (c,) = qco.check_blog_links()
-    assert c.passed is True and "All 2 blog post link(s) resolve" in c.message
-
-
-def test_blog_links_reds_and_names_every_broken_link(fake_s3):
-    html = b'<a href="week-04.html">one</a><a href="week-99.html">gone</a>'
-    fake_s3(objects={INDEX_KEY: html}, listing={INDEX_KEY: 1, "blog/week-04.html": 1})
-    (c,) = qco.check_blog_links()
-    assert c.passed is False
-    assert "1 broken link(s): week-99.html" in c.message
-
-
-def test_blog_links_regex_cannot_see_a_hyphenated_slug(fake_s3):
-    """Census note, not a live defect: the link regex is
-    ``href="(week-[\\w.]+\\.html)"`` and ``[\\w.]`` excludes ``-``, so a
-    date-style slug such as ``week-2026-01.html`` is invisible to the check
-    (reported as "no links" rather than checked). The retired corpus used
-    ``week-NN``/``week-YYYY.MM.DD`` shapes, both of which DO match, so nothing
-    was ever silently unchecked in production — but a revived blog that dates
-    its slugs with hyphens would get a green from an empty sweep."""
-    fake_s3(objects={INDEX_KEY: b'<a href="week-2026-01.html">one</a>'}, listing={INDEX_KEY: 1})
-    (c,) = qco.check_blog_links()
-    assert c.passed is None and "No week-*.html links found" in c.message
-
-    # The dotted historical form is seen.
-    fake_s3(objects={INDEX_KEY: b'<a href="week-2026.03.08.html">one</a>'}, listing={INDEX_KEY: 1, "blog/week-2026.03.08.html": 1})
-    (c,) = qco.check_blog_links()
-    assert c.passed is True
-
-
-def test_blog_links_missing_index_is_non_critical(fake_s3):
-    fake_s3(objects={})
-    (c,) = qco.check_blog_links()
-    assert c.name == "blog:index" and c.passed is None and "non-critical" in c.message
-
-
-def test_blog_links_unlistable_bucket_is_a_hard_fail(fake_s3):
-    fake_s3(objects={INDEX_KEY: b'<a href="week-1.html">x</a>'}, raise_on={"list:blog/"})
-    (c,) = qco.check_blog_links()
-    assert c.name == "blog:list" and c.passed is False
-
-
-def test_blog_links_an_index_with_no_week_links_warns(fake_s3):
-    fake_s3(objects={INDEX_KEY: b"<p>coming soon</p>"}, listing={INDEX_KEY: 1})
-    (c,) = qco.check_blog_links()
-    assert c.passed is None and "No week-*.html links" in c.message
-
-
-def test_census_check_blog_links_is_no_longer_wired_into_the_sweep():
-    """#1658 census note: qa_smoke_lambda imports check_blog_links but its run
-    list appends a hand-built PAUSED Check for blog:links instead of calling it
-    (blog moved to /story/ in v4). The coverage above therefore exercises an
-    orphan. Recorded so a future reader does not mistake it for a live gate."""
-    import pathlib
-    import re
-
-    src = (pathlib.Path(__file__).resolve().parents[1] / "lambdas" / "operational" / "qa_smoke_lambda.py").read_text(encoding="utf-8")
-    assert not re.search(r"check_blog_links\(\)", src), "check_blog_links is live again — delete this census note"
-    assert "check_blog_links," in src, "the import is gone too — the orphan was cleaned up; delete this test"
+# The #1658 tranche recorded it as an orphan: qa_smoke_lambda imported it but its
+# run list appended a hand-built PAUSED Check instead of calling it (the blog moved
+# to /story/ in v4). #2307 deleted the function, its import and its seven tests —
+# including the census test that existed only to record the orphan — and kept the
+# paused `blog:links` Check as `_blog_links_retired` in the sweep's run list. The
+# tranche's finding about its `href="(week-[\w.]+\.html)"` regex (which excludes
+# `-`, so a hyphenated date slug would read as "no links found") dies with it; a
+# revived blog needs a fresh check, not this one.
+#
+# Guarded by test_qa_smoke_fault_isolation_2307.py, whose derived run-list test
+# asserts the `blog_links` step is still present and still paused.
 
 
 # ──────────────────────────────────────────────────────────────────────────────

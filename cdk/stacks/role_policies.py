@@ -2210,7 +2210,7 @@ def operational_qa_smoke() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="S3Read",
             actions=["s3:GetObject"],
-            # dashboard/* + config/* + blog/* (check_blog_links reads blog/index.html)
+            # dashboard/* + config/* + blog/* (blog/* is now unread — #2307 deleted the orphaned blog-links check)
             # + ai-canary-log/* (#1956: check_canary_precision reads the canary's
             #   dated findings records for the nightly grounded false-positive-rate
             #   line; fail-soft in the lambda — degrades to a WARN naming this

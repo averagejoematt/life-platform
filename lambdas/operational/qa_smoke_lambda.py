@@ -71,16 +71,16 @@ from operational.qa_check import (  # noqa: E402,F401
     QA_SMOKE_EMF_NAMESPACE,
     Check,
     emf_summary_line,
+    run_isolated,
     split_warns,
 )
 
-# #1665 (2026-08-02): the five AWS-surface sweeps (S3 freshness, score sanity,
-# blog links, Lambda secrets, avatar sprites) live in operational/qa_check_outputs.py
-# — extracted when concurrent merges pushed this module back over the 1200-line
-# ceiling. Re-exported so qa_smoke_lambda.check_* stay valid public entrypoints.
+# #1665: the AWS-surface sweeps (S3 freshness, score sanity, Lambda secrets,
+# avatar sprites) live in operational/qa_check_outputs.py — extracted when this
+# module crossed the 1200-line ceiling. Re-exported so qa_smoke_lambda.check_*
+# stay valid entrypoints. (#2307 deleted the orphaned blog-links sweep there.)
 from operational.qa_check_outputs import (  # noqa: E402,F401
     check_avatar_assets,
-    check_blog_links,
     check_lambda_secrets,
     check_s3_freshness,
     check_score_sanity,
@@ -297,7 +297,7 @@ def check_mcp_tool_calls():
                 body = json.loads(r.read().decode("utf-8"))
             if "error" in body:
                 return False, f"RPC error: {body['error']}"
-            content = body.get("result", {}).get("content", [])
+            content = (body.get("result") or {}).get("content") or []
             if not content:
                 return False, "Empty result content"
             return True, json.loads(content[0].get("text", "{}"))
@@ -839,7 +839,7 @@ def check_canary_precision():
             if rec.get("skipped") or rec.get("blind"):
                 continue  # no grounded verdict exists for these runs
             runs += 1
-            if any(str(a).endswith(":grounded") for a in rec.get("alarms", [])):
+            if any(str(a).endswith(":grounded") for a in rec.get("alarms") or []):
                 alarmed_dates.append(d)
     except Exception as e:
         return [c.warn(f"canary precision unreadable ({e}) — fail-soft; needs s3:GetObject on {CANARY_LOG_PREFIX}/* (#1956)")]
@@ -984,6 +984,59 @@ def build_report_html(all_checks, run_time_str):
 
 
 # ---------------------------------------------------------------------------
+# The nightly run list
+# ---------------------------------------------------------------------------
+
+
+def _blog_links_retired():
+    msg = "Blog — paused (chronicle now lives at /story/ in v4); will return if revived"
+    return [Check("blog:links", "Blog Links", CONTENT_TRUTH).pause(msg)]
+
+
+def check_steps():
+    """The sweep's ordered run list: ``(label, zero-arg callable)`` pairs.
+
+    THE one place a check is wired into the nightly, and a function rather than a
+    constant so each entry resolves its callable at CALL time — monkeypatching
+    ``qa_smoke_lambda.check_<x>`` is therefore seen here, which is what lets
+    tests/test_qa_smoke_fault_isolation_2307.py derive the real set and make each
+    member raise (#1917: derive the set, never enumerate it). Every step runs
+    through ``run_isolated`` (#2307): one raising check costs ONE red.
+    """
+    return [
+        ("ddb_freshness", check_ddb_freshness),
+        ("hae_liveness_truth", check_hae_liveness_truth),  # #2001: dark HAE datatypes carry a numeric days_dark when findable
+        ("s3_freshness", check_s3_freshness),
+        # #1949: raw_layout facets must be live-true (DDB-fresh/raw-dead reds a check)
+        ("raw_archive_liveness", lambda: raw_archive_qa.check_raw_archive_liveness(table, s3, S3_BUCKET, Check, CONTENT_TRUTH, pt_now)),
+        ("score_sanity", check_score_sanity),
+        ("lambda_secrets", check_lambda_secrets),
+        ("avatar_assets", check_avatar_assets),  # character avatar visuals — kept (real check)
+        ("mcp_tool_calls", check_mcp_tool_calls),
+        ("reader_truth", check_reader_truth),  # #1096: phase-aware narrative truth (Haiku, budget-aware, fail-soft)
+        ("predict_week_freshness", check_predict_week_freshness),  # #1198: predict-the-week never live on a stale ISO week
+        ("hero_weight_arithmetic", check_hero_weight_arithmetic),  # #1225: home hero stat row reconciles + trend-honest
+        ("coach_labs_truth", check_coach_labs_truth),  # #1993: no served coach text may narrate an empty labs store
+        # #1972: chronicle/podcast lists must carry a next-date OR an honest-pending line, never neither
+        ("content_cadence", check_content_cadence),
+        # #1951: the /subscribe/ weekly-send promise must agree with each sender's live kill switch
+        ("subscriber_promise_truth", check_subscriber_promise_truth),
+        # #1243: a same-title episode in podcast/episodes.json must date-match its journal article
+        ("podcast_parity", check_podcast_parity),
+        ("weight_truth", lambda: weight_truth_qa.checks(Check, SITE_BASE_URL, CONTENT_TRUTH)),  # #1894: home/cockpit vs coaching
+        ("receipt_replay", check_receipt_replay),  # #1373: progression-receipt drift alarm (deterministic replay)
+        ("redirect_spotcheck", check_redirect_spotcheck),  # #1430: weekly legacy-redirect sample, rotates over redirects.map
+        ("notion_template_schema", check_notion_template_schema),  # #1840: code TEMPLATE_SK vs live Notion schema drift gate
+        ("canary_precision", check_canary_precision),  # #1956: AI-canary grounded false-positive-rate (sensor on the sensor)
+        ("phase_stamp_coverage", check_coach_ensemble_phase_stamp_coverage),  # #1970: tagger-blind COACH#/ENSEMBLE# gap
+        # Blog moved to /story/ in v4: retired, not broken, so it reports PAUSED —
+        # visible, never a fault. (#2307 deleted the orphaned check_blog_links
+        # implementation this hand-built Check had already replaced.)
+        ("blog_links", _blog_links_retired),
+    ]
+
+
+# ---------------------------------------------------------------------------
 # Lambda handler
 # ---------------------------------------------------------------------------
 
@@ -995,38 +1048,12 @@ def lambda_handler(event, context):
         run_time_str = run_time.strftime("%A, %b %-d at %-I:%M %p PT")
         print(f"[QA] Smoke test starting — {run_time_str}")
 
+        # #2307: fault-isolated accumulation. A raise inside any one step is
+        # reported as a red `sweep:<label>` check; it can no longer cancel the
+        # steps after it (16 of 21 sat downstream of check_score_sanity).
         all_checks = []
-        all_checks += check_ddb_freshness()
-        all_checks += check_hae_liveness_truth()  # #2001: dark HAE datatypes must carry a numeric days_dark when one is findable
-        all_checks += check_s3_freshness()
-        # #1949: raw_layout facets must be live-true (DDB-fresh/raw-dead reds a check)
-        all_checks += raw_archive_qa.check_raw_archive_liveness(table, s3, S3_BUCKET, Check, CONTENT_TRUTH, pt_now)
-        all_checks += check_score_sanity()
-        all_checks += check_lambda_secrets()
-        all_checks += check_avatar_assets()  # character avatar visuals — kept (real check)
-        all_checks += check_mcp_tool_calls()
-        all_checks += check_reader_truth()  # #1096: phase-aware narrative truth (Haiku, budget-aware, fail-soft)
-        all_checks += check_predict_week_freshness()  # #1198: predict-the-week never live on a stale ISO week
-        all_checks += check_hero_weight_arithmetic()  # #1225: home hero stat row reconciles + trend-honest
-        all_checks += check_coach_labs_truth()  # #1993: no served coach text may narrate an empty labs store against real draws
-        # #1972: chronicle/podcast lists must carry a next-date OR an honest-pending line, never neither
-        all_checks += check_content_cadence()
-        # #1951: the /subscribe/ weekly-send promise must agree with each sender's live kill switch
-        all_checks += check_subscriber_promise_truth()
-        # #1243: a same-title episode in podcast/episodes.json must date-match its journal article
-        all_checks += check_podcast_parity()
-        all_checks += weight_truth_qa.checks(Check, SITE_BASE_URL, CONTENT_TRUTH)  # #1894: home/cockpit vs the coaching door
-        all_checks += check_receipt_replay()  # #1373: progression-receipt drift alarm (deterministic replay)
-        all_checks += check_redirect_spotcheck()  # #1430: weekly legacy-redirect sample, rotates over redirects.map
-        all_checks += check_notion_template_schema()  # #1840: code TEMPLATE_SK vs live Notion schema drift gate
-        all_checks += check_canary_precision()  # #1956: AI-canary grounded-check false-positive-rate line (sensor on the sensor)
-        all_checks += check_coach_ensemble_phase_stamp_coverage()  # #1970: tagger-blind COACH#/ENSEMBLE# phase-stamp gap
-        # blog moved to /story/ in v4 — shown paused (not failed) so it's not forgotten.
-        all_checks.append(
-            Check("blog:links", "Blog Links", CONTENT_TRUTH).pause(
-                "Blog — paused (chronicle now lives at /story/ in v4); will return if revived"
-            )
-        )
+        for _label, _fn in check_steps():
+            all_checks += run_isolated(_label, _fn)
 
         # #1345 DR-drill hook: an explicit {"synthetic_fail": true} invoke payload
         # injects ONE clearly-labeled synthetic FAIL so the CI smoke→rollback path can

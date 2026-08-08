@@ -155,10 +155,12 @@ def test_check_warns_fail_soft_on_fetch_error(monkeypatch):
 
 def test_check_wired_into_qa_smoke_lambda():
     """qa_smoke_lambda re-exports check_podcast_parity and calls it in
-    lambda_handler — the same contract check_content_cadence's wiring pins
+    check_steps() — the same contract check_content_cadence's wiring pins
     (#1972)."""
     qa_smoke_path = os.path.join(_REPO, "lambdas", "operational", "qa_smoke_lambda.py")
     src = open(qa_smoke_path, encoding="utf-8").read()
     assert "from operational.qa_check_podcast_parity import" in src
     assert "check_podcast_parity" in src
-    assert "all_checks += check_podcast_parity()" in src
+    # #2307: the nightly run list moved out of lambda_handler into check_steps(),
+    # the ONE place a check is wired in — and each step now runs fault-isolated.
+    assert '("podcast_parity", check_podcast_parity)' in src, "check_podcast_parity is not in the check_steps() run list"

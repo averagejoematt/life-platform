@@ -292,13 +292,11 @@ def test_check_redirect_spotcheck_missing_map_is_warn_not_fail(monkeypatch):
 
 
 def test_check_redirect_spotcheck_wired_into_lambda_handler():
-    """AST-check: lambda_handler actually calls check_redirect_spotcheck() —
-    a plausible regression class is writing the Check function but never
-    wiring it into the run, which the mock-based tests above wouldn't catch."""
-    import ast
-    import inspect
-
-    src = inspect.getsource(qa.lambda_handler)
-    tree = ast.parse(src)
-    names = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)}
-    assert "check_redirect_spotcheck" in names, "lambda_handler never calls check_redirect_spotcheck() (#1430)"
+    """The nightly must actually RUN it — a plausible regression class is writing
+    the Check function but never wiring it in, which the mock-based tests above
+    would not catch. #2307: the run list is qa.check_steps(), the one wiring
+    point the handler loops over, so assert against the live list."""
+    assert (
+        "redirect_spotcheck",
+        qa.check_redirect_spotcheck,
+    ) in qa.check_steps(), "check_redirect_spotcheck is not in the nightly run list (#1430)"

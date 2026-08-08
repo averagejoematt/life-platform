@@ -138,6 +138,41 @@ class Check:
 QA_SMOKE_EMF_NAMESPACE = "LifePlatform/QaSmoke"
 
 
+SWEEP_INTEGRITY_CATEGORY = "Sweep Integrity"
+
+
+def run_isolated(label, fn):
+    """Run ONE check-producing callable so a raise costs one check, not the sweep.
+
+    #2307: qa_smoke_lambda's handler accumulated all 21 check calls inside a
+    single ``try``, whose ``except`` re-raises. Any check that threw therefore
+    cancelled every check after it — a null ``day_grade`` in dashboard/data.json
+    raised out of ``check_score_sanity`` and took the 16 checks downstream of it
+    with it. That is the self-concealing shape (#2287, #2271): a crashed sweep
+    and a sweep with nothing to report look the same from outside.
+
+    The raise is converted into an explicit ``sweep:<label>`` red rather than
+    swallowed. ADR-104: a check that could not evaluate must SAY so — it is
+    never counted as a pass, and never as a warn (a warn is a known-benign
+    state; "the checker itself broke" is not one).
+
+    Partition is DEPLOY_HEALTH deliberately. A check raising is evidence about
+    the code that just shipped, and it is what the old behaviour already did to
+    ci-cd — the handler's re-raise failed the whole invocation, which the smoke
+    oracle reads as a deploy failure. Classifying it CONTENT_TRUTH would quietly
+    WEAKEN the gate while this change was nominally about strengthening it.
+    """
+    try:
+        return list(fn())
+    except Exception as exc:  # noqa: BLE001 — converting a raise into a reported red IS the point
+        return [
+            Check(f"sweep:{label}", SWEEP_INTEGRITY_CATEGORY, DEPLOY_HEALTH).fail(
+                f"{label} raised {type(exc).__name__}: {exc} — this check did not run, "
+                "its result is UNKNOWN (not a pass). The rest of the sweep continued."
+            )
+        ]
+
+
 def split_warns(checks):
     """Partition a run's warned checks into (alarmed, chronic) lists.
 
