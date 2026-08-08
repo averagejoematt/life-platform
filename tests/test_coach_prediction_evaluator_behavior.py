@@ -930,20 +930,11 @@ class TestBayesianPosterior:
         table.put_error = RuntimeError("throttled")
         ev._update_bayesian_confidence("sleep_coach", "sleep", "success")  # must not raise
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-2 discovery): asymmetric Bayesian credit on the machine path. "
-            "_evaluate_machine sets beats_null=True only when eval_spec['null_hypothesis'] is "
-            "truthy, and NO writer in the repo ever emits one (coach_state_updater."
-            "_build_prediction_eval_spec hard-codes null_hypothesis=None; diary_claims omits the "
-            "key), so a confirmed thresholded call yields bayesian_update=None while every refuted "
-            "call yields 'failure'. Beta(alpha,beta) can then only move toward beta and the "
-            "published mean_confidence can only fall. (The `beats_null_if` branch is also dead: all "
-            "three arms assign True.)"
-        ),
-    )
     def test_a_confirmed_call_credits_alpha_the_way_a_refuted_call_debits_beta(self, table):
+        """#2219: the machine path used to credit alpha only when the spec carried a
+        truthy `null_hypothesis` — a key no writer in this repo emits — so a confirmed
+        thresholded call scored nothing while every refuted one debited beta, and the
+        published mean_confidence could only fall."""
         daily_series("hrv", [60.0], table=table)
         spec = {"type": "machine", "metric": "hrv", "condition": "gt", "threshold": 50}
         evaluations, _ = ev._evaluate_all([prediction(evaluation=spec, subdomain="hrv", created_date=days_before(30))], TODAY)
@@ -989,6 +980,93 @@ class TestVerdictRouting:
         spec = {"type": "machine", "metric": "hrv", "condition": "gt", "threshold": None}
         result = ev._evaluate_machine({"claim_natural": "something will happen"}, spec, {}, TODAY)
         assert (result["status"], result["beats_null"]) == ("inconclusive", False)
+
+
+class TestCreditIsSymmetric:
+    """#2219 — a track record that can only fall is not a track record.
+
+    The machine (threshold) path used to gate alpha behind a `null_hypothesis`
+    string that no writer emits, so it debited beta on every miss and credited
+    nothing on a hit. These pin the symmetry, and pin that the fix did NOT widen
+    crediting to "any confirm": a verdict that explicitly did not beat its null
+    still moves neither side.
+    """
+
+    THRESHOLD_SPEC = {"type": "machine", "metric": "hrv", "condition": "gt", "threshold": 50}
+
+    def test_a_met_threshold_beats_the_null_the_way_an_above_noise_move_does(self, table, monkeypatch):
+        """The two deterministic paths must agree on what a confirm is worth."""
+        daily_series("hrv", [60.0], table=table)
+        machine = ev._evaluate_machine({}, dict(self.THRESHOLD_SPEC), {}, TODAY)
+        monkeypatch.setattr(ev, "_get_ewma_trend", lambda *a, **k: ("up", ev.DIRECTIONAL_NOISE_THRESHOLD + 1e-6))
+        directional = ev._evaluate_directional({}, {"metric": "hrv", "condition": "up"}, {}, TODAY)
+        assert (machine["status"], machine["beats_null"]) == ("confirmed", True)
+        assert (machine["status"], machine["beats_null"]) == (directional["status"], directional["beats_null"])
+
+    def test_a_missed_threshold_still_debits_beta_and_never_claims_the_null(self, table):
+        """The control: the half that already worked must keep working."""
+        daily_series("hrv", [40.0], table=table)
+        evaluations, stats = ev._evaluate_all(
+            [prediction(evaluation=dict(self.THRESHOLD_SPEC), subdomain="hrv", created_date=days_before(30))], TODAY
+        )
+        assert (evaluations[0]["status"], evaluations[0]["beats_null"]) == ("refuted", False)
+        assert evaluations[0]["bayesian_update"] == "failure"
+        assert float(confidence_rows(table)[-1]["beta_param"]) == 2.0
+        assert stats["refuted"] == 1
+
+    def test_one_hit_and_one_miss_leave_the_posterior_where_it_started(self, table):
+        """Equal-magnitude credit: Beta(1,1) -> Beta(2,2), mean back at 0.5.
+
+        Both calls are on the same reading — one bet it above 50, one below — so
+        exactly one had to be right, and a coach who splits cannot end the day
+        less trusted than they began it.
+        """
+        daily_series("hrv", [60.0], table=table)
+        hit = prediction(pred_id="hit", evaluation=dict(self.THRESHOLD_SPEC), subdomain="hrv", created_date=days_before(30))
+        miss = prediction(
+            pred_id="miss",
+            evaluation={"type": "machine", "metric": "hrv", "condition": "lt", "threshold": 50},
+            subdomain="hrv",
+            created_date=days_before(30),
+        )
+        evaluations, _ = ev._evaluate_all([hit, miss], TODAY)
+        assert [e["bayesian_update"] for e in evaluations] == ["success", "failure"]
+        final = confidence_rows(table)[-1]
+        assert (float(final["alpha"]), float(final["beta_param"])) == (2.0, 2.0)
+        assert float(final["mean_confidence"]) == pytest.approx(0.5)
+
+    def test_a_stated_null_hypothesis_cannot_veto_a_deterministic_verdict(self, table):
+        """Prose is not machine-checkable, so it must not gate the grade — in
+        either direction. Historically the presence of this key was the ONLY way
+        to score a hit; a spec carrying one must now grade identically to one
+        that does not."""
+        daily_series("hrv", [60.0], table=table)
+        with_null = ev._evaluate_machine(
+            {},
+            {**self.THRESHOLD_SPEC, "null_hypothesis": "HRV drifts with no intervention", "beats_null_if": "exceeds_threshold"},
+            {},
+            TODAY,
+        )
+        without_null = ev._evaluate_machine({}, dict(self.THRESHOLD_SPEC), {}, TODAY)
+        assert with_null == without_null
+        assert (with_null["status"], with_null["beats_null"]) == ("confirmed", True)
+
+    def test_a_confirm_that_did_not_beat_its_null_still_moves_neither_side(self, table, monkeypatch):
+        """The guard the fix must not dissolve: `_evaluate_all` credits alpha on
+        `confirmed AND beats_null`, not on `confirmed`. No evaluator returns this
+        shape today — a null the machine can actually measure would — but the
+        contract is what keeps a future one from silently inflating a coach."""
+        monkeypatch.setattr(
+            ev,
+            "_evaluate_machine",
+            lambda *a, **k: {"status": "confirmed", "reason": "matched the null", "actual_value": 60.0, "beats_null": False},
+        )
+        evaluations, stats = ev._evaluate_all(
+            [prediction(evaluation=dict(self.THRESHOLD_SPEC), subdomain="hrv", created_date=days_before(30))], TODAY
+        )
+        assert evaluations[0]["status"] == "confirmed"
+        assert evaluations[0]["bayesian_update"] is None
+        assert confidence_rows(table) == []
 
 
 # ══════════════════════════════════════════════════════════════════════════════
