@@ -82,14 +82,7 @@ def _is_traveling(date_str=None):
         return None
 
 
-# ── Citation gate (#758) ──
-# Seligman/Holt-Lunstad-style research citations read as rigor-flavored garnish when the
-# underlying personal sample is a handful of days (ADR-105: uncertainty + n on every claim).
-# Gate the citation on real data volume; below threshold, omit it — the honest numbers
-# (counts, streaks, correlations) still return either way. 14 = two full rolling weeks of
-# enriched_social_quality logs, matching this tool's own rolling_7d/rolling_30d windows —
-# enough to say "this is a pattern," not one journal entry dressed up as a finding.
-_SOCIAL_CITATION_MIN_N = 14
+_KJ_PER_KCAL = 1.0 / 4.184  # thermochemical kilocalorie (#2221)
 
 # ── Experiment metrics ──
 
@@ -99,24 +92,24 @@ _EXPERIMENT_METRICS = [
     ("whoop", "sleep_efficiency_pct", "Sleep Efficiency %", True),  # normalized from sleep_efficiency_percentage
     ("whoop", "deep_pct", "Deep Sleep %", True),  # normalized from slow_wave_sleep_hours
     ("whoop", "rem_pct", "REM Sleep %", True),  # normalized from rem_sleep_hours
-    ("eightsleep", "sleep_onset_latency_min", "Sleep Onset Latency", False),  # Eight Sleep only — Whoop doesn't track
+    ("eightsleep", "time_to_sleep_min", "Sleep Onset Latency", False),  # writer: eightsleep_lambda.py (#2221)
     # Recovery
     ("whoop", "recovery_score", "Whoop Recovery", True),
-    ("whoop", "hrv_rmssd", "HRV (rMSSD)", True),
+    ("whoop", "hrv", "HRV (rMSSD)", True),  # writer: whoop_lambda.py stores `hrv` (#2221)
     ("whoop", "resting_heart_rate", "Resting HR", False),
     # Stress & Energy
-    ("garmin", "average_stress_level", "Garmin Stress", False),
+    ("garmin", "avg_stress", "Garmin Stress", False),  # writer: garmin_lambda.py (#2221)
     ("garmin", "body_battery_high", "Body Battery Peak", True),
     # Body
     ("withings", "weight_lbs", "Weight (lbs)", None),  # direction depends on goal
     # Nutrition
-    ("macrofactor", "calories", "Calories", None),
+    ("macrofactor", "calories_kcal", "Calories", None),  # writer: macrofactor_lambda.py (#2221)
     ("macrofactor", "protein_g", "Protein (g)", None),
     # Movement
     ("apple_health", "steps", "Steps", True),
-    # Glucose (if available)
-    ("apple_health", "cgm_mean_glucose", "Mean Glucose", False),
-    ("apple_health", "cgm_time_in_range_pct", "CGM Time in Range %", True),
+    # Glucose (if available) — writer: health_auto_export_lambda.py stores blood_glucose_* (#2221)
+    ("apple_health", "blood_glucose_avg", "Mean Glucose", False),
+    ("apple_health", "blood_glucose_time_in_range_pct", "CGM Time in Range %", True),
 ]
 
 
@@ -391,184 +384,6 @@ def tool_update_insight_outcome(args):
         "outcome_notes": outcome_notes,
         "text_preview": existing.get("text", "")[:120],
     }
-
-
-def tool_get_social_connection_trend(args):
-    """
-    Aggregates enriched_social_quality from journal entries over time.
-    Tracks social connection quality, streaks, rolling averages, and
-    correlates with health outcomes. The `perma_context` field (a Seligman
-    PERMA / Holt-Lunstad citation) is gated on n — see `_SOCIAL_CITATION_MIN_N` (#758).
-    """
-    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
-
-    def _sf(v):
-        if v is None:
-            return None
-        try:
-            return float(v)
-        except (ValueError, TypeError):
-            return None
-
-    def _avg(vals):
-        v = [x for x in vals if x is not None]
-        return round(sum(v) / len(v), 2) if v else None
-
-    QUALITY_MAP = {"alone": 1, "surface": 2, "meaningful": 3, "deep": 4}
-
-    journal_items = query_source("notion", start_date, end_date)
-    if not journal_items:
-        return {"error": "No journal data for range.", "start_date": start_date, "end_date": end_date}
-
-    daily_social = {}
-    daily_mood = {}
-    daily_energy = {}
-    daily_stress = {}
-    for item in journal_items:
-        d = item.get("date")
-        if not d:
-            continue
-        sq = item.get("enriched_social_quality")
-        if sq and sq in QUALITY_MAP:
-            score = QUALITY_MAP[sq]
-            if d not in daily_social or score > daily_social[d]["score"]:
-                daily_social[d] = {"quality": sq, "score": score}
-        for field, store in [("enriched_mood", daily_mood), ("enriched_energy", daily_energy), ("enriched_stress", daily_stress)]:
-            v = _sf(item.get(field))
-            if v is not None:
-                store[d] = v
-
-    if not daily_social:
-        return {"error": "No enriched_social_quality data found.", "entries_checked": len(journal_items)}
-
-    sorted_dates = sorted(daily_social.keys())
-    scores = [daily_social[d]["score"] for d in sorted_dates]
-
-    distribution = {}
-    for d, info in daily_social.items():
-        q = info["quality"]
-        distribution[q] = distribution.get(q, 0) + 1
-
-    rolling_7d = []
-    rolling_30d = []
-    for i, d in enumerate(sorted_dates):
-        w7 = scores[max(0, i - 6) : i + 1]
-        w30 = scores[max(0, i - 29) : i + 1]
-        rolling_7d.append({"date": d, "avg": round(sum(w7) / len(w7), 2)})
-        rolling_30d.append({"date": d, "avg": round(sum(w30) / len(w30), 2)})
-
-    current_streak = 0
-    longest_streak = 0
-    temp_streak = 0
-    for d in sorted_dates:
-        if daily_social[d]["score"] >= 3:
-            temp_streak += 1
-            longest_streak = max(longest_streak, temp_streak)
-        else:
-            temp_streak = 0
-    for d in reversed(sorted_dates):
-        if daily_social[d]["score"] >= 3:
-            current_streak += 1
-        else:
-            break
-
-    days_since_meaningful = None
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    for d in reversed(sorted_dates):
-        if daily_social[d]["score"] >= 3:
-            days_since_meaningful = (datetime.strptime(today, "%Y-%m-%d") - datetime.strptime(d, "%Y-%m-%d")).days
-            break
-
-    health_correlations = []
-    HEALTH_SOURCES = [
-        ("whoop", "recovery_score", "Recovery"),
-        ("whoop", "hrv", "HRV"),
-        ("whoop", "sleep_score", "Sleep Score"),
-        ("garmin", "avg_stress", "Stress"),
-        ("garmin", "body_battery_high", "Body Battery"),
-    ]
-    health_data = {}
-    for src, _, _ in HEALTH_SOURCES:
-        if src not in health_data:
-            try:
-                health_data[src] = {item.get("date"): item for item in query_source(src, start_date, end_date)}
-            except Exception:
-                health_data[src] = {}
-
-    for src, field, label in HEALTH_SOURCES:
-        xs, ys = [], []
-        for d in sorted_dates:
-            sq = daily_social[d]["score"]
-            hv = _sf(health_data.get(src, {}).get(d, {}).get(field))
-            if hv is not None:
-                xs.append(sq)
-                ys.append(hv)
-        if len(xs) >= 10:
-            n = len(xs)
-            mx, my = sum(xs) / n, sum(ys) / n
-            cov = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / n
-            sx = (sum((x - mx) ** 2 for x in xs) / n) ** 0.5
-            sy = (sum((y - my) ** 2 for y in ys) / n) ** 0.5
-            r = round(cov / (sx * sy), 3) if sx > 0 and sy > 0 else 0
-            health_correlations.append(
-                {"metric": label, "r": r, "n": n, "interpretation": "strong" if abs(r) > 0.5 else "moderate" if abs(r) > 0.3 else "weak"}
-            )
-
-    journal_correlations = []
-    for field_data, label in [(daily_mood, "Mood"), (daily_energy, "Energy"), (daily_stress, "Stress")]:
-        xs, ys = [], []
-        for d in sorted_dates:
-            if d in field_data:
-                xs.append(daily_social[d]["score"])
-                ys.append(field_data[d])
-        if len(xs) >= 10:
-            n = len(xs)
-            mx, my = sum(xs) / n, sum(ys) / n
-            cov = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / n
-            sx = (sum((x - mx) ** 2 for x in xs) / n) ** 0.5
-            sy = (sum((y - my) ** 2 for y in ys) / n) ** 0.5
-            r = round(cov / (sx * sy), 3) if sx > 0 and sy > 0 else 0
-            journal_correlations.append({"metric": label, "r": r, "n": n})
-
-    meaningful_days = [d for d in sorted_dates if daily_social[d]["score"] >= 3]
-    low_days = [d for d in sorted_dates if daily_social[d]["score"] <= 2]
-    comparison = {}
-    for src, field, label in HEALTH_SOURCES:
-        m_vals = [_sf(health_data.get(src, {}).get(d, {}).get(field)) for d in meaningful_days]
-        l_vals = [_sf(health_data.get(src, {}).get(d, {}).get(field)) for d in low_days]
-        m_avg, l_avg = _avg(m_vals), _avg(l_vals)
-        if m_avg is not None and l_avg is not None:
-            comparison[label] = {"meaningful_avg": m_avg, "low_social_avg": l_avg, "diff": round(m_avg - l_avg, 2)}
-
-    result = {
-        "start_date": start_date,
-        "end_date": end_date,
-        "total_days_with_data": len(daily_social),
-        "distribution": distribution,
-        "overall_avg_score": _avg(scores),
-        "score_legend": {"alone": 1, "surface": 2, "meaningful": 3, "deep": 4},
-        "rolling_7d_latest": rolling_7d[-1] if rolling_7d else None,
-        "rolling_30d_latest": rolling_30d[-1] if rolling_30d else None,
-        "streaks": {
-            "current_meaningful_streak": current_streak,
-            "longest_meaningful_streak": longest_streak,
-            "days_since_meaningful": days_since_meaningful,
-        },
-        "health_correlations": health_correlations,
-        "journal_correlations": journal_correlations,
-        "meaningful_vs_low_comparison": comparison,
-    }
-
-    # #758: cite external wellbeing research only once there's enough real data to
-    # ground it in — below the floor it's garnish, not a finding about this person.
-    if len(daily_social) >= _SOCIAL_CITATION_MIN_N:
-        result["perma_context"] = (
-            "Seligman PERMA: Relationships are #1 wellbeing predictor. Holt-Lunstad: isolation "
-            "increases mortality 26%. Target: meaningful+ connection 5+ days/week."
-        )
-
-    return result
 
 
 def _get_state_of_mind_trend(args):
@@ -1215,11 +1030,14 @@ def tool_get_experiment_results(args):
     except ValueError:
         raise ValueError("Invalid start_date or end_date on experiment")
 
-    during_days = (end_dt - start_dt).days
-    if during_days < 1:
+    # #2221/#1917: [start, end] spans (end - start).days + 1 CALENDAR DAYS. Dropping the start
+    # day made the before window one date shorter than the during window while both were labelled
+    # with the same number, and made the 14-day gate fire a day late.
+    during_days = (end_dt - start_dt).days + 1
+    if during_days < 2:
         return {"error": "Experiment has less than 1 day of data. Check back later."}
 
-    # Before period = same number of days before start
+    # Before period = an equal-length window immediately preceding the start day
     before_start = (start_dt - timedelta(days=during_days)).strftime("%Y-%m-%d")
     before_end = (start_dt - timedelta(days=1)).strftime("%Y-%m-%d")
     during_start = start_date
@@ -1685,8 +1503,8 @@ def _get_movement_score(args):
         flights = ah.get("flights_climbed")
         distance = ah.get("distance_walk_run_miles")
         active_cal = ah.get("active_calories")
-        exercise_kj = strava.get("total_kilojoules")
-        exercise_kcal = float(exercise_kj) if exercise_kj else 0
+        # #2221: Strava stores work in kJ, active_calories is kcal — the raw subtraction was 4.18x too large.
+        exercise_kcal = round(float(strava.get("total_kilojoules") or 0) * _KJ_PER_KCAL, 1)
         hevy_workout = date in hevy_dates
         strava_workout = int(float(strava.get("activity_count", 0))) > 0
         has_workout = hevy_workout or strava_workout
