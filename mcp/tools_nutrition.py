@@ -116,11 +116,17 @@ def _get_micronutrient_report(args):
                     elif pct_rda < 90:
                         row["status"] = "LOW"
                         near_gaps.append({"field": field, "average": avg_val, "unit": unit, "pct_rda": pct_rda, "rda": rda})
-                    elif ul and avg_val > ul:
-                        row["status"] = "ABOVE_UPPER_LIMIT"
-                        exceedances.append({"field": field, "average": avg_val, "unit": unit, "upper_limit": ul})
-                    else:
-                        row["status"] = "ADEQUATE"
+            # Upper-limit exceedance must NOT depend on `score` or on `rda` being set (#2248):
+            # total_sodium_mg and total_caffeine_mg both carry an `upper_limit` but no `score`
+            # (and caffeine has no `rda` at all), so nesting this under either silently excluded
+            # the two most actionable overages in the table. Checked independently here, it fires
+            # for every upper_limit entry regardless of score/rda. A scored+rda'd nutrient that
+            # isn't DEFICIENT/LOW and isn't over its limit still lands on ADEQUATE, unchanged.
+            if ul and avg_val > ul:
+                row["status"] = "ABOVE_UPPER_LIMIT"
+                exceedances.append({"field": field, "average": avg_val, "unit": unit, "upper_limit": ul})
+            elif meta.get("score") and rda and "status" not in row:
+                row["status"] = "ADEQUATE"
             if optimal:
                 row["optimal"] = optimal
                 row["pct_optimal"] = round(avg_val / optimal * 100, 1)
