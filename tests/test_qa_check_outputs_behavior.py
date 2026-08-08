@@ -47,7 +47,24 @@ import pytest  # noqa: E402
 from operational import qa_check_outputs as qco  # noqa: E402
 from operational.qa_check import CONTENT_TRUTH, DEPLOY_HEALTH  # noqa: E402
 
-NOW = datetime.now(timezone.utc)
+# #2223: a module-level wall-clock global desyncs from a handler that reads its
+# own clock at call time. The instant is a literal, and the module under test is
+# pinned to the SAME instant by the autouse fixture below.
+NOW = datetime(2026, 8, 8, 12, 0, 0, tzinfo=timezone.utc)
+
+
+class _FrozenDatetime(datetime):
+    @classmethod
+    def now(cls, tz=None):
+        return NOW if tz is not None else NOW.replace(tzinfo=None)
+
+
+@pytest.fixture(autouse=True)
+def _freeze_module_clock(monkeypatch):
+    """``check_s3_freshness`` ages objects against ``datetime.now(timezone.utc)``
+    — freeze it to NOW so the reported age is exact, not a race with the suite's
+    own runtime."""
+    monkeypatch.setattr(qco, "datetime", _FrozenDatetime)
 
 
 def _by_name(checks):
