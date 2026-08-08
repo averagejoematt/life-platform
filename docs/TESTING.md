@@ -17,7 +17,11 @@
 | Smoke (post-deploy) | `tests/smoke_test_site.sh` + `qa-smoke` Lambda | ~30s | Yes, after each deploy |
 | Manual | Browser checks, MCP tool dispatch | Variable | No |
 
-**Total tests:** 8798 `def test_` functions (auto-synced by `deploy/sync_doc_metadata.py`; do not hand-edit this number).
+<<<<<<< HEAD
+**Total tests:** 8796 `def test_` functions (auto-synced by `deploy/sync_doc_metadata.py`; do not hand-edit this number).
+=======
+**Total tests:** 8796 `def test_` functions (auto-synced by `deploy/sync_doc_metadata.py`; do not hand-edit this number).
+>>>>>>> 0012c71f (fix(infra): branch-protection bypass is a User actor, not Integration — the app 422s off an org on a personal repo (#2198))
 
 ---
 
