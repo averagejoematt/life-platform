@@ -165,6 +165,7 @@ except ImportError:
     logger.setLevel(_log.INFO)
 
 from ai import ai_calls  # -- Extracted module imports ---------------------------------------------------
+from common import dry_run  # #2255: one definition of what DRY_RUN suppresses
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from content import html_builder, output_writers
 from experiment import phase_taxonomy  # ADR-077: the class registry the reads derive from (#2089)
@@ -1459,6 +1460,7 @@ def _run_ai_coach_pipeline(
     readiness_colour,
     character_sheet,
     brief_mode,
+    persist=True,
 ):
     """Runs the full AI coach pipeline (8 v2 coaches + ensemble digest kick-off +
     Board of Directors + Training/Nutrition + Journal + TL;DR/Guidance) and
@@ -1536,17 +1538,22 @@ def _run_ai_coach_pipeline(
         except Exception as e:
             logger.warning(f"{_label} Coach V2 failed (non-blocking): {e}")
 
-    # Invoke ensemble digest (async) after all v2 coaches complete
-    try:
-        _lc = boto3.client("lambda", region_name="us-west-2")
-        _lc.invoke(
-            FunctionName="coach-ensemble-digest",
-            InvocationType="Event",
-            Payload=json.dumps({"cycle_date": datetime.now(timezone.utc).strftime("%Y-%m-%d")}).encode(),
-        )
-        logger.info("Ensemble digest invoked (async)")
-    except Exception as e:
-        logger.warning(f"Ensemble digest invoke failed (non-blocking): {e}")
+    # Invoke ensemble digest (async) after all v2 coaches complete.
+    # #2255: fanning this out is a write — coach-ensemble-digest persists its own
+    # record and spends Bedrock budget — so a dry run must not trigger it.
+    if not persist:
+        logger.info("[DRY_RUN] skipping the async coach-ensemble-digest invoke")
+    else:
+        try:
+            _lc = boto3.client("lambda", region_name="us-west-2")
+            _lc.invoke(
+                FunctionName="coach-ensemble-digest",
+                InvocationType="Event",
+                Payload=json.dumps({"cycle_date": datetime.now(timezone.utc).strftime("%Y-%m-%d")}).encode(),
+            )
+            logger.info("Ensemble digest invoked (async)")
+        except Exception as e:
+            logger.warning(f"Ensemble digest invoke failed (non-blocking): {e}")
 
     # Build the shared system block ONCE; pass to all 4 AI calls so they
     # share one preamble object (smaller request build, single construction).
@@ -1639,18 +1646,33 @@ def lambda_handler(event, context):
     if event.get("healthcheck"):
         return {"statusCode": 200, "body": "ok"}
 
-    # DRY_RUN gate (added 2026-05-26): event payload `{"dry_run": true}` OR
-    # env DRY_RUN=1 — generates the brief end-to-end but skips both SES
-    # send_email calls (line ~1462 sick-day banner, line ~2004 main brief).
-    # Prevents the "5 duplicate Morning Briefs" bug class where manual
-    # invocations during testing actually ship to recipients.
-    # Caller can also pass {"force_send": true} to override env DRY_RUN
-    # for one-off real sends.
-    _dry_run = bool(event.get("dry_run")) or (os.environ.get("DRY_RUN", "").lower() in ("1", "true", "yes") and not event.get("force_send"))
+    # DRY_RUN gate (added 2026-05-26; SCOPE CORRECTED 2026-08-08, #2255).
+    # Event payload `{"dry_run": true}` OR env DRY_RUN=1 (overridable for a
+    # one-off real send with `{"force_send": true}`). It generates the brief
+    # end-to-end and then suppresses every side effect:
+    #   * both ses.send_email calls (sick-day banner, main brief) — the
+    #     original 2026-05-26 purpose, killing the "5 duplicate Morning Briefs"
+    #     bug class where manual test invocations shipped to recipients;
+    #   * every WRITE on the path (#2255). Until this fix the writes were gated
+    #     on `demo_mode` alone, so a dry run pushed the LIVE
+    #     generated/public_stats.json + pulse.json that averagejoematt.com
+    #     serves, plus write_dashboard/clinical/buddy_json, store_day_grade,
+    #     store_habit_scores, the guidance_given update_item, the insight
+    #     ledger batch, and the async coach-ensemble-digest invoke;
+    #   * record_email_send (#2255) — it used to stamp `status: "success"` +
+    #     `sent_at` into the email_log partition the status page and the
+    #     missing-send alarm read, for mail that was never sent. That false
+    #     success is the worse half: an overwritten artifact is corrected by
+    #     the next real run, a silenced alarm is not.
+    # It deliberately does NOT suppress reads, rendering, AI generation (that's
+    # usually what you invoked a dry run to look at — cap the spend with the
+    # budget tier, not with this flag), or the ComputePipelineStaleness
+    # datapoint, which measures the compute pipeline rather than this run.
+    # The single predicate below is `dry_run.persistence_enabled(event, demo_mode)`
+    # — one place, so a new write site cannot pick up only the demo_mode half.
+    _dry_run = dry_run.stash(event)
     if _dry_run:
-        logger.info("[daily-brief] DRY_RUN mode — generating brief but skipping SES send")
-    # Stash on event so the two send_email paths can read it without plumbing
-    event["_dry_run_resolved"] = _dry_run
+        logger.info("[daily-brief] DRY_RUN mode — generating the brief but writing nothing (no SES, no S3, no DynamoDB)")
 
     _init_output_writers()  # late-bind; safe to call multiple times (idempotent)
 
@@ -1664,6 +1686,8 @@ def lambda_handler(event, context):
         return _regrade_handler(regrade_dates, profile)
 
     demo_mode = event.get("demo_mode", False)
+    # #2255: THE gate for every write below — demo_mode OR dry_run suppresses it.
+    _persist = dry_run.persistence_enabled(event, demo_mode)
     logger.info("Daily Brief v2.82.0 starting..." + (" [DEMO MODE]" if demo_mode else ""))
     profile = fetch_profile()
     if not profile:
@@ -1780,17 +1804,19 @@ def lambda_handler(event, context):
             )
             logger.info(f"Recovery brief sent: {_sb_subject}")
 
-        try:
-            output_writers.write_buddy_json(
-                {"date": yesterday, "whoop": _sb_whoop, "sick_day": True, "sick_day_reason": _sick_brief_reason},
-                profile,
-                yesterday,
-                character_sheet=None,
-            )
-        except Exception as _sbe:
-            logger.warning(f"write_buddy_json (sick) failed: {_sbe}")
+        if _persist:  # #2255: a dry run of the sick-day path writes nothing either
+            try:
+                output_writers.write_buddy_json(
+                    {"date": yesterday, "whoop": _sb_whoop, "sick_day": True, "sick_day_reason": _sick_brief_reason},
+                    profile,
+                    yesterday,
+                    character_sheet=None,
+                )
+            except Exception as _sbe:
+                logger.warning(f"write_buddy_json (sick) failed: {_sbe}")
 
-        return {"statusCode": 200, "body": f"Recovery brief sent for {yesterday}"}
+        # #2255: report honestly — a dry run generated it, it did not send it.
+        return {"statusCode": 200, "body": f"Recovery brief {'generated (DRY_RUN, not sent)' if _dry_run else 'sent'} for {yesterday}"}
 
     # Deduplicate multi-device Strava activities
     strava = data.get("strava")
@@ -1918,7 +1944,7 @@ def lambda_handler(event, context):
             logger.warning("compute_day_grade failed, using defaults: " + str(e))
             day_grade_score, grade, component_scores, component_details = None, "—", {}, {}
 
-        if day_grade_score is not None and not demo_mode:
+        if day_grade_score is not None and _persist:
             try:
                 store_day_grade(
                     yesterday,
@@ -1985,7 +2011,7 @@ def lambda_handler(event, context):
             logger.warning("compute_habit_streaks failed: " + str(e))
             mvp_streak, full_streak, vice_streaks = 0, 0, {}
 
-        if not demo_mode:
+        if _persist:
             try:
                 store_habit_scores(yesterday, component_details, component_scores, vice_streaks, profile, tier0_streak=mvp_streak)
             except Exception as e:
@@ -2057,6 +2083,7 @@ def lambda_handler(event, context):
         readiness_colour,
         character_sheet,
         brief_mode,
+        persist=_persist,  # #2255: gates the async ensemble-digest fan-out
     )
     bod_insight = _ai["bod_insight"]
     training_nutrition = _ai["training_nutrition"]
@@ -2073,7 +2100,7 @@ def lambda_handler(event, context):
 
     # Phase 1B: Write guidance_given back to computed_insights for anti-repetition
     try:
-        if tldr_guidance:
+        if tldr_guidance and _persist:  # #2255: a dry run must not poison anti-repetition state
             _guidance_items = tldr_guidance.get("guidance", [])
             _tldr_text = tldr_guidance.get("tldr", "")
             _guidance_given = [_tldr_text] + _guidance_items if _tldr_text else _guidance_items
@@ -2324,7 +2351,7 @@ def lambda_handler(event, context):
         )
         logger.info("Sent: " + subject)
 
-    if not demo_mode:
+    if _persist:  # #2255: demo_mode OR dry_run
         output_writers.write_dashboard_json(
             data,
             profile,
@@ -2361,7 +2388,9 @@ def lambda_handler(event, context):
 
     # site_writer: write public_stats.json to S3 for averagejoematt.com
     # Non-fatal — failure here never breaks the Daily Brief
-    if not demo_mode:
+    # #2255: `_persist`, not `not demo_mode` — these are the LIVE artifacts the
+    # public site serves, and a dry run used to overwrite them.
+    if _persist:
         try:
             from content.site_writer import write_public_stats
             from web.site_api_common import PLATFORM_STATS  # #1369: the ONE counts home
@@ -2699,5 +2728,10 @@ def lambda_handler(event, context):
         except Exception as _sw_e:
             logger.warning(f"site_writer failed (non-fatal): {_sw_e}")
 
-    record_email_send(table, "daily_brief")
-    return {"statusCode": 200, "body": "Daily brief v2.77.0 sent: " + subject}
+    # #2255: a dry run sent no mail, so it must not write the row the status
+    # page and the missing-send alarm read as proof that it did.
+    if _dry_run:
+        logger.info("[DRY_RUN] skipping record_email_send — no mail was sent, so no email_log row is written")
+    else:
+        record_email_send(table, "daily_brief")
+    return {"statusCode": 200, "body": ("Daily brief v2.77.0 " + ("generated (DRY_RUN, not sent): " if _dry_run else "sent: ") + subject)}
