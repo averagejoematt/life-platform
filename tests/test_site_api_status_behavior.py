@@ -1350,7 +1350,10 @@ def test_a_scheduled_sender_never_reports_the_idle_gray_state(monkeypatch):
     This test is the ratchet on that decision: no age from 0 to 30 days may produce
     gray, and the helper may not come back.
     """
-    assert not hasattr(sas, "_sched_aware"), "the deleted idle-state helper is back"
+    # `_sched_aware` was a function LOCAL to status(), never a module attribute, so a
+    # hasattr() check here would be vacuous — it would pass against the very code that
+    # still has the helper. Read the source instead.
+    assert "_sched_aware" not in _SRC, "the deleted idle-state helper is back in the module"
     row = _weekly_email()
     seen = set()
     for age in range(0, 31):

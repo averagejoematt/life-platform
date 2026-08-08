@@ -61,7 +61,7 @@ def status(*, _g) -> dict:
     if now_ts - _status_cache_ts < STATUS_CACHE_TTL and _status_cache:
         return _ok(_status_cache, cache_seconds=60)
 
-    # (#2221: `today_dow` lived here to feed the deleted _sched_aware idle state. The
+    # (#2221: `today_dow` lived here to feed the deleted schedule-aware idle state. The
     # cadence check that replaced it measures days of silence, not the weekday.)
 
     # ── Pipeline health check results (active probe) ──
