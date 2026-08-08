@@ -260,55 +260,39 @@ deleted, fail-open via `[[ -f ]]`, so its doc-sync half silently no-oped).
 - The handover carries one line either way: `**Stash/hooks:** clean` or
   `**Stash/hooks:** <what was found + what you did about it>`.
 
-### (e6) Label-completeness gate — a wrap gate, same shape as (d)/(e)/(e2)/(e3)/(e4)/(e5) (#1349)
-
-The label-routing rule (`.claude/agents/issue-filer.md`'s "exactly one model:*" ADR-099
-contract) is only real if it holds over time — a session seeds work from `gh issue list
---label model:sonnet ...`-style queries, and an issue with no `model:*` label is silently
-invisible to every one of them. Same shape as the #1259 memory-orphan gate: a one-line
-check that must print nothing.
-
-- Run:
-  ```bash
-  python3 scripts/check_story_labels.py
-  ```
-  It must print `OK`. If it lists violators, add exactly one `model:*` label
-  (`model:sonnet` / `model:opus` / `model:fable`, per issue-filer.md's routing rubric) to
-  each before closing this step — do not leave a printed violator unfixed.
-- If `gh` isn't authenticated/reachable from this session, the script fails open (prints
-  a skip note, exits 0) — note that in the handover rather than silently skipping the
-  check.
-- This gate is the `model:*` rule alone. The rest of the ADR-099 filing contract is
-  (e7)'s, which already absorbs this rule — both run until #1872 deletes this one.
-
-### (e7) Backlog-hygiene gate — a wrap gate, same shape as (d)/(e)/(e2)/(e3)/(e4)/(e5)/(e6) (#1870)
+### (e7) Backlog-hygiene gate — a wrap gate, same shape as (d)/(e)/(e2)/(e3)/(e4)/(e5) (#1870, blocking since #1872)
 
 The ADR-099 filing contract is only real if something re-reads it after filing. #1863
-measured the gap: (e6)'s `model:*` rule was the ONLY validation a filed issue ever got, so
-#1858 and #1859 — filed mid-session on 2026-07-27 with no milestone, no score line and no
-`## Outcome` — were invisible to every ranked query and nothing noticed.
+measured the gap: `scripts/check_story_labels.py`'s `model:*` rule was the ONLY
+validation a filed issue ever got, so #1858 and #1859 — filed mid-session on 2026-07-27
+with no milestone, no score line and no `## Outcome` — were invisible to every ranked
+query and nothing noticed. That script's single rule is now absorbed and it is deleted
+(#1872) — this gate is the only filing-contract check.
 
 - Run:
   ```bash
-  python3 scripts/check_backlog_hygiene.py --advisory
+  python3 scripts/check_backlog_hygiene.py
   ```
   It lints the whole open corpus against the ADR-099 amendment (#1865): one `type:*` /
   `area:*` / `model:*`, `prio:*` + a milestone on work issues, a `## Outcome` naming a
   sanctioned audience, 3–5 `## Acceptance` boxes, the canonical `**Score:**` line whose
   `→ <milestone>` matches the real one, the `**Epic:**` link, epic `## Stories` coverage,
   `Now`-queue liveness, and stale `Later` issues.
-- **It always exits 0 for now** — the corpus is known-dirty and #1868's backfill burns the
-  list down; **#1872** flips the default to `--blocking` and deletes `check_story_labels.py`
-  (whose `model:*` rule this linter already absorbs). **The exit code is the provisional
-  half; the gate shape is not** — a printed violator on an issue this session filed,
-  touched or closed may not be left unfixed. Fix those before closing this step; don't
-  chase the backlog's historical debt at wrap time — #1868 owns that.
-- If `gh` isn't authenticated/reachable from this session, the linter fails open (prints a
-  skip note, exits 0) — note that in the handover rather than silently skipping the check.
+- **Blocking by default (#1872, the ADR-108 promotion pattern):** #1867 landed advisory
+  deliberately (the corpus was known-dirty); #1868 backfilled it to zero violations, #1872
+  re-measured that clean state held and flipped the default to exit 1 on any violation —
+  see the dated ADR-099 amendment in `docs/DECISIONS.md` for the measured evidence.
+  A printed violator on an issue this session filed, touched or closed may not be left unfixed.
+  `--advisory` is available as an explicit opt-out when you need the report without the
+  exit code (e.g. the (e9) `later_staleness` sweep below).
+- **Live-fetch failure stays fail-open even blocking:** if `gh` isn't authenticated/
+  reachable from this session, the linter fails open (prints a skip note, exits 0) — a
+  missing `gh` auth or no network must never wedge the wrap. Note that in the handover
+  rather than silently skipping the check.
 - Its `now_liveness` and `later_staleness` findings are not defects — they are (e9)'s
   input. Carry them there rather than fixing them here.
 
-### (e8) Closure-comment gate — a wrap gate, same shape as (d)/(e)/(e2)/(e3)/(e4)/(e5)/(e6)/(e7) (#1870)
+### (e8) Closure-comment gate — a wrap gate, same shape as (d)/(e)/(e2)/(e3)/(e4)/(e5)/(e7) (#1870)
 
 Every issue closed this session gets an outcome verdict, or the wrap is incomplete —
 **silent omission is not an outcome.** #1863 measured the hole: **53 of the last 60 closed
@@ -372,8 +356,9 @@ upkeep the wrap can't skip.
   (`gh issue edit <N> --milestone Next`) if it still matters, or close it (`gh issue close
   <N> --reason "not planned"`, plus its (e8) comment) if it doesn't. "Keep it on `Later`"
   is a legitimate third call, but only when stated out loud with a one-clause reason —
-  never by silence. An aged `Later` issue is a triage signal, never a defect: this rule can
-  never fail the gate, even after #1872.
+  never by silence. An aged `Later` issue is a triage signal, never a defect: `later_staleness`
+  findings are ADVISORY severity, so this rule can never fail the gate even under (e7)'s
+  blocking default.
 - The handover carries one line either way: `**Backlog:** Now <n> actionable (promoted
   #N, #M); Later sweep — <calls made>` or `**Backlog:** Now live at <n>; no stale Later
   issues`.
@@ -404,8 +389,8 @@ incident row in the session ledger; a new red could hide among the chronic ones.
   AND unacknowledged.
 - **AWS-unreachable degrade:** if CloudWatch can't be reached (no creds, offline),
   the script prints `UNVERIFIED` and exits 0 on its own — note that in the handover
-  rather than claiming a clean board (mirrors the (e6)/(e7) `gh`-unavailable
-  fail-open shape).
+  rather than claiming a clean board (mirrors (e7)'s `gh`-unavailable fail-open
+  shape).
 - The handover carries one line either way: `**Alarms:** <N> red >72h, all cited`,
   `**Alarms:** <M> uncited — named: <alarm names>`, or `**Alarms:** unverified — AWS
   unreachable`.
@@ -481,12 +466,12 @@ session — status block, handover, build beat (9 R22 smalls #836–#845)`).
 - **Decisions or explicit skip, never silence (#1343).** Every wrap's handover carries a
   `**Decisions:** <ADR-NNN filed or "none needed — reason">` line — a governance decision
   must never land only in a workflow file or a commit message.
-- **Model: label completeness, no silent skips (#1349).** `scripts/check_story_labels.py`
-  must print `OK` before the wrap commit; a violator gets fixed (labeled), not deferred.
-- **Filing-contract violators get fixed, not deferred (#1870).**
-  `scripts/check_backlog_hygiene.py --advisory` runs at every wrap (step (e7)); a printed
-  violator on an issue this session filed, touched or closed may not be left unfixed. The
-  advisory exit code is provisional (#1872 flips it) — the gate shape is not.
+- **Filing-contract violators get fixed, not deferred (#1870, blocking since #1872).**
+  `scripts/check_backlog_hygiene.py` runs at every wrap (step (e7)) and exits 1 on any
+  violation by default — this absorbs and replaces the old #1349 `model:*`-only
+  label-completeness gate (`scripts/check_story_labels.py`, deleted by #1872). A printed
+  violator on an issue this session filed, touched or closed may not be left unfixed. A
+  live-fetch failure (no `gh`/network) still fails open — exit 0 — even in blocking mode.
 - **Outcome verdict on every closure, never silence (#1870).** Step (e8): each issue closed
   this session carries the ADR-099 closure comment (`**Shipped:** …` + `**Outcome:**
   <realized|partial|not-realized> — …`), a `not planned` close included. A fabricated

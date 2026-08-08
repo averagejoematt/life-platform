@@ -7,8 +7,9 @@ line and no outcome section and nothing noticed.
 
 House style is #1189's "no vacuous scans": every rule below is planted with a fixture
 that violates it AND a fixture that satisfies it, so a rule that silently stopped biting
-(or bit everything) fails here. The wrap-wiring assertions mirror
-tests/test_story_label_gate_1349.py.
+(or bit everything) fails here. The wrap-wiring assertions mirrored the retired
+tests/test_story_label_gate_1349.py, which #1872 deleted alongside the script it tested
+(scripts/check_story_labels.py) once this linter's --blocking default absorbed its rule.
 """
 
 import json
@@ -84,26 +85,33 @@ def _live_now_queue(n=3, start=900):
     return [_issue(number=start + i, labels=("type:story", "area:infra", "model:sonnet", "prio:P3")) for i in range(n)]
 
 
-# ── the gate is wired into the /wrap skill (mirrors test_story_label_gate_1349) ──
+# ── the gate is wired into the /wrap skill (mirrors the old test_story_label_gate_1349) ──
 def test_wrap_skill_invokes_the_hygiene_linter():
     wrap = WRAP.read_text(encoding="utf-8")
     assert "check_backlog_hygiene.py" in wrap, "#1867: the linter must actually be invoked from wrap.md, not merely described"
-    assert "--advisory" in wrap, "#1867: the wrap invocation must be the advisory one until #1872 flips it"
 
 
-def test_wrap_still_invokes_the_absorbed_label_gate_until_1872():
-    """The `model:*` rule is duplicated on purpose: this linter absorbs it, but deleting
-    scripts/check_story_labels.py is #1872's proof, gated on the #1868 backfill."""
+def test_wrap_e7_invocation_is_bare_blocking_not_advisory():
+    """#1872: the (e7) gate invocation itself must be the bare (blocking-by-default) form —
+    `--advisory` may still appear elsewhere (the (e9) later_staleness report, and as the
+    documented opt-out), but not on the gate's own command line."""
+    section = _wrap_step("e7")
+    assert "python3 scripts/check_backlog_hygiene.py\n" in section, "(e7) must invoke the linter bare — blocking is the default post-#1872"
+    assert "check_backlog_hygiene.py --advisory\n" not in section, "(e7)'s own gate call must not opt back into advisory mode"
+
+
+def test_wrap_no_longer_references_the_deleted_label_gate_script():
+    """#1872's proof: scripts/check_story_labels.py is deleted and no wrap step invokes it
+    (mentioning it in past-tense narrative, e.g. 'absorbed and deleted', is fine)."""
     wrap = WRAP.read_text(encoding="utf-8")
-    assert "check_story_labels.py" in wrap
-    assert (ROOT / "scripts" / "check_story_labels.py").exists()
+    assert not (ROOT / "scripts" / "check_story_labels.py").exists()
+    assert "python3 scripts/check_story_labels.py" not in wrap
 
 
-def test_wrap_says_the_linter_is_advisory_and_names_the_flip_issue():
+def test_wrap_says_the_linter_is_blocking_by_default_and_names_the_flip_issue():
     wrap = WRAP.read_text(encoding="utf-8")
     section = wrap.split("check_backlog_hygiene.py")[1][:1200]
-    assert "exits 0" in section
-    assert "#1872" in section, "the wrap step must name what flips it blocking, or it reads as a permanent no-op"
+    assert "#1872" in section, "the wrap step must name the issue that flipped it blocking"
 
 
 # ── the three #1870 wrap steps: gate (e7), closure comment (e8), queue upkeep (e9) ──
@@ -117,12 +125,13 @@ def _wrap_step(letter: str) -> str:
 
 def test_wrap_e7_is_the_hygiene_gate_in_the_established_shape():
     """#1870 AC1: the #1867 advisory line is formalized into its own (e7) gate slot —
-    same 'same shape as (d)/(e)/(e2)...' lettering every other wrap gate carries."""
+    same 'same shape as (d)/(e)/(e2)...' lettering every other wrap gate carries.
+    #1872 flipped this gate's own invocation to the bare (blocking) form."""
     section = _wrap_step("e7")
     assert "same shape as" in section.splitlines()[0], "(e7) must declare the established gate shape in its heading"
-    assert "check_backlog_hygiene.py --advisory" in section
+    assert "python3 scripts/check_backlog_hygiene.py\n" in section
     assert "may not be left unfixed" in section, "#1870: the wrap discipline is that a printed violator gets fixed"
-    assert "#1872" in section, "(e7) must name the issue that flips the exit code, or it reads as a permanent no-op"
+    assert "#1872" in section, "(e7) must name the issue that flipped the exit code, or it reads as a permanent no-op"
 
 
 def test_wrap_e8_carries_the_adr099_closure_contract_verbatim():
@@ -494,23 +503,52 @@ def test_check_reports_every_rule_over_a_deliberately_dirty_corpus():
 
 
 def test_cli_advisory_mode_prints_violations_and_exits_zero(tmp_path, capsys):
-    """The AC: lands advisory. A day-one blocking gate would red the wrap over #1868's
-    outstanding backfill — the ADR-108 promotion pattern."""
+    """The explicit `--advisory` opt-out: report the violations, never fail the caller.
+    Pre-#1872 this was the unflagged default; post-#1872 it must be requested."""
     fixture = tmp_path / "issues.json"
     fixture.write_text(json.dumps([_issue(number=1858, labels=("type:story",), milestone=None, body="nothing")]), encoding="utf-8")
-    rc = hy.main(["--issues-json", str(fixture), "--now", "2026-07-27T00:00:00Z"])
+    rc = hy.main(["--issues-json", str(fixture), "--advisory", "--now", "2026-07-27T00:00:00Z"])
     out = capsys.readouterr().out
     assert rc == 0, "advisory mode must never exit non-zero"
     assert "#1858" in out and "ADVISORY MODE" in out
 
 
 def test_cli_blocking_mode_exists_and_exits_one(tmp_path, capsys):
-    """#1872 flips the default to this; the flag must already work, or the flip is a rewrite."""
+    """The explicit `--blocking` flag must keep working (kept for explicit callers) even
+    though it is now redundant with the default."""
     fixture = tmp_path / "issues.json"
     fixture.write_text(json.dumps([_issue(number=1858, labels=("type:story",), milestone=None, body="nothing")]), encoding="utf-8")
     rc = hy.main(["--issues-json", str(fixture), "--blocking", "--now", "2026-07-27T00:00:00Z"])
     capsys.readouterr()
     assert rc == 1
+
+
+# ── mutation proof #1 (#1872): a deliberately non-conforming issue, DEFAULT invocation ──
+def test_cli_default_mode_is_now_blocking_and_exits_one(tmp_path, capsys):
+    """#1872's core flip, proven directly: the BARE invocation (no --advisory, no
+    --blocking) must behave exactly like --blocking now — this is what "the --advisory
+    default is removed" means operationally. A deliberately non-conforming issue (no
+    type/area/model/prio/milestone/outcome/acceptance/score/epic — a fixture that
+    violates nearly every rule at once) must exit 1 with zero flags passed."""
+    fixture = tmp_path / "issues.json"
+    fixture.write_text(
+        json.dumps(
+            [
+                {
+                    "number": 99999,
+                    "title": "a deliberately non-conforming issue",
+                    "labels": [],
+                    "milestone": None,
+                    "body": "just a paragraph, no sections, no score line, no epic link.",
+                    "updatedAt": "2026-08-08T00:00:00Z",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    rc = hy.main(["--issues-json", str(fixture), "--now", "2026-08-08T00:00:00Z"])
+    capsys.readouterr()
+    assert rc == 1, "the default invocation (no flags) must exit 1 on a violating corpus post-#1872"
 
 
 def test_cli_blocking_mode_does_not_fail_on_advisories_alone(tmp_path, capsys):
@@ -546,10 +584,15 @@ def test_cli_rule_filter_narrows_the_report(tmp_path, capsys):
     assert "milestone" in out and "acceptance_count" not in out
 
 
+# ── mutation proof #2 (#1872): a simulated gh/network failure, DEFAULT invocation ──
 def test_cli_is_fail_open_when_gh_is_unavailable_in_both_modes(monkeypatch, capsys):
     """No network/gh auth in CI's test job — a live-fetch failure must never red the suite
-    or block a wrap, in either mode (check_story_labels.py's advisory contract)."""
+    or wedge a wrap, in ANY mode, including the new blocking default. `hy.main([])` here
+    IS the post-#1872 default (no flags) — this is the fail-open half of the flip's
+    non-negotiable bar: a missing `gh` auth must exit 0 even though violations would
+    otherwise exit 1."""
     monkeypatch.setattr(hy, "_fetch_live_issues", lambda: None)
-    assert hy.main([]) == 0
+    assert hy.main([]) == 0, "bare invocation (the blocking default) must still fail OPEN on a live-fetch failure"
     assert hy.main(["--blocking"]) == 0
+    assert hy.main(["--advisory"]) == 0
     capsys.readouterr()

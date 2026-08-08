@@ -334,7 +334,7 @@ def test_cli_offline_mode_ranks_a_fixture(tmp_path, capsys):
 
 def test_cli_is_fail_open_when_gh_is_unavailable(monkeypatch, capsys):
     """No network/gh auth in CI's test job — a live-fetch failure must never red the
-    suite or block a session (check_story_labels.py's advisory contract)."""
+    suite or block a session (check_backlog_hygiene.py's fail-open contract)."""
     monkeypatch.setattr(bn, "_fetch_live_issues", lambda: None)
     rc = bn.main([])
     capsys.readouterr()

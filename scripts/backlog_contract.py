@@ -289,7 +289,7 @@ def label_names(issue: Dict[str, Any]) -> List[str]:
     """Label names from a `gh issue list --json labels` record.
 
     Tolerates a plain list-of-strings fixture too, matching
-    check_story_labels.unlabeled_stories' house style.
+    check_backlog_hygiene.py's rule fixtures (the shared house style).
     """
     return [lbl.get("name", "") if isinstance(lbl, dict) else str(lbl) for lbl in (issue.get("labels") or [])]
 
