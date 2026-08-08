@@ -35,10 +35,16 @@ No test ever combines a fixture date with a real `datetime.now()`.
 Fakes are hand-rolled and bounded; no MagicMock appears inside a loop- or
 pagination-shaped read.
 
-Tests that document a DEFECT in current behaviour are marked xfail with a
-`DEFECT (tranche-3 discovery)` reason naming the module, function, what it does
-and what it should do; they assert the behaviour the reader should get and will
-flip green when the defect is fixed. No production code is modified here.
+This file was written by a coverage tranche whose job was to REPORT, not fix: it
+landed with 27 `xfail` markers, each an already-verified defect with a working
+reproduction. #1658 closed that loop. 25 of the 27 are now fixed in
+`lambdas/emails/monthly_digest_lambda.py` and assert the reader-facing behaviour
+for real; each carries a `FIXED #1658` comment holding the original defect report
+so the record survives the flip. Two were re-reviewed and found NOT to be defects
+(the model tier and the prompt-caching claim) — both say so where they sit. Four
+tests that pinned the DEFECTIVE behaviour as if it were correct (the month labels,
+the subject line, the Monday-only guard, and an advisor-header assertion that
+could never pass) were rewritten, and say what they used to assert.
 """
 
 import datetime as _datetime_mod
@@ -1111,10 +1117,14 @@ def test_the_board_call_asks_for_enough_tokens_for_six_sections(monkeypatch):
 @pytest.mark.xfail(
     strict=False,
     reason=(
-        "DEFECT (tranche-3 discovery, P3 / COST-OPT-2): call_haiku_monthly (lines 563-565) sends the ENTIRE board "
-        "prompt as a single user message with no `system` block. Prompt caching engages on cache_control blocks "
-        "attached to the system message, so this — the platform's largest single monthly prompt — can never be "
-        "cached. The persona/rules half of the prompt belongs in `system`."
+        "LEFT OPEN BY DECISION, not a defect (#1658 re-review of a tranche-3 xfail). The observation is accurate — "
+        "call_haiku_monthly sends the whole board prompt as one user message with no `system` block, so no "
+        "cache_control block can be attached and prompt caching never engages. The CONCLUSION was wrong: a prompt "
+        "cache entry lives ~5 minutes, and this prompt is built once every ~30 days, so the COST-OPT-2 saving being "
+        "claimed here is unobtainable — the cache would have expired 8,600 times over before the next call. Against "
+        "zero saving stands a real cost: the data/goals blocks sit in the MIDDLE of the template, so making the "
+        "static half cacheable means restructuring the prompt the board has been reasoning over. Left as-is "
+        "deliberately; revisit only if this letter's cadence ever drops below the cache TTL."
     ),
 )
 def test_the_static_half_of_the_board_prompt_is_sent_as_a_cacheable_system_block(monkeypatch):
@@ -1127,21 +1137,34 @@ def test_the_static_half_of_the_board_prompt_is_sent_as_a_cacheable_system_block
     assert seen[0].get("system")
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P3): call_haiku_monthly is named for Haiku and every comment/doc calls this the "
-        "Haiku council call, but line 564 defaults the model to 'claude-sonnet-4-6'. Under ADR-049 model tiering a "
-        "structured, section-templated task is a Haiku task; the letter has been silently billing at Sonnet rates."
-    ),
-)
-def test_the_haiku_council_call_actually_requests_haiku(monkeypatch):
+def test_the_board_call_uses_the_narrative_model_tier(monkeypatch):
+    """Replaces a tranche-3 xfail that asserted the opposite (#1658 re-review).
+
+    That xfail read the function's NAME as the contract — "call_haiku_monthly is
+    named for Haiku, therefore requesting Sonnet is the defect" — and cited ADR-049
+    tiering. ADR-049 tiers STRUCTURED work to Haiku and NARRATIVE work to Sonnet,
+    and this is the platform's flagship narrative surface: six advisor voices and a
+    chair's verdict over 30 days of data, read once a month for ~12 calls a year.
+    Sonnet is the correct tier; the misnomer is the function's name. Pinned as the
+    positive contract so a future "cost fix" cannot quietly downgrade the letter.
+    """
     seen = []
     _fake_ai(monkeypatch, capture=seen)
     monkeypatch.setattr(m, "_build_monthly_prompt_from_config", lambda: None)
     monkeypatch.setattr(m, "_presence_block", lambda: "")
     monkeypatch.setattr(m, "_HAS_INSIGHT_WRITER", False)
     monkeypatch.delenv("AI_MODEL", raising=False)
+    m.call_haiku_monthly({}, {})
+    assert "sonnet" in seen[0]["model"].lower()
+
+
+def test_the_board_model_stays_overridable_by_the_platform_env_var(monkeypatch):
+    seen = []
+    _fake_ai(monkeypatch, capture=seen)
+    monkeypatch.setattr(m, "_build_monthly_prompt_from_config", lambda: None)
+    monkeypatch.setattr(m, "_presence_block", lambda: "")
+    monkeypatch.setattr(m, "_HAS_INSIGHT_WRITER", False)
+    monkeypatch.setenv("AI_MODEL", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
     m.call_haiku_monthly({}, {})
     assert "haiku" in seen[0]["model"].lower()
 
@@ -1277,20 +1300,24 @@ def test_a_character_sheet_read_failure_never_blocks_the_letter(monkeypatch, fro
     assert data["cur"]["whoop"]["days"] == 2  # the rest of the month survived
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P3): monthly_digest_lambda.gather_all line 584 lists 'eightsleep' among the "
-        "sources it fetches for BOTH arms, but `extractors` (lines 585-592) has no eightsleep entry and nothing "
-        "downstream reads raw_cur['eightsleep']. Two full DynamoDB range queries per month are issued and discarded, "
-        "and the Eight Sleep bed data never reaches the letter at all."
-    ),
-)
+# FIXED #1658 (found as a tranche-3 xfail, P3): monthly_digest_lambda.gather_all line 584 lists 'eightsleep' among the sources
+# it fetches for BOTH arms, but `extractors` (lines 585-592) has no eightsleep entry and nothing downstream reads
+# raw_cur['eightsleep']. Two full DynamoDB range queries per month were issued and discarded. Fixed by REMOVING the fetch (whoop
+# is the letter's sleep source of truth), not by plumbing eightsleep through — see the docstring.
 def test_every_source_the_letter_fetches_reaches_the_letter(monkeypatch, frozen_monday):
+    """Derived from `m.SOURCES`, not from a restated literal set, so a source
+    added to the fetch list without a consumer reds this test.
+
+    The original assertion restated the list INCLUDING `eightsleep` and so demanded
+    the opposite remedy — that the bed data be plumbed through to the letter. Whoop
+    is the sleep source of truth for this letter (`cur["sleep"]` is extracted from
+    the whoop partition), so the correct fix for a fetch nobody reads was to stop
+    issuing it: two full DynamoDB range queries a month, discarded.
+    """
     monkeypatch.setattr(m, "table", _seeded_table())
     data, _ = m.gather_all()
-    fetched = {"whoop", "withings", "strava", "eightsleep", "hevy", "macrofactor", "todoist", "chronicling"}
-    assert fetched <= set(data["cur"])
+    assert "eightsleep" not in m.SOURCES
+    assert set(m.SOURCES) <= set(data["cur"])
 
 
 # FIXED #1658 (found as a tranche-3 xfail, P3): gather_all lines 605-612 build `cur`/`prior` with every extractor and then
@@ -1812,9 +1839,15 @@ def test_the_weekday_guard_reads_the_clock_in_utc(monkeypatch):
 # invoke on a Monday mails Matthew a real monthly letter — there is no way to exercise this function against production data
 # without sending.
 def test_a_dry_run_invocation_builds_the_letter_without_mailing_it(handler_env):
+    """Already fixed by #2222's shared send-suppressor before this cluster was
+    worked (the marker was a stale xpass); the #1658 half is the two lines below
+    it — a dry run must also leave no trace that a delivery happened, or the
+    suppressor becomes the reason the month's real letter is skipped."""
     resp = m.lambda_handler({"dry_run": True}, None)
     assert resp["statusCode"] == 200
     assert handler_env["ses"].sent == []
+    assert handler_env["writer"].written == []  # no ledger insight from a run that mailed nothing
+    assert [p for p in m.table.puts if "email_log" in str(p.get("pk"))] == []  # no send record
 
 
 # FIXED #1658 (found as a tranche-3 xfail, P2): lambda_handler writes no send record and reads none, so nothing prevents a

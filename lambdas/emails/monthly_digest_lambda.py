@@ -9,6 +9,11 @@ condensed section summaries.
 
 v1.1.0: Board prompt now dynamically built from s3://matthew-life-platform/config/board_of_directors.json
         Falls back to hardcoded _FALLBACK_MONTHLY_PROMPT if S3 read fails.
+v1.3.0 (#1658): cadence is enforced by the send log (at most one letter per calendar
+        month), not by a weekday guard. The old `weekday() == 0` check meant the
+        schedule above — the first SUNDAY — could never satisfy it, so the letter had
+        never actually been delivered. The month labels now name the month the data
+        covers rather than the month the send happens in.
 """
 
 import json
@@ -640,6 +645,11 @@ def call_haiku_monthly(data, goals):
         except Exception as e:
             logger.warning(f"IC-16 failed: {e}")
 
+    # Sonnet is DELIBERATE despite this function's name (#1658). ADR-049 tiers
+    # structured work to Haiku and narrative work to Sonnet, and this is the
+    # platform's flagship narrative surface: six advisor voices plus a chair's
+    # verdict over 30 days of data, read once a month. The misnomer is the
+    # function's name (kept for its call sites), not the model.
     payload = json.dumps(
         {"model": os.environ.get("AI_MODEL", "claude-sonnet-4-6"), "max_tokens": 2500, "messages": [{"role": "user", "content": prompt}]}
     ).encode()
@@ -1268,6 +1278,14 @@ def lambda_handler(event, context):
         EmailTags=[{"Name": "message_type", "Value": "monthly_digest"}],
     )
     logger.info(f"Sent: Monthly Coach's Letter · {month}")
+
+    # A dry run must leave NO trace that looks like a delivery: writing the send
+    # record would make the real scheduled invocation later that month skip as
+    # "already sent" — the suppressor would become the thing that suppresses the
+    # letter (the exact failure mode this handler just came out of).
+    if dry_run:
+        logger.info("[DRY_RUN] skipping the send record and the insight ledger write — no mail went out")
+        return {"statusCode": 200, "body": f"dry run — monthly letter built, not sent: {month}"}
 
     record_email_send(table, today)
 
