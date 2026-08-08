@@ -344,19 +344,6 @@ def test_unknown_view_envelope_names_the_alternatives(ddb):
     assert "hint" in out
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "mcp/registry.py declares a `days` property on get_cgm ('[dashboard] Days to analyse "
-        "(default: 30)') but mcp/tools_cgm.py::_get_cgm_dashboard lines 68-69 read only "
-        "start_date/end_date — `days` is never touched. What it should do: honor the declared "
-        "argument (or drop it from the schema). Who it hurts: Matthew asks 'how was my glucose "
-        "this week', Claude passes days=7 exactly as the schema instructs, and the tool silently "
-        "answers about the last 31 days — a mean, a time-in-range and a clinical flag computed "
-        "over four times the window he asked about, with the wrong window printed back at him in "
-        "`period`. P2."
-    ),
-)
 def test_dashboard_honors_the_declared_days_argument(ddb):
     ddb({AH_PK: [_glucose_day("2026-08-08", 100)]})
     assert "days" in TOOLS["get_cgm"]["schema"]["inputSchema"]["properties"]  # the schema really declares it
@@ -365,19 +352,6 @@ def test_dashboard_honors_the_declared_days_argument(ddb):
     assert out["period"]["start"] >= "2026-08-01"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "mcp/tools_cgm.py::_get_cgm_dashboard lines 68-69 build the default window as "
-        "`now - timedelta(days=30)` .. `now` and both bounds are INCLUSIVE in the DynamoDB "
-        "`sk BETWEEN` that mcp/core.py::query_source issues — so the '30 day' default actually "
-        "spans 31 calendar days (2026-07-09 through 2026-08-08). What it should do: subtract 29 "
-        "for a 30-day inclusive window, per #1917 window-name honesty. Who it hurts: every "
-        "monthly glucose comparison silently includes one extra day, and a 'last 30 days' mean "
-        "quoted beside a differently-derived 30-day figure elsewhere on the platform will not "
-        "reconcile. P3."
-    ),
-)
 def test_default_window_spans_the_number_of_days_it_is_named_for(ddb):
     ddb({AH_PK: [_glucose_day("2026-08-08", 100)]})
     out = tc.tool_get_cgm({"view": "dashboard"})
@@ -388,10 +362,15 @@ def test_default_window_spans_the_number_of_days_it_is_named_for(ddb):
 
 
 def test_default_window_is_derived_from_the_frozen_clock(ddb):
-    """Pins today's behaviour so the xfail above is unambiguous about what changed."""
+    """The exact default window, pinned to the frozen clock.
+
+    Was ``2026-07-09`` — ``now - timedelta(days=30)`` against an INCLUSIVE
+    ``sk BETWEEN``, i.e. a 31-day span behind a "30 day" name. #2221 subtracts 29;
+    this literal is the record of that change.
+    """
     ddb({AH_PK: [_glucose_day("2026-08-08", 100)]})
     out = tc.tool_get_cgm({"view": "dashboard"})
-    assert out["period"] == {"start": "2026-07-09", "end": "2026-08-08"}  # 2026-08-08 minus 30 days
+    assert out["period"] == {"start": "2026-07-10", "end": "2026-08-08"}  # 30 inclusive days ending today
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -449,18 +428,6 @@ def test_dashboard_clinical_flags_fire_on_their_own_thresholds(ddb):
     assert all(f["severity"] == "warning" for f in out["clinical_flags"])
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "mcp/tools_cgm.py::_get_cgm_dashboard line 150 tells the reader 'Targets: mean <100, "
-        "SD <20, TIR >90%, fasting <90' while the flag that enforces the SD target (line 118) "
-        "fires only above 25, and its own message claims '> 25 target'. What it should do: state "
-        "one SD target. Who it hurts: a glucose SD of 22 mg/dL is above the target the same "
-        "response prints and produces no warning at all — the note and the flag disagree inside a "
-        "single payload, so the reader cannot tell which is the platform's actual bar. Same "
-        "mismatch on fasting (note says <90, the flag fires above 100). P2."
-    ),
-)
 def test_dashboard_sd_flag_matches_the_target_it_publishes(ddb):
     ddb({AH_PK: [_glucose_day("2026-05-01", 95, sd=22, tir=95, above140=2)]})
     out = tc.tool_get_cgm({"view": "dashboard", "start_date": "2026-05-01", "end_date": "2026-05-01"})
@@ -468,18 +435,6 @@ def test_dashboard_sd_flag_matches_the_target_it_publishes(ddb):
     assert any("variability" in f["message"] for f in out["clinical_flags"])
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "mcp/tools_cgm.py::_get_cgm_dashboard computes `time_below_70_pct` for every day "
-        "(line 91) and then never reads it again — it is in no summary aggregate (lines 104-113) "
-        "and in no clinical flag (lines 115-129). Hypoglycemia is the only glucose excursion that "
-        "is acutely dangerous, and it is the one excursion the dashboard will not mention. What "
-        "it should do: aggregate and flag time below 70 mg/dL alongside time above 140. Who it "
-        "hurts: Matthew asks 'how's my glucose' on a day he spent 12% of below 70 and the answer "
-        "warns him about being 4% above 140. P2."
-    ),
-)
 def test_dashboard_flags_hypoglycemia(ddb):
     ddb({AH_PK: [_glucose_day("2026-05-01", 92, mn=54, sd=18, tir=88, above140=0, below70=12)]})
     out = tc.tool_get_cgm({"view": "dashboard", "start_date": "2026-05-01", "end_date": "2026-05-01"})
@@ -488,20 +443,6 @@ def test_dashboard_flags_hypoglycemia(ddb):
     assert any("below" in f["message"].lower() for f in out["clinical_flags"])
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "mcp/tools_cgm.py::_get_cgm_dashboard lines 85-91 read every per-day metric with "
-        "`.get(field, 0)`, so a DATE# row that carries `blood_glucose_avg` but not the "
-        "time-in-range / min / max / std_dev / readings attributes (a row predating those fields, "
-        "or any partial merge) is published as a day with a glucose MINIMUM of 0.0 mg/dL, 0 "
-        "readings and 0.0% time in range. What it should do: omit an unmeasured field (ADR-104 "
-        "behavioral absence), as `avg_fasting_proxy` already does for `min` on line 99. Who it "
-        "hurts: a blood glucose of 0 mg/dL is incompatible with life and 0% time in range is a "
-        "diabetic emergency; both are printed in the daily table as measured facts about a day "
-        "the sensor simply did not report. P1."
-    ),
-)
 def test_dashboard_unmeasured_day_reports_absence_not_zero(ddb):
     ddb({AH_PK: [_glucose_day("2026-05-01", 100), _partial_glucose_day("2026-05-02", 104)]})
     out = tc.tool_get_cgm({"view": "dashboard", "start_date": "2026-05-01", "end_date": "2026-05-02"})
@@ -512,19 +453,6 @@ def test_dashboard_unmeasured_day_reports_absence_not_zero(ddb):
     assert partial["readings"] != 0 or "readings" not in partial
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "mcp/tools_cgm.py::_get_cgm_dashboard lines 100-112: `sd_vals`, `tir_vals` and `a140` are "
-        "built from EVERY row including the zero-filled unmeasured ones, and the resulting means "
-        "then drive the clinical flags on lines 118-126. `min_vals` on line 99 filters `> 0`; the "
-        "other three do not — the same absence is excluded from one aggregate and averaged into "
-        "three others. What it should do: aggregate only days that actually carry the field, and "
-        "publish that field's own n. Who it hurts: on a real two-day window whose measured TIR is "
-        "96%, the tool reports `avg_time_in_range_pct: 48.0` and raises 'Time in range 48.0% < "
-        "90% target' — a fabricated clinical warning produced entirely by a missing attribute. P1."
-    ),
-)
 def test_dashboard_aggregates_exclude_unmeasured_days(ddb):
     ddb({AH_PK: [_glucose_day("2026-05-01", 100, sd=20, tir=96, above140=4), _partial_glucose_day("2026-05-02", 104)]})
     out = tc.tool_get_cgm({"view": "dashboard", "start_date": "2026-05-01", "end_date": "2026-05-02"})
@@ -551,19 +479,6 @@ def test_dashboard_fasting_proxy_is_none_when_no_day_measured_a_minimum(ddb):
     assert s["avg_fasting_proxy"] is None  # absent, not 0.0
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "mcp/tools_cgm.py::_get_cgm_dashboard line 108 means the DAILY MEANS unweighted, so a day "
-        "built from one fingerstick counts exactly as much as a day built from 288 sensor "
-        "readings, and the summary publishes no total reading count anywhere (`readings` exists "
-        "per-day on line 88 but is never summed). What it should do: weight by "
-        "blood_glucose_readings_count, or publish the per-day n distribution beside the mean, per "
-        "ADR-105. Who it hurts: one high manual spot-check on a sick day moves the headline "
-        "'average glucose' as much as a full sensor day, and nothing in the response lets Matthew "
-        "see that it did. P2."
-    ),
-)
 def test_dashboard_mean_is_weighted_by_readings(ddb):
     ddb(
         {
@@ -675,17 +590,6 @@ def test_dashboard_decimal_values_survive_json_serialisation(ddb):
     json.dumps(out)  # must not raise
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "mcp/tools_cgm.py::_get_cgm_dashboard lines 84-91 call bare `float()`/`int(float())` on "
-        "stored attributes with no guard, so a single non-numeric value in one DATE# row raises "
-        "ValueError out of the tool. What it should do: skip or report the unusable row the way "
-        "_load_cgm_readings (lines 56-57) already does. Who it hurts: one bad row from the HAE "
-        "webhook takes the entire glucose dashboard down with a stack trace instead of degrading "
-        "to the 29 good days beside it. P2."
-    ),
-)
 def test_dashboard_survives_a_non_numeric_stored_value(ddb):
     ddb({AH_PK: [_glucose_day("2026-05-01", 100), _glucose_day("2026-05-02", 105, n="n/a")]})
     out = tc.tool_get_cgm({"view": "dashboard", "start_date": "2026-05-01", "end_date": "2026-05-02"})
@@ -733,19 +637,6 @@ def test_disclaimer_rides_on_every_successful_view(ddb, s3):
     assert "Not medical advice" in out["_disclaimer"]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "mcp/tools_cgm.py::tool_get_cgm line 501 attaches the R13-F09 medical disclaimer only "
-        "`if 'error' not in result`, so every empty-state and failure envelope ships WITHOUT it — "
-        "including 'No blood glucose data in range. Requires Dexcom Stelo + webhook.', which is "
-        "itself a health statement. What it should do: attach the disclaimer to every response "
-        "from a health-assessment tool. Who it hurts: the response most likely to be quoted back "
-        "as 'the platform says you have no glucose data / your sensor is off' is the one response "
-        "that carries no 'not medical advice' qualifier. P2 (compliance posture, not a wrong "
-        "number)."
-    ),
-)
 def test_disclaimer_rides_on_the_error_envelope_too(ddb):
     ddb({AH_PK: []})
     out = tc.tool_get_cgm({"view": "dashboard", "start_date": "2026-05-01", "end_date": "2026-05-01"})
@@ -926,19 +817,6 @@ def test_fasting_direct_same_day_validation_is_hand_derived(ddb, s3):
     assert "Good agreement" in out["bias_analysis"]["interpretation"]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "mcp/tools_cgm.py::_get_fasting_glucose_validation line 460 returns `direct_validations` "
-        "as a LIST when there is same-day overlap and as a bare STRING ('No same-day overlap "
-        "between CGM and lab draws.') when there is not. What it should do: keep the key's type "
-        "stable and move the explanation to a sibling note, the way `cgm_coverage` and "
-        "`bias_analysis` already do. Who it hurts: any consumer that iterates or takes len() of "
-        "the field gets 48 single characters instead of zero validations — and the MCP client is "
-        "an LLM reading the JSON, which will happily narrate a list of letters. P2 (envelope "
-        "parity)."
-    ),
-)
 def test_fasting_direct_validations_keeps_a_stable_type_when_empty(ddb, s3):
     s3({_cgm_key("2026-05-01"): NIGHT_2026_05_01})
     ddb({LABS_PK: [_lab_draw("2026-06-01", "2026-06-01", 95)]})  # no same-day overlap
@@ -946,20 +824,6 @@ def test_fasting_direct_validations_keeps_a_stable_type_when_empty(ddb, s3):
     assert isinstance(out["direct_validations"], list) and out["direct_validations"] == []
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "mcp/tools_cgm.py::_get_fasting_glucose_validation lines 262-271 publish mean, median, "
-        "std_dev and the p10/p25/p75/p90 percentiles of the overnight-nadir distribution with no "
-        "minimum n, and line 265 substitutes a literal 0 for std_dev when n == 1. Line 433 then "
-        "reads that 0 back and emits 'Very stable overnight nadirs (SD 0 mg/dL) -- strong "
-        "metabolic consistency.' What it should do: withhold a distribution (and every insight "
-        "derived from it) below a minimum number of nights, and report an uncomputable SD as "
-        "absent rather than 0 (ADR-104/105). Who it hurts: ONE night of CGM produces a four-point "
-        "percentile curve and a positive clinical verdict about Matthew's metabolic consistency "
-        "that is derived entirely from the fact that a single number equals itself. P1."
-    ),
-)
 def test_fasting_single_night_does_not_produce_a_distribution_or_a_verdict(ddb, s3):
     s3({_cgm_key("2026-05-01"): NIGHT_2026_05_01})
     ddb({LABS_PK: []})
@@ -1000,20 +864,6 @@ def test_fasting_z_score_is_hand_derived_against_the_nadir_distribution(ddb, s3)
     assert sv["vs_overnight_nadir"]["percentile_of_nadir_dist"] == 100.0
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "mcp/tools_cgm.py::_get_fasting_glucose_validation lines 369-402 build the whole "
-        "`bias_analysis` block — including a named agreement band and an explicit "
-        "`confidence: high|moderate|low|very_low` — from the difference of two means, and publish "
-        "NEITHER n. `lab_mean_fasting` can be one draw and `cgm_overnight_nadir_mean` one night, "
-        "and the response still reads 'Excellent agreement ... confidence: high'. What it should "
-        "do: carry `n_lab_draws` and `n_nights` beside the bands, and refuse a confidence label "
-        "below a minimum of each, per ADR-105. Who it hurts: this block is the tool's verdict on "
-        "whether Matthew's CGM can be trusted against a venous draw; a single coincidence is "
-        "presented with the same confidence vocabulary as a year of paired data. P2."
-    ),
-)
 def test_fasting_bias_analysis_publishes_its_n(ddb, s3):
     s3({_cgm_key("2026-05-01"): NIGHT_2026_05_01})
     ddb({LABS_PK: [_lab_draw("2026-06-01", "2026-06-01", 88)]})
@@ -1023,22 +873,6 @@ def test_fasting_bias_analysis_publishes_its_n(ddb, s3):
     assert bias["n_lab_draws"] == 1 and bias["n_nights"] == 1
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "mcp/tools_cgm.py::_get_fasting_glucose_validation lines 291-302 append lab draws in the "
-        "order DynamoDB returns them (sk order) and lines 436-444 then treat `lab_draws[0]` as the "
-        "OLDEST and `lab_draws[-1]` as the most RECENT — without ever sorting on `draw_date`. The "
-        "two orders diverge the moment a draw is filed under a report/import date later than the "
-        "draw itself (a backfilled older panel), which is exactly what a manual lab import does. "
-        "labs_helpers._query_all_lab_draws sorts explicitly; this parallel reader does not — the "
-        "same unsorted-`[0]` class tranche 2 found on DEXA. What it should do: sort by draw_date "
-        "before taking first/last. Who it hurts: on draws of 88 (Feb), 92 (Apr) and 101 (Jun) — "
-        "genuinely RISING — the tool reports 'Lab fasting glucose trending down: 101.0 -> 92.0 "
-        "mg/dL -- positive trajectory.' A worsening fasting glucose is narrated back to Matthew "
-        "as a win. P1."
-    ),
-)
 def test_fasting_lab_trend_uses_draw_date_order_not_row_order(ddb, s3):
     s3({_cgm_key("2026-05-01"): NIGHT_2026_05_01})
     ddb(
@@ -1056,20 +890,14 @@ def test_fasting_lab_trend_uses_draw_date_order_not_row_order(ddb, s3):
     assert not any("positive trajectory" in i for i in insights)
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "mcp/tools_cgm.py::_get_fasting_glucose_validation line 181 hard-codes the S3 discovery "
-        "prefixes as ['2024/', '2025/', '2026/']. Every CGM day recorded from 2027-01-01 onward is "
-        "invisible to this view, and from that date the view returns 'No CGM data found in S3.' "
-        "for a sensor that is streaming normally. What it should do: derive the year range from "
-        "the data (or from the frozen genesis date forward). Who it hurts: the fasting-glucose "
-        "validation — the tool that decides whether Matthew's CGM can stand in for a venous draw "
-        "— silently empties itself on a specific future date, roughly five months out, with no "
-        "alarm and no CI signal. P1 (dated time bomb)."
-    ),
-)
 def test_fasting_discovers_cgm_days_beyond_the_hardcoded_year_list(ddb, s3):
+    """CORRECTION (#2221): as written under xfail this test requested the ``ddb``
+    fixture but never INSTALLED it, so the run reached the real ``table.query`` and
+    died on a botocore ClientError. The marker went green on an unpatched AWS call,
+    not on the year-list bug it names. The double is installed now, so the only thing
+    that can fail here is the discovery range.
+    """
+    ddb({LABS_PK: []})
     c = s3(
         {
             _cgm_key("2026-05-01"): NIGHT_2026_05_01,
@@ -1084,20 +912,6 @@ def test_fasting_discovers_cgm_days_beyond_the_hardcoded_year_list(ddb, s3):
     assert out["cgm_coverage"]["last_date"] == "2027-01-02"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "mcp/tools_cgm.py::_get_fasting_glucose_validation lines 286-290 issue ONE table.query for "
-        "the labs partition and never follow `LastEvaluatedKey`, while the sibling reader "
-        "mcp/labs_helpers.py::_query_all_lab_draws (lines 39-45) paginates the identical query. "
-        "What it should do: paginate. Who it hurts: once the labs partition exceeds a 1 MB page "
-        "(the biomarker maps are large), the bias analysis, the z-scores and the lab trend are "
-        "computed from a silently truncated prefix of Matthew's draw history — with no indication "
-        "in the response that anything was dropped. P3 today, P1 the day it crosses the page. "
-        "Same single-page read on line 179's S3 discovery is correctly paginated, which shows the "
-        "omission here is an oversight rather than a decision."
-    ),
-)
 def test_fasting_lab_read_is_paginated(ddb, s3):
     s3({_cgm_key("2026-05-01"): NIGHT_2026_05_01})
     ddb(
@@ -1108,21 +922,6 @@ def test_fasting_lab_read_is_paginated(ddb, s3):
     assert len(out["lab_draws"]) == 2
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "mcp/tools_cgm.py::_get_fasting_glucose_validation lines 171-176 call bare "
-        "`float(args.get('nadir_start_hour', 0))` / `int(args.get('min_overnight_readings', 6))` "
-        "on caller-supplied arguments with no guard and no range check, so a non-numeric value "
-        "raises ValueError straight out of the tool, and an out-of-range window (e.g. "
-        "nadir_end_hour=30, or start > end) silently produces an empty or nonsensical nadir set. "
-        "These four arguments are also undeclared in mcp/registry.py's get_cgm inputSchema, so "
-        "nothing validates them upstream either. What it should do: validate and clamp, or "
-        "declare them in the schema. Who it hurts: a malformed tool call from the model returns a "
-        "stack trace instead of an error envelope — the one failure mode the dispatcher's own "
-        "`valid_views` envelope exists to avoid. P2."
-    ),
-)
 def test_fasting_rejects_a_malformed_window_argument(ddb, s3):
     s3({_cgm_key("2026-05-01"): NIGHT_2026_05_01})
     ddb({LABS_PK: []})
