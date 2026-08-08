@@ -7,7 +7,19 @@ from datetime import datetime, timedelta, timezone
 
 from mcp.core import get_profile, get_sot, query_source
 from mcp.helpers import compute_daily_load_score, compute_ewa
+from mcp.strength_helpers import classify_exercise
 from mcp.tools_correlation import tool_get_zone2_breakdown
+
+# Readiness tier severity, worst last. Comparing the tier strings directly (e.g.
+# `min("GREEN", "YELLOW")`) is a lexicographic trap — "GREEN" < "YELLOW"
+# alphabetically, so a `min()`-based demotion silently never fires (#2247).
+# Always demote/promote through this rank, never the raw strings.
+_TIER_SEVERITY = {"GREEN": 0, "YELLOW": 1, "RED": 2}
+
+
+def _demote_tier(tier, floor):
+    """Return the more severe of ``tier`` and ``floor`` (never re-promotes)."""
+    return floor if _TIER_SEVERITY[floor] > _TIER_SEVERITY[tier] else tier
 
 
 def _get_training_load(args):
@@ -618,7 +630,7 @@ def _get_training_recommendation(args):
         for workout in item.get("workouts") or []:
             for exercise in workout.get("exercises") or []:
                 ename = exercise.get("exercise_name", "")
-                cls = classify_exercise(ename)  # noqa: F821
+                cls = classify_exercise(ename)
                 for mg in cls["muscle_groups"]:
                     if mg not in muscle_last_trained or d > muscle_last_trained[mg]:
                         muscle_last_trained[mg] = d
@@ -654,7 +666,7 @@ def _get_training_recommendation(args):
         tier = "RED"
     # Meeusen 2013: non-functional overreaching risk after 5+ consecutive training days
     if consecutive_training_days >= 5:
-        tier = min(tier, "YELLOW") if tier == "GREEN" else tier
+        tier = _demote_tier(tier, "YELLOW")
 
     # ── 6. Generate recommendation ───────────────────────────────────────────
     rec = {}

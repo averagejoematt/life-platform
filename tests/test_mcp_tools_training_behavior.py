@@ -777,10 +777,16 @@ def test_recommendation_acwr_above_one_point_five_forces_red(sources):
     assert out["recommendation"]["type"] in ("Full Rest", "Active Recovery")
 
 
-def test_recommendation_five_consecutive_training_days_leaves_the_tier_green(sources):
-    """OBSERVED: mcp/tools_training.py:657 tries to demote GREEN→YELLOW after 5+
-    consecutive training days with `min(tier, "YELLOW")`. min() on strings is
-    lexicographic and "GREEN" < "YELLOW", so the demotion is a no-op."""
+def test_five_consecutive_training_days_demotes_green_to_yellow(sources):
+    """FIXED (#2247) — mcp/tools_training.py used to demote GREEN→YELLOW after 5+
+    consecutive training days with `min(tier, "YELLOW")`. `min` on str is
+    lexicographic ("GREEN" < "YELLOW" alphabetically), so the branch reassigned
+    GREEN to GREEN and the demotion never fired: Matthew on his 7th straight
+    training day with great sleep was told GREEN and prescribed VO2max intervals
+    or heavy compounds — the exact scenario the guard exists to prevent. The fix
+    ranks tiers by an explicit severity map (`_TIER_SEVERITY`) instead of
+    comparing the strings. This test fails against the pre-fix code (asserts
+    GREEN survives) and passes now that the demotion actually fires."""
     strava = [strava_day(_d(-i), activities=[activity("Run", minutes=60, avg_hr=140)], activity_count=1) for i in range(1, 8)]
     sources(
         whoop=[_recovery_day(TODAY, recovery=95)],
@@ -792,24 +798,32 @@ def test_recommendation_five_consecutive_training_days_leaves_the_tier_green(sou
     )
     out = call("get_training", {"view": "recommendation", "date": TODAY})
     assert out["training_context"]["consecutive_training_days"] >= 5
-    assert out["readiness_tier"] == "GREEN"
+    assert out["readiness_tier"] == "YELLOW"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEAD SAFETY GUARD — mcp/tools_training.py:657 (_get_training_recommendation) writes "
-        '`tier = min(tier, "YELLOW") if tier == "GREEN" else tier` to encode Meeusen 2013 '
-        "(non-functional overreaching risk after 5+ consecutive training days). `min` on str is "
-        'lexicographic and "GREEN" < "YELLOW", so the branch reassigns GREEN to GREEN and the '
-        'demotion NEVER fires. It should be an explicit `tier = "YELLOW"`. Matthew on his 7th '
-        "straight training day with good sleep is told GREEN and prescribed VO2max intervals or "
-        "heavy compounds — the exact scenario the guard was written to prevent. (The companion "
-        "warning at :783 does still fire, so the payload is self-contradictory: a RED-flag warning "
-        "attached to a GREEN tier.)"
-    ),
-)
-def test_five_consecutive_training_days_should_demote_green_to_yellow(sources):
+def test_five_consecutive_training_days_does_not_promote_red_to_yellow(sources):
+    """The demotion is a floor, not a reset: a composite that already earned RED
+    (e.g. from #1.5 ACWR or, here, uniformly poor recovery/sleep/battery signals)
+    must stay RED under the same 5+ consecutive-training-day condition — the
+    Meeusen guard should never accidentally IMPROVE a worse verdict."""
+    strava = [strava_day(_d(-i), activities=[activity("Run", minutes=60, avg_hr=140)], activity_count=1) for i in range(1, 8)]
+    sources(
+        whoop=[_recovery_day(TODAY, recovery=10)],
+        eightsleep=[{"date": TODAY, "sleep_score": 10}],
+        garmin=[{"date": TODAY, "body_battery_high": 10}],
+        strava=strava,
+        macrofactor_workouts=[],
+        computed_metrics=[],
+    )
+    out = call("get_training", {"view": "recommendation", "date": TODAY})
+    assert out["training_context"]["consecutive_training_days"] >= 5
+    assert out["readiness_tier"] == "RED"
+
+
+def test_recommendation_warning_agrees_with_its_own_tier(sources):
+    """FIXED (#2247) — before the fix this scenario shipped a self-contradictory
+    payload: 'GREEN, go hard' next to '⚠️ 7 consecutive training days'. Now the
+    tier the warning attaches to actually reflects the risk it names."""
     strava = [strava_day(_d(-i), activities=[activity("Run", minutes=60, avg_hr=140)], activity_count=1) for i in range(1, 8)]
     sources(
         whoop=[_recovery_day(TODAY, recovery=95)],
@@ -821,43 +835,25 @@ def test_five_consecutive_training_days_should_demote_green_to_yellow(sources):
     )
     out = call("get_training", {"view": "recommendation", "date": TODAY})
     assert out["readiness_tier"] == "YELLOW"
-
-
-def test_recommendation_warning_contradicts_its_own_tier(sources):
-    """OBSERVED consequence of the dead guard: the payload simultaneously says
-    'GREEN, go hard' and '⚠️ 7 consecutive training days'."""
-    strava = [strava_day(_d(-i), activities=[activity("Run", minutes=60, avg_hr=140)], activity_count=1) for i in range(1, 8)]
-    sources(
-        whoop=[_recovery_day(TODAY, recovery=95)],
-        eightsleep=[{"date": TODAY, "sleep_score": 95}],
-        garmin=[{"date": TODAY, "body_battery_high": 95}],
-        strava=strava,
-        macrofactor_workouts=[],
-        computed_metrics=[],
-    )
-    out = call("get_training", {"view": "recommendation", "date": TODAY})
-    assert out["readiness_tier"] == "GREEN"
     assert any("consecutive training days" in w for w in out["warnings"])
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "NameError P1 — mcp/tools_training.py:621 (_get_training_recommendation) calls "
-        "`classify_exercise(ename)` which is NOT imported in that module. The `# noqa: F821` beside "
-        "it was added mechanically by deploy/archive/onetime/fix_ci_lint.py (whose own comment says "
-        "'imported from strength_helpers'), i.e. the linter was silenced INSTEAD of the import being "
-        "added — mcp/tools_strength.py imports the same symbol correctly from mcp.strength_helpers. "
-        "Consequence: the moment any macrofactor_workouts record in the tool's 14-day window carries "
-        "a workout with an exercise, get_training(view='recommendation') raises NameError out of the "
-        "MCP handler instead of returning a recommendation. It is latent only because "
-        "macrofactor_workouts has had no writer for ~4 months (phase_taxonomy.py:130, #485) — but "
-        "historical rows are explicitly KEPT, so passing the tool's own declared `date` argument at a "
-        "date with strength history reaches it today. It should import classify_exercise from "
-        "mcp.strength_helpers. Matthew gets a tool crash instead of today's training plan."
-    ),
-)
 def test_recommendation_survives_a_macrofactor_workout_with_exercises(sources):
+    """FIXED (#2249) — `classify_exercise(ename)` at mcp/tools_training.py:621
+    calls a name that was never imported in this module; the `# noqa: F821`
+    beside it was added mechanically by deploy/archive/onetime/fix_ci_lint.py
+    (whose own comment says "imported from strength_helpers") instead of the
+    import actually being added — mcp/tools_strength.py imports the same symbol
+    correctly from mcp.strength_helpers. Before the fix, the moment any
+    macrofactor_workouts record in the tool's 14-day window carried a workout
+    with an exercise, get_training(view='recommendation') raised NameError out
+    of the MCP handler instead of returning a recommendation. It was latent only
+    because macrofactor_workouts has had no writer for ~4 months
+    (phase_taxonomy.py:130, #485) — but historical rows are explicitly KEPT, so
+    the tool's own declared `date` argument landing on a date with strength
+    history reached it. Now `classify_exercise` is imported properly and the
+    call both survives AND actually classifies the exercise into muscle_recovery
+    (Bench Press -> Chest/Triceps/Shoulders), rather than merely not crashing."""
     sources(
         whoop=[_recovery_day(TODAY, recovery=80)],
         eightsleep=[],
@@ -873,6 +869,9 @@ def test_recommendation_survives_a_macrofactor_workout_with_exercises(sources):
     )
     out = call("get_training", {"view": "recommendation", "date": TODAY})
     assert "muscle_recovery" in out
+    assert set(out["muscle_recovery"]) == {"Chest", "Triceps", "Shoulders"}
+    for mg in ("Chest", "Triceps", "Shoulders"):
+        assert out["muscle_recovery"][mg]["last_trained"] == _d(-2)
 
 
 def test_recommendation_muscle_recovery_is_empty_without_strength_history(sources):
@@ -921,9 +920,10 @@ def test_recommendation_never_passes_include_pilot(sources):
 def test_recommendation_yellow_strength_branch_can_only_ever_say_general(sources):
     """OBSERVED: the YELLOW strength branch picks target muscles from
     `muscle_recovery`, which is populated exclusively from macrofactor_workouts —
-    the partition whose only code path raises NameError (see the xfail above) and
-    which has had no writer for ~4 months (#485). So the branch is permanently
-    reduced to 'Full Body (Light)' targeting the literal string 'General'."""
+    a partition that has had no writer for ~4 months (#485, unrelated to #2249's
+    now-fixed classify_exercise import). With no writer, no historical row falls
+    in the query window here, so the branch is permanently reduced to
+    'Full Body (Light)' targeting the literal string 'General'."""
     sources(
         whoop=[_recovery_day(TODAY, recovery=50)],
         eightsleep=[{"date": TODAY, "sleep_score": 50}],
