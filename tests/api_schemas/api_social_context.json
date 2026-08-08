@@ -1,0 +1,37 @@
+{
+  "captured_at": "2026-08-08T03:57:06.304856+00:00",
+  "fetch_path": "/api/social_context?route=training",
+  "is_prefix_sample": false,
+  "path": "/api/social_context",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "items": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "route": {
+        "type": "string"
+      },
+      "total": {
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}
