@@ -128,11 +128,43 @@ def test_scanner_actually_fires_on_a_new_field(tmp_path):
 # must live in the SAME frame the handler anchors on, or these tests become
 # time bombs that fail only between 5pm and midnight PT (the golden-test
 # wall-clock lesson).
-_NOW = datetime.now(ZoneInfo("America/Los_Angeles"))
+#
+# #2223: a live `datetime.now(...)` read here, ONCE at import time, is itself
+# a second time bomb — CI run 31244919499 fired it verbatim: fixtures built as
+# "Day 5" got asserted against a handler that had already ticked to "Day 6"
+# because the suite's EXECUTION crossed Pacific midnight a few minutes after
+# COLLECTION. Fixed instant + freeze the handler's own clock to match (see
+# _freeze_vitals_clock below, the same pattern tests/test_home_og_day_frame_1955.py
+# already uses on this exact module).
+_PT = ZoneInfo("America/Los_Angeles")
+_NOW = datetime(2026, 7, 20, 12, 0, tzinfo=_PT)  # arbitrary fixed PT noon
 
 
 def _d(days_ago: int) -> str:
     return (_NOW - timedelta(days=days_ago)).strftime("%Y-%m-%d")
+
+
+class _FrozenDateTime(datetime):
+    """datetime whose now() is pinned to _NOW, tz-converted like the real
+    clock. site_api_vitals.py takes `datetime` as a plain module import (its
+    handlers read it back via the `_g` hand-off — see the module's own
+    docstring); `strptime`/`timedelta` arithmetic/`.astimezone()` all keep
+    working since this subclasses the real datetime rather than mocking it."""
+
+    @classmethod
+    def now(cls, tz=None):
+        if tz is None:
+            return _NOW.replace(tzinfo=None)
+        return _NOW.astimezone(tz)
+
+
+@pytest.fixture(autouse=True)
+def _freeze_vitals_clock(monkeypatch):
+    """Pin site_api_vitals's live clock to the SAME instant `_NOW`/`_d()`
+    build fixtures from, so the handler's own `datetime.now(PT)` (read at call
+    time inside site_api_body.vitals(), injected via the `_g` hand-off) can
+    never disagree with what these fixtures call "today" (#2223)."""
+    monkeypatch.setattr(vitals, "datetime", _FrozenDateTime)
 
 
 def _whoop(date_str, hrv):

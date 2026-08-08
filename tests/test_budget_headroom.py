@@ -38,6 +38,12 @@ def gov():
 # projected=$83.24 vs the $75 ceiling, ai $1.79/day of a $2.68/day burn —
 # a dev sprint alone, 6 days into the month.
 
+# #2223 disposition: CLEARED, not frozen. Read live at import time, but every
+# downstream use (below and in budget_guard.read_breakdown, which compares
+# `datetime.now(utc) - computed_at` against a 48h `max_age_s`) is an
+# ELAPSED-SECONDS measurement, never a calendar-day IDENTITY comparison — see
+# tests/test_wallclock_globals_2223.py's ALLOWED_WALLCLOCK_GLOBALS entry for
+# this name, which is the authoritative statement of why this one is safe.
 _NOW = datetime.now(timezone.utc)
 
 

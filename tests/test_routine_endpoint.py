@@ -15,6 +15,8 @@ import os
 import sys
 from datetime import datetime
 
+import pytest
+
 os.environ.setdefault("TABLE_NAME", "life-platform")
 os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
 os.environ.setdefault("USER_ID", "matthew")
@@ -26,7 +28,33 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas", "web"))
 
 from web import site_api_data as sad  # noqa: E402
 
-_TODAY = datetime.now(sad.PT).strftime("%Y-%m-%d")
+# #2223: `datetime.now(sad.PT).strftime(...)` read ONCE at import time used to
+# live here. site_api_protocols.routine() (lambdas/web/site_api_protocols.py:275)
+# reads its own `datetime.now(PT)` again at CALL time — a plain module import,
+# not `_g`-injected — so a CI run whose EXECUTION crosses Pacific midnight after
+# this file's COLLECTION desynced the two ("assert -1 == 0" on days_out, CI run
+# 31244919499). Fixed instant + freeze the handler's clock to match instead.
+# Any date strictly between the past/future fixtures exercised below
+# (2026-01-05 .. 2027-01-02) keeps the days_out sign assertions meaningful.
+_TODAY = "2026-06-20"
+
+
+class _FrozenDateTime(datetime):
+    """datetime whose now() is pinned to _TODAY."""
+
+    @classmethod
+    def now(cls, tz=None):
+        base = datetime.strptime(_TODAY, "%Y-%m-%d")
+        return base.replace(tzinfo=tz) if tz else base
+
+
+@pytest.fixture(autouse=True)
+def _freeze_clock(monkeypatch):
+    """Pin site_api_protocols's live clock to _TODAY so routine()'s own
+    `datetime.now(PT)` agrees with this file's fixtures regardless of
+    wall-clock time (#2223)."""
+    monkeypatch.setattr(sad._protocols, "datetime", _FrozenDateTime)
+
 
 _PHASE_STATE = {
     "phases": ["Foundation", "Build", "Forge", "Sustain"],

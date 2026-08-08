@@ -38,9 +38,37 @@ sys.path.insert(0, str(_REPO / "lambdas" / "web"))
 
 from web import site_api_intelligence as sad  # noqa: E402  # #1911: batched GetMetricData sweep
 
-_NOW = datetime.now(timezone.utc)
+# #2223: this used to be a live `datetime.now(timezone.utc)` read at import
+# time — a genuine time bomb, not just latent. site_api_budget.inference_receipt()
+# reads its own LIVE `datetime.now(timezone.utc)` again at call time
+# (lambdas/web/site_api_budget.py:148 — that module takes no `_g` injection at
+# all, per site_api_intelligence.py's own docstring) to classify "today" vs
+# "month" buckets. A CI run whose EXECUTION crosses UTC midnight after this
+# file's COLLECTION would reclassify every synthetic bucket below as
+# yesterday's, and test_today_and_month_arithmetic_is_preserved's `today_total`
+# would silently read 0 instead of 100. Fixed instant + freeze the handler's
+# clock to match (`_freeze_budget_clock` below) instead.
+_NOW = datetime(2026, 7, 20, 12, 0, tzinfo=timezone.utc)
 _DAY_START = _NOW.replace(hour=0, minute=0, second=0, microsecond=0)
 _MONTH_START = _NOW.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+
+class _FrozenDateTime(datetime):
+    """datetime whose now() is pinned to _NOW."""
+
+    @classmethod
+    def now(cls, tz=None):
+        if tz is None:
+            return _NOW.replace(tzinfo=None)
+        return _NOW.astimezone(tz)
+
+
+@pytest.fixture(autouse=True)
+def _freeze_budget_clock(monkeypatch):
+    """Pin site_api_budget's live clock to the SAME instant _NOW / _DAY_START /
+    _MONTH_START and every synthetic CloudWatch bucket below derive from."""
+    monkeypatch.setattr(sad._budget, "datetime", _FrozenDateTime)
+
 
 _MODELS = [f"us.anthropic.model-{i}" for i in range(6)]
 _FNS = [f"life-platform-fn-{i}" for i in range(19)]
