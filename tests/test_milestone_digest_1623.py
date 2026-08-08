@@ -191,3 +191,33 @@ def test_oldest_pending_goes_first(monkeypatch, _wire):
     rows = [GENESIS_ROW, _event("w300", "2026-08-18"), _event("w310", "2026-08-02")]
     result, _ = _run(rows, monkeypatch=monkeypatch)
     assert result["milestone_id"] == "w310"
+
+
+# ── #2222: the send-suppressor gate ───────────────────────────────────────────
+# Tier A — this module loops over a friends-and-family recipient list, so an
+# invoke that used to "just check what it would do" mailed five real people.
+
+
+def test_dry_run_builds_the_notes_and_mails_nobody(monkeypatch, _wire):
+    """The exact event that would otherwise deliver 5 notes, with dry_run on."""
+    rows = [GENESIS_ROW, _event("w300", "2026-08-18", label="Weekly average under 300")]
+    table = FakeDdbTable(rows=rows)
+    monkeypatch.setattr(shell, "table", table)
+
+    result = shell.lambda_handler({"dry_run": True}, None)
+
+    assert _wire.sends == [], "a dry run reached SES — this mails friends and family"
+    # The build path still ran to completion: the digest was composed and
+    # counted, it just never left the building.
+    assert result["status"] == "sent" and result["delivered"] == 5
+
+
+def test_a_normal_event_still_sends(monkeypatch, _wire):
+    """The other half of the contract — the gate must not break the real path."""
+    rows = [GENESIS_ROW, _event("w300", "2026-08-18", label="Weekly average under 300")]
+    table = FakeDdbTable(rows=rows)
+    monkeypatch.setattr(shell, "table", table)
+
+    shell.lambda_handler({}, None)
+
+    assert len(_wire.sends) == 5

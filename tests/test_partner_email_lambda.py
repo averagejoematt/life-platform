@@ -1104,3 +1104,38 @@ def test_handler_stub_is_reachable_only_on_a_genuine_ai3_failure_and_logs_loudly
     assert exc_records, "expected a loudly-logged (exc_info-attached) ERROR record"
     assert any("AI-3 validation failed" in r.message or "AI-3 validation failed" in r.getMessage() for r in exc_records)
     assert fake_ses.sends[0]["Content"]["Simple"]["Body"]["Html"]["Data"].startswith("<!DOCTYPE html>")
+
+
+# ── #2222: the send-suppressor gate ───────────────────────────────────────────
+# Tier A — the recipient here is a real partner, resolved from SSM at runtime
+# and never visible in source. An invoke to "see what it looks like" mailed her.
+
+
+def test_handler_dry_run_builds_the_email_and_mails_nobody(monkeypatch):
+    fake_ses = _wire_handler(monkeypatch)
+
+    resp = partner.lambda_handler({"dry_run": True}, None)
+
+    assert fake_ses.sends == [], "a dry run reached SES — this mails a real partner"
+    # Not a short-circuit: the handler ran the whole gather/compose path.
+    assert resp["statusCode"] == 200
+
+
+def test_handler_dry_run_env_var_also_suppresses(monkeypatch):
+    """Scheduled rules do not let an operator pass a payload."""
+    fake_ses = _wire_handler(monkeypatch)
+    monkeypatch.setenv("DRY_RUN", "true")
+
+    partner.lambda_handler({}, None)
+
+    assert fake_ses.sends == []
+
+
+def test_handler_dry_run_false_string_still_sends(monkeypatch):
+    """A guard that treats the string "false" as truthy would silently disable
+    the weekly email for good — the failure mode nobody would notice."""
+    fake_ses = _wire_handler(monkeypatch)
+
+    partner.lambda_handler({"dry_run": "false"}, None)
+
+    assert len(fake_ses.sends) == 1

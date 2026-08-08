@@ -127,7 +127,9 @@ def _run_handler(monkeypatch, *, infra_ok=True, residue_rows=0, cleanup_ok=True)
     monkeypatch.setattr(canary, "emit", lambda *a, **k: None)
 
     alerts = []
-    monkeypatch.setattr(canary, "send_alert", lambda failures, ts: alerts.append(failures))
+    # #2222: send_alert now takes the dry_run suppressor flag the handler derives
+    # from the invoke event; the stub has to accept it or the handler's call raises.
+    monkeypatch.setattr(canary, "send_alert", lambda failures, ts, dry_run=False: alerts.append(failures))
 
     class _FakeBoto3:
         def client(self, name, region_name=None):
