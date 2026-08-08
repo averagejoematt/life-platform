@@ -1,0 +1,40 @@
+{
+  "_description": "The hand-maintained half of stack.json's cost_of_ownership block (#1401). ONLY facts with no code origin live here: the Cost Explorer actuals series and the composition ranges (both restated from docs/COST_TRACKER.md and pinned to it by tests/test_stack_manifest_drift.py), and the two dimensions this platform genuinely does not measure. Every figure that HAS a code origin — the published run-rate, the base and surge ceilings, the surge trigger, the supplement run-rate, the manual-touchpoint counts — is injected by scripts/v4_build_stack_manifest.py from that origin and must never be typed here.",
+  "_honesty_contract": "ADR-104/105. Every figure carries a `basis` saying how it was derived and a `confidence` saying how much weight it holds. Where no source exists the value is null with a basis explaining why, never a plausible-looking guess.",
+  "aws": {
+    "composition": {
+      "non_ai_floor_monthly_usd": [36, 43],
+      "ai_variable_monthly_usd": [24, 44],
+      "basis": "docs/COST_TRACKER.md, verified against Cost Explorer 2026-07-19. The bill is two things: a measured non-AI structural floor (dominated by the CloudWatch alarm estate and per-service secret isolation) and variable model inference that scales with how much building happened that month, not with how much data was collected.",
+      "confidence": "measured range over billed months, not a forecast"
+    },
+    "actuals": [
+      { "month": "2026-03", "label": "Mar 2026", "usd": 20.04 },
+      { "month": "2026-04", "label": "Apr 2026", "usd": 35.01 },
+      { "month": "2026-05", "label": "May 2026", "usd": 48.19 },
+      { "month": "2026-06", "label": "Jun 2026", "usd": 79.8 }
+    ],
+    "actuals_basis": "AWS Cost Explorer, unblended, whole-account. n=4 complete billed months (docs/COST_TRACKER.md 'Monthly Actuals'). The platform's first partial month and any month still in progress are deliberately excluded — a partial month is not a run-rate. The series rises because the platform grew, not because usage drifted: the June peak is the month a coaching feature launched.",
+    "live_endpoints": [
+      { "path": "/api/receipts", "publishes": "month-to-date spend, projected month-end, effective ceiling, degradation tier, daily AI vs infrastructure burn" },
+      { "path": "/api/inference_receipt", "publishes": "per-model and per-function token usage, priced" },
+      { "path": "/api/status", "publishes": "the cost block: month-to-date, projected, ceiling, tier" }
+    ],
+    "scope_note": "One budget covers the WHOLE platform, not just the AI. CI minutes are billed by the code host on a separate plan and are not inside this figure.",
+    "verifiability": "These are not the platform's own claims about itself: the live endpoints above serve the governor's own numbers, refreshed every 8 hours, and omit dollars rather than freeze them when the upstream reading goes stale."
+  },
+  "devices": {
+    "monthly_usd": null,
+    "one_time_usd": null,
+    "basis": "Not published, because this platform does not measure it. Every device and app price is vendor-set, varies by region and plan, and changes without notice; any total stated here would be a guess wearing a decimal point. The device SET is enumerated in sources[].device — derived from the same public gear catalogue the site renders — so a reader can price the exact list at current vendor rates rather than trust a stale aggregate.",
+    "confidence": "no figure asserted",
+    "shape_note": "The set splits into recurring subscriptions (a wearable membership, several logging apps) and one-time hardware (a scale, a bed cover, a watch, a tape measure). A fork of this architecture needs none of them in full — the pipeline's value comes from the sources being classified and reconciled, not from owning all of them."
+  },
+  "time": {
+    "hours_to_build": null,
+    "hours_per_week_to_operate": null,
+    "basis": "Not published, because nothing here instruments the owner's hours. The platform measures sleep, training and spend with real sensors; it has no sensor pointed at its own construction, so both figures would be recollection presented as measurement. What CAN be stated is structural, and is derived below.",
+    "confidence": "no figure asserted",
+    "structural_note": "Ingestion, computation, email and QA all run unattended on fixed schedules; there is no daily human step in the data path. Recurring human time concentrates in two places, both counted in recurring_manual_touchpoints: re-authorising credentialed sources when a provider token dies, and the sources whose records only exist because someone typed them."
+  }
+}
