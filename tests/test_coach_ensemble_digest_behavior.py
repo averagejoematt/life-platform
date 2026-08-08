@@ -28,8 +28,10 @@ What these tests pin:
     argument has persisted"; a re-run of one cycle must not inflate it.
   * **Decimal before DynamoDB** — no bare float may reach `put_item`.
 
-Tests marked xfail record defects discovered by this tranche; they are NOT
-fixed here (test-only change).
+The nine defects this tranche discovered were carried as xfail markers until
+#2221; they are now FIXED in `lambdas/coach/coach_ensemble_digest.py` and the
+markers are gone. Every assertion below is a live contract — nothing in this
+file is allowed to fail again.
 """
 
 import json
@@ -239,21 +241,6 @@ def test_the_dispute_docket_identity_gate_reads_this_modules_roster():
     assert dispute_docket is not None
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery): coach_ensemble_digest.py:56 hand-lists "
-        "ALL_COACH_IDS instead of importing coach.persona_registry."
-        "OPERATIONAL_COACH_IDS, which is the canonical roster ('MUST stay equal to "
-        "the operational: true personas in config/personas.json', enforced by "
-        "tests/test_persona_registry.py). The two currently hold the same SET but a "
-        "DIFFERENT ORDER, so the drift is already real; the ordering is what the "
-        "digest's absent-coach list and the prompt's coach enumeration are built "
-        "from. A ninth operational coach added to the registry would be invisible to "
-        "the ensemble digest and would be rejected by dispute_docket's identity gate "
-        "as a 'non-member coach id' — the guard-the-SET class."
-    ),
-)
 def test_the_digest_roster_is_the_registry_itself_not_a_copy():
     assert ced.ALL_COACH_IDS == OPERATIONAL_COACH_IDS
 
@@ -568,26 +555,6 @@ def test_the_fallback_survives_a_coach_with_neither_record():
     assert digest["coach_summaries"][0]["coach_id"] == "sleep_coach"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, reader/writer mismatch): "
-        "coach_ensemble_digest.py:480 builds the fallback summary's key_concerns "
-        "from `compressed.get('key_themes', [])`. NOTHING writes `key_themes`. The "
-        "only writer of COACH#*/COMPRESSED#latest is coach_history_summarizer, whose "
-        "schema (coach_history_summarizer.py:571-577, 1005-1011) stores "
-        "`key_concerns`, `key_recommendations` and `recent_themes` — never "
-        "`key_themes`. So the fallback digest's key_concerns is ALWAYS [], even "
-        "though the exact data it wants is sitting in the record it just read. "
-        "`key_recommendations` is likewise hard-coded to [] on line 481 while "
-        "`compressed['key_recommendations']` exists. Since `ensemble` is a band-1 "
-        "budget feature (paused whenever tier >= 1, which memory records as the "
-        "DEFAULT state), the fallback is the COMMON path, not the rare one — and the "
-        "empty lists are then written back into every coach's COMPRESSED#latest as "
-        "`digest_contribution.key_concerns_captured` and replayed into the next "
-        "cycle's prompt as if the ensemble had found nothing."
-    ),
-)
 def test_the_fallback_reports_the_concerns_the_compressed_state_actually_holds():
     digest = ced._build_default_digest({"sleep_coach": {"output": None, "compressed": coach_compressed()}}, FROZEN_TODAY)
     summary = digest["coach_summaries"][0]
@@ -683,58 +650,17 @@ def test_a_write_failure_is_excluded_from_the_reported_count(monkeypatch):
     assert ced._write_disagreements([disagreement()], FROZEN_TODAY) == 0
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, idempotency): _write_disagreements() "
-        "(coach_ensemble_digest.py:558) increments `cycle_count` on every write with "
-        "no guard on `last_cycle_date`, which it stores one line later and never "
-        "reads. Re-running the digest for the SAME cycle_date — a retry, a manual "
-        "re-invoke, an EventBridge duplicate delivery — therefore reports a "
-        "one-cycle-old disagreement as two cycles old. That number is not internal: "
-        "emails/podcast_script_v2.py:102 renders it verbatim into the Friday Panel "
-        'prompt as "OPEN ARGUMENT (cycle_count N)", so a retry inflates a public '
-        "claim about how long the coaches have been arguing (ADR-104)."
-    ),
-)
 def test_re_running_one_cycle_does_not_inflate_the_persistence_count(table):
     ced._write_disagreements([disagreement()], FROZEN_TODAY)
     ced._write_disagreements([disagreement()], FROZEN_TODAY)
     assert table.store[("ENSEMBLE#disagreements", "ACTIVE#protein_timing")]["cycle_count"] == 1
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery): two distinct disagreements whose topics "
-        "slugify identically ('Protein timing' vs 'protein-TIMING?') collide on "
-        "ACTIVE#{slug} within a SINGLE run. The second silently overwrites the "
-        "first's positions AND — because _get_item now finds the record the same "
-        "loop just wrote — bumps cycle_count to 2 on a disagreement's very first "
-        "appearance. _slugify's 80-char truncation widens the collision surface "
-        "further. The inflated count is published by the Friday Panel."
-    ),
-)
 def test_two_topics_in_one_run_that_share_a_slug_do_not_inflate_the_count(table):
     ced._write_disagreements([disagreement("Protein timing"), disagreement("protein-TIMING?")], FROZEN_TODAY)
     assert table.store[("ENSEMBLE#disagreements", "ACTIVE#protein_timing")]["cycle_count"] == 1
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery): _write_disagreements() writes the LLM's "
-        "`coaches` list straight into ENSEMBLE#disagreements with no membership "
-        "check against ALL_COACH_IDS. dispute_docket.open_from_disagreements got "
-        "exactly this gate in #1797 ('a model echoing the template — or writing a "
-        "display name instead of the canonical id — would otherwise open a real "
-        "docket between coaches that do not exist'), but the sibling writer on the "
-        "same input did not. The unchecked partition is read by "
-        "emails/podcast_script_v2.py:99 and rendered into the public Friday Panel "
-        "script, so an invented coach id or a real display name can reach a reader "
-        "surface. The same one-line gate belongs on both writers."
-    ),
-)
 def test_a_disagreement_naming_a_coach_who_does_not_exist_is_not_stored(table):
     ced._write_disagreements([disagreement(coaches=["coach_a", "Dr. Someone Real"])], FROZEN_TODAY)
     assert table.puts == []
@@ -872,18 +798,6 @@ def test_the_structured_task_uses_the_haiku_tier(monkeypatch):
     assert "system" not in captured["body"]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery): _call_haiku() (coach_ensemble_digest.py:166) "
-        "indexes `resp['content'][0]['text']` with no guard. A response whose content "
-        "list is empty — which is what a max_tokens stop with no emitted text looks "
-        "like — raises IndexError instead of degrading. The handler's blanket except "
-        "does catch it, so the run silently files a fallback digest; the honest "
-        "behaviour is to treat an empty completion as 'no response' explicitly rather "
-        "than as an unhandled index error deep in the parser."
-    ),
-)
 def test_an_empty_completion_degrades_rather_than_raising_an_index_error(monkeypatch):
     monkeypatch.setattr(retry_utils, "call_anthropic_raw", lambda req: {"content": []})
     assert ced._call_haiku("sys", "user") in (None, "", {})
@@ -1064,22 +978,6 @@ def test_the_returned_digest_carries_no_decimals_for_a_json_caller(table, monkey
     json.dumps(result)  # must not raise
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery): a budget-paused or LLM-failed cycle writes "
-        "`digest_contribution` into every coach's COMPRESSED#latest "
-        "(coach_ensemble_digest.py:776 -> 618-625) with key_concerns_captured, "
-        "key_recommendations_captured and team_input_requested all EMPTY — and with "
-        "no `_fallback` marker of its own, unlike the digest itself. "
-        "COMPRESSED#latest is dumped verbatim into the NEXT cycle's ensemble prompt "
-        "(_build_user_message:444) and into the coach's own memory block "
-        "(site_api_ai_lambda.py:891), so the stub is replayed as if the ensemble had "
-        "genuinely found nothing to capture. Because `ensemble` is a band-1 feature "
-        "(paused at tier >= 1) this is the common path. The write-back should either "
-        "be skipped on a fallback cycle or carry the fallback marker with it."
-    ),
-)
 def test_a_fallback_cycle_does_not_write_empty_findings_into_coach_memory(table, monkeypatch):
     _seed_one_coach(table)
     monkeypatch.setattr(budget_guard, "allow", lambda feature: False)
@@ -1088,19 +986,6 @@ def test_a_fallback_cycle_does_not_write_empty_findings_into_coach_memory(table,
     assert contribution is None or contribution.get("_fallback") is True
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery): the docket summary is attached to the digest "
-        "dict AFTER _write_digest has already stored it "
-        "(coach_ensemble_digest.py:753 writes, 768 mutates), so `docket` exists only "
-        "in the Lambda's RETURN value and is never persisted. Nothing in the repo "
-        "reads it — the field is a return-only artefact that looks like stored state. "
-        "Either write it (move the docket pass above _write_digest) or stop building "
-        "it; as written, an operator reading the stored digest cannot tell whether "
-        "the docket pass ran at all."
-    ),
-)
 def test_the_docket_outcome_is_persisted_with_the_digest_that_produced_it(table, monkeypatch):
     _seed_one_coach(table)
     _llm(monkeypatch, {"coach_summaries": [], "active_disagreements": [disagreement()], "unanimous_flags": []})
@@ -1110,20 +995,6 @@ def test_the_docket_outcome_is_persisted_with_the_digest_that_produced_it(table,
     assert table.store[("ENSEMBLE#digest", f"CYCLE#{FROZEN_TODAY}")]["docket"] == {"opened": 1, "skipped": 0}
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery): the no-coach-data digest "
-        "(coach_ensemble_digest.py:693-699) is written with NO `_fallback` marker — "
-        "only a prose `note`. site_api_coach_stance._latest_cycle_digest and "
-        "coach_observatory_renderer both take the NEWEST ENSEMBLE#digest CYCLE# row "
-        "unconditionally and check neither field, so an empty digest written on a "
-        "cycle where the coaches simply had not run yet shadows the previous cycle's "
-        "genuine cross-coach content and renders as 'the coaches referenced nothing'. "
-        "Every other empty-digest path in this module sets _fallback; this one is the "
-        "outlier."
-    ),
-)
 def test_an_empty_cycle_marks_itself_the_same_way_every_other_fallback_does(table):
     ced.lambda_handler({}, None)
     assert table.store[("ENSEMBLE#digest", f"CYCLE#{FROZEN_TODAY}")].get("_fallback") is True
