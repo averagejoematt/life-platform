@@ -1,0 +1,389 @@
+"""tests/test_data_reconciliation_behavior.py — behavioural contracts for
+``lambdas/operational/data_reconciliation_lambda.py`` (#1658 coverage tranche 5).
+
+Measured **0%** covered before this file — all 112 statements. This is the
+weekly Sunday-night job that answers "did any source silently stop writing?",
+and it was the highest-missing fully-dark module in the operational package.
+Nothing here had ever been executed by a test, including its severity
+classifier, which is what decides whether Matthew reads the report at all.
+
+Contracts pinned here:
+
+  * **Severity is a function of the gap DISTRIBUTION, not the total.** One
+    source missing 3 days is RED even though four sources missing one day each
+    is a larger total; both boundaries are pinned from the docstring's own
+    rubric, on both sides.
+  * **A DDB read error is "unknown", not "missing".** ``check_source_coverage``
+    records ``None`` on failure, ``coverage_emoji`` renders it ❓, and an
+    unknown day must not be reported to Matthew as a confirmed gap (ADR-104).
+  * **The expected-days facet is honoured** — a weekday-only source that wrote
+    5 of 7 days has zero gaps; the same 5/7 on a daily source is 2.
+  * **The send is gated.** The handler runs entirely through
+    ``common.send_guard``; the dry-run path must produce the identical report
+    and reach SES zero times. No email Lambda is invoked, live or otherwise
+    (#2111) — ``guarded_send_email`` is replaced with a recorder and the SES
+    client is never touched.
+  * **The S3 summary is non-fatal.** A failed archive write must not lose the
+    verdict the handler already computed.
+
+No AWS and no network. Arithmetic is hand-derived in the body.
+"""
+
+from __future__ import annotations
+
+import os
+
+# Read at import time (conftest supplies fake AWS creds).
+os.environ.setdefault("S3_BUCKET", "test-bucket")
+os.environ.setdefault("EMAIL_RECIPIENT", "qa@example.com")
+os.environ.setdefault("EMAIL_SENDER", "qa@example.com")
+
+import json  # noqa: E402
+import re  # noqa: E402
+
+import pytest  # noqa: E402
+from ingestion.source_registry import reconciliation_sources  # noqa: E402
+from operational import data_reconciliation_lambda as dr  # noqa: E402
+
+DATES = ["2026-08-01", "2026-08-02", "2026-08-03", "2026-08-04", "2026-08-05", "2026-08-06", "2026-08-07"]
+
+
+def _result(source, present_days, expected_days=7, notes="n"):
+    """Build one source_results row with `present_days` of the week present."""
+    coverage = {d: (i < present_days) for i, d in enumerate(DATES)}
+    days_present = sum(1 for v in coverage.values() if v is True)
+    gaps = max(0, min(expected_days, len(DATES)) - days_present)
+    return {
+        "source": source,
+        "coverage": coverage,
+        "days_present": days_present,
+        "days_checked": len(DATES),
+        "gaps": gaps,
+        "expected_days": expected_days,
+        "notes": notes,
+    }
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# The source list
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_source_list_is_the_registry_plus_the_local_computed_partitions():
+    """#498 (X-10): source rows DERIVE from the registry's expected_days facet.
+    The computed partitions stay local because they are compute outputs, whose
+    cadence is a schedule, not an ingestion property."""
+    assert dr.SOURCES == reconciliation_sources() + dr.COMPUTED_PARTITIONS
+    assert {s for s, _, _ in dr.COMPUTED_PARTITIONS} == {
+        "day_grade",
+        "habit_scores",
+        "computed_metrics",
+        "character_sheet",
+        "adaptive_mode",
+        "computed_insights",
+    }
+    assert all(e == 7 for _, e, _ in dr.COMPUTED_PARTITIONS), "every computed partition runs daily"
+
+
+def test_skip_set_is_empty_so_no_source_is_silently_unchecked():
+    """Census: ``_SKIP_SOURCES`` is an empty set, so the ``continue`` arm in the
+    handler is unreachable today. If a source is ever added here it stops being
+    reconciled — with no line in the report saying so."""
+    assert dr._SKIP_SOURCES == set()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# check_source_coverage
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class _FakeTable:
+    def __init__(self, present=(), boom=()):
+        self.present = set(present)
+        self.boom = set(boom)
+        self.calls: list[dict] = []
+
+    def get_item(self, Key, **kw):
+        self.calls.append({"Key": Key, **kw})
+        date = Key["sk"].split("#", 1)[1]
+        if date in self.boom:
+            raise RuntimeError("throttled")
+        return {"Item": {"pk": Key["pk"]}} if date in self.present else {}
+
+
+def test_check_source_coverage_maps_presence_per_day(monkeypatch):
+    t = _FakeTable(present={"2026-08-01", "2026-08-03"})
+    monkeypatch.setattr(dr, "table", t)
+    cov = dr.check_source_coverage("whoop", DATES[:3])
+    assert cov == {"2026-08-01": True, "2026-08-02": False, "2026-08-03": True}
+    assert [c["Key"]["pk"] for c in t.calls] == ["USER#matthew#SOURCE#whoop"] * 3
+    assert all(c["ProjectionExpression"] == "pk" for c in t.calls), "an existence probe must not pull the row"
+
+
+def test_check_source_coverage_records_a_read_failure_as_unknown_not_missing(monkeypatch):
+    """A throttled read is not evidence the day is empty. ADR-104: unknown is a
+    third state, and it renders ❓ rather than ❌."""
+    monkeypatch.setattr(dr, "table", _FakeTable(present={"2026-08-02"}, boom={"2026-08-01"}))
+    cov = dr.check_source_coverage("whoop", DATES[:2])
+    assert cov["2026-08-01"] is None
+    assert cov["2026-08-02"] is True
+
+
+def test_coverage_emoji_has_three_states():
+    assert dr.coverage_emoji(True) == "✅"
+    assert dr.coverage_emoji(False) == "❌"
+    assert dr.coverage_emoji(None) == "❓"
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# classify_severity
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_severity_green_only_when_every_source_is_whole():
+    label, color = dr.classify_severity([_result("whoop", 7), _result("strava", 5, expected_days=5)])
+    assert label == "GREEN — Full Coverage"
+    assert color == "#059669"
+
+
+def test_severity_yellow_for_a_small_scatter_of_gaps():
+    rows = [_result("whoop", 6), _result("notion", 5), _result("todoist", 7)]
+    # Hand-derived: gaps 1 + 2 + 0 = 3; max single 2; 2 sources affected.
+    assert [r["gaps"] for r in rows] == [1, 2, 0]
+    label, color = dr.classify_severity(rows)
+    assert label == "YELLOW — Monitor" and color == "#d97706"
+
+
+def test_severity_red_on_three_missing_days_in_one_source_even_though_the_total_is_small():
+    rows = [_result("whoop", 4)]
+    assert rows[0]["gaps"] == 3
+    assert dr.classify_severity(rows)[0] == "RED — Investigate Gaps"
+    # …and two days in one source is still only YELLOW: the boundary is 3.
+    assert dr.classify_severity([_result("whoop", 5)])[0] == "YELLOW — Monitor"
+
+
+def test_severity_red_on_breadth_at_four_sources_and_yellow_at_three():
+    three = [_result(f"s{i}", 6) for i in range(3)]
+    four = [_result(f"s{i}", 6) for i in range(4)]
+    assert dr.classify_severity(three)[0] == "YELLOW — Monitor"
+    assert dr.classify_severity(four)[0] == "RED — Investigate Gaps"
+
+
+def test_severity_on_an_empty_result_set_is_green_not_a_crash():
+    assert dr.classify_severity([])[0] == "GREEN — Full Coverage"
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# build_html_report
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_report_renders_a_row_per_source_with_weekday_headers():
+    rows = [_result("whoop", 7, notes="Recovery/sleep"), _result("notion", 5, notes="Journal")]
+    html = dr.build_html_report(DATES, rows, "YELLOW — Monitor", "#d97706")
+    assert "2026-08-01 → 2026-08-07" in html
+    # 2026-08-01 is a Saturday; the header runs Sat…Fri for this window.
+    assert re.findall(r"<th style='padding:8px;text-align:center;'>(\w{3})</th>", html) == [
+        "Sat",
+        "Sun",
+        "Mon",
+        "Tue",
+        "Wed",
+        "Thu",
+        "Fri",
+    ]
+    assert "whoop" in html and "notion" in html
+    assert "Recovery/sleep" in html and "Journal" in html
+    assert "2 sources checked | 2 total gaps | 1 sources affected" in html
+
+
+def test_report_badges_a_gapped_source_and_colours_by_size():
+    two_gaps = dr.build_html_report(DATES, [_result("notion", 5)], "YELLOW", "#d97706")
+    assert ">2 gaps<" in two_gaps and "#d97706" in two_gaps
+
+    one_gap = dr.build_html_report(DATES, [_result("notion", 6)], "YELLOW", "#d97706")
+    assert ">1 gap<" in one_gap, "singular, not '1 gaps'"
+
+    three_gaps = dr.build_html_report(DATES, [_result("notion", 4)], "RED", "#dc2626")
+    assert ">3 gaps<" in three_gaps and "#dc2626" in three_gaps
+
+
+def test_report_omits_the_recommended_actions_block_when_there_is_nothing_to_do():
+    green = dr.build_html_report(DATES, [_result("whoop", 7)], "GREEN — Full Coverage", "#059669")
+    assert "Recommended actions" not in green
+    assert "All systems nominal" in green
+
+
+def test_report_lists_the_exact_missing_dates_in_the_actions_block():
+    row = _result("notion", 5)
+    html = dr.build_html_report(DATES, [row], "YELLOW", "#d97706")
+    assert "Recommended actions" in html
+    missing = [d for d in DATES if row["coverage"][d] is False]
+    assert missing == ["2026-08-06", "2026-08-07"]
+    assert "<code>notion</code>: 2 gaps (2026-08-06, 2026-08-07)" in html
+
+
+def test_report_renders_unknown_days_as_question_marks_not_crosses():
+    row = _result("whoop", 7)
+    row["coverage"]["2026-08-03"] = None
+    html = dr.build_html_report(DATES, [row], "GREEN", "#059669")
+    assert "❓" in html
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "DEFECT: the summary bar's inline style is a Python conditional that was "
+        "never evaluated. build_html_report emits "
+        "`background:#f0fdf4 if {total_gaps}==0 else #fef3c7;` inside an f-string "
+        "— only `{total_gaps}` interpolates, so the literal text "
+        "'#f0fdf4 if 0==0 else #fef3c7' ships as the CSS value, every client "
+        "discards the declaration, and the green/amber summary bar has never once "
+        "rendered its colour in any weekly report. Correct behaviour: a single "
+        "valid hex colour chosen in Python before the f-string. Reported by "
+        "#1658 coverage tranche 5; not fixed here."
+    ),
+)
+def test_defect_summary_bar_background_is_a_valid_css_colour():
+    html = dr.build_html_report(DATES, [_result("whoop", 7)], "GREEN", "#059669")
+    (summary_style,) = re.findall(r'<div style="(padding:16px 24px;background:[^"]*)"', html)
+    background = re.search(r"background:([^;]+);", summary_style).group(1).strip()
+    assert re.fullmatch(r"#[0-9a-fA-F]{3,8}", background), f"not a CSS colour: {background!r}"
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# lambda_handler
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class _RecordingS3:
+    def __init__(self, boom=False):
+        self.puts: list[dict] = []
+        self.boom = boom
+
+    def put_object(self, **kw):
+        if self.boom:
+            raise RuntimeError("AccessDenied")
+        self.puts.append(kw)
+
+
+@pytest.fixture()
+def handler_env(monkeypatch):
+    """Wire the handler to fakes. SES is NEVER constructed or called: the send
+    chokepoint itself is replaced with a recorder (#2111)."""
+
+    def _install(present_by_source, sources=None, s3_boom=False):
+        sends: list[dict] = []
+
+        def _send(ses_client, dry_run, **kwargs):
+            sends.append({"dry_run": dry_run, **kwargs})
+            return {"MessageId": "fake", "dry_run": dry_run}
+
+        class _T:
+            def get_item(self, Key, **kw):
+                source = Key["pk"].rsplit("#", 1)[-1]
+                date = Key["sk"].split("#", 1)[1]
+                return {"Item": {"pk": Key["pk"]}} if date in present_by_source.get(source, set()) else {}
+
+        s3 = _RecordingS3(boom=s3_boom)
+        monkeypatch.setattr(dr, "table", _T())
+        monkeypatch.setattr(dr, "guarded_send_email", _send)
+        monkeypatch.setattr(dr, "ses", object())  # a real SES call would raise AttributeError
+        monkeypatch.setattr(dr.boto3, "client", lambda name, region_name=None: s3)
+        monkeypatch.setattr(dr, "SOURCES", sources or [("whoop", 7, "Recovery"), ("strava", 5, "Cardio")])
+        return sends, s3
+
+    return _install
+
+
+def _all_seven(anchor_days=7):
+    import datetime as _dt
+
+    today = _dt.datetime.now(_dt.timezone.utc).date()
+    return {(today - _dt.timedelta(days=i)).isoformat() for i in range(anchor_days, 0, -1)}
+
+
+def test_handler_reports_green_when_every_source_is_whole(handler_env):
+    week = _all_seven()
+    sends, s3 = handler_env({"whoop": week, "strava": week})
+    resp = dr.lambda_handler({"dry_run": True}, None)
+
+    body = json.loads(resp["body"])
+    assert resp["statusCode"] == 200
+    assert body["severity"] == "GREEN — Full Coverage"
+    assert body["total_gaps"] == 0 and body["sources_with_gaps"] == 0
+    assert len(body["week"].split(" → ")) == 2
+
+
+def test_handler_counts_gaps_against_each_sources_expected_days(handler_env):
+    week = sorted(_all_seven())
+    # strava expects 5/7; five present days is complete for it, but the same
+    # five days on whoop (expects 7) is a two-day gap.
+    sends, s3 = handler_env({"whoop": set(week[:5]), "strava": set(week[:5])})
+    body = json.loads(dr.lambda_handler({"dry_run": True}, None)["body"])
+    assert body["total_gaps"] == 2
+    assert body["sources_with_gaps"] == 1
+
+
+def test_handler_checks_the_last_seven_completed_days_never_today(handler_env):
+    import datetime as _dt
+
+    sends, s3 = handler_env({})
+    dr.lambda_handler({"dry_run": True}, None)
+    week_label = json.loads(dr.lambda_handler({"dry_run": True}, None)["body"])["week"]
+    start, end = week_label.split(" → ")
+    today = _dt.datetime.now(_dt.timezone.utc).date().isoformat()
+    assert end < today, "ingestion may still be running today; today is deliberately excluded"
+    assert (_dt.date.fromisoformat(end) - _dt.date.fromisoformat(start)).days == 6
+
+
+def test_handler_dry_run_builds_the_full_report_and_sends_nothing(handler_env):
+    sends, s3 = handler_env({})
+    dr.lambda_handler({"dry_run": True}, None)
+    (sent,) = sends
+    assert sent["dry_run"] is True, "the guard must receive the suppress decision, not be bypassed"
+    assert "Weekly Data Reconciliation" in sent["Content"]["Simple"]["Body"]["Html"]["Data"]
+    assert sent["Destination"]["ToAddresses"] == [dr.RECIPIENT]
+    assert sent["Content"]["Simple"]["Subject"]["Data"].startswith("📊 Weekly Reconciliation | ")
+
+
+def test_handler_subject_carries_the_severity_so_the_inbox_is_scannable(handler_env):
+    sends, s3 = handler_env({})
+    dr.lambda_handler({"dry_run": True}, None)
+    assert "RED — Investigate Gaps" in sends[0]["Content"]["Simple"]["Subject"]["Data"]
+
+
+def test_handler_archives_a_machine_readable_summary_to_s3(handler_env):
+    week = sorted(_all_seven())
+    sends, s3 = handler_env({"whoop": set(week[:6]), "strava": set(week)})
+    dr.lambda_handler({"dry_run": True}, None)
+
+    (put,) = s3.puts
+    assert put["Bucket"] == dr.BUCKET
+    assert put["Key"] == f"reconciliation/{week[-1]}_weekly_reconciliation.json"
+    assert put["ContentType"] == "application/json"
+    summary = json.loads(put["Body"])
+    whoop = next(r for r in summary["results"] if r["source"] == "whoop")
+    assert whoop["gaps"] == 1
+    assert whoop["missing_dates"] == [week[6]]
+    assert summary["severity"] == "YELLOW — Monitor"
+
+
+def test_handler_treats_a_failed_s3_archive_as_non_fatal(handler_env):
+    sends, s3 = handler_env({}, s3_boom=True)
+    resp = dr.lambda_handler({"dry_run": True}, None)
+    assert resp["statusCode"] == 200, "the verdict is already computed; a failed archive must not lose it"
+    assert len(sends) == 1
+
+
+def test_handler_raises_when_the_report_cannot_be_delivered(handler_env, monkeypatch):
+    """A silent send failure would make a dark week look identical to a clean
+    one — the handler must fail loudly so the Lambda error alarm fires."""
+    handler_env({})
+
+    def _boom(ses_client, dry_run, **kwargs):
+        raise RuntimeError("SES throttled")
+
+    monkeypatch.setattr(dr, "guarded_send_email", _boom)
+    with pytest.raises(RuntimeError, match="SES throttled"):
+        dr.lambda_handler({"dry_run": True}, None)
