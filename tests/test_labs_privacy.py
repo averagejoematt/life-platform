@@ -68,7 +68,14 @@ def _fixture_labs() -> dict:
                 "category": "Iron Metabolism",
             },
             # --- must be stripped ---
-            # Synthetic named-gene genotype under a Pharmacogenomics category (category-match branch).
+            # Synthetic named-gene genotype under a Pharmacogenomics category. NOTE
+            # (#2211): despite the old comment here claiming this pinned the
+            # category-match branch, its name/range both also carry "Genotype"/
+            # "variant" — so it trips the free-text screen (_GENETIC_TEXT_RE) just
+            # as surely as the category screen (_GENETIC_CATEGORY_RE), and does
+            # NOT isolate either one alone. See
+            # test_strip_removes_category_only_entry_with_no_text_tell below for a
+            # fixture that actually pins the category screen in isolation.
             {
                 "name": f"{SYNTHETIC_GENE_MARKER} Genotype",
                 "value": "AA/AA",
@@ -142,6 +149,69 @@ def test_strip_does_not_mutate_input():
     before = json.dumps(labs, sort_keys=True)
     sad._strip_genetic_biomarkers(labs)
     assert json.dumps(labs, sort_keys=True) == before
+
+
+def test_strip_removes_category_only_entry_with_no_text_tell():
+    """#2211: `_strip_genetic_biomarkers` runs TWO screens in order —
+    `_GENETIC_CATEGORY_RE` against `category`, then `_GENETIC_TEXT_RE` against
+    name/notes/range/value. Every "category-match" fixture in `_fixture_labs()`
+    above ALSO trips the text screen (its name/range carry "Genotype"/"variant"),
+    so neutering the category screen alone left the full 10,930-test offline
+    suite green — nothing exercised it in isolation.
+
+    This fixture is built to isolate screen 1: a pharmacogenomics category
+    (matches `_GENETIC_CATEGORY_RE`) on a marker whose name/value/range/notes
+    contain none of the free-text screen's tells (genotype/gene/rsID/variant/
+    allele/snp) — e.g. a metabolizer-status marker whose display fields are just
+    a plain-language result. Confirmed inline before the real assertion, so this
+    test cannot pass by accident if the fixture drifts.
+
+    The marker name is a synthetic sentinel (SYNTHETIC_GENE_MARKER), not a real
+    gene symbol — this repo is public and keeps edit history.
+    """
+    category_only_marker = {
+        "name": f"{SYNTHETIC_GENE_MARKER} Metabolizer Status",
+        "value": "Normal Metabolizer",
+        "unit": None,
+        "range": "Normal / Intermediate / Poor",
+        "notes": "",
+        "flag": None,
+        "decimals": 0,
+        "category": "Pharmacogenomics",
+    }
+    text = " ".join(str(category_only_marker.get(k) or "") for k in ("name", "notes", "range", "value"))
+    assert sad._GENETIC_CATEGORY_RE.search(category_only_marker["category"]), "fixture must trip the category screen"
+    assert not sad._GENETIC_TEXT_RE.search(text), "fixture leaks into the text screen — it must isolate the category branch"
+
+    labs = _fixture_labs()
+    labs["biomarkers"].append(category_only_marker)
+    out = sad._strip_genetic_biomarkers(labs)
+    names = [b["name"] for b in out["biomarkers"]]
+    assert category_only_marker["name"] not in names, "the category-only genetic marker survived the strip"
+    assert names == ["ApoB", "LDL Cholesterol", "Ferritin"]
+
+
+def test_the_screen_set_has_not_silently_grown_a_third_screen():
+    """Guard the SET, not the instance (recurring class in this repo — 10
+    prior occurrences through 2026-08-08). `_strip_genetic_biomarkers` currently
+    runs exactly two `.search(`-guarded screens, each pinned by an isolating
+    fixture in this file (`_GENETIC_CATEGORY_RE` above,
+    `test_strip_removes_all_genetic_entries`'s text-branch fixtures for
+    `_GENETIC_TEXT_RE`). This test derives the screen list from the function's
+    own source rather than hardcoding "two" as a belief, so a screen added later
+    without a matching isolating fixture fails loudly here instead of shipping
+    unguarded like screen 1 did.
+    """
+    import inspect
+
+    src = inspect.getsource(sad._strip_genetic_biomarkers)
+    screens = re.findall(r"(_GENETIC_\w+_RE)\.search\(", src)
+    assert screens == ["_GENETIC_CATEGORY_RE", "_GENETIC_TEXT_RE"], (
+        f"_strip_genetic_biomarkers now runs screens {screens} — if a screen was added or "
+        "removed, pin/update the isolating fixture for it (see "
+        "test_strip_removes_category_only_entry_with_no_text_tell for the pattern) before "
+        "updating this assertion."
+    )
 
 
 def test_handle_labs_serialization_never_leaks_genetics(monkeypatch):
