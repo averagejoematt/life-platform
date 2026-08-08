@@ -332,26 +332,23 @@ def test_the_default_end_date_follows_the_pacific_calendar_not_utc(monkeypatch):
     assert t.window_for("macrofactor")[1] == "2026-05-09"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (#1917 + frame mixing, P2, mcp/tools_nutrition.py:73-74, 179-180, 341-342): the "
-        "default `end_date` is `_nutrition_through_date()` — a PACIFIC-anchored yesterday — while "
-        "the default `start_date` is `datetime.now(timezone.utc) - 29 days`. Two different calendar "
-        "frames define one window, so its LENGTH depends on where the clock sits relative to the "
-        "UTC/PT boundary: 29 dates in the PT morning and 28 in the UTC-evening window. The registry "
-        "documents `start_date` as 'default: 30 days ago'. Every average, deficiency verdict and "
-        "ratio in the micronutrient/summary/meal-timing views is computed over that window."
-    ),
-)
 @pytest.mark.parametrize("utc_now", [NOW, datetime(2026, 5, 11, 3, 0, 0, tzinfo=timezone.utc)])
-def test_the_default_window_really_spans_thirty_days(monkeypatch, utc_now):
+@pytest.mark.parametrize("view", ["summary", "micronutrients", "meal_timing", "macros"])
+def test_the_default_window_really_spans_thirty_days(monkeypatch, utc_now, view):
+    """#1917 + frame mixing: the default `end_date` is `_nutrition_through_date()` — a
+    PACIFIC-anchored yesterday — while the default `start_date` used to be
+    `datetime.now(timezone.utc) - 29 days`. Two calendar frames defining one window made its
+    LENGTH depend on where the clock sat relative to the UTC/PT boundary, while the registry
+    documents `start_date` as 'default: 30 days ago'. `_nutrition_default_range` derives the
+    start from the RESOLVED end, so the span is 30 inclusive dates at every hour — asserted
+    across all four views, not just the one that happened to be measured."""
     _FROZEN[0] = utc_now
     _PT[0] = "2026-05-10"
     t = install(monkeypatch, [])
-    tn.tool_get_nutrition({"view": "summary"})
+    tn.tool_get_nutrition({"view": view})
     lo, hi = t.window_for("macrofactor")
     assert span_days(lo, hi) == 30
+    assert hi == "2026-05-09"  # still Pacific-anchored, both frames agree
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -428,42 +425,35 @@ def test_micronutrients_hides_a_pilot_phase_macrofactor_row(monkeypatch):
     assert out["by_category"]["Macros"][0]["days_logged"] == 3
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (ADR-104, P1, mcp/tools_nutrition.py:140-154 _get_micronutrient_report): the three "
-        "longevity flags are computed as `totals_sum.get(field, 0) / max(totals_count.get(field, 1), "
-        "1)`, so a nutrient that appears in NO record averages to a factual 0.0 — and every "
-        "threshold is a `<`, so absence fires all three. On a range that only ever logged fiber the "
-        "tool asserts 'DHA averages 0.0g/day - below the 1g+ associated with cognitive protection', "
-        "'Magnesium averages 0mg/day' and 'Vitamin D from food averages 0.0mcg/day', each with a "
-        "supplement recommendation attached. Every other number in this function is correctly gated "
-        "on `totals_count[field] == 0`; only the flag block is not. Who it hurts: three fabricated "
-        "deficiencies, stated as measured averages, that he can act on by buying supplements."
-    ),
-)
 def test_micronutrients_makes_no_longevity_claim_about_a_nutrient_never_logged(monkeypatch):
+    """ADR-104: the three longevity flags were computed as
+    `totals_sum.get(f, 0) / max(totals_count.get(f, 1), 1)`, so a nutrient appearing in NO
+    record averaged to a factual 0.0 — and every threshold is a `<`, so absence fired all
+    three. On a range that only ever logged fiber the tool asserted 'DHA averages 0.0g/day',
+    'Magnesium averages 0mg/day' and 'Vitamin D from food averages 0.0mcg/day', each with a
+    supplement recommendation attached. Derived over the SET of flagged nutrients, so a
+    fourth flag added with the same wiring mistake joins this assertion automatically."""
     install(monkeypatch, micro_rows(total_fiber_g=40))
     out = tn.tool_get_nutrition(MICRO_ARGS)
     assert out["longevity_flags"] == []
+    # and the flags still fire when the nutrient IS logged and IS short
+    install(monkeypatch, micro_rows(total_fiber_g=40, total_omega3_dha_g=0.1, total_magnesium_mg=100, total_vitamin_d_mcg=1))
+    assert len(tn.tool_get_nutrition(MICRO_ARGS)["longevity_flags"]) == 3
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (ADR-104, P2, mcp/tools_nutrition.py:131-133 _get_micronutrient_report): when "
-        "omega-6 was never logged, `omega6` evaluates to 0.0 (sum default 0 over a count floored to "
-        "1) and the published `omega6_omega3_ratio` becomes 0.0:1 — a PERFECT anti-inflammatory "
-        "score invented out of a missing column. The sibling `omega6_omega3_status` correctly reads "
-        "'insufficient_data' only because 0.0 happens to be falsy, so the summary block contradicts "
-        "itself: an insufficient-data status beside a concrete ratio. The ratio must be None when "
-        "either side has no readings."
-    ),
-)
 def test_micronutrients_publishes_no_omega_ratio_when_omega_six_was_never_logged(monkeypatch):
+    """ADR-104: with omega-6 never logged, `omega6` evaluated to 0.0 (sum default 0 over a
+    count floored to 1) and the published ratio became 0.0:1 — a PERFECT anti-inflammatory
+    score invented out of a missing column, sitting next to an `omega6_omega3_status` of
+    'insufficient_data' (correct only because 0.0 happens to be falsy). Both sides must have
+    readings before a ratio exists."""
     install(monkeypatch, micro_rows(total_omega3_total_g=2))
     out = tn.tool_get_nutrition(MICRO_ARGS)
     assert out["summary"]["omega6_omega3_ratio"] is None
+    assert out["summary"]["omega6_omega3_status"] == "insufficient_data"
+    # the mirror case — omega-3 absent — was already handled and must stay handled
+    install(monkeypatch, micro_rows(total_omega6_g=12))
+    assert tn.tool_get_nutrition(MICRO_ARGS)["summary"]["omega6_omega3_ratio"] is None
 
 
 def test_every_nutrient_with_an_upper_limit_can_actually_flag_an_exceedance(monkeypatch):
@@ -517,20 +507,18 @@ def test_an_unlogged_upper_limit_nutrient_is_omitted_not_implied_adequate(monkey
     assert "total_caffeine_mg" not in {e["field"] for e in out["exceedances"]}
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (ADR-105, P2, mcp/tools_nutrition.py:115-118 _get_micronutrient_report): the "
-        "per-category rows carry `days_logged`, but the `deficiencies` / `near_gaps` lists — the "
-        "part a reader actually quotes, and the part the summary counts — drop it. The docstring "
-        "calls these 'chronic deficiencies'; a single logged day produces one identical in shape to "
-        "a thirty-day one, and nothing in the payload distinguishes them."
-    ),
-)
 def test_a_deficiency_entry_states_how_many_days_it_averaged(monkeypatch):
+    """ADR-105: the per-category rows carried `days_logged` but the `deficiencies` /
+    `near_gaps` / `exceedances` lists — the part a reader quotes, and the part the summary
+    counts — dropped it. The docstring calls these 'chronic'; a single logged day produced
+    one identical in shape to a thirty-day one. Asserted over all three quoted lists."""
     install(monkeypatch, [mf("2026-05-01", total_fiber_g=5)])
     out = tn.tool_get_nutrition(MICRO_ARGS)
     assert out["deficiencies"][0].get("days_logged") == 1
+    install(monkeypatch, micro_rows(total_fiber_g=30, total_iron_mg=90))  # 78.9% RDA -> LOW; iron over its UL
+    out = tn.tool_get_nutrition(MICRO_ARGS)
+    assert out["near_gaps"][0].get("days_logged") == 3
+    assert out["exceedances"][0].get("days_logged") == 3
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -614,11 +602,10 @@ def test_meal_timing_reports_no_sleep_data_rather_than_a_null_gap(monkeypatch):
 
 
 def test_meal_timing_computes_the_pre_sleep_gap_when_the_onset_field_is_present(monkeypatch):
-    """The sleep-overlap arithmetic itself is correct: onset 23:00 (23.0) minus the
-    20:00 average last bite = a 3.0 h gap -> GOOD (Panda's >=3h). It is simply
-    never reached in production, because nothing writes `sleep_start_local` (see
-    the xfail immediately below)."""
-    rows = TIMING_ROWS + [eightsleep("2026-05-05", sleep_start_local="23:00"), eightsleep("2026-05-06", sleep_start_local="23:00")]
+    """The sleep-overlap arithmetic: onset 23.0 minus the 20:00 average last bite = a 3.0 h
+    gap -> GOOD (Panda's >=3h). `sleep_onset_hour` is the LOCAL fractional hour the Eight
+    Sleep writer derives (see the writer-shape test below)."""
+    rows = TIMING_ROWS + [eightsleep("2026-05-05", sleep_onset_hour=23.0), eightsleep("2026-05-06", sleep_onset_hour=23.0)]
     install(monkeypatch, rows)
     overlap = tn.tool_get_nutrition(TIMING_ARGS)["sleep_overlap"]
     assert overlap["avg_last_bite_to_sleep_hrs"] == 3.0
@@ -626,9 +613,9 @@ def test_meal_timing_computes_the_pre_sleep_gap_when_the_onset_field_is_present(
 
 
 def test_meal_timing_flags_a_last_bite_too_close_to_sleep(monkeypatch):
-    """Onset 21:30 (21.5) minus the 20:00 average last bite = 1.5 h -> below the
+    """Onset 21.5 minus the 20:00 average last bite = 1.5 h -> below the
     2.5 h floor, so the GLP-1 clearance flag fires and the status is TOO_CLOSE."""
-    rows = TIMING_ROWS + [eightsleep(day, sleep_start_local="21:30") for day in ("2026-05-05", "2026-05-06")]
+    rows = TIMING_ROWS + [eightsleep(day, sleep_onset_hour=21.5) for day in ("2026-05-05", "2026-05-06")]
     install(monkeypatch, rows)
     out = tn.tool_get_nutrition(TIMING_ARGS)
     assert out["sleep_overlap"]["avg_last_bite_to_sleep_hrs"] == 1.5
@@ -640,7 +627,7 @@ def test_meal_timing_wraps_a_pre_sleep_gap_across_midnight(monkeypatch):
     """A recorded onset EARLIER in the clock day than the last bite is a
     next-morning wake/onset artefact, not a negative gap: 9.0 - 20.0 = -11.0,
     wrapped to 13.0 h."""
-    rows = TIMING_ROWS + [eightsleep(day, sleep_start_local="09:00") for day in ("2026-05-05", "2026-05-06")]
+    rows = TIMING_ROWS + [eightsleep(day, sleep_onset_hour=9.0) for day in ("2026-05-05", "2026-05-06")]
     install(monkeypatch, rows)
     assert tn.tool_get_nutrition(TIMING_ARGS)["sleep_overlap"]["avg_last_bite_to_sleep_hrs"] == 13.0
 
@@ -678,112 +665,120 @@ def test_meal_timing_carries_a_minute_that_rounds_up_into_the_next_hour(monkeypa
     assert tn.tool_get_nutrition(TIMING_ARGS)["eating_window"]["avg_first_bite"] == "08:00"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (reader/writer field mismatch, P1, mcp/tools_nutrition.py:277-282 "
-        "_get_meal_timing): the sleep-overlap block reads `si.get('sleep_start_local') or "
-        "si.get('sleep_onset_local')` from the EIGHTSLEEP partition. "
-        "`ingestion/eightsleep_lambda.py:493-495` writes `sleep_start` / `sleep_end`; the only "
-        "`sleep_start_local` writer in the repo is `ingestion/garmin_lambda.py:709`, which writes "
-        "it to the GARMIN partition — this reads like a Garmin field name pasted into an Eight "
-        "Sleep read. `sleep_onset_local` has no writer at all. The whole `sleep_overlap` section is "
-        "therefore permanently dark: pre_sleep_gap is always None, the status is always "
-        "'no_sleep_data', and Panda's '>=3h before sleep onset' circadian flag can never fire. "
-        "A SECOND bug guards the same feature — line 280 slices `str(onset_str)[:5]` before "
-        "parsing, and both candidate writers store a full ISO timestamp, so even the right field on "
-        "the right partition would parse '2026-' and yield None. Two independent faults over one "
-        "feature is why nobody has ever seen it fail."
-    ),
-)
 def test_meal_timing_computes_the_last_bite_to_sleep_gap_from_the_eightsleep_writer_shape(monkeypatch):
+    """Reader/writer field agreement, DERIVED by calling the writer.
+
+    CORRECTION to the original marker: it prescribed the wrong remedy — it asserted the
+    Eight Sleep WRITER should start producing `sleep_start_local`. It should not. That is a
+    GARMIN field name (`ingestion/garmin_lambda.py:709`, written to the garmin partition);
+    `sleep_onset_local` has no writer anywhere in the repo. The Eight Sleep writer already
+    publishes exactly what this tool needs — `sleep_onset_hour`, the LOCAL fractional hour
+    derived with the night's tz offset — alongside the raw UTC ISO `sleep_start`. The fix is
+    in the READER. (The marker's second half was right: the old code sliced
+    `str(onset_str)[:5]` off what both candidate writers store as a full ISO timestamp, so
+    even the correct field name would have parsed '2026-' and yielded None. Two faults over
+    one feature is why nobody had ever seen `sleep_overlap` fail — it was always
+    'no_sleep_data' and Panda's >=3h flag could never fire.)
+    """
     from ingestion import eightsleep_lambda
 
-    src = inspect.getsource(eightsleep_lambda)
-    assert '"sleep_start_local"' in src or '"sleep_onset_local"' in src, "no writer produces the field the tool reads"
-    rows = TIMING_ROWS + [
-        eightsleep("2026-05-05", sleep_start="2026-05-05T23:00:00"),
-        eightsleep("2026-05-06", sleep_start="2026-05-06T23:00:00"),
-    ]
+    produced = eightsleep_lambda.compute_derived_fields(
+        {"sleep_start": "2026-05-06T06:00:00Z", "sleep_end": "2026-05-06T14:00:00Z"}, tz_offset=-7
+    )
+    assert "sleep_onset_hour" in produced, "the Eight Sleep writer no longer derives the field this tool reads"
+    assert produced["sleep_onset_hour"] == 23.0  # 06:00Z at UTC-7 == 23:00 the previous local evening
+
+    rows = TIMING_ROWS + [eightsleep(day, **produced) for day in ("2026-05-05", "2026-05-06")]
     install(monkeypatch, rows)
     overlap = tn.tool_get_nutrition(TIMING_ARGS)["sleep_overlap"]
     assert overlap["avg_last_bite_to_sleep_hrs"] == 3.0  # onset 23.0 - avg last bite 20.0
+    assert overlap["status"] == "GOOD"
+    assert not any("GLP-1 clearance" in f for f in tn.tool_get_nutrition(TIMING_ARGS)["circadian_flags"])
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (ADR-104/105, P1, mcp/tools_nutrition.py:263-268 _get_meal_timing): `stdev` returns "
-        "the literal 0 when fewer than two values exist, and that 0 is published as "
-        "`first_bite_consistency_sd_hrs` / `last_bite_consistency_sd_hrs`. Zero is not a neutral "
-        "placeholder here — it is the BEST possible value on that scale, so one logged day reads as "
-        "perfect circadian consistency. It also suppresses the '>1.5h SD' inconsistency flag, so "
-        "the single case where the tool has no idea is the case where it reassures him. Should be "
-        "None with n stated."
-    ),
-)
+def test_meal_timing_falls_back_to_the_raw_iso_sleep_start(monkeypatch):
+    """Rows written before `compute_derived_fields` shipped carry only the raw UTC ISO
+    `sleep_start`. Converted to Pacific (the same conversion `mcp/helpers.py` back-fills
+    with), 2026-05-06T06:00Z is 23:00 PDT — a 3.0 h gap, not a dark section."""
+    rows = TIMING_ROWS + [eightsleep(day, sleep_start=f"{day}T06:00:00Z") for day in ("2026-05-05", "2026-05-06")]
+    install(monkeypatch, rows)
+    assert tn.tool_get_nutrition(TIMING_ARGS)["sleep_overlap"]["avg_last_bite_to_sleep_hrs"] == 3.0
+
+
+def test_meal_timing_ignores_the_garmin_field_name_it_used_to_read(monkeypatch):
+    """The dead names must stay dead: an eightsleep row carrying only `sleep_start_local`
+    (which nothing writes to that partition) reports no sleep data rather than a gap."""
+    rows = TIMING_ROWS + [eightsleep(day, sleep_start_local="23:00") for day in ("2026-05-05", "2026-05-06")]
+    install(monkeypatch, rows)
+    assert tn.tool_get_nutrition(TIMING_ARGS)["sleep_overlap"]["status"] == "no_sleep_data"
+
+
 def test_meal_timing_reports_no_consistency_figure_from_a_single_day(monkeypatch):
+    """ADR-104/105: `stdev` returned the literal 0 below n=2 and published it as
+    `first_bite_consistency_sd_hrs`. Zero is not a neutral placeholder on a consistency
+    scale — it is the BEST possible value, so ONE logged day read as perfect circadian
+    consistency AND suppressed the '>1.5h SD' flag: the single case where the tool has no
+    idea was the case where it reassured him. None, with the n stated beside it."""
     install(monkeypatch, [TIMING_ROWS[0]])
     ew = tn.tool_get_nutrition(TIMING_ARGS)["eating_window"]
     assert ew["first_bite_consistency_sd_hrs"] is None
+    assert ew["last_bite_consistency_sd_hrs"] is None
+    assert ew["consistency_n_days"] == 1
+    assert not any("inconsistent circadian signalling" in f for f in tn.tool_get_nutrition(TIMING_ARGS)["circadian_flags"])
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (ADR-104, P2, mcp/tools_nutrition.py:234 + 245-250 _get_meal_timing): the caloric "
-        "distribution divides by the DAY-LEVEL `total_calories_kcal` field, not by the sum of the "
-        "food_log entries it just bucketed. Two consequences: (a) when that field is absent — which "
-        "`macrofactor_lambda` guarantees for a zero total, since it drops zero-valued rollups — "
-        "`total_cal` is 0 and every bucket publishes a factual 0.0%, so a fully logged day reads as "
-        "'no calories in any part of the day'; (b) when the field and the entries disagree, the "
-        "four percentages silently fail to sum to 100 with nothing saying so."
-    ),
-)
 def test_meal_timing_distribution_reflects_the_entries_it_actually_bucketed(monkeypatch):
-    """Same three meals as day 1, but with no day-level total: 400/700/900 of 2000
+    """ADR-104: the caloric distribution divided by the DAY-LEVEL `total_calories_kcal`,
+    not by the sum of the food_log entries it had just bucketed. `macrofactor_lambda` drops
+    zero-valued rollups at write time, so a day without that field published a factual 0.0%
+    in every bucket — a fully logged day reading as 'no calories in any part of the day'.
+
+    Same three meals as day 1, but with no day-level total: 400/700/900 of 2000
     logged kcal is still 20 / 35 / 45 percent."""
     install(monkeypatch, [mf("2026-05-05", food_log=[meal("08:00", 400), meal("12:30", 700), meal("19:00", 900)])])
-    dist = tn.tool_get_nutrition(TIMING_ARGS)["daily_breakdown"][0]["distribution"]
-    assert sum(dist.values()) == pytest.approx(100.0, abs=0.3)
+    day = tn.tool_get_nutrition(TIMING_ARGS)["daily_breakdown"][0]
+    assert day["distribution"] == {"morning_pct": 20.0, "midday_pct": 35.0, "evening_pct": 45.0, "late_pct": 0.0}
+    assert sum(day["distribution"].values()) == pytest.approx(100.0, abs=0.3)
+    assert day["located_calories"] == 2000
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (P3, mcp/tools_nutrition.py:186-192 + 214-228 _get_meal_timing): `t2d` parses only "
-        "`HH:MM`; anything else (a 12-hour `7:30 PM`, an empty string) returns None and the entry is "
-        "dropped from BOTH the bite times and the calorie buckets — while its calories still sit "
-        "inside the day-level `total_calories_kcal` denominator. So an unparseable timestamp "
-        "silently shrinks the eating window AND deflates every distribution percentage, with no "
-        "count of what was skipped. The time string comes straight from a MacroFactor CSV column "
-        "(`macrofactor_lambda.py:164`), whose format the platform does not control. Measured here: "
-        "a day with an 08:00 meal and a '7:30 PM' meal reports first_bite == last_bite == 08:00, "
-        "`eating_window_hrs: 0.0` and 20% of its calories located — a 13.5-hour eating window "
-        "published as zero."
-    ),
-)
+def test_meal_timing_percentages_sum_to_100_when_the_rollup_disagrees_with_the_entries(monkeypatch):
+    """The other half of the same defect: when the day-level rollup and the entries
+    disagree, the four percentages used to silently fail to sum to 100 with nothing saying
+    so. Bucketing against the located total makes them sum, and both figures are published
+    so the disagreement is visible rather than absorbed."""
+    install(monkeypatch, [mf("2026-05-05", total_calories_kcal=3000, food_log=[meal("08:00", 400), meal("19:00", 600)])])
+    day = tn.tool_get_nutrition(TIMING_ARGS)["daily_breakdown"][0]
+    assert sum(day["distribution"].values()) == pytest.approx(100.0, abs=0.3)
+    assert (day["total_calories"], day["located_calories"]) == (3000, 1000)
+
+
 def test_meal_timing_reports_entries_it_could_not_parse(monkeypatch):
+    """`t2d` parses only `HH:MM`; a 12-hour '7:30 PM' from the MacroFactor CSV column (whose
+    format the platform does not control) returns None and the entry is dropped from BOTH
+    the bite times and the calorie buckets — silently shrinking the eating window. The drop
+    still happens; it is now COUNTED, and the calories of a dropped entry no longer sit
+    inside a denominator its own bucket never entered."""
     install(monkeypatch, [mf("2026-05-05", total_calories_kcal=2000, food_log=[meal("08:00", 400), meal("7:30 PM", 1600)])])
-    out = tn.tool_get_nutrition(TIMING_ARGS)
-    assert out["daily_breakdown"][0].get("entries_skipped") == 1
+    day = tn.tool_get_nutrition(TIMING_ARGS)["daily_breakdown"][0]
+    assert day["entries_skipped"] == 1
+    assert day["located_calories"] == 400
+    assert day["distribution"]["morning_pct"] == 100.0  # of what was located, not 20% of an unlocated 2000
+    # a fully-parsed day states zero skipped rather than omitting the count
+    install(monkeypatch, TIMING_ROWS)
+    assert [r["entries_skipped"] for r in tn.tool_get_nutrition(TIMING_ARGS)["daily_breakdown"]] == [0, 0]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (P3, mcp/tools_nutrition.py:210, 365, 460 — _get_meal_timing, "
-        "_get_nutrition_summary, _get_macro_targets): all three sort with `key=lambda x: x['date']`, "
-        "a bare subscript. One malformed partition row without a `date` attribute raises KeyError "
-        "out of the tool and takes down the whole answer, where the micronutrient view (which does "
-        "not sort) would have kept working. Every other read in this module uses `.get`."
-    ),
-)
-def test_meal_timing_tolerates_a_row_with_no_date_attribute(monkeypatch):
+@pytest.mark.parametrize("view", ["meal_timing", "summary", "macros"])
+def test_the_sorting_views_tolerate_a_row_with_no_date_attribute(monkeypatch, view):
+    """All three sorting views used `key=lambda x: x['date']`, a bare subscript: one
+    malformed partition row without the attribute raised KeyError out of the tool and took
+    down the whole answer, where the micronutrient view (which does not sort) kept working.
+    Parametrised over the SET of sorting views so a fourth cannot regress silently."""
     broken = {"pk": PK + "macrofactor", "sk": "DATE#2026-05-05", "total_calories_kcal": 2000}
     install(monkeypatch, TIMING_ROWS + [broken])
-    out = tn.tool_get_nutrition(TIMING_ARGS)
-    assert isinstance(out, dict)
+    out = tn.tool_get_nutrition(dict(TIMING_ARGS, view=view))
+    assert isinstance(out, dict) and "error" not in out
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -823,10 +818,11 @@ def test_summary_averages_only_the_days_that_carry_each_field(monkeypatch):
 
 
 def test_summary_compares_each_average_to_its_target_with_a_signed_gap(monkeypatch):
-    """protein average 125.0 vs the 180 g target -> gap -55.0, 69.4% of target."""
+    """protein average 125.0 vs the 180 g target -> gap -55.0, 69.4% of target, over the
+    n=2 days that carried protein."""
     install(monkeypatch, SUMMARY_ROWS)
     tc = tn.tool_get_nutrition(SUMMARY_ARGS)["target_comparison"]["protein_g"]
-    assert tc == {"target": 180, "average": 125.0, "gap": -55.0, "pct_of_target": 69.4}
+    assert tc == {"target": 180, "average": 125.0, "gap": -55.0, "pct_of_target": 69.4, "n": 2}
 
 
 def test_summary_errors_and_echoes_the_window_when_macrofactor_is_silent(monkeypatch):
@@ -845,40 +841,37 @@ def test_summary_paginates_the_macrofactor_partition_without_dropping_days(monke
     assert t.page_count > len(t.queries), "the fake never paginated — the loop was not exercised"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (ADR-105, P2, mcp/tools_nutrition.py:383-411 _get_nutrition_summary): `avg(field)` "
-        "averages `[r[field] for r in daily_rows if field in r]` — a per-FIELD n — but the only n "
-        "published is `period.days_with_data`, the count of ROWS. Here fiber was logged on 1 of 2 "
-        "days and is reported as a 30.0 g/day average beside 'days_with_data: 2', scored at 100% of "
-        "its target. Any nutrient MacroFactor tracks sporadically silently averages over a "
-        "different, smaller and invisible sample than the one the payload advertises. Each "
-        "target_comparison entry should carry its own n."
-    ),
-)
 def test_summary_states_the_per_field_sample_behind_each_target_comparison(monkeypatch):
+    """ADR-105: `avg(field)` averages a per-FIELD sample, but the only n published was
+    `period.days_with_data`, the count of ROWS. Fiber logged on 1 of 2 days was reported as
+    a 30.0 g/day average beside 'days_with_data: 2', scored at 100% of its target — a
+    smaller, invisible sample than the payload advertised. Every comparison now carries its
+    own n, asserted over the whole SET rather than the one field that happened to differ."""
     install(monkeypatch, SUMMARY_ROWS)
     out = tn.tool_get_nutrition(SUMMARY_ARGS)
     assert out["period"]["days_with_data"] == 2
-    assert out["target_comparison"]["fiber_g"].get("n") == 1
+    assert out["target_comparison"]["fiber_g"]["n"] == 1
+    assert out["target_comparison"]["protein_g"]["n"] == 2
+    missing_n = [f for f, tc in out["target_comparison"].items() if "n" not in tc]
+    assert missing_n == []
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (self-inconsistency, P2, mcp/tools_nutrition.py:396 vs 500 — _get_nutrition_summary "
-        "TARGETS['fiber_g'] = 30 while _get_macro_targets returns targets['fiber_g'] = 25, and the "
-        "macros view's `hit_fiber` threshold is a third literal 25 at line 472). One tool, one set "
-        "of arguments, two published fiber targets depending on which view he asks for. 27 g/day "
-        "is simultaneously 90% of target and a hit."
-    ),
-)
 def test_the_two_nutrition_views_agree_on_the_fiber_target(monkeypatch):
+    """Self-inconsistency: `_get_nutrition_summary` published fiber_g = 30, `_get_macro_targets`
+    published 25 under `targets`, and the macros view's `hit_fiber` compared against a THIRD
+    literal 25 — so 27 g/day was simultaneously 90% of target and a hit. One tool, one set of
+    arguments, one target: `_FIBER_TARGET_G`. The scoring threshold is asserted too, since a
+    published target the hit test does not use is the same defect wearing a different hat."""
     install(monkeypatch, SUMMARY_ROWS)
     summary_target = tn.tool_get_nutrition(SUMMARY_ARGS)["target_comparison"]["fiber_g"]["target"]
-    macros_target = tn.tool_get_nutrition(dict(SUMMARY_ARGS, view="macros"))["targets"]["fiber_g"]
-    assert summary_target == macros_target
+    macros = tn.tool_get_nutrition(dict(SUMMARY_ARGS, view="macros"))
+    assert summary_target == macros["targets"]["fiber_g"] == tn._FIBER_TARGET_G
+    # a day exactly ON the published target is a hit; one under it is not
+    at_target = tn._FIBER_TARGET_G
+    install(monkeypatch, [mf("2026-05-01", total_calories_kcal=2000, total_fiber_g=at_target)])
+    assert tn.tool_get_nutrition(dict(SUMMARY_ARGS, view="macros"))["daily_breakdown"][0]["hit_fiber_target"] is True
+    install(monkeypatch, [mf("2026-05-01", total_calories_kcal=2000, total_fiber_g=at_target - 1)])
+    assert tn.tool_get_nutrition(dict(SUMMARY_ARGS, view="macros"))["daily_breakdown"][0]["hit_fiber_target"] is False
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -904,7 +897,12 @@ def test_macros_scores_daily_adherence_against_the_given_targets(monkeypatch):
     assert (day1["calories_pct"], day1["protein_pct"]) == (100.0, 100.0)
     assert (day2["calories_pct"], day2["protein_pct"]) == (75.0, 66.7)
     assert [day1["hit_calorie_target"], day1["hit_protein_target"], day1["hit_fiber_target"]] == [True, True, True]
-    assert out["adherence"] == {"calorie_target_hit_pct": 50.0, "protein_target_hit_pct": 50.0, "fiber_target_hit_pct": 50.0}
+    assert out["adherence"] == {
+        "calorie_target_hit_pct": 50.0,
+        "protein_target_hit_pct": 50.0,
+        "fiber_target_hit_pct": 50.0,
+        "days_scored": {"calorie": 2, "protein": 2, "fiber": 2},
+    }
 
 
 def test_macros_rolling_window_spans_exactly_the_days_requested(monkeypatch):
@@ -948,42 +946,35 @@ def test_macros_still_answers_when_the_weight_lookup_fails(monkeypatch):
     assert out["adherence"]["protein_target_hit_pct"] == 0.0  # 150 and 100 both short of 180*0.95
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (ADR-104, P1, mcp/tools_nutrition.py:446-452 _get_macro_targets): "
-        "`float(wt_items_sorted[0].get('weight_lbs', 0))` defaults a missing weight to ZERO and "
-        "carries it straight into Mifflin-St Jeor: BMR = 10*0 + 6.25*182.88 - 175 + 5 = 973, "
-        "target = round(973 * 1.55) = 1508 kcal. The surrounding `try/except` catches type errors "
-        "but not this one, because 0 is a perfectly good float — so a Withings row that synced "
-        "without a weight (body-composition-only, a partial sync) makes the tool tell a 220 lb man "
-        "to eat 1508 kcal/day, under the 1500 floor its own sibling tool warns about. An absent "
-        "weight must fall through to the 2400 default, not through a zero-weight human."
-    ),
-)
 def test_macros_ignores_a_withings_row_that_carries_no_weight(monkeypatch):
+    """ADR-104: `float(wt_items_sorted[0].get('weight_lbs', 0))` defaulted a missing weight
+    to ZERO and carried it into Mifflin-St Jeor — BMR 973, target round(973*1.55) = 1508 kcal.
+    The surrounding try/except never caught it, because 0 is a perfectly good float. A
+    Withings row that synced without a weight (body-composition-only, a partial sync) made
+    the tool tell a 220 lb man to eat 1508 kcal/day. An absent weight is not a weight."""
     install(monkeypatch, MACRO_ROWS + [withings("2026-05-02", fat_ratio=38.0)])
     out = tn.tool_get_nutrition({"view": "macros", "start_date": "2026-05-01", "end_date": "2026-05-02"})
     assert out["targets"]["calories_kcal"] == 2400
+    # and a weightless row NEWER than a real weigh-in must not mask the weigh-in either
+    rows = MACRO_ROWS + [withings("2026-05-01", weight_lbs=220.0), withings("2026-05-02", fat_ratio=38.0)]
+    install(monkeypatch, rows)
+    out = tn.tool_get_nutrition({"view": "macros", "start_date": "2026-05-01", "end_date": "2026-05-02"})
+    assert out["targets"]["calories_kcal"] == 3055
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (ADR-104, P2, mcp/tools_nutrition.py:461-476 _get_macro_targets): every macro is "
-        "read as `float(item.get(field, 0) or 0)`, so a partition row with no calorie rollup — "
-        "which `macrofactor_lambda` produces for a day it could not total (zero rollups are dropped "
-        "at write time, line 307) — is published as `calories_kcal: 0, calories_pct: 0.0` and "
-        "counted as a MISSED calorie target. Unlogged days are folded into the adherence "
-        "denominator as failures, so the hit-rate he is graded on falls for days he simply did not "
-        "upload."
-    ),
-)
 def test_macros_excludes_a_day_with_no_calorie_rollup_from_the_hit_rate(monkeypatch):
+    """ADR-104: every macro was read as `float(item.get(field, 0) or 0)`, so a row with no
+    calorie rollup — which `macrofactor_lambda` produces for a day it could not total, since
+    zero rollups are dropped at write time — was published as `calories_kcal: 0` and counted
+    as a MISSED target. The hit-rate he is graded on fell for days he simply did not upload."""
     rows = MACRO_ROWS[:1] + [mf("2026-05-02", total_protein_g=150, total_fiber_g=30)]
     install(monkeypatch, rows)
     out = tn.tool_get_nutrition(MACRO_ARGS)
     assert out["adherence"]["calorie_target_hit_pct"] == 100.0  # 1 of 1 measured day
+    assert out["adherence"]["days_scored"] == {"calorie": 1, "protein": 2, "fiber": 2}
+    # the unmeasured day is present and explicitly blank, never a factual zero
+    day2 = out["daily_breakdown"][1]
+    assert day2["calories_kcal"] is None and day2["calories_pct"] is None and day2["hit_calorie_target"] is None
 
 
 @pytest.mark.xfail(
@@ -1039,7 +1030,15 @@ def sust_rows(hrv=None, eff=None, rec=None, cal=1800, t0=None, kj=None) -> list[
         # exactly the shape ingestion/habitify_lambda.py writes
         rows += [habitify(day, completion_pct=t0[i], total_completed=8, total_possible=10) for i, day in enumerate(_SUST_DAYS)]
     if kj:
-        rows += [strava(day, activities=[{"kilojoules": kj[i], "moving_time_seconds": 3600}]) for i, day in enumerate(_SUST_DAYS)]
+        # DERIVED from the real writer: ingestion/strava_lambda.transform() rolls the
+        # per-activity `kilojoules` up into a day-level `total_kilojoules`, so the fixture
+        # cannot drift from what the strava partition actually holds.
+        from ingestion import strava_lambda
+
+        for i, day in enumerate(_SUST_DAYS):
+            raw = {"activities": [{"kilojoules": kj[i], "moving_time_seconds": 3600}]}
+            produced = {k: v for k, v in strava_lambda.transform(raw, day)[0].items() if k not in ("source", "date")}
+            rows.append(strava(day, **produced))
     return rows
 
 
@@ -1159,72 +1158,73 @@ def test_deficit_marks_a_channel_with_too_few_points_as_insufficient_data(monkey
     assert channel(out, "Training Output")["direction"] == "insufficient_data"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (reader/writer field mismatch, P1, mcp/tools_nutrition.py:635 "
-        "tool_get_deficit_sustainability): channel 4 collects "
-        "`h.get('tier_0_completion_rate') or h.get('t0_rate')` from the habitify partition. "
-        "`ingestion/habitify_lambda.py:359-372` writes `completion_pct`, `completion_pct_strict`, "
-        "`by_group[*].pct`, `total_completed`, `total_possible` — NEITHER field the tool reads is "
-        "produced by any writer in the repo (grep confirms only readers). The Habit Completion "
-        "channel has therefore never carried a value: `t0_rates` is always [], the direction is "
-        "always 'insufficient_data', and `habits_degraded` is always False. Behavioural unravelling "
-        "— the earliest and most actionable sign a cut is failing — is structurally invisible to "
-        "the tool built to catch it. (The site-api sibling at lambdas/web/site_api_nutrition.py:854 "
-        "reads the same two dead names.)"
-    ),
-)
 def test_the_habit_channel_reads_a_field_the_habitify_writer_produces(monkeypatch):
+    """Reader/writer field agreement, channel 4.
+
+    `ingestion/habitify_lambda.py` writes `completion_pct` (pending-aware),
+    `completion_pct_strict`, `by_group[*].pct`, `total_completed`, `total_possible`. The tool
+    read `tier_0_completion_rate` or `t0_rate` — NEITHER produced by any writer in the repo
+    (there is no "Tier 0" group; `P40_GROUPS` is the nine named groups). The channel had
+    therefore never carried a value: always [], always 'insufficient_data', `habits_degraded`
+    always False — behavioural unravelling, the earliest sign a cut is failing, structurally
+    invisible to the tool built to catch it.
+
+    CORRECTION to the original marker: it prescribed asserting the WRITER produces
+    `tier_0_completion_rate`. It should not — the writer is right and the reader was wrong.
+    The dead names are asserted dead below."""
     from ingestion import habitify_lambda
 
     src = inspect.getsource(habitify_lambda)
-    assert '"tier_0_completion_rate"' in src or '"t0_rate"' in src, "no writer produces either field the tool reads"
+    assert '"completion_pct"' in src, "the habitify writer no longer produces the field this channel reads"
+    assert '"tier_0_completion_rate"' not in src and '"t0_rate"' not in src
+
     install(monkeypatch, sust_rows(hrv=FLAT, t0=[0.9, 0.9, 0.9, 0.3, 0.3, 0.3]))
     out = tn.tool_get_deficit_sustainability(SUST_ARGS)
-    assert channel(out, "Habit Completion")["direction"] == "declining"
+    hab = channel(out, "Habit Completion")
+    assert hab["direction"] == "declining"
+    assert hab["delta_pct"] == -66.7  # (0.3 - 0.9) / 0.9 * 100
+    assert hab["status"] == "degraded"
+    assert hab["avg"] == 0.6
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (reader/writer field mismatch, P1, mcp/tools_nutrition.py:646 "
-        "tool_get_deficit_sustainability): channel 5 sums `s.get('total_kilojoules', 0)` per day, "
-        "and `ingestion/strava_lambda.py:300-311 transform()` never writes that key — it rolls up "
-        "distance / moving time / elevation / zone-2 seconds only. This test calls the real "
-        "transform so it cannot drift from the writer. Consequence: `training_vals` is all zeros, "
-        "`trend_direction` short-circuits on `first_avg == 0` and returns ('stable', 0), so the "
-        "Training Output channel can never degrade either. The per-activity `kilojoules` IS "
-        "captured (strava_lambda.py:173) and is right there in `activities` — it is simply never "
-        "summed."
-    ),
-)
+def test_the_habit_channel_stays_dark_on_the_field_names_it_used_to_read(monkeypatch):
+    """The dead names must stay dead: a habitify row carrying only `tier_0_completion_rate`
+    is not a habit reading, so the channel says insufficient_data rather than inventing one."""
+    rows = sust_rows(hrv=FLAT)
+    rows += [habitify(day, tier_0_completion_rate=v) for day, v in zip(_SUST_DAYS, [0.9, 0.9, 0.9, 0.3, 0.3, 0.3])]
+    install(monkeypatch, rows)
+    assert channel(tn.tool_get_deficit_sustainability(SUST_ARGS), "Habit Completion")["direction"] == "insufficient_data"
+
+
 def test_the_training_channel_reads_a_field_the_strava_writer_produces(monkeypatch):
+    """Reader/writer field agreement, channel 5 — DERIVED by calling the real transform.
+
+    CORRECTION to the original marker: its stated cause is FALSE on current main. It claimed
+    `strava_lambda.transform()` "never writes" `total_kilojoules`; the writer rolls the
+    per-activity `kilojoules` up into a day-level `total_kilojoules` and says so in a comment
+    naming this very reader. The tool's read was already correct — what was stale was the
+    FIXTURE, which built strava rows carrying only `activities`, so the channel measured a
+    column the test itself had failed to write. `sust_rows` now builds its strava rows
+    THROUGH `transform`, which is what makes this assertion mean anything."""
     from ingestion import strava_lambda
 
     produced = strava_lambda.transform({"activities": [{"kilojoules": 900, "moving_time_seconds": 3600}]}, "2026-05-03")[0]
-    assert "total_kilojoules" in produced
+    assert produced["total_kilojoules"] == 900
     install(monkeypatch, sust_rows(hrv=FLAT, kj=[1000, 1000, 1000, 300, 300, 300]))
     out = tn.tool_get_deficit_sustainability(SUST_ARGS)
-    assert channel(out, "Training Output")["direction"] == "declining"
+    train = channel(out, "Training Output")
+    assert train["direction"] == "declining"
+    assert train["delta_pct"] == -70.0  # (300 - 1000) / 1000 * 100
+    assert train["status"] == "degraded"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (P1, the composite consequence of the two field mismatches above, "
-        "mcp/tools_nutrition.py:653-693 tool_get_deficit_sustainability): the tool advertises five "
-        "channels and escalates at 3+ (WARNING) and 4+ (CRITICAL), but only three of the five can "
-        "ever change state — habits and training are wired to fields no writer produces. So "
-        "CRITICAL is unreachable, and WARNING requires ALL THREE surviving channels (which all read "
-        "the same Whoop record) to degrade at once. Here every one of the five real signals "
-        "collapses — HRV -20%, efficiency -10.5%, recovery -28.6%, T0 habits 0.9 -> 0.3, training "
-        "1000 -> 300 kJ — and the tool still answers WARNING/3, understating a textbook "
-        "back-off-now week. Who it hurts: the escalation ladder is calibrated against a denominator "
-        "of 5 while only 3 can fire."
-    ),
-)
 def test_a_total_collapse_across_all_five_channels_reaches_critical(monkeypatch):
+    """The composite consequence of the two field mismatches above: the tool advertises five
+    channels and escalates at 3+ (WARNING) / 4+ (CRITICAL), but with habits and training
+    wired to dead names only three could ever change state — so CRITICAL was unreachable and
+    WARNING required ALL THREE surviving channels (which all read the same Whoop record) to
+    degrade at once. The escalation ladder was calibrated against a denominator of 5 while
+    only 3 could fire."""
     rows = sust_rows(
         hrv=FLAT,
         eff=[95, 95, 95, 85, 85, 85],
@@ -1234,47 +1234,33 @@ def test_a_total_collapse_across_all_five_channels_reaches_critical(monkeypatch)
     )
     install(monkeypatch, rows)
     out = tn.tool_get_deficit_sustainability(SUST_ARGS)
-    assert out["degraded_count"] >= 4
+    assert out["degraded_count"] == 5
+    assert [c["status"] for c in out["channels"]] == ["degraded"] * 5
     assert out["severity"] == "CRITICAL"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (ADR-104, P1, mcp/tools_nutrition.py:557-576 tool_get_deficit_sustainability): "
-        "`cals` is collected with a truthiness filter and then `avg_cal = sum/len if cals else 0`. "
-        "Seven MacroFactor rows that carry no `total_calories_kcal` rollup — reachable, since "
-        "`macrofactor_lambda` drops zero-valued totals at write time and its daily-summary path "
-        "writes protein-only rows — pass the `len(mf_items) < 7` floor and then average to a "
-        "factual ZERO intake. `deficit_kcal = 2500 - 0` makes it a 2500 kcal/day, 100%, "
-        "'aggressive' deficit fabricated entirely out of missing data, and every severity verdict "
-        "downstream is computed against it. Absent intake must be an error, exactly as the <7-day "
-        "case already is."
-    ),
-)
 def test_deficit_refuses_to_score_a_window_with_no_calorie_data(monkeypatch):
+    """ADR-104: `cals` was collected with a truthiness filter and then `avg_cal = sum/len if
+    cals else 0`. Seven MacroFactor rows carrying no `total_calories_kcal` — reachable, since
+    `macrofactor_lambda` drops zero-valued totals at write time — cleared the `len(mf_items)
+    < 7` floor and averaged to a factual ZERO intake, making `2500 - 0` a 100% 'aggressive'
+    deficit fabricated out of missing data, with every severity verdict computed against it."""
     rows = [mf(d("2026-05-03", i), total_protein_g=150) for i in range(7)]
     install(monkeypatch, rows + sust_rows(hrv=FLAT)[7:])
     out = tn.tool_get_deficit_sustainability(SUST_ARGS)
     assert "error" in out, f"reported a {out.get('deficit', {}).get('deficit_pct')}% deficit from no intake data"
+    assert "deficit" not in out and "severity" not in out
+    assert "calorie rollup" in out["error"]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (ADR-105 / #1917, P2, mcp/tools_nutrition.py:696-706 "
-        "tool_get_deficit_sustainability): `period` publishes `days` — the REQUESTED window — and "
-        "nothing else, while `avg_intake_kcal`, `deficit_kcal` and `deficit_pct` are computed over "
-        "however many days actually carried a calorie rollup. Seven logged days inside a 14-day "
-        "request produce a payload that says 'days: 14'. Every other range tool in this module "
-        "publishes `days_with_data`; this one, the one that issues the strongest recommendations, "
-        "does not."
-    ),
-)
 def test_deficit_states_how_many_days_actually_carried_intake(monkeypatch):
+    """ADR-105/#1917: `period` published `days` — the REQUESTED window — and nothing else,
+    while every intake figure was computed over however many days carried a rollup. Seven
+    logged days inside a 14-day request produced a payload that said 'days: 14'."""
     install(monkeypatch, sust_rows(hrv=FLAT))
     out = tn.tool_get_deficit_sustainability({"days": 14, "end_date": "2026-05-09"})
-    assert out["period"].get("days_with_data") == 7
+    assert out["period"]["days"] == 14
+    assert out["period"]["days_with_data"] == 7
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1388,43 +1374,40 @@ def test_metabolic_adaptation_needs_three_paired_weeks(monkeypatch):
     assert "≥3 weeks" in tn._get_metabolic_adaptation(ADAPT_ARGS)["error"]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (ADR-104/105, P1, mcp/tools_nutrition.py:791-796 _get_metabolic_adaptation): "
-        "`weekly_deficit = (base_tdee - wd['avg_cal']) * 7` charges every ISO week a FULL SEVEN "
-        "DAYS of deficit regardless of how many days were actually logged — and `cal_days` is "
-        "computed two blocks earlier and sits unused in the very dict being iterated. With 2 logged "
-        "days a week the expected loss is inflated 3.5x (8.0 lb instead of 2.3 lb) against an "
-        "actual 2.1 lb, so the adaptation ratio collapses from an honest 0.91 ('NONE - tracking "
-        "close to expected') to 0.26 -> SEVERE: 'plateau territory... 2-3 week reverse diet... "
-        "check thyroid markers (TSH, T3, T4) at next blood draw.' Partial logging alone "
-        "manufactures a metabolic-suppression diagnosis and a medical follow-up. Who it hurts: "
-        "anyone who logs some days and not others, which is everyone."
-    ),
-)
 def test_metabolic_adaptation_scales_the_expected_deficit_to_the_days_actually_logged(monkeypatch):
+    """ADR-104/105: `weekly_deficit = (base_tdee - wd['avg_cal']) * 7` charged every ISO week
+    a FULL SEVEN DAYS of deficit regardless of how many were logged — while `cal_days`, the
+    honest multiplier, was computed two blocks earlier and sat unused in the very dict being
+    iterated. At 2 logged days a week that inflated expected loss 3.5x (8.0 lb against a real
+    2.3) and collapsed the ratio from an honest 0.91 ('NONE') to 0.26 -> SEVERE: '2-3 week
+    reverse diet... check thyroid markers (TSH, T3, T4) at next blood draw.' Partial logging
+    alone manufactured a metabolic-suppression diagnosis and a medical follow-up."""
     install(monkeypatch, adapt_rows(days_per_week=2))
     out = tn._get_metabolic_adaptation(ADAPT_ARGS)
     # 8 weeks * (2500 - 2000) kcal * 2 logged days = 8000 kcal / 3500 = 2.3 lb expected
     assert out["metabolic_adaptation"]["expected_loss_lbs"] == 2.3
     assert out["metabolic_adaptation"]["actual_loss_lbs"] == 2.1
+    assert out["metabolic_adaptation"]["adaptation_ratio"] == 0.91
     assert out["metabolic_adaptation"]["severity"] == "NONE"
+    assert "thyroid" not in out["recommendation"]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (ADR-105, P2, mcp/tools_nutrition.py:812-819 _get_metabolic_adaptation): "
-        "`recent_rates = weekly_data[-4:]` and `early_rates = weekly_data[1:5]` are published as "
-        "`recent_avg_lbs_per_week` vs `early_avg_lbs_per_week` with a `rate_slowdown_pct` between "
-        "them — but below eight weeks those slices OVERLAP, and at the three-week minimum the tool "
-        "accepts they are the IDENTICAL two weeks. The result is a 0.0% slowdown presented as a "
-        "measured comparison of two periods that are the same period. Should be None until the "
-        "windows are disjoint."
-    ),
-)
+@pytest.mark.parametrize("days_per_week,expected", [(2, 2.3), (3, 3.4), (4, 4.6), (7, 8.0)])
+def test_metabolic_adaptation_expected_loss_scales_with_logging_density(monkeypatch, days_per_week, expected):
+    """The same fix stated as a monotone SET rather than one measured point: 8 weeks x
+    (2500-2000) kcal x n logged days / 3500. Only the fully-logged 7-day case may reach the
+    8.0 lb the flat multiplier used to charge everyone."""
+    install(monkeypatch, adapt_rows(days_per_week=days_per_week))
+    assert tn._get_metabolic_adaptation(ADAPT_ARGS)["metabolic_adaptation"]["expected_loss_lbs"] == expected
+
+
 def test_metabolic_adaptation_gives_no_slowdown_when_early_and_recent_overlap(monkeypatch):
+    """ADR-105: `recent_rates = weekly_data[-4:]` and `early_rates = weekly_data[1:5]` were
+    published with a `rate_slowdown_pct` between them — but below nine weeks those slices
+    OVERLAP, and at the three-week minimum this tool accepts they are the IDENTICAL two
+    weeks, so a 0.0% slowdown was presented as a measured comparison of a period against
+    itself. The two averages are each real and stay published; only the comparison between
+    them waits for disjoint windows, and `rate_windows_disjoint` says which state it is in."""
     rows = []
     for wi, monday in enumerate(_MONDAYS[5:]):  # three ISO weeks
         rows += [mf(d(monday, o), total_calories_kcal=2000) for o in range(5)]
@@ -1434,20 +1417,36 @@ def test_metabolic_adaptation_gives_no_slowdown_when_early_and_recent_overlap(mo
     out = tn._get_metabolic_adaptation(ADAPT_ARGS)
     assert out["period"]["weeks_analysed"] == 3
     assert out["rate_analysis"]["rate_slowdown_pct"] is None
+    assert out["rate_analysis"]["rate_windows_disjoint"] is False
+    assert out["rate_analysis"]["early_avg_lbs_per_week"] is not None  # each average is still real
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (ADR-104, P2, mcp/tools_nutrition.py:800-801 + 842-849 _get_metabolic_adaptation): "
-        "`adaptation_ratio = actual_loss / expected_loss` goes NEGATIVE when weight went up, falls "
-        "through every band to SEVERE, and is then interpolated into "
-        "f'Losing only {round(ratio*100)}% of expected' — so a 1.9 lb GAIN is reported as 'Losing "
-        "only -63% of expected'. The severity happens to be right; the sentence is nonsense, and it "
-        "is the sentence a reader quotes. A gain needs its own branch."
-    ),
-)
+def test_metabolic_adaptation_publishes_a_slowdown_once_the_windows_are_disjoint(monkeypatch):
+    """The other half of the derived check: at nine weeks `[1:5]` and `[-4:]` no longer
+    share an index, so the comparison becomes meaningful and IS published. Without this the
+    fix above would be indistinguishable from deleting the feature."""
+    mondays = [d("2026-03-09", 7 * i) for i in range(9)]
+    weights = [320.0 - i for i in range(5)] + [316.0 - 0.5 * (i + 1) for i in range(4)]  # 1.0 lb/wk then 0.5
+    rows = []
+    for wi, monday in enumerate(mondays):
+        rows += [mf(d(monday, o), total_calories_kcal=2000) for o in range(7)]
+        rows.append(withings(monday, weight_lbs=weights[wi]))
+    install(monkeypatch, rows)
+    out = tn._get_metabolic_adaptation({"end_date": "2026-05-10", "weeks": 10})
+    assert out["period"]["weeks_analysed"] == 9
+    assert out["rate_analysis"]["rate_windows_disjoint"] is True
+    # early weeks 1-4 fall 1.0 lb/wk, recent weeks 5-8 fall 0.5 -> a 50% slowdown
+    assert out["rate_analysis"]["early_avg_lbs_per_week"] == 1.0
+    assert out["rate_analysis"]["recent_avg_lbs_per_week"] == 0.5
+    assert out["rate_analysis"]["rate_slowdown_pct"] == 50.0
+
+
 def test_metabolic_adaptation_does_not_describe_a_weight_gain_as_losing(monkeypatch):
+    """ADR-104: `adaptation_ratio = actual_loss / expected_loss` goes NEGATIVE when weight
+    went up, falls through every band to SEVERE and is then interpolated into
+    f'Losing only {round(ratio*100)}% of expected' — a 1.9 lb GAIN reported as 'Losing only
+    -63% of expected'. The severity is right; the sentence is nonsense, and the sentence is
+    what a reader quotes."""
     rows = []
     for wi, monday in enumerate(_MONDAYS[5:]):
         rows += [mf(d(monday, o), total_calories_kcal=2000) for o in range(5)]
@@ -1457,6 +1456,8 @@ def test_metabolic_adaptation_does_not_describe_a_weight_gain_as_losing(monkeypa
     out = tn._get_metabolic_adaptation(ADAPT_ARGS)
     assert out["metabolic_adaptation"]["actual_loss_lbs"] < 0
     assert "Losing only -" not in out["recommendation"]
+    assert "Losing" not in out["recommendation"] and "UP 1.9 lb" in out["recommendation"]
+    assert out["metabolic_adaptation"]["severity"] == "SEVERE"  # the verdict was never the wrong part
 
 
 # ──────────────────────────────────────────────────────────────────────────────

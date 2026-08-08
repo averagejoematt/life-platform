@@ -4,7 +4,7 @@ Nutrition tools: micronutrients, meal timing, macros, food log.
 
 import math
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from mcp.core import get_profile, pacific_today, parallel_query_sources, query_source
 
@@ -22,6 +22,55 @@ def _nutrition_through_date():
     # Pacific day: "yesterday" must be relative to the PT calendar, else a caller in
     # the UTC-evening window gets today's (still-empty) PT day. See AUDIT BUG-03.
     return (datetime.strptime(pacific_today(), "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
+
+
+_DEFAULT_RANGE_DAYS = 30
+
+
+def _nutrition_default_range(args, days=_DEFAULT_RANGE_DAYS):
+    """Resolve (start_date, end_date) for a view the caller gave no explicit range.
+
+    Both ends MUST come from one calendar frame. Every view used to anchor its end to
+    `_nutrition_through_date()` (Pacific yesterday) while deriving its start from
+    `datetime.now(timezone.utc) - 29 days`. Two frames defining one window make its
+    LENGTH depend on where the clock sits relative to the UTC/PT boundary — 30 inclusive
+    dates in the PT morning, 29 in the UTC-evening window — while the registry documents
+    a flat "default: 30 days ago". Deriving the start from the RESOLVED end makes the
+    span exactly `days` inclusive dates at every hour, and matches how the macros view
+    (`_get_macro_targets`) has always computed its rolling window.
+    """
+    end_date = args.get("end_date") or _nutrition_through_date()
+    start_date = args.get("start_date") or (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    return start_date, end_date
+
+
+def _latest_weight_lbs(wt_items):
+    """The most recent Withings weight in `wt_items`, or None.
+
+    A Withings row can sync WITHOUT a weight (a body-composition-only or partial sync),
+    so "the latest row" is not the same thing as "the latest weigh-in". Reading
+    `.get('weight_lbs', 0)` off the newest row put a ZERO through Mifflin-St Jeor and
+    produced a 1508 kcal/day target for a 220 lb man (ADR-104: an absent measurement is
+    not a measurement of zero). Pick the newest row that actually carries a weight.
+    """
+    for item in sorted(wt_items or [], key=lambda x: x.get("date", ""), reverse=True):
+        raw = item.get("weight_lbs")
+        if raw in (None, ""):
+            continue
+        try:
+            val = float(raw)
+        except (TypeError, ValueError):
+            continue
+        if val > 0:
+            return val
+    return None
+
+
+def _mifflin_tdee(weight_lbs):
+    """Mifflin-St Jeor BMR x 1.55 moderate-activity multiplier, Matthew-specific
+    (height 72in = 182.88cm, age ~35 — only used when the profile lookup fails)."""
+    bmr = 10 * (weight_lbs * 0.453592) + 6.25 * 182.88 - 5 * 35 + 5
+    return round(bmr * 1.55)
 
 
 # ── MacroFactor reference data ──
@@ -62,6 +111,12 @@ _MICRO_CATEGORY_ORDER = ["Macros", "Fatty Acids", "Minerals", "Vitamins", "B Vit
 _OMEGA_RATIO_TARGET = 4.0  # Attia / Simopoulos: keep O6:O3 < 4:1
 # Phillips 2016 MPS threshold; older adults may need 3g+ (anabolic resistance)
 _LEUCINE_MPS_THRESHOLD = 2.5  # g leucine per meal to trigger MPS (Phillips / Attia)
+# ONE fiber target for the whole module. `view=summary` published 30 g/day, `view=macros`
+# published 25 under `targets`, and the macros hit test compared against a THIRD literal 25
+# — so 27 g/day was simultaneously "90% of target" and "a hit" depending on which view was
+# asked. One tool must not answer one question two ways. (The 38 g in
+# `_MICRONUTRIENT_TARGETS` is a different quantity — the NIH RDA, not Matthew's target.)
+_FIBER_TARGET_G = 30
 
 
 def _get_micronutrient_report(args):
@@ -70,8 +125,7 @@ def _get_micronutrient_report(args):
     Flags chronic deficiencies (avg < 60% RDA), near-miss gaps (60-90%), upper-limit exceedances,
     omega-6:omega-3 ratio, and generates actionable longevity commentary.
     """
-    end_date = args.get("end_date", _nutrition_through_date())
-    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=29)).strftime("%Y-%m-%d"))
+    start_date, end_date = _nutrition_default_range(args)
 
     items = query_source("macrofactor", start_date, end_date)
     if not items:
@@ -104,18 +158,30 @@ def _get_micronutrient_report(args):
             optimal = meta.get("optimal")
             ul = meta.get("upper_limit")
             unit = meta["unit"]
-            row = {"field": field, "average": avg_val, "unit": unit, "days_logged": totals_count[field]}
+            days_logged = totals_count[field]
+            row = {"field": field, "average": avg_val, "unit": unit, "days_logged": days_logged}
             if rda:
                 pct_rda = round(avg_val / rda * 100, 1)
                 row["rda"] = rda
                 row["pct_rda"] = pct_rda
                 if meta.get("score"):
+                    # ADR-105: the deficiency / near-gap lists are the part a reader quotes, and
+                    # the docstring calls them CHRONIC. Each entry carries the n it averaged over,
+                    # so a one-day shortfall cannot read as a thirty-day one.
+                    entry = {
+                        "field": field,
+                        "average": avg_val,
+                        "unit": unit,
+                        "pct_rda": pct_rda,
+                        "rda": rda,
+                        "days_logged": days_logged,
+                    }
                     if pct_rda < 60:
                         row["status"] = "DEFICIENT"
-                        deficiencies.append({"field": field, "average": avg_val, "unit": unit, "pct_rda": pct_rda, "rda": rda})
+                        deficiencies.append(entry)
                     elif pct_rda < 90:
                         row["status"] = "LOW"
-                        near_gaps.append({"field": field, "average": avg_val, "unit": unit, "pct_rda": pct_rda, "rda": rda})
+                        near_gaps.append(entry)
             # Upper-limit exceedance must NOT depend on `score` or on `rda` being set (#2248):
             # total_sodium_mg and total_caffeine_mg both carry an `upper_limit` but no `score`
             # (and caffeine has no `rda` at all), so nesting this under either silently excluded
@@ -124,7 +190,7 @@ def _get_micronutrient_report(args):
             # isn't DEFICIENT/LOW and isn't over its limit still lands on ADEQUATE, unchanged.
             if ul and avg_val > ul:
                 row["status"] = "ABOVE_UPPER_LIMIT"
-                exceedances.append({"field": field, "average": avg_val, "unit": unit, "upper_limit": ul})
+                exceedances.append({"field": field, "average": avg_val, "unit": unit, "upper_limit": ul, "days_logged": days_logged})
             elif meta.get("score") and rda and "status" not in row:
                 row["status"] = "ADEQUATE"
             if optimal:
@@ -134,27 +200,37 @@ def _get_micronutrient_report(args):
         if cat_rows:
             categories[cat] = sorted(cat_rows, key=lambda r: r.get("pct_rda", 999))
 
-    omega6 = totals_sum.get("total_omega6_g", 0) / max(totals_count.get("total_omega6_g", 1), 1)
-    omega3 = totals_sum.get("total_omega3_total_g", 0) / max(totals_count.get("total_omega3_total_g", 1), 1)
-    o6_o3 = round(omega6 / omega3, 1) if omega3 > 0 else None
+    # ADR-104 — a nutrient that appears in NO record has no average, not an average of 0.
+    # `totals_sum.get(f, 0) / max(totals_count.get(f, 1), 1)` turned every absence into a
+    # factual 0.0, and every threshold below is a `<`, so a range that only logged fiber
+    # fired ALL THREE longevity flags — three fabricated deficiencies, each with a
+    # supplement recommendation attached. Every other number in this function is already
+    # gated on `totals_count[field] == 0`; the flag block and the omega ratio were not.
+    def logged_avg(field):
+        count = totals_count.get(field, 0)
+        return (totals_sum.get(field, 0.0) / count) if count else None
+
+    omega6 = logged_avg("total_omega6_g")
+    omega3 = logged_avg("total_omega3_total_g")
+    o6_o3 = round(omega6 / omega3, 1) if (omega6 is not None and omega3) else None
 
     longevity_flags = []
     if o6_o3 and o6_o3 > _OMEGA_RATIO_TARGET:
         longevity_flags.append(
             f"Omega-6:Omega-3 ratio is {o6_o3}:1 (target <{_OMEGA_RATIO_TARGET}:1). Pro-inflammatory — increase EPA/DHA or reduce seed oils."
         )
-    dha_avg = totals_sum.get("total_omega3_dha_g", 0) / max(totals_count.get("total_omega3_dha_g", 1), 1)
-    if dha_avg < 1.0:
+    dha_avg = logged_avg("total_omega3_dha_g")
+    if dha_avg is not None and dha_avg < 1.0:
         longevity_flags.append(
             f"DHA averages {round(dha_avg, 2)}g/day — below the 1g+ associated with cognitive protection (Rhonda Patrick). Add fatty fish ≥3x/week or algae-based DHA supplement."
         )
-    mag_avg = totals_sum.get("total_magnesium_mg", 0) / max(totals_count.get("total_magnesium_mg", 1), 1)
-    if mag_avg < 350:
+    mag_avg = logged_avg("total_magnesium_mg")
+    if mag_avg is not None and mag_avg < 350:
         longevity_flags.append(
             f"Magnesium averages {round(mag_avg)}mg/day. Sub-optimal magnesium is linked to poor sleep quality, elevated cortisol, and lower HRV. Target 400-500mg from food + glycinate supplement."
         )
-    vd_avg = totals_sum.get("total_vitamin_d_mcg", 0) / max(totals_count.get("total_vitamin_d_mcg", 1), 1)
-    if vd_avg < 25:
+    vd_avg = logged_avg("total_vitamin_d_mcg")
+    if vd_avg is not None and vd_avg < 25:
         longevity_flags.append(
             f"Vitamin D from food averages {round(vd_avg, 1)}mcg/day. Difficult to reach optimal serum levels (60-80 ng/mL) from diet alone in the Pacific Northwest — consider 4,000-5,000 IU D3+K2 supplement."
         )
@@ -176,14 +252,62 @@ def _get_micronutrient_report(args):
     }
 
 
+def _avg_sleep_onset_hour(start_date, end_date):
+    """Average local sleep-onset hour over the window, from the Eight Sleep partition.
+
+    Reader/writer agreement: `ingestion/eightsleep_lambda.py` writes `sleep_onset_hour`
+    (a LOCAL fractional hour, e.g. 23.9, derived with the night's tz offset) alongside the
+    raw UTC ISO `sleep_start`. This block used to read `sleep_start_local` / `sleep_onset_local`
+    — the first is a GARMIN field name, the second has no writer anywhere in the repo — and
+    then sliced `str(onset_str)[:5]` off it, which would have parsed "2026-" even had the
+    field existed. Two independent faults over one feature is why nobody ever saw the
+    sleep-overlap section fail: it was permanently dark, always "no_sleep_data", and Panda's
+    ">=3h before sleep onset" flag could never fire.
+
+    Returns None (never 0) when nothing in the window carries an onset.
+    """
+    onsets = []
+    try:
+        for si in query_source("eightsleep", start_date, end_date):
+            hour = si.get("sleep_onset_hour")
+            if hour is None and si.get("sleep_start"):
+                hour = _hour_from_iso_local(si["sleep_start"])
+            if hour is None:
+                continue
+            try:
+                h = float(hour) % 24
+            except (TypeError, ValueError):
+                continue
+            # An onset recorded before 08:00 local is a past-midnight bedtime; lift it onto
+            # the same evening axis as the last bite so the gap arithmetic stays monotonic.
+            onsets.append(h if h > 8 else h + 24)
+    except Exception:
+        return None
+    return sum(onsets) / len(onsets) if onsets else None
+
+
+def _hour_from_iso_local(ts_str):
+    """Pacific fractional hour of a UTC ISO timestamp — the same conversion
+    `mcp/helpers.py` applies when back-filling `sleep_onset_hour` from `sleep_start`."""
+    try:
+        from common.pacific_time import PACIFIC, parse_iso_utc
+
+        dt = parse_iso_utc(ts_str)
+        if dt is None:
+            return None
+        local = dt.astimezone(PACIFIC)
+        return round(local.hour + local.minute / 60 + local.second / 3600, 2)
+    except Exception:
+        return None
+
+
 def _get_meal_timing(args):
     """
     Eating window analysis: first bite, last bite, window duration, caloric distribution
     across morning/midday/evening/late, circadian consistency (SD of meal times),
     and overlap with sleep onset. Based on Satchin Panda / Salk Institute TRF research.
     """
-    end_date = args.get("end_date", _nutrition_through_date())
-    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=29)).strftime("%Y-%m-%d"))
+    start_date, end_date = _nutrition_default_range(args)
 
     items = query_source("macrofactor", start_date, end_date)
     if not items:
@@ -213,50 +337,67 @@ def _get_meal_timing(args):
     last_bites = []
     windows = []
 
-    for item in sorted(items, key=lambda x: x["date"]):
+    # `.get("date", "")`, not `x["date"]`: one malformed partition row without the
+    # attribute used to raise KeyError straight out of the tool and take down the whole
+    # answer, where the micronutrient view (which does not sort) kept working.
+    for item in sorted(items, key=lambda x: x.get("date", "")):
         food_log = item.get("food_log", [])
         if not food_log:
             continue
         times = []
+        entries_skipped = 0
         morning_cal = midday_cal = evening_cal = late_cal = 0.0
         for entry in food_log:
             td = t2d(entry.get("time"))
             cal = float(entry.get("calories_kcal", 0) or 0)
-            if td is not None:
-                times.append(td)
-                if td < 11:
-                    morning_cal += cal
-                elif td < 15:
-                    midday_cal += cal
-                elif td < 20:
-                    evening_cal += cal
-                else:
-                    late_cal += cal
+            if td is None:
+                # `t2d` parses only HH:MM, and the string comes straight from a MacroFactor
+                # CSV column whose format the platform does not control. A dropped entry
+                # shrinks the eating window AND (before the denominator fix below) deflated
+                # every distribution percentage — silently. Count it and publish the count.
+                entries_skipped += 1
+                continue
+            times.append(td)
+            if td < 11:
+                morning_cal += cal
+            elif td < 15:
+                midday_cal += cal
+            elif td < 20:
+                evening_cal += cal
+            else:
+                late_cal += cal
         if not times:
             continue
         fb = min(times)
         lb = max(times)
         wh = round(lb - fb, 2)
-        total_cal = float(item.get("total_calories_kcal", 0) or 0)
+        # ADR-104: divide by what was actually BUCKETED, not by the day-level rollup.
+        # `macrofactor_lambda` drops zero-valued totals at write time, so a day missing
+        # `total_calories_kcal` published a factual 0.0% in every bucket — a fully logged
+        # day reading as "no calories in any part of the day" — and whenever the rollup and
+        # the entries disagreed the four percentages silently failed to sum to 100.
+        located_cal = morning_cal + midday_cal + evening_cal + late_cal
+        day_cal = float(item.get("total_calories_kcal", 0) or 0)
+        row = {
+            "date": item.get("date", ""),
+            "first_bite": d2hm(fb),
+            "last_bite": d2hm(lb),
+            "eating_window_hrs": wh,
+            "total_calories": round(day_cal or located_cal, 0),
+            "located_calories": round(located_cal, 0),
+            "distribution": {
+                "morning_pct": round(morning_cal / located_cal * 100, 1) if located_cal else 0,
+                "midday_pct": round(midday_cal / located_cal * 100, 1) if located_cal else 0,
+                "evening_pct": round(evening_cal / located_cal * 100, 1) if located_cal else 0,
+                "late_pct": round(late_cal / located_cal * 100, 1) if located_cal else 0,
+            },
+            "late_eating_flag": lb >= 20.0,
+            "entries_skipped": entries_skipped,
+        }
         first_bites.append(fb)
         last_bites.append(lb)
         windows.append(wh)
-        daily_rows.append(
-            {
-                "date": item["date"],
-                "first_bite": d2hm(fb),
-                "last_bite": d2hm(lb),
-                "eating_window_hrs": wh,
-                "total_calories": round(total_cal, 0),
-                "distribution": {
-                    "morning_pct": round(morning_cal / total_cal * 100, 1) if total_cal else 0,
-                    "midday_pct": round(midday_cal / total_cal * 100, 1) if total_cal else 0,
-                    "evening_pct": round(evening_cal / total_cal * 100, 1) if total_cal else 0,
-                    "late_pct": round(late_cal / total_cal * 100, 1) if total_cal else 0,
-                },
-                "late_eating_flag": lb >= 20.0,
-            }
-        )
+        daily_rows.append(row)
 
     if not daily_rows:
         return {"error": "No food log entries with timestamps found."}
@@ -267,29 +408,23 @@ def _get_meal_timing(args):
     avg_win = round(sum(windows) / n, 1)
 
     def stdev(vals):
+        """Sample SD, or None below n=2.
+
+        ADR-104/105: returning the literal 0 here is not a neutral placeholder — 0 is the
+        BEST possible value on a consistency scale, so ONE logged day read as perfect
+        circadian consistency and simultaneously suppressed the '>1.5h SD' flag. The one
+        case where the tool has no idea was the case where it reassured him.
+        """
         n2 = len(vals)
         if n2 < 2:
-            return 0
+            return None
         m = sum(vals) / n2
         return round(math.sqrt(sum((v - m) ** 2 for v in vals) / (n2 - 1)), 2)
 
+    fb_sd = stdev(first_bites)
+    lb_sd = stdev(last_bites)
     late_days = sum(1 for r in daily_rows if r["late_eating_flag"])
-
-    # Eight Sleep sleep-onset overlap
-    sleep_onset_avg = None
-    try:
-        si_items = query_source("eightsleep", start_date, end_date)
-        onsets = []
-        for si in si_items:
-            onset_str = si.get("sleep_start_local") or si.get("sleep_onset_local")
-            if onset_str:
-                td = t2d(str(onset_str)[:5])
-                if td is not None:
-                    onsets.append(td if td > 8 else td + 24)
-        if onsets:
-            sleep_onset_avg = sum(onsets) / len(onsets)
-    except Exception:
-        pass
+    sleep_onset_avg = _avg_sleep_onset_hour(start_date, end_date)
 
     pre_sleep_gap = None
     if sleep_onset_avg is not None:
@@ -304,8 +439,8 @@ def _get_meal_timing(args):
         trf_flags.append(
             f"Average eating window is {avg_win}h — wider than the 10h TRF target. Try compressing to <10h for metabolic benefit."
         )
-    if stdev(first_bites) > 1.5:
-        trf_flags.append(f"First bite time varies by {stdev(first_bites)}h SD — inconsistent circadian signalling. Aim for <1h variation.")
+    if fb_sd is not None and fb_sd > 1.5:
+        trf_flags.append(f"First bite time varies by {fb_sd}h SD — inconsistent circadian signalling. Aim for <1h variation.")
     if late_days > n * 0.3:
         trf_flags.append(f"Eating after 8pm on {late_days}/{n} days. Late eating suppresses melatonin-mediated metabolic signalling.")
     # >=3h pre-sleep fasting allows GLP-1 clearance (Panda 2018, Huberman); <2.5h too close
@@ -320,8 +455,9 @@ def _get_meal_timing(args):
             "avg_first_bite": d2hm(avg_fb),
             "avg_last_bite": d2hm(avg_lb),
             "avg_window_hrs": avg_win,
-            "first_bite_consistency_sd_hrs": stdev(first_bites),
-            "last_bite_consistency_sd_hrs": stdev(last_bites),
+            "first_bite_consistency_sd_hrs": fb_sd,
+            "last_bite_consistency_sd_hrs": lb_sd,
+            "consistency_n_days": n,
             "trf_status": "OPTIMAL" if avg_win <= 10 else "BORDERLINE" if avg_win <= 12 else "WIDE",
         },
         "late_eating": {"days_eating_after_8pm": late_days, "pct_days": round(late_days / n * 100, 1)},
@@ -344,8 +480,7 @@ def _get_nutrition_summary(args):
     Returns per-day rows and period averages for calories, protein, carbs, fat, fiber,
     sodium, caffeine, omega-3, and key micronutrients.
     """
-    end_date = args.get("end_date", _nutrition_through_date())
-    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=29)).strftime("%Y-%m-%d"))
+    start_date, end_date = _nutrition_default_range(args)
 
     items = query_source("macrofactor", start_date, end_date)
 
@@ -368,8 +503,8 @@ def _get_nutrition_summary(args):
     ]
 
     daily_rows = []
-    for item in sorted(items, key=lambda x: x["date"]):
-        row = {"date": item["date"], "entries_logged": item.get("entries_count", 0)}
+    for item in sorted(items, key=lambda x: x.get("date", "")):  # `.get`: a row with no date must not KeyError the tool
+        row = {"date": item.get("date", ""), "entries_logged": item.get("entries_count", 0)}
         for db_field, out_field in MACRO_FIELDS:
             v = item.get(db_field)
             if v is not None:
@@ -386,6 +521,9 @@ def _get_nutrition_summary(args):
         daily_rows.append(row)
 
     # Period averages
+    def field_n(field):
+        return sum(1 for r in daily_rows if field in r)
+
     def avg(field):
         vals = [r[field] for r in daily_rows if field in r]
         return round(sum(vals) / len(vals), 1) if vals else None
@@ -399,7 +537,7 @@ def _get_nutrition_summary(args):
     TARGETS = {
         "calories_kcal": 2400,
         "protein_g": 180,
-        "fiber_g": 30,
+        "fiber_g": _FIBER_TARGET_G,
         "fiber_per_1000kcal": 14,  # Board rec 1A (Norton): minimum fiber density
         "sodium_mg": 2300,
         "omega3_total_g": 2.0,
@@ -414,6 +552,11 @@ def _get_nutrition_summary(args):
                 "average": avg_val,
                 "gap": round(avg_val - target, 1),
                 "pct_of_target": round(avg_val / target * 100, 1),
+                # ADR-105: `avg()` averages a per-FIELD sample, but the only n published used to
+                # be `period.days_with_data` — the count of ROWS. A nutrient MacroFactor tracks
+                # sporadically averaged over a smaller, invisible sample than the payload
+                # advertised. Each comparison now states the n behind its own number.
+                "n": field_n(field),
             }
 
     return {
@@ -447,55 +590,67 @@ def _get_macro_targets(args):
             wt_items = query_source(
                 "withings", (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=14)).strftime("%Y-%m-%d"), end_date
             )
-            wt_items_sorted = sorted(wt_items, key=lambda x: x["date"], reverse=True)
-            if wt_items_sorted:
-                weight_lbs = float(wt_items_sorted[0].get("weight_lbs", 0))
-                # Mifflin-St Jeor BMR for male (approx for Matthew)
-                weight_kg = weight_lbs * 0.453592
-                # Matthew-specific fallback: height 72in = 182.88cm, age ~35; only used when profile lookup fails
-                bmr = 10 * weight_kg + 6.25 * 182.88 - 5 * 35 + 5
-                tdee_estimate = round(bmr * 1.55)  # Moderate activity Harris-Benedict multiplier; Matthew-specific
-                calorie_target = calorie_target or tdee_estimate
+            weight_lbs = _latest_weight_lbs(wt_items)
+            if weight_lbs is not None:
+                calorie_target = _mifflin_tdee(weight_lbs)
         except Exception:
             pass
     calorie_target = calorie_target or 2400  # Matthew-specific targets: 2400 kcal deficit, 180g protein (~0.8g/lb BW)
     protein_target = protein_target or 180  # Matthew-specific targets: 2400 kcal deficit, 180g protein (~0.8g/lb BW)
 
+    def measured(item, field):
+        """The day's rollup for `field`, or None when the day carries none.
+
+        ADR-104: `float(item.get(field, 0) or 0)` folded an UNLOGGED day into the adherence
+        denominator as a failure. `macrofactor_lambda` drops zero-valued rollups at write
+        time, so a day it could not total is exactly a day with the key absent — and the
+        hit-rate he is graded on fell for days he simply did not upload.
+        """
+        raw = item.get(field)
+        if raw in (None, ""):
+            return None
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            return None
+
     daily_rows = []
-    hits_cal = hits_prot = hits_fiber = 0
-    for item in sorted(items, key=lambda x: x["date"]):
-        cal = float(item.get("total_calories_kcal", 0) or 0)
-        prot = float(item.get("total_protein_g", 0) or 0)
-        fiber = float(item.get("total_fiber_g", 0) or 0)
-        fat = float(item.get("total_fat_g", 0) or 0)
-        carbs = float(item.get("total_carbs_g", 0) or 0)
+    hits = {"calorie": 0, "protein": 0, "fiber": 0}
+    measured_days = {"calorie": 0, "protein": 0, "fiber": 0}
+    for item in sorted(items, key=lambda x: x.get("date", "")):  # `.get`: a row with no date must not KeyError the tool
+        cal = measured(item, "total_calories_kcal")
+        prot = measured(item, "total_protein_g")
+        fiber = measured(item, "total_fiber_g")
+        fat = measured(item, "total_fat_g")
+        carbs = measured(item, "total_carbs_g")
 
-        cal_pct = round(cal / calorie_target * 100, 1)
-        prot_pct = round(prot / protein_target * 100, 1)
-
-        hit_cal = 0.85 <= cal / calorie_target <= 1.10
-        hit_prot = prot >= protein_target * 0.95
-        hit_fiber = fiber >= 25
-
-        hits_cal += int(hit_cal)
-        hits_prot += int(hit_prot)
-        hits_fiber += int(hit_fiber)
+        hit_cal = (0.85 <= cal / calorie_target <= 1.10) if cal is not None else None
+        hit_prot = (prot >= protein_target * 0.95) if prot is not None else None
+        hit_fiber = (fiber >= _FIBER_TARGET_G) if fiber is not None else None
+        for axis, hit in (("calorie", hit_cal), ("protein", hit_prot), ("fiber", hit_fiber)):
+            if hit is not None:
+                measured_days[axis] += 1
+                hits[axis] += int(hit)
 
         daily_rows.append(
             {
-                "date": item["date"],
-                "calories_kcal": round(cal, 0),
-                "calories_pct": cal_pct,
-                "protein_g": round(prot, 1),
-                "protein_pct": prot_pct,
-                "fat_g": round(fat, 1),
-                "carbs_g": round(carbs, 1),
-                "fiber_g": round(fiber, 1),
+                "date": item.get("date", ""),
+                "calories_kcal": round(cal, 0) if cal is not None else None,
+                "calories_pct": round(cal / calorie_target * 100, 1) if cal is not None else None,
+                "protein_g": round(prot, 1) if prot is not None else None,
+                "protein_pct": round(prot / protein_target * 100, 1) if prot is not None else None,
+                "fat_g": round(fat, 1) if fat is not None else None,
+                "carbs_g": round(carbs, 1) if carbs is not None else None,
+                "fiber_g": round(fiber, 1) if fiber is not None else None,
                 "hit_calorie_target": hit_cal,
                 "hit_protein_target": hit_prot,
                 "hit_fiber_target": hit_fiber,
             }
         )
+
+    def hit_pct(axis):
+        n_axis = measured_days[axis]
+        return round(hits[axis] / n_axis * 100, 1) if n_axis else None
 
     n = len(daily_rows)
     return {
@@ -503,13 +658,15 @@ def _get_macro_targets(args):
         "targets": {
             "calories_kcal": calorie_target,
             "protein_g": protein_target,
-            "fiber_g": 25,
+            "fiber_g": _FIBER_TARGET_G,
             "note": "Calorie target estimated from TDEE (Mifflin-St Jeor × 1.55 activity factor) unless overridden.",
         },
         "adherence": {
-            "calorie_target_hit_pct": round(hits_cal / n * 100, 1) if n else 0,
-            "protein_target_hit_pct": round(hits_prot / n * 100, 1) if n else 0,
-            "fiber_target_hit_pct": round(hits_fiber / n * 100, 1) if n else 0,
+            "calorie_target_hit_pct": hit_pct("calorie"),
+            "protein_target_hit_pct": hit_pct("protein"),
+            "fiber_target_hit_pct": hit_pct("fiber"),
+            # The n behind each rate — days that actually carried the rollup, not days in range.
+            "days_scored": dict(measured_days),
         },
         "daily_breakdown": daily_rows,
     }
@@ -546,7 +703,7 @@ def tool_get_deficit_sustainability(args):
       1. HRV trend (Whoop) — declining HRV under deficit = ANS stress
       2. Sleep quality (Whoop) — efficiency + deep sleep % degradation
       3. Recovery trend (Whoop) — sustained low recovery under deficit
-      4. Habit completion (Habitify Tier 0) — behavioural unravelling
+      4. Habit completion (Habitify daily `completion_pct`) — behavioural unravelling
       5. Training output (Strava + Hevy) — volume/intensity dropping
     When 3+ of 5 degrade concurrently during an active deficit → flag.
     Attia / Huberman: aggressive deficits destroy adherence and muscle.
@@ -561,21 +718,22 @@ def tool_get_deficit_sustainability(args):
         return {"error": f"Need ≥7 days of MacroFactor data. Found {len(mf_items)}."}
 
     cals = [float(i.get("total_calories_kcal", 0) or 0) for i in mf_items if i.get("total_calories_kcal")]
-    avg_cal = sum(cals) / len(cals) if cals else 0
+    if not cals:
+        # ADR-104: seven rows that carry no calorie rollup clear the `len(mf_items) < 7`
+        # floor and then averaged to a factual ZERO intake, making `tdee - 0` a 100%
+        # "aggressive" deficit fabricated entirely out of missing data — with every
+        # severity verdict downstream computed against it. Absent intake is an error,
+        # exactly as the <7-day case already is.
+        return {"error": f"Need ≥7 days with a calorie rollup. Found {len(mf_items)} MacroFactor days, none carrying total_calories_kcal."}
+    avg_cal = sum(cals) / len(cals)
 
     # Estimate TDEE from profile or Withings
     profile = get_profile()
     tdee_estimate = profile.get("tdee_estimate")
     if not tdee_estimate:
-        wt_items = query_source("withings", start_date, end_date)
-        if wt_items:
-            latest_wt = sorted(wt_items, key=lambda x: x.get("date", ""), reverse=True)[0]
-            weight_kg = float(latest_wt.get("weight_lbs", 220)) * 0.453592
-            # Matthew-specific fallback: height 72in = 182.88cm, age ~35; only used when profile lookup fails
-            bmr = 10 * weight_kg + 6.25 * 182.88 - 5 * 35 + 5
-            tdee_estimate = round(bmr * 1.55)  # Moderate activity Harris-Benedict multiplier; Matthew-specific
-        else:
-            tdee_estimate = 2400  # Matthew-specific TDEE fallback for ~220lb moderately active male
+        weight_lbs = _latest_weight_lbs(query_source("withings", start_date, end_date))
+        # Matthew-specific TDEE fallback for ~220lb moderately active male when the scale is silent
+        tdee_estimate = _mifflin_tdee(weight_lbs) if weight_lbs is not None else 2400
 
     deficit_kcal = round(tdee_estimate - avg_cal)
     deficit_pct = round(deficit_kcal / tdee_estimate * 100, 1) if tdee_estimate else 0
@@ -635,10 +793,20 @@ def tool_get_deficit_sustainability(args):
     rec_avg = safe_avg(rec_vals)
     recovery_degraded = rec_dir == "declining" and abs(rec_delta) > 10
 
-    # ── Channel 4: Habit completion (Tier 0) ──
+    # ── Channel 4: Habit completion ──
+    # Reader/writer agreement: `ingestion/habitify_lambda.py` writes `completion_pct`
+    # (pending-aware) and `completion_pct_strict`, plus `by_group[*].pct` over the nine
+    # P40 groups — there is no "Tier 0" partition and NOTHING in the repo has ever
+    # written `tier_0_completion_rate` or `t0_rate`. This channel therefore never carried
+    # a value: the list was always [], the direction always "insufficient_data" and
+    # `habits_degraded` always False, so behavioural unravelling — the earliest and most
+    # actionable sign a cut is failing — was structurally invisible to the tool built to
+    # catch it.
     t0_rates = []
     for h in habit_items:
-        t0 = h.get("tier_0_completion_rate") or h.get("t0_rate")
+        t0 = h.get("completion_pct")
+        if t0 is None:
+            t0 = h.get("completion_pct_strict")
         if t0 is not None:
             t0_rates.append(float(t0))
     t0_dir, t0_delta = trend_direction(t0_rates)
@@ -699,7 +867,10 @@ def tool_get_deficit_sustainability(args):
         recommendation = "Deficit appears sustainable. All systems holding."
 
     return {
-        "period": {"start_date": start_date, "end_date": end_date, "days": days},
+        # ADR-105/#1917: `days` is the REQUESTED window; every intake figure below is
+        # computed over however many days actually carried a calorie rollup. Publishing
+        # only the request let seven logged days inside a fourteen-day ask read as "days: 14".
+        "period": {"start_date": start_date, "end_date": end_date, "days": days, "days_with_data": len(cals)},
         "deficit": {
             "in_deficit": in_deficit,
             "avg_intake_kcal": round(avg_cal),
@@ -715,7 +886,7 @@ def tool_get_deficit_sustainability(args):
         "severity": severity,
         "recommendation": recommendation,
         "methodology": (
-            "Monitors 5 channels: HRV trend, sleep quality, recovery, T0 habit completion, training output. "
+            "Monitors 5 channels: HRV trend, sleep quality, recovery, habit completion, training output. "
             "Compares first-third vs last-third of the window. 3+ concurrent degradations = deficit unsustainable. "
             "Based on Attia, Huberman: aggressive deficits erode adherence, sleep, and lean mass."
         ),
@@ -773,10 +944,7 @@ def _get_metabolic_adaptation(args):
     base_tdee = profile.get("tdee_estimate")
     if not base_tdee:
         first_wt = sum(weekly_wt[weeks_sorted[0]]) / len(weekly_wt[weeks_sorted[0]])
-        weight_kg = first_wt * 0.453592
-        # Matthew-specific fallback: height 72in = 182.88cm, age ~35; only used when profile lookup fails
-        bmr = 10 * weight_kg + 6.25 * 182.88 - 5 * 35 + 5
-        base_tdee = round(bmr * 1.55)  # Moderate activity Harris-Benedict multiplier; Matthew-specific
+        base_tdee = _mifflin_tdee(first_wt)
 
     weekly_data = []
     for wk in weeks_sorted:
@@ -794,9 +962,16 @@ def _get_metabolic_adaptation(args):
 
     # ── Expected vs actual weight loss ──
     # 1 lb fat ≈ 3500 kcal deficit
+    # ADR-104/105: charge each week only the days it actually LOGGED. Multiplying by a
+    # flat 7 billed every week a full seven days of deficit regardless — `cal_days` was
+    # computed two blocks above and sat unused in the very dict being iterated. At two
+    # logged days a week that inflates expected loss 3.5x (8.0 lb against a real 2.3),
+    # collapsing the adaptation ratio from an honest 0.91 ("NONE") to 0.26 -> SEVERE:
+    # "plateau territory... check thyroid markers at next blood draw." Partial logging
+    # alone manufactured a metabolic-suppression diagnosis and a medical follow-up.
     total_deficit_kcal = 0
     for wd in weekly_data:
-        weekly_deficit = (base_tdee - wd["avg_cal"]) * 7
+        weekly_deficit = (base_tdee - wd["avg_cal"]) * min(wd["cal_days"], 7)
         total_deficit_kcal += max(weekly_deficit, 0)  # only count deficit weeks
 
     expected_loss_lbs = round(total_deficit_kcal / 3500, 1)
@@ -815,19 +990,40 @@ def _get_metabolic_adaptation(args):
         else:
             wd["weekly_loss_lbs"] = round(weekly_data[i - 1]["avg_weight"] - wd["avg_weight"], 2)
 
-    recent_rates = [wd["weekly_loss_lbs"] for wd in weekly_data[-4:] if wd.get("weekly_loss_lbs") is not None]
-    early_rates = [wd["weekly_loss_lbs"] for wd in weekly_data[1:5] if wd.get("weekly_loss_lbs") is not None]
+    # ADR-105: `rate_slowdown_pct` compares an "early" window to a "recent" one, but the two
+    # fixed slices OVERLAP below nine weeks — and at the three-week minimum this tool accepts
+    # they are the IDENTICAL two weeks, publishing a 0.0% slowdown as a measured comparison of
+    # a period against itself. Derive the index sets and only compare when they are disjoint.
+    n_weeks = len(weekly_data)
+    early_idx = set(range(1, min(5, n_weeks)))
+    recent_idx = set(range(max(0, n_weeks - 4), n_weeks))
+    windows_disjoint = bool(early_idx) and bool(recent_idx) and not (early_idx & recent_idx)
+
+    recent_rates = [weekly_data[i]["weekly_loss_lbs"] for i in sorted(recent_idx) if weekly_data[i].get("weekly_loss_lbs") is not None]
+    early_rates = [weekly_data[i]["weekly_loss_lbs"] for i in sorted(early_idx) if weekly_data[i].get("weekly_loss_lbs") is not None]
     recent_avg = round(sum(recent_rates) / len(recent_rates), 2) if recent_rates else None
     early_avg = round(sum(early_rates) / len(early_rates), 2) if early_rates else None
 
     rate_slowdown = None
-    if recent_avg is not None and early_avg is not None and early_avg > 0.3:
+    if windows_disjoint and recent_avg is not None and early_avg is not None and early_avg > 0.3:
         rate_slowdown = round((1 - recent_avg / early_avg) * 100, 1)
 
     # ── Severity classification ──
     if adaptation_ratio is None:
         severity = "INSUFFICIENT_DATA"
         recommendation = "Not enough deficit data to assess metabolic adaptation."
+    elif actual_loss_lbs < 0:
+        # A GAIN has a negative ratio, which fell through every band to SEVERE and was then
+        # interpolated into "Losing only -63% of expected" — nonsense, and it is the sentence
+        # a reader quotes. The severity is right; the gain needs its own sentence.
+        severity = "SEVERE"
+        recommendation = (
+            f"Weight is UP {abs(actual_loss_lbs)} lb over this window against an expected "
+            f"{expected_loss_lbs} lb LOSS from the logged deficit. Before reading this as metabolic "
+            "adaptation, check the inputs: intake under-logging, water/glycogen shifts and a "
+            f"stale TDEE estimate ({base_tdee} kcal) all produce this shape. Re-weigh under "
+            "consistent conditions for 7-10 days, then reassess."
+        )
     elif adaptation_ratio >= 0.85:
         severity = "NONE"
         recommendation = "Weight loss tracking close to expected. No adaptation detected."
@@ -867,6 +1063,7 @@ def _get_metabolic_adaptation(args):
             "early_avg_lbs_per_week": early_avg,
             "recent_avg_lbs_per_week": recent_avg,
             "rate_slowdown_pct": rate_slowdown,
+            "rate_windows_disjoint": windows_disjoint,
         },
         "weekly_data": weekly_data,
         "recommendation": recommendation,
