@@ -572,6 +572,15 @@ class TestPhaseScopedReads:
         names = [c["name"] for c in chg.gather_context()["existing_challenges"]]
         assert names == ["Live"]
 
+    def test_a_tombstoned_challenge_is_hidden_even_without_a_phase_tag(self, table):
+        """The half the phase FilterExpression cannot reach. store_challenge's
+        dedup uses singleton_visible, which hides a tombstoned row whether or not
+        the tagger also stamped a phase; the reader half must use the identical
+        predicate or the prompt still forbids what the writer will re-issue."""
+        seed(table, "challenges", "CHALLENGE#wiped_2026-08-04", name="Wiped", status="active", domain="sleep", tombstone=True)
+        seed(table, "challenges", "CHALLENGE#live_2026-08-04", name="Live", status="candidate", domain="mental")
+        assert [c["name"] for c in chg.gather_context()["existing_challenges"]] == ["Live"]
+
     def test_existing_challenges_are_reduced_to_the_three_dedup_facets(self, table):
         seed(table, "challenges", "CHALLENGE#live_2026-08-04", name="Live", status="candidate", domain="mental", protocol="secret")
         assert chg.gather_context()["existing_challenges"] == [{"name": "Live", "status": "candidate", "domain": "mental"}]
@@ -853,6 +862,24 @@ class TestStoreChallenge:
         assert challenge_id and not challenge_id.startswith("_")
         assert table.puts[0]["name"]
 
+    def test_a_name_that_slugs_away_entirely_still_produces_a_key(self, table):
+        """The second half of the same hole, which the empty-name case hides:
+        slug() guarded a FALSY name but not one that the regex erases, so a
+        punctuation-only name still keyed CHALLENGE#_<date>."""
+        assert chg.slug("!!!") == "challenge"
+        challenge_id = chg.store_challenge(candidate(name="!!!"))
+        assert challenge_id == f"challenge_{TODAY}"
+
+    def test_two_unnamed_candidates_do_not_silently_collapse_into_one_row(self, table, monkeypatch):
+        """The reader-visible consequence of the keyless row: two nameless
+        candidates in one run collided on CHALLENGE#_<date> and the second was
+        dropped as a duplicate. They still share a key — but now a NAMED one, and
+        the dedup skip is the honest documented path rather than an accident."""
+        first = chg.store_challenge(candidate(name=""))
+        second = chg.store_challenge(candidate(name="", protocol="different"))
+        assert first == f"unnamed-challenge_{TODAY}"
+        assert second is None and len(table.puts) == 1
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # lambda_handler — gates, cap, dedup, fail-soft
@@ -971,6 +998,25 @@ class TestHandlerFailSoft:
     def test_an_unparseable_model_response_stores_nothing(self, ready, monkeypatch):
         stub_generation(monkeypatch, None)
         assert ready.puts == [] and chg.lambda_handler({}, None)["generated"] == 0
+
+    def test_a_generation_failure_is_an_error_while_a_quiet_week_completes(self, ready, monkeypatch):
+        """The pair, asserted together: the only difference between 'the model
+        failed' and 'the model found nothing' used to be invisible downstream."""
+        stub_generation(monkeypatch, None)
+        failed = chg.lambda_handler({}, None)
+        stub_generation(monkeypatch, {"challenges": []})
+        quiet = chg.lambda_handler({}, None)
+        assert failed["status"] == "error" and failed.get("reason") != "no_signal"
+        assert quiet["status"] == "completed" and quiet["generated"] == 0
+        assert failed["status"] != quiet["status"]
+
+    def test_a_malformed_candidate_does_not_turn_a_write_failure_into_a_partial_success(self, ready, monkeypatch):
+        """The isolation must stay narrow. An `except Exception` around the store
+        loop would pass the malformed-candidate test above and silently downgrade
+        a DynamoDB outage to a completed week that wrote nothing."""
+        stub_generation(monkeypatch, {"challenges": [candidate(name="Bad", duration_days="seven"), candidate(name="Good")]})
+        monkeypatch.setattr(ready, "put_item", lambda **kw: (_ for _ in ()).throw(RuntimeError("ProvisionedThroughputExceeded")))
+        assert chg.lambda_handler({}, None)["status"] == "error"
 
     def test_an_empty_model_envelope_is_reported_as_an_error_not_a_success(self, ready, monkeypatch):
         """resp['content'][0] on an empty content list raises; the run must
