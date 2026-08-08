@@ -236,6 +236,12 @@
     "lambdas/ingestion/youtube_lambda.py": {
       "function": "youtube-social-ingestion"
     },
+    "lambdas/ingestion/bluesky_lambda.py": {
+      "function": "bluesky-social-ingestion"
+    },
+    "lambdas/ingestion/mastodon_lambda.py": {
+      "function": "mastodon-social-ingestion"
+    },
     "lambdas/ingestion/strava_lambda.py": {
       "function": "strava-data-ingestion"
     },

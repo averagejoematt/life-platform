@@ -134,6 +134,8 @@ SOURCE_CLASS: dict[str, str] = {
     # consent artifacts frozen at mark time (exact approved text). Follows the notion parent: kept
     # forever, genesis-anchored on read; revocation is an explicit unmark, never a reset wipe.
     "youtube": RAW_TIMESERIES,  # #1669: inbound social — Matthew's own posts, a logged fact layer
+    "bluesky": RAW_TIMESERIES,  # #1676: inbound social — Matthew's own posts, a logged fact layer
+    "mastodon": RAW_TIMESERIES,  # #1676: inbound social — Matthew's own posts, a logged fact layer
     # (kept forever, genesis-anchored on read) like notion; provenance (`origin`) lives on the row.
     "food_delivery": RAW_TIMESERIES,  # behavioral archive (incl. longest-ever streak)
     "sick_days": RAW_TIMESERIES,

@@ -78,6 +78,7 @@ Generated from `ci/lambda_map.json` by `deploy/sync_deploy_doc_map.py` (#2005);
 
 **Ingestion** (`lambdas/ingestion/`):
 - activity-enrichment → `lambdas/ingestion/enrichment_lambda.py`
+- bluesky-social-ingestion → `lambdas/ingestion/bluesky_lambda.py`
 - dropbox-poll → `lambdas/ingestion/dropbox_poll_lambda.py`
 - eightsleep-data-ingestion → `lambdas/ingestion/eightsleep_lambda.py`
 - food-delivery-ingestion → `lambdas/ingestion/food_delivery_lambda.py`
@@ -87,6 +88,7 @@ Generated from `ci/lambda_map.json` by `deploy/sync_deploy_doc_map.py` (#2005);
 - hevy-backfill → `lambdas/ingestion/hevy_backfill_lambda.py` (cdk_only†)
 - journal-enrichment → `lambdas/ingestion/journal_enrichment_lambda.py`
 - macrofactor-data-ingestion → `lambdas/ingestion/macrofactor_lambda.py`
+- mastodon-social-ingestion → `lambdas/ingestion/mastodon_lambda.py`
 - measurements-ingestion → `lambdas/ingestion/measurements_ingestion_lambda.py`
 - notion-journal-ingestion → `lambdas/ingestion/notion_lambda.py`
 - social-enrichment → `lambdas/ingestion/social_enrichment_lambda.py`

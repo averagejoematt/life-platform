@@ -474,6 +474,22 @@ COVERAGE = {
         "sentinel; a real liveness alarm would false-fire every run on a Lambda that cannot invoke by design. When the channel id "
         "is provisioned, flip active_api:True in source_registry and move this to ('ingest-liveness', 'youtube').",
     ),
+    "bluesky-social-ingestion": (
+        EXEMPT,
+        "2026-08-05",
+        "#1676 (epic #1668): inbound-social Bluesky source is registry-resident and DORMANT until the owner provisions the "
+        "life-platform/bluesky handle — active_api:False, no secret yet, so it fetches nothing and writes no INGEST_HEALTH "
+        "sentinel; a real liveness alarm would false-fire every run on a Lambda that cannot invoke by design. When the handle "
+        "is provisioned, flip active_api:True in source_registry and move this to ('ingest-liveness', 'bluesky').",
+    ),
+    "mastodon-social-ingestion": (
+        EXEMPT,
+        "2026-08-05",
+        "#1676 (epic #1668): inbound-social Mastodon source is registry-resident and DORMANT until the owner provisions the "
+        "life-platform/mastodon instance/handle — active_api:False, no secret yet, so it fetches nothing and writes no "
+        "INGEST_HEALTH sentinel; a real liveness alarm would false-fire every run on a Lambda that cannot invoke by design. When "
+        "the account is provisioned, flip active_api:True in source_registry and move this to ('ingest-liveness', 'mastodon').",
+    ),
 }
 
 
