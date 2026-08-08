@@ -6,7 +6,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
 from mcp.core import get_profile, query_source
-from mcp.helpers import pearson_r
+from mcp.helpers import HR_ZONE_BOUNDS, classify_hr_zone, pearson_r
 
 
 def tool_get_zone2_breakdown(args):
@@ -29,19 +29,9 @@ def tool_get_zone2_breakdown(args):
     profile = get_profile()
     max_hr = float(profile.get("max_heart_rate", 190))
 
-    # 5 zones by % of max HR (standard model)
-    # Zone 1: 50-60%  (warm-up / recovery)
-    # Zone 2: 60-70%  (aerobic base / fat burn — the longevity zone)
-    # Zone 3: 70-80%  (tempo / aerobic capacity)
-    # Zone 4: 80-90%  (threshold / lactate)
-    # Zone 5: 90-100% (VO2 max / anaerobic)
-    ZONE_BOUNDS = [
-        ("zone_1", "Zone 1 (Recovery)", 0.50, 0.60),
-        ("zone_2", "Zone 2 (Aerobic)", 0.60, 0.70),
-        ("zone_3", "Zone 3 (Tempo)", 0.70, 0.80),
-        ("zone_4", "Zone 4 (Threshold)", 0.80, 0.90),
-        ("zone_5", "Zone 5 (VO2 Max)", 0.90, 1.00),
-    ]
+    # 5 zones by % of max HR (standard model) — the ONE definition, shared with
+    # mcp/tools_training.py's periodization view via mcp.helpers (#2221).
+    ZONE_BOUNDS = list(HR_ZONE_BOUNDS)
 
     zone_hr_ranges = {}
     for key, label, lo_pct, hi_pct in ZONE_BOUNDS:
@@ -60,22 +50,8 @@ def tool_get_zone2_breakdown(args):
             return None
 
     def classify_zone(avg_hr):
-        """Classify activity into HR zone by avg HR."""
-        if avg_hr is None:
-            return "no_hr"
-        pct = avg_hr / max_hr
-        if pct < 0.50:
-            return "below_zone_1"
-        elif pct < 0.60:
-            return "zone_1"
-        elif pct < 0.70:
-            return "zone_2"
-        elif pct < 0.80:
-            return "zone_3"
-        elif pct < 0.90:
-            return "zone_4"
-        else:
-            return "zone_5"
+        """Classify activity into HR zone by avg HR (mcp.helpers — one definition)."""
+        return classify_hr_zone(avg_hr, max_hr)
 
     # ── Query Strava activities ──────────────────────────────────────────────
     strava_items = query_source("strava", start_date, end_date)

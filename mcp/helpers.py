@@ -92,11 +92,66 @@ def compute_daily_load_score(day_record):
     return round(dist * 10 + elev / 100, 1)
 
 
-def compute_ewa(daily_values_chrono, decay_days):
+def compute_ewa(daily_values_chrono, decay_days, seed=0.0):
     # #543: delegate to the single sanctioned EWMA (stats_core.ewma_series, ADR-105)
     # so this helper and EWMA-ACWR share one implementation. Historical contract kept:
     # rounds each smoothed value to 2 decimals.
-    return [(date_str, round(ewa, 2)) for date_str, ewa in stats_core.ewma_series(daily_values_chrono, decay_days)]
+    #
+    # `seed` is the initial level, passed straight through to stats_core. Callers that
+    # report the HEAD of the series (not just its tail) must warm-start it — a seed of 0
+    # over a finite warm-up leaves exp(-n/tau) of the seed's weight in the answer, which
+    # reads as measured fatigue rather than as start-of-series bias (see
+    # `mcp/tools_training.py::_get_training_load` and `acwr_compute_lambda::_ewma_acwr`,
+    # which warm-starts the same way).
+    return [(date_str, round(ewa, 2)) for date_str, ewa in stats_core.ewma_series(daily_values_chrono, decay_days, seed=seed)]
+
+
+def warm_start_seed(daily_values_chrono, days=7):
+    """Mean of the first ``days`` values of a chronological series (0.0 if empty).
+
+    The same warm-start `acwr_compute_lambda._ewma_acwr` uses, factored out so the two
+    EWMA callers cannot drift apart.
+    """
+    vals = [float(v) for _, v in daily_values_chrono[: max(int(days), 1)]]
+    return sum(vals) / len(vals) if vals else 0.0
+
+
+# ── HR zone classification (ONE definition, #2221) ────────────────────────────
+# The platform's canonical 5-zone model by % of max HR, published by
+# `mcp/tools_correlation.py::tool_get_zone2_breakdown` (the tool `get_zone2_breakdown`
+# is registered to) and pinned by `tests/api_schemas/api_zone2.json`. It lives here
+# because `mcp/tools_training.py`'s periodization view used to carry a SECOND,
+# incompatible definition (`avg_hr <= 70% of max` == Zone 2, which swallowed Zone 1 and
+# below and used an inclusive upper bound), so the two tools published different
+# "Zone 2 minutes" for the identical activity. Derive the band here; never restate it.
+#
+#   Zone 1: 50-60%  (recovery)      Zone 4: 80-90%  (threshold)
+#   Zone 2: 60-70%  (aerobic base)  Zone 5: 90-100% (VO2 max)
+#   Zone 3: 70-80%  (tempo — Seiler's "no man's land")
+HR_ZONE_BOUNDS = (
+    ("zone_1", "Zone 1 (Recovery)", 0.50, 0.60),
+    ("zone_2", "Zone 2 (Aerobic)", 0.60, 0.70),
+    ("zone_3", "Zone 3 (Tempo)", 0.70, 0.80),
+    ("zone_4", "Zone 4 (Threshold)", 0.80, 0.90),
+    ("zone_5", "Zone 5 (VO2 Max)", 0.90, 1.00),
+)
+
+
+def classify_hr_zone(avg_hr, max_hr):
+    """Zone key for an activity's average HR: the canonical band, exclusive upper bound.
+
+    Returns ``"no_hr"`` when avg_hr is absent (ADR-104 — an unmeasured activity is not a
+    Zone 1 activity) and ``"below_zone_1"`` under 50% of max.
+    """
+    if avg_hr is None or not max_hr:
+        return "no_hr"
+    pct = float(avg_hr) / float(max_hr)
+    if pct < HR_ZONE_BOUNDS[0][2]:
+        return "below_zone_1"
+    for key, _label, lo, hi in HR_ZONE_BOUNDS:
+        if lo <= pct < hi:
+            return key
+    return "zone_5"
 
 
 def pearson_r(xs, ys):

@@ -6,7 +6,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
 from mcp.core import get_profile, get_sot, query_source
-from mcp.helpers import compute_daily_load_score, compute_ewa
+from mcp.helpers import classify_hr_zone, compute_daily_load_score, compute_ewa, warm_start_seed
 from mcp.strength_helpers import classify_exercise
 from mcp.tools_correlation import tool_get_zone2_breakdown
 
@@ -46,9 +46,26 @@ def _get_training_load(args):
         chrono.append((ds, load_by_date.get(ds, 0.0)))
         cur += timedelta(days=1)
 
-    # Banister 1991 Impulse-Response model: CTL 42-day, ATL 7-day
-    ctl_series = compute_ewa(chrono, 42)
-    atl_series = compute_ewa(chrono, 7)
+    # ADR-104: a totally dark cardio partition is ABSENCE, not zero fitness. The
+    # `if not result_rows` guard further down cannot see this — result_rows is built
+    # from the generated day grid above, so it is non-empty for every window where
+    # start <= end, and the "No training data found" envelope was unreachable for its
+    # actual purpose. A deauthed Strava / post-reset / Garmin-paused (ADR-074) window
+    # used to answer with a fully-formed model reading ctl 0.0 / peak fitness 0.0 /
+    # injury_risk "low" / form "neutral" as measured fact.
+    if not load_by_date:
+        return {"error": "No training data found for the requested window."}
+
+    # Banister 1991 Impulse-Response model: CTL 42-day, ATL 7-day.
+    # Warm-START both EWMAs at the mean of the first week of the warm-up, the same way
+    # `acwr_compute_lambda._ewma_acwr` does. A seed of 0 over the 84-day warm-up leaves
+    # exp(-84/42) = 13.5% of the seed's weight in the FIRST reported CTL, so a perfectly
+    # constant training load used to open the window at ctl 86.78 / acwr 1.15 / tsb
+    # -13.22 ("fatigued") and close it at ctl 99.82 / acwr 1.00 ("neutral") — a fatigue
+    # cliff and a ~15% inflated injury ratio manufactured by the seed, not by training.
+    seed = warm_start_seed(chrono, 7)
+    ctl_series = compute_ewa(chrono, 42, seed=seed)
+    atl_series = compute_ewa(chrono, 7, seed=seed)
 
     start_dt_req = datetime.strptime(start_date, "%Y-%m-%d")
     result_rows = []
@@ -108,10 +125,33 @@ def _get_training_load(args):
             "monotony_risk": "HIGH — monotonous training increases illness/overtraining risk" if monotony and monotony > 2.0 else "ok",
         }
 
+    # ADR-105 (n beside the number) — the form verdict above is computed off a day grid
+    # that fills every gap with 0.0, so an ingestion outage is arithmetically identical
+    # to a rest week: CTL decays, TSB climbs, and the tool says "fresh — good for key
+    # sessions". Publish how many of those days were actually OBSERVED so a reader (and
+    # anything downstream) can tell a quiet week from a dark one. No coverage floor is
+    # imposed: ADR-105 bars thresholds that aren't derived from personal variance, and
+    # there is no such basis for one here — the honest move is to ship the n.
+    window_days = [r["date"] for r in result_rows]
+    observed = sum(1 for d in window_days if d in load_by_date)
+    warmup_days = [d for d, _v in chrono if d < start_date]
+    coverage = {
+        "days_in_window": len(window_days),
+        "days_with_data": observed,
+        "coverage_pct": round(100.0 * observed / len(window_days), 1) if window_days else 0.0,
+        "warmup_days": len(warmup_days),
+        "warmup_days_with_data": sum(1 for d in warmup_days if d in load_by_date),
+        "note": (
+            "Days with no cardio record are modelled as load 0.0 — indistinguishable from a genuine "
+            "rest day. Read the form/ACWR verdict against this coverage, not on its own."
+        ),
+    }
+
     return {
         "model": "Banister Impulse-Response (CTL=42d EWA, ATL=7d EWA)",
         "load_proxy": "kJ (cycling) > TRIMP (HR×time) > distance+elevation estimate",
         "current_state": latest,
+        "coverage": coverage,
         "peak_fitness": {"ctl": peak_ctl["ctl_fitness"], "date": peak_ctl["date"]},
         "monotony": monotony_result,
         "series": result_rows,
@@ -174,6 +214,7 @@ def _get_training_periodization(args):
             "zone2_minutes": 0,
             "hard_minutes": 0,
             "easy_minutes": 0,
+            "moderate_minutes": 0,
             "sessions": 0,
             "strength_sessions": 0,
             "cardio_sessions": 0,
@@ -213,14 +254,25 @@ def _get_training_periodization(args):
                 weeks[wk]["cardio_minutes"] += duration_min
 
                 if avg_hr:
-                    hr_pct = avg_hr / max_hr * 100
-                    if hr_pct <= 70:
+                    # ONE Zone-2 definition (#2221). This used to count every minute at
+                    # avg HR <= 70% of max as Zone 2 — Zone 1 and below included, and with
+                    # an INCLUSIVE upper bound — while the canonical publisher
+                    # (tool_get_zone2_breakdown) counts 60% <= pct < 70%. The two tools
+                    # answered the same question with different numbers, and this tool's
+                    # inflated figure drove its own 150 min/week Attia target check.
+                    zone = classify_hr_zone(avg_hr, max_hr)
+                    if zone == "zone_2":
                         weeks[wk]["zone2_minutes"] += duration_min
+                    if zone in ("below_zone_1", "zone_1", "zone_2"):
                         weeks[wk]["easy_minutes"] += duration_min
-                    elif hr_pct >= 80:
-                        weeks[wk]["hard_minutes"] += duration_min
+                    elif zone == "zone_3":
+                        # Seiler's "no man's land" — its OWN bucket. Folding it into
+                        # easy_minutes made middle_zone_pct 0.0 by construction and let a
+                        # week of pure Zone 3 report easy_pct 100.0 / "well_polarized",
+                        # so the board note that warns about exactly this could never fire.
+                        weeks[wk]["moderate_minutes"] += duration_min
                     else:
-                        weeks[wk]["easy_minutes"] += duration_min  # Zone 3 counted as moderate
+                        weeks[wk]["hard_minutes"] += duration_min
 
             elif is_strength:
                 weeks[wk]["strength_sessions"] += 1
@@ -244,9 +296,22 @@ def _get_training_periodization(args):
         vol = _sf(item.get("total_volume_lbs")) or 0
         weeks[wk]["total_volume_lbs"] += vol
 
+    # How many calendar days of each ISO week the QUERY actually covers. #1917 window
+    # honesty: `rest_days = 7 - len(dates)` charged the in-progress week (and the
+    # window's truncated first week) for days that have not happened / were never
+    # queried, so two sessions on the only two elapsed days of a Wednesday read as
+    # "5 rest days". A day outside the queried window is unobserved, not rest taken.
+    days_in_window_by_week = defaultdict(int)
+    _cur = datetime.strptime(start_date, "%Y-%m-%d")
+    _stop = datetime.strptime(end_date, "%Y-%m-%d")
+    while _cur <= _stop:
+        days_in_window_by_week[_cur.strftime("%G-W%V")] += 1
+        _cur += timedelta(days=1)
+
     # Calculate rest days per week
     for wk, data in weeks.items():
-        data["rest_days"] = 7 - len(data["dates"])
+        data["days_in_window"] = days_in_window_by_week.get(wk, 7)
+        data["rest_days"] = max(data["days_in_window"] - len(data["dates"]), 0)
         data["dates"] = sorted(data["dates"])  # Convert set to sorted list
 
     # ── 3. Weekly progression analysis ───────────────────────────────────────
@@ -281,10 +346,12 @@ def _get_training_periodization(args):
                 "strength_minutes": round(w["strength_minutes"], 1),
                 "zone2_minutes": round(w["zone2_minutes"], 1),
                 "hard_minutes": round(w["hard_minutes"], 1),
+                "moderate_minutes": round(w["moderate_minutes"], 1),
                 "easy_pct": easy_pct,
                 "hard_pct": hard_pct,
                 "volume_lbs": round(w["total_volume_lbs"], 1),
                 "rest_days": w["rest_days"],
+                "days_in_window": w["days_in_window"],
                 "cardio_sessions": w["cardio_sessions"],
                 "strength_sessions": w["strength_sessions"],
             }
@@ -324,15 +391,21 @@ def _get_training_periodization(args):
     # ── 5. Training polarization check (Seiler) ─────────────────────────────
     total_easy = sum(w["easy_minutes"] for wk, w in weeks.items())
     total_hard = sum(w["hard_minutes"] for wk, w in weeks.items())
-    total_all = total_easy + total_hard
+    total_mid = sum(w["moderate_minutes"] for wk, w in weeks.items())
+    # Three buckets, three shares. The denominator used to be easy+hard only, so
+    # easy_pct + hard_pct was 100 by construction and middle_zone_pct could only ever
+    # be 0.0 — the tool was structurally blind to the one pattern Seiler warns about.
+    total_all = total_easy + total_hard + total_mid
     polarization = None
 
     if total_all > 0:
         easy_ratio = round(total_easy / total_all * 100, 1)
         hard_ratio = round(total_hard / total_all * 100, 1)
-        mid_ratio = round(100 - easy_ratio - hard_ratio, 1)
+        mid_ratio = round(total_mid / total_all * 100, 1)
 
-        if easy_ratio >= 75:
+        if mid_ratio > easy_ratio and mid_ratio > hard_ratio:
+            pol_status = "too_much_moderate"
+        elif easy_ratio >= 75:
             pol_status = "well_polarized"
         elif easy_ratio >= 60:
             pol_status = "moderately_polarized"
@@ -409,7 +482,11 @@ def _get_training_periodization(args):
         )
 
     if polarization:
-        if polarization["status"] == "too_much_intensity":
+        if polarization["status"] == "too_much_moderate":
+            bod.append(
+                f"Seiler: {polarization['middle_zone_pct']}% of your training is Zone 3 — the 'no man's land' that generates fatigue without proportional adaptation. Push the easy work easier (Zone 2) and the hard work harder (Zone 4-5)."
+            )
+        elif polarization["status"] == "too_much_intensity":
             bod.append(
                 f"Seiler: Only {polarization['easy_pct']}% of your training is easy. The 80/20 model says you need more Zone 2 and fewer moderate sessions. 'No man's land' (Zone 3) generates fatigue without proportional adaptation."
             )
@@ -451,7 +528,11 @@ def _get_training_periodization(args):
             "peak (>300 min/week), deload (<60 min or <=2 sessions). Polarization per Seiler (80/20 model). "
             "Progressive overload = first-half vs second-half average weekly volume. "
             "Deload trigger: 4+ consecutive loading weeks or 3 weeks of rising volume. "
-            "Zone 2 threshold: avg HR <= 70% max HR (Attia/WHO 150 min/week target)."
+            "Zone 2 = avg HR 60-70% of max, the same band get_zone2_breakdown publishes "
+            "(Attia/WHO 150 min/week target); Zone 3 (70-80%) is reported separately as "
+            "middle_zone_pct, not folded into easy. rest_days is bounded by the days of "
+            "each ISO week the query actually covers (days_in_window), so an in-progress "
+            "or truncated week does not count unelapsed days as rest."
         ),
         "source": "strava + macrofactor_workouts",
     }
@@ -658,20 +739,40 @@ def _get_training_recommendation(args):
     if body_battery is not None:
         signals.append(body_battery)
 
-    composite = _avg(signals) if signals else 50
-    tier = "GREEN" if composite >= 67 else ("YELLOW" if composite >= 33 else "RED")
+    # ADR-104: with Whoop, Eight Sleep AND Garmin all silent this used to return
+    # `composite = 50` — a fabricated mid-scale number published in the same field, with
+    # the same type, as a measured one, and a confident YELLOW tier with a Zone 2
+    # prescription attached. All-silent is a live state (Garmin is paused platform-wide
+    # per ADR-074; Whoop has latched AUTH_FAILURE repeatedly). Absence reads as absence.
+    composite = _avg(signals) if signals else None
+    tier = "UNKNOWN" if composite is None else ("GREEN" if composite >= 67 else ("YELLOW" if composite >= 33 else "RED"))
 
-    # Injury risk override
+    # Injury risk override. This one is a MEASURED fact (from the load model, not from
+    # the recovery signals) so it still fires when the recovery side is dark.
     if acwr is not None and acwr > 1.5:
         tier = "RED"
-    # Meeusen 2013: non-functional overreaching risk after 5+ consecutive training days
-    if consecutive_training_days >= 5:
+    # Meeusen 2013: non-functional overreaching risk after 5+ consecutive training days.
+    # A floor on an existing verdict — it cannot manufacture one out of UNKNOWN, since
+    # "YELLOW" would then be asserting a readiness level nothing measured.
+    if consecutive_training_days >= 5 and tier in _TIER_SEVERITY:
         tier = _demote_tier(tier, "YELLOW")
 
     # ── 6. Generate recommendation ───────────────────────────────────────────
     rec = {}
 
-    if tier == "RED" or composite < 30:
+    if tier == "UNKNOWN":
+        rec = {
+            "type": "No recommendation — readiness data unavailable",
+            "intensity": None,
+            "description": (
+                "No recovery signal (Whoop recovery, Eight Sleep score, Garmin body battery) exists for this "
+                "date, so no readiness-based prescription is made. Check source freshness before training off "
+                "this answer; the training-load context below is still measured."
+            ),
+            "duration_min": None,
+            "hr_ceiling": None,
+        }
+    elif tier == "RED" or composite < 30:
         # Low readiness → rest or very easy
         if consecutive_rest_days >= 2:
             rec = {
@@ -810,7 +911,12 @@ def _get_training_recommendation(args):
 
     # ── 8. Board of Directors rationale ───────────────────────────────────────
     bod_notes = []
-    if tier == "GREEN":
+    if tier == "UNKNOWN":
+        bod_notes.append(
+            "ADR-104: no recovery signal for this date — the platform will not invent a readiness number. "
+            "Fix ingestion, or make the call on how you feel; that is a legitimate input, a fabricated 50 is not."
+        )
+    elif tier == "GREEN":
         bod_notes.append("Huberman: Full parasympathetic recovery detected. Sympathetic drive available for high-output work.")
         if rec.get("type", "").startswith("Strength"):
             bod_notes.append(
@@ -853,7 +959,15 @@ def _get_training_recommendation(args):
     return {
         "date": target_date,
         "readiness_tier": tier,
-        "composite_readiness": round(composite, 1),
+        "composite_readiness": round(composite, 1) if composite is not None else None,
+        # ADR-105: the n behind the mean. A composite built from ONE signal and one built
+        # from THREE were reported identically — same field, same type, no n.
+        "composite_readiness_n": len(signals),
+        "composite_readiness_signals": [
+            k
+            for k, v in (("whoop_recovery", recovery_score), ("sleep_score", sleep_score), ("body_battery", body_battery))
+            if v is not None
+        ],
         "recommendation": rec,
         "warnings": warnings,
         "board_of_directors": bod_notes,
@@ -937,8 +1051,16 @@ def tool_get_acwr_status(args):
 
     latest = history[0]
 
-    # ── Trend (last 7 days with data) ────────────────────────────────────────
-    recent_acwrs = [h["acwr"] for h in history if h.get("acwr") is not None][:7]
+    # ── The real 7-day window (#1917 window honesty) ─────────────────────────
+    # `trend_7d` and `alerts_last_7d` used to slice `history[:7]` — the newest seven
+    # RECORDS, not the newest seven DAYS. computed_metrics is written by a nightly
+    # Lambda that can and does miss days (this tool's own error path exists for exactly
+    # that), so on a sparse partition "alerts_last_7d: 7" could describe two months.
+    # Bound by the calendar and publish the n actually covered.
+    window_start_7d = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=6)).strftime("%Y-%m-%d")
+    last_7d = [h for h in history if (h.get("date") or "") >= window_start_7d]
+
+    recent_acwrs = [h["acwr"] for h in last_7d if h.get("acwr") is not None]
     trend = None
     if len(recent_acwrs) >= 3:
         if recent_acwrs[0] > recent_acwrs[-1] * 1.05:
@@ -949,13 +1071,33 @@ def tool_get_acwr_status(args):
             trend = "stable"
 
     # ── Alert count ──────────────────────────────────────────────────────────
-    alerts_7d = sum(1 for h in history[:7] if h.get("alert"))
+    alerts_7d = sum(1 for h in last_7d if h.get("alert"))
+
+    # ── Staleness of the answer ──────────────────────────────────────────────
+    # `latest = history[0]` was hoisted to the top level with no comparison against the
+    # REQUESTED date, so a 12-day-old record answered "what is my ACWR?" in the present
+    # tense ("Rest is not optional this week"). The floor comes from the WRITER's
+    # cadence, not from a literature default: acwr-compute runs nightly, so a record two
+    # or more days behind the requested date means at least one run was missed.
+    days_stale = None
+    if latest.get("date"):
+        days_stale = (datetime.strptime(end_date, "%Y-%m-%d") - datetime.strptime(latest["date"], "%Y-%m-%d")).days
+    is_stale = days_stale is not None and days_stale >= 2
+    staleness_note = None
+    if is_stale:
+        staleness_note = (
+            f"The newest ACWR record ({latest.get('date')}) is {days_stale} days older than the requested date "
+            f"({end_date}). acwr-compute writes nightly, so at least one run was missed. Present-tense coaching "
+            "is withheld — this describes the load state as of that date, not today's."
+        )
 
     # ── Board coaching note ──────────────────────────────────────────────────
     zone = latest.get("zone", "unknown")
     acwr = latest.get("acwr")
     coaching = None
-    if zone == "danger":
+    if is_stale:
+        coaching = None  # a stale measurement does not get a live-voice verdict
+    elif zone == "danger":
         coaching = "Attia + Galpin: ACWR above 1.5 is the strongest predictor of non-contact injury in the next 7 days. Rest is not optional this week."
     elif zone == "caution":
         coaching = "Galpin: ACWR in the caution zone (1.3-1.5). Reduce volume by 30-40%. Maintain intensity on 1-2 key sessions; cut accessory work."
@@ -973,7 +1115,12 @@ def tool_get_acwr_status(args):
         "acute_load_7d": latest.get("acute_load_7d"),
         "chronic_load_28d": latest.get("chronic_load_28d"),
         "trend_7d": trend,
+        "trend_7d_n": len(recent_acwrs),
         "alerts_last_7d": alerts_7d,
+        "records_last_7d": len(last_7d),
+        "days_stale": days_stale,
+        "is_stale": is_stale,
+        "staleness_note": staleness_note,
         "coaching": coaching,
         "history": history,
         "method": latest.get("method", "ewma"),
