@@ -1657,45 +1657,123 @@ class TestDryRun:
         brief.lambda_handler({"dry_run": True}, None)
         assert handler_env["ses"].sent == []
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:2670 (lambda_handler): `record_email_send(table, 'daily_brief')` runs "
-            "unconditionally — outside the `if event['_dry_run_resolved']` branch at 2283 — so a DRY_RUN "
-            "invocation writes an email_log row stamped `status: 'success'` for a mail that was never "
-            "sent. The row's stated purpose (line 1378) is 'so the status page can track last send', and "
-            "the CloudWatch alarm on a missing row is exactly what a dry run should NOT silence. It "
-            "should skip the record, or stamp it `dry_run`. Hurts: Matthew — a real send failure on a "
-            "day someone was testing looks green."
-        ),
-    )
     def test_a_dry_run_does_not_claim_a_successful_send_in_the_status_log(self, handler_env):
+        """#2255. `record_email_send` used to run unconditionally, outside the
+        `_dry_run_resolved` branch, so a DRY_RUN wrote an email_log row stamped
+        `status: "success"` for mail that was never sent — the row the status
+        page reads as "last send" and the missing-send alarm reads as health.
+        That is the more dangerous half of the defect: an overwritten artifact
+        is corrected by the next real run, a silenced alarm is not."""
         r = computed_row()
         handler_env["table"].store[(r["pk"], r["sk"])] = r
         brief.lambda_handler({"dry_run": True}, None)
         email_log = [p for p in handler_env["table"].puts if "email_log" in str(p.get("pk", ""))]
         assert email_log == [], f"a dry run recorded a send: {email_log}"
+        # …and a real run still does record one, so the assertion above is not
+        # passing because the write was deleted outright.
+        brief.lambda_handler({}, None)
+        real = [p for p in handler_env["table"].puts if "email_log" in str(p.get("pk", ""))]
+        assert [p["status"] for p in real] == ["success"]
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:1622-1626 (lambda_handler): the DRY_RUN gate covers ONLY the two "
-            "ses.send_email calls (2283, 1739). Every side effect downstream still fires: "
-            "output_writers.write_dashboard/clinical/buddy/public_stats_json (2301-2317), "
-            "site_writer.write_public_stats + write_pulse_json (2520/2633) — which overwrite the LIVE "
-            "public artifacts averagejoematt.com serves — the guidance_given update_item (2056) and the "
-            "day_grade/habit_scores puts on the fallback path. A dry run is therefore not a dry run: "
-            "testing the brief republishes the public site's stats. It should gate the writes too (or "
-            "the flag should be named send_only). Hurts: readers of the live site, and anyone who "
-            "believes DRY_RUN is side-effect-free."
-        ),
-    )
+    def test_a_dry_run_reports_that_it_did_not_send(self, handler_env):
+        """The other half of honesty: the return body. A dry run that answers
+        'Daily brief sent: …' is a false success in the invoke response and in
+        the CloudWatch log line, which is what an operator actually reads."""
+        r = computed_row()
+        handler_env["table"].store[(r["pk"], r["sk"])] = r
+        body = brief.lambda_handler({"dry_run": True}, None)["body"]
+        assert "DRY_RUN" in body and "not sent" in body
+        assert brief.lambda_handler({}, None)["body"].startswith("Daily brief v2.77.0 sent:")
+
     def test_a_dry_run_does_not_republish_the_live_public_artifacts(self, handler_env):
+        """#2255. `generated/public_stats.json` and `pulse.json` are what
+        averagejoematt.com serves. Both write paths were gated on `demo_mode`
+        alone, so 'use dry_run to test the brief safely' republished the live
+        public site exactly as a real run did."""
         r = computed_row()
         handler_env["table"].store[(r["pk"], r["sk"])] = r
         brief.lambda_handler({"dry_run": True}, None)
         assert handler_env["public_stats"].calls == [], "DRY_RUN overwrote the public site's stats"
         assert handler_env["pulse"].calls == []
+        assert handler_env["writers"].public_stats == []
+        # Not vacuous: the same fixture, the same row, a real invocation — both
+        # writers fire. A test that never reached the write path would fail here.
+        brief.lambda_handler({}, None)
+        assert handler_env["public_stats"].calls and handler_env["pulse"].calls
+        assert handler_env["writers"].public_stats
+
+    def test_a_dry_run_writes_nothing_anywhere(self, handler_env):
+        """The set-level form of #2255, asserted at the SINKS rather than at the
+        call sites — so a write site added later is caught without anyone
+        remembering to extend a list. Every persistence channel this handler
+        can reach is a bounded fake, and after a dry run every one of them must
+        be empty: DynamoDB puts and updates, S3 objects, the four
+        `output_writers` JSON artifacts, the two `site_writer` live artifacts,
+        the insight ledger, the async coach-ensemble-digest fan-out, and SES.
+
+        The paired real invocation below is what makes this non-vacuous: with
+        the same fixture and the same row, a normal run lights up the same
+        sinks. If the dry-run half ever passes because the handler bailed early
+        (a raise, an unmet precondition, a stubbed-out path), the real half
+        fails and says so."""
+        r = computed_row()
+        handler_env["table"].store[(r["pk"], r["sk"])] = r
+        brief.lambda_handler({"dry_run": True}, None)
+
+        table, writers, s3 = handler_env["table"], handler_env["writers"], handler_env["s3"]
+        assert table.puts == [], f"DRY_RUN wrote to DynamoDB: {table.puts}"
+        assert table.updates == [], f"DRY_RUN updated DynamoDB: {table.updates}"
+        assert s3.puts == [], f"DRY_RUN wrote to S3: {s3.puts}"
+        assert writers.dashboard == [] and writers.clinical == [] and writers.buddy == [] and writers.public_stats == []
+        assert handler_env["public_stats"].calls == [] and handler_env["pulse"].calls == []
+        assert handler_env["boto3"].lambda_client.invocations == [], "DRY_RUN fanned out to another Lambda"
+        assert handler_env["ses"].sent == []
+        # The brief was still fully generated — this is a dry run, not a no-op.
+        assert handler_env["html"].calls
+
+        # Falsifier: the identical run without the flag exercises those sinks.
+        brief.lambda_handler({}, None)
+        assert table.puts, "the real path writes nothing either — the assertions above are vacuous"
+        assert writers.dashboard and writers.clinical and writers.buddy and writers.public_stats
+        assert handler_env["public_stats"].calls and handler_env["pulse"].calls
+        assert len(handler_env["ses"].sent) == 1
+
+    def test_the_dry_run_env_var_suppresses_the_writes_too_not_just_the_send(self, handler_env, monkeypatch):
+        """The env-var route resolves through the same predicate as the event
+        route — a suppressor that only half the callers get is how #2255's
+        sibling defects (#2222) look."""
+        monkeypatch.setenv("DRY_RUN", "1")
+        r = computed_row()
+        handler_env["table"].store[(r["pk"], r["sk"])] = r
+        brief.lambda_handler({}, None)
+        assert handler_env["table"].puts == []
+        assert handler_env["public_stats"].calls == []
+
+    def test_force_send_restores_the_writes_as_well_as_the_send(self, handler_env, monkeypatch):
+        """`force_send` means 'do the real run' — suppressing the writes while
+        sending the mail would leave the live artifacts describing a different
+        day than the mail."""
+        monkeypatch.setenv("DRY_RUN", "1")
+        r = computed_row()
+        handler_env["table"].store[(r["pk"], r["sk"])] = r
+        brief.lambda_handler({"force_send": True}, None)
+        assert len(handler_env["ses"].sent) == 1
+        assert handler_env["public_stats"].calls and handler_env["table"].puts
+
+    def test_the_sick_day_path_writes_nothing_under_dry_run_either(self, handler_env, monkeypatch):
+        """The recovery-brief branch returns before the main write block, and
+        its own `write_buddy_json` was not even `demo_mode`-gated."""
+        from health import sick_day_checker
+
+        monkeypatch.setattr(sick_day_checker, "check_sick_day", lambda *a, **k: {"reason": "flu"})
+        out = brief.lambda_handler({"dry_run": True}, None)
+        assert handler_env["ses"].sent == []
+        assert handler_env["writers"].buddy == []
+        assert handler_env["table"].puts == []
+        assert "not sent" in out["body"]
+        # Falsifier: the same sick day, really run, does write the buddy file.
+        brief.lambda_handler({}, None)
+        assert handler_env["writers"].buddy
 
 
 class TestSickDayBrief:
