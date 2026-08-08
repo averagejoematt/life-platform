@@ -1026,6 +1026,15 @@ class TestStoreHabitScores:
 
 
 class TestFoodDeliverySignal:
+    @pytest.fixture(autouse=True)
+    def _delivery_public(self, monkeypatch):
+        # #2233 gates this function behind NUTRITION_DELIVERY_PUBLIC (default off);
+        # that disclosure question has its own dedicated coverage in
+        # tests/test_food_delivery_gate_2233.py. This class is about the #2235
+        # freshness/formatting logic, so the flag is turned on here to exercise it
+        # independent of disclosure defaults.
+        monkeypatch.setenv("NUTRITION_DELIVERY_PUBLIC", "true")
+
     def _streak(self, table, **fields):
         # #2235: updated_at defaults FRESH (pinned to the frozen cron instant) so
         # these tests exercise the signal-formatting logic, not the freshness gate
@@ -1070,6 +1079,11 @@ class TestFoodDeliveryStreakFreshness2235:
     source_registry.py) must never surface as a live-sounding streak — this is the
     exact bug the issue found live (a record 133 days stale still reporting
     "streak_days: 3" as current)."""
+
+    @pytest.fixture(autouse=True)
+    def _delivery_public(self, monkeypatch):
+        # See TestFoodDeliverySignal._delivery_public — same rationale.
+        monkeypatch.setenv("NUTRITION_DELIVERY_PUBLIC", "true")
 
     def _streak_at(self, table, updated_at, **fields):
         row = {"updated_at": updated_at}

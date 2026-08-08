@@ -2088,7 +2088,15 @@ class TestBuildHtmlNumbers:
 class TestBuildHtmlPrivacy:
     def test_the_delivery_free_streak_is_never_rendered_in_the_digest(self, table, delivery_public):
         """Pins today's behaviour: `get_food_delivery_digest_line` exists and
-        returns a line, but nothing calls it — see the xfail below."""
+        returns a line, but nothing calls it — see the xfail below.
+
+        #2233 gates `get_food_delivery_digest_line` behind NUTRITION_DELIVERY_PUBLIC
+        (default off); the `delivery_public` fixture turns the flag on so this test's
+        own point (the line exists but nothing calls it) is exercised rather than
+        short-circuited by an unrelated disclosure default.
+        `test_no_binge_or_delivery_spend_figure_reaches_the_rendered_digest` below is
+        the dedicated flag-off guard.
+        """
         table.add(
             {
                 "pk": "USER#matthew#SOURCE#food_delivery",
@@ -2111,6 +2119,11 @@ class TestBuildHtmlPrivacy:
 
 
 class TestFoodDeliveryDigestLine:
+    # #2233 gates these functions behind NUTRITION_DELIVERY_PUBLIC (default off);
+    # that disclosure question has its own dedicated coverage in
+    # tests/test_food_delivery_gate_2233.py. This class is about the #2235
+    # freshness/formatting logic, so each test takes main's `delivery_public`
+    # fixture (023874f0) to exercise it independent of disclosure defaults.
     def test_no_streak_record_yields_no_line(self, table, delivery_public):
         assert wd.get_food_delivery_digest_line() is None
 
@@ -2159,7 +2172,7 @@ class TestFoodDeliveryDigestLine:
             "maintained for nothing."
         ),
     )
-    def test_the_streak_line_reaches_the_nutrition_section_it_is_written_for(self, table, monkeypatch):
+    def test_the_streak_line_reaches_the_nutrition_section_it_is_written_for(self, table, delivery_public):
         table.add(
             {
                 "pk": "USER#matthew#SOURCE#food_delivery",
@@ -2179,7 +2192,10 @@ class TestFoodDeliveryDigestFreshness2235:
     food_delivery's stale_hours threshold (336h = 14 days, source_registry.py) must
     not surface as a live streak here either."""
 
-    def test_a_stale_record_yields_no_line(self, table):
+    # This class is about the #2235 freshness gate, not the #2233 disclosure gate,
+    # so every test takes main's module-level `delivery_public` fixture (023874f0)
+    # to exercise freshness independent of disclosure defaults.
+    def test_a_stale_record_yields_no_line(self, table, delivery_public):
         stale = (FROZEN_NOW - timedelta(hours=337)).isoformat()
         table.add(
             {
@@ -2192,7 +2208,7 @@ class TestFoodDeliveryDigestFreshness2235:
         )
         assert wd.get_food_delivery_digest_line() is None
 
-    def test_a_record_just_inside_the_threshold_still_reports(self, table):
+    def test_a_record_just_inside_the_threshold_still_reports(self, table, delivery_public):
         fresh = (FROZEN_NOW - timedelta(hours=335)).isoformat()
         table.add(
             {
@@ -2205,7 +2221,7 @@ class TestFoodDeliveryDigestFreshness2235:
         )
         assert "1.10x" in wd.get_food_delivery_digest_line()
 
-    def test_a_record_with_no_updated_at_is_withheld(self, table):
+    def test_a_record_with_no_updated_at_is_withheld(self, table, delivery_public):
         table.add({"pk": "USER#matthew#SOURCE#food_delivery", "sk": "STREAK#current", "streak_days": 40})
         assert wd.get_food_delivery_digest_line() is None
 
