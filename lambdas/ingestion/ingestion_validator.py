@@ -148,22 +148,29 @@ _SCHEMAS: dict[str, dict] = {
         },
         "at_least_one_of": ["strain", "average_heart_rate", "kilojoule", "sport_name"],
     },
+    # #2287: body_battery_highest -> body_battery_high. The #480/A-7 sweep that
+    # fixed whoop's sleep_score missed this row: no writer has ever emitted
+    # `body_battery_highest` (garmin_lambda.extract_body_battery stores
+    # body_battery_high/_low/_end), so the type + range checks could never fire
+    # and body battery could never satisfy at_least_one_of. Dead since 2026-03-08.
+    # Still open on this row: `stress_level_avg` — the writer emits avg_stress /
+    # max_stress. Left alone here; it is a validator-only defect, outside #2287.
     "garmin": {
         "required_fields": ["pk", "sk", "date"],
         "typed_fields": {
             "steps": (int, float),
             "resting_heart_rate": (int, float),
             "stress_level_avg": (int, float),
-            "body_battery_highest": (int, float),
+            "body_battery_high": (int, float),
         },
         "range_checks": {
             "steps": (0, 100_000),
             "resting_heart_rate": (20, 200),
             "stress_level_avg": (0, 100),
-            "body_battery_highest": (0, 100),
+            "body_battery_high": (0, 100),
             "sleep_duration_seconds": (0, 86_400),
         },
-        "at_least_one_of": ["steps", "resting_heart_rate", "body_battery_highest"],
+        "at_least_one_of": ["steps", "resting_heart_rate", "body_battery_high"],
     },
     "apple_health": {
         "required_fields": ["pk", "sk", "date"],

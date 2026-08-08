@@ -513,7 +513,11 @@ def find_interior_gaps(present_dates, window_start: str, window_end: str) -> lis
 # Added v3.7.27 (item 11 — Omar / Jin board recommendation).
 FIELD_COMPLETENESS_CHECKS: dict[str, list[str]] = {
     "whoop": ["hrv", "recovery_score", "sleep_duration_hours"],
-    "garmin": ["steps", "resting_heart_rate", "body_battery_highest"],
+    # #2287: was body_battery_highest, a name NO writer has ever emitted (it has
+    # only ever existed in this map and in ingestion_validator's garmin schema,
+    # both added 2026-03-14). garmin_lambda's extract_body_battery stores
+    # body_battery_high / _low / _end. Same #2271 defect on the garmin row.
+    "garmin": ["steps", "resting_heart_rate", "body_battery_high"],
     "apple_health": ["steps", "active_calories"],
     # "macrofactor":   [...],  # dead since 2026-04-11 (Tier 1 torn down)
     "strava": ["activity_count"],  # RE-ENABLED 2026-06-20
