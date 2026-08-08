@@ -478,7 +478,11 @@ def ex_todoist(recs_dict):
     recs = list(recs_dict.values()) if recs_dict else []
     if not recs:
         return None
-    c = [int(r.get("tasks_completed", 0)) for r in recs]
+    # #2245: todoist_lambda writes `completed_count` (the #480/A-7 rename documented in
+    # ingestion_validator.py) — reading the pre-rename `tasks_completed` matched nothing
+    # and published a permanent measured zero. The OUTPUT key stays `tasks_completed`:
+    # it is the renderer's and the Board prompt's contract, not the storage field.
+    c = [int(r.get("completed_count", 0) or 0) for r in recs]
     return {"tasks_completed": sum(c), "avg_per_day": avg(c), "days": len(recs)}
 
 

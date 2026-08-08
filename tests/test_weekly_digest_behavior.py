@@ -996,37 +996,61 @@ class TestExTodoist:
     def test_no_records_is_absence(self):
         assert wd.ex_todoist({}) is None
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-3, P1 — reader/writer field-name mismatch): "
-            "weekly_digest_lambda.py:480 `ex_todoist` reads `tasks_completed`, but "
-            "todoist_lambda.py:250 stores `completed_count` (with active_count / "
-            "overdue_count). ingestion_validator.py:292 already documents the rename: '#480/A-7: "
-            "written names are completed_count/active_count/overdue_count (the old "
-            "tasks_completed/tasks_added matched nothing)', and site_api_sleep.py:231 reads "
-            "`completed_count` first. The digest was never updated, so `int(r.get("
-            "'tasks_completed', 0))` returns 0 for every record and the Productivity section "
-            "renders 'Tasks Completed: 0' and 'Avg Per Day: 0.0' every week — with a "
-            "delta_html arrow computed off two zeros. Hurts: an absence is published to "
-            "Matthew as a measured zero (ADR-104), and the same wrong figure is serialised "
-            "into the Board prompt."
-        ),
-    )
     def test_completed_tasks_are_read_from_the_field_todoist_actually_writes(self):
+        """#2245: todoist_lambda writes `completed_count` (the #480/A-7 rename
+        documented in ingestion_validator.py:292). Reading the pre-rename
+        `tasks_completed` matched nothing and published a permanent measured zero."""
         t = as_range("todoist", {"2026-08-02": {"completed_count": 5}, "2026-08-03": {"completed_count": 7}})
         out = wd.ex_todoist(t)
         # 5 + 7 = 12 completions over 2 days → 6.0 per day
         assert out["tasks_completed"] == 12
         assert out["avg_per_day"] == 6.0
+        assert out["days"] == 2
 
-    def test_the_dead_field_currently_yields_a_flat_zero_week(self):
-        """Control for the defect above — pins today's behaviour so the fix is
-        visible as a change, and proves the diagnosis rather than asserting it."""
-        t = as_range("todoist", {"2026-08-02": {"completed_count": 5}, "2026-08-03": {"completed_count": 7}})
+    def test_the_pre_rename_field_name_is_not_what_is_read(self):
+        """Regression guard for #2245 in the other direction: a record carrying ONLY the
+        dead `tasks_completed` name is not silently counted. No record in the live
+        partition has carried that name since 2022 — reading it back would re-introduce
+        exactly the ambiguity the rename removed."""
+        t = as_range("todoist", {"2026-08-02": {"tasks_completed": 5}, "2026-08-03": {"tasks_completed": 7}})
         out = wd.ex_todoist(t)
         assert out["tasks_completed"] == 0
         assert out["days"] == 2
+
+    def test_a_null_completed_count_is_treated_as_zero_not_a_crash(self):
+        t = as_range("todoist", {"2026-08-02": {"completed_count": None}, "2026-08-03": {"completed_count": 4}})
+        assert wd.ex_todoist(t)["tasks_completed"] == 4
+
+    def test_the_rendered_row_and_its_delta_carry_the_real_count(self):
+        """End-to-end over the real extractor: raw records → ex_todoist → build_html.
+        Before #2245 both weeks extracted to 0 and the delta arrow compared two zeros."""
+        this = wd.ex_todoist(as_range("todoist", {"2026-08-02": {"completed_count": 5}, "2026-08-03": {"completed_count": 7}}))
+        prior = wd.ex_todoist(as_range("todoist", {"2026-07-26": {"completed_count": 3}}))
+        html = wd.build_html(digest_data(this={"todoist": this}, prior={"todoist": prior}), BOARD_TEXT, profile_row())
+        assert "Tasks Completed" in html and ">12<" in html
+        assert "6.0" in html  # avg per day, not 0.0
+        assert "↑9" in html  # week-over-week delta: 12 vs 3, not the →0 of two dead zeros
+        assert "→0" not in html
+
+    def test_the_board_prompt_payload_carries_the_real_completion_count(self, monkeypatch):
+        """The same `this`/`prior` dict is serialised verbatim into BOARD_PROMPT's
+        data_json — a permanently-zero todoist signal was being reasoned over."""
+        captured = {}
+
+        def fake_call(req, **kwargs):
+            captured["req"] = req
+            return {"content": [{"text": BOARD_TEXT}]}
+
+        monkeypatch.setattr(wd, "call_anthropic_with_retry", fake_call)
+        monkeypatch.setattr(wd, "_presence_block", lambda: "")
+        monkeypatch.setattr(wd, "_HAS_INSIGHT_WRITER", False)
+
+        this = wd.ex_todoist(as_range("todoist", {"2026-08-02": {"completed_count": 5}, "2026-08-03": {"completed_count": 7}}))
+        wd.call_haiku(digest_data(this={"todoist": this}), profile_row())
+        import json as _json
+
+        prompt = _json.loads(captured["req"].data.decode())["messages"][0]["content"]
+        assert '"tasks_completed": 12' in prompt
 
 
 # ══════════════════════════════════════════════════════════════════════════════
