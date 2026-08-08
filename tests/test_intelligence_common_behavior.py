@@ -30,8 +30,18 @@ hand-rolled bounded fake wired onto the module attribute the code looks up. Ever
 clock is frozen; no fixture date is ever combined with a live `datetime.now()`.
 
 Findings that reflect production defects are marked `xfail(strict=False)` with
-the module, function, what it does, what it should do, and who it hurts. No
-production code is modified by this file.
+the module, function, what it does, what it should do, and who it hurts.
+
+#1658 second pass (2026-08-08): 17 markers were opened here by the reporting
+tranche; 15 are now closed. 13 were real defects and are FIXED in
+`lambdas/intelligence/intelligence_common.py` — each of those assertions was
+first confirmed to FAIL against the pre-fix module, and the docstring on each
+records the pre-fix observation, so none of them can pass vacuously. 2 were
+correct on the facts and wrong on the diagnosis (the credibility/thread-
+prediction cluster: `SOURCE#coach_thread#` predictions were deliberately voided
+by #726, so their "missing" resolver and grader are the intended state) — those
+markers are replaced by tests that pin the corrected record. 2 remain open and
+say why in their own reason strings.
 """
 
 import json
@@ -198,17 +208,14 @@ def wired(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _reset_module_caches():
-    """The S3 loaders keep warm-container globals; a leaked cache would make
-    these tests order-dependent."""
+    """The S3 loader keeps warm-container globals; a leaked cache would make these
+    tests order-dependent. (`_detection_rules_cache*` was dropped with the dead
+    loader — #1658.)"""
     ic._goals_cache = None
     ic._goals_cache_ts = 0
-    ic._detection_rules_cache = None
-    ic._detection_rules_cache_ts = 0
     yield
     ic._goals_cache = None
     ic._goals_cache_ts = 0
-    ic._detection_rules_cache = None
-    ic._detection_rules_cache_ts = 0
 
 
 # ── repo scanners, for the reader/writer + dark-surface hunts ────────────────
@@ -415,7 +422,10 @@ class TestCgmStaleness:
                 # HAE writes apple_health every day — this is always fresh.
                 return {"Items": [{"sk": "DATE#2026-08-08"}]}
             if "blood_glucose_avg" in str(kwargs.get("FilterExpression", "")):
-                return {"Count": 4}  # four glucose days, all a month old
+                if kwargs.get("Select") == "COUNT":
+                    return {"Count": 4}  # four glucose days, all a month old
+                # the newest-first glucose-bearing probe (#1658)
+                return {"Items": [{"sk": "DATE#2026-07-09"}, {"sk": "DATE#2026-07-08"}]}
             return {"Count": 90}
 
         monkeypatch.setattr(ic, "table", FakeTable(router=router))
@@ -425,21 +435,26 @@ class TestCgmStaleness:
         inv = self._inventory(monkeypatch)
         assert inv["cgm"]["records"] == 4  # not the 90 apple_health days
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (P1, VERIFIED) intelligence_common.py:139-168 build_data_inventory: the "
-            "`latest` probe runs BEFORE the cgm branch and is never re-issued with "
-            "attribute_exists(blood_glucose_avg), so cgm inherits apple_health's latest date. "
-            "apple_health is written daily by the HAE webhook, so cgm can never look stale — "
-            "build_coach_preamble's >=3d / >=7d staleness directives are structurally "
-            "unreachable for glucose. It should re-probe the newest glucose-bearing record. "
-            "Hurts Matthew: the glucose coach opines confidently on a CGM that stopped weeks ago."
-        ),
-    )
-    def test_cgm_latest_should_be_the_newest_glucose_bearing_record(self, monkeypatch):
+    def test_cgm_latest_is_the_newest_glucose_bearing_record(self, monkeypatch):
+        """FIXED (#1658, was xfail): the `latest` probe ran BEFORE the cgm branch and was
+        never re-issued with attribute_exists(blood_glucose_avg), so cgm inherited
+        apple_health's latest date. HAE writes apple_health every day, so cgm could never
+        look stale and build_coach_preamble's >=3d / >=7d staleness directives were
+        structurally unreachable for glucose — the coach opined confidently on a CGM that
+        had stopped weeks ago. Pre-fix this asserted 2026-08-08 (apple_health's date)."""
         inv = self._inventory(monkeypatch)
-        assert inv["cgm"]["latest"] != inv["apple_health"]["latest"]
+        assert inv["apple_health"]["latest"] == "2026-08-08"
+        assert inv["cgm"]["latest"] == "2026-07-09"
+        assert (
+            ic.build_coach_preamble(
+                coach_name="c",
+                domain="glucose",
+                goals={"targets": {}},
+                inventory=inv,
+                maturity={"glucose": {"phase": "orientation", "days": 4, "threshold": 7, "unit": "CGM days"}},
+            ).count("DATA STALENESS WARNINGS")
+            == 1
+        )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -752,14 +767,20 @@ class TestPreambleCredibility:
     @pytest.mark.xfail(
         strict=False,
         reason=(
-            "DEFECT (P2, VERIFIED) intelligence_common.py:1629 load_credibility reads "
-            "USER#matthew / SOURCE#coach_credibility#{coach_id}, and NO module in lambdas/ or "
-            "mcp/ writes that key — #1239 deleted compute_all_credibility, the only writer, and "
-            "left the reader. So every coach prompt permanently carries 'Track record: nascent "
-            "(0 predictions resolved, 0% accuracy)' and the over-confident corrective is "
-            "structurally unreachable. It should be written by whatever computes credibility "
-            "(compute_credibility, itself uncalled). Hurts Matthew: a coach with a real track "
-            "record is told, every day, that it has none."
+            "DEFECT (P2, VERIFIED — diagnosis CORRECTED by #1658) intelligence_common.py "
+            "load_credibility reads USER#matthew / SOURCE#coach_credibility#{coach_id}, and NO "
+            "module in lambdas/ or mcp/ writes that key (#1239 deleted compute_all_credibility, "
+            "the only writer, and left the reader). Every coach prompt therefore carries "
+            "'Track record: nascent (0 predictions resolved, 0% accuracy)' every day, and the "
+            "over-confident corrective is structurally unreachable. CORRECTION: the fix is NOT "
+            "'call compute_credibility and store it' — that function grades the "
+            "SOURCE#coach_thread# predictions #726 deliberately voided as ungradeable. The "
+            "evaluator-graded ledger is COACH#{coach}_coach / PREDICTION#, which DOES carry a "
+            "real track record. So the honest repairs are (a) source the preamble's track "
+            "record from that canonical store, or (b) stop asserting '0% accuracy' over n=0 "
+            "and say 'not yet measured' (ADR-104/105). Both are a change of contract, not a "
+            "one-line repair, and want their own issue — left open deliberately. Hurts "
+            "Matthew: a coach with a real graded track record is told, every day, it has none."
         ),
     )
     def test_something_in_the_repo_writes_the_credibility_record_it_reads(self):
@@ -826,18 +847,12 @@ class TestNullClaimCheck:
             for src in sources:
                 assert src in labels, f"{keyword} -> {src}, never built by build_data_inventory"
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (P2, VERIFIED) intelligence_common.py:633-637 validate_coach_output check 1 "
-            "uses text_lower.index(phrase), which finds only the FIRST occurrence of each "
-            "phrase. A narrative that says 'no data' once about a genuinely empty source and "
-            "again about a source with 90 records is never flagged for the second. It should "
-            "scan every occurrence (re.finditer). Hurts Matthew: the false claim later in a "
-            "long narrative is the one that ships."
-        ),
-    )
     def test_a_second_occurrence_of_a_phrase_is_also_checked(self):
+        """FIXED (#1658, was xfail): check 1 used `text_lower.index(phrase)`, which reads
+        only occurrence #1. A narrative saying "no data" once about a genuinely empty
+        source and again about a source with 90 records was never flagged for the second —
+        and the false claim later in a long narrative is the one that ships. Pre-fix this
+        returned []."""
         narrative = (
             "On bloodwork there is no data for this cycle, so I will wait. "
             "Now, a long stretch of unrelated commentary to push the next claim "
@@ -895,19 +910,12 @@ class TestOverconfidenceCheck:
         flags = _validate("Your pattern shows a clean overnight curve.", maturity=maturity, domain="glucose")
         assert [f for f in flags if f["check"] == "overconfidence"] == []
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (P2, VERIFIED) intelligence_common.py:731 validate_coach_output check 5 runs "
-            "ONLY when phase == 'orientation'. EMERGING_VOICE (line 219) explicitly instructs "
-            '\'Do NOT use definitive language like "your pattern is" or "this shows"\' — and '
-            "nothing checks it, so the emerging voice rule is prompt-only (the "
-            "reference_prompt_structural_guarantees class). It should also flag definitive "
-            "language in emerging. Hurts Matthew: a coach with 8 nights of data can assert a "
-            "confirmed pattern and pass validation."
-        ),
-    )
     def test_definitive_language_is_also_flagged_in_the_emerging_phase(self):
+        """FIXED (#1658, was xfail): check 5 ran ONLY when phase == "orientation".
+        EMERGING_VOICE explicitly instructs \'Do NOT use definitive language like "your
+        pattern is" or "this shows"\' and nothing checked it, so that rule was prompt-only
+        (reference_prompt_structural_guarantees) — a coach with 8 nights of data could
+        assert a confirmed pattern and pass validation. Pre-fix this returned []."""
         maturity = {"glucose": {"phase": "emerging", "days": 8, "unit": "CGM days"}}
         flags = _validate("The data confirms your overnight curve is flat.", maturity=maturity, domain="glucose")
         assert [f for f in flags if f["check"] == "overconfidence"]
@@ -938,20 +946,13 @@ class TestCrossCoachContradiction:
         flags = _validate("Your resting heart rate is 55 bpm.", all_narratives={"training": "You peaked at 165 bpm."})
         assert [f for f in flags if f["check"] == "cross_coach_contradiction"]
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (P2, VERIFIED) intelligence_common.py:705/709 validate_coach_output check 4: "
-            "the numeric-claim regex ends in `\\b` after an alternation containing `%`. `%` is a "
-            "non-word character, so `22%` followed by a space or end-of-string has no word "
-            "boundary and NEVER matches — every percentage claim (body fat, adherence, recovery) "
-            "is invisible to the cross-coach check while mg/dL, bpm, ms, lbs, kcal and g all "
-            "match. The `%` alternative should be outside the \\b (or the pattern should use a "
-            "lookahead). Hurts Matthew: two coaches can publish different body-fat percentages "
-            "on the same day and the contradiction check reports green."
-        ),
-    )
     def test_percentage_claims_are_compared_too(self):
+        """FIXED (#1658, was xfail): the numeric-claim regex closed an alternation
+        containing `%` with `\\b`. `%` is a non-word character, so `22%` followed by a space
+        or end-of-string had no word boundary and NEVER matched — every percentage claim
+        (body fat, adherence, recovery) was invisible to the cross-coach check while mg/dL,
+        bpm, ms, lbs, kcal and g all matched. Two coaches could publish different body-fat
+        percentages on the same day and the check reported green. Pre-fix this returned []."""
         flags = _validate("Your body fat is 22% right now.", all_narratives={"nutrition": "Body fat is closer to 26% by my read."})
         assert [f for f in flags if f["check"] == "cross_coach_contradiction"]
 
@@ -1001,25 +1002,23 @@ class TestValidatorSurfaceIsHonestAboutItself:
         for narrative in ("You walked 1,,2,3 steps.", "You walked 0 steps.", "12,345,678 steps logged."):
             ic.validate_coach_output("c", "physical", narrative, inventory, _MATURITY_EMERGING)
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (P1, VERIFIED) intelligence_common.py:690-700 validate_coach_output check 3 "
-            "('SOT violation') is a no-op: it parses the step count into a discarded expression, "
-            "confirms garmin and apple_health both exist, and then executes `pass` with a "
-            "'deferred to full implementation' comment. write_quality_results nevertheless "
-            "records checks_run=5, so the intelligence_quality partition asserts a check that "
-            "cannot produce a flag — the gate reports green while dark (the ADR-125/#1927 "
-            "class). It should either compare the cited figure against the garmin source of "
-            "truth or be removed and checks_run derived. Hurts Matthew: a coach can cite Apple "
-            "Health's step count as fact while CLAUDE.md names garmin the SOT, and the honesty "
-            "layer scores it clean."
-        ),
-    )
     def test_the_advertised_check_count_matches_the_checks_that_can_fire(self, wired):
+        """FIXED (#1658, was xfail): check 3 ("SOT violation") was a no-op — it parsed the
+        step count into a discarded expression, confirmed garmin and apple_health both
+        existed, then executed `pass` behind a "deferred to full implementation" comment.
+        write_quality_results nevertheless recorded checks_run=5, so the
+        intelligence_quality partition asserted a check that could not produce a flag: a
+        gate reporting green while dark (ADR-125/#1927). The dead check is deleted and the
+        count is derived from `_VALIDATOR_CHECKS`. Pre-fix: 5 != 4."""
         table, _s3 = wired
         ic.write_quality_results("2026-08-08", "physical_coach", "physical", [])
         assert table.puts[0]["checks_run"] == len(self._all_emitted_checks())
+        assert table.puts[0]["checks_run"] == len(ic._VALIDATOR_CHECKS)
+
+    def test_the_derived_check_registry_names_only_checks_that_fire(self):
+        """Mutation-proof for the derivation: adding a name to `_VALIDATOR_CHECKS` without
+        a check that can emit it re-opens the exact hole #1658 closed."""
+        assert set(ic._VALIDATOR_CHECKS) == self._all_emitted_checks()
 
 
 class TestWriteQualityResults:
@@ -1303,7 +1302,9 @@ class TestCoachThreadReads:
         kwargs = table.queries[0]
         assert _condition_values(kwargs["KeyConditionExpression"]) == ["USER#matthew", "SOURCE#coach_thread#sleep#"]
         assert kwargs["ScanIndexForward"] is False
-        assert kwargs["Limit"] == 4
+        # #1658: the read over-fetches per page so a run of pilot-tagged rows can't hide
+        # the live entries behind them (Limit is applied BEFORE the filter, #1203).
+        assert kwargs["Limit"] >= 4
 
     def test_the_thread_partition_is_phase_filtered_as_the_taxonomy_requires(self, wired):
         """SOURCE#coach_thread is EXPERIMENT_SCOPED — the filter is correct
@@ -1324,23 +1325,23 @@ class TestCoachThreadReads:
         monkeypatch.setattr(ic, "table", FakeTable(router=lambda kw, pk: {"Items": rows}))
         assert ic.read_coach_thread("sleep")[0]["predictions"][0]["confidence"] == 0.8
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (P1, VERIFIED) intelligence_common.py:1266-1274 read_coach_thread combines "
-            "Limit with the ADR-058 FilterExpression. DynamoDB applies Limit BEFORE the filter "
-            "(#1203 — the mechanism this file's own build_data_inventory docstring documents at "
-            "line 135), so when the newest `limit` thread rows are pilot-tagged (every cycle "
-            "reset) the read returns fewer rows than exist, or none at all, while live entries "
-            "sit just past the page. It should page until `limit` VISIBLE rows are collected, "
-            "or bound with a key floor (phase_taxonomy.cycle_read_floor) instead of a filter. "
-            "Hurts Matthew: build_thread_prompt_block then tells a coach with months of history "
-            "'This is your first assessment', and compute_credibility reports n=0."
-        ),
-    )
     def test_live_entries_beyond_the_first_page_are_still_reachable(self, monkeypatch):
+        """FIXED (#1658, was xfail): the read paired `Limit` with the ADR-058
+        FilterExpression, and DynamoDB applies Limit BEFORE the filter (#1203 — the
+        mechanism build_data_inventory's own docstring documents). With the newest four
+        rows pilot-tagged (i.e. every cycle reset) the single-shot read returned NOTHING
+        while three live entries sat just past the page, and build_thread_prompt_block then
+        told a coach with months of history "This is your first assessment". Pre-fix this
+        returned []."""
         monkeypatch.setattr(ic, "table", LimitThenFilterTable(_thread_rows()))
-        assert ic.read_coach_thread("sleep", limit=4) != []
+        entries = ic.read_coach_thread("sleep", limit=4)
+        assert [e["sk"].rsplit("#", 1)[1] for e in entries] == ["2026-08-03", "2026-08-02", "2026-08-01"]
+
+    def test_the_paged_read_still_honours_the_requested_limit(self, monkeypatch):
+        """Over-fetching must not leak extra entries to the prompt layer."""
+        rows = [{"pk": "USER#matthew", "sk": f"SOURCE#coach_thread#sleep#2026-08-{d:02d}", "position_summary": "p"} for d in range(1, 9)]
+        monkeypatch.setattr(ic, "table", LimitThenFilterTable(rows))
+        assert len(ic.read_coach_thread("sleep", limit=2)) == 2
 
 
 class TestThreadPromptBlock:
@@ -1469,22 +1470,24 @@ class TestUpdatePredictionStatus:
         assert ic.update_prediction_status("sleep", "p1", "confirmed") is False
         assert table.puts == []
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (P1, VERIFIED) intelligence_common.py:1282 update_prediction_status has NO "
-            "caller in lambdas/ or mcp/ — coach_prediction_evaluator has its own private "
-            "_update_prediction_status (coach_prediction_evaluator.py:865) which writes to "
-            "COACH#{coach}/PREDICTION#{id}, a DIFFERENT store from the SOURCE#coach_thread "
-            "entries compute_credibility grades. So no thread prediction is ever resolved: "
-            "stamp_thread_predictions writes status='pending' and nothing ever changes it. "
-            "Either the evaluator should also settle thread predictions or the thread's "
-            "credibility should read the COACH# store. Hurts Matthew: coach credibility can "
-            "never move off its floor, so 'YOUR CREDIBILITY: nascent' is a permanent constant."
-        ),
-    )
-    def test_the_thread_prediction_store_has_a_live_resolver(self):
-        assert _live_references("update_prediction_status")
+    def test_the_thread_prediction_store_is_deliberately_left_unresolved(self):
+        """RECORD CORRECTED (#1658, was xfail "DEFECT P1"). The finding was right on the
+        facts — `update_prediction_status` has no caller and no `SOURCE#coach_thread#`
+        prediction is ever resolved — and wrong on the diagnosis. That is the INTENDED
+        state, not a gap: #725/#726 made `COACH#{coach}_coach / PREDICTION#` the canonical
+        graded ledger (code-stamped ids, settled daily by
+        `coach_prediction_evaluator._update_prediction_status`, served to both MCP and the
+        public site), and explicitly VOIDED the legacy thread-embedded arrays as
+        "LLM-authored, ungradeable metadata"
+        (deploy/archive/onetime/void_legacy_predictions_726.py). What the thread copies
+        still earn their keep for is narrative continuity in the coach prompt, not grading.
+        Wiring a second resolver onto a deliberately-voided store would re-create the
+        double ledger #726 removed. Pinned so that wiring it later is a deliberate act."""
+        assert _live_references("update_prediction_status") == []
+        with open(os.path.join(ROOT, "lambdas", "coach", "coach_prediction_evaluator.py"), encoding="utf-8") as fh:
+            evaluator = fh.read()
+        assert "_update_prediction_status" in evaluator  # the canonical resolver, live
+        assert "PREDICTION#" in evaluator
 
 
 class TestIsoWeek:
@@ -1615,18 +1618,11 @@ class TestStampIdentity:
         out = ic.stamp_thread_predictions("sleep", [{"text": "HRV will rise", "metric": "hrv"}], today=TODAY)
         assert out[0]["target_date"] == "2026-08-22"
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (P2, VERIFIED) intelligence_common.py:1390 _prediction_slug truncates to the "
-            "first 40 characters, so two distinct claims sharing a 40-char prefix collapse to "
-            "one semantic_key and `stamped[key] = rec` (line 1480) silently drops the first. "
-            "'Your resting heart rate will fall below 55 bpm' and '...below 60 bpm' differ only "
-            "past char 40. It should hash the full text (or key on text+metric). Hurts Matthew: "
-            "a forecast the coach actually made is never recorded and never graded."
-        ),
-    )
     def test_two_claims_differing_past_forty_characters_stay_distinct(self, no_prior):
+        """FIXED (#1658, was xfail): `_prediction_slug` truncated to the first 40
+        characters, so two distinct forecasts sharing a 40-char prefix collapsed onto one
+        semantic_key and `stamped[key] = rec` silently dropped the first — a forecast the
+        coach actually made was never recorded and never graded. Pre-fix len(out) was 1."""
         out = ic.stamp_thread_predictions(
             "sleep",
             [
@@ -1636,22 +1632,26 @@ class TestStampIdentity:
             today=TODAY,
         )
         assert len(out) == 2
+        assert len({p["semantic_key"] for p in out}) == 2
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (P2, VERIFIED) intelligence_common.py:1462-1463 stamp_thread_predictions "
-            "carries a prior open prediction forward with `target_date: carried.get('target_date')` "
-            "and `first_seen: carried.get('first_seen') or carried.get('target_date')`. A prior "
-            "written before #725 has no target_date, so the re-emitted record gets "
-            "target_date=None — ungradeable, permanently pending, and re-carried every day "
-            "forever; and when only first_seen is missing, first_seen is back-filled from a "
-            "FUTURE date. It should re-stamp a missing deadline from today's timeframe and "
-            "leave first_seen honestly unknown. Hurts Matthew: a zombie prediction inflates "
-            "predictions_total and never resolves."
-        ),
-    )
+    def test_a_short_claim_keeps_the_canonical_slug_shared_with_coach_state_updater(self):
+        """The digest is added ONLY past 40 chars, so short claims still read the same
+        identity as the canonical COACH#/PREDICTION# path (coach_state_updater.py)."""
+        text = "HRV will rise"
+        assert ic._prediction_slug(text) == re.sub(r"[^a-z0-9]+", "_", text.lower()[:40]).strip("_")
+
+    def test_the_slug_is_a_pure_function_of_the_text(self):
+        """A key that varied by batch composition would re-mint a carried prediction."""
+        long_text = "Your resting heart rate will fall below 55 bpm within the fortnight"
+        assert ic._prediction_slug(long_text) == ic._prediction_slug(long_text)
+
     def test_a_carried_prediction_without_a_deadline_is_restamped_not_nulled(self, monkeypatch):
+        """FIXED (#1658, was xfail): a prior open prediction was carried forward with
+        `target_date: carried.get("target_date")`. A prior written before #725 has no
+        target_date, so the re-emitted record got target_date=None — ungradeable,
+        permanently pending, and re-carried every day forever, inflating predictions_total;
+        and `first_seen: … or carried.get("target_date")` back-filled first_seen from a
+        FUTURE date. Pre-fix target_date was None."""
         prior = {"prediction_id": "legacy", "semantic_key": "hrv_will_rise", "status": "pending"}
         monkeypatch.setattr(ic, "read_coach_thread", lambda coach_id, limit=10: [{"predictions": [prior]}])
         out = ic.stamp_thread_predictions("sleep", [{"text": "HRV will rise"}], today=TODAY)
@@ -1720,21 +1720,18 @@ class TestComputeCredibility:
         assert result["accuracy_pct"] == 0
         assert result["predictions_resolved"] == 0
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (P1, VERIFIED) intelligence_common.py:1587 compute_credibility has NO caller "
-            "in lambdas/ or mcp/ and its result is never persisted; the only live credibility "
-            "read (load_credibility, line 1629) reads SOURCE#coach_credibility#, which no module "
-            "writes. Combined with the unresolvable thread predictions above, the credibility "
-            "surface is dark end to end: it can only report 'nascent', never rise or fall. It "
-            "should be invoked by the daily coach pipeline and its output stored under the key "
-            "load_credibility reads. Hurts Matthew: the coaching layer's self-assessment is a "
-            "constant that looks like a measurement."
-        ),
-    )
-    def test_compute_credibility_has_a_live_caller(self):
-        assert _live_references("compute_credibility")
+    def test_compute_credibility_is_deliberately_uncalled_because_it_grades_a_voided_store(self):
+        """RECORD CORRECTED (#1658, was xfail "DEFECT P1"). The fact is right —
+        `compute_credibility` has no caller and its result is never persisted — but the
+        prescribed fix ("it should be invoked by the daily coach pipeline and its output
+        stored under the key load_credibility reads") would make things WORSE, not better:
+        its only input is `read_coach_thread`'s embedded predictions, the store #726 voided
+        as ungradeable. Persisting a credibility score computed from a deliberately-voided
+        ledger would publish a measurement-shaped number with no measurement behind it —
+        the ADR-104 violation the finding was trying to close. The live honesty gap is the
+        READER, not this writer (see TestPreambleCredibility). Pinned so a future call site
+        has to argue with this."""
+        assert _live_references("compute_credibility") == []
 
 
 class TestLoadCredibility:
@@ -1896,55 +1893,51 @@ class TestBuildersParadox:
         result, _table = self._run(monkeypatch, todoist=[real_row])
         assert result["platform_tasks"] == 17
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (P1, VERIFIED) intelligence_common.py:1046-1068 compute_builders_paradox_score "
-            "maps a total data absence (every component 0) to score=50, which falls in the "
-            "'tipping' band and prints 'Platform activity is outpacing health behaviors — watch "
-            "this trend' alongside '0 platform tasks completed, 0 workouts'. That is an "
-            "assertion about behaviour derived from no observations — the ADR-104 "
-            "behavioural-absence violation in its purest form. It should return an explicit "
-            "'insufficient data' label with no score. Hurts Matthew: on any day the pipes are "
-            "quiet the coach tells him the platform is winning, citing nothing."
-        ),
-    )
     def test_no_data_is_reported_as_no_data_not_as_a_midpoint_verdict(self, monkeypatch):
+        """FIXED (#1658, was xfail): a total absence of observations mapped to score=50,
+        which lands in the "tipping" band and printed "Platform activity is outpacing
+        health behaviors — watch this trend" alongside "0 platform tasks completed, 0
+        workouts" — a behavioural verdict derived from no behaviour, the purest ADR-104
+        violation. Pre-fix label was "tipping" and the interpretation carried "outpacing"."""
         result, _table = self._run(monkeypatch)
-        assert result["label"] not in ("tipping", "displaced")
+        assert result["label"] == "insufficient_data"
+        assert result["score"] is None
         assert "outpacing" not in result["interpretation"]
+        assert "not enough to score" in result["interpretation"]
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (P2, VERIFIED) intelligence_common.py:1027 compute_builders_paradox_score "
-            "builds its step series with `if i.get('steps')`, which is falsy for a genuine "
-            "0-step day, so zero-movement days are dropped from the mean instead of pulling it "
-            "down. It should filter on presence (`'steps' in i`), not truth. Hurts Matthew: a "
-            "week with two sedentary days reports the average of the active ones — the health "
-            "side of the paradox ratio is systematically flattered."
-        ),
-    )
+    def test_the_paradox_block_is_not_injected_into_the_mind_prompt_when_unscored(self):
+        """Union check: the one live caller interpolates `score`/100 into a coach prompt,
+        so an unscored window must be skipped there rather than rendered as "None/100"."""
+        path = os.path.join(ROOT, "lambdas", "intelligence", "ai_expert_analyzer_lambda.py")
+        with open(path, encoding="utf-8") as fh:
+            src = fh.read()
+        assert 'bp.get("label") == "insufficient_data"' in src
+        assert src.index('bp.get("label") == "insufficient_data"') < src.index("BUILDER'S PARADOX CHECK")
+
     def test_a_zero_step_day_is_averaged_in_rather_than_dropped(self, monkeypatch):
-        # steps 0, 0, 9000 -> honest mean 3000; the code returns 9000
+        """FIXED (#1658, was xfail): the step series was built with `if i.get("steps")`,
+        falsy for a genuine 0-step day, so sedentary days were dropped from the mean
+        instead of pulling it down and the health side of the ratio was systematically
+        flattered. Pre-fix avg_steps was 9000 for this series."""
+        # steps 0, 0, 9000 -> honest mean 3000
         result, _table = self._run(monkeypatch, garmin=[{"steps": 0}, {"steps": 0}, {"steps": 9000}])
         assert result["avg_steps"] == 3000
+        assert result["step_days"] == 3
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (P2, VERIFIED, ADR-105) intelligence_common.py:1013-1014 + 1072-1083 "
-            "compute_builders_paradox_score publishes habit_adherence_pct and avg_steps as "
-            "point estimates with no sample size — line 1014 computes `len(pcts)` and discards "
-            "it in a statement with no effect. A 7-day window that observed one habit row and "
-            "one step row is presented identically to one that observed seven. ADR-105 requires "
-            "n on every statistical claim. Hurts Matthew: a mean over n=1 reads as a weekly "
-            "average."
-        ),
-    )
+    def test_a_non_numeric_step_value_is_skipped_rather_than_crashing_the_score(self, monkeypatch):
+        """Filtering on presence rather than truth means a garbage value now reaches
+        float() — it must be skipped, not raised, and must not count toward n."""
+        result, _table = self._run(monkeypatch, garmin=[{"steps": "n/a"}, {"steps": 4000}])
+        assert (result["avg_steps"], result["step_days"]) == (4000, 1)
+
     def test_the_averaged_components_publish_their_sample_size(self, monkeypatch):
+        """FIXED (#1658, was xfail, ADR-105): habit_adherence_pct and avg_steps shipped as
+        point estimates with no sample size — the code even computed `len(pcts)` and
+        discarded it in a statement with no effect. A 7-day window that observed one habit
+        row read identically to one that observed seven. Pre-fix neither key existed."""
         result, _table = self._run(monkeypatch, habitify=[{"completion_pct": Decimal("0.5")}], garmin=[{"steps": 5000}])
-        assert {"habit_days", "step_days"} & set(result)
+        assert (result["habit_days"], result["step_days"]) == (1, 1)
+        assert "n=1 days" in result["interpretation"]
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -2026,22 +2019,17 @@ class TestCompleteAction:
         with pytest.raises(RuntimeError):
             ic.complete_action("a1")
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (P2, VERIFIED) intelligence_common.py:903-912 complete_action issues an "
-            "unconditional update_item, and DynamoDB update_item UPSERTS. Completing an action "
-            "id that does not exist silently CREATES a SOURCE#coach_actions# row whose only "
-            "attributes are status=completed + completion_date — a phantom completed action with "
-            "no text, domain or issue date, which then flows into get_action_history and the "
-            "coach preamble. It should carry ConditionExpression=attribute_exists(pk). Hurts "
-            "Matthew: the accountability record can gain completions for work never assigned."
-        ),
-    )
     def test_completing_an_unknown_action_does_not_mint_a_phantom_record(self, wired):
+        """FIXED (#1658, was xfail): complete_action issued an unconditional update_item,
+        and DynamoDB update_item UPSERTS — completing an id that does not exist silently
+        CREATED a SOURCE#coach_actions# row carrying only status=completed +
+        completion_date, a phantom completed action with no text, domain or issue date,
+        which then flowed into get_action_history and the coach preamble. Pre-fix no
+        ConditionExpression was sent."""
         table, _s3 = wired
         ic.complete_action("does-not-exist")
         assert "ConditionExpression" in table.updates[0]
+        assert type(table.updates[0]["ConditionExpression"]).__name__ == "AttributeExists"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -2092,33 +2080,22 @@ class TestGoalsLoader:
         assert config["start_weight_lbs"] == EXPERIMENT_BASELINE_WEIGHT_LBS
 
 
-class TestDetectionRulesLoader:
-    def test_a_successful_load_is_cached(self, monkeypatch):
-        s3 = FakeS3({"config/action_detection_rules.json": {"rules": [{"id": "r1"}], "version": "3"}})
-        monkeypatch.setattr(ic, "s3", s3)
-        assert ic._load_detection_rules()["version"] == "3"
-        ic._load_detection_rules()
-        assert len(s3.gets) == 1
+class TestDetectionRulesLoaderIsGone:
+    """FIXED (#1658, was xfail): `_load_detection_rules` had no caller anywhere in
+    lambdas/ or mcp/ — the action-completion detection loop that consumed
+    config/action_detection_rules.json was removed by #1239 and the loader plus its two
+    cache globals were left behind, shipping in every bundle (#781). Auto-detection of
+    completed coach actions would be a new feature, not a repair, so the dead loader is
+    deleted rather than left looking like a live path. Pre-fix all three of these
+    attributes existed."""
 
-    def test_a_failed_load_returns_an_empty_ruleset_and_is_not_cached(self, monkeypatch):
-        monkeypatch.setattr(ic, "s3", FakeS3(error=RuntimeError("throttled")))
-        assert ic._load_detection_rules() == {"rules": [], "expiry_days": 14, "version": "0"}
-        monkeypatch.setattr(ic, "s3", FakeS3({"config/action_detection_rules.json": {"rules": [], "version": "9"}}))
-        assert ic._load_detection_rules()["version"] == "9"
+    def test_the_dead_loader_and_its_cache_globals_no_longer_ship(self):
+        for name in ("_load_detection_rules", "_detection_rules_cache", "_detection_rules_cache_ts", "_DETECTION_RULES_CACHE_TTL"):
+            assert not hasattr(ic, name), name
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (P3, VERIFIED) intelligence_common.py:798 _load_detection_rules has no "
-            "caller in lambdas/ or mcp/ — the action-completion detection loop (Workstream 3) "
-            "that consumed config/action_detection_rules.json was removed by #1239 and the "
-            "loader plus its cache globals were left behind, shipping in every bundle (#781). "
-            "It should be deleted or wired. Hurts Matthew indirectly: coach actions are never "
-            "auto-detected as complete, so the accountability loop stays manual."
-        ),
-    )
-    def test_the_detection_rules_loader_has_a_live_caller(self):
-        assert _live_references("_load_detection_rules")
+    def test_nothing_in_the_shipping_surface_still_reads_the_rules_object(self):
+        """The S3 object may outlive the code; no bundle should read it."""
+        assert _live_string_literals_containing("action_detection_rules") == []
 
 
 # ══════════════════════════════════════════════════════════════════════════════
