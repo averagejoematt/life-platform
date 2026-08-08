@@ -519,3 +519,18 @@ def _confidence_badge(level):
         "font-size:9px;font-weight:700;letter-spacing:0.08em;"
         'font-family:-apple-system,sans-serif;white-space:nowrap;">' + label + "</span>"
     )
+
+
+def coerce_int(value):
+    """int(float(value)) or None — absence and garbage both read as absence.
+
+    #2221: the daily brief's pre-computed read path used a bare `int(float(...))`
+    on cells written by another Lambda, so one "—" placeholder raised ValueError
+    out of lambda_handler and lost the whole morning email.
+    """
+    if value is None:
+        return None
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return None

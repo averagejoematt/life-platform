@@ -170,6 +170,7 @@ from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DA
 from content import html_builder, output_writers
 from experiment import phase_taxonomy  # ADR-077: the class registry the reads derive from (#2089)
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from ingestion import source_registry  # #2003: the canonical freshness set + thresholds
 from intelligence import weight_recency  # #1894/#1924: a weigh-in carries its own date
 from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
@@ -188,7 +189,7 @@ ai_calls.init(
 # ==============================================================================
 
 
-from common.digest_utils import d2f, get_food_delivery_streak_state, safe_float  # shared bundled helpers (#970)
+from common.digest_utils import coerce_int, d2f, get_food_delivery_streak_state, safe_float  # shared bundled helpers (#970)
 
 
 def avg(vals):
@@ -354,22 +355,16 @@ def fetch_range(source, start, end):
 # The source SET and the thresholds are module-level so they are derivable by a
 # guard (a list buried inside lambda_handler could not be checked against
 # phase_taxonomy) and so the scan itself is testable without running the brief.
-STALENESS_SOURCES = [
-    "whoop",
-    "withings",
-    "strava",
-    "todoist",
-    "apple_health",
-    "eightsleep",
-    "macrofactor",
-    "garmin",
-    "habitify",
-    "food_delivery",
-    "measurements",
-    "notion",
-]
-STALENESS_DEFAULT_THRESHOLD_DAYS = 2
-STALENESS_THRESHOLD_OVERRIDE_DAYS = {"food_delivery": 90, "measurements": 60}
+#
+# #2221: these were hand-kept literals — a SECOND opinion on freshness that
+# disagreed with the canonical one on most of the list (withings 48h vs 168h,
+# todoist 48 vs 72, macrofactor 48 vs 96, food_delivery 2160 vs 336) and still
+# watched `garmin`, which ADR-074 paused. So the banner cried wolf on four healthy
+# sources daily and never reported a food-delivery pipe dead for 76 days. Both
+# paths now derive from source_registry, the canonical home per #2003.
+STALENESS_SOURCES = sorted(source_registry.checker_sources())
+STALENESS_DEFAULT_THRESHOLD_DAYS = source_registry.DEFAULT_STALE_HOURS / 24
+STALENESS_THRESHOLD_OVERRIDE_DAYS = {k: h / 24 for k, h in source_registry.stale_hours_overrides(STALENESS_SOURCES).items()}
 
 
 def scan_stale_sources(today_d, user_id=None):
@@ -496,8 +491,14 @@ def _normalize_whoop_sleep(item):
             ("rem_sleep_hours", "rem_pct"),
             ("light_sleep_hours", "light_pct"),
         ]:
+            # ADR-104 (#2221): `out.get(src_field, 0)` published a factual 0.0%
+            # deep/rem/light for an absent staging breakdown (partial sync, nap-only
+            # night), and write_clinical_json's 30-day `is not None` average dragged
+            # toward zero on every such night. Absence stays absent.
+            if out.get(src_field) is None:
+                continue
             try:
-                hrs = float(out.get(src_field, 0))
+                hrs = float(out[src_field])
                 if pct_field not in out:
                     out[pct_field] = round(hrs / dur * 100, 1)
             except (TypeError, ValueError):
@@ -625,8 +626,11 @@ def gather_daily_data(profile, yesterday):
 
     hrv_7d_recs = fetch_range("whoop", (today - timedelta(days=7)).isoformat(), yesterday)
     hrv_30d_recs = fetch_range("whoop", (today - timedelta(days=30)).isoformat(), yesterday)
-    hrv_7d_vals = [float(r["hrv"]) for r in hrv_7d_recs if "hrv" in r]
-    hrv_30d_vals = [float(r["hrv"]) for r in hrv_30d_recs if "hrv" in r]
+    # #2221 (P1 crash): key-presence (`if "hrv" in r`) let an explicit NULL hrv cell
+    # reach float(None) → TypeError out of the unwrapped gather_daily_data call, and
+    # one bad cell cost the whole brief. Filter on the VALUE, as safe_float does.
+    hrv_7d_vals = [v for v in (safe_float(r, "hrv") for r in hrv_7d_recs) if v is not None]
+    hrv_30d_vals = [v for v in (safe_float(r, "hrv") for r in hrv_30d_recs) if v is not None]
 
     strava_60d = fetch_range("strava", (today - timedelta(days=60)).isoformat(), yesterday)
     tsb = compute_tsb(strava_60d, today)
@@ -662,14 +666,11 @@ def gather_daily_data(profile, yesterday):
     weight_recency_facts = weight_recency.summarize_weight_readings(withings_recent, today.isoformat())
 
     withings_14d = fetch_range("withings", (today - timedelta(days=14)).isoformat(), yesterday)
-    week_ago_weight = None
+    # #2221: one definition, one place — the compute Lambda resolves the same
+    # concept through this helper, so the weekly delta no longer flips on which
+    # pipeline ran.
     target_date = (today - timedelta(days=7)).isoformat()
-    for w in withings_14d:
-        d = w.get("sk", "").replace("DATE#", "")
-        if d <= target_date:
-            wt = safe_float(w, "weight_lbs")
-            if wt:
-                week_ago_weight = wt
+    week_ago_weight = weight_recency.week_ago_weight(withings_14d, target_date)
 
     # Avatar weight: 30-day lookback so avatar doesn't reset to frame 1 on missed weigh-ins
     avatar_weight = latest_weight
@@ -974,6 +975,11 @@ def fetch_anomaly_record(date_str):
 def compute_tsb(strava_60d, today):
     # #490: shared TSS-like scale (walks count via the moving-time fallback) so this
     # fallback bands the same way as the computed_metrics value it stands in for.
+    # ADR-104 (#2221): an EMPTY window is not "balanced form" — banister() returns
+    # 0.0 for no load, which compute_readiness turned into a clamp(60+0×2)=60
+    # mid-scale component, so readiness read 60/yellow on the strength of nothing.
+    if not strava_60d:
+        return None
     _ctl, _atl, tsb = training_load.compute_ctl_atl_tsb(strava_60d, today)
     return tsb
 
@@ -1853,9 +1859,16 @@ def lambda_handler(event, context):
                     else:
                         logger.info(f"Using pre-computed metrics for {yesterday} (age: {_age_hours:.1f}h)")
                 except Exception as _ts_e:
+                    # #2221: an unparseable stamp is an UNKNOWN age, not a fresh row.
+                    _compute_stale = True
+                    _compute_age_msg = "age unknown (unparseable computed_at)"
                     logger.warning("REL-1: could not parse computed_at: " + str(_ts_e))
             else:
-                logger.info("Using pre-computed metrics for " + yesterday)
+                # #2221: a row with NO computed_at was declared fresh on the basis of
+                # nothing — the shape a partial write leaves. Unknown age is stale.
+                _compute_stale = True
+                _compute_age_msg = "age unknown (no computed_at)"
+                logger.warning("REL-1: computed_metrics for " + yesterday + " carries no computed_at — treating as stale")
         else:
             _compute_stale = True
             _compute_age_msg = "not available"
@@ -1894,10 +1907,14 @@ def lambda_handler(event, context):
 
     if _computed:
         # Read pre-computed values — daily-metrics-compute already stored day_grade + habit_scores
+        # #2221 (P1 crash): unwrapped, a single non-numeric cell (an "—" placeholder,
+        # a stringified None — shapes a partial compute write produces) raised
+        # ValueError out of lambda_handler and lost the whole brief. A malformed
+        # cell costs the day grade, not the email.
         _cm_score = _computed.get("day_grade_score")
-        day_grade_score = int(float(_cm_score)) if _cm_score is not None else None
+        day_grade_score = coerce_int(_cm_score)
         grade = _computed.get("day_grade_letter", "—")
-        component_scores = {k: int(float(v)) if v is not None else None for k, v in _computed.get("component_scores", {}).items()}
+        component_scores = {k: coerce_int(v) for k, v in _computed.get("component_scores", {}).items()}
         component_details = _computed.get("component_details", {})
         # Overwrite data dict with pre-computed derived values for HTML rendering
         if _computed.get("tsb") is not None:

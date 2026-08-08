@@ -165,3 +165,40 @@ you cite it at all, date it explicitly ("as of {data.get('current_weight_as_of')
 weight-change figure below spans {data.get('weight_change_span_days')} days — describe that
 actual span, never assume four weeks.
 """
+
+
+# ── The "week ago" weigh-in — ONE definition (#2221) ──────────────────────────
+#
+# daily_brief_lambda and daily_metrics_compute_lambda both derived "the weight
+# seven days ago" from the same ascending 14-day Withings window, and disagreed:
+# the brief kept the LAST match (the newest weigh-in at or before day-7), the
+# compute Lambda took `next(...)` (the FIRST — i.e. a reading up to 14 days old).
+# lambda_handler lets the compute value overwrite the brief's whenever a
+# computed_metrics row exists, so the weekly delta the reader sees flipped
+# depending on which pipeline ran, and the figure published as `weight_delta_7d`
+# (#1917 renamed it FOR honesty) could silently span 14 days on the compute path.
+#
+# The newest reading at or before the target is the correct one: it is the
+# closest to the seven-day mark, so the delta actually covers about the window
+# its name claims. Both callers now resolve through here.
+def week_ago_weight(withings_window, target_date, weight_field="weight_lbs"):
+    """The newest weigh-in at or before `target_date` (an ISO date string).
+
+    `withings_window` is the raw DDB item list (sk `DATE#YYYY-MM-DD`), in any
+    order. Returns a float, or None when the window holds no qualifying reading.
+    """
+    best_date = None
+    best_value = None
+    for item in withings_window or []:
+        d = str(item.get("sk", "")).replace("DATE#", "")[:10]
+        if not d or d > target_date:
+            continue
+        try:
+            value = float(item.get(weight_field))
+        except (TypeError, ValueError):
+            continue
+        if not value:
+            continue
+        if best_date is None or d >= best_date:
+            best_date, best_value = d, value
+    return best_value

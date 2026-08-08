@@ -246,14 +246,21 @@ def test_staleness_scan_does_not_phase_filter(monkeypatch):
 
 
 def test_long_threshold_sources_no_longer_false_alarm_every_cycle(monkeypatch):
-    """The concrete cost of the bug. food_delivery (90d) and measurements (60d)
-    have deliberately long thresholds because their newest row is legitimately
-    old — which also guarantees it is pre-genesis and pilot-tagged. Phase-filtered,
+    """The concrete cost of the bug. food_delivery and measurements have
+    deliberately long thresholds because their newest row is legitimately old —
+    which also guarantees it is pre-genesis and pilot-tagged. Phase-filtered,
     both reported "no data" on Day 1 of every cycle; cross-phase they report their
-    true age and stay silent while inside their threshold."""
+    true age and stay silent while inside their threshold.
+
+    #2221: the ages are derived from the module's own thresholds, which now come
+    from source_registry rather than a hand-kept literal (food_delivery was 90d
+    here against the registry's 14d — the brief was UNDER-reporting a genuinely
+    stale food-delivery pipe for 76 days).
+    """
     last_seen = {src: _TODAY - timedelta(days=1) for src in brief.STALENESS_SOURCES}
-    last_seen["food_delivery"] = _TODAY - timedelta(days=30)  # inside the 90d threshold
-    last_seen["measurements"] = _TODAY - timedelta(days=30)  # inside the 60d threshold
+    for _long in ("food_delivery", "measurements"):
+        _inside = max(1, int(brief.STALENESS_THRESHOLD_OVERRIDE_DAYS[_long]) - 1)
+        last_seen[_long] = _TODAY - timedelta(days=_inside)
     monkeypatch.setattr(brief, "table", PhaseAwareFakeTable(_brief_rows(last_seen)))
     assert brief.scan_stale_sources(_TODAY) == []
 
@@ -274,10 +281,14 @@ def test_a_genuinely_stale_source_still_alarms_with_its_true_age(monkeypatch):
 def test_a_source_that_never_wrote_is_still_reported_no_data(monkeypatch):
     """An empty partition is genuinely 'no data' — that branch is preserved; the
     bug was that a NON-empty partition also produced it."""
-    last_seen = {src: _TODAY for src in brief.STALENESS_SOURCES if src != "garmin"}
+    # #2221: the absent source is picked off the module's own (now registry-derived)
+    # list rather than named — `garmin` used to be the literal here, and it left the
+    # set when the brief stopped watching a deliberately paused source.
+    _absent = brief.STALENESS_SOURCES[0]
+    last_seen = {src: _TODAY for src in brief.STALENESS_SOURCES if src != _absent}
     monkeypatch.setattr(brief, "table", PhaseAwareFakeTable(_brief_rows(last_seen)))
     stale = brief.scan_stale_sources(_TODAY)
-    assert [(s["source"], s["age_days"]) for s in stale] == [("garmin", None)]
+    assert [(s["source"], s["age_days"]) for s in stale] == [(_absent, None)]
 
 
 def test_staleness_scan_survives_every_day_of_the_opening_week(monkeypatch):

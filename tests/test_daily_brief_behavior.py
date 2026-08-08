@@ -83,6 +83,7 @@ try:
     from experiment import phase_taxonomy as tax  # noqa: E402
     from experiment.phase_filter import PHASE_FILTER_EXPRESSION  # noqa: E402
     from ingestion import source_registry as registry  # noqa: E402
+    from intelligence import weight_recency  # noqa: E402
 except ImportError as _e:  # pragma: no cover — only when the bundle layout changes
     _import_err = _e
     brief = None  # type: ignore
@@ -474,20 +475,6 @@ class TestNormaliseWhoopSleep:
         out = brief._normalize_whoop_sleep({"slow_wave_sleep_hours": 1.4})
         assert "deep_pct" not in out
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:498-503 (_normalize_whoop_sleep): the staging derivation reads "
-            "`float(out.get(src_field, 0))`, so a Whoop record that carries a duration but NO staging "
-            "breakdown (a partial sync, or a nap-only night) gets deep_pct/rem_pct/light_pct = 0.0 — a "
-            "fabricated factual zero for an absent measurement. It should leave the field unset. "
-            "This is not cosmetic: output_writers.write_clinical_json:882-889 averages deep_pct/rem_pct "
-            "over 30 days filtering on `is not None`, so every staging-less night silently drags the "
-            "clinical 30-day average deep-sleep % toward zero. Hurts: Matthew, and anyone reading the "
-            "clinical JSON. (The email itself is protected only by accident — html_builder.py:811 "
-            "tests truthiness, so 0.0 renders as an em dash.)"
-        ),
-    )
     def test_absent_staging_is_absence_not_zero_percent(self):
         out = brief._normalize_whoop_sleep({"sleep_duration_hours": 7.0})
         assert out.get("deep_pct") is None, f"fabricated deep_pct={out.get('deep_pct')}"
@@ -864,19 +851,6 @@ class TestComputeReadiness:
         score, _ = brief.compute_readiness(_readiness_data(primary_whoop={"recovery_score": 30}, whoop={"recovery_score": 86}))
         assert score == 30
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:1290-1292 (compute_readiness) reads `data['tsb']`, which "
-            "gather_daily_data:631 always populates from training_load.compute_ctl_atl_tsb — and that "
-            "returns 0.0, never None, for an EMPTY 60-day Strava window. So a period with no training "
-            "data at all contributes a readiness component of clamp(60 + 0×2) = 60, a fabricated "
-            "mid-scale 'neutral form' from no measurement (ADR-104). On a day when recovery and sleep "
-            "are also absent, readiness is reported as 60/yellow on the strength of nothing. It should "
-            "distinguish 'no training data' from 'balanced form'. Hurts: Matthew, and the public "
-            "site — the same value ships as `tsb_form` in public_stats.json."
-        ),
-    )
     def test_an_empty_training_window_does_not_manufacture_a_neutral_form_component(self):
         empty_tsb = brief.compute_tsb([], date(2026, 8, 7))
         assert empty_tsb is None, f"an empty Strava window produced tsb={empty_tsb} rather than absence"
@@ -1234,18 +1208,6 @@ class TestGatherDailyData:
             table.store[(r["pk"], r["sk"])] = r
         assert brief.gather_daily_data(PROFILE, YESTERDAY)["primary_whoop"]["recovery_score"] == 86.0
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:627-628 (gather_daily_data): "
-            "`[float(r['hrv']) for r in hrv_7d_recs if 'hrv' in r]` tests for KEY PRESENCE, not for a "
-            "value. A DynamoDB row that carries an explicit NULL `hrv` (boto3 returns it as None — a "
-            "shape whoop_lambda can write on a partial sync) makes float(None) raise TypeError inside "
-            "gather_daily_data, which lambda_handler does NOT wrap: the exception escapes and the "
-            "ENTIRE brief is lost for that day. It should filter on the value the way safe_float does. "
-            "Hurts: Matthew — one malformed cell costs the whole morning email. Severity P1 (crash)."
-        ),
-    )
     def test_one_null_hrv_cell_does_not_cost_the_whole_brief(self, table):
         good = whoop_row(YESTERDAY, hrv=Decimal("58"))
         bad = whoop_row("2026-08-05", hrv=None)
@@ -1254,32 +1216,36 @@ class TestGatherDailyData:
         data = brief.gather_daily_data(PROFILE, YESTERDAY)
         assert data["hrv"]["hrv_7d"] == 58.0
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:666-671 (gather_daily_data) picks week_ago_weight with a LAST-WINS "
-            "loop over an ascending 14-day window — the NEWEST weigh-in at or before day-7. "
-            "daily_metrics_compute_lambda.py:1030-1037 implements the same concept as `next(...)` over "
-            "the same ascending window — the OLDEST, i.e. a reading up to 14 days old. One concept, two "
-            "answers, and lambda_handler:1864-1865 lets the compute value overwrite the brief's whenever "
-            "computed_metrics exists — so the weekly weight delta the reader sees flips depending on "
-            "whether a pipeline ran, and the figure published as `weight_delta_7d` (#1917 renamed it for "
-            "honesty) can span up to 14 days on the compute path. One definition, one place. "
-            "Hurts: Matthew and every reader of public_stats.json / the weekly-signal email."
-        ),
-    )
     def test_week_ago_weight_agrees_with_the_compute_lambdas_definition(self, table):
+        """#2221 — one concept, one implementation.
+
+        The brief kept the LAST match of a loop over the ascending 14-day window
+        (the NEWEST weigh-in at or before day-7); daily_metrics_compute_lambda
+        took `next(...)` over the same window (the OLDEST — a reading up to 14
+        days old). lambda_handler lets the compute value overwrite the brief's
+        whenever a computed_metrics row exists, so the weekly delta flipped on
+        which pipeline ran, and `weight_delta_7d` — a name #1917 gave it FOR
+        honesty — could span 14 days on the compute path.
+
+        CORRECTION to the marker's implied remedy: it is the COMPUTE lambda that
+        was wrong, not the brief. The newest reading at or before the target is
+        the one closest to the seven-day mark, so both callers now resolve
+        through `weight_recency.week_ago_weight` and the compute lambda's
+        `next(...)` is gone. This asserts the shared definition AND that the
+        other caller really routes through it — a value-only assertion would
+        pass again the moment someone re-derived it locally.
+        """
         # Two weigh-ins at or before the day-7 target (2026-07-31): 07-26 and 07-30.
         for d, wt in (("2026-07-26", 325.0), ("2026-07-30", 320.0), (YESTERDAY, 317.0)):
             r = withings_row(d, wt)
             table.store[(r["pk"], r["sk"])] = r
         brief_value = brief.gather_daily_data(PROFILE, YESTERDAY)["week_ago_weight"]
         withings_14d = brief.fetch_range("withings", D14, YESTERDAY)
-        compute_value = next(
-            (float(w["weight_lbs"]) for w in withings_14d if w.get("sk", "").replace("DATE#", "") <= D7 and w.get("weight_lbs")),
-            None,
-        )
-        assert brief_value == compute_value, f"brief says {brief_value}, daily-metrics-compute says {compute_value}"
+        assert brief_value == weight_recency.week_ago_weight(withings_14d, D7) == 320.0
+
+        compute_src = (REPO_ROOT / "lambdas" / "compute" / "daily_metrics_compute_lambda.py").read_text()
+        assert "weight_recency.week_ago_weight(" in compute_src, "the compute lambda no longer shares the definition"
+        assert "week_ago_weight = next(" not in compute_src, "the compute lambda re-derived week_ago_weight locally"
 
     @pytest.mark.xfail(
         strict=False,
@@ -1325,24 +1291,6 @@ class TestStalenessScanAgainstTheRegistry:
         for src in brief.STALENESS_SOURCES:
             assert tax.classify(brief.USER_PREFIX + src) in never_hidden, src
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:356-371: STALENESS_SOURCES / "
-            "STALENESS_DEFAULT_THRESHOLD_DAYS / STALENESS_THRESHOLD_OVERRIDE_DAYS are a hand-maintained "
-            "second opinion on freshness, while scan_stale_sources' own docstring (line 385 region) "
-            "claims it 'Reads the SAME freshness logic the freshness-checker Lambda + "
-            "get_freshness_status MCP tool use'. It does not: freshness_checker_lambda.py:45-48 derives "
-            "its set and its thresholds from ingestion/source_registry.py "
-            "(`checker_sources()` + `stale_hours_overrides()`), the canonical home per #2003. The two "
-            "disagree on most of the list — withings (registry 168h, brief 48h), todoist (72h vs 48h), "
-            "macrofactor (96h vs 48h — the registry says it is '~24h behind by design'), notion (336h vs "
-            "48h) and food_delivery (336h vs 2160h) — so the banner cries wolf on four sources that are "
-            "behaving normally and under-reports the one that is not. It should derive from the "
-            "registry. Hurts: Matthew — a banner that fires every morning is a banner he stops reading, "
-            "and it explicitly tells him his day grade may be wrong."
-        ),
-    )
     def test_the_scans_thresholds_agree_with_the_canonical_source_registry(self):
         overrides = registry.stale_hours_overrides(brief.STALENESS_SOURCES)
         mismatched = {}
@@ -1353,19 +1301,6 @@ class TestStalenessScanAgainstTheRegistry:
                 mismatched[src] = (brief_hours, canonical)
         assert not mismatched, f"brief-vs-registry threshold drift: {mismatched}"
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:356-369: STALENESS_SOURCES still lists `garmin`, which "
-            "source_registry marks `paused: True` (ADR-074 — no EventBridge rule, deliberately not "
-            "ingesting). The canonical freshness path excludes paused sources from "
-            "`checker_sources()` precisely so they cannot alarm. The brief therefore prints "
-            "'garmin — last update … (Nd ago)' in the ⚠️ Data Status banner EVERY morning, forever, for "
-            "a source that is off on purpose. It should derive the set from `checker_sources()`. "
-            "Hurts: Matthew — a permanent false line in the one banner that is supposed to mean "
-            "'today's grade may not be real'."
-        ),
-    )
     def test_the_scan_never_watches_a_deliberately_paused_source(self):
         watched = set(brief.STALENESS_SOURCES)
         paused = {k for k, v in registry.SOURCE_REGISTRY.items() if v.get("paused")}
@@ -1865,19 +1800,6 @@ class TestComputeStaleness:
         assert metric["MetricName"] == "ComputePipelineStaleness"
         assert metric["Value"] == 1.0
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:1804-1805 (lambda_handler): when a computed_metrics row exists but "
-            "carries NO `computed_at`, the else-branch logs 'Using pre-computed metrics' and leaves "
-            "_compute_stale False — the row is declared fresh on the basis of nothing. The same happens "
-            "at 1802-1803 when computed_at is present but unparseable. Both are exactly the shapes a "
-            "partial write or a schema change produces, and both suppress the reader-facing 'data may "
-            "be estimated' banner AND report 0.0 to the ComputePipelineStaleness alarm. Unknown age "
-            "should be treated as stale, not as fresh. Hurts: Matthew — a brief built on a month-old "
-            "row presents itself as today's."
-        ),
-    )
     def test_a_row_with_no_timestamp_is_not_declared_fresh(self, handler_env):
         r = computed_row()
         del r["computed_at"]
@@ -1885,18 +1807,6 @@ class TestComputeStaleness:
         stale, _ = self._run_and_get_stale_flag(handler_env)
         assert stale is True, "a computed row of unknown age was presented as current"
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:1842-1847 (lambda_handler): the pre-computed branch is NOT wrapped in "
-            "a try — `int(float(_cm_score))` and the `component_scores` comprehension raise ValueError "
-            "on any non-numeric cell (an empty string, an '—' placeholder, a stringified None). The "
-            "exception escapes lambda_handler and the entire brief is lost, where the inline fallback "
-            "path immediately below (1887-1892) catches exactly this and degrades to defaults. One "
-            "malformed cell in a compute output should cost the day grade, not the email. "
-            "Hurts: Matthew. Severity P1 (crash)."
-        ),
-    )
     def test_a_malformed_pre_computed_cell_does_not_lose_the_whole_brief(self, handler_env):
         r = computed_row(day_grade_score="—")
         handler_env["table"].store[(r["pk"], r["sk"])] = r
