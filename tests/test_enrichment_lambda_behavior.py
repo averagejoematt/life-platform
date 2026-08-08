@@ -959,34 +959,160 @@ def test_the_strava_source_re_fetches_days_that_are_already_stored():
     assert sv._config.refresh_today is True
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P1): activity-enrichment's entire output is "
-        "destroyed by the next Strava ingest of the same day. strava_lambda's "
-        "IngestionConfig sets refresh_trailing_days=3 + refresh_today=True, so "
-        "ingestion_framework.py:397-398 forces the last three days to be re-fetched "
-        "on EVERY run; transform() (strava_lambda.py:296) rebuilds the day record "
-        "from the API response alone, and the framework stores it with a full "
-        "put_item replace (ingestion_framework.py:468 / safe_put_item:143-149), not a "
-        "merge. Enrichment writes `enriched_name` into the nested activities at "
-        "cron(30 15) and strava-data-ingestion re-runs at cron(10 <18 hours/day>) — "
-        "so the label survives roughly 40 minutes and is then gone, and enrichment "
-        "only ever revisits YESTERDAY, so it is never rebuilt. Net effect: the "
-        "enriched label is permanently absent for essentially every day, and "
-        "site_api_autonomic, site_api_vitals_depth, the weekly + monthly digest "
-        "emails and mcp/tools_data.search_activities all silently fall back to the "
-        "raw Strava name. (Consistent with the observation recorded in "
-        "docs/specs/SPEC_RECOVERY_ADAPTIVE_AUTHORING_2026-06-21.md B1: 'the one clean "
-        "walk carried an enriched_name; the others didn't'.)"
-    ),
-)
+# ── The real store path, not a simulation of it ───────────────────────────────
+# #2250 is fixed in `ingestion_framework._store_item`, so the durability tests
+# below drive THAT function with a bounded fake table. Asserting against a
+# hand-rolled "simulated replace" would pin the simulation, not the pipeline.
+
+
+class StoreTable:
+    """`get_item`/`put_item` stand-in for the framework's store path.
+
+    Holds exactly one item (the day being re-ingested) and records every call, so
+    a test can assert both the merged result AND whether the read happened at all.
+    """
+
+    def __init__(self, item=None, get_raises=None):
+        self.item = item
+        self.puts = []
+        self.get_calls = []
+        self.get_raises = get_raises
+
+    def get_item(self, Key):
+        self.get_calls.append(Key)
+        if self.get_raises:
+            raise self.get_raises
+        return {"Item": self.item} if self.item is not None else {}
+
+    def put_item(self, Item):
+        self.puts.append(Item)
+        self.item = Item
+        return {}
+
+
+def _reingest(stored_day, fresh_day, config=None):
+    """Store `fresh_day` over `stored_day` through the framework's real path.
+
+    Returns the item that actually reached `put_item` — i.e. what the next
+    reader of that partition would see.
+    """
+    import logging
+
+    from ingestion import ingestion_framework as fw
+
+    date_str = fresh_day["date"]
+    key = {"pk": f"{en.USER_PREFIX}strava", "sk": f"DATE#{date_str}"}
+    table = StoreTable({**key, **stored_day} if stored_day is not None else None)
+    item = {**key, "source": "strava", **fresh_day}
+    fw._store_item(table, None, config or sv._config, item, date_str, logging.getLogger("test-2250"))
+    return table, table.puts[-1]
+
+
+def _api_day(date_str="2026-08-06", activities=((1, "Morning Run"),)):
+    """A day record exactly as strava_lambda builds it from an API response."""
+    normalized = [sv._normalize({"id": i, "name": n, "distance": 4828.0}) for i, n in activities]
+    return sv.transform({"activities": normalized}, date_str)[0]
+
+
 def test_enrichment_survives_a_re_ingest_of_the_same_day():
-    stored = sv.transform({"activities": [sv._normalize({"id": 1, "name": "Morning Run"})]}, "2026-08-06")[0]
+    """#2250, the headline: the label the enricher wrote at 15:30 UTC is still
+    there after the 16:10 UTC Strava run replaces the same day record."""
+    stored = _api_day()
     stored["activities"][0]["enriched_name"] = "Issaquah, WA Run · 3.0mi"
-    # Simulate the re-fetch: the framework rebuilds and put_item-replaces the day.
-    refetched = sv.transform({"activities": [sv._normalize({"id": 1, "name": "Morning Run"})]}, "2026-08-06")[0]
-    assert refetched["activities"][0].get("enriched_name") == "Issaquah, WA Run · 3.0mi"
+    stored["activities"][0]["enriched_at"] = "2026-08-07T15:30:00+00:00"
+    stored["enriched_at"] = "2026-08-07T15:30:00+00:00"
+
+    _, written = _reingest(stored, _api_day())
+
+    assert written["activities"][0]["enriched_name"] == "Issaquah, WA Run · 3.0mi"
+    assert written["activities"][0]["enriched_at"] == "2026-08-07T15:30:00+00:00"
+    assert written["enriched_at"] == "2026-08-07T15:30:00+00:00"
+
+
+def test_the_label_follows_its_activity_when_a_late_arrival_shifts_the_list():
+    """Late arrivals are the whole reason refresh_trailing_days exists, so the
+    carry-forward must match on the activity's own id, never on list position."""
+    stored = _api_day(activities=((1, "Morning Run"),))
+    stored["activities"][0]["enriched_name"] = "Issaquah, WA Run · 3.0mi"
+
+    # The re-fetch picks up an evening walk that sorts FIRST in the API response.
+    _, written = _reingest(stored, _api_day(activities=((2, "Evening Walk"), (1, "Morning Run"))))
+
+    by_id = {a["strava_id"]: a for a in written["activities"]}
+    assert by_id["1"]["enriched_name"] == "Issaquah, WA Run · 3.0mi"
+    assert "enriched_name" not in by_id["2"], "an activity the enricher never saw must not borrow a label"
+
+
+def test_an_activity_the_store_never_had_carries_no_label():
+    stored = _api_day(activities=((1, "Morning Run"),))
+    stored["activities"][0]["enriched_name"] = "Issaquah, WA Run · 3.0mi"
+    _, written = _reingest(stored, _api_day(activities=((9, "Brand New Hike"),)))
+    assert "enriched_name" not in written["activities"][0]
+
+
+def test_the_first_ingest_of_a_date_stores_plainly():
+    """No stored record → nothing to carry, and no crash on the empty read."""
+    table, written = _reingest(None, _api_day())
+    assert table.get_calls == [{"pk": f"{en.USER_PREFIX}strava", "sk": "DATE#2026-08-06"}]
+    assert "enriched_name" not in written["activities"][0]
+
+
+def test_a_failed_read_of_the_stored_record_never_blocks_the_ingest():
+    """Losing a label is bad; losing the day's data is worse."""
+    import logging
+
+    from ingestion import ingestion_framework as fw
+
+    table = StoreTable({}, get_raises=RuntimeError("throttled"))
+    item = {"pk": f"{en.USER_PREFIX}strava", "sk": "DATE#2026-08-06", "source": "strava", **_api_day()}
+    fw._store_item(table, None, sv._config, item, "2026-08-06", logging.getLogger("test-2250"))
+    assert len(table.puts) == 1
+
+
+def test_a_source_with_no_downstream_writer_pays_nothing_for_the_hook():
+    """The merge is opt-in per source: without carry_forward_fn the framework
+    must not spend a read on every store."""
+    from ingestion.ingestion_framework import IngestionConfig
+
+    plain = IngestionConfig(source_name="strava")
+    assert plain.carry_forward_fn is None
+    table, _ = _reingest(_api_day(), _api_day(), config=plain)
+    assert table.get_calls == []
+
+
+def test_the_strava_source_actually_declares_the_merge():
+    """Derived from the source's own config — the fix is inert if this is unset."""
+    assert sv._config.carry_forward_fn is sv.carry_forward_enrichment
+
+
+def test_the_carried_fields_are_exactly_the_ones_the_enricher_writes():
+    """Guard the SET: if the enricher grows a third write-back field, the merge
+    must grow with it rather than silently dropping it on the next ingest."""
+    written_by_enricher = set()
+    tree = ast.parse(open(MODULE_SRC, encoding="utf-8").read())
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Subscript) and isinstance(node.slice, ast.Constant):
+            value = node.slice.value
+            if isinstance(value, str) and value.startswith("enriched"):
+                written_by_enricher.add(value)
+    assert written_by_enricher, "AST derivation found nothing — the guard would be vacuous"
+    assert written_by_enricher <= set(sv.ENRICHMENT_CARRY_FORWARD_FIELDS)
+
+
+def test_the_weekly_digest_renders_the_label_that_survived_the_re_ingest():
+    """End-to-end acceptance: a real downstream reader, fed the record that the
+    real store path actually wrote after a re-ingest."""
+    os.environ.setdefault("EMAIL_RECIPIENT", "test@example.com")
+    os.environ.setdefault("EMAIL_SENDER", "test@example.com")
+    sys.path.insert(0, os.path.join(ROOT, "lambdas", "emails"))
+    import weekly_digest_lambda as wd
+
+    stored = _api_day()
+    stored["activities"][0]["enriched_name"] = "Issaquah, WA Run · 3.0mi"
+    _, written = _reingest(stored, _api_day())
+
+    block = wd.ex_strava({"2026-08-06": written}, {"max_heart_rate": 186})
+    assert block["activities"][0]["name"] == "Issaquah, WA Run · 3.0mi"
 
 
 @pytest.mark.xfail(

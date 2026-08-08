@@ -313,6 +313,65 @@ def transform(raw: dict, date_str: str) -> list[dict]:
     ]
 
 
+# ── Enrichment carry-forward (#2250) ──────────────────────────────────────────
+# `activity-enrichment` (cron(30 15)) writes `enriched_name`/`enriched_at` into the
+# nested activities of an already-stored Strava day. This Lambda then re-fetches the
+# trailing 3 days + today on every run (cron(10 <18 hours/day>)) and the framework
+# stores the rebuilt day with a full put_item REPLACE — so the label lived ~40
+# minutes (15:30 → 16:10 UTC) and was gone, on every day, forever, because
+# enrichment only ever revisits YESTERDAY. Carry the two enrichment fields forward
+# per activity so the two writers stop fighting over the same partition.
+
+ENRICHMENT_CARRY_FORWARD_FIELDS = ("enriched_name", "enriched_at")
+
+
+def _activity_identity(activity: dict):
+    """Stable per-activity key across a re-fetch.
+
+    `strava_id` is the API's own immutable id and is what `_normalize()` stores;
+    the (name, start_date) fallback only matters for pre-`strava_id` legacy rows.
+    """
+    sid = activity.get("strava_id")
+    if sid:
+        return ("id", str(sid))
+    name, start = activity.get("name"), activity.get("start_date")
+    if name or start:
+        return ("fallback", str(name), str(start))
+    return None
+
+
+def carry_forward_enrichment(existing: dict, new: dict) -> dict:
+    """Re-apply activity-enrichment's write-back onto the rebuilt day record.
+
+    Matched by activity identity, not position — a late-arriving activity shifts
+    the list. A value present on the freshly-fetched activity always wins (the API
+    is authoritative for everything it knows about); enrichment fields never come
+    from the API, so in practice the stored value is what survives.
+    """
+    prior = {}
+    for act in existing.get("activities") or []:
+        if not isinstance(act, dict):
+            continue
+        key = _activity_identity(act)
+        if key is None:
+            continue
+        keep = {f: act[f] for f in ENRICHMENT_CARRY_FORWARD_FIELDS if act.get(f) not in (None, "")}
+        if keep:
+            prior[key] = keep
+
+    for act in new.get("activities") or []:
+        if not isinstance(act, dict):
+            continue
+        for field, value in prior.get(_activity_identity(act), {}).items():
+            if act.get(field) in (None, ""):
+                act[field] = value
+
+    # Day-level stamp the enricher also writes (UpdateExpression `enriched_at`).
+    if existing.get("enriched_at") and not new.get("enriched_at"):
+        new["enriched_at"] = existing["enriched_at"]
+    return new
+
+
 # ── Framework config ──────────────────────────────────────────────────────────
 
 _config = IngestionConfig(
@@ -331,6 +390,9 @@ _config = IngestionConfig(
     # dropped (the Jun 2026 afternoon-walk gap the DI-2 reconciler flagged).
     # Re-fetch the trailing 3 days every run so late arrivals are merged in.
     refresh_trailing_days=3,
+    # #2250: ...and because that re-fetch is a full REPLACE, hand the stored record
+    # to the merge above first so activity-enrichment's output survives it.
+    carry_forward_fn=carry_forward_enrichment,
 )
 
 
