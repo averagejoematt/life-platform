@@ -88,6 +88,11 @@ if [ "${1:-}" != "--dry-run" ]; then
   python3 "$(dirname "$0")/../scripts/v4_build_journal.py" --write || echo "  ⚠️  journal essays build skipped — keeping existing essay pages"
   # #498: data_sources.json is GENERATED from lambdas/source_registry.py — never hand-edit.
   python3 "$(dirname "$0")/../scripts/v4_build_data_sources.py" || echo "  ⚠️  data_sources build skipped — keeping existing site/data/data_sources.json"
+  # #1401: stack.json is the public instrument manifest ("fork the architecture, not the
+  # data") — GENERATED from source_registry.py + the public protocol/supplement catalogues
+  # + the same cost constants /method/cost/ serves. Runs AFTER data_sources.py because it
+  # derives its source set from that generator. Never hand-edit; tests/test_stack_manifest_drift.py pins it.
+  python3 "$(dirname "$0")/../scripts/v4_build_stack_manifest.py" || echo "  ⚠️  stack manifest build skipped — keeping existing site/data/stack.json"
   # #544: /method/registry/ is GENERATED from lambdas/methods_registry.py — never hand-edit.
   python3 "$(dirname "$0")/../scripts/v4_build_methods.py" || echo "  ⚠️  methods registry build skipped — keeping existing site/method/registry/index.html"
   # #1823: theme_river.json + /story/theme-river/ are GENERATED from the live journal

@@ -95,6 +95,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | [design/PORTRAIT_RUNBOOK.md](design/PORTRAIT_RUNBOOK.md) | Coach-portrait style bible + commissioning gate (ADR-106) |
 | [design/DESIGN_PARTNER_BRIEF.md](design/DESIGN_PARTNER_BRIEF.md) | The design-session contract + Slop Litmus v1 — synced into the v5 design project as BRIEF.md (#1464) |
 | [COST_TRACKER.md](COST_TRACKER.md) | The $85 budget (surge $100 — ADR-133) + real run-rate |
+| [STACK_MANIFEST.md](STACK_MANIFEST.md) | `/data/stack.json` — the public "fork the architecture, not the data" instrument manifest: what it derives from, the privacy allowlists, the honest cost block (#1401) |
 | [RESERVED_CONCURRENCY.md](RESERVED_CONCURRENCY.md) | Concurrency strategy |
 | [A11Y_BASELINE.md](A11Y_BASELINE.md) | Accessibility baseline (pre-v4 audit) |
 

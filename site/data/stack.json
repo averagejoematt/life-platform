@@ -1,0 +1,884 @@
+{
+  "$schema": "/data/stack.schema.json",
+  "_meta": {
+    "generated_by": "scripts/v4_build_stack_manifest.py — derived from source_registry.py + the public protocol/supplement catalogues (#1401); never hand-edit",
+    "schema_version": "1.0.0",
+    "updated": "2026-08-08",
+    "framing": "Fork the architecture, not the data. This describes the instrument — what measures and how — and contains no health metrics, no personal records, and no account-specific identifiers.",
+    "license": "The manifest is published for reuse. It is a description, not a guarantee."
+  },
+  "architecture": {
+    "shape": "ingest → store → serve",
+    "cloud": "AWS, single region",
+    "stages": [
+      {
+        "stage": "ingest",
+        "what": "scheduled and webhook-driven functions pull each source, detect missing days, and fetch only the gap",
+        "services": [
+          "serverless functions",
+          "cron scheduler",
+          "managed secrets"
+        ]
+      },
+      {
+        "stage": "store",
+        "what": "raw provider JSON archived immutably to object storage; normalized daily metrics to a single-table key-value store",
+        "services": [
+          "object storage",
+          "single-table NoSQL"
+        ]
+      },
+      {
+        "stage": "serve",
+        "what": "a read-only HTTP API over the store, a static site on a CDN, scheduled email, and an MCP server for conversational access",
+        "services": [
+          "serverless HTTP API",
+          "CDN + static hosting",
+          "transactional email",
+          "MCP"
+        ]
+      }
+    ],
+    "ingest_patterns": [
+      "file_transport",
+      "frozen_archive",
+      "habit_bridge",
+      "manual_entry",
+      "scheduled_credentialed_pull",
+      "scheduled_keyless_pull",
+      "webhook_push"
+    ],
+    "key_choices": [
+      "single-table NoSQL with a composite key (partition = user+source, sort = date) — every source shares one table",
+      "raw archive is write-once and delete-protected; normalization is always re-derivable from it",
+      "each source is classified behavioral vs infrastructure — only infrastructure staleness is allowed to page you",
+      "one source registry is the single origin for freshness thresholds, QA tiers, alarms, and every public catalogue",
+      "stdlib HTTP only for provider calls — no third-party HTTP dependency to keep patched"
+    ]
+  },
+  "sources": [
+    {
+      "id": "apple_health",
+      "name": "Apple Health",
+      "category": "Wearables",
+      "measures": "Steps, active energy, CGM, blood pressure, state of mind",
+      "method": "Health Auto Export webhook, near-real-time",
+      "posture": "load-bearing",
+      "ingest_pattern": "webhook_push",
+      "behavioral": false,
+      "paused": false,
+      "raw_scheme": "timestamped",
+      "device": {
+        "product": "Apple Watch + Health Auto Export",
+        "vendor": "Apple / Health Auto Export",
+        "purchasable": true
+      }
+    },
+    {
+      "id": "habitify",
+      "name": "Habitify",
+      "category": "Inputs",
+      "measures": "Daily habit completions",
+      "method": "API pull, hourly",
+      "posture": "load-bearing",
+      "ingest_pattern": "scheduled_credentialed_pull",
+      "behavioral": false,
+      "paused": false,
+      "raw_scheme": "date-tree",
+      "device": {
+        "product": "Habitify (habit tracker)",
+        "vendor": "Habitify",
+        "purchasable": true
+      }
+    },
+    {
+      "id": "hevy",
+      "name": "Hevy",
+      "category": "Manual logs",
+      "measures": "Strength sets, reps, load, rest times",
+      "method": "API-key pull, hourly 12–23 UTC",
+      "posture": "load-bearing",
+      "ingest_pattern": "scheduled_credentialed_pull",
+      "behavioral": true,
+      "paused": false,
+      "raw_scheme": "flat-uuid",
+      "device": {
+        "product": "Hevy (workout logger)",
+        "vendor": "Hevy",
+        "purchasable": true
+      }
+    },
+    {
+      "id": "macrofactor",
+      "name": "MacroFactor",
+      "category": "Manual logs",
+      "measures": "Calories, macros, meals",
+      "method": "Manual CSV export via Dropbox poller, ~24h behind by design",
+      "posture": "load-bearing",
+      "ingest_pattern": "file_transport",
+      "behavioral": true,
+      "paused": false,
+      "device": {
+        "product": "MacroFactor (nutrition app)",
+        "vendor": "MacroFactor",
+        "purchasable": true
+      }
+    },
+    {
+      "id": "strava",
+      "name": "Strava",
+      "category": "Wearables",
+      "measures": "Activities, walks, heart rate",
+      "method": "OAuth API pull, hourly",
+      "posture": "load-bearing",
+      "ingest_pattern": "scheduled_credentialed_pull",
+      "behavioral": true,
+      "paused": false,
+      "raw_scheme": "date-tree",
+      "device": {
+        "product": "Strava (subscription)",
+        "vendor": "Strava",
+        "purchasable": true
+      }
+    },
+    {
+      "id": "supplements",
+      "name": "Supplements",
+      "category": "Manual logs",
+      "measures": "Supplement & medication adherence",
+      "method": "Habitify bridge (name-mapped habits)",
+      "posture": "load-bearing",
+      "ingest_pattern": "habit_bridge",
+      "behavioral": true,
+      "paused": false,
+      "device": {
+        "product": "Supplements & medication",
+        "vendor": "via Habitify",
+        "purchasable": false
+      }
+    },
+    {
+      "id": "whoop",
+      "name": "Whoop",
+      "category": "Wearables",
+      "measures": "Recovery, sleep, HRV, resting HR, strain",
+      "method": "OAuth API pull, hourly",
+      "posture": "load-bearing",
+      "ingest_pattern": "scheduled_credentialed_pull",
+      "behavioral": false,
+      "paused": false,
+      "raw_scheme": "date-tree",
+      "device": {
+        "product": "Whoop band + membership",
+        "vendor": "Whoop",
+        "purchasable": true
+      }
+    },
+    {
+      "id": "withings",
+      "name": "Withings",
+      "category": "Wearables",
+      "measures": "Weight, body composition",
+      "method": "OAuth API pull, hourly",
+      "posture": "load-bearing",
+      "ingest_pattern": "scheduled_credentialed_pull",
+      "behavioral": true,
+      "paused": false,
+      "raw_scheme": "date-tree",
+      "device": {
+        "product": "Withings smart scale",
+        "vendor": "Withings",
+        "purchasable": true
+      }
+    },
+    {
+      "id": "eightsleep",
+      "name": "Eight Sleep",
+      "category": "Wearables",
+      "measures": "Sleep stages, HR/HRV, restlessness",
+      "method": "API pull, hourly",
+      "posture": "portfolio",
+      "ingest_pattern": "scheduled_credentialed_pull",
+      "behavioral": false,
+      "paused": false,
+      "raw_scheme": "date-tree",
+      "device": {
+        "product": "Eight Sleep Pod cover",
+        "vendor": "Eight Sleep",
+        "purchasable": true
+      }
+    },
+    {
+      "id": "food_delivery",
+      "name": "Food delivery",
+      "category": "Manual logs",
+      "measures": "Delivery-order behavioral signal (incl. longest-ever streak)",
+      "method": "Manual log",
+      "posture": "portfolio",
+      "ingest_pattern": "manual_entry",
+      "behavioral": true,
+      "paused": false,
+      "device": {
+        "product": "Food-delivery signal",
+        "vendor": "hand-logged",
+        "purchasable": false
+      }
+    },
+    {
+      "id": "notion",
+      "name": "Notion",
+      "category": "Inputs",
+      "measures": "Journal entries — the subjective layer",
+      "method": "API pull (journal database), hourly",
+      "posture": "portfolio",
+      "ingest_pattern": "scheduled_credentialed_pull",
+      "behavioral": true,
+      "paused": false,
+      "raw_scheme": "date-tree",
+      "device": {
+        "product": "Notion (journal)",
+        "vendor": "Notion",
+        "purchasable": true
+      }
+    },
+    {
+      "id": "measurements",
+      "name": "Tape measure",
+      "category": "Manual logs",
+      "measures": "Body tape measurements",
+      "method": "Manual entry via MCP",
+      "posture": "portfolio",
+      "ingest_pattern": "manual_entry",
+      "behavioral": true,
+      "paused": false,
+      "device": {
+        "product": "Body tape measure",
+        "vendor": "any spring-loaded body tape",
+        "purchasable": true
+      }
+    },
+    {
+      "id": "todoist",
+      "name": "Todoist",
+      "category": "Inputs",
+      "measures": "Tasks completed",
+      "method": "API pull, 1x daily (14:00 UTC)",
+      "posture": "portfolio",
+      "ingest_pattern": "scheduled_credentialed_pull",
+      "behavioral": false,
+      "paused": false,
+      "raw_scheme": "date-tree",
+      "device": {
+        "product": "Todoist (task manager)",
+        "vendor": "Todoist",
+        "purchasable": true
+      }
+    },
+    {
+      "id": "weather",
+      "name": "Weather",
+      "category": "Inputs",
+      "measures": "Temperature, precipitation, daylight",
+      "method": "Open-Meteo API pull, 2x daily",
+      "posture": "portfolio",
+      "ingest_pattern": "scheduled_keyless_pull",
+      "behavioral": false,
+      "paused": false,
+      "raw_scheme": "date-tree",
+      "device": {
+        "product": "Weather",
+        "vendor": "Open-Meteo",
+        "purchasable": false
+      }
+    },
+    {
+      "id": "garmin",
+      "name": "Garmin",
+      "category": "Wearables",
+      "measures": "Stress, body battery, steps",
+      "method": "OAuth API pull, 4x daily — paused (ADR-074)",
+      "posture": "paused",
+      "ingest_pattern": "scheduled_credentialed_pull",
+      "behavioral": false,
+      "paused": true,
+      "raw_scheme": "date-tree",
+      "device": {
+        "product": "Garmin watch",
+        "vendor": "Garmin",
+        "purchasable": true
+      }
+    },
+    {
+      "id": "labs",
+      "name": "Blood labs",
+      "category": "Clinical",
+      "measures": "Blood biomarkers (episodic panels)",
+      "method": "Manual entry from lab PDFs",
+      "posture": "load-bearing",
+      "ingest_pattern": "manual_entry",
+      "behavioral": false,
+      "paused": false
+    },
+    {
+      "id": "dexa",
+      "name": "DEXA",
+      "category": "Clinical",
+      "measures": "Body-composition scans",
+      "method": "Manual entry per scan",
+      "posture": "load-bearing",
+      "ingest_pattern": "manual_entry",
+      "behavioral": false,
+      "paused": false
+    },
+    {
+      "id": "genome",
+      "name": "Genome",
+      "category": "Clinical",
+      "measures": "SNP clinical interpretations",
+      "method": "One-time import",
+      "posture": "load-bearing",
+      "ingest_pattern": "manual_entry",
+      "behavioral": false,
+      "paused": false
+    },
+    {
+      "id": "state_of_mind",
+      "name": "State of Mind",
+      "category": "Inputs",
+      "measures": "Affect self-reports (Apple State of Mind)",
+      "method": "Health Auto Export webhook",
+      "posture": "portfolio",
+      "ingest_pattern": "webhook_push",
+      "behavioral": false,
+      "paused": false
+    },
+    {
+      "id": "macrofactor_workouts",
+      "name": "MacroFactor workouts",
+      "category": "Archive",
+      "measures": "Historical strength log (pre-Hevy)",
+      "method": "Frozen archive — no writer",
+      "posture": "archive",
+      "ingest_pattern": "frozen_archive",
+      "behavioral": false,
+      "paused": false
+    },
+    {
+      "id": "chronicling",
+      "name": "Chronicling",
+      "category": "Archive",
+      "measures": "Pre-platform habit history",
+      "method": "Frozen archive — no writer",
+      "posture": "archive",
+      "ingest_pattern": "frozen_archive",
+      "behavioral": false,
+      "paused": false
+    }
+  ],
+  "protocols": [
+    {
+      "id": "sleep",
+      "name": "Sleep Protocol",
+      "domain": "sleep",
+      "category": "Sleep",
+      "tier": "foundation",
+      "status": "active",
+      "definition": "9pm screens off, 10pm target bed, 68°F bed temperature",
+      "mechanism": "Optimizes slow-wave sleep for HGH release, memory consolidation, and metabolic recovery",
+      "tracked_by": [
+        "Whoop",
+        "Eight Sleep",
+        "Apple Health"
+      ],
+      "key_metrics": [
+        "Whoop sleep score",
+        "next-day recovery score",
+        "HRV on waking"
+      ]
+    },
+    {
+      "id": "strength",
+      "name": "Strength Training 3×/week",
+      "domain": "movement",
+      "category": "Movement",
+      "tier": "foundation",
+      "status": "active",
+      "definition": "Progressive overload, compound movements, 3 sessions/week minimum",
+      "mechanism": "Sustained moderate deficit (~500 kcal) preserves lean mass during weight loss",
+      "tracked_by": [
+        "Hevy",
+        "Strava",
+        "Whoop",
+        "DEXA"
+      ],
+      "key_metrics": [
+        "Body composition (DEXA)",
+        "strength metrics (Hevy)",
+        "ACWR load ratio"
+      ]
+    },
+    {
+      "id": "zone2",
+      "name": "Zone 2 Cardio",
+      "domain": "movement",
+      "category": "Movement",
+      "tier": "foundation",
+      "status": "active",
+      "definition": "3–4 sessions/week, 45 min+ at <75% HRV-adjusted max HR",
+      "mechanism": "Builds mitochondrial density and fat oxidation capacity below VT1",
+      "tracked_by": [
+        "Garmin",
+        "Strava",
+        "Whoop"
+      ],
+      "key_metrics": [
+        "VO2max proxy",
+        "resting HR trend",
+        "weekly Z2 minutes"
+      ]
+    },
+    {
+      "id": "intermittent_fasting",
+      "name": "16:8 Intermittent Fasting",
+      "domain": "nutrition",
+      "category": "Nutrition",
+      "tier": "intervention",
+      "status": "active",
+      "definition": "Eating window 12pm–8pm; 16-hour fast overnight",
+      "mechanism": "16:8 window aligns eating with circadian rhythm and extends overnight fat oxidation",
+      "tracked_by": [
+        "MacroFactor",
+        "Dexcom Stelo",
+        "Withings"
+      ],
+      "key_metrics": [
+        "Fasting glucose (CGM)",
+        "weight trend",
+        "body composition"
+      ]
+    },
+    {
+      "id": "cgm",
+      "name": "CGM Protocol",
+      "domain": "nutrition",
+      "category": "Metabolic",
+      "tier": "measurement",
+      "status": "active",
+      "definition": "Continuous glucose monitoring via Dexcom Stelo, meal spike logging",
+      "mechanism": "Continuous glucose data reveals individual meal responses invisible to standard blood panels",
+      "tracked_by": [
+        "Dexcom Stelo",
+        "platform CGM module"
+      ],
+      "key_metrics": [
+        "Time-in-range (<140 mg/dL)",
+        "post-meal peak glucose",
+        "fasting baseline"
+      ]
+    },
+    {
+      "id": "morning_sunlight",
+      "name": "Morning Sunlight 10 min",
+      "domain": "sleep",
+      "category": "Circadian / Mind",
+      "tier": "supporting",
+      "status": "active",
+      "definition": "Outdoor light exposure within 30 min of waking, 10 min minimum",
+      "mechanism": "Morning photon exposure sets the suprachiasmatic nucleus clock, improving melatonin timing by 1-2 hours",
+      "tracked_by": [
+        "Habitify",
+        "Whoop sleep timing"
+      ],
+      "key_metrics": [
+        "Bedtime consistency (std deviation)",
+        "subjective energy levels",
+        "HRV trend"
+      ]
+    }
+  ],
+  "supplements": [
+    {
+      "key": "cordyceps",
+      "name": "Cordyceps",
+      "group": "cognitive",
+      "group_name": "Cognitive Support",
+      "dose": "500mg",
+      "timing": "AM",
+      "evidence": {
+        "grade": "emerging",
+        "confidence_pct": 30
+      },
+      "cost_monthly_usd": 12,
+      "paused": true
+    },
+    {
+      "key": "lions_mane",
+      "name": "Lion's Mane",
+      "group": "cognitive",
+      "group_name": "Cognitive Support",
+      "dose": "500-1000mg",
+      "timing": "AM",
+      "evidence": {
+        "grade": "emerging",
+        "confidence_pct": 35
+      },
+      "cost_monthly_usd": 15,
+      "paused": true
+    },
+    {
+      "key": "reishi",
+      "name": "Reishi",
+      "group": "cognitive",
+      "group_name": "Cognitive Support",
+      "dose": "500mg",
+      "timing": "PM",
+      "evidence": {
+        "grade": "emerging",
+        "confidence_pct": 20
+      },
+      "cost_monthly_usd": 12,
+      "paused": true
+    },
+    {
+      "key": "b_complex",
+      "name": "B Complex",
+      "group": "longevity",
+      "group_name": "Longevity Foundation",
+      "dose": "1 daily",
+      "timing": "AM",
+      "evidence": {
+        "grade": "moderate",
+        "confidence_pct": 55
+      },
+      "cost_monthly_usd": 8,
+      "paused": false
+    },
+    {
+      "key": "multivitamin",
+      "name": "Multivitamin",
+      "group": "longevity",
+      "group_name": "Longevity Foundation",
+      "dose": "1 daily",
+      "timing": "AM with food",
+      "evidence": {
+        "grade": "moderate",
+        "confidence_pct": 50
+      },
+      "cost_monthly_usd": 12,
+      "paused": false
+    },
+    {
+      "key": "nac",
+      "name": "NAC (N-Acetyl Cysteine)",
+      "group": "longevity",
+      "group_name": "Longevity Foundation",
+      "dose": "600-1200mg",
+      "timing": "AM",
+      "evidence": {
+        "grade": "emerging",
+        "confidence_pct": 20
+      },
+      "cost_monthly_usd": 10,
+      "paused": false
+    },
+    {
+      "key": "omega3",
+      "name": "Omega-3 (EPA/DHA)",
+      "group": "longevity",
+      "group_name": "Longevity Foundation",
+      "dose": "2-4g combined",
+      "timing": "With fat-containing meal",
+      "evidence": {
+        "grade": "strong",
+        "confidence_pct": 90
+      },
+      "cost_monthly_usd": 15,
+      "paused": false
+    },
+    {
+      "key": "vitamin_d",
+      "name": "Vitamin D3 + K2",
+      "group": "longevity",
+      "group_name": "Longevity Foundation",
+      "dose": "5000 IU",
+      "timing": "AM with fat",
+      "evidence": {
+        "grade": "strong",
+        "confidence_pct": 90
+      },
+      "cost_monthly_usd": 5,
+      "paused": false
+    },
+    {
+      "key": "zinc",
+      "name": "Zinc Picolinate",
+      "group": "longevity",
+      "group_name": "Longevity Foundation",
+      "dose": "30mg",
+      "timing": "With meal",
+      "evidence": {
+        "grade": "moderate",
+        "confidence_pct": 60
+      },
+      "cost_monthly_usd": 8,
+      "paused": false
+    },
+    {
+      "key": "green_tea",
+      "name": "Green Tea Phytosome (EGCG)",
+      "group": "metabolic",
+      "group_name": "Metabolic & Body Comp",
+      "dose": "250mg",
+      "timing": "AM",
+      "evidence": {
+        "grade": "moderate",
+        "confidence_pct": 45
+      },
+      "cost_monthly_usd": 10,
+      "paused": false
+    },
+    {
+      "key": "inositol",
+      "name": "Myo-Inositol",
+      "group": "metabolic",
+      "group_name": "Metabolic & Body Comp",
+      "dose": "2-4g",
+      "timing": "PM",
+      "evidence": {
+        "grade": "emerging",
+        "confidence_pct": 20
+      },
+      "cost_monthly_usd": 10,
+      "paused": false
+    },
+    {
+      "key": "probiotics",
+      "name": "Probiotics",
+      "group": "metabolic",
+      "group_name": "Metabolic & Body Comp",
+      "dose": "Multi-strain",
+      "timing": "AM empty stomach",
+      "evidence": {
+        "grade": "moderate",
+        "confidence_pct": 45
+      },
+      "cost_monthly_usd": 15,
+      "paused": false
+    },
+    {
+      "key": "collagen",
+      "name": "Collagen Peptides",
+      "group": "muscle",
+      "group_name": "Muscle & Performance",
+      "dose": "10-15g",
+      "timing": "Pre-training + Vitamin C",
+      "evidence": {
+        "grade": "moderate",
+        "confidence_pct": 60
+      },
+      "cost_monthly_usd": 15,
+      "paused": false
+    },
+    {
+      "key": "creatine",
+      "name": "Creatine Monohydrate",
+      "group": "muscle",
+      "group_name": "Muscle & Performance",
+      "dose": "5g",
+      "timing": "AM with food",
+      "evidence": {
+        "grade": "strong",
+        "confidence_pct": 95
+      },
+      "cost_monthly_usd": 8,
+      "paused": false
+    },
+    {
+      "key": "electrolytes",
+      "name": "Electrolytes",
+      "group": "muscle",
+      "group_name": "Muscle & Performance",
+      "dose": "Full spectrum",
+      "timing": "AM + intra-workout",
+      "evidence": {
+        "grade": "strong",
+        "confidence_pct": 85
+      },
+      "cost_monthly_usd": 12,
+      "paused": false
+    },
+    {
+      "key": "glutamine",
+      "name": "L-Glutamine",
+      "group": "muscle",
+      "group_name": "Muscle & Performance",
+      "dose": "5g",
+      "timing": "Post-training",
+      "evidence": {
+        "grade": "moderate",
+        "confidence_pct": 50
+      },
+      "cost_monthly_usd": 10,
+      "paused": false
+    },
+    {
+      "key": "protein",
+      "name": "Protein Supplement",
+      "group": "muscle",
+      "group_name": "Muscle & Performance",
+      "dose": "30g whey/casein",
+      "timing": "Post-training",
+      "evidence": {
+        "grade": "strong",
+        "confidence_pct": 90
+      },
+      "cost_monthly_usd": 30,
+      "paused": false
+    },
+    {
+      "key": "apigenin",
+      "name": "Apigenin",
+      "group": "sleep",
+      "group_name": "Sleep Architecture",
+      "dose": "50mg",
+      "timing": "PM",
+      "evidence": {
+        "grade": "moderate",
+        "confidence_pct": 66
+      },
+      "cost_monthly_usd": 10,
+      "paused": false
+    },
+    {
+      "key": "glycine",
+      "name": "Glycine",
+      "group": "sleep",
+      "group_name": "Sleep Architecture",
+      "dose": "2-3g",
+      "timing": "PM",
+      "evidence": {
+        "grade": "moderate",
+        "confidence_pct": 66
+      },
+      "cost_monthly_usd": 8,
+      "paused": false
+    },
+    {
+      "key": "theanine",
+      "name": "L-Theanine",
+      "group": "sleep",
+      "group_name": "Sleep Architecture",
+      "dose": "100-200mg",
+      "timing": "PM",
+      "evidence": {
+        "grade": "moderate",
+        "confidence_pct": 66
+      },
+      "cost_monthly_usd": 8,
+      "paused": false
+    },
+    {
+      "key": "l_threonate",
+      "name": "Magnesium L-Threonate",
+      "group": "sleep",
+      "group_name": "Sleep Architecture",
+      "dose": "144mg elemental",
+      "timing": "PM",
+      "evidence": {
+        "grade": "moderate",
+        "confidence_pct": 66
+      },
+      "cost_monthly_usd": 12,
+      "paused": false
+    }
+  ],
+  "cost_of_ownership": {
+    "_honesty_contract": "ADR-104/105. Every figure carries a `basis` saying how it was derived and a `confidence` saying how much weight it holds. Where no source exists the value is null with a basis explaining why, never a plausible-looking guess.",
+    "aws": {
+      "composition": {
+        "non_ai_floor_monthly_usd": [
+          36,
+          43
+        ],
+        "ai_variable_monthly_usd": [
+          24,
+          44
+        ],
+        "basis": "docs/COST_TRACKER.md, verified against Cost Explorer 2026-07-19. The bill is two things: a measured non-AI structural floor (dominated by the CloudWatch alarm estate and per-service secret isolation) and variable model inference that scales with how much building happened that month, not with how much data was collected.",
+        "confidence": "measured range over billed months, not a forecast"
+      },
+      "actuals": [
+        {
+          "month": "2026-03",
+          "label": "Mar 2026",
+          "usd": 20.04
+        },
+        {
+          "month": "2026-04",
+          "label": "Apr 2026",
+          "usd": 35.01
+        },
+        {
+          "month": "2026-05",
+          "label": "May 2026",
+          "usd": 48.19
+        },
+        {
+          "month": "2026-06",
+          "label": "Jun 2026",
+          "usd": 79.8
+        }
+      ],
+      "actuals_basis": "AWS Cost Explorer, unblended, whole-account. n=4 complete billed months (docs/COST_TRACKER.md 'Monthly Actuals'). The platform's first partial month and any month still in progress are deliberately excluded — a partial month is not a run-rate. The series rises because the platform grew, not because usage drifted: the June peak is the month a coaching feature launched.",
+      "live_endpoints": [
+        {
+          "path": "/api/receipts",
+          "publishes": "month-to-date spend, projected month-end, effective ceiling, degradation tier, daily AI vs infrastructure burn"
+        },
+        {
+          "path": "/api/inference_receipt",
+          "publishes": "per-model and per-function token usage, priced"
+        },
+        {
+          "path": "/api/status",
+          "publishes": "the cost block: month-to-date, projected, ceiling, tier"
+        }
+      ],
+      "scope_note": "One budget covers the WHOLE platform, not just the AI. CI minutes are billed by the code host on a separate plan and are not inside this figure.",
+      "verifiability": "These are not the platform's own claims about itself: the live endpoints above serve the governor's own numbers, refreshed every 8 hours, and omit dollars rather than freeze them when the upstream reading goes stale.",
+      "monthly_usd_typical": "~$80",
+      "monthly_usd_typical_basis": "the run-rate published on /method/cost/, read from the same constant the /api/platform_stats endpoint serves — not a second opinion about it.",
+      "ceiling_usd": 85.0,
+      "surge_ceiling_usd": 100.0,
+      "surge_trigger_trailing_7d_uniques": 900,
+      "ceiling_basis": "a self-imposed hard limit (ADR-063/133), enforced in code rather than aspired to: a governor reprojects month-end spend every 8 hours and publishes a degradation tier, and each AI feature reads that tier before it runs. The limit floats to the surge value only while real reader traffic exceeds the trigger above."
+    },
+    "devices": {
+      "monthly_usd": null,
+      "one_time_usd": null,
+      "basis": "Not published, because this platform does not measure it. Every device and app price is vendor-set, varies by region and plan, and changes without notice; any total stated here would be a guess wearing a decimal point. The device SET is enumerated in sources[].device — derived from the same public gear catalogue the site renders — so a reader can price the exact list at current vendor rates rather than trust a stale aggregate.",
+      "confidence": "no figure asserted",
+      "shape_note": "The set splits into recurring subscriptions (a wearable membership, several logging apps) and one-time hardware (a scale, a bed cover, a watch, a tape measure). A fork of this architecture needs none of them in full — the pipeline's value comes from the sources being classified and reconciled, not from owning all of them."
+    },
+    "time": {
+      "hours_to_build": null,
+      "hours_per_week_to_operate": null,
+      "basis": "Not published, because nothing here instruments the owner's hours. The platform measures sleep, training and spend with real sensors; it has no sensor pointed at its own construction, so both figures would be recollection presented as measurement. What CAN be stated is structural, and is derived below.",
+      "confidence": "no figure asserted",
+      "structural_note": "Ingestion, computation, email and QA all run unattended on fixed schedules; there is no daily human step in the data path. Recurring human time concentrates in two places, both counted in recurring_manual_touchpoints: re-authorising credentialed sources when a provider token dies, and the sources whose records only exist because someone typed them.",
+      "recurring_manual_touchpoints": {
+        "credentialed_sources_that_can_need_reauth": 8,
+        "sources_whose_records_require_typing": 5,
+        "basis": "counted from this manifest's own sources[]. These are the only two places a human recurrently has to act; everything else runs on a scheduler."
+      }
+    },
+    "supplements": {
+      "active_monthly_usd": 206,
+      "including_paused_monthly_usd": 245,
+      "item_count": 21,
+      "paused_count": 3,
+      "basis": "summed from this manifest's own supplements[].cost_monthly_usd — the published /protocols/supplements/ catalogue. The per-item inputs are the owner's typical retail spend at his chosen brands, not receipts, so treat the total as a shopping estimate.",
+      "confidence": "arithmetic-exact over estimated inputs"
+    }
+  }
+}

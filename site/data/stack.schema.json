@@ -1,0 +1,259 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://averagejoematt.com/data/stack.schema.json",
+  "title": "Life-stack manifest",
+  "description": "A machine-readable description of a personal health-measurement instrument: what it measures, how each source is ingested, what protocols and supplements are under measurement, and what it costs to own. Deliberately describes the INSTRUMENT and never the subject — no health metrics, no per-day records, no lab values, no identifiers. Published so the architecture can be forked without the data. Reference implementation: https://averagejoematt.com/data/stack.json",
+  "type": "object",
+  "required": ["_meta", "architecture", "sources", "protocols", "supplements", "cost_of_ownership"],
+  "properties": {
+    "$schema": { "type": "string", "description": "Pointer to this schema." },
+    "_meta": {
+      "type": "object",
+      "required": ["generated_by", "schema_version", "updated", "framing"],
+      "properties": {
+        "generated_by": { "type": "string", "description": "The generator that produced this file. A manifest a human edits by hand is a manifest that drifts; state the generator so a consumer knows the file is derived." },
+        "schema_version": { "type": "string", "description": "Semver of this schema. Minor = additive fields; major = a field changed meaning or was removed." },
+        "updated": { "type": "string", "format": "date", "description": "UTC date the manifest was last regenerated." },
+        "framing": { "type": "string" },
+        "license": { "type": "string" }
+      }
+    },
+    "architecture": {
+      "type": "object",
+      "description": "The shape of the pipeline in vendor-neutral terms. Intentionally carries no resource names, account identifiers, ARNs, bucket names or function names — a fork should copy the shape, not the deployment.",
+      "required": ["shape", "stages", "ingest_patterns", "key_choices"],
+      "properties": {
+        "shape": { "type": "string" },
+        "cloud": { "type": "string" },
+        "stages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["stage", "what", "services"],
+            "properties": {
+              "stage": { "type": "string", "enum": ["ingest", "store", "serve"] },
+              "what": { "type": "string" },
+              "services": { "type": "array", "items": { "type": "string" }, "description": "Generic service categories, not product names." }
+            }
+          }
+        },
+        "ingest_patterns": {
+          "type": "array",
+          "description": "The distinct ingest patterns present in sources[]. Derived, not declared.",
+          "items": { "$ref": "#/$defs/ingestPattern" }
+        },
+        "key_choices": { "type": "array", "items": { "type": "string" }, "description": "The decisions a fork would most regret getting wrong." }
+      }
+    },
+    "sources": {
+      "type": "array",
+      "description": "Every data source the instrument publicly advertises. A source that exists but is not yet publicly advertised is absent by design.",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "category", "measures", "method", "posture", "ingest_pattern", "behavioral", "paused"],
+        "properties": {
+          "id": { "type": "string", "description": "Stable machine key." },
+          "name": { "type": "string" },
+          "category": { "type": "string", "description": "Public grouping, e.g. Wearables / Inputs / Manual logs / Clinical / Archive." },
+          "measures": { "type": "string", "description": "What this source measures, in reader-facing words." },
+          "method": { "type": "string", "description": "How the data arrives, including cadence." },
+          "posture": {
+            "type": "string",
+            "enum": ["load-bearing", "portfolio", "paused", "archive"],
+            "description": "The value verdict. load-bearing = something depends on it; portfolio = kept for breadth; paused = deliberately off; archive = frozen, no writer."
+          },
+          "ingest_pattern": { "$ref": "#/$defs/ingestPattern" },
+          "behavioral": {
+            "type": "boolean",
+            "description": "True when a record exists only because a human DID something (weighed in, trained, logged). A gap is then a logging lapse, not a broken pipe — so it must never page anyone. False = infrastructure: the pipe runs unattended, and a gap means something broke. This one boolean is the most portable idea in the manifest; getting it wrong is how an operator learns to ignore alarms."
+          },
+          "paused": { "type": "boolean", "description": "Deliberately not ingesting. Never counted as stale." },
+          "raw_scheme": {
+            "type": "string",
+            "enum": ["date-tree", "flat-uuid", "timestamped"],
+            "description": "The SHAPE of this source's immutable raw archive — never a concrete key or bucket. Present only for sources that keep a raw archive."
+          },
+          "device": {
+            "type": "object",
+            "description": "The consumer product behind the source, where one exists.",
+            "required": ["product", "vendor", "purchasable"],
+            "properties": {
+              "product": { "type": "string" },
+              "vendor": { "type": "string" },
+              "purchasable": { "type": "boolean", "description": "False = in the pipeline but not something a reader can buy (a free API, a hand-logged signal, a bridge over another source)." }
+            }
+          }
+        }
+      }
+    },
+    "protocols": {
+      "type": "array",
+      "description": "The interventions held under continuous measurement — their DEFINITIONS only. Results (findings, adherence, signal strength) belong to the subject and are deliberately excluded from this manifest.",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "domain", "category", "tier", "status", "definition", "mechanism", "tracked_by", "key_metrics"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "domain": { "type": "string" },
+          "category": { "type": "string" },
+          "tier": { "type": "string", "description": "foundation / intervention / measurement / supporting — how load-bearing the protocol is." },
+          "status": { "type": "string" },
+          "definition": { "type": "string", "description": "What the protocol IS — the rule being followed." },
+          "mechanism": { "type": "string", "description": "The claimed physiological mechanism. A claim, not a result." },
+          "tracked_by": { "type": "array", "items": { "type": "string" }, "description": "Which sources hold this protocol accountable." },
+          "key_metrics": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "supplements": {
+      "type": "array",
+      "description": "The supplement stack at exactly the granularity the public catalogue already renders — name, group, dose, timing, evidence grade, monthly cost, paused. No wider.",
+      "items": {
+        "type": "object",
+        "required": ["key", "name", "group", "group_name", "dose", "timing", "evidence", "cost_monthly_usd", "paused"],
+        "properties": {
+          "key": { "type": "string" },
+          "name": { "type": "string" },
+          "group": { "type": "string" },
+          "group_name": { "type": "string" },
+          "dose": { "type": "string" },
+          "timing": { "type": "string" },
+          "evidence": {
+            "type": "object",
+            "required": ["grade", "confidence_pct"],
+            "properties": {
+              "grade": { "type": "string", "enum": ["strong", "moderate", "emerging"], "description": "The catalogue's own evidence grade. 'emerging' explicitly means the human evidence is thin — it is published rather than hidden so a reader can discount it." },
+              "confidence_pct": { "type": "integer", "minimum": 0, "maximum": 100, "description": "The catalogue's confidence figure for that grade. A judgment, not a meta-analysis." }
+            }
+          },
+          "cost_monthly_usd": { "type": "number", "description": "Typical retail spend per month. An estimate, not a receipt." },
+          "paused": { "type": "boolean", "description": "In the catalogue but not currently taken. Kept visible rather than deleted so the record of what was tried survives." }
+        }
+      }
+    },
+    "cost_of_ownership": {
+      "type": "object",
+      "description": "What it costs to run this instrument. Every figure carries a `basis` (how it was derived) and a `confidence`. Where no honest source exists the value is null with a basis explaining why — a null here is a deliberate claim that the number is unknown, not a missing field.",
+      "required": ["_honesty_contract", "aws", "supplements", "devices", "time"],
+      "properties": {
+        "_honesty_contract": { "type": "string" },
+        "aws": {
+          "type": "object",
+          "required": ["monthly_usd_typical", "ceiling_usd", "composition", "actuals", "scope_note"],
+          "properties": {
+            "monthly_usd_typical": { "type": "string", "description": "The trailing run-rate as published on the instrument's own live cost page. Read from the same constant that page reads, so the two cannot disagree." },
+            "monthly_usd_typical_basis": { "type": "string" },
+            "ceiling_usd": { "type": "number", "description": "The self-imposed hard monthly limit, enforced in code." },
+            "surge_ceiling_usd": { "type": "number", "description": "The limit the ceiling floats to while real reader traffic exceeds the trigger below." },
+            "surge_trigger_trailing_7d_uniques": { "type": "integer" },
+            "ceiling_basis": { "type": "string" },
+            "composition": {
+              "type": "object",
+              "description": "The bill decomposed into its fixed and variable halves.",
+              "required": ["non_ai_floor_monthly_usd", "ai_variable_monthly_usd", "basis", "confidence"],
+              "properties": {
+                "non_ai_floor_monthly_usd": { "$ref": "#/$defs/usdRange" },
+                "ai_variable_monthly_usd": { "$ref": "#/$defs/usdRange" },
+                "basis": { "type": "string" },
+                "confidence": { "type": "string" }
+              }
+            },
+            "actuals": {
+              "type": "array",
+              "description": "Complete billed months only. Partial and in-progress months are excluded: a partial month is not a run-rate.",
+              "items": {
+                "type": "object",
+                "required": ["month", "label", "usd"],
+                "properties": {
+                  "month": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}$" },
+                  "label": { "type": "string" },
+                  "usd": { "type": "number" }
+                }
+              }
+            },
+            "actuals_basis": { "type": "string" },
+            "live_endpoints": {
+              "type": "array",
+              "description": "Where a reader can check the live bill rather than trust this file.",
+              "items": {
+                "type": "object",
+                "required": ["path", "publishes"],
+                "properties": { "path": { "type": "string" }, "publishes": { "type": "string" } }
+              }
+            },
+            "scope_note": { "type": "string" },
+            "verifiability": { "type": "string" }
+          }
+        },
+        "supplements": {
+          "type": "object",
+          "required": ["active_monthly_usd", "including_paused_monthly_usd", "item_count", "paused_count", "basis", "confidence"],
+          "properties": {
+            "active_monthly_usd": { "type": "number", "description": "Sum over the non-paused catalogue rows in this same file — a reader can add them up and get this number." },
+            "including_paused_monthly_usd": { "type": "number" },
+            "item_count": { "type": "integer" },
+            "paused_count": { "type": "integer" },
+            "basis": { "type": "string" },
+            "confidence": { "type": "string" }
+          }
+        },
+        "devices": {
+          "type": "object",
+          "description": "Hardware and app-subscription cost. Null figures are deliberate.",
+          "required": ["monthly_usd", "one_time_usd", "basis", "confidence"],
+          "properties": {
+            "monthly_usd": { "type": ["number", "null"] },
+            "one_time_usd": { "type": ["number", "null"] },
+            "basis": { "type": "string" },
+            "confidence": { "type": "string" },
+            "shape_note": { "type": "string" }
+          }
+        },
+        "time": {
+          "type": "object",
+          "description": "Human time cost. Null figures are deliberate; the derived touchpoint counts are what can honestly be said instead.",
+          "required": ["hours_to_build", "hours_per_week_to_operate", "basis", "confidence"],
+          "properties": {
+            "hours_to_build": { "type": ["number", "null"] },
+            "hours_per_week_to_operate": { "type": ["number", "null"] },
+            "basis": { "type": "string" },
+            "confidence": { "type": "string" },
+            "structural_note": { "type": "string" },
+            "recurring_manual_touchpoints": {
+              "type": "object",
+              "description": "Counted from sources[] — the only two places recurring human action is structurally required.",
+              "properties": {
+                "credentialed_sources_that_can_need_reauth": { "type": "integer" },
+                "sources_whose_records_require_typing": { "type": "integer" },
+                "basis": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "ingestPattern": {
+      "type": "string",
+      "description": "How a source's data arrives. A closed vocabulary — a source that matches none of these fails the manifest build rather than being silently filed as manual.",
+      "enum": [
+        "scheduled_credentialed_pull",
+        "scheduled_keyless_pull",
+        "webhook_push",
+        "file_transport",
+        "habit_bridge",
+        "manual_entry",
+        "frozen_archive"
+      ]
+    },
+    "usdRange": {
+      "type": "array",
+      "description": "An inclusive [low, high] USD range. A range rather than a point estimate wherever the underlying figure genuinely varies.",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": { "type": "number" }
+    }
+  }
+}
