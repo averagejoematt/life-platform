@@ -1,16 +1,18 @@
 {
   "architecture": "x86_64",
   "layer_name": "pillow-layer",
-  "layer_version": 1,
-  "measured": "2026-08-04",
+  "layer_version": 2,
+  "measured": "2026-08-08",
   "packages": {
-    "pillow": "11.3.0"
+    "pillow": "12.3.0"
   },
-  "platforms": null,
-  "provenance": "measured read-only from the LIVE layer via `aws lambda get-layer-version-by-arn` + inspection of the returned zip's *.dist-info (#2099). The original build inputs are unknown \u2014 these layers were hand-built offline before deploy/build_lambda_layer.py existed, which is the blind spot #2099 closes. platforms/zip_sha256 become real on the first --promote after a scripted rebuild.",
+  "platforms": [
+    "manylinux2014_x86_64",
+    "manylinux_2_28_x86_64"
+  ],
   "runtime": "python3.12",
   "target_pins": [
-    "Pillow==11.3.0"
+    "Pillow==12.3.0"
   ],
-  "zip_sha256": null
+  "zip_sha256": "e1f52b11c59d1f8d7afbef9cb0ac3b26c187cd1a778c69527e1777fb7c55f7ff"
 }

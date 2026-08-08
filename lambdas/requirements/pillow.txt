@@ -24,9 +24,9 @@
 # python3.12 runtime satisfies manylinux_2_28.
 #
 # ── DEPLOYED — the full resolved contents of the LIVE layer version below.
-#   pillow-layer:1, measured 2026-08-04 read-only via
+#   pillow-layer:2, measured 2026-08-08 read-only via
 #   `aws lambda get-layer-version-by-arn` + inspection of the returned zip's
 #   *.dist-info. Ground truth, not an estimate. Transitive packages are listed
 #   explicitly so pip-audit sees the WHOLE layer, not just its top-level pins.
 
-pillow==11.3.0
+pillow==12.3.0
