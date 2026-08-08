@@ -1350,7 +1350,20 @@ def get_food_delivery_brief_signal():
     Reads the food_delivery STREAK#current record and returns a contextual
     message about the current delivery-free streak or recent order.
     Non-fatal — returns None on any error.
+
+    Gated by nutrition_delivery_public() (P2.3, #2209/#2210, this door #2233) —
+    checked BEFORE the query, matching the sibling readers in
+    web/site_api_meals.py and web/site_api_nutrition.py. With the flag off
+    (default), the food_delivery partition is never queried and no
+    delivery-derived narrative reaches the daily brief, group_narratives, or
+    the public public_stats.json artifact it feeds. The gate lives INSIDE this
+    function (not at its one current call site) so every future caller is
+    protected without anyone needing to remember to re-check the flag.
     """
+    from web.site_api_common import nutrition_delivery_public
+
+    if not nutrition_delivery_public():
+        return None
     try:
         resp = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#food_delivery", "sk": "STREAK#current"})
         streak = resp.get("Item")

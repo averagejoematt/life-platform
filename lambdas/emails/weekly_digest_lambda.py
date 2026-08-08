@@ -2053,7 +2053,19 @@ def get_food_delivery_digest_line():
     Reads the food_delivery STREAK#current record and returns a contextual
     digest line about the current delivery-free streak.
     Non-fatal — returns None on any error.
+
+    Gated by nutrition_delivery_public() (P2.3, #2209/#2210, discovered as an
+    ungated latent door alongside #2233's fix to the sibling
+    daily_brief_lambda.get_food_delivery_brief_signal) — checked BEFORE the
+    query, matching every other reader of the food_delivery partition. This
+    function currently has no call site (dead code), but the gate lives here,
+    inside the function, so wiring it into the digest later can't reopen this
+    door without also flipping NUTRITION_DELIVERY_PUBLIC on.
     """
+    from web.site_api_common import nutrition_delivery_public
+
+    if not nutrition_delivery_public():
+        return None
     try:
         resp = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#food_delivery", "sk": "STREAK#current"})
         streak = resp.get("Item")
