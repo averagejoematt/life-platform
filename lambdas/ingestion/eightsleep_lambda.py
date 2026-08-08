@@ -117,10 +117,15 @@ def _get_es_client_creds():
     if _es_client_cache is not None:
         return _es_client_cache
     try:
-        _es_client_cache = json.loads(_cached_secret(secrets_client, "life-platform/eightsleep-client"))
+        creds = json.loads(_cached_secret(secrets_client, "life-platform/eightsleep-client"))
     except Exception as e:
+        # Never cache the FAILURE. Latching {} for the life of the container turns
+        # one transient Secrets Manager throttle into empty client credentials on
+        # every later login POST → 401 → the ADR-052 breaker trips → Eight Sleep
+        # goes dark for 24h from a blip that had already cleared.
         logger.warning(f"[eightsleep] Failed to load client creds from Secrets Manager: {e}")
-        _es_client_cache = {}
+        return {}
+    _es_client_cache = creds
     return _es_client_cache
 
 
@@ -317,16 +322,23 @@ def _hour_of_day(iso_ts: str, tz_offset: int = _DEFAULT_TZ_OFFSET) -> float | No
     Extract local fractional hour (0.0–24.0) from an ISO UTC timestamp.
 
     Examples:
-      "2026-02-20T06:54:00.000Z" with tz_offset=-8 → 22.9 (10:54 pm PST prev evening)
-      "2026-02-21T18:06:30.000Z" with tz_offset=-8 →  7.11 (7:06 am PST)
+      "2026-02-20T06:54:00.000Z"      with tz_offset=-8 → 22.9 (10:54 pm PST prev evening)
+      "2026-02-21T18:06:30.000Z"      with tz_offset=-8 →  7.11 (7:06 am PST)
+      "2026-02-20T22:54:00-08:00"     with tz_offset=-8 → 22.9 (already local)
+
+    The timestamp's OWN offset is honoured: an offset-bearing string is converted
+    into the target zone rather than being read as if it were UTC (which shifted
+    the local hour by the offset, silently, with no error). A naive timestamp is
+    still assumed to be UTC — the format Eight Sleep returns today.
 
     Returns a float where 23.5 = 11:30 pm and 6.75 = 6:45 am.
     """
     try:
-        ts = iso_ts.split(".")[0].rstrip("Z").replace("+00:00", "")
-        dt = datetime.fromisoformat(ts)
-        local_hour = (dt.hour + dt.minute / 60.0 + dt.second / 3600.0 + tz_offset) % 24
-        return round(local_hour, 2)
+        dt = datetime.fromisoformat(iso_ts.strip().replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        local = dt.astimezone(timezone(timedelta(hours=tz_offset)))
+        return round(local.hour + local.minute / 60.0 + local.second / 3600.0, 2)
     except Exception:
         return None
 
@@ -462,19 +474,24 @@ def parse_trends_for_date(
         print("No days found in trends response.")
         return None
 
+    # `day` is the vendor's own local WAKE date, and fetch_day always asks for a
+    # two-day window (from=D-1, to=D). A single returned night is therefore just
+    # as likely to be D-1 as D — relabelling it as the requested date wrote the
+    # same session under two DATE# keys (the 2026-07-10 double-stamp class), so a
+    # non-matching night is no match at all, however many were returned.
     target = next((d for d in days if d.get("day") == wake_date), None)
-    if target is None and len(days) == 1:
-        target = days[0]
     if target is None:
         print(f"No day matching {wake_date}. Available: {[d.get('day', '?') for d in days]}")
         return None
 
     def secs_to_hours(s):
-        return round(s / 3600.0, 2) if s else None
+        # ADR-104 both ways: a MEASURED zero (0 s of deep sleep, a night with no
+        # awake time at all) is 0.0, not absence. Only a missing value is None.
+        return round(s / 3600.0, 2) if s is not None else None
 
-    sleep_s = target.get("sleepDuration") or 0
-    presence_s = target.get("presenceDuration") or 0
-    awake_s = max(presence_s - sleep_s, 0)
+    sleep_s = target.get("sleepDuration")
+    presence_s = target.get("presenceDuration")
+    awake_s = max(presence_s - sleep_s, 0) if (sleep_s is not None and presence_s is not None) else None
 
     sq = target.get("sleepQualityScore") or {}
     sr = target.get("sleepRoutineScore") or {}
@@ -484,7 +501,9 @@ def parse_trends_for_date(
     resp_rate = _safe_float((sq.get("respiratoryRate") or {}).get("current"))
 
     latency_s = (sr.get("latencyAsleepSeconds") or {}).get("current")
-    latency_min = round(float(latency_s) / 60.0, 1) if latency_s else None
+    # latency 0 = asleep the moment he lay down (the best possible onset), not a
+    # missing reading — and compute_derived_fields needs it to produce waso_hours.
+    latency_min = round(float(latency_s) / 60.0, 1) if latency_s is not None else None
 
     sleep_start = target.get("sleepStart")
     sleep_end = target.get("sleepEnd")

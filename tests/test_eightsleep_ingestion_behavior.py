@@ -629,48 +629,18 @@ class TestZeroValuedStages:
     reader as "no data".
     """
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-2 discovery): parse_trends_for_date.secs_to_hours() guards on "
-            "`if s else None`, so deepDuration=0 (a real, common bad-night reading) is stripped "
-            "from the record entirely — deep_hours AND deep_pct are absent instead of 0.0, and "
-            "every downstream reader (site_api_sleep, ai_expert_analyzer's `if e.get('deep_pct')`) "
-            "renders it as missing data. ADR-104 in reverse: a measured zero becomes absence."
-        ),
-    )
     def test_a_night_with_zero_deep_sleep_stores_zero_not_absence(self):
         day = canonical_day(deepDuration=0, lightDuration=LIGHT_S + DEEP_S)
         rec = es.parse_trends_for_date({"days": [day]}, WAKE_DATE, "left", tz_offset=-7)
         assert rec["deep_hours"] == 0.0
         assert rec["deep_pct"] == 0.0
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-2 discovery): latencyAsleepSeconds.current == 0 (asleep the moment "
-            "he lay down — the best possible onset latency) is coerced to None by "
-            "`if latency_s else None`, so time_to_sleep_min is stripped AND waso_hours is never "
-            "computed (compute_derived_fields needs latency). The best nights lose two clinical "
-            "fields; the hypothesis engine's sleep_onset_min row is blank for exactly those days."
-        ),
-    )
     def test_falling_asleep_instantly_stores_a_zero_latency_and_still_yields_waso(self):
         day = canonical_day(sleepRoutineScore={"latencyAsleepSeconds": {"current": 0}})
         rec = es.parse_trends_for_date({"days": [day]}, WAKE_DATE, "left", tz_offset=-7)
         assert rec["time_to_sleep_min"] == 0.0
         assert rec["waso_hours"] == 0.5
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-2 discovery): when presenceDuration == sleepDuration the derived "
-            "awake seconds are 0, secs_to_hours() returns None, and compute_derived_fields then "
-            "skips time_in_bed_hours AND sleep_efficiency_pct entirely. A 100%-efficiency night "
-            "publishes NO efficiency at all — and sleep_efficiency_pct is one of only two fields "
-            "freshness_checker uses to call the Eight Sleep partition alive."
-        ),
-    )
     def test_a_perfect_night_reports_100_percent_efficiency_rather_than_no_efficiency(self):
         day = canonical_day(presenceDuration=SLEEP_S)
         rec = es.parse_trends_for_date({"days": [day]}, WAKE_DATE, "left", tz_offset=-7)
@@ -680,18 +650,6 @@ class TestZeroValuedStages:
 
 
 class TestSingleDayFallbackMisattribution:
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-2 discovery): parse_trends_for_date's `if target is None and "
-            "len(days) == 1: target = days[0]` fallback attributes ANY single returned night to "
-            "the requested wake_date. fetch_day always asks for a 2-day window (from=D-1, to=D), "
-            "so on a morning where only D-1 has been scored the D-1 night is re-stored under "
-            "DATE#D — the same session written twice under two dates with different sleep_start "
-            "values, the exact double-stamp class the 2026-07-10 truth audit fixed in the "
-            "framework's day selection."
-        ),
-    )
     def test_a_lone_non_matching_night_is_not_relabelled_as_the_requested_date(self):
         payload = {"days": [canonical_day(day="2026-05-09")]}
         assert es.parse_trends_for_date(payload, WAKE_DATE, "left", tz_offset=-7) is None
@@ -976,17 +934,6 @@ class TestClientCredentialCache:
         assert es._get_es_client_creds()["client_id"] == "cid"
         assert client.gets == 1
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-2 discovery): _get_es_client_creds() caches the FAILURE — on any "
-            "exception it sets _es_client_cache = {} and the `is not None` guard then returns "
-            "that empty dict for the life of the container. One transient Secrets Manager "
-            "throttle therefore makes every subsequent login POST an empty client_id/client_secret "
-            "→ 401 → the ADR-052 breaker trips → Eight Sleep goes dark for 24h from a blip that "
-            "had already cleared. Negative results must not be cached."
-        ),
-    )
     def test_a_transient_secrets_manager_failure_does_not_latch_empty_client_credentials(self, monkeypatch):
         state = {"fail": True}
 
@@ -1157,7 +1104,10 @@ def wired(monkeypatch):
 
     def fake_api_get(path, token, params=None):
         calls.append({"path": path, "token": token, "params": params})
-        return canonical_trends()
+        # Label the night with the wake date actually requested — the vendor keys
+        # `day` off its own local wake date, and a fixture that always answers
+        # 2026-05-10 would let a day-attribution defect read as correct.
+        return canonical_trends(canonical_day(day=(params or {}).get("to", WAKE_DATE)))
 
     monkeypatch.setattr(es, "api_get", fake_api_get)
     return {"table": table, "s3": s3, "secrets": secrets, "calls": calls}
@@ -1358,17 +1308,6 @@ class TestWriterReaderFieldNames:
 
 
 class TestLatentTimestampFormatSensitivity:
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-2 discovery, latent): _hour_of_day() strips a 'Z'/'+00:00' suffix and "
-            "otherwise hands the string to fromisoformat, then adds the configured tz offset to the "
-            "PARSED clock time. A timestamp carrying any other UTC offset (e.g. '...T23:54:00-07:00') "
-            "is therefore silently treated as if it were UTC — the local hour comes out shifted by the "
-            "offset (16.9 instead of 23.9) with no error. Only latent while Eight Sleep returns UTC; "
-            "a vendor format change would corrupt every circadian field with no signal."
-        ),
-    )
     def test_an_offset_bearing_timestamp_is_not_silently_read_as_utc(self):
         # 23:54 local on a -07:00 offset IS 23.9 in that local frame.
         assert es._hour_of_day("2026-05-09T23:54:00-07:00", -7) == 23.9
