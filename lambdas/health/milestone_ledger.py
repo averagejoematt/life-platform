@@ -625,7 +625,7 @@ def collect_signals(table, user_prefix: str, phase_filter, today: str) -> dict:
 
     habits_sorted = sorted(habits, key=lambda i: str(i.get("sk") or ""))
     latest_habit = habits_sorted[-1] if habits_sorted else {}
-    tier0_streak = int(_f(latest_habit.get("t0_perfect_streak")) or _f(latest_habit.get("t0_aggregate_streak")) or 0)
+    tier0_streak = int(_f(latest_habit.get("t0_perfect_streak")) or 0)
 
     chars_sorted = sorted(chars, key=lambda i: str(i.get("sk") or ""))
     character_level = int(_f((chars_sorted[-1] if chars_sorted else {}).get("character_level")) or 1)

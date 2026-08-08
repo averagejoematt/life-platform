@@ -808,8 +808,16 @@ def store_day_grade(date_str, total_score, grade, component_scores, weights):
         logger.warning(f"store_day_grade failed: {e}")
 
 
-def store_habit_scores(date_str, component_details, component_scores, vice_streaks, profile):
-    """Write habit_scores record — preserves existing schema for trending tool compatibility."""
+def store_habit_scores(date_str, component_details, component_scores, vice_streaks, profile, tier0_streak=None):
+    """Write habit_scores record — preserves existing schema for trending tool compatibility.
+
+    #2242: `tier0_streak` (the running Tier-0 perfect-day streak this run already
+    computed for computed_metrics) is persisted here as `t0_perfect_streak` — the
+    field name every downstream reader already agrees on (/api/habit_streaks, the
+    five streak badges in achievement_rules, the N-Day Streak ladder in
+    milestone_ledger). Before this it was computed and dropped on the floor on this
+    partition, so eleven awards read a permanent 0 and were structurally unearnable.
+    """
     try:
         hd = component_details.get("habits_mvp", {})
         if not hd or hd.get("composite_method") != "tier_weighted":
@@ -859,6 +867,10 @@ def store_habit_scores(date_str, component_details, component_scores, vice_strea
             item["tier1_pct"] = Decimal(str(round(t1["done"] / t1["total"], 3)))
         if missed_t0:
             item["missed_tier0"] = missed_t0
+        if tier0_streak is not None:
+            # Written even when 0 — an honest zero is the reset signal the streak
+            # badges need, not an absence (ADR-104).
+            item["t0_perfect_streak"] = Decimal(str(int(tier0_streak)))
         if vice_streaks:
             item["vice_streaks"] = _deep_dec(vice_streaks)
         if sg_pcts:
@@ -1318,6 +1330,7 @@ def lambda_handler(event, context):
         component_scores,
         streak_data.get("vice_streaks", {}),
         profile,
+        tier0_streak=streak_data.get("tier0_streak", 0),
     )
 
     # CLEANUP-1 complete (v3.7.28): write_composite_scores() removed per ADR-025.

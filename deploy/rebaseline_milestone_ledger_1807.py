@@ -99,7 +99,7 @@ def collect_lifetime_signals(table) -> dict:
         if not (sk.startswith("DATE#") and len(sk) == 15):
             continue
         habit_days.append(sk[5:])
-        s = _f(h.get("t0_perfect_streak")) or _f(h.get("t0_aggregate_streak")) or 0
+        s = _f(h.get("t0_perfect_streak")) or 0
         max_streak = max(max_streak, int(s))
 
     # Historic MAX days-tracked inside any 365-day window (the rule's window).

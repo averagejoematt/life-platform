@@ -1101,8 +1101,16 @@ def store_day_grade(date_str, total_score, grade, component_scores, weights, alg
         raise  # Re-raise — day grade loss cascades to character sheet + insights
 
 
-def store_habit_scores(date_str, component_details, component_scores, vice_streaks, profile):
-    """Persist tier-level habit scores for historical trending."""
+def store_habit_scores(date_str, component_details, component_scores, vice_streaks, profile, tier0_streak=None):
+    """Persist tier-level habit scores for historical trending.
+
+    #2242: `tier0_streak` is persisted as `t0_perfect_streak` — the field name the
+    /api/habit_streaks endpoint, the five streak badges and the N-Day Streak
+    milestone ladder all read. This is the FALLBACK writer (it only runs when
+    daily-metrics-compute left no `computed_metrics` row); it must agree with the
+    primary writer in `compute/daily_metrics_compute_lambda.py` or the streak
+    resets on every fallback day.
+    """
     try:
         hd = component_details.get("habits_mvp", {})
         if not hd or hd.get("composite_method") != "tier_weighted":
@@ -1153,6 +1161,9 @@ def store_habit_scores(date_str, component_details, component_scores, vice_strea
             "missed_tier0": missed_t0 if missed_t0 else None,
             "computed_at": datetime.now(timezone.utc).isoformat(),
         }
+        if tier0_streak is not None:
+            # Written even when 0 — an honest zero is the reset signal (ADR-104).
+            item["t0_perfect_streak"] = Decimal(str(int(tier0_streak)))
         if vice_streaks:
             item["vice_streaks"] = json.loads(json.dumps(vice_streaks), parse_float=Decimal)
         if sg_pcts:
@@ -1976,7 +1987,7 @@ def lambda_handler(event, context):
 
         if not demo_mode:
             try:
-                store_habit_scores(yesterday, component_details, component_scores, vice_streaks, profile)
+                store_habit_scores(yesterday, component_details, component_scores, vice_streaks, profile, tier0_streak=mvp_streak)
             except Exception as e:
                 logger.warning("store_habit_scores failed: " + str(e))
 
