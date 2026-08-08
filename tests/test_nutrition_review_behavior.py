@@ -1568,17 +1568,17 @@ def test_a_config_driven_panel_prompt_is_used_when_the_board_config_loads(handle
     assert system == "BOARD PROMPT 1800/190"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): the AI-3 validation gate is structurally DARK on this lambda. It runs only "
-        "`if ai_content and not ai_content.startswith('<div')` — a sentinel meant to detect the hardcoded failure "
-        "stub. But the system prompt orders the panel to 'Write clean HTML ... Each expert section in a div with "
-        "border-left', so real output starts with '<div' and skips validation entirely. Nothing the panel actually "
-        "produces is ever safety-checked."
-    ),
-)
+# ══════════════════════════════════════════════════════════════════════════════
+# #2216 — the two gates that keyed off the panel's own required markup, and the
+# missing dry_run gate. The three tests below were xfail; they are the contract
+# now. Each is paired with a test from the opposite direction, because a gate
+# that is on but never fires is the defect these replaced.
+# ══════════════════════════════════════════════════════════════════════════════
+
+
 def test_real_panel_html_output_is_still_safety_validated(handler_env):
+    """The panel's prompt ORDERS `<div ... border-left ...>` sections, so the old
+    `startswith('<div')` stub sentinel skipped validation on every real edition."""
     seen = []
     handler_env["monkeypatch"].setattr(
         m,
@@ -1590,32 +1590,101 @@ def test_real_panel_html_output_is_still_safety_validated(handler_env):
     assert len(seen) == 1
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): the same `startswith('<div')` sentinel gates IC-15 insight persistence, so "
-        "every real (HTML) panel review is dropped from the insight ledger. IC-16 then feeds the next week's prompt "
-        "'PREVIOUS NUTRITION INSIGHTS' that never accumulate — the progressive-context loop is permanently empty."
-    ),
-)
+def test_the_failure_card_is_not_run_through_the_safety_validator(handler_env):
+    """The other direction: the hardcoded card the module writes itself is the
+    ONE thing the gate is meant to skip."""
+    seen = []
+    handler_env["monkeypatch"].setattr(
+        m,
+        "validate_ai_output",
+        lambda text, *a, **k: seen.append(text) or aiv.AIValidationResult(original_text=text, output_type=aiv.AIOutputType.NUTRITION_COACH),
+    )
+    handler_env["state"]["ai_error"] = RuntimeError("bedrock throttled")
+    m.lambda_handler({}, None)
+    assert seen == []
+    assert m._AI_UNAVAILABLE_MARKER in _sent_html(handler_env)
+
+
+def test_a_full_length_compliant_edition_reaches_the_reader_unchanged(handler_env):
+    """Turning the validator ON must not start blocking legitimate editions.
+
+    Exercises the REAL validator against the shape the prompt demands: long
+    inline-styled HTML, a weekly average written with a thousands separator, and
+    per-serving meal macros — all of which the low-calorie BLOCK previously
+    misread ("1,700 kcal" as a 700 kcal prescription)."""
+    edition = (
+        '<div style="border-left:3px solid #10b981;padding:12px;margin-bottom:16px;">'
+        "<div>Dr. Webb: you averaged 1,700 kcal per day against the 1,800 target, and protein held at 186 g. "
+        "Thursday's 1,450 kcal was the only outlier.</div></div>"
+        '<div style="border-left:3px solid #8b5cf6;padding:12px;margin-bottom:16px;">'
+        "<div>Dr. Patel: choline landed near 380 mg; two eggs at breakfast closes most of that gap.</div></div>"
+        '<div style="border-left:3px solid #f59e0b;padding:12px;">'
+        "<div>Meal idea: Smoky Turkey Kofte Bowls — 520 cal per serving, 42P / 30C / 18F.</div></div>"
+    )
+    edition += '<div style="padding:8px;">Grocery list: salmon, lentils, kefir, spinach, pumpkin seeds.</div>' * 120
+    assert len(edition) > 5_000  # past the validator's default max_length on purpose
+    handler_env["state"]["ai"] = edition
+    m.lambda_handler({}, None)
+    html = _sent_html(handler_env)
+    assert "you averaged 1,700 kcal per day" in html
+    assert aiv._fallback_for_type(aiv.AIOutputType.NUTRITION_COACH) not in html
+    assert len(handler_env["writer"].written) == 1
+
+
+def test_genuinely_dangerous_calorie_advice_in_a_real_edition_is_still_blocked(handler_env):
+    """The permissive direction above is only safe while this one still fires."""
+    handler_env["state"]["ai"] = (
+        '<div style="border-left:3px solid #10b981;padding:12px;">'
+        "<div>Dr. Webb: eat only 600 calories per day this week and the scale will move fast.</div></div>"
+    )
+    m.lambda_handler({}, None)
+    html = _sent_html(handler_env)
+    assert "eat only 600 calories per day" not in html
+    assert "Calorie guidance review needed" in html
+
+
 def test_a_delivered_panel_review_is_recorded_in_the_insight_ledger(handler_env):
     handler_env["state"]["ai"] = '<div style="border-left:3px solid #10b981;">Dr. Webb: protein held.</div>'
     m.lambda_handler({}, None)
     assert len(handler_env["writer"].written) == 1
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery, #2111 class): nutrition_review_lambda has NO dry_run gate — several sibling "
-        "email lambdas (between_chronicle, chronicle_email_sender, chronicle_approve, coach_panel_podcast) accept "
-        "{'dry_run': true}. Any manual/regeneration invoke of this function mails Matthew a real review."
-    ),
-)
+def test_blocked_panel_output_is_not_recorded_in_the_insight_ledger(handler_env):
+    """A validator fallback is not an insight — IC-16 would feed it back into next
+    week's prompt as 'previous nutrition insights'."""
+    handler_env["state"]["ai"] = '<div style="border-left:3px solid #10b981;">Dr. Webb: eat only 500 calories per day until Saturday.</div>'
+    m.lambda_handler({}, None)
+    assert handler_env["writer"].written == []
+
+
 def test_a_dry_run_invocation_builds_the_review_without_mailing_it(handler_env):
     resp = m.lambda_handler({"dry_run": True}, None)
     assert resp["statusCode"] == 200
     assert handler_env["ses"].sent == []
+
+
+def test_a_dry_run_really_builds_the_review_it_declines_to_send(handler_env):
+    """Not-sending is only half of it — a dry run that skipped the work would pass
+    the assertion above while proving nothing."""
+    resp = m.lambda_handler({"dry_run": True}, None)
+    assert resp["dry_run"] is True
+    assert resp["subject"] == "Nutrition Review - 2026-06-12 - 1800 kcal - 190g protein"
+    assert resp["html_bytes"] > 1_000
+    assert len(handler_env["calls"]["anthropic"]) == 1  # the panel really ran
+
+
+def test_a_dry_run_writes_no_durable_row(handler_env):
+    """No send record, no weekly summary, no insight — a dry run must not leave
+    the platform claiming a review went out."""
+    m.lambda_handler({"dry_run": True}, None)
+    assert handler_env["table"].puts == []
+    assert handler_env["writer"].written == []
+
+
+def test_a_scheduled_invocation_still_sends(handler_env):
+    """The EventBridge payload carries no dry_run key — the gate must default off."""
+    m.lambda_handler({"source": "aws.events", "detail-type": "Scheduled Event"}, None)
+    assert len(handler_env["ses"].sent) == 1
 
 
 @pytest.mark.xfail(

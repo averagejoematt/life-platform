@@ -120,7 +120,9 @@ _AGGRESSIVE_TRAINING_PHRASES = [
 ]
 
 _DANGEROUS_CALORIE_PHRASES = [
-    r"\b[1-7]\d{2}\s*(?:kcal|calories|cal)(?!\s*deficit)\b",  # 100-799 cal mentioned
+    # 100-799 cal mentioned. The lookbehind (#2216) keeps a thousands separator
+    # out of it: "1,700 kcal" is 1700, not a 700-kcal recommendation.
+    r"\b(?<![\d.,])[1-7]\d{2}\s*(?:kcal|calories|cal)(?!\s*deficit)\b",
     r"\bfast(?:ing)?\s+(?:all\s+day|24\s*h|skip\s+meal)\b",
     r"\bskip\s+(?:all\s+)?meal\b",
     r"\beat\s+nothing\b",
@@ -128,8 +130,10 @@ _DANGEROUS_CALORIE_PHRASES = [
 ]
 
 # The confirming figure regex for the low-calorie BLOCK (Check 5): a 100-799
-# figure followed by a calorie unit.
-_LOW_CALORIE_FIGURE_RE = re.compile(r"\b([1-7]\d{2})\s*(?:kcal|calories|cal)\b", re.IGNORECASE)
+# figure followed by a calorie unit. #2216 — the lookbehind stops a thousands
+# separator being read as its own figure: "you averaged 1,700 kcal per day" is a
+# report of a 1700-kcal week, and was being blocked as a 700-kcal prescription.
+_LOW_CALORIE_FIGURE_RE = re.compile(r"\b(?<![\d.,])([1-7]\d{2})\s*(?:kcal|calories|cal)\b", re.IGNORECASE)
 
 # #2215 — a 100-799 kcal figure is only a starvation-level *recommendation* when
 # it describes a DAY's intake. The identical figure is routine, safe labelling

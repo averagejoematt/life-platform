@@ -131,6 +131,43 @@ def test_a_recipe_cards_macros_do_not_exempt_a_bare_low_target_on_the_next_line(
     assert "520" not in r.block_reason
 
 
+# ── #2216: a thousands separator is not a second figure ──────────────────────
+# The confirming regex read the last three digits of "1,700 kcal" as its own
+# 100-799 figure, so a nutrition panel reporting a perfectly normal weekly
+# average was BLOCKED as a starvation prescription. Surfaced when nutrition_
+# review's validation gate was switched on for the first time.
+
+
+def test_a_thousands_separated_average_is_not_a_starvation_figure():
+    r = validate_ai_output(
+        "You averaged 1,700 kcal per day this week against your 1,800 target.",
+        AIOutputType.NUTRITION_COACH,
+        {},
+    )
+    assert not r.blocked, r.block_reason
+
+
+def test_a_thousands_separated_figure_written_as_calories_is_also_safe():
+    r = validate_ai_output(
+        "Last week you averaged 2,100 calories per day; this week 1,750.",
+        AIOutputType.NUTRITION_COACH,
+        {},
+    )
+    assert not r.blocked, r.block_reason
+
+
+def test_a_bare_low_daily_figure_is_still_blocked_after_the_separator_fix():
+    """The separator fix must not open a hole: an un-separated 100-799 daily
+    figure is exactly what Check 5 exists for."""
+    r = validate_ai_output(
+        "Eat only 600 calories per day this week and the scale will move fast.",
+        AIOutputType.NUTRITION_COACH,
+        {},
+    )
+    assert r.blocked
+    assert "600" in r.block_reason
+
+
 # ── WARN tier (used as-is, but flagged) ──────────────────────────────────────
 
 
