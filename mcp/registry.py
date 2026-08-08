@@ -681,8 +681,8 @@ TOOLS = {
         "schema": {
             "name": "get_insights",
             "description": (
-                "List insights from the personal coaching log. "
-                "Returns all insights newest-first with days_open calculated. "
+                "List insights from the personal coaching log, newest-first, with days_open calculated. "
+                "`total` is the whole corpus, `returned` the page, `truncated` says if they differ (#2221). "
                 "Stale flag is set for open insights older than 14 days. "
                 "Use for: 'what insights are open?', 'show my coaching log', "
                 "'what have I been meaning to act on?', 'any stale insights?', "

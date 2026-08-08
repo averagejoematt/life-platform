@@ -354,38 +354,42 @@ def test_get_insights_status_filter_narrows_the_result(table):
     assert out["insights"][0]["insight_id"] == "b"
 
 
-def test_get_insights_total_is_the_page_size_not_the_corpus_size(table):
-    """OBSERVED: `total` is len(results), and results stops at `limit`. With 120
-    insights and the declared default limit of 50, the tool reports total 50."""
+def test_get_insights_total_is_the_corpus_size_and_the_page_says_it_is_a_page(table):
+    """FIXED (#2221, ADR-104): `total` used to be len(results) with results cut at
+    `limit`, so 120 insights read as "total 50" — the number Matthew gets when he
+    asks how many are still open. `total` is now the corpus, `returned` the page,
+    and `truncated` says the two differ."""
     rows = [
         {"pk": INSIGHTS_PK, "sk": f"INSIGHT#{i:03d}", "insight_id": f"{i:03d}", "date_saved": TODAY, "status": "open"} for i in range(120)
     ]
     table(rows=rows)
     out = call("get_insights", {})
-    assert out["total"] == 50 == len(out["insights"])
+    assert out["total"] == 120
+    assert out["returned"] == 50 == len(out["insights"])
+    assert out["truncated"] is True
+    assert out["scan_exhausted"] is True
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "ADR-104 — mcp/tools_lifestyle.py:334-340 (tool_get_insights) returns "
-        '`{"total": len(results)}` where `results` was truncated at `limit` (default 50), and the '
-        'registered description promises "Returns ALL insights newest-first". Worse, the DynamoDB '
-        "query at :301 passes `Limit: 200` ALONGSIDE the ADR-058 phase FilterExpression — DynamoDB "
-        "applies Limit to items READ, before the filter, so on a partition with pilot-phase rows "
-        "even fewer than 200 survive, and the query is issued once with no pagination "
-        "(LastEvaluatedKey is never followed). It should paginate, report the true corpus count "
-        "separately from the returned page, and say when the page was truncated. Matthew asks 'how "
-        "many insights are still open?' and is told 50 whatever the answer is."
-    ),
-)
-def test_get_insights_total_should_reflect_the_corpus_not_the_page(table):
-    rows = [
-        {"pk": INSIGHTS_PK, "sk": f"INSIGHT#{i:03d}", "insight_id": f"{i:03d}", "date_saved": TODAY, "status": "open"} for i in range(120)
-    ]
-    table(rows=rows)
-    out = call("get_insights", {})
-    assert out["total"] == 120 or "truncated" in str(out).lower()
+def test_get_insights_follows_the_pagination_cursor(table):
+    """The read used to issue ONE query and never follow LastEvaluatedKey, so the
+    corpus count was capped by whatever survived a single page — and DynamoDB
+    applies `Limit` to items READ, BEFORE the ADR-058 phase FilterExpression, so a
+    partition carrying pilot rows yields fewer still. Two pages, 3 rows, no cut."""
+    page1 = [{"pk": INSIGHTS_PK, "sk": "INSIGHT#003", "insight_id": "003", "date_saved": TODAY, "status": "open"}]
+    page2 = [{"pk": INSIGHTS_PK, "sk": f"INSIGHT#{i:03d}", "insight_id": f"{i:03d}", "date_saved": TODAY, "status": "open"} for i in (2, 1)]
+    pages = [{"Items": page1, "LastEvaluatedKey": {"pk": INSIGHTS_PK, "sk": "INSIGHT#003"}}, {"Items": page2}]
+    t = FakeDdbTable(rows=[], query_hook=lambda _t, **kw: pages[len(_t.query_calls) - 1])
+    monkey = pytest.MonkeyPatch()
+    monkey.setattr(tl, "table", t)
+    try:
+        out = call("get_insights", {})
+    finally:
+        monkey.undo()
+    assert out["total"] == 3 and out["truncated"] is False
+    assert [i["insight_id"] for i in out["insights"]] == ["003", "002", "001"]
+    assert t.query_calls[1]["ExclusiveStartKey"] == {"pk": INSIGHTS_PK, "sk": "INSIGHT#003"}
+    # The phase filter rides on EVERY page, not just the first (ADR-058).
+    assert all("#phase" in kw["FilterExpression"] for kw in t.query_calls)
 
 
 def test_get_insights_read_is_phase_filtered(table):

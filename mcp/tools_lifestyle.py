@@ -84,6 +84,12 @@ def _is_traveling(date_str=None):
 
 _KJ_PER_KCAL = 1.0 / 4.184  # thermochemical kilocalorie (#2221)
 
+# get_insights pagination (#2221). PAGE_SIZE is the per-query DynamoDB `Limit`; MAX_SCAN
+# bounds the whole walk so one MCP call can never read an unbounded partition. The corpus
+# count is reported as a floor (`scan_exhausted`) rather than silently capped.
+_INSIGHTS_PAGE_SIZE = 200
+_INSIGHTS_MAX_SCAN = 2000
+
 # ── Experiment metrics ──
 
 _EXPERIMENT_METRICS = [
@@ -297,18 +303,31 @@ def tool_get_insights(args):
 
     from mcp.core import _apply_phase_filter  # ADR-058
 
-    resp = table.query(
-        **_apply_phase_filter(
+    # #2221: the PAGE and the CORPUS are different numbers, and the tool used to publish
+    # the page as `total`. Two compounding causes: DynamoDB applies `Limit` to items READ
+    # (before the ADR-058 phase FilterExpression, so a partition carrying pilot rows yields
+    # fewer than the cap), and LastEvaluatedKey was never followed. "How many insights are
+    # still open?" answered 50 whatever the answer was. Follow the pages, count the whole
+    # corpus, and say plainly when `insights` is a truncation of it.
+    items = []
+    start_key = None
+    while len(items) < _INSIGHTS_MAX_SCAN:
+        params = _apply_phase_filter(
             {
                 "KeyConditionExpression": Key("pk").eq(INSIGHTS_PK) & Key("sk").begins_with("INSIGHT#"),
                 "ScanIndexForward": False,  # newest first
-                "Limit": 200,
+                "Limit": _INSIGHTS_PAGE_SIZE,
             }
         )
-    )
-    items = resp.get("Items", [])
+        if start_key is not None:
+            params["ExclusiveStartKey"] = start_key
+        resp = table.query(**params)
+        items.extend(resp.get("Items", []))
+        start_key = resp.get("LastEvaluatedKey")
+        if not start_key:
+            break
 
-    results = []
+    matched = []
     for item in items:
         status = item.get("status", "open")
         if status_filter and status != status_filter:
@@ -320,7 +339,7 @@ def tool_get_insights(args):
         except Exception:
             days_open = None
 
-        results.append(
+        matched.append(
             {
                 "insight_id": item.get("insight_id", ""),
                 "text": item.get("text", ""),
@@ -333,13 +352,17 @@ def tool_get_insights(args):
                 "stale": (days_open is not None and days_open > 14 and status == "open"),
             }
         )
-        if len(results) >= limit:
-            break
 
-    stale_count = sum(1 for r in results if r["stale"])
+    results = matched[:limit]
+    # ADR-104: counts describe what was counted. `total`/`stale_count` are the corpus (every
+    # matching insight the scan reached); `returned` is the page. `scan_exhausted` False means
+    # even the corpus count is a floor — the scan cap was hit before the partition ran out.
     return {
-        "total": len(results),
-        "stale_count": stale_count,
+        "total": len(matched),
+        "returned": len(results),
+        "truncated": len(matched) > len(results),
+        "scan_exhausted": start_key is None,
+        "stale_count": sum(1 for r in matched if r["stale"]),
         "status_filter": status_filter or "all",
         "insights": results,
     }

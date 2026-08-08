@@ -142,10 +142,11 @@ BASELINE = {
     "lambdas/health/character_engine.py": 2117,
     "lambdas/content/html_builder.py": 2104,
     "lambdas/web/site_api_ai_lambda.py": 1991,
-    # 1989 -> 1806 by #2221: tool_get_social_connection_trend was lifted into cohesive
-    # mcp/tools_social_connection.py (253 lines, under the ceiling) so the honest-numbers
-    # fixes could land without raising this number. The ratchet tightening.
-    "mcp/tools_lifestyle.py": 1806,
+    # 1989 -> 1829 by #2221: tool_get_social_connection_trend was lifted into cohesive
+    # mcp/tools_social_connection.py (257 lines, under the ceiling), which paid for the
+    # honest-numbers fixes that stayed behind (get_insights pagination + corpus counts)
+    # and still handed back 160 lines. The ratchet tightening.
+    "mcp/tools_lifestyle.py": 1829,
     "lambdas/emails/coach_panel_podcast_lambda.py": 1904,
     # site_api_coach.py (2664 by the time the slice ran) drained to a ~440-line facade by
     # #1654 — the handler logic now lives in cohesive web/site_api_coach_{profile,stance,
