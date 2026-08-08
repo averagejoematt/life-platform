@@ -127,6 +127,55 @@ _DANGEROUS_CALORIE_PHRASES = [
     r"\bzero\s+calories\b",
 ]
 
+# The confirming figure regex for the low-calorie BLOCK (Check 5): a 100-799
+# figure followed by a calorie unit.
+_LOW_CALORIE_FIGURE_RE = re.compile(r"\b([1-7]\d{2})\s*(?:kcal|calories|cal)\b", re.IGNORECASE)
+
+# #2215 — a 100-799 kcal figure is only a starvation-level *recommendation* when
+# it describes a DAY's intake. The identical figure is routine, safe labelling
+# when it describes one serving / dish / food item, which is exactly what the
+# weekly-plate recipe cards are required by their own system prompt to print
+# ("Approximate macros per serving (cal/P/C/F)"). These two signals mark a
+# figure as per-item labelling rather than a daily prescription.
+_PER_ITEM_CALORIE_CONTEXT = [
+    r"\bper\s+(?:serving|portion|meal|snack|bowl|plate|slice|piece|item|cup|scoop|egg|recipe)\b",
+    r"\b(?:each|one|a)\s+(?:serving|portion|bowl|plate|slice|scoop)\b",
+    r"/\s*serving\b",
+    r"\bserves\s+\d",
+]
+
+# "520 cal · 42P / 30C / 18F" — a calorie figure sitting inside a macro
+# breakdown is a nutrition label. Two DISTINCT macro classes are required so a
+# stray letter next to a number cannot fake it, and they must sit in the SAME
+# segment (HTML element / sentence) as the figure so one recipe card's macros
+# cannot exempt a daily target written on the next line.
+_MACRO_BREAKDOWN_TOKENS = {
+    "protein": re.compile(r"\b\d{1,3}\s*g?\s*(?:P|protein)\b", re.IGNORECASE),
+    "carbs": re.compile(r"\b\d{1,3}\s*g?\s*(?:C|carbs?|carbohydrates?)\b", re.IGNORECASE),
+    "fat": re.compile(r"\b\d{1,3}\s*g?\s*(?:F|fat)\b", re.IGNORECASE),
+}
+
+# A per-DAY framing always wins over the labelling signals above: "500 cal a day
+# (40P/30C/10F)" is a starvation target no matter how it is annotated.
+_DAILY_INTAKE_CONTEXT = [
+    r"\b(?:per|a|each)\s+day\b",
+    r"/\s*day\b",
+    r"\bdaily\b",
+    r"\btoday\b",
+    r"\beat\s+(?:only|just|no\s+more\s+than)\b",
+    r"\blimit(?:ed)?\s+(?:yourself\s+)?to\b",
+    r"\bno\s+more\s+than\b",
+    r"\bstay\s+(?:under|below)\b",
+    r"\bcalorie\s+target\b",
+    r"\btotal\s+(?:daily\s+)?(?:intake|calories)\b",
+]
+
+# How far either side of the figure we look for that context.
+_CALORIE_CONTEXT_WINDOW = 80
+
+# Segment boundary for the macro-breakdown signal: an HTML tag or a sentence end.
+_SEGMENT_BOUNDARY_RE = re.compile(r"<[^>]{0,200}>|(?<=[.!?;])\s")
+
 _SUPPLEMENT_OVERDOSE_PATTERNS = {
     # Supplement name → (safe_max_per_day, unit_pattern)
     "vitamin_d": (10_000, r"(?:vitamin\s+d\s*\d{5,}|d3\s*\d{5,})"),
@@ -317,9 +366,16 @@ def validate_ai_output(
         low_cal_found = _find_patterns(stripped, _DANGEROUS_CALORIE_PHRASES)
         if low_cal_found:
             # Extract any actual calorie numbers to confirm (avoid false positives on "800 cal deficit")
-            cal_numbers = re.findall(r"\b([1-7]\d{2})\s*(?:kcal|calories|cal)\b", stripped, re.IGNORECASE)
-            # Only block if numbers are < 800 and not clearly about deficit/restriction context
-            blocked_cals = [c for c in cal_numbers if int(c) < 800 and not re.search(rf"{c}.*(?:deficit|below)", stripped, re.IGNORECASE)]
+            blocked_cals = []
+            for _cal_match in _LOW_CALORIE_FIGURE_RE.finditer(stripped):
+                cal = _cal_match.group(1)
+                # Only block if the number is < 800 and not clearly about deficit/restriction context
+                if int(cal) >= 800 or re.search(rf"{cal}.*(?:deficit|below)", stripped, re.IGNORECASE):
+                    continue
+                # #2215: a per-serving recipe macro labels ONE dish, not a day's intake.
+                if _is_per_item_calorie_figure(stripped, _cal_match):
+                    continue
+                blocked_cals.append(cal)
             if blocked_cals:
                 result.blocked = True
                 result.block_reason = f"Dangerously low calorie recommendation: {blocked_cals} kcal"
@@ -464,6 +520,39 @@ def _find_patterns(text: str, patterns: list[str]) -> list[str]:
         if re.search(pattern, text, re.IGNORECASE):
             found.append(pattern.replace(r"\b", "").replace("\\", "").strip(".+*?()[]{}^$|"))
     return found
+
+
+def _is_per_item_calorie_figure(text: str, match: re.Match) -> bool:
+    """#2215 — True when a 100-799 kcal figure LABELS one serving/dish rather
+    than PRESCRIBING a day's intake.
+
+    The low-calorie BLOCK exists to catch a starvation-level daily target
+    ("eat only 500 calories today"). It cannot distinguish that from a recipe
+    card's per-serving macro line, which every Weekly Plate edition is required
+    by its own system prompt to carry — so every compliant edition was blocked.
+
+    Two signals mark a figure as labelling: an explicit per-serving/per-item
+    qualifier, or a macro breakdown (>=2 distinct macro classes) beside it.
+    An explicit per-day framing in the same window overrides both — annotating
+    a starvation target with macros must not buy an exemption.
+    """
+    window = text[max(0, match.start() - _CALORIE_CONTEXT_WINDOW) : match.end() + _CALORIE_CONTEXT_WINDOW]
+    if _find_patterns(window, _DAILY_INTAKE_CONTEXT):
+        return False
+    if _find_patterns(window, _PER_ITEM_CALORIE_CONTEXT):
+        return True
+    segment = _enclosing_segment(text, match)
+    macro_classes = sum(1 for token in _MACRO_BREAKDOWN_TOKENS.values() if token.search(segment))
+    return macro_classes >= 2
+
+
+def _enclosing_segment(text: str, match: re.Match) -> str:
+    """The HTML element / sentence containing `match` — the macro-breakdown
+    signal is only trusted this close to the figure."""
+    left = max((b.end() for b in _SEGMENT_BOUNDARY_RE.finditer(text, 0, match.start())), default=0)
+    right_boundary = _SEGMENT_BOUNDARY_RE.search(text, match.end())
+    right = right_boundary.start() if right_boundary else len(text)
+    return text[left:right]
 
 
 def _check_hallucinated_metrics(text: str, health_context: dict) -> list[str]:

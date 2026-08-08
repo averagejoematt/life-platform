@@ -1160,22 +1160,15 @@ class TestHandlerAiDegradation:
         html = wired["ses"].sent[0]["Content"]["Simple"]["Body"]["Html"]["Data"]
         assert "Smoky Turkey Kofte Bowls" in html
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-2 discovery): weekly_plate validates its output as "
-            "AIOutputType.NUTRITION_COACH, whose Check-5 BLOCKS any three-digit calorie figure "
-            "100-799 followed by cal/kcal/calories (ai_output_validator.py:317-330). But this "
-            "module's own SYSTEM_PROMPT *requires* every 'Try This' recipe card to carry "
-            "'Approximate macros per serving (cal/P/C/F)', and a single-serving recipe is almost "
-            "always 300-700 kcal. So a prompt-compliant edition is blocked and the ENTIRE email "
-            "body is replaced by the validator's one-line fallback ('Calorie guidance review "
-            "needed. Target minimum: 1,200 kcal/day...'). The check exists to catch a "
-            "starvation-level daily recommendation; it cannot tell that apart from a per-serving "
-            "recipe macro. Runs the real validator — no stub."
-        ),
-    )
     def test_a_per_serving_recipe_macro_does_not_get_the_whole_edition_blocked(self, wired, monkeypatch):
+        """FIXED (#2215): weekly_plate validates its output as AIOutputType.NUTRITION_COACH,
+        whose Check-5 blocked ANY three-digit calorie figure 100-799 followed by
+        cal/kcal/calories — while this module's own SYSTEM_PROMPT *requires* every 'Try This'
+        recipe card to carry 'Approximate macros per serving (cal/P/C/F)'. Every
+        prompt-compliant edition was therefore replaced wholesale by the validator's one-line
+        fallback. The check now distinguishes a per-item macro label from a daily intake
+        prescription (ai_output_validator._is_per_item_calorie_figure). Runs the real
+        validator — no stub."""
         monkeypatch.setattr(wp, "call_anthropic", lambda s, u: AI_HTML_WITH_PER_SERVING_MACROS)
         wp.lambda_handler({}, None)
         html = wired["ses"].sent[0]["Content"]["Simple"]["Body"]["Html"]["Data"]
