@@ -27,11 +27,26 @@ from web import site_api_social as social  # noqa: E402
 
 
 class _FakeTable:
-    def __init__(self, items):
+    """Rows live in ONE source partition (default: youtube), like real data — the
+    membrane loop queries every _BROADCAST_SOURCES partition (#2161 made that 3),
+    and a fake that answered every pk with the same rows triplicated each post
+    the moment a second source existed (the 2026-08-08 main red)."""
+
+    def __init__(self, items, source="youtube"):
+        self._pk = f"{social.USER_PREFIX}{source}"
         self._items = items
 
+    def _pk_of(self, expr):
+        try:
+            vals = expr.get_expression()["values"]
+            first = vals[0] if isinstance(vals, (list, tuple)) else vals
+            return first.get_expression()["values"][1]
+        except Exception:
+            return None
+
     def query(self, **kw):
-        return {"Items": list(self._items)}
+        pk = self._pk_of(kw.get("KeyConditionExpression"))
+        return {"Items": list(self._items) if pk in (None, self._pk) else []}
 
 
 def _event(route=None):
