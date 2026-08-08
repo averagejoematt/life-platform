@@ -289,6 +289,7 @@ class IngestionConfig:
         gap_rate_limit_seconds: float = 1.0,
         refresh_today: bool = False,
         refresh_trailing_days: int = 0,
+        carry_forward_fn=None,
     ):
         self.source_name = source_name
         self.secret_id = secret_id
@@ -314,6 +315,14 @@ class IngestionConfig:
         # be re-fetched every run, regardless of presence — transform() rebuilds the
         # whole day from all API activities, so a re-fetch merges in late arrivals.
         self.refresh_trailing_days = refresh_trailing_days
+        # #2250: the flip side of refresh_today/refresh_trailing_days. Re-fetching a
+        # stored date is a full put_item REPLACE built from the API response alone,
+        # so a field written by a LATER pass (activity-enrichment's `enriched_name`)
+        # is destroyed on the next run of this source. A source whose records are
+        # written by more than one Lambda supplies
+        # `carry_forward_fn(existing_item, new_item) -> new_item`, called by
+        # _store_item with the currently-stored record. None = plain replace.
+        self.carry_forward_fn = carry_forward_fn
 
         # Environment
         self.region = os.environ.get("AWS_REGION", "us-west-2")
@@ -431,6 +440,42 @@ def phase_for_date(date_str: str) -> str:
 _phase_for_date = phase_for_date
 
 
+def _carry_forward(table, config, item, logger):
+    """#2250: re-apply fields a LATER writer added to the record we're replacing.
+
+    Every framework store is a full `put_item` REPLACE, and `transform()` rebuilds
+    the day from the API response alone. For a source with `refresh_today` /
+    `refresh_trailing_days` set, that replace re-runs on an already-stored date on
+    every single run — so anything a downstream pass wrote onto the stored record
+    (activity-enrichment's `enriched_name`, written at 15:30 UTC, vs. Strava's next
+    ingest at 16:10 UTC) is destroyed, typically within the hour.
+
+    A source that has such a downstream writer declares
+    `carry_forward_fn(existing_item, new_item) -> new_item` on its IngestionConfig;
+    the framework hands it the currently-stored record just before the replace. The
+    callback owns the merge policy — the framework never guesses which fields are
+    safe to keep.
+
+    Never fatal: a failed read or a raising callback logs and stores the un-merged
+    item. Losing a label is bad; losing the day's ingest is worse.
+    """
+    fn = getattr(config, "carry_forward_fn", None)
+    if fn is None:
+        return item
+    try:
+        existing = (table.get_item(Key={"pk": item["pk"], "sk": item["sk"]}) or {}).get("Item")
+    except Exception as e:  # pragma: no cover - defensive
+        logger.warning(f"[CARRY-FORWARD] read failed for {item.get('sk')} — storing un-merged: {e}")
+        return item
+    if not existing:
+        return item
+    try:
+        return fn(existing, item)
+    except Exception as e:  # pragma: no cover - defensive
+        logger.warning(f"[CARRY-FORWARD] merge failed for {item.get('sk')} — storing un-merged: {e}")
+        return item
+
+
 def _store_item(table, s3, config, item, date_str, logger):
     """Validate (DATA-2), size-guard (REL-3), and store a single DDB item.
 
@@ -449,6 +494,10 @@ def _store_item(table, s3, config, item, date_str, logger):
             logger.warning(f"[DATA-2] Validation warnings for " f"{config.source_name}/{date_str}: {vr.warnings}")
     except ImportError:
         pass  # Validator not available — proceed without
+
+    # #2250: a full put_item REPLACE would wipe any field a later pass wrote onto
+    # the stored record; sources with a downstream writer opt into a merge.
+    item = _carry_forward(table, config, item, logger)
 
     # ADR-058: stamp phase=pilot|experiment so the default-deny read filter works.
     # Don't overwrite an explicitly-set phase (e.g., admin backfill scripts).
