@@ -30,7 +30,10 @@ returned".
 
 from __future__ import annotations
 
+import ast
+import inspect
 import json
+import pathlib
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -257,6 +260,19 @@ def test_the_empty_state_still_shapes_the_weekday_weekend_split_so_the_panel_ren
     assert set(wvw) == {"weekday", "weekend"}
     assert wvw["weekday"]["avg_calories"] is None
     assert wvw["weekend"]["days"] == 0
+
+
+def test_the_shape_parity_empty_state_still_never_reaches_the_private_partitions():
+    """Shape parity gave the genesis-week branch `food_delivery` and
+    `blueprint_benchmark` keys so the front-end binds one shape. A KEY is not a QUERY:
+    both stay None and the branch must still read only the macrofactor partition, or
+    "make the empty state match" would have quietly become a privacy regression
+    (P2.3 food delivery, P2.5 PROVEN_BLUEPRINT — both flag-gated OFF)."""
+    src = FakeSources()
+    body = overview(src)
+    assert body["food_delivery"] is None
+    assert body["blueprint_benchmark"] is None
+    assert src.sources_read == {"macrofactor"}
 
 
 def test_the_empty_state_trend_is_an_empty_series_not_a_row_of_zeros():
@@ -1535,7 +1551,45 @@ def test_a_channel_starting_from_zero_reads_as_stable_instead_of_an_infinite_cha
     assert train["status"] == "stable"
 
 
+def test_the_habit_channel_reads_a_field_the_habitify_writer_actually_produces():
+    """Reader/writer agreement, channel 4 — the marker's stated cause was only half of it.
+
+    The marker described the `or` dropping an honest 0. True, but underneath it the
+    channel read `tier_0_completion_rate` / `t0_rate`, and NEITHER name has ever been
+    produced by any writer in this repo: `ingestion/habitify_lambda.py` writes
+    `completion_pct` (pending-aware), `completion_pct_strict` and `by_group[*].pct` over
+    the nine `P40_GROUPS`, and there is no "Tier 0" group at all. So the channel was not
+    merely dropping zeros — it had never carried a single value in production: always [],
+    always 'insufficient_data', never degraded. Behavioural unravelling, the earliest and
+    most actionable sign a cut is failing, was structurally invisible to the panel built
+    to catch it. The FIXTURE was stale in the same way, which is why the marker's test
+    could not have caught it either.
+    """
+    # Read the writer's SOURCE rather than importing it: habitify_lambda builds an
+    # IngestionConfig at import time and needs S3_BUCKET in the environment.
+    writer = pathlib.Path(inspect.getfile(nut)).parent.parent / "ingestion" / "habitify_lambda.py"
+    src_text = writer.read_text()
+    assert '"completion_pct"' in src_text, "the habitify writer no longer produces the field this channel reads"
+    assert '"tier_0_completion_rate"' not in src_text and '"t0_rate"' not in src_text
+
+
+def test_the_habit_channel_stays_dark_on_the_field_names_it_used_to_read():
+    """The dead names must stay dead: a habitify row carrying only
+    `tier_0_completion_rate` is not a habit reading, so the channel says
+    insufficient_data rather than inventing one out of a name nothing writes."""
+    src = _sust_sources()
+    src.data["habitify"] = [
+        row("habitify", d, tier_0_completion_rate=v)
+        for d, v in zip([(datetime(2026, 5, 9) - timedelta(days=5 - i)).strftime("%Y-%m-%d") for i in range(6)], DROP6)
+    ]
+    ds = sustainability(src)["deficit_sustainability"]
+    t0 = next(c for c in ds["channels"] if c["name"] == "Habit completion")
+    assert t0["direction"] == "insufficient_data"
+    assert t0["status"] == "stable"  # absence of evidence is not evidence of strain
+
+
 def test_a_day_of_zero_habit_completion_drives_the_habit_channel_rather_than_vanishing():
+    # completion_pct 0.8, 0.8, 0.5, 0.5, 0.0, 0.0 -> first third 0.8, last third 0.0
     ds = sustainability(_sust_sources(t0=[80, 80, 50, 50, 0, 0]))["deficit_sustainability"]
     t0 = next(c for c in ds["channels"] if c["name"] == "Habit completion")
     assert t0["direction"] == "declining"
@@ -1716,6 +1770,46 @@ def test_a_single_malformed_macro_value_does_not_take_down_the_whole_nutrition_p
         ]
     )
     assert overview(src)["nutrition"]["avg_calories"] == 2000
+
+
+def test_no_field_in_the_module_is_coerced_without_the_shared_none_guard():
+    """Guard the SET, not the instance.
+
+    The 500 was never specifically `total_calories_kcal` — it was the CLASS of bare
+    `float(row["field"])` / `float(row.get("field") or 0)` coercions on hand-uploaded
+    MacroFactor and Withings export data, of which the module carried nine while
+    `_resolve_mf_tdee` and `_mifflin_tdee` guarded the identical coercion two functions
+    away. The offender list is DERIVED from the module's own AST rather than hand-listed,
+    so a NEW unguarded coercion cannot ship past this file.
+    """
+    tree = ast.parse(inspect.getsource(nut))
+
+    def _catches_a_coercion_error(handler):
+        types = handler.type.elts if isinstance(handler.type, ast.Tuple) else [handler.type]
+        return any(isinstance(t, ast.Name) and t.id in ("ValueError", "TypeError", "Exception") for t in types)
+
+    # A coercion already sitting inside a try/except ValueError|TypeError is guarded —
+    # `_tmin` and the eating-window meal-time parse are the legitimate cases.
+    guarded = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Try) and any(_catches_a_coercion_error(h) for h in node.handlers):
+            for stmt in node.body:
+                for sub in ast.walk(stmt):
+                    guarded.add(id(sub))
+
+    offenders = []
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in ("float", "int")):
+            continue
+        if not node.args or id(node) in guarded:
+            continue
+        reads_a_row = any(
+            isinstance(sub, ast.Subscript) or (isinstance(sub, ast.Call) and isinstance(sub.func, ast.Attribute) and sub.func.attr == "get")
+            for sub in ast.walk(node.args[0])
+        )
+        if reads_a_row:
+            offenders.append(ast.unparse(node))
+    assert not offenders, f"unguarded coercion(s) on partition data — route through _num(): {offenders}"
 
 
 def test_a_withings_row_with_a_non_numeric_weight_falls_back_to_no_estimate():

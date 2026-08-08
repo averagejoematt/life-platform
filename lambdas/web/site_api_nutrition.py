@@ -45,6 +45,12 @@ _TARGET_RATE_LB_WK = 3
 _KCAL_PER_LB = 3500
 _REQUIRED_DEFICIT_KCAL = round(_TARGET_RATE_LB_WK * _KCAL_PER_LB / 7)  # 1500
 
+# Last-resort protein lines, used ONLY when canonical_facts carries a value that will not
+# coerce. The authoritative default lives in the `_prof.get(<key>, <default>)` call itself,
+# whose literal shape tests/test_protein_contract.py pins against the producer.
+_PROTEIN_TARGET_FALLBACK_G = 190.0
+_PROTEIN_FLOOR_FALLBACK_G = 170.0
+
 
 def _num(v):
     """``float(v)`` or ``None`` — never raises (#2221).
@@ -377,9 +383,22 @@ def nutrition_overview(*, _g) -> dict:
     # (protein_g_target/protein_g_floor). This page used to hardcode 190 and call it
     # the "floor" while the coaches graded against the real 170 floor — a reader
     # crossing doors saw two truths.
+    # #2221: coerced through `_num` like every other read — a non-numeric
+    # protein_target_g in canonical_facts used to 500 the whole nutrition door rather
+    # than fall back to the documented default. Found by the derived AST guard in
+    # tests/test_site_api_nutrition_behavior.py, not by any marker.
+    #
+    # The `.get("<key>", <default>)` LITERAL shape is load-bearing:
+    # tests/test_protein_contract.py regex-matches key+default here against
+    # daily_metrics_compute's producer so the doors cannot tell two protein truths
+    # again. Keep the literal; add the guard around it, never instead of it.
     _prof = _get_profile()
-    protein_target = float(_prof.get("protein_target_g", 190))
-    protein_floor = float(_prof.get("protein_floor_g", 170))
+    protein_target = _num(_prof.get("protein_target_g", 190))
+    if protein_target is None:
+        protein_target = _PROTEIN_TARGET_FALLBACK_G
+    protein_floor = _num(_prof.get("protein_floor_g", 170))
+    if protein_floor is None:
+        protein_floor = _PROTEIN_FLOOR_FALLBACK_G
     protein_hit_days = sum(1 for v in pro_vals if v >= protein_target)
     protein_hit_pct = round(protein_hit_days / len(pro_vals) * 100) if pro_vals else 0
     floor_hit_days = sum(1 for v in pro_vals if v >= protein_floor)
