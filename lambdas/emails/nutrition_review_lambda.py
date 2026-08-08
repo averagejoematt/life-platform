@@ -14,6 +14,12 @@ Profile (targets).
 
 v1.1.0: Expert panel prompt dynamically built from s3://matthew-life-platform/config/board_of_directors.json
         Falls back to hardcoded _FALLBACK_SYSTEM_PROMPT if S3 config unavailable.
+v1.2.0 (#2216): the AI-3 validation and IC-15 insight gates no longer key off
+        `startswith("<div")` — the panel's own prompt orders that markup, so both
+        gates were dark on every genuine edition. They now key off an explicit
+        failure marker (`_AI_UNAVAILABLE_MARKER`) no prompt asks for. The handler
+        also accepts `{"dry_run": true}`: it builds the full review and returns
+        it WITHOUT calling SES or writing any durable row.
 """
 
 import json
@@ -729,6 +735,36 @@ def store_weekly_summary(dates, summary):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# AI FAILURE MARKER (#2216)
+# ══════════════════════════════════════════════════════════════════════════════
+
+# When the panel call fails we render a hardcoded card in place of the panel.
+# Two downstream gates need to tell that card apart from a real edition: AI-3
+# safety validation and the IC-15 insight-ledger write. The old sentinel —
+# `ai_content.startswith("<div")` — could not: the system prompt ORDERS the
+# panel to "Write clean HTML with inline styles ... Each expert section in a div
+# with border-left", so every genuine edition matched the stub test and skipped
+# both gates. The marker below is an explicit attribute no prompt asks for, so
+# only the stub carries it.
+_AI_UNAVAILABLE_MARKER = 'data-ai-status="unavailable"'
+_AI_UNAVAILABLE_HTML = (
+    f'<div {_AI_UNAVAILABLE_MARKER} style="background:#16213e;border-radius:8px;padding:20px;color:#e0e0e0;">'
+    "AI analysis unavailable. Review data table above.</div>"
+)
+
+# A compliant edition is ~1500-2000 words of inline-styled HTML — far past the
+# validator's 5k default, which would otherwise emit the "unusually long" WARN on
+# every single edition and mean nothing. This bound is set from the shape the
+# prompt actually demands, so the warning still fires on runaway generation.
+_PANEL_MAX_CHARS = 40_000
+
+
+def is_panel_edition(ai_content):
+    """True when `ai_content` is real panel output rather than the failure card."""
+    return bool(ai_content) and _AI_UNAVAILABLE_MARKER not in ai_content
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # HANDLER
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -754,6 +790,11 @@ def record_email_send(table, lambda_name):
 
 def lambda_handler(event, context):
     logger.info("Nutrition Review v1.0 starting...")
+
+    # #2216: {"dry_run": true} builds the whole review — data, prompt, panel call,
+    # validation, HTML — and returns it without calling SES or writing any durable
+    # row. A regeneration/verification invoke must never mail Matthew a review.
+    dry_run = bool(event.get("dry_run")) if isinstance(event, dict) else False
 
     data = gather_nutrition_data()
     if not data:
@@ -829,14 +870,17 @@ def lambda_handler(event, context):
         ai_content = call_anthropic(system, user_message)
     except Exception as e:
         logger.error(f"Anthropic failed: {e}")
-        ai_content = '<div style="background:#16213e;border-radius:8px;padding:20px;color:#e0e0e0;">AI analysis unavailable. Review data table above.</div>'
+        ai_content = _AI_UNAVAILABLE_HTML
 
-    # AI-3: Validate output before rendering
-    if _HAS_AI_VALIDATOR and ai_content and not ai_content.startswith("<div"):
-        _val = validate_ai_output(ai_content, AIOutputType.NUTRITION_COACH)
+    # AI-3: Validate output before rendering. Runs on every REAL edition (#2216) —
+    # only the failure card, which carries the explicit marker, is exempt.
+    panel_blocked = False
+    if _HAS_AI_VALIDATOR and is_panel_edition(ai_content):
+        _val = validate_ai_output(ai_content, AIOutputType.NUTRITION_COACH, max_length=_PANEL_MAX_CHARS)
         if _val.blocked:
+            panel_blocked = True
             logger.error(f"[AI-3] Nutrition review output BLOCKED: {_val.block_reason}")
-            ai_content = _val.safe_fallback or "<p>AI analysis unavailable. Review data table above.</p>"
+            ai_content = _val.safe_fallback or _AI_UNAVAILABLE_HTML
         elif _val.warnings:
             logger.warning(f"[AI-3] Nutrition review warnings: {_val.warnings}")
 
@@ -847,6 +891,16 @@ def lambda_handler(event, context):
     avg_cal = summary.get("avg_calories", 0)
     avg_pro = summary.get("avg_protein_g", 0)
     subject = f"Nutrition Review - {dates['this_end']} - {int(avg_cal)} kcal - {int(avg_pro)}g protein"
+
+    if dry_run:
+        logger.info(f"[dry-run] Nutrition review built, NOT sent: {subject}")
+        return {
+            "statusCode": 200,
+            "dry_run": True,
+            "subject": subject,
+            "html_bytes": len(html),
+            "body": f"Nutrition review DRY RUN (not sent): {subject}",
+        }
 
     ses.send_email(
         FromEmailAddress=SENDER,
@@ -862,8 +916,11 @@ def lambda_handler(event, context):
 
     store_weekly_summary(dates, summary)
 
-    # IC-15: Persist nutrition insights
-    if _HAS_INSIGHT_WRITER and ai_content and not ai_content.startswith("<div"):
+    # IC-15: Persist nutrition insights. Only a REAL, delivered edition belongs in
+    # the ledger (#2216) — not the failure card, and not a validator fallback that
+    # replaced blocked output; IC-16 feeds those straight back into next week's
+    # prompt as "previous insights".
+    if _HAS_INSIGHT_WRITER and not panel_blocked and is_panel_edition(ai_content):
         try:
             insight_writer.write_insight(
                 digest_type="nutrition_review",
