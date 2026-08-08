@@ -30,8 +30,18 @@ hand-rolled bounded fake wired onto the module attribute the code looks up. Ever
 clock is frozen; no fixture date is ever combined with a live `datetime.now()`.
 
 Findings that reflect production defects are marked `xfail(strict=False)` with
-the module, function, what it does, what it should do, and who it hurts. No
-production code is modified by this file.
+the module, function, what it does, what it should do, and who it hurts.
+
+#1658 second pass (2026-08-08): 17 markers were opened here by the reporting
+tranche; 15 are now closed. 13 were real defects and are FIXED in
+`lambdas/intelligence/intelligence_common.py` — each of those assertions was
+first confirmed to FAIL against the pre-fix module, and the docstring on each
+records the pre-fix observation, so none of them can pass vacuously. 2 were
+correct on the facts and wrong on the diagnosis (the credibility/thread-
+prediction cluster: `SOURCE#coach_thread#` predictions were deliberately voided
+by #726, so their "missing" resolver and grader are the intended state) — those
+markers are replaced by tests that pin the corrected record. 2 remain open and
+say why in their own reason strings.
 """
 
 import json
@@ -757,14 +767,20 @@ class TestPreambleCredibility:
     @pytest.mark.xfail(
         strict=False,
         reason=(
-            "DEFECT (P2, VERIFIED) intelligence_common.py:1629 load_credibility reads "
-            "USER#matthew / SOURCE#coach_credibility#{coach_id}, and NO module in lambdas/ or "
-            "mcp/ writes that key — #1239 deleted compute_all_credibility, the only writer, and "
-            "left the reader. So every coach prompt permanently carries 'Track record: nascent "
-            "(0 predictions resolved, 0% accuracy)' and the over-confident corrective is "
-            "structurally unreachable. It should be written by whatever computes credibility "
-            "(compute_credibility, itself uncalled). Hurts Matthew: a coach with a real track "
-            "record is told, every day, that it has none."
+            "DEFECT (P2, VERIFIED — diagnosis CORRECTED by #1658) intelligence_common.py "
+            "load_credibility reads USER#matthew / SOURCE#coach_credibility#{coach_id}, and NO "
+            "module in lambdas/ or mcp/ writes that key (#1239 deleted compute_all_credibility, "
+            "the only writer, and left the reader). Every coach prompt therefore carries "
+            "'Track record: nascent (0 predictions resolved, 0% accuracy)' every day, and the "
+            "over-confident corrective is structurally unreachable. CORRECTION: the fix is NOT "
+            "'call compute_credibility and store it' — that function grades the "
+            "SOURCE#coach_thread# predictions #726 deliberately voided as ungradeable. The "
+            "evaluator-graded ledger is COACH#{coach}_coach / PREDICTION#, which DOES carry a "
+            "real track record. So the honest repairs are (a) source the preamble's track "
+            "record from that canonical store, or (b) stop asserting '0% accuracy' over n=0 "
+            "and say 'not yet measured' (ADR-104/105). Both are a change of contract, not a "
+            "one-line repair, and want their own issue — left open deliberately. Hurts "
+            "Matthew: a coach with a real graded track record is told, every day, it has none."
         ),
     )
     def test_something_in_the_repo_writes_the_credibility_record_it_reads(self):
@@ -1454,22 +1470,24 @@ class TestUpdatePredictionStatus:
         assert ic.update_prediction_status("sleep", "p1", "confirmed") is False
         assert table.puts == []
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (P1, VERIFIED) intelligence_common.py:1282 update_prediction_status has NO "
-            "caller in lambdas/ or mcp/ — coach_prediction_evaluator has its own private "
-            "_update_prediction_status (coach_prediction_evaluator.py:865) which writes to "
-            "COACH#{coach}/PREDICTION#{id}, a DIFFERENT store from the SOURCE#coach_thread "
-            "entries compute_credibility grades. So no thread prediction is ever resolved: "
-            "stamp_thread_predictions writes status='pending' and nothing ever changes it. "
-            "Either the evaluator should also settle thread predictions or the thread's "
-            "credibility should read the COACH# store. Hurts Matthew: coach credibility can "
-            "never move off its floor, so 'YOUR CREDIBILITY: nascent' is a permanent constant."
-        ),
-    )
-    def test_the_thread_prediction_store_has_a_live_resolver(self):
-        assert _live_references("update_prediction_status")
+    def test_the_thread_prediction_store_is_deliberately_left_unresolved(self):
+        """RECORD CORRECTED (#1658, was xfail "DEFECT P1"). The finding was right on the
+        facts — `update_prediction_status` has no caller and no `SOURCE#coach_thread#`
+        prediction is ever resolved — and wrong on the diagnosis. That is the INTENDED
+        state, not a gap: #725/#726 made `COACH#{coach}_coach / PREDICTION#` the canonical
+        graded ledger (code-stamped ids, settled daily by
+        `coach_prediction_evaluator._update_prediction_status`, served to both MCP and the
+        public site), and explicitly VOIDED the legacy thread-embedded arrays as
+        "LLM-authored, ungradeable metadata"
+        (deploy/archive/onetime/void_legacy_predictions_726.py). What the thread copies
+        still earn their keep for is narrative continuity in the coach prompt, not grading.
+        Wiring a second resolver onto a deliberately-voided store would re-create the
+        double ledger #726 removed. Pinned so that wiring it later is a deliberate act."""
+        assert _live_references("update_prediction_status") == []
+        with open(os.path.join(ROOT, "lambdas", "coach", "coach_prediction_evaluator.py"), encoding="utf-8") as fh:
+            evaluator = fh.read()
+        assert "_update_prediction_status" in evaluator  # the canonical resolver, live
+        assert "PREDICTION#" in evaluator
 
 
 class TestIsoWeek:
@@ -1702,21 +1720,18 @@ class TestComputeCredibility:
         assert result["accuracy_pct"] == 0
         assert result["predictions_resolved"] == 0
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (P1, VERIFIED) intelligence_common.py:1587 compute_credibility has NO caller "
-            "in lambdas/ or mcp/ and its result is never persisted; the only live credibility "
-            "read (load_credibility, line 1629) reads SOURCE#coach_credibility#, which no module "
-            "writes. Combined with the unresolvable thread predictions above, the credibility "
-            "surface is dark end to end: it can only report 'nascent', never rise or fall. It "
-            "should be invoked by the daily coach pipeline and its output stored under the key "
-            "load_credibility reads. Hurts Matthew: the coaching layer's self-assessment is a "
-            "constant that looks like a measurement."
-        ),
-    )
-    def test_compute_credibility_has_a_live_caller(self):
-        assert _live_references("compute_credibility")
+    def test_compute_credibility_is_deliberately_uncalled_because_it_grades_a_voided_store(self):
+        """RECORD CORRECTED (#1658, was xfail "DEFECT P1"). The fact is right —
+        `compute_credibility` has no caller and its result is never persisted — but the
+        prescribed fix ("it should be invoked by the daily coach pipeline and its output
+        stored under the key load_credibility reads") would make things WORSE, not better:
+        its only input is `read_coach_thread`'s embedded predictions, the store #726 voided
+        as ungradeable. Persisting a credibility score computed from a deliberately-voided
+        ledger would publish a measurement-shaped number with no measurement behind it —
+        the ADR-104 violation the finding was trying to close. The live honesty gap is the
+        READER, not this writer (see TestPreambleCredibility). Pinned so a future call site
+        has to argue with this."""
+        assert _live_references("compute_credibility") == []
 
 
 class TestLoadCredibility:
