@@ -156,7 +156,12 @@ BASELINE = {
     "lambdas/compute/hypothesis_engine_lambda.py": 1556,
     "lambdas/ai/ai_context.py": 1415,
     "lambdas/content/output_writers.py": 1387,
-    "lambdas/compute/daily_metrics_compute_lambda.py": 1369,
+    # 1369 -> 1370 by #2299: one `from intelligence.weight_recency import week_ago_weight`
+    # import. That module exists because the compute Lambda and the daily brief had two
+    # different definitions of "last week's weight" and the compute one was wrong (it took
+    # the OLDEST reading in a 14-day window). The single line buys one shared definition —
+    # the ratchet's first real bump, and the shape it is meant to allow.
+    "lambdas/compute/daily_metrics_compute_lambda.py": 1370,
     "lambdas/coach/coach_narrative_orchestrator.py": 1315,
     "lambdas/coach/coach_state_updater.py": 1268,
     "mcp/tools_hevy_routine.py": 1218,
