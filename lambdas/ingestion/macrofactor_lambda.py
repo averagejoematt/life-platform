@@ -379,6 +379,9 @@ def build_day_items(rows):
 
 
 def safe_int(val):
+    # int() is safe here only because safe_float rejects non-finite values —
+    # int(float('nan')) raises ValueError, so a 'nan' Reps/RIR cell used to
+    # abort the workout ingest from three call sites at once.
     v = safe_float(val)
     return int(v) if v is not None else None
 
