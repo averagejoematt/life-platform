@@ -169,7 +169,7 @@ def habit_streaks(*, _g) -> dict:
     t0_pct = round(t0_done / t0_total * 100) if t0_total else 0
 
     # Compute aggregate T0 streak from habit_scores (t0_streak field if present)
-    t0_streak = int(record.get("t0_perfect_streak") or record.get("t0_aggregate_streak") or 0)
+    t0_streak = int(record.get("t0_perfect_streak") or 0)
 
     return _ok(
         {
@@ -360,8 +360,6 @@ def habits(*, _g) -> dict:
         t01_total = int(item.get("tier01_total", t0_total) or t0_total)
         t0_pct = round(t0_done / t0_total * 100) if t0_total else 0
         t01_pct = round(t01_done / t01_total * 100) if t01_total else 0
-        int(item.get("t0_perfect_streak") or item.get("t0_aggregate_streak") or 0)
-
         # Per-group breakdown: prefer flat group_* fields on habit_scores;
         # fall back to habitify by_group data if present
         group_data = {}
@@ -426,7 +424,7 @@ def habits(*, _g) -> dict:
     latest_streak = 0
     if items:
         last_item = _decimal_to_float(items[-1])
-        latest_streak = int(last_item.get("t0_perfect_streak") or last_item.get("t0_aggregate_streak") or 0)
+        latest_streak = int(last_item.get("t0_perfect_streak") or 0)
 
     # ── Day-of-week analysis (0=Mon ... 6=Sun)
     dow_sums = [0.0] * 7

@@ -447,7 +447,7 @@ def collect_inputs(table, user_prefix: str, phase_filter, start_weight_lbs: floa
 
 
 def _streak_of(item) -> int:
-    return int(_f(item.get("t0_perfect_streak")) or _f(item.get("t0_aggregate_streak")) or 0)
+    return int(_f(item.get("t0_perfect_streak")) or 0)
 
 
 def _completed_challenge_stats(challenges: list[dict]) -> tuple[int, int]:
