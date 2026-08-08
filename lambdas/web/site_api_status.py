@@ -28,6 +28,7 @@ from boto3.dynamodb.conditions import Key
 
 from web.site_api_common import (
     DDB_REGION,
+    PLATFORM_STATS,
     STATUS_CACHE_TTL,
     USER_PREFIX,
     _ok,
@@ -115,7 +116,7 @@ def status(*, _g) -> dict:
         "food-delivery-ingestion": "food_delivery",
         "character-sheet-compute": "character_sheet",
         "daily-metrics-compute": "computed_metrics",
-        "daily-insight-compute": "insights",
+        "daily-insight-compute": "computed_insights",
         "adaptive-mode-compute": "adaptive_mode",
         "daily-brief": "daily_brief",
         "weekly-digest": "weekly_digest",
@@ -409,7 +410,11 @@ def status(*, _g) -> dict:
         ("character_sheet", "Character Sheet", "Pillar scores \u00b7 level \u00b7 XP", 25, 49),
         ("computed_metrics", "Daily Metrics", "Cross-domain computed signals", 25, 49),
         ("habit_scores", "Habit Score Aggregation", "Tier scores \u00b7 streaks \u00b7 grades", 25, 49),
-        ("insights", "Daily Insights", "IC-8 intent vs execution", 25, 49),
+        # `computed_insights`, not `insights` (#2220): daily-insight-compute writes its
+        # daily record to SOURCE#computed_insights. SOURCE#insights exists but is keyed
+        # INSIGHT#<timestamp>, so the DATE# freshness probe could never match it — this
+        # row read "never ran" forever, which the old green rewrite hid completely.
+        ("computed_insights", "Daily Insights", "IC-8 intent vs execution", 25, 49),
         ("adaptive_mode", "Adaptive Mode", "Engagement scoring \u00b7 brief mode", 25, 49),
     ]
     _EMAIL_LAMBDAS = [
@@ -594,7 +599,12 @@ def status(*, _g) -> dict:
             # Activity-dependent sources: distinguish "user didn't log" vs "pipeline broke"
             # If a source HAD regular data and suddenly stops, that's likely a pipeline issue
             # (auth failure, webhook key mismatch) — not missing user activity.
-            if activity_dep and status in ("red", "yellow") and sid not in alarming_sources:
+            #
+            # The excuse needs a record to excuse (`and last`, #2220). A feed that has
+            # never produced a single record is not "ready, awaiting activity" — nothing
+            # has ever been observed from it, so _comp_status's red stands rather than
+            # being rewritten green on the basis of nothing (ADR-104).
+            if activity_dep and last and status in ("red", "yellow") and sid not in alarming_sources:
                 # Check if this source had a consistent history that suddenly stopped
                 _was_regular = False
                 if last:
@@ -632,12 +642,11 @@ def status(*, _g) -> dict:
                 if _was_regular:
                     status = "yellow"
                     comment = f"Pipeline may need attention \u2014 was flowing regularly but stopped {rel}. Check auth/webhook."
-                elif last:
-                    status = "green"
-                    comment = f"Pipeline ready \u2014 awaiting user activity. Last data: {rel}"
                 else:
                     status = "green"
-                    comment = "Pipeline ready \u2014 no data recorded yet"
+                    comment = f"Pipeline ready \u2014 awaiting user activity. Last data: {rel}"
+            elif activity_dep and not last:
+                comment = "No record has ever arrived on this feed"
 
         # CloudWatch alarm override — if Lambda is actively erroring, escalate status
         if sid in alarming_sources and status != "blue":
@@ -673,15 +682,18 @@ def status(*, _g) -> dict:
         last = _last_sync(sid)
         status, rel, comment = _comp_status(last, yh, rh, source_id=sid)
         uptime = _uptime_90d(sid, activity_dependent=True)  # compute depends on ingestion — missing days aren't system failures
-        # Compute sources depend on ingestion data — if no new input, no new output is expected
-        if status in ("red", "yellow") and sid not in alarming_sources:
-            if not last:
-                status = "green"
-                rel = "verified"
-                comment = "Smoke-tested OK \u2014 awaiting first scheduled run (April 1+)"
-            else:
-                status = "green"
-                comment = f"Last computed: {rel} \u2014 runs daily when new data arrives"
+        # Compute sources depend on ingestion data — if no new input, no new output is
+        # expected, so a SHORT gap is still excused to green. #2220 bounds the excuse by
+        # the row's own threshold: it applies to yellow only. Past red_h the component
+        # really has stopped producing and now says so, and a component with NO output
+        # ever is no longer rewritten green — the old branch published rel="verified"
+        # and "Smoke-tested OK", which asserts a pre-launch smoke run rather than
+        # reporting an observation of this component (ADR-104).
+        if status == "yellow" and last and sid not in alarming_sources:
+            status = "green"
+            comment = f"Last computed: {rel} \u2014 runs daily when new data arrives"
+        elif not last:
+            comment = "No output on record \u2014 this component has never published a result"
         if sid in alarming_sources:
             status = "red"
             comment = "CloudWatch alarm firing \u2014 Lambda errors detected"
@@ -708,12 +720,13 @@ def status(*, _g) -> dict:
         if status in ("yellow",) and last and lid not in alarming_sources:
             status = "green"
             comment = f"Last sent: {rel} \u2014 next run scheduled"
-        # Pre-launch: weekly emails that haven't fired yet — smoke-tested Mar 29
+        # A sender with no send log has not sent. #2220 retired the pre-launch
+        # "smoke-tested Mar 29" carve-out, which turned that red green, replaced the
+        # measured age with rel="verified" and — worse — overwrote the whole uptime
+        # array with `[1] * 90`: ninety green delivery bars invented from zero send
+        # records. The bars now stay as measured (neutral, because nothing was sent).
         if status == "red" and not last:
-            status = "green"
-            rel = "verified"
-            comment = "Smoke-tested OK \u2014 awaiting first scheduled run"
-            uptime = [1] * max(1, len(uptime))
+            comment = "No send on record \u2014 this sender has never delivered"
         if lid in alarming_sources:
             status = "red"
             comment = "CloudWatch alarm firing \u2014 Lambda errors detected"
@@ -751,16 +764,29 @@ def status(*, _g) -> dict:
     except Exception:
         pass
 
+    # The page/tool counts come from PLATFORM_STATS (#2220) \u2014 the one dict
+    # `deploy/sync_doc_metadata.py --apply` rewrites and `tests/test_platform_stats_truth.py`
+    # pins against an AST parse of mcp/registry.py. They were hand-typed literals here and
+    # had drifted to "116 tools" (registry holds 76) and "66 pages" (77).
+    # NB: read the count from PLATFORM_STATS, never `import mcp.registry` \u2014 build_bundle's
+    # stage_tree() copies only lambdas/, so mcp/ is absent from the site-api bundle and a
+    # runtime import of it would pass every local test and ModuleNotFoundError in prod.
     infra = [
         {
             "id": "cloudfront_main",
             "name": "averagejoematt.com",
-            "description": "CloudFront \u00b7 66 pages",
+            "description": f"CloudFront \u00b7 {PLATFORM_STATS['site_pages']} pages",
             "status": "green",
             "comment": None,
         },
         {"id": "site_api", "name": "Site API Lambda", "description": "us-west-2 \u00b7 60+ endpoints", "status": "green", "comment": None},
-        {"id": "mcp_server", "name": "MCP server", "description": "us-west-2 \u00b7 116 tools", "status": "green", "comment": None},
+        {
+            "id": "mcp_server",
+            "name": "MCP server",
+            "description": f"us-west-2 \u00b7 {PLATFORM_STATS['mcp_tools']} tools",
+            "status": "green",
+            "comment": None,
+        },
         {"id": "dynamodb", "name": "DynamoDB", "description": "on-demand \u00b7 PITR enabled", "status": "green", "comment": None},
         {
             "id": "ses",
@@ -774,9 +800,17 @@ def status(*, _g) -> dict:
 
     # Overall status: proportional to severity.
     # Exclude: blue (manual/infrequent), gray (idle), yellow (overdue labs etc.)
-    red_components = [c for c in ds_components + compute_components + email_components if c["status"] == "red"]
+    #
+    # The infrastructure panel used to be excluded WHOLESALE (#2220), so a red
+    # dead-letter queue — ingestion actively dropping messages — left the traffic light
+    # green. Only the MEASURED infrastructure rows join the rollup: the rest of that
+    # panel is hand-typed `"status": "green"` literals, and padding the denominator with
+    # unobserved greens would make the light harder to turn, not more honest.
+    _MEASURED_INFRA_IDS = {"dlq"}
+    rollup_components = ds_components + compute_components + email_components + [c for c in infra if c["id"] in _MEASURED_INFRA_IDS]
+    red_components = [c for c in rollup_components if c["status"] == "red"]
     red_count = len(red_components)
-    total_active = len([c for c in ds_components + compute_components + email_components if c["status"] not in ("blue", "gray")])
+    total_active = len([c for c in rollup_components if c["status"] not in ("blue", "gray")])
 
     if red_count == 0:
         overall = "green"
