@@ -271,6 +271,15 @@ def _claims_by_entry():
                 claim[field] = value
         text = claim.get("claim_natural")
         if text:
+            # Re-screen the verbatim prose on every serve (#2206), the same two-layer
+            # shape #2203 covers for journal quotes: the wide dossier screen, then the
+            # narrower #1569 all-or-nothing scrub. STATED RULE (deliberately narrower
+            # than the journal-quote path's all-or-nothing): a rejection here drops
+            # ONLY `claim_natural` — the remaining allowlisted STRUCTURED fields
+            # (metric/grade_by/status/confidence) still ride along, because they are
+            # not verbatim prose and the screens exist to gate his words, not scored,
+            # already-dated metadata. A reader can therefore see that a forecast was
+            # made and how it graded without ever seeing the sentence he wrote it in.
             screened = _public_decision_note(text) if not find_dossier_violations(text) else None
             if not screened:
                 claim.pop("claim_natural", None)

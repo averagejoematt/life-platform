@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -476,6 +477,112 @@ def test_a_publicly_marked_claim_is_projected_from_the_allowlist_only(shelf):
     assert claim["grade_by"] == "2026-09-25"
     assert set(claim) <= set(sd.CLAIM_PUBLIC_FIELDS)
     assert "internal grading criterion" not in _flatten(card)
+
+
+# ── #2206: the two content screens on a public claim's verbatim prose ───────
+# `_claims_by_entry` re-screens `claim_natural` through the same two-layer shape
+# #2203 covers for journal quotes (wide dossier screen, then the narrower #1569
+# all-or-nothing scrub) — but until this issue, neither branch had a fixture that
+# actually tripped it: every existing claim fixture used clean text that cleared
+# both screens outright, so the rejection path never executed.
+
+
+def test_a_public_claim_whose_prose_trips_the_wide_screen_withholds_only_the_prose(shelf):
+    """First-layer pin: a synthetic age disclosure trips `find_dossier_violations`
+    (AGE_PATTERNS — chronological age is never public, PhenoAge Option A) without
+    touching vice vocabulary at all.
+
+    Also pins #2206's semantic question: rejection here drops ONLY
+    `claim_natural` — the remaining allowlisted STRUCTURED fields still ride
+    along. That is deliberately narrower than the journal-quote path's #1569
+    all-or-nothing rule (which withholds the whole quote object), because a
+    claim's metric/status/grade_by carry independent value the prose screen was
+    never meant to gate. Stated in `_claims_by_entry`'s comment and pinned here
+    rather than left an untested accident."""
+    sd, ft = shelf
+    text = "If I clear day sixty I will be 41 years old by then."
+    assert find_dossier_violations(text) != []  # confirm the premise inline
+    ft.put_item(
+        Item={
+            "pk": CLAIMS_PK,
+            "sk": "PREDICTION#2026-07-27#age-tell",
+            "source_sk": "DATE#2026-07-27#journal#video_diary#1",
+            "claim_id": "2026-07-27#age-tell",
+            "claim_natural": text,
+            "metric": "adherence",
+            "status": "pending",
+            "visibility": "public",
+        }
+    )
+    out = sd._claims_by_entry()
+    bucket = out["DATE#2026-07-27#journal#video_diary#1"]
+    assert bucket["count"] == 1
+    assert len(bucket["public"]) == 1
+    claim = bucket["public"][0]
+    assert "claim_natural" not in claim
+    assert claim["metric"] == "adherence" and claim["status"] == "pending"
+
+
+def test_a_public_claim_only_the_narrow_scrub_would_catch_withholds_the_prose(shelf):
+    """Second-layer pin: a fixture that clears `find_dossier_violations` outright
+    (its taboo vocabulary is \\b-word-boundary matched, so letter-spaced
+    obfuscation slips past it) but that `_public_decision_note`'s underlying
+    `_scrub_blocked_terms` catches via its normalized (de-spaced/de-punctuated)
+    fail-safe — the #2203 technique. The term is read live off
+    config/content_filter.json rather than hardcoded, per #2206's privacy note,
+    so the fixture tracks the real vocabulary instead of a copy of it."""
+    sd, ft = shelf
+    cf_path = os.path.join(_REPO, "config", "content_filter.json")
+    with open(cf_path, encoding="utf-8") as f:
+        cf = json.load(f)
+    # _scrub_blocked_terms's normalized fail-safe only fires for terms whose
+    # de-spaced form is >=7 chars (see its docstring) — pick the shortest one
+    # that qualifies, so the fixture stays as mild as the vocabulary allows.
+    term = min(
+        (kw for kw in cf["blocked_vice_keywords"] if len(sac._normalize_for_detection(kw)) >= 7),
+        key=len,
+    )
+    obfuscated_term = " ".join(term)  # defeats the \b-anchored regex both screens' literal passes use
+    text = f"Slipping toward the {obfuscated_term} again is the risk if I miss the mark."
+
+    assert find_dossier_violations(text) == []  # clears the wide screen outright
+    ft.put_item(
+        Item={
+            "pk": CLAIMS_PK,
+            "sk": "PREDICTION#2026-07-28#narrow-tell",
+            "source_sk": "DATE#2026-07-28#journal#video_diary#1",
+            "claim_id": "2026-07-28#narrow-tell",
+            "claim_natural": text,
+            "metric": "adherence",
+            "status": "pending",
+            "visibility": "public",
+        }
+    )
+    out = sd._claims_by_entry()
+    bucket = out["DATE#2026-07-28#journal#video_diary#1"]
+    assert bucket["count"] == 1
+    claim = bucket["public"][0]
+    assert "claim_natural" not in claim
+    assert claim["metric"] == "adherence"
+
+
+def test_the_claims_screen_set_has_not_silently_grown_a_third_screen():
+    """Guard the SET, not the instance: derive the screen-call list from
+    `_claims_by_entry`'s own source via `inspect.getsource` (the technique #2211
+    used for `_strip_genetic_biomarkers`) rather than trusting the two screens
+    named in this issue. If a third screen is added later without a matching
+    isolating fixture, this fails loudly instead of shipping unguarded the way
+    both of today's screens did."""
+    import inspect
+
+    from web import site_api_diary as sd
+
+    src = inspect.getsource(sd._claims_by_entry)
+    calls = sorted(set(re.findall(r"(find_dossier_violations|_public_decision_note)\(", src)))
+    assert calls == ["_public_decision_note", "find_dossier_violations"], (
+        "the set of content screens gating claim_natural has changed — add an isolating, "
+        "mutation-proven fixture for the new screen before widening this assertion"
+    )
 
 
 # ── AC4: wiring + registration ───────────────────────────────────────────────
