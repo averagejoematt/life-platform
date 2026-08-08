@@ -103,10 +103,25 @@ fi
 
 # ── The format gate, kept (this is the half CI actually enforces) ─────────────
 STAGED_PY="$(printf '%s\n' "${STAGED}" | grep -E '^(lambdas|mcp|cdk|tests|scripts|deploy)/.*\.py$' || true)"
+
+# PREFER THE PINNED BLACK, NOT THE ONE ON PATH. CI runs black 26.3.1; a typical
+# local install is 25.9.0, and the two disagree in BOTH directions — a file the
+# local one calls clean can be one CI reformats, and vice versa. Resolving from
+# PATH is how an agent's green commit red-mained main's Lint job on 2026-08-08
+# (lambdas/emails/anomaly_detector_lambda.py). The repo keeps the pin in
+# .venv-black; use it when present and say loudly when it is not.
+BLACK="black"
+if [ -x "${ROOT}/.venv-black/bin/black" ]; then
+  BLACK="${ROOT}/.venv-black/bin/black"
+else
+  echo "[agent-commit] ⚠ .venv-black not found — falling back to black on PATH ($(black --version 2>/dev/null | head -1))." >&2
+  echo "[agent-commit]   CI pins 26.3.1; a version skew here can pass locally and red main's Lint job." >&2
+fi
+
 if [ -n "${STAGED_PY}" ]; then
-  if command -v black >/dev/null 2>&1 && command -v ruff >/dev/null 2>&1; then
-    if ! black --check ${STAGED_PY}; then
-      echo "[agent-commit] ❌ black would reformat — run: black ${STAGED_PY}" >&2
+  if command -v "${BLACK}" >/dev/null 2>&1 || [ -x "${BLACK}" ]; then
+    if ! "${BLACK}" --check ${STAGED_PY}; then
+      echo "[agent-commit] ❌ black would reformat — run: ${BLACK} ${STAGED_PY}" >&2
       exit 1
     fi
     if ! ruff check ${STAGED_PY}; then
