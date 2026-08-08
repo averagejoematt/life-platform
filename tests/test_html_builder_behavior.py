@@ -746,30 +746,10 @@ def test_header_vacation_fund_failure_degrades_to_a_section_error():
     assert "Vacation Fund section unavailable" in html
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "lambdas/content/html_builder.py:458-480 _brief_header — the travel banner is the ONLY "
-        "section in the whole renderer that runs outside a try/except. `abs(tz_offset)` on line 468 "
-        "raises TypeError for a trip row whose tz_offset_hours is null or a string, and the exception "
-        "propagates out of _brief_header, out of build_html (which has no guard of its own), and "
-        "aborts the entire email. The vestigial `try: pass  # travel already handled above` on lines "
-        "482-485 shows the guard was meant to wrap this block and does not. Should degrade to "
-        "_section_error_html like every other section. Hurts Matthew: one malformed manually-entered "
-        "TRIP# row and there is no morning brief at all."
-    ),
-)
 def test_header_a_malformed_trip_row_degrades_instead_of_killing_the_brief():
     travel = {"destination": "Tokyo", "timezone": "Asia/Tokyo", "tz_offset": None, "direction": "east"}
     html = hb.build_html(**_build_kwargs(data=_data(travel_active=travel)))
     assert "Travel section unavailable" in html
-
-
-def test_header_travel_crash_currently_propagates_out_of_build_html():
-    """The live behavior the xfail above describes, pinned so it cannot get worse."""
-    travel = {"destination": "Tokyo", "timezone": "Asia/Tokyo", "tz_offset": None, "direction": "east"}
-    with pytest.raises(TypeError):
-        hb.build_html(**_build_kwargs(data=_data(travel_active=travel)))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -852,16 +832,6 @@ def test_character_a_malformed_sheet_degrades_to_a_section_error():
     assert "Character Sheet section unavailable" in html
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "lambdas/content/html_builder.py:584-586 _brief_character — `pd.get('level', 1) if pd else 1` "
-        "renders a pillar the character engine has never scored as a factual 'Level 1' with a drawn "
-        "bar, indistinguishable from a genuinely level-1 pillar. ADR-104 says absence must render as "
-        "absence (an em dash / greyed bar). Hurts Matthew: after a cycle reset every unscored pillar "
-        "reads as a real level-1 score in the brief's headline character block."
-    ),
-)
 def test_character_an_unscored_pillar_is_not_reported_as_level_1():
     sheet = _sheet()
     del sheet["pillar_mind"]
@@ -870,16 +840,6 @@ def test_character_an_unscored_pillar_is_not_reported_as_level_1():
     assert html.count('font-size:8px;margin:0;">1</p>') == 0
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "lambdas/content/html_builder.py:657 _brief_character — `eff.get('description', '')` is a "
-        "bare expression whose value is discarded; the active-effect description is read and thrown "
-        "away, so only the emoji + name ever reach the reader. Should either render the description "
-        "or stop reading it. Hurts Matthew: the character engine writes an explanation for every "
-        "active effect and none of it is ever shown."
-    ),
-)
 def test_character_active_effect_descriptions_reach_the_reader():
     effects = [{"name": "Sleep Drag", "emoji": "😵", "description": "3 nights under 6h — recovery penalty"}]
     html = hb._brief_character(_sheet(active_effects=effects), [], [])
@@ -1022,18 +982,6 @@ def test_readiness_vitals_row():
     assert ">58 bpm</p>" in html  # round(57.6)
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "lambdas/content/html_builder.py:874/894 _brief_scorecards — the Essential Seven treats a "
-        "habit ABSENT from tier_status[0] as a miss (`tier0_status.get(h_name, False)`), renders it "
-        "with an ✗, and counts it in the 'n/7 complete' denominator. scoring_engine omits a habit "
-        "that was not applicable that day (weekday-scoped habit on a weekend, post_training habit "
-        "with no workout) rather than marking it False. ADR-104: not-applicable must be visually "
-        "distinct from missed. Hurts Matthew: the above-the-fold section of every weekend brief "
-        "shows habits he was never expected to do as failures, and understates the completion bar."
-    ),
-)
 def test_essential_seven_distinguishes_not_applicable_from_missed():
     reg = {"Sleep 7h": {"tier": 0, "status": "active"}, "Weekday lift": {"tier": 0, "status": "active"}}
     # Saturday: only Sleep 7h was evaluated; Weekday lift is absent, not False.
@@ -1042,33 +990,12 @@ def test_essential_seven_distinguishes_not_applicable_from_missed():
     assert "1/1 complete" in html  # honest; currently renders "1/2 complete"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "lambdas/content/html_builder.py:830-839 _brief_scorecards — the HRV line is wrapped in a "
-        "bare `except Exception: pass`. `data['hrv']` is a hard subscript, so any packet without the "
-        "'hrv' key (or with hrv=None) makes the whole HRV readout vanish with no placeholder, no log "
-        "line and no _section_error_html. Should use .get() and render 'no trend data', or surface "
-        "the failure. Hurts Matthew: HRV silently disappearing from the scorecard is "
-        "indistinguishable from a quiet day."
-    ),
-)
 def test_scorecard_missing_hrv_block_is_reported_not_swallowed():
     data = {"date": DATE, "whoop": {"hrv": 60.4}}  # no "hrv" key at all
     html = _scorecards(data=data)
     assert "📡 HRV:" in html or "section unavailable" in html
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "lambdas/content/html_builder.py:806-818 _brief_scorecards — the sleep-architecture cells use "
-        "truthiness (`str(round(deep_pct)) + '%' if deep_pct else '—'`), so a MEASURED 0 renders as "
-        "the same em dash as an unmeasured night. ADR-104 cuts both ways: absence must not look like "
-        "0, and 0 must not look like absence. Hurts Matthew: a night Whoop recorded genuinely zero "
-        "deep sleep — clinically the most alarming reading in the block — is displayed as 'no data'."
-    ),
-)
 def test_scorecard_a_measured_zero_deep_percentage_is_shown_as_zero():
     sleep = {"sleep_duration_hours": 6.0, "sleep_score": 40.0, "deep_pct": 0.0, "rem_pct": 12.0}
     html = _scorecards(data=_data(sleep=sleep))
@@ -1262,12 +1189,19 @@ def test_cgm_absent_says_so():
 
 
 def test_cgm_seven_day_trend_needs_three_days():
+    """Three days is the floor to draw the line at all — and it is named for its span.
+
+    Updated with the #1917 fix below: a mean over 3 days is a "3-day avg (n=3)", never a
+    "7-day avg". The full window keeps the 7-day name.
+    """
     two = [{"blood_glucose_avg": 95}, {"blood_glucose_avg": 105}]
-    assert "7-day avg" not in _training(data=_data(apple={"blood_glucose_avg": 96}, apple_7d=two))
+    assert "avg:" not in _training(data=_data(apple={"blood_glucose_avg": 96}, apple_7d=two))
     three = two + [{"blood_glucose_avg": 100}]
     html = _training(data=_data(apple={"blood_glucose_avg": 96}, apple_7d=three))
     # avg([95, 105, 100]) = 100.0 -> round -> 100
-    assert "7-day avg: " in html and ">100 mg/dL<" in html
+    assert "3-day avg: " in html and ">100 mg/dL<" in html and "(n=3)" in html
+    seven = [{"blood_glucose_avg": 100} for _ in range(7)]
+    assert "7-day avg: " in _training(data=_data(apple={"blood_glucose_avg": 96}, apple_7d=seven))
 
 
 def test_gait_absent_says_so():
@@ -1324,18 +1258,6 @@ def test_acwr_alert_renders_for_a_record_written_by_acwr_compute_lambda():
     assert "elevated injury risk" in html
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "lambdas/content/html_builder.py:1021-1022 + 1047-1051 _brief_training_body — total_vol and "
-        "total_sets are read off the DAY aggregate `mf_workouts` but rendered INSIDE the per-workout "
-        "loop, so on a two-a-day the same day total is printed under each workout. "
-        "lambdas/emails/daily_brief_lambda.py:471-475 (fetch_hevy_workouts) confirms there is exactly "
-        "one total for the whole day and its docstring says 'possibly several a day'. Should either "
-        "hoist the totals out of the loop or aggregate per workout. Hurts Matthew: a two-session day "
-        "reads as ~2x the volume actually lifted."
-    ),
-)
 def test_hevy_volume_is_not_the_day_total_repeated_under_every_workout():
     mf_workouts = {
         "workouts": [
@@ -1349,35 +1271,12 @@ def test_hevy_volume_is_not_the_day_total_repeated_under_every_workout():
     assert html.count("Volume: 2,160 lbs") == 1
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "lambdas/content/html_builder.py:1279 _brief_training_body — "
-        "`safe_float(apple, 'blood_glucose_max')` is a bare expression whose value is discarded. "
-        "health_auto_export_lambda writes blood_glucose_max on every CGM day and the CGM Spotlight "
-        "reads it and drops it, so the reader sees the overnight LOW and the SD but never the peak. "
-        "Should render it beside the low (the hypo callout has a hyper counterpart) or stop reading "
-        "it. Hurts Matthew: the single most actionable CGM number of the day is computed, stored, "
-        "read, and thrown away."
-    ),
-)
 def test_cgm_spotlight_shows_the_daily_maximum_it_reads():
     apple = {"blood_glucose_avg": 96.0, "blood_glucose_min": 70.0, "blood_glucose_max": 187.0}
     html = _training(data=_data(apple=apple))
     assert "187" in html
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "lambdas/content/html_builder.py:1249-1257 _brief_training_body — the supplement render loop "
-        "iterates the three keys of the hardcoded `timing_labels` map, not the groups actually "
-        "present in `by_timing`. Any supplement whose `timing` is anything else (including the "
-        "module's own default of 'other' on line 1242) is collected into by_timing and then never "
-        "printed. Should iterate the derived groups, labelling unknown ones. Hurts Matthew: a "
-        "supplement he took is silently absent from the brief's SUPPLEMENTS list with no 'and N more'."
-    ),
-)
 def test_supplements_with_an_unlisted_timing_are_still_shown():
     supps = {"supplements": [{"name": "Creatine", "timing": "morning_fasted"}, {"name": "Ashwagandha", "timing": "pre_bed"}]}
     html = _training(data=_data(supplements_today=supps))
@@ -1385,31 +1284,12 @@ def test_supplements_with_an_unlisted_timing_are_still_shown():
     assert "Ashwagandha" in html
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "lambdas/content/html_builder.py:1313-1321 _brief_training_body — the CGM '7-day avg' line "
-        "ships a mean with no n, and the underlying window is whatever `apple_7d` happened to "
-        "contain (the guard is only `len >= 3`). ADR-105 requires the n beside every statistical "
-        "claim, and #1917 requires a window-named figure to span its window or carry no value. "
-        "Hurts Matthew: a '7-day avg' computed from 3 days reads as a full week."
-    ),
-)
 def test_cgm_seven_day_average_ships_its_n():
     apple_7d = [{"blood_glucose_avg": 95}, {"blood_glucose_avg": 105}, {"blood_glucose_avg": 100}]
     html = _training(data=_data(apple={"blood_glucose_avg": 96}, apple_7d=apple_7d))
     assert "n=3" in html or "3 days" in html or "3-day" in html
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "lambdas/content/html_builder.py:982 _brief_training_body — "
-        "`dur_min = round((act.get('moving_time_seconds') or 0) / 60)` renders an activity whose "
-        "duration Strava did not report as a factual '0 min'. ADR-104: absent is an em dash. Hurts "
-        "Matthew: a logged workout appears in the Training Report claiming zero minutes."
-    ),
-)
 def test_training_activity_without_a_duration_is_not_reported_as_zero_minutes():
     act = {"name": "Hike", "sport_type": "Hike", "distance_miles": 4.0}
     html = _training(data=_data(strava={"activities": [act]}))
@@ -1508,21 +1388,6 @@ def test_guidance_items_render_in_order():
     assert html.index("Walk before noon.") < html.index("Protein at breakfast.")
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "lambdas/content/html_builder.py:1417-1421 _brief_lifestyle — the WEATHER CONTEXT card reads "
-        "'condition', 'precip_in', 'aqi', 'sunrise_local' and 'sunset_local'. "
-        "lambdas/ingestion/weather_lambda.py:102-114 writes temp_high_f / temp_low_f / temp_avg_f / "
-        "humidity_pct / precipitation_mm / wind_speed_max_mph / pressure_hpa / daylight_hours / "
-        "sunshine_hours / uv_index_max — and strips None keys. Repo-wide, 'aqi', 'condition', "
-        "'precip_in', 'sunrise_local' and 'sunset_local' appear ONLY on this read side: no writer "
-        "produces any of them. Consequence: four of the card's five cells have never rendered, and "
-        "the section is permanently a bare Hi/Lo. 'precip_in' is additionally a unit mismatch against "
-        "the stored millimetres. Hurts Matthew: sunrise, precipitation, air quality and conditions — "
-        "the context the section exists to give — are all dark."
-    ),
-)
 def test_weather_card_renders_the_fields_the_weather_lambda_actually_writes():
     # exactly what weather_lambda.transform() puts in DynamoDB
     rec = {
@@ -1540,22 +1405,18 @@ def test_weather_card_renders_the_fields_the_weather_lambda_actually_writes():
     html = _lifestyle(data=_data(weather_yesterday=rec))
     assert ">78°/55°F</p>" in html  # this part works
     assert "Precip" in html  # precipitation was measured and is nowhere in the card
-    assert "Conditions" in html or "Sunrise" in html
+    assert "5.1 mm" in html  # ...and in the writer's unit, not the read side's fictional inches
+    # CORRECTION to the marker's third clause. It asked for "Conditions" or "Sunrise" on
+    # this record, but neither can be honest: the writer emits no condition string and no
+    # sunrise/sunset, so there is nothing to render. Reader/writer parity here means
+    # rendering what weather_lambda.transform() DOES store. Lighting up the Conditions and
+    # Sunrise cells is a weather_lambda change (request weather_code + sunrise/sunset from
+    # Open-Meteo), and it does not belong in the renderer.
+    for label in ("Humidity", "Wind max", "UV max", "Daylight"):
+        assert label in html, label
+    assert "Conditions" not in html and "Sunrise" not in html
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "lambdas/content/html_builder.py:1512-1515 _brief_lifestyle — "
-        "`int(todoist.get('active_count', 0))` and siblings turn a missing count into a factual 0, "
-        "and the load band is then derived from that fabricated 0 ('CLEAR'). todoist_lambda writes "
-        "these keys only when it has them, and ingestion_validator.py:305 only requires "
-        "`at_least_one_of` completed/active/overdue — so a partial record is an expected shape, not "
-        "a corruption. ADR-104: absent must render as an em dash and must not drive a load verdict. "
-        "Hurts Matthew: a partial Todoist sync reports '0 DONE YESTERDAY' and a green 'CLEAR' load "
-        "signal on a day with 40 overdue tasks."
-    ),
-)
 def test_task_load_missing_counts_are_not_reported_as_zero():
     html = _lifestyle(data=_data(todoist={"active_count": 120}))  # only one of the four keys present
     assert "CLEAR" not in html
@@ -1786,19 +1647,6 @@ def test_weekly_habit_review_failure_degrades_to_a_section_error():
     assert "Weekly Habit Review section unavailable" in html
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "html_builder interpolates every model-generated and third-party string straight into the "
-        "email body with no escaping: the TL;DR (line 442), a guidance item (1643), the board insight "
-        "(1858), every V2 coach paragraph (1744/1765/1786/1815), an anomaly message (1879), a journal "
-        "theme (1704) and a Strava activity name (990). The coach/board/TL;DR strings are Bedrock "
-        "output and the activity name is third-party API text, so a stray '<' or '&' silently "
-        "corrupts the section and an emitted tag is rendered as markup by the mail client. Should "
-        "route every interpolated value through html.escape. Hurts Matthew: a garbled or truncated "
-        "section in the one email he reads daily, with no error to explain it."
-    ),
-)
 @pytest.mark.parametrize(
     "kind",
     ["tldr", "guidance", "bod", "coach", "anomaly", "theme", "activity_name"],
@@ -1952,17 +1800,17 @@ def test_build_html_banner_colour_tracks_the_brief_mode():
     assert "linear-gradient(135deg,#1a1a2e,#16213e" in hb.build_html(**_build_kwargs())
 
 
-def test_three_vestigial_try_blocks_guard_nothing():
+def test_the_one_remaining_vestigial_try_block_guards_nothing():
     """`try: pass` / `except Exception as _e: out += _section_error_html(...)`.
 
-    There are three of these — the Travel guard (lines 482-485), an Adaptive
-    Mode leftover, and a "dummy try block" in the scorecard (909-912). They are
-    the fossil of guards that were moved or never wired, and the Travel one is
-    the reason a malformed trip row takes down the whole email (see the xfail in
-    §7). Pinned by count so removing or wiring them is a deliberate act.
+    There were three of these — the Travel guard, an Adaptive Mode leftover, and a
+    "dummy try block" in the scorecard. The Travel one was the fossil of the guard
+    that was never wired around the travel banner, and it is now a real guard (see
+    §7); the scorecard one is still a fossil. Pinned by count so removing or wiring
+    the survivor is a deliberate act.
     """
-    assert HB_SOURCE.count("try:\n        pass") == 2
-    assert "# travel already handled above" in HB_SOURCE
+    assert HB_SOURCE.count("try:\n        pass") == 1
+    assert "# travel already handled above" not in HB_SOURCE
     assert "# dummy try block" in HB_SOURCE
 
 

@@ -35,7 +35,12 @@ except ImportError:
 
 from common.digest_utils import safe_float  # shared bundled helpers (#970; the local d2f copy was unused)
 
-from content.brief_format import esc, pct_int
+from content.brief_format import esc, supplement_timing_label, supplement_timing_order, weather_context_cells
+
+# S2-T1-10 Weekly Habit Review — compute + render live in their own module (#1654 shape).
+# Re-exported here because `daily_brief_lambda` and the behavior suite both reach for
+# `html_builder._compute_weekly_habit_review`.
+from content.brief_weekly_habits import _compute_weekly_habit_review, _render_weekly_habit_review  # noqa: F401
 
 
 def avg(vals):
@@ -107,308 +112,6 @@ def hrv_trend_str(hrv_7d, hrv_30d):
 # ==============================================================================
 # HTML BUILDER
 # ==============================================================================
-
-
-# ==============================================================================
-# S2-T1-10: WEEKLY HABIT REVIEW — helper functions
-# Sunday-only section in the Daily Brief.
-# ==============================================================================
-
-
-def _compute_weekly_habit_review(habit_7d_records, profile):
-    """Compute weekly habit review data from 7 days of habit_scores DDB records.
-
-    Returns a dict with per-habit completion, streak patterns, and synergy health.
-    Returns None if no records.
-    """
-    if not habit_7d_records:
-        return None
-
-    registry = profile.get("habit_registry", {})
-    sorted_recs = sorted(habit_7d_records, key=lambda x: x.get("date", ""))
-
-    daily = []
-    all_missed = {}  # habit_name -> days_missed_count
-
-    for rec in sorted_recs:
-        t0_done = int(rec.get("tier0_done", 0))
-        t0_total = int(rec.get("tier0_total", 0))
-        raw_pct = rec.get("tier0_pct")
-        # ADR-104: a day on which NO tier-0 habit was applicable (every T0 habit scoped
-        # `applicable_days: weekdays` on a weekend, say) carries no tier0_pct at all —
-        # store_habit_scores strips the key because `t0["total"]` is falsy. That is an
-        # unmeasured day, not a 0% day, and folding it in as 0.0 halves an honest week.
-        if raw_pct is not None:
-            t0_pct = float(raw_pct)
-        elif t0_total:
-            t0_pct = t0_done / t0_total
-        else:
-            t0_pct = None
-        missed = rec.get("missed_tier0") or []
-        perfect = (t0_total > 0) and (t0_done == t0_total)
-        date_str = rec.get("date", rec.get("sk", "").replace("DATE#", ""))
-        daily.append(
-            {
-                "date": date_str,
-                "t0_done": t0_done,
-                "t0_total": t0_total,
-                "t0_pct": round(t0_pct, 3) if t0_pct is not None else None,
-                "perfect": perfect,
-                "missed": missed,
-                # The habits actually evaluated that day. `tier0_applicable` is written by
-                # store_habit_scores; older rows have only the count, so fall back to
-                # "the day evaluated something" (tier0_total > 0).
-                "applicable": list(rec.get("tier0_applicable") or []),
-                "measured": bool(t0_total),
-            }
-        )
-        for h in missed:
-            all_missed[h] = all_missed.get(h, 0) + 1
-
-    days = len(daily)
-    if days == 0:
-        return None
-
-    perfect_days = sum(1 for d in daily if d["perfect"])
-    # n is the number of MEASURED days; unmeasured days are excluded, not zeroed (ADR-105).
-    avg_t0_raw = [d["t0_pct"] for d in daily if d["t0_pct"] is not None]
-    avg_t0_pct = round(sum(avg_t0_raw) / len(avg_t0_raw), 3) if avg_t0_raw else None
-    measured_days = len(avg_t0_raw)
-
-    # Per T0 habit breakdown — the denominator is the number of days the habit was
-    # actually evaluated, never the window length. scoring_engine.score_habits_registry
-    # `continue`s past a habit that was not applicable, so it never reaches tier_status[0]
-    # and never reaches missed_tier0 either; crediting that absence as "done" reported a
-    # habit missed every day it applied at 4/7.
-    t0_habits = []
-    for name, meta in registry.items():
-        if meta.get("status") == "active" and meta.get("tier", 2) == 0:
-            applied = [d for d in daily if (name in d["applicable"] if d["applicable"] else d["measured"])]
-            days_total = len(applied)
-            days_done = sum(1 for d in applied if name not in d["missed"])
-            t0_habits.append(
-                {
-                    "name": name,
-                    "days_done": days_done,
-                    "days_total": days_total,
-                    "pct": round(days_done / days_total, 3) if days_total else 0,
-                }
-            )
-    t0_habits.sort(key=lambda x: -x["pct"])  # best first
-
-    # T1 summary
-    t1_vals = [float(r["tier1_pct"]) for r in sorted_recs if r.get("tier1_pct") is not None]
-    avg_t1_pct = round(sum(t1_vals) / len(t1_vals), 3) if t1_vals else None
-
-    # Synergy groups
-    synergy_totals = {}
-    for rec in sorted_recs:
-        sg = rec.get("synergy_groups") or {}
-        for group, pct in sg.items():
-            synergy_totals.setdefault(group, []).append(float(pct))
-    synergy_summary = {g: round(sum(v) / len(v), 2) for g, v in synergy_totals.items()}
-
-    return {
-        "days": days,
-        "measured_days": measured_days,  # ADR-105: the n behind avg_t0_pct
-        "daily": daily,
-        "perfect_days": perfect_days,
-        "avg_t0_pct": avg_t0_pct,
-        "avg_t1_pct": avg_t1_pct,
-        "t0_habits": t0_habits,
-        "synergy": synergy_summary,
-    }
-
-
-def _render_weekly_habit_review(whr):
-    """Render the Sunday Weekly Habit Review section as an HTML string.
-
-    Returns empty string if whr is None.
-    """
-    if not whr:
-        return ""
-
-    days = whr.get("days", 7)
-    perfect = whr.get("perfect_days", 0)
-    avg_t0 = whr.get("avg_t0_pct", 0)
-    measured_days = whr.get("measured_days")
-    t0_habits = whr.get("t0_habits", [])
-    avg_t1 = whr.get("avg_t1_pct")
-    synergy = whr.get("synergy", {})
-    daily = whr.get("daily", [])
-
-    # Overall completion colour. Percentages ROUND — int() truncates, and the float the
-    # compute layer produces lands just under (0.29 * 100 == 28.999999999999996), so every
-    # figure in this section was systematically a point low.
-    if avg_t0 is None:
-        t0_pct_int = None
-        t0_pct_str = "—"
-        overall_col = "#94a3b8"
-        overall_label = "No measured days"
-    else:
-        t0_pct_int = pct_int(avg_t0)
-        t0_pct_str = str(t0_pct_int)
-        if t0_pct_int >= 85:
-            overall_col = "#22c55e"
-            overall_label = "Strong week"
-        elif t0_pct_int >= 65:
-            overall_col = "#f59e0b"
-            overall_label = "Mixed week"
-        else:
-            overall_col = "#ef4444"
-            overall_label = "Needs attention"
-
-    perfect_pct = pct_int(perfect / days) if days else 0
-
-    # ── Daily mini-bars (Mon-Sun) ────────────────────────────────────────────
-    bar_cells = ""
-    DAY_ABBR = ["M", "T", "W", "T", "F", "S", "S"]
-    for i, d in enumerate(daily):
-        d_pct = d.get("t0_pct")
-        if d_pct is None:  # nothing was applicable that day — a grey stub, not a red 0
-            pct_bar = 8
-            bar_col = "#475569"
-            done_str = "—"
-        else:
-            pct_bar = max(8, int(d_pct * 60))
-            bar_col = "#22c55e" if d_pct >= 0.85 else "#f59e0b" if d_pct >= 0.65 else "#ef4444"
-            done_str = str(d["t0_done"]) + "/" + str(d["t0_total"])
-        day_abbr = DAY_ABBR[i % 7]
-        try:
-            from datetime import datetime as _dt
-
-            day_abbr = _dt.strptime(d["date"], "%Y-%m-%d").strftime("%a")[0]
-        except Exception:
-            pass
-        crown = " &#9733;" if d["perfect"] else ""
-        bar_cells += (
-            '<td style="text-align:center;padding:0 2px;vertical-align:bottom;">'
-            + '<div style="font-size:9px;color:'
-            + bar_col
-            + ';font-weight:700;margin-bottom:2px;">'
-            + done_str
-            + crown
-            + "</div>"
-            + '<div style="height:'
-            + str(pct_bar)
-            + "px;background:"
-            + bar_col
-            + ';border-radius:3px 3px 0 0;min-width:24px;"></div>'
-            + '<div style="font-size:8px;color:#94a3b8;margin-top:3px;">'
-            + day_abbr
-            + "</div>"
-            + "</td>"
-        )
-
-    bars_html = (
-        '<table style="width:100%;border-collapse:collapse;margin:12px 0 4px;">'
-        '<tr style="vertical-align:bottom;">' + bar_cells + "</tr></table>"
-    )
-
-    # ── Per-habit breakdown rows ─────────────────────────────────────────────
-    habit_rows = ""
-    for h in t0_habits:
-        p = pct_int(h["pct"])
-        col = "#22c55e" if p >= 85 else "#f59e0b" if p >= 65 else "#ef4444"
-        bar_w = max(4, p)
-        flag = " &#9888;" if p <= 50 else ""
-        # Habit names come from the S3-hosted habit_registry config: an ampersand or an
-        # angle bracket silently corrupted the row.
-        short_name = esc(h["name"][:32]) + ("…" if len(h["name"]) > 32 else "")
-        habit_rows += (
-            "<tr>"
-            '<td style="padding:5px 8px 5px 12px;font-size:12px;color:#e2e8f0;width:55%;">' + short_name + flag + "</td>"
-            '<td style="padding:5px 8px;width:45%;">'
-            '<div style="display:flex;align-items:center;gap:6px;">'
-            '<div style="flex:1;background:rgba(255,255,255,0.08);border-radius:3px;height:6px;">'
-            '<div style="width:' + str(bar_w) + "%;height:6px;background:" + col + ';border-radius:3px;"></div></div>'
-            '<span style="font-size:11px;font-weight:700;color:'
-            + col
-            + ';min-width:36px;text-align:right;">'
-            + str(h["days_done"])
-            + "/"
-            + str(h["days_total"])
-            + "</span>"
-            "</div></td>"
-            "</tr>"
-        )
-
-    # ── Synergy groups ───────────────────────────────────────────────────────
-    synergy_html = ""
-    if synergy:
-        chips = ""
-        for group, pct in sorted(synergy.items(), key=lambda x: -x[1]):
-            p_int = pct_int(pct)
-            col = "#22c55e" if p_int >= 75 else "#f59e0b" if p_int >= 50 else "#ef4444"
-            chips += (
-                '<span style="display:inline-block;background:rgba(255,255,255,0.06);'
-                "border:1px solid " + col + "40;border-radius:12px;"
-                "padding:3px 10px;font-size:10px;color:"
-                + col
-                + ';margin:2px 3px 2px 0;font-weight:600;">'
-                + esc(group)
-                + " "
-                + str(p_int)
-                + "%</span>"
-            )
-        synergy_html = (
-            '<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08);">'
-            '<p style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin:0 0 5px;">Synergy Stacks</p>'
-            + chips
-            + "</div>"
-        )
-
-    # ── T1 line ──────────────────────────────────────────────────────────────
-    t1_html = ""
-    if avg_t1 is not None:
-        t1_pct_int = pct_int(avg_t1)
-        t1_col = "#22c55e" if t1_pct_int >= 75 else "#f59e0b" if t1_pct_int >= 50 else "#94a3b8"
-        t1_html = (
-            '<p style="font-size:11px;color:#64748b;margin:6px 0 0;">'
-            'Tier 1 avg: <span style="color:' + t1_col + ';font-weight:700;">' + str(t1_pct_int) + "%</span></p>"
-        )
-
-    # ADR-105: when the window contains unmeasured days, the mean ships its own n.
-    n_note = ""
-    if measured_days is not None and measured_days != days:
-        n_note = " (n=" + str(measured_days) + " measured)"
-
-    html = (
-        "<!-- S2-T1-10: Weekly Habit Review (Sunday only) -->"
-        '<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);'
-        'border-radius:12px;padding:16px 20px;margin:0 0 20px;">'
-        # Header row
-        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">'
-        "<div>"
-        '<p style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;margin:0 0 2px;">&#128197; Weekly Habit Review</p>'
-        '<p style="font-size:24px;font-weight:800;color:'
-        + overall_col
-        + ';margin:0;line-height:1.1;">'
-        + t0_pct_str
-        + '<span style="font-size:14px;">%</span> T0</p>'
-        '<p style="font-size:11px;color:' + overall_col + ';margin:2px 0 0;">' + overall_label + n_note + "</p>"
-        "</div>"
-        '<div style="text-align:right;">'
-        '<p style="font-size:10px;color:#64748b;margin:0 0 2px;">' + str(days) + "-day window</p>"
-        '<p style="font-size:20px;font-weight:700;color:#e2e8f0;margin:0;">' + str(perfect) + "/" + str(days) + "</p>"
-        '<p style="font-size:10px;color:#94a3b8;margin:2px 0 0;">perfect days (' + str(perfect_pct) + "%)</p>"
-        "</div>"
-        "</div>"
-        # Daily bars
-        + bars_html
-        # Habit table
-        + '<table style="width:100%;border-collapse:collapse;margin-top:8px;">'
-        + '<tr><td colspan="2" style="padding:0 0 4px 12px;font-size:10px;color:#64748b;'
-        + 'text-transform:uppercase;letter-spacing:1px;">T0 Habits</td></tr>'
-        + habit_rows
-        + "</table>"
-        # T1 line
-        + t1_html
-        # Synergy
-        + synergy_html + "</div>"
-    )
-
-    return html
 
 
 # ── Daily-brief section builders (extracted from build_html for maintainability) ──
@@ -486,7 +189,7 @@ def _brief_header(brief_mode, data, day_grade_score, grade, tldr_guidance, vacat
     # TL;DR line
     tldr_text = (tldr_guidance or {}).get("tldr", "")
     if tldr_text:
-        out += '<p style="color:#cbd5e1;font-size:13px;margin:4px 0 0;font-style:italic;">' + tldr_text + "</p>"
+        out += '<p style="color:#cbd5e1;font-size:13px;margin:4px 0 0;font-style:italic;">' + esc(tldr_text) + "</p>"
 
     out += '</div><div style="text-align:right;">'
 
@@ -502,32 +205,35 @@ def _brief_header(brief_mode, data, day_grade_score, grade, tldr_guidance, vacat
 
     out += "</div></div>"
 
-    # Travel banner
-    travel = data.get("travel_active")
-    if travel:
-        dest = travel.get("destination", "Unknown")
-        country = travel.get("country", "")
-        tz = travel.get("timezone", "")
-        tz_offset = travel.get("tz_offset", 0)
-        direction = travel.get("direction", "")
-        tz_str = (" (" + tz + (", UTC" + ("+" if tz_offset >= 0 else "") + str(int(tz_offset)) if tz else "") + ")") if tz else ""
-        jet_note = ""
-        if abs(tz_offset) >= 5:
-            jet_note = " &#128992; Jet lag protocol: " + (
-                "Morning sunlight ASAP, avoid melatonin until day 3."
-                if direction == "east"
-                else "Bright light in evening, consider 0.5mg melatonin at destination bedtime."
-            )
-        loc_label = dest + (", " + country if country else "")
-        out += (
-            '<div style="background:rgba(99,102,241,0.2);border-left:3px solid #6366f1;'
-            'padding:8px 16px;margin-top:12px;border-radius:0 6px 6px 0;">'
-            '<p style="color:#a5b4fc;font-size:11px;margin:0;">'
-            "&#9992; TRAVELING: " + loc_label + tz_str + jet_note + "</p></div>"
-        )
-
+    # Travel banner. This was the ONE section in the renderer running outside a guard —
+    # `abs(tz_offset)` raises TypeError for a manually-entered TRIP# row whose
+    # tz_offset_hours is null or a string, and the exception propagated out of
+    # _brief_header and out of build_html, so there was no morning brief at all. The
+    # fragment is built into a local and only appended once it is complete, so a partial
+    # banner can never reach the reader either.
     try:
-        pass  # travel already handled above
+        travel = data.get("travel_active")
+        if travel:
+            dest = travel.get("destination", "Unknown")
+            country = travel.get("country", "")
+            tz = travel.get("timezone", "")
+            tz_offset = travel.get("tz_offset", 0)
+            direction = travel.get("direction", "")
+            tz_str = (" (" + tz + (", UTC" + ("+" if tz_offset >= 0 else "") + str(int(tz_offset)) if tz else "") + ")") if tz else ""
+            jet_note = ""
+            if abs(tz_offset) >= 5:
+                jet_note = " &#128992; Jet lag protocol: " + (
+                    "Morning sunlight ASAP, avoid melatonin until day 3."
+                    if direction == "east"
+                    else "Bright light in evening, consider 0.5mg melatonin at destination bedtime."
+                )
+            loc_label = esc(dest) + (", " + esc(country) if country else "")
+            out += (
+                '<div style="background:rgba(99,102,241,0.2);border-left:3px solid #6366f1;'
+                'padding:8px 16px;margin-top:12px;border-radius:0 6px 6px 0;">'
+                '<p style="color:#a5b4fc;font-size:11px;margin:0;">'
+                "&#9992; TRAVELING: " + loc_label + esc(tz_str) + jet_note + "</p></div>"
+            )
     except Exception as _e:
         out += _section_error_html("Travel", _e)
 
@@ -629,10 +335,15 @@ def _brief_character(character_sheet, protocol_recs, triggered_rewards):
             out += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;">'
             for pn in pillar_names:
                 pd = character_sheet.get("pillar_" + pn, {})
-                pl = pd.get("level", 1) if pd else 1
-                pt = pd.get("tier", "Foundation") if pd else "Foundation"
-                pc = tier_colors.get(pt, "#78716c")
-                pct_bar = round((pl / 100) * 100)
+                # ADR-104: a pillar the character engine has never scored has no level.
+                # `pd.get("level", 1)` drew it as a real Level 1 with a real bar, which is
+                # indistinguishable from a genuinely level-1 pillar — and after a cycle
+                # reset that is every pillar.
+                pl = pd.get("level") if pd else None
+                pt = (pd.get("tier", "Foundation") if pd else "Foundation") or "Foundation"
+                pc = tier_colors.get(pt, "#78716c") if pl is not None else "#374151"
+                pct_bar = round((pl / 100) * 100) if pl is not None else 0
+                label = str(pl) if pl is not None else "&mdash;"
                 out += (
                     "<div>"
                     '<p style="color:#9ca3af;font-size:8px;margin:0;">' + pillar_emojis.get(pn, "•") + "</p>"
@@ -642,7 +353,7 @@ def _brief_character(character_sheet, protocol_recs, triggered_rewards):
                     + ";border-radius:2px;height:"
                     + str(pct_bar)
                     + '%;width:100%;position:absolute;bottom:0;"></div></div>'
-                    '<p style="color:#9ca3af;font-size:8px;margin:0;">' + str(pl) + "</p>"
+                    '<p style="color:#9ca3af;font-size:8px;margin:0;">' + label + "</p>"
                     "</div>"
                 )
             out += "</div></div>"
@@ -701,7 +412,10 @@ def _brief_character(character_sheet, protocol_recs, triggered_rewards):
                 for eff in cs_effects:
                     eff_name = eff.get("name", "")
                     eff_emoji = eff.get("emoji", "✨")
-                    eff.get("description", "")
+                    # The character engine writes an explanation for every active effect;
+                    # this read used to be a bare expression whose value was discarded, so
+                    # the reader only ever saw the emoji and the name.
+                    eff_desc = eff.get("description", "")
                     eff_color = "#f87171" if "drag" in eff_name.lower() or "penalty" in eff_name.lower() else "#60a5fa"
                     out += (
                         '<span style="display:inline-block;background:rgba(0,0,0,0.3);border-radius:12px;padding:2px 8px;margin:2px;font-size:10px;color:'
@@ -709,9 +423,11 @@ def _brief_character(character_sheet, protocol_recs, triggered_rewards):
                         + ';">'
                         + eff_emoji
                         + " "
-                        + eff_name
+                        + esc(eff_name)
                         + "</span>"
                     )
+                    if eff_desc:
+                        out += '<p style="color:#9ca3af;font-size:10px;margin:2px 0 4px 4px;">' + esc(eff_desc) + "</p>"
                 out += "</div>"
 
             # Triggered rewards (pre-computed, passed in)
@@ -849,19 +565,23 @@ def _brief_scorecards(component_details, component_scores, data, mvp_streak, pro
             out += '<p style="color:#64748b;font-size:9px;margin:0 0 6px;font-weight:700;">SLEEP ARCHITECTURE</p>'
             out += '<div style="display:flex;gap:16px;flex-wrap:wrap;">'
 
+            # ADR-104 cuts both ways: absence must not look like 0, and a MEASURED 0 must
+            # not look like absence. These cells tested truthiness, so a night Whoop
+            # recorded genuinely zero deep sleep — the most alarming reading in the block —
+            # rendered as the same em dash as an unmeasured night.
             arch_items = [
-                ("Duration", str(round(sleep_dur, 1)) + "h" if sleep_dur else "—", "#94a3b8"),
-                ("Score", str(round(sleep_score_val)) if sleep_score_val else "—", "#60a5fa"),
-                ("Efficiency", str(round(efficiency)) + "%" if efficiency else "—", "#a78bfa"),
+                ("Duration", str(round(sleep_dur, 1)) + "h" if sleep_dur is not None else "—", "#94a3b8"),
+                ("Score", str(round(sleep_score_val)) if sleep_score_val is not None else "—", "#60a5fa"),
+                ("Efficiency", str(round(efficiency)) + "%" if efficiency is not None else "—", "#a78bfa"),
                 (
                     "Deep",
-                    str(round(deep_pct)) + "%" if deep_pct else "—",
-                    "#22c55e" if deep_pct and deep_pct >= 20 else "#f59e0b" if deep_pct else "#94a3b8",
+                    str(round(deep_pct)) + "%" if deep_pct is not None else "—",
+                    "#22c55e" if deep_pct is not None and deep_pct >= 20 else "#f59e0b" if deep_pct is not None else "#94a3b8",
                 ),
                 (
                     "REM",
-                    str(round(rem_pct)) + "%" if rem_pct else "—",
-                    "#22c55e" if rem_pct and rem_pct >= 20 else "#f59e0b" if rem_pct else "#94a3b8",
+                    str(round(rem_pct)) + "%" if rem_pct is not None else "—",
+                    "#22c55e" if rem_pct is not None and rem_pct >= 20 else "#f59e0b" if rem_pct is not None else "#94a3b8",
                 ),
             ]
             for arch_label, arch_val, arch_color in arch_items:
@@ -873,17 +593,19 @@ def _brief_scorecards(component_details, component_scores, data, mvp_streak, pro
                 )
             out += "</div></div>"
 
-        # HRV trend
-        try:
-            trend_s = hrv_trend_str(data["hrv"].get("hrv_7d"), data["hrv"].get("hrv_30d"))
-            hrv_val = safe_float(data.get("whoop"), "hrv")
-            if hrv_val:
-                out += (
-                    '<p style="color:#64748b;font-size:10px;margin:8px 0 0;">'
-                    '📡 HRV: <span style="color:#94a3b8;">' + str(round(hrv_val)) + "ms yesterday · " + trend_s + "</span></p>"
-                )
-        except Exception:
-            pass
+        # HRV trend. `data["hrv"]` used to be a hard subscript inside a bare
+        # `except Exception: pass`, so any packet without the key made the whole HRV
+        # readout vanish with no placeholder and no log line — indistinguishable from a
+        # quiet day. The missing window is now stated ("no trend data") and a real failure
+        # surfaces through the enclosing Scorecard guard.
+        _hrv_window = data.get("hrv") or {}
+        trend_s = hrv_trend_str(_hrv_window.get("hrv_7d"), _hrv_window.get("hrv_30d"))
+        hrv_val = safe_float(data.get("whoop"), "hrv")
+        if hrv_val:
+            out += (
+                '<p style="color:#64748b;font-size:10px;margin:8px 0 0;">'
+                '📡 HRV: <span style="color:#94a3b8;">' + str(round(hrv_val)) + "ms yesterday · " + trend_s + "</span></p>"
+            )
 
         out += "</div><!-- /S:scorecard -->"
 
@@ -916,15 +638,26 @@ def _brief_scorecards(component_details, component_scores, data, mvp_streak, pro
                 + "d streak</p>"
                 "</div>"
             )
+            # ADR-104: not-applicable is not a miss. scoring_engine.score_habits_registry
+            # `continue`s past a habit that was not applicable that day (weekday-scoped
+            # habit on a weekend, post_training habit with no workout) rather than marking
+            # it False, so it never reaches tier_status[0]. Treating that absence as a miss
+            # put an ✗ on habits Matthew was never expected to do and understated the
+            # completion bar in the above-the-fold section of every weekend brief.
             for h_name in tier0_names:
+                evaluated = h_name in tier0_status
                 done = bool(tier0_status.get(h_name, False))
                 # Ava: green = done, amber = miss. No red — amber signals attention, not failure.
-                icon_html = (
-                    '<span style="color:#22c55e;font-size:14px;">&#10003;</span>'
-                    if done
-                    else '<span style="color:#f59e0b;font-size:14px;">&#10005;</span>'
-                )
-                name_color = "#e2e8f0" if done else "#94a3b8"
+                # Grey em dash = the habit did not apply today; it is not scored either way.
+                if not evaluated:
+                    icon_html = '<span style="color:#475569;font-size:14px;">&mdash;</span>'
+                    name_color = "#475569"
+                elif done:
+                    icon_html = '<span style="color:#22c55e;font-size:14px;">&#10003;</span>'
+                    name_color = "#e2e8f0"
+                else:
+                    icon_html = '<span style="color:#f59e0b;font-size:14px;">&#10005;</span>'
+                    name_color = "#94a3b8"
                 out += (
                     '<div style="display:flex;align-items:center;justify-content:space-between;'
                     'padding:5px 0;border-bottom:1px solid #1e293b;">'
@@ -933,13 +666,14 @@ def _brief_scorecards(component_details, component_scores, data, mvp_streak, pro
                     + '<span style="color:'
                     + name_color
                     + ';font-size:12px;">'
-                    + h_name
+                    + esc(h_name)
                     + "</span>"
                     "</div>"
                     "</div>"
                 )
-            done_count = sum(1 for n in tier0_names if bool(tier0_status.get(n, False)))
-            total_count = len(tier0_names)
+            evaluated_names = [n for n in tier0_names if n in tier0_status]
+            done_count = sum(1 for n in evaluated_names if bool(tier0_status.get(n, False)))
+            total_count = len(evaluated_names)
             bar_pct = round(done_count / total_count * 100) if total_count else 0
             bar_color = "#22c55e" if done_count == total_count else "#f59e0b" if done_count >= total_count * 0.7 else "#ef4444"
             out += (
@@ -1026,7 +760,12 @@ def _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrit
             for act in activities:
                 name = act.get("name", "Activity")
                 sport = act.get("sport_type", "?")
-                dur_min = round((act.get("moving_time_seconds") or 0) / 60)
+                # ADR-104: an activity whose duration Strava did not report has no duration.
+                # `or 0` published it as a factual "0 min".
+                _mts = act.get("moving_time_seconds")
+                dur_str = (str(round(_mts / 60)) + " min") if _mts is not None else "—"
+                if _mts is None and act.get("elapsed_time_seconds") is not None:
+                    dur_str = str(round(act["elapsed_time_seconds"] / 60)) + " min (elapsed)"
                 avg_hr_act = act.get("average_heartrate")
                 dist = act.get("distance_miles")
                 elev = act.get("elevation_gain_ft")
@@ -1034,9 +773,9 @@ def _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrit
                 out += (
                     '<div style="background:#1e293b;border-radius:8px;padding:12px;margin-bottom:8px;">'
                     '<div style="display:flex;justify-content:space-between;">'
-                    '<div><p style="color:#e2e8f0;font-size:14px;font-weight:600;margin:0;">' + name + "</p>"
-                    '<p style="color:#64748b;font-size:11px;margin:2px 0;">' + sport + "</p></div>"
-                    '<p style="color:#60a5fa;font-size:13px;font-weight:600;margin:0;">' + str(dur_min) + " min</p>"
+                    '<div><p style="color:#e2e8f0;font-size:14px;font-weight:600;margin:0;">' + esc(name) + "</p>"
+                    '<p style="color:#64748b;font-size:11px;margin:2px 0;">' + esc(sport) + "</p></div>"
+                    '<p style="color:#60a5fa;font-size:13px;font-weight:600;margin:0;">' + dur_str + "</p>"
                     "</div>"
                 )
 
@@ -1065,12 +804,10 @@ def _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrit
             for w in workouts:
                 w_name = w.get("workout_name", "Strength Session")
                 exercises = w.get("exercises", [])
-                total_vol = mf_workouts.get("total_volume_lbs")
-                total_sets = mf_workouts.get("total_sets")
 
                 out += (
                     '<div style="background:#0f172a;border-radius:8px;padding:12px;margin-top:8px;">'
-                    '<p style="color:#94a3b8;font-size:11px;font-weight:700;margin:0 0 8px;">💪 ' + w_name + "</p>"
+                    '<p style="color:#94a3b8;font-size:11px;font-weight:700;margin:0 0 8px;">💪 ' + esc(w_name) + "</p>"
                 )
                 for ex in exercises[:8]:
                     ex_name = ex.get("exercise_name", "?")
@@ -1088,15 +825,23 @@ def _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrit
                         set_strs.append(st)
                     out += (
                         '<p style="color:#64748b;font-size:10px;margin:0 0 2px;">'
-                        '<span style="color:#94a3b8;">' + ex_name + "</span>: " + ", ".join(set_strs) + "</p>"
+                        '<span style="color:#94a3b8;">' + esc(ex_name) + "</span>: " + ", ".join(set_strs) + "</p>"
                     )
 
-                if total_vol:
-                    out += (
-                        '<p style="color:#475569;font-size:9px;margin:6px 0 0;">'
-                        "Volume: " + fmt_num(total_vol) + " lbs · " + str(round(float(total_sets or 0))) + " sets</p>"
-                    )
                 out += "</div>"
+
+            # total_volume_lbs / total_sets are the DAY aggregate (fetch_hevy_workouts
+            # returns exactly one total for the whole day, "possibly several a day"), so
+            # rendering them inside the per-workout loop printed the same figure under each
+            # workout and a two-a-day read as ~2x the volume actually lifted.
+            total_vol = mf_workouts.get("total_volume_lbs")
+            total_sets = mf_workouts.get("total_sets")
+            if total_vol and workouts:
+                _span = " (day total, " + str(len(workouts)) + " sessions)" if len(workouts) > 1 else ""
+                out += (
+                    '<p style="color:#475569;font-size:9px;margin:6px 0 0;">'
+                    "Volume: " + fmt_num(total_vol) + " lbs · " + str(round(float(total_sets or 0))) + " sets" + _span + "</p>"
+                )
 
         # AI training/nutrition commentary
         training_text = (training_nutrition or {}).get("training", "")
@@ -1291,20 +1036,19 @@ def _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrit
                 for s in supp_list:
                     t = s.get("timing", "other")
                     by_timing.setdefault(t, []).append(s)
-                timing_labels = {
-                    "morning_fasted": "Morning (fasted)",
-                    "afternoon_with_food": "Afternoon (with food)",
-                    "evening_sleep": "Evening / Sleep",
-                }
-                for timing_key, timing_label in timing_labels.items():
-                    if timing_key in by_timing:
-                        out += '<p style="color:#64748b;font-size:9px;margin:4px 0 2px;font-weight:700;">' + timing_label.upper() + "</p>"
-                        for s_item in by_timing[timing_key]:
-                            name = s_item.get("name", "?")
-                            dose = s_item.get("dose", "")
-                            unit = s_item.get("unit", "")
-                            dose_str = (" — " + str(dose) + " " + str(unit)).strip() if dose else ""
-                            out += '<p style="color:#94a3b8;font-size:11px;margin:0;">• ' + name + dose_str + "</p>"
+                # The loop used to iterate a hardcoded three-key label map, so any
+                # supplement whose timing was anything else — including this function's own
+                # "other" default two lines up — was collected into by_timing and then
+                # silently never printed, with no "and N more".
+                for timing_key in supplement_timing_order(by_timing):
+                    timing_label = supplement_timing_label(timing_key)
+                    out += '<p style="color:#64748b;font-size:9px;margin:4px 0 2px;font-weight:700;">' + esc(timing_label).upper() + "</p>"
+                    for s_item in by_timing[timing_key]:
+                        name = s_item.get("name", "?")
+                        dose = s_item.get("dose", "")
+                        unit = s_item.get("unit", "")
+                        dose_str = (" — " + str(dose) + " " + str(unit)).strip() if dose else ""
+                        out += '<p style="color:#94a3b8;font-size:11px;margin:0;">• ' + esc(name) + esc(dose_str) + "</p>"
             else:
                 out += '<p style="color:#475569;font-size:11px;margin:0;">No supplement data logged.</p>'
         else:
@@ -1326,17 +1070,26 @@ def _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrit
         glucose_tir = safe_float(apple, "blood_glucose_time_in_range_pct")
         glucose_std = safe_float(apple, "blood_glucose_std_dev")
         glucose_min = safe_float(apple, "blood_glucose_min")
-        safe_float(apple, "blood_glucose_max")
+        # health_auto_export_lambda writes blood_glucose_max on every CGM day. This read
+        # used to be a bare expression whose value was discarded: the single most
+        # actionable number of the day was computed, stored, read and thrown away.
+        glucose_max = safe_float(apple, "blood_glucose_max")
 
         if glucose_avg is not None:
             tir_color = "#22c55e" if glucose_tir and glucose_tir >= 85 else "#f59e0b" if glucose_tir and glucose_tir >= 70 else "#ef4444"
             avg_color = "#22c55e" if glucose_avg < 100 else "#f59e0b" if glucose_avg < 120 else "#ef4444"
 
-            out += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">'
+            peak_color = (
+                "#22c55e"
+                if glucose_max is not None and glucose_max < 140
+                else "#f59e0b" if glucose_max is not None and glucose_max < 180 else "#ef4444"
+            )
+            out += '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;">'
             cgm_items = [
                 ("Avg", str(round(glucose_avg)), "mg/dL", avg_color),
                 ("TIR", str(round(glucose_tir)) + "%" if glucose_tir else "—", "70-140", tir_color),
                 ("Fasting", str(round(glucose_min)) if glucose_min else "—", "overnight low", "#94a3b8"),
+                ("Peak", str(round(glucose_max)) if glucose_max is not None else "—", "daily max", peak_color),
                 (
                     "Variability",
                     str(round(glucose_std, 1)) if glucose_std else "—",
@@ -1359,15 +1112,31 @@ def _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrit
                     '<p style="color:#ef4444;font-size:11px;margin:8px 0 0;">'
                     "⚠ Hypoglycemia signal: overnight low " + str(round(glucose_min)) + " mg/dL</p>"
                 )
+            # the hypo callout's hyper counterpart
+            if glucose_max is not None and glucose_max >= 180:
+                out += (
+                    '<p style="color:#ef4444;font-size:11px;margin:8px 0 0;">'
+                    "⚠ Hyperglycemia signal: daily peak " + str(round(glucose_max)) + " mg/dL</p>"
+                )
 
             # 7-day trend
             apple_7d = data.get("apple_7d") or []
             gl_7d = [safe_float(d, "blood_glucose_avg") for d in apple_7d if safe_float(d, "blood_glucose_avg")]
             if len(gl_7d) >= 3:
+                # ADR-105 / #1917: the mean ships its n, and a window-named figure spans its
+                # window or is named for the span it actually has. A "7-day avg" computed
+                # from 3 days read as a full week.
                 trend_avg = avg(gl_7d)
+                _n = len(gl_7d)
+                _window_label = "7-day avg" if _n >= 7 else str(_n) + "-day avg"
                 out += (
                     '<p style="color:#475569;font-size:10px;margin:6px 0 0;">'
-                    '7-day avg: <span style="color:#94a3b8;">' + str(round(trend_avg)) + " mg/dL</span></p>"
+                    + _window_label
+                    + ': <span style="color:#94a3b8;">'
+                    + str(round(trend_avg))
+                    + " mg/dL</span> (n="
+                    + str(_n)
+                    + ")</p>"
                 )
         else:
             out += '<p style="color:#64748b;font-size:12px;margin:0;">No glucose data for yesterday.</p>'
@@ -1447,6 +1216,11 @@ def _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrit
     return out
 
 
+def _tl_num(val):
+    """Task Load cell: a measured count, or an em dash for a count the sync never sent."""
+    return str(val) if val is not None else "&mdash;"
+
+
 def _brief_lifestyle(data, profile, tldr_guidance):
     """Section group of the daily brief (extracted from build_html, ADR-pending).
 
@@ -1482,7 +1256,7 @@ def _brief_lifestyle(data, profile, tldr_guidance):
                 )
             if condition:
                 out += (
-                    '<div><p style="color:#94a3b8;font-size:13px;margin:0;">' + condition + "</p>"
+                    '<div><p style="color:#94a3b8;font-size:13px;margin:0;">' + esc(condition) + "</p>"
                     '<p style="color:#475569;font-size:9px;margin:0;">Conditions</p></div>'
                 )
             if sunrise:
@@ -1501,6 +1275,12 @@ def _brief_lifestyle(data, profile, tldr_guidance):
                     '<div><p style="color:' + aqi_color + ';font-size:12px;margin:0;">' + str(round(aqi)) + "</p>"
                     '<p style="color:#475569;font-size:9px;margin:0;">AQI</p></div>'
                 )
+            # Reader/writer parity: `condition`, `precip_in`, `aqi`, `sunrise_local` and
+            # `sunset_local` above have NO writer anywhere in the repo, so four of the
+            # card's five cells had never rendered and the section was a bare Hi/Lo. The
+            # reads stay (a future writer, or a hand-entered record, still lights them up);
+            # what weather_lambda.transform() actually stores is rendered here.
+            out += weather_context_cells(weather)
             out += "</div></div>"
         out += "<!-- /S:weather -->"
     except Exception as _e:
@@ -1559,14 +1339,27 @@ def _brief_lifestyle(data, profile, tldr_guidance):
         out += "<!-- S:task_load -->"
         todoist = data.get("todoist")
         if todoist:
-            active = int(todoist.get("active_count", 0))
-            overdue = int(todoist.get("overdue_count", 0))
-            due_today = int(todoist.get("due_today_count", 0))
-            completed = int(todoist.get("completed_count", 0))
+            # ADR-104: todoist_lambda writes each count only when it has it, and
+            # ingestion_validator only requires at_least_one_of completed/active/overdue —
+            # a partial record is an expected shape, not a corruption. `.get(key, 0)` turned
+            # every absent count into a factual 0 and then derived a green "CLEAR" load
+            # verdict from the fabricated zero. A present-but-malformed value still raises
+            # (int("many")) and still costs this one named section.
+            def _count(key):
+                raw = todoist.get(key)
+                return int(raw) if raw is not None else None
+
+            active = _count("active_count")
+            overdue = _count("overdue_count")
+            due_today = _count("due_today_count")
+            completed = _count("completed_count")
             by_project = todoist.get("completions_by_project", {})
 
-            # Cognitive load colour
-            if overdue > 30:
+            # Cognitive load colour — derived only from a measured overdue count.
+            if overdue is None:
+                load_color = "#64748b"
+                load_label = "—"
+            elif overdue > 30:
                 load_color = "#dc2626"
                 load_label = "HIGH"
             elif overdue > 15:
@@ -1584,18 +1377,18 @@ def _brief_lifestyle(data, profile, tldr_guidance):
                 '<p style="color:#64748b;font-size:10px;margin:0 0 10px;font-weight:700;letter-spacing:1px;">TASK LOAD</p>'
                 '<div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;">'
                 '<div><p style="color:#e2e8f0;font-size:20px;font-weight:700;margin:0;">'
-                + str(completed)
+                + _tl_num(completed)
                 + '</p><p style="color:#475569;font-size:9px;margin:0;">DONE YESTERDAY</p></div>'
                 '<div><p style="color:'
                 + load_color
                 + ';font-size:20px;font-weight:700;margin:0;">'
-                + str(overdue)
+                + _tl_num(overdue)
                 + '</p><p style="color:#475569;font-size:9px;margin:0;">OVERDUE</p></div>'
                 '<div><p style="color:#94a3b8;font-size:20px;font-weight:700;margin:0;">'
-                + str(due_today)
+                + _tl_num(due_today)
                 + '</p><p style="color:#475569;font-size:9px;margin:0;">DUE TODAY</p></div>'
                 '<div><p style="color:#94a3b8;font-size:20px;font-weight:700;margin:0;">'
-                + str(active)
+                + _tl_num(active)
                 + '</p><p style="color:#475569;font-size:9px;margin:0;">ACTIVE</p></div>'
                 '<div style="margin-left:auto;"><p style="color:'
                 + load_color
@@ -1690,7 +1483,7 @@ def _brief_lifestyle(data, profile, tldr_guidance):
             for item in guidance_items:
                 out += (
                     '<div style="background:#1e293b;border-radius:8px;padding:10px 14px;margin-bottom:8px;">'
-                    '<p style="color:#e2e8f0;font-size:12px;margin:0;line-height:1.5;">' + item + "</p></div>"
+                    '<p style="color:#e2e8f0;font-size:12px;margin:0;line-height:1.5;">' + esc(item) + "</p></div>"
                 )
             out += "</div>"
         out += "<!-- /S:guidance -->"
@@ -1813,7 +1606,7 @@ def _brief_journal_coaches(
             if themes:
                 out += (
                     '<p style="color:#64748b;font-size:10px;margin:8px 0 4px;">Themes:</p>'
-                    '<p style="color:#94a3b8;font-size:11px;margin:0;">' + ", ".join(str(t) for t in themes[:5]) + "</p>"
+                    '<p style="color:#94a3b8;font-size:11px;margin:0;">' + ", ".join(esc(str(t)) for t in themes[:5]) + "</p>"
                 )
             out += "</div>"
         out += "<!-- /S:journal_pulse -->"
@@ -1853,7 +1646,7 @@ def _brief_journal_coaches(
         if sleep_coach_v2_text:
             _sc_paragraphs = sleep_coach_v2_text.strip().split("\n\n")
             _sc_body = "".join(
-                f'<p style="color:#c7d2fe;font-size:13px;line-height:1.6;margin:0 0 8px 0;">{p.strip()}</p>'
+                f'<p style="color:#c7d2fe;font-size:13px;line-height:1.6;margin:0 0 8px 0;">{esc(p.strip())}</p>'
                 for p in _sc_paragraphs
                 if p.strip()
             )
@@ -1874,7 +1667,7 @@ def _brief_journal_coaches(
         if nutrition_coach_v2_text:
             _nc_paragraphs = nutrition_coach_v2_text.strip().split("\n\n")
             _nc_body = "".join(
-                f'<p style="color:#c7d2fe;font-size:13px;line-height:1.6;margin:0 0 8px 0;">{p.strip()}</p>'
+                f'<p style="color:#c7d2fe;font-size:13px;line-height:1.6;margin:0 0 8px 0;">{esc(p.strip())}</p>'
                 for p in _nc_paragraphs
                 if p.strip()
             )
@@ -1895,7 +1688,7 @@ def _brief_journal_coaches(
         if training_coach_v2_text:
             _tc_paragraphs = training_coach_v2_text.strip().split("\n\n")
             _tc_body = "".join(
-                f'<p style="color:#c7d2fe;font-size:13px;line-height:1.6;margin:0 0 8px 0;">{p.strip()}</p>'
+                f'<p style="color:#c7d2fe;font-size:13px;line-height:1.6;margin:0 0 8px 0;">{esc(p.strip())}</p>'
                 for p in _tc_paragraphs
                 if p.strip()
             )
@@ -1924,7 +1717,7 @@ def _brief_journal_coaches(
             if _sec_text:
                 _paras = _sec_text.strip().split("\n\n")
                 _body = "".join(
-                    f'<p style="color:#c7d2fe;font-size:13px;line-height:1.6;margin:0 0 8px 0;">{p.strip()}</p>'
+                    f'<p style="color:#c7d2fe;font-size:13px;line-height:1.6;margin:0 0 8px 0;">{esc(p.strip())}</p>'
                     for p in _paras
                     if p.strip()
                 )
@@ -1967,7 +1760,7 @@ def _brief_journal_coaches(
                 + "</div>"
                 '<div style="background:#16213e;border-left:3px solid #6366f1;border-radius:0 8px 8px 0;'
                 'padding:12px 16px;">'
-                '<p style="color:#c7d2fe;font-size:13px;line-height:1.6;margin:0;">' + bod_insight + "</p>"
+                '<p style="color:#c7d2fe;font-size:13px;line-height:1.6;margin:0;">' + esc(bod_insight) + "</p>"
                 "</div></div>"
             )
         out += "<!-- /S:bod -->"
@@ -1986,7 +1779,9 @@ def _brief_journal_coaches(
             for alert in alerts[:3]:
                 metric = alert.get("metric", "")
                 msg = alert.get("message", "")
-                out += '<p style="color:#fca5a5;font-size:12px;margin:0 0 4px;">' "<strong>" + metric + ":</strong> " + msg + "</p>"
+                out += (
+                    '<p style="color:#fca5a5;font-size:12px;margin:0 0 4px;">' "<strong>" + esc(metric) + ":</strong> " + esc(msg) + "</p>"
+                )
             out += "</div>"
         out += "<!-- /S:anomaly -->"
     except Exception as _e:
