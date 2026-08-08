@@ -39,6 +39,10 @@ pytestmark = pytest.mark.integration
 KNOWN_OPTIONAL: dict[tuple, str] = {
     ("USER#matthew#ledger", "TOTALS#current"): "zeroed/recreated by restart_ledger_reset (ADR-072)",
     (
+        "USER#matthew#SOURCE#whoop",
+        "AUTH_GLITCH",
+    ): "#2196 one-shot transient-401 marker — written only when a data endpoint rejects a token minted seconds earlier, TTL'd to 2h; absence is the healthy steady state and _glitch_marker_is_fresh() returns False for it",
+    (
         "USER#matthew#SOURCE#ai_analysis",
         "EXPERT#experiment_arc",
     ): "experiment-scoped (ADR-077): wiped at every reset, recreated by the expert analyzer's next weekly run; coherence_sentinel guards both reads with `if arc` (absent for up to a week each genesis)",

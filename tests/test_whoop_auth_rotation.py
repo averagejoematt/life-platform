@@ -189,7 +189,7 @@ def test_authenticate_persists_rotated_secret_before_returning(monkeypatch):
             write_calls.append((SecretId, json.loads(SecretString)))
 
     monkeypatch.setattr(whoop.boto3, "client", lambda *a, **k: _SM())
-    monkeypatch.setattr(whoop, "_refresh_access_token", lambda *a, **k: ("at-NEW", "rt-NEW"))
+    monkeypatch.setattr(whoop, "_refresh_access_token", lambda *a, **k: ("at-NEW", "rt-NEW", 3600))
 
     secret_data = {"client_id": "cid", "client_secret": "csec", "refresh_token": "rt-OLD", "access_token": "at-OLD"}
     result = whoop.authenticate(secret_data)
@@ -223,11 +223,12 @@ def test_persist_refreshed_secret_retries_once_then_gives_up_without_raising(mon
 
 def test_refresh_access_token_retries_transient_502(monkeypatch):
     """The ACTUAL first failure of the 2026-08-03 incident: a bare 502 on the
-    token endpoint. _refresh_access_token must now retry (same policy as the
-    data-fetch endpoints, via the shared http_retry.urlopen_with_retry) instead
-    of losing the whole attempt to one gateway blip. Drives the REAL retry/
-    backoff logic end-to-end by patching only the underlying urllib.urlopen
-    that http_retry itself calls."""
+    token endpoint. One further attempt is still made so a genuinely
+    unprocessed 5xx recovers inside the invocation — but since #2196 that
+    attempt is whoop_lambda's own single CLASSIFIED probe (http_retry is called
+    with the non-idempotent escape hatch, max_attempts=1), not http_retry's
+    blind 3-attempt policy. Drives the real path end-to-end by patching only
+    the underlying urllib.urlopen that http_retry itself calls."""
     from common import http_retry
 
     class _Resp:
@@ -253,7 +254,9 @@ def test_refresh_access_token_retries_transient_502(monkeypatch):
 
     monkeypatch.setattr(http_retry.urllib.request, "urlopen", fake_urlopen)
     monkeypatch.setattr(http_retry.time, "sleep", lambda *_: None)  # skip the real 2s/8s backoff in tests
+    monkeypatch.setattr(whoop.time, "sleep", lambda *_: None)  # skip whoop's own probe delay
 
-    access_token, refresh_token = whoop._refresh_access_token("cid", "csec", "rt-1")
+    access_token, refresh_token, expires_in = whoop._refresh_access_token("cid", "csec", "rt-1")
     assert (access_token, refresh_token) == ("at-2", "rt-2")
-    assert attempts["n"] == 2, "expected exactly one retry after the 502"
+    assert expires_in == 0, "this fixture's token body carries no expires_in"
+    assert attempts["n"] == 2, "expected exactly one classified probe after the 502"

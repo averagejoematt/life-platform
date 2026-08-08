@@ -603,6 +603,18 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn, event, co
                         SecretId=config.secret_id,
                         SecretString=json.dumps(credentials),
                     )
+                    # #2196: the warm container's cached copy is now stale — for a
+                    # rotating-token source (Whoop's single-use refresh_token) a
+                    # stale hit means the NEXT invocation in this container reads
+                    # an already-spent token and burns an exchange to discover it.
+                    # `secret_cache.invalidate` shipped with zero callers; this is
+                    # the writeback point, so this is where it belongs.
+                    try:
+                        from common.secret_cache import invalidate as _invalidate_secret
+
+                        _invalidate_secret(config.secret_id)
+                    except Exception:  # pragma: no cover — cache hygiene is best-effort
+                        pass
                     logger.info("Credentials updated in Secrets Manager")
                     break
                 except Exception as e:
