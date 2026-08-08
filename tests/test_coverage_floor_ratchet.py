@@ -88,7 +88,13 @@ RATCHET_FLOOR = 74
 # Raised 70.40 -> 78.10 by #1658 tranche 3 (2026-08-08). Measured 78.24 with the
 # CI job's exact invocation and pinned deps on base 520a7c12; banked a tenth of a
 # point under, same convention. The regression catch line is therefore 76.60%.
-RATCHET_HIGH_WATER = 78.10
+# Raised 78.10 -> 78.90 (2026-08-09) after #1658 tranche 4. Measured **79.02%** —
+# read out of the CI job itself ("Required test coverage of 74% reached. Total
+# coverage: 79.02%", run 31274908729 on green main e806d7e4), not re-derived
+# locally: the local interpreter has no pytest-cov at the pinned 7.1.0 and a
+# different cov version is a different measurement. Banked 0.12 under, same
+# convention. The regression catch line is therefore 77.40%.
+RATCHET_HIGH_WATER = 78.90
 
 # The regression tolerance CI runs with. Mirrors coverage_gap_warn.py's default;
 # asserted equal below so the two can't drift (the #1206 drift class again).
