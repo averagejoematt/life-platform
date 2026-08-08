@@ -26,6 +26,13 @@ deterministic ``enriched_coach_route`` (training vs mind, ``social_signals``) so
 training-flavoured post reaches the training/domain coach and a reflective one reaches
 journal/Mind — the routing is by enriched CONTENT, not by channel.
 
+#1675 (extending #1574/#1756 to this channel): once a post is enriched, the routed coach
+also writes ONE short grounded reaction to it, produced by coach/coach_diary_reaction.py
+and served on the same lab-notes surface as the diary reactions — the SAME mechanism, not
+a second one. Membrane-gated (origin:human, S5 sensitivity-cleared) and budget-gated
+before any Bedrock call, idempotent per post, and fail-open — a reaction never fails
+enrichment (see ``maybe_react_to_post``).
+
 Extracted fields (schema v1): enriched_themes, enriched_behaviors, enriched_entities,
 enriched_exercise_context, enriched_sentiment, enriched_causal_hints (grounded),
 enriched_channel, enriched_coach_route, enriched_schema_version, enriched_at.
@@ -126,9 +133,13 @@ def _ground_causal_hints(hints, post_text):
 
 def post_text(item):
     """The enrichable text for a social post: its title + description (the fields the
-    ingestion transform persists, #1669). Kept small; the full raw payload is in S3."""
-    parts = [str(item.get("title") or ""), str(item.get("description") or "")]
-    return "\n".join(p for p in parts if p).strip()
+    ingestion transform persists, #1669). Kept small; the full raw payload is in S3.
+
+    #1675: the definition moved to ``social_signals`` (pure, AWS-free) so the coach
+    reaction's ADR-104 quote-grounding checks against exactly the same text this
+    enricher grounds its causal hints against. Delegating call, not a re-export — a
+    test that patches this name still intercepts every in-module use."""
+    return social_signals.post_text(item)
 
 
 def select_enrichable(posts):
@@ -237,6 +248,76 @@ def apply_enrichment(item, enrichment):
     return True
 
 
+def post_with_enrichment(item, enrichment):
+    """The stored post as it will look AFTER this run's enrichment lands (#1675).
+
+    ``apply_enrichment`` writes with update_item; it does not mutate the in-memory item.
+    The coach reaction routes on the enriched signals this pass just produced (the
+    persisted ``enriched_coach_route``, and the enriched themes behind the laundered
+    public theme), so it is handed this merged view rather than the stale record.
+    Derived from FIELD_MAPPING — never a second hand-maintained key list.
+
+    Called with ``enrichment=None`` on the already-enriched path, where the stored
+    record IS the current view: the persisted ``enriched_coach_route`` is then left
+    exactly as it is rather than recomputed from an empty dict (which would silently
+    re-route every re-swept post to the Mind coach).
+    """
+    view = dict(item or {})
+    view["enriched_channel"] = str(view.get("channel") or view.get("source") or "")
+    if not enrichment:
+        return view
+    for haiku_key, (dynamo_key, _dtype) in FIELD_MAPPING.items():
+        val = enrichment.get(haiku_key)
+        if val is not None:
+            view[dynamo_key] = val
+    view["enriched_coach_route"] = social_signals.classify_coach_route(enrichment)
+    return view
+
+
+def _tally(counter, result):
+    """Fold one trigger result into the run summary's reaction counter (#1675)."""
+    if counter is None:
+        return result
+    counter["stored" if (result or {}).get("reacted") else "skipped"] += 1
+    return result
+
+
+def maybe_react_to_post(item, enrichment=None):
+    """#1675 (epic #1668, extending #1574/#1756 to the social channel): a coach reacts
+    to a just-enriched PUBLIC social post.
+
+    Option A, exactly as #1756 wired the diary side — inline in the record-enrichment
+    pipeline. No second pipeline, no new Lambda, no new schedule, no lambda_count churn
+    (the "4th channel" principle), and this pass is the only place the enriched route
+    the reaction uses exists. The reaction machinery itself is #1574's, unchanged; only
+    the permission gate and the routing signal are the social channel's.
+
+    Cost posture — every gate is BEFORE any Bedrock call:
+      not a reaction surface        -> free, no I/O
+      platform-origin echo (S2)     -> free, no I/O
+      not sensitivity-cleared (S5)  -> free, no I/O   (the fail-closed default)
+      already has a reaction        -> one GetItem
+      budget tier >= 2              -> the producer's own budget_guard gate, no call
+    So a held or platform post costs exactly nothing; a cleared human post costs one
+    Haiku/Sonnet call, once, ever.
+
+    Fail-OPEN by contract: any failure here is logged and swallowed — a reaction must
+    never fail social enrichment. Returns the trigger's result dict.
+    """
+    try:
+        from coach.coach_diary_reaction import maybe_react
+
+        result = maybe_react(post_with_enrichment(item, enrichment), table_=table)
+    except Exception as e:  # noqa: BLE001 — belt-and-braces around the import itself
+        logger.error(f"  social coach reaction failed (non-fatal) for {(item or {}).get('sk')}: {e}")
+        return {"reacted": False, "reason": "error", "error": str(e)}
+    if result.get("reacted"):
+        logger.info(f"  ✓ coach reaction stored for {item.get('sk')}: {result.get('coach_id')} → {result.get('sk')}")
+    elif result.get("reason") not in ("not_diary", "platform_origin", "held", "exists"):
+        logger.info(f"  coach reaction not produced for {item.get('sk')}: {result.get('reason')}")
+    return result
+
+
 def query_channel_posts(channel, start_date, end_date):
     """All ingested posts for one channel in [start_date, end_date] (inclusive of the end
     day's suffixed keys). sk=DATE#{date}#{post_id}; the ``#~`` upper bound sorts after
@@ -257,10 +338,14 @@ def query_channel_posts(channel, start_date, end_date):
     return [i for i in items if i.get("post_id") or i.get("sk", "").count("#") >= 2]
 
 
-def enrich_post(item, force=False):
+def enrich_post(item, force=False, reactions=None):
     """Enrich a single already-membrane-passed human post. Returns
     'enriched' | 'skipped' | 'error'. Callers MUST have filtered platform echoes first
-    (select_enrichable) — this re-asserts the gate as defense in depth."""
+    (select_enrichable) — this re-asserts the gate as defense in depth.
+
+    ``reactions`` (optional) is a mutable counter dict the #1675 coach-reaction trigger
+    tallies into, so the run summary reports what the trigger actually did rather than
+    leaving it invisible in the logs."""
     sk = item.get("sk", "")
     if not prov.is_enrichable(item):
         logger.info(f"Skipping {sk}: platform-origin echo (membrane) — never enriched")
@@ -275,6 +360,11 @@ def enrich_post(item, force=False):
     stale_schema = int(item.get("enriched_schema_version") or 0) < SCHEMA_VERSION
     if not force and item.get("enriched_at") and not stale_schema:
         logger.info(f"Skipping {sk}: already enriched at {item['enriched_at']}")
+        # #1675: an already-enriched post still gets its chance at a reaction — the S5
+        # sensitivity verdict can flip to cleared after enrichment, and a budget-paused
+        # or quality-gate-held reaction should be retried on the next sweep. Idempotent
+        # (one GetItem, then nothing) once a reaction exists.
+        _tally(reactions, maybe_react_to_post(item))
         return "skipped"
 
     channel = item.get("channel") or item.get("source") or ""
@@ -290,6 +380,8 @@ def enrich_post(item, force=False):
             f"  ✓ Enriched {sk}: route={social_signals.classify_coach_route(enrichment)}, "
             f"themes={enrichment.get('themes', [])}, sentiment={enrichment.get('sentiment')}"
         )
+        # #1675: the coaches react to Matthew's public voice — inline, fail-open, gated.
+        _tally(reactions, maybe_react_to_post(item, enrichment))
         return "enriched"
     except Exception as e:  # noqa: BLE001 — one bad post must not fail the sweep
         logger.error(f"  ✗ Error enriching {sk}: {e}")
@@ -321,13 +413,14 @@ def lambda_handler(event: dict, context) -> dict:
         logger.info(f"Social enrichment: channels={list(channels)} {start_date} → {end_date} (force={force})")
 
         enriched = skipped = errors = platform_excluded = 0
+        reactions = {"stored": 0, "skipped": 0}  # #1675: what the coach-reaction trigger did
         for channel in channels:
             posts = query_channel_posts(channel, start_date, end_date)
             human_posts = select_enrichable(posts)
             platform_excluded += len(posts) - len(human_posts)
             logger.info(f"  {channel}: {len(posts)} posts, {len(human_posts)} human (membrane excluded {len(posts) - len(human_posts)})")
             for item in human_posts:
-                status = enrich_post(item, force=force)
+                status = enrich_post(item, force=force, reactions=reactions)
                 enriched += status == "enriched"
                 skipped += status == "skipped"
                 errors += status == "error"
@@ -338,6 +431,7 @@ def lambda_handler(event: dict, context) -> dict:
             "skipped": skipped,
             "errors": errors,
             "platform_excluded": platform_excluded,
+            "reactions": reactions,
             "date_range": f"{start_date} → {end_date}",
         }
         logger.info(f"Complete: {summary}")

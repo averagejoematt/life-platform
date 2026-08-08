@@ -145,6 +145,16 @@ _FEATURE_CUTOFF = {
     # call per entry; a paused call yields NO reaction (nothing renders — AC3), never a
     # fabricated one.
     "coach_diary_reaction": 2,
+    # coach_social_reaction (#1675, epic #1668): the SAME reaction mechanism as
+    # coach_diary_reaction, pointed at the social channel — the routed coach's short
+    # grounded reaction to a public post of Matthew's, rendered on the same lab-notes
+    # surface. Same audience, so ADR-125 puts it in the same band (2): it outlives every
+    # internal/dev AI feature and pauses before the two irreducible reader promises. It
+    # is a SEPARATE feature name rather than a shared one purely for observability — the
+    # per-channel Bedrock cost is then separable at the chokepoint, and either channel
+    # can be re-banded later without moving the other. One short Haiku/Sonnet call per
+    # post; a paused call yields NO reaction (nothing renders), never a fabricated one.
+    "coach_social_reaction": 2,
     # semantic_recall (#1384): the "when did I feel like this before?" precedent
     # retrieval — Titan-v2 embeddings + cosine. A reader-narrative ENHANCEMENT (the
     # coach precedent line + chronicle recall card), so it pauses in band 2 with the

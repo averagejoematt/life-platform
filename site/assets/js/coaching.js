@@ -112,11 +112,15 @@ function entriesFor(s, data) {
   }
   if (s.kind === "fieldnotes") {
     const weeks = (data.entries || []).map((e) => ({ id: e.week, title: `Week ${e.week} field note`, date: e.ai_generated_at ? String(e.ai_generated_at).slice(0, 10) : "" }));
-    // #1574: coach reactions to diary entries, listed above the weekly notes. The id
-    // encodes date@channel so the renderer can find the reaction in the cached list.
+    // #1574: coach reactions to things Matthew said, listed above the weekly notes.
+    // #1675: the same list now also carries reactions to his PUBLIC social posts —
+    // one mechanism, one surface. The id encodes date@channel~uid so the renderer can
+    // find the reaction in the cached list; the uid segment (the server's per-record
+    // sk id) is what keeps two same-day posts on one channel addressable. `~` and not
+    // `#` because the id is written into location.hash by selectEntry.
     const reactions = (data.diary_reactions || []).map((r) => ({
-      id: `diary:${r.date}${r.channel ? "@" + r.channel : ""}`,
-      title: `${r.coach_name || "A coach"} on the diary`,
+      id: reactionId(r),
+      title: `${r.coach_name || "A coach"} on ${r.kind === "social" ? "the post" : "the diary"}`,
       date: r.date || "",
     }));
     return reactions.concat(weeks);
@@ -924,31 +928,41 @@ async function renderFieldNote(read, id) {
   enhanceCoachNames(read);
 }
 
-// ── COACH REACTIONS TO DIARY ENTRIES (#1574) — the Third Wall, polarity inverted ──
-// The HUMAN (a V3-consented diary entry) is the primary voice; the coach REACTS.
-// The reaction is already in the section's cached data (secFetch merged it), so this
-// is a pure render — no second fetch. The private entry never crossed the wire: the
-// producer reduced it to a leak-proof public context (theme + optional owner-cleared
-// quote) before storing, so nothing here can leak unmarked journal words.
+// ── COACH REACTIONS TO WHAT MATTHEW SAID (#1574, #1675) — the Third Wall, inverted ──
+// The HUMAN is the primary voice; the coach REACTS. Two channels, one mechanism and
+// one render: a V3-consented diary entry (#1574), or a public social post that cleared
+// the origin membrane + the sensitivity gate (#1675). The reaction is already in the
+// section's cached data (secFetch merged it), so this is a pure render — no second
+// fetch. Neither source record crossed the wire: the producer reduced it to a
+// leak-proof public context (theme + optional cleared quote) before storing, so
+// nothing here can leak unmarked words.
+const REACTION_CHANNEL_LABEL = { video_diary: "video diary", solo_recording: "solo recording", youtube: "YouTube" };
+// The list id: date@channel~uid. See the comment in entriesFor for why `~` not `#`.
+const reactionId = (r) => `diary:${r.date}${r.channel ? "@" + r.channel : ""}${r.uid ? "~" + r.uid : ""}`;
+
 function renderDiaryReaction(read, id) {
   const list = (cache["lab-notes"] || {}).diary_reactions || [];
-  const r = list.find((x) => `diary:${x.date}${x.channel ? "@" + x.channel : ""}` === id);
-  if (!r) { read.innerHTML = `<p class="dx-prose">This diary reaction isn't available.</p>`; return; }
-  const channelLabel = { video_diary: "video diary", solo_recording: "solo recording" }[r.channel] || "diary";
+  const r = list.find((x) => reactionId(x) === id);
+  if (!r) { read.innerHTML = `<p class="dx-prose">This reaction isn't available.</p>`; return; }
+  const isSocial = r.kind === "social";
+  const channelLabel = REACTION_CHANNEL_LABEL[r.channel] || (isSocial ? String(r.channel || "social") : "diary");
   const themeLabel = String(r.theme || "").replace(/_/g, " ");
-  // The HUMAN voice — the V3-consented sliver: (quote tier) the one line he cleared,
-  // else an allude-only line naming the theme. His raw words stay private otherwise.
+  // The HUMAN voice. Diary: the V3-consented sliver — (quote tier) the one line he
+  // cleared, else an allude-only line naming the theme; his raw words stay private.
+  // Social: a line of the post's own already-public words, plus a link to the post —
+  // nothing is being disclosed here that he did not publish himself.
   let human = `<div class="voice human"><span class="who">Matthew · ${esc(channelLabel)}</span>`;
-  human += r.quote
-    ? `<p class="what">“${esc(r.quote)}”</p>`
-    : `<p class="what pending-lead">He recorded a ${esc(channelLabel)}${themeLabel ? ` on ${esc(themeLabel)}` : ""} and cleared a short public reaction — the words themselves stay private.</p>`;
+  if (r.quote) human += `<p class="what">“${esc(r.quote)}”</p>`;
+  else if (isSocial) human += `<p class="what pending-lead">He posted on ${esc(channelLabel)}${themeLabel ? ` about ${esc(themeLabel)}` : ""}.</p>`;
+  else human += `<p class="what pending-lead">He recorded a ${esc(channelLabel)}${themeLabel ? ` on ${esc(themeLabel)}` : ""} and cleared a short public reaction — the words themselves stay private.</p>`;
+  if (isSocial && r.post_url) human += `<p class="pending-sub label"><a href="${esc(r.post_url)}" rel="noopener noreferrer" target="_blank">see the post →</a></p>`;
   human += `</div>`;
   // The MACHINE voice — the coach, responding to the human, not the sensors.
   const machine = r.reaction
     ? `<div class="voice machine"><span class="who">${esc(r.coach_name || "The coach")}</span><p class="what">${esc(r.reaction)}</p></div>`
     : "";
   read.innerHTML =
-    `<p class="dx-kicker label">diary reaction · ${esc(r.date || "")} · Matthew ↔ ${esc(r.coach_name || "the coach")}${r.tone ? ` · ${esc(r.tone)}` : ""}</p>` +
+    `<p class="dx-kicker label">${isSocial ? "post" : "diary"} reaction · ${esc(r.date || "")} · Matthew ↔ ${esc(r.coach_name || "the coach")}${r.tone ? ` · ${esc(r.tone)}` : ""}</p>` +
     human + machine;
   enhanceCoachNames(read);
 }

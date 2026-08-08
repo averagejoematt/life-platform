@@ -1286,14 +1286,21 @@ def handle_field_notes(event):
 
 
 def handle_diary_reactions(event):
-    """GET /api/diary_reactions — coach reactions to Video Diary entries (#1574).
+    """GET /api/diary_reactions — coach reactions to things Matthew said (#1574/#1675).
 
     The lab-notes counterpart of the field-note Third Wall, with the polarity
-    inverted: the HUMAN (a V3-consented diary entry) is the primary voice and the
-    coach REACTS. Read-only. Only reactions the producer stored are returned; the
-    entry itself is private — the producer (coach_diary_reaction) has already
-    reduced it to a leak-proof public context (theme + optional owner-cleared quote)
-    before anything was persisted, so this endpoint serves stored fields verbatim.
+    inverted: the HUMAN is the primary voice and the coach REACTS. Read-only. Only
+    reactions the producer stored are returned; the source record itself never lands
+    here — the producer (coach_diary_reaction) has already reduced it to a leak-proof
+    public context (theme + optional cleared quote) before anything was persisted, so
+    this endpoint serves stored fields verbatim.
+
+    #1675: the same partition now also carries reactions to Matthew's PUBLIC social
+    posts (the S2 origin membrane + the S5 sensitivity gate cleared them before any
+    reaction was produced). ``kind`` tells the two apart — a private recording he
+    cleared a sliver of, vs. a post he published himself — and a social row also
+    carries the post's own public ``post_url``. One partition, one endpoint, one
+    surface: no second reaction pipeline (the story's first acceptance criterion).
 
     Absent → empty list (AC3: the site renders nothing, no empty shell). Phase-filtered
     (ADR-058) so a wiped cycle's reactions don't resurface. Optional ?date= single mode,
@@ -1306,6 +1313,14 @@ def handle_diary_reactions(event):
         out = {
             "date": i.get("entry_date") or str(i.get("sk", "")).replace("DATE#", "").split("#")[0],
             "channel": i.get("channel", "video_diary"),
+            # #1675: which side of the membrane the human half came from. Legacy rows
+            # (written before the social channel existed) carry no kind and are diary.
+            "kind": i.get("kind") or "diary",
+            # #1675: the per-record id segment of the sk. The front-end builds its list
+            # id from date+channel; without this, two same-day posts on one channel
+            # produce the SAME id and the second is unreachable — the render-layer twin
+            # of the sk collision #1756 fixed in storage.
+            "uid": i.get("entry_uid") or "",
             "coach_id": i.get("coach_id"),
             "coach_name": i.get("coach_name"),
             "tone": i.get("tone", "reflective"),
@@ -1325,6 +1340,12 @@ def handle_diary_reactions(event):
             note = _public_decision_note(q)
             if note:
                 out["quote"] = note
+        # #1675 (social only): the public post's own URL, so "he posted" is a real link
+        # rather than a claim. Re-validated here as https — the serve layer never trusts
+        # a stored string it is about to put in an href.
+        url = str(i.get("post_url") or "").strip()
+        if url.startswith("https://") and " " not in url:
+            out["post_url"] = url
         return out
 
     date_param = qs.get("date")
