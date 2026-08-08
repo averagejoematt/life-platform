@@ -57,9 +57,17 @@ from web.site_api_common import (
 )
 
 # DynamoDB-backed rate limiting (survives warm-container distribution + cold
-# starts). The in-memory stores below are now only a fail-open fallback used if
-# the shared rate_limiter module is unavailable. The site_api role already
-# permits UpdateItem on the RATE#* partition (no IAM change needed).
+# starts). The site_api role already permits UpdateItem on the RATE#* partition
+# (no IAM change needed).
+#
+# #2237: `_RATE_LIMITER_READY` must be read in EXACTLY ONE place — `_rate_check`
+# below. Every public write door in this module calls that helper. Before #2237
+# each door open-coded `if _RATE_LIMITER_READY:` for itself and five of the seven
+# had no working fallback at all: `_handle_challenge_checkin`, `_handle_ritual_log`,
+# `_handle_experiment_suggest` and `_handle_cohort_submit` had no `else` branch
+# whatsoever, and `_handle_board_question`'s `else` set `allowed = True`
+# unconditionally. A bundle missing `common/rate_limiter.py` therefore turned all
+# five into unlimited anonymous write doors that still answered 200 — silently.
 try:
     from common.rate_limiter import check_rate_limit as _ddb_rate_check
 
@@ -71,11 +79,8 @@ except Exception:  # pragma: no cover — import guard
 # These were originally module-level in site_api_lambda; they're only
 # touched by the handlers in this file, so they move with the cluster.
 _token_secret_cache = None
-_nudge_rate_store: dict = {}  # ACCT-2: ip_hash+category -> list of timestamps (fallback only)
-
 
 _nudge_counts: dict = {}  # ACCT-2: category -> approximate count
-_finding_rate_store: dict = {}  # NEW-1: ip_hash -> list of timestamps for submit_finding
 # S3 config caches for experiment + challenge endpoints
 _challenges_cache = None
 _challenges_cache_at = None  # #2019 — TTL stamp; None = pinned (test injection)
@@ -241,6 +246,67 @@ def handle_subscriber_count() -> dict:
     return _ok({"count": count}, cache_seconds=600)
 
 
+# ── #2237: the ONE rate-limit chokepoint for this module ─────────────────────
+# Keyed "endpoint|ip_hash" -> newest timestamps inside the window. One store for
+# every door, so a new write door cannot ship with its own (or no) fallback.
+_FALLBACK_RATE_STORE: dict = {}
+_FALLBACK_STORE_MAX_KEYS = 4096  # bounded — see _memory_rate_check's fail-closed branch
+
+
+def _memory_rate_check(endpoint: str, ip_hash: str, limit: int, window_seconds: int) -> tuple:
+    """Per-container sliding-window limiter, used ONLY when `common.rate_limiter`
+    failed to import at module load.
+
+    This is the degraded mode CLAUDE.md documents ("an in-memory dict is the
+    fail-open fallback only"), previously open-coded at two of the seven doors and
+    absent from the other five. Degraded, not absent: the window is per warm
+    container rather than per fleet, so the effective ceiling becomes
+    `limit x live containers` instead of `limit`. That is bounded and small.
+    Skipping the check outright — the shipped behaviour #2237 found — was not
+    bounded by anything.
+
+    FAIL CLOSED at capacity. If the store already holds `_FALLBACK_STORE_MAX_KEYS`
+    distinct (endpoint, ip) windows after pruning the expired ones, the write is
+    REFUSED rather than admitted. The distributed flood is exactly the case an
+    unbounded in-memory limiter cannot police, so it ends in 429s here instead of
+    an unmetered write path plus an ever-growing dict in a 20-concurrency Lambda.
+
+    Returns the shared limiter's (allowed, remaining, retry_after) triple.
+    """
+    now = int(time.time())
+    key = f"{endpoint}|{ip_hash}"
+    recent = [t for t in _FALLBACK_RATE_STORE.get(key, []) if t > now - window_seconds]
+
+    if not recent and len(_FALLBACK_RATE_STORE) >= _FALLBACK_STORE_MAX_KEYS:
+        for stale in [k for k, ts in _FALLBACK_RATE_STORE.items() if not any(t > now - window_seconds for t in ts)]:
+            _FALLBACK_RATE_STORE.pop(stale, None)
+        if len(_FALLBACK_RATE_STORE) >= _FALLBACK_STORE_MAX_KEYS:
+            logger.warning(f"[rate_limit] in-memory fallback at capacity — refusing {endpoint} (fail closed)")
+            return False, 0, window_seconds
+
+    if len(recent) >= limit:
+        _FALLBACK_RATE_STORE[key] = recent[-limit:]
+        return False, 0, window_seconds
+
+    recent.append(now)
+    _FALLBACK_RATE_STORE[key] = recent[-max(limit, 1) :]
+    return True, max(0, limit - len(recent)), window_seconds
+
+
+def _rate_check(endpoint: str, ip_hash: str, limit: int, window_seconds: int, fail_open: bool = True) -> tuple:
+    """The single door every rate-limited write in this module passes through.
+
+    Uses the shared DynamoDB limiter when it is available and the bounded
+    in-memory fallback when it is not — but NEVER returns "allowed" without having
+    applied a limit. `_RATE_LIMITER_READY` is read here and nowhere else, which is
+    what `tests/test_site_api_social_behavior.py` pins: a future write door that
+    forgets its fallback is not expressible, because there is only one fallback.
+    """
+    if _RATE_LIMITER_READY:
+        return _ddb_rate_check(table, endpoint=endpoint, ip_hash=ip_hash, limit=limit, window_seconds=window_seconds, fail_open=fail_open)
+    return _memory_rate_check(endpoint, ip_hash, limit, window_seconds)
+
+
 def _emit_rate_limit_metric(endpoint: str) -> None:
     """OBS-03: EMF metric emitted when a rate limit is hit. Zero-config via stdout."""
     import json as _json
@@ -279,8 +345,6 @@ def _handle_nudge(event: dict) -> dict:
     NOTE: the per-category display *counts* are still approximate/in-memory — a
     durable counts schema remains future work, separate from this rate limit.
     """
-    import time as _time
-
     source_ip = extract_client_ip(event)
     try:
         body = json.loads(event.get("body") or "{}")
@@ -294,18 +358,7 @@ def _handle_nudge(event: dict) -> dict:
     ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
     # Rate limit: 1 per IP per category per hour. Per-category endpoint key so a
     # nudge in one category doesn't consume another's budget.
-    if _RATE_LIMITER_READY:
-        allowed, _rem, _retry = _ddb_rate_check(
-            table, endpoint=f"nudge:{category}", ip_hash=ip_hash, limit=1, window_seconds=3600, fail_open=True
-        )
-    else:
-        now = int(_time.time())
-        rate_key = f"{ip_hash}:{category}"
-        recent = [t for t in _nudge_rate_store.get(rate_key, []) if t > now - 3600]
-        allowed = not recent
-        if allowed:
-            recent.append(now)
-            _nudge_rate_store[rate_key] = recent[-10:]
+    allowed, _rem, _retry = _rate_check(f"nudge:{category}", ip_hash, limit=1, window_seconds=3600)
     if not allowed:
         return {
             "statusCode": 429,
@@ -338,25 +391,12 @@ def _handle_submit_finding(event: dict) -> dict:
     Stores visitor-discovered correlation findings in S3 for Matthew's review.
     Rate limit: 3 per IP per hour.
     """
-    import time as _time
-
     source_ip = extract_client_ip(event)
     ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
 
     # Rate limit: FINDING_RATE_LIMIT per IP per hour — DynamoDB-backed (survives
-    # cold starts; in-memory fallback only).
-    if _RATE_LIMITER_READY:
-        allowed, remaining, _retry = _ddb_rate_check(
-            table, endpoint="submit_finding", ip_hash=ip_hash, limit=FINDING_RATE_LIMIT, window_seconds=3600, fail_open=True
-        )
-    else:
-        now = int(_time.time())
-        recent = [t for t in _finding_rate_store.get(ip_hash, []) if t > now - 3600]
-        allowed = len(recent) < FINDING_RATE_LIMIT
-        if allowed:
-            recent.append(now)
-            _finding_rate_store[ip_hash] = recent[-10:]
-        remaining = max(0, FINDING_RATE_LIMIT - len(recent))
+    # cold starts; bounded in-memory fallback only, #2237).
+    allowed, remaining, _retry = _rate_check("submit_finding", ip_hash, limit=FINDING_RATE_LIMIT, window_seconds=3600)
     if not allowed:
         _emit_rate_limit_metric("submit_finding")
         return {
@@ -1078,6 +1118,59 @@ def handle_challenge_catalog() -> dict:
     return _ok(result, cache_seconds=900)
 
 
+# ── #2238: the check-in `note` screen ────────────────────────────────────────
+# `note` is the only reader-supplied FREE TEXT in this module that reaches a
+# public payload. It is captured by an anonymous POST (_handle_challenge_checkin),
+# stored inside the challenge row's `daily_checkins`, and `handle_challenges`
+# publishes that row WHOLE on GET /api/challenges. Until #2238 it was only
+# length-capped: no HTML strip (unlike _handle_submit_finding / _handle_board_question,
+# which both run the same re.sub) and no blocked-vice screen (unlike this module's
+# challenge name/id filters). A stored `<script>` tag and blocked-vice vocabulary
+# both came back verbatim to every reader of /protocols.
+#
+# Screened on BOTH sides deliberately: the write door rejects loudly (400, the
+# _handle_board_question precedent) so the submitter is told, and the read door
+# re-screens because rows written before this landed are still in the table and
+# no backfill touches Matthew's own challenge records.
+
+
+def _sanitise_note(raw) -> str:
+    """HTML-strip + length-cap a reader-supplied check-in note — the identical
+    treatment `_handle_submit_finding` and `_handle_board_question` give their
+    free-text fields."""
+    return re.sub(r"<[^>]+>", "", str(raw or "")).strip()[:500]
+
+
+def _screened_note(raw) -> str:
+    """A stored note, made safe to publish: HTML stripped, and emptied entirely if
+    it carries blocked-vice vocabulary. Returns "" for anything withheld."""
+    note = _sanitise_note(raw)
+    if _is_blocked_vice(note):
+        return ""
+    return note
+
+
+def _public_checkins(checkins) -> list:
+    """The read-side screen over a challenge's stored `daily_checkins` (#2238).
+
+    Keeps the check-in day itself — that is Matthew's own progress data, and the
+    completion arithmetic reads `completed`, never `note` — and withholds only the
+    stranger-supplied text when it fails the screen.
+    """
+    out = []
+    for entry in checkins or []:
+        if not isinstance(entry, dict):
+            continue
+        row = dict(entry)
+        note = _screened_note(row.get("note"))
+        if note:
+            row["note"] = note
+        else:
+            row.pop("note", None)
+        out.append(row)
+    return out
+
+
 def handle_challenges() -> dict:
     """GET /api/challenges — live challenges overlaid on the full catalog.
 
@@ -1114,6 +1207,10 @@ def handle_challenges() -> dict:
             # entry id while the display name is benign; `name or id` missed it.
             if _is_blocked_vice(ch.get("name", "")) or _is_blocked_vice(ch.get("id", "")):
                 continue
+            # #2238: reader-supplied check-in notes are published with this row —
+            # screen them before they leave, including rows stored pre-#2238.
+            if "daily_checkins" in ch:
+                ch["daily_checkins"] = _public_checkins(ch.get("daily_checkins"))
             ch["origin"] = "live"
             if status == "active":
                 checkins = ch.get("daily_checkins", [])
@@ -1187,27 +1284,30 @@ def _handle_challenge_checkin(event: dict) -> dict:
 
     challenge_id = (body.get("challenge_id") or "").strip()
     completed = body.get("completed")
-    note = (body.get("note") or "").strip()[:500]
+    # #2238: the note is free text from an anonymous stranger that ends up on the
+    # public GET /api/challenges payload. HTML-strip it (sibling capture doors do
+    # the same) and refuse blocked-vice vocabulary outright, as _handle_board_question does.
+    note = _sanitise_note(body.get("note"))
     date_str = (body.get("date") or "").strip()
 
     if not challenge_id:
         return _error(400, "challenge_id required")
     if completed is None:
         return _error(400, "completed (true/false) required")
+    if _is_blocked_vice(note):
+        return _error(400, "That note can't be submitted.")
 
-    # Rate limit: 1 check-in per IP per challenge per day (#358).
-    if _RATE_LIMITER_READY:
-        ip = extract_client_ip(event)
-        ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
-        allowed, _rem, _retry = _ddb_rate_check(
-            table, endpoint=f"challenge_checkin:{challenge_id}", ip_hash=ip_hash, limit=1, window_seconds=86400, fail_open=True
-        )
-        if not allowed:
-            return {
-                "statusCode": 429,
-                "headers": {**CORS_HEADERS, "Retry-After": "86400", "Cache-Control": "no-store"},
-                "body": json.dumps({"error": "Already checked in for this challenge today."}),
-            }
+    # Rate limit: 1 check-in per IP per challenge per day (#358). Applied
+    # unconditionally via the module chokepoint (#2237) — never skipped.
+    ip = extract_client_ip(event)
+    ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
+    allowed, _rem, _retry = _rate_check(f"challenge_checkin:{challenge_id}", ip_hash, limit=1, window_seconds=86400)
+    if not allowed:
+        return {
+            "statusCode": 429,
+            "headers": {**CORS_HEADERS, "Retry-After": "86400", "Cache-Control": "no-store"},
+            "body": json.dumps({"error": "Already checked in for this challenge today."}),
+        }
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     if not date_str:
@@ -1358,20 +1458,17 @@ def _handle_ritual_log(event: dict) -> dict:
         return _error(403, "Invalid or tampered link")
 
     # Rate limit: RITUAL_LOG_RATE_LIMIT per IP per hour — DynamoDB-backed (survives
-    # cold starts; in-memory fallback only). Public GET, so it needs the same
-    # DDB-backed protection as every other write endpoint in this module.
+    # cold starts; bounded in-memory fallback only, #2237). Public GET, so it needs
+    # the same protection as every other write endpoint in this module.
     ip = extract_client_ip(event)
     ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
-    if _RATE_LIMITER_READY:
-        allowed, _rem, _retry = _ddb_rate_check(
-            table, endpoint="ritual_log", ip_hash=ip_hash, limit=RITUAL_LOG_RATE_LIMIT, window_seconds=3600, fail_open=True
-        )
-        if not allowed:
-            return {
-                "statusCode": 429,
-                "headers": {**CORS_HEADERS, "Retry-After": "3600", "Cache-Control": "no-store"},
-                "body": json.dumps({"error": "Too many taps recently. Try again in a bit."}),
-            }
+    allowed, _rem, _retry = _rate_check("ritual_log", ip_hash, limit=RITUAL_LOG_RATE_LIMIT, window_seconds=3600)
+    if not allowed:
+        return {
+            "statusCode": 429,
+            "headers": {**CORS_HEADERS, "Retry-After": "3600", "Cache-Control": "no-store"},
+            "body": json.dumps({"error": "Too many taps recently. Try again in a bit."}),
+        }
 
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
     # #1405: private-class metrics land in their own Matthew-private partition —
@@ -1438,19 +1535,16 @@ def _handle_experiment_suggest(event: dict) -> dict:
     with status="pending" so they're distinguishable from owner-created experiments
     and can be moderated before surfacing publicly.
     """
-    # Rate limit: 3 per IP per hour (#358).
-    if _RATE_LIMITER_READY:
-        ip = extract_client_ip(event)
-        ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
-        allowed, _rem, _retry = _ddb_rate_check(
-            table, endpoint="experiment_suggest", ip_hash=ip_hash, limit=3, window_seconds=3600, fail_open=True
-        )
-        if not allowed:
-            return {
-                "statusCode": 429,
-                "headers": {**CORS_HEADERS, "Retry-After": "3600", "Cache-Control": "no-store"},
-                "body": json.dumps({"error": "Too many suggestions. Please try again later."}),
-            }
+    # Rate limit: 3 per IP per hour (#358). Applied unconditionally (#2237).
+    ip = extract_client_ip(event)
+    ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
+    allowed, _rem, _retry = _rate_check("experiment_suggest", ip_hash, limit=3, window_seconds=3600)
+    if not allowed:
+        return {
+            "statusCode": 429,
+            "headers": {**CORS_HEADERS, "Retry-After": "3600", "Cache-Control": "no-store"},
+            "body": json.dumps({"error": "Too many suggestions. Please try again later."}),
+        }
     try:
         body = json.loads(event.get("body", "{}"))
         idea = body.get("idea", "").strip()
@@ -1656,17 +1750,13 @@ def _handle_board_question(event: dict) -> dict:
     budget/rate-gated /api/board_ask and published as a dispatch. The optional email
     is stored privately for a reply and is never echoed back or published.
     """
-    import time as _time  # noqa: F401 (parity with submit_finding; fallback path)
-
     source_ip = extract_client_ip(event)
     ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
 
-    if _RATE_LIMITER_READY:
-        allowed, remaining, _retry = _ddb_rate_check(
-            table, endpoint="board_question", ip_hash=ip_hash, limit=BOARD_QUESTION_RATE_LIMIT, window_seconds=3600, fail_open=True
-        )
-    else:
-        allowed, remaining = True, BOARD_QUESTION_RATE_LIMIT
+    # #2237: this door's old `else` branch set `allowed = True` unconditionally —
+    # an unmetered S3 write path whenever the shared limiter was unavailable. It
+    # now shares the module chokepoint with every other door.
+    allowed, remaining, _retry = _rate_check("board_question", ip_hash, limit=BOARD_QUESTION_RATE_LIMIT, window_seconds=3600)
     if not allowed:
         _emit_rate_limit_metric("board_question")
         return {
@@ -2402,17 +2492,15 @@ def _handle_cohort_submit(event: dict) -> dict:
     ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
 
     # Rate limit: 1 submission per IP per week — DDB-backed (the SAME limiter the
-    # challenge check-in uses), survives warm-container distribution.
-    if _RATE_LIMITER_READY:
-        allowed, _rem, _retry = _ddb_rate_check(
-            table, endpoint=f"cohort_submit:{week}", ip_hash=ip_hash, limit=1, window_seconds=COHORT_SUBMIT_WINDOW, fail_open=True
-        )
-        if not allowed:
-            return {
-                "statusCode": 429,
-                "headers": {**CORS_HEADERS, "Retry-After": str(COHORT_SUBMIT_WINDOW), "Cache-Control": "no-store"},
-                "body": json.dumps({"error": "You've already added your number this week."}),
-            }
+    # challenge check-in uses), survives warm-container distribution. Applied
+    # unconditionally via the module chokepoint (#2237).
+    allowed, _rem, _retry = _rate_check(f"cohort_submit:{week}", ip_hash, limit=1, window_seconds=COHORT_SUBMIT_WINDOW)
+    if not allowed:
+        return {
+            "statusCode": 429,
+            "headers": {**CORS_HEADERS, "Retry-After": str(COHORT_SUBMIT_WINDOW), "Cache-Control": "no-store"},
+            "body": json.dumps({"error": "You've already added your number this week."}),
+        }
 
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
     try:

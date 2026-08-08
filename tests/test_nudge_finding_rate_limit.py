@@ -89,7 +89,7 @@ def test_nudge_in_memory_fallback_still_limits(monkeypatch):
     # When the shared limiter is unavailable, the in-memory fallback must still
     # block a repeat within the hour (degraded but not absent).
     monkeypatch.setattr(social, "_RATE_LIMITER_READY", False)
-    social._nudge_rate_store.clear()
+    social._FALLBACK_RATE_STORE.clear()  # #2237: one shared fallback store, not a per-endpoint dict
     first = social._handle_nudge(_ev({"category": "watching"}))
     second = social._handle_nudge(_ev({"category": "watching"}))
     assert first["statusCode"] == 200
