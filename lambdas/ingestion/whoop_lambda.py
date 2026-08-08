@@ -45,15 +45,29 @@ except ImportError:
 try:
     from common.http_retry import urlopen_with_retry
 except ImportError:  # pragma: no cover — layer-module fallback (local tooling)
-    urlopen_with_retry = urllib.request.urlopen
+    if not TYPE_CHECKING:  # mypy sees ONE signature (the import); runtime unchanged (#1656)
+
+        def urlopen_with_retry(req, timeout=30, max_attempts=None):
+            # The fallback must accept max_attempts — the token POST passes it (#2196).
+            return urllib.request.urlopen(req, timeout=timeout)
+
 
 try:
-    from common.auth_breaker import mark_as_auth_failure
+    from common.auth_breaker import check_breaker, looks_like_auth_failure, mark_as_auth_failure, mark_failure
 except ImportError:  # pragma: no cover — layer-module fallback (local tooling)
     if not TYPE_CHECKING:  # mypy sees ONE signature (the import); runtime unchanged (#1656)
 
         def mark_as_auth_failure(exc):
             return exc
+
+        def check_breaker(table, source_name, user_id, logger):
+            return None
+
+        def mark_failure(table, source_name, user_id, error_msg, logger):
+            return None
+
+        def looks_like_auth_failure(exc):
+            return False
 
 
 from common.pacific_time import parse_iso_utc  # #1964: THE ISO parser (naive input == UTC, never runner-local)
@@ -67,6 +81,36 @@ DYNAMODB_TABLE = os.environ.get("TABLE_NAME", "life-platform")
 
 WHOOP_TOKEN_URL = "https://api.prod.whoop.com/oauth/oauth2/token"
 WHOOP_API_BASE = "https://api.prod.whoop.com/developer/v2"
+
+# ── Rotation-budget knobs (#2196) ─────────────────────────────────────────────
+# Whoop's refresh_token is SINGLE-USE: every exchange mints a new one and voids
+# the old one server-side at the moment of issue. So each exchange is a chance
+# to lose the credential in transit (measured: ~1% of token POSTs 5xx; the
+# 2026-08-03 and 2026-08-04 losses were both a 5xx AFTER the server had already
+# consumed the token). Exchanges are therefore a budget to spend, not a free
+# per-invocation ritual — see `authenticate`.
+#
+# _ACCESS_TOKEN_SKEW_SECONDS: refresh only when the stored access token has
+# less than this much life left (clock skew + the run's own duration).
+_ACCESS_TOKEN_SKEW_SECONDS = int(os.environ.get("WHOOP_TOKEN_SKEW_SECONDS", "300"))
+# Where the expiry lives IN the existing secret JSON (no new storage): an epoch
+# seconds int alongside access_token/refresh_token.
+_EXPIRES_AT_FIELD = "access_token_expires_at"  # noqa: S105 — a JSON field name, not a secret
+
+# The token POST's transport codes: the ones where the request MIGHT not have
+# been processed. A 400 immediately after one of these, in the same invocation,
+# is the "lost rotation" fingerprint (see _refresh_access_token).
+_TOKEN_TRANSPORT_CODES = frozenset({429, 500, 502, 503, 504})
+_TOKEN_PROBE_DELAY_SECONDS = 2
+
+# A data-endpoint 401 within this window of a SUCCESSFUL rotation in the same
+# invocation is treated as transient (2026-08-01: a 401 8s after a healthy
+# refresh latched the 24h breaker on a credential that was never dead).
+_ROTATION_GRACE_SECONDS = int(os.environ.get("WHOOP_ROTATION_GRACE_SECONDS", "600"))
+# Durable one-shot: the grace applies once, then recurrence latches (see
+# _fetch_all_endpoints). TTL'd like the auth-failure marker.
+_GLITCH_SK = "AUTH_GLITCH"
+_GLITCH_TTL_SECONDS = 2 * 3600
 WHOOP_SCOPES = "offline read:recovery read:cycles read:workout read:sleep " "read:profile read:body_measurement"
 
 WHOOP_SPORT_NAMES = {
@@ -109,18 +153,62 @@ _cw = boto3.client("cloudwatch", region_name=REGION)
 # ── Whoop API ─────────────────────────────────────────────────────────────────
 
 
-def _refresh_access_token(client_id: str, client_secret: str, refresh_token: str) -> tuple:
-    """POST the token exchange. #2069: on-call retry (429/5xx, same policy as
-    the data endpoints below) — the 2026-08-03 12:00 UTC incident's FIRST
-    failure was a bare 502 on this exact call with no retry, which meant a
-    single transient gateway blip cost an entire refresh attempt with no
-    chance to recover within the run. Retrying here is safe: a 502/503/504
-    from Whoop's edge is the common case where the backend never actually
-    processed (and therefore never rotated) the single-use refresh_token, so
-    a retry with the SAME token typically just succeeds; in the rarer case
-    where the backend DID rotate before failing to respond, the retry gets an
-    immediate, correctly-classified 400 (see `authenticate`) in THIS
-    invocation instead of silence until the next hourly run."""
+class WhoopRotationLost(RuntimeError):
+    """The single-use refresh_token was consumed by Whoop but never reached us.
+
+    Raised ONLY on the measured fingerprint (#2196): a token POST that returned
+    a transport 5xx, followed — in the SAME invocation, with the SAME token — by
+    a 400. The 400 proves the server had already rotated (and therefore voided)
+    the token before its 5xx response was lost in transit. The credential is
+    unrecoverable without a browser re-auth, and every later run will 400.
+
+    Distinct from the generic auth latch on purpose: this class of death is
+    *not* "the credential expired / the user revoked us", it is "our stored
+    token is provably stale through no fault of the operator", and the only fix
+    is an immediate manual re-auth.
+    """
+
+
+def _token_post(payload: bytes) -> dict:
+    """One token exchange. NO retry (#2196, acceptance box 2).
+
+    `http_retry`'s documented non-idempotent escape hatch (max_attempts=1,
+    module docstring "a POST/PUT whose 5xx might mean 'the write actually
+    landed'") is exactly this request: Whoop consumes the single-use
+    refresh_token server-side BEFORE responding, so a blind retry re-sends a
+    token that may already be spent. #2069 added retry here on the assumption
+    that a 5xx meant "never processed"; the 2026-08-04 trace refutes it — the
+    retry re-sent the spent token ~10s later and got a 400. Retry policy for
+    this POST now lives in `_refresh_access_token`, which classifies what it
+    sees instead of retrying blindly.
+    """
+    req = urllib.request.Request(
+        WHOOP_TOKEN_URL,
+        data=payload,
+        method="POST",
+        headers={"Content-Type": "application/x-www-form-urlencoded", "User-Agent": "WhoopIngestion/1.0"},
+    )
+    with urlopen_with_retry(req, timeout=30, max_attempts=1) as resp:
+        data: dict = json.loads(resp.read())
+    return data
+
+
+def _refresh_access_token(client_id: str, client_secret: str, refresh_token: str) -> tuple[str, str, int]:
+    """Exchange the refresh_token. Returns (access_token, refresh_token, expires_in).
+
+    On a transport 5xx we make exactly ONE further attempt with the same token
+    — deliberate and classified, not a blind retry (#2196):
+
+      * it succeeds  → the 5xx really was "never processed", the rotation is
+        intact, and the run recovers inside the invocation (the #2069 benefit,
+        kept);
+      * it returns 400 → the first POST DID rotate before failing to answer.
+        The stored token is provably spent: raise `WhoopRotationLost`, which
+        `authenticate` surfaces as its own urgent signal instead of letting it
+        masquerade as a generic auth latch discovered days later.
+
+    Any other outcome propagates unchanged.
+    """
     payload = urllib.parse.urlencode(
         {
             "grant_type": "refresh_token",
@@ -130,15 +218,75 @@ def _refresh_access_token(client_id: str, client_secret: str, refresh_token: str
             "scope": WHOOP_SCOPES,
         }
     ).encode()
-    req = urllib.request.Request(
-        WHOOP_TOKEN_URL,
-        data=payload,
-        method="POST",
-        headers={"Content-Type": "application/x-www-form-urlencoded", "User-Agent": "WhoopIngestion/1.0"},
-    )
-    with urlopen_with_retry(req, timeout=30) as resp:
-        data = json.loads(resp.read())
-    return data["access_token"], data["refresh_token"]
+    try:
+        data = _token_post(payload)
+    except urllib.error.HTTPError as e:
+        if e.code not in _TOKEN_TRANSPORT_CODES:
+            raise
+        logger.warning("Whoop token POST returned %d — one classified probe with the same refresh_token", e.code)
+        time.sleep(_TOKEN_PROBE_DELAY_SECONDS)
+        try:
+            data = _token_post(payload)
+        except urllib.error.HTTPError as probe_exc:
+            if probe_exc.code == 400:
+                raise WhoopRotationLost(
+                    f"WHOOP_ROTATION_LOST — the token endpoint returned {e.code} and then rejected the same "
+                    "refresh_token, so Whoop consumed the rotation and the new token was lost in transit. "
+                    "The stored credential is dead; re-auth required NOW: python3 setup/setup_whoop_auth.py"
+                ) from probe_exc
+            raise
+    return data["access_token"], data["refresh_token"], int(data.get("expires_in") or 0)
+
+
+def _invalidate_secret_cache() -> None:
+    """Drop the warm-container copy of the Whoop secret after a rotation write.
+
+    #2196, acceptance box 4: `common.secret_cache.invalidate` shipped with ZERO
+    callers, so a warm container held the PRE-rotation secret for up to its 15
+    minute TTL. Every "a concurrent invocation already rotated the token;
+    adopting it" WARNING in the logs is that: a second invocation reading a
+    cached, already-spent refresh_token and burning an exchange to discover it.
+    Best-effort — a cache miss is never worse than a stale hit.
+    """
+    try:
+        from common.secret_cache import invalidate
+    except ImportError:  # pragma: no cover — layer-module fallback (local tooling)
+        return
+    try:
+        invalidate(SECRET_NAME)
+    except Exception as e:  # pragma: no cover — cache hygiene must never fail a run
+        logger.warning("Whoop secret-cache invalidate failed (non-fatal): %s", e)
+
+
+def _emit_rotation_lost_metric() -> None:
+    """The distinct urgent signal for a lost rotation (#2196, box 3).
+
+    Rides the EXISTING OAuth observability channel rather than inventing one:
+    the same `LifePlatform/OAuth` namespace and `Source` dimension the
+    auth_breaker's IngestAuthHealthy uses, on the PutMetricData grant the
+    ingestion role already holds (role_policies._ingestion_base) — so this
+    needs no IAM change and no new topic. The generic latch still happens
+    (mark_as_auth_failure → the framework marks the breaker → IngestAuthHealthy
+    0 → `ingest-auth-unhealthy-whoop`, urgent-topic-routed, which is what pages
+    and reaches the remediation triage). What this metric adds is the CAUSE,
+    separable from "the credential expired": a nonzero OAuthRotationLost{whoop}
+    means re-auth NOW, not "look into it". The marker text carries the same
+    classification into the operator-visible error string.
+    """
+    try:
+        _cw.put_metric_data(
+            Namespace="LifePlatform/OAuth",
+            MetricData=[
+                {
+                    "MetricName": "OAuthRotationLost",
+                    "Dimensions": [{"Name": "Source", "Value": "whoop"}],
+                    "Value": 1.0,
+                    "Unit": "Count",
+                }
+            ],
+        )
+    except Exception as e:  # metric emission must never fail the run
+        logger.warning("Whoop rotation-lost metric emit failed (non-fatal): %s", e)
 
 
 def _persist_refreshed_secret(secret: dict) -> bool:
@@ -170,6 +318,7 @@ def _persist_refreshed_secret(secret: dict) -> bool:
     for attempt in (1, 2):
         try:
             secrets_client.update_secret(SecretId=SECRET_NAME, SecretString=json.dumps(secret))
+            _invalidate_secret_cache()
             logger.info("Whoop rotated refresh_token persisted immediately post-refresh")
             return True
         except Exception as e:
@@ -392,12 +541,73 @@ def _compute_sleep_consistency(date_str: str, current_onset: int) -> float | Non
 
 # ── SIMP-2 callbacks ──────────────────────────────────────────────────────────
 
-_secret_cache = {"access_token": None}
+_secret_cache: dict[str, Any] = {"access_token": None}
+# Per-invocation rotation state (#2196). Reserved concurrency is 1, so a module
+# global is a per-invocation scratchpad; `authenticate` resets it every run.
+_rotation_state: dict[str, Any] = {"rotated_at": None}
+
+
+class WhoopTransientAuthGlitch(RuntimeError):
+    """A data-endpoint auth rejection seconds after a *successful* rotation.
+
+    Deliberately NOT an HTTPError and deliberately worded without any of
+    `auth_breaker`'s classifier substrings ("401", "unauthorized", "auth
+    failed", …): the framework must record this as an ordinary per-date error
+    (the run reports 207, the ingest-health streak grows, the
+    consecutive-failures alarm still covers recurrence) WITHOUT latching the
+    24h breaker on a credential that just proved itself working.
+    """
+
+
+def _seconds_until_expiry(secret: dict) -> float | None:
+    """Life left on the stored access token, or None if we can't tell.
+
+    None (no stored expiry — e.g. the first run after a re-auth, or a secret
+    written before #2196) means "assume expired" at every call site: the
+    conservative direction, since a wrong reuse costs a whole run's data while
+    a wrong refresh costs one exchange.
+    """
+    raw = secret.get(_EXPIRES_AT_FIELD)
+    if raw is None:
+        return None
+    try:
+        return float(raw) - time.time()
+    except (TypeError, ValueError):
+        return None
 
 
 def authenticate(secret_data: dict) -> dict:
-    """Refresh on every cold invocation. Whoop refresh rotates refresh_token,
-    so framework's enable_secret_writeback=True persists both back.
+    """Return usable credentials, exchanging the refresh_token ONLY when needed.
+
+    #2196 (acceptance box 1) — the treadmill this ends: `authenticate` ran on
+    every invocation, before gap detection, and unconditionally spent one
+    single-use refresh_token rotation. At ~22 invocations/day against a
+    measured ~1% token-endpoint 5xx rate, the expected time to a lost rotation
+    was 4-5 days — which matches the observed 08-01 / 08-03 / 08-04 cadence
+    exactly. An access token is reusable until it expires, so the exchange is
+    now gated on the expiry Whoop itself reports (`expires_in`, stored as
+    `access_token_expires_at` IN the existing secret JSON — no new storage),
+    minus a skew margin. The rotation rate becomes at most one per access-token
+    lifetime instead of one per invocation: the 09:30 recovery-refresh run, the
+    daily reconcile invocation, EventBridge at-least-once duplicates and warm
+    re-entries all stop costing a rotation.
+    """
+    secret = dict(secret_data)
+    _rotation_state["rotated_at"] = None
+
+    stored_token = secret.get("access_token")
+    remaining = _seconds_until_expiry(secret)
+    if stored_token and remaining is not None and remaining > _ACCESS_TOKEN_SKEW_SECONDS:
+        _secret_cache["access_token"] = stored_token
+        logger.info("whoop_token_reused remaining_s=%d — no refresh_token rotation this run", int(remaining))
+        return secret
+
+    logger.info("whoop_token_exchange reason=%s", "no_stored_expiry" if remaining is None else f"expires_in_{int(remaining)}s")
+    return _rotate(secret)
+
+
+def _rotate(secret: dict) -> dict:
+    """Spend one refresh_token rotation and persist the result.
 
     Concurrency-safe (2026-06-08): EventBridge at-least-once delivery occasionally
     fires two invocations seconds apart. The first rotates the single-use refresh
@@ -410,32 +620,51 @@ def authenticate(secret_data: dict) -> dict:
     (which only recognizes 401/403 + keywords, deliberately NOT a bare '400'
     — a data-fetch 400 is not auth) can latch on THIS specific, call-site-
     confirmed case without over-broadening what counts as "auth" globally.
+
+    `WhoopRotationLost` (#2196) is the third outcome: not a race, not an expired
+    credential — a rotation Whoop consumed and we never received. It gets its
+    own urgent signal before it re-raises into the same latch.
     """
-    secret = dict(secret_data)
     try:
-        access_token, new_refresh = _refresh_access_token(
+        access_token, new_refresh, expires_in = _refresh_access_token(
             secret["client_id"],
             secret["client_secret"],
             secret["refresh_token"],
         )
+    except WhoopRotationLost as lost:
+        logger.error("%s", lost)
+        _emit_rotation_lost_metric()
+        mark_as_auth_failure(lost)
+        raise
     except urllib.error.HTTPError as e:
         if e.code != 400:
             raise
         for _ in range(2):
             time.sleep(1.5)  # let a concurrent invocation persist its rotated token
+            _invalidate_secret_cache()  # never decide the race from a warm-container copy
             fresh = json.loads(boto3.client("secretsmanager").get_secret_value(SecretId=SECRET_NAME)["SecretString"])
             if fresh.get("refresh_token") and fresh["refresh_token"] != secret["refresh_token"]:
                 logger.warning("Whoop refresh 400 — a concurrent invocation already rotated the token; adopting it.")
                 secret["access_token"] = fresh["access_token"]
                 secret["refresh_token"] = fresh["refresh_token"]
+                if fresh.get(_EXPIRES_AT_FIELD) is not None:
+                    secret[_EXPIRES_AT_FIELD] = fresh[_EXPIRES_AT_FIELD]
                 _secret_cache["access_token"] = fresh["access_token"]
+                # The winner minted this token seconds ago — same grace footing
+                # as if we had rotated it ourselves (see _fetch_all_endpoints).
+                _rotation_state["rotated_at"] = time.time()
                 return secret
         logger.error("Whoop refresh 400 with unchanged refresh_token — genuine auth failure.")
         mark_as_auth_failure(e)
         raise
     secret["access_token"] = access_token
     secret["refresh_token"] = new_refresh
+    if expires_in > 0:
+        secret[_EXPIRES_AT_FIELD] = int(time.time()) + expires_in
+    else:  # the provider didn't say — don't invent a lifetime, just re-exchange next run
+        secret.pop(_EXPIRES_AT_FIELD, None)
     _secret_cache["access_token"] = access_token
+    _rotation_state["rotated_at"] = time.time()
     # #2069: persist BEFORE returning — see _persist_refreshed_secret's docstring
     # for why this closes the crash window instead of relying solely on the
     # framework's post-authenticate() writeback.
@@ -443,18 +672,113 @@ def authenticate(secret_data: dict) -> dict:
     return secret
 
 
-def fetch_day(credentials: dict, date_str: str) -> dict | None:
-    """Fetch all 4 Whoop endpoints for one calendar day (UTC)."""
-    token = _secret_cache["access_token"] or credentials["access_token"]
-    next_day = (datetime.strptime(date_str, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
-    start_dt = f"{date_str}T00:00:00.000Z"
-    end_dt = f"{next_day}T00:00:00.000Z"
+# ── Data-endpoint 401 handling (#2196, acceptance box 6) ──────────────────────
+
+
+def _glitch_marker_is_fresh() -> bool:
+    """True if a previous run already used the one-shot transient-401 grace.
+
+    Same marker shape as the auth breaker (DDB item on the whoop partition with
+    a TTL), read age-first so an expired-but-not-yet-reaped row can't latch a
+    healthy run. Read failures return False — the grace stays available, which
+    is the fail-open direction that matches the framework's own breaker lookup.
+    """
+    try:
+        resp = _table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#whoop", "sk": _GLITCH_SK})
+    except Exception as e:
+        logger.warning("whoop glitch-marker lookup failed (non-fatal): %s", e)
+        return False
+    item = resp.get("Item")
+    if not item:
+        return False
+    try:
+        marked_at = float(item.get("marked_at_epoch", 0))
+    except (TypeError, ValueError):
+        return False
+    return (time.time() - marked_at) < _GLITCH_TTL_SECONDS
+
+
+def _mark_glitch() -> None:
+    now = time.time()
+    try:
+        _table.put_item(
+            Item={
+                "pk": f"USER#{USER_ID}#SOURCE#whoop",
+                "sk": _GLITCH_SK,
+                "marked_at_epoch": Decimal(str(int(now))),
+                "marked_at": datetime.now(timezone.utc).isoformat(),
+                "ttl": int(now) + _GLITCH_TTL_SECONDS,
+            }
+        )
+    except Exception as e:
+        logger.warning("whoop glitch-marker write failed (non-fatal): %s", e)
+
+
+def _fetch_all_endpoints(token: str, start_dt: str, end_dt: str) -> dict:
     return {
         "recovery": _fetch_endpoint(token, "recovery", start_dt, end_dt),
         "sleep": _fetch_endpoint(token, "activity/sleep", start_dt, end_dt),
         "cycle": _fetch_endpoint(token, "cycle", start_dt, end_dt),
         "workouts": _fetch_endpoint(token, "activity/workout", start_dt, end_dt),
     }
+
+
+def fetch_day(credentials: dict, date_str: str) -> dict | None:
+    """Fetch all 4 Whoop endpoints for one calendar day (UTC).
+
+    A 401 here is normally a genuine dead credential and MUST keep latching the
+    breaker. Two narrow exceptions (#2196), in order:
+
+      1. The access token was REUSED this run (no rotation — the box-1 path).
+         A rejection then may simply mean the stored token died early, which
+         before this change could not happen because every run refreshed. So:
+         spend one rotation and retry once. If the exchange itself fails as
+         auth, that propagates and latches, unchanged.
+      2. The token was minted seconds ago (proactively, or by the retry above,
+         or adopted from a concurrent winner) and the data endpoint still 401s.
+         That is the 2026-08-01 shape: a healthy refresh at 12:00:20, a 401 at
+         12:00:28, and a 24h breaker latched on a credential that was never
+         dead. Grace it ONCE — durably, via the AUTH_GLITCH marker — so a
+         recurrence on the next run latches normally.
+    """
+    token = _secret_cache["access_token"] or credentials["access_token"]
+    next_day = (datetime.strptime(date_str, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+    start_dt = f"{date_str}T00:00:00.000Z"
+    end_dt = f"{next_day}T00:00:00.000Z"
+
+    try:
+        return _fetch_all_endpoints(token, start_dt, end_dt)
+    except urllib.error.HTTPError as e:
+        if e.code != 401:
+            raise
+        if _rotation_state["rotated_at"] is None:
+            logger.warning("Whoop data endpoint rejected the reused access token — spending one rotation and retrying.")
+            refreshed = _rotate(dict(credentials))
+            credentials.update(refreshed)  # later dates in this run reuse the new token
+            try:
+                return _fetch_all_endpoints(refreshed["access_token"], start_dt, end_dt)
+            except urllib.error.HTTPError as retry_exc:
+                if retry_exc.code != 401:
+                    raise
+                e = retry_exc
+        age = time.time() - float(_rotation_state["rotated_at"] or 0)
+        if age > _ROTATION_GRACE_SECONDS:
+            raise  # not "seconds after a rotation" any more — treat as genuine
+        if _glitch_marker_is_fresh():
+            logger.error("Whoop data-endpoint auth rejection recurred after a fresh rotation — latching the breaker.")
+            raise
+        _mark_glitch()
+        logger.warning(
+            "Whoop data endpoint rejected a token minted %.0fs ago — transient, not latching; retries next run (#2196).",
+            age,
+        )
+        # NB: the message is rendered in MINUTES on purpose — `auth_breaker`
+        # classifies on substrings, and a seconds figure could literally print
+        # "401" (age 401s is inside the grace window) and self-latch.
+        raise WhoopTransientAuthGlitch(
+            f"whoop data endpoint rejected a token minted {age / 60:.1f} minutes ago in this same run — "
+            "classified transient (one-shot grace); the next run latches if it recurs"
+        ) from e
 
 
 def transform(raw: dict, date_str: str) -> list[dict]:
@@ -672,7 +996,30 @@ def _emit_reconciliation_metric(missing_count: int) -> None:
 
 
 def _reconcile(event: dict, context) -> dict:
-    """Diff the trailing-window Whoop API record set against the store (read-only)."""
+    """Diff the trailing-window Whoop API record set against the store (read-only).
+
+    #2196 (acceptance box 5): this path used to bypass the ADR-052 auth breaker
+    entirely — while the credential was dead from 08-03 to 08-07 the reconcile
+    invocation still authenticated and hammered the token endpoint daily, one
+    more exchange per day against a provider we already knew had locked us out
+    (and one more chance to log a confusing failure on top of the real one).
+    The breaker exists precisely so a known-dead credential stops being
+    re-tried; honor it here the way run_ingestion does.
+    """
+    marker = check_breaker(_table, source_name="whoop", user_id=USER_ID, logger=logger)
+    if marker:
+        logger.info("[RECONCILE] skipped — auth breaker active (marked_at=%s)", marker.get("marked_at"))
+        return {
+            "statusCode": 200,
+            "body": json.dumps(
+                {
+                    "mode": "reconcile",
+                    "source": "whoop",
+                    "skipped": "auth_failure_circuit_breaker",
+                    "marked_at": str(marker.get("marked_at")),
+                }
+            ),
+        }
     try:
         secrets_client = boto3.client("secretsmanager", region_name=REGION)
         try:
@@ -741,6 +1088,14 @@ def _reconcile(event: dict, context) -> dict:
         # A reconcile failure (e.g. transient Whoop outage) must NOT raise — that
         # would trip the ingestion-error-whoop alarm on an unrelated cause. Skip
         # the metric for the day (the alarm treats missing data as not-breaching).
+        #
+        # #2196: an AUTH failure discovered here is different — swallowing it
+        # kept the breaker un-latched, so the next reconcile went right back at
+        # the dead endpoint. Mark it (same helper the framework uses), then
+        # still return non-fatally.
+        if looks_like_auth_failure(e):
+            logger.error("[RECONCILE] auth failure — marking the breaker so the next run skips: %s", e)
+            mark_failure(_table, source_name="whoop", user_id=USER_ID, error_msg=e, logger=logger)
         logger.error("[RECONCILE] failed (non-fatal): %s", e, exc_info=True)
         return {"statusCode": 200, "body": json.dumps({"mode": "reconcile", "source": "whoop", "error": str(e)})}
 

@@ -36,6 +36,7 @@ bar and paste it back.
 import argparse
 import json
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -152,10 +153,22 @@ def verify_token(access_token: str) -> bool:
 def save_tokens(secret: dict, token_body: dict) -> dict:
     """Write access_token + refresh_token into the secret IN PLACE — every other
     field (client_id, client_secret, anything else present) is preserved, matching
-    what whoop_lambda's refresh path expects to read back."""
+    what whoop_lambda's refresh path expects to read back.
+
+    #2196: also stamp `access_token_expires_at` (epoch seconds, derived from the
+    provider's own `expires_in`) — the field whoop_lambda.authenticate() reads to
+    decide whether it needs to spend a single-use refresh_token rotation at all.
+    Without it, the first run after a re-auth throws away a perfectly good access
+    token and rotates immediately. `expires_in` itself is deliberately NOT copied
+    (it's a duration, meaningless once stored)."""
     updated = dict(secret)
     updated["access_token"] = token_body["access_token"]
     updated["refresh_token"] = token_body["refresh_token"]
+    expires_in = token_body.get("expires_in")
+    if expires_in:
+        updated["access_token_expires_at"] = int(time.time()) + int(expires_in)
+    else:
+        updated.pop("access_token_expires_at", None)
     client = boto3.client("secretsmanager", region_name=REGION)
     client.update_secret(SecretId=SECRET_ID, SecretString=json.dumps(updated))
     return updated
