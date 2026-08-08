@@ -14,14 +14,37 @@ Two guard classes (ADR-105 rigor bar / ADR-077 "clamped, not hidden"):
    (?date=) deliberately keeps the full reach (ADR-058). `hrv_30d_avg` carries
    min-n semantics + an explicit `hrv_30d_n`.
 
-All dates are computed relative to the wall clock at test time and genesis is
-monkeypatched per-test — no frozen-fixture time bombs.
+All dates are computed relative to a FIXED instant (`_NOW`) rather than the
+live wall clock. Earlier this file DID read `datetime.now(timezone.utc)` once
+at import time — genuinely a #2223 time bomb (not just latent), in TWO ways:
+
+  1. training_overview() excludes "today" from its averages by comparing
+     fixture dates against a LIVE `datetime.now(timezone.utc)` read again at
+     call time (site_api_training.py:160, a plain module import, not
+     `_g`-injected), so a CI run whose EXECUTION crosses UTC midnight after
+     this file's COLLECTION would reclassify "today"'s partial row as a
+     complete day and silently change avg_daily_steps/avg_strain.
+
+  2. handle_vitals()'s LIVE d7/d30 windows are computed as `max(today - N
+     days, genesis)` (ADR-077 "clamped, not hidden") from its OWN live PT
+     clock; the genesis-clamp tests below build `genesis = _d(5)` relative to
+     this file's `_NOW` and assert the handler's query start == that genesis.
+     If `_NOW` (fixture time) and the handler's live "today" (call time) are
+     not the SAME instant, the un-clamped d7 window no longer relates to
+     `genesis` the way the test assumes and the assertion silently depends on
+     the two clocks staying "close enough" — not fixed, just usually true.
+
+Freeze BOTH handlers' clocks to the SAME fixed instant (`_freeze_clocks`
+below) instead of leaning on real-clock proximity — the same pattern used in
+tests/test_window_name_honesty_1917.py and tests/test_home_og_day_frame_1955.py.
 """
 
 import json
 import os
 import sys
 from datetime import datetime, timedelta, timezone
+
+import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
@@ -30,7 +53,36 @@ from web import (
     site_api_vitals as vitals,  # noqa: E402
 )
 
-_NOW = datetime.now(timezone.utc)
+_NOW = datetime(2026, 7, 20, 12, 0, tzinfo=timezone.utc)  # fixed instant — see _freeze_clocks below
+
+
+class _FrozenDateTime(datetime):
+    """datetime whose now() is pinned to _NOW, tz-converted like the real
+    clock (noon UTC keeps the same calendar date in PT too, so vitals'
+    PT-anchored "today" and this file's UTC-frame `_d()` fixtures agree)."""
+
+    @classmethod
+    def now(cls, tz=None):
+        if tz is None:
+            return _NOW.replace(tzinfo=None)
+        return _NOW.astimezone(tz)
+
+
+@pytest.fixture(autouse=True)
+def _freeze_clocks(monkeypatch):
+    """Pin BOTH handlers' live clocks to the SAME instant `_NOW`/`_d()` build
+    fixtures from (#2223):
+
+    - site_api_training's `datetime` (training_overview() reads it directly,
+      not via `_g`) — its own live "today" excludes the still-accruing
+      partial day from avg_daily_steps/avg_strain.
+    - site_api_vitals's `datetime` (handle_vitals()'s d7/d30 windows clamp to
+      `max(today - N days, genesis)`) — the genesis-clamp tests below assert
+      the handler's query start equals a `genesis` built from `_NOW`, which
+      only holds when the handler's live "today" IS `_NOW`.
+    """
+    monkeypatch.setattr(obs._training, "datetime", _FrozenDateTime)
+    monkeypatch.setattr(vitals, "datetime", _FrozenDateTime)
 
 
 def _d(days_ago: int) -> str:
