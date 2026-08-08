@@ -1202,6 +1202,11 @@ def store_habit_scores(date_str, component_details, component_scores, vice_strea
 # ==============================================================================
 
 
+# #2221: a run of missing habitify days longer than this is treated as the end of
+# available history rather than as a gap inside a live streak.
+STREAK_GAP_TOLERANCE_DAYS = 3
+
+
 def compute_habit_streaks(profile, yesterday_str):
     """Compute streaks: Tier 0 streak, Tier 0+1 streak, and per-vice streaks."""
     registry = profile.get("habit_registry", {})
@@ -1233,64 +1238,91 @@ def compute_habit_streaks(profile, yesterday_str):
     vice_streaks = {v: 0 for v in vice_habits}
     vice_broken = {v: False for v in vice_habits}
 
+    # #2221, ADR-104. Three ways this scan turned an ABSENCE into a fact:
+    #   1. `if not rec: break` read one missing habitify day (an API blip, a travel
+    #      day, a phone left off) as the end of history, so a 40-day vice streak
+    #      rendered as 2 — presented as a fact, with no marker that the scan hit a
+    #      gap. A gap is now skipped, and the scan stops only after a RUN of missing
+    #      days long enough to mean "history exhausted".
+    #   2. `habits_map.get(h, 0)` mapped an absent habit key to "not done", so a
+    #      habit added to the registry today retroactively destroyed the streak, and
+    #      a habit Habitify simply did not return read as a miss. Absent is unknown.
+    #   3. a day whose applicable habits are ALL unknown proves nothing either way,
+    #      so it is skipped rather than counted as clean.
+    # The tier loops are additionally guarded on a NON-EMPTY habit set: with no
+    # active tier-0 habits and no mvp_habits — the state right after a reset — the
+    # inner all() was vacuously true and the streak grew by one for every day that
+    # merely HAD a habitify record. A streak over an empty set is not a streak.
+    gap_days = 0
+    consecutive_missing = 0
+
+    def _day_verdict(habit_names, is_weekday, habits_map, skip_post_training):
+        """(any_reading, all_done) over the habits applicable on this day."""
+        any_reading = False
+        for h in habit_names:
+            meta = registry.get(h, {})
+            applicable = meta.get("applicable_days", "daily")
+            if applicable == "weekdays" and not is_weekday:
+                continue
+            if skip_post_training and applicable == "post_training":
+                continue
+            if h not in habits_map:
+                continue  # no reading — not evidence of a miss
+            any_reading = True
+            done = habits_map.get(h)
+            if not (done is not None and float(done) >= 1):
+                return True, False
+        return any_reading, True
+
     for i in range(0, 90):
         dt = datetime.strptime(yesterday_str, "%Y-%m-%d") - timedelta(days=i)
         date_str = dt.strftime("%Y-%m-%d")
         is_weekday = dt.weekday() < 5
         rec = fetch_date("habitify", date_str)
         if not rec:
-            break
+            consecutive_missing += 1
+            if consecutive_missing > STREAK_GAP_TOLERANCE_DAYS:
+                break  # a run this long is the end of history, not a gap
+            gap_days += 1
+            continue
+        consecutive_missing = 0
         habits_map = rec.get("habits", {})
 
-        if not t0_broken:
-            all_t0 = True
-            for h in tier0_habits:
-                meta = registry.get(h, {})
-                applicable = meta.get("applicable_days", "daily")
-                if applicable == "weekdays" and not is_weekday:
-                    continue
-                done = habits_map.get(h, 0)
-                if not (done is not None and float(done) >= 1):
-                    all_t0 = False
-                    break
-            if all_t0:
-                tier0_streak += 1
-            else:
-                t0_broken = True
+        if tier0_habits and not t0_broken:
+            seen_t0, all_t0 = _day_verdict(tier0_habits, is_weekday, habits_map, False)
+            if seen_t0:
+                if all_t0:
+                    tier0_streak += 1
+                else:
+                    t0_broken = True
 
-        if not t01_broken:
-            all_t01 = True
-            for h in tier01_habits:
-                meta = registry.get(h, {})
-                applicable = meta.get("applicable_days", "daily")
-                if applicable == "weekdays" and not is_weekday:
-                    continue
-                if applicable == "post_training":
-                    continue
-                done = habits_map.get(h, 0)
-                if not (done is not None and float(done) >= 1):
-                    all_t01 = False
-                    break
-            if all_t01:
-                tier01_streak += 1
-            else:
-                t01_broken = True
+        if tier01_habits and not t01_broken:
+            seen_t01, all_t01 = _day_verdict(tier01_habits, is_weekday, habits_map, True)
+            if seen_t01:
+                if all_t01:
+                    tier01_streak += 1
+                else:
+                    t01_broken = True
 
         for v in vice_habits:
-            if not vice_broken[v]:
-                done = habits_map.get(v, 0)
-                if done is not None and float(done) >= 1:
-                    vice_streaks[v] += 1
-                else:
-                    vice_broken[v] = True
+            if vice_broken[v] or v not in habits_map:
+                continue
+            done = habits_map.get(v)
+            if done is not None and float(done) >= 1:
+                vice_streaks[v] += 1
+            else:
+                vice_broken[v] = True
 
-        if t0_broken and t01_broken and all(vice_broken.values()):
+        if (t0_broken or not tier0_habits) and (t01_broken or not tier01_habits) and all(vice_broken.values()):
             break
 
     return {
         "tier0_streak": tier0_streak,
         "tier01_streak": tier01_streak,
         "vice_streaks": vice_streaks,
+        # #2221: the reader is entitled to know the scan crossed a data gap rather
+        # than an unbroken run of days.
+        "streak_gap_days": gap_days,
     }
 
 
@@ -1830,6 +1862,14 @@ def lambda_handler(event, context):
                 )
             except Exception as _sbe:
                 logger.warning(f"write_buddy_json (sick) failed: {_sbe}")
+
+        # #2221: the sick-day branch returned BEFORE record_email_send, so a real SES
+        # send left no email_log row — and a missing row is exactly what monitoring
+        # reads as "the daily brief did not send". Every sick day produced a false
+        # missed-brief alarm, on the days Matthew is least able to investigate one.
+        # Same #2255 rule as the normal path: a dry run wrote nothing, so it logs nothing.
+        if not _dry_run:
+            record_email_send(table, "daily_brief")
 
         # #2255: report honestly — a dry run generated it, it did not send it.
         return {"statusCode": 200, "body": f"Recovery brief {'generated (DRY_RUN, not sent)' if _dry_run else 'sent'} for {yesterday}"}
@@ -2608,11 +2648,22 @@ def lambda_handler(event, context):
                     else:
                         _group_narratives["nutrition"] = _fd_signal
                 # Habits
+                # #2221 reader/writer mismatch: this read `tier0_pct` /
+                # `tier0_completion_pct` off `streak_data` (compute_habit_streaks
+                # returns neither) and off `_computed` (computed_metrics does not
+                # carry it), so the completion clause had never rendered on either
+                # path. CORRECTION to the marker, which named daily_metrics_compute
+                # as the writer: there are TWO writers and both target the
+                # SOURCE#habit_scores row — this module's own store_habit_scores
+                # writes tier0_pct there too. Read the row both of them write.
+                # Both store it as a FRACTION (round(done/total, 3)), so the old
+                # `round(float(pct))%` would have rendered 0.75 as "1% completion"
+                # had it ever fired.
                 _hab_pct = None
-                if streak_data:
-                    _hab_pct = streak_data.get("tier0_pct") or streak_data.get("tier0_completion_pct")
-                elif _computed:
-                    _hab_pct = _computed.get("tier0_pct")
+                _hab_scores = fetch_date("habit_scores", yesterday) or {}
+                _hab_frac = safe_float(_hab_scores, "tier0_pct")
+                if _hab_frac is not None:
+                    _hab_pct = _hab_frac * 100
                 if _tier0_streak is not None:
                     _hab_msg = f"Tier 0 streak: {_tier0_streak} days"
                     if _hab_pct is not None:

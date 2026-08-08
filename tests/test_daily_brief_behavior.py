@@ -772,18 +772,6 @@ class TestHabitStreaks:
         out = brief.compute_habit_streaks(STREAK_PROFILE, YESTERDAY)
         assert out["vice_streaks"]["no_weed"] == 90
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:1210-1211 (compute_habit_streaks): `if not rec: break` treats a day "
-            "with NO habitify record as the end of history and stops the scan. A single ingestion gap "
-            "(Habitify API blip, a travel day, a phone left off) therefore silently truncates every "
-            "streak the reader is shown — a 40-day vice streak renders as 2 — and the number is "
-            "presented as a fact, with no marker that the scan hit a data gap rather than a miss. "
-            "It should distinguish 'no data' from 'not done' (carry the streak across an absent day, or "
-            "surface the gap). Hurts: Matthew, on the single most motivating number in the email."
-        ),
-    )
     def test_a_missing_habitify_day_does_not_silently_truncate_a_long_streak(self, table):
         # 40 clean days, one ingestion gap 3 days back, clean before and after.
         days = {_back(i): {"no_weed": 1} for i in range(40) if i != 3}
@@ -791,16 +779,6 @@ class TestHabitStreaks:
         out = brief.compute_habit_streaks(STREAK_PROFILE, YESTERDAY)
         assert out["vice_streaks"]["no_weed"] > 3, f"streak truncated at the gap: {out['vice_streaks']['no_weed']}"
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:1222/1240/1251 (compute_habit_streaks): `habits_map.get(h, 0)` maps an "
-            "ABSENT habit key to 0 — 'not done'. A habit added to the profile registry today, or one "
-            "Habitify simply did not return for a day, therefore reads as a miss and zeroes the tier "
-            "streak. Absence of a reading is not evidence of a miss (ADR-104). Hurts: Matthew — adding a "
-            "new tier-0 habit retroactively destroys the existing streak."
-        ),
-    )
     def test_a_habit_absent_from_the_days_record_is_not_counted_as_a_miss(self, table):
         _seed_habit_days(table, {_back(i): {"sleep_7h": 1, "no_weed": 1} for i in range(3)})  # 'protein' never reported
         assert brief.compute_habit_streaks(STREAK_PROFILE, YESTERDAY)["tier0_streak"] == 3
@@ -1749,17 +1727,6 @@ class TestSickDayBrief:
         brief.lambda_handler({}, None)
         assert [p for p in handler_env["table"].puts if p.get("pk", "").endswith("day_grade")] == []
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:1766 (lambda_handler): the sick-day branch returns before "
-            "record_email_send at 2670, so no email_log row is written on a sick day even though a real "
-            "SES send happened. The row exists so 'the status page can track last send' (line 1378) and "
-            "a missing row is what monitoring reads as a missed brief — so every sick day produces a "
-            "false 'the daily brief did not send' signal. It should record the send it just made. "
-            "Hurts: Matthew, exactly on the days he is least able to investigate a false alarm."
-        ),
-    )
     def test_a_sick_day_send_is_still_recorded_for_the_status_page(self, handler_env):
         brief.lambda_handler({}, None)
         email_log = [p for p in handler_env["table"].puts if "email_log" in str(p.get("pk", ""))]
@@ -1987,20 +1954,6 @@ class TestCockpitGroupNarratives:
         assert "activity" not in n  # no Strava rows seeded
         assert "nutrition" not in n  # no CGM, no delivery streak
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:2497-2506 (lambda_handler): the habits narrative appends "
-            "'— N% completion today' from `streak_data.get('tier0_pct')` / "
-            "`streak_data.get('tier0_completion_pct')` / `_computed.get('tier0_pct')`. None of the three "
-            "is ever produced: compute_habit_streaks (daily_brief_lambda.py:1260-1264) returns exactly "
-            "{tier0_streak, tier01_streak, vice_streaks}, and daily_metrics_compute_lambda.py:857 writes "
-            "tier0_pct onto the SOURCE#habit_scores row, not onto computed_metrics. Reader/writer "
-            "mismatch: the completion clause has never rendered on either path. It should read the "
-            "habit_scores row. Hurts: readers of the cockpit habits pillar — the sentence is half the "
-            "story it was written to tell."
-        ),
-    )
     def test_the_habits_line_carries_todays_completion_percentage(self, handler_env):
         hs = day_row("habit_scores", YESTERDAY, tier0_pct=Decimal("0.75"), tier0_done=3, tier0_total=4)
         handler_env["table"].store[(hs["pk"], hs["sk"])] = hs
@@ -2101,19 +2054,6 @@ class TestInlineFallbackPath:
         assert args[12] == 3  # mvp_streak — three clean tier-0 days back from the subject date
         assert args[14] == {"no_weed": 3}  # vice_streaks
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:1215-1229 (compute_habit_streaks): when the profile declares NO "
-            "active tier-0 habits and no mvp_habits — the state right after an experiment reset, and "
-            "the state of a fresh profile — `tier0_habits` is empty, so the inner `all(...)` loop is "
-            "vacuously true and the streak increments once for every day that merely HAS a habitify "
-            "record. The brief then renders a growing 'Tier 0 streak: N days' for a set of zero habits, "
-            "and publishes the same N to public_stats.json's platform block. A streak over an empty set "
-            "is not a streak; it should be absence. Hurts: Matthew and every reader of the cockpit — a "
-            "headline number that measures nothing."
-        ),
-    )
     def test_an_empty_habit_registry_produces_no_streak_rather_than_a_vacuous_one(self, handler_env):
         for i in range(3):
             r = habitify_row(_back(i), {"anything": 1})
