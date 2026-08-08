@@ -237,14 +237,6 @@ def test_a_negative_cell_is_preserved_not_clamped():
     assert mf.safe_float("-15.5") == -15.5
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): safe_float() sanitises '-', 'N/A' and 'n/a' but "
-        "accepts 'nan'/'NaN'/'inf' as numbers, returning a non-finite float. It poisons "
-        "the whole day total (see the end-to-end xfail below)."
-    ),
-)
 def test_non_finite_placeholder_cells_read_as_absence():
     import math
 
@@ -314,25 +306,11 @@ def test_unparseable_duration_text_is_absent_not_a_crash():
     assert mf.parse_duration_min("unknown") is None
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): parse_duration_min() raises ValueError on a "
-        "duration string that contains 'm'/'h' but is not its expected shape "
-        "(e.g. '45 mins' -> float('45 ins')). The trailing try/except shows the "
-        "intent is None-on-unparseable; instead one malformed cell aborts the whole "
-        "workout ingest."
-    ),
-)
 def test_a_malformed_unit_suffix_duration_degrades_to_absence():
     assert mf.parse_duration_min("45 mins") is None
     assert mf.parse_duration_min("90 min") is None
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=("DEFECT (tranche-2 discovery): parse_duration_min('1:ab') raises ValueError from the " "unguarded int() in the colon branch."),
-)
 def test_a_malformed_colon_duration_degrades_to_absence():
     assert mf.parse_duration_min("1:ab") is None
 
@@ -499,16 +477,6 @@ def test_a_nutrient_never_logged_has_no_total_field_at_all(frozen_clock):
     assert "total_caffeine_mg" not in day
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): build_day_items() filters day totals with "
-        "`if v != 0`, so a genuinely-logged zero (0 g alcohol, 0 g added sugar) is "
-        "dropped from the day item entirely. Downstream readers then cannot "
-        "distinguish 'logged zero alcohol' from 'alcohol never tracked' — the "
-        "inverse of the ADR-104 failure the filter was aimed at."
-    ),
-)
 def test_a_day_whose_logged_alcohol_is_zero_still_reports_zero(frozen_clock):
     day = mf.build_day_items([food_row(**{"Calories (kcal)": "400", "Alcohol (g)": "0"})])["2026-08-05"]
     assert day.get("total_alcohol_g") == 0
@@ -563,15 +531,6 @@ def test_two_identical_rows_in_one_export_count_as_two_servings(frozen_clock):
     assert day["total_calories_kcal"] == 600.0
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): a 'nan' cell (common in pandas/spreadsheet "
-        "round-trips) is accepted by safe_float, propagates through the day total, "
-        "and floats_to_decimal then maps the non-finite value to None — so a day "
-        "with a real logged meal is stored with total_calories_kcal = None."
-    ),
-)
 def test_a_nan_cell_cannot_null_out_a_real_days_calories(frozen_clock):
     from common.numeric import floats_to_decimal
 
@@ -926,30 +885,11 @@ def test_rebuilding_the_same_workout_export_is_idempotent(frozen_clock):
     assert mf.build_workout_day_items(rows) == mf.build_workout_day_items(list(rows))
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): build_workout_day_items()'s date loop has no "
-        "`else` clause (unlike parse_entry's), so a Date it cannot parse is used "
-        "VERBATIM as the partition key — writing sk='DATE#April 4, 2026'. That is an "
-        "unreadable row in the macrofactor_workouts partition (the TD-19 "
-        "partition-mismatch class), not a skipped row."
-    ),
-)
 def test_a_workout_row_with_an_unparseable_date_is_dropped_not_mis_partitioned(frozen_clock):
     day_items = mf.build_workout_day_items([workout_row(date="April 4, 2026")])
     assert all(re.fullmatch(r"DATE#\d{4}-\d{2}-\d{2}", item["sk"]) for item in day_items.values())
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): one malformed 'Workout Duration' cell "
-        "('45 mins') propagates parse_duration_min's ValueError out of "
-        "build_workout_day_items, aborting the entire upload — every other workout "
-        "in the file is lost with it."
-    ),
-)
 def test_one_malformed_duration_cell_cannot_abort_the_whole_workout_import(frozen_clock):
     rows = [
         workout_row(duration="45 mins", **{"Reps": "5"}),
@@ -1090,18 +1030,6 @@ def test_summary_days_are_independent_partitions(frozen_clock):
     assert items["2026-08-05"]["total_calories_kcal"] == 2200.0
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): build_summary_day_items()'s final sanity "
-        "check only inspects the FIRST 10 characters ('len >= 10 and [4]/[7] are "
-        "dashes'), so a date carrying a time component ('2026-08-05 00:00:00' — the "
-        "usual spreadsheet/XLSX round-trip form) is accepted verbatim and written as "
-        "sk='DATE#2026-08-05 00:00:00'. That row is invisible to every DATE#-keyed "
-        "reader. Note the nutrition path rejects the same value outright, so the two "
-        "parsers disagree on the same input."
-    ),
-)
 def test_a_summary_date_carrying_a_time_component_still_lands_on_the_right_partition(frozen_clock):
     items = mf.build_summary_day_items([summary_row(date="2026-08-05 00:00:00")])
     for item in items.values():
