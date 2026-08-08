@@ -64,6 +64,16 @@ What it checks (all read-only; CloudFormation drift-detection API calls are free
      lists the top wall-clock-consuming workflows over the trailing 7 days
      (`gh run list`, needs only `actions: read`) so a run-rate regression is
      attributable even without billing-API access.
+  9. HAE WEBHOOK INGRESS PARITY (#1946) — a pre-IaC console-created HTTP API
+     coexisted with the CDK-managed one for months after the July IaC cutover,
+     each with its own apigateway-invoke grant on the `health-auto-export-webhook`
+     Lambda (the orphan's scoped to a wildcard `/*/*`, the CDK one to the
+     declared `/*/*/ingest` route). Asserts the Lambda's live resource policy
+     carries EXACTLY ONE apigateway-invoke statement, scoped to the API id
+     derived live from LifePlatformIngestion's own `AWS::ApiGatewayV2::Api`
+     resource (guard-the-SET — never a hand-pasted API id) and its declared
+     route. Any future console-created ingress, or a re-widened grant, reds
+     this check.
 
 Output: a findings record written to s3://<bucket>/drift-log/{latest,<date>}.json
 (mirrors the Coherence Sentinel's coherence-log pattern) so the remediation agent can
@@ -636,6 +646,110 @@ def check_codeql_alerts():
     return result
 
 
+# ── 10. HAE webhook ingress parity (#1946) ───────────────────────────────────
+#
+# A pre-IaC console-created HTTP API (`health-auto-export-api`, id a76xwxt2wa,
+# `"tags": {}` — no CloudFormation owner) coexisted with the CDK-managed one
+# for months after the July IaC cutover, each holding its own apigateway-invoke
+# grant on `health-auto-export-webhook` — the orphan's scoped to the wildcard
+# `/*/*` (every stage/method/route) vs. the CDK statement's route-scoped
+# `/*/*/ingest`. Guard-the-SET: the expected API id is DERIVED live from
+# LifePlatformIngestion's own `AWS::ApiGatewayV2::Api` resource, never
+# hand-pasted, so a stack replacement (new physical id) doesn't false-positive
+# and a THIRD console-created API doesn't go unnoticed either.
+HAE_WEBHOOK_FUNCTION = "health-auto-export-webhook"
+HAE_INGESTION_STACK = "LifePlatformIngestion"
+# Mirrors the POST /ingest route CDK declares (add_routes() in
+# cdk/stacks/ingestion_stack.py) — HttpLambdaIntegration auto-grants exactly
+# this SourceArn suffix; any other suffix (or the bare `/*/*` wildcard) is a
+# wider-than-declared grant.
+HAE_ROUTE_SOURCE_ARN_SUFFIX = "/*/*/ingest"
+
+
+def get_cdk_managed_hae_api_id(cfn=None):
+    """Derive the CDK-managed HAE webhook API's physical id from LifePlatformIngestion's
+    own `AWS::ApiGatewayV2::Api` resource — never a hand-pasted literal (guard-the-SET).
+
+    Returns `(api_id, error)`: exactly one of the two is non-None/non-empty. `error` is a
+    human-readable string when the stack didn't resolve to exactly one such resource
+    (a genuinely unexpected shape, not "no orphan found" — that's a separate question).
+    Shared by `check_hae_webhook_ingress` (drift check) and `teardown_hae_orphan_api.py`
+    (the owner-run cleanup), so both agree on what "CDK-managed" means."""
+    cfn = cfn or _client("cloudformation")
+    try:
+        cdk_api_ids = []
+        token = None
+        while True:
+            kw = {"StackName": HAE_INGESTION_STACK}
+            if token:
+                kw["NextToken"] = token
+            resp = cfn.list_stack_resources(**kw)
+            for r in resp.get("StackResourceSummaries", []):
+                if r.get("ResourceType") == "AWS::ApiGatewayV2::Api" and r.get("PhysicalResourceId"):
+                    cdk_api_ids.append(r["PhysicalResourceId"])
+            token = resp.get("NextToken")
+            if not token:
+                break
+    except Exception as e:  # noqa: BLE001
+        return None, f"list_stack_resources({HAE_INGESTION_STACK}): {e}"
+
+    if len(cdk_api_ids) != 1:
+        return None, f"expected exactly 1 AWS::ApiGatewayV2::Api in {HAE_INGESTION_STACK}, found {len(cdk_api_ids)}: {cdk_api_ids}"
+    return cdk_api_ids[0], None
+
+
+def check_hae_webhook_ingress():
+    """The webhook Lambda's resource policy must carry EXACTLY ONE apigateway
+    invoke grant, scoped to the CDK-managed API's declared POST /ingest route.
+
+    A second grant (an orphan console-created API, #1946) or a widened
+    SourceArn (the bare `/*/*` wildcard instead of `/*/*/ingest`) is the
+    unmanaged-ingress defect class this closes."""
+    cdk_api_id, err = get_cdk_managed_hae_api_id()
+    if err:
+        return {"status": "error", "detail": err}
+    expected_suffix = f"{cdk_api_id}{HAE_ROUTE_SOURCE_ARN_SUFFIX}"
+
+    try:
+        lam = _client("lambda")
+        policy = json.loads(lam.get_policy(FunctionName=HAE_WEBHOOK_FUNCTION)["Policy"])
+    except Exception as e:  # noqa: BLE001
+        return {"status": "error", "detail": f"get_policy({HAE_WEBHOOK_FUNCTION}): {e}"}
+
+    invoke_statements = []
+    for stmt in policy.get("Statement", []):
+        principal = stmt.get("Principal") or {}
+        if principal.get("Service") != "apigateway.amazonaws.com":
+            continue
+        source_arn = ((stmt.get("Condition") or {}).get("ArnLike") or {}).get("AWS:SourceArn", "")
+        invoke_statements.append({"sid": stmt.get("Sid"), "source_arn": source_arn})
+
+    if len(invoke_statements) != 1:
+        return {
+            "status": "drift",
+            "cdk_api_id": cdk_api_id,
+            "invoke_statements": invoke_statements,
+            "detail": (
+                f"expected exactly 1 apigateway-invoke statement on {HAE_WEBHOOK_FUNCTION}, "
+                f"found {len(invoke_statements)} — an out-of-IaC ingress grant"
+            ),
+        }
+
+    source_arn = invoke_statements[0]["source_arn"]
+    if not source_arn.endswith(expected_suffix):
+        return {
+            "status": "drift",
+            "cdk_api_id": cdk_api_id,
+            "invoke_statements": invoke_statements,
+            "detail": (
+                f"invoke grant SourceArn {source_arn!r} does not match the CDK-managed API's "
+                f"declared route (expected suffix {expected_suffix!r}) — wider-than-declared grant"
+            ),
+        }
+
+    return {"status": "clean", "cdk_api_id": cdk_api_id, "invoke_statements": invoke_statements}
+
+
 # ── Assemble + persist ───────────────────────────────────────────────────────
 
 
@@ -652,6 +766,7 @@ def run_sweep():
         "github_push_runs": check_github_push_runs(),
         "github_quota": check_github_quota(),
         "codeql_alerts": check_codeql_alerts(),
+        "hae_webhook_ingress": check_hae_webhook_ingress(),
     }
     statuses = [c.get("status") for c in checks.values()]
     if "drift" in statuses:
@@ -690,6 +805,7 @@ def _summary(status, checks):
         ("github_config", "GitHub config diverges from documented posture"),
         ("github_push_runs", "main-push workflow runs not queuing"),
         ("codeql_alerts", "un-triaged open CodeQL alert(s)"),
+        ("hae_webhook_ingress", "HAE webhook ingress grant drift"),
     ):
         c = checks.get(key, {})
         if c.get("status") == "drift":

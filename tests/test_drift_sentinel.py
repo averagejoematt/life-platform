@@ -153,9 +153,24 @@ def test_site_sha_ancestry_survives_git_fetch_failure(monkeypatch):
 
 
 def _patch_all(
-    monkeypatch, cfn, post, orphan, bucket, doc=None, site=None, oidc=None, gh_config=None, gh_push=None, quota=None, codeql=None
+    monkeypatch,
+    cfn,
+    post,
+    orphan,
+    bucket,
+    doc=None,
+    site=None,
+    oidc=None,
+    gh_config=None,
+    gh_push=None,
+    quota=None,
+    codeql=None,
+    hae=None,
 ):
     monkeypatch.setattr(ds, "check_codeql_alerts", lambda: codeql or {"status": "clean", "open_count": 0, "sample": []})
+    monkeypatch.setattr(
+        ds, "check_hae_webhook_ingress", lambda: hae or {"status": "clean", "cdk_api_id": "p6clybdkkc", "invoke_statements": []}
+    )
     monkeypatch.setattr(ds, "check_cfn_drift", lambda *a, **k: cfn)
     monkeypatch.setattr(ds, "check_postflight", lambda: post)
     monkeypatch.setattr(ds, "check_orphan_functions", lambda: orphan)
@@ -1282,3 +1297,169 @@ def test_sweep_surfaces_codeql_drift_in_summary(monkeypatch):
     rec = ds.run_sweep()
     assert rec["status"] == "drift"
     assert "un-triaged open CodeQL alert(s)" in rec["summary"]
+
+
+# ── HAE webhook ingress parity (#1946) ───────────────────────────────────────
+
+
+class _FakeCfnHaeApis:
+    """Fake cloudformation client: list_stack_resources returns the given
+    AWS::ApiGatewayV2::Api physical ids for LifePlatformIngestion."""
+
+    def __init__(self, api_ids):
+        self._api_ids = api_ids
+
+    def list_stack_resources(self, StackName, NextToken=None):  # noqa: N803 — boto3 kwarg casing
+        assert StackName == ds.HAE_INGESTION_STACK
+        return {"StackResourceSummaries": [{"ResourceType": "AWS::ApiGatewayV2::Api", "PhysicalResourceId": aid} for aid in self._api_ids]}
+
+
+class _FakeLambdaHaePolicy:
+    """Fake lambda client: get_policy returns the given Statement list."""
+
+    def __init__(self, statements):
+        self._policy = {"Version": "2012-10-17", "Id": "default", "Statement": statements}
+
+    def get_policy(self, FunctionName):  # noqa: N803 — boto3 kwarg casing
+        assert FunctionName == ds.HAE_WEBHOOK_FUNCTION
+        return {"Policy": json.dumps(self._policy)}
+
+
+def _hae_client(monkeypatch, api_ids, statements):
+    """Dispatch ds._client("lambda"/"cloudformation") to the two fakes above."""
+    fake_lambda = _FakeLambdaHaePolicy(statements)
+    fake_cfn = _FakeCfnHaeApis(api_ids)
+
+    def _dispatch(service, region=ds.REGION):
+        return {"lambda": fake_lambda, "cloudformation": fake_cfn}[service]
+
+    monkeypatch.setattr(ds, "_client", _dispatch)
+
+
+def _cdk_stmt(api_id, sid="LifePlatformIngestion-HaeWebhookApiPOSTingestHaeWebhookIntegrationPermission"):
+    return {
+        "Sid": sid,
+        "Effect": "Allow",
+        "Principal": {"Service": "apigateway.amazonaws.com"},
+        "Action": "lambda:InvokeFunction",
+        "Resource": "arn:aws:lambda:us-west-2:205930651321:function:health-auto-export-webhook",
+        "Condition": {"ArnLike": {"AWS:SourceArn": f"arn:aws:execute-api:us-west-2:205930651321:{api_id}/*/*/ingest"}},
+    }
+
+
+def _orphan_stmt(api_id, sid="ApiGatewayInvoke"):
+    return {
+        "Sid": sid,
+        "Effect": "Allow",
+        "Principal": {"Service": "apigateway.amazonaws.com"},
+        "Action": "lambda:InvokeFunction",
+        "Resource": "arn:aws:lambda:us-west-2:205930651321:function:health-auto-export-webhook",
+        "Condition": {"ArnLike": {"AWS:SourceArn": f"arn:aws:execute-api:us-west-2:205930651321:{api_id}/*/*"}},
+    }
+
+
+def test_get_cdk_managed_hae_api_id_returns_the_single_resource(monkeypatch):
+    monkeypatch.setattr(ds, "_client", lambda *a, **k: _FakeCfnHaeApis(["p6clybdkkc"]))
+    api_id, err = ds.get_cdk_managed_hae_api_id()
+    assert api_id == "p6clybdkkc"
+    assert err is None
+
+
+def test_get_cdk_managed_hae_api_id_errors_on_zero_resources(monkeypatch):
+    monkeypatch.setattr(ds, "_client", lambda *a, **k: _FakeCfnHaeApis([]))
+    api_id, err = ds.get_cdk_managed_hae_api_id()
+    assert api_id is None
+    assert "found 0" in err
+
+
+def test_get_cdk_managed_hae_api_id_errors_on_multiple_resources(monkeypatch):
+    monkeypatch.setattr(ds, "_client", lambda *a, **k: _FakeCfnHaeApis(["a1", "a2"]))
+    api_id, err = ds.get_cdk_managed_hae_api_id()
+    assert api_id is None
+    assert "found 2" in err
+
+
+def test_hae_webhook_ingress_clean_when_single_grant_matches_cdk_api(monkeypatch):
+    _hae_client(monkeypatch, api_ids=["p6clybdkkc"], statements=[_cdk_stmt("p6clybdkkc")])
+    res = ds.check_hae_webhook_ingress()
+    assert res["status"] == "clean"
+    assert res["cdk_api_id"] == "p6clybdkkc"
+    assert len(res["invoke_statements"]) == 1
+
+
+def test_hae_webhook_ingress_drift_when_orphan_grant_also_present(monkeypatch):
+    # Reproduces the #1946 live shape: the CDK grant AND the pre-IaC orphan's
+    # wildcard grant both on the resource policy at once.
+    _hae_client(
+        monkeypatch,
+        api_ids=["p6clybdkkc"],
+        statements=[_cdk_stmt("p6clybdkkc"), _orphan_stmt("a76xwxt2wa")],
+    )
+    res = ds.check_hae_webhook_ingress()
+    assert res["status"] == "drift"
+    assert "found 2" in res["detail"]
+    assert len(res["invoke_statements"]) == 2
+
+
+def test_hae_webhook_ingress_drift_when_grant_is_wildcard_scoped(monkeypatch):
+    # A single statement, but scoped to the CDK api's id with the WIDER wildcard
+    # suffix instead of the declared /*/*/ingest route — a re-widened grant.
+    _hae_client(monkeypatch, api_ids=["p6clybdkkc"], statements=[_orphan_stmt("p6clybdkkc")])
+    res = ds.check_hae_webhook_ingress()
+    assert res["status"] == "drift"
+    assert "wider-than-declared" in res["detail"]
+
+
+def test_hae_webhook_ingress_drift_when_zero_invoke_statements(monkeypatch):
+    _hae_client(monkeypatch, api_ids=["p6clybdkkc"], statements=[])
+    res = ds.check_hae_webhook_ingress()
+    assert res["status"] == "drift"
+    assert "found 0" in res["detail"]
+
+
+def test_hae_webhook_ingress_ignores_non_apigateway_principals(monkeypatch):
+    other_principal_stmt = {
+        "Sid": "SomeOtherGrant",
+        "Effect": "Allow",
+        "Principal": {"Service": "events.amazonaws.com"},
+        "Action": "lambda:InvokeFunction",
+        "Resource": "arn:aws:lambda:us-west-2:205930651321:function:health-auto-export-webhook",
+    }
+    _hae_client(monkeypatch, api_ids=["p6clybdkkc"], statements=[_cdk_stmt("p6clybdkkc"), other_principal_stmt])
+    res = ds.check_hae_webhook_ingress()
+    assert res["status"] == "clean"
+    assert len(res["invoke_statements"]) == 1
+
+
+def test_hae_webhook_ingress_error_when_cdk_api_derivation_fails(monkeypatch):
+    _hae_client(monkeypatch, api_ids=[], statements=[_cdk_stmt("p6clybdkkc")])
+    res = ds.check_hae_webhook_ingress()
+    assert res["status"] == "error"
+
+
+def test_hae_webhook_ingress_error_soft_on_get_policy_failure(monkeypatch):
+    class _BoomLambda:
+        def get_policy(self, FunctionName):  # noqa: N803
+            raise RuntimeError("Throttling")
+
+    def _dispatch(service, region=ds.REGION):
+        return {"lambda": _BoomLambda(), "cloudformation": _FakeCfnHaeApis(["p6clybdkkc"])}[service]
+
+    monkeypatch.setattr(ds, "_client", _dispatch)
+    res = ds.check_hae_webhook_ingress()
+    assert res["status"] == "error"
+    assert "Throttling" in res["detail"]
+
+
+def test_sweep_surfaces_hae_webhook_ingress_drift_in_summary(monkeypatch):
+    _patch_all(
+        monkeypatch,
+        cfn={"status": "clean", "stacks": {}},
+        post={"config_drift": {"status": "clean"}, "layer_uniformity": {"status": "clean"}, "asset_completeness": {"status": "clean"}},
+        orphan={"status": "clean", "orphans": []},
+        bucket={"status": "clean", "missing_prefixes": []},
+        hae={"status": "drift", "cdk_api_id": "p6clybdkkc", "invoke_statements": [], "detail": "an out-of-IaC ingress grant"},
+    )
+    rec = ds.run_sweep()
+    assert rec["status"] == "drift"
+    assert "HAE webhook ingress grant drift" in rec["summary"]

@@ -97,6 +97,31 @@ diff`), `CDKBootstrapRoleAssume`, `CloudFrontInvalidate` (site-deploy).
 
 ---
 
+## Remediation-role HAE webhook ingress-check read — STAGED (#1946), NOT yet applied
+
+> **Status: the checked-in JSON is AHEAD of live.** #1946 adds ONE statement to
+> `github-actions-remediation-role.permissions.json`: `HaeWebhookIngressCheck` —
+> `lambda:GetPolicy` scoped to the single `health-auto-export-webhook` function
+> ARN, so the new daily `hae-webhook-ingress-drift.yml` gate can read that
+> Lambda's resource policy and assert it carries exactly one apigateway-invoke
+> grant, scoped to the CDK-managed API's declared `/*/*/ingest` route (guards
+> against a repeat of the pre-IaC orphan API class, #1946). Until applied, the
+> new workflow's `AccessDenied` on `GetPolicy` reads as an `error` status (not
+> `drift`) from `deploy/check_hae_webhook_ingress_drift.py --strict` — still a
+> red run, distinguishable in the log from a real drift finding. Apply
+> (attended):
+>
+> ```bash
+> aws iam put-role-policy \
+>   --role-name github-actions-remediation-role \
+>   --policy-name remediation-permissions \
+>   --policy-document file://infra/iam/github-actions-remediation-role.permissions.json
+> python3 deploy/verify_oidc_iam.py --strict   # expect CLEAN (for this role)
+> python3 deploy/check_hae_webhook_ingress_drift.py --strict   # expect a real clean/drift verdict, not AccessDenied
+> ```
+
+---
+
 ## Diagnosis-role qa_archive screenshot write — STAGED (#1441), NOT yet applied
 
 > **Status: the checked-in JSON is AHEAD of live.** #1441 adds ONE statement to

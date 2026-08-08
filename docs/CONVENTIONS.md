@@ -719,6 +719,7 @@ read that section for the incident narrative and the exact mechanics.
 | A relative doc link/anchor is broken | `check_doc_links.py` | §8 above |
 | A canonical page is unindexed or unverified >180d | `check_doc_index.py` | §8 above |
 | A doc-sync literal (test/alarm/lambda count) drifts from ground truth | `deploy/sync_doc_metadata.py --check` | §8 above; literals excluded from this table's edits (see CLAUDE.md) |
+| `health-auto-export-webhook` gains a second ingress (an out-of-IaC API Gateway) or a wider-than-declared invoke grant | HAE webhook single-ingress parity (#1946) | `deploy/check_hae_webhook_ingress_drift.py --strict`; `.github/workflows/hae-webhook-ingress-drift.yml` (daily, blocking); logic shared with `drift_sentinel.check_hae_webhook_ingress` |
 
 **Pre-commit hook** (`scripts/install_hooks.sh`, installed once per clone — runs on every local commit):
 
