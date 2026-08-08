@@ -44,10 +44,22 @@ without it, the first test to run would serve its answer to every later one.
 
 Tests carrying `xfail(strict=False, reason="DEFECT (tranche-2 discovery): ...")`
 describe the contract the endpoint OUGHT to hold and currently does not. They are
-findings, not fixes. #2220 fixed six of the eleven — those markers are gone and the
-assertions are load-bearing now; five findings remain marked (the inert `yellow_h`
-column, the shared-partition uptime bars, the missed-weekly-run window, the
-unreachable gray idle state, and the unguarded `strptime`).
+findings, not fixes. #2220 fixed six of the eleven; #2221 then took the remaining
+five and left exactly ONE marked:
+
+  * FIXED — the shared-partition uptime bars (`_uptime_90d` now honours field_check),
+    the missed-weekly-run window (the recovery branch is bounded by the sender's own
+    cadence, not by red_h), and the unguarded `strptime` (two call sites, not one —
+    an unreadable date now reads as unreadable, per ADR-104, instead of 500-ing the
+    whole page).
+  * FIXED DIFFERENTLY — the unreachable gray idle state. It really was dead code, but
+    making it reachable would have masked a missed weekly send as "idle, next: Sun",
+    so the state was deleted. `test_a_scheduled_sender_never_reports_the_idle_gray_state`
+    is now the ratchet on that, and explains the reasoning in full.
+  * STILL MARKED — the inert `yellow_h` column. Confirmed inert, but the repair as
+    written contradicts `test_data_from_yesterday_is_still_green` on the same source
+    and contradicts the cadence-derived window in `source_registry`. The marker's own
+    reason carries the corrected finding.
 """
 
 import ast
@@ -721,10 +733,24 @@ def test_the_lag_grace_runs_out_and_a_lagged_source_does_go_yellow(monkeypatch):
 @pytest.mark.xfail(
     strict=False,
     reason=(
-        "DEFECT (tranche-2 discovery): _comp_status() takes yellow_h but never reads it. "
-        "The yellow boundary is hard-coded at effective_days <= 1, so every per-source yellow_h "
-        "column in _DATA_SOURCES/_COMPUTE_SOURCES/_EMAIL_LAMBDAS is inert. A source configured to "
-        "warn after 25h is published green at ~42h."
+        "DEFECT (tranche-2 discovery, CAUSE CORRECTED and DELIBERATELY LEFT by #2221). The premise "
+        "is confirmed: _comp_status() takes yellow_h and never reads it — the yellow boundary is "
+        "hard-coded at effective_days <= 1, so every yellow_h column in _DATA_SOURCES / "
+        "_COMPUTE_SOURCES / _EMAIL_LAMBDAS is inert. But the prescribed repair — start enforcing the "
+        "configured hours — cannot be shipped as written, for two measured reasons. (1) It "
+        "CONTRADICTS test_data_from_yesterday_is_still_green in this same file, on the SAME row: "
+        "_plain_source() and this test's picker differ only by `yellow_h < 41`, and both resolve to "
+        "`weather`. One asserts yesterday->green, the other asserts yesterday (41.7h at the frozen "
+        "clock, yellow_h=25) -> yellow. Both cannot hold. (2) The 25h is a PICKED number that "
+        "disagrees with the platform's own cadence-derived window: source_registry['weather'] sets "
+        "stale_hours=None -> the 48h default, commented 'comfortably covers the 2x-daily cron "
+        "without false-staling' — under which 41.7h IS green. So the real finding is one level up: "
+        "_DATA_SOURCES hand-types freshness windows that duplicate and contradict "
+        "lambdas/ingestion/source_registry.py, and then does not read them. The fix is to derive "
+        "these columns from the registry (freshness windows come from the writer's cron, never "
+        "picked) and retire whichever of the two sibling contracts loses — a threshold decision "
+        "about the reader-facing traffic light, not a code change. Half-enforcing a picked number "
+        "would trade a dead column for a false yellow."
     ),
 )
 def test_a_source_past_its_own_yellow_threshold_is_not_reported_green(monkeypatch):
@@ -957,16 +983,9 @@ def test_manual_and_onetime_sources_publish_no_daily_bars(monkeypatch):
             assert by_name(body, "data_sources", row["name"])["uptime_90d"] == []
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): _uptime_90d(source_id) ignores the row's field_check, "
-        "so every sub-source sharing the apple_health partition draws the SAME bars. A CGM feed "
-        "with no glucose reading in 90 days shows a fully green uptime chart built from other "
-        "sub-sources' rows (water, steps, mindful minutes)."
-    ),
-)
 def test_a_sub_source_uptime_bar_reflects_that_sub_sources_own_data(monkeypatch):
+    """#2221 (was a tranche-2 xfail): _uptime_90d now takes the row's field_check and
+    filters server-side, so a sub-source of a shared partition draws its OWN bars."""
     shared = [r for r in DATA_ROWS if r["field_check"]]
     assert len(shared) >= 2, "this contract only exists while a partition is shared by sub-sources"
     target, other = shared[0], shared[1]
@@ -1303,39 +1322,43 @@ def test_a_never_sent_email_does_not_publish_a_fabricated_uptime_history(monkeyp
     assert c["last_sync_relative"] == "never"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): a weekly sender that MISSED its last scheduled day is "
-        "published green. The yellow-recovery branch fires on any `last`, so the window between "
-        "'sent this week' and the red threshold (~17 days for a 400h red_h) reports 'next run "
-        "scheduled' for a sender that has already skipped a week."
-    ),
-)
 def test_a_weekly_email_that_missed_its_last_scheduled_run_is_not_green(monkeypatch):
+    """#2221 (was a tranche-2 xfail): the recovery branch is bounded by the sender's own
+    cadence (one week) instead of red_h, which had rewritten up to ~17 days of silence
+    to "next run scheduled"."""
     row = _weekly_email()
     table = healthy_platform().clear(f"email_log#{row['id']}").add(f"email_log#{row['id']}", days_ago(10)).build()
     c = by_id(Harness(monkeypatch, table).body(), "email", row["id"])
     assert c["status"] != "green", f"a sender ten days silent on a weekly cadence published green: {c['comment']!r}"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): the schedule-aware gray state is unreachable dead code. "
-        "`_sched_aware` is only consulted when status is neither green nor red, but every earlier "
-        "branch has already forced one of those two — so no input to /api/status can ever produce "
-        "the 'gray / next: <Day>' idle state the status page has a colour for."
-    ),
-)
-def test_an_idle_weekly_email_can_reach_the_gray_next_run_state(monkeypatch):
+def test_a_scheduled_sender_never_reports_the_idle_gray_state(monkeypatch):
+    """#2221 — the finding was right, the prescribed repair was not.
+
+    The tranche-2 marker read "the schedule-aware gray state is unreachable dead code"
+    and asked for it to be made REACHABLE. It was indeed unreachable (`_sched_aware`
+    only ran when status was neither green nor red, and every earlier branch had
+    already forced one of those). But reaching it would have been a regression, not a
+    fix: the only status that can now arrive at that point is the yellow a MISSED
+    weekly slot produces (the test above), and `_sched_aware` would have repainted it
+    "gray / next: Sun" on the six days a week that are not the send day — an honest
+    signal turned into a shrug, the exact ADR-104 failure this endpoint exists to
+    avoid. So the dead state was DELETED instead. A scheduled sender is fully described
+    by green (inside its cadence, and the comment already names the next run), yellow
+    (a whole cycle with no delivery) and red (past its threshold).
+
+    This test is the ratchet on that decision: no age from 0 to 30 days may produce
+    gray, and the helper may not come back.
+    """
+    assert not hasattr(sas, "_sched_aware"), "the deleted idle-state helper is back"
     row = _weekly_email()
     seen = set()
     for age in range(0, 31):
         sas._status_cache, sas._status_cache_ts = {}, 0
         table = healthy_platform().clear(f"email_log#{row['id']}").add(f"email_log#{row['id']}", days_ago(age)).build()
         seen.add(by_id(Harness(monkeypatch, table).body(), "email", row["id"])["status"])
-    assert "gray" in seen, f"no age between 0 and 30 days produced gray; only {sorted(seen)}"
+    assert "gray" not in seen, f"the idle gray state is back and can mask a missed send: {sorted(seen)}"
+    assert seen <= {"green", "yellow", "red"}, f"unexpected colour from a scheduled sender: {sorted(seen)}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1478,18 +1501,11 @@ def test_never_imported_manual_and_onetime_components_never_drive_the_light(monk
     assert body["overall"] == "green"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): `_comp_status` calls datetime.strptime on the sort key with "
-        "no guard, so a single unparseable `DATE#` row anywhere in the table raises ValueError out "
-        "of the handler — taking down the whole status page AND the footer dot (status_summary "
-        "delegates to status). The module already wraps this exact strptime in try/except at two "
-        "other call sites, so the omission is an inconsistency rather than a decision. No known "
-        "live writer emits such a key, so this is latent fragility rather than an active outage."
-    ),
-)
 def test_one_unparseable_sort_key_does_not_take_down_the_whole_status_page(monkeypatch):
+    """#2221 (was a tranche-2 xfail, ADR-104): the strptime is guarded and reports the
+    row as unreadable — non-green, never a pass, and never a 500 out of the handler.
+    Correction to the marker: there were TWO unguarded call sites, not one — the manual
+    (due-date) branch had the same shape and is guarded too."""
     row = _plain_source()
     table = healthy_platform().clear(row["id"]).add(row["id"], "latest").build()
     assert Harness(monkeypatch, table).status()["statusCode"] == 200
