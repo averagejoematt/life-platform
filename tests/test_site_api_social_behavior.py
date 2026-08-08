@@ -559,38 +559,29 @@ def test_every_social_endpoint_sets_an_explicit_cache_control(name, monkeypatch)
     assert _call(name, monkeypatch)["headers"].get("Cache-Control"), name
 
 
-# The two endpoints whose QUIET-PATH branch hand-rolls its envelope instead of
-# going through `_ok`/`_error`. The full endpoint list is still derived; only the
-# known-defective subset is named, and the guard below keeps it honest.
-_HANDROLLED_QUIET_PATH = {"_handle_verify_subscriber", "_handle_replicate_certify"}
-_HANDROLLED_REASON = (
-    "DEFECT — site_api_social.py:196/205/210 (`_handle_verify_subscriber`) and :2268/:2284 "
-    "(`_handle_replicate_certify`) build their responses as bare "
-    "`{'statusCode': ..., 'headers': {**CORS_HEADERS, 'Cache-Control': ...}}` dicts instead of "
-    "calling `site_api_common._ok`/`_error`. They therefore emit neither the `x-request-id` "
-    "response header nor `_meta.request_id`, so a reader complaint about /api/verify_subscriber "
-    "or /api/replicate_certify cannot be correlated to a CloudWatch line — unlike every sibling "
-    "endpoint in the module. About fifteen other 200/429 branches in this file share the pattern; "
-    "these two are simply the ones whose DEFAULT path is hand-rolled. Hurts Matthew, debugging a "
-    "reported failure on the two doors that mint credentials and mutate a public counter."
-)
+def test_no_endpoint_hand_rolls_its_response_envelope(monkeypatch):
+    """Fixed by #2221 (was an xfail on the two doors whose DEFAULT path hand-rolled
+    it): 29 branches in this module built a bare
+    ``{"statusCode": ..., "headers": {**CORS_HEADERS, ...}}`` dict, and every one of
+    them dropped the ``x-request-id`` echo. This is the STRUCTURAL half of the fix —
+    a dict display with a literal ``statusCode`` key is no longer expressible in the
+    module, so a new door cannot reintroduce the class. ``_ok``/``_error``/
+    ``_envelope`` — all three in ``site_api_common`` — are the only builders."""
+    tree = ast.parse(pathlib.Path(inspect.getfile(social)).read_text())
+    offenders = [
+        n.lineno
+        for n in ast.walk(tree)
+        if isinstance(n, ast.Dict) and any(isinstance(k, ast.Constant) and k.value == "statusCode" for k in n.keys)
+    ]
+    assert offenders == [], f"hand-rolled response envelope(s) at line(s) {offenders}"
+    # ...and the builder it must use really is the shared one, not a local re-spelling.
+    assert social._envelope is sac._envelope
 
 
-def test_the_handrolled_envelope_set_is_a_subset_of_the_discovered_endpoints():
-    """Keeps the named subset above from drifting away from the derived set."""
-    assert _HANDROLLED_QUIET_PATH <= set(ENDPOINTS)
-
-
-@pytest.mark.parametrize(
-    "name",
-    [
-        pytest.param(n, marks=pytest.mark.xfail(strict=False, reason=_HANDROLLED_REASON)) if n in _HANDROLLED_QUIET_PATH else n
-        for n in sorted(ENDPOINTS)
-    ],
-)
+@pytest.mark.parametrize("name", sorted(ENDPOINTS))
 def test_a_request_id_is_echoed_so_a_reader_complaint_reaches_a_log_line(name, monkeypatch):
     """``set_request_id`` is how "this page is wrong" is tied to a CloudWatch line.
-    Every ``_ok``/``_error`` response echoes it; a hand-rolled envelope drops it."""
+    Every ``_ok``/``_error``/``_envelope`` response echoes it."""
     sac.set_request_id("req-social-123")
     resp = _call(name, monkeypatch)
     assert resp["headers"].get("x-request-id") == "req-social-123", name
@@ -808,18 +799,6 @@ def test_the_public_subscriber_count_counts_only_confirmed_records(monkeypatch):
     assert ok_body(social.handle_subscriber_count())["count"] == 2
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (ADR-104) — site_api_social.py:238-240 `handle_subscriber_count`. On ANY DynamoDB "
-        "exception the handler sets `count = 0` and publishes it through `_ok` as a plain number, "
-        "indistinguishable from a genuine 'nobody has subscribed'. During a DDB blip the homepage "
-        "and /subscribe/ social-proof line therefore state as fact that the platform has zero "
-        "subscribers. It should publish absence (None / an explicit `available: false`) so the "
-        "front-end can hide the line. Hurts every reader (a false number) and Matthew (his own "
-        "social proof reads zero)."
-    ),
-)
 def test_a_database_outage_reports_an_unknown_subscriber_count_not_a_factual_zero(monkeypatch):
     wire(monkeypatch, table=FakeSocialTable([_subscriber_row("a@x.com")], fail={"query"}))
     assert ok_body(social.handle_subscriber_count())["count"] is None
@@ -949,18 +928,6 @@ def test_an_s3_outage_tells_the_reader_to_retry_instead_of_pretending_to_save(mo
     assert social._handle_submit_finding(post(GOOD_FINDING))["statusCode"] == 503
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT — site_api_social.py:374-384 `_handle_submit_finding` vs :1691 "
-        "`_handle_board_question`. The board-question door rejects blocked-vice text at the door "
-        "(`if _is_blocked_vice(question): return _error(400, ...)`); the finding door — the same "
-        "shape, the same S3 moderation queue, the same public POST — applies NO vice filter to "
-        "`finding`, `metric_a` or `metric_b`. It should run the identical `_is_blocked_vice` check. "
-        "Hurts Matthew: the two sibling capture surfaces disagree about what a stranger may write "
-        "into his queue, and the unguarded one is the older/more-linked of the two."
-    ),
-)
 def test_the_finding_door_rejects_blocked_vice_text_the_way_the_board_door_does(monkeypatch):
     wire(monkeypatch)
     assert social._handle_submit_finding(post({**GOOD_FINDING, "finding": "marijuana correlates with my sleep"}))["statusCode"] == 400
@@ -1272,18 +1239,6 @@ def test_a_follow_with_a_bad_address_or_missing_id_is_rejected(body, monkeypatch
     assert social._handle_experiment_follow(post(body))["statusCode"] == 400
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT — site_api_social.py:712 `_handle_experiment_follow` (and the identical :1000 in "
-        "`_handle_challenge_follow`). The docstring and the inline comment both say 'Rate limit: 10 "
-        "follows per IP per hour', but the check `if count >= 10` runs AFTER the atomic increment, "
-        "so `count` is 1 on the first request and the TENTH request sees count == 10 and is "
-        "refused. The effective limit is NINE. It should be `if count > 10` (or the docs should say "
-        "9). Hurts a reader who follows ten experiments in one sitting and is told 'too many follow "
-        "requests' on the tenth; P3 because the direction of the error is conservative."
-    ),
-)
 def test_the_follow_limit_allows_the_ten_follows_it_advertises(monkeypatch):
     wire(monkeypatch)
     statuses = [social._handle_experiment_follow(post({**FOLLOW, "library_id": f"exp-{i}"}))["statusCode"] for i in range(10)]
@@ -1373,18 +1328,6 @@ def test_a_pilot_run_is_hidden_from_the_public_experiment_detail_page(monkeypatc
     assert body["runs"] == [] and "pilot-only outcome text" not in json.dumps(body)
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT — site_api_social.py:862 `_handle_experiment_detail` publishes "
-        "`completed_runs_count = sum(1 for r in runs if r['status'] == 'completed')`, while :543 "
-        "`handle_experiment_library` counts a run as completed when its status is in "
-        "('completed', 'partial', 'failed'). The two surfaces therefore disagree about the same "
-        "experiment: the pillar header says '1 completed' and the detail page it links to says "
-        "'0 completed runs'. One definition should be shared. Hurts a reader who clicks through "
-        "from the library card to the detail page and sees the number change."
-    ),
-)
 def test_the_library_and_the_detail_page_agree_on_what_counts_as_a_completed_run(monkeypatch):
     rows = [
         {
@@ -1539,18 +1482,6 @@ def test_a_pilot_phase_challenge_is_hidden_from_the_public_list(monkeypatch):
     assert not [c for c in ok_body(social.handle_challenges())["challenges"] if c["id"] == "pilot-one"]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (ADR-104) — site_api_social.py:1127 `handle_challenges` publishes "
-        "`'success_rate': round(completed_days / len(checkins) * 100) if checkins else 0`. A "
-        "challenge that is active but has no check-ins yet — the state EVERY challenge is in on "
-        "its first day — ships `success_rate: 0`, which reads as '0% of your attempts succeeded'. "
-        "The honest value for a rate with an empty denominator is absent (None). The sibling field "
-        "`completed_days: 0` is genuinely 0 and correct; only the RATE is fabricated. Hurts "
-        "Matthew and every reader on day one of every challenge."
-    ),
-)
 def test_a_challenge_with_no_checkins_yet_reports_an_unknown_success_rate_not_zero_percent(monkeypatch):
     rows = [
         {
@@ -1566,18 +1497,6 @@ def test_a_challenge_with_no_checkins_yet_reports_an_unknown_success_rate_not_ze
     assert live["progress"]["success_rate"] is None
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT — site_api_social.py:1126 `handle_challenges` (and the twin at :1271 in "
-        "`_handle_challenge_checkin`) computes `completion_pct = round(len(checkins)/duration*100)` "
-        "with no upper clamp, so a 7-day challenge carrying 10 check-in rows publishes "
-        "`completion_pct: 143`. It should clamp to 100 (or publish the raw counts and let the "
-        "client render). Reachable in practice because `_handle_challenge_checkin` accepts an "
-        "arbitrary, unvalidated `date` string (see the xfail below) and dedups on it, so extra "
-        "rows really can exceed the duration. Hurts a reader who sees a progress bar past 100%."
-    ),
-)
 def test_challenge_completion_percent_never_exceeds_one_hundred(monkeypatch):
     rows = [
         {
@@ -1717,19 +1636,6 @@ def test_a_second_checkin_for_the_same_challenge_from_one_ip_in_a_day_is_refused
     assert resp["statusCode"] == 429
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (input validation) — site_api_social.py:1191 `_handle_challenge_checkin` reads "
-        "`date_str = (body.get('date') or '').strip()` and writes it straight into the stored "
-        "check-in with NO format validation and NO length cap. A public POST can therefore write "
-        "`{'date': 'tomorrow-ish'}` or a 100 KB string into Matthew's "
-        "`USER#matthew#SOURCE#challenges` record. The dedup key is that same field, so each bogus "
-        "value is a NEW row — which is also how `completion_pct` gets past 100 (see the xfail "
-        "above). It should validate `^\\d{4}-\\d{2}-\\d{2}$` and reject anything else. Hurts "
-        "Matthew: strangers writing arbitrary bytes into his own challenge record."
-    ),
-)
 def test_a_checkin_date_that_is_not_a_calendar_date_is_rejected(monkeypatch):
     wire(monkeypatch, table=_active_challenge_table())
     resp = social._handle_challenge_checkin(post({"challenge_id": "cold-shower-finish", "completed": True, "date": "not-a-date"}))
@@ -1985,33 +1891,14 @@ def test_the_post_endpoint_set_is_derived_and_non_empty():
     assert len(POST_ENDPOINTS) >= 10, sorted(POST_ENDPOINTS)
 
 
-@pytest.mark.parametrize(
-    "name",
-    [
-        (
-            pytest.param(
-                n,
-                marks=pytest.mark.xfail(
-                    strict=False,
-                    reason=(
-                        "DEFECT — site_api_social.py:1454-1474 `_handle_experiment_suggest` is the only POST "
-                        "handler in the module without a dedicated `except` around `json.loads`; a malformed "
-                        "body falls through to the catch-all and returns 500 'Failed to submit suggestion'. "
-                        "Every sibling returns 400 'Invalid JSON body'. Hurts a reader (a server-error page "
-                        "for their own typo) and Matthew (5xx alarm noise from client errors)."
-                    ),
-                ),
-            )
-            if n == "_handle_experiment_suggest"
-            else n
-        )
-        for n in sorted(POST_ENDPOINTS)
-    ],
-)
+@pytest.mark.parametrize("name", sorted(POST_ENDPOINTS))
 def test_a_malformed_body_on_any_public_post_door_is_a_client_error_not_a_server_error(name, monkeypatch):
     """Garbage bytes arrive at a public POST every day. Each door must answer 4xx —
     a 500 both misleads the reader and pollutes the 5xx alarm this Lambda is
-    watched by."""
+    watched by.
+
+    Fixed by #2221 (was an xfail on `_handle_experiment_suggest`, the module's only
+    POST handler with no dedicated `except` around `json.loads`)."""
     wire(monkeypatch, table=_active_challenge_table(), s3=_cohort_and_challenge_s3())
     assert POST_ENDPOINTS[name][1](post("{not valid json"))["statusCode"] != 500
 
@@ -2206,20 +2093,40 @@ def test_the_board_question_door_is_metered_when_the_shared_rate_limiter_is_unav
     assert statuses == [200] * social.BOARD_QUESTION_RATE_LIMIT + [429] * (6 - social.BOARD_QUESTION_RATE_LIMIT)
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (observability) — site_api_social.py:244 `_emit_rate_limit_metric` exists to emit "
-        "the OBS-03 `LifePlatform/SiteApi RateLimitHit` EMF metric, but only TWO of the module's "
-        "ten 429 paths call it (`_handle_submit_finding`:361 and `_handle_board_question`:1671). "
-        "The nudge, experiment_vote, experiment_follow, challenge_vote, challenge_follow, "
-        "challenge_checkin, experiment_suggest, ritual_log and cohort_submit 429s emit nothing, so "
-        "the CloudWatch metric under-reports abuse by ~80% and a flood against those doors is "
-        "invisible. Every 429 return should emit. Hurts Matthew (blind to abuse on eight of ten "
-        "public write doors)."
-    ),
-)
+def test_no_429_is_built_outside_the_one_metered_refusal_builder():
+    """Guard the SET, not the instance. #2221's finding was that
+    `_emit_rate_limit_metric` existed but only 3 of the module's 13 refusal paths
+    called it. Emitting inside `_rate_limited` fixes today's ten; this makes a
+    NEW unmetered 429 unexpressible — the literal `429` may appear only in that
+    builder's own signature-free body and in the `_rate_limited` call sites."""
+    tree = ast.parse(pathlib.Path(inspect.getfile(social)).read_text())
+    builder = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "_rate_limited")
+    exempt = {id(n) for n in ast.walk(builder)}
+    offenders = [n.lineno for n in ast.walk(tree) if isinstance(n, ast.Constant) and n.value == 429 and id(n) not in exempt]
+    assert offenders == [], f"a 429 built outside _rate_limited at line(s) {offenders}"
+
+
+def test_the_metered_refusal_builder_covers_every_public_write_door():
+    """...and the set it covers is DERIVED: every `_rate_limited(...)` call site is
+    counted, so a door that drops its refusal shows up as a shrinking number."""
+    tree = ast.parse(pathlib.Path(inspect.getfile(social)).read_text())
+    endpoints = {
+        n.args[0].value
+        for n in ast.walk(tree)
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "_rate_limited" and n.args
+    }
+    assert len(endpoints) >= 13, sorted(endpoints)
+    assert {"nudge", "submit_finding", "board_question", "verify_subscriber", "cohort_submit"} <= endpoints
+
+
 def test_every_rate_limited_refusal_emits_the_abuse_metric(monkeypatch):
+    """Fixed by #2221 (was xfail).
+
+    CORRECTION to the marker this replaces: it said "only TWO of the module's ten
+    429 paths call it". There are THIRTEEN 429 paths, not ten (it omitted
+    `verify_subscriber` and `predict_week`), and THREE already emitted —
+    `verify_subscriber` had been given one by #2239 after the marker was written.
+    The gap was 10 of 13 (~77%), not 8 of 10 (~80%)."""
     emitted: list = []
     monkeypatch.setattr(social, "_emit_rate_limit_metric", lambda endpoint: emitted.append(endpoint))
     wire(monkeypatch)
@@ -2380,72 +2287,24 @@ def test_the_fourth_suggestion_in_an_hour_from_one_ip_is_refused(monkeypatch):
     assert social._handle_experiment_suggest(post({"idea": "one suggestion too many"}))["statusCode"] == 429
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (input validation) — site_api_social.py:1456-1468 `_handle_experiment_suggest` "
-        "applies a MINIMUM length to `idea` (10 chars) but no MAXIMUM, and none at all to "
-        "`source`. Both are written verbatim into `USER#matthew#SOURCE#experiment_suggestions`. "
-        "Every sibling capture door in this file caps its text (`finding` 500, `metric_a/b` 100, "
-        "`question` 500, `note` 500). A public POST can therefore park a ~400 KB DynamoDB item "
-        "per request, three times an hour per IP. It should cap at the same 500-char bar. Hurts "
-        "Matthew (storage cost, and a moderation queue item he cannot read)."
-    ),
-)
 def test_a_suggestion_is_length_capped_like_every_other_reader_text_field(monkeypatch):
     table, _s3, _sec = wire(monkeypatch)
     social._handle_experiment_suggest(post({"idea": "x" * 50_000, "source": "y" * 50_000}))
     assert len(table.puts[0]["idea"]) <= 500 and len(table.puts[0]["source"]) <= 500
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT — site_api_social.py:1456 `_handle_experiment_suggest` is the only reader-text "
-        "door in this module that does NOT strip HTML: `_handle_submit_finding`:374-377 and "
-        "`_handle_board_question`:1683 both run `re.sub(r'<[^>]+>', '', ...)` first, and it also "
-        "skips the `_is_blocked_vice` check `_handle_board_question`:1691 applies. Markup and "
-        "blocked-vice text land verbatim in the suggestions partition. It should sanitise "
-        "identically. Hurts Matthew, whose moderation queue is the render target."
-    ),
-)
 def test_a_suggestion_is_html_stripped_like_every_other_reader_text_field(monkeypatch):
     table, _s3, _sec = wire(monkeypatch)
     social._handle_experiment_suggest(post({"idea": "<script>alert(1)</script>please try zone 2"}))
     assert "<script>" not in table.puts[0]["idea"]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT — site_api_social.py:1455 `_handle_experiment_suggest` parses its body with "
-        "`json.loads(event.get('body', '{}'))` — the DEFAULT form — while every sibling handler "
-        "uses `json.loads(event.get('body') or '{}')`. A Function-URL POST with an empty body "
-        "delivers `body: ''`, which is a present key, so the default never applies and "
-        "`json.loads('')` raises; the broad `except` turns that into a 500 'Failed to submit "
-        "suggestion'. Same for a non-string `idea` (`123`.strip() -> AttributeError -> 500). Both "
-        "are client errors and should be 400. Hurts a reader who gets a server-error page for a "
-        "malformed request, and Matthew whose 5xx alarm counts it."
-    ),
-)
 @pytest.mark.parametrize("body", ["", json.dumps({"idea": 12345})])
 def test_a_malformed_suggestion_body_is_a_client_error_not_a_server_error(body, monkeypatch):
     wire(monkeypatch)
     assert social._handle_experiment_suggest(post(body))["statusCode"] == 400
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT — site_api_social.py:1471 `_handle_experiment_suggest` returns "
-        "`{'statusCode': 200, 'headers': CORS_HEADERS, ...}` — the bare module-level dict, with no "
-        "`Cache-Control`. It is the only 200 response in this module without one. On a POST whose "
-        "response says 'received', an absent Cache-Control leaves CloudFront to guess; every "
-        "sibling write door sets `Cache-Control: no-store`. It also passes the shared CORS_HEADERS "
-        "object by reference rather than copying it, so any future in-place edit would leak "
-        "process-wide. Hurts a reader whose retry could be served a cached 'received'."
-    ),
-)
 def test_the_suggestion_response_is_explicitly_uncacheable_like_every_other_write(monkeypatch):
     wire(monkeypatch)
     resp = social._handle_experiment_suggest(post({"idea": "try a longer deload week"}))
@@ -2695,60 +2554,63 @@ def test_the_field_name_scan_finds_both_sides_so_the_parity_test_is_not_vacuous(
     assert _writer_record_keys("youtube_lambda.py") >= {"title", "description", "thumbnail_url"}
 
 
-@pytest.mark.parametrize(
-    "channel",
-    [
-        "youtube",
-        pytest.param(
-            "bluesky",
-            marks=pytest.mark.xfail(
-                strict=False,
-                reason=(
-                    "DEFECT (reader/writer field mismatch) — site_api_social.py:1784 "
-                    "`_broadcast_card` builds every card by reading `post.get('title')` -> caption, "
-                    "`post.get('description')` -> excerpt and `post.get('thumbnail_url')`. Only "
-                    "`ingestion/youtube_lambda.transform` writes those names. "
-                    "`ingestion/bluesky_lambda.transform`:290-303 writes the post body as `text` "
-                    "and its media as `embed_url`, and writes NO title/description/thumbnail_url at "
-                    "all. Every Bluesky post therefore renders on /story/broadcast/, "
-                    "/api/social_context and /api/membrane as a card with an empty caption, empty "
-                    "excerpt and no thumbnail — a blank row with only a link. The card should read "
-                    "`title or text` (and `thumbnail_url or embed_url`), or the writer should "
-                    "normalise. Hurts every reader of /story/broadcast/ the day the owner "
-                    "provisions the Bluesky handle; latent only because the channel is dormant."
-                ),
-            ),
-        ),
-        pytest.param(
-            "mastodon",
-            marks=pytest.mark.xfail(
-                strict=False,
-                reason=(
-                    "DEFECT (reader/writer field mismatch) — the same defect as Bluesky, second "
-                    "instance: `ingestion/mastodon_lambda.transform`:323-334 writes the status body "
-                    "as `text` and writes no `title`, `description` or `thumbnail_url`, while "
-                    "site_api_social.py:1784 `_broadcast_card` reads only those three. Every "
-                    "Mastodon post renders as a blank card. Same fix, same audience."
-                ),
-            ),
-        ),
-    ],
-)
+@pytest.mark.parametrize("channel", sorted(_INGEST_LAMBDAS))
 def test_every_field_the_broadcast_card_reads_is_a_field_that_channel_actually_writes(channel):
     """Both sides AST-derived from the shipped source, so neither the reader's nor
-    the writer's field list can be hand-typed wrong in this test."""
+    the writer's field list can be hand-typed wrong in this test.
+
+    Fixed by #2221 (was xfail for bluesky + mastodon, which wrote the post body as
+    `text` and no title/description/thumbnail_url at all, so every microblog post
+    rendered as a blank card). Fixed in the WRITERS, not the reader: the card stays
+    channel-agnostic and each transform normalises into the one shape."""
     read = _card_read_keys() - _FRAMEWORK_SUPPLIED
     written = _writer_record_keys(_INGEST_LAMBDAS[channel])
     assert not (read - written), f"{channel} never writes {sorted(read - written)}"
 
 
-def test_a_bluesky_shaped_post_renders_a_blank_card_today(monkeypatch):
-    """The behavioural companion to the AST parity test: NOT an xfail, because this
-    is the current, observable output. Pinned so the fix is visible when it lands."""
-    row = _post_row("bluesky", "2026-05-09", "b1", text="A real post body", embed_url="https://img.example/x.jpg")
+def test_a_bluesky_post_renders_its_own_text_as_the_card_caption(monkeypatch):
+    """The behavioural companion to the AST parity test. It used to pin the blank
+    card as observable output; #2221 fixed it, so it now pins the fixed output.
+
+    CORRECTION to the marker this replaces: it proposed the card read
+    `thumbnail_url or embed_url`. A Bluesky `embed_url` is
+    `record.embed.external.uri` — the target of an external LINK card, not an image
+    (`ingestion/bluesky_lambda._parse_entries`) — and both front-end renderers put
+    `thumbnail_url` straight into `<img src>` (site/assets/js/dispatches.js:437,
+    evidence_shared.js:221). That fix would have shipped a broken image on every
+    Bluesky post carrying a link. The thumbnail stays empty; only the text is
+    normalised."""
+    row = _post_row(
+        "bluesky",
+        "2026-05-09",
+        "b1",
+        text="A real post body",
+        title="A real post body",
+        description="A real post body",
+        embed_url="https://example.com/an-article",
+    )
     wire(monkeypatch, table=FakeSocialTable([row]))
     card = ok_body(social.handle_broadcast())["items"][0]
-    assert (card["caption"], card["excerpt"], card["thumbnail_url"]) == ("", "", "")
+    assert (card["caption"], card["excerpt"]) == ("A real post body", "A real post body")
+    assert card["thumbnail_url"] == "", "an external-link uri is not an image and must not reach <img src>"
+
+
+@pytest.mark.parametrize("channel", ["bluesky", "mastodon"])
+def test_the_microblog_transforms_derive_the_card_fields_from_the_post_text(channel):
+    """The parity test above only proves the KEYS are declared. This proves the
+    values are real: `title`/`description` must read the post's own text, and
+    `thumbnail_url` must NOT be `embed_url` (see the correction above)."""
+    path = pathlib.Path(inspect.getfile(social)).parents[1] / "ingestion" / _INGEST_LAMBDAS[channel]
+    tree = ast.parse(path.read_text())
+    fn = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "transform")
+    assigned = {}
+    for node in ast.walk(fn):
+        if isinstance(node, ast.Dict):
+            for k, v in zip(node.keys, node.values):
+                if isinstance(k, ast.Constant) and isinstance(k.value, str):
+                    assigned[k.value] = ast.unparse(v)
+    assert "text" in assigned["title"] and "text" in assigned["description"], assigned
+    assert "embed_url" not in assigned["thumbnail_url"], assigned["thumbnail_url"]
 
 
 def test_the_membrane_post_partitions_are_raw_timeseries_so_no_phase_filter_is_owed():
@@ -2984,20 +2846,6 @@ def test_the_predictor_provenance_admits_it_only_covers_the_active_window(monkey
     assert "8-day" in note or "active window" in note
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (ADR-104) — site_api_social.py:2103-2105, :2129-2131, :2140-2142 "
-        "(`_ladder_subscriber_count`, `_ladder_predictor_count`, `_ladder_replicator_count`). Every "
-        "one of them swallows a DynamoDB exception and returns a literal 0, which "
-        "`handle_ladder_counts` then publishes with `countable: True` and a provenance block that "
-        "claims the number is a 'COUNT of confirmed subscriber records'. During a DDB outage the "
-        "public engagement ladder therefore states as FACT that nobody has ever subscribed, "
-        "predicted or replicated — while its own provenance vouches for the number. Absence should "
-        "publish `count: None` (the `reader` rung already models exactly this). Hurts every reader "
-        "of the ladder and Matthew, whose participation reads as zero."
-    ),
-)
 def test_a_database_outage_makes_the_ladder_counts_unknown_not_zero(monkeypatch):
     wire(monkeypatch, table=FakeSocialTable([_subscriber_row("a@x.com")], fail={"query", "get_item"}))
     rungs = ok_body(social.handle_ladder_counts())["rungs"]
@@ -3252,22 +3100,11 @@ def test_the_live_challenge_catalog_cache_retries_a_failed_load(monkeypatch):
     assert ok_body(social.handle_challenges())["count"] > 0
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (#1821 / #2019 class) — site_api_social.py:1049-1051 `handle_challenge_catalog` "
-        "(and :872-874 `_public_challenge_ids`, which shares the same global) caches with `if "
-        "_challenge_catalog_cache is None:`. `_load_s3_json` returns `{}` on ANY failure, and `{}` "
-        "is not None — so a single transient S3 error PERMANENTLY pins that warm container on an "
-        "empty catalog: `/api/challenge_catalog` serves `{'challenges': [], 'total_votes': 0}` for "
-        "the container's whole life, and `/api/challenge_vote` 503s forever. There is also no TTL "
-        "at all, so even a SUCCESSFUL load is never refreshed — the sibling `_challenges_cache` in "
-        "the same file was given `config_cache_valid(...)` for exactly this reason (#2019). It "
-        "should use the same TTL helper and not cache a miss. Hurts every reader of /protocols "
-        "after any S3 blip, with no signal that anything failed."
-    ),
-)
 def test_a_transient_s3_failure_does_not_permanently_empty_the_challenge_catalog(monkeypatch):
+    """Fixed by #2221 (was xfail). `_load_s3_json` returns `{}` on ANY failure and
+    `{}` is not None, so the old `if _challenge_catalog_cache is None:` guard pinned
+    a warm container on an empty catalog for its whole life after one S3 blip —
+    /api/challenge_catalog served no challenges and /api/challenge_vote 503'd."""
     s3 = FakeS3()
     wire(monkeypatch, s3=s3)
     assert ok_body(social.handle_challenge_catalog())["challenges"] == []
@@ -3275,19 +3112,16 @@ def test_a_transient_s3_failure_does_not_permanently_empty_the_challenge_catalog
     assert ok_body(social.handle_challenge_catalog())["challenges"], "the empty catalog was cached forever"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (#2019 class) — site_api_social.py:1049-1051 `handle_challenge_catalog` caches the "
-        "S3 catalog with NO expiry stamp, so a corrected `site/config/challenges_catalog.json` "
-        "that has already landed in S3 keeps serving the pre-correction bytes until the container "
-        "recycles. #2019 measured ~13h of withdrawn citations from exactly this pattern on "
-        "/api/supplements and fixed it with `config_cache_valid` — which the sibling "
-        "`_challenges_cache` (:1137) in this very file now uses. Hurts every reader after any "
-        "catalog edit, including a privacy correction that flips an entry to `public: false`."
-    ),
-)
 def test_a_corrected_challenge_catalog_starts_serving_without_a_container_recycle(monkeypatch):
+    """Fixed by #2221 (was xfail): the catalog read now carries a `config_cache_valid`
+    expiry stamp like its sibling `_challenges_cache` (#2019), so a published
+    correction — including one that flips an entry to `public: false` — starts
+    serving on its own instead of waiting for a Lambda recycle.
+
+    The TTL is driven to 0 rather than the cache being reset by hand: with the old
+    `is None` guard, expiring the TTL changes nothing and this still fails. Resetting
+    the module global instead would pass either way."""
+    monkeypatch.setattr(sac, "CONFIG_CACHE_TTL_SECONDS", 0)
     s3 = _catalog_s3()
     wire(monkeypatch, s3=s3)
     assert "cold-shower-finish" in {c["id"] for c in ok_body(social.handle_challenge_catalog())["challenges"]}

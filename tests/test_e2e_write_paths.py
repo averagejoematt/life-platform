@@ -498,9 +498,12 @@ def test_experiment_follow_roundtrip_idempotency_and_rate_limit(wp):
     assert (status, body.get("already_following")) == (200, True)
     assert sum(1 for (pk, _sk) in wp.table.store if pk == "EXPERIMENT_FOLLOWS") == 1
 
-    # Per-IP budget (10/h counter; the request that reaches count=10 is refused):
-    # requests 1+2 above consumed 2, so 7 more distinct emails pass, the next 429s.
-    for i in range(7):
+    # Per-IP budget: 10 follows per IP per hour, and #2221 made that the ADVERTISED
+    # ten — the counter is read AFTER its increment, so `>= 10` used to refuse the
+    # tenth and the effective limit was nine. Requests 1+2 above consumed 2 (the
+    # idempotent repeat is still a metered request), so 8 more distinct emails pass
+    # and the eleventh 429s.
+    for i in range(8):
         status, _ = wp.call("/api/experiment_follow", body={"email": f"e2e-test-f{i}@harness.e2e-invalid", "library_id": LIB_ID}, ip=IP_A)
         assert status == 200
     status, _ = wp.call("/api/experiment_follow", body={"email": "e2e-test-f7@harness.e2e-invalid", "library_id": LIB_ID}, ip=IP_A)

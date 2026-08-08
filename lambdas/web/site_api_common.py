@@ -579,6 +579,26 @@ def _error(status: int, message: str) -> dict:
     }
 
 
+# ── #2221: the ONE non-`_ok`/`_error` envelope ────────────────────────────────
+# A write door can't use `_ok` — that stamps a `public, max-age=…` Cache-Control onto
+# what is a mutation — so 29 branches in site_api_social.py hand-rolled
+# `{"statusCode": …, "headers": {**CORS_HEADERS, …}, "body": json.dumps(…)}` instead.
+# Every one of them dropped the `x-request-id` echo `_ok`/`_error` add, so a reader
+# complaint about /api/verify_subscriber or /api/replicate_certify could not be tied
+# back to a CloudWatch line. This is the third and last builder; the correlation id
+# is no longer something a door can forget.
+def _envelope(status: int, payload: dict, cache_control: str = "no-store", retry_after=None) -> dict:
+    """A write-door response carrying the same correlation-id contract as `_ok`/`_error`."""
+    rid = get_request_id()
+    headers = {**CORS_HEADERS, **_request_id_headers(), "Cache-Control": cache_control}
+    if retry_after is not None:
+        headers["Retry-After"] = str(retry_after)
+    body = dict(payload)
+    if rid:
+        body["_meta"] = {"request_id": rid}
+    return {"statusCode": status, "headers": headers, "body": json.dumps(body)}
+
+
 def _load_s3_json(key: str, cache_name: str) -> dict:
     """Load a JSON file from S3. Returns parsed dict. Caller manages caching."""
     try:
