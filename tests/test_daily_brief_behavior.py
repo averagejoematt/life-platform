@@ -1873,18 +1873,6 @@ class TestPublicStatsTruth:
         assert published["journey"]["lost_lbs"] is None
         assert published["journey"]["progress_pct"] is None
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:2395 (lambda_handler): `_acwr = float(_cm.get('acwr') or 1.1)` "
-            "substitutes a fabricated 1.1 — a healthy mid-band acute:chronic ratio — whenever the ACWR "
-            "compute has not run or produced no value. That number is published to "
-            "generated/public_stats.json and drawn on the daily OG share card "
-            "(og_image_lambda.py:145 renders training['acwr']). A reader cannot tell a measured 1.1 from "
-            "no measurement at all. ADR-104: it should publish null. "
-            "Hurts: every reader of the site and of the share cards."
-        ),
-    )
     def test_an_absent_acwr_is_published_as_null_not_as_a_healthy_looking_default(self, handler_env):
         r = computed_row()  # no `acwr` key at all
         handler_env["table"].store[(r["pk"], r["sk"])] = r
@@ -1924,47 +1912,16 @@ class TestPublicStatsTruth:
         training = _published(handler_env)["training"]
         assert training["injury_risk"] == "low"
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:2535 (lambda_handler): `'rhr_trend': 'improving'` is a hard-coded "
-            "string published to public_stats.json alongside a real, resolver-derived rhr_bpm. The site "
-            "renders it as a measured trend. It has never been computed, so it reads 'improving' on a "
-            "day resting heart rate rose. ADR-104 / ADR-105: a claim with no computation behind it "
-            "should not ship. Hurts: every reader of averagejoematt.com."
-        ),
-    )
     def test_the_published_rhr_trend_is_computed_rather_than_asserted(self, handler_env):
         brief.lambda_handler({}, None)
         first = _published(handler_env)["vitals"]["rhr_trend"]
         assert first != "improving", "rhr_trend is a hard-coded constant, not a measurement"
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:2571-2572 (lambda_handler): `'total_miles_30d': 0` and "
-            "`'activity_count_30d': 0` are hard-coded zeros published into public_stats.json's training "
-            "block. A reader (and the OG card generator) cannot distinguish 'we do not compute this' "
-            "from 'you did nothing for 30 days'. ADR-104: publish null, or compute it — the 60-day "
-            "Strava window needed is already in hand at this point in the handler. Hurts: every reader "
-            "of the site."
-        ),
-    )
     def test_uncomputed_training_totals_are_published_as_absence_not_as_zero(self, handler_env):
         brief.lambda_handler({}, None)
         training = _published(handler_env)["training"]
         assert training["total_miles_30d"] is None and training["activity_count_30d"] is None
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:2565-2567 (lambda_handler): ctl_fitness / atl_fatigue / tsb_form fall "
-            "back to a literal 0 when the computed values are absent (`float(data.get('ctl') if ... else "
-            "0)`, `float(data.get('tsb') or 0)`). Zero CTL is not 'unknown fitness', it is 'completely "
-            "detrained', and the site plots it on the same axis as a measured value. ADR-104: absence "
-            "should publish null. Hurts: every reader of the site's training block."
-        ),
-    )
     def test_absent_training_load_publishes_null_rather_than_a_detrained_zero(self, handler_env):
         r = computed_row()
         for k in ("ctl", "atl", "tsb"):
@@ -2049,20 +2006,6 @@ class TestCockpitGroupNarratives:
         handler_env["table"].store[(hs["pk"], hs["sk"])] = hs
         assert "completion today" in self._narratives(handler_env)["habits"]
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:2366-2372 + 2477-2479 + 2573 (lambda_handler): `_z2_this_week` sums "
-            "the FULL moving time of every activity whose sport matches "
-            "run/walk/ride/swim/elliptical/workout — no heart-rate zone, no pace band, no intensity "
-            "filter of any kind — and then publishes it as `zone2_this_week_min` against a 150-minute "
-            "Zone 2 target, and narrates it as 'Zone 2 this week: N / 150 min (P% of target)'. A "
-            "max-effort interval session counts in full toward a Zone-2 goal. It is total aerobic "
-            "moving minutes, and it should be named that (or actually filtered by zone). "
-            "#1917 window/label-honesty class. Hurts: Matthew (a training target he can hit without "
-            "doing the work) and every reader of the cockpit activity pillar."
-        ),
-    )
     def test_zone_two_minutes_exclude_work_done_above_zone_two(self, handler_env):
         sprint = day_row(
             "strava",

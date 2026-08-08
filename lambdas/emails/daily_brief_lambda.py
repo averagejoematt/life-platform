@@ -189,7 +189,7 @@ ai_calls.init(
 # ==============================================================================
 
 
-from common.digest_utils import coerce_int, d2f, get_food_delivery_streak_state, safe_float  # shared bundled helpers (#970)
+from common.digest_utils import coerce_int, d2f, get_food_delivery_streak_state, rhr_trend_str, safe_float  # shared helpers (#970)
 
 
 def avg(vals):
@@ -631,11 +631,19 @@ def gather_daily_data(profile, yesterday):
     # one bad cell cost the whole brief. Filter on the VALUE, as safe_float does.
     hrv_7d_vals = [v for v in (safe_float(r, "hrv") for r in hrv_7d_recs) if v is not None]
     hrv_30d_vals = [v for v in (safe_float(r, "hrv") for r in hrv_30d_recs) if v is not None]
+    # #2221: the same two windows carry resting heart rate, so `rhr_trend` can be a
+    # measurement rather than the hard-coded "improving" public_stats used to ship.
+    rhr_7d_vals = [v for v in (safe_float(r, "resting_heart_rate") for r in hrv_7d_recs) if v is not None]
+    rhr_30d_vals = [v for v in (safe_float(r, "resting_heart_rate") for r in hrv_30d_recs) if v is not None]
 
     strava_60d = fetch_range("strava", (today - timedelta(days=60)).isoformat(), yesterday)
     tsb = compute_tsb(strava_60d, today)
     strava_7d_cutoff = (today - timedelta(days=7)).isoformat()
     strava_7d = [r for r in strava_60d if r.get("sk", "").replace("DATE#", "") >= strava_7d_cutoff]
+    # #2221: sliced, not re-read — public_stats' 30-day training totals were
+    # hard-coded zeros because this window was computed here and then dropped.
+    strava_30d_cutoff = (today - timedelta(days=30)).isoformat()
+    strava_30d = [r for r in strava_60d if r.get("sk", "").replace("DATE#", "") >= strava_30d_cutoff]
 
     # Weight: latest + 7-day ago for weekly delta
     # 30-day lookback so a few days without weighing doesn't null out the homepage
@@ -846,6 +854,7 @@ def gather_daily_data(profile, yesterday):
         "garmin": garmin,
         "mf_workouts": mf_workouts,
         "hrv": {"hrv_7d": avg(hrv_7d_vals), "hrv_30d": avg(hrv_30d_vals), "hrv_yesterday": safe_float(whoop, "hrv")},
+        "rhr": {"rhr_7d": avg(rhr_7d_vals), "rhr_30d": avg(rhr_30d_vals)},
         "tsb": tsb,
         "journal": journal,
         "journal_entries": journal_entries,
@@ -867,6 +876,7 @@ def gather_daily_data(profile, yesterday):
         "travel_active": travel_active,
         "bp_data": bp_data,
         "strava_7d": strava_7d,
+        "strava_30d": strava_30d,
         "todoist": todoist_yesterday,
         "computed_insights": computed_insights,
         "computed_metrics": computed_metrics,  # BS-09: ACWR + training load alert
@@ -2435,13 +2445,40 @@ def lambda_handler(event, context):
             _prog_pct = round((_start_wt - _curr_wt) / (_start_wt - _goal_wt) * 100, 1) if _curr_wt and _start_wt != _goal_wt else None
 
             # TSB/training from data
+            # #2221/#1917: this summed the FULL moving time of every aerobic-ish
+            # activity — no zone filter of any kind — and published it against a
+            # 150-min ZONE 2 target, so a max-effort interval session counted in full
+            # toward a Zone-2 goal. CORRECTION to the marker: the answer is not an
+            # HR band re-derived here. strava_lambda already stores the MEASURED
+            # per-activity `zone2_seconds` (from Strava's own /zones endpoint) and
+            # the day aggregate `total_zone2_seconds`, which /api/zone2 reads. Use
+            # the measurement; an activity Strava gated or never zoned contributes
+            # nothing rather than its whole duration.
             _strava_7d = data.get("strava_7d") or []
             _z2_this_week = 0.0
             for _act_day in _strava_7d:
+                _day_z2 = _act_day.get("total_zone2_seconds")
+                if _day_z2 is not None:
+                    _z2_this_week += float(_day_z2 or 0) / 60
+                    continue
                 for _act in _act_day.get("activities") or []:
-                    _sport = (_act.get("sport_type") or _act.get("type") or "").lower()
-                    if any(z in _sport for z in ["run", "walk", "ride", "swim", "elliptical", "workout"]):
-                        _z2_this_week += float(_act.get("moving_time_seconds") or 0) / 60
+                    _z2_this_week += float(_act.get("zone2_seconds") or 0) / 60
+
+            # #2221: 30-day training totals — computed from the window gather already
+            # sliced. `None` when the partition holds no rows at all: an empty window
+            # is absence, not a measured "you did nothing".
+            _strava_30d = data.get("strava_30d") or []
+            _miles_30d = None
+            _activity_count_30d = None
+            if _strava_30d:
+                _m = sum(float(_d.get("total_distance_miles") or 0) for _d in _strava_30d)
+                _miles_30d = round(_m, 1)
+                _activity_count_30d = sum(len(_d.get("activities") or []) for _d in _strava_30d)
+
+            # #2221: RHR trend, measured. Lower is better, so the polarity is the
+            # inverse of hrv_trend_str's; absent either window, absent trend.
+            _rhr = data.get("rhr") or {}
+            _rhr_trend = rhr_trend_str(_rhr.get("rhr_7d"), _rhr.get("rhr_30d"))
 
             # G-5/tier0_streak FIX: mvp_streak is always set (from _computed OR streak_data above)
             _tier0_streak = mvp_streak
@@ -2465,7 +2502,11 @@ def lambda_handler(event, context):
 
             # ACWR from computed_metrics if available
             _cm = data.get("computed_metrics") or {}
-            _acwr = float(_cm.get("acwr") or 1.1)
+            # ADR-104 (#2221): was `float(_cm.get("acwr") or 1.1)` — a fabricated
+            # healthy mid-band ratio whenever the ACWR compute had not run, published
+            # to public_stats.json and drawn on the daily OG share card. A reader
+            # could not tell a measured 1.1 from no measurement.
+            _acwr = safe_float(_cm, "acwr")
 
             # v1.2.0: Build trend arrays for homepage sparklines
             _trends = {}
@@ -2605,7 +2646,13 @@ def lambda_handler(event, context):
                     "hrv_ms": round(_vr["hrv_ms"], 1) if _vr["hrv_ms"] is not None else None,
                     "hrv_trend": html_builder.hrv_trend_str(_hrv.get("hrv_7d"), _hrv.get("hrv_30d")),
                     "rhr_bpm": _vr["rhr_bpm"],
-                    "rhr_trend": "improving",
+                    # ADR-104/105 (#2221): was the hard-coded string "improving",
+                    # published beside a real resolver-derived rhr_bpm and rendered by
+                    # the site as a measured trend — so it read "improving" on a day
+                    # resting heart rate rose. Now the 7d-vs-30d comparison the whoop
+                    # window supports, with RHR's polarity (lower is better), and
+                    # honest absence when either window is empty.
+                    "rhr_trend": _rhr_trend,
                     "recovery_pct": round(_rec, 0) if _rec is not None else None,
                     "recovery_status": _rec_status,
                     "sleep_hours": _vr["sleep_hours"],
@@ -2635,9 +2682,12 @@ def lambda_handler(event, context):
                 training={
                     # Authoritative CTL/ATL from computed_metrics (>=0) — no more
                     # reverse-engineering them from TSB with magic offsets (the -955 bug).
-                    "ctl_fitness": float(data.get("ctl") if data.get("ctl") is not None else 0),
-                    "atl_fatigue": float(data.get("atl") if data.get("atl") is not None else 0),
-                    "tsb_form": float(data.get("tsb") or 0),
+                    # ADR-104 (#2221): these fell back to a literal 0. Zero CTL is not
+                    # "unknown fitness", it is "completely detrained", and the site plots
+                    # it on the same axis as a measured value. Absence publishes null.
+                    "ctl_fitness": safe_float(data, "ctl"),
+                    "atl_fatigue": safe_float(data, "atl"),
+                    "tsb_form": safe_float(data, "tsb"),
                     "acwr": _acwr,
                     # #2243: writer stores these prefixed (acwr_zone/acwr_alert) — the bare
                     # names never existed on the record, so form_status was permanently
@@ -2646,8 +2696,13 @@ def lambda_handler(event, context):
                     # key at all), publish honest absence rather than fabricating "low".
                     "form_status": _cm.get("acwr_zone", "neutral"),
                     "injury_risk": ("high" if _cm.get("acwr_alert") else "low") if "acwr_alert" in _cm else None,
-                    "total_miles_30d": 0,
-                    "activity_count_30d": 0,
+                    # ADR-104 (#2221): hard-coded zeros — a reader (and the OG card)
+                    # could not tell "we do not compute this" from "you did nothing for
+                    # 30 days". Computed from the Strava window already in hand; null
+                    # when the window holds no rows at all, because an empty partition
+                    # is absence, not a measured zero.
+                    "total_miles_30d": _miles_30d,
+                    "activity_count_30d": _activity_count_30d,
                     "zone2_this_week_min": round(_z2_this_week),
                     "zone2_target_min": 150,
                 },

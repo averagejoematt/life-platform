@@ -534,3 +534,18 @@ def coerce_int(value):
         return int(float(value))
     except (TypeError, ValueError):
         return None
+
+
+def rhr_trend_str(rhr_7d, rhr_30d):
+    """Resting-heart-rate trend phrase, 7-day average against 30-day (#2221).
+
+    RHR's polarity is the inverse of HRV's — a FALLING resting heart rate is the
+    improvement — so this cannot reuse `hrv_trend_str`. Bands at +/-2%, matching it.
+    Returns None (not a phrase) when either window is empty: `public_stats.json`
+    publishes this field, and ADR-104 wants absence to read as absence rather than
+    as the hard-coded "improving" that shipped here for the field's whole life.
+    """
+    if not rhr_7d or not rhr_30d or rhr_30d == 0:
+        return None
+    pct = round((rhr_7d / rhr_30d - 1) * 100)
+    return "improving" if pct <= -2 else "stable" if pct < 2 else "worsening"
