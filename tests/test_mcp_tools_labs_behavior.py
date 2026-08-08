@@ -288,17 +288,6 @@ def test_unknown_view_returns_a_hint_and_never_raises(labs_table):
     assert "error" not in out or "No lab draws" in out["error"]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "mcp/tools_labs.py::_get_lab_trends (lines 91-101) never reads the start_date/end_date "
-        "arguments that mcp/registry.py declares for the trends view — it always regresses over "
-        "EVERY draw ever taken. What it should do: honor the declared window (or drop the "
-        "parameters from the schema). Who it hurts: Matthew asks 'how has my LDL moved since "
-        "March' through Claude Desktop, gets a slope computed from 2019 onward, and reads it as "
-        "the answer to the question he asked. P2."
-    ),
-)
 def test_trends_honors_the_declared_start_date_window(labs_table):
     labs_table(
         {
@@ -314,17 +303,6 @@ def test_trends_honors_the_declared_start_date_window(labs_table):
     assert out["trends"]["ldl_c"]["data_points"] == 1
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "mcp/tools_labs.py::_get_lab_trends line 109 (`if bm_key in bms`) does an EXACT dict-key "
-        "match, but mcp/registry.py's get_labs schema advertises the biomarker property as "
-        "'Filter by biomarker name (partial match)'. What it should do: match the documented "
-        "way, or the schema should stop promising partial match. Who it hurts: Matthew types "
-        "'cholesterol' and is told \"No data for 'cholesterol'\" while cholesterol_total sits in "
-        "every draw — a present biomarker reads as never measured. P2."
-    ),
-)
 def test_trends_biomarker_partial_match_as_documented(labs_table):
     labs_table({LABS_PK: [_draw("2026-01-01", {"cholesterol_total": _bm(190)})]})
     desc = TOOLS["get_labs"]["schema"]["inputSchema"]["properties"]["biomarker"]["description"]
@@ -418,18 +396,6 @@ def test_results_single_draw_passes_the_stored_flag_through_verbatim(labs_table)
     assert out["provider"] == "Function Health" and out["lab_network"] == "Quest"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "mcp/tools_labs.py::_get_lab_results lines 69-84: when `category` is supplied the "
-        "biomarkers dict is narrowed (line 71) but total_biomarkers, out_of_range_count and "
-        "out_of_range are copied from the WHOLE draw (lines 82-84). What it should do: report "
-        "counts over the same set it displays, or name them draw_total_*. Who it hurts: Matthew "
-        "asks for the lipid panel, sees 2 lipid values, and reads 'total_biomarkers: 3, "
-        "out_of_range: [glucose]' beside them — a flag for a biomarker that is not on screen and "
-        "not in the category he asked for. P2."
-    ),
-)
 def test_results_category_filter_also_narrows_the_counts(labs_table):
     labs_table(
         {
@@ -495,19 +461,6 @@ def test_trends_single_biomarker_slope_and_change_are_hand_derived(labs_table):
     assert [p["date"] for p in tr["values"]] == ["2026-01-01", "2026-03-02"]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "mcp/tools_labs.py::_get_lab_trends lines 136-138 extrapolate `projected_1yr = intercept "
-        "+ slope * (last_x + 365)` from as few as TWO draws with no domain clamp and no "
-        "uncertainty. On two real-shaped LDL draws (130 -> 110 over 60 days) it returns "
-        "**-11.65 mg/dL** — a negative LDL cholesterol, which is not a possible human value. "
-        "What it should do: refuse to project outside the biomarker's physical domain (and, per "
-        "ADR-105, refuse to project at all from n=2 without an interval). Who it hurts: Matthew "
-        "asks 'where is my LDL heading' and is handed a number that is not merely wrong but "
-        "impossible, with no caveat attached. P1."
-    ),
-)
 def test_trends_projection_stays_inside_the_biomarkers_physical_domain(labs_table):
     labs_table(
         {
@@ -518,23 +471,18 @@ def test_trends_projection_stays_inside_the_biomarkers_physical_domain(labs_tabl
         }
     )
     tr = tl.tool_get_labs({"view": "trends", "biomarker": "ldl_c"})["trends"]["ldl_c"]
-    # Derivation of the value actually returned today:
+    # Derivation of the extrapolation that must NOT be published:
     #   intercept = 120 - (-0.3333 * 30) = 129.999 -> round(.,2) = 130.0
-    #   projected = 130.0 + (-0.3333 * (60 + 365)) = 130.0 - 141.6525 = -11.6525 -> -11.65
-    assert tr["projected_1yr"] == -11.65  # today's behaviour, pinned for the record
-    assert tr["projected_1yr"] is None or tr["projected_1yr"] > 0, "LDL cholesterol cannot be negative"
+    #   projected = 130.0 + (-0.3333 * (60 + 365.25)) = 130.0 - 141.7358 = -141.74 + 130 = -11.74
+    # A negative LDL cholesterol is not a possible human value, so it is withheld and
+    # the reason is published in its place — never silently replaced by a plausible number.
+    assert tr["projected_1yr"] is None
+    assert "outside the physical domain" in tr["projection_note"]
+    assert "-11.74" in tr["projection_note"]  # the withheld value is still shown, named as withheld
+    # The rest of the trend is unaffected — only the forecast is refused.
+    assert tr["direction"] == "falling" and tr["data_points"] == 2
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "mcp/tools_labs.py::_get_lab_trends uses TWO different year lengths in the same response: "
-        "line 132 reports slope_per_year with 365.25 days, line 138 projects one year ahead with "
-        "365. What it should do: use one year length, so `latest + slope_per_year` reconciles "
-        "with `projected_1yr`. Who it hurts: any reader (or downstream coach prompt) that "
-        "cross-checks the two numbers finds a residual that looks like a data problem. P3."
-    ),
-)
 def test_trends_slope_per_year_and_projection_use_the_same_year_length(labs_table):
     labs_table(
         {
@@ -558,18 +506,6 @@ def test_trends_unknown_biomarker_names_itself_in_the_error(labs_table):
     assert "search_biomarker" in out["trends"]["not_a_marker"]["hint"]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "mcp/tools_labs.py::_get_lab_trends line 93 defaults `biomarkers_req` to [] when neither "
-        "`biomarker` nor the (undeclared) `biomarkers` argument is given, so the loop body never "
-        "runs and the tool returns `{'trends': {}}` with no error and no hint. What it should do: "
-        "return an error/hint envelope naming the required argument, as every other empty state "
-        "in this module does. Who it hurts: 'show me my biomarker trends' — the exact phrase the "
-        "registry description advertises — returns a silently empty object, which Claude reads as "
-        "'no trends exist'. P2."
-    ),
-)
 def test_trends_without_a_biomarker_argument_says_so(labs_table):
     labs_table({LABS_PK: [_draw("2026-01-01", {"ldl_c": _bm(130)})]})
     out = tl.tool_get_labs({"view": "trends"})
@@ -577,18 +513,6 @@ def test_trends_without_a_biomarker_argument_says_so(labs_table):
     assert "error" in out or "hint" in out
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "mcp/tools_labs.py::_get_lab_trends line 110 reads the value as "
-        "`bm.get('value_numeric') or bm.get('value')` — a truthiness fallback, so a biomarker "
-        "genuinely measured at 0 (a non-detectable assay result) falls through to `value` and, "
-        "when that is absent or a string, is dropped from the series entirely. Same `or` pattern "
-        "on lines 157-159 for the derived-ratio inputs. What it should do: test for None, not "
-        "falsiness. Who it hurts: a real zero reads as 'never measured' — the trend silently "
-        "loses its most clinically interesting point. P2."
-    ),
-)
 def test_trends_keeps_a_biomarker_measured_at_zero(labs_table):
     labs_table(
         {
@@ -602,18 +526,6 @@ def test_trends_keeps_a_biomarker_measured_at_zero(labs_table):
     assert out["trends"]["crp_hs"]["data_points"] == 2
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "mcp/tools_labs.py::_get_lab_trends line 126 calls "
-        "`datetime.strptime(points[0]['date'], '%Y-%m-%d')` on `d.get('draw_date', '')` (line "
-        "112) with no guard, so a draw row whose draw_date attribute is missing or malformed "
-        "raises ValueError straight out of the tool. What it should do: skip (or report) the "
-        "undated draw the way the rest of the module handles bad input. Who it hurts: one bad "
-        "row from the manual lab import takes the ENTIRE trends view down with a stack trace "
-        "instead of degrading — and the sk still carries the date, so the data is recoverable. P2."
-    ),
-)
 def test_trends_survives_a_draw_with_no_draw_date(labs_table):
     bad = _draw("2026-01-01", {"ldl_c": _bm(130)})
     bad.pop("draw_date")  # sk is still DATE#2026-01-01
@@ -732,19 +644,6 @@ def test_out_of_range_publishes_the_n_behind_every_rate(labs_table):
         assert {"times_flagged", "times_tested", "flag_rate_pct"} <= set(f)
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "mcp/tools_labs.py::_get_out_of_range_history line 223 classifies persistence purely from "
-        "`flag_rate_pct` with no minimum n, so a biomarker flagged on the ONE draw it has ever "
-        "appeared in scores 100% and is labelled 'chronic'. What it should do: withhold a "
-        "persistence class (or label it 'single observation') below a minimum draw count, per "
-        "ADR-105. Who it hurts: 'chronic' is a clinical word. A first-ever high ferritin comes "
-        "back to Matthew as a chronic condition, and the same field feeds `chronic_flags`, which "
-        "drives the genome-driver narrative on line 239 ('genetic baseline rather than lifestyle "
-        "failure'). P2."
-    ),
-)
 def test_out_of_range_does_not_call_a_single_observation_chronic(labs_table):
     labs_table({LABS_PK: [_draw("2026-01-01", {"ferritin": _bm(400, flag="high", category="minerals")})]})
     out = tl.tool_get_labs({"view": "out_of_range"})
@@ -823,10 +722,14 @@ def test_trends_view_genome_response_carries_the_privacy_notice(labs_table):
 
 
 def test_out_of_range_view_genome_response_carries_the_privacy_notice(labs_table):
-    # One draw, one flagged biomarker → flag_rate 100% → "chronic" → genome_drivers populated.
+    # Flagged on BOTH draws → 2/2 → 100% over n=2 → "chronic" → genome_drivers populated.
+    # (Two draws, not one: a single observation no longer earns a persistence class.)
     labs_table(
         {
-            LABS_PK: [_draw("2026-01-01", {"glucose": _bm(126, flag="high", category="metabolic")})],
+            LABS_PK: [
+                _draw("2026-01-01", {"glucose": _bm(126, flag="high", category="metabolic")}),
+                _draw("2026-03-02", {"glucose": _bm(131, flag="high", category="metabolic")}),
+            ],
             GENOME_PK: GENOME_ROWS,
         }
     )
@@ -905,7 +808,10 @@ def test_trends_view_also_carries_the_genome_context(labs_table):
 def test_out_of_range_attaches_genome_drivers_only_to_chronic_flags(labs_table):
     labs_table(
         {
-            LABS_PK: [_draw("2026-01-01", {"glucose": _bm(126, flag="high", category="metabolic")})],
+            LABS_PK: [
+                _draw("2026-01-01", {"glucose": _bm(126, flag="high", category="metabolic")}),
+                _draw("2026-03-02", {"glucose": _bm(131, flag="high", category="metabolic")}),
+            ],
             GENOME_PK: GENOME_ROWS,
         }
     )
@@ -997,18 +903,6 @@ def test_galleri_signal_is_reframed_as_absence_of_evidence(labs_table):
     assert ct["galleri"]["last_signal"] == "No signal detected at 24-month early-detection threshold"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "mcp/tools_labs.py::_build_cadence_trackers line 438 publishes `raw_signal` alongside the "
-        "deliberately reframed `last_signal`. The reframe exists (lines 426-431, Technical Board / "
-        "Viktor) precisely so 'NO CANCER SIGNAL DETECTED' is not read as evidence of absence — and "
-        "the raw string is handed back in the same dict, one key away. What it should do: keep the "
-        "raw value out of the response (or behind an explicit opt-in). Who it hurts: an LLM "
-        "summarising this payload has both strings available and will quote the shoutier one; the "
-        "board's framing decision is advisory rather than enforced. P3."
-    ),
-)
 def test_galleri_raw_signal_is_not_republished_beside_the_reframe(labs_table):
     labs_table(_cadence_draws())
     ct = tl.tool_get_labs({"view": "results"})["cadence_trackers"]
@@ -1054,24 +948,30 @@ def test_cadence_tracker_failure_never_takes_down_the_view(labs_table, monkeypat
     assert "cadence_trackers" not in out
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "mcp/tools_labs.py::_build_cadence_trackers line 364 calls `datetime.now().date()` — naive "
-        "LOCAL time on the Lambda host (UTC in production) — while tool_get_freshness_status line "
-        "511 in the same module correctly uses `datetime.now(timezone.utc)` and the platform keys "
-        "its data by PACIFIC day (common.pacific_time / mcp.core.pacific_today). What it should "
-        "do: use the same Pacific frame the data is keyed in. Who it hurts: `days_since_last` and "
-        "the green/amber read of `next_due` are off by one for the whole UTC-evening window every "
-        "day — cosmetic on a 180-day cadence, but it is a third clock in a module that already "
-        "has two. P3."
-    ),
-)
 def test_cadence_clock_is_the_platform_clock(labs_table):
-    import inspect
+    """The cadence clock reads the PACIFIC day the platform keys its data by.
 
-    src = inspect.getsource(tl._build_cadence_trackers)
-    assert "datetime.now()" not in src
+    Behavioural, not a source grep. The instant below is 2026-08-09 03:00Z — still
+    2026-08-08 in Pacific. A naive `datetime.now()` (LOCAL, i.e. UTC on the Lambda
+    host) reads 2026-08-09 and reports one extra day since the draw, every day, for
+    the whole UTC-evening window; that was a THIRD clock in a module whose freshness
+    tool already runs on UTC.
+    """
+    labs_table(_cadence_draws())
+    _FROZEN[0] = datetime(2026, 8, 9, 3, 0, 0, tzinfo=timezone.utc)
+    ct = tl.tool_get_labs({"view": "results"})["cadence_trackers"]
+    # 2026-02-08 -> 2026-08-08 (Pacific) = 181 days. A UTC/local clock would say 182.
+    assert ct["nfl"]["days_since_last"] == 181
+
+    # And the bare zero-argument `datetime.now()` cannot come back. AST, not a
+    # substring: the docstring and comments above legitimately quote the bad call.
+    import ast
+    import inspect
+    import textwrap
+
+    tree = ast.parse(textwrap.dedent(inspect.getsource(tl._build_cadence_trackers)))
+    bare = [n for n in ast.walk(tree) if isinstance(n, ast.Call) and getattr(n.func, "attr", None) == "now" and not (n.args or n.keywords)]
+    assert bare == [], "_build_cadence_trackers is back on a naive local clock"
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1167,35 +1067,25 @@ def test_freshness_no_data_rows_omit_the_age_key_the_stale_rows_publish(freshnes
     assert "last_date" not in shapes["no_data"]
 
 
-def test_freshness_query_failure_builds_an_unknown_row_that_reaches_no_bucket(freshness_table):
-    """A throttled/failed partition read builds a `status: unknown` entry (line 529)
-    that `stale_sources`/`fresh_sources` (lines 589-590) then select away — so the
-    caller sees neither the source nor the failure. Same blindness as the xfail
-    below, reached by a different path; pinned here as today's behaviour.
+def test_freshness_query_failure_surfaces_the_source_and_its_error(freshness_table):
+    """A throttled partition read is the SECOND path into the same blindness.
+
+    It used to build a `status: unknown` row that neither `stale_sources` nor
+    `fresh_sources` selected, so the source vanished and the answer was green. The
+    fix is at the buckets, not at one call site — this is the sibling path.
     """
     freshness_table({}, raises_for={_src_pk("whoop")})
     out = tl.tool_get_freshness_status({"sources": ["whoop"]})
     reported = {r["source"] for r in out["stale_sources"] + out["fresh_sources"]}
-    assert reported == set()
-    assert out["stale_count"] == 0 and out["fresh_count"] == 0
-    assert out["status"] == "green"  # …while the one source asked about could not be read
+    assert reported == {"whoop"}
+    row = out["stale_sources"][0]
+    assert row["status"] == "unreadable"
+    assert "throttled" in row["error"]
+    assert out["unreadable_count"] == 1
+    assert out["fresh_count"] == 0
+    assert out["status"] != "green"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "mcp/tools_labs.py::tool_get_freshness_status lines 552-558: a source whose newest row has "
-        "a non-DATE# sk, or a DATE# sk that will not parse, hits a bare `continue` — the source is "
-        "dropped from per_source entirely, counted neither fresh nor stale, and never appears in "
-        "the response. Same silent exit for the `status: unknown` rows built on line 529, which "
-        "are appended to per_source but then land in NEITHER `stale_sources` nor `fresh_sources` "
-        "(lines 589-590 select only stale/no_data/fresh). What it should do: surface every "
-        "requested source, and never report green while one could not be read. Who it hurts: this "
-        "is the 'are we OK?' tool. Asked about two sources with one unreadable, it answers "
-        "`status: green, fresh_count: 1, stale_count: 0` — the unreadable source vanishes without "
-        "a trace and Matthew reads an all-clear. P1."
-    ),
-)
 def test_freshness_never_reports_green_about_a_source_it_could_not_read(freshness_table):
     freshness_table(
         {
@@ -1218,11 +1108,18 @@ def test_freshness_macrofactor_drift_probe_reports_its_own_failure(freshness_tab
 
 
 def test_freshness_unparseable_date_in_the_sort_key(freshness_table):
-    """A DATE# sk whose payload is not a calendar date takes the same silent
-    `continue` as the corrupt-sk case above (line 557-558) — see the xfail."""
+    """A DATE# sk whose payload is not a calendar date is the THIRD path in.
+
+    2026-13-45 is a well-formed sk carrying a nonexistent date. It used to take the
+    same silent `continue` as the corrupt-sk case; now it is reported unreadable with
+    the offending key quoted, so the row is findable rather than merely absent."""
     freshness_table({_src_pk("whoop"): [{"pk": _src_pk("whoop"), "sk": "DATE#2026-13-45"}]})
     out = tl.tool_get_freshness_status({"sources": ["whoop"]})
-    assert out["fresh_sources"] == [] and out["stale_sources"] == []
+    assert out["fresh_sources"] == []
+    row = out["stale_sources"][0]
+    assert row["source"] == "whoop" and row["status"] == "unreadable"
+    assert "DATE#2026-13-45" in row["reason"]
+    assert out["status"] != "green"
 
 
 def test_freshness_unknown_source_keys_are_ignored_not_fabricated(freshness_table):

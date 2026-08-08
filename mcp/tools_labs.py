@@ -50,9 +50,21 @@ _GENOME_SCAN_MAX_DEPTH = 12
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
+from common.pacific_time import PACIFIC
+
 from mcp.config import logger, table
 from mcp.helpers import _linear_regression
-from mcp.labs_helpers import _genome_context_for_biomarkers, _query_all_lab_draws
+from mcp.labs_helpers import _draw_date_of, _genome_context_for_biomarkers, _measured_value, _query_all_lab_draws
+
+# One year, used for BOTH `slope_per_year` and the 1-year projection. They used to
+# disagree (365.25 vs 365), so `latest + slope_per_year` never reconciled with
+# `projected_1yr` and the residual looked like a data problem.
+YEAR_DAYS = 365.25
+
+# ADR-105: a rate needs a denominator before it is a rate. A biomarker flagged on
+# the one and only draw it has ever appeared in scores 100% — "chronic" is a
+# clinical word and a single observation has not earned it.
+MIN_DRAWS_FOR_PERSISTENCE = 2
 
 
 def _carries_genome_identifiers(node, _depth=0):
@@ -101,7 +113,7 @@ def _get_lab_results(args):
         for d in draws:
             summaries.append(
                 {
-                    "draw_date": d.get("draw_date"),
+                    "draw_date": _draw_date_of(d),
                     "provider": d.get("lab_provider"),
                     "lab_network": d.get("lab_network"),
                     "fasting": d.get("fasting"),
@@ -112,30 +124,98 @@ def _get_lab_results(args):
             )
         return {"total_draws": len(draws), "draws": summaries, "hint": "Pass draw_date to see full biomarkers for a specific draw."}
 
-    draw = next((d for d in draws if d.get("draw_date") == draw_date), None)
+    draw = next((d for d in draws if _draw_date_of(d) == draw_date), None)
     if not draw:
-        return {"error": f"No draw for {draw_date}", "available_dates": [d.get("draw_date") for d in draws]}
+        return {"error": f"No draw for {draw_date}", "available_dates": [_draw_date_of(d) for d in draws]}
 
     biomarkers = draw.get("biomarkers", {})
+    total_biomarkers = draw.get("total_biomarkers")
+    out_of_range_count = draw.get("out_of_range_count")
+    out_of_range = draw.get("out_of_range", [])
     if category:
         biomarkers = {k: v for k, v in biomarkers.items() if v.get("category") == category}
+        # The counts must describe the set actually on screen. Copying the WHOLE
+        # draw's totals beside a narrowed panel names a flag for a biomarker that is
+        # not shown and not in the category that was asked for.
+        out_of_range = [k for k, v in biomarkers.items() if v.get("flag") in ("high", "low")]
+        total_biomarkers = len(biomarkers)
+        out_of_range_count = len(out_of_range)
 
     genome_ctx = _genome_context_for_biomarkers(list(biomarkers.keys()))
     categories = sorted(set(v.get("category", "") for v in draw.get("biomarkers", {}).values()))
 
-    return {
+    result = {
         "draw_date": draw_date,
         "provider": draw.get("lab_provider"),
         "lab_network": draw.get("lab_network"),
         "physician": draw.get("physician"),
         "fasting": draw.get("fasting"),
-        "total_biomarkers": draw.get("total_biomarkers"),
-        "out_of_range_count": draw.get("out_of_range_count"),
-        "out_of_range": draw.get("out_of_range", []),
+        "total_biomarkers": total_biomarkers,
+        "out_of_range_count": out_of_range_count,
+        "out_of_range": out_of_range,
         "biomarkers": biomarkers,
         "genome_context": genome_ctx if genome_ctx else None,
         "categories_in_draw": categories,
     }
+    if category:
+        result["category_filter"] = category
+        result["draw_total_biomarkers"] = draw.get("total_biomarkers")
+        result["draw_out_of_range"] = draw.get("out_of_range", [])
+    return result
+
+
+def _within_window(date_str, start_date, end_date):
+    """Inclusive [start_date, end_date] membership for an ISO date, or False if undatable."""
+    if not date_str:
+        return False
+    if start_date and date_str < start_date:
+        return False
+    if end_date and date_str > end_date:
+        return False
+    return True
+
+
+def _resolve_biomarker_keys(requested, draws):
+    """Map each requested biomarker name onto the keys actually present in the draws.
+
+    The registry advertises the `biomarker` property as "partial match"; the loop
+    below used to do an exact dict-key lookup, so "cholesterol" came back as
+    "No data for 'cholesterol'" while `cholesterol_total` sat in every draw — a
+    present biomarker reading as never measured.
+
+    Returns `([(response_key, actual_key), ...], ambiguity_notes)`. An exact key
+    always wins. A token resolving to exactly one biomarker keeps the *requested*
+    name as its response key (the caller reads back the name it asked with) and
+    carries `resolved_biomarker`. An ambiguous token is never silently narrowed to
+    one guess: it expands to one entry per match under the real keys, with a note
+    under the requested name naming every match.
+    """
+    present: set = set()
+    for d in draws:
+        present.update(d.get("biomarkers", {}) or {})
+
+    resolved: list = []
+    notes: dict = {}
+    for name in requested:
+        if name in present:
+            resolved.append((name, name))
+            continue
+        token = str(name).lower()
+        matches = sorted(k for k in present if token in str(k).lower())
+        if len(matches) == 1:
+            resolved.append((name, matches[0]))
+        elif matches:
+            notes[name] = {
+                "matched_biomarkers": matches,
+                "hint": f"'{name}' matched {len(matches)} biomarkers; each is reported under its own key.",
+            }
+            resolved.extend((m, m) for m in matches)
+        else:
+            # No match at all — kept so the loop emits the usual "No data" envelope.
+            resolved.append((name, name))
+    # De-dupe while preserving order (a token can expand onto an explicitly named key).
+    seen: set = set()
+    return [rk_ak for rk_ak in resolved if not (rk_ak in seen or seen.add(rk_ak))], notes
 
 
 def _get_lab_trends(args):
@@ -149,28 +229,63 @@ def _get_lab_trends(args):
     if not draws:
         return {"error": "No lab draws found"}
 
+    # The registry declares start_date/end_date for this view; honour them rather
+    # than regressing over every draw ever taken and answering a question that was
+    # not asked ("how has my LDL moved since March" must not start in 2019).
+    start_date, end_date = args.get("start_date"), args.get("end_date")
+    window = None
+    if start_date or end_date:
+        window = {"start_date": start_date, "end_date": end_date}
+        draws = [d for d in draws if _within_window(_draw_date_of(d), start_date, end_date)]
+        if not draws:
+            return {
+                "trends": {},
+                "error": f"No lab draws between {start_date or 'the first draw'} and {end_date or 'today'}",
+                "window": window,
+            }
+
+    if not biomarkers_req:
+        return {
+            "trends": {},
+            "error": "No biomarker requested for the trends view.",
+            "hint": "Pass biomarker='ldl_c' (partial names are matched), or use view='results' for the whole panel.",
+            "total_draws": len(draws),
+            **({"window": window} if window else {}),
+        }
+
     from datetime import datetime as _dt
 
-    trends = {}
-    for bm_key in biomarkers_req:
+    resolved, ambiguous = _resolve_biomarker_keys(biomarkers_req, draws)
+    trends: dict = dict(ambiguous)
+    for resp_key, bm_key in resolved:
         points = []
+        undated = 0
         for d in draws:
             bms = d.get("biomarkers", {})
-            if bm_key in bms:
-                val = bms[bm_key].get("value_numeric") or bms[bm_key].get("value")
-                if isinstance(val, (int, float)):
-                    date = d.get("draw_date", "")
-                    points.append(
-                        {
-                            "date": date,
-                            "value": round(val, 2),
-                            "flag": bms[bm_key].get("flag", "normal"),
-                            "ref": bms[bm_key].get("ref_text", ""),
-                            "unit": bms[bm_key].get("unit", ""),
-                        }
-                    )
+            if bm_key not in bms:
+                continue
+            val = _measured_value(bms[bm_key])
+            if not isinstance(val, (int, float)):
+                continue
+            date = _draw_date_of(d)
+            if not date:
+                # An undatable draw has no place on a time axis, and crashing the
+                # whole view on one bad import row is not degrading gracefully.
+                undated += 1
+                continue
+            points.append(
+                {
+                    "date": date,
+                    "value": round(val, 2),
+                    "flag": bms[bm_key].get("flag", "normal"),
+                    "ref": bms[bm_key].get("ref_text", ""),
+                    "unit": bms[bm_key].get("unit", ""),
+                }
+            )
         if not points:
-            trends[bm_key] = {"error": f"No data for '{bm_key}'", "hint": "Use search_biomarker to find valid names."}
+            trends[resp_key] = {"error": f"No data for '{resp_key}'", "hint": "Use search_biomarker to find valid names."}
+            if undated:
+                trends[resp_key]["undated_draws_skipped"] = undated
             continue
 
         base = _dt.strptime(points[0]["date"], "%Y-%m-%d")
@@ -179,15 +294,29 @@ def _get_lab_trends(args):
 
         if slope is not None:
             direction = "rising" if slope > 0.001 else ("falling" if slope < -0.001 else "stable")
-            slope_per_year = round(slope * 365.25, 2)
+            slope_per_year = round(slope * YEAR_DAYS, 2)
         else:
             direction, slope_per_year = "insufficient_data", None
 
-        projected_1yr = None
+        projected_1yr, projection_note = None, None
         if slope is not None and len(reg_pts) >= 2:
-            projected_1yr = round(intercept + slope * (reg_pts[-1][0] + 365), 2)
+            raw = round(intercept + slope * (reg_pts[-1][0] + YEAR_DAYS), 2)
+            # A straight line extrapolated a year past two draws leaves the
+            # biomarker's physical domain long before it leaves the arithmetic:
+            # 130 -> 110 mg/dL LDL over 60 days projects to a NEGATIVE cholesterol.
+            # The floor is derived from this biomarker's own observed range rather
+            # than a literature default — negative is out of domain unless this
+            # marker has actually been measured negative.
+            if raw < 0 and min(p["value"] for p in points) >= 0:
+                projection_note = (
+                    f"Withheld: the linear extrapolation lands at {raw}, outside the physical domain of "
+                    f"'{bm_key}' (never measured below 0 in {len(points)} draws). A straight line is not a "
+                    "physiological model over a year."
+                )
+            else:
+                projected_1yr = raw
 
-        trends[bm_key] = {
+        entry = {
             "values": points,
             "data_points": len(points),
             "direction": direction,
@@ -198,17 +327,34 @@ def _get_lab_trends(args):
             "earliest": points[0]["value"],
             "total_change": round(points[-1]["value"] - points[0]["value"], 2),
         }
+        if projection_note:
+            entry["projection_note"] = projection_note
+        elif projected_1yr is not None and len(points) < 3:
+            # ADR-105: the forecast ships with its n and with what that n cannot buy.
+            entry["projection_caveat"] = (
+                f"Projected from n={len(points)}: no prediction interval is computable " "(zero residual degrees of freedom below n=3)."
+            )
+        if bm_key != resp_key:
+            entry["resolved_biomarker"] = bm_key
+        if undated:
+            entry["undated_draws_skipped"] = undated
+        trends[resp_key] = entry
 
-    derived = {}
+    derived: dict = {}
     if include_derived:
         for d in draws:
             bms = d.get("biomarkers", {})
-            date = d.get("draw_date", "")
-            tg_v = bms.get("triglycerides", {}).get("value_numeric") or bms.get("triglycerides", {}).get("value")
-            hdl_v = bms.get("hdl", {}).get("value_numeric") or bms.get("hdl", {}).get("value")
-            tc_v = bms.get("cholesterol_total", {}).get("value_numeric") or bms.get("cholesterol_total", {}).get("value")
+            date = _draw_date_of(d)
+            tg_v = _measured_value(bms.get("triglycerides"))
+            hdl_v = _measured_value(bms.get("hdl"))
+            tc_v = _measured_value(bms.get("cholesterol_total"))
+            # `hdl_v > 0` on ALL THREE: an HDL of 0 is not a physiologic measurement,
+            # so non-HDL derived from it would be a fabricated number, not just an
+            # un-dividable one. (Before the honest-zero fix above this fell out by
+            # accident, because a stored 0 was silently turned into None.)
+            hdl_ok = isinstance(hdl_v, (int, float)) and hdl_v > 0
 
-            if isinstance(tg_v, (int, float)) and isinstance(hdl_v, (int, float)) and hdl_v > 0:
+            if isinstance(tg_v, (int, float)) and hdl_ok:
                 derived.setdefault("tg_hdl_ratio", []).append(
                     {
                         "date": date,
@@ -216,22 +362,41 @@ def _get_lab_trends(args):
                         "interpretation": "optimal <1.0, good <2.0, elevated >=2.0 (insulin resistance proxy)",
                     }
                 )
-            if isinstance(tc_v, (int, float)) and isinstance(hdl_v, (int, float)):
+            if isinstance(tc_v, (int, float)) and hdl_ok:
                 derived.setdefault("non_hdl_cholesterol", []).append(
                     {"date": date, "value": round(tc_v - hdl_v, 1), "interpretation": "optimal <130, borderline 130-159, high >=160"}
                 )
-            if isinstance(tc_v, (int, float)) and isinstance(hdl_v, (int, float)) and hdl_v > 0:
                 derived.setdefault("tc_hdl_ratio", []).append(
                     {"date": date, "value": round(tc_v / hdl_v, 2), "interpretation": "optimal <3.5, good <5.0, elevated >=5.0"}
                 )
 
-    genome_ctx = _genome_context_for_biomarkers(biomarkers_req)
-    result = {"trends": trends, "total_draws": len(draws), "date_range": f"{draws[0].get('draw_date')} to {draws[-1].get('draw_date')}"}
+    genome_ctx = _genome_context_for_biomarkers([actual for _, actual in resolved])
+    result = {
+        "trends": trends,
+        "total_draws": len(draws),
+        "date_range": f"{_draw_date_of(draws[0]) or 'unknown'} to {_draw_date_of(draws[-1]) or 'unknown'}",
+    }
+    if window:
+        result["window"] = window
     if derived:
         result["derived_ratios"] = derived
     if genome_ctx:
         result["genome_context"] = genome_ctx
     return result
+
+
+def _persistence_class(times_tested, flag_rate_pct):
+    """Persistence label for a flagged biomarker, or `single_observation` below the min n.
+
+    A rate computed over one draw is not a rate: a first-ever high ferritin scores
+    100% and used to come back labelled "chronic" — a clinical word — and the same
+    field feeds `chronic_flags`, which drives the "genetic baseline rather than
+    lifestyle failure" narrative. ADR-105: publish the class only once there is a
+    denominator behind it.
+    """
+    if times_tested < MIN_DRAWS_FOR_PERSISTENCE:
+        return "single_observation"
+    return "chronic" if flag_rate_pct >= 60 else ("recurring" if flag_rate_pct >= 30 else "occasional")
 
 
 def _get_out_of_range_history(args):
@@ -242,11 +407,11 @@ def _get_out_of_range_history(args):
 
     oor_map = defaultdict(list)
     for d in draws:
-        date = d.get("draw_date", "")
+        date = _draw_date_of(d)
         bms = d.get("biomarkers", {})
         for key, bm_data in bms.items():
             if bm_data.get("flag") in ("high", "low"):
-                val = bm_data.get("value_numeric") or bm_data.get("value")
+                val = _measured_value(bm_data)
                 oor_map[key].append(
                     {
                         "date": date,
@@ -270,7 +435,7 @@ def _get_out_of_range_history(args):
                 "times_flagged": len(occurrences),
                 "times_tested": tested_count,
                 "flag_rate_pct": flagged_rate,
-                "persistence": "chronic" if flagged_rate >= 60 else ("recurring" if flagged_rate >= 30 else "occasional"),
+                "persistence": _persistence_class(tested_count, flagged_rate),
                 "occurrences": occurrences,
             }
         )
@@ -280,7 +445,7 @@ def _get_out_of_range_history(args):
 
     return {
         "total_draws": total_draws,
-        "date_range": f"{draws[0].get('draw_date')} to {draws[-1].get('draw_date')}",
+        "date_range": f"{_draw_date_of(draws[0]) or 'unknown'} to {_draw_date_of(draws[-1]) or 'unknown'}",
         "flagged_biomarkers": flagged,
         "total_unique_flags": len(flagged),
         "chronic_flags": chronic_keys,
@@ -407,12 +572,30 @@ def _allergen_meta(biomarker_key):
     return base, _ALLERGEN_CATEGORIES.get(base, "other")
 
 
+def _frame_galleri_signal(raw):
+    """Reframe an all-clear Galleri result; anything else passes through verbatim.
+
+    Technical Board (Viktor): absence of evidence is not evidence of absence. The
+    reframe is applied at EVERY point the signal is published — the tracker head and
+    each history entry — because a reframe that leaves the shoutier raw string one
+    key away is advisory, not enforced: an LLM summarising the payload will quote
+    "NO CANCER SIGNAL DETECTED".
+    """
+    if "NO CANCER" in str(raw or "").upper() or "NO SIGNAL" in str(raw or "").upper():
+        return "No signal detected at 24-month early-detection threshold"
+    return raw
+
+
 def _build_cadence_trackers():
     """Return cadence-tracker dict for NfL + Galleri. Returns {} if no draws."""
     draws = _query_all_lab_draws()
     if not draws:
         return {}
-    today = datetime.now().date()
+    # The platform keys its data by the PACIFIC calendar day, and this module already
+    # runs a UTC clock in tool_get_freshness_status; a bare `datetime.now()` here was
+    # a third clock — naive LOCAL time (UTC on the Lambda host), off by one for the
+    # whole UTC-evening window every day.
+    today = datetime.now(timezone.utc).astimezone(PACIFIC).date()
 
     def _latest_for(biomarker_key):
         """Find the latest draw containing this biomarker; return (date_str, value, unit) or None."""
@@ -422,7 +605,7 @@ def _build_cadence_trackers():
                 bm = bms[biomarker_key]
                 return (
                     d.get("draw_date"),
-                    bm.get("value_numeric") or bm.get("value"),
+                    _measured_value(bm),
                     bm.get("unit", ""),
                 )
         return None
@@ -435,10 +618,10 @@ def _build_cadence_trackers():
             if bm:
                 entry = {"date": d.get("draw_date")}
                 if value_field == "numeric":
-                    entry["value"] = bm.get("value_numeric") or bm.get("value")
+                    entry["value"] = _measured_value(bm)
                     entry["unit"] = bm.get("unit", "")
                 else:
-                    entry["signal"] = bm.get("value")
+                    entry["signal"] = _frame_galleri_signal(bm.get("value"))
                 out.append(entry)
         return out
 
@@ -474,19 +657,14 @@ def _build_cadence_trackers():
         except (ValueError, TypeError):
             days_since = None
             next_due = None
-        # Reframe per Technical Board (Viktor): absence-of-evidence ≠ evidence-of-absence
-        signal_str = str(last_signal or "").upper()
-        if "NO CANCER" in signal_str or "NO SIGNAL" in signal_str:
-            framed_signal = "No signal detected at 24-month early-detection threshold"
-        else:
-            framed_signal = last_signal
         out["galleri"] = {
             "last_drawn": last_date_str,
             "days_since_last": days_since,
             "recommended_cadence_days": GALLERI_CADENCE_DAYS,
             "next_due": next_due,
-            "last_signal": framed_signal,
-            "raw_signal": last_signal,
+            # Reframe per Technical Board (Viktor). The raw string is NOT republished
+            # beside it — see _frame_galleri_signal.
+            "last_signal": _frame_galleri_signal(last_signal),
             "history": _history_for("galleri_cancer_signal", "signal"),
         }
 
@@ -562,6 +740,26 @@ def tool_get_freshness_status(args):
     today = datetime.now(timezone.utc).date()
     per_source = []
     stale_count = 0
+    unreadable_count = 0
+
+    def _unreadable(src, reason, threshold_days):
+        """A source we could not read is a NOT-OK answer, never a silent omission.
+
+        This tool's whole job is "are we OK?". Three paths used to exit without a
+        trace — a failed partition read built a `status: unknown` row that neither
+        output bucket selected, and a non-DATE# or unparseable sk hit a bare
+        `continue` — so asking about two sources with one unreadable answered
+        `green, fresh_count: 1, stale_count: 0` and the unreadable source vanished.
+        Unreadable rows count toward `stale_count` (which is really "sources not
+        confirmed fresh") so the existing escalation tiers cover them.
+        """
+        return {
+            "source": src,
+            "label": SOURCES[src],
+            "status": "unreadable",
+            "reason": reason,
+            "threshold_days": threshold_days,
+        }
 
     for src in keys:
         threshold_hours = SOURCE_STALE_HOURS.get(src, DEFAULT_STALE_HOURS)
@@ -577,14 +775,11 @@ def tool_get_freshness_status(args):
                 ScanIndexForward=False,
             )
         except Exception as e:
-            per_source.append(
-                {
-                    "source": src,
-                    "label": SOURCES[src],
-                    "status": "unknown",
-                    "error": str(e),
-                }
-            )
+            row = _unreadable(src, f"partition read failed: {e}", int(threshold_days))
+            row["error"] = str(e)
+            per_source.append(row)
+            stale_count += 1
+            unreadable_count += 1
             continue
         _rl = has_rate_limit_marker(table, "matthew", src)
         items = resp.get("Items", [])
@@ -602,10 +797,16 @@ def tool_get_freshness_status(args):
             continue
         sk = items[0].get("sk", "")
         if not sk.startswith("DATE#"):
+            per_source.append(_unreadable(src, f"newest row has a non-DATE# sort key ({sk!r})", int(threshold_days)))
+            stale_count += 1
+            unreadable_count += 1
             continue
         try:
             d = datetime.strptime(sk.split("DATE#", 1)[1][:10], "%Y-%m-%d").date()
         except (ValueError, IndexError):
+            per_source.append(_unreadable(src, f"newest sort key does not carry a calendar date ({sk!r})", int(threshold_days)))
+            stale_count += 1
+            unreadable_count += 1
             continue
         age_days = (today - d).days
         is_stale = age_days >= threshold_days
@@ -637,7 +838,9 @@ def tool_get_freshness_status(args):
     else:
         overall = "orange"
 
-    stale_sources = [s for s in per_source if s.get("status") in ("stale", "no_data")]
+    # "stale_sources" is the needs-attention bucket; an unreadable source belongs in
+    # it, because the one thing it must never do is disappear from the answer.
+    stale_sources = [s for s in per_source if s.get("status") in ("stale", "no_data", "unreadable")]
     fresh_sources = [s for s in per_source if s.get("status") == "fresh"]
 
     # ── MacroFactor format-drift (meal-grouping guard) ──
@@ -723,6 +926,7 @@ def tool_get_freshness_status(args):
         "status": overall,
         "checked_at": datetime.now(timezone.utc).isoformat(),
         "stale_count": stale_count,
+        "unreadable_count": unreadable_count,
         "fresh_count": len(fresh_sources),
         "stale_sources": stale_sources,
         "fresh_sources": fresh_sources,
@@ -736,5 +940,9 @@ def tool_get_freshness_status(args):
             f"measurements={SOURCE_STALE_HOURS['measurements']//24}d. "
             "Mirrors freshness_checker_lambda.py."
         ),
-        "context": ("Status tiers: green (all fresh) / yellow (1 stale <7d) / " "orange (mixed) / red (3+ stale OR any >14d)."),
+        "context": (
+            "Status tiers: green (all fresh) / yellow (1 stale <7d) / orange (mixed) / red (3+ stale OR any >14d). "
+            "stale_count counts every source not confirmed fresh — stale, no_data and unreadable alike; "
+            "unreadable_count is the subset we could not read at all, and is never reported as green."
+        ),
     }
