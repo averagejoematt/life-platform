@@ -466,20 +466,12 @@ def test_micronutrients_publishes_no_omega_ratio_when_omega_six_was_never_logged
     assert out["summary"]["omega6_omega3_ratio"] is None
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (P1, mcp/tools_nutrition.py:112-121 _get_micronutrient_report): the "
-        "`ABOVE_UPPER_LIMIT` branch sits inside `if meta.get('score')`, so the two nutrients whose "
-        "upper limit is the most actionable thing about them — total_sodium_mg (UL 2300) and "
-        "total_caffeine_mg (UL 400) — are the exact two that carry no `score` flag and therefore "
-        "can NEVER produce an exceedance. Caffeine also has `rda: None`, so it gets no status row "
-        "at all. 5000 mg of sodium and 600 mg of caffeine a day both report `exceedances: 0`. This "
-        "test DERIVES the set of upper-limit nutrients from _MICRONUTRIENT_TARGETS, so a new one "
-        "with the same wiring mistake joins it automatically."
-    ),
-)
 def test_every_nutrient_with_an_upper_limit_can_actually_flag_an_exceedance(monkeypatch):
+    """Fixed by #2248: ABOVE_UPPER_LIMIT no longer nests under `if meta.get("score")`
+    (or under `if rda`, which caffeine — rda: None — never even entered). This test
+    DERIVES the set of upper-limit nutrients from _MICRONUTRIENT_TARGETS rather than
+    hardcoding "sodium and caffeine", so a future nutrient with the same wiring
+    mistake joins it automatically."""
     unflagged = []
     for field in sorted(UL_FIELDS):
         ul = tn._MICRONUTRIENT_TARGETS[field]["upper_limit"]
@@ -488,6 +480,41 @@ def test_every_nutrient_with_an_upper_limit_can_actually_flag_an_exceedance(monk
         if field not in {e["field"] for e in out["exceedances"]}:
             unflagged.append(field)
     assert unflagged == []
+
+
+def test_sodium_and_caffeine_are_the_score_less_upper_limit_nutrients(monkeypatch):
+    """Pins the claim in #2248 itself: of the ~13 _MICRONUTRIENT_TARGETS entries
+    carrying an `upper_limit`, exactly total_sodium_mg and total_caffeine_mg lack
+    `score` — every other one (calcium, iron, zinc, selenium, copper, vitamin
+    A/D/E, B3, B6, folate) has it. If a future entry adds an upper_limit without
+    `score`, this test documents the new score-less set rather than staying silent."""
+    score_less_ul_fields = {f for f in UL_FIELDS if not tn._MICRONUTRIENT_TARGETS[f].get("score")}
+    assert score_less_ul_fields == {"total_sodium_mg", "total_caffeine_mg"}
+
+
+def test_sodium_exceedance_is_not_also_reported_as_deficient_or_low(monkeypatch):
+    """Acceptance criterion #2: fixing the exceedance gate must not pull sodium into
+    the DEFICIENT/LOW branches it was (accidentally) shielded from before — those
+    stay scoped to `score`, which sodium and caffeine still do not carry."""
+    install(monkeypatch, micro_rows(total_sodium_mg=100))  # far below rda 1500 and ul 2300
+    out = tn.tool_get_nutrition(MICRO_ARGS)
+    assert out["summary"]["deficiencies"] == 0
+    assert out["summary"]["near_gaps"] == 0
+    sodium_row = next(r for r in out["by_category"]["Minerals"] if r["field"] == "total_sodium_mg")
+    assert "status" not in sodium_row
+
+
+def test_an_unlogged_upper_limit_nutrient_is_omitted_not_implied_adequate(monkeypatch):
+    """ADR-104: caffeine never logged in the window must not surface at all — and in
+    particular must never be reported as ABOVE_UPPER_LIMIT's implicit opposite,
+    'within limits'. The absence gate (`totals_count[field] == 0: continue`) already
+    covers this; this test pins that the #2248 fix didn't change that for the
+    now-independent upper-limit branch."""
+    install(monkeypatch, micro_rows(total_fiber_g=40))  # no caffeine field anywhere in range
+    out = tn.tool_get_nutrition(MICRO_ARGS)
+    other_fields = {r["field"] for r in out["by_category"].get("Other", [])}
+    assert "total_caffeine_mg" not in other_fields
+    assert "total_caffeine_mg" not in {e["field"] for e in out["exceedances"]}
 
 
 @pytest.mark.xfail(
