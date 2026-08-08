@@ -37,9 +37,22 @@ def tool_get_readiness_score(args):
     Device agreement: Whoop vs Garmin HRV and RHR delta is computed and returned
     as a confidence signal — large disagreement flags lower score reliability.
     """
+    # Bad input returns an error DICT, never a stack trace out of the tool: an
+    # unparseable string used to raise ValueError and an explicit {"date": None}
+    # raised TypeError, both of which reach the MCP caller as a crash.
     end_date = args.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    d7_start = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
-    d30_start = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=30)).strftime("%Y-%m-%d")
+    if not isinstance(end_date, str) or not end_date.strip():
+        return {"error": f"Invalid 'date' argument ({end_date!r}) — expected a YYYY-MM-DD string, or omit it for today."}
+    try:
+        _end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+    except ValueError:
+        return {"error": f"Could not parse date {end_date!r} — expected YYYY-MM-DD (e.g. 2026-05-10)."}
+    # #1917 window-name honesty: `sk BETWEEN DATE#start AND DATE#end~` is
+    # INCLUSIVE at both ends, so a 7-day window starts 6 days back, not 7.
+    # `days=7`/`days=30` spanned 8/31 dates while publishing hrv_7d_avg_ms,
+    # hrv_30d_baseline_ms and n_days_7d — every one naming a window it outran.
+    d7_start = (_end_dt - timedelta(days=6)).strftime("%Y-%m-%d")
+    d30_start = (_end_dt - timedelta(days=29)).strftime("%Y-%m-%d")
 
     def _clamp(v, lo=0.0, hi=100.0):
         return max(lo, min(hi, v))
@@ -117,16 +130,31 @@ def tool_get_readiness_score(args):
         trend_pct = round((ratio - 1.0) * 100, 1)
         # Base 60 (neutral readiness); +10% HRV above baseline = score 80, -10% = score 40
         hrv_score = _clamp(60.0 + (ratio - 1.0) * 200.0)
+        # ADR-105: the n travels with the average on BOTH branches. The live
+        # fallback below counts its own readings; this branch can only report
+        # what daily-metrics-compute stored beside the average — and today it
+        # stores none, so the n publishes as an explicit absence rather than
+        # being silently omitted (which read as "n not applicable").
+        _n7 = _cm.get("hrv_7d_n")
+        _n30 = _cm.get("hrv_30d_n")
+        _hrv_raw = {
+            "hrv_7d_avg_ms": round(hrv_7d_avg, 1),
+            "hrv_30d_baseline_ms": round(hrv_30d_avg, 1),
+            "trend_pct": trend_pct,
+            "trend_direction": "above_baseline" if trend_pct > 3 else ("below_baseline" if trend_pct < -3 else "at_baseline"),
+            "n_days_7d": int(_n7) if _n7 is not None else None,
+            "n_days_30d": int(_n30) if _n30 is not None else None,
+            "source": "pre_computed_metrics",
+        }
+        if _n7 is None or _n30 is None:
+            _hrv_raw["n_note"] = (
+                "daily-metrics-compute stores the HRV averages without the reading counts behind them, "
+                "so the n is unknown for this branch — treat the trend as unweighted by sample size."
+            )
         components["hrv_trend"] = {
             "score": round(hrv_score, 1),
             "weight": 0.20,
-            "raw": {
-                "hrv_7d_avg_ms": round(hrv_7d_avg, 1),
-                "hrv_30d_baseline_ms": round(hrv_30d_avg, 1),
-                "trend_pct": trend_pct,
-                "trend_direction": "above_baseline" if trend_pct > 3 else ("below_baseline" if trend_pct < -3 else "at_baseline"),
-                "source": "pre_computed_metrics",
-            },
+            "raw": _hrv_raw,
         }
     else:
         # Fallback: live 30-day Whoop query (pre-compute record missing)
@@ -193,8 +221,17 @@ def tool_get_readiness_score(args):
         # Fallback: live Banister model (264d Strava query — only runs if pre-compute missing)
         try:
             load_result = _get_training_load({"end_date": end_date})
-            if "current_state" in load_result:
-                cs = load_result["current_state"]
+            cs = load_result.get("current_state") or {}
+            # ADR-104: _get_training_load fills EVERY calendar date in its window,
+            # using 0.0 for dates with no record — so a platform with no training
+            # data at all still yields ctl=atl=0 -> tsb_form 0.0 -> clamp(70+0) =
+            # a training_form component scoring 70.0 at 10% weight. With nothing
+            # else present that renormalised to exactly 70.0 => GREEN => "go ahead
+            # with your planned hard session" on a wholly silent platform. An
+            # all-zero Banister series is the ABSENCE of training data, not
+            # measured freshness: publish no component rather than a neutral 70.
+            _measured_load = float(cs.get("ctl_fitness") or 0) > 0 or float(cs.get("atl_fatigue") or 0) > 0
+            if cs and _measured_load:
                 tsb = cs.get("tsb_form", 0.0)
                 tsb_score = _clamp(70.0 + float(tsb) * 2.5)
                 components["training_form"] = {
@@ -227,8 +264,13 @@ def tool_get_readiness_score(args):
             garmin_stale = True
 
     if garmin_today and not garmin_stale:
-        # Use end-of-day Body Battery as primary; fall back to high if end is missing
-        bb = garmin_today.get("body_battery_end") or garmin_today.get("body_battery_high")
+        # Use end-of-day Body Battery as primary; fall back to high if end is missing.
+        # ADR-104: `end or high` treated a fully-depleted 0 — a REAL reading, and the
+        # strongest "rest today" signal Garmin produces — as missing and substituted
+        # the day's HIGH. Presence is `is not None`, matching the selection guard above.
+        bb = garmin_today.get("body_battery_end")
+        if bb is None:
+            bb = garmin_today.get("body_battery_high")
         if bb is not None:
             bb_score = _clamp(float(bb))  # Body Battery is already 0-100
             components["garmin_body_battery"] = {
@@ -259,7 +301,11 @@ def tool_get_readiness_score(args):
         device_agreement = {"status": "unavailable", "reason": "no whoop recovery record to cross-check against"}
     else:
         device_agreement = {"status": "unavailable", "reason": "overlapping garmin+whoop records lack comparable HRV/RHR fields"}
-    if "whoop_recovery" in components and garmin_today is not None:
+    # `not garmin_stale` is load-bearing: without it this block OVERWROTE the
+    # "stale data excluded" verdict above with a cross-check computed from that
+    # very record, publishing "device_agreement: available, confidence: high" off
+    # a reading the tool had just refused to score at 5% weight.
+    if "whoop_recovery" in components and garmin_today is not None and not garmin_stale:
         whoop_hrv_val = components["whoop_recovery"]["raw"].get("hrv_ms")
         garmin_hrv_val = garmin_today.get("hrv_last_night")
         whoop_rhr_val = components["whoop_recovery"]["raw"].get("resting_hr")
@@ -355,6 +401,15 @@ def tool_get_readiness_score(args):
         for k in ("whoop_recovery", "sleep_quality", "garmin_body_battery")
         if k in components and components[k]["raw"].get("date")
     ]
+    # hrv_trend / training_form carry no raw.date of their own, so a score built
+    # PURELY from a pre-computed metrics row used to fall through to the requested
+    # date — a six-day-old record presented as today's readiness, with
+    # is_forward_dated False and no staleness warning. The record's own date is
+    # the honest as-of for any component sourced from it.
+    if _cm.get("date") and any(
+        components.get(k, {}).get("raw", {}).get("source") == "pre_computed_metrics" for k in ("hrv_trend", "training_form")
+    ):
+        _data_dates.append(_cm["date"])
     as_of_date = max(_data_dates) if _data_dates else end_date
     is_forward_dated = as_of_date < end_date
 
@@ -364,6 +419,18 @@ def tool_get_readiness_score(args):
         "is_forward_dated": is_forward_dated,
         "readiness_score": readiness_score,
         "label": label,
+        # ADR-105: the label is the one thing a reader quotes, so its uncertainty
+        # travels WITH it rather than four keys away in a free-text
+        # data_completeness string. Derived from the weight actually covered.
+        "label_confidence": {
+            "level": "high" if total_weight >= 0.85 else ("moderate" if total_weight >= 0.60 else "low"),
+            "weight_covered_pct": round(total_weight * 100),
+            "n_components": len(components),
+            "note": (
+                "Confidence reflects how much of the 100% scoring weight was actually measured. "
+                "A low-confidence label is a signal about the data, not about the body."
+            ),
+        },
         "recommendation": recommendation,
         "components": components,
         "device_agreement": device_agreement,
@@ -386,12 +453,24 @@ def tool_get_readiness_score(args):
     # Cross-check: show pre-computed readiness if available (computed by daily-metrics-compute
     # with slightly different weights — useful to spot drift between models)
     if _cm.get("readiness_score") is not None:
+        # `_cm` is selected as (exact end_date match, else newest in the 7-day
+        # window), so the stored score can pre-date the live one. A drift detector
+        # that silently compares today against last week reports drift that isn't
+        # there — the day it was computed FOR ships with the number.
+        _cc_date = _cm.get("date")
         result["_precomputed_cross_check"] = {
+            "date": _cc_date,
+            "computed_for_requested_date": _cc_date == end_date,
             "readiness_score": float(_cm["readiness_score"]),
             "label": _cm.get("readiness_colour", ""),
             "source": "daily-metrics-compute (9:40 AM)",
             "note": "Pre-computed with Whoop recovery 40% + sleep 30% + HRV trend 20% + TSB 10% (no Body Battery component). Minor weight difference from live tool.",
         }
+        if _cc_date and _cc_date != end_date:
+            result["_precomputed_cross_check"]["drift_note"] = (
+                f"The stored score is for {_cc_date}, not the requested {end_date} — a difference from the live "
+                "score above may be elapsed time rather than model drift."
+            )
     return result
 
 
@@ -403,7 +482,11 @@ def tool_get_weight_loss_progress(args):
     journey_start = profile.get("journey_start_date")
     journey_start_wt = profile.get("journey_start_weight_lbs")
     goal_weight = profile.get("goal_weight_lbs")
-    height_in = profile.get("height_inches", 70)
+    # ADR-104: no default height. A missing height used to silently become 70in,
+    # from which the tool published a BMI, a CLINICAL BMI CATEGORY, milestone
+    # crossings and lbs-to-cross — a fabricated clinical classification with no
+    # note anywhere that the input was assumed (at 311 lbs, 44.6 vs his real 42.2).
+    height_in = profile.get("height_inches")
 
     # HONOR an explicit start_date verbatim — the old code always overrode it
     # with journey_start. No leak risk: query_source's phase filter (ADR-058)
@@ -515,33 +598,60 @@ def tool_get_weight_loss_progress(args):
         for threshold, label in sorted(milestone_thresholds, key=lambda x: x[0], reverse=True):
             if current_bmi >= threshold:
                 lbs_to_threshold = round((threshold - 0.1) * (height_in**2) / 703 - weight_series[-1]["weight_lbs"], 1) * -1
-                upcoming_milestones.append(
-                    {
-                        "milestone": label,
-                        "lbs_to_cross": round(lbs_to_threshold, 1),
-                        "weeks_at_current_pace": (
-                            round(lbs_to_threshold / max(sum(weekly_rates[-4:]) / max(len(weekly_rates[-4:]), 1), 0.1), 1)
-                            if weekly_rates
-                            else None
-                        ),
-                    }
-                )
+                # ADR-104: the old `max(mean_rate, 0.1)` floor existed to dodge a
+                # divide-by-zero, but on a NEGATIVE mean (he is gaining) it clamped
+                # to +0.1 lb/wk and published a confident finite ETA to a milestone
+                # he is moving away from. A direction that isn't in the data is not
+                # a number to manufacture: report None and say why.
+                _recent = weekly_rates[-4:]
+                _recent_mean = round(sum(_recent) / len(_recent), 2) if _recent else None
+                _entry = {
+                    "milestone": label,
+                    "lbs_to_cross": round(lbs_to_threshold, 1),
+                    "recent_pace_lbs_per_week": _recent_mean,
+                    "n_recent_rates": len(_recent),
+                }
+                if _recent_mean is not None and _recent_mean > 0:
+                    _entry["weeks_at_current_pace"] = round(lbs_to_threshold / _recent_mean, 1)
+                else:
+                    _entry["weeks_at_current_pace"] = None
+                    _entry["pace_note"] = (
+                        "No ETA: recent weight trend is flat or reversing "
+                        f"({'no paired weigh-ins yet' if _recent_mean is None else f'{_recent_mean} lbs/week'}) — "
+                        "at this pace the milestone is not being approached."
+                    )
+                upcoming_milestones.append(_entry)
                 break
 
     plateau = None
-    recent_14 = [
-        pt for pt in weight_series if (datetime.now(timezone.utc).date() - datetime.strptime(pt["date"], "%Y-%m-%d").date()).days <= 14
-    ]
+    # The lookback hangs off END_DATE — the report's own anchor — not the wall
+    # clock. A live `now` spliced into a caller-chosen window made a real plateau
+    # inside a historical request invisible, and the one-sided `<= 14` also
+    # admitted FUTURE-dated points as negative day counts.
+    _anchor = datetime.strptime(end_date, "%Y-%m-%d").date()
+    recent_14 = [pt for pt in weight_series if 0 <= (_anchor - datetime.strptime(pt["date"], "%Y-%m-%d").date()).days <= 14]
     if len(recent_14) >= 3:
         wts = [pt["weight_lbs"] for pt in recent_14]
         spread = max(wts) - min(wts)
         # <1.5lb range in 14d = plateau; accounts for ~2lb daily water fluctuation noise
         if spread < 1.5:
+            # #1917: duration_days was the literal 14 no matter how far the
+            # qualifying weigh-ins actually spanned — a 4-day cluster was reported
+            # as a 14-day stall, which is a reason to cut calories.
+            # Elapsed days between the first and last qualifying weigh-in.
+            _span = (datetime.strptime(recent_14[-1]["date"], "%Y-%m-%d") - datetime.strptime(recent_14[0]["date"], "%Y-%m-%d")).days
             plateau = {
                 "detected": True,
-                "duration_days": 14,
+                "duration_days": _span,
+                "n_weigh_ins": len(recent_14),
+                "first_weigh_in": recent_14[0]["date"],
+                "last_weigh_in": recent_14[-1]["date"],
                 "weight_range_lbs": spread,
-                "note": "Scale has moved less than 1.5 lbs in 14 days. This is normal — check training load and sleep quality before changing nutrition.",
+                "note": (
+                    f"Scale has moved less than 1.5 lbs across {_span} days ({len(recent_14)} weigh-ins, "
+                    f"{recent_14[0]['date']} → {recent_14[-1]['date']}). This is normal — check training load "
+                    "and sleep quality before changing nutrition."
+                ),
             }
 
     start_weight = weight_series[0]["weight_lbs"]
@@ -552,11 +662,19 @@ def tool_get_weight_loss_progress(args):
     projection = None
     if goal_weight and avg_weekly and avg_weekly > 0:
         weeks_remaining = (current_weight - goal_weight) / avg_weekly
-        goal_date = datetime.now(timezone.utc) + timedelta(weeks=weeks_remaining)
+        # Anchored to the LAST WEIGH-IN the projection was computed from, not the
+        # wall clock: three weeks off the scale used to slide the goal date three
+        # weeks later while the underlying rate never moved.
+        _last_weigh_in = weight_series[-1]["date"]
+        goal_date = datetime.strptime(_last_weigh_in, "%Y-%m-%d") + timedelta(weeks=weeks_remaining)
         projection = {
             "goal_weight_lbs": goal_weight,
             "lbs_remaining": round(current_weight - goal_weight, 1),
             "avg_weekly_loss_lbs": avg_weekly,
+            # ADR-105: the n behind the average travels with it — three paired
+            # weigh-ins and thirty no longer produce identically-confident output.
+            "n_weekly_rates": len(weekly_rates),
+            "projected_from_date": _last_weigh_in,
             "projected_goal_date": goal_date.strftime("%Y-%m-%d"),
             "weeks_remaining": round(weeks_remaining, 1),
         }
@@ -588,11 +706,30 @@ def tool_get_weight_loss_progress(args):
 
 def _get_energy_expenditure(args):
     end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    d30_start = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
-    d7_start = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
+    try:
+        _end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+    except (ValueError, TypeError):
+        return {"error": f"Could not parse end_date {end_date!r} — expected YYYY-MM-DD."}
+    # Both window starts hang off END_DATE, not the wall clock. Asking for a
+    # historical end_date used to issue `sk BETWEEN DATE#<recent> AND DATE#<older>~`
+    # — a DynamoDB ValidationException — while the result was still stamped with
+    # the requested as_of_date. #1917: an INCLUSIVE BETWEEN means a 7-day window
+    # starts 6 days back; `days=7`/`days=30` summed 8/31 dates and then divided by
+    # the literals 7 and 30, overstating the daily average that sets his calorie
+    # target by ~14%.
+    _explicit_start = args.get("start_date")
+    d30_start = _explicit_start or (_end_dt - timedelta(days=29)).strftime("%Y-%m-%d")
+    d7_start = _explicit_start or (_end_dt - timedelta(days=6)).strftime("%Y-%m-%d")
+    _d7_days = (_end_dt - datetime.strptime(d7_start, "%Y-%m-%d")).days + 1
+    _d30_days = (_end_dt - datetime.strptime(d30_start, "%Y-%m-%d")).days + 1
     profile = get_profile()
 
-    height_in = profile.get("height_inches", 70)
+    height_in = profile.get("height_inches")
+    if not height_in:
+        # ADR-104: Mifflin-St Jeor is 6.25 kcal per cm of height. Assuming 70in
+        # published a BMR, a TDEE and a calorie target he would eat to, all
+        # derived from a guess, with nothing saying so.
+        return {"error": "No height_inches in profile — BMR cannot be computed without it, and will not be estimated."}
     dob_str = profile.get("date_of_birth")
     sex = profile.get("biological_sex", "male").lower()
     target_deficit_kcal = args.get("target_deficit_kcal", 500)
@@ -614,10 +751,19 @@ def _get_energy_expenditure(args):
     if dob_str:
         try:
             dob = datetime.strptime(dob_str, "%Y-%m-%d")
-            age_years = (datetime.now(timezone.utc) - dob).days / 365.25
-        except Exception:
-            pass
-    age_years = age_years or 35  # Matthew-specific fallback: age 35; only used when profile lookup fails
+            # Both sides NAIVE. This was `datetime.now(timezone.utc) - dob`, an
+            # aware-minus-naive subtraction that raised TypeError on EVERY call;
+            # the bare `except Exception: pass` swallowed it, so the profile's real
+            # date_of_birth could never reach the BMR and the hardcoded 35 always
+            # won — dead code that looked live, worth ~5 kcal per year of error.
+            age_years = (datetime.now(timezone.utc).replace(tzinfo=None) - dob).days / 365.25
+        except Exception as _e:
+            logger.warning(f"_get_energy_expenditure: could not parse date_of_birth {dob_str!r} — {_e}")
+    age_basis = (
+        "profile_date_of_birth" if age_years is not None else ("date_of_birth_unparseable" if dob_str else "no_date_of_birth_in_profile")
+    )
+    if age_years is None:
+        age_years = 35  # assumed — surfaced as bmr_age_basis so it is never mistaken for a measured input
 
     if sex == "female":
         bmr = round(10 * weight_kg + 6.25 * height_cm - 5 * age_years - 161, 0)
@@ -625,20 +771,25 @@ def _get_energy_expenditure(args):
         bmr = round(10 * weight_kg + 6.25 * height_cm - 5 * age_years + 5, 0)
 
     def exercise_kcal_from_strava(strava_items):
+        """Returns (kcal, basis). The basis is published: until the strava writer
+        rolled `total_kilojoules` up, `total_kj` was always 0 and EVERY TDEE this
+        tool returned came from the duration proxy while the payload said nothing
+        about which branch ran."""
         total_kj = sum(float(d.get("total_kilojoules") or 0) for d in strava_items)
         total_time = sum(float(d.get("total_moving_time_seconds") or 0) for d in strava_items)
         if total_kj > 0:
-            return round(total_kj * 1.0, 0)
+            # kJ of mechanical work ≈ kcal expended at ~25% gross efficiency.
+            return round(total_kj * 1.0, 0), "measured_kilojoules"
         hours = total_time / 3600
-        return round(6 * weight_kg * hours, 0)
+        return round(6 * weight_kg * hours, 0), ("duration_proxy_6_kcal_per_kg_hour" if total_time > 0 else "no_activity_in_window")
 
     strava_7d = query_source("strava", d7_start, end_date)
     strava_30d = query_source("strava", d30_start, end_date)
 
-    ex_kcal_7d = exercise_kcal_from_strava(strava_7d)
-    ex_kcal_30d = exercise_kcal_from_strava(strava_30d)
-    ex_daily_7d_avg = round(ex_kcal_7d / 7, 0)
-    ex_daily_30d_avg = round(ex_kcal_30d / 30, 0)
+    ex_kcal_7d, ex_basis_7d = exercise_kcal_from_strava(strava_7d)
+    ex_kcal_30d, ex_basis_30d = exercise_kcal_from_strava(strava_30d)
+    ex_daily_7d_avg = round(ex_kcal_7d / _d7_days, 0)
+    ex_daily_30d_avg = round(ex_kcal_30d / _d30_days, 0)
 
     tdee_7d_avg = round(bmr + ex_daily_7d_avg, 0)
     tdee_30d_avg = round(bmr + ex_daily_30d_avg, 0)
@@ -667,8 +818,13 @@ def _get_energy_expenditure(args):
         "current_weight_date": current_weight_date,
         "bmr_formula": "Mifflin-St Jeor",
         "bmr_kcal": bmr,
+        "bmr_age_years": round(age_years, 1),
+        "bmr_age_basis": age_basis,
+        "window": {"d7_start": d7_start, "d7_days": _d7_days, "d30_start": d30_start, "d30_days": _d30_days, "end_date": end_date},
         "exercise_kcal_7d_daily_avg": ex_daily_7d_avg,
         "exercise_kcal_30d_daily_avg": ex_daily_30d_avg,
+        "exercise_energy_basis_7d": ex_basis_7d,
+        "exercise_energy_basis_30d": ex_basis_30d,
         "tdee_7d_avg": tdee_7d_avg,
         "tdee_30d_avg": tdee_30d_avg,
         "target_deficit_kcal": target_deficit_kcal,
@@ -689,7 +845,15 @@ def _get_hydration_score(args):
     Fallback guidance: Habitify manual log if Apple Health sync is incomplete.
     """
     end = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"))
+    try:
+        _end_dt = datetime.strptime(end, "%Y-%m-%d")
+    except (ValueError, TypeError):
+        return {"error": f"Could not parse end_date {end!r} — expected YYYY-MM-DD."}
+    # Same class as the energy view: `start` defaulted to `now - 30` while `end`
+    # came from args, so passing only end_date (a documented registry parameter)
+    # produced an inverted BETWEEN that DynamoDB rejects. Hangs off end_date, and
+    # 30 INCLUSIVE dates start 29 days back.
+    start = args.get("start_date") or (_end_dt - timedelta(days=29)).strftime("%Y-%m-%d")
     target_ml_override = args.get("target_ml")
 
     # Pull water data from apple_health (SOT for water domain)
@@ -715,10 +879,22 @@ def _get_hydration_score(args):
     # Compute target: 35ml/kg (Webb's guidance), 2500ml floor, or override
     if target_ml_override:
         daily_target_ml = float(target_ml_override)
+        target_basis = f"{int(daily_target_ml)}ml caller override"
     elif weight_kg:
-        daily_target_ml = max(2500, round(weight_kg * 35))
+        _bodyweight_ml = round(weight_kg * 35)
+        daily_target_ml = max(2500, _bodyweight_ml)
+        # The stated basis must multiply out to the target it claims to explain.
+        # It was unconditionally "35ml/kg x {weight}kg" even when the 2500ml floor
+        # was what actually set the number (120 lbs -> 54.4kg -> 1904ml, published
+        # as the basis for a 2500ml target).
+        target_basis = (
+            f"35ml/kg x {weight_kg}kg = {_bodyweight_ml}ml, raised to the 2500ml minimum floor"
+            if _bodyweight_ml < 2500
+            else f"35ml/kg x {weight_kg}kg"
+        )
     else:
         daily_target_ml = 3000  # reasonable default
+        target_basis = "3000ml default"
 
     daily_target_oz = round(daily_target_ml / 29.5735, 1)
 
@@ -768,7 +944,12 @@ def _get_hydration_score(args):
             "pct_target": pct_target,
             "met_target": met_target,
             "score": score,
-            "exercise_min": ex["total_min"] if ex else 0,
+            # ADR-104: a day with NO strava record is UNMEASURED, not zero minutes
+            # of exercise. That fabricated 0 was then used to CLASSIFY the day
+            # (`exercise_min <= 20` -> rest day), so every unmeasured day padded
+            # the rest-day average the "you drink LESS on training days"
+            # recommendation is computed against.
+            "exercise_min": ex["total_min"] if ex else None,
             "exercise_avg_hr": ex["avg_hr"] if ex else None,
         }
         daily_rows.append(row)
@@ -788,17 +969,36 @@ def _get_hydration_score(args):
     adequacy_rate = round((n - len(deficit_days)) / n * 100, 1)
     avg_score = round(sum(r["score"] for r in daily_rows) / n, 1)
 
-    # Streak: current consecutive days at target
+    # Streak: current consecutive CALENDAR days at target, anchored to the window
+    # end. daily_rows holds only days that cleared the 500ml floor — unlogged days
+    # were `continue`d out — so walking it naively jumped calendar gaps (two
+    # on-target days in April + two in May read as a 4-day streak across a 17-day
+    # silence) and a streak that ended weeks ago was still called "current".
     streak = 0
+    streak_note = None
+    _prev_date = None
     for row in reversed(daily_rows):
-        if row["met_target"]:
-            streak += 1
-        else:
+        _row_dt = datetime.strptime(row["date"], "%Y-%m-%d")
+        if _prev_date is None:
+            # Anchor: the newest logged day must be the window end or the day before.
+            if (_end_dt - _row_dt).days > 1:
+                streak_note = (
+                    f"No current streak: the most recent logged day is {row['date']}, {(_end_dt - _row_dt).days} days before {end}."
+                )
+                break
+        elif (_prev_date - _row_dt).days != 1:
+            break  # a calendar gap (unlogged day) ends the streak
+        if not row["met_target"]:
             break
+        streak += 1
+        _prev_date = _row_dt
 
-    # Correlation: exercise days vs rest days
-    ex_days = [r for r in daily_rows if r["exercise_min"] > 20]
-    rest_days = [r for r in daily_rows if r["exercise_min"] <= 20]
+    # Correlation: exercise days vs rest days. Unmeasured days (exercise_min None)
+    # belong to NEITHER side — counting them as rest days is what made the split
+    # mostly unknowns.
+    ex_days = [r for r in daily_rows if r["exercise_min"] is not None and r["exercise_min"] > 20]
+    rest_days = [r for r in daily_rows if r["exercise_min"] is not None and r["exercise_min"] <= 20]
+    unmeasured_exercise_days = sum(1 for r in daily_rows if r["exercise_min"] is None)
     ex_avg_ml = round(sum(r["water_ml"] for r in ex_days) / max(1, len(ex_days)), 0) if ex_days else None
     rest_avg_ml = round(sum(r["water_ml"] for r in rest_days) / max(1, len(rest_days)), 0) if rest_days else None
 
@@ -830,7 +1030,7 @@ def _get_hydration_score(args):
         "target": {
             "daily_target_ml": daily_target_ml,
             "daily_target_oz": daily_target_oz,
-            "basis": f"35ml/kg x {weight_kg}kg" if weight_kg else "3000ml default",
+            "basis": target_basis,
             "weight_kg": weight_kg,
         },
         "summary": {
@@ -841,11 +1041,18 @@ def _get_hydration_score(args):
             "deficit_days": len(deficit_days),
             "zero_data_days": zero_data_days,
             "current_streak_days": streak,
+            "current_streak_note": streak_note,
         },
         "exercise_correlation": {
             "exercise_days_avg_ml": ex_avg_ml,
             "rest_days_avg_ml": rest_avg_ml,
-            "note": "Higher hydration on exercise days expected — flag if inverted.",
+            "n_exercise_days": len(ex_days),
+            "n_rest_days": len(rest_days),
+            "n_days_exercise_unmeasured": unmeasured_exercise_days,
+            "note": (
+                "Higher hydration on exercise days expected — flag if inverted. Days with no Strava record "
+                "are excluded from both sides rather than counted as rest days."
+            ),
         },
         "deficit_dates": deficit_days,
         "recommendations": recs,
