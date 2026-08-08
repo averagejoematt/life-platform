@@ -521,7 +521,12 @@ FIELD_COMPLETENESS_CHECKS: dict[str, list[str]] = {
     "withings": ["weight_lbs"],
     "habitify": ["total_completed"],
     "measurements": ["waist_navel_in", "waist_narrowest_in", "thigh_left_in"],
-    "todoist": ["tasks_completed"],
+    # #2271: was ["tasks_completed"], a name todoist_lambda has never written
+    # (it emits completed_count — see ingestion_validator's todoist schema). The
+    # ProjectionExpression below therefore returned an empty Item on every run
+    # since this map was introduced (2026-03-14), so the check could only ever
+    # report PARTIAL and never once verified todoist completeness.
+    "todoist": ["completed_count"],
     # google_calendar removed — ADR-030
 }
 

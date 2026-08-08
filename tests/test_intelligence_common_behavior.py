@@ -1851,53 +1851,41 @@ class TestBuildersParadox:
     def test_a_platform_heavy_week_with_no_health_signal_scores_displaced(self, monkeypatch):
         """Hand-derived: tasks 20 -> intensity min(100, 60) = 60; health 0 ->
         raw = 60/max(1, 60) * 100 = 100 -> score 100 -> 'displaced'. (The row
-        has to carry `tasks_completed` explicitly; see the writer defect below.)"""
-        result, _table = self._run(monkeypatch, todoist=[{"tasks_completed": 20}])
+        carries the writer's real field, `completed_count` — #2271.)"""
+        result, _table = self._run(monkeypatch, todoist=[{"completed_count": 20}])
         assert (result["platform_intensity"], result["score"], result["label"]) == (60, 100, "displaced")
         assert "consuming the time and energy it was designed to protect" in result["interpretation"]
 
     def test_a_tipping_week_names_the_trend(self, monkeypatch):
         """workouts 1 -> 5; steps 3200 -> 10; health 15. tasks 3 -> intensity 9.
         raw = 9/24*100 = 37.5 -> round -> 38 -> 'tipping'."""
-        result, _table = self._run(monkeypatch, todoist=[{"tasks_completed": 3}], strava_count=1, garmin=[{"steps": 3200}])
+        result, _table = self._run(monkeypatch, todoist=[{"completed_count": 3}], strava_count=1, garmin=[{"steps": 3200}])
         assert (result["health_score"], result["platform_intensity"], result["score"]) == (15, 9, 38)
         assert result["label"] == "tipping"
         assert "outpacing health behaviors" in result["interpretation"]
 
     def test_a_non_numeric_task_count_never_crashes_the_score(self, monkeypatch):
-        result, _table = self._run(monkeypatch, todoist=[{"tasks_completed": "many"}])
+        result, _table = self._run(monkeypatch, todoist=[{"completed_count": "many"}])
         assert result["platform_tasks"] == 0
 
-    def test_an_open_task_list_is_counted_as_completed_work(self, monkeypatch):
-        """PIN (P2): the `tasks` fallback (line 962) counts the LENGTH of a task
-        list as tasks COMPLETED. Nothing writes a `tasks` key today, so the
-        branch is dark — but if one ever did, open tasks would inflate platform
-        intensity and push the paradox verdict toward 'displaced'."""
+    def test_an_open_task_list_is_never_counted_as_completed_work(self, monkeypatch):
+        """#2271: the `tasks` fallback counted the LENGTH of an OPEN task list as
+        tasks COMPLETED. No todoist record has ever carried a `tasks` key, so the
+        branch was dark — but it was an inversion waiting for a writer, and it is
+        now deleted. An open list contributes nothing."""
         result, _table = self._run(monkeypatch, todoist=[{"tasks": [{"id": i} for i in range(30)]}])
-        assert result["platform_tasks"] == 30
+        assert result["platform_tasks"] == 0
 
     def test_the_interpretation_names_every_component_it_scored(self, monkeypatch):
         result, _table = self._run(monkeypatch, strava_count=3, notion_count=1)
         assert "3 workouts" in result["interpretation"]
         assert "1 journal entries" in result["interpretation"]
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (P1, VERIFIED) intelligence_common.py:959-964 compute_builders_paradox_score "
-            "reads `tasks_completed` and falls back to `tasks` on the todoist partition. The "
-            "todoist writer (lambdas/ingestion/todoist_lambda.py:250) writes `completed_count` / "
-            "`active_count` / `completed_tasks` and has NEVER written either field — "
-            "ingestion_validator.py:292 records exactly this ('the old tasks_completed/tasks_added "
-            "matched nothing', #480/A-7). So platform_tasks is structurally 0, platform_intensity "
-            "is structurally 0, and the score is pinned at 0/'healthy' no matter how much "
-            "platform work happened. It should read `completed_count`. Hurts Matthew: the one "
-            "metric built to catch the platform eating his life reports 'Health behaviors are "
-            "keeping pace with platform work — balanced' every single day, and states '0 "
-            "platform tasks completed' as a fact in the coach narrative."
-        ),
-    )
     def test_completed_todoist_tasks_are_actually_counted(self, monkeypatch):
+        """#2271 (was xfail): compute_builders_paradox_score read `tasks_completed`,
+        a name the todoist writer has never emitted, so platform_tasks was
+        structurally 0 and the one metric built to catch the platform eating
+        Matthew's life reported 'balanced' every single day."""
         real_row = {
             "pk": "USER#matthew#SOURCE#todoist",
             "sk": "DATE#2026-08-07",

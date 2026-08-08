@@ -775,7 +775,7 @@ def test_build_alert_html_severity_escalates_at_four_metrics():
     two = [_flag(source="whoop", field="hrv"), _flag(source="withings", field="weight_lbs", label="Weight")]
     four = two + [
         _flag(source="garmin", field="avg_stress", label="Garmin Stress", direction="high"),
-        _flag(source="todoist", field="tasks_completed", label="Tasks Completed"),
+        _flag(source="todoist", field="completed_count", label="Tasks Completed"),
     ]
     moderate = anomaly.build_alert_html(two, "hypo", "2026-08-02")
     high = anomaly.build_alert_html(four, "hypo", "2026-08-02")
@@ -953,7 +953,7 @@ def test_handler_multi_source_sends_alert_and_writes_record(monkeypatch, ses):
         _flag(source="whoop"),
         _flag(source="withings", field="weight_lbs", label="Weight"),
         _flag(source="garmin", field="avg_stress", label="Garmin Stress", direction="high"),
-        _flag(source="todoist", field="tasks_completed", label="Tasks Completed"),
+        _flag(source="todoist", field="completed_count", label="Tasks Completed"),
     ]
     monkeypatch.setattr(anomaly, "check_anomalies", lambda *_a, **_k: list(flagged))
     monkeypatch.setattr(anomaly, "call_haiku_hypothesis", lambda f, c: "HRV fell after a hard session.")
@@ -1142,7 +1142,7 @@ def test_handler_survives_a_primary_email_failure(monkeypatch):
 def test_build_context_drops_keys_and_list_fields(monkeypatch):
     rows = [
         _row("whoop", "2026-08-02", hrv=55, activities=[{"x": 1}], recovery_score=42),
-        _row("todoist", "2026-08-02", tasks_completed=3, food_log=[]),
+        _row("todoist", "2026-08-02", completed_count=3, food_log=[]),
     ]
     _install(monkeypatch, FakeTable(rows=rows))
     context = anomaly.build_context("2026-08-02")
@@ -1150,5 +1150,5 @@ def test_build_context_drops_keys_and_list_fields(monkeypatch):
     assert context["whoop"] == {"date": "2026-08-02", "hrv": 55, "recovery_score": 42}
     assert "pk" not in context["whoop"] and "sk" not in context["whoop"]
     assert "activities" not in context["whoop"]
-    assert context["todoist"] == {"date": "2026-08-02", "tasks_completed": 3}
+    assert context["todoist"] == {"date": "2026-08-02", "completed_count": 3}
     assert "eightsleep" not in context  # sources with no row are omitted entirely
