@@ -121,6 +121,94 @@ def test_the_post_merge_lane_does_not_run_the_whole_suite_twice():
     assert "name: Full test suite" not in text, "#2259: the duplicated full-suite step is back — the suite would run twice again"
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# 2026-08-09 — the OTHER half of the pre-merge gap: the structural gates
+# ══════════════════════════════════════════════════════════════════════════════
+# #2258 moved the behaviour suite left. What stayed post-merge-only was every gate
+# whose verdict is a pure function of the repo tree: the two size ceilings, the two
+# registries a new module has to join, the mypy clean set, and ruff. Main went red
+# four times on 2026-08-08 on exactly those, each red knowable from the PR's own diff.
+
+CI_LINT = ROOT / ".github" / "workflows" / "ci-lint.yml"
+
+
+def test_the_structural_gates_run_pre_merge():
+    """Every gate whose failure depends only on the repo tree must be in the lane.
+
+    Derived, not asserted against a copy of the list: this reads the real set out of
+    tests/conftest.py's `_PREMERGE_EXTRA_FILES` and checks each file exists, so a
+    rename or deletion fails here instead of silently shrinking the lane.
+    """
+    import tests.conftest as conftest  # noqa: PLC0415 — imported here to keep this module stdlib-only at import time
+
+    extra = conftest._PREMERGE_EXTRA_FILES
+    assert extra, "the structural-gate source is empty — the size ceilings and registry guards are post-merge-only again"
+    missing = sorted(n for n in extra if not (ROOT / "tests" / n).is_file())
+    assert not missing, (
+        f"_PREMERGE_EXTRA_FILES names test file(s) that do not exist: {missing}. "
+        "A renamed guard silently leaves the pre-merge lane — repoint the entry."
+    )
+    # UP-ONLY, the same ratchet shape as mypy_clean_set.py's DIRTY denylist. Existence
+    # alone would not catch the real regression: quietly DROPPING an entry puts that gate
+    # back to post-merge-only with every test still green. Removing a name here is only
+    # correct when the guard itself is gone (and then the existence check above covers it).
+    floor = {
+        "test_lambda_size_gate.py",
+        "test_module_size_guard.py",
+        "test_phase_context_coverage.py",
+        "test_grounding_wiring_1967.py",
+        "test_mypy_clean_modules.py",
+    }
+    dropped = sorted(n for n in floor if n not in extra and (ROOT / "tests" / n).is_file())
+    assert not dropped, (
+        f"_PREMERGE_EXTRA_FILES dropped {dropped} while the file still exists. That gate is "
+        "post-merge-only again — which is how main went red four times on 2026-08-08."
+    )
+    # The lane must still select them via the ONE marker, not a second hand-list in YAML.
+    assert (
+        'pytest tests/ -m "premerge' in _text()
+    ), "the lane no longer selects the whole tests/ tree by marker — the extra files would not be picked up"
+
+
+def test_the_mypy_gate_runs_pre_merge_with_the_same_command():
+    """ci-lint.yml's Mypy gate is ENFORCED and was invisible on a PR. Both lanes must run
+    the identical command against the identical authoritative module list, so a change to
+    tests/mypy_clean_set.py cannot move one lane and leave the other behind."""
+    pre, lint = _text(), CI_LINT.read_text(encoding="utf-8")
+    command = "mypy --config-file mypy.ini $(python3 tests/mypy_clean_set.py)"
+    assert (
+        command in pre
+    ), f"pr-checks.yml no longer runs the tier-2 mypy gate (`{command}`) — a var-annotated error red-mained main twice on 2026-08-08"
+    assert (
+        "tests/mypy_clean_set.py" in lint
+    ), "ci-lint.yml no longer reads the authoritative clean set — the two lanes would be checking different module sets"
+
+
+def test_the_lane_installs_mypy_so_its_own_gate_cannot_be_vacuous():
+    """tests/test_mypy_clean_modules.py carries `skipif(not _mypy_available())`. In a lane
+    without mypy installed that test reports green while checking nothing — the exact
+    shape of the coverage gate that could never fail (#2259)."""
+    assert "mypy==" in _text(), "pr-checks.yml stopped installing mypy — test_mypy_clean_modules.py silently degrades to a skip"
+
+
+def test_the_ruff_gate_runs_pre_merge():
+    """Same class as mypy: ENFORCED post-merge, invisible on a PR. The six-directory set
+    is load-bearing — running a subset is how a ruff red reaches main."""
+    dirs = "lambdas/ mcp/ cdk/ tests/ scripts/ deploy/"
+    assert f"ruff check {dirs}" in _text(), "pr-checks.yml no longer runs the ruff gate over the full six-directory set"
+
+
+def test_the_lane_gates_report_independently():
+    """#749: sequential gates mean the first red masks the rest — one push per layer for
+    an agent. Every check step carries `if: always()` so all violations surface at once."""
+    text = _text()
+    body = text[text.index("jobs:") :]
+    steps = [s for s in body.split("      - name: ")[1:]]
+    checks = [s for s in steps if not s.split("\n")[0].lower().startswith("install")]
+    masked = [s.split("\n")[0] for s in checks if "if: always()" not in s]
+    assert not masked, f"pre-merge gate step(s) without `if: always()` will be masked by an earlier red: {masked}"
+
+
 def test_the_coverage_gate_can_actually_fail_the_build():
     """#2259: `pytest … | tail -100` under GitHub's default `bash -e {0}` exits with
     tail's status, so --cov-fail-under and every test failure were discarded. The gate
