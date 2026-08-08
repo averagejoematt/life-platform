@@ -34,7 +34,6 @@ Sections:
 import html as _html
 import json
 import os
-import statistics
 import urllib.error
 import urllib.request
 from collections import Counter, defaultdict
@@ -46,12 +45,9 @@ from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DA
 
 # ── Shared digest utilities (digest_utils.py) ───────────────────────────────
 from common.digest_utils import (
-    _normalize_whoop_sleep,
     avg,
-    compute_banister_from_dict,  # #490: shared TSS-like Banister
     compute_confidence,  # BS-05: confidence badges
     d2f,
-    dedup_activities,
     fmt,
     fmt_num,
     get_food_delivery_streak_state,  # #2235: one read path for STREAK#current
@@ -66,6 +62,11 @@ TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 RECIPIENT = os.environ["EMAIL_RECIPIENT"]
 SENDER = os.environ["EMAIL_SENDER"]
 USER_ID = os.environ.get("USER_ID", "matthew")
+
+# The stub the digest ships when the Board could not speak (an inference failure, or
+# the tier-3 BudgetExceeded path). Named so the handler can tell it apart from a real
+# verdict by identity rather than by sniffing the rendered text (#1658/#2221).
+COMMENTARY_UNAVAILABLE = "🎯 THE CHAIR — OVERVIEW\nCommentary unavailable.\n💡 INSIGHT OF THE WEEK\nReview data sections below."
 
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
 table = dynamodb.Table(TABLE_NAME)
@@ -115,12 +116,18 @@ def fetch_profile():
     return _shared_fetch_profile(table, USER_ID)
 
 
-def query_range(source, start_date, end_date):
+def query_range(source, start_date, end_date, include_pilot=False):
     """Batch query all records for a source in a date range, as a {date: record} dict.
 
     Shared paginated, phase-scoped implementation (digest_utils, #970).
+
+    `include_pilot` (#2221, the #2109/#2150 contract): default False keeps ADR-058
+    default-deny for the week/prior-week arms. A caller with genuine cross-cycle
+    intent — the 60-day Banister window below — passes
+    `source_reads_cross_phase(source)`, so the decision is derived from the source's
+    own phase class rather than hard-coded here.
     """
-    return digest_utils.query_range(table, source, start_date, end_date, user_id=USER_ID)
+    return digest_utils.query_range(table, source, start_date, end_date, user_id=USER_ID, include_pilot=include_pilot)
 
 
 def query_range_list(source, start_date, end_date):
@@ -184,508 +191,26 @@ def hit_bar(pct, color="#27ae60"):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# EXTRACTORS — return summarized dicts from raw records
+# EXTRACTORS — pure record→summary transforms, lifted to weekly_digest_extractors.py
+# (#2221; #1654's shape). Re-exported so every existing call site keeps its name.
 # ══════════════════════════════════════════════════════════════════════════════
 
-
-def ex_day_grades(grades_dict):
-    """Extract day grade summary from {date: record} dict."""
-    if not grades_dict:
-        return None
-    days = []
-    for date_str in sorted(grades_dict.keys()):
-        rec = grades_dict[date_str]
-        score = safe_float(rec, "total_score")
-        grade = rec.get("letter_grade", "—")
-        if score is not None:
-            days.append({"date": date_str, "score": score, "grade": grade})
-    if not days:
-        return None
-    scores = [d["score"] for d in days]
-    grade_counts = defaultdict(int)
-    for d in days:
-        g = d["grade"]
-        if g.startswith("A"):
-            grade_counts["A"] += 1
-        elif g.startswith("B"):
-            grade_counts["B"] += 1
-        elif g.startswith("C"):
-            grade_counts["C"] += 1
-        elif g == "D":
-            grade_counts["D"] += 1
-        elif g == "F":
-            grade_counts["F"] += 1
-    return {
-        "days": days,
-        "avg_score": avg(scores),
-        "min_score": min(scores),
-        "max_score": max(scores),
-        "grade_counts": dict(grade_counts),
-        "days_graded": len(days),
-    }
-
-
-def ex_whoop(recs_dict):
-    recs = list(recs_dict.values()) if recs_dict else []
-    if not recs:
-        return None
-    hrvs = [float(r["hrv"]) for r in recs if "hrv" in r]
-    recoveries = [float(r["recovery_score"]) for r in recs if "recovery_score" in r]
-    rhrs = [float(r["resting_heart_rate"]) for r in recs if "resting_heart_rate" in r]
-    strains = [float(r["strain"]) for r in recs if "strain" in r]
-    return {
-        "hrv_avg": avg(hrvs),
-        "hrv_min": min(hrvs, default=None),
-        "hrv_max": max(hrvs, default=None),
-        "recovery_avg": avg(recoveries),
-        "recovery_min": min(recoveries, default=None),
-        "rhr_avg": avg(rhrs),
-        "strain_avg": avg(strains),
-        "days": len(recs),
-    }
-
-
-# _normalize_whoop_sleep imported from digest_utils
-
-
-def ex_whoop_sleep(recs_dict):
-    """Extract sleep metrics from Whoop records (SOT for sleep duration/staging v2.55.0)."""
-    recs = [_normalize_whoop_sleep(r) for r in (recs_dict.values() if recs_dict else [])]
-    if not recs:
-        return None
-    scores = [float(r["sleep_score"]) for r in recs if "sleep_score" in r]
-    durs = []
-    for r in recs:
-        d = safe_float(r, "sleep_duration_hours")
-        if d is not None:
-            durs.append(d)
-    effs = [safe_float(r, "sleep_efficiency_pct") for r in recs]
-    effs = [e for e in effs if e is not None]
-    deep_pcts = [float(r["deep_pct"]) for r in recs if "deep_pct" in r]
-    rem_pcts = [float(r["rem_pct"]) for r in recs if "rem_pct" in r]
-    return {
-        "score_avg": avg(scores),
-        "score_min": min(scores, default=None),
-        "duration_avg_hrs": avg(durs),
-        "efficiency_avg": avg(effs),
-        "deep_pct": avg(deep_pcts),
-        "rem_pct": avg(rem_pcts),
-        "nights": len(recs),
-    }
-
-
-def ex_withings(recs_dict):
-    recs = list(recs_dict.values()) if recs_dict else []
-    if not recs:
-        return None
-    weights = [float(r["weight_lbs"]) for r in recs if "weight_lbs" in r]
-    bodyfats = [float(r["body_fat_pct"]) for r in recs if "body_fat_pct" in r]
-    sr = sorted(recs, key=lambda r: r.get("sk", ""), reverse=True)
-    return {
-        "weight_latest": float(sr[0]["weight_lbs"]) if sr and "weight_lbs" in sr[0] else None,
-        "weight_avg": avg(weights),
-        "weight_min": min(weights, default=None),
-        "weight_max": max(weights, default=None),
-        "body_fat_avg": avg(bodyfats),
-        "measurements": len(recs),
-    }
-
-
-def ex_strava(recs_dict, profile):
-    recs = list(recs_dict.values()) if recs_dict else []
-    if not recs:
-        return None
-    max_hr = profile.get("max_heart_rate", 186)
-    z2_low = max_hr * 0.60
-    z2_high = max_hr * 0.70
-    acts = []
-    zone2_mins = 0
-    daily_loads = []
-    for r in recs:
-        day_kj = 0
-        day_acts = r.get("activities", [])
-        day_acts = dedup_activities(day_acts)
-        for a in day_acts:
-            hr = float(a.get("average_heartrate") or 0)
-            secs = float(a.get("moving_time_seconds") or 0)
-            kj = float(a.get("kilojoules") or 0)
-            day_kj += kj
-            obj = {
-                "date": r.get("date", ""),
-                "name": a.get("enriched_name") or a.get("name", ""),
-                "sport": a.get("sport_type", ""),
-                "miles": round(float(a.get("distance_miles") or 0), 1),
-                "elev": round(float(a.get("total_elevation_gain_feet") or 0)),
-                "hr": round(hr) if hr else None,
-                "mins": round(secs / 60),
-                "kj": kj,
-            }
-            acts.append(obj)
-            if hr and z2_low <= hr <= z2_high:
-                zone2_mins += obj["mins"]
-        if day_kj > 0:
-            daily_loads.append(day_kj)
-    total_mins = sum(a["mins"] for a in acts)
-    z2_pct = round(zone2_mins / total_mins * 100) if total_mins else 0
-    mono = (
-        round(statistics.mean(daily_loads) / statistics.stdev(daily_loads), 2)
-        if len(daily_loads) >= 3 and statistics.stdev(daily_loads) > 0
-        else None
-    )
-    return {
-        "total_miles": round(sum(a["miles"] for a in acts), 1),
-        "total_elevation_feet": round(sum(a["elev"] for a in acts)),
-        "total_minutes": total_mins,
-        "activity_count": len(acts),
-        "zone2_minutes": round(zone2_mins),
-        "zone2_pct": z2_pct,
-        "zone2_target": 150,
-        "zone2_hr_range": f"{round(z2_low)}-{round(z2_high)}",
-        "training_monotony": mono,
-        "activities": acts,
-    }
-
-
-def ex_macrofactor(recs_dict, profile):
-    recs = list(recs_dict.values()) if recs_dict else []
-    if not recs:
-        return None
-    cal_target = profile.get("calorie_target", 1800)
-    prot_target = profile.get("protein_target_g", 190)
-    cals = [float(r["total_calories_kcal"]) for r in recs if "total_calories_kcal" in r]
-    prots = [float(r["total_protein_g"]) for r in recs if "total_protein_g" in r]
-    fats = [float(r["total_fat_g"]) for r in recs if "total_fat_g" in r]
-    carbs = [float(r["total_carbs_g"]) for r in recs if "total_carbs_g" in r]
-    fibers = [float(r["total_fiber_g"]) for r in recs if "total_fiber_g" in r]
-    return {
-        "calories_avg": avg(cals),
-        "protein_avg_g": avg(prots),
-        "fat_avg_g": avg(fats),
-        "carbs_avg_g": avg(carbs),
-        "fiber_avg_g": avg(fibers),
-        "days_logged": len(recs),
-        "protein_hit_rate": round(sum(1 for p in prots if p >= prot_target) / len(prots) * 100) if prots else None,
-        "calorie_hit_rate": round(sum(1 for c in cals if c <= cal_target * 1.10) / len(cals) * 100) if cals else None,
-        "protein_target": prot_target,
-        "calorie_target": cal_target,
-    }
-
-
-def ex_hevy_workouts(recs):
-    """Strength session summary sourced from Hevy per-workout records (#485 —
-    macrofactor_workouts stopped ingesting ~4 months ago; Hevy is the live,
-    hourly-ingested source per ADR-060).
-
-    `recs` is a FLAT LIST of Hevy DDB records (one item per workout, fetched via
-    query_range_list — NOT the {date: record} dict query_range produces, since
-    Hevy can legitimately have more than one workout on a date). Each record
-    already carries its own exercises/sets, so — unlike the old macrofactor
-    daily-aggregate shape this replaces — there's no nested per-day "workouts"
-    list to unpack; one Hevy record IS one workout.
-    """
-    if not recs:
-        return None
-    workouts = []
-    total_vol = 0.0
-    total_sets = 0
-    for r in recs:
-        exercises = r.get("exercises") or []
-        vol_lbs = 0.0
-        for ex in exercises:
-            for s in ex.get("sets") or []:
-                weight_kg = safe_float(s, "weight_kg")
-                reps = s.get("reps")
-                total_sets += 1
-                if weight_kg is not None and reps is not None:
-                    vol_lbs += (weight_kg / 0.45359237) * float(reps)
-        workouts.append(
-            {
-                "date": r.get("date", ""),
-                "name": r.get("title") or "Workout",
-                "exercises": len(exercises),
-                "volume_lbs": round(vol_lbs),
-            }
-        )
-        total_vol += vol_lbs
-    if not workouts:
-        return None
-    return {
-        "workout_count": len(workouts),
-        "workouts": workouts,
-        "total_volume_lbs": round(total_vol),
-        "total_sets": total_sets,
-        "best_workout": max(workouts, key=lambda w: w["volume_lbs"], default=None),
-    }
-
-
-def ex_habitify(recs_dict, profile):
-    recs = list(recs_dict.values()) if recs_dict else []
-    if not recs:
-        return None
-    mvp_list = profile.get("mvp_habits", [])
-    daily_mvp_pcts = []
-    daily_overall_pcts = []
-    mvp_completion = defaultdict(int)  # habit_name -> days completed
-    mvp_days_available = 0
-    for r in recs:
-        habits_map = r.get("habits", {})
-        if not habits_map:
-            continue
-        mvp_days_available += 1
-        mvp_done = 0
-        for h in mvp_list:
-            done = habits_map.get(h, 0)
-            if done is not None and float(done) >= 1:
-                mvp_done += 1
-                mvp_completion[h] += 1
-        if mvp_list:
-            daily_mvp_pcts.append(mvp_done / len(mvp_list) * 100)
-        comp = safe_float(r, "completion_pct")
-        if comp is not None:
-            daily_overall_pcts.append(comp * 100)
-    return {
-        "mvp_avg_pct": avg(daily_mvp_pcts),
-        "overall_avg_pct": avg(daily_overall_pcts),
-        "mvp_completion": dict(mvp_completion),
-        "mvp_total": len(mvp_list),
-        "days_tracked": mvp_days_available,
-    }
-
-
-def ex_apple_health(recs_dict):
-    recs = list(recs_dict.values()) if recs_dict else []
-    if not recs:
-        return None
-    steps = [float(r["steps"]) for r in recs if "steps" in r]
-    water = [float(r["water_intake_ml"]) for r in recs if "water_intake_ml" in r and float(r.get("water_intake_ml", 0)) >= 118]
-    glucose_avgs = [float(r["blood_glucose_avg"]) for r in recs if "blood_glucose_avg" in r]
-    tir_vals = [float(r["blood_glucose_time_in_range_pct"]) for r in recs if "blood_glucose_time_in_range_pct" in r]
-    gait_speeds = [float(r["walking_speed_mph"]) for r in recs if "walking_speed_mph" in r]
-    return {
-        "steps_avg": avg(steps),
-        "steps_total": round(sum(steps)) if steps else None,
-        "water_avg_ml": avg(water),
-        "water_days": len(water),
-        "glucose_avg": avg(glucose_avgs),
-        "glucose_tir_avg": avg(tir_vals),
-        "glucose_days": len(glucose_avgs),
-        "gait_speed_avg": avg(gait_speeds),
-        "gait_days": len(gait_speeds),
-        "days": len(recs),
-    }
-
-
-def ex_todoist(recs_dict):
-    recs = list(recs_dict.values()) if recs_dict else []
-    if not recs:
-        return None
-    # #2245: todoist_lambda writes `completed_count` (the #480/A-7 rename documented in
-    # ingestion_validator.py) — reading the pre-rename `tasks_completed` matched nothing
-    # and published a permanent measured zero. The OUTPUT key stays `tasks_completed`:
-    # it is the renderer's and the Board prompt's contract, not the storage field.
-    c = [int(r.get("completed_count", 0) or 0) for r in recs]
-    return {"tasks_completed": sum(c), "avg_per_day": avg(c), "days": len(recs)}
-
-
-def ex_journal(entries_by_date):
-    """Extract journal signals from {date: [entries]} dict."""
-    if not entries_by_date:
-        return None
-    mood_scores, energy_scores, stress_scores = [], [], []
-    all_themes, all_emotions, all_avoidance, all_cognitive = [], [], [], []
-    notable_quotes = []
-    templates_count = {}
-    daily_mood = {}
-    total_entries = 0
-    for date_str, entries in entries_by_date.items():
-        for entry in entries:
-            total_entries += 1
-            template = str(entry.get("template", ""))
-            templates_count[template] = templates_count.get(template, 0) + 1
-            m = entry.get("enriched_mood")
-            e = entry.get("enriched_energy")
-            s = entry.get("enriched_stress")
-            if m is not None:
-                mood_scores.append(float(m))
-                daily_mood.setdefault(date_str, []).append(float(m))
-            if e is not None:
-                energy_scores.append(float(e))
-            if s is not None:
-                stress_scores.append(float(s))
-            if m is None:
-                for field in ("morning_mood", "day_rating"):
-                    val = entry.get(field)
-                    if val is not None:
-                        mood_scores.append(float(val))
-                        daily_mood.setdefault(date_str, []).append(float(val))
-                        break
-            if e is None:
-                for field in ("morning_energy", "energy_eod"):
-                    val = entry.get(field)
-                    if val is not None:
-                        energy_scores.append(float(val))
-                        break
-            if s is None:
-                val = entry.get("stress_level")
-                if val is not None:
-                    stress_scores.append(float(val))
-            for t in entry.get("enriched_themes") or []:
-                all_themes.append(str(t))
-            for em in entry.get("enriched_emotions") or []:
-                all_emotions.append(str(em))
-            for av in entry.get("enriched_avoidance_flags") or []:
-                all_avoidance.append(str(av))
-            for cp in entry.get("enriched_cognitive_patterns") or []:
-                all_cognitive.append(str(cp))
-            q = entry.get("enriched_notable_quote")
-            if q:
-                notable_quotes.append({"date": date_str, "quote": str(q)})
-    if total_entries == 0:
-        return None
-    theme_freq = defaultdict(int)
-    for t in all_themes:
-        theme_freq[t] += 1
-    emotion_freq = defaultdict(int)
-    for em in all_emotions:
-        emotion_freq[em] += 1
-    daily_mood_avg = {d: round(sum(v) / len(v), 1) for d, v in daily_mood.items() if v}
-    best_day = max(daily_mood_avg.items(), key=lambda x: x[1], default=(None, None))
-    worst_day = min(daily_mood_avg.items(), key=lambda x: x[1], default=(None, None))
-    return {
-        "mood_avg": avg(mood_scores),
-        "energy_avg": avg(energy_scores),
-        "stress_avg": avg(stress_scores),
-        "entries": total_entries,
-        "days_journaled": len(entries_by_date),
-        "top_themes": sorted(theme_freq.items(), key=lambda x: -x[1])[:6],
-        "top_emotions": sorted(emotion_freq.items(), key=lambda x: -x[1])[:6],
-        "avoidance_flags": list(dict.fromkeys(all_avoidance))[:5],
-        "cognitive_patterns": list(dict.fromkeys(all_cognitive))[:5],
-        "notable_quotes": notable_quotes[:3],
-        "best_mood_day": {"date": best_day[0], "score": best_day[1]} if best_day[0] else None,
-        "worst_mood_day": {"date": worst_day[0], "score": worst_day[1]} if worst_day[0] else None,
-    }
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# CHARACTER SHEET EXTRACTION (v2.71.0)
-# ══════════════════════════════════════════════════════════════════════════════
-
-
-def ex_character_sheet(recs_dict):
-    """Extract weekly character sheet summary from pre-computed records."""
-    if not recs_dict:
-        return None
-
-    pillar_order = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
-    tier_order = ["Foundation", "Momentum", "Discipline", "Mastery", "Elite"]
-    dates = sorted(recs_dict.keys())
-    latest = recs_dict[dates[-1]] if dates else {}
-    earliest = recs_dict[dates[0]] if dates else {}
-
-    levels = [recs_dict[d].get("character_level", 0) for d in dates]
-    start_level = levels[0] if levels else 0
-    end_level = levels[-1] if levels else 0
-
-    all_events = []
-    for d in dates:
-        for ev in recs_dict[d].get("level_events", []):
-            all_events.append({**ev, "date": d})
-
-    pillar_summary = {}
-    for p in pillar_order:
-        start_pd = earliest.get(f"pillar_{p}") or {}
-        end_pd = latest.get(f"pillar_{p}") or {}
-        xp_earned = sum((recs_dict[d].get(f"pillar_{p}") or {}).get("xp_delta", 0) for d in dates)
-        raw_scores = [(recs_dict[d].get(f"pillar_{p}") or {}).get("raw_score") for d in dates]
-        raw_scores = [r for r in raw_scores if r is not None]
-        avg_raw = round(sum(raw_scores) / len(raw_scores), 1) if raw_scores else None
-
-        pillar_summary[p] = {
-            "start_level": start_pd.get("level", 0),
-            "end_level": end_pd.get("level", 0),
-            "level_delta": end_pd.get("level", 0) - start_pd.get("level", 0),
-            "tier": end_pd.get("tier", "Foundation"),
-            "tier_emoji": end_pd.get("tier_emoji", "\U0001f528"),
-            "xp_earned": xp_earned,
-            "avg_raw": avg_raw,
-        }
-
-    # Closest to next tier transition
-    closest_to_tier = None
-    min_gap = 999
-    for p in pillar_order:
-        end_pd = latest.get(f"pillar_{p}") or {}
-        level = end_pd.get("level", 0)
-        tier = end_pd.get("tier", "Foundation")
-        tier_idx = tier_order.index(tier) if tier in tier_order else 0
-        if tier_idx < len(tier_order) - 1:
-            next_min = [1, 21, 41, 61, 81][tier_idx + 1]
-            gap = next_min - level
-            if 0 < gap < min_gap:
-                min_gap = gap
-                closest_to_tier = {
-                    "pillar": p,
-                    "current_level": level,
-                    "current_tier": tier,
-                    "next_tier": tier_order[tier_idx + 1],
-                    "levels_needed": gap,
-                }
-
-    return {
-        "character_level_start": start_level,
-        "character_level_end": end_level,
-        "character_level_delta": end_level - start_level,
-        "character_tier": latest.get("character_tier", "Foundation"),
-        "character_tier_emoji": latest.get("character_tier_emoji", "\U0001f528"),
-        "character_xp": latest.get("character_xp", 0),
-        "pillar_summary": pillar_summary,
-        "events": all_events,
-        "closest_to_tier": closest_to_tier,
-        "days_with_data": len(dates),
-        "active_effects": latest.get("active_effects", []),
-    }
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# TRAINING LOAD (Banister)
-# ══════════════════════════════════════════════════════════════════════════════
-
-
-def compute_banister(strava_60d):
-    # #490: one Banister implementation — digest_utils scores activities on the shared
-    # TSS-like scale (walks count), so the digest's form bands mean the same thing as
-    # computed_metrics.
-    return compute_banister_from_dict(strava_60d)
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 4-WEEK TRENDS
-# ══════════════════════════════════════════════════════════════════════════════
-
-
-def compute_4week_trends(weekly_data):
-    """Given 4 weeks of extracted data (newest first), compute trend arrows."""
-    trends = {}
-    for metric, source, field in [
-        ("weight", "withings", "weight_avg"),
-        ("hrv", "whoop", "hrv_avg"),
-        ("recovery", "whoop", "recovery_avg"),
-        ("sleep", "sleep", "score_avg"),
-        ("rhr", "whoop", "rhr_avg"),
-        ("day_grade", "day_grades", "avg_score"),
-    ]:
-        vals = []
-        for wk in weekly_data.get(source, []):
-            vals.append(wk.get(field) if wk else None)
-        v = [x for x in vals if x is not None]
-        if len(v) < 2:
-            trends[metric] = "→"
-        else:
-            slope = v[0] - v[-1]
-            trends[metric] = "→" if abs(slope) < 0.5 else ("↑" if slope > 0 else "↓")
-    return trends
-
+from emails.weekly_digest_extractors import (  # noqa: E402
+    compute_4week_trends,
+    compute_banister,
+    ex_apple_health,
+    ex_character_sheet,
+    ex_day_grades,
+    ex_habitify,
+    ex_hevy_workouts,
+    ex_journal,
+    ex_macrofactor,
+    ex_strava,
+    ex_todoist,
+    ex_whoop,
+    ex_whoop_sleep,
+    ex_withings,
+)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # WEIGHT PROJECTION
@@ -693,13 +218,23 @@ def compute_4week_trends(weekly_data):
 
 
 def weight_projection(w4_weight_avgs, goal_weight, current_weight):
-    vals = [w for w in w4_weight_avgs if w is not None]
+    """Per-week loss rate over the four weekly averages (newest first).
+
+    #2221: the divisor is the number of weeks that ELAPSED between the newest and
+    oldest observation, not the number of weeks that happened to carry a weigh-in.
+    Dividing by `len(vals) - 1` after dropping the gaps turned 6 lbs lost over three
+    weeks with two weigh-ins into "6.0 lbs/wk" and quoted a goal ETA three times too
+    soon — worst exactly in the weeks he stepped on the scale least.
+    """
+    idx = [i for i, w in enumerate(w4_weight_avgs) if w is not None]
+    vals = [w4_weight_avgs[i] for i in idx]
     if len(vals) < 2 or current_weight is None or goal_weight is None:
         return None
     total_delta = vals[0] - vals[-1]
     if abs(total_delta) < 0.5:
         return {"status": "insufficient_data"}
-    rate_per_week = total_delta / (len(vals) - 1)
+    weeks_elapsed = idx[-1] - idx[0]
+    rate_per_week = total_delta / weeks_elapsed
     if rate_per_week >= 0:
         return {"status": "not_losing"}
     weeks_to_goal = (current_weight - goal_weight) / abs(rate_per_week)
@@ -732,20 +267,44 @@ def compute_sleep_debt(whoop_dict, target_hrs=7.5):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+def _days_open(saved, now):
+    """Age in days of an insight's `date_saved`, or None if it cannot be read.
+
+    #2221: BOTH writers store a DATE-ONLY string — mcp/tools_lifestyle.py:278 and
+    insight_email_parser_lambda.py:137 both use `now.strftime("%Y-%m-%d")`. That
+    parses NAIVE, so subtracting it from a tz-aware `now` raised TypeError, the bare
+    `except` set days_open = 0, and `0 >= 7` was never true: the "⏳ N Open Insights"
+    box had never once rendered for a real insight. A naive parse is UTC-anchored
+    here, matching the writers' own `datetime.now(timezone.utc)`.
+    """
+    try:
+        saved_dt = datetime.fromisoformat(str(saved).replace("Z", "+00:00"))
+    except Exception:
+        return None
+    if saved_dt.tzinfo is None:
+        saved_dt = saved_dt.replace(tzinfo=timezone.utc)
+    return (now - saved_dt).days
+
+
 def fetch_stale_insights(days_threshold=7):
     try:
         # ADR-058: phase=pilot hidden by default.
         from experiment.phase_filter import with_phase_filter
 
-        r = table.query(
-            **with_phase_filter(
-                {
-                    "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-                    "ExpressionAttributeValues": {":pk": f"USER#{USER_ID}#SOURCE#insights", ":s": "INSIGHT#0", ":e": "INSIGHT#z"},
-                }
-            )
-        )
-        items = r.get("Items", [])
+        # #2221: paginate. A single query truncates at DynamoDB's 1 MB page, and the
+        # items that fall off are the OLDEST — exactly the ones this section exists to
+        # surface — so a truncated accountability list read as a complete one.
+        kwargs = {
+            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+            "ExpressionAttributeValues": {":pk": f"USER#{USER_ID}#SOURCE#insights", ":s": "INSIGHT#0", ":e": "INSIGHT#z"},
+        }
+        items = []
+        while True:
+            r = table.query(**with_phase_filter(kwargs))
+            items.extend(r.get("Items", []))
+            if "LastEvaluatedKey" not in r:
+                break
+            kwargs["ExclusiveStartKey"] = r["LastEvaluatedKey"]
     except Exception as e:
         logger.warning(f"fetch_stale_insights: {e}")
         return []
@@ -755,11 +314,10 @@ def fetch_stale_insights(days_threshold=7):
         if str(item.get("status", "")).lower() != "open":
             continue
         saved = item.get("date_saved", "")
-        try:
-            saved_dt = datetime.fromisoformat(saved.replace("Z", "+00:00"))
-            days_open = (now - saved_dt).days
-        except Exception:
-            days_open = 0
+        days_open = _days_open(saved, now)
+        if days_open is None:
+            # ADR-104: an unparseable date is unknown, not "saved today" and not stale.
+            continue
         if days_open >= days_threshold:
             stale.append(
                 {
@@ -951,10 +509,17 @@ def gather_all():
         "garmin",
         "day_grade",
     ]
+    # #2221: ONE four-week query per source, kept and reused. The 4-week-trend block
+    # below used to re-issue the identical query for all ten sources (plus a dead
+    # dict-comprehension statement that queried day_grade and discarded the result),
+    # so every source was read at least twice per run on a Lambda already close to its
+    # timeout.
     raw_this = {}
     raw_prior = {}
+    full_data = {}
     for src in sources:
         full = query_range(src, w4_start, w1_end)  # get 4 weeks in one query
+        full_data[src] = full
         raw_this[src] = {d: r for d, r in full.items() if w1_start <= d <= w1_end}
         raw_prior[src] = {d: r for d, r in full.items() if w2_start <= d <= w2_end}
         logger.info(f"  {src}: {len(raw_this[src])} this week, {len(raw_prior[src])} prior")
@@ -999,15 +564,7 @@ def gather_all():
         "journal": ex_journal(journal_prior),
     }
 
-    # ── 4-week trends ──
-    # Build weekly extractions for weeks 3 and 4
-    {src: {d: r for d, r in query_range(src, w3_start, w2_start).items() if w3_start <= d < w2_start} for src in ["day_grade"]}
-    # Reuse data already queried (4 weeks in one shot above)
-    full_data = {}
-    for src in sources:
-        full = query_range(src, w4_start, w1_end)
-        full_data[src] = full
-
+    # ── 4-week trends (off the four weeks already in `full_data`) ──
     def extract_week(src_data, start, end):
         return {d: r for d, r in src_data.items() if start <= d <= end}
 
@@ -1036,7 +593,15 @@ def gather_all():
     trends = compute_4week_trends(weekly_extractions)
 
     # ── Banister (60-day Strava) ──
-    strava_60d = query_range("strava", (today - timedelta(days=60)).isoformat(), w1_end)
+    # #2221/#2109: a trailing PHYSIOLOGICAL window must not truncate to the age of the
+    # current experiment cycle. `strava` is raw_timeseries, so the reset's phase=pilot
+    # tags hid all pre-genesis days and the load model saw an empty window — CTL = ATL
+    # = TSB = 0.0, which the form bands read as "Fresh" rather than as no data, for the
+    # first six weeks of every cycle. The include_pilot decision is derived from the
+    # source's own class, exactly as #2109 established for the compute-layer readers.
+    from experiment.phase_filter import source_reads_cross_phase
+
+    strava_60d = query_range("strava", (today - timedelta(days=60)).isoformat(), w1_end, include_pilot=source_reads_cross_phase("strava"))
     training_load = compute_banister(strava_60d)
 
     # ── Sleep debt ──
@@ -1098,6 +663,13 @@ def gather_all():
         "character_sheet_prior": character_sheet_prior,
         "acwr_data": acwr_data,  # BS-09
         "mcp_mutations_line": get_mcp_mutations_digest_line(w1_start, w1_end),  # #753
+        # #2221: the delivery-free streak line. PRIVATE-by-default — the reader itself
+        # checks nutrition_delivery_public() before it touches the partition (#2233), so
+        # with the flag off this is None and nothing renders.
+        "delivery_line": get_food_delivery_digest_line(),
+        # #2221: the component scorecard's raw grades. lambda_handler used to re-query
+        # day_grade for exactly this window, a fourth read of a source already in hand.
+        "_raw_grades": raw_this["day_grade"],
         "dates": {"this_start": w1_start, "this_end": w1_end, "prior_start": w2_start, "prior_end": w2_end},
     }, profile
 
@@ -1365,28 +937,13 @@ def build_html(data, commentary, profile):
     if dg and dg.get("days"):
         dg_avg = dg["avg_score"]
         dg_prior_avg = dg_prior["avg_score"] if dg_prior else None
-        from_letter = lambda s: (
-            "A+"
-            if s >= 95
-            else (
-                "A"
-                if s >= 90
-                else (
-                    "A-"
-                    if s >= 85
-                    else (
-                        "B+"
-                        if s >= 80
-                        else (
-                            "B"
-                            if s >= 75
-                            else "B-" if s >= 70 else "C+" if s >= 65 else "C" if s >= 60 else "C-" if s >= 55 else "D" if s >= 45 else "F"
-                        )
-                    )
-                )
-            )
-        )
-        avg_grade = from_letter(dg_avg)
+        # #2221: the letter is the platform's own letter_grade, applied to the SAME
+        # rounded number printed beside it. It used to be a private re-implementation
+        # fed the UNROUNDED average, so a week at 84.6 rendered "85 B+" — the headline
+        # number and its letter disagreed, and the letter also picked the colour.
+        from health.scoring_engine import letter_grade as _letter_grade
+
+        avg_grade = _letter_grade(round(dg_avg))
         avg_color = grade_colour(avg_grade)
         t4_dg = tr.get("day_grade", "→")
 
@@ -1576,12 +1133,19 @@ def build_html(data, commentary, profile):
                     vals.append(v)
             comp_avgs[comp] = avg(vals) if vals else None
 
-    # Fallback: compute from extracted data
-    sleep_avg = comp_avgs.get("sleep_quality") or (t["sleep"]["score_avg"] if t.get("sleep") else None)
-    recovery_avg = comp_avgs.get("recovery") or (t["whoop"]["recovery_avg"] if t.get("whoop") else None)
+    # Fallback: compute from extracted data — only when the stored component is ABSENT.
+    # #2221/ADR-104: `comp_avgs.get(x) or <fallback>` treated a measured 0.0 as missing
+    # and silently swapped in a DIFFERENT measurement over a different denominator, so
+    # the single worst week the scoring engine can record rendered as a healthy number.
+    def _component(key, fallback):
+        stored = comp_avgs.get(key)
+        return stored if stored is not None else fallback
+
+    sleep_avg = _component("sleep_quality", t["sleep"]["score_avg"] if t.get("sleep") else None)
+    recovery_avg = _component("recovery", t["whoop"]["recovery_avg"] if t.get("whoop") else None)
     nutrition_avg = comp_avgs.get("nutrition")
     movement_avg = comp_avgs.get("movement")
-    habits_avg = comp_avgs.get("habits_mvp") or (t["habitify"]["mvp_avg_pct"] if t.get("habitify") else None)
+    habits_avg = _component("habits_mvp", t["habitify"]["mvp_avg_pct"] if t.get("habitify") else None)
     hydration_avg = comp_avgs.get("hydration")
     journal_avg = comp_avgs.get("journal")
     glucose_avg = comp_avgs.get("glucose")
@@ -1741,8 +1305,17 @@ def build_html(data, commentary, profile):
             sl_rows += row("REM %", f'<span style="color:{rcol};">{fmt(s["rem_pct"], "%")}</span> (target 20-25%)')
         if sd:
             dcol = "#27ae60" if sd["debt_hrs"] <= 2 else "#e67e22" if sd["debt_hrs"] <= 5 else "#e74c3c"
+            # #1917/#2221: the row is labelled for the WEEK but compute_sleep_debt
+            # accrues the target only over nights that HAVE a duration. Three nights at
+            # target with four unmeasured nights used to render "0.0 hrs" in green — a
+            # debt-free week built out of absence. The n it was computed over is now
+            # printed on the row itself.
+            _nights = sd.get("nights")
             sl_rows += row(
-                "7-Day Sleep Debt", f'<span style="color:{dcol};font-weight:700;">{fmt(sd["debt_hrs"], " hrs")}</span>', highlight=True
+                "7-Day Sleep Debt",
+                f'<span style="color:{dcol};font-weight:700;">{fmt(sd["debt_hrs"], " hrs")}</span>'
+                + (f' <span style="font-size:11px;color:#888;">({_nights} of 7 nights measured)</span>' if _nights is not None else ""),
+                highlight=True,
             )
     sleep_section = section("Sleep & Architecture", "😴", tbl(sl_rows)) if sl_rows else ""
 
@@ -1756,25 +1329,24 @@ def build_html(data, commentary, profile):
         # Essential Seven aggregate header
         _e7_names = profile.get("mvp_habits", [])
         _e7_tracked = h.get("days_tracked", 0)
-        _e7_comp = h.get("mvp_completion", {})
-        _e7_days_perfect = 0
-        if _e7_names and _e7_tracked:
-            # Count days where all E7 habits were done (approximate from per-habit data)
-            # Use mvp_avg_pct as proxy: days_perfect ≈ days where avg was 100%
-            _e7_done_counts = [_e7_comp.get(n, 0) for n in _e7_names]
-            _e7_min_done = min(_e7_done_counts) if _e7_done_counts else 0
-            _e7_days_perfect = _e7_min_done  # at least this many days had all E7 complete
-        _e7_bar_pct = round(_e7_days_perfect / max(_e7_tracked, 1) * 100)
-        _e7_bar_col = "#27ae60" if _e7_bar_pct >= 70 else "#e67e22" if _e7_bar_pct >= 40 else "#e74c3c"
-        _e7_bar = (
-            f'<span style="display:inline-block;width:80px;height:8px;background:#eee;border-radius:4px;vertical-align:middle;">'
-            f'<span style="display:inline-block;width:{_e7_bar_pct}%;height:8px;background:{_e7_bar_col};border-radius:4px;"></span></span>'
-        )
-        hab_rows += row(
-            "⭐ Essential Seven — Perfect Days",
-            f'<span style="color:{_e7_bar_col};font-weight:700;">{_e7_days_perfect}/{_e7_tracked} days {_e7_bar}</span>',
-            highlight=True,
-        )
+        # #2221: the EXACT perfect-day count from ex_habitify, which walks the per-day
+        # habit maps. This used to be min(per-habit totals) — a LOWER BOUND rendered as
+        # an exact count, so two habits each done 5 of 7 days on disjoint days showed
+        # "5/7 days" with a green bar where the true answer is 0. The error only ever
+        # flattered. If the extractor did not supply it, the honest render is "—", not a
+        # fabricated number (ADR-104).
+        _e7_days_perfect = h.get("mvp_perfect_days")
+        if _e7_names and _e7_tracked and _e7_days_perfect is not None:
+            _e7_bar_pct = round(_e7_days_perfect / max(_e7_tracked, 1) * 100)
+            _e7_bar_col = "#27ae60" if _e7_bar_pct >= 70 else "#e67e22" if _e7_bar_pct >= 40 else "#e74c3c"
+            _e7_bar = (
+                f'<span style="display:inline-block;width:80px;height:8px;background:#eee;border-radius:4px;vertical-align:middle;">'
+                f'<span style="display:inline-block;width:{_e7_bar_pct}%;height:8px;background:{_e7_bar_col};border-radius:4px;"></span></span>'
+            )
+            _e7_value = f'<span style="color:{_e7_bar_col};font-weight:700;">{_e7_days_perfect}/{_e7_tracked} days {_e7_bar}</span>'
+        else:
+            _e7_value = "—"
+        hab_rows += row("⭐ Essential Seven — Perfect Days", _e7_value, highlight=True)
         hab_rows += row(
             "MVP Completion (avg)",
             f'<span style="color:{mvp_col};font-weight:700;">{fmt(mvp_pct, "%")}</span>',
@@ -1785,13 +1357,21 @@ def build_html(data, commentary, profile):
         hab_rows += row("Days Tracked", str(h.get("days_tracked", 0)))
         # Per-habit completion
         mvp_comp = h.get("mvp_completion", {})
+        # #2221: each habit's own denominator is the days Habitify actually OFFERED it.
+        # A renamed or archived habit used to divide by every tracked day and render
+        # "0/7 (0%)" in red for a habit that was never in the data.
+        mvp_offered = h.get("mvp_offered") or {}
         mvp_total_days = h.get("days_tracked", 1)
         for habit_name in profile.get("mvp_habits", []):
             days_done = mvp_comp.get(habit_name, 0)
-            pct = round(days_done / mvp_total_days * 100) if mvp_total_days else 0
+            habit_days = mvp_offered.get(habit_name, mvp_total_days)
+            if not habit_days:
+                hab_rows += row(f"↳ {habit_name[:30] + '...' if len(habit_name) > 30 else habit_name}", "— not tracked")
+                continue
+            pct = round(days_done / habit_days * 100)
             hcol = "#27ae60" if pct >= 80 else "#e67e22" if pct >= 50 else "#e74c3c"
             short = habit_name[:30] + "..." if len(habit_name) > 30 else habit_name
-            hab_rows += row(f"↳ {short}", f'<span style="color:{hcol};">{days_done}/{mvp_total_days} ({pct}%)</span>')
+            hab_rows += row(f"↳ {short}", f'<span style="color:{hcol};">{days_done}/{habit_days} ({pct}%)</span>')
     habits_section = section("Habits — MVP Tracker", "✅", tbl(hab_rows)) if hab_rows else ""
 
     # ── Nutrition ──
@@ -1805,13 +1385,24 @@ def build_html(data, commentary, profile):
             delta_html(m.get("calories_avg"), mp.get("calories_avg"), " kcal", invert=True),
             highlight=True,
         )
-        nu_rows += row("Calorie Hit Rate", hit_bar(m.get("calorie_hit_rate")))
+
+        # ADR-105 (#2221): a hit rate is over the days he LOGGED, which is not the week.
+        # One logged day at target rendered "100%" with a full green bar. The rate keeps
+        # its honest denominator (an unlogged day is absence, not a miss) and now states
+        # the n it was computed over, right next to the bar.
+        def _hit_n(n_key):
+            n = m.get(n_key)
+            if n is None:
+                return ""
+            return f' <span style="font-size:11px;color:#888;">(n={n} of {m.get("days_logged", 0)} logged)</span>'
+
+        nu_rows += row("Calorie Hit Rate", hit_bar(m.get("calorie_hit_rate")) + _hit_n("calorie_hit_n"))
         nu_rows += row(
             "Avg Protein",
             f'{fmt(m.get("protein_avg_g"), "g")} (target {m.get("protein_target")}g)',
             delta_html(m.get("protein_avg_g"), mp.get("protein_avg_g"), "g"),
         )
-        nu_rows += row("Protein Hit Rate", hit_bar(m.get("protein_hit_rate"), "#2980b9"))
+        nu_rows += row("Protein Hit Rate", hit_bar(m.get("protein_hit_rate"), "#2980b9") + _hit_n("protein_hit_n"))
         if m.get("fat_avg_g"):
             nu_rows += row("Avg Fat", fmt(m["fat_avg_g"], "g"))
         if m.get("carbs_avg_g"):
@@ -1819,6 +1410,15 @@ def build_html(data, commentary, profile):
         if m.get("fiber_avg_g"):
             nu_rows += row("Avg Fiber", fmt(m["fiber_avg_g"], "g"))
         nu_rows += row("Days Logged", str(m.get("days_logged", 0)))
+    # #2221: the delivery-free streak finally reaches the section it was written for.
+    # `get_food_delivery_digest_line` documented itself as the weekly-digest nutrition
+    # line and had no call site anywhere in the repo, so the behaviour-change loop the
+    # streak exists to reinforce had no weekly readout. gather_all supplies the value —
+    # and supplies None whenever NUTRITION_DELIVERY_PUBLIC is off, which is the default,
+    # so this row is gated at the reader, not here (#2209/#2210/#2233).
+    _delivery_line = data.get("delivery_line")
+    if _delivery_line:
+        nu_rows += row("Delivery-Free Streak", _esc(_delivery_line), highlight=True)
     nutrition_section = section("Nutrition", "🥗", tbl(nu_rows)) if nu_rows else ""
 
     # ── Weight ──
@@ -2135,10 +1735,6 @@ def lambda_handler(event, context):
     dates = data["dates"]
     logger.info(f"{dates['this_start']} → {dates['this_end']}")
 
-    # Store raw grades for component scorecard
-    raw_grades = query_range("day_grade", dates["this_start"], dates["this_end"])
-    data["_raw_grades"] = raw_grades
-
     # PROD-MON-06 (#360): gate telemetry — add subscriber count + weight progress
     # so build_html can render the private gate readout at the top of the digest.
     _real_subs = _count_real_subscribers()
@@ -2154,18 +1750,25 @@ def lambda_handler(event, context):
     if hasattr(logger, "set_date"):
         logger.set_date(dates.get("this_end", ""))  # OBS-1
     logger.info("Calling Haiku for Board commentary...")
+    # #2221: whether the Board actually spoke is tracked as a FLAG, never sniffed back
+    # out of the rendered text (the #1658 lesson from the monthly letter, whose
+    # substring sentinel could not fire). The stub keeps the email section rendered,
+    # but it is not coaching and must not enter the insight ledger.
+    commentary_ok = True
     try:
         commentary = call_haiku(data, profile)
     except Exception as e:
         logger.warning(f"Haiku failed: {e}")
-        commentary = "🎯 THE CHAIR — OVERVIEW\nCommentary unavailable.\n" "💡 INSIGHT OF THE WEEK\nReview data sections below."
+        commentary = COMMENTARY_UNAVAILABLE
+        commentary_ok = False
 
     # AI-3: Validate output before rendering
-    if _HAS_AI_VALIDATOR and commentary:
+    if _HAS_AI_VALIDATOR and commentary and commentary_ok:
         _val = validate_ai_output(commentary, AIOutputType.WEEKLY_DIGEST)
         if _val.blocked:
             logger.info(f"[AI-3] Weekly digest commentary BLOCKED: {_val.block_reason}")
-            commentary = _val.safe_fallback
+            commentary = _val.safe_fallback or COMMENTARY_UNAVAILABLE
+            commentary_ok = False
         elif _val.warnings:
             logger.info(f"[AI-3] Weekly digest warnings: {_val.warnings}")
 
@@ -2190,8 +1793,12 @@ def lambda_handler(event, context):
     )
     logger.info("Sent.")
 
-    # IC-15: Persist insights from this digest
-    if _HAS_INSIGHT_WRITER and commentary:
+    # IC-15: Persist insights from this digest — genuine Board output only (#2221).
+    # insight_writer.build_insights_context replays what lands here into NEXT week's
+    # prompt as PREVIOUS INSIGHTS, so filing the AI-failure stub (or the validator's
+    # safe_fallback) with confidence="high", actionable=True fed the model its own
+    # outage back as last week's coaching.
+    if _HAS_INSIGHT_WRITER and commentary and commentary_ok:
         try:
             insights = []
             # Write the full Board commentary as a coaching insight

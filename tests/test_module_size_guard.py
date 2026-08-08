@@ -135,7 +135,10 @@ BASELINE = {
     "lambdas/compute/daily_insight_compute_lambda.py": 2352,
     "mcp/registry.py": 2409,
     "lambdas/ai/ai_calls.py": 2396,
-    "lambdas/emails/weekly_digest_lambda.py": 2216,
+    # 2216 -> 1828 by #2221: the pure record->summary extractors were lifted into
+    # lambdas/emails/weekly_digest_extractors.py (559 lines, under the ceiling) so the
+    # honest-numbers fixes could land without raising this number. The ratchet tightening.
+    "lambdas/emails/weekly_digest_lambda.py": 1828,
     "lambdas/health/character_engine.py": 2117,
     "lambdas/content/html_builder.py": 2104,
     "lambdas/web/site_api_ai_lambda.py": 1991,
