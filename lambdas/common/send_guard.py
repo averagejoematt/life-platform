@@ -62,7 +62,7 @@ def is_dry_run(event: Optional[Any] = None) -> bool:
 def _describe(kwargs: Mapping[str, Any]) -> str:
     """Best-effort one-line description of a send, for the dry-run log."""
     destination = kwargs.get("Destination") or {}
-    recipients = []
+    recipients: list[str] = []
     if isinstance(destination, Mapping):
         for field in ("ToAddresses", "CcAddresses", "BccAddresses"):
             value = destination.get(field)
