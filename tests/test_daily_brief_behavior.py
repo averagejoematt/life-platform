@@ -1851,29 +1851,38 @@ class TestPublicStatsTruth:
         brief.lambda_handler({}, None)
         assert _published(handler_env)["training"]["acwr"] is None
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:2569-2570 (lambda_handler) reads `_cm.get('zone')` and "
-            "`_cm.get('alert')` off the computed_metrics row — but the writer, "
-            "acwr_compute_lambda.py:284-285 (`_write_acwr`), stores those fields as `acwr_zone` and "
-            "`acwr_alert`. Neither bare name is ever written by anything in this repo. The classic "
-            "reader/writer mismatch: `form_status` is therefore permanently 'neutral' and `injury_risk` "
-            "permanently 'low' in public_stats.json — including on days the ACWR engine has raised a "
-            "genuine overtraining alert — and og_image_lambda.py:146 prints that 'NEUTRAL' on the public "
-            "share card. The same two bare names are read at daily_brief_lambda.py:798-799 (log only) "
-            "and, worse, at html_builder.py:1078-1079, which is what greys out the ACWR zone label and "
-            "the alert colour in the email itself. Hurts: Matthew (a suppressed injury warning) and "
-            "every reader of the public site."
-        ),
-    )
     def test_a_raised_acwr_alert_reaches_the_published_injury_risk(self, handler_env):
+        """#2243 (fixed): daily_brief_lambda now reads acwr_zone/acwr_alert (the
+        names acwr_compute_lambda._write_acwr actually writes), so a genuine
+        overtraining alert reaches public_stats.json/the OG card instead of
+        publishing a permanent 'neutral'/'low'."""
         r = computed_row(acwr=Decimal("1.62"), acwr_zone="danger", acwr_alert=True)
         handler_env["table"].store[(r["pk"], r["sk"])] = r
         brief.lambda_handler({}, None)
         training = _published(handler_env)["training"]
         assert training["injury_risk"] == "high", "an ACWR alert did not reach injury_risk"
         assert training["form_status"] == "danger"
+
+    def test_an_absent_acwr_alert_publishes_honest_absence_not_a_fabricated_low(self, handler_env):
+        """ADR-104: fixing the field-name mismatch must not just swap one
+        fabricated default for another. When acwr-compute genuinely hasn't run
+        (no acwr_alert key at all on the record), injury_risk must publish null,
+        not a healthy-looking 'low' that a reader can't distinguish from a real
+        measured non-alert day."""
+        r = computed_row()  # no acwr/acwr_zone/acwr_alert keys at all
+        handler_env["table"].store[(r["pk"], r["sk"])] = r
+        brief.lambda_handler({}, None)
+        training = _published(handler_env)["training"]
+        assert training["injury_risk"] is None, "absent ACWR data must not default to 'low'"
+
+    def test_an_explicit_non_alert_still_publishes_low(self, handler_env):
+        """The honest-absence fix above must not regress the ordinary case: a
+        real computed non-alert day still publishes 'low', not null."""
+        r = computed_row(acwr=Decimal("1.0"), acwr_zone="safe", acwr_alert=False)
+        handler_env["table"].store[(r["pk"], r["sk"])] = r
+        brief.lambda_handler({}, None)
+        training = _published(handler_env)["training"]
+        assert training["injury_risk"] == "low"
 
     @pytest.mark.xfail(
         strict=False,

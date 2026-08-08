@@ -795,8 +795,10 @@ def gather_daily_data(profile, yesterday):
     # BS-09: ACWR training load (written by acwr-compute Lambda at 9:55 AM)
     computed_metrics = fetch_date("computed_metrics", yesterday)
     if computed_metrics and computed_metrics.get("acwr"):
-        _acwr_zone = computed_metrics.get("zone", "?")
-        _acwr_alert = computed_metrics.get("alert", False)
+        # #2243: writer stores these prefixed (acwr_zone/acwr_alert) — the bare
+        # names never existed, so this log line always printed "?" and never ALERT.
+        _acwr_zone = computed_metrics.get("acwr_zone", "?")
+        _acwr_alert = computed_metrics.get("acwr_alert", False)
         logger.info(
             "ACWR loaded for %s: %s (%s)%s",
             yesterday,
@@ -2579,8 +2581,13 @@ def lambda_handler(event, context):
                     "atl_fatigue": float(data.get("atl") if data.get("atl") is not None else 0),
                     "tsb_form": float(data.get("tsb") or 0),
                     "acwr": _acwr,
-                    "form_status": _cm.get("zone", "neutral"),
-                    "injury_risk": "high" if _cm.get("alert") else "low",
+                    # #2243: writer stores these prefixed (acwr_zone/acwr_alert) — the bare
+                    # names never existed on the record, so form_status was permanently
+                    # "neutral" and injury_risk permanently "low", even on a genuine alert
+                    # day. ADR-104: when the compute genuinely hasn't run (no acwr_alert
+                    # key at all), publish honest absence rather than fabricating "low".
+                    "form_status": _cm.get("acwr_zone", "neutral"),
+                    "injury_risk": ("high" if _cm.get("acwr_alert") else "low") if "acwr_alert" in _cm else None,
                     "total_miles_30d": 0,
                     "activity_count_30d": 0,
                     "zone2_this_week_min": round(_z2_this_week),
