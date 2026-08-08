@@ -39,6 +39,7 @@ from datetime import datetime, timedelta, timezone
 import boto3
 from common import digest_utils  # shared query_range implementations (#970)
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
+from experiment.phase_filter import singleton_visible, source_reads_cross_phase, with_phase_filter  # ADR-058 (#2109/#2221)
 
 try:
     from common.platform_logger import get_logger
@@ -75,6 +76,22 @@ HABIT_SCORES_PK = f"USER#{USER_ID}#SOURCE#habit_scores"
 MAX_NEW_CHALLENGES = 5
 LOOKBACK_DAYS = 14
 
+# SYSTEM_PROMPT states the contract as "Duration: 7-30 days". These are that
+# sentence, in code, so the writer cannot ship a horizon the platform never
+# agreed to (#2221) — the same guard domain/difficulty/source already have.
+MIN_DURATION_DAYS = 7
+MAX_DURATION_DAYS = 30
+
+
+class MalformedCandidate(ValueError):
+    """A model-supplied candidate the writer cannot honestly store (#2221).
+
+    Distinct from an infrastructure failure on purpose: the handler skips a
+    malformed candidate and keeps the rest of the batch, while a DynamoDB or
+    Bedrock error still surfaces as ``status='error'`` rather than being
+    swallowed into a partial success.
+    """
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # HELPERS
@@ -91,16 +108,38 @@ def query_range(source, start_date, end_date):
     copy did not paginate (1MB-page truncation) and did not apply the ADR-058
     phase filter (every platform DDB read must be phase-scoped); both fixed by
     consolidation. Fail-soft ([] on error) preserved.
+
+    #2221 (#2109 class): the phase filter is derived per source rather than
+    applied unconditionally. notion / whoop / withings are RAW_TIMESERIES — kept
+    across resets and tagged ``phase=pilot`` for every pre-genesis day — so a
+    blanket filter truncated this reader's 14-day windows to the CYCLE'S AGE
+    (genesis 2026-08-03 meant a 4-day "fourteen day" HRV/journal/weight window)
+    while the prompt still called them fourteen days. habit_scores stays filtered:
+    it is EXPERIMENT_SCOPED derived intelligence the reset tombstones on purpose.
     """
     try:
-        return digest_utils.query_range_list(table, source, start_date, end_date, user_id=USER_ID)
+        return digest_utils.query_range_list(
+            table,
+            source,
+            start_date,
+            end_date,
+            user_id=USER_ID,
+            include_pilot=source_reads_cross_phase(source, user_id=USER_ID),
+        )
     except Exception as e:
         logger.warning(f"query_range({source}) failed: {e}")
         return []
 
 
 def slug(name):
-    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:50] if name else "challenge"
+    """A key-safe slug that is never empty.
+
+    The trailing fallback covers both halves of the old divergence (#2221): a
+    falsy name AND a name that slugs away entirely ("!!!"), either of which
+    produced ``CHALLENGE#_<date>`` — a keyless row on the reader-facing
+    challenges surface that a second such candidate silently collides with.
+    """
+    return re.sub(r"[^a-z0-9]+", "-", (name or "").lower()).strip("-")[:50] or "challenge"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -157,10 +196,21 @@ def gather_context():
     from boto3.dynamodb.conditions import Key
 
     try:
+        # ADR-058 (#2221): character_sheet is EXPERIMENT_SCOPED, so the wiped prior
+        # cycle's rows must not read as live. Limit=1 is safe alongside the filter
+        # here — DynamoDB applies Limit before the FilterExpression, but this scan
+        # is descending over DATE# keys and every pilot row predates genesis, so
+        # the newest row is current-cycle whenever a current-cycle row exists at
+        # all. Before the first character-sheet run of a fresh cycle the read
+        # honestly returns nothing rather than the previous cycle's level.
         cs_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(CHARACTER_PK) & Key("sk").begins_with("DATE#"),
-            ScanIndexForward=False,
-            Limit=1,
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(CHARACTER_PK) & Key("sk").begins_with("DATE#"),
+                    "ScanIndexForward": False,
+                    "Limit": 1,
+                }
+            )
         )
         cs_items = d2f(cs_resp.get("Items", []))
         if cs_items:
@@ -211,13 +261,23 @@ def gather_context():
 
     # 4. Confirmed hypotheses — candidates for challenge graduation
     try:
+        # ADR-058 (#2221): hypotheses is EXPERIMENT_SCOPED — the wipe tombstones and
+        # phase-tags the prior cycle's bets, which must not graduate into this
+        # cycle's challenges.
         hyp_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(HYPOTHESES_PK) & Key("sk").begins_with("HYPOTHESIS#"),
-            ScanIndexForward=False,
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(HYPOTHESES_PK) & Key("sk").begins_with("HYPOTHESIS#"),
+                    "ScanIndexForward": False,
+                }
+            )
         )
-        confirmed = [
-            d2f(h) for h in hyp_resp.get("Items", []) if h.get("status") in ("confirmed", "confirming") and h.get("check_count", 0) >= 2
-        ]
+        # #2221: 'confirming' means SUPPORTED BUT STILL UNDER TEST — the engine
+        # itself classifies it as an OPEN bet (hypothesis_engine_lambda L1140,
+        # phase_taxonomy.OPEN_BET_STATUSES). Handing it to the writer under the
+        # prompt header "CONFIRMED HYPOTHESES" made the challenge assert a finding
+        # the data has not yet supported (ADR-104/105).
+        confirmed = [d2f(h) for h in hyp_resp.get("Items", []) if h.get("status") == "confirmed" and h.get("check_count", 0) >= 2]
         if confirmed:
             context["confirmed_hypotheses"] = [
                 {
@@ -233,11 +293,21 @@ def gather_context():
 
     # 5. Existing challenges — for dedup
     try:
+        # ADR-058 (#2221): challenges is EXPERIMENT_SCOPED. The query filter hides
+        # phase-tagged rows; singleton_visible on top also drops TOMBSTONED ones,
+        # which is what makes the two halves of this Lambda agree — store_challenge
+        # already treats a tombstoned collision as ABSENT (#1969, "the fresh cycle
+        # may legitimately re-issue the challenge"). Without it the prompt forbade
+        # the model to propose exactly what the writer would then re-issue.
         ch_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(CHALLENGES_PK) & Key("sk").begins_with("CHALLENGE#"),
-            ScanIndexForward=False,
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(CHALLENGES_PK) & Key("sk").begins_with("CHALLENGE#"),
+                    "ScanIndexForward": False,
+                }
+            )
         )
-        existing = d2f(ch_resp.get("Items", []))
+        existing = [d2f(c) for c in ch_resp.get("Items", []) if singleton_visible(c)]
         context["existing_challenges"] = [{"name": c.get("name"), "status": c.get("status"), "domain": c.get("domain")} for c in existing]
         logger.info(f"Existing challenges: {len(existing)}")
     except Exception as e:
@@ -425,12 +495,39 @@ def generate_challenges(context):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+def _coerce_duration(challenge: dict) -> int:
+    """The model's duration_days, bounded to the window SYSTEM_PROMPT promises.
+
+    #2221: this was a bare ``int(challenge.get("duration_days", 7))`` — the only
+    model-supplied enum-ish field with no allowlist. An out-of-range NUMBER is
+    clamped (the model asserted a horizon; the platform bounds it), but a
+    non-numeric one is MalformedCandidate rather than silently defaulted: a
+    hoped_outcome written against "seven" was written against an unknown horizon,
+    and inventing 7 for it would publish a claim the model never made.
+    """
+    if "duration_days" not in challenge:
+        return MIN_DURATION_DAYS
+    try:
+        days = int(challenge["duration_days"])
+    except (TypeError, ValueError) as e:
+        raise MalformedCandidate(f"duration_days is not a number: {challenge['duration_days']!r}") from e
+    clamped = max(MIN_DURATION_DAYS, min(MAX_DURATION_DAYS, days))
+    if clamped != days:
+        logger.warning(
+            "duration_days %s outside the documented %s-%s window; clamped to %s", days, MIN_DURATION_DAYS, MAX_DURATION_DAYS, clamped
+        )
+    return clamped
+
+
 def store_challenge(challenge: dict):
     """Write a challenge candidate to DynamoDB."""
     now = datetime.now(timezone.utc)
-    name = challenge.get("name", "Unnamed Challenge")
+    # #2221: `.get("name", ...)` only defaults on an ABSENT key — a model returning
+    # name="" kept the empty string and slugged to a keyless CHALLENGE#_<date>.
+    name = (challenge.get("name") or "").strip() or "Unnamed Challenge"
     date_str = now.strftime("%Y-%m-%d")
-    ch_slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:50]
+    duration_days = _coerce_duration(challenge)
+    ch_slug = slug(name)  # the module's own guarded helper, not a second inline copy
     challenge_id = f"{ch_slug}_{date_str}"
     sk = f"CHALLENGE#{challenge_id}"
 
@@ -438,8 +535,6 @@ def store_challenge(challenge: dict):
     # TOMBSTONED colliding row is the wiped prior cycle's archive (only possible
     # when a reset landed the same day), treated as absent: the fresh cycle may
     # legitimately re-issue the challenge, and the put below restamps the record.
-    from experiment.phase_filter import singleton_visible
-
     existing = table.get_item(Key={"pk": CHALLENGES_PK, "sk": sk}).get("Item")
     if singleton_visible(existing):
         logger.info(f"Skipping duplicate challenge: {challenge_id}")
@@ -471,7 +566,7 @@ def store_challenge(challenge: dict):
         "source_detail": challenge.get("source_detail", ""),
         "domain": domain,
         "difficulty": difficulty,
-        "duration_days": int(challenge.get("duration_days", 7)),
+        "duration_days": duration_days,
         "protocol": challenge.get("protocol", ""),
         "success_criteria": challenge.get("success_criteria", ""),
         # #1118 — the protocols-grammar hypothesis: what should visibly change if
@@ -530,8 +625,15 @@ def lambda_handler(event, context):
         # 2. Generate challenges
         result = generate_challenges(ctx)
         if not result or "challenges" not in result:
-            logger.warning("No challenges generated or invalid response")
-            return {"status": "completed", "generated": 0, "reason": "no_signal"}
+            # #2221 (ADR-104): generate_challenges returns None for an AI-3 BLOCK and
+            # for a parse failure alike, and this used to publish either one to the
+            # caller, the logs and CloudWatch as {'status':'completed',
+            # 'reason':'no_signal'} — indistinguishable from the model honestly
+            # finding nothing. An AI failure is not a data finding. A genuinely
+            # quiet week is a PARSED {"challenges": []} and still completes below
+            # with generated=0 and no reason at all.
+            logger.error("Challenge generation failed or returned an invalid envelope")
+            return {"status": "error", "generated": 0, "reason": "generation_failed"}
 
         challenges = result["challenges"]
         reasoning = result.get("reasoning", "")
@@ -540,19 +642,32 @@ def lambda_handler(event, context):
         # 4. Store candidates (with dedup)
         stored = 0
         stored_ids = []
+        rejected = 0
         for ch in challenges[:MAX_NEW_CHALLENGES]:
-            challenge_id = store_challenge(ch)
+            # #2221: per-candidate isolation for MODEL-shaped failures only. One
+            # malformed candidate used to raise out of this loop into the blanket
+            # except, so the run reported neither the rows it had already written
+            # nor the ones it never reached. Infrastructure failures (a DDB write
+            # error, a Bedrock outage) deliberately still propagate — a partial
+            # write must not be reported as a completed week.
+            try:
+                challenge_id = store_challenge(ch)
+            except MalformedCandidate as e:
+                rejected += 1
+                logger.warning("Discarding malformed candidate %r: %s", ch.get("name"), e)
+                continue
             if challenge_id:
                 stored += 1
                 stored_ids.append(challenge_id)
 
         elapsed = round(time.time() - start_time, 1)
-        logger.info(f"Challenge generator complete: {stored}/{len(challenges)} stored in {elapsed}s")
+        logger.info(f"Challenge generator complete: {stored}/{len(challenges)} stored ({rejected} malformed) in {elapsed}s")
 
         return {
             "status": "completed",
             "generated": len(challenges),
             "stored": stored,
+            "rejected": rejected,
             "challenge_ids": stored_ids,
             "reasoning": reasoning[:500],
             "elapsed_seconds": elapsed,
