@@ -17,7 +17,8 @@ MAX_LINES = 2000
 GRANDFATHERED = {
     "lambdas/emails/daily_brief_lambda.py",
     # wednesday_chronicle_lambda.py split into cohesive chronicle_* helpers (#1654) — now a thin facade under the cap.
-    "lambdas/emails/weekly_digest_lambda.py",  # tightly-coupled email pipeline; #360 gate readout added
+    # weekly_digest_lambda.py: the pure extractors moved to weekly_digest_extractors.py (#2221,
+    # #1654's shape) — 2216 -> 1828 lines, back under the 2,000-line cap, so the entry is dropped.
     "lambdas/compute/daily_insight_compute_lambda.py",
 }
 

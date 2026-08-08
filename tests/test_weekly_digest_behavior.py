@@ -27,10 +27,12 @@ client the module holds is replaced with a hand-rolled bounded fake (never a
 MagicMock inside a paginated read). Time is frozen module-wide by an autouse
 fixture — no fixture date is ever combined with the real clock.
 
-Tests that document a DEFECT in current behaviour are marked
-`@pytest.mark.xfail(strict=False)` with a reason naming the module, function,
-line, current behaviour, correct behaviour and who it hurts. Nothing in this
-file edits production code.
+This file carried 14 `xfail` markers, each documenting a real defect. #2221 burned
+all 14: every one was a genuine bug and every one is now fixed in
+`weekly_digest_lambda.py` / `weekly_digest_extractors.py`, so the markers are gone
+and the assertions are live. Five of the fourteen named the wrong REPAIR (not the
+wrong bug) — the docstring on each of those tests records the correction. There are
+no xfails left here; a new one is a new finding, not a stale marker.
 """
 
 import os
@@ -472,20 +474,15 @@ class TestExWhoop:
         # Only one HRV reading exists, so the average is that reading — not 20.0.
         assert out["hrv_avg"] == 40.0
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-3): weekly_digest_lambda.py:242 `ex_whoop` reports `days` as "
-            "len(recs) — every Whoop day record in the window — while every average beside it "
-            "is computed over only the days that carried that field. A week where the strap "
-            "logged recovery on 6 days but HRV on 2 reports hrv_avg over n=2 alongside "
-            "days=6. That dict is serialised straight into the Board prompt (call_haiku's "
-            "data_json), so the six advisors are told the sample size is 6. ADR-105 requires "
-            "n to be the n of the statistic. Hurts: the AI narrates a 2-reading average as a "
-            "week's trend."
-        ),
-    )
-    def test_the_reported_day_count_is_the_n_of_the_averages_it_sits_beside(self):
+    def test_every_average_carries_its_own_sample_size(self):
+        """ADR-105 (#2221). CORRECTION to the marker this replaces: it asserted
+        `days == 2`, i.e. that the single `days` scalar should become the HRV n. One
+        scalar cannot be the n of four averages computed over four different subsets —
+        the same week has recovery on 4 days and HRV on 2, and a `days` of 2 would then
+        misdescribe recovery_avg exactly as `days` of 4 misdescribed hrv_avg. The defect
+        is real (this dict is serialised verbatim into the Board prompt, so the advisors
+        were told one sample size for four statistics); the repair is a per-statistic n,
+        with `days` keeping its honest meaning of "days with a Whoop record"."""
         w = as_range(
             "whoop",
             {
@@ -496,7 +493,11 @@ class TestExWhoop:
             },
         )
         out = wd.ex_whoop(w)
-        assert out["days"] == 2, "days must describe the HRV sample it is printed next to"
+        assert out["hrv_n"] == 2, "the n printed with hrv_avg must be the HRV sample"
+        assert out["recovery_n"] == 4
+        assert out["rhr_n"] == 0 and out["rhr_avg"] is None
+        assert out["strain_n"] == 0
+        assert out["days"] == 4, "`days` is days-with-a-record, and must not be confused for an n"
 
 
 class TestExWhoopSleep:
@@ -634,19 +635,6 @@ class TestWeightProjection:
         eta_date = FROZEN_NOW.date() + timedelta(weeks=7.5)
         assert out["eta"] == eta_date.strftime("%B %Y")
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-3, P1): weekly_digest_lambda.py:696 `weight_projection` computes "
-            "`rate_per_week = total_delta / (len(vals) - 1)` AFTER dropping the None weeks — so "
-            "the divisor is the count of weeks that HAD a weigh-in, not the weeks that elapsed. "
-            "Two weigh-in weeks three weeks apart (301.0 now, 307.0 four weeks ago, nothing in "
-            "between) give -6/1 = 6.0 lbs/week instead of the true 2.0 lbs/week, and the '📅 "
-            "Projection' row in the Weight section then quotes a goal ETA three times too soon "
-            "(and paints it green, since rate >= 0.5). Hurts: Matthew plans around a fabricated "
-            "loss rate exactly in the weeks he weighed in least."
-        ),
-    )
     def test_gaps_between_weigh_in_weeks_do_not_inflate_the_per_week_rate(self):
         # newest-first with weeks 2 and 3 unmeasured: 301.0 this week, 307.0 four weeks ago.
         # Elapsed weeks between the two observations = 3 → true rate = 6.0 / 3 = 2.0 lbs/week.
@@ -759,24 +747,19 @@ class TestComputeBanister:
         assert out["atl"] > out["ctl"] > 0
         assert out["tsb"] < 0
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-3, P1): weekly_digest_lambda.py:116-121 `query_range` drops "
-            "digest_utils.query_range's `include_pilot` parameter entirely, so no caller can "
-            "opt into a cross-phase read — and :1033 uses it for the 60-day Banister window. "
-            "`strava` classifies as raw_timeseries, i.e. phase_filter.source_reads_cross_phase "
-            "returns True, so the pre-genesis days are hidden by the ADR-058 default-deny "
-            "filter. This is the exact failure #2109 measured and fixed for the compute "
-            "layer's readers ('the Banister load model saw an empty 60-day window (CTL = ATL = "
-            "TSB = 0.0, which downstream bands read as perfect freshness rather than as no "
-            "data)') — the weekly digest was not included in that fix. Hurts: for the first "
-            "six weeks of every experiment cycle the Training Load section reports near-zero "
-            "CTL and a positive TSB labelled 'Fresh', and the Board is prompted on it."
-        ),
-    )
     def test_the_sixty_day_load_window_survives_an_experiment_reset(self, table, monkeypatch):
-        monkeypatch.setattr(wd, "fetch_profile", lambda: profile_row())
+        """#2109's fix, extended to this reader (#2221).
+
+        CORRECTION to the marker this replaces: it reproduced the bug by calling
+        `wd.query_range("strava", …)` with DEFAULT arguments and demanded a cross-phase
+        result. That would have made default-deny the default for every arm of the
+        digest, which is not the #2109 contract and would have leaked a prior cycle's
+        rows into the week/prior-week comparison. The contract is that a caller with
+        cross-cycle intent can OPT IN, and that the Banister call site does — so the
+        assertion is on what the reader sees, `gather_all`'s training_load.
+        """
+        monkeypatch.setattr(wd, "boto3", FakeBoto3(FakeS3({})))
+        table.add(profile_row())
         # 60 days of identical training; everything before the cycle-12 genesis is
         # tagged phase=pilot by the reset (ADR-077), which is most of the window.
         genesis = "2026-08-03"
@@ -785,11 +768,14 @@ class TestComputeBanister:
             row = rec("strava", d, activities=[act(secs=3600.0, hr=130.0, start=f"{d}T08:00:00")])
             row["phase"] = EXPERIMENT_PHASE_CURRENT if d >= genesis else "pilot"
             table.add(row)
-        strava_60d = wd.query_range("strava", (FROZEN_NOW.date() - timedelta(days=60)).isoformat(), W1_END)
-        out = wd.compute_banister(strava_60d)
+        data, _profile = wd.gather_all()
+        out = data["training_load"]
         # A 42-day EWMA over 60 consecutive identical training days must be a real
         # fitness number, not the near-zero of a five-day-old cycle.
         assert out["ctl"] > 10, f"pre-genesis training vanished from the load model: {out}"
+        # …and the week arm stays default-deny: of W1's 7 days only 08-03→08-08 are
+        # post-genesis, so 6 activities — not the 7 an unfiltered week read would give.
+        assert data["this"]["strava"]["activity_count"] == 6
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -838,25 +824,23 @@ class TestExMacrofactor:
         assert out["protein_hit_rate"] is None
         assert out["calories_avg"] is None
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-3, P2 — window/denominator honesty, #1917): "
-            "weekly_digest_lambda.py:365-366 `ex_macrofactor` divides both hit rates by "
-            "len(cals)/len(prots) — the days he LOGGED — while the section they render into is "
-            "the week. One logged day at target renders 'Protein Hit Rate: 100%' with a full "
-            "green bar (hit_bar, :1802/:1808) for a week he logged once. 'Days Logged' is a "
-            "separate row further down the same table, so the two numbers never appear as a "
-            "fraction. ADR-104: an unlogged day is absence, and a rate quoted over the week "
-            "must either use the week's denominator or state its own n. Hurts: Matthew reads a "
-            "perfect adherence week off one meal-logged day."
-        ),
-    )
-    def test_a_hit_rate_is_stated_against_the_week_not_only_the_logged_days(self):
+    def test_a_hit_rate_states_the_sample_it_was_computed_over(self):
+        """ADR-105 (#2221). CORRECTION to the marker this replaces: it demanded the hit
+        rate be re-based on the seven-day week ("at most 1/7 ≈ 14%, never 100%"). That
+        repair is the ADR-104 error the sibling habitify marker in this same file exists
+        to remove — dividing by the week converts six UNLOGGED days into six recorded
+        MISSES, which is inventing data, not withholding it. The defect (a bare "100%"
+        with a full green bar off one logged day) is real; the honest repair is to state
+        the n, which is what the renderer now prints beside the bar."""
         m = as_range("macrofactor", {"2026-08-02": {"total_calories_kcal": Decimal("1500"), "total_protein_g": Decimal("200")}})
         out = wd.ex_macrofactor(m, profile_row())
-        # One logged day out of a seven-day week: at most 1/7 ≈ 14%, never 100%.
-        assert out["protein_hit_rate"] is None or out["protein_hit_rate"] <= 15
+        assert out["protein_hit_rate"] == 100
+        assert out["protein_hit_n"] == 1
+        assert out["calorie_hit_n"] == 1
+        html = wd.build_html(digest_data(this={"macrofactor": out}), BOARD_TEXT, profile_row())
+        # The reader never sees a bare 100% — the sample size is on the row.
+        assert "Protein Hit Rate" in html
+        assert "n=1 of 1 logged" in html
 
 
 class TestExHevyWorkouts:
@@ -934,18 +918,6 @@ class TestExHabitify:
         h = as_range("habitify", {"2026-08-02": {"habits": {"a": 1}}, "2026-08-03": {"habits": {}}})
         assert wd.ex_habitify(h, p)["days_tracked"] == 1
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-3, P2 — ADR-104 absence-as-zero): weekly_digest_lambda.py:433 "
-            "`ex_habitify` reads `habits_map.get(h, 0)` — an MVP habit that Habitify did not "
-            "return for a day at all (archived, paused, renamed, or an ingestion gap) is scored "
-            "an explicit MISS, indistinguishable from a habit he was offered and skipped. The "
-            "per-habit row then renders '0/7 (0%)' in red for a habit that was never tracked. "
-            "Hurts: a habit rename silently reads as a total collapse in adherence, and the "
-            "MVP average it feeds is depressed by data absence."
-        ),
-    )
     def test_a_habit_absent_from_the_days_map_is_absence_not_a_recorded_miss(self):
         p = profile_row(mvp_habits=["tracked", "archived"])
         h = as_range("habitify", {"2026-08-02": {"habits": {"tracked": 1}}})
@@ -1339,40 +1311,22 @@ class TestFetchStaleInsights:
         table.add(insight_row("2026-07-20T00:00:00", "2026-07-20T00:00:00Z", text="newer"))
         assert [s["text"] for s in wd.fetch_stale_insights()] == ["older", "newer"]
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-3, P1 — the Open Insights section is permanently dark): "
-            "weekly_digest_lambda.py:753-756 parses `date_saved` with "
-            "datetime.fromisoformat(...) and subtracts it from a tz-AWARE "
-            "datetime.now(timezone.utc). But BOTH writers store a date-only string — "
-            "mcp/tools_lifestyle.py:266 and insight_email_parser_lambda.py:137 both use "
-            "now.strftime('%Y-%m-%d') — which parses NAIVE, so the subtraction raises "
-            "TypeError, the bare `except Exception` sets days_open = 0, and 0 >= 7 is never "
-            "true. Every real insight is therefore filtered out and the '⏳ N Open Insights' "
-            "box (:1950-1965) has never rendered. The MCP sibling gets it right "
-            "(tools_lifestyle.py:314 compares two dates). Hurts: the accountability loop — "
-            "the insights Matthew saves are never surfaced back to him."
-        ),
-    )
     def test_an_insight_saved_in_the_format_the_writers_use_is_reported_as_stale(self, table):
+        """Both writers store DATE-ONLY (`mcp/tools_lifestyle.py:278` and
+        `insight_email_parser_lambda.py:137`, each `now.strftime("%Y-%m-%d")`), which
+        parsed NAIVE and raised TypeError against a tz-aware now — so days_open was 0
+        for every real insight and the "⏳ N Open Insights" box had never rendered."""
         table.add(insight_row("2026-07-01T00:00:00", "2026-07-01"))
         stale = wd.fetch_stale_insights(days_threshold=7)
         assert len(stale) == 1, "date-only date_saved (what both writers store) never goes stale"
         assert stale[0]["days_open"] == 39
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-3, P3): weekly_digest_lambda.py:734-742 `fetch_stale_insights` "
-            "issues ONE table.query and reads resp['Items'] with no LastEvaluatedKey loop, "
-            "unlike every other read in this module (digest_utils.query_range and "
-            "_attribution_breakdown both paginate). DynamoDB truncates a query at 1 MB, so "
-            "once the insights partition grows past a page the oldest open items — exactly "
-            "the ones the section exists to surface — fall off silently. Hurts: a silently "
-            "truncated accountability list reads as a complete one."
-        ),
-    )
+    def test_an_unreadable_date_saved_is_withheld_rather_than_read_as_today(self, table):
+        """ADR-104: a corrupt date is unknown. It must not be silently dated to now
+        (the old `except: days_open = 0`) and must not be reported as stale either."""
+        table.add(insight_row("2026-07-01T00:00:00", "not-a-date"))
+        assert wd.fetch_stale_insights(days_threshold=7) == []
+
     def test_a_paginated_insights_partition_is_read_to_the_end(self, table):
         old = insight_row("2026-07-01T00:00:00", "2026-07-01T00:00:00Z", text="page two item")
         table.pages = [
@@ -1539,14 +1493,30 @@ class TestGatherAll:
         for src in ("whoop", "strava", "apple_health", "macrofactor", "withings", "habitify", "todoist", "day_grade", "hevy"):
             assert f"USER#matthew#SOURCE#{src}" in queried, f"{src} never queried"
 
-    def test_every_read_carries_the_phase_filter(self, table, monkeypatch):
-        """ADR-058 default-deny: a prior cycle's rows must not leak into a week."""
+    def test_every_read_carries_the_phase_filter_but_the_load_window(self, table, monkeypatch):
+        """ADR-058 default-deny: a prior cycle's rows must not leak into a week.
+
+        The ONE sanctioned exception (#2109/#2221) is the 60-day Banister window, a
+        trailing PHYSIOLOGICAL window that must not truncate to the age of the current
+        cycle. It is derived here, not listed: the unfiltered reads must be exactly the
+        reads whose window starts before the four-week arm does, and their source must
+        be one the phase taxonomy itself says reads cross-phase.
+        """
+        from experiment.phase_filter import source_reads_cross_phase
+
         monkeypatch.setattr(wd, "boto3", FakeBoto3(FakeS3({})))
         table.add(profile_row())
         wd.gather_all()
         ranged = [q for q in table.queries if ":s" in (q.get("ExpressionAttributeValues") or {})]
         assert ranged
-        assert all(PHASE_FILTER_EXPRESSION in (q.get("FilterExpression") or "") for q in ranged)
+        unfiltered = [q for q in ranged if PHASE_FILTER_EXPRESSION not in (q.get("FilterExpression") or "")]
+        four_week_start = f"DATE#{(FROZEN_NOW.date() - timedelta(days=28)).isoformat()}"
+        for q in unfiltered:
+            vals = q["ExpressionAttributeValues"]
+            src = vals[":pk"].rsplit("#", 1)[-1]
+            assert source_reads_cross_phase(src), f"{src} opted out of the phase filter but is not cross-phase"
+            assert vals[":s"] < four_week_start, f"{src} skipped the filter on a window inside the experiment cycle"
+        assert len(unfiltered) == 1, f"only the 60-day load window may read cross-phase: {unfiltered}"
 
     def test_the_extracted_week_only_contains_days_inside_the_window(self, table, monkeypatch):
         monkeypatch.setattr(wd, "boto3", FakeBoto3(FakeS3({})))
@@ -1569,19 +1539,6 @@ class TestGatherAll:
         # must not raise — the reset-morning DLQ crash class
         wd.build_html(data, BOARD_TEXT, profile)
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-3, P3 — cost/latency): weekly_digest_lambda.py:951 already pulls "
-            "four weeks of every source in one paginated query per source, then :998 evaluates "
-            "a dict comprehension whose result is DISCARDED (a dead statement, one more "
-            "day_grade query) and :1001-1003 re-issues the identical four-week query for all "
-            "ten sources a second time to build `full_data`. Every source is therefore read at "
-            "least twice per run, and day_grade four times (here, the dead line, and again in "
-            "lambda_handler:2120). Hurts: nothing the reader sees — pure RCU and cold-start "
-            "latency on a Lambda that already runs close to its timeout."
-        ),
-    )
     def test_each_source_is_read_once_per_run(self, table, monkeypatch):
         monkeypatch.setattr(wd, "boto3", FakeBoto3(FakeS3({})))
         table.add(profile_row())
@@ -1942,20 +1899,6 @@ class TestBuildHtmlNumbers:
         assert "Range: 70.0–90.0" in html
         assert "2 days graded" in html
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-3, P2 — the number and the letter beside it disagree): "
-            "weekly_digest_lambda.py:1362-1383 `from_letter` is a private re-implementation of "
-            "scoring_engine.letter_grade and is applied to the UNROUNDED weekly average, while "
-            ":1423 prints `round(dg_avg)` next to it. A week averaging 84.6 renders "
-            "'85 B+' — because from_letter(84.6) = 'B+' but the platform's own "
-            "letter_grade(85) = 'A-'. The mismatched letter also picks the colour "
-            "(grade_colour), so the headline is painted blue instead of green. Hurts: the one "
-            "number at the top of the email contradicts the letter printed on it, and "
-            "contradicts what /cockpit shows for the same week."
-        ),
-    )
     def test_the_headline_letter_matches_the_headline_number(self):
         dg = {
             "days": [{"date": "2026-08-02", "score": 85, "grade": "A-"}],
@@ -1989,19 +1932,6 @@ class TestBuildHtmlNumbers:
         for label in ("Nutrition", "Movement", "Water", "Journal", "Glucose"):
             assert scorecard_value(html, label) == "—"
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-3, P1 — ADR-104 falsy-fallback): weekly_digest_lambda.py:1574-1578 "
-            "uses `comp_avgs.get(x) or <fallback>` for Sleep, Recovery and Habits. A component "
-            "average of exactly 0.0 — a real, measured, catastrophic week — is falsy, so the "
-            "cell silently falls through to a DIFFERENT measurement (the raw Whoop/Habitify "
-            "aggregate), which is computed over a different denominator and is usually "
-            "non-zero. The reader is shown a healthy-looking number for the worst week the "
-            "scoring engine can record. Correct: `if comp_avgs.get(x) is not None`. Hurts: the "
-            "single worst week is the one the scorecard misreports."
-        ),
-    )
     def test_a_genuinely_zero_component_average_is_shown_as_zero(self):
         dg = {
             "days": [{"date": "2026-08-02", "score": 10, "grade": "F"}],
@@ -2064,39 +1994,30 @@ class TestBuildHtmlNumbers:
         assert name[:30] + "..." in html
         assert name not in html
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-3, P2 — a lower bound printed as an exact count): "
-            "weekly_digest_lambda.py:1755-1769 renders '⭐ Essential Seven — Perfect Days: "
-            "N/M days' where N is `min(per-habit completion counts)`. The code's own comment "
-            "concedes it is 'at least this many days' — min-of-counts is a lower bound on the "
-            "number of days where ALL habits were done, not that number. Two habits each done "
-            "5 of 7 days on DISJOINT days yields 0 perfect days but renders 5/7 with a green "
-            "bar. `ex_habitify` already walks the per-day habit maps (:428-443) and could "
-            "count perfect days exactly. Hurts: Matthew's flagship consistency metric is "
-            "systematically overstated, and never understated, so the error only ever "
-            "flatters."
-        ),
-    )
     def test_perfect_days_counts_days_on_which_every_habit_was_done(self):
-        # Two habits, each completed on 1 of 2 tracked days, on DIFFERENT days →
-        # zero days had both done.
-        hab = {"mvp_avg_pct": 50.0, "mvp_completion": {"a": 1, "b": 1}, "mvp_total": 2, "days_tracked": 2}
-        html = wd.build_html(digest_data(this={"habitify": hab}), BOARD_TEXT, profile_row(mvp_habits=["a", "b"]))
+        """Two habits, each done on 1 of 2 tracked days, on DIFFERENT days → zero
+        perfect days. `min(per-habit totals)` said 1, a lower bound printed as an exact
+        count, and the error only ever flattered.
+
+        Driven through `ex_habitify` rather than a hand-written summary dict (the shape
+        the marker used): the exact count can only come from the per-day habit maps, so
+        a hand-built dict cannot exercise the fix.
+        """
+        p = profile_row(mvp_habits=["a", "b"])
+        h = as_range("habitify", {"2026-08-02": {"habits": {"a": 1, "b": 0}}, "2026-08-03": {"habits": {"a": 0, "b": 1}}})
+        hab = wd.ex_habitify(h, p)
+        assert hab["mvp_perfect_days"] == 0
+        html = wd.build_html(digest_data(this={"habitify": hab}), BOARD_TEXT, p)
         assert "0/2 days" in html
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-3, P2 — window-name honesty, #1917): weekly_digest_lambda.py:1739 "
-            "renders the row '7-Day Sleep Debt' but compute_sleep_debt (:720) accrues the "
-            "target only over the nights that HAVE a duration — `target × len(durs)`. Three "
-            "nights at exactly 7.5 h and four nights with no strap render '7-Day Sleep Debt: "
-            "0.0 hrs' in green. The returned dict already carries `nights`, and the renderer "
-            "drops it. Hurts: four unmeasured nights are published as a debt-free week."
-        ),
-    )
+    def test_a_perfect_day_count_the_extractor_did_not_supply_renders_as_absence(self):
+        """ADR-104: an old-shape summary with no `mvp_perfect_days` must render "—",
+        not a fabricated zero and not the old min-of-counts guess."""
+        hab = {"mvp_avg_pct": 50.0, "mvp_completion": {"a": 1, "b": 1}, "mvp_total": 2, "days_tracked": 2}
+        html = wd.build_html(digest_data(this={"habitify": hab}), BOARD_TEXT, profile_row(mvp_habits=["a", "b"]))
+        assert "Perfect Days" in html
+        assert "1/2 days" not in html and "0/2 days" not in html
+
     def test_a_sleep_debt_row_discloses_how_many_nights_it_covers(self):
         sd = {"debt_hrs": 0.0, "nights": 3, "avg_hrs": 7.5, "target_hrs": 7.5}
         html = wd.build_html(digest_data(this={"sleep": {"score_avg": 80.0}}, sleep_debt=sd), BOARD_TEXT, profile_row())
@@ -2110,18 +2031,17 @@ class TestBuildHtmlNumbers:
 
 
 class TestBuildHtmlPrivacy:
-    def test_the_delivery_free_streak_is_never_rendered_in_the_digest(self, table, delivery_public):
-        """Pins today's behaviour: `get_food_delivery_digest_line` exists and
-        returns a line, but nothing calls it — see the xfail below.
+    def test_the_delivery_free_streak_is_withheld_while_the_gate_is_off(self, wired):
+        """#2233's disclosure gate, asserted END TO END through the handler.
 
-        #2233 gates `get_food_delivery_digest_line` behind NUTRITION_DELIVERY_PUBLIC
-        (default off); the `delivery_public` fixture turns the flag on so this test's
-        own point (the line exists but nothing calls it) is exercised rather than
-        short-circuited by an unrelated disclosure default.
-        `test_no_binge_or_delivery_spend_figure_reaches_the_rendered_digest` below is
-        the dedicated flag-off guard.
+        This test used to pin the OPPOSITE — that the streak never renders — because
+        `get_food_delivery_digest_line` had no call site at all (the marker below it
+        described the dead code). Now that the line reaches the section it was written
+        for, the contract worth pinning is the GATE: with NUTRITION_DELIVERY_PUBLIC
+        unset (the default), the reader never queries the partition and nothing renders,
+        even with a live 31-day streak sitting in the table.
         """
-        table.add(
+        wired["table"].add(
             {
                 "pk": "USER#matthew#SOURCE#food_delivery",
                 "sk": "STREAK#current",
@@ -2129,10 +2049,10 @@ class TestBuildHtmlPrivacy:
                 "updated_at": FROZEN_NOW.isoformat(),  # #2235: fresh
             }
         )
-        assert wd.get_food_delivery_digest_line() == "Delivery-free streak: 31 days (nutrition bonus 1.10x active)"
-        m = {"calories_avg": 1800.0, "protein_avg_g": 190.0, "calorie_target": 1800, "protein_target": 190, "days_logged": 7}
-        html = wd.build_html(digest_data(this={"macrofactor": m}), BOARD_TEXT, profile_row())
+        wd.lambda_handler({}, None)
+        html = wired["ses"].sent[0]["Content"]["Simple"]["Body"]["Html"]["Data"]
         assert "Delivery-free streak" not in html
+        assert "Delivery-Free Streak" not in html
 
     def test_no_binge_or_delivery_spend_figure_reaches_the_rendered_digest(self, table):
         """Privacy regression guard: the delivery/binge signals are owner-only
@@ -2182,22 +2102,16 @@ class TestFoodDeliveryDigestLine:
         table.get_error = RuntimeError("ddb down")
         assert wd.get_food_delivery_digest_line() is None
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-3, P2 — a shipped feature that is dead code): "
-            "weekly_digest_lambda.py:2050 `get_food_delivery_digest_line` documents itself as "
-            "'Returns a one-line summary for the weekly digest nutrition section', but a "
-            "repo-wide grep finds no caller — not build_html, not lambda_handler, not any "
-            "test. The delivery-free streak (which the character engine already treats as a "
-            "nutrition multiplier, character_sheet_lambda.py:653) is never reported back to "
-            "Matthew in the weekly email. Hurts: the behaviour-change loop this streak exists "
-            "to reinforce has no weekly readout, and the function is carried, deployed and "
-            "maintained for nothing."
-        ),
-    )
-    def test_the_streak_line_reaches_the_nutrition_section_it_is_written_for(self, table, delivery_public):
-        table.add(
+    def test_the_streak_line_reaches_the_nutrition_section_it_is_written_for(self, wired, delivery_public):
+        """CORRECTION to the marker this replaces: it asserted on `build_html` alone,
+        which would have forced the renderer to issue its own DynamoDB read. `build_html`
+        is pure in this module — every other fetched value (mcp_mutations_line, the ACWR
+        record, the gate telemetry) is gathered by `gather_all` and handed to the
+        renderer — so the wiring goes there, and the assertion is on the email the
+        handler actually sends. The marker's claim was exact: the function documented
+        itself as the weekly-digest nutrition line and had no caller anywhere.
+        """
+        wired["table"].add(
             {
                 "pk": "USER#matthew#SOURCE#food_delivery",
                 "sk": "STREAK#current",
@@ -2205,8 +2119,8 @@ class TestFoodDeliveryDigestLine:
                 "updated_at": FROZEN_NOW.isoformat(),
             }
         )
-        m = {"calories_avg": 1800.0, "protein_avg_g": 190.0, "calorie_target": 1800, "protein_target": 190, "days_logged": 7}
-        html = wd.build_html(digest_data(this={"macrofactor": m}), BOARD_TEXT, profile_row())
+        wd.lambda_handler({}, None)
+        html = wired["ses"].sent[0]["Content"]["Simple"]["Body"]["Html"]["Data"]
         assert "Delivery-free streak: 31 days" in html
 
 
@@ -2374,22 +2288,6 @@ class TestLambdaHandler:
         monkeypatch.setattr(wired["writer"], "write_insights_batch", boom)
         assert wd.lambda_handler({}, None)["statusCode"] == 200
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-3, P2 — an AI-failure stub filed as genuine coaching): "
-            "weekly_digest_lambda.py:2173 gates the insight write on `if _HAS_INSIGHT_WRITER "
-            "and commentary` only. When call_haiku raises (:2140-2142, which includes the "
-            "tier-3 BudgetExceeded path) commentary becomes the canned '🎯 THE CHAIR — "
-            "OVERVIEW / Commentary unavailable.' stub, and that stub is written to the ledger "
-            "with insight_type='coaching', confidence='high', actionable=True. "
-            "insight_writer.build_insights_context then replays it into NEXT week's Board "
-            "prompt as PREVIOUS INSIGHTS (:1199). The validator's safe_fallback takes the same "
-            "path. Same shape as the tranche-1/tranche-2 findings on daily_brief and "
-            "weekly_plate. Hurts: the insight ledger accumulates non-content that is fed back "
-            "to the model as if it were last week's coaching."
-        ),
-    )
     def test_a_failed_board_call_is_not_filed_as_genuine_coaching(self, wired, monkeypatch):
         monkeypatch.setattr(wd, "call_haiku", lambda d, p: (_ for _ in ()).throw(RuntimeError("bedrock 500")))
         wd.lambda_handler({}, None)
