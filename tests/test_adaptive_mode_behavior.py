@@ -8,11 +8,13 @@ Patch" banner, and the board's register follows it. A defect here does not
 corrupt a number — it tells a person they are struggling, or fails to notice
 that they are.
 
-Two of the four scoring components read field names that no writer produces
-(see the xfail'd tests below), which is why the reachability tests here are
-written against the *composite contract* — "a good day can reach flourishing",
-"a day with no data is not called a rough patch" — rather than against the
-per-component internals. Those are the claims a reader actually experiences.
+#2214 (fixed): two of the four scoring components used to read field names no
+writer produced — score_journal did a plain get_item against the notion
+partition when notion_lambda only ever writes suffixed keys, and
+score_grade_trend read 'score'/'grade_numeric'/'numeric_grade' when both
+day_grade writers stamp 'total_score'. Both are now fixed (query the date's
+suffix range for journal; read total_score for grade trend) and the four
+tests that pinned the defect (below) are real, passing assertions again.
 
 Every clock is frozen; the fake table is bounded and hand-rolled.
 """
@@ -223,19 +225,6 @@ class TestGradeTrend:
         score, _ = am.score_grade_trend(YESTERDAY)
         assert 0 <= score <= 100
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-2 discovery): score_grade_trend reads 'score' / "
-            "'grade_numeric' / 'numeric_grade' from the day_grade partition, but "
-            "every writer (daily_metrics_compute.store_day_grade and "
-            "daily_brief_lambda.store_day_grade) stores the value as 'total_score' "
-            "— which ingestion_validator lists as a REQUIRED field for that "
-            "partition. The lookup therefore never matches, so this 25%-weighted "
-            "component is permanently pinned at the neutral 50 and always reports "
-            "'insufficient grade history'."
-        ),
-    )
     def test_a_real_grade_history_produces_a_real_trend(self, table):
         # A week of clearly improving grades, written the way the partition is
         # actually written (total_score).
@@ -263,17 +252,6 @@ class TestJournalScoring:
     def test_no_journal_record_scores_zero(self, table):
         assert am.score_journal(YESTERDAY) == (0, "no journal entry")
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-2 discovery): score_journal does a get_item on "
-            "sk='DATE#<date>' of the notion partition, but notion_lambda only ever "
-            "writes SUFFIXED sort keys ('DATE#<date>#journal#<template>'). No plain "
-            "DATE# item exists, so the lookup always misses and this 25%-weighted "
-            "component returns 0 / 'no journal entry' on every single day, however "
-            "much was written."
-        ),
-    )
     def test_two_substantive_entries_score_full_marks(self, table):
         seed(
             table,
@@ -349,34 +327,11 @@ class TestCompositeMode:
         seed(table, _habit_row(YESTERDAY, t0_done=t0_done, t0_total=t0_total, t1_done=t0_done and 2 or 0, t1_total=2))
         assert am.compute_adaptive_mode(YESTERDAY)["brief_mode"] == expected_mode
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-2 discovery, consequence of the two field-name "
-            "mismatches above): with journal pinned at 0 and grade_trend pinned at "
-            "50, the composite maxes out at 0*.25 + 100*.30 + 100*.20 + 50*.25 = "
-            "62.5. The 'flourishing' threshold is 70, so the 🌟 mode is "
-            "MATHEMATICALLY UNREACHABLE — the best possible day is reported as "
-            "'standard'."
-        ),
-    )
     def test_the_best_possible_day_can_reach_flourishing(self, table):
         _best_possible_day(table)
         result = am.compute_adaptive_mode(YESTERDAY)
         assert result["brief_mode"] == "flourishing", result["component_scores"]
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-2 discovery): a day with NO data at all scores "
-            "0*.25 + 50*.30 + 50*.20 + 50*.25 = 37.5, which is below the 40 "
-            "'struggling' threshold — so an empty platform tells the reader "
-            "'💛 Rough Patch'. Absence must not be rendered as struggle "
-            "(ADR-104); the three data-absent components deliberately return the "
-            "neutral 50, and the journal component's hard 0 (see the field-name "
-            "defect above) is what drags the composite under the line."
-        ),
-    )
     def test_a_day_with_no_data_at_all_is_not_called_a_rough_patch(self, table):
         result = am.compute_adaptive_mode(YESTERDAY)
         assert result["brief_mode"] != "struggling", result["component_scores"]
