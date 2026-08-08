@@ -20,6 +20,7 @@ Pins every acceptance criterion of the consent-per-line verbatim channel:
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import sys
@@ -43,6 +44,7 @@ import pytest  # noqa: E402
 from content import journal_quotes as jq  # noqa: E402
 from experiment import phase_taxonomy as pt  # noqa: E402
 from privacy import privacy_guard  # noqa: E402
+from web import site_api_common as sac  # noqa: E402 — reuse the real normalizer, not a copy of it
 
 from mcp import tools_journal as tj  # noqa: E402
 
@@ -278,10 +280,15 @@ def test_endpoint_serves_dated_labeled_quotes_with_receipts(coach_module):
     assert q["receipts"] == "/cockpit/?date=2026-07-21"
 
 
-def test_endpoint_withholds_a_quote_the_filter_would_alter(coach_module):
-    """All-or-nothing (the #1569 verbatim rule): a stored line the serve-time content
-    filter would touch is dropped entirely, never served mangled. Defense in depth —
-    the mark gate refuses these anyway; this pins the second layer."""
+def test_endpoint_withholds_a_quote_the_first_screen_flags(coach_module):
+    """First-layer pin (#2203 correction — this test previously mis-claimed to pin
+    the second/defense-in-depth layer, but its fixture trips jq.find_mark_violations
+    (the FULL taboo vocabulary — substances/real-name/family/private-event/age)
+    outright, so the handler `continue`s before `_public_decision_note` (the
+    narrower #1569 all-or-nothing scrub) is ever reached. It's a real regression
+    test for the wider gate, just not the one its old docstring described. See
+    test_endpoint_withholds_a_quote_only_the_second_screen_would_catch below for a
+    fixture that actually exercises the second layer."""
     sc, ft = coach_module
     ft.put_item(
         Item={
@@ -290,6 +297,61 @@ def test_endpoint_withholds_a_quote_the_filter_would_alter(coach_module):
             "date": "2026-07-21",
             "quote": "weed on my mind",
             "marked_at": "2026-07-21T20:00:00Z",
+            "grounding": "verified",
+        }
+    )
+    # Precondition that motivates this being a first-layer (not second-layer) test:
+    # the fixture trips find_mark_violations itself.
+    assert jq.find_mark_violations("weed on my mind") != []
+    body = _body(sc.handle_journal_quotes({"queryStringParameters": None}))
+    assert body["quotes"] == [] and body["featured"] is None
+
+
+def test_endpoint_withholds_a_quote_only_the_second_screen_would_catch(coach_module):
+    """Genuine second-layer pin (#2203, the #1569/ADR-142 all-or-nothing rule via
+    `_public_decision_note`).
+
+    The wider gate (jq.find_mark_violations) matches its taboo vocabulary with
+    \\b-anchored word-boundary regexes, so a term broken up with letter-spacing
+    never matches — the fixture below clears find_mark_violations outright (see
+    the inline assertion). The narrower gate's underlying scrub
+    (site_api_common._scrub_blocked_terms) additionally normalizes the text
+    (strips whitespace/punctuation, lowercases) before checking for a long,
+    unambiguous vice term and — if one turns up only in that normalized form —
+    refuses the WHOLE text rather than surgically excising an obfuscated span.
+    That refusal makes the scrubbed text differ from the raw quote, so
+    _public_decision_note (the #1569 all-or-nothing rule) returns None and the
+    handler withholds the quote — this is the ONLY one of the two screens that
+    catches this fixture, so a screen-2 regression genuinely reds this test.
+
+    The vice term is pulled live from config/content_filter.json (the same file
+    _scrub_blocked_terms's runtime fallback mirrors) rather than hardcoded, so the
+    fixture tracks the real vocabulary instead of a copy of it."""
+    sc, ft = coach_module
+    cf_path = os.path.join(_REPO, "config", "content_filter.json")
+    with open(cf_path, encoding="utf-8") as f:
+        cf = json.load(f)
+    # _scrub_blocked_terms's normalized fail-safe only fires for terms whose
+    # de-spaced form is >=7 chars (see its docstring) — pick the shortest term
+    # that qualifies, so the fixture stays as mild as the vocabulary allows.
+    term = min(
+        (kw for kw in cf["blocked_vice_keywords"] if len(sac._normalize_for_detection(kw)) >= 7),
+        key=len,
+    )
+    obfuscated_term = " ".join(term)  # defeats the \b-anchored regex both screens' literal passes use
+    quote = f"Almost reached for the {obfuscated_term} again tonight."
+
+    # Empirically confirm the premise inline (not just asserted in the docstring):
+    # screen 1 clears this fixture outright.
+    assert jq.find_mark_violations(quote) == []
+
+    ft.put_item(
+        Item={
+            "pk": QUOTES_PK,
+            "sk": jq.quote_sk("2026-07-22", quote),
+            "date": "2026-07-22",
+            "quote": quote,
+            "marked_at": "2026-07-22T20:00:00Z",
             "grounding": "verified",
         }
     )
