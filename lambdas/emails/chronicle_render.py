@@ -32,12 +32,14 @@ def markdown_to_html(md_text):
     for line in lines:
         stripped = line.strip()
 
-        # Blockquotes (Board interviews)
-        if stripped.startswith("> "):
+        # Blockquotes (Board interviews). #2221: the marker is ">" — the space after
+        # it is OPTIONAL in markdown. Requiring "> " rendered an interview written as
+        # ">Dr. Park said..." as ordinary prose with a stray ">" in front of it.
+        if stripped.startswith(">"):
             if not in_blockquote:
                 in_blockquote = True
                 bq_buffer = []
-            bq_buffer.append(stripped[2:])
+            bq_buffer.append(stripped[1:].lstrip())
             continue
         elif in_blockquote:
             # End of blockquote

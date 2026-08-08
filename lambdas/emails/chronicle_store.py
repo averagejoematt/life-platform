@@ -39,7 +39,7 @@ def store_installment(
     body_html,
     themes,
     has_board,
-    confidence_level="MEDIUM",
+    confidence_level="UNKNOWN",  # #2221: an unstated confidence is unmeasured, not middling
     confidence_badge_html="",  # BS-05
     status="published",
     approval_token=None,
@@ -195,6 +195,61 @@ def _set_chronicle_pending(week_num, reason, display, *, _g):
         logger.info(f"[chronicle] pending marker set: week={week_num} reason={reason}")
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[chronicle] _set_chronicle_pending failed (non-fatal): {e}")
+
+
+def held_week(week_num, reason, display, body, status_code=500, dry_run=False, *, _g):
+    """#803/#2221: end a week WITHOUT publishing, but never silently.
+
+    #803 gave the privacy hold a reader-facing marker so /story/chronicle/ could say
+    why no new week landed instead of just going stale and renumbering. Every other
+    non-publishing exit had been left silent — the gather failure, the data-packet
+    failure, the AI failure, the #914 presence hold and the AI-3 safety block each
+    returned a 500 and the week simply vanished from the listing. This is the one
+    exit those routes share, so a new hold cannot forget the marker.
+
+    The marker is fail-open (see chronicle_store._set_chronicle_pending) and clears
+    itself the next time a week actually publishes, so a transient failure that a
+    retry fixes leaves no residue.
+
+    `dry_run` suppresses the marker: a rehearsal must not rewrite the reader-facing
+    posts.json.
+    """
+    logger = _g["logger"]
+    if dry_run:
+        logger.info(f"[dry_run] would mark week {week_num} pending: reason={reason}")
+    else:
+        _set_chronicle_pending(week_num, reason, display, _g=_g)
+    return {"statusCode": status_code, "body": body}
+
+
+def dry_run_response(week_num, date_str, title, stats_line, raw_markdown, conf_level, has_board, share_kit, recap, preview_mode, *, _g):
+    """#2221: the {"dry_run": true} rehearsal's report.
+
+    The handler reaches this instead of the store/publish branches, so nothing was
+    written, published or mailed. Report what WOULD have happened so the run is
+    inspectable without touching a reader, a mailbox or a stored row.
+    """
+    logger = _g["logger"]
+    words = len(raw_markdown.split())
+    logger.info(f"[dry_run] Week {week_num} built ({words} words) — nothing stored, published or mailed")
+    return {
+        "statusCode": 200,
+        "body": json.dumps(
+            {
+                "status": "dry_run",
+                "week": week_num,
+                "date": date_str,
+                "title": title,
+                "stats_line": stats_line,
+                "words": words,
+                "confidence_level": conf_level,
+                "has_board_interview": has_board,
+                "share_kit": bool(share_kit),
+                "recap_beats": len((recap or {}).get("recent_beats", [])),
+                "would_have": "stored a draft + mailed the preview" if preview_mode else "published + mailed the installment",
+            }
+        ),
+    }
 
 
 def _send_preview_email(title, week_num, date_str, approval_token, email_html, kit_block="", *, _g):

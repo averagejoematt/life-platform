@@ -349,6 +349,10 @@ def _send_preview_email(title, week_num, date_str, approval_token, email_html, k
     return _store._send_preview_email(title, week_num, date_str, approval_token, email_html, kit_block=kit_block, _g=globals())
 
 
+def _held_week(week_num, reason, display, body, status_code=500, dry_run=False):
+    return _store.held_week(week_num, reason, display, body, status_code=status_code, dry_run=dry_run, _g=globals())
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # HANDLER
 # ══════════════════════════════════════════════════════════════════════════════
@@ -362,7 +366,11 @@ def record_email_send(table, lambda_name):
     try:
         table.put_item(
             Item={
-                "pk": f"USER#matthew#SOURCE#email_log#{lambda_name}",
+                # #2221: derive the user from USER_ID like every other write in this
+                # Lambda. The hard-coded 'matthew' put the send record in the wrong
+                # partition under any non-default USER_ID (same fix as
+                # nutrition_review_lambda's copy of this helper).
+                "pk": f"USER#{USER_ID}#SOURCE#email_log#{lambda_name}",
                 "sk": f"DATE#{today}",
                 "sent_at": datetime.now(timezone.utc).isoformat(),
                 "status": "success",
@@ -446,6 +454,24 @@ def lambda_handler(event: dict, context) -> dict:
     # chronicle week. Lets the first recap go live now (and supports regeneration)
     # without forcing an out-of-cadence installment.
     event = event or {}
+
+    # #2221 (#2111 class): {"dry_run": true} rehearses the week — gather, packet, the
+    # Sonnet call, the grounding/presence/AI-3/privacy gates and the render all run, and
+    # NOTHING is written, published or mailed: no installment row, no journal/share-kit
+    # S3 write, no pending marker, no recap commit, no Elena state invoke, no insight
+    # row, no email_log row, no SES send. It is not free — the model call is the point,
+    # so a rehearsal costs one Sonnet generation — but it is the only way to inspect a
+    # week without mailing Matthew. Sibling email lambdas (between_chronicle,
+    # chronicle_approve, coach_panel_podcast) accept the same flag; this one — the most
+    # expensive of them — had no gate at all, so every manual invoke sent mail.
+    _dry = bool(event.get("dry_run"))
+    if _dry:
+        logger.info("[dry_run] rehearsal invoke — the week will be built but never stored, published or mailed")
+
+    # Phase 3 bootstrap/regenerate: {"recap_only": true} builds + commits the
+    # "previously on" recap from EXISTING published installments WITHOUT writing a new
+    # chronicle week. Lets the first recap go live now (and supports regeneration)
+    # without forcing an out-of-cadence installment.
     if event.get("recap_only"):
         data = gather_chronicle_data()
         if not data:
@@ -453,6 +479,11 @@ def lambda_handler(event: dict, context) -> dict:
         recap = build_recap(data, new_installment_md=None, new_meta=None)
         if not recap or not recap.get("as_of"):
             return {"statusCode": 200, "body": json.dumps({"status": "recap_skipped", "reason": "no published history or build failed"})}
+        if _dry:
+            return {
+                "statusCode": 200,
+                "body": json.dumps({"status": "dry_run_recap", "as_of": recap["as_of"], "beats": len(recap.get("recent_beats", []))}),
+            }
         _write_recap(recap, recap["as_of"])
         return {
             "statusCode": 200,
@@ -471,19 +502,28 @@ def lambda_handler(event: dict, context) -> dict:
         # reads it, so the tier band can be rebanded there without editing this lambda.
         if not allow("chronicle"):
             logger.info("Budget guard paused 'chronicle' — Wednesday chronicle skipped this week (no Bedrock spend)")
-            _set_chronicle_pending(
+            return _held_week(
                 None,
                 "budget_tier",
                 "This week's chronicle is paused — the platform's AI budget guard is protecting monthly spend. "
                 "It resumes automatically once usage drops below the threshold.",
+                "skipped: budget tier",
+                status_code=200,
+                dry_run=_dry,
             )
-            return {"statusCode": 200, "body": "skipped: budget tier"}
     except ImportError:
         pass
 
     data = gather_chronicle_data()
     if not data:
-        return {"statusCode": 500, "body": "Failed to gather data"}
+        return _held_week(
+            None,
+            "generation_error",
+            "This week's chronicle didn't land — the platform couldn't assemble the week's data in time. "
+            "Nothing was published or stored for this week; it retries on the next run.",
+            "Failed to gather data",
+            dry_run=_dry,
+        )
 
     # ── #2254: generation-time idempotency ────────────────────────────────────
     # This gate sits BEFORE build_data_packet and the Sonnet call, so a retry, a
@@ -525,7 +565,14 @@ def lambda_handler(event: dict, context) -> dict:
         data_packet, week_num = build_data_packet(data)
     except Exception as e:
         logger.error(f"build_data_packet raised: {e}")
-        return {"statusCode": 500, "body": f"Failed to build data packet: {e}"}
+        return _held_week(
+            None,
+            "generation_error",
+            "This week's chronicle didn't land — the platform couldn't turn the week's data into the "
+            "packet the writer works from. Nothing was published or stored for this week.",
+            f"Failed to build data packet: {e}",
+            dry_run=_dry,
+        )
     logger.info(f"Data packet: {len(data_packet)} chars, Week {week_num}")
 
     # Build user message with previous installments for continuity
@@ -661,7 +708,14 @@ def lambda_handler(event: dict, context) -> dict:
         raw_installment = call_anthropic(elena_prompt, user_message, archive_text=_archive_text)
     except Exception as e:
         logger.error(f"Anthropic failed: {e}")
-        return {"statusCode": 500, "body": f"AI generation failed: {e}"}
+        return _held_week(
+            week_num,
+            "ai_error",
+            f"Week {week_num}'s installment wasn't written — the model call failed. Nothing was published "
+            "or stored for this week; the next run picks the story back up.",
+            f"AI generation failed: {e}",
+            dry_run=_dry,
+        )
 
     logger.info(f"Installment received: {len(raw_installment)} chars, ~{len(raw_installment.split())} words")
 
@@ -686,8 +740,9 @@ def lambda_handler(event: dict, context) -> dict:
             logger.info(f"[ADR-104] chronicle corrected once; residual findings: {len(_residual)}")
         elif _residual:
             logger.warning(f"[ADR-104] chronicle keeps {len(_residual)} residual grounding findings (best draft)")
-        if _corrected or _residual:
+        if (_corrected or _residual) and not _dry:
             # #812/#744: a fired chronicle gate is labeled eval data — retain the pair.
+            # #2221: a rehearsal writes nothing, not even fail-soft eval data.
             try:
                 from experiment import eval_retention
 
@@ -730,7 +785,15 @@ def lambda_handler(event: dict, context) -> dict:
                 logger.warning(f"[#914] chronicle presence-ack gate fired: {_ack_finding.get('detail')}")
             if raw_installment is None:
                 logger.error("[#914] chronicle HELD by presence-ack gate — not publishing this week")
-                return {"statusCode": 500, "body": "[#914] Chronicle held: presence gap unacknowledged at severity loud/alarm"}
+                return _held_week(
+                    week_num,
+                    "presence_hold",
+                    f"Week {week_num}'s installment was written and then withheld — Matthew's own logging went "
+                    "quiet during the window, and the draft narrated a normal week over an incomplete one. "
+                    "No chronicle beats a dishonest one. Nothing was published or stored for this week.",
+                    "[#914] Chronicle held: presence gap unacknowledged at severity loud/alarm",
+                    dry_run=_dry,
+                )
     except ImportError:
         pass  # engagement_core unavailable — serve as before
     except Exception as _ack_e:
@@ -741,7 +804,15 @@ def lambda_handler(event: dict, context) -> dict:
         _val = validate_ai_output(raw_installment, AIOutputType.CHRONICLE, min_length=200)
         if _val.blocked:
             logger.error(f"[AI-3] Chronicle BLOCKED: {_val.block_reason}")
-            return {"statusCode": 500, "body": f"[AI-3] Chronicle blocked: {_val.block_reason}"}
+            return _held_week(
+                week_num,
+                "safety_hold",
+                f"Week {week_num}'s installment was generated but withheld before publishing — it didn't clear "
+                "the platform's automatic output check on the writing itself. No content was published or "
+                "stored for this week.",
+                f"[AI-3] Chronicle blocked: {_val.block_reason}",
+                dry_run=_dry,
+            )
         elif _val.warnings:
             logger.warning(f"[AI-3] Chronicle warnings: {_val.warnings}")
 
@@ -767,7 +838,12 @@ def lambda_handler(event: dict, context) -> dict:
     # BS-05: Compute confidence badge based on total journey data depth.
     # Henning: LOW (<14d data), MEDIUM (14-49d), HIGH (≥50d + sig + effect).
     # Chronicle draws on full journey history — use days-since-start as n.
-    _conf_level = "MEDIUM"
+    # #2221 / ADR-104-105: the default is UNKNOWN, not MEDIUM. When the BS-05 module is
+    # absent or compute_confidence raises, nothing about this week's evidence has been
+    # measured — storing "MEDIUM" asserted a middling verdict over a journey length no
+    # one looked at. An unmeasurable confidence must read as unmeasured. (The badge HTML
+    # was already "" on this path, so no reader-facing pill is invented either.)
+    _conf_level = "UNKNOWN"
     _conf_badge_html = ""
     _conf_reason = ""
     if _HAS_CONFIDENCE:
@@ -775,7 +851,7 @@ def lambda_handler(event: dict, context) -> dict:
             _journey_start = data.get("profile", {}).get("journey_start_date", EXPERIMENT_START_DATE)
             _journey_days = (datetime.strptime(data["dates"]["end"], "%Y-%m-%d") - datetime.strptime(_journey_start, "%Y-%m-%d")).days
             _conf = compute_confidence(days_of_data=_journey_days)
-            _conf_level = _conf.get("level", "MEDIUM")
+            _conf_level = _conf.get("level") or "UNKNOWN"
             _conf_badge_html = _conf.get("badge_html", "")
             _conf_reason = _conf.get("reason", "")
             logger.info(f"BS-05 confidence: {_conf_level} ({_conf_reason})")
@@ -787,9 +863,14 @@ def lambda_handler(event: dict, context) -> dict:
     # Convert to HTML
     body_html = markdown_to_html(body_md)
 
-    # Detect Board interview — a blockquote counts UNLESS it's Margaret's editor's
-    # note (#548), which is also rendered as a blockquote but isn't an interview.
-    has_board = any(line.strip().startswith("> ") and "editor's note" not in line.strip().lower() for line in body_md.split("\n"))
+    # #2221: ">" is the blockquote marker; the following space is optional in markdown
+    # (markdown_to_html and scripts/v4_build_journal.py match the same way). Requiring
+    # "> " left an interview written as ">Dr. Park said..." un-flagged, so the site's
+    # interview filter silently missed the week.
+    #
+    # Detect Board interview — a blockquote counts UNLESS it's Margaret's editor's note
+    # (#548), which is also rendered as a blockquote but isn't an interview.
+    has_board = any(line.strip().startswith(">") and "editor's note" not in line.strip().lower() for line in body_md.split("\n"))
 
     # Collect all installments for index pages (including the new one)
     date_str = data["dates"]["end"]
@@ -924,6 +1005,14 @@ def lambda_handler(event: dict, context) -> dict:
         new_meta={"date": date_str, "week_number": week_num, "title": title},
     )
     draft_recap_json = json.dumps(recap, default=str) if recap else None
+
+    if _dry:
+        # #2221: the rehearsal exit. Everything above this line is pure computation —
+        # every write in this handler lives in the two branches below and in the
+        # email_log row after them, and none of them run.
+        return _store.dry_run_response(
+            week_num, date_str, title, stats_line, raw_installment, _conf_level, has_board, share_kit, recap, PREVIEW_MODE, _g=globals()
+        )
 
     if PREVIEW_MODE:
         # ── FEAT-12: Build all HTML artifacts without publishing ─────────────

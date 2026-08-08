@@ -35,9 +35,11 @@ with a real `datetime.now()`.
 Fakes are hand-rolled and bounded — no MagicMock inside a pagination- or
 loop-shaped read.
 
-Tests that document a DEFECT in current behaviour are marked xfail with a
-`DEFECT (tranche-3 discovery)` reason naming the module, function, what it does
-and what it should do. No production code is modified here.
+This file carried six `DEFECT (tranche-3 discovery)` xfail markers. #2221 burned
+all six — every one named a real defect, and each fix landed in production code
+(the facade, emails/chronicle_personas.py, emails/chronicle_render.py,
+emails/chronicle_store.py and scripts/v4_build_journal.py). There are no xfails
+left here: a failure in this file is a regression, not a known gap.
 """
 
 import json
@@ -534,16 +536,9 @@ def test_a_failed_status_write_never_takes_down_the_chronicle(frozen_clock):
     m.record_email_send(table, "wednesday_chronicle")  # must not raise
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P3): wednesday_chronicle_lambda.record_email_send (line 357) hard-codes "
-        "'USER#matthew' in the partition key while every other write in this Lambda derives the user from the "
-        "USER_ID env var. Under any non-default USER_ID the send record lands in the wrong user's partition. Same "
-        "defect as nutrition_review_lambda's copy of this helper."
-    ),
-)
 def test_the_send_record_is_keyed_to_the_configured_user(monkeypatch, frozen_clock):
+    """#2221 (was a tranche-3 xfail): record_email_send hard-coded 'USER#matthew' while
+    every other write in this Lambda derives the user from USER_ID."""
     monkeypatch.setattr(m, "USER_ID", "someone_else")
     table = FakeTable()
     m.record_email_send(table, "wednesday_chronicle")
@@ -694,17 +689,11 @@ def test_a_notebook_read_failure_degrades_to_no_block_rather_than_a_failed_week(
     assert m._elena_notebook_block(5) == ""
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P3): _elena_notebook_block line 407 (and _due_callback_promises line 481) test "
-        "a promise's deadline with `int(c.get('due_by_week') or 10**6)`. Week 0 is a real week in this platform — the "
-        "PROLOGUE (see test_chronicle_prologue_order_1988, which reconciles prologue week_number to 0) — so a "
-        "promise due by week 0 is FALSY and is pushed out to week 1,000,000, i.e. never due. The most overdue "
-        "promise Elena can hold is the one the gate can never surface. The guard must test for None, not falsiness."
-    ),
-)
 def test_a_promise_due_in_the_prologue_week_is_still_due(monkeypatch):
+    """#2221 (was a tranche-3 xfail): week 0 is a REAL week — the prologue. The
+    `int(x or 10**6)` idiom made a week-0 deadline falsy, so the most overdue promise
+    Elena could hold was the one the gate could never surface. Owner is
+    emails/chronicle_personas.py, not the facade."""
     block = _notebook(monkeypatch, [_callback("Explain why he started.", due=0, made=0)], week=5)
     assert "PROMISES DUE" in block
 
@@ -924,17 +913,10 @@ def test_a_board_interview_at_the_very_end_of_an_installment_is_not_dropped():
     assert "<blockquote>Dr. Park had the last word.</blockquote>" in html
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P3): lambda_handler line 907 detects a Board interview with "
-        "`line.strip().startswith('> ')` — a '>' followed by a SPACE. Markdown blockquotes do not require the space, "
-        "and markdown_to_html has the identical restriction, so an interview written as '>Dr. Park said...' is both "
-        "un-flagged (has_board_interview False, so the site's interview filter misses the week) and rendered as "
-        "ordinary prose with a stray '>' in front of it."
-    ),
-)
 def test_a_blockquote_without_a_space_is_still_recognised_as_an_interview():
+    """#2221 (was a tranche-3 xfail): the markdown blockquote marker is ">"; the space
+    after it is optional. All THREE matchers were strict — the handler's has_board
+    detector, markdown_to_html, and scripts/v4_build_journal.py (the public page)."""
     body = "He asked about the plateau.\n\n>Dr. Park was unimpressed.\n\nHe let it sit."
     assert any(line.strip().startswith(">") for line in body.split("\n"))
     assert "<blockquote>" in m.markdown_to_html(body)
@@ -1027,17 +1009,10 @@ def test_an_installment_the_safety_validator_blocks_is_never_published(env):
     assert env["ses"].sent == [] and _stored_installment(env) is None
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P2, #803 class): only the budget-pause and privacy-hold routes call "
-        "_set_chronicle_pending. The AI-3 block (line 859), the #914 presence hold (line 848), the packet failure "
-        "(line 643) and the AI failure (line 779) each return without writing any marker, so the week vanishes from "
-        "/story/chronicle/ with no explanation and the numbering jumps — the exact reader-facing silence #803 fixed "
-        "for the privacy gate. Every held week needs a marker."
-    ),
-)
 def test_a_week_held_by_the_safety_validator_tells_the_reader_it_was_held(env):
+    """#2221 (was a tranche-3 xfail, #803 class): every non-publishing exit now leaves a
+    reader-facing marker via _held_week — the AI-3 block, the #914 presence hold, the
+    packet failure, the AI failure and the gather failure, not just budget + privacy."""
     env["state"]["ai"] = '"T"\n\n[x]\n\nToo short.'
     m.lambda_handler({}, None)
     assert _pending_marker(env) is not None
@@ -1553,17 +1528,9 @@ def test_the_installment_put_is_conditional_unless_overwrite_is_explicit(env):
     assert "ConditionExpression" not in forced
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P2 / #2111 class): lambda_handler honours only {'recap_only': true}; there is "
-        "no dry_run gate. Any manual or regeneration invoke spends a full Sonnet call and mails Matthew (the preview "
-        "email in PREVIEW_MODE, the subscriber-facing installment otherwise). Sibling email lambdas "
-        "(between_chronicle, chronicle_approve, coach_panel_podcast) all accept {'dry_run': true}; this one — the "
-        "most expensive of them — does not."
-    ),
-)
 def test_a_dry_run_invocation_builds_the_week_without_mailing_it(env):
+    """#2221 (was a tranche-3 xfail, #2111 class): {"dry_run": true} rehearses the week
+    and writes nothing — no row, no S3, no pending marker, no email_log, no mail."""
     resp = m.lambda_handler({"dry_run": True}, None)
     assert resp["statusCode"] == 200
     assert env["ses"].sent == []
@@ -1680,17 +1647,9 @@ def test_the_pagination_loop_stops_at_its_page_cap(publish_env):
     assert len(calls) == m._MAX_INSTALLMENT_PAGES
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P3 / ADR-105): lambda_handler lines 885-898 default the stored confidence "
-        "level to the literal 'MEDIUM' and keep it whenever the BS-05 module is absent or compute_confidence "
-        "raises. The installment row (and the email badge built from it) then asserts MEDIUM confidence over a "
-        "journey length that was never measured. An unmeasurable confidence should be stored as unknown, not as a "
-        "middling verdict."
-    ),
-)
 def test_an_unmeasurable_confidence_is_stored_as_unknown_not_as_medium(env):
+    """#2221 (was a tranche-3 xfail, ADR-105): an unmeasurable confidence is stored as
+    UNKNOWN. "MEDIUM" asserted a middling verdict over a journey nobody measured."""
     from common import digest_utils
 
     env["monkeypatch"].setattr(digest_utils, "compute_confidence", lambda **kw: (_ for _ in ()).throw(RuntimeError("no")))
