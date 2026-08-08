@@ -23,7 +23,14 @@ DynamoDB patterns:
 Bayesian model: Beta(alpha, beta) distribution per coach per subdomain.
   - confirmed + beats_null: alpha += 1
   - refuted: beta += 1
-  - matches_null or inconclusive: no update
+  - inconclusive / expired / confirmed-but-matches-null: no update
+
+  Both deterministic verdict paths report beats_null=True on a confirm (#2219):
+  the threshold (machine) or the above-noise directional move (directional) IS
+  the falsifiable bar, so credit and debit are symmetric. The `beats_null`
+  conjunction is kept in `_evaluate_all` as the explicit contract — a future
+  evaluator that CAN measure a null may return confirmed-but-matches-null, and
+  that outcome must still move neither side.
 
 Idempotent: safe to re-run. Already-evaluated predictions (status not in
 pending/confirming) are skipped. Learning log uses put_item (upsert).
@@ -632,8 +639,12 @@ def _evaluate_machine(pred, eval_spec, data_cache, today_str):
     Steps:
       1. Fetch current metric value
       2. Apply condition against threshold
-      3. Compare against null hypothesis
-      4. Return status: confirmed / refuted / inconclusive
+      3. Return status: confirmed / refuted / inconclusive
+
+    A met condition is `confirmed` with beats_null=True (#2219) — the threshold
+    is the bar the call had to clear, so a hit credits alpha the same way a miss
+    debits beta. The spec's free-text `null_hypothesis` / `beats_null_if` keys
+    are not read: neither is machine-checkable, and no writer emits them.
     """
     metric_key = eval_spec.get("metric")
     if not metric_key:
@@ -686,23 +697,29 @@ def _evaluate_machine(pred, eval_spec, data_cache, today_str):
             "beats_null": False,
         }
 
-    # Determine status considering null hypothesis
-    null_text = eval_spec.get("null_hypothesis", "")
-    beats_null_if = eval_spec.get("beats_null_if", "")
-
+    # ── #2219: a confirmed threshold call credits alpha, symmetrically ────────
+    # This branch used to set beats_null=True only when the spec carried a truthy
+    # `null_hypothesis`, and fall through to beats_null=False when it did not.
+    # No writer in this repo has ever emitted that key (coach_state_updater's
+    # _build_prediction_eval_spec hard-codes it to None; diary_claims omits it),
+    # and the live corpus agrees — 0 of the 2,458 PREDICTION# rows standing on
+    # 2026-08-08 carried one. So `_evaluate_all` could never reach its
+    # `confirmed and beats_null` -> alpha branch from here, while every refuted
+    # call took the unconditional beta branch: the posterior could only fall.
+    #
+    # The threshold IS the null on this path. The spec names a number and a
+    # comparison the evaluator grades deterministically, so crossing it is the
+    # falsifiable event — there is nothing further to beat, exactly as
+    # `_evaluate_directional` has always treated a matched, above-noise move
+    # (beats_null=True with no null-hypothesis gate). A free-text
+    # `null_hypothesis` is not machine-checkable and therefore cannot change a
+    # deterministic verdict; giving one real gating power would need its own
+    # numeric spec field and an ADR-105 threshold derived from personal variance,
+    # not a prose string. The `beats_null_if` three-way branch is gone with it:
+    # all three of its arms assigned True, so it distinguished nothing.
     if result:
-        if null_text:
-            # Has a null hypothesis — check beats_null_if
-            if beats_null_if == "exceeds_threshold":
-                beats_null = True
-            elif beats_null_if == "meets_threshold":
-                beats_null = True
-            else:
-                beats_null = True  # Default: confirmed with null = beats null
-            status = "confirmed"
-        else:
-            status = "confirmed"
-            beats_null = False  # No null hypothesis to beat
+        status = "confirmed"
+        beats_null = True
     else:
         status = "refuted"
         beats_null = False
