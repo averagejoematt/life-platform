@@ -32,7 +32,7 @@ DEGRADE HONESTLY
   If CloudWatch can't be reached (no creds, offline, throttled) this prints a clear
   UNVERIFIED notice and exits 0 — a gate that can't measure anything must not claim
   a clean board (mirrors the gh-unavailable fail-open shape in check_backlog_hygiene.py
-  / check_story_labels.py). The handover should still say so rather than silently
+  ). The handover should still say so rather than silently
   skipping the line.
 
 USAGE

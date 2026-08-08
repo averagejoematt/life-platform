@@ -47,11 +47,24 @@ def test_gate_registry_is_a_real_markdown_table():
 def test_gate_registry_references_the_new_1349_gates():
     """Non-vacuous: the two NEW gates this issue introduces (label-completeness,
     suite-duration budget) must actually appear in the table, not just the pre-existing
-    ones."""
+    ones.
+
+    #1349's own label-completeness gate (`check_story_labels.py`) was absorbed into
+    `check_backlog_hygiene.py` and deleted by #1872 — its rule (`model:*`) is asserted
+    here instead of the retired script name, since the row now points at the linter
+    that replaced it."""
     section = _text().split("## 9. Gate registry")[1].split("## Facts that drift")[0]
-    assert "check_story_labels.py" in section
+    assert "check_backlog_hygiene.py" in section
+    assert "model:*" in section
     assert "coverage_gap_warn.py" in section
     assert "duration" in section.lower()
+
+
+def test_gate_registry_no_longer_references_the_deleted_1349_script():
+    """#1872: check_story_labels.py is deleted, its rule absorbed — a dangling reference
+    to it in the registry would point at a file that no longer exists."""
+    section = _text().split("## 9. Gate registry")[1].split("## Facts that drift")[0]
+    assert "check_story_labels.py" not in section
 
 
 def test_gate_registry_is_pointers_not_restatements():

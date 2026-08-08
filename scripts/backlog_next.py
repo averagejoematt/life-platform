@@ -44,7 +44,7 @@ USAGE
 
 EXIT CODE: always 0. This is an advisory selector, not a gate; a live-fetch
 failure (no network/auth) prints one advisory line and exits 0, matching
-check_story_labels.py's fail-open contract.
+check_backlog_hygiene.py's fail-open contract.
 """
 
 import argparse
@@ -75,7 +75,7 @@ def build_row(issue: Dict[str, Any]) -> Dict[str, Any]:
     """Everything the ranker needs about one issue, parsed once.
 
     A plain dict (not a class) so fixtures read as data and the pure functions
-    below stay trivially testable, per the check_story_labels.py house style.
+    below stay trivially testable, per this repo's fixture-as-data house style.
     """
     labels = bc.label_names(issue)
     body = issue.get("body") or ""

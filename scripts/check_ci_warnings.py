@@ -37,7 +37,7 @@ DEGRADE HONESTLY
   Any `gh`/API failure (no auth, rate limit, network, offline) prints an
   UNVERIFIED notice and exits 0 — a gate that can't read GitHub must not claim
   a clean warning board (same fail-open shape as check_alarm_citations.py /
-  check_backlog_hygiene.py / check_story_labels.py).
+  check_backlog_hygiene.py).
 
 USAGE
   python3 scripts/check_ci_warnings.py             # gate: untriaged warning(s) -> exit 1

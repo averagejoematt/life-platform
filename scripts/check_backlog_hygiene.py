@@ -25,29 +25,33 @@ THE FIX
   the single parse surface, shared with `scripts/backlog_next.py` (#1866) — this
   module compiles no regex of its own, and a test asserts that.
 
-  This script ABSORBS `check_story_labels.py`'s single `model:*` rule (see
-  `rule_one_model_label`). Both scripts run for now: deleting the older one is
-  #1872's proof, gated on the #1868 backfill and the advisory→blocking flip. Net
-  script budget for the whole program is +1, per ADR-103/144.
+  This script ABSORBED `check_story_labels.py`'s single `model:*` rule (see
+  `rule_one_model_label`) and tightened it (exactly one, not merely "some"). #1872
+  deleted that script once this linter was blocking — net script budget for the
+  whole program is +1, per ADR-103/144.
 
-ADVISORY FIRST — DELIBERATELY (the ADR-108 promotion pattern)
-  It lands `--advisory`: it prints every violation and exits 0. The corpus is
-  known-dirty (that is the finding), so a blocking gate on day one would red the
-  wrap for work nobody has done yet. `--blocking` already exists and works; #1872
-  flips the default once #1868 has backfilled the corpus to green. Staleness stays
-  advisory in BOTH modes — an old `Later` issue is a triage signal, not a defect.
+BLOCKING BY DEFAULT (the ADR-108 promotion pattern — promoted on measured evidence)
+  #1867 landed `--advisory` deliberately: the corpus was known-dirty, and a
+  blocking gate on day one would have red the wrap for work nobody had done yet.
+  #1868 backfilled it to zero violations; #1872 measured that clean state held
+  (56 open issues, 0 violations, re-verified immediately before the flip — see the
+  dated ADR-099 amendment in `docs/DECISIONS.md`) and promoted the default from
+  print-and-exit-0 to print-and-exit-1. `--advisory` stays available as an
+  explicit opt-out (a session that wants the report without the exit code).
+  Staleness stays advisory in BOTH modes — an old `Later` issue is a triage
+  signal, not a defect.
 
 USAGE
-  python3 scripts/check_backlog_hygiene.py                 # advisory (default): print, exit 0
-  python3 scripts/check_backlog_hygiene.py --blocking      # exit 1 on any violation (#1872 flips this on)
+  python3 scripts/check_backlog_hygiene.py                 # blocking (default): exit 1 on any violation
+  python3 scripts/check_backlog_hygiene.py --advisory      # explicit opt-out: print, always exit 0
   python3 scripts/check_backlog_hygiene.py --rule score_line_canonical   # one rule at a time
   python3 scripts/check_backlog_hygiene.py --summary       # counts only, no per-issue lines
   python3 scripts/check_backlog_hygiene.py --issues-json FIXTURE.json --now 2026-07-27T00:00:00Z
 
-EXIT CODE: 0 in advisory mode, always. 1 in --blocking mode when any
-severity=violation finding exists. A live-fetch failure (no network/gh auth) is
-ALWAYS fail-open — prints a skip note and exits 0, in either mode — matching
-check_story_labels.py's wrap-time contract.
+EXIT CODE: 1 by default when any severity=violation finding exists. 0 with
+`--advisory`, always. A live-fetch failure (no network/gh auth) is ALWAYS
+fail-open — prints a skip note and exits 0, in EITHER mode, blocking included —
+a missing `gh` auth or a network blip must never wedge a wrap.
 """
 
 import argparse
@@ -213,11 +217,11 @@ def rule_one_area_label(ctx: Dict[str, Any]) -> List[Finding]:
 
 
 def rule_one_model_label(ctx: Dict[str, Any]) -> List[Finding]:
-    """Exactly one `model:*` — ABSORBS scripts/check_story_labels.py (#1349).
+    """Exactly one `model:*` — absorbed scripts/check_story_labels.py's rule (#1349).
 
     That script's rule was "an open type:story has SOME model:* label"; this one
-    tightens it to exactly one and applies it corpus-wide, which is why #1872 can
-    delete it. Until #1872 both run, and both must be satisfied.
+    tightens it to exactly one and applies it corpus-wide, which is why #1872 could
+    delete it — the older script's contract is a strict subset of this rule's.
     """
     if len(ctx["models"]) != 1:
         found = ", ".join(ctx["models"]) or "none"
@@ -519,9 +523,9 @@ def render(findings: List[Finding], issue_count: int, mode: str, summary_only: b
     out.append(f"BACKLOG HYGIENE — {len(violations)} violation(s) + {len(advisories)} advisory(ies) over {issue_count} open issue(s):")
     for rule, count in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])):
         out.append(f"  {count:>4}  {rule}")
-    out.append("  (~ = advisory, never blocking; ! = violation, blocking once #1872 flips the default)")
+    out.append("  (~ = advisory, never blocking; ! = violation, blocking by default since #1872)")
     if mode == ADVISORY:
-        out.append("ADVISORY MODE — exiting 0. The #1868 backfill burns this list down; #1872 flips the default to --blocking.")
+        out.append("ADVISORY MODE (explicit --advisory opt-out) — exiting 0 regardless of violations.")
     return out
 
 
@@ -561,9 +565,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Lint the open GitHub issue corpus against the ADR-099 filing contract.")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(
-        "--advisory", action="store_true", help="Print violations and exit 0 (the default while #1868's backfill is outstanding)."
+        "--advisory", action="store_true", help="Print violations and always exit 0 — an explicit opt-out (blocking is the default)."
     )
-    mode.add_argument("--blocking", action="store_true", help="Exit 1 on any violation. #1872 flips this on as the default.")
+    mode.add_argument(
+        "--blocking", action="store_true", help="Exit 1 on any violation. This is already the default; the flag stays for explicit callers."
+    )
     parser.add_argument("--rule", action="append", help="Report only these rule name(s); repeatable.")
     parser.add_argument("--summary", action="store_true", help="Counts per rule only, no per-issue lines.")
     parser.add_argument("--now", help="ISO timestamp for the staleness rule (default: now). Injected so tests are deterministic.")
@@ -577,17 +583,17 @@ def main(argv: Optional[List[str]] = None) -> int:
     else:
         issues = _fetch_live_issues()
         if issues is None:
-            return 0  # fail-open: no gh/network/auth available in this context — ALWAYS, in either mode
+            return 0  # fail-open: no gh/network/auth available in this context — ALWAYS, blocking mode included
 
     now = _parse_iso(args.now) if args.now else None
     findings = check(issues, now=now)
     if args.rule:
         findings = [f for f in findings if f.rule in set(args.rule)]
 
-    mode_name = "blocking" if args.blocking else ADVISORY
+    mode_name = ADVISORY if args.advisory else "blocking"
     print("\n".join(render(findings, len(issues), mode_name, summary_only=args.summary)))
 
-    if args.blocking and any(f.severity == VIOLATION for f in findings):
+    if not args.advisory and any(f.severity == VIOLATION for f in findings):
         return 1
     return 0
 
