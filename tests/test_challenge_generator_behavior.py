@@ -489,21 +489,6 @@ class TestHypothesisGraduation:
         assert "confirmed_hypotheses" not in ctx
         assert "habits" in ctx
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-2 discovery): gather_context admits status=='confirming' "
-            "into context['confirmed_hypotheses'], which build_generation_prompt "
-            "renders under the header 'CONFIRMED HYPOTHESES' and SYSTEM_PROMPT tells "
-            "the model to convert into a challenge ('If a confirmed hypothesis has an "
-            "actionable recommendation...'). hypothesis_engine_lambda itself classifies "
-            "'confirming' as PENDING, not confirmed (lines 1140-1141: pending = status "
-            "in ('pending','confirming'); confirmed = status == 'confirmed'). So a "
-            "hypothesis still under test is presented to the writer as established "
-            "evidence, and the challenge it produces asserts a finding the data has "
-            "not yet supported (ADR-104/105)."
-        ),
-    )
     def test_a_still_confirming_hypothesis_is_not_presented_as_confirmed(self, table):
         _hyp(table, "2026-08-01T00:00:00", "confirming", 4)
         assert "confirmed_hypotheses" not in chg.gather_context()
@@ -567,19 +552,6 @@ class TestPhaseScopedReads:
         assert source_reads_cross_phase("habit_scores") is False
         assert applied["habit_scores"] is True
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-2 discovery): gather_context's three direct partition "
-            "reads — character_sheet (Limit=1 newest), hypotheses (HYPOTHESIS#) and "
-            "challenges (CHALLENGE#) — call table.query() with a bare "
-            "KeyConditionExpression and NO with_phase_filter, while the same "
-            "function's query_range() reads go through digest_utils and are filtered. "
-            "All three sources are EXPERIMENT_SCOPED in phase_taxonomy, so after a "
-            "reset the wiped prior cycle's rows are still read as live (ADR-058 "
-            "default-deny is bypassed on a get-style query path)."
-        ),
-    )
     def test_every_experiment_scoped_partition_read_is_phase_scoped(self, table):
         self._seed_every_partition(table)
         chg.gather_context()
@@ -587,21 +559,6 @@ class TestPhaseScopedReads:
             if not source_reads_cross_phase(source):
                 assert applied, f"{source} is EXPERIMENT_SCOPED but its read carries no phase filter"
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-2 discovery, #2109 class): query_range() calls "
-            "digest_utils.query_range_list without include_pilot, so the ADR-058 "
-            "filter is applied unconditionally to whoop / withings / notion — all "
-            "RAW_TIMESERIES in phase_taxonomy, i.e. kept across resets and tagged "
-            "phase='pilot' for every pre-genesis day. On a fresh cycle the 14-day "
-            "windows therefore truncate to the cycle's AGE (genesis 2026-08-03 means "
-            "a 4-day 'fourteen day' journal/HRV/weight window), and the generator "
-            "mines a signal from a window it believes is 14 days long. #2109 fixed "
-            "exactly this shape in six other compute readers via "
-            "phase_filter.source_reads_cross_phase; this reader was not converted."
-        ),
-    )
     def test_a_raw_timeseries_window_is_not_truncated_to_the_cycle_age(self, table):
         self._seed_every_partition(table)
         chg.gather_context()
@@ -609,19 +566,6 @@ class TestPhaseScopedReads:
             if source_reads_cross_phase(source):
                 assert not applied, f"{source} is RAW_TIMESERIES but its 14-day window is clamped to the current phase"
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-2 discovery, reader-visible consequence of the "
-            "unfiltered CHALLENGE# read above): a pre-genesis / wiped-cycle challenge "
-            "still appears in context['existing_challenges'], which the prompt renders "
-            "as 'EXISTING CHALLENGES (do NOT duplicate)'. The same module's "
-            "store_challenge deliberately treats a tombstoned collision as ABSENT "
-            "(#1969 — 'the fresh cycle may legitimately re-issue the challenge'), so "
-            "the two halves of one Lambda disagree: the writer will re-issue what the "
-            "prompt has just forbidden the model to propose."
-        ),
-    )
     def test_a_wiped_cycles_challenge_is_not_offered_as_an_existing_one(self, table):
         seed(table, "challenges", "CHALLENGE#old_2026-06-01", name="Old", status="active", domain="sleep", phase="pilot", tombstone=True)
         seed(table, "challenges", "CHALLENGE#live_2026-08-04", name="Live", status="candidate", domain="mental")
@@ -891,19 +835,6 @@ class TestStoreChallenge:
         for field in ("description", "source_detail", "protocol", "success_criteria", "hoped_outcome"):
             assert item[field] == ""
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-2 discovery): store_challenge allowlists domain, "
-            "difficulty and source but passes duration_days straight through "
-            "int(challenge.get('duration_days', 7)). SYSTEM_PROMPT states the "
-            "contract as 'Duration: 7-30 days', so a model returning 365 (or 0, or "
-            "-1) writes a challenge whose stated duration the platform never agreed "
-            "to and whose hoped_outcome was written against a different horizon — "
-            "the exact class of silent out-of-range value the other three fields are "
-            "guarded against."
-        ),
-    )
     @pytest.mark.parametrize("supplied", [0, -3, 365])
     def test_an_out_of_range_duration_is_clamped_to_the_documented_window(self, table, supplied):
         chg.store_challenge(candidate(name=f"Dur {supplied}", duration_days=supplied))
@@ -917,18 +848,6 @@ class TestStoreChallenge:
         assert chg.slug(None) == "challenge"
         assert chg.slug("Kitchen Closed At 8pm!") == "kitchen-closed-at-8pm"
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-2 discovery): the module defines slug(), which returns "
-            "'challenge' for a falsy name, but store_challenge re-implements the same "
-            "regex inline WITHOUT that guard. A model returning name='' therefore "
-            "writes sk='CHALLENGE#_<date>' with name='' — a nameless row on the "
-            "reader-facing challenges surface, and a key that a second unnamed "
-            "candidate in the same run collides with (silently dropped as a "
-            "duplicate). The duplicated-logic half that has the guard is dead code."
-        ),
-    )
     def test_a_nameless_candidate_does_not_produce_a_keyless_challenge(self, table):
         challenge_id = chg.store_challenge(candidate(name=""))
         assert challenge_id and not challenge_id.startswith("_")
@@ -1072,20 +991,6 @@ class TestHandlerFailSoft:
         assert resp["status"] == "error"
         assert "stored" not in resp
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-2 discovery): the store loop in lambda_handler has no "
-            "per-candidate isolation, and store_challenge coerces duration with a "
-            "bare int(...). One malformed candidate (duration_days='seven' or null — "
-            "both trivially producible by a free-text model) raises ValueError/"
-            "TypeError out of the loop into the handler's blanket except, so the run "
-            "returns {'status':'error'} and reports NEITHER the challenges it already "
-            "wrote NOR the ones it never reached. The rows are in DynamoDB; the "
-            "response, the logs and the CloudWatch metric all say the week produced "
-            "nothing."
-        ),
-    )
     def test_one_malformed_candidate_does_not_discard_the_rest_of_the_batch(self, ready, monkeypatch):
         stub_generation(
             monkeypatch,
@@ -1095,19 +1000,6 @@ class TestHandlerFailSoft:
         assert resp["status"] == "completed"
         assert resp["stored"] == 2
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-2 discovery): generate_challenges returns None for an "
-            "AI-3 guardrail BLOCK and for a parse failure alike, and lambda_handler "
-            "maps None to {'status':'completed','generated':0,'reason':'no_signal'}. "
-            "A blocked or unparseable generation is therefore published to the caller "
-            "and to CloudWatch as a genuine quiet week — indistinguishable from the "
-            "model honestly finding nothing. ADR-104: the platform must not report an "
-            "AI failure as a data finding. The contrast is inside this same handler: "
-            "a Bedrock exception DOES surface as status='error'."
-        ),
-    )
     def test_a_blocked_generation_is_not_reported_as_a_no_signal_week(self, ready, monkeypatch):
         class _Blocked:
             blocked = True
