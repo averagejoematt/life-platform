@@ -963,7 +963,7 @@ def lambda_handler(event: dict, context) -> dict:
 
     # Collect all installments for index pages (including the new one)
     date_str = data["dates"]["end"]
-    all_installments = []
+    all_installments: list = []
     try:
         # ADR-058: phase=pilot hidden by default.
         from experiment.phase_filter import with_phase_filter
