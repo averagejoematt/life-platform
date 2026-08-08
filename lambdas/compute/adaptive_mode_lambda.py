@@ -120,14 +120,50 @@ def score_journal(date_str):
     morning + evening entries = 100
     one template entry = 60
     no entry = 0
+
+    #2214: notion_lambda (`build_sk`) never writes a bare 'DATE#{date}' key —
+    every journal row is suffixed 'DATE#{date}#journal#<template>[#<id>]', one
+    row per template/entry for the day. A plain get_item against 'DATE#{date}'
+    therefore always missed, permanently pinning this 25%-weighted component
+    at 0. Query the date's whole suffix range instead and aggregate across
+    every row found.
+
+    Real notion rows carry no `word_count`/`entry_count`/`template_count`
+    fields (notion_lambda's dynamic property extraction never sets them —
+    docs/SCHEMA.md's notion partition lists no such fields); the only
+    guaranteed-present field is `raw_text` (always non-empty: at minimum
+    "[<template>]"). So each row still honours an explicit field when a
+    writer supplies one (the historical/tested contract), but falls back to
+    deriving word_count from raw_text and counting the row itself as one
+    entry — so a real journal entry actually moves this component instead of
+    silently scoring 0 forever.
     """
-    item = fetch_record("notion", date_str)  # journal lives under notion source
-    if not item:
+    pk = f"USER#{USER_ID}#SOURCE#notion"
+    lo = f"DATE#{date_str}"
+    hi = f"DATE#{date_str}~"
+    try:
+        resp = table.query(
+            KeyConditionExpression="pk = :pk AND sk BETWEEN :lo AND :hi",
+            ExpressionAttributeValues={":pk": pk, ":lo": lo, ":hi": hi},
+        )
+        items = resp.get("Items", [])
+    except Exception as e:
+        logger.warning(f"score_journal query failed for {date_str}: {e}")
+        items = []
+
+    if not items:
         return 0, "no journal entry"
 
-    template_count = item.get("template_count", 0)
-    entry_count = item.get("entry_count", 0)
-    word_count = item.get("word_count", 0)
+    entry_count = 0
+    word_count = 0
+    template_count = 0
+    for it in items:
+        entry_count += int(it.get("entry_count", 1) or 0)
+        if "word_count" in it:
+            word_count += int(it.get("word_count") or 0)
+        else:
+            word_count += len(str(it.get("raw_text", "")).split())
+        template_count += int(it.get("template_count", 0) or 0)
 
     # Two or more substantive entries
     if entry_count >= 2 and word_count > 100:
@@ -192,7 +228,14 @@ def score_grade_trend(base_date_str):
         d = (base_date - timedelta(days=i)).isoformat()
         item = fetch_record("day_grade", d)
         if item:
-            grade_val = item.get("score") or item.get("grade_numeric") or item.get("numeric_grade")
+            # #2214: both writers (daily_metrics_compute_lambda.store_day_grade,
+            # daily_brief_lambda.store_day_grade) stamp the value as 'total_score'
+            # — the REQUIRED field for this partition per ingestion_validator.
+            # 'score'/'grade_numeric'/'numeric_grade' are kept as a last-resort
+            # fallback only (no known writer uses them; harmless to tolerate).
+            grade_val = item.get("total_score")
+            if grade_val is None:
+                grade_val = item.get("score") or item.get("grade_numeric") or item.get("numeric_grade")
             if grade_val is not None:
                 try:
                     grades[d] = float(grade_val)
@@ -219,6 +262,35 @@ def score_grade_trend(base_date_str):
 
 
 # ── Core computation ──────────────────────────────────────────────────────────
+
+# #2214: exact literal reasons that ONLY a genuine no-record-found branch
+# returns — never a branch that measured a real (even zero) outcome. Kept as
+# an exact-match set rather than a substring test so a future reason-string
+# edit fails loudly (KeyError-shaped: the override silently stops firing)
+# instead of accidentally widening what counts as "absent".
+_ABSENT_REASONS = frozenset(
+    {
+        "no habit data (neutral)",  # score_t0_habits / score_t1_habits: no habit_scores record at all
+        "no T0 habits tracked",  # score_t0_habits: record exists, tier0_total == 0
+        "no T1 habits tracked",  # score_t1_habits: record exists, tier1_total == 0
+        "insufficient grade history (neutral)",  # score_grade_trend: < 3 usable grade points
+        "no journal entry",  # score_journal: no notion row at all for the date
+    }
+)
+
+
+def _all_components_absent(journal_reason, t0_reason, t1_reason, trend_reason):
+    """True only when every component is reporting genuine data-absence — not
+    when a component measured a real outcome, even a bad one. Deliberately
+    distinguishes "no journal entry" (no notion row exists) from "no journal
+    content" (a row exists and shows zero effort) — the latter is a real
+    signal, not absence."""
+    return (
+        journal_reason in _ABSENT_REASONS
+        and t0_reason in _ABSENT_REASONS
+        and t1_reason in _ABSENT_REASONS
+        and trend_reason in _ABSENT_REASONS
+    )
 
 
 def compute_adaptive_mode(date_str):
@@ -251,7 +323,20 @@ def compute_adaptive_mode(date_str):
     engagement_score = round(engagement_score, 1)
 
     # Determine mode
-    if engagement_score >= 70:
+    if _all_components_absent(journal_reason, t0_reason, t1_reason, trend_reason):
+        # #2214/ADR-104: a day with NO recorded signal anywhere (not even an
+        # attempt logged) is data-absence, not struggle. Each component
+        # already neutralises its OWN missing data at 50 — except journal,
+        # whose honest "wrote literally nothing" is a real 0 (see
+        # score_journal's distinct "no journal content" branch). Combined
+        # with three neutral-50s, that honest 0 alone drags the weighted
+        # composite under the struggling line on a platform with nothing to
+        # measure yet (e.g. Day 1). engagement_score is left untouched
+        # (still the true weighted composite) — only the reader-facing mode
+        # is routed to standard.
+        brief_mode = "standard"
+        mode_label = "Standard"
+    elif engagement_score >= 70:
         brief_mode = "flourishing"
         mode_label = "🌟 Flourishing"
     elif engagement_score < 40:
