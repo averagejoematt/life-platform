@@ -19,7 +19,14 @@ from web.site_api_common import (
     _ok,
     _window_span,
     logger,
+    nutrition_delivery_public,
 )
+
+# Food-delivery off-protocol tell (P2.3, PRIVATE-by-default — flag OFF, #2209). Shared
+# with site_api_nutrition.food_delivery gate — same env var, same helper, so this
+# reader can never drift out of sync with the sibling. With the flag off, the delivery
+# source is never queried and nothing private (spend/binge figures) enters the response.
+_DELIVERY_PUBLIC = nutrition_delivery_public()
 
 
 def protein_sources(*, _g) -> dict:
@@ -277,7 +284,14 @@ def food_delivery_overview(*, _g) -> dict:
     GET /api/food_delivery_overview
     Returns: 30-day food delivery stats from food_delivery DDB partition.
     Cache: 3600s.
+
+    Gated by NUTRITION_DELIVERY_PUBLIC (#2209) — checked BEFORE the query, matching
+    the sibling site_api_nutrition.py tell: with the flag off (default), the
+    food_delivery source is never queried and nothing private enters the response.
     """
+    if not _DELIVERY_PUBLIC:
+        return _ok({"food_delivery": None}, cache_seconds=3600)
+
     _query_source = _g["_query_source"]
     _experiment_date = _g["_experiment_date"]
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")

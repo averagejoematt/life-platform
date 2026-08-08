@@ -133,7 +133,7 @@ Read-only query layer (with limited writes for memory, insights, decisions, hypo
 | `/api/weekly_physical_summary` | strava, garmin, apple_health | Training page |
 | `/api/protein_sources` | macrofactor | Nutrition page |
 | `/api/strength_deep_dive` | hevy | Training page |
-| `/api/food_delivery_overview` | food_delivery | Nutrition page |
+| `/api/food_delivery_overview` | food_delivery | No consumer (#2209 — `grep -rn "food_delivery_overview" site/` returns zero hits; gated by `NUTRITION_DELIVERY_PUBLIC`, default OFF) |
 
 ---
 

@@ -22,9 +22,13 @@ from web.site_api_common import (
     _ok,
     _window_span,
     logger,
+    nutrition_delivery_public,
 )
 
-_DELIVERY_PUBLIC = os.environ.get("NUTRITION_DELIVERY_PUBLIC", "").strip().lower() in ("1", "true", "yes")
+# Shared with site_api_meals.food_delivery_overview (#2209) — both readers of the
+# food_delivery DDB partition parse the SAME env var through the SAME helper so they
+# can never drift out of sync.
+_DELIVERY_PUBLIC = nutrition_delivery_public()
 
 _BLUEPRINT_PUBLIC = os.environ.get("NUTRITION_BLUEPRINT_PUBLIC", "").strip().lower() in ("1", "true", "yes")
 
