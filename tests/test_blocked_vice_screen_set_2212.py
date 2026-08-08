@@ -204,11 +204,15 @@ def test_blocked_vice_call_sites_derivation_is_non_vacuous():
     assert found_files == {
         "site_api_data.py",
         "site_api_habits.py",
-        "site_api_social.py",
+        "site_api_journey.py",
+        "site_api_ledger.py",
         "site_api_mind.py",
-    }, f"expected _is_blocked_vice call sites in exactly these 4 modules, got {found_files}"
-    assert len(sites) == 13, (
-        f"expected 13 distinct _is_blocked_vice call sites (11 from #2212 + 2 from #2238), "
+        "site_api_protocols.py",
+        "site_api_rollups.py",
+        "site_api_social.py",
+    }, f"expected _is_blocked_vice call sites in exactly these 8 modules, got {found_files}"
+    assert len(sites) == 24, (
+        f"expected 24 distinct _is_blocked_vice call sites (11 from #2212 + 2 from #2238 + 11 from #2240), "
         f"got {len(sites)} — a call site was added or removed; update this pin AND give the changed "
         f"site the same mutation-proof treatment as the rest of this file"
     )

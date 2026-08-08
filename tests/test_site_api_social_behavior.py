@@ -1152,28 +1152,34 @@ def test_a_vote_query_failure_degrades_to_zero_votes_without_losing_the_page(mon
     assert ok_body(social.handle_experiment_library())["total_experiments"] == 3
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (privacy) — site_api_social.py:433 `handle_experiment_library` and :754 "
-        "`_handle_experiment_detail`. The sibling catalog surfaces in this SAME module filter twice "
-        "before publishing: `handle_challenge_catalog` (:1070) drops `public: false` entries and "
-        "`handle_challenges` (:1115, :1143) drops anything `_is_blocked_vice(name) or "
-        "_is_blocked_vice(id)`. The experiment library surfaces apply NEITHER — every entry in "
-        "experiment_library.json, and every joined DDB experiment name, is published verbatim. It "
-        "is currently correct only because that file happens to contain no private entry; nothing "
-        "in the code enforces it, and the identical file class already shipped a leak once "
-        "(CHANGELOG: two `public:false` blocked-category challenge templates were publicly "
-        "fetchable). Hurts Matthew: a blocked-vice experiment added to the library is published "
-        "with no guard, on a 900s-cached public route."
-    ),
-)
 def test_the_experiment_library_filters_blocked_vice_entries_like_the_challenge_catalog_does(monkeypatch):
+    """Fixed by #2240 (was xfail): the library surface now applies the same
+    never-public-vocabulary screen the challenge routes at :1115/:1143 apply, on
+    name AND id. The synthetic sentinel keeps a real blocked term out of this
+    public repo's permanent history. The full derived surface SET — nine
+    functions, not the two this test's original reason line named — is guarded in
+    tests/test_experiment_surface_vice_screen_2240.py."""
+    sentinel = _pin_synthetic_vice(monkeypatch)
     library = json.loads(json.dumps(LIBRARY))
-    library["experiments"].append({"id": "marijuana-taper", "name": "Marijuana taper", "pillar": "sleep"})
+    library["experiments"].append({"id": f"{sentinel}-taper", "name": f"{sentinel.title()} taper", "pillar": "sleep"})
     wire(monkeypatch, s3=_library_s3(library))
     ids = {e["id"] for p in ok_body(social.handle_experiment_library())["pillars"] for e in p["experiments"]}
-    assert "marijuana-taper" not in ids
+    assert f"{sentinel}-taper" not in ids
+
+
+def test_the_experiment_detail_route_404s_a_blocked_vice_entry(monkeypatch):
+    """The sibling door #2240 closed at the same time: a screened id must 404
+    rather than serve the entry (and must not distinguish itself from an absent id)."""
+    sentinel = _pin_synthetic_vice(monkeypatch)
+    library = json.loads(json.dumps(LIBRARY))
+    library["experiments"].append({"id": f"{sentinel}-taper", "name": "Evening taper", "pillar": "sleep"})
+    wire(monkeypatch, s3=_library_s3(library))
+    resp = social._handle_experiment_detail({"queryStringParameters": {"id": f"{sentinel}-taper"}})
+    assert resp["statusCode"] == 404
+    # Only the caller's own id is echoed (the standard not-found message); none of
+    # the entry's stored fields cross the boundary.
+    assert "Evening taper" not in resp["body"]
+    assert "pillar" not in resp["body"]
 
 
 # ── experiment_vote ───────────────────────────────────────────────────────────

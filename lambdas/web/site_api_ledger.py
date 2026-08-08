@@ -8,7 +8,7 @@ from boto3.dynamodb.conditions import Key
 from common import stats_core
 from experiment.phase_filter import singleton_visible, with_phase_filter
 
-from web.site_api_common import S3_REGION, USER_PREFIX, _decimal_to_float, _ok, logger
+from web.site_api_common import S3_REGION, USER_PREFIX, _decimal_to_float, _is_blocked_vice, _ok, logger
 
 
 def ledger(*, _g) -> dict:
@@ -200,6 +200,10 @@ def discoveries(*, _g) -> dict:
 
         for exp in lib.get("experiments", []):
             if exp.get("status") != "active":
+                continue
+            # #2240: active hypotheses publish the catalog entry's name — screen
+            # name AND id, matching the challenge-route pattern.
+            if _is_blocked_vice(exp.get("name", "") or "") or _is_blocked_vice(exp.get("id", "") or ""):
                 continue
             exp_name = exp.get("name", "")
             # Only supplements pillar entries have a second registry to cross-check

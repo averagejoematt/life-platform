@@ -577,6 +577,11 @@ def handle_experiment_library() -> dict:
             if not item.get("sk", "").startswith("EXP#"):
                 continue
             exp_id = item.get("sk", "").replace("EXP#", "")
+            # #2240: the live overlay is a second door into this public payload —
+            # screen the record's name AND id the same way the challenge routes do
+            # before any of it can key or colour a published library entry.
+            if _is_blocked_vice(item.get("name", "")) or _is_blocked_vice(exp_id):
+                continue
             lib_id = item.get("library_id")
             status = item.get("status", "unknown")
             start = item.get("start_date", "")
@@ -605,7 +610,13 @@ def handle_experiment_library() -> dict:
         logger.warning(f"[experiment_library] Experiment query failed (non-fatal): {e}")
 
     # ── Merge votes + experiment status into library entries ──
-    experiments = library.get("experiments", [])
+    # #2240: screen the catalog entries (name AND id — a keyword often lives only in
+    # the id while the display name is benign, ER-06) before anything downstream can
+    # count, group or publish them. total_experiments/total_votes are computed from
+    # the screened list, so a blocked entry is not even visible as a count.
+    experiments = [
+        e for e in library.get("experiments", []) if not (_is_blocked_vice(e.get("name", "")) or _is_blocked_vice(e.get("id", "")))
+    ]
     pillar_map = {}
     pillar_meta = library.get("pillars", {})
     pillar_order = library.get("pillar_order", list(pillar_meta.keys()))
@@ -682,7 +693,13 @@ def _valid_library_ids() -> frozenset:
         bucket = os.environ.get("S3_BUCKET", "matthew-life-platform")
         resp = s3_client.get_object(Bucket=bucket, Key="site/config/experiment_library.json")
         library = json.loads(resp["Body"].read().decode("utf-8"))
-        ids = frozenset((e.get("id") or "").lower() for e in library.get("experiments", []) if e.get("id"))
+        # #2240: a screened-out entry is not votable either — the vote allowlist is
+        # derived from the same catalog and must not readmit what the read doors drop.
+        ids = frozenset(
+            (e.get("id") or "").lower()
+            for e in library.get("experiments", [])
+            if e.get("id") and not (_is_blocked_vice(e.get("name", "")) or _is_blocked_vice(e.get("id", "")))
+        )
         _library_ids_cache = (_time.time(), ids)
     except Exception as e:
         logger.warning(f"[experiment_vote] Library allowlist load failed: {e}")
@@ -876,6 +893,10 @@ def _handle_experiment_detail(event: dict) -> dict:
         if exp.get("id") == lib_id:
             lib_exp = exp
             break
+    # #2240: a screened entry is indistinguishable from an absent one — same 404,
+    # same message, so the response can't confirm the entry exists.
+    if lib_exp and (_is_blocked_vice(lib_exp.get("name", "")) or _is_blocked_vice(lib_exp.get("id", ""))):
+        return _error(404, f"Experiment '{lib_id}' not found in library")
     if not lib_exp:
         return _error(404, f"Experiment '{lib_id}' not found in library")
 
@@ -920,6 +941,10 @@ def _handle_experiment_detail(event: dict) -> dict:
             if not item.get("sk", "").startswith("EXP#"):
                 continue
             item_lib_id = item.get("library_id", "")
+            # #2240: the run overlay is the second door into this payload — screen the
+            # live record's name AND its experiment id before it joins `runs`.
+            if _is_blocked_vice(item.get("name", "")) or _is_blocked_vice(item.get("sk", "").replace("EXP#", "")):
+                continue
             name_slug = re.sub(r"[^a-z0-9]+", "-", item.get("name", "").lower()).strip("-")[:40]
             if item_lib_id == lib_id or name_slug == lib_id:
                 start = item.get("start_date", "")

@@ -10,6 +10,7 @@ from web.site_api_common import (
     PT,
     _error,
     _get_profile,
+    _is_blocked_vice,
     _latest_item,
     _ok,
     logger,
@@ -194,6 +195,10 @@ def changes_since(qs: dict = None, *, _g) -> dict:
     try:
         exp_items = _query_source("experiments", start_date, end_date)
         for ev in exp_items:
+            # #2240: the events feed publishes the experiment name as its title —
+            # screen name AND id, matching the challenge-route pattern.
+            if _is_blocked_vice(ev.get("name", "") or "") or _is_blocked_vice(ev.get("sk", "").replace("EXP#", "")):
+                continue
             if ev.get("status") == "completed":
                 events_list.append(
                     {
