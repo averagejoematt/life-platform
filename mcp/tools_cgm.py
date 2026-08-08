@@ -6,7 +6,9 @@ import json
 import re
 from datetime import datetime, timedelta, timezone
 
-from mcp.config import S3_BUCKET, USER_ID, USER_PREFIX, logger, s3_client, table
+from ingestion.source_registry import raw_date_key, raw_year_prefix  # bundled shared module: the X-9 raw/ layout facts (#2278/#2286)
+
+from mcp.config import S3_BUCKET, USER_PREFIX, logger, s3_client, table
 from mcp.core import query_source
 
 # ── CGM helpers ──
@@ -109,8 +111,10 @@ def _load_cgm_readings(date_str):
         logger.warning("_load_cgm_readings: non-calendar date: %r -- rejecting", date_str)
         return []
     try:
-        y, m, d = date_str.split("-")
-        key = f"raw/{USER_ID}/cgm_readings/{y}/{m}/{d}.json"
+        # #2286: resolved from the registry, never assembled from parts. The raw/ zone
+        # is three-generation fractured in prefix AND leaf filename (X-9/#1256), so a
+        # hand-built key is a coin flip that fails by returning nothing.
+        key = raw_date_key("apple_health", date_str, sub="cgm_readings")
         resp = s3_client.get_object(Bucket=S3_BUCKET, Key=key)
         readings = json.loads(resp["Body"].read())
         result = []
@@ -358,12 +362,17 @@ def _get_fasting_glucose_validation(args):
     paginator = s3_client.get_paginator("list_objects_v2")
     cgm_days = []  # list of "YYYY-MM-DD"
     this_year = datetime.now(timezone.utc).year
-    for prefix_year in [f"{y}/" for y in range(_CGM_FIRST_YEAR, max(this_year + 1, _CGM_FIRST_YEAR) + 1)]:
+    # #2286: both the listing prefix AND the reverse-parse come from the registry.
+    # They used to be two hand-written copies of the same literal, and the comment
+    # documenting the key shape still showed the PRE-user-segment form
+    # (`raw/cgm_readings/…`) — the exact doc rot that produced #2278.
+    tree_prefix = raw_year_prefix("apple_health", _CGM_FIRST_YEAR, sub="cgm_readings").rsplit("/", 2)[0] + "/"
+    for year in range(_CGM_FIRST_YEAR, max(this_year + 1, _CGM_FIRST_YEAR) + 1):
         try:
-            for page in paginator.paginate(Bucket=S3_BUCKET, Prefix=f"raw/{USER_ID}/cgm_readings/{prefix_year}"):
+            for page in paginator.paginate(Bucket=S3_BUCKET, Prefix=raw_year_prefix("apple_health", year, sub="cgm_readings")):
                 for obj in page.get("Contents", []):
-                    key = obj["Key"]  # raw/cgm_readings/2024/10/01.json
-                    parts = key.replace(f"raw/{USER_ID}/cgm_readings/", "").replace(".json", "").split("/")
+                    key = obj["Key"]  # <registry prefix>/YYYY/MM/DD.json
+                    parts = key.replace(tree_prefix, "").replace(".json", "").split("/")
                     if len(parts) == 3:
                         y, m, d = parts
                         cgm_days.append(f"{y}-{m.zfill(2)}-{d.zfill(2)}")

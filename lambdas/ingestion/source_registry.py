@@ -932,6 +932,29 @@ def raw_date_key(source: str, date_str: str, sub: str | None = None) -> str:
     return f"{layout['prefix']}/{day:%Y}/{day:%m}/{leaf}"
 
 
+def raw_year_prefix(source: str, year: int, sub: str | None = None) -> str:
+    """The S3 listing prefix for one YEAR of `source` — `raw_date_key`'s sibling (#2286).
+
+    A caller enumerating "which days exist" wants a prefix, not a key, and had no
+    registry-resolved way to get one — so `mcp/tools_cgm.py` hand-built
+    ``f"raw/{USER_ID}/cgm_readings/{year}/"`` and then reversed the same literal to
+    parse the date back out of each key. Two hand-built forms of the same fact, either
+    of which goes silently empty if the layout moves: exactly #2278's failure, which
+    reported "no readings on file" rather than raising.
+
+    Restricted to `date-tree` sources on purpose. A flat or timestamped archive has no
+    per-year prefix, and inventing one would hand back a plausible string that lists
+    nothing — the X-9 trap this function exists to close.
+    """
+    layout = raw_layout_for(source, sub)
+    scheme = layout.get("scheme")
+    if scheme != "date-tree":
+        raise ValueError(
+            f"raw_year_prefix: {source!r}{'/' + sub if sub else ''} is {scheme!r}, not a date tree — it has no per-year prefix"
+        )
+    return f"{layout['prefix']}/{int(year):04d}/"
+
+
 # ── #914: presence / quiet-stretch channels — registry-owned ───────────────────
 # The severity ladder's thresholds live HERE, next to the engagement_channel facet
 # definitions, so channel config and escalation policy are read from one place
