@@ -147,6 +147,7 @@ class FakeTable:
         self.queries = []
         self.gets = []
         self.puts = []
+        self.put_kwargs = []
         self.put_error = None
         self.query_error = None
         self.get_error = None
@@ -192,6 +193,7 @@ class FakeTable:
 
     def put_item(self, Item=None, **kwargs):
         self.puts.append(Item)
+        self.put_kwargs.append({"Item": Item, **kwargs})
         if self.put_error:
             raise self.put_error
         self.rows = [r for r in self.rows if (r.get("pk"), r.get("sk")) != (Item.get("pk"), Item.get("sk"))]
@@ -1285,12 +1287,16 @@ def test_a_draft_carries_a_single_use_approval_token(env):
     assert re.fullmatch(r"[0-9a-f]{64}", token)
 
 
-def test_two_runs_never_reuse_the_same_approval_token(env):
+def test_two_forced_regenerations_never_reuse_the_same_approval_token(env):
+    """Distinct drafts get distinct tokens. #2254 made a plain re-run a no-op, so the
+    two-drafts case now requires the explicit {'force': true} regeneration."""
     m.lambda_handler({}, None)
     first = _stored_installment(env)["approval_token"]
     env["table"].puts.clear()
-    m.lambda_handler({}, None)
-    assert _stored_installment(env)["approval_token"] != first
+    m.lambda_handler({"force": True}, None)
+    second = _stored_installment(env)
+    assert second is not None, "a forced regeneration must actually store a new draft"
+    assert second["approval_token"] != first
 
 
 def test_a_draft_carries_the_prebuilt_artifacts_the_approver_will_publish(env):
@@ -1440,23 +1446,111 @@ def test_the_share_kit_is_written_alongside_the_published_post(publish_env):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P1): wednesday_chronicle_lambda.lambda_handler has NO idempotency check. It "
-        "never reads whether an installment already exists for data['dates']['end'] and never writes a "
-        "generation marker, so a retry, a manual re-run, or an EventBridge at-least-once redelivery on the same "
-        "Wednesday regenerates the week (a second Sonnet call plus the Haiku editor pass), OVERWRITES the stored "
-        "row — discarding a draft Matthew may already have approved along with its approval token — and sends a "
-        "second email. #2112 fixed exactly this class on the downstream chronicle-email-sender; the generator "
-        "itself was never given the same gate."
-    ),
-)
 def test_a_second_run_on_the_same_week_does_not_regenerate_or_resend(env):
+    """#2254 (was a tranche-3 xfail): the generator's half of the #2112 idempotency
+    class. A retry / manual re-invoke / at-least-once redelivery must cost no Bedrock
+    call and raise no second email."""
     m.lambda_handler({}, None)
     m.lambda_handler({}, None)
     assert len(env["calls"]["ai"]) == 1
     assert len(env["ses"].sent) == 1
+
+
+def test_a_second_run_reports_the_week_it_refused_to_regenerate(env):
+    m.lambda_handler({}, None)
+    body = json.loads(m.lambda_handler({}, None)["body"])
+    assert body["status"] == "already_generated"
+    assert body["date"] == WEEK_END
+    assert body["existing_status"] == "draft"
+
+
+def test_a_second_run_leaves_the_stored_draft_and_its_approval_token_untouched(env):
+    """The reader-facing harm this gate prevents: a re-run used to mint a fresh
+    approval_token over the draft, silently 403-ing the approve link already in
+    Matthew's inbox, and to replace content he may have already approved."""
+    m.lambda_handler({}, None)
+    first = dict(_stored_installment(env))
+    env["table"].puts.clear()
+    m.lambda_handler({}, None)
+    assert env["table"].puts == []  # nothing written at all — not the row, not an email_log
+    row = env["table"].get_item(Key={"pk": first["pk"], "sk": first["sk"]})["Item"]
+    assert row["approval_token"] == first["approval_token"]
+    assert row["content_markdown"] == first["content_markdown"]
+
+
+def test_an_already_published_week_is_never_regenerated_on_the_publish_route(publish_env):
+    """Not preview-only: the immediate-publish route would otherwise overwrite a live
+    post and re-mail the installment."""
+    m.lambda_handler({}, None)
+    assert _stored_installment(publish_env)["status"] == "published"
+    resp = m.lambda_handler({}, None)
+    assert json.loads(resp["body"])["existing_status"] == "published"
+    assert len(publish_env["calls"]["ai"]) == 1
+    assert len(publish_env["ses"].sent) == 1
+
+
+def test_a_week_whose_changes_were_requested_is_regenerated_without_force(env):
+    """chronicle_approve tells Matthew to "Re-run the wednesday-chronicle Lambda" after
+    Request Changes, so changes_requested must NOT be protected — the gate would
+    otherwise deadlock the one path that exists to fix a rejected week."""
+    env["table"].rows.append(
+        _installment_row(WEEK_END, 5, title="The rejected draft", status="changes_requested"),
+    )
+    resp = m.lambda_handler({}, None)
+    assert resp["statusCode"] == 200
+    assert _stored_installment(env)["status"] == "draft"
+    assert len(env["calls"]["ai"]) == 1
+
+
+def test_force_regenerates_a_week_that_already_has_a_draft(env):
+    m.lambda_handler({}, None)
+    env["table"].puts.clear()
+    m.lambda_handler({"force": True}, None)
+    assert _stored_installment(env) is not None
+    assert len(env["calls"]["ai"]) == 2
+
+
+def test_an_idempotency_read_failure_does_not_stop_the_week_from_being_written(env):
+    """Fail-open on the read: a DDB blip must not silently skip the week. The
+    conditional put is the fail-closed backstop in that case."""
+    env["table"].get_error = RuntimeError("ddb down")
+    resp = m.lambda_handler({}, None)
+    assert resp["statusCode"] == 200
+    assert _stored_installment(env)["status"] == "draft"
+
+
+def test_a_refused_conditional_put_suppresses_the_preview_email(env):
+    """The last line of defence: if the row is protected at WRITE time (a racing
+    invoke landed between the idempotency read and the put), the approval_token was
+    never persisted — mailing its approve link would hand Matthew a button that 403s."""
+
+    class _Refusing(Exception):
+        pass
+
+    _Refusing.__name__ = "ConditionalCheckFailedException"
+
+    def _put(Item=None, **kwargs):
+        if Item.get("source") == "chronicle" and "ConditionExpression" in kwargs:
+            raise _Refusing("The conditional request failed")
+        return FakeTable.put_item(env["table"], Item=Item, **kwargs)
+
+    env["table"].put_item = _put
+    resp = m.lambda_handler({}, None)
+    assert json.loads(resp["body"])["status"] == "already_generated"
+    assert env["ses"].sent == []
+
+
+def test_the_installment_put_is_conditional_unless_overwrite_is_explicit(env):
+    """Mutation proof for the guard itself: the put carries a ConditionExpression that
+    names both protected statuses, and only `force` drops it."""
+    m.lambda_handler({}, None)
+    kwargs = [k for k in env["table"].put_kwargs if (k.get("Item") or {}).get("source") == "chronicle"][0]
+    assert "ConditionExpression" in kwargs
+    assert set(kwargs["ExpressionAttributeValues"].values()) == set(m._store.PROTECTED_STATUSES)
+    env["table"].put_kwargs.clear()
+    m.lambda_handler({"force": True}, None)
+    forced = [k for k in env["table"].put_kwargs if (k.get("Item") or {}).get("source") == "chronicle"][0]
+    assert "ConditionExpression" not in forced
 
 
 @pytest.mark.xfail(
@@ -1475,44 +1569,115 @@ def test_a_dry_run_invocation_builds_the_week_without_mailing_it(env):
     assert env["ses"].sent == []
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P2): lambda_handler line 1147 calls record_email_send(table, "
-        "'wednesday_chronicle') on BOTH routes, including PREVIEW_MODE — where no newsletter was sent, only a draft "
-        "stored and an approval email raised. The status page therefore reports the Wednesday chronicle as "
-        "successfully SENT every week, including weeks whose draft is still sitting unapproved and unpublished. The "
-        "record belongs on the publish route only (or should carry the route it describes)."
-    ),
-)
+def _email_log_pks(env):
+    return [p.get("pk", "") for p in env["table"].puts if "email_log" in p.get("pk", "")]
+
+
 def test_a_draft_that_was_never_mailed_is_not_logged_as_a_successful_send(env):
+    """#2254 (was a tranche-3 xfail). site_api_status reads NOTHING but the presence of
+    a row in email_log#wednesday_chronicle (_last_sync/_uptime_90d both project `sk`
+    only), so a status field on that same partition would be invisible — the row itself
+    is the claim. A preview must therefore not land there at all."""
     m.lambda_handler({}, None)
-    assert [p for p in env["table"].puts if "email_log" in p.get("pk", "")] == []
+    assert "USER#matthew#SOURCE#email_log#wednesday_chronicle" not in _email_log_pks(env)
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-3 discovery, P2): lambda_handler lines 916-928 read the WHOLE chronicle partition with a "
-        "single un-paginated `table.query` (no Limit, no LastEvaluatedKey loop) and hand the result to "
-        "publish_to_journal, which REGENERATES generated/journal/posts.json from exactly that list. Installments "
-        "store full `content_markdown` (~10 KB each), so past DynamoDB's 1 MB page the query truncates silently and "
-        "the manifest rewrite DELETES the oldest posts from the public listing. digest_utils.query_range in this "
-        "same module paginates properly; this read does not."
-    ),
-)
-def test_the_installment_listing_is_read_across_every_page(publish_env):
+def test_the_preview_run_is_still_logged_under_its_own_partition(env):
+    """Suppressing the false claim must not lose the observability: the preview run is
+    recorded, just where it cannot be read as a reader-facing send."""
+    m.lambda_handler({}, None)
+    assert "USER#matthew#SOURCE#email_log#wednesday_chronicle_preview" in _email_log_pks(env)
+
+
+def test_the_publish_route_still_logs_a_real_send(publish_env):
+    m.lambda_handler({}, None)
+    assert "USER#matthew#SOURCE#email_log#wednesday_chronicle" in _email_log_pks(publish_env)
+
+
+def _is_listing_query(kwargs):
+    """The handler's all-installments listing read, told apart from the #1385 whole-life
+    archive read of the SAME partition (which carries an explicit Limit=500)."""
+    eav = kwargs.get("ExpressionAttributeValues") or {}
+    return (
+        isinstance(eav, dict)
+        and str(eav.get(":pk", "")).endswith("SOURCE#chronicle")
+        and eav.get(":prefix") == "DATE#"
+        and "Limit" not in kwargs
+    )
+
+
+def _paging_table(publish_env, pages):
+    """Replace the chronicle listing query with a scripted multi-page response.
+
+    Only the installment listing is paged; every other read in the handler still goes to
+    the real FakeTable, so the handler runs end to end.
+    """
     seen = []
+    real_query = publish_env["table"].query
 
     def _paged(**kwargs):
+        if not _is_listing_query(kwargs):
+            return real_query(**kwargs)
         seen.append(kwargs)
-        if "ExclusiveStartKey" not in kwargs:
-            return {"Items": [_installment_row("2026-07-28", 4)], "LastEvaluatedKey": {"sk": "DATE#2026-07-28"}}
-        return {"Items": [_installment_row("2026-07-21", 3)]}
+        idx = len(seen) - 1
+        out = {"Items": pages[idx]}
+        if idx + 1 < len(pages):
+            out["LastEvaluatedKey"] = {"sk": pages[idx][-1]["sk"]}
+        return out
 
     publish_env["table"].query = _paged
+    return seen
+
+
+def test_the_installment_listing_is_read_across_every_page(publish_env):
+    """#2254 (was a tranche-3 xfail)."""
+    seen = _paging_table(publish_env, [[_installment_row("2026-07-28", 4)], [_installment_row("2026-07-21", 3)]])
     m.lambda_handler({}, None)
     assert any("ExclusiveStartKey" in q for q in seen)
+
+
+def test_no_post_beyond_the_first_page_is_dropped_from_the_public_manifest(publish_env):
+    """The consequence the pagination exists to prevent: publish_to_journal REGENERATES
+    generated/journal/posts.json wholesale from this list, so anything the query silently
+    truncated is DELETED from the public listing — and, because the week-NN sequence is
+    the index into this same list, the survivors are renumbered too."""
+    _paging_table(
+        publish_env,
+        [
+            [_installment_row("2026-07-28", 4, title="Page one post")],
+            [_installment_row("2026-07-21", 3, title="Page two post")],
+            [_installment_row("2026-07-14", 2, title="Page three post")],
+        ],
+    )
+    m.lambda_handler({}, None)
+    manifest = None
+    for put in publish_env["s3"].puts:
+        if put["Key"] == "generated/journal/posts.json":
+            manifest = json.loads(put["Body"])
+    assert manifest is not None
+    titles = [p["title"] for p in manifest["posts"]]
+    assert "Page three post" in titles, f"oldest page dropped from the public manifest: {titles}"
+    assert {"Page one post", "Page two post"} <= set(titles)
+    # The new week is the 4th-oldest of 4 -> sequence 4; a dropped page would shift it.
+    assert [p["sequence"] for p in manifest["posts"] if p["title"] == TITLE] == [4]
+
+
+def test_the_pagination_loop_stops_at_its_page_cap(publish_env):
+    """A malformed/never-terminating LastEvaluatedKey must not spin the Lambda for its
+    whole timeout."""
+    calls = []
+
+    real_query = publish_env["table"].query
+
+    def _never_ends(**kwargs):
+        if not _is_listing_query(kwargs):
+            return real_query(**kwargs)
+        calls.append(kwargs)
+        return {"Items": [], "LastEvaluatedKey": {"sk": "DATE#2026-01-01"}}
+
+    publish_env["table"].query = _never_ends
+    m.lambda_handler({}, None)
+    assert len(calls) == m._MAX_INSTALLMENT_PAGES
 
 
 @pytest.mark.xfail(

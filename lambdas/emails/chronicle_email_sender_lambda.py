@@ -182,6 +182,33 @@ def _mark_installment_delivered(date_str: str, sent_count: int) -> None:
         logger.warning("Failed to mark installment %s delivered (non-fatal): %s", date_str, exc)
 
 
+def _record_email_send(sent_count: int) -> None:
+    """#2254: write the email_log row the status page reads for "Wednesday chronicle".
+
+    This is the ONLY place a real reader-facing chronicle delivery happens, so it is the
+    only honest place to claim one. The generator (wednesday-chronicle) used to write
+    this row on its PREVIEW route — where nothing was sent to a reader, only a draft
+    stored and an approval email raised — so the status page reported a successful weekly
+    send for weeks whose draft was still sitting unapproved. The generator now logs its
+    preview to email_log#wednesday_chronicle_preview; this row means mail was delivered.
+
+    Fail-soft: a failed status write must never fail an otherwise-successful send."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    try:
+        table.put_item(
+            Item={
+                "pk": f"USER#{USER_ID}#SOURCE#email_log#wednesday_chronicle",
+                "sk": f"DATE#{today}",
+                "sent_at": datetime.now(timezone.utc).isoformat(),
+                "status": "success",
+                "sent_to_count": Decimal(int(sent_count)),
+                "ttl": int(time.time()) + 86400 * 90,
+            }
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.info("[status-tracking] Non-fatal write failure: %s", exc)
+
+
 def _get_confirmed_subscribers() -> list[dict]:
     """
     Query subscribers partition for all confirmed records.
@@ -571,6 +598,10 @@ def lambda_handler(event, context):
         # trigger gets a genuine retry rather than a permanently-stuck installment.
         if sent > 0 and date_str:
             _mark_installment_delivered(date_str, sent)
+        # #2254: the status-page send record belongs to the delivery, not to the
+        # generator's preview. Written on any successful send (dry-run returns earlier).
+        if sent > 0:
+            _record_email_send(sent)
 
         return {
             "statusCode": 200,
