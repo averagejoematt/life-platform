@@ -9,6 +9,11 @@ condensed section summaries.
 
 v1.1.0: Board prompt now dynamically built from s3://matthew-life-platform/config/board_of_directors.json
         Falls back to hardcoded _FALLBACK_MONTHLY_PROMPT if S3 read fails.
+v1.3.0 (#1658): cadence is enforced by the send log (at most one letter per calendar
+        month), not by a weekday guard. The old `weekday() == 0` check meant the
+        schedule above — the first SUNDAY — could never satisfy it, so the letter had
+        never actually been delivered. The month labels now name the month the data
+        covers rather than the month the send happens in.
 """
 
 import json
@@ -96,6 +101,21 @@ ZONE2_HR_HIGH = 129
 PROTEIN_TARGET_G = 180
 CALORIE_TARGET = 1800
 
+# The sources `gather_all` reads for BOTH arms. Every entry must reach the letter:
+# `eightsleep` sat here with no extractor and no reader, so two full DynamoDB range
+# queries a month were issued and discarded while Whoop remained the sleep SOT
+# (#1658). Kept module-level so the behaviour test can derive the fetched set from
+# the code instead of restating it — a fetch with no consumer reds the test.
+SOURCES = ["whoop", "withings", "strava", "hevy", "macrofactor", "todoist", "chronicling"]
+
+# The stub the letter ships when the board could not speak. It is a NAMED constant
+# because the handler must be able to tell it apart from a real verdict by identity
+# — the old test, `"unavailable" not in commentary[:50]`, could not (#1658).
+COMMENTARY_UNAVAILABLE = (
+    "\U0001f3af THE CHAIR — MONTHLY OVERVIEW\nCommentary unavailable this month.\n"
+    "\U0001f4a1 INSIGHT OF THE MONTH\nReview your data sections below."
+)
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # HELPERS  (same patterns as weekly digest)
@@ -115,23 +135,28 @@ def fetch_range(source, start, end):
     is derived per source from `phase_taxonomy` rather than fixed here, since this
     function is also (indirectly, via its only caller's source list) never asked for
     an EXPERIMENT_SCOPED source today but must not silently widen if it ever is.
-    """
-    try:
-        # ADR-058: phase=pilot hidden by default unless the source reads cross-phase.
-        from experiment.phase_filter import source_reads_cross_phase, with_phase_filter
 
-        r = table.query(
-            **with_phase_filter(
-                {
-                    "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-                    "ExpressionAttributeValues": {":pk": f"USER#{USER_ID}#SOURCE#{source}", ":s": f"DATE#{start}", ":e": f"DATE#{end}"},
-                },
-                include_pilot=source_reads_cross_phase(source),
-            )
+    A read failure RAISES (#1658 / ADR-104). It used to `except Exception: return []`,
+    which made a DynamoDB outage, a throttle, or a malformed key indistinguishable
+    from a genuinely empty month — and the renderer publishes an empty month as
+    confident measurement ("0%" hit rates, a CTL/TSB verdict, "data not available").
+    A monthly email is wrong for a whole month before anyone notices, so the right
+    failure mode is a loud one: the invocation fails, the alarm fires, and the letter
+    is re-sent from real data rather than mailed once with fabricated absence.
+    """
+    # ADR-058: phase=pilot hidden by default unless the source reads cross-phase.
+    from experiment.phase_filter import source_reads_cross_phase, with_phase_filter
+
+    r = table.query(
+        **with_phase_filter(
+            {
+                "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                "ExpressionAttributeValues": {":pk": f"USER#{USER_ID}#SOURCE#{source}", ":s": f"DATE#{start}", ":e": f"DATE#{end}"},
+            },
+            include_pilot=source_reads_cross_phase(source),
         )
-        return [d2f(i) for i in r.get("Items", [])]
-    except Exception:
-        return []
+    )
+    return [d2f(i) for i in r.get("Items", [])]
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -150,9 +175,14 @@ def get_date_windows():
     prior_end = (today - timedelta(days=31)).isoformat()
     prior_start = (today - timedelta(days=60)).isoformat()
 
-    # Month label (the calendar month we just completed or are in)
-    month_label = today.strftime("%B %Y")
-    prior_label = (today.replace(day=1) - timedelta(days=1)).strftime("%B %Y")
+    # Labels name the month the ARM ACTUALLY COVERS, not the month the send
+    # happens in (#1658). The old labels were `today.strftime(...)` and "the
+    # calendar month before today", which on the schedule's own fire slot (first
+    # Sunday, e.g. 2026-08-02) headlined 29 days of JULY data as "August 2026"
+    # and attributed every delta to "July" when the prior arm was June. The
+    # windows themselves stay rolling-30-day; only the naming is corrected.
+    month_label = datetime.strptime(cur_start, "%Y-%m-%d").strftime("%B %Y")
+    prior_label = datetime.strptime(prior_start, "%Y-%m-%d").strftime("%B %Y")
 
     return {
         "cur_start": cur_start,
@@ -203,7 +233,12 @@ def ex_strava(recs, profile=None):
                 zone2_mins += obj["mins"]
     total_miles = round(sum(float(r.get("total_distance_miles", 0)) for r in recs), 1)
     total_mins = round(sum(float(r.get("total_moving_time_seconds", 0)) for r in recs) / 60)
-    z2_pct = round(zone2_mins / total_mins * 100) if total_mins else 0
+    # Both sides of the Zone-2 ratio come from the DEDUPED activity list (#1658).
+    # The numerator always did; the denominator used to be the day record's
+    # `total_moving_time_seconds`, which double-counts a Garmin→Strava auto-sync
+    # duplicate — halving the published zone2_pct on exactly the days that carry one.
+    dedup_mins = sum(a["mins"] for a in acts)
+    z2_pct = round(zone2_mins / dedup_mins * 100) if dedup_mins else 0
     return {
         "total_miles": total_miles,
         "total_minutes": total_mins,
@@ -216,13 +251,23 @@ def ex_strava(recs, profile=None):
 
 
 def ex_hevy(recs):
+    """Monthly strength summary: session count AND the volume behind it (#1658).
+
+    The per-workout list (titles + volume) was always built here and then thrown
+    away — the letter reported the number of sessions but not a pound of the work,
+    which is the figure a lifter actually reads a monthly review for.
+    """
     if not recs:
         return None
     wk = []
     for r in recs:
         for w in r.get("workouts", []):
             wk.append({"title": w.get("title", ""), "volume_lbs": round(float(w.get("total_volume_lbs", 0)))})
-    return {"workout_count": len(wk)}
+    return {
+        "workout_count": len(wk),
+        "total_volume_lbs": sum(w["volume_lbs"] for w in wk),
+        "avg_volume_lbs": round(sum(w["volume_lbs"] for w in wk) / len(wk)) if wk else None,
+    }
 
 
 def ex_macrofactor(recs, profile=None):
@@ -238,23 +283,37 @@ def ex_macrofactor(recs, profile=None):
     cal_target = (profile or {}).get("calorie_target", CALORIE_TARGET)
     cals = [float(r["total_calories_kcal"]) for r in recs if "total_calories_kcal" in r]
     prots = [float(r["total_protein_g"]) for r in recs if "total_protein_g" in r]
-    days = len(recs)
+    # ADR-104/105 (#1658): each rate is computed over the days it was MEASURED on,
+    # not over every row MacroFactor happened to write. The denominator used to be
+    # len(recs), so a month with 30 rows of which 10 carried no protein published a
+    # rate diluted by 10 days that were never measured — and `days_logged` counted
+    # unlogged rows as logged. With nothing logged at all the rates are None
+    # (absence), not a confident 0%.
+    days_logged = sum(1 for r in recs if "total_calories_kcal" in r or "total_protein_g" in r)
     return {
         "calories_avg": avg(cals),
         "protein_avg_g": avg(prots),
         "calorie_target": cal_target,
         "protein_target": prot_target,
-        "days_logged": days,
-        "protein_hit_rate": round(sum(1 for p in prots if p >= prot_target) / days * 100) if days else None,
-        "calorie_hit_rate": round(sum(1 for c in cals if c <= cal_target) / days * 100) if days else None,
+        "days_logged": days_logged,
+        "days_in_window": len(recs),
+        "protein_hit_rate": round(sum(1 for p in prots if p >= prot_target) / len(prots) * 100) if prots else None,
+        "calorie_hit_rate": round(sum(1 for c in cals if c <= cal_target) / len(cals) * 100) if cals else None,
+        "protein_hit_rate_n": len(prots),
+        "calorie_hit_rate_n": len(cals),
     }
 
 
 def ex_character_sheet(recs):
-    """Extract character sheet metrics from pre-computed DynamoDB records."""
+    """Extract character sheet metrics from pre-computed DynamoDB records.
+
+    #1658: this used to `recs.sort(...)` IN PLACE — an extractor silently
+    reordering its caller's own list — and to read a missing pillar block or a
+    missing `character_xp` as a measured zero (ADR-104 behavioural absence).
+    """
     if not recs:
         return None
-    recs.sort(key=lambda r: r.get("sk", ""))
+    recs = sorted(recs, key=lambda r: r.get("sk", ""))
     latest = recs[-1]
     char_level = float(latest.get("character_level") or latest.get("level") or 0)
     char_xp = float(latest.get("character_xp") or latest.get("xp") or 0)
@@ -262,10 +321,15 @@ def ex_character_sheet(recs):
     char_tier_emoji = str(latest.get("character_tier_emoji") or "🔨")
     pillars = {}
     for p in ("sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"):
-        pd = latest.get(f"pillar_{p}") or {}
-        if isinstance(pd, dict):
+        pd = latest.get(f"pillar_{p}")
+        # A pillar the engine never scored has NO block. `or {}` used to coerce that
+        # into a dict, which then rendered as a measured "Level 0 — Foundation" row.
+        if isinstance(pd, dict) and pd:
             pillars[p] = {"level": float(pd.get("level") or 0), "tier": str(pd.get("tier") or "Foundation")}
-    xp_vals = [float(r.get("character_xp") or 0) for r in recs]
+    # A day whose record carries no XP reading is SKIPPED, not read as 0 XP: when
+    # the window's first record was such a day, xp_delta_30d became the athlete's
+    # entire lifetime XP presented as one month's gain.
+    xp_vals = [float(r["character_xp"]) for r in recs if r.get("character_xp") is not None]
     xp_delta = round(xp_vals[-1] - xp_vals[0], 0) if len(xp_vals) >= 2 else 0
     return {
         "character_level": char_level,
@@ -278,24 +342,38 @@ def ex_character_sheet(recs):
 
 
 def ex_chronicling(recs):
+    """Habit / P40 summary for the window.
+
+    #1658, two ADR-104/105 corrections:
+      * `days` is now the n `score_avg` was actually computed over, not every row
+        in the window — a mean must be published with ITS OWN n;
+      * a group present in the schema but never scored this month (value None)
+        used to reach `float(v)` and raise, and — had it not — would have sorted
+        as zero and been named the month's "⚠️ Weakest Group". An unmeasured
+        group is neither the best nor the worst; it is unmeasured.
+    """
     if not recs:
         return None
     scores = []
     group_totals = {}
     for r in recs:
-        s = float(r["total_score"]) if "total_score" in r else None
+        s = float(r["total_score"]) if r.get("total_score") is not None else None
         if s is not None:
             scores.append(s)
         for g, v in (r.get("group_scores") or {}).items():
-            group_totals.setdefault(g, []).append(float(v))
+            group_totals.setdefault(g, [])
+            if v is not None:
+                group_totals[g].append(float(v))
     group_avgs = {g: avg(v) for g, v in group_totals.items()}
-    sorted_groups = sorted(group_avgs.items(), key=lambda x: x[1] or 0)
+    # Rank only the groups that carry a measured average.
+    ranked = sorted(((g, v) for g, v in group_avgs.items() if v is not None), key=lambda x: x[1])
     return {
         "score_avg": avg(scores),
         "group_avgs": group_avgs,
-        "days": len(recs),
-        "best_group": sorted_groups[-1][0] if sorted_groups else None,
-        "worst_group": sorted_groups[0][0] if sorted_groups else None,
+        "days": len(scores),
+        "days_in_window": len(recs),
+        "best_group": ranked[-1][0] if ranked else None,
+        "worst_group": ranked[0][0] if ranked else None,
     }
 
 
@@ -318,7 +396,9 @@ def compute_annual_goals(cur, windows, profile=None):
     today = datetime.now(timezone.utc).date()
     year_start = today.replace(month=1, day=1)
     days_elapsed = (today - year_start).days
-    days_in_year = 365
+    # Derived, not hard-coded 365 (#1658): in a leap year every "Year elapsed"
+    # figure was overstated, and 2028-12-31 read as 100% elapsed with a day to run.
+    days_in_year = (year_start.replace(year=year_start.year + 1) - year_start).days
     year_pct = round(days_elapsed / days_in_year * 100)
 
     goals = {"year_pct_elapsed": year_pct}
@@ -400,10 +480,12 @@ def _build_monthly_prompt_from_config():
     prompt = f"""You are the coordinating intelligence for Matthew's Monthly Health Board of Advisors.
 
 CONTEXT:
-Matthew Walker, 36, Seattle. Senior Director at a SaaS company. Goal: lose ~117 lbs (302→185),
-build muscle, improve sleep and stress management. Current phase: Phase 1 Ignition (1800 cal/day,
-190g protein, 3 lbs/week target). He tracks obsessively but struggles to translate data into
+Matthew Walker, 36, Seattle. Senior Director at a SaaS company. Goals: lose weight, build muscle,
+improve sleep and stress management. He tracks obsessively but struggles to translate data into
 consistent behavioural change.
+His CURRENT weight goal, journey start weight and progress are in the ANNUAL GOALS CONTEXT block
+below, and his current calorie / protein targets are in THIS MONTH'S DATA — read them from there.
+Do not assume any target figure that is not in those blocks.
 
 This is a MONTHLY review — not a weekly summary. Your job is to identify the arc and narrative
 of the past 30 days, not describe individual weeks. Look for:
@@ -444,9 +526,11 @@ Be honest. A month of data deserves a month's worth of insight."""
 _FALLBACK_MONTHLY_PROMPT = """You are the coordinating intelligence for Matthew's Monthly Health Board of Advisors.
 
 CONTEXT:
-Matthew Walker, 36, Seattle. Senior Director at a SaaS company. Goal: lose ~80 lbs, build muscle,
+Matthew Walker, 36, Seattle. Senior Director at a SaaS company. Goals: lose weight, build muscle,
 improve sleep and stress management. He tracks obsessively but struggles to translate data into
 consistent behavioural change.
+His CURRENT weight goal, journey start weight and progress are in the ANNUAL GOALS CONTEXT block
+below — read them from there rather than assuming a figure.
 
 This is a MONTHLY review — not a weekly summary. Your job is to identify the arc and narrative
 of the past 30 days, not describe individual weeks. Look for:
@@ -496,7 +580,7 @@ Key question: Across 30 days, where is the genuine behavioural gap? Not the wors
 5–7 sentences. Give the month a clear verdict. Address weight progress and trajectory explicitly. Acknowledge what the data shows is genuinely working. Name ONE focus for the next 30 days, justified by the month's data. End with a forward-looking statement that connects this month's progress to the larger 12-month goal.
 
 💡 INSIGHT OF THE MONTH
-One sentence. Actionable over the next 30 days. Must cite real numbers. This is the single most important thing Matthew can change in April to make May's letter better.
+One sentence. Actionable over the next 30 days. Must cite real numbers. This is the single most important thing Matthew can change to make next month's letter better.
 
 Be honest. A month of data deserves a month's worth of insight."""
 
@@ -561,6 +645,11 @@ def call_haiku_monthly(data, goals):
         except Exception as e:
             logger.warning(f"IC-16 failed: {e}")
 
+    # Sonnet is DELIBERATE despite this function's name (#1658). ADR-049 tiers
+    # structured work to Haiku and narrative work to Sonnet, and this is the
+    # platform's flagship narrative surface: six advisor voices plus a chair's
+    # verdict over 30 days of data, read once a month. The misnomer is the
+    # function's name (kept for its call sites), not the model.
     payload = json.dumps(
         {"model": os.environ.get("AI_MODEL", "claude-sonnet-4-6"), "max_tokens": 2500, "messages": [{"role": "user", "content": prompt}]}
     ).encode()
@@ -582,15 +671,6 @@ def call_haiku_monthly(data, goals):
 def gather_all():
     today = datetime.now(timezone.utc).date()
     wins = get_date_windows()
-    sources = ["whoop", "withings", "strava", "eightsleep", "hevy", "macrofactor", "todoist", "chronicling"]
-    extractors = {
-        "whoop": ex_whoop,
-        "withings": ex_withings,
-        "strava": ex_strava,
-        "hevy": ex_hevy,
-        "macrofactor": ex_macrofactor,
-        "chronicling": ex_chronicling,
-    }
 
     # ── Profile (needed for profile-driven targets) ──
     try:
@@ -600,17 +680,25 @@ def gather_all():
         logger.warning(f"gather_all: profile fetch failed: {e}")
         profile = {}
 
-    raw_cur = {s: fetch_range(s, wins["cur_start"], wins["cur_end"]) for s in sources}
-    raw_prior = {s: fetch_range(s, wins["prior_start"], wins["prior_end"]) for s in sources}
+    raw_cur = {s: fetch_range(s, wins["cur_start"], wins["cur_end"]) for s in SOURCES}
+    raw_prior = {s: fetch_range(s, wins["prior_start"], wins["prior_end"]) for s in SOURCES}
 
-    cur = {s: extractors[s](raw_cur[s]) for s in extractors}
-    prior = {s: extractors[s](raw_prior[s]) for s in extractors}
+    # One pass per extractor per arm (#1658). This used to build cur/prior with the
+    # profile-blind extractors and then immediately overwrite strava + macrofactor
+    # with profile-aware recomputations — four wasted passes over the month's records,
+    # including a full dedup_activities sweep, every run.
+    def _extract(raw):
+        return {
+            "whoop": ex_whoop(raw["whoop"]),
+            "withings": ex_withings(raw["withings"]),
+            "strava": ex_strava(raw["strava"], profile),
+            "hevy": ex_hevy(raw["hevy"]),
+            "macrofactor": ex_macrofactor(raw["macrofactor"], profile),
+            "chronicling": ex_chronicling(raw["chronicling"]),
+        }
 
-    # Sources that need profile for target-aware extraction
-    cur["strava"] = ex_strava(raw_cur["strava"], profile)
-    prior["strava"] = ex_strava(raw_prior["strava"], profile)
-    cur["macrofactor"] = ex_macrofactor(raw_cur["macrofactor"], profile)
-    prior["macrofactor"] = ex_macrofactor(raw_prior["macrofactor"], profile)
+    cur = _extract(raw_cur)
+    prior = _extract(raw_prior)
 
     # Sleep: extracted from Whoop (SOT for duration/staging v2.55.0)
     cur["sleep"] = ex_whoop_sleep(raw_cur["whoop"])
@@ -680,6 +768,29 @@ def gather_all():
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+def _is_section_header(line: str) -> bool:
+    """True for an advisor's section header line in the board commentary.
+
+    Derived from the SHAPE the prompt asks for — a leading emoji followed by an
+    upper-case name/title — rather than from a hardcoded six-emoji tuple (#1658).
+    The prompt builds its headers from whichever members the S3 board config
+    assigns to `monthly_digest`, each with their own emoji, so any advisor added
+    to the board (or any emoji written without the exact VS16 variation selector)
+    silently lost its heading and was rendered as ordinary body prose.
+    """
+    line = line.strip()
+    if not line:
+        return False
+    # The six advisors of the shipped fallback prompt stay a fast path, so this can
+    # only ever match MORE lines than the old tuple did, never fewer.
+    if any(line.startswith(e) for e in ("🏋️", "🥗", "😴", "🩺", "🧠", "🎯")):
+        return True
+    if line[0].isascii():
+        return False
+    letters = [c for c in line if c.isalpha()]
+    return bool(letters) and all(c.isupper() for c in letters)
+
+
 def build_html(data, goals, commentary, windows):
     cur = data["cur"]
     prior = data["prior"]
@@ -728,7 +839,7 @@ def build_html(data, goals, commentary, windows):
         elif in_insight:
             if line.strip():
                 insight_html += f'<p style="font-size:14px;color:#78350f;line-height:1.7;margin:0;">{line}</p>'
-        elif any(line.startswith(e) for e in ("🏋️", "🥗", "😴", "🩺", "🧠", "🎯")):
+        elif _is_section_header(line):
             board_html += f'<p style="font-size:13px;font-weight:700;color:#1a1a2e;margin:16px 0 4px;">{line}</p>'
         elif line.strip():
             board_html += f'<p style="font-size:13px;color:#333;line-height:1.6;margin:0 0 8px;">{line}</p>'
@@ -758,7 +869,7 @@ def build_html(data, goals, commentary, windows):
                 col, emoji = ("#27ae60", "🟢") if cur_val <= lo else ("#e67e22", "🟡") if cur_val <= hi else ("#e74c3c", "🔴")
             else:
                 col, emoji = ("#e74c3c", "🔴") if cur_val < lo else ("#e67e22", "🟡") if cur_val < hi else ("#27ae60", "🟢")
-        dlt = delta(cur_val, prior_val, unit, invert=invert) if prior_val else ""
+        dlt = delta(cur_val, prior_val, unit, invert=invert) if prior_val is not None else ""
         return (
             f'<div style="text-align:center;padding:10px 8px;flex:1;">'
             f'<div style="font-size:20px;">{emoji}</div>'
@@ -837,17 +948,30 @@ def build_html(data, goals, commentary, windows):
         z2_range = st_c.get("zone2_hr_range", f"{ZONE2_HR_LOW}–{ZONE2_HR_HIGH}")
         z2col = "#27ae60" if z2 >= 500 else "#e67e22" if z2 >= 200 else "#e74c3c"
         tr_rows += row(f"Zone 2 ({z2_range} bpm)", f'<span style="color:{z2col};font-weight:700;">{z2} min ({z2pct}% of cardio)</span>')
+    # ADR-104 (#1658): the fitness verdict is only published when something was
+    # actually measured. These rows used to render outside the `if st_c:` guard, so
+    # a month with no recorded activity at all still published "CTL — 42-day
+    # Fitness: 0.0" and "TSB — Current Form: 0.0 (Neutral)" — a confident verdict
+    # computed over nothing. The 60-day load window is wider than the 30-day arm, so
+    # the guard is "the load model saw something", not "this month had activity".
     tsb = tl.get("tsb", 0)
-    tcol = "#27ae60" if tsb >= 0 else "#e67e22" if tsb >= -15 else "#e74c3c"
-    tr_rows += row("CTL — 42-day Fitness", fmt(tl.get("ctl")), highlight=True)
-    tr_rows += row(
-        "TSB — Current Form",
-        f'<span style="color:{tcol};">{fmt(tl.get("tsb"))} ({"Fresh" if tsb>=5 else "Neutral" if tsb>=-5 else "Fatigued"})</span>',
-    )
+    if st_c or any(v for v in (tl or {}).values()):
+        tcol = "#27ae60" if tsb >= 0 else "#e67e22" if tsb >= -15 else "#e74c3c"
+        tr_rows += row("CTL — 42-day Fitness", fmt(tl.get("ctl")), highlight=True)
+        tr_rows += row(
+            "TSB — Current Form",
+            f'<span style="color:{tcol};">{fmt(tl.get("tsb"))} ({"Fresh" if tsb>=5 else "Neutral" if tsb>=-5 else "Fatigued"})</span>',
+        )
     if cur.get("hevy"):
         h = cur["hevy"]
         hp = prior.get("hevy") or {}
         tr_rows += row("Strength Workouts", str(h.get("workout_count", 0)), delta(h.get("workout_count"), hp.get("workout_count")))
+        if h.get("total_volume_lbs"):
+            tr_rows += row(
+                "Strength Volume",
+                f'{h["total_volume_lbs"]:,} lbs',
+                delta(h.get("total_volume_lbs"), hp.get("total_volume_lbs"), " lbs", dec=0),
+            )
     training_section = section("Training — 30 Days", "🏃", tbl(tr_rows))
 
     # ── Recovery ──
@@ -917,9 +1041,10 @@ def build_html(data, goals, commentary, windows):
             delta(m_c.get("calories_avg"), m_p.get("calories_avg"), " kcal", invert=True),
             highlight=True,
         )
-        nu_rows += row("Calorie Target Hit", f'{m_c.get("calorie_hit_rate", "—")}%')
+        # An unmeasured rate renders as absence, not as "0%" / "None%" (#1658).
+        nu_rows += row("Calorie Target Hit", fmt(m_c.get("calorie_hit_rate"), "%", dec=0))
         nu_rows += row("Avg Protein", fmt(m_c.get("protein_avg_g"), "g"), delta(m_c.get("protein_avg_g"), m_p.get("protein_avg_g"), "g"))
-        nu_rows += row("Protein Target Hit", f'{m_c.get("protein_hit_rate", "—")}%')
+        nu_rows += row("Protein Target Hit", fmt(m_c.get("protein_hit_rate"), "%", dec=0))
         nu_rows += row("Days Logged", str(m_c.get("days_logged", 0)))
     else:
         nu_rows = '<tr><td colspan="2" style="padding:12px;color:#999;font-size:13px;font-style:italic;">MacroFactor pending — export CSV from app</td></tr>'
@@ -939,7 +1064,7 @@ def build_html(data, goals, commentary, windows):
             for g, v in sorted(ch_c["group_avgs"].items(), key=lambda x: x[1] or 0):
                 gcol = "#27ae60" if (v or 0) >= 75 else "#e67e22" if (v or 0) >= 55 else "#e74c3c"
                 cp = ch_p.get("group_avgs", {}).get(g)
-                hab_rows += row(f"↳ {g}", f'<span style="color:{gcol};">{fmt(v, "%")}</span>', delta(v, cp, "%") if cp else "")
+                hab_rows += row(f"↳ {g}", f'<span style="color:{gcol};">{fmt(v, "%")}</span>', delta(v, cp, "%") if cp is not None else "")
         if ch_c.get("best_group"):
             hab_rows += row("🏆 Best Group", ch_c["best_group"])
         if ch_c.get("worst_group"):
@@ -962,7 +1087,7 @@ def build_html(data, goals, commentary, windows):
         p_level = cs_p.get("character_level")
         xp_str = f"+{int(xp_d)} XP" if xp_d >= 0 else f"{int(xp_d)} XP"
         xp_col = "#27ae60" if xp_d >= 0 else "#e74c3c"
-        lvl_delta = delta(level, p_level) if p_level else ""
+        lvl_delta = delta(level, p_level) if p_level is not None else ""
         cs_rows = row(
             "Character Level",
             f'<span style="font-size:15px;font-weight:700;">Level {int(level)}</span> — {tier}',
@@ -987,7 +1112,7 @@ def build_html(data, goals, commentary, windows):
             plvl = pd.get("level", 0)
             ptier = pd.get("tier", "")
             prev = (cs_p.get("pillars") or {}).get(pname, {}).get("level") if cs_p else None
-            dlt = delta(plvl, prev) if prev else ""
+            dlt = delta(plvl, prev) if prev is not None else ""
             emoji = _PILLAR_EMOJI.get(pname, "")
             cs_rows += row(f"{emoji} {(pname or "").capitalize()}", f"Level {int(plvl)} — {ptier}", dlt)
         cs_html = section("Character Sheet — 30 Days", "🎮", tbl(cs_rows))
@@ -1032,16 +1157,76 @@ def build_html(data, goals, commentary, windows):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def lambda_handler(event, context):
-    # P1.6: Scheduler fires on the 1st of each month (America/Los_Angeles).
-    # Guard: only send on Mondays so cadence matches original "1st Monday" intent.
-    dry_run = is_dry_run(event)
-    from datetime import date
+EMAIL_LOG_NAME = "monthly_digest"
 
-    today = date.today()
-    if today.weekday() != 0:  # 0 = Monday
-        logger.info(f"[SKIP] Monthly digest: today is {today.strftime('%A')} — only runs on Mondays. Exiting.")
-        return {"statusCode": 200, "body": "skipped — not Monday"}
+
+def _email_log_pk():
+    return f"USER#{USER_ID}#SOURCE#email_log#{EMAIL_LOG_NAME}"
+
+
+def record_email_send(table_, today):
+    """Write a completion record so a re-invoke can't double-send (#1658).
+
+    Every other email lambda in this package writes one of these; this one didn't,
+    so nothing stopped a retry / manual re-run / EventBridge at-least-once
+    redelivery from mailing a second identical letter and filing a second identical
+    insight — and the status page could not report the monthly letter's last send
+    at all. Non-fatal on failure: a status write must never lose a sent letter.
+    """
+    import time as _time
+
+    try:
+        table_.put_item(
+            Item={
+                "pk": _email_log_pk(),
+                "sk": f"DATE#{today.isoformat()}",
+                "sent_at": datetime.now(timezone.utc).isoformat(),
+                "status": "success",
+                "ttl": int(_time.time()) + 86400 * 400,
+            }
+        )
+    except Exception as e:
+        logger.info(f"[status-tracking] Non-fatal write failure: {e}")
+
+
+def _already_sent_this_month(today) -> bool:
+    """True when a letter is already recorded for `today`'s calendar month.
+
+    Fail-OPEN: a read failure must never be the reason a monthly letter goes
+    unsent — the letter already spent months not sending (see the handler note).
+    """
+    month_start = today.replace(day=1).isoformat()
+    try:
+        r = table.query(
+            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
+            ExpressionAttributeValues={":pk": _email_log_pk(), ":s": f"DATE#{month_start}", ":e": f"DATE#{today.isoformat()}"},
+        )
+        return bool(r.get("Items"))
+    except Exception as e:
+        logger.warning(f"[monthly] send-log read failed, proceeding: {e}")
+        return False
+
+
+def lambda_handler(event, context):
+    # The cadence guard is IDEMPOTENCY, not the weekday (#1658).
+    #
+    # This used to `return "skipped — not Monday"` unless date.today().weekday() == 0
+    # — while the EventBridge rule is `cron(0 16 ? * 1#1 *)`, whose day-of-week field
+    # is 1-7 = SUN-SAT, i.e. the first SUNDAY. Sunday is never Monday, so every
+    # scheduled invocation no-opped and the letter was never delivered at all; three
+    # ~2ms log streams are the whole record of it. The old guard also read the
+    # runtime's LOCAL date to make a weekday decision, in a repo whose crons are
+    # fixed-UTC precisely so weekdays can't drift.
+    #
+    # The schedule already guarantees a monthly cadence; what it does NOT guarantee
+    # is exactly-once (retries, manual re-runs, at-least-once redelivery). So the
+    # guard that stays is the one that matters: at most one letter per calendar
+    # month, from the send log this handler now writes.
+    dry_run = is_dry_run(event)
+    today = datetime.now(timezone.utc).date()
+    if not dry_run and _already_sent_this_month(today):
+        logger.info(f"[SKIP] Monthly digest: a letter is already recorded for {today.strftime('%B %Y')}. Exiting.")
+        return {"statusCode": 200, "body": "skipped — already sent this month"}
 
     logger.info("Monthly Coach's Letter v1.1.0 (Board Centralization) starting...")
     data, goals = gather_all()
@@ -1049,24 +1234,29 @@ def lambda_handler(event, context):
     logger.info(f"{windows['month_label']} | {windows['cur_start']} → {windows['cur_end']}")
 
     logger.info("Calling Haiku for monthly council commentary...")
+    # Whether the board actually spoke is tracked as a FLAG, not sniffed back out of
+    # the rendered text (#1658). The old gate was `"unavailable" not in
+    # commentary[:50]`, and the failure stub's word "unavailable" starts at index 42
+    # — it does not FIT in a 50-character slice, so the sentinel could never fire and
+    # the stub was filed into the insight ledger as a genuine monthly coaching
+    # insight with confidence="high", actionable=True. A substring test was the wrong
+    # instrument anyway: the prompt explicitly asks advisors to say so when data is
+    # "missing, mock, or unavailable", so a REAL insight can contain the word too.
+    commentary_ok = True
     try:
         commentary = call_haiku_monthly(data, goals)
     except Exception as e:
         logger.warning(f"Haiku failed: {e}")
-        commentary = (
-            "🎯 THE CHAIR — MONTHLY OVERVIEW\nCommentary unavailable this month.\n"
-            "💡 INSIGHT OF THE MONTH\nReview your data sections below."
-        )
+        commentary = COMMENTARY_UNAVAILABLE
+        commentary_ok = False
 
     # AI-3: Validate output before rendering
-    if _HAS_AI_VALIDATOR and commentary and "unavailable" not in commentary[:50]:
+    if _HAS_AI_VALIDATOR and commentary and commentary_ok:
         _val = validate_ai_output(commentary, AIOutputType.MONTHLY_DIGEST)
         if _val.blocked:
             logger.info(f"[AI-3] Monthly digest commentary BLOCKED: {_val.block_reason}")
-            commentary = _val.safe_fallback or (
-                "\U0001f3af THE CHAIR \u2014 MONTHLY OVERVIEW\nCommentary unavailable this month.\n"
-                "\U0001f4a1 INSIGHT OF THE MONTH\nReview your data sections below."
-            )
+            commentary = _val.safe_fallback or COMMENTARY_UNAVAILABLE
+            commentary_ok = False
         elif _val.warnings:
             logger.info(f"[AI-3] Monthly digest warnings: {_val.warnings}")
 
@@ -1089,8 +1279,18 @@ def lambda_handler(event, context):
     )
     logger.info(f"Sent: Monthly Coach's Letter · {month}")
 
+    # A dry run must leave NO trace that looks like a delivery: writing the send
+    # record would make the real scheduled invocation later that month skip as
+    # "already sent" — the suppressor would become the thing that suppresses the
+    # letter (the exact failure mode this handler just came out of).
+    if dry_run:
+        logger.info("[DRY_RUN] skipping the send record and the insight ledger write — no mail went out")
+        return {"statusCode": 200, "body": f"dry run — monthly letter built, not sent: {month}"}
+
+    record_email_send(table, today)
+
     # IC-15: Persist monthly insights
-    if _HAS_INSIGHT_WRITER and commentary and "unavailable" not in commentary[:50]:
+    if _HAS_INSIGHT_WRITER and commentary and commentary_ok:
         try:
             insight_writer.write_insight(
                 digest_type="monthly_digest",
@@ -1100,7 +1300,14 @@ def lambda_handler(event, context):
                 tags=["monthly", "board", "coaching"],
                 confidence="high",
                 actionable=True,
-                date=month,
+                # A SORTABLE date, not the display label (#1658). insight_writer's
+                # recency filter is a STRING comparison against a YYYY-MM-DD cutoff,
+                # and "August 2026" sorts above every "2026-..-.." cutoff because "A"
+                # sorts above the digits — so a monthly insight never aged out of the
+                # 14/30/90-day context windows and was replayed into every downstream
+                # AI prompt until its TTL expired. This is the last day the letter
+                # actually reviewed.
+                date=windows["cur_end"],
             )
             logger.info("IC-15: monthly insight persisted")
         except Exception as e:
