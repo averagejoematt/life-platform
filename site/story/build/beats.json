@@ -2336,6 +2336,29 @@
         }
       ],
       "why_it_mattered": "Three separate sweeps closed this same data class and all three missed a door, because each time somebody wrote down the doors they could think of. The fix that worked derives the list from the code instead — and it found a fourth door in its first run. That's the difference between fixing a bug and fixing the reason the bug keeps coming back."
+    },
+    {
+      "id": "2026-08-08-the-guards-that-caught-me",
+      "date": "2026-08-08",
+      "title": "The guards that caught me",
+      "shipped": "Twenty-seven fixes shipped today, but the one that matters is smaller than any of them. A CI step was supposed to fail the build when tests broke or coverage dropped. It piped its output into another command, and in that shell the exit code of a pipeline is the LAST command's — so the check reported success no matter what happened. It had never once failed. Adding one line turned it on, and within hours it caught three real problems that had been sitting there reading green: a stale engine doc, and two source files that had quietly grown past the size limit the project sets for itself. Also shipped: a monthly email that has never sent in its life now will (the schedule fired on Sundays; the code only ran on Mondays), and a fix so the AI narrating my data can't be handed a number that got corrupted on its way into the prompt.",
+      "gotcha": "I was asked to delete a duplicated test step to save time. Before deleting it I checked what the remaining step actually enforced — and found it enforced nothing. Deleting the duplicate as asked would have left the project with no test signal at all, still reporting green. The cheap task was hiding the real one.",
+      "honest_miss": "Verifying a privacy screen, I broke it in a way that left the code LOOKING broken but behaving the same, saw the guard stay green, and nearly concluded the guard was useless. It wasn't — my sabotage hadn't actually changed anything. A test that a fake break doesn't fail proves nothing about the guard; it proves something about the break. I made the same mistake twice in one day before catching it.",
+      "prs": [
+        {
+          "label": "PR #2270",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2270"
+        },
+        {
+          "label": "PR #2293",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2293"
+        },
+        {
+          "label": "PR #2284",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2284"
+        }
+      ],
+      "why_it_mattered": "A check that always passes is worse than no check, because it buys the confidence of one without the work. This one had been reporting success for its whole existence, and everything downstream — me included — read that as evidence. The three problems it caught in its first hours weren't new; they had been sitting in plain sight, behind a green tick. It's the same reason I publish the numbers here rather than a summary of them: a measurement nobody can fail is decoration."
     }
   ]
 }
