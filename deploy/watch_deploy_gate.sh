@@ -31,15 +31,38 @@ approved_file="$(mktemp)"
 
 echo "[gate-watch] armed: every ${INTERVAL}s for ${MAX_MINUTES}m; skipping runs: ${SKIP}"
 
+# DO NOT poll `gh run list --status waiting` — measured 2026-08-08, it is unreliable:
+# a live CI/CD run whose Deploy job was sitting at the environment gate did NOT appear
+# in that list (its run-level status read `in_progress`), while two week-old zombies
+# did. A watcher built on it fires on the wrong runs and silently never fires on the
+# right ones. The authoritative signal is a NON-EMPTY `pending_deployments` on the run,
+# which is also exactly what approve_deployment.sh acts on — so poll that directly over
+# every run that has not completed.
 while [ "$(date +%s)" -lt "${deadline}" ]; do
-  waiting="$(gh run list --status waiting --limit 20 --json databaseId,name \
-              --jq '.[] | select(.name == "CI/CD") | .databaseId' 2>/dev/null || true)"
+  candidates="$(gh run list --limit 30 --json databaseId,name,status \
+                 --jq '.[] | select(.name == "CI/CD") | select(.status != "completed") | .databaseId' 2>/dev/null || true)"
+
+  waiting=""
+  for run in ${candidates}; do
+    pending="$(gh api "repos/${REPO}/actions/runs/${run}/pending_deployments" \
+                --jq 'length' 2>/dev/null || echo 0)"
+    if [ "${pending:-0}" -gt 0 ]; then
+      waiting="${waiting} ${run}"
+    fi
+  done
 
   for run in ${waiting}; do
     case " ${SKIP} " in *" ${run} "*)
       continue ;;
     esac
     if grep -qx "${run}" "${approved_file}" 2>/dev/null; then
+      continue
+    fi
+    if [ -n "${GATE_WATCH_DRY_RUN:-}" ]; then
+      # Proof mode: exercise detection + selection without approving anything, so the
+      # firing path can be verified against a run we must never actually approve.
+      echo "[gate-watch] DRY RUN — would approve run ${run}"
+      echo "${run}" >>"${approved_file}"
       continue
     fi
     echo "[gate-watch] $(date -u +%H:%M:%SZ) approving run ${run}"
