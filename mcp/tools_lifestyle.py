@@ -629,11 +629,10 @@ def _get_state_of_mind_trend(args):
     for d in days_data:
         ds = d["date"]
         try:
-            y, m, day = ds.split("-")
-            # HAE writes SoM raw check-ins under the user-segmented prefix
-            # (raw/matthew/state_of_mind/…). The old un-segmented path silently
-            # 404'd, dropping the label/association/time-of-day deep analysis.
-            key = f"raw/{USER_ID}/state_of_mind/{y}/{m}/{day}.json"
+            # #2286: resolved from the registry, like the blood-pressure read above.
+            # The un-segmented path this replaced silently 404'd, dropping the
+            # label/association/time-of-day deep analysis — #2278's failure shape.
+            key = raw_date_key("apple_health", ds, sub="state_of_mind")
             resp = s3_client.get_object(Bucket=S3_BUCKET, Key=key)
             entries = json.loads(resp["Body"].read())
             for e in entries:

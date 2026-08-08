@@ -16,7 +16,13 @@ extend-exclude = '''/(\.venv|cdk\.out|layer-build|site|node_modules|archive|data
 [tool.ruff]
 line-length = 140
 target-version = "py312"
-extend-exclude = [".venv", "cdk.out", "layer-build", "site", "node_modules", "archive", "datadrops", "_mcp_staging"]
+# `cdk/_bundle_staging` is a local build artifact (gitignored, ~7.7 MB, a COPY of
+# lambdas/ that CDK bundling leaves behind). CI never sees it, but a developer or agent
+# who has run a deploy does — ruff scanned it and reported 13 phantom violations against
+# duplicated source. Since 2026-08-09 the ruff gate runs PRE-MERGE (pr-checks.yml), so a
+# local run that disagrees with CI is no longer a curiosity: it is an agent chasing
+# errors that cannot exist on the runner.
+extend-exclude = [".venv", "cdk.out", "cdk/_bundle_staging", "layer-build", "site", "node_modules", "archive", "datadrops", "_mcp_staging"]
 
 [tool.ruff.lint]
 # pycodestyle (E/W) + pyflakes (F) + isort (I) + flake8-bandit (S, security/SAST).
