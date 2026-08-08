@@ -833,11 +833,20 @@ def _get_training_recommendation(args):
     try:
         z2_result = tool_get_zone2_breakdown({"start_date": d7_start, "end_date": target_date})
         if "summary" in z2_result:
-            z2_min = z2_result["summary"].get("total_zone2_minutes", 0)
-            z2_target = z2_result["summary"].get("weekly_target_minutes", 150)
+            # Read the keys the producer actually publishes (#2246). tool_get_zone2_breakdown's
+            # summary is built in mcp/tools_correlation.py and names these `total_zone_2_min` /
+            # `weekly_target_min` — the same names lambdas/web/site_api_autonomic.py publishes and
+            # tests/api_schemas/api_zone2.json pins. Reading `total_zone2_minutes` /
+            # `weekly_target_minutes` here always missed, so both .get defaults won and the note
+            # below fired "Only 0 of 150 ... (0%)" on every single call.
+            z2_summary = z2_result["summary"]
+            z2_min = z2_summary.get("total_zone_2_min", 0)
+            z2_target = z2_summary.get("weekly_target_min", 150)
             z2_pct = round(z2_min / z2_target * 100) if z2_target > 0 else 0
             if z2_pct < 50:
-                bod_notes.append(f"Attia: Only {z2_min} of {z2_target} Zone 2 minutes this week ({z2_pct}%). Prioritize Zone 2 sessions.")
+                bod_notes.append(
+                    f"Attia: Only {z2_min:.0f} of {z2_target:.0f} Zone 2 minutes this week ({z2_pct}%). Prioritize Zone 2 sessions."
+                )
     except Exception:
         pass
 
