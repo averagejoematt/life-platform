@@ -1342,19 +1342,13 @@ class TestWriterReaderFieldNames:
         # hypothesis_engine_lambda maps sleep_onset_min <- time_to_sleep_min.
         assert "time_to_sleep_min" in _written_field_names()
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "DEFECT (tranche-2 discovery): reader/writer FIELD-NAME MISMATCH. "
-            "experiment_design.DESIGN_METRICS['sleep_onset_latency_min'] and "
-            "mcp/tools_lifestyle._EXPERIMENT_METRICS both query the eightsleep partition for "
-            "'sleep_onset_latency_min', which this Lambda has never written — the stored name is "
-            "'time_to_sleep_min'. Sleep Onset Latency is the ONLY Eight-Sleep-exclusive criterion "
-            "metric ('Eight Sleep only — Whoop doesn't track'), so any pre-registered experiment "
-            "choosing it extracts None for every day and closes with an empty series."
-        ),
-    )
     def test_every_eightsleep_field_the_experiment_metric_registries_query_is_actually_written(self, summer_clock):
+        """FIXED (#2221). Both registries used to query the eightsleep partition for
+        'sleep_onset_latency_min', which this Lambda has never written — the stored
+        name is 'time_to_sleep_min'. Sleep Onset Latency is the ONLY Eight-Sleep-
+        exclusive criterion metric, so any pre-registered experiment choosing it
+        extracted None for every day and closed with an empty series. The DESIGN_METRICS
+        KEY (the frozen pre-registration slug) is unchanged; only the field it reads is."""
         from experiment.experiment_design import DESIGN_METRICS
 
         written = _written_field_names()
