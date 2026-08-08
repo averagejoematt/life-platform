@@ -247,6 +247,27 @@ def _frozen_and_isolated(monkeypatch):
     freeze(DEFAULT_NOW)
 
 
+@pytest.fixture
+def delivery_public(monkeypatch):
+    """Opt IN to the ungated food-delivery reader.
+
+    `/api/food_delivery_overview` ships PRIVATE-by-default (#2209/#2210): with
+    `NUTRITION_DELIVERY_PUBLIC` unset the handler returns `{"food_delivery": None}`
+    and never queries the partition. Every test below that asserts on delivery
+    *content* — counts, spend, binge days, platform breakdown, weekly trend — is
+    exercising the flag-ON path, so it must say so explicitly. Without this,
+    those tests do not fail on the shipped default; they read `None` and raise.
+
+    `_DELIVERY_PUBLIC` is a module-level constant computed at IMPORT time
+    (`site_api_meals.py:29`), so the env var is already frozen by the time a test
+    runs — patch the module attribute, never the environment.
+
+    Tests that pin the GATE itself (`test_food_delivery_respects_the_same_privacy
+    _flag_its_sibling_endpoint_does`) deliberately do NOT take this fixture.
+    """
+    monkeypatch.setattr(meals, "_DELIVERY_PUBLIC", True)
+
+
 def make_g(sources: FakeSources | None = None, table: FakeTable | None = None) -> dict:
     """The facade's injection surface, hand-built.
 
@@ -516,7 +537,7 @@ def _data_keys(payload: dict) -> set[str]:
         ),
     ],
 )
-def test_the_empty_state_publishes_every_key_the_populated_state_does(name):
+def test_the_empty_state_publishes_every_key_the_populated_state_does(delivery_public, name):
     empty = _data_keys(body_of(HANDLERS[name](_g=make_g())))
     populated = _data_keys(body_of(HANDLERS[name](_g=_populated_g(name))))
     missing = populated - empty
@@ -546,7 +567,7 @@ def test_meal_glucose_keeps_publishing_has_cgm_when_there_are_no_meals():
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def test_an_empty_delivery_window_reports_absence_rather_than_zero_orders():
+def test_an_empty_delivery_window_reports_absence_rather_than_zero_orders(delivery_public):
     """ "0 orders in 30 days" is a *claim of abstinence*. The honest answer when
     the partition is empty is "no delivery record", which is what `None` says."""
     assert call("food_delivery_overview")["food_delivery"] is None
@@ -1030,44 +1051,44 @@ DELIVERY_FIXTURE = FakeSources(
 )
 
 
-def test_delivery_order_count_is_the_number_of_records_in_the_window():
+def test_delivery_order_count_is_the_number_of_records_in_the_window(delivery_public):
     assert call("food_delivery_overview", DELIVERY_FIXTURE)["food_delivery"]["orders_30d"] == 4
 
 
-def test_delivery_spend_totals_and_averages_are_rounded_to_cents():
+def test_delivery_spend_totals_and_averages_are_rounded_to_cents(delivery_public):
     fd = call("food_delivery_overview", DELIVERY_FIXTURE)["food_delivery"]
     assert fd["total_spend_30d"] == 86.00  # 24.50 + 31.25 + 18.00 + 12.25
     assert fd["avg_spend"] == 21.50  # 86.00 / 4
 
 
-def test_binge_days_counts_only_the_records_flagged_as_such():
+def test_binge_days_counts_only_the_records_flagged_as_such(delivery_public):
     assert call("food_delivery_overview", DELIVERY_FIXTURE)["food_delivery"]["binge_days_30d"] == 1
 
 
-def test_the_platform_breakdown_is_ordered_most_used_first():
+def test_the_platform_breakdown_is_ordered_most_used_first(delivery_public):
     assert call("food_delivery_overview", DELIVERY_FIXTURE)["platform_breakdown"][0] == {"platform": "DoorDash", "count": 2}
 
 
-def test_the_platform_breakdown_accounts_for_every_order():
+def test_the_platform_breakdown_accounts_for_every_order(delivery_public):
     """A pie chart bound to this array must add up to orders_30d, or the reader
     sees a missing slice."""
     b = call("food_delivery_overview", DELIVERY_FIXTURE)
     assert sum(p["count"] for p in b["platform_breakdown"]) == b["food_delivery"]["orders_30d"]
 
 
-def test_an_order_with_no_platform_recorded_is_labelled_unknown_not_dropped():
+def test_an_order_with_no_platform_recorded_is_labelled_unknown_not_dropped(delivery_public):
     """Dropping it would understate the order count the spend was computed from."""
     names = {p["platform"] for p in call("food_delivery_overview", DELIVERY_FIXTURE)["platform_breakdown"]}
     assert "Unknown" in names
 
 
-def test_the_weekly_trend_buckets_orders_by_iso_week_in_chronological_order():
+def test_the_weekly_trend_buckets_orders_by_iso_week_in_chronological_order(delivery_public):
     trend = call("food_delivery_overview", DELIVERY_FIXTURE)["weekly_trend"]
     # 2026-04-13 and 2026-04-15 are both ISO week 16; 04-20 is week 17; 05-04 is week 19.
     assert trend == [{"week": "2026-W16", "orders": 2}, {"week": "2026-W17", "orders": 1}, {"week": "2026-W19", "orders": 1}]
 
 
-def test_a_delivery_record_dated_only_by_its_sort_key_still_lands_in_a_week():
+def test_a_delivery_record_dated_only_by_its_sort_key_still_lands_in_a_week(delivery_public):
     """The partition carries both a `date` attribute and a `DATE#` sort key
     depending on ingestion generation; neither may drop out of the trend."""
     src = FakeSources(
@@ -1076,7 +1097,7 @@ def test_a_delivery_record_dated_only_by_its_sort_key_still_lands_in_a_week():
     assert call("food_delivery_overview", src)["weekly_trend"] == [{"week": "2026-W16", "orders": 1}]
 
 
-def test_a_record_with_an_unparseable_date_is_kept_in_the_spend_totals():
+def test_a_record_with_an_unparseable_date_is_kept_in_the_spend_totals(delivery_public):
     """The date parse is guarded; the order still happened and still cost money,
     so dropping it from `total_spend_30d` would understate the reader's number."""
     # filter_window off: the row has no parseable date, so the real DDB range query
@@ -1101,7 +1122,7 @@ def test_a_record_with_an_unparseable_date_is_kept_in_the_spend_totals():
         "chart draws late December to the right of the following week."
     ),
 )
-def test_a_week_that_straddles_new_year_is_one_bucket_in_chronological_order():
+def test_a_week_that_straddles_new_year_is_one_bucket_in_chronological_order(delivery_public):
     freeze(datetime(2027, 1, 5, 18, 0, 0, tzinfo=timezone.utc))
     src = FakeSources(
         food_delivery=[
@@ -1126,7 +1147,7 @@ def test_protein_sources_reads_exactly_the_clamped_thirty_day_window():
     assert src.window_for("macrofactor") == (D30, TODAY)
 
 
-def test_food_delivery_reads_exactly_the_clamped_thirty_day_window():
+def test_food_delivery_reads_exactly_the_clamped_thirty_day_window(delivery_public):
     src = FakeSources()
     meals.food_delivery_overview(_g=make_g(src))
     assert src.window_for("food_delivery") == (D30, TODAY)
@@ -1183,7 +1204,7 @@ def test_every_ungapped_intensive_window_key_this_module_publishes_nulls_on_a_sh
 
 
 @pytest.mark.parametrize("key", sorted(_MODULE_EXTENSIVE_WINDOW_KEYS))
-def test_extensive_delivery_counts_stay_populated_on_a_short_window(monkeypatch, key):
+def test_extensive_delivery_counts_stay_populated_on_a_short_window(delivery_public, monkeypatch, key):
     """The other half of the same derived SET. The registry classifies these as
     EXTENSIVE, and the rubric is explicit: "3 orders in the last 30 days" is TRUE
     on Day 5 — a count over a partly elapsed window understates, it never
@@ -1324,7 +1345,7 @@ def test_the_module_clock_can_be_frozen_for_every_handler_not_just_four_of_them(
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def test_the_meal_endpoints_never_touch_a_partition_they_were_not_asked_for():
+def test_the_meal_endpoints_never_touch_a_partition_they_were_not_asked_for(delivery_public):
     """The generic containment check: each handler reads its own sources and no
     others, so a private partition cannot be pulled in by a refactor."""
     expected = {
@@ -1339,29 +1360,34 @@ def test_the_meal_endpoints_never_touch_a_partition_they_were_not_asked_for():
         assert src.sources_read == want, f"{name} read {src.sources_read}"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): /api/food_delivery_overview publishes order count, "
-        "total and average spend, per-platform breakdown and — most sensitively — "
-        "`binge_days_30d` on the fully public, unauthenticated route table "
-        "(site_api_lambda.ROUTES has no auth or flag gate). The SAME data class is treated as "
-        "PRIVATE-by-default two modules over: site_api_nutrition gates its food-delivery block "
-        "behind `_DELIVERY_PUBLIC` (env NUTRITION_DELIVERY_PUBLIC, default OFF) and, with the "
-        "flag off, does not even QUERY the partition. Two endpoints in the same serving path "
-        "disagree about whether delivery/binge data is publishable; the flag-off one is the "
-        "deliberate P2.3 decision."
-    ),
-)
-def test_food_delivery_respects_the_same_privacy_flag_its_sibling_endpoint_does(monkeypatch):
-    import os
+def test_food_delivery_respects_the_same_privacy_flag_its_sibling_endpoint_does():
+    """FIXED by #2210 (was a tranche-2 xfail). `/api/food_delivery_overview` sits on
+    the fully public, unauthenticated route table and publishes order count, spend
+    and — most sensitively — `binge_days_30d`. The same data class is PRIVATE-by-
+    default one module over (`site_api_nutrition`), so this endpoint now shares the
+    identical `nutrition_delivery_public()` helper and the two can no longer drift.
 
-    monkeypatch.delenv("NUTRITION_DELIVERY_PUBLIC", raising=False)
-    assert os.environ.get("NUTRITION_DELIVERY_PUBLIC") is None  # the shipped default: OFF
+    Asserted on the SHIPPED constant, not a patched one: `_DELIVERY_PUBLIC` is
+    computed at import, so this pins the value the Lambda actually boots with."""
+    assert meals._DELIVERY_PUBLIC is False, "the shipped default must be OFF — this is the P2.3 decision"
+
     src = FakeSources(food_delivery=[delivery("2026-04-15", amount=31.25, binge=True)])
     b = call("food_delivery_overview", src)
     assert src.sources_read == set(), "the private partition was queried with the flag off"
     assert b["food_delivery"] is None
+
+
+def test_the_delivery_gate_is_what_withholds_the_data_and_not_an_empty_fixture(delivery_public):
+    """The mutation proof for the test above. Same fixture, same handler, gate ON:
+    the partition IS read and the private figures DO appear. Without this pair, the
+    gate test would pass just as happily against a handler that had quietly stopped
+    reading delivery data for any reason at all."""
+    src = FakeSources(food_delivery=[delivery("2026-04-15", amount=31.25, binge=True)])
+    b = call("food_delivery_overview", src)
+    assert src.sources_read == {"food_delivery"}
+    assert b["food_delivery"]["orders_30d"] == 1
+    assert b["food_delivery"]["total_spend_30d"] == 31.25
+    assert b["food_delivery"]["binge_days_30d"] == 1
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1511,7 +1537,7 @@ def test_one_unparseable_protein_value_does_not_five_hundred_the_protein_page():
         "same records with try/except, so the omission is inconsistent within one function."
     ),
 )
-def test_one_currency_formatted_amount_does_not_five_hundred_the_delivery_page():
+def test_one_currency_formatted_amount_does_not_five_hundred_the_delivery_page(delivery_public):
     src = FakeSources(food_delivery=[delivery("2026-04-15", amount="$24.50"), delivery("2026-04-16", amount=18.0)])
     assert meals.food_delivery_overview(_g=make_g(src))["statusCode"] in (200, 503)
 
@@ -1536,7 +1562,7 @@ def test_a_null_food_name_is_skipped_rather_than_crashing_the_strip():
     assert [s["food"] for s in call("protein_sources", src)["protein_sources"]] == ["Steak"]
 
 
-def test_a_delivery_flag_recorded_as_the_string_false_is_counted_as_a_binge():
+def test_a_delivery_flag_recorded_as_the_string_false_is_counted_as_a_binge(delivery_public):
     """Documented truthiness hazard, pinned as a tripwire: `if i.get("binge")` is a
     truthiness test, so any non-empty string — including "false" or "no" — counts.
     Boolean and numeric encodings behave correctly; a string encoding would
