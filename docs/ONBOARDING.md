@@ -76,7 +76,7 @@ site-api Lambda (~135 endpoints, primarily read-only — ADR-037) ← averagejoe
 | **EventBridge** | All cron schedules, fixed UTC (no DST drift) | CDK-managed only — never create rules via Console |
 | **Secrets Manager** (`life-platform/*`) | All credentials | 25 active secrets. See `docs/SECRETS_MAP.md` |
 | **CloudFront** (4 distributions) | CDN for `averagejoematt.com`, `dash`, `blog`, `buddy` | S3 website endpoint origins (ADR-053/054). Site syncs invalidate via CDK helpers |
-| **MCP Lambda** | 76 tools across 25 domain modules in `mcp/` | The interface Claude uses to query data |
+| **MCP Lambda** | 76 tools across 26 domain modules in `mcp/` | The interface Claude uses to query data |
 | **AWS Bedrock** (ADR-062) | All Claude inference (coach generation, daily brief sections) via `lambdas/bedrock_client.invoke()` — IAM auth, no API key | Prompt caching enabled (ADR-049); Haiku for structured, Sonnet for narrative; budget-tier gated (ADR-063/133) |
 
 ---

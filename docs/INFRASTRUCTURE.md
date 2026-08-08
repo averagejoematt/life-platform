@@ -59,7 +59,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Function URL (remote) | `<not committed — SEC-02 #780; read live: aws lambda get-function-url-config --function-name life-platform-mcp --region us-west-2>` |
 | Auth (remote) | OAuth 2.1 auto-approve + HMAC Bearer via `life-platform/mcp-api-key` secret (auto-rotates every 90 days) |
 | Auth (local) | `mcp_bridge.py` → `.config.json` → Function URL |
-| Tools | **76** across **25** tool modules (`mcp/tools_*.py`) |
+| Tools | **76** across **26** tool modules (`mcp/tools_*.py`) |
 | Cache warmer | 14 warm-steps pre-computed nightly (warmer config) |
 
 ---

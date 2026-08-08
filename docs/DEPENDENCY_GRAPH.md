@@ -83,7 +83,7 @@ Historical bug (v4.5.0): `daily-insight-compute` ran BEFORE the `computed_metric
 
 ## 4. MCP Tool Layer (DynamoDB → Claude)
 
-Read-only query layer (with limited writes for memory, insights, decisions, hypotheses, social, supplements, todoist, character config). **76 tools across 25 modules** (count = top-level keys in the `TOOLS` dict in `mcp/registry.py`, via `deploy/sync_doc_metadata.py::_auto_discover_tool_count`; do NOT `grep -c '"name":'` — it over-counts by matching nested input-schema fields).
+Read-only query layer (with limited writes for memory, insights, decisions, hypotheses, social, supplements, todoist, character config). **76 tools across 26 modules** (count = top-level keys in the `TOOLS` dict in `mcp/registry.py`, via `deploy/sync_doc_metadata.py::_auto_discover_tool_count`; do NOT `grep -c '"name":'` — it over-counts by matching nested input-schema fields).
 
 | MCP Module | DDB Partitions Read |
 |------------|-------------------|
