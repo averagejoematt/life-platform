@@ -366,6 +366,28 @@ def table(monkeypatch):
 
 
 @pytest.fixture
+def delivery_public(monkeypatch):
+    """Opt IN to the ungated food-delivery reader.
+
+    `get_food_delivery_{brief_signal,digest_line}` ship PRIVATE-by-default
+    (#2209/#2210, this door #2233): with `NUTRITION_DELIVERY_PUBLIC` unset they
+    return None and never query the partition. Every test below that asserts on
+    delivery *content* — streak text, bonus multipliers, the ordered-today
+    override — is exercising the flag-ON path and must say so.
+
+    Tests asserting *absence* need it too, for a subtler reason: with the flag
+    off they pass vacuously, and would keep passing against a function stubbed to
+    `return None`. Taking the fixture is what makes them test their own claim.
+
+    The gate reads the env var at CALL time (`nutrition_delivery_public()`), not
+    at import, so setting the environment is correct here — unlike the sibling
+    `site_api_meals._DELIVERY_PUBLIC`, which is import-frozen and must be patched
+    as a module attribute.
+    """
+    monkeypatch.setenv("NUTRITION_DELIVERY_PUBLIC", "true")
+
+
+@pytest.fixture
 def ses(monkeypatch):
     s = FakeSes()
     monkeypatch.setattr(brief, "ses", s)
@@ -1007,10 +1029,10 @@ class TestFoodDeliverySignal:
     def _streak(self, table, **fields):
         table.store[(f"USER#{brief.USER_ID}#SOURCE#food_delivery", "STREAK#current")] = fields
 
-    def test_no_streak_record_is_no_signal(self, table):
+    def test_no_streak_record_is_no_signal(self, table, delivery_public):
         assert brief.get_food_delivery_brief_signal() is None
 
-    def test_a_zero_day_streak_produces_no_line(self, table):
+    def test_a_zero_day_streak_produces_no_line(self, table, delivery_public):
         self._streak(table, streak_days=0)
         assert brief.get_food_delivery_brief_signal() is None
 
@@ -1018,20 +1040,20 @@ class TestFoodDeliverySignal:
         "days,expected_multiplier",
         [(7, "1.02x"), (14, "1.05x"), (30, "1.10x")],
     )
-    def test_each_bonus_band_names_its_own_multiplier(self, table, days, expected_multiplier):
+    def test_each_bonus_band_names_its_own_multiplier(self, table, delivery_public, days, expected_multiplier):
         self._streak(table, streak_days=days)
         assert expected_multiplier in brief.get_food_delivery_brief_signal()
 
-    def test_a_short_streak_is_reported_without_claiming_a_bonus(self, table):
+    def test_a_short_streak_is_reported_without_claiming_a_bonus(self, table, delivery_public):
         self._streak(table, streak_days=3)
         line = brief.get_food_delivery_brief_signal()
         assert "3 days" in line and "bonus" not in line
 
-    def test_an_order_placed_today_overrides_the_streak_line(self, table):
+    def test_an_order_placed_today_overrides_the_streak_line(self, table, delivery_public):
         self._streak(table, streak_days=40, last_order_date=TODAY)
         assert "ordered today" in brief.get_food_delivery_brief_signal()
 
-    def test_a_failed_read_is_non_fatal(self, table):
+    def test_a_failed_read_is_non_fatal(self, table, delivery_public):
         table.get_error = RuntimeError("throttled")
         assert brief.get_food_delivery_brief_signal() is None
 
@@ -1903,21 +1925,18 @@ class TestPublicStatsTruth:
         training = _published(handler_env)["training"]
         assert training["ctl_fitness"] is None and training["atl_fatigue"] is None
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:2489-2495 (lambda_handler) appends "
-            "get_food_delivery_brief_signal()'s line — 'Delivery-free streak: N days', or 'Food delivery "
-            "ordered today' — into `_group_narratives['nutrition']`, which is written verbatim into "
-            "generated/public_stats.json (site_writer.py:384, PUBLIC_STATS_KEY = "
-            "'generated/public_stats.json', served publicly via the ADR-046 CloudFront generated "
-            "origin). Food-delivery behaviour is private-by-default everywhere else on the platform: "
-            "site_api_meals.py:288 gates the identical data class behind NUTRITION_DELIVERY_PUBLIC "
-            "(#2209, default off). This is the same data class through a different door, with no gate "
-            "at all. It should be gated by the same flag. Hurts: Matthew's privacy. Severity P1."
-        ),
-    )
     def test_the_food_delivery_streak_is_not_published_to_the_public_artifact(self, handler_env):
+        """FIXED by #2251 (#2233) — was a tranche-3 xfail, and the test that found it.
+
+        `lambda_handler` appends `get_food_delivery_brief_signal()`'s line into
+        `_group_narratives["nutrition"]`, which `site_writer` writes verbatim into
+        `public_stats.json` — served publicly at `/public_stats.json`. That was a
+        third door onto the food-delivery partition, and unlike #2209/#2210's it
+        was actually publishing.
+
+        The gate now lives inside the signal function itself, so this asserts on
+        the SHIPPED default (flag unset) rather than a patched one — deliberately
+        NOT taking the `delivery_public` fixture."""
         handler_env["table"].store[(f"USER#{brief.USER_ID}#SOURCE#food_delivery", "STREAK#current")] = {"streak_days": Decimal("21")}
         brief.lambda_handler({}, None)
         narratives = _published(handler_env)["group_narratives"]

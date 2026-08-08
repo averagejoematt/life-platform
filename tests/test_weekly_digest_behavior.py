@@ -257,6 +257,28 @@ def table(monkeypatch):
 
 
 @pytest.fixture
+def delivery_public(monkeypatch):
+    """Opt IN to the ungated food-delivery reader.
+
+    `get_food_delivery_{brief_signal,digest_line}` ship PRIVATE-by-default
+    (#2209/#2210, this door #2233): with `NUTRITION_DELIVERY_PUBLIC` unset they
+    return None and never query the partition. Every test below that asserts on
+    delivery *content* — streak text, bonus multipliers, the ordered-today
+    override — is exercising the flag-ON path and must say so.
+
+    Tests asserting *absence* need it too, for a subtler reason: with the flag
+    off they pass vacuously, and would keep passing against a function stubbed to
+    `return None`. Taking the fixture is what makes them test their own claim.
+
+    The gate reads the env var at CALL time (`nutrition_delivery_public()`), not
+    at import, so setting the environment is correct here — unlike the sibling
+    `site_api_meals._DELIVERY_PUBLIC`, which is import-frozen and must be patched
+    as a module attribute.
+    """
+    monkeypatch.setenv("NUTRITION_DELIVERY_PUBLIC", "true")
+
+
+@pytest.fixture
 def ses(monkeypatch):
     s = FakeSes()
     monkeypatch.setattr(wd, "ses", s)
@@ -2064,7 +2086,7 @@ class TestBuildHtmlNumbers:
 
 
 class TestBuildHtmlPrivacy:
-    def test_the_delivery_free_streak_is_never_rendered_in_the_digest(self, table):
+    def test_the_delivery_free_streak_is_never_rendered_in_the_digest(self, table, delivery_public):
         """Pins today's behaviour: `get_food_delivery_digest_line` exists and
         returns a line, but nothing calls it — see the xfail below."""
         table.add({"pk": "USER#matthew#SOURCE#food_delivery", "sk": "STREAK#current", "streak_days": 31})
@@ -2082,19 +2104,19 @@ class TestBuildHtmlPrivacy:
 
 
 class TestFoodDeliveryDigestLine:
-    def test_no_streak_record_yields_no_line(self, table):
+    def test_no_streak_record_yields_no_line(self, table, delivery_public):
         assert wd.get_food_delivery_digest_line() is None
 
-    def test_a_zero_day_streak_is_absence_rather_than_a_zero_line(self, table):
+    def test_a_zero_day_streak_is_absence_rather_than_a_zero_line(self, table, delivery_public):
         table.add({"pk": "USER#matthew#SOURCE#food_delivery", "sk": "STREAK#current", "streak_days": 0})
         assert wd.get_food_delivery_digest_line() is None
 
-    def test_each_bonus_band_is_named_at_its_threshold(self, table):
+    def test_each_bonus_band_is_named_at_its_threshold(self, table, delivery_public):
         for days, marker in ((7, "1.02x"), (14, "1.05x"), (30, "1.10x")):
             table.add({"pk": "USER#matthew#SOURCE#food_delivery", "sk": "STREAK#current", "streak_days": days})
             assert marker in wd.get_food_delivery_digest_line()
 
-    def test_a_failed_read_yields_no_line_rather_than_an_exception(self, table):
+    def test_a_failed_read_yields_no_line_rather_than_an_exception(self, table, delivery_public):
         table.get_error = RuntimeError("ddb down")
         assert wd.get_food_delivery_digest_line() is None
 
