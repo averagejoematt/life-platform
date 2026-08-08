@@ -434,7 +434,7 @@ def training_overview(*, _g) -> dict:
     for h in ah_30d:
         d = h.get("date") or h.get("sk", "").replace("DATE#", "")
         try:
-            wk = datetime.strptime(d, "%Y-%m-%d").strftime("%Y-W%V")
+            wk = datetime.strptime(d, "%Y-%m-%d").strftime("%G-W%V")
         except Exception:
             continue
         _bw = float(h.get("breathwork_minutes") or 0)
@@ -562,7 +562,7 @@ def training_overview(*, _g) -> dict:
         d = a.get("_day_date") or ""
         try:
             dt = datetime.strptime(d, "%Y-%m-%d")
-            week_key = dt.strftime("%Y-W%V")
+            week_key = dt.strftime("%G-W%V")
         except Exception:
             continue
         week_buckets[week_key]["workouts"] += 1
@@ -818,7 +818,7 @@ def strength_deep_dive(*, _g) -> dict:
         d = day.get("date") or day.get("sk", "").replace("DATE#", "")
         try:
             dt = datetime.strptime(d, "%Y-%m-%d")
-            week_key = dt.strftime("%Y-W%V")
+            week_key = dt.strftime("%G-W%V")
         except Exception:
             continue
 

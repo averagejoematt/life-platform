@@ -1111,18 +1111,17 @@ def test_a_record_with_an_unparseable_date_is_kept_in_the_spend_totals(delivery_
     assert b["weekly_trend"] == []
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): site_api_meals.food_delivery_overview builds its week "
-        "label with `strftime('%Y-W%V')` — CALENDAR year paired with ISO week number. It must "
-        "be '%G-W%V' (ISO year). At a year boundary the SAME ISO week is split into two "
-        "buckets (2026-12-31 -> '2026-W53', 2027-01-01 -> '2027-W53'), and because the trend "
-        "is sorted lexically by the label, '2027-W53' sorts AFTER '2027-W01' — so the January "
-        "chart draws late December to the right of the following week."
-    ),
-)
 def test_a_week_that_straddles_new_year_is_one_bucket_in_chronological_order(delivery_public):
+    """FIXED (#2256): the week label is `strftime('%G-W%V')` — ISO year-week paired
+    with ISO week number, not the CALENDAR year `%Y`.
+
+    With `%Y-W%V` the SAME ISO week split into two buckets at the boundary
+    (2026-12-31 -> '2026-W53', 2027-01-01 -> '2027-W53'), and because the trend is
+    sorted lexically by the label, '2027-W53' sorted AFTER '2027-W01' — the January
+    chart drew late December to the right of the following week. Both assertions
+    below fail against the `%Y` form: the first sees `[1, 1, 1]`, the second an
+    out-of-order label list.
+    """
     freeze(datetime(2027, 1, 5, 18, 0, 0, tzinfo=timezone.utc))
     src = FakeSources(
         food_delivery=[
@@ -1133,6 +1132,7 @@ def test_a_week_that_straddles_new_year_is_one_bucket_in_chronological_order(del
     )
     trend = call("food_delivery_overview", src)["weekly_trend"]
     assert [t["orders"] for t in trend] == [2, 1], f"the straddling week split into {trend}"
+    assert [t["week"] for t in trend] == ["2026-W53", "2027-W01"]
     assert [t["week"] for t in trend] == sorted(t["week"] for t in trend)
 
 

@@ -315,7 +315,7 @@ def food_delivery_overview(*, _g) -> dict:
             binge_days += 1
         d = i.get("date") or i.get("sk", "").replace("DATE#", "")
         try:
-            wk = datetime.strptime(d, "%Y-%m-%d").strftime("%Y-W%V")
+            wk = datetime.strptime(d, "%Y-%m-%d").strftime("%G-W%V")
             weekly_counts[wk] += 1
         except Exception:
             pass
