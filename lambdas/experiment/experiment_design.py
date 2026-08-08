@@ -38,18 +38,20 @@ DESIGN_METRICS = {
     "deep_pct": ("whoop", "deep_pct", "Deep Sleep %"),
     "rem_pct": ("whoop", "rem_pct", "REM Sleep %"),
     "sleep_duration_hours": ("whoop", "sleep_duration_hours", "Sleep Duration (h)"),
-    "sleep_onset_latency_min": ("eightsleep", "sleep_onset_latency_min", "Sleep Onset Latency (min)"),
+    # The KEY is the frozen pre-registration slug and never changes; the second element
+    # is the DynamoDB field the writer actually stores (#2221 — six were reader-invented).
+    "sleep_onset_latency_min": ("eightsleep", "time_to_sleep_min", "Sleep Onset Latency (min)"),
     "recovery_score": ("whoop", "recovery_score", "Whoop Recovery"),
-    "hrv_rmssd": ("whoop", "hrv_rmssd", "HRV (rMSSD)"),
+    "hrv_rmssd": ("whoop", "hrv", "HRV (rMSSD)"),
     "resting_heart_rate": ("whoop", "resting_heart_rate", "Resting HR"),
-    "garmin_stress": ("garmin", "average_stress_level", "Garmin Stress"),
+    "garmin_stress": ("garmin", "avg_stress", "Garmin Stress"),
     "body_battery_high": ("garmin", "body_battery_high", "Body Battery Peak"),
     "weight_lbs": ("withings", "weight_lbs", "Weight (lbs)"),
-    "calories": ("macrofactor", "calories", "Calories"),
+    "calories": ("macrofactor", "calories_kcal", "Calories"),
     "protein_g": ("macrofactor", "protein_g", "Protein (g)"),
     "steps": ("apple_health", "steps", "Steps"),
-    "cgm_mean_glucose": ("apple_health", "cgm_mean_glucose", "Mean Glucose"),
-    "cgm_time_in_range_pct": ("apple_health", "cgm_time_in_range_pct", "CGM Time in Range %"),
+    "cgm_mean_glucose": ("apple_health", "blood_glucose_avg", "Mean Glucose"),
+    "cgm_time_in_range_pct": ("apple_health", "blood_glucose_time_in_range_pct", "CGM Time in Range %"),
 }
 
 VALID_DIRECTIONS = ("higher", "lower")

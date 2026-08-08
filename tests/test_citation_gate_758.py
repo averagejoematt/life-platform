@@ -3,7 +3,7 @@ tests/test_citation_gate_758.py — #758 gate the PERMA/Seligman citation garnis
 
 Tool outputs cited Seligman/Holt-Lunstad/PERMA over n=1-day datasets — rigor-flavored
 garnish that undermines the actual rigor bar (ADR-105: uncertainty + n on every statistical
-claim). `mcp.tools_lifestyle.tool_get_social_connection_trend` returns a `perma_context`
+claim). `mcp.tools_social_connection.tool_get_social_connection_trend` returns a `perma_context`
 field unconditionally regardless of how many real enriched_social_quality datapoints exist.
 
 This pins: below `_SOCIAL_CITATION_MIN_N` the citation is OMITTED entirely (not hedged,
@@ -29,7 +29,7 @@ os.environ.setdefault("TABLE_NAME", "life-platform")
 os.environ.setdefault("DYNAMODB_TABLE", "life-platform")
 os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
 
-import mcp.tools_lifestyle as tl  # noqa: E402
+import mcp.tools_social_connection as tl  # noqa: E402  (#2221 lifted the tool out of tools_lifestyle)
 
 
 def _social_entries(n, quality="meaningful"):

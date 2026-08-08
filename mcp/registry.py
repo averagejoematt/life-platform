@@ -52,7 +52,6 @@ from mcp.tools_lifestyle import (
     tool_get_field_notes,
     tool_get_insights,
     tool_get_intake_response,
-    tool_get_social_connection_trend,
     tool_list_experiments,
     tool_log_evening_intake,
     tool_log_field_note_response,
@@ -81,6 +80,7 @@ from mcp.tools_reading import (
 )
 from mcp.tools_sick_days import tool_manage_sick_days
 from mcp.tools_social import tool_get_social_dashboard
+from mcp.tools_social_connection import tool_get_social_connection_trend  # lifted out of tools_lifestyle by #2221
 
 # tools_calendar retired v3.7.46 (ADR-030) — google_calendar import removed
 from mcp.tools_strength import tool_get_muscle_volume
@@ -681,8 +681,8 @@ TOOLS = {
         "schema": {
             "name": "get_insights",
             "description": (
-                "List insights from the personal coaching log. "
-                "Returns all insights newest-first with days_open calculated. "
+                "List insights from the personal coaching log, newest-first, with days_open calculated. "
+                "`total` is the whole corpus, `returned` the page, `truncated` says if they differ (#2221). "
                 "Stale flag is set for open insights older than 14 days. "
                 "Use for: 'what insights are open?', 'show my coaching log', "
                 "'what have I been meaning to act on?', 'any stale insights?', "

@@ -67,7 +67,10 @@ os.environ.setdefault("USER_ID", "matthew")
 import pytest  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
 
-from mcp import tools_lifestyle as tl  # noqa: E402
+from mcp import (
+    tools_lifestyle as tl,  # noqa: E402
+    tools_social_connection as tsc,  # noqa: E402  (#2221 — the connection tool's own module)
+)
 from mcp.registry import TOOLS  # noqa: E402
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -188,6 +191,7 @@ class _Body:
 @pytest.fixture(autouse=True)
 def frozen_clock(monkeypatch):
     monkeypatch.setattr(tl, "datetime", _FrozenDatetime)
+    monkeypatch.setattr(tsc, "datetime", _FrozenDatetime)
 
 
 @pytest.fixture
@@ -205,6 +209,9 @@ def sources(monkeypatch):
     def _install(**by_source):
         reader = FakeSourceReader(**by_source)
         monkeypatch.setattr(tl, "query_source", reader)
+        # #2221: get_social_connection_trend lives in its own module now — patch the
+        # name IT resolves, not only tools_lifestyle's (a re-export is not a patch point).
+        monkeypatch.setattr(tsc, "query_source", reader)
         return reader
 
     return _install
@@ -229,7 +236,10 @@ def call(tool_name: str, args: dict):
 # §1 — Registry parity: the SET under test is derived, never restated
 # ═══════════════════════════════════════════════════════════════════════════════
 
-LIFESTYLE_TOOL_NAMES = {name for name, spec in TOOLS.items() if getattr(spec["fn"], "__module__", "") == "mcp.tools_lifestyle"}
+# #2221 lifted get_social_connection_trend into its own module; the SET is still
+# DERIVED from the registry, now over both modules this file owns.
+_OWNED_MODULES = {"mcp.tools_lifestyle", "mcp.tools_social_connection"}
+LIFESTYLE_TOOL_NAMES = {name for name, spec in TOOLS.items() if getattr(spec["fn"], "__module__", "") in _OWNED_MODULES}
 
 EXERCISED_HERE = {
     "create_experiment",
@@ -249,7 +259,7 @@ EXERCISED_HERE = {
 
 def test_registry_is_the_source_of_truth_for_which_lifestyle_tools_exist():
     assert LIFESTYLE_TOOL_NAMES == EXERCISED_HERE, (
-        f"mcp/tools_lifestyle.py now exports {sorted(LIFESTYLE_TOOL_NAMES)} through the registry; "
+        f"{sorted(_OWNED_MODULES)} now export {sorted(LIFESTYLE_TOOL_NAMES)} through the registry; "
         f"this behavioural file only exercises {sorted(EXERCISED_HERE)}."
     )
 
@@ -344,38 +354,42 @@ def test_get_insights_status_filter_narrows_the_result(table):
     assert out["insights"][0]["insight_id"] == "b"
 
 
-def test_get_insights_total_is_the_page_size_not_the_corpus_size(table):
-    """OBSERVED: `total` is len(results), and results stops at `limit`. With 120
-    insights and the declared default limit of 50, the tool reports total 50."""
+def test_get_insights_total_is_the_corpus_size_and_the_page_says_it_is_a_page(table):
+    """FIXED (#2221, ADR-104): `total` used to be len(results) with results cut at
+    `limit`, so 120 insights read as "total 50" — the number Matthew gets when he
+    asks how many are still open. `total` is now the corpus, `returned` the page,
+    and `truncated` says the two differ."""
     rows = [
         {"pk": INSIGHTS_PK, "sk": f"INSIGHT#{i:03d}", "insight_id": f"{i:03d}", "date_saved": TODAY, "status": "open"} for i in range(120)
     ]
     table(rows=rows)
     out = call("get_insights", {})
-    assert out["total"] == 50 == len(out["insights"])
+    assert out["total"] == 120
+    assert out["returned"] == 50 == len(out["insights"])
+    assert out["truncated"] is True
+    assert out["scan_exhausted"] is True
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "ADR-104 — mcp/tools_lifestyle.py:334-340 (tool_get_insights) returns "
-        '`{"total": len(results)}` where `results` was truncated at `limit` (default 50), and the '
-        'registered description promises "Returns ALL insights newest-first". Worse, the DynamoDB '
-        "query at :301 passes `Limit: 200` ALONGSIDE the ADR-058 phase FilterExpression — DynamoDB "
-        "applies Limit to items READ, before the filter, so on a partition with pilot-phase rows "
-        "even fewer than 200 survive, and the query is issued once with no pagination "
-        "(LastEvaluatedKey is never followed). It should paginate, report the true corpus count "
-        "separately from the returned page, and say when the page was truncated. Matthew asks 'how "
-        "many insights are still open?' and is told 50 whatever the answer is."
-    ),
-)
-def test_get_insights_total_should_reflect_the_corpus_not_the_page(table):
-    rows = [
-        {"pk": INSIGHTS_PK, "sk": f"INSIGHT#{i:03d}", "insight_id": f"{i:03d}", "date_saved": TODAY, "status": "open"} for i in range(120)
-    ]
-    table(rows=rows)
-    out = call("get_insights", {})
-    assert out["total"] == 120 or "truncated" in str(out).lower()
+def test_get_insights_follows_the_pagination_cursor(table):
+    """The read used to issue ONE query and never follow LastEvaluatedKey, so the
+    corpus count was capped by whatever survived a single page — and DynamoDB
+    applies `Limit` to items READ, BEFORE the ADR-058 phase FilterExpression, so a
+    partition carrying pilot rows yields fewer still. Two pages, 3 rows, no cut."""
+    page1 = [{"pk": INSIGHTS_PK, "sk": "INSIGHT#003", "insight_id": "003", "date_saved": TODAY, "status": "open"}]
+    page2 = [{"pk": INSIGHTS_PK, "sk": f"INSIGHT#{i:03d}", "insight_id": f"{i:03d}", "date_saved": TODAY, "status": "open"} for i in (2, 1)]
+    pages = [{"Items": page1, "LastEvaluatedKey": {"pk": INSIGHTS_PK, "sk": "INSIGHT#003"}}, {"Items": page2}]
+    t = FakeDdbTable(rows=[], query_hook=lambda _t, **kw: pages[len(_t.query_calls) - 1])
+    monkey = pytest.MonkeyPatch()
+    monkey.setattr(tl, "table", t)
+    try:
+        out = call("get_insights", {})
+    finally:
+        monkey.undo()
+    assert out["total"] == 3 and out["truncated"] is False
+    assert [i["insight_id"] for i in out["insights"]] == ["003", "002", "001"]
+    assert t.query_calls[1]["ExclusiveStartKey"] == {"pk": INSIGHTS_PK, "sk": "INSIGHT#003"}
+    # The phase filter rides on EVERY page, not just the first (ADR-058).
+    assert all("#phase" in kw["FilterExpression"] for kw in t.query_calls)
 
 
 def test_get_insights_read_is_phase_filtered(table):
@@ -486,35 +500,38 @@ def test_social_trend_takes_the_best_entry_per_day(sources):
     assert out["total_days_with_data"] == 1 and out["overall_avg_score"] == 4.0
 
 
-def test_social_trend_rolling_7d_is_the_last_seven_RECORDS_not_seven_days(sources):
-    """OBSERVED (#1917): the rolling windows at mcp/tools_lifestyle.py:444-445
-    slice the SCORES LIST by index, so with one journal entry per month the
-    "rolling_7d" average spans half a year.
+def test_social_trend_rolling_7d_spans_seven_calendar_days_not_seven_records(sources):
+    """FIXED (#2221/#1917): the rolling windows used to slice the SCORES LIST by
+    index, so with one journal entry per month the "rolling_7d" average spanned
+    half a year and rolling_7d/rolling_30d collapsed to the same number silently.
 
-    Seven entries, one every 30 days, alternating deep(4)/alone(1) with the
-    newest deep: values oldest→newest 4,1,4,1,4,1,4 ⇒ mean = 19/7 = 2.714… ⇒ 2.71.
+    Seven entries, one every 30 days, alternating deep(4)/alone(1) with the newest
+    deep. The entries sit at TODAY-180, -150, -120, -90, -60, -30 and TODAY. A real
+    7-day window [TODAY-6, TODAY] contains only TODAY, and a real 30-day window
+    [TODAY-29, TODAY] also contains only TODAY (the -30 entry is one day outside it)
+    ⇒ both are 4.0 at days_logged 1, and both say so. Under the old index slicing
+    BOTH read 2.71 — the mean of all seven entries spanning half a year.
     """
     qualities = ["deep", "alone", "deep", "alone", "deep", "alone", "deep"]
     rows = [journal_day(_d(-30 * (6 - i)), q) for i, q in enumerate(qualities)]
     sources(notion=rows)
     out = call("get_social_connection_trend", {"start_date": _d(-365), "end_date": TODAY})
-    assert out["rolling_7d_latest"] == {"date": TODAY, "avg": 2.71}
-    assert out["rolling_30d_latest"] == {"date": TODAY, "avg": 2.71}  # identical: only 7 points exist
+    assert out["rolling_7d_latest"] == {"date": TODAY, "avg": 4.0, "days_logged": 1, "window_days": 7, "window_start": _d(-6)}
+    assert out["rolling_30d_latest"] == {"date": TODAY, "avg": 4.0, "days_logged": 1, "window_days": 30, "window_start": _d(-29)}
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "#1917 WINDOW HONESTY — mcp/tools_lifestyle.py:441-447 "
-        "(tool_get_social_connection_trend) builds rolling_7d / rolling_30d as "
-        "`scores[max(0, i-6):i+1]`, i.e. the last seven ENTRIES, not the last seven DAYS. Journaling "
-        "is voluntary and gappy by nature, so on a sparse stretch `rolling_7d_latest` describes "
-        "months while naming a week, and rolling_7d and rolling_30d collapse to the same number "
-        "without saying so. It should window by date and publish the n of days actually covered. "
-        "Matthew reads 'my connection quality this week' off a half-year mean."
-    ),
-)
-def test_social_trend_rolling_windows_should_be_bounded_by_dates(sources):
+def test_social_trend_rolling_7d_and_30d_diverge_on_a_gappy_stretch(sources):
+    """The two windows are only distinguishable once they are bounded by dates:
+    entries at TODAY-20 (alone=1) and TODAY (deep=4). The 7-day window sees only
+    TODAY ⇒ 4.0 at n=1; the 30-day window sees both ⇒ (4+1)/2 = 2.5 at n=2. Under
+    the old index slicing both read 2.5 and nothing said the "week" was 21 days."""
+    sources(notion=[journal_day(_d(-20), "alone"), journal_day(TODAY, "deep")])
+    out = call("get_social_connection_trend", {"start_date": _d(-90), "end_date": TODAY})
+    assert out["rolling_7d_latest"]["avg"] == 4.0 and out["rolling_7d_latest"]["days_logged"] == 1
+    assert out["rolling_30d_latest"]["avg"] == 2.5 and out["rolling_30d_latest"]["days_logged"] == 2
+
+
+def test_social_trend_rolling_windows_are_bounded_by_dates(sources):
     qualities = ["deep", "alone", "deep", "alone", "deep", "alone", "deep"]
     rows = [journal_day(_d(-30 * (6 - i)), q) for i, q in enumerate(qualities)]
     sources(notion=rows)
@@ -525,12 +542,12 @@ def test_social_trend_rolling_windows_should_be_bounded_by_dates(sources):
 def test_social_trend_citation_is_gated_on_fourteen_days_of_data(sources):
     """#758: the Seligman/Holt-Lunstad citation is garnish below a real n. 13
     days ⇒ no citation, 14 ⇒ citation. The floor is derived from the module."""
-    assert tl._SOCIAL_CITATION_MIN_N == 14
-    thin = [journal_day(_d(-i), "meaningful") for i in range(tl._SOCIAL_CITATION_MIN_N - 1)]
+    assert tsc._SOCIAL_CITATION_MIN_N == 14
+    thin = [journal_day(_d(-i), "meaningful") for i in range(tsc._SOCIAL_CITATION_MIN_N - 1)]
     sources(notion=thin)
     assert "perma_context" not in call("get_social_connection_trend", {"start_date": _d(-30), "end_date": TODAY})
 
-    thick = [journal_day(_d(-i), "meaningful") for i in range(tl._SOCIAL_CITATION_MIN_N)]
+    thick = [journal_day(_d(-i), "meaningful") for i in range(tsc._SOCIAL_CITATION_MIN_N)]
     sources(notion=thick)
     out = call("get_social_connection_trend", {"start_date": _d(-30), "end_date": TODAY})
     assert "Seligman PERMA" in out["perma_context"]
@@ -561,14 +578,22 @@ def test_social_trend_correlation_r_is_hand_derived_and_carries_its_n(sources):
     sources(notion=rows, whoop=whoop, garmin=[])
     out = call("get_social_connection_trend", {"start_date": _d(-30), "end_date": TODAY})
     recovery = next(c for c in out["health_correlations"] if c["metric"] == "Recovery")
-    assert recovery == {"metric": "Recovery", "r": 1.0, "n": 10, "interpretation": "strong"}
+    assert recovery["r"] == 1.0 and recovery["n"] == 10
+    # #2221/ADR-105: a perfect alternation is maximally autocorrelated, so the AR(1)
+    # correction collapses the effective n to the floor of 2 and NOTHING inferential can
+    # be claimed from it. r=1.0 still stands; the verdict does not.
+    assert recovery["n_eff"] == 2.0
+    assert recovery["p_value"] is None and recovery["ci_low"] is None
+    assert recovery["confidence"] == "LOW" and recovery["impact"] == "INCONCLUSIVE"
 
 
-def test_social_trend_correlations_carry_no_p_value_ci_or_multiplicity_control(sources):
-    """OBSERVED (ADR-105): the module publishes a bare Pearson r with a
+def test_social_trend_correlations_carry_p_value_ci_and_multiplicity_control(sources):
+    """FIXED (#2221, ADR-105): the module used to publish a bare Pearson r with a
     "strong"/"moderate"/"weak" label at n>=10 — no p, no CI, no effective-n, no
-    FDR across the eight correlations it runs — while the sanctioned
-    implementation (mcp/helpers.py::correlation_report) provides all four."""
+    FDR across the eight correlations it runs. It now routes through the sanctioned
+    mcp/helpers.py::correlation_report, which supplies all four, and health +
+    journal correlations go through ONE batch so the BH-FDR covers the whole family
+    of eight rather than two half-families."""
     rows, whoop = [], []
     for i in range(12):
         rows.append(journal_day(_d(-i), "deep" if i % 2 == 0 else "alone"))
@@ -576,24 +601,12 @@ def test_social_trend_correlations_carry_no_p_value_ci_or_multiplicity_control(s
     sources(notion=rows, whoop=whoop, garmin=[])
     out = call("get_social_connection_trend", {"start_date": _d(-30), "end_date": TODAY})
     corr = out["health_correlations"][0]
-    assert set(corr) == {"metric", "r", "n", "interpretation"}
-    assert not {"p_value", "q_value", "ci_low", "ci_high", "n_eff", "confidence"} & set(corr)
+    assert set(corr) == {"metric", "r", "n", "n_eff", "ci_low", "ci_high", "p_value", "q_value", "confidence", "impact"}
+    # The bare unearned verdict is gone for good.
+    assert "interpretation" not in corr
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "ADR-105 — mcp/tools_lifestyle.py:495-520 (tool_get_social_connection_trend) hand-rolls a "
-        "population Pearson r inline (twice), gates it at a bare n>=10, and attaches a "
-        "'strong'/'moderate'/'weak' verdict with no p-value, no confidence interval, no "
-        "autocorrelation-corrected effective n, and no multiple-comparison control across the eight "
-        "correlations it computes in one call. mcp/helpers.py:115 correlation_report exists for "
-        "exactly this and supplies all four (it is what #535 replaced six identical copies of). It "
-        "should route through correlation_report. Matthew reads 'Recovery r=0.62 (strong)' from ten "
-        "autocorrelated days as a finding about his life."
-    ),
-)
-def test_social_trend_correlations_should_route_through_the_sanctioned_report(sources):
+def test_social_trend_correlations_route_through_the_sanctioned_report(sources):
     rows, whoop = [], []
     for i in range(12):
         rows.append(journal_day(_d(-i), "deep" if i % 2 == 0 else "alone"))
@@ -603,14 +616,13 @@ def test_social_trend_correlations_should_route_through_the_sanctioned_report(so
     assert {"p_value", "confidence"} <= set(out["health_correlations"][0])
 
 
-def test_social_trend_whoop_sleep_score_correlation_can_never_populate(sources):
-    """OBSERVED reader/writer mismatch: the HEALTH_SOURCES table at
-    mcp/tools_lifestyle.py:472-478 reads ("whoop", "sleep_score"), but the Whoop
+def test_social_trend_whoop_sleep_score_correlation_populates_from_writer_true_records(sources):
+    """FIXED (#2221): HEALTH_SOURCES reads ("whoop", "sleep_score"), but the Whoop
     writer (lambdas/ingestion/whoop_lambda.py) stores `sleep_quality_score` — the
     alias only exists after mcp/helpers.py::normalize_whoop_sleep, which this
-    function (unlike tool_get_experiment_results) never calls. Fed
-    writer-true records, every other whoop metric correlates and Sleep Score is
-    absent."""
+    function now calls on the way in (as tool_get_experiment_results already did).
+    Fed writer-true records, Sleep Score correlates alongside every other whoop
+    metric instead of being silently dropped."""
     rows, whoop = [], []
     for i in range(12):
         rows.append(journal_day(_d(-i), "deep" if i % 2 == 0 else "alone"))
@@ -626,27 +638,11 @@ def test_social_trend_whoop_sleep_score_correlation_can_never_populate(sources):
     sources(notion=rows, whoop=whoop, garmin=[])
     out = call("get_social_connection_trend", {"start_date": _d(-30), "end_date": TODAY})
     metrics = {c["metric"] for c in out["health_correlations"]}
-    assert {"Recovery", "HRV"} <= metrics
-    assert "Sleep Score" not in metrics
-    assert "Sleep Score" not in out["meaningful_vs_low_comparison"]
+    assert {"Recovery", "HRV", "Sleep Score"} <= metrics
+    assert "Sleep Score" in out["meaningful_vs_low_comparison"]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "READER/WRITER MISMATCH — mcp/tools_lifestyle.py:475 lists ('whoop', 'sleep_score', 'Sleep "
-        "Score') in HEALTH_SOURCES, but lambdas/ingestion/whoop_lambda.py writes the field as "
-        "`sleep_quality_score`; `sleep_score` exists only as a normalised alias produced by "
-        "mcp/helpers.py::normalize_whoop_sleep, which tool_get_social_connection_trend never calls "
-        "(its sibling tool_get_experiment_results does, at :1233-1236). The 'Sleep Score' row is "
-        "therefore permanently missing from both health_correlations and "
-        "meaningful_vs_low_comparison, silently — the tool reports the four metrics that do work "
-        "and never says the fifth was dropped. It should normalise the whoop rows on the way in. "
-        "Matthew's most-asked question about connection ('does seeing people help me sleep?') is "
-        "the one the tool structurally cannot answer."
-    ),
-)
-def test_social_trend_should_correlate_sleep_score_from_writer_true_records(sources):
+def test_social_trend_correlates_sleep_score_from_writer_true_records(sources):
     rows, whoop = [], []
     for i in range(12):
         rows.append(journal_day(_d(-i), "deep" if i % 2 == 0 else "alone"))
@@ -679,7 +675,10 @@ def test_social_trend_journal_correlations_are_reported_with_their_n(sources):
         rows.append(journal_day(_d(-i), "deep" if high else "alone", enriched_mood=8 if high else 3))
     sources(notion=rows, whoop=[], garmin=[])
     out = call("get_social_connection_trend", {"start_date": _d(-30), "end_date": TODAY})
-    assert out["journal_correlations"] == [{"metric": "Mood", "r": 1.0, "n": 10}]
+    mood = out["journal_correlations"]
+    assert [c["metric"] for c in mood] == ["Mood"]
+    assert mood[0]["r"] == 1.0 and mood[0]["n"] == 10
+    assert {"p_value", "q_value", "n_eff", "confidence"} <= set(mood[0])  # #2221: same report as health
 
 
 def test_social_trend_days_since_meaningful_is_measured_from_today_not_the_window_end(sources):
@@ -913,13 +912,12 @@ def _whoop_writer_true(date: str, recovery: float) -> dict:
     return {"date": date, "recovery_score": recovery, "hrv": 60, "resting_heart_rate": 52, "sleep_duration_hours": 7.5}
 
 
-def test_get_experiment_results_before_and_during_windows_are_different_lengths(table, sources):
-    """OBSERVED (#1917): an experiment run 2026-07-01 → 2026-07-14 has
-    during_days = (end - start).days = 13. The BEFORE window is
-    [start - 13, start - 1] = 2026-06-18 → 2026-06-30, which is 13 dates. The
-    DURING window is [start, end] = 2026-07-01 → 2026-07-14, which is 14 dates.
-    The response labels BOTH "(13 days)". Fed one record per date, the n's differ
-    by one — an asymmetric comparison presented as symmetric."""
+def test_get_experiment_results_before_and_during_windows_span_equal_calendar_days(table, sources):
+    """FIXED (#2221/#1917): an experiment run 2026-07-01 → 2026-07-14 spans
+    during_days = (end - start).days + 1 = 14 CALENDAR DAYS. The BEFORE window is
+    [start - 14, start - 1] = 2026-06-17 → 2026-06-30, which is also 14 dates.
+    Fed one record per date the two n's match, and both labels say 14 —
+    previously the before side was 13 dates while both were labelled "(13 days)"."""
     table(
         rows=[
             {
@@ -934,31 +932,18 @@ def test_get_experiment_results_before_and_during_windows_are_different_lengths(
             }
         ]
     )
-    whoop = [_whoop_writer_true(_d(-i, "2026-07-14"), 70) for i in range(0, 27)]  # 2026-06-18 .. 2026-07-14
+    whoop = [_whoop_writer_true(_d(-i, "2026-07-14"), 70) for i in range(0, 28)]  # 2026-06-17 .. 2026-07-14
     sources(whoop=whoop)
     out = call("get_experiment_results", {"experiment_id": "a"})
     recovery = next(c for c in out["comparisons"] if c["metric"] == "Whoop Recovery")
-    assert recovery["before_n"] == 13 and recovery["during_n"] == 14
-    assert out["comparison_period"]["before"] == "2026-06-18 → 2026-06-30 (13 days)"
-    assert out["comparison_period"]["during"] == "2026-07-01 → 2026-07-14 (13 days)"
+    assert recovery["before_n"] == 14 and recovery["during_n"] == 14
+    assert out["comparison_period"]["before"] == "2026-06-17 → 2026-06-30 (14 days)"
+    assert out["comparison_period"]["during"] == "2026-07-01 → 2026-07-14 (14 days)"
+    # The min-14-day gate no longer fires a day late on a 14-calendar-day experiment.
+    assert out["duration_warning"] is None
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "#1917 WINDOW HONESTY / ADR-105 — mcp/tools_lifestyle.py:1207-1215 "
-        "(tool_get_experiment_results) computes during_days = (end_dt - start_dt).days, which is "
-        "EXCLUSIVE of the start day, then builds the before window as [start - during_days, "
-        "start - 1] (during_days dates) and the during window as [start, end] (during_days + 1 "
-        "dates), and labels both '({during_days} days)' at :1337-1338. So every before/during "
-        "comparison the engine publishes is off by one day on one side, and the min-14-day gate at "
-        ":1313 fires a day late (a 14-calendar-day experiment reports 'Only 13 days of data'). It "
-        "should make the windows equal-length and label them by the dates they actually span. "
-        "Matthew grades his own protocols — including the pre-registered ones — off a comparison "
-        "whose two halves are not the same size."
-    ),
-)
-def test_experiment_before_and_during_windows_should_be_equal_length(table, sources):
+def test_experiment_before_and_during_windows_are_equal_length(table, sources):
     table(
         rows=[
             {
@@ -971,7 +956,7 @@ def test_experiment_before_and_during_windows_should_be_equal_length(table, sour
             }
         ]
     )
-    whoop = [_whoop_writer_true(_d(-i, "2026-07-14"), 70) for i in range(0, 27)]
+    whoop = [_whoop_writer_true(_d(-i, "2026-07-14"), 70) for i in range(0, 28)]
     sources(whoop=whoop)
     out = call("get_experiment_results", {"experiment_id": "a"})
     recovery = next(c for c in out["comparisons"] if c["metric"] == "Whoop Recovery")
@@ -1169,9 +1154,11 @@ WRITER_TRUE_RECORD = {
     "apple_health": {"steps": 9400, "blood_glucose_avg": 96, "blood_glucose_time_in_range_pct": 91},
 }
 
-# The metrics the engine CANNOT populate from writer-true data, each with the
-# field the writer really uses. Kept as a mapping so the failure is legible.
-KNOWN_DARK_METRICS = {
+# The six metrics that could NOT populate from writer-true data before #2221 —
+# each entry is (source, the reader-invented field, the field the writer really
+# uses). Kept as the historical record: the repair is asserted against it below,
+# so a regression to any one of the invented names is named, not just counted.
+PREVIOUSLY_DARK_METRICS = {
     "Sleep Onset Latency": ("eightsleep", "sleep_onset_latency_min", "time_to_sleep_min"),
     "HRV (rMSSD)": ("whoop", "hrv_rmssd", "hrv"),
     "Garmin Stress": ("garmin", "average_stress_level", "avg_stress"),
@@ -1220,60 +1207,31 @@ def test_experiment_metric_registry_has_a_writer_true_fixture_for_every_source()
     )
 
 
-def test_six_experiment_metrics_can_never_populate_from_writer_true_data(table, sources):
-    """OBSERVED: fed a record from every source using the field names the
-    ingestion Lambdas really write, six of the sixteen declared metrics never
-    appear in the comparison. Each is a reader/writer field-name mismatch; the
-    engine reports the ten that work and says nothing about the six it dropped."""
+def test_every_declared_experiment_metric_populates_from_writer_true_data(table, sources):
+    """FIXED (#2221): fed a record from every source using the field names the
+    ingestion Lambdas really write, ALL sixteen declared metrics appear in the
+    comparison. Six of them could not before — each was a reader-invented field
+    name that no writer in lambdas/ has ever produced."""
     reported, out = _drive_metric_audit(table, sources)
     declared = {label for _src, _field, label, _hib in tl._EXPERIMENT_METRICS}
 
-    assert set(KNOWN_DARK_METRICS) <= declared  # the dark set is a real subset of the registry
-    assert declared - reported == set(KNOWN_DARK_METRICS)
-    assert reported == {
-        "Sleep Score",
-        "Sleep Efficiency %",
-        "Deep Sleep %",
-        "REM Sleep %",
-        "Whoop Recovery",
-        "Resting HR",
-        "Body Battery Peak",
-        "Weight (lbs)",
-        "Protein (g)",
-        "Steps",
-    }
-    # Nothing in the payload tells the reader six metrics were silently dropped.
-    assert out["metrics_compared"] == 10
-    assert not any(k in out for k in ("metrics_unavailable", "missing_metrics", "coverage"))
-
-
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "READER/WRITER MISMATCH ×6 — mcp/tools_lifestyle.py:95-119 (_EXPERIMENT_METRICS, consumed by "
-        "tool_get_experiment_results) names six fields no writer in lambdas/ produces:\n"
-        "  :101 eightsleep 'sleep_onset_latency_min' → writer eightsleep_lambda.py:497 "
-        "'time_to_sleep_min'\n"
-        "  :104 whoop 'hrv_rmssd'                    → writer whoop_lambda.py:403 'hrv'\n"
-        "  :107 garmin 'average_stress_level'        → writer garmin_lambda.py:496 'avg_stress'\n"
-        "  :112 macrofactor 'calories'               → writer macrofactor_lambda.py:52 'calories_kcal'\n"
-        "  :117 apple_health 'cgm_mean_glucose'      → writer health_auto_export_lambda.py:327 "
-        "'blood_glucose_avg'\n"
-        "  :118 apple_health 'cgm_time_in_range_pct' → writer health_auto_export_lambda.py:332 "
-        "'blood_glucose_time_in_range_pct'\n"
-        "The same six names are also wired into lambdas/experiment/experiment_design.py's "
-        "DESIGN_METRICS, so a PRE-REGISTERED experiment whose frozen criterion is HRV, glucose, "
-        "stress, calories or sleep latency evaluates against an empty series — the exact class "
-        "tests/test_hypothesis_engine_behavior.py:661 already documented for the hypothesis engine. "
-        "It should read the writers' names (or the sources should publish aliases). Matthew's "
-        "supplement and CGM experiments — the ones he actually runs — are graded on the metrics that "
-        "happen to work, and the tool never says the headline metric was dropped."
-    ),
-)
-def test_every_declared_experiment_metric_should_populate_from_writer_true_data(table, sources):
-    reported, _out = _drive_metric_audit(table, sources)
-    declared = {label for _src, _field, label, _hib in tl._EXPERIMENT_METRICS}
+    assert set(PREVIOUSLY_DARK_METRICS) <= declared  # the repaired set is a real subset of the registry
     assert declared == reported
+    assert out["metrics_compared"] == len(declared) == 16
+
+
+def test_no_experiment_metric_still_reads_a_reader_invented_field():
+    """Name the six repairs individually so a regression says WHICH one, and pin
+    the same repair in lambdas/experiment/experiment_design.py::DESIGN_METRICS —
+    a frozen pre-registration whose criterion is HRV/glucose/stress/calories/
+    latency evaluated against an empty series until #2221."""
+    from experiment import experiment_design
+
+    by_label = {label: (src, field) for src, field, label, _hib in tl._EXPERIMENT_METRICS}
+    design_fields = {(src, field) for src, field, _label in experiment_design.DESIGN_METRICS.values()}
+    for label, (source, invented_field, writer_field) in PREVIOUSLY_DARK_METRICS.items():
+        assert by_label[label] == (source, writer_field), f"{label} must read the writer's field, not '{invented_field}'"
+        assert (source, invented_field) not in design_fields, f"DESIGN_METRICS still reads the invented '{invented_field}' for {label}"
 
 
 def test_experiment_results_normalises_whoop_before_comparing(table, sources):
@@ -1843,15 +1801,14 @@ def _movement_sources(monkeypatch, *, apple_health=None, strava=None, hevy=None)
     monkeypatch.setattr(tl, "parallel_query_sources", _parallel)
 
 
-def test_movement_neat_subtracts_kilojoules_from_kilocalories(monkeypatch):
-    """OBSERVED UNIT ERROR: mcp/tools_lifestyle.py:1677-1678 reads Strava's
-    ``total_kilojoules`` and assigns it to a variable literally named
-    ``exercise_kcal``, then subtracts it from Apple Health's ``active_calories``
-    (kcal) at :1702.
+def test_movement_neat_converts_kilojoules_before_subtracting(monkeypatch):
+    """FIXED (#2221) UNIT ERROR: ``_get_movement_score`` read Strava's
+    ``total_kilojoules`` into a variable literally named ``exercise_kcal`` and
+    subtracted it from Apple Health's ``active_calories`` (kcal).
 
-    A 2000 kJ ride is 2000 * 0.239 = 478 kcal of work. On a day with 900 kcal
-    active calories the honest NEAT is 900 - 478 = 422 kcal. The tool computes
-    900 - 2000 = -1100, clamps at 0, and reports NEAT 0.
+    A 2000 kJ ride is 2000 / 4.184 = 478.0 kcal of work. On a day with 900 kcal
+    active calories the honest NEAT is 900 - 478.0 = 422 kcal. The tool used to
+    compute 900 - 2000 = -1100, clamp at 0, and report NEAT 0.
     """
     _movement_sources(
         monkeypatch,
@@ -1861,26 +1818,11 @@ def test_movement_neat_subtracts_kilojoules_from_kilocalories(monkeypatch):
     out = TOOLS["get_daily_metrics"]["fn"]({"view": "movement", "start_date": TODAY, "end_date": TODAY})
     row = out["daily"][0]
     assert row["active_calories"] == 900
-    assert row["neat_estimate_kcal"] == 0  # 900 kcal - 2000 kJ, floored at zero
-    assert out["summary"]["avg_neat_kcal"] == 0
+    assert row["neat_estimate_kcal"] == 422.0  # 900 kcal - 478.0 kcal, no longer floored at zero
+    assert out["summary"]["avg_neat_kcal"] == 422.0
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "UNIT ERROR P1 — mcp/tools_lifestyle.py:1677-1678 (_get_movement_score, reached by the "
-        "registered get_daily_metrics view='movement') does "
-        "`exercise_kj = strava.get('total_kilojoules'); exercise_kcal = float(exercise_kj) if "
-        "exercise_kj else 0` — the value is kJ and the variable is named kcal — then subtracts it "
-        "from Apple Health `active_calories` (kcal) at :1702 to estimate NEAT. 1 kJ = 0.239 kcal, so "
-        "the subtraction is 4.18x too large: any ride over roughly 3800 kJ zeroes NEAT outright, and "
-        "every cycling day understates non-exercise movement. The fix is a kJ→kcal conversion "
-        "(kj * 0.239) before the subtraction. Matthew's NEAT trend — the number this view exists to "
-        "produce, and the one that feeds its own movement-score composite — is systematically wrong "
-        "on exactly the days he trains hardest."
-    ),
-)
-def test_movement_neat_should_convert_kilojoules_before_subtracting(monkeypatch):
+def test_movement_neat_conversion_uses_the_thermochemical_kilocalorie(monkeypatch):
     _movement_sources(
         monkeypatch,
         apple_health=[{"date": TODAY, "steps": 9000, "active_calories": 900}],
