@@ -131,16 +131,53 @@ def allowed_numbers(*sources) -> set:
     return allowed
 
 
-def fabricated_numbers(text: str, allowed: set) -> list:
-    """Numbers in the output that appear nowhere in the input (minus benign)."""
+# ── The numeric match window (#2290) ────────────────────────────────────────
+# Two named tolerances, because two kinds of caller want different things.
+#
+# TOLERANT (0.01) is the historical behaviour and stays the default. It exists so a
+# narrative surface that legitimately rounds isn't refused. Its cost, measured in #2290:
+# a corruption confined to a TRAILING DECIMAL (74.61 -> 74.62) lands inside the window
+# and passes the gate *regardless of what is on the allow-list*. #2276 narrowed the
+# allow-list; it did not touch this, and the two are independent.
+#
+# EXACT (0.0) disables the window entirely. It does NOT mean "no rounding allowed" —
+# rounding is handled separately below, so a caller on EXACT still accepts 64 or 64.2
+# for 64.23. What it refuses is a number that is near an allowed one without being a
+# rounding of it, which is precisely the corrupted-decimal class.
+NUMBER_TOLERANCE_TOLERANT = 0.01
+NUMBER_TOLERANCE_EXACT = 0.0
+
+# Float-comparison slop for the rounding check. Numbers are already quantised to 4dp by
+# numbers_in_text(), so this only absorbs binary-representation noise.
+_ROUNDING_EPS = 1e-9
+_MAX_ROUNDING_PRECISION = 4
+
+
+def _is_restatement(x: float, a: float) -> bool:
+    """True when ``x`` is ``a`` rounded to some precision — a restatement, not a fabrication.
+
+    Generalises the old integer-restatement branch (which was precision 0 only, "64 for
+    64.2") to every precision up to the 4dp quantisation ``numbers_in_text`` applies. This
+    is what makes NUMBER_TOLERANCE_EXACT usable rather than punitive: a reader-facing
+    surface may still say "74.6" for 74.61, it simply may not say "74.62".
+    """
+    return any(abs(x - round(a, d)) <= _ROUNDING_EPS for d in range(_MAX_ROUNDING_PRECISION + 1))
+
+
+def fabricated_numbers(text: str, allowed: set, *, tolerance: float = NUMBER_TOLERANCE_TOLERANT) -> list:
+    """Numbers in the output that appear nowhere in the input (minus benign).
+
+    ``tolerance`` is the half-window a number may sit from an allowed one and still count
+    as grounded. Pass ``NUMBER_TOLERANCE_EXACT`` on a surface where the gate IS the honesty
+    claim being made to a reader (ADR-104) — see the module note above and #2290.
+    """
     out = []
     for x in sorted(numbers_in_text(text)):
         if x in _BENIGN_NUMBERS:
             continue
-        if any(abs(x - a) < 0.01 for a in allowed):
+        if tolerance > 0 and any(abs(x - a) < tolerance for a in allowed):
             continue
-        # An integer restatement of an input float (64 for 64.2) is grounded.
-        if any(abs(x - round(a)) < 0.01 for a in allowed):
+        if any(_is_restatement(x, a) for a in allowed):
             continue
         out.append(x)
     return out
@@ -911,6 +948,7 @@ def grounding_findings(
     available_logs=None,
     evaluated_predictions=None,
     nightly_vitals=None,
+    number_tolerance: float = NUMBER_TOLERANCE_TOLERANT,
 ) -> list:
     """Deterministic grounding check. Returns [{type, detail, ...}] — empty = grounded.
 
@@ -920,6 +958,10 @@ def grounding_findings(
       a sub-band canonical value (44% = Whoop yellow) — #1208, band_adjective_findings.
     - "fabricated_number": a number appears in the output but nowhere in the
       input allow-list (and isn't benign) — the trend/range fabrication class.
+      ``number_tolerance`` sets how close counts as "in" (#2290). The default keeps
+      every existing caller's behaviour; a reader-facing surface whose refusal copy IS
+      an honesty claim should pass ``NUMBER_TOLERANCE_EXACT``, which still accepts a
+      rounding of an allowed number but refuses a corrupted trailing decimal.
     - "fabricated_date": a full calendar date is cited in the output that appears in
       no supplied legitimate date — #1242, fabricated_dates(). Checked ONLY when
       ``allowed_dates`` is passed (an empty set means "no dates are legitimate");
@@ -951,7 +993,7 @@ def grounding_findings(
     if facts:
         findings.extend(band_adjective_findings(text, facts))
     if allowed is not None:
-        for x in fabricated_numbers(text, allowed):
+        for x in fabricated_numbers(text, allowed, tolerance=number_tolerance):
             findings.append(
                 {
                     "type": "fabricated_number",
