@@ -91,4 +91,4 @@ combine-as-imports = true
 # is what stops real coverage being deleted down into it. Raising this floor does
 # not replace raising that mark — they move together.
 [tool.coverage.report]
-fail_under = 58
+fail_under = 66
