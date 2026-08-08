@@ -955,13 +955,18 @@ def compute_builders_paradox_score(days: int = 7) -> dict:
             )
         )
         for item in resp.get("Items", []):
-            # Count completed tasks — todoist records have task_count or completed_count
-            platform_tasks += int(item.get("tasks_completed", 0) or 0)
-            # Fallback: count items if no aggregate field
-            if platform_tasks == 0:
-                tasks = item.get("tasks", [])
-                if isinstance(tasks, list):
-                    platform_tasks += len(tasks)
+            # #2271: todoist records carry `completed_count` (the only name
+            # todoist_lambda has ever written). The previous `tasks_completed`
+            # read matched nothing, so this always fell through to the
+            # len(item["tasks"]) fallback — which is itself a field no todoist
+            # record carries, making the Builder's Paradox task count a
+            # permanent measured zero.
+            platform_tasks += int(item.get("completed_count", 0) or 0)
+            # #2271: the former `tasks` fallback is deleted, not repaired. No
+            # todoist record has ever carried a `tasks` key, and the branch
+            # counted the LENGTH of an OPEN task list as tasks COMPLETED — a
+            # latent inversion that would have inflated platform intensity the
+            # moment anything started writing that name.
     except Exception as e:
         logger.warning("Builder's Paradox: Todoist query failed: %s", e)
 

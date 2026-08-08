@@ -228,7 +228,10 @@ def sleep_correlations(*, _g) -> dict:
     todoist = {}
     for t in _query_source("todoist", d30, today):
         dt = t.get("date") or t.get("sk", "").replace("DATE#", "")[:10]
-        v = _f(t.get("completed_count") or t.get("tasks_completed") or t.get("completed") or t.get("completed_today"))
+        # #2271: `completed_count` is the only completion field todoist_lambda
+        # has ever written; the three former fallbacks (tasks_completed /
+        # completed / completed_today) were dead names that could never match.
+        v = _f(t.get("completed_count"))
         if v is not None and dt:
             todoist[dt] = v
     cards.append(

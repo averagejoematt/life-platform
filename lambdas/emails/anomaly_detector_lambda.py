@@ -134,7 +134,12 @@ MIN_ABSOLUTE_CHANGE = {
     "blood_pressure_diastolic": 5,
 }
 
-DOW_NORMALIZED_METRICS = {"steps", "tasks_completed", "completion_pct"}
+# #2271: these are METRICS *field* names, so they must move in lockstep with
+# METRICS below — "tasks_completed" here named a field METRICS no longer emits
+# (and the todoist record never carried), which would silently drop the
+# day-of-week normalisation this set exists to apply. Guarded by
+# tests/test_todoist_reader_writer_contract.py.
+DOW_NORMALIZED_METRICS = {"steps", "completed_count", "completion_pct"}
 
 # Metrics where Z-scoring should be performed on log(value) rather than raw value.
 # HRV is right-skewed / lognormal: raw Z-scores over-alert on high-HRV days and
@@ -153,7 +158,11 @@ METRICS = [
     ("apple_health", "steps", "Steps", True),
     ("apple_health", "walking_speed_mph", "Walking Speed", True),
     ("apple_health", "walking_asymmetry_pct", "Walking Asymmetry", False),
-    ("todoist", "tasks_completed", "Tasks Completed", True),
+    # #2271: field was "tasks_completed", which todoist_lambda has never
+    # written — safe_float() returned None for it on every run, so this metric
+    # `continue`d out of check_anomalies before any baseline was computed and
+    # todoist anomaly detection has been dark since it was added.
+    ("todoist", "completed_count", "Tasks Completed", True),
     ("habitify", "completion_pct", "P40 Habits", True),
     ("garmin", "body_battery_high", "Body Battery", True),
     ("garmin", "avg_stress", "Garmin Stress", False),
@@ -681,7 +690,8 @@ def build_sustained_alert_html(sustained_list, date_str):
         tc_html = ""
         if s.get("training_context"):
             tc_html = f'<p style="color:#92400e;font-size:13px;margin:6px 0 0 0;">' f'<em>{s["training_context"]}</em></p>'
-        rows.append(f"""
+        rows.append(
+            f"""
         <tr>
           <td style="padding:12px 16px;border-bottom:1px solid #fef3c7;">
             <strong style="color:#1f2937;">{s["label"]}</strong><br>
@@ -691,7 +701,8 @@ def build_sustained_alert_html(sustained_list, date_str):
             </span>
             {tc_html}
           </td>
-        </tr>""")
+        </tr>"""
+        )
 
     return f"""<!DOCTYPE html>
 <html>

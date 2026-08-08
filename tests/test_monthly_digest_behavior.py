@@ -1228,15 +1228,15 @@ def _seeded_table():
         _row_for("withings", MON_CUR_END, weight_lbs=Decimal("305.0"), body_fat_pct=Decimal("36.0")),
         _row_for("macrofactor", "2026-07-10", total_calories_kcal=1700, total_protein_g=200),
         _row_for("chronicling", "2026-07-10", total_score=72, group_scores={"sleep": 80, "food": 60}),
-        _row_for("todoist", "2026-07-10", tasks_completed=6),
-        _row_for("todoist", MON_CUR_END, tasks_completed=4),
+        _row_for("todoist", "2026-07-10", completed_count=6),
+        _row_for("todoist", MON_CUR_END, completed_count=4),
         _row_for("hevy", "2026-07-10", workouts=[{"title": "Push", "total_volume_lbs": 12000}]),
         _row_for("character_sheet", MON_CUR_END, character_level=14, character_xp=5000, character_tier="Momentum"),
         _strava_day([_act()], miles=2.0, secs=1800, elev=100, date_str="2026-07-10"),
         # prior arm
         _row_for("whoop", "2026-06-10", hrv=44, recovery_score=52, resting_heart_rate=61),
         _row_for("withings", "2026-06-10", weight_lbs=Decimal("312.0")),
-        _row_for("todoist", "2026-06-10", tasks_completed=9),
+        _row_for("todoist", "2026-06-10", completed_count=9),
         {"pk": f"USER#{m.USER_ID}", "sk": "PROFILE#v1", **PROFILE},
     ]
     return _table_with(rows)

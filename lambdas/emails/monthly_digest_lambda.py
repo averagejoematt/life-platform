@@ -618,8 +618,14 @@ def gather_all():
     # Todoist (simple count, no extractor above)
     td_cur = raw_cur.get("todoist", [])
     td_prior = raw_prior.get("todoist", [])
-    cur["todoist"] = {"tasks_completed": sum(int(r.get("tasks_completed", 0)) for r in td_cur), "days": len(td_cur)}
-    prior["todoist"] = {"tasks_completed": sum(int(r.get("tasks_completed", 0)) for r in td_prior), "days": len(td_prior)}
+    # #2271: todoist_lambda has only ever written `completed_count` (see
+    # ingestion_validator.py's todoist schema) — reading the never-written
+    # `tasks_completed` matched nothing and published a permanent measured zero,
+    # the identical defect #2245 fixed in weekly_digest.ex_todoist. The OUTPUT
+    # key stays `tasks_completed`: it is this module's own contract with the
+    # renderer/prompt below, not a DynamoDB attribute name.
+    cur["todoist"] = {"tasks_completed": sum(int(r.get("completed_count", 0) or 0) for r in td_cur), "days": len(td_cur)}
+    prior["todoist"] = {"tasks_completed": sum(int(r.get("completed_count", 0) or 0) for r in td_prior), "days": len(td_prior)}
 
     # Character sheet (pre-computed daily records)
     cs_recs_cur = cs_recs_prior = []
