@@ -35,11 +35,13 @@
     "strict_required_status_checks_policy": false,
     "do_not_enforce_on_create": true,
     "producer_app": "github-actions",
+    "reconcile_push_secret": "RECONCILE_PUSH_TOKEN",
     "bypass_actors": [
       {
-        "app": "github-actions",
+        "actor_type": "User",
+        "login": "averagejoematt",
         "bypass_mode": "always",
-        "why": "ci-cd.yml's `reconcile` job pushes one regenerated-artifact commit DIRECTLY to main with GITHUB_TOKEN (it is not a PR). A required-status-checks rule blocks any ref update whose head has no passing checks, so without this bypass every reconcile push is rejected and merge-day drift stops being repaired. github-actions[bot] is not a repo admin, so no admin/enforce_admins knob covers it."
+        "why": "#2198, measured 2026-08-07 under BOTH the session auth and the owner's own gh auth: an `Integration` bypass actor for the github-actions app 422s on this repo — 'Actor GitHub Actions integration must be part of the ruleset source or owner organization' — because this repo is owned by a personal (User) account, not an organization the app is installed into. GitHub's ruleset schema documents `User` as a separate, valid actor_type (distinct from the org-only `OrganizationAdmin`), and the repo owner trivially satisfies 'part of the ruleset source'. A `User` bypass only matches a push AUTHENTICATED as that account, so ci-cd.yml's `reconcile` job pushes with the `RECONCILE_PUSH_TOKEN` repo secret (a fine-grained PAT owned by this account, Contents:read-and-write on this repo only) instead of the default GITHUB_TOKEN — GITHUB_TOKEN authenticates as the github-actions[bot] Integration identity, which this bypass does not cover. Sequencing matters: `--apply` must not run until that secret exists (see `reconcile_push_secret_provisioned` preflight in scripts/apply_branch_protection.py) or the very next reconcile push is rejected with no bypass to catch it."
       }
     ],
     "required_status_checks": [

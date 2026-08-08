@@ -292,15 +292,29 @@ still valid; the bot is the net under it, not a replacement for pre-merge hygien
      required checks, no PR rule, `enforcement: active`, `bypass_actors: []`. A
      normal (fast-forward, non-deleting) push from `github-actions[bot]` —
      including the reconcile bot's commit and a squash-merge — is unaffected.
-   - `main-required-fast-lane` (#1662, **ADR-148**) carries one
-     `required_status_checks` rule scoped to the fast lane. A required-checks
-     rule blocks **any** ref update whose head has no passing checks, including
-     the reconcile bot's DIRECT push — which is why that ruleset carries a
-     `bypass_actors` entry for the `github-actions` Integration (`always`).
-     **If the reconcile push is rejected, check that bypass first**:
-     `gh api repos/<owner>/<repo>/rulesets --jq '.[] | {id,name}'` then read the
-     full record. Desired state is `deploy/github_posture.json`; re-assert with
-     `python3 scripts/apply_branch_protection.py --check` (and `--apply` to fix).
+   - `main-required-fast-lane` (#1662, **ADR-148**, mechanism amended #2198)
+     carries one `required_status_checks` rule scoped to the fast lane. A
+     required-checks rule blocks **any** ref update whose head has no passing
+     checks, including the reconcile bot's DIRECT push — which is why that
+     ruleset carries a `bypass_actors` entry. **That entry is a `User` (the
+     repo owner), not an `Integration`** — measured 2026-08-07 under two
+     separate auths, a `github-actions` Integration bypass actor 422s on this
+     personal-account-owned repo ("must be part of the ruleset source or owner
+     organization"; `OrganizationAdmin` is documented as N/A off an org too). A
+     `User` bypass only covers a push authenticated as that account, so
+     `ci-cd.yml`'s reconcile job pushes with the `RECONCILE_PUSH_TOKEN` repo
+     secret (a fine-grained PAT owned by the account, `Contents:
+     read-and-write` on this repo only), falling back to `GITHUB_TOKEN` until
+     that secret is provisioned. **If the reconcile push is rejected, check
+     both first**: `gh api repos/<owner>/<repo>/rulesets --jq '.[] | {id,name}'`
+     then read the full record for `bypass_actors`, and confirm
+     `RECONCILE_PUSH_TOKEN` exists (`gh secret list`). Desired state is
+     `deploy/github_posture.json`; re-assert with `python3
+     scripts/apply_branch_protection.py --check` (and `--apply` to fix — it
+     refuses to run until the secret is provisioned, so a stranding apply is
+     structurally prevented). Full comparison of the rejected alternatives
+     (classic protection, a fast-lane-PR reconcile) is in `docs/DECISIONS.md`'s
+     ADR-148 amendment.
    Otherwise a rejected push means someone force-pushed.
 3. **A generator crashed** — same failure the test suite would have shown; fix the
    generator like any red test. Reproduce locally: run the generators from repo root
@@ -744,7 +758,7 @@ These values change and must **never** be hand-written in docs or memory. Read t
 | Open CodeQL alerts | `gh api '/repos/{owner}/{repo}/code-scanning/alerts?state=open&per_page=100' --paginate --jq length` → steady state **0** since the #1902 triage (every alert is fixed or dismissed-with-reason; a just-merged fix stays open until CodeQL re-analyzes main). `drift_sentinel.check_codeql_alerts` alarms on regrowth — an open alert is un-triaged by definition, so triage it, never let the list re-accumulate |
 | `main` classic branch protection | `gh api repos/<owner>/<repo>/branches/main/protection` → must 404 "Branch not protected" (removed 2026-07-13, #1173; a 200 here means protection was re-added out of band — reconcile the doc, don't assume this table is wrong) |
 | `main` ruleset posture | `gh api repos/<owner>/<repo>/rulesets` → must show `main-block-force-push-and-deletion` (id `19162901`) with `rules: [deletion, non_fast_forward]` only, `enforcement: active`, no `pull_request`/`required_status_checks` rule (#1325), **and** `main-required-fast-lane` (#1662, ADR-148). Full record: `gh api repos/<owner>/<repo>/rulesets/<id>` |
-| `main` required status checks + auto-merge | `python3 scripts/apply_branch_protection.py --check` → exit 0 and "clean" when live matches `deploy/github_posture.json` (ADR-148). It prints the required contexts, the `github-actions` bypass the reconcile bot depends on, and `allow_auto_merge`. Never hand-edit the ruleset in the GitHub UI — `--apply` is the only sanctioned writer, and the weekly drift sentinel reports any out-of-band edit |
+| `main` required status checks + auto-merge | `python3 scripts/apply_branch_protection.py --check` → exit 0 and "clean" when live matches `deploy/github_posture.json` (ADR-148). It prints the required contexts, the `User` bypass actor (the repo owner, #2198) the reconcile bot depends on, and `allow_auto_merge`. Never hand-edit the ruleset in the GitHub UI — `--apply` is the only sanctioned writer, and the weekly drift sentinel reports any out-of-band edit |
 
 The pre-commit hook (`scripts/install_hooks.sh` — run once after cloning) runs
 `deploy/sync_doc_metadata.py --apply` directly and auto-stages every target file it

@@ -16,9 +16,34 @@ WHY A RULESET AND NOT CLASSIC BRANCH PROTECTION
   `reconcile` job pushes a regenerated-artifact commit DIRECTLY to main as
   github-actions[bot], which is not an admin — under classic protection with required
   checks that push is rejected on every merge day, and `enforce_admins:false` does not
-  help a bot. Rulesets carry `bypass_actors`, so the bot keeps its push and humans stay
-  gated. It also leaves `gh api .../branches/main/protection` at its documented 404
-  (docs/CONVENTIONS.md drift-discovery table) — nothing about the classic surface moves.
+  help a bot. Rulesets carry `bypass_actors`, so a correctly-configured actor keeps its
+  push and humans stay gated. It also leaves `gh api .../branches/main/protection` at
+  its documented 404 (docs/CONVENTIONS.md drift-discovery table) — nothing about the
+  classic surface moves.
+
+THE BYPASS ACTOR IS A `User`, NOT AN `Integration` (#2198)
+  The original design (#1662/ADR-148) bypassed the ruleset with the built-in
+  `github-actions` app as an `Integration` actor. Measured live 2026-08-07 under BOTH
+  the session auth and the owner's own gh auth, that write 422s on this repo:
+  `"Actor GitHub Actions integration must be part of the ruleset source or owner
+  organization"`. This repo is owned by a personal (User) account, not an
+  organization the app is installed into — the write is refused structurally, not for
+  lack of auth. GitHub's ruleset schema separately documents `User` as a valid
+  bypass-actor type (distinct from the org-only `OrganizationAdmin`), and the repo
+  owner trivially satisfies "part of the ruleset source". A `User` bypass actor only
+  matches a push AUTHENTICATED as that account, so `ci-cd.yml`'s `reconcile` job must
+  push using a stored fine-grained PAT belonging to the owner (repo secret named by
+  the spec's `reconcile_push_secret`, `Contents: read-and-write` on this repo only) —
+  not the default `GITHUB_TOKEN`, which authenticates as the `github-actions[bot]`
+  Integration identity and is not covered by a `User` bypass. `--apply` refuses to run
+  until that secret exists live (`reconcile_push_secret_provisioned()` below); applying
+  first would strand the very next reconcile push with no bypass to catch it. Two
+  alternative mechanisms were measured and rejected — see docs/DECISIONS.md's ADR-148
+  amendment (#2198) for the full comparison (classic protection: no per-actor bypass
+  at all; a fast-lane-PR reconcile: GitHub's own docs put GITHUB_TOKEN-opened PRs'
+  `pull_request` runs in an "approval-required" state, so the required check could
+  never auto-report and the PR would wedge exactly the way ADR-148's own
+  `preflight_contexts()` was built to prevent).
 
 WHAT IT WILL NEVER DO
   * It never enables required reviews. Solo operator: a `pull_request` rule (or classic
@@ -232,10 +257,66 @@ def resolve_app_id(slug: str, cache: dict | None = None) -> int:
     return app_id
 
 
+def resolve_user_id(login: str, cache: dict | None = None) -> int:
+    """GitHub login → numeric user id, resolved LIVE (`GET /users/{login}` is public).
+
+    `User` bypass actors are matched by id, not login (#2198) — a wrong/stale literal
+    would silently produce a bypass that matches nobody, and the failure only shows up
+    on the day the reconcile job actually needs the bypass."""
+    if cache is not None and login in cache:
+        return cache[login]
+    data, err = gh_json(f"/users/{login}")
+    if err or not isinstance(data, dict) or not data.get("id"):
+        raise SpecError(f"could not resolve GitHub user `{login}` to a numeric id: {err or data}")
+    user_id = int(data["id"])
+    if cache is not None:
+        cache[login] = user_id
+    return user_id
+
+
+def resolve_bypass_actor_id(actor: dict, app_cache: dict, user_cache: dict) -> int:
+    """One spec bypass-actor entry → its live numeric `actor_id`.
+
+    Only two `actor_type` shapes are implemented — the two GitHub actually lets this
+    (personal-account-owned) repo use, per the #2198 measurement: `Integration` (a
+    GitHub App, resolved by slug — kept for any future app-owned bypass) and `User`
+    (a GitHub account, resolved by login — what the reconcile push uses today, since
+    `Integration` 422s here). Any other declared actor_type raises rather than guessing
+    a resolution path that was never measured against this repo."""
+    actor_type = actor.get("actor_type")
+    if actor_type == "Integration":
+        return resolve_app_id(actor["app"], app_cache)
+    if actor_type == "User":
+        return resolve_user_id(actor["login"], user_cache)
+    raise SpecError(
+        f"bypass actor_type `{actor_type}` has no resolver — #2198 only measured `Integration` and `User` "
+        "on this repo; add a resolver in resolve_bypass_actor_id() before declaring it in the spec"
+    )
+
+
+# The repo secret ci-cd.yml's `reconcile` job must push with once the `User` bypass
+# actor is live — a PAT belonging to the bypassed account (#2198). Applying the ruleset
+# before this secret exists would strand the very next reconcile push with no bypass to
+# catch it (GITHUB_TOKEN authenticates as github-actions[bot], which the `User` bypass
+# actor does not cover), so `--apply` refuses until this reads back present.
+RECONCILE_PUSH_SECRET_DEFAULT = "RECONCILE_PUSH_TOKEN"
+
+
+def reconcile_push_secret_provisioned(repo: str, secret_name: str) -> bool | None:
+    """GET-only: does `secret_name` exist as a repo secret? True/False, or None if the
+    listing itself could not be read (e.g. a token without repo-admin secrets:read —
+    this is advisory in that case, never a hard block on an unrelated scope gap)."""
+    data, err = gh_json(f"/repos/{repo}/actions/secrets")
+    if err or not isinstance(data, dict):
+        return None
+    names = {s.get("name") for s in data.get("secrets") or []}
+    return secret_name in names
+
+
 # ── desired payload ──────────────────────────────────────────────────────────
 
 
-def build_ruleset_payload(spec: dict, app_ids: dict) -> dict:
+def build_ruleset_payload(spec: dict, app_ids: dict, user_ids: dict | None = None) -> dict:
     """The exact POST/PUT body for the required-checks ruleset."""
     assert_no_review_requirement(spec)
     assert_preserves_existing_ruleset(spec)
@@ -243,12 +324,17 @@ def build_ruleset_payload(spec: dict, app_ids: dict) -> dict:
     checks = [{"context": c["context"], "integration_id": producer} for c in spec["required_status_checks"]]
     if not checks:
         raise SpecError("the spec declares zero required status checks — an empty required-checks ruleset is a no-op")
+    user_ids = user_ids or {}
     payload = {
         "name": spec["name"],
         "target": spec.get("target", "branch"),
         "enforcement": spec.get("enforcement", "active"),
         "bypass_actors": [
-            {"actor_id": app_ids[b["app"]], "actor_type": "Integration", "bypass_mode": b.get("bypass_mode", "always")}
+            {
+                "actor_id": resolve_bypass_actor_id(b, app_ids, user_ids),
+                "actor_type": b["actor_type"],
+                "bypass_mode": b.get("bypass_mode", "always"),
+            }
             for b in spec.get("bypass_actors", [])
         ],
         "conditions": {"ref_name": {"include": list(spec.get("include_refs", [])), "exclude": []}},
@@ -338,7 +424,8 @@ def _print_plan(spec: dict, desired: dict, ruleset_problems: list[str], settings
     print(f"strict (branch up to date): {desired['rules'][0]['parameters']['strict_required_status_checks_policy']}")
     print("bypass           :")
     for b in spec.get("bypass_actors", []):
-        print(f"  · app `{b['app']}` ({b.get('bypass_mode', 'always')}) — {b.get('why', '')[:120]}")
+        who = f"app `{b['app']}`" if b.get("actor_type") == "Integration" else f"user `{b.get('login')}`"
+        print(f"  · {who} ({b.get('actor_type', 'Integration')}, {b.get('bypass_mode', 'always')}) — {b.get('why', '')[:120]}")
     print("required reviews : NONE (solo operator — structurally refused by this tool)")
     print()
     print("ruleset drift    : " + ("; ".join(ruleset_problems) if ruleset_problems else "none (live matches spec)"))
@@ -382,11 +469,17 @@ def main(argv: list[str] | None = None) -> int:
 
     repo = args.repo or repo_slug()
     app_cache: dict = {}
+    user_cache: dict = {}
     try:
-        needed = {spec.get("producer_app", "github-actions")} | {b["app"] for b in spec.get("bypass_actors", [])}
-        for slug in sorted(needed):
+        needed_apps = {spec.get("producer_app", "github-actions")} | {
+            b["app"] for b in spec.get("bypass_actors", []) if b.get("actor_type") == "Integration"
+        }
+        for slug in sorted(needed_apps):
             resolve_app_id(slug, app_cache)
-        desired = build_ruleset_payload(spec, app_cache)
+        needed_users = {b["login"] for b in spec.get("bypass_actors", []) if b.get("actor_type") == "User"}
+        for login in sorted(needed_users):
+            resolve_user_id(login, user_cache)
+        desired = build_ruleset_payload(spec, app_cache, user_cache)
     except SpecError as e:
         print(f"FAIL: {e}", file=sys.stderr)
         return 2
@@ -423,6 +516,34 @@ def main(argv: list[str] | None = None) -> int:
     if not args.apply:
         print("\ndry run — nothing mutated. Re-run with --apply to make it so.")
         return 0
+
+    # ── #2198: refuse to apply a `User` bypass actor before the reconcile job can
+    # authenticate as that user. Applying first would strand the very next reconcile
+    # push to main with no bypass to catch it — GITHUB_TOKEN authenticates as
+    # github-actions[bot] (an Integration identity), which a `User` bypass does not
+    # cover. Only checked for specs that actually declare a User bypass actor. ──
+    user_bypass_actors = [b for b in spec.get("bypass_actors", []) if b.get("actor_type") == "User"]
+    if user_bypass_actors:
+        secret_name = spec.get("reconcile_push_secret", RECONCILE_PUSH_SECRET_DEFAULT)
+        provisioned = reconcile_push_secret_provisioned(repo, secret_name)
+        if provisioned is False:
+            print(
+                f"FAIL: repo secret `{secret_name}` does not exist yet — applying now would strand ci-cd.yml's "
+                "reconcile job's direct push to main (it would still authenticate with GITHUB_TOKEN as "
+                "github-actions[bot], which the new `User` bypass actor does not cover). Create a fine-grained "
+                f"PAT owned by the bypassed account with Contents: read-and-write on this repo only, store it as "
+                f"the `{secret_name}` repo secret, and update ci-cd.yml's reconcile checkout step to use it "
+                "(see docs/CONVENTIONS.md §4c) — then re-run --apply.",
+                file=sys.stderr,
+            )
+            return 2
+        if provisioned is None:
+            print(
+                f"WARN: could not verify repo secret `{secret_name}` exists (soft-fail — token may lack "
+                "Administration/secrets read); proceeding on trust. Confirm it exists before this run, or the "
+                "next reconcile push may be silently rejected.",
+                file=sys.stderr,
+            )
 
     # ── mutations, only past here ──
     if ruleset_problems:
