@@ -52,6 +52,7 @@ RECIPIENT = os.environ["EMAIL_RECIPIENT"]
 SENDER = os.environ["EMAIL_SENDER"]
 S3_BUCKET = os.environ["S3_BUCKET"]
 SECRET_NAME = os.environ.get("SECRET_NAME", "life-platform/ai-keys")
+TODOIST_SECRET_NAME = os.environ.get("TODOIST_SECRET_NAME", "life-platform/todoist")
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 
@@ -254,6 +255,26 @@ def _fetch_projects(token):
     except Exception as e:
         logger.warning(f"Todoist projects fetch failed: {e}")
         return {}
+
+
+def _fetch_todoist_token():
+    """Fetch the real Todoist API token from Secrets Manager (life-platform/todoist),
+    matching the pattern already used by mcp/tools_todoist.py and
+    pipeline_health_check_lambda.py. Cached in-memory 15min via common.secret_cache
+    (warm-container reuse, COST-OPT-1). Non-fatal: returns None on any failure so the
+    caller can fall back to an honest "unavailable" state rather than crash the send."""
+    try:
+        from common.secret_cache import get_secret_json
+
+        secret = get_secret_json(TODOIST_SECRET_NAME, secrets)
+        token = secret.get("todoist_api_token") or secret.get("todoist")
+        if not token:
+            logger.warning("Todoist secret has no recognized token key (expected todoist_api_token or todoist)")
+            return None
+        return token
+    except Exception as e:
+        logger.warning(f"Todoist token fetch failed (non-fatal): {e}")
+        return None
 
 
 def gather_todoist_data(token):
@@ -640,6 +661,7 @@ Format it as a clear call-to-action. Bold the actual action. End with why this o
 - Cross-pillar reasoning is your superpower. Use it. Name trade-offs explicitly.
 - The overdue section is about reducing anxiety, not adding to it. Tone is matter-of-fact, not judgmental.
 - Task names should appear exactly as provided — don't rephrase or paraphrase them.
+- If TASKS DUE THIS WEEK or OVERDUE is marked UNAVAILABLE, say so plainly in that section (e.g. "Todoist wasn't reachable this week") — never present it as zero tasks or a clean slate.
 - This email is read Monday morning before the week starts. It should feel like a strategic briefing, not a review."""
 
 
@@ -730,6 +752,21 @@ def build_user_message(week_state, todoist_data, health_data, profile, pillar_ma
         except Exception as e:
             logger.warning(f"IC-16 insights failed: {e}")
 
+    # ADR-104: honest absence, never fabricated emptiness. `available` is only True
+    # when gather_todoist_data actually ran against the real API (see lambda_handler);
+    # a missing token or a failed fetch must read as "unavailable," not as a true zero.
+    todoist_available = todoist_data.get("available", True)
+    if todoist_available:
+        due_line = f"TASKS DUE THIS WEEK: {todoist_data.get('total_due_this_week', 0)} tasks"
+        due_body = chr(10).join(task_block) if task_block else "No tasks due this week"
+        overdue_line = f"OVERDUE: {todoist_data.get('total_overdue', 0)} tasks"
+        overdue_body = chr(10).join(overdue_block) if overdue_block else "None — clean slate"
+    else:
+        due_line = "TASKS DUE THIS WEEK: UNAVAILABLE"
+        due_body = "Todoist could not be reached this week. State this absence plainly in Section 2 — do not report a task count or imply the list is empty."
+        overdue_line = "OVERDUE: UNAVAILABLE"
+        overdue_body = "Todoist could not be reached this week. State this absence plainly in Section 4 — do not report an overdue count or imply a clean slate."
+
     payload = f"""== MATTHEW'S MONDAY MORNING BRIEFING ==
 
 JOURNEY CONTEXT: {journey_context}
@@ -751,11 +788,11 @@ LAST WEEK:
   Last week avg grade: {week_state.get('last_week_avg_grade', 'N/A')}
   {habit_summary or 'No habit data'}
 
-TASKS DUE THIS WEEK: {todoist_data.get('total_due_this_week', 0)} tasks
-{chr(10).join(task_block) if task_block else 'No tasks due this week'}
+{due_line}
+{due_body}
 
-OVERDUE: {todoist_data.get('total_overdue', 0)} tasks
-{chr(10).join(overdue_block) if overdue_block else 'None — clean slate'}
+{overdue_line}
+{overdue_body}
 
 BOARD OF DIRECTORS CONTEXT:
 {board_context}
@@ -834,10 +871,10 @@ def record_email_send(table, lambda_name):
 def lambda_handler(event, context):
     logger.info("Monday Compass v1.0.0 starting...")
 
-    # ADR-062: Bedrock IAM auth — no Anthropic key. The Todoist token was never
-    # populated here (the old get_secret() was a Bedrock-IAM sentinel), so the
-    # Todoist block below stays a no-op exactly as before.
-    todoist_token = None
+    # #2178: real Todoist token from Secrets Manager (life-platform/todoist),
+    # matching mcp/tools_todoist.py / pipeline_health_check_lambda.py. ADR-062 is
+    # unrelated — it's about Bedrock IAM auth, not Todoist.
+    todoist_token = _fetch_todoist_token()
 
     profile = fetch_profile()
     if not profile:
@@ -847,13 +884,18 @@ def lambda_handler(event, context):
     pillar_map = load_project_pillar_map()
     health_data = gather_health_data()
 
-    todoist_data = {"due_this_week": [], "overdue": [], "total_due_this_week": 0, "total_overdue": 0}
+    # ADR-104: `available` distinguishes "fetched and genuinely zero" from
+    # "never fetched" so the prompt/render can state absence honestly instead of
+    # presenting an empty stub as a true "0 due, 0 overdue" reading.
+    todoist_data = {"due_this_week": [], "overdue": [], "total_due_this_week": 0, "total_overdue": 0, "available": False}
     if todoist_token:
         try:
             todoist_data = gather_todoist_data(todoist_token)
+            todoist_data["available"] = True
             logger.info(f"Todoist: {todoist_data['total_due_this_week']} due, {todoist_data['total_overdue']} overdue")
         except Exception as e:
             logger.error(f"Todoist gather failed (non-fatal): {e}")
+            todoist_data = {"due_this_week": [], "overdue": [], "total_due_this_week": 0, "total_overdue": 0, "available": False}
     else:
         logger.warning("No Todoist token — skipping task data")
 
