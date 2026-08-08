@@ -30,7 +30,10 @@ returned".
 
 from __future__ import annotations
 
+import ast
+import inspect
 import json
+import pathlib
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -231,18 +234,6 @@ def test_the_empty_overlay_still_publishes_its_sample_size_and_readiness():
     assert o["caption"] is None
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): the genesis-week / no-data branch of "
-        "nutrition_overview returns a DIFFERENT payload shape from the populated branch — "
-        "it omits loss_rate, meal_rhythm, electrolytes, lean_mass, projection, "
-        "reconciliation, micronutrients, food_delivery and blueprint_benchmark entirely. "
-        "A front-end that binds `data.loss_rate.protein_hit_pct` throws for the whole "
-        "first stretch of every experiment cycle, which is exactly when the empty state "
-        "is supposed to render gracefully."
-    ),
-)
 def test_the_empty_state_publishes_the_same_top_level_keys_as_a_populated_one():
     """A front-end binds to one payload shape. If the genesis-week response omits
     keys the populated response has, every reader in the first days of a cycle
@@ -257,15 +248,6 @@ def test_the_empty_state_publishes_the_same_top_level_keys_as_a_populated_one():
     assert not missing, f"empty nutrition state omits keys the populated one publishes: {sorted(missing)}"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): the empty-state `nutrition` block omits "
-        "`tdee_source`, which the populated block always publishes. The front-end uses that "
-        "label to say whether the TDEE is measured or estimated; on a genesis week the key "
-        "is simply absent rather than null."
-    ),
-)
 def test_the_empty_nutrition_block_publishes_the_same_fields_as_a_populated_one():
     populated = overview(FakeSources(macrofactor=[mf(TODAY, total_calories_kcal=2000, expenditure_kcal=2800)]))["nutrition"]
     empty = overview(FakeSources())["nutrition"]
@@ -278,6 +260,19 @@ def test_the_empty_state_still_shapes_the_weekday_weekend_split_so_the_panel_ren
     assert set(wvw) == {"weekday", "weekend"}
     assert wvw["weekday"]["avg_calories"] is None
     assert wvw["weekend"]["days"] == 0
+
+
+def test_the_shape_parity_empty_state_still_never_reaches_the_private_partitions():
+    """Shape parity gave the genesis-week branch `food_delivery` and
+    `blueprint_benchmark` keys so the front-end binds one shape. A KEY is not a QUERY:
+    both stay None and the branch must still read only the macrofactor partition, or
+    "make the empty state match" would have quietly become a privacy regression
+    (P2.3 food delivery, P2.5 PROVEN_BLUEPRINT — both flag-gated OFF)."""
+    src = FakeSources()
+    body = overview(src)
+    assert body["food_delivery"] is None
+    assert body["blueprint_benchmark"] is None
+    assert src.sources_read == {"macrofactor"}
 
 
 def test_the_empty_state_trend_is_an_empty_series_not_a_row_of_zeros():
@@ -386,16 +381,6 @@ def test_a_record_carrying_an_explicit_date_field_is_keyed_by_it_not_by_the_sort
     assert overview(src)["nutrition_trend"][0]["date"] == "2026-05-06"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): site_api_nutrition._mf resolves a macro with "
-        "`item.get(field) or item.get(alt_field)`, so an HONEST LOGGED ZERO on the primary "
-        "field is treated as absent and dropped from the average. A zero-fiber day "
-        "(carnivore/shake day — entirely realistic) is excluded from avg_fiber_g, inflating "
-        "the published average. Absence and zero must not be the same value (ADR-104)."
-    ),
-)
 def test_an_honestly_logged_zero_macro_is_averaged_in_rather_than_dropped():
     # fiber logged as 0 on one day and 10 on the other: honest mean = 5.0
     src = FakeSources(
@@ -407,15 +392,6 @@ def test_an_honestly_logged_zero_macro_is_averaged_in_rather_than_dropped():
     assert overview(src)["nutrition"]["avg_fiber_g"] == 5.0
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): nutrition_overview's `latest_calories` / "
-        "`latest_protein_g` guard on TRUTHINESS (`if _mf(...)`) while every average guards "
-        "on `is not None`. A fully-logged fast day (0 kcal) therefore publishes "
-        "latest_calories=None — 'not logged' — for a day that WAS logged."
-    ),
-)
 def test_a_logged_zero_calorie_fast_day_is_reported_as_zero_not_as_unlogged():
     src = FakeSources(macrofactor=[mf("2026-05-09", total_calories_kcal=0)])
     assert overview(src)["nutrition"]["latest_calories"] == 0
@@ -556,16 +532,6 @@ def test_the_recent_window_days_shrinks_with_a_young_cycle_rather_than_claiming_
     assert overview(src)["nutrition"]["cal_avg_recent_window_days"] == 3
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): the 'recent' window is built as "
-        "`date >= _experiment_date(7)`, an INCLUSIVE lower bound 7 days before today — "
-        "so it spans 8 calendar dates (today-7 .. today) while `_window_span` reports "
-        "actual_days=7 and the published key is named cal_7d_avg. An eighth day is "
-        "averaged into a figure labelled seven days."
-    ),
-)
 def test_the_seven_day_window_covers_exactly_seven_calendar_dates():
     # One record on each of the 8 dates today-7..today, all 1000 kcal except the
     # oldest (today-7 = 2026-05-03) at 8000. A true 7-day window excludes 05-03,
@@ -659,16 +625,6 @@ def test_the_deficit_intensity_label_follows_the_published_percentage_bands(inta
     assert overview(src)["loss_rate"]["deficit_label"] == expected_label
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): nutrition_overview's deficit_label band ladder has no "
-        "surplus branch — a NEGATIVE deficit (eating above maintenance) falls through to the "
-        "`else` and is published as 'maintenance'. A reader in a 600 kcal daily surplus is "
-        "told they are at maintenance. deficit_sustainability has the same ladder but pairs it "
-        "with `in_deficit: False`; the nutrition_overview loss_rate panel carries no such guard."
-    ),
-)
 def test_eating_above_maintenance_is_not_labelled_maintenance():
     # tdee 2500, intake 3100 → deficit -600 (a surplus)
     src = FakeSources(macrofactor=[mf("2026-05-09", total_calories_kcal=3100, expenditure_kcal=2500)])
@@ -755,16 +711,6 @@ def test_the_weekday_split_carries_the_full_macro_set_a_reader_can_compare():
     assert wd["avg_fiber_g"] == 30.0
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): the weekday/weekend `protein_hit_pct` divides by "
-        "len(group) — EVERY day in the bucket — and coerces a missing protein value to 0 via "
-        "`(_mf(...) or 0) >= target`, so a day with no protein logged counts as a MISS. The "
-        "headline `protein_hit_pct` divides by days that actually have protein data. Same "
-        "field name, two definitions: a reader comparing the panels sees 100% and 50%."
-    ),
-)
 def test_a_day_with_no_protein_logged_does_not_count_as_a_missed_protein_day():
     src = FakeSources(
         macrofactor=[
@@ -828,15 +774,6 @@ def test_average_protein_per_meal_divides_window_protein_by_window_meals():
     assert overview(src)["meal_rhythm"]["avg_protein_per_meal"] == 50.0
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): meal_rhythm.avg_protein_per_meal sums protein over "
-        "EVERY day in the window but sums meals only over days that carry a `total_meals` "
-        "field. One day missing total_meals therefore doubles the published grams-per-meal. "
-        "The numerator and the denominator must be drawn from the same set of days."
-    ),
-)
 def test_a_day_without_a_meal_count_does_not_inflate_the_grams_per_meal_figure():
     # Day 1: 200 g over 4 meals. Day 2: 200 g, meal count not recorded.
     # The only defensible figure from the days that carry both is 200/4 = 50.0.
@@ -1174,16 +1111,6 @@ def test_no_projection_is_published_without_a_recent_weigh_in():
     assert overview(src)["projection"] is None
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): the next-mark-below computation is "
-        "`int((cur_weight - 0.1) // 5) * 5`. The 0.1 lb epsilon exists to stop a weight "
-        "sitting exactly ON a mark from targeting itself, but it creates a 0.1 lb dead zone "
-        "just above every mark: at 195.05 lb the next mark below is 195, yet the code "
-        "publishes 190 — a bet ten pounds further out than the real one."
-    ),
-)
 def test_a_weight_just_above_a_five_pound_mark_targets_that_mark():
     assert overview(_projection_sources(weight_lbs=195.05))["projection"]["target_weight_lbs"] == 195
 
@@ -1254,23 +1181,43 @@ def test_no_reconciliation_series_is_built_without_a_tdee():
     assert r["ready"] is False
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): the reconciliation chart's two trajectories do not "
-        "share a baseline. `cum_def` accumulates from the FIRST logged day, while "
-        "`start_actual` is anchored to the first day that has a WEIGH-IN. When the scale "
-        "starts later than the food log, every projected_loss row carries the pre-weigh-in "
-        "deficit while the actual row starts at zero — so the published `gap_lbs` "
-        "('logging accuracy / TDEE drift') is inflated by exactly the un-weighed prefix."
-    ),
-)
 def test_projected_and_actual_loss_share_a_baseline_on_the_first_weighed_day():
+    """The two reconciliation trajectories must start on the same DAY.
+
+    `cum_def` accumulated from the first LOGGED day while `start_actual` anchored to the
+    first WEIGHED day, so when the scale started later than the food log every
+    pre-weigh-in day was added to the projected line and to nothing on the actual line —
+    inflating the published `gap_lbs`, which the page sells to the reader as "logging
+    accuracy / TDEE drift".
+
+    CORRECTION to the original marker. It prescribed asserting
+    `first_weighed["projected_loss_lbs"] == 0.0` — an EXCLUSIVE baseline, where the
+    baseline day's own deficit is not yet on the projected line. That contradicts
+    `test_the_reconciliation_publishes_the_gap_once_the_overlap_is_long_enough`, which is
+    green and pins the INCLUSIVE convention: with weigh-ins on every one of 20 days it
+    expects 5.71 lb projected (20 × 1000 / 3500), and an exclusive baseline would make it
+    19 × 1000 / 3500 = 5.43. Satisfying the marker as written would have required
+    reversing that green contract. The defect is real and is fixed; only the marker's
+    asserted value for the baseline day was wrong.
+
+    Hand-derived, first_weight_day=3 (weigh-ins on days 3..19 of 20, 1000 kcal/day):
+      days 0..2 have no baseline to be measured against -> no projected value at all
+      day 3 is the baseline: actual 0.0 ; projected = its own 1000 / 3500 = 0.29
+      day 19: 17 weighed days x 1000 = 17000 / 3500 = 4.857 -> 4.86 projected
+              scale W[3]=199.4 down to W[19]=196.2 -> 3.2 actual ; gap 1.66
+      before the fix the projected line also carried the 3-day prefix: 5.71, gap 2.51
+    """
     src, days = _recon_sources(n_days=20, first_weight_day=3)
-    rows = overview(src)["reconciliation"]["days"]
-    first_weighed = next(r for r in rows if r["actual_loss_lbs"] is not None)
+    r = overview(src)["reconciliation"]
+    rows = r["days"]
+    assert [x["projected_loss_lbs"] for x in rows[:3]] == [None, None, None]
+    first_weighed = next(x for x in rows if x["actual_loss_lbs"] is not None)
+    assert first_weighed is rows[3]
     assert first_weighed["actual_loss_lbs"] == 0.0
-    assert first_weighed["projected_loss_lbs"] == 0.0
+    assert first_weighed["projected_loss_lbs"] == 0.29
+    assert r["projected_loss_lbs"] == 4.86
+    assert r["actual_loss_lbs"] == 3.2
+    assert r["gap_lbs"] == 1.66
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1470,7 +1417,12 @@ def _sust_sources(intake=2000, tdee=3000, hrv=None, eff=None, rec=None, t0=None,
         row("whoop", d, hrv=(hrv or FLAT6)[i], sleep_efficiency_pct=(eff or FLAT6)[i], recovery_score=(rec or FLAT6)[i])
         for i, d in enumerate(wdays)
     ]
-    habit = [row("habitify", d, tier_0_completion_rate=(t0 or FLAT6)[i]) for i, d in enumerate(wdays)]
+    # `completion_pct` is what ingestion/habitify_lambda.py actually writes, and it is a
+    # 0–1 FRACTION (`total_completed / resolved_possible`), not a percentage. The channel
+    # is trend-only, so the shared FLAT6/DROP6 magnitudes are scaled rather than
+    # redefined. (The fixture used to write `tier_0_completion_rate`, a name no writer in
+    # the repo has ever produced — see the reader/writer test below.)
+    habit = [row("habitify", d, completion_pct=(t0 or FLAT6)[i] / 100) for i, d in enumerate(wdays)]
     strava = [row("strava", d, total_kilojoules=(kj or FLAT6)[i]) for i, d in enumerate(wdays)]
     return FakeSources(macrofactor=macro, whoop=whoop, habitify=habit, strava=strava)
 
@@ -1599,19 +1551,45 @@ def test_a_channel_starting_from_zero_reads_as_stable_instead_of_an_infinite_cha
     assert train["status"] == "stable"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): the Tier-0 habit channel collects values with "
-        "`if (h.get('tier_0_completion_rate') or h.get('t0_rate')) is not None` — the `or` "
-        "makes a genuine 0% completion day falsy, so it is dropped from the series. A "
-        "collapse to zero adherence (the single strongest sign the cut is costing "
-        "something) removes days from the channel instead of driving it, and with enough "
-        "zeros the channel silently reports 'insufficient_data'. Same class as the "
-        "sleep/HRV/recovery `if w.get(...)` filters."
-    ),
-)
+def test_the_habit_channel_reads_a_field_the_habitify_writer_actually_produces():
+    """Reader/writer agreement, channel 4 — the marker's stated cause was only half of it.
+
+    The marker described the `or` dropping an honest 0. True, but underneath it the
+    channel read `tier_0_completion_rate` / `t0_rate`, and NEITHER name has ever been
+    produced by any writer in this repo: `ingestion/habitify_lambda.py` writes
+    `completion_pct` (pending-aware), `completion_pct_strict` and `by_group[*].pct` over
+    the nine `P40_GROUPS`, and there is no "Tier 0" group at all. So the channel was not
+    merely dropping zeros — it had never carried a single value in production: always [],
+    always 'insufficient_data', never degraded. Behavioural unravelling, the earliest and
+    most actionable sign a cut is failing, was structurally invisible to the panel built
+    to catch it. The FIXTURE was stale in the same way, which is why the marker's test
+    could not have caught it either.
+    """
+    # Read the writer's SOURCE rather than importing it: habitify_lambda builds an
+    # IngestionConfig at import time and needs S3_BUCKET in the environment.
+    writer = pathlib.Path(inspect.getfile(nut)).parent.parent / "ingestion" / "habitify_lambda.py"
+    src_text = writer.read_text()
+    assert '"completion_pct"' in src_text, "the habitify writer no longer produces the field this channel reads"
+    assert '"tier_0_completion_rate"' not in src_text and '"t0_rate"' not in src_text
+
+
+def test_the_habit_channel_stays_dark_on_the_field_names_it_used_to_read():
+    """The dead names must stay dead: a habitify row carrying only
+    `tier_0_completion_rate` is not a habit reading, so the channel says
+    insufficient_data rather than inventing one out of a name nothing writes."""
+    src = _sust_sources()
+    src.data["habitify"] = [
+        row("habitify", d, tier_0_completion_rate=v)
+        for d, v in zip([(datetime(2026, 5, 9) - timedelta(days=5 - i)).strftime("%Y-%m-%d") for i in range(6)], DROP6)
+    ]
+    ds = sustainability(src)["deficit_sustainability"]
+    t0 = next(c for c in ds["channels"] if c["name"] == "Habit completion")
+    assert t0["direction"] == "insufficient_data"
+    assert t0["status"] == "stable"  # absence of evidence is not evidence of strain
+
+
 def test_a_day_of_zero_habit_completion_drives_the_habit_channel_rather_than_vanishing():
+    # completion_pct 0.8, 0.8, 0.5, 0.5, 0.0, 0.0 -> first third 0.8, last third 0.0
     ds = sustainability(_sust_sources(t0=[80, 80, 50, 50, 0, 0]))["deficit_sustainability"]
     t0 = next(c for c in ds["channels"] if c["name"] == "Habit completion")
     assert t0["direction"] == "declining"
@@ -1698,16 +1676,6 @@ def test_the_reported_period_starts_at_the_genesis_clamped_window_start(monkeypa
     assert ds["period"]["end"] == TODAY
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): deficit_sustainability publishes "
-        "`period: {start, end, days: 14}` with 14 as a LITERAL, while `start` is "
-        "genesis-clamped by _experiment_date. Three days into a cycle the payload claims a "
-        "14-day period over a 7-day window — exactly the #1917 window-name dishonesty that "
-        "site_api_common._window_span exists to prevent."
-    ),
-)
 def test_the_reported_period_length_matches_the_window_it_actually_covers(monkeypatch):
     monkeypatch.setattr(sac, "EXPERIMENT_START", "2026-05-03")  # genesis 7 days ago
     ds = sustainability(_sust_sources())["deficit_sustainability"]
@@ -1794,17 +1762,6 @@ def test_the_fourteen_day_window_is_the_one_actually_queried():
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): nutrition_overview coerces macro values with a bare "
-        "`float(v)` inside `_mf`, with no guard. One malformed MacroFactor row anywhere in "
-        "the 30-day window raises ValueError out of the handler and 500s the whole nutrition "
-        "door — every other panel on the page included. The TDEE resolvers "
-        "(_resolve_mf_tdee / _mifflin_tdee) DO guard the same coercion, so the fragility is "
-        "inconsistent within the module."
-    ),
-)
 def test_a_single_malformed_macro_value_does_not_take_down_the_whole_nutrition_page():
     src = FakeSources(
         macrofactor=[
@@ -1815,15 +1772,46 @@ def test_a_single_malformed_macro_value_does_not_take_down_the_whole_nutrition_p
     assert overview(src)["nutrition"]["avg_calories"] == 2000
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): the projection/reconciliation block reads the latest "
-        "weight with an unguarded `float(w['weight_lbs'])`, unlike `_latest_weight_lbs` a few "
-        "lines above which wraps the identical coercion in try/except. A single "
-        "non-numeric Withings weight therefore 500s /api/nutrition_overview."
-    ),
-)
+def test_no_field_in_the_module_is_coerced_without_the_shared_none_guard():
+    """Guard the SET, not the instance.
+
+    The 500 was never specifically `total_calories_kcal` — it was the CLASS of bare
+    `float(row["field"])` / `float(row.get("field") or 0)` coercions on hand-uploaded
+    MacroFactor and Withings export data, of which the module carried nine while
+    `_resolve_mf_tdee` and `_mifflin_tdee` guarded the identical coercion two functions
+    away. The offender list is DERIVED from the module's own AST rather than hand-listed,
+    so a NEW unguarded coercion cannot ship past this file.
+    """
+    tree = ast.parse(inspect.getsource(nut))
+
+    def _catches_a_coercion_error(handler):
+        types = handler.type.elts if isinstance(handler.type, ast.Tuple) else [handler.type]
+        return any(isinstance(t, ast.Name) and t.id in ("ValueError", "TypeError", "Exception") for t in types)
+
+    # A coercion already sitting inside a try/except ValueError|TypeError is guarded —
+    # `_tmin` and the eating-window meal-time parse are the legitimate cases.
+    guarded = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Try) and any(_catches_a_coercion_error(h) for h in node.handlers):
+            for stmt in node.body:
+                for sub in ast.walk(stmt):
+                    guarded.add(id(sub))
+
+    offenders = []
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in ("float", "int")):
+            continue
+        if not node.args or id(node) in guarded:
+            continue
+        reads_a_row = any(
+            isinstance(sub, ast.Subscript) or (isinstance(sub, ast.Call) and isinstance(sub.func, ast.Attribute) and sub.func.attr == "get")
+            for sub in ast.walk(node.args[0])
+        )
+        if reads_a_row:
+            offenders.append(ast.unparse(node))
+    assert not offenders, f"unguarded coercion(s) on partition data — route through _num(): {offenders}"
+
+
 def test_a_withings_row_with_a_non_numeric_weight_falls_back_to_no_estimate():
     src = FakeSources(
         macrofactor=[mf("2026-05-09", total_calories_kcal=2000)],
