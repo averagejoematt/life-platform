@@ -1506,8 +1506,8 @@ def _handle_explain(event: dict) -> dict:
             # Allow-lists: see _grounding_allow_lists (#2276 intersection, #1967 dates).
             # #2290: EXACT window HERE only — the gate IS the refusal copy's honesty claim.
             _allowed, _allowed_dates = _grounding_allow_lists(_gg, payload, payload_txt, day_ctx)
-            _gate = dict(cycle_gate_params(), number_tolerance=_gg.NUMBER_TOLERANCE_EXACT)
-            if _gg.grounding_findings(explanation, allowed=_allowed, allowed_dates=_allowed_dates, **_gate):
+            _tol = {"number_tolerance": _gg.NUMBER_TOLERANCE_EXACT}  # #2290
+            if _gg.grounding_findings(explanation, allowed=_allowed, allowed_dates=_allowed_dates, **_tol, **cycle_gate_params()):
                 logger.warning(f"[explain] ungrounded numbers for {surface} — refusing")
                 explanation = (
                     "I'd rather not narrate numbers I can't ground in this page's data. "

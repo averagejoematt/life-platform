@@ -95,15 +95,18 @@ def test_grounding_findings_threads_the_parameter():
 
 # ── The call site, asserted structurally (acceptance 3) ───────────────────────
 # A behavioural test of /api/explain would need a live Bedrock call. What is checkable
-# offline — and what actually regresses — is whether the endpoint still ASKS for the
-# exact window. A future edit that drops the kwarg reds here.
+# offline — and what actually regresses — is whether the endpoint still ASKS for the exact
+# window. The anchor is the CONSTANT, not one kwarg spelling: the call site passes it via a
+# small dict so `**cycle_gate_params()` stays literally visible at the call, which
+# tests/test_grounding_wiring_1967.py requires in order to see the freshness class armed.
+# Anchoring on the spelling would break on that refactor while the behaviour was intact.
 def test_api_explain_asks_for_the_exact_window():
     from pathlib import Path
 
     src = (Path(__file__).resolve().parent.parent / "lambdas" / "web" / "site_api_ai_lambda.py").read_text(encoding="utf-8")
     handler = src[src.index("def _handle_explain") :]
     handler = handler[: handler.index("\ndef ", 10)]
-    assert "number_tolerance=_gg.NUMBER_TOLERANCE_EXACT" in handler, (
+    assert "_gg.NUMBER_TOLERANCE_EXACT" in handler, (
         "/api/explain no longer requests the exact numeric window (#2290). Its refusal copy "
         "claims it will not narrate numbers it cannot ground in the page's data; under the "
         "tolerant window that claim is only true to two decimal places."
