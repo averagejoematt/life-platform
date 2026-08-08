@@ -23,9 +23,9 @@ monkeypatched onto the module (fixture-date + real `datetime.now()` is a time
 bomb). Fakes are hand-rolled and bounded — no MagicMock inside a pagination
 loop.
 
-Tests that document a DEFECT in current behaviour are marked xfail with a
-`DEFECT (tranche-2 discovery)` reason; they assert the behaviour the reader
-should get, and will flip green when the defect is fixed.
+The eight tranche-2 `DEFECT` xfails this file shipped with are gone (#2221): all
+eight named real defects, all eight are fixed in the lambda, and every test here
+is now an enforcing contract. Nothing in this file is expected to fail.
 """
 
 import json
@@ -689,27 +689,11 @@ def test_an_unparseable_scan_date_leaves_the_age_unknown(frozen_clock):
     assert ctx["scan_date"] == "unknown"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): extract_dexa_context builds its caveat with an f-string on months_ago "
-        "without checking it resolved. A DEXA record with a missing/unparseable scan_date feeds the panel prompt "
-        "the literal sentence 'Scan is None months old.' — a nonsense claim handed to the AI as fact."
-    ),
-)
 def test_an_unparseable_scan_date_does_not_produce_a_none_months_old_caveat(frozen_clock):
     ctx = m.extract_dexa_context({"scan_date": "unknown", "body_composition": {}})
     assert "None months" not in ctx["caveat"]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): the DEXA caveat string is unconditional — a scan taken THIS WEEK is "
-        "described to the panel as 'Scan is 0 months old. Weight has changed significantly since.' The module "
-        "asserts a weight change it has not measured (ADR-104: no fabricated claims)."
-    ),
-)
 def test_a_fresh_dexa_scan_is_not_described_as_stale(frozen_clock):
     ctx = m.extract_dexa_context({"scan_date": "2026-06-10", "body_composition": {}})
     assert ctx["months_ago"] == 0
@@ -861,28 +845,12 @@ def test_two_days_with_the_same_standing_get_the_same_flag():
     assert _cell_colors(a, 1)[1:4] == _cell_colors(b, 1)[1:4]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery, ADR-104): build_summary_table coerces every missing total with `or 0`, so a "
-        "day Matthew logged NO food on renders as a real row reading '0 kcal / 0g protein / 0% micro' in red — a "
-        "fabricated measurement. Absence must be visibly absent (em-dash / omitted row), not a zero."
-    ),
-)
 def test_an_unlogged_day_does_not_render_as_zero_calories():
     html = _table({"2026-06-06": _mf_day(cal=1800, protein=190), "2026-06-07": {"food_log": []}})
     unlogged = _day_row(html, "Sun 06/07")
     assert unlogged is None or unlogged[1] != "0"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): the snapshot's AVG row divides by len(days) after coercing missing totals to "
-        "0, while compute_weekly_summary (which feeds the SUBJECT LINE) averages only the days that have data. One "
-        "unlogged day makes the email's subject and its own table disagree about the week's average."
-    ),
-)
 def test_the_average_row_agrees_with_the_average_in_the_subject_line():
     days = m.extract_daily_nutrition({"2026-06-06": _mf_day(cal=1800, protein=190), "2026-06-07": {"food_log": []}})
     html = m.build_summary_table(days, dict(PROFILE))
@@ -1120,15 +1088,6 @@ def test_no_board_loader_in_the_bundle_falls_back(monkeypatch):
     assert m._build_nutrition_prompt_from_config(1800, 190) is None
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): _build_nutrition_prompt_from_config indexes member['name'] directly and is "
-        "called UNGUARDED from lambda_handler. A board member saved without a name (or any other config shape "
-        "error) raises KeyError out of the handler, so the whole nutrition email fails to send — the module's "
-        "documented contract is to fall back to the hardcoded prompt when the config is unusable."
-    ),
-)
 def test_a_malformed_board_member_degrades_to_the_fallback_prompt(monkeypatch):
     config = {"members": {"webb": {"active": True, "features": {"nutrition_review": {"prompt_focus": "Macros."}}}}}
     _with_board(monkeypatch, config)
@@ -1281,15 +1240,6 @@ def test_gather_picks_the_most_recent_lab_draw(monkeypatch, frozen_clock):
     assert m.gather_nutrition_data()["latest_lab"]["panel"] == "newest"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): gather_nutrition_data sorts labs by draw_date before taking [0] but takes "
-        "dexa_items[0] unsorted — DynamoDB serves the partition in ascending sk order, so `latest_dexa` is the "
-        "OLDEST scan on file. The panel benchmarks body composition (and its 'months ago' caveat) against a stale "
-        "scan whenever more than one DEXA exists."
-    ),
-)
 def test_gather_picks_the_most_recent_dexa_scan(monkeypatch, frozen_clock):
     pk = f"USER#{m.USER_ID}#SOURCE#dexa"
     table = FakeTable(
@@ -1394,14 +1344,6 @@ def test_a_failed_status_write_never_takes_down_the_email(frozen_clock):
     m.record_email_send(table, "nutrition_review")  # must not raise
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery, minor): record_email_send hard-codes 'USER#matthew' in the partition key "
-        "instead of using the module's USER_ID (which every other write in this lambda derives from the env var). "
-        "Under any non-default USER_ID the send record lands in the wrong user's partition."
-    ),
-)
 def test_the_send_record_is_keyed_to_the_configured_user(monkeypatch, frozen_clock):
     monkeypatch.setattr(m, "USER_ID", "someone_else")
     table = FakeTable()
@@ -1687,15 +1629,6 @@ def test_a_scheduled_invocation_still_sends(handler_env):
     assert len(handler_env["ses"].sent) == 1
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (tranche-2 discovery): the subject line does int(avg_cal)/int(avg_pro) on compute_weekly_summary "
-        "values that are None whenever no day in the week carried that total (records present, totals absent — the "
-        "partial-record case). int(None) raises TypeError BEFORE ses.send_email, so the whole weekly review is lost "
-        "rather than degrading to a subject without the number."
-    ),
-)
 def test_a_week_of_records_without_totals_still_sends_a_review(handler_env):
     handler_env["state"]["data"] = _gathered(
         macrofactor_this={

@@ -169,8 +169,15 @@ def gather_nutrition_data():
         lab_items.sort(key=lambda x: x.get("draw_date", ""), reverse=True)
         latest_lab = lab_items[0]
 
+    # #2221: sort before taking [0], exactly as the lab draw above does. query_all
+    # returns the partition in ascending sk order, so the unsorted [0] was the
+    # OLDEST scan on file — the panel benchmarked body composition, and stated its
+    # "months ago" caveat, against a stale scan whenever more than one DEXA exists.
     dexa_items = query_all("dexa")
-    latest_dexa = dexa_items[0] if dexa_items else None
+    latest_dexa = None
+    if dexa_items:
+        dexa_items.sort(key=lambda x: x.get("scan_date") or "", reverse=True)
+        latest_dexa = dexa_items[0]
 
     supplements = query_range("supplements", w1_start, w1_end)
 
@@ -350,6 +357,27 @@ def extract_genome_context(snps):
     return [{"gene": s.get("gene"), "risk": s.get("risk_level"), "summary": s.get("summary"), "category": s.get("category")} for s in snps]
 
 
+def _dexa_caveat(months_ago):
+    """The age caveat handed to the panel as fact — so it may only state what we measured.
+
+    #2221: this was one unconditional f-string. It told the panel "Scan is None
+    months old." whenever the scan_date failed to parse, and asserted "Weight has
+    changed significantly since." even for a scan taken this week — a weight
+    change this function has no data to measure (ADR-104). The age is stated when
+    it is known; the weight comparison is delegated to the panel, which receives
+    the 30-day weight block alongside this one.
+    """
+    if months_ago is None:
+        return "Scan date could not be parsed - treat body composition as a benchmark of unknown age, not a current measurement."
+    if months_ago == 0:
+        return "Scan is less than a month old - body composition is current."
+    plural = "" if months_ago == 1 else "s"
+    return (
+        f"Scan is {months_ago} month{plural} old - body composition is a benchmark from that date, not a current "
+        "measurement. Compare weight_at_scan_lbs against the weight block before reading these numbers as today's."
+    )
+
+
 def extract_dexa_context(dexa):
     if not dexa:
         return None
@@ -370,7 +398,7 @@ def extract_dexa_context(dexa):
         "visceral_fat_g": safe_float(bc, "visceral_fat_g"),
         "bmd_t_score": safe_float(bc, "bmd_t_score"),
         "ag_ratio": safe_float(bc, "ag_ratio"),
-        "caveat": f"Scan is {months_ago} months old. Weight has changed significantly since.",
+        "caveat": _dexa_caveat(months_ago),
     }
 
 
@@ -411,10 +439,23 @@ def _build_nutrition_prompt_from_config(calorie_target, protein_target_g):
 
     Returns the fully-rendered prompt string (no remaining placeholders),
     or None if config unavailable.
+
+    #2221: "unavailable" now includes *unusable*. This is called unguarded from
+    `lambda_handler`, and the renderer below indexes config the board editor is
+    free to save incomplete (a member with no `name` raised KeyError). Any config
+    shape error used to escape the handler and lose the whole weekly review;
+    falling back to the hardcoded panel prompt is the documented contract.
     """
     if not _HAS_BOARD_LOADER:
         return None
+    try:
+        return _render_board_prompt(calorie_target, protein_target_g)
+    except Exception as e:
+        logger.warning("[nutrition] Board config unusable (%s: %s) - using the hardcoded panel prompt", type(e).__name__, e)
+        return None
 
+
+def _render_board_prompt(calorie_target, protein_target_g):
     config = board_loader.load_board(s3_client, S3_BUCKET)
     if not config:
         return None
@@ -604,11 +645,59 @@ def call_anthropic(system_prompt, user_message):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+# ADR-104 (#2221): a total the reader never logged is missing data, not a zero.
+# `or 0` used to coerce every absent total, so a day with no food log rendered a
+# real row reading "0 / 0g / 0%" — and, because 0 kcal clears `<= target * 1.05`,
+# the calorie cell came out GREEN: an unlogged day read as a perfect deficit day.
+# An absent value now renders as an em-dash in neutral grey: no number, and no
+# green/amber/red verdict the module has not earned.
+_ABSENT_CELL = "&mdash;"
+_ABSENT_COLOR = "#6b7280"
+
+
+def _graded_cell(value, color_of, fmt):
+    """(colour, text) for one table cell. Absent -> em-dash, ungraded."""
+    if value is None:
+        return _ABSENT_COLOR, _ABSENT_CELL
+    return color_of(value), fmt(value)
+
+
 def build_summary_table(days, profile):
     if not days:
         return ""
     cal_target = profile.get("calorie_target", 1800)
     protein_target = profile.get("protein_target_g", 190)
+
+    def _cal_color(v):
+        return "#10b981" if v <= cal_target * 1.05 else "#f59e0b" if v <= cal_target * 1.2 else "#ef4444"
+
+    def _pro_color(v):
+        return "#10b981" if v >= protein_target * 0.85 else "#f59e0b" if v >= protein_target * 0.7 else "#ef4444"
+
+    def _fib_color(v):
+        return "#10b981" if v >= 30 else "#f59e0b" if v >= 20 else "#ef4444"
+
+    def _mic_color(v):
+        return "#10b981" if v >= 70 else "#f59e0b" if v >= 50 else "#ef4444"
+
+    def _plain(_v):
+        return "#e0e0e0"
+
+    def _avg(_v):
+        return "#4cc9f0"
+
+    # (formatter, colour-for-a-day-row) per numeric column, in column order.
+    columns = [
+        (lambda v: f"{int(v)}", _cal_color),
+        (lambda v: f"{int(v)}g", _pro_color),
+        (lambda v: f"{int(v)}g", _plain),
+        (lambda v: f"{int(v)}g", _plain),
+        (lambda v: f"{v:.0f}g", _fib_color),
+        (lambda v: f"{v:.0f}%", _mic_color),
+    ]
+    day_keys = ["total_calories", "total_protein_g", "total_carbs_g", "total_fat_g", "total_fiber_g", "micronutrient_avg_pct"]
+    avg_keys = ["avg_calories", "avg_protein_g", "avg_carbs_g", "avg_fat_g", "avg_fiber_g", "avg_micronutrient_pct"]
+    weights = ["600", "600", "400", "400", "400", "400"]
 
     rows = ""
     for d in days:
@@ -616,44 +705,26 @@ def build_summary_table(days, profile):
             day_name = datetime.strptime(d["date"], "%Y-%m-%d").strftime("%a %m/%d")
         except Exception:
             day_name = d["date"]
-        cal = d.get("total_calories") or 0
-        pro = d.get("total_protein_g") or 0
-        carb = d.get("total_carbs_g") or 0
-        fat = d.get("total_fat_g") or 0
-        fiber = d.get("total_fiber_g") or 0
-        micro_pct = d.get("micronutrient_avg_pct") or 0
-
-        cal_c = "#10b981" if cal <= cal_target * 1.05 else "#f59e0b" if cal <= cal_target * 1.2 else "#ef4444"
-        pro_c = "#10b981" if pro >= protein_target * 0.85 else "#f59e0b" if pro >= protein_target * 0.7 else "#ef4444"
-        fib_c = "#10b981" if fiber >= 30 else "#f59e0b" if fiber >= 20 else "#ef4444"
-        mic_c = "#10b981" if micro_pct >= 70 else "#f59e0b" if micro_pct >= 50 else "#ef4444"
-
+        cell_html = ""
+        for key, (fmt, color), weight in zip(day_keys, columns, weights):
+            c, t = _graded_cell(d.get(key), color, fmt)
+            cell_html += f'<td style="padding:8px;color:{c};font-size:13px;text-align:center;font-weight:{weight};">{t}</td>'
         rows += f"""<tr style="border-bottom:1px solid #2a2d4a;">
-            <td style="padding:8px;color:#e0e0e0;font-size:13px;">{day_name}</td>
-            <td style="padding:8px;color:{cal_c};font-size:13px;text-align:center;font-weight:600;">{int(cal)}</td>
-            <td style="padding:8px;color:{pro_c};font-size:13px;text-align:center;font-weight:600;">{int(pro)}g</td>
-            <td style="padding:8px;color:#e0e0e0;font-size:13px;text-align:center;">{int(carb)}g</td>
-            <td style="padding:8px;color:#e0e0e0;font-size:13px;text-align:center;">{int(fat)}g</td>
-            <td style="padding:8px;color:{fib_c};font-size:13px;text-align:center;">{fiber:.0f}g</td>
-            <td style="padding:8px;color:{mic_c};font-size:13px;text-align:center;">{micro_pct:.0f}%</td>
+            <td style="padding:8px;color:#e0e0e0;font-size:13px;">{day_name}</td>{cell_html}
         </tr>"""
 
-    n = len(days)
-    ac = sum(d.get("total_calories") or 0 for d in days) / n
-    ap = sum(d.get("total_protein_g") or 0 for d in days) / n
-    acb = sum(d.get("total_carbs_g") or 0 for d in days) / n
-    af = sum(d.get("total_fat_g") or 0 for d in days) / n
-    afb = sum(d.get("total_fiber_g") or 0 for d in days) / n
-    am = sum(d.get("micronutrient_avg_pct") or 0 for d in days) / n
-
+    # #2221: the AVG row is now DERIVED from compute_weekly_summary — the same
+    # function that feeds the subject line — instead of a parallel
+    # `sum(... or 0) / len(days)`. One unlogged day used to make the subject say
+    # 1800 kcal while the table underneath it said 900. Two averages of the same
+    # week cannot disagree if only one of them is computed.
+    summary = compute_weekly_summary(days)
+    avg_html = ""
+    for key, (fmt, _color) in zip(avg_keys, columns):
+        c, t = _graded_cell(summary.get(key), _avg, fmt)
+        avg_html += f'<td style="padding:8px;color:{c};font-size:13px;text-align:center;font-weight:700;">{t}</td>'
     rows += f"""<tr style="border-top:2px solid #4cc9f0;background:#0f1127;">
-        <td style="padding:8px;color:#4cc9f0;font-size:13px;font-weight:700;">AVG</td>
-        <td style="padding:8px;color:#4cc9f0;font-size:13px;text-align:center;font-weight:700;">{int(ac)}</td>
-        <td style="padding:8px;color:#4cc9f0;font-size:13px;text-align:center;font-weight:700;">{int(ap)}g</td>
-        <td style="padding:8px;color:#4cc9f0;font-size:13px;text-align:center;font-weight:700;">{int(acb)}g</td>
-        <td style="padding:8px;color:#4cc9f0;font-size:13px;text-align:center;font-weight:700;">{int(af)}g</td>
-        <td style="padding:8px;color:#4cc9f0;font-size:13px;text-align:center;font-weight:700;">{afb:.0f}g</td>
-        <td style="padding:8px;color:#4cc9f0;font-size:13px;text-align:center;font-weight:700;">{am:.0f}%</td>
+        <td style="padding:8px;color:#4cc9f0;font-size:13px;font-weight:700;">AVG</td>{avg_html}
     </tr>"""
 
     return f"""<table style="width:100%;border-collapse:collapse;background:#16213e;border-radius:8px;overflow:hidden;margin-bottom:20px;">
@@ -777,7 +848,10 @@ def record_email_send(table, lambda_name):
     try:
         table.put_item(
             Item={
-                "pk": f"USER#matthew#SOURCE#email_log#{lambda_name}",
+                # #2221: derive the user from USER_ID like every other write in
+                # this lambda — a hardcoded "matthew" put the send record in the
+                # wrong partition under any non-default USER_ID.
+                "pk": f"USER#{USER_ID}#SOURCE#email_log#{lambda_name}",
                 "sk": f"DATE#{today}",
                 "sent_at": datetime.now(timezone.utc).isoformat(),
                 "status": "success",
@@ -888,9 +962,15 @@ def lambda_handler(event, context):
     html = build_email_html(summary_table, ai_content, dates, weight_info)
 
     summary = compute_weekly_summary(days_this)
-    avg_cal = summary.get("avg_calories", 0)
-    avg_pro = summary.get("avg_protein_g", 0)
-    subject = f"Nutrition Review - {dates['this_end']} - {int(avg_cal)} kcal - {int(avg_pro)}g protein"
+    # #2221: a week of records that carry no totals (the partial-record case, and
+    # the shape a stalled MacroFactor feed produces) leaves these None. `int(None)`
+    # raised here, BEFORE ses.send_email — losing the entire review rather than
+    # degrading. ADR-104: say the number is absent, never substitute a 0.
+    avg_cal = summary.get("avg_calories")
+    avg_pro = summary.get("avg_protein_g")
+    cal_part = f"{int(avg_cal)} kcal" if avg_cal is not None else "calories not logged"
+    pro_part = f"{int(avg_pro)}g protein" if avg_pro is not None else "protein not logged"
+    subject = f"Nutrition Review - {dates['this_end']} - {cal_part} - {pro_part}"
 
     if dry_run:
         logger.info(f"[dry-run] Nutrition review built, NOT sent: {subject}")
