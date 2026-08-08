@@ -38,6 +38,7 @@ from web.site_api_common import (
     USER_PREFIX,
     _clamp_today,
     _decimal_to_float,
+    _is_blocked_vice,
     _ok,
     logger,
 )
@@ -235,10 +236,13 @@ def timeline(*, _g) -> dict:
     exp_resp = table.query(
         **with_phase_filter({"KeyConditionExpression": Key("pk").eq(exp_pk)}, include_pilot=source_reads_cross_phase("experiments"))
     )
+    # #2240: the timeline publishes experiment NAMES — same never-public-vocabulary
+    # screen the challenge routes apply, on name AND id (ER-06).
     experiments = [
         {"name": i.get("name", ""), "start": i.get("start_date", ""), "end": i.get("end_date"), "status": i.get("status", "active")}
         for i in _decimal_to_float(exp_resp.get("Items", []))
         if i.get("sk", "").startswith("EXP#")
+        if not (_is_blocked_vice(i.get("name", "") or "") or _is_blocked_vice(i.get("sk", "").replace("EXP#", "")))
     ]
 
     # Character level history (#2150: EXPERIMENT_SCOPED — stays current-cycle;
@@ -430,6 +434,9 @@ def journey_timeline(*, _g) -> dict:
         )
         for item in _decimal_to_float(exp_resp.get("Items", [])):
             if not item.get("sk", "").startswith("EXP#"):
+                continue
+            # #2240: event titles embed the experiment name — screen name AND id.
+            if _is_blocked_vice(item.get("name", "") or "") or _is_blocked_vice(item.get("sk", "").replace("EXP#", "")):
                 continue
             start = item.get("start_date", "")
             if not start or start < start_date:

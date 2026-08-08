@@ -13,6 +13,7 @@ from web.site_api_common import (
     USER_ID,
     USER_PREFIX,
     _decimal_to_float,
+    _is_blocked_vice,
     _load_s3_json,
     _load_supp_metadata,
     _ok,
@@ -78,6 +79,10 @@ def experiments(*, _g) -> dict:
     experiments = []
     for item in items:
         if not item.get("sk", "").startswith("EXP#"):
+            continue
+        # #2240: /api/experiments publishes live run names and ids — same
+        # never-public-vocabulary screen the challenge routes apply (name AND id).
+        if _is_blocked_vice(item.get("name", "") or "") or _is_blocked_vice(item.get("sk", "").replace("EXP#", "")):
             continue
         start = item.get("start_date", "")
         end = item.get("end_date")
