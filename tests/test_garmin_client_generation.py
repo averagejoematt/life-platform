@@ -349,17 +349,17 @@ def test_display_name_falls_through_a_failing_profile_endpoint():
 # ── #2099 honest-manifest contract ───────────────────────────────────────────
 
 
-def test_manifest_still_states_the_deployed_02x_truth():
-    """This change is merge-safe ahead of the owner's layer rebuild.
+def test_manifest_states_the_deployed_truth():
+    """The manifest's uncommented, pip-audit-scannable pins say what is actually
+    running — derived from the SAME deployed record the #2099 gate compares
+    against, never a version literal pinned in this test (the 2026-08-08 lesson:
+    the owner rebuild promoted 0.2.40→0.3.8 and a hardcoded pin here redded main
+    while every real gate was green). Hand-flipping a pin without a rebuild is
+    still the #1778/#1780 failure mode — check_manifests() owns that."""
+    import json as _json
 
-    The build TARGET moves to 0.3.8 (a comment — the spec for the next build),
-    while the uncommented, pip-audit-scannable pins keep saying what is actually
-    running. Flipping the deployed pin here without a rebuild is exactly the
-    #1778/#1780 failure mode that #2099's gate exists to catch, and it would red
-    main for everyone else.
-    """
     body = (_REPO / "lambdas" / "requirements" / "garmin.txt").read_text()
     pins = {ln.strip() for ln in body.splitlines() if ln.strip() and not ln.startswith("#")}
-    assert "garminconnect==0.2.40" in pins, "deployed pin must keep reporting the live layer"
-    assert "garminconnect==0.3.8" not in pins, "0.3.8 is a build target, not deployed — do not promote it by hand"
-    assert "#   layer-build-target: garminconnect==0.3.8" in body
+    deployed = _json.loads((_REPO / "deploy" / "layers" / "garth.deployed.json").read_text())
+    expected = {f"{k}=={v}" for k, v in deployed["packages"].items()}
+    assert pins == expected, "manifest pins must equal the deployed-layer record exactly"

@@ -106,7 +106,12 @@ def test_check_is_clean_on_a_freshly_rendered_tree(tmp_path, monkeypatch):
 def test_check_fires_on_a_hand_edited_manifest(tmp_path, monkeypatch):
     """The #1778/#1780 failure mode: a bot bumps the pin in the manifest. Must go RED."""
     spec, _ = _spec_into(tmp_path, monkeypatch)
-    spec.manifest_path.write_text(spec.manifest_path.read_text().replace("pillow==11.3.0", "pillow==12.3.0"))
+    import re as _re
+
+    body = spec.manifest_path.read_text()
+    edited, n = _re.subn(r"^pillow==\S+$", "pillow==99.0.0", body, count=1, flags=_re.M)
+    assert n == 1, "fixture must actually edit the pillow pin"
+    spec.manifest_path.write_text(edited)
     problems = blb.check_manifests([spec.key])
     assert any("drifted" in p for p in problems), problems
 
