@@ -187,21 +187,80 @@ def _is_confirmed_subscriber(email: str) -> bool:
         return False
 
 
+# #2239 — per-IP budget for /api/verify_subscriber. Generous against the ONE
+# legitimate shape (a reader types their address once and the token then lives 24h
+# in sessionStorage), tight against enumeration: 10/hr turns "probe the roster at
+# line speed" into ~240 addresses/day/IP instead of unbounded. Sibling capture
+# doors in this module sit at 1-5 per IP per window.
+VERIFY_SUBSCRIBER_RATE_LIMIT = 10
+VERIFY_SUBSCRIBER_RATE_WINDOW = 3600
+
+
 def _handle_verify_subscriber(event: dict) -> dict:
     """
     GET /api/verify_subscriber?email=...
     Returns a 24hr token if the email is a confirmed subscriber.
     Frontend stores token in sessionStorage and sends as X-Subscriber-Token header
     to unlock 20 questions/hr instead of the default 5.
+
+    #2239 — this door is a MEMBERSHIP ORACLE over the subscriber roster, and that
+    is accepted, not overlooked. Recorded here so it is not "fixed" cosmetically
+    later:
+
+      * The endpoint's entire purpose is to hand back a credential IF AND ONLY IF
+        the caller-supplied address is on the confirmed list. Any response that
+        carries the token is therefore a perfect oracle regardless of its status
+        code — uniforming 200/404 would only move the signal from `resp.status` to
+        `"token" in body`, which the sole client already branches on. That is
+        obfuscation, not a fix, and it would leave the leak while retiring the
+        test that names it.
+      * The only way to actually close it is to stop answering synchronously —
+        mail the token to the address instead, so issuance requires proof of
+        control. That is a product change (a new email door + a claim flow), out
+        of scope here; see the PR for #2239.
+      * So the mitigation is COST: the oracle is metered per IP, and both answers
+        are metered by the SAME counter, before either reaches DynamoDB. Probing
+        the roster is no longer free or unbounded.
+
+    The limiter is deliberately fail-CLOSED: when DynamoDB is unreachable
+    `_is_confirmed_subscriber` already returns False and the door answers 404 for
+    everyone, so there is no legitimate flow to protect during an outage — only an
+    unmetered enumeration window to close.
     """
     params = event.get("queryStringParameters") or {}
     email = (params.get("email") or "").strip().lower()
 
     if not email or "@" not in email or len(email) > 254:
+        # Rejected BEFORE the rate check on purpose: a malformed address costs no
+        # DynamoDB operation (not even the limiter's UpdateItem) and can answer no
+        # membership question, so metering it would only spend writes on garbage.
         return {
             "statusCode": 400,
             "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
             "body": json.dumps({"error": "Valid email required"}),
+        }
+
+    # Metered through the module chokepoint (#2237) like every other public door.
+    # Keyed on the IP alone — NOT on the address — or each new probe address would
+    # get its own fresh budget and enumeration would stay free.
+    ip_hash = hashlib.sha256(extract_client_ip(event).encode()).hexdigest()[:16]
+    allowed, _rem, retry_after = _rate_check(
+        "verify_subscriber",
+        ip_hash,
+        limit=VERIFY_SUBSCRIBER_RATE_LIMIT,
+        window_seconds=VERIFY_SUBSCRIBER_RATE_WINDOW,
+        fail_open=False,
+    )
+    if not allowed:
+        _emit_rate_limit_metric("verify_subscriber")
+        return {
+            "statusCode": 429,
+            "headers": {
+                **CORS_HEADERS,
+                "Retry-After": str(retry_after or VERIFY_SUBSCRIBER_RATE_WINDOW),
+                "Cache-Control": "no-store",
+            },
+            "body": json.dumps({"error": "Too many verification attempts. Try again in a little while."}),
         }
 
     if not _is_confirmed_subscriber(email):

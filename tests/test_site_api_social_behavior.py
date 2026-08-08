@@ -695,43 +695,106 @@ def test_a_missing_signing_secret_is_a_loud_failure_not_a_derivable_key(monkeypa
         social._handle_verify_subscriber(get({"email": CONFIRMED_EMAIL}))
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT — site_api_social.py:185 `_handle_verify_subscriber`. The endpoint answers 200 "
-        "for an address on the confirmed-subscriber list and 404 (`Email not found. Subscribe at "
-        "/subscribe/ ...`) for one that is not, with NO authentication and NO rate limit. That is "
-        "an unauthenticated membership oracle over the subscriber list: anyone can test an "
-        "arbitrary address against averagejoematt.com's subscriber roster one request at a time. "
-        "It should return an indistinguishable response for both cases (e.g. always 200 with a "
-        "token only when the address is confirmed AND the caller proves control of it, or a "
-        "uniform 'if that address is subscribed we've unlocked it' answer). Hurts every "
-        "subscriber, whose membership is private. See also the companion rate-limit xfail below."
-    ),
-)
-def test_the_verify_endpoint_does_not_reveal_whether_an_address_is_on_the_subscriber_list(monkeypatch):
+def _drive_verify(n, *, email=lambda i: f"probe{i}@example.com", ip="203.0.113.7") -> list:
+    """n consecutive verify lookups from one IP; returns the status codes in order."""
+    return [social._handle_verify_subscriber(get({"email": email(i)}, ip=ip))["statusCode"] for i in range(n)]
+
+
+def test_subscriber_lookups_from_one_ip_are_rate_limited_like_every_other_public_door(monkeypatch):
+    """#2239. Was an unmetered oracle: 200 consecutive lookups from one IP each
+    reached `_is_confirmed_subscriber` and therefore DynamoDB.
+
+    The budget is hand-derived, not read back off the code: `VERIFY_SUBSCRIBER_RATE_LIMIT`
+    lookups succeed and the very next one is refused, because `common.rate_limiter`
+    admits while `count <= limit`.
+    """
+    table, _s3, _sec = wire(monkeypatch, table=_subscriber_table(CONFIRMED_EMAIL))
+    limit = social.VERIFY_SUBSCRIBER_RATE_LIMIT
+    statuses = _drive_verify(limit + 4)
+
+    assert statuses[:limit] == [404] * limit, statuses
+    assert statuses[limit:] == [429] * 4, statuses
+    # The refused ones must be refused BEFORE the roster lookup, or the limiter
+    # caps the leak but not the DDB spend it was also filed for.
+    assert len(table.gets) == limit, f"a 429 still cost a subscriber read ({len(table.gets)} reads for {limit + 4} probes)"
+
+
+def test_the_rate_limit_is_keyed_on_the_caller_not_on_the_address_being_probed(monkeypatch):
+    """The whole point is enumeration. If the counter keyed on the email too, every
+    new probe address would arrive with a fresh budget and the limit would police
+    nothing — the exact `guard exists but guards nothing` shape."""
+    wire(monkeypatch, table=_subscriber_table(CONFIRMED_EMAIL))
+    limit = social.VERIFY_SUBSCRIBER_RATE_LIMIT
+    # Every request uses a DIFFERENT address; one IP.
+    assert _drive_verify(limit + 1)[-1] == 429
+    # A different IP still gets its own budget — this is per-caller, not global.
+    assert _drive_verify(1, ip="198.51.100.9")[0] == 404
+
+
+def test_a_confirmed_and_an_unknown_address_are_metered_by_the_SAME_counter(monkeypatch):
+    """Otherwise an attacker gets `limit` free hits/hr per outcome class, and the
+    404 half — the half that answers `is this address a subscriber?` — would be the
+    one with its own untouched budget."""
+    wire(monkeypatch, table=_subscriber_table(CONFIRMED_EMAIL))
+    limit = social.VERIFY_SUBSCRIBER_RATE_LIMIT
+    # Spend the whole budget on the CONFIRMED address (200s), then probe a stranger.
+    hits = _drive_verify(limit, email=lambda i: CONFIRMED_EMAIL)
+    assert hits == [200] * limit, hits
+    assert social._handle_verify_subscriber(get({"email": "someone-else@example.com"}))["statusCode"] == 429
+
+
+def test_the_refusal_tells_the_caller_when_to_come_back_and_is_never_cached(monkeypatch):
+    """A 429 cached by CloudFront would lock a whole NAT out for the TTL."""
+    wire(monkeypatch, table=_subscriber_table(CONFIRMED_EMAIL))
+    _drive_verify(social.VERIFY_SUBSCRIBER_RATE_LIMIT)
+    resp = social._handle_verify_subscriber(get({"email": CONFIRMED_EMAIL}))
+    assert resp["statusCode"] == 429
+    assert resp["headers"]["Cache-Control"] == "no-store"
+    assert int(resp["headers"]["Retry-After"]) > 0
+
+
+def test_the_limiter_fails_CLOSED_when_dynamodb_cannot_meter(monkeypatch):
+    """#2239: fail-open here would mean a DDB blip reopens the unmetered
+    enumeration window. Nothing legitimate is lost — with DDB down
+    `_is_confirmed_subscriber` returns False and the door 404s for everyone
+    anyway, so the fail-open branch protects no working flow."""
+    wire(monkeypatch, table=FakeSocialTable([_subscriber_row(CONFIRMED_EMAIL)], fail={"update_item"}))
+    assert social._handle_verify_subscriber(get({"email": CONFIRMED_EMAIL}))["statusCode"] == 429
+
+
+# The "shared limiter module went missing" arm is NOT re-stated here: this door
+# now appears in the AST-derived `RATE_LIMITED_DOORS` set below, so the
+# `_RATE_LIMITER_READY = False` mutation sweep (#2237) picks it up automatically.
+
+
+# ── the 200-vs-404 distinction: REVIEWED and explicitly ACCEPTED (#2239) ───────
+
+
+def test_the_membership_distinction_is_accepted_and_metered_rather_than_obscured(monkeypatch):
+    """#2239 acceptance item 3. The status-code distinction was reviewed and kept.
+
+    Reason, pinned here so a later "tidy-up" does not mistake obfuscation for a
+    fix: the endpoint's contract is to mint a credential IFF the supplied address
+    is confirmed, so ANY response carrying the token is a perfect oracle whatever
+    its status code. Uniforming 200/404 moves the signal from `resp.status` to
+    `"token" in body` — which the sole client (`site/legacy/ask/index.html`) already
+    branches on — and buys nothing. Closing it for real means not answering
+    synchronously at all (mail the token, so issuance requires proof of control of
+    the address), which is a product change, not a patch.
+
+    So this test asserts the two things that ARE true after #2239: the distinction
+    is still observable, and it is no longer free.
+    """
     wire(monkeypatch, table=_subscriber_table(CONFIRMED_EMAIL))
     member = social._handle_verify_subscriber(get({"email": CONFIRMED_EMAIL}))
     stranger = social._handle_verify_subscriber(get({"email": "someone-else@example.com"}))
-    assert member["statusCode"] == stranger["statusCode"], "membership is distinguishable by status code"
 
-
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT — site_api_social.py:185 `_handle_verify_subscriber`. Alone among this module's "
-        "public endpoints it applies NO per-IP rate limit: 200 consecutive lookups from one IP all "
-        "reach `_is_confirmed_subscriber` and therefore DynamoDB. Every sibling write/read door "
-        "here (nudge, submit_finding, votes, follows, check-in, ritual_log, board_question, "
-        "cohort_submit) is DDB-rate-limited. It should call `_ddb_rate_check` like they do. Hurts "
-        "subscribers (unmetered enumeration of the membership oracle above) and Matthew (unmetered "
-        "DDB read spend on a public GET)."
-    ),
-)
-def test_subscriber_lookups_from_one_ip_are_rate_limited_like_every_other_public_door(monkeypatch):
-    table, _s3, _sec = wire(monkeypatch, table=_subscriber_table(CONFIRMED_EMAIL))
-    statuses = {social._handle_verify_subscriber(get({"email": f"probe{i}@example.com"}))["statusCode"] for i in range(200)}
-    assert 429 in statuses, f"200 unmetered lookups all completed ({len(table.gets)} DDB reads)"
+    # Accepted: membership remains distinguishable...
+    assert (member["statusCode"], stranger["statusCode"]) == (200, 404)
+    assert "token" in body_of(member) and "token" not in body_of(stranger)
+    # ...and BOTH answers came out of the one per-IP budget, which is the mitigation.
+    remaining = social.VERIFY_SUBSCRIBER_RATE_LIMIT - 2
+    assert _drive_verify(remaining + 1)[-1] == 429
 
 
 # ── subscriber count ──────────────────────────────────────────────────────────
@@ -1849,6 +1912,10 @@ _FLAG_DRIVERS = {
     "_handle_board_question": lambda: post({"question": "what should i read about zone 2"}),
     "_handle_nudge": lambda: post({"category": "watching"}),
     "_handle_submit_finding": lambda: post(GOOD_FINDING),
+    # #2239 — a GET, not a POST, but it goes through the same chokepoint and so
+    # joins the derived sweep automatically. Driven with an address that is NOT on
+    # the roster: the 404 branch is the one an enumerator actually uses.
+    "_handle_verify_subscriber": lambda: get({"email": "probe@example.com"}),
 }
 
 
