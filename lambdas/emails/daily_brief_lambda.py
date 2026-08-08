@@ -356,12 +356,11 @@ def fetch_range(source, start, end):
 # guard (a list buried inside lambda_handler could not be checked against
 # phase_taxonomy) and so the scan itself is testable without running the brief.
 #
-# #2221: these were hand-kept literals — a SECOND opinion on freshness that
-# disagreed with the canonical one on most of the list (withings 48h vs 168h,
-# todoist 48 vs 72, macrofactor 48 vs 96, food_delivery 2160 vs 336) and still
-# watched `garmin`, which ADR-074 paused. So the banner cried wolf on four healthy
-# sources daily and never reported a food-delivery pipe dead for 76 days. Both
-# paths now derive from source_registry, the canonical home per #2003.
+# #2221: these were hand-kept literals that disagreed with the canonical thresholds
+# on most of the list (withings 48h vs 168h, todoist 48 vs 72, macrofactor 48 vs 96,
+# food_delivery 2160 vs 336) and still watched ADR-074-paused `garmin` — so the
+# banner cried wolf on four healthy sources daily and could not report a
+# food-delivery pipe dead for 76 days. Derived from source_registry now (#2003).
 STALENESS_SOURCES = sorted(source_registry.checker_sources())
 STALENESS_DEFAULT_THRESHOLD_DAYS = source_registry.DEFAULT_STALE_HOURS / 24
 STALENESS_THRESHOLD_OVERRIDE_DAYS = {k: h / 24 for k, h in source_registry.stale_hours_overrides(STALENESS_SOURCES).items()}
@@ -491,10 +490,8 @@ def _normalize_whoop_sleep(item):
             ("rem_sleep_hours", "rem_pct"),
             ("light_sleep_hours", "light_pct"),
         ]:
-            # ADR-104 (#2221): `out.get(src_field, 0)` published a factual 0.0%
-            # deep/rem/light for an absent staging breakdown (partial sync, nap-only
-            # night), and write_clinical_json's 30-day `is not None` average dragged
-            # toward zero on every such night. Absence stays absent.
+            # ADR-104 (#2221): `out.get(src_field, 0)` published a factual 0.0% for an
+            # absent breakdown, dragging write_clinical_json's 30-day average to zero.
             if out.get(src_field) is None:
                 continue
             try:
@@ -626,13 +623,11 @@ def gather_daily_data(profile, yesterday):
 
     hrv_7d_recs = fetch_range("whoop", (today - timedelta(days=7)).isoformat(), yesterday)
     hrv_30d_recs = fetch_range("whoop", (today - timedelta(days=30)).isoformat(), yesterday)
-    # #2221 (P1 crash): key-presence (`if "hrv" in r`) let an explicit NULL hrv cell
-    # reach float(None) → TypeError out of the unwrapped gather_daily_data call, and
-    # one bad cell cost the whole brief. Filter on the VALUE, as safe_float does.
+    # #2221 (P1): key-presence let an explicit NULL hrv cell reach float(None) →
+    # TypeError out of the unwrapped gather_daily_data call, costing the whole brief.
     hrv_7d_vals = [v for v in (safe_float(r, "hrv") for r in hrv_7d_recs) if v is not None]
     hrv_30d_vals = [v for v in (safe_float(r, "hrv") for r in hrv_30d_recs) if v is not None]
-    # #2221: the same two windows carry resting heart rate, so `rhr_trend` can be a
-    # measurement rather than the hard-coded "improving" public_stats used to ship.
+    # #2221: the same windows carry RHR, so `rhr_trend` can be a measurement.
     rhr_7d_vals = [v for v in (safe_float(r, "resting_heart_rate") for r in hrv_7d_recs) if v is not None]
     rhr_30d_vals = [v for v in (safe_float(r, "resting_heart_rate") for r in hrv_30d_recs) if v is not None]
 
@@ -640,8 +635,8 @@ def gather_daily_data(profile, yesterday):
     tsb = compute_tsb(strava_60d, today)
     strava_7d_cutoff = (today - timedelta(days=7)).isoformat()
     strava_7d = [r for r in strava_60d if r.get("sk", "").replace("DATE#", "") >= strava_7d_cutoff]
-    # #2221: sliced, not re-read — public_stats' 30-day training totals were
-    # hard-coded zeros because this window was computed here and then dropped.
+    # #2221: sliced, not re-read — public_stats' 30-day totals were hard-coded zeros
+    # because this window was computed here and then dropped.
     strava_30d_cutoff = (today - timedelta(days=30)).isoformat()
     strava_30d = [r for r in strava_60d if r.get("sk", "").replace("DATE#", "") >= strava_30d_cutoff]
 
@@ -674,9 +669,8 @@ def gather_daily_data(profile, yesterday):
     weight_recency_facts = weight_recency.summarize_weight_readings(withings_recent, today.isoformat())
 
     withings_14d = fetch_range("withings", (today - timedelta(days=14)).isoformat(), yesterday)
-    # #2221: one definition, one place — the compute Lambda resolves the same
-    # concept through this helper, so the weekly delta no longer flips on which
-    # pipeline ran.
+    # #2221: one definition, one place — the compute Lambda resolves the same concept
+    # through this helper, so the weekly delta no longer flips on which pipeline ran.
     target_date = (today - timedelta(days=7)).isoformat()
     week_ago_weight = weight_recency.week_ago_weight(withings_14d, target_date)
 
@@ -854,6 +848,10 @@ def gather_daily_data(profile, yesterday):
         "garmin": garmin,
         "mf_workouts": mf_workouts,
         "hrv": {"hrv_7d": avg(hrv_7d_vals), "hrv_30d": avg(hrv_30d_vals), "hrv_yesterday": safe_float(whoop, "hrv")},
+        # #2221: the CGM day aggregate rides the apple_health row (where the HAE webhook
+        # writes it and /api/biomarkers reads it) — a re-key of a row already in hand,
+        # not another DDB read. None unless the day carries glucose readings.
+        "cgm": apple if (apple or {}).get("blood_glucose_readings_count") else None,
         "rhr": {"rhr_7d": avg(rhr_7d_vals), "rhr_30d": avg(rhr_30d_vals)},
         "tsb": tsb,
         "journal": journal,
@@ -985,9 +983,8 @@ def fetch_anomaly_record(date_str):
 def compute_tsb(strava_60d, today):
     # #490: shared TSS-like scale (walks count via the moving-time fallback) so this
     # fallback bands the same way as the computed_metrics value it stands in for.
-    # ADR-104 (#2221): an EMPTY window is not "balanced form" — banister() returns
-    # 0.0 for no load, which compute_readiness turned into a clamp(60+0×2)=60
-    # mid-scale component, so readiness read 60/yellow on the strength of nothing.
+    # ADR-104 (#2221): an EMPTY window is not "balanced form" — banister() returns 0.0
+    # for no load, which compute_readiness turned into clamp(60+0×2)=60.
     if not strava_60d:
         return None
     _ctl, _atl, tsb = training_load.compute_ctl_atl_tsb(strava_60d, today)
@@ -1000,6 +997,7 @@ def compute_tsb(strava_60d, today):
 # AST-level check confirmed zero logic divergence. One implementation, one
 # place for the next scoring change.
 # ==============================================================================
+from health import habit_streaks  # noqa: E402 — #2221: the ADR-104 streak scan, lifted out
 from health.scoring_engine import (  # noqa: E402,F401
     COMPONENT_SCORERS,
     compute_day_grade,
@@ -1202,132 +1200,13 @@ def store_habit_scores(date_str, component_details, component_scores, vice_strea
 # ==============================================================================
 
 
-# #2221: a run of missing habitify days longer than this is treated as the end of
-# available history rather than as a gap inside a live streak.
-STREAK_GAP_TOLERANCE_DAYS = 3
-
-
 def compute_habit_streaks(profile, yesterday_str):
-    """Compute streaks: Tier 0 streak, Tier 0+1 streak, and per-vice streaks."""
-    registry = profile.get("habit_registry", {})
-    mvp_list = profile.get("mvp_habits", [])
-
-    tier0_habits = []
-    tier01_habits = []
-    vice_habits = []
-    for name, meta in registry.items():
-        if meta.get("status") != "active":
-            continue
-        tier = meta.get("tier", 2)
-        if tier == 0:
-            tier0_habits.append(name)
-            tier01_habits.append(name)
-        elif tier == 1:
-            tier01_habits.append(name)
-        if meta.get("vice", False):
-            vice_habits.append(name)
-
-    if not tier0_habits:
-        tier0_habits = mvp_list
-        tier01_habits = mvp_list
-
-    tier0_streak = 0
-    tier01_streak = 0
-    t0_broken = False
-    t01_broken = False
-    vice_streaks = {v: 0 for v in vice_habits}
-    vice_broken = {v: False for v in vice_habits}
-
-    # #2221, ADR-104. Three ways this scan turned an ABSENCE into a fact:
-    #   1. `if not rec: break` read one missing habitify day (an API blip, a travel
-    #      day, a phone left off) as the end of history, so a 40-day vice streak
-    #      rendered as 2 — presented as a fact, with no marker that the scan hit a
-    #      gap. A gap is now skipped, and the scan stops only after a RUN of missing
-    #      days long enough to mean "history exhausted".
-    #   2. `habits_map.get(h, 0)` mapped an absent habit key to "not done", so a
-    #      habit added to the registry today retroactively destroyed the streak, and
-    #      a habit Habitify simply did not return read as a miss. Absent is unknown.
-    #   3. a day whose applicable habits are ALL unknown proves nothing either way,
-    #      so it is skipped rather than counted as clean.
-    # The tier loops are additionally guarded on a NON-EMPTY habit set: with no
-    # active tier-0 habits and no mvp_habits — the state right after a reset — the
-    # inner all() was vacuously true and the streak grew by one for every day that
-    # merely HAD a habitify record. A streak over an empty set is not a streak.
-    gap_days = 0
-    consecutive_missing = 0
-
-    def _day_verdict(habit_names, is_weekday, habits_map, skip_post_training):
-        """(any_reading, all_done) over the habits applicable on this day."""
-        any_reading = False
-        for h in habit_names:
-            meta = registry.get(h, {})
-            applicable = meta.get("applicable_days", "daily")
-            if applicable == "weekdays" and not is_weekday:
-                continue
-            if skip_post_training and applicable == "post_training":
-                continue
-            if h not in habits_map:
-                continue  # no reading — not evidence of a miss
-            any_reading = True
-            done = habits_map.get(h)
-            if not (done is not None and float(done) >= 1):
-                return True, False
-        return any_reading, True
-
-    for i in range(0, 90):
-        dt = datetime.strptime(yesterday_str, "%Y-%m-%d") - timedelta(days=i)
-        date_str = dt.strftime("%Y-%m-%d")
-        is_weekday = dt.weekday() < 5
-        rec = fetch_date("habitify", date_str)
-        if not rec:
-            consecutive_missing += 1
-            if consecutive_missing > STREAK_GAP_TOLERANCE_DAYS:
-                break  # a run this long is the end of history, not a gap
-            gap_days += 1
-            continue
-        consecutive_missing = 0
-        habits_map = rec.get("habits", {})
-
-        if tier0_habits and not t0_broken:
-            seen_t0, all_t0 = _day_verdict(tier0_habits, is_weekday, habits_map, False)
-            if seen_t0:
-                if all_t0:
-                    tier0_streak += 1
-                else:
-                    t0_broken = True
-
-        if tier01_habits and not t01_broken:
-            seen_t01, all_t01 = _day_verdict(tier01_habits, is_weekday, habits_map, True)
-            if seen_t01:
-                if all_t01:
-                    tier01_streak += 1
-                else:
-                    t01_broken = True
-
-        for v in vice_habits:
-            if vice_broken[v] or v not in habits_map:
-                continue
-            done = habits_map.get(v)
-            if done is not None and float(done) >= 1:
-                vice_streaks[v] += 1
-            else:
-                vice_broken[v] = True
-
-        if (t0_broken or not tier0_habits) and (t01_broken or not tier01_habits) and all(vice_broken.values()):
-            break
-
-    return {
-        "tier0_streak": tier0_streak,
-        "tier01_streak": tier01_streak,
-        "vice_streaks": vice_streaks,
-        # #2221: the reader is entitled to know the scan crossed a data gap rather
-        # than an unbroken run of days.
-        "streak_gap_days": gap_days,
-    }
+    """Thin delegate — the scan lives in `health.habit_streaks` (#2221). Kept as a
+    module-level name because every caller reaches it here, and because `fetch_date`
+    (which closes over this module's `table`) is what the pure helper needs."""
+    return habit_streaks.compute_habit_streaks(profile, yesterday_str, fetch_date)
 
 
-# ==============================================================================
-# READINESS
 # ==============================================================================
 
 
@@ -1520,6 +1399,7 @@ def _run_ai_coach_pipeline(
         "bod_insight": "",
         "training_nutrition": {},
         "journal_coach_text": "",
+        "journal_coach_is_stub": False,
         "tldr_guidance": {},
         "sleep_coach_v2_text": "",
         "nutrition_coach_v2_text": "",
@@ -1664,6 +1544,11 @@ def _run_ai_coach_pipeline(
                 journal_coach_text = (
                     "Quieter journal day — no clear pattern surfaced. " "|| One small thing: jot down what you're saving energy for."
                 )
+                # #2221/ADR-104: the stub keeps the email section rendered, but it is an
+                # AI-FAILURE placeholder, not coaching. It used to be persisted into the
+                # Insight Ledger and read back by later briefs as prior advice Matthew
+                # never received. Marked so the ledger write can exclude it.
+                result["journal_coach_is_stub"] = True
             else:
                 logger.info("Journal coach: " + journal_coach_text[:80])
             result["journal_coach_text"] = journal_coach_text
@@ -1863,11 +1748,10 @@ def lambda_handler(event, context):
             except Exception as _sbe:
                 logger.warning(f"write_buddy_json (sick) failed: {_sbe}")
 
-        # #2221: the sick-day branch returned BEFORE record_email_send, so a real SES
-        # send left no email_log row — and a missing row is exactly what monitoring
-        # reads as "the daily brief did not send". Every sick day produced a false
-        # missed-brief alarm, on the days Matthew is least able to investigate one.
-        # Same #2255 rule as the normal path: a dry run wrote nothing, so it logs nothing.
+        # #2221: this branch returned BEFORE record_email_send, so a real SES send left
+        # no email_log row — which monitoring reads as "the brief did not send". Every
+        # sick day raised a false missed-brief alarm. #2255 rule still applies: a dry
+        # run wrote nothing, so it logs nothing.
         if not _dry_run:
             record_email_send(table, "daily_brief")
 
@@ -1914,8 +1798,8 @@ def lambda_handler(event, context):
                     _compute_age_msg = "age unknown (unparseable computed_at)"
                     logger.warning("REL-1: could not parse computed_at: " + str(_ts_e))
             else:
-                # #2221: a row with NO computed_at was declared fresh on the basis of
-                # nothing — the shape a partial write leaves. Unknown age is stale.
+                # #2221: NO computed_at was declared fresh on the basis of nothing — the
+                # shape a partial write leaves. Unknown age is stale.
                 _compute_stale = True
                 _compute_age_msg = "age unknown (no computed_at)"
                 logger.warning("REL-1: computed_metrics for " + yesterday + " carries no computed_at — treating as stale")
@@ -1957,10 +1841,9 @@ def lambda_handler(event, context):
 
     if _computed:
         # Read pre-computed values — daily-metrics-compute already stored day_grade + habit_scores
-        # #2221 (P1 crash): unwrapped, a single non-numeric cell (an "—" placeholder,
-        # a stringified None — shapes a partial compute write produces) raised
-        # ValueError out of lambda_handler and lost the whole brief. A malformed
-        # cell costs the day grade, not the email.
+        # #2221 (P1): unwrapped, a single non-numeric cell (an "—", a stringified None
+        # — shapes a partial compute write leaves) raised ValueError out of
+        # lambda_handler and lost the whole brief. It costs the day grade, not the email.
         _cm_score = _computed.get("day_grade_score")
         day_grade_score = coerce_int(_cm_score)
         grade = _computed.get("day_grade_letter", "—")
@@ -2155,6 +2038,7 @@ def lambda_handler(event, context):
     bod_insight = _ai["bod_insight"]
     training_nutrition = _ai["training_nutrition"]
     journal_coach_text = _ai["journal_coach_text"]
+    _journal_coach_is_stub = bool(_ai.get("journal_coach_is_stub"))
     tldr_guidance = _ai["tldr_guidance"]
     sleep_coach_v2_text = _ai["sleep_coach_v2_text"]
     nutrition_coach_v2_text = _ai["nutrition_coach_v2_text"]
@@ -2182,19 +2066,6 @@ def lambda_handler(event, context):
                 logger.info(f"Wrote {len(_guidance_given)} guidance items to computed_insights for anti-repetition")
     except Exception as _gg_e:
         logger.warning(f"guidance_given write failed (non-fatal): {_gg_e}")
-
-    # HP-12: Elena hero line for public_stats.json
-    _elena_hero_line = None
-    try:
-        _tldr = tldr_guidance.get("tldr", "") if tldr_guidance else ""
-        if _tldr:
-            if len(_tldr) <= 200:  # 200 chars fits the homepage pull-quote block without overflow
-                _elena_hero_line = _tldr
-            else:
-                cutoff = _tldr[:200].rfind(". ")
-                _elena_hero_line = _tldr[: cutoff + 1] if cutoff > 0 else _tldr[:200] + "\u2026"
-    except Exception as _e:
-        logger.warning(f"HP-12: elena_hero_line generation failed: {_e}")
 
     # AI-3: Validate all AI outputs before delivery
     if _HAS_AI_VALIDATOR:
@@ -2224,6 +2095,23 @@ def lambda_handler(event, context):
                 logger.info("[AI-3] All AI outputs passed validation")
         except Exception as _v_e:
             logger.warning(f"AI-3 validation failed (non-fatal): {_v_e}")
+
+    # HP-12 / #2221 (P1): sliced AFTER the AI-3 validator, not before. Sliced before,
+    # any sentence the validator stripped or rewrote for a fabricated number still
+    # reached public_stats.json and the homepage un-validated while the email showed
+    # the corrected one — the one AI sentence on the site that bypassed the ADR-104
+    # grounding gate. Validation first, publication second.
+    _elena_hero_line = None
+    try:
+        _tldr = tldr_guidance.get("tldr", "") if tldr_guidance else ""
+        if _tldr:
+            if len(_tldr) <= 200:  # 200 chars fits the homepage pull-quote block without overflow
+                _elena_hero_line = _tldr
+            else:
+                cutoff = _tldr[:200].rfind(". ")
+                _elena_hero_line = _tldr[: cutoff + 1] if cutoff > 0 else _tldr[:200] + "\u2026"
+    except Exception as _e:
+        logger.warning(f"HP-12: elena_hero_line generation failed: {_e}")
 
     # Pre-compute rewards + protocol recs (passed to html_builder as params)
     triggered_rewards = []
@@ -2444,7 +2332,8 @@ def lambda_handler(event, context):
                     bod_insight=bod_insight,
                     tldr_guidance=tldr_guidance,
                     training_nutrition=training_nutrition,
-                    journal_coach_text=journal_coach_text,
+                    # #2221: a stub is not coaching — withheld, not filed as prior advice.
+                    journal_coach_text=None if _journal_coach_is_stub else journal_coach_text,
                     date=yesterday,
                     component_scores=component_scores,
                 )
@@ -2486,14 +2375,11 @@ def lambda_handler(event, context):
 
             # TSB/training from data
             # #2221/#1917: this summed the FULL moving time of every aerobic-ish
-            # activity — no zone filter of any kind — and published it against a
-            # 150-min ZONE 2 target, so a max-effort interval session counted in full
-            # toward a Zone-2 goal. CORRECTION to the marker: the answer is not an
-            # HR band re-derived here. strava_lambda already stores the MEASURED
-            # per-activity `zone2_seconds` (from Strava's own /zones endpoint) and
-            # the day aggregate `total_zone2_seconds`, which /api/zone2 reads. Use
-            # the measurement; an activity Strava gated or never zoned contributes
-            # nothing rather than its whole duration.
+            # activity — no zone filter at all — against a 150-min ZONE 2 target, so a
+            # max-effort interval session counted in full. CORRECTION to the marker: no
+            # HR band is re-derived here. strava_lambda already stores the MEASURED
+            # `zone2_seconds` per activity + `total_zone2_seconds` per day (Strava's own
+            # /zones), which /api/zone2 reads. A gated/unzoned activity contributes 0.
             _strava_7d = data.get("strava_7d") or []
             _z2_this_week = 0.0
             for _act_day in _strava_7d:
@@ -2504,9 +2390,8 @@ def lambda_handler(event, context):
                 for _act in _act_day.get("activities") or []:
                     _z2_this_week += float(_act.get("zone2_seconds") or 0) / 60
 
-            # #2221: 30-day training totals — computed from the window gather already
-            # sliced. `None` when the partition holds no rows at all: an empty window
-            # is absence, not a measured "you did nothing".
+            # #2221: 30-day totals from the window gather already sliced. None on an
+            # empty partition — absence, not a measured "you did nothing".
             _strava_30d = data.get("strava_30d") or []
             _miles_30d = None
             _activity_count_30d = None
@@ -2542,10 +2427,8 @@ def lambda_handler(event, context):
 
             # ACWR from computed_metrics if available
             _cm = data.get("computed_metrics") or {}
-            # ADR-104 (#2221): was `float(_cm.get("acwr") or 1.1)` — a fabricated
-            # healthy mid-band ratio whenever the ACWR compute had not run, published
-            # to public_stats.json and drawn on the daily OG share card. A reader
-            # could not tell a measured 1.1 from no measurement.
+            # ADR-104 (#2221): was `float(_cm.get("acwr") or 1.1)` — a fabricated healthy
+            # mid-band ratio, published to public_stats.json and drawn on the OG card.
             _acwr = safe_float(_cm, "acwr")
 
             # v1.2.0: Build trend arrays for homepage sparklines
@@ -2632,11 +2515,18 @@ def lambda_handler(event, context):
                         f"Zone 2 this week: {round(_z2_this_week)} / 150 min "
                         f"({_z2pct}% of target){'  ✓' if _z2_this_week >= 150 else ''}."
                     )
-                # Nutrition — CGM time-in-range if available
+                # Nutrition — CGM time-in-range if available.
+                #
+                # #2221, reader/writer mismatch THREE layers deep: (a) `data` carried
+                # neither key, so this had never rendered; (b) `time_in_range_pct` /
+                # `tir_pct` are fields no writer stores — HAE writes
+                # `blood_glucose_time_in_range_pct` onto the apple_health row, which is
+                # what /api/biomarkers reads; (c) the label named 70–140, a band that
+                # does not exist (70–180 is in_range, 70–120 is optimal). #1917.
                 _cgm_data = data.get("cgm") or data.get("cgm_today") or {}
-                _tir = safe_float(_cgm_data, "time_in_range_pct") or safe_float(_cgm_data, "tir_pct")
+                _tir = safe_float(_cgm_data, "blood_glucose_time_in_range_pct")
                 if _tir:
-                    _group_narratives["nutrition"] = f"Time in range (70–140 mg/dL): {round(_tir)}% today" + (
+                    _group_narratives["nutrition"] = f"Time in range (70–180 mg/dL): {round(_tir)}% today" + (
                         " — on target." if _tir >= 70 else " — below target."
                     )
                 # Food delivery streak signal (appended to nutrition narrative)
@@ -2648,17 +2538,10 @@ def lambda_handler(event, context):
                     else:
                         _group_narratives["nutrition"] = _fd_signal
                 # Habits
-                # #2221 reader/writer mismatch: this read `tier0_pct` /
-                # `tier0_completion_pct` off `streak_data` (compute_habit_streaks
-                # returns neither) and off `_computed` (computed_metrics does not
-                # carry it), so the completion clause had never rendered on either
-                # path. CORRECTION to the marker, which named daily_metrics_compute
-                # as the writer: there are TWO writers and both target the
-                # SOURCE#habit_scores row — this module's own store_habit_scores
-                # writes tier0_pct there too. Read the row both of them write.
-                # Both store it as a FRACTION (round(done/total, 3)), so the old
-                # `round(float(pct))%` would have rendered 0.75 as "1% completion"
-                # had it ever fired.
+                # #2221: this read tier0_pct off `streak_data` and `_computed`, which carry
+                # it on neither path, so the clause had never rendered. TWO writers store
+                # it, both onto SOURCE#habit_scores, both as a FRACTION — so the old
+                # `round(float(pct))%` would have said "1%" for 0.75.
                 _hab_pct = None
                 _hab_scores = fetch_date("habit_scores", yesterday) or {}
                 _hab_frac = safe_float(_hab_scores, "tier0_pct")
@@ -2697,11 +2580,9 @@ def lambda_handler(event, context):
                     "hrv_ms": round(_vr["hrv_ms"], 1) if _vr["hrv_ms"] is not None else None,
                     "hrv_trend": html_builder.hrv_trend_str(_hrv.get("hrv_7d"), _hrv.get("hrv_30d")),
                     "rhr_bpm": _vr["rhr_bpm"],
-                    # ADR-104/105 (#2221): was the hard-coded string "improving",
-                    # published beside a real resolver-derived rhr_bpm and rendered by
-                    # the site as a measured trend — so it read "improving" on a day
-                    # resting heart rate rose. Now the 7d-vs-30d comparison the whoop
-                    # window supports, with RHR's polarity (lower is better), and
+                    # ADR-104/105 (#2221): was the hard-coded string "improving", shipped
+                    # beside a real rhr_bpm and rendered as a measured trend — so it read
+                    # "improving" on a day RHR rose. Now 7d-vs-30d, RHR polarity, and
                     # honest absence when either window is empty.
                     "rhr_trend": _rhr_trend,
                     "recovery_pct": round(_rec, 0) if _rec is not None else None,
@@ -2734,8 +2615,7 @@ def lambda_handler(event, context):
                     # Authoritative CTL/ATL from computed_metrics (>=0) — no more
                     # reverse-engineering them from TSB with magic offsets (the -955 bug).
                     # ADR-104 (#2221): these fell back to a literal 0. Zero CTL is not
-                    # "unknown fitness", it is "completely detrained", and the site plots
-                    # it on the same axis as a measured value. Absence publishes null.
+                    # "unknown fitness", it is "completely detrained". Absence is null.
                     "ctl_fitness": safe_float(data, "ctl"),
                     "atl_fatigue": safe_float(data, "atl"),
                     "tsb_form": safe_float(data, "tsb"),
@@ -2747,11 +2627,8 @@ def lambda_handler(event, context):
                     # key at all), publish honest absence rather than fabricating "low".
                     "form_status": _cm.get("acwr_zone", "neutral"),
                     "injury_risk": ("high" if _cm.get("acwr_alert") else "low") if "acwr_alert" in _cm else None,
-                    # ADR-104 (#2221): hard-coded zeros — a reader (and the OG card)
-                    # could not tell "we do not compute this" from "you did nothing for
-                    # 30 days". Computed from the Strava window already in hand; null
-                    # when the window holds no rows at all, because an empty partition
-                    # is absence, not a measured zero.
+                    # ADR-104 (#2221): hard-coded zeros — a reader (and the OG card) could
+                    # not tell "we do not compute this" from "you did nothing for 30 days".
                     "total_miles_30d": _miles_30d,
                     "activity_count_30d": _activity_count_30d,
                     "zone2_this_week_min": round(_z2_this_week),

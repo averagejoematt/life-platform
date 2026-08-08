@@ -145,6 +145,9 @@ def test_pipeline_takes_data_only_path_when_budget_denies(monkeypatch):
         "bod_insight": "",
         "training_nutrition": {},
         "journal_coach_text": "",
+        # #2221: the AI-failure stub marker — False on the budget-denied path, which
+        # never called the journal coach at all.
+        "journal_coach_is_stub": False,
         "tldr_guidance": {},
         "sleep_coach_v2_text": "",
         "nutrition_coach_v2_text": "",

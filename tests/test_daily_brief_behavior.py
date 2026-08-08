@@ -1225,18 +1225,6 @@ class TestGatherDailyData:
         assert "weight_recency.week_ago_weight(" in compute_src, "the compute lambda no longer shares the definition"
         assert "week_ago_weight = next(" not in compute_src, "the compute lambda re-derived week_ago_weight locally"
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:2482-2487 (lambda_handler) builds the /live/ nutrition narrative from "
-            "`data.get('cgm') or data.get('cgm_today')`, but gather_daily_data's returned dict "
-            "(daily_brief_lambda.py:832-872) contains NEITHER key — no CGM read happens anywhere in this "
-            "module. The reader/writer mismatch class: the CGM time-in-range narrative on the cockpit "
-            "has therefore never rendered, silently, since it was added. It should read the cgm "
-            "partition (or the apple_health CGM aggregate) and populate the key. "
-            "Hurts: every reader of averagejoematt.com's cockpit — a whole pillar narrative is dark."
-        ),
-    )
     def test_the_gathered_data_carries_the_cgm_key_the_cockpit_narrative_reads(self, table):
         data = brief.gather_daily_data(PROFILE, YESTERDAY)
         assert "cgm" in data or "cgm_today" in data
@@ -2212,19 +2200,6 @@ class TestAiOutputOrdering:
         brief.lambda_handler({}, None)
         assert called.calls == []
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:2066-2076 vs 2078-2098 (lambda_handler): `_elena_hero_line` is sliced "
-            "out of `tldr_guidance` BEFORE the AI-3 output validator runs and replaces tldr_guidance "
-            "with its corrected version. The hero line is then published to "
-            "generated/public_stats.json (2602, `elena_hero_line=`) and rendered on the homepage — so "
-            "any sentence the validator strips or rewrites for a fabricated number still reaches the "
-            "PUBLIC page carrying the un-validated text, while the email shows the corrected one. The "
-            "slice should happen after validation. Hurts: every reader of the homepage; it is the one "
-            "AI sentence on the public site that bypasses the ADR-104 grounding gate. Severity P1."
-        ),
-    )
     def test_the_public_hero_line_is_taken_from_the_validated_text(self, handler_env, monkeypatch):
         def scrub(**kw):
             kw = dict(kw)
@@ -2237,20 +2212,6 @@ class TestAiOutputOrdering:
         hero = handler_env["public_stats"].calls[0][1]["elena_hero_line"]
         assert "12 hours" not in hero, f"un-validated model text reached the public homepage: {hero!r}"
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "daily_brief_lambda.py:1576-1587 (_run_ai_coach_pipeline): when the journal coach returns "
-            "empty or under 10 characters, a hard-coded stub ('Quieter journal day — no clear pattern "
-            "surfaced. || One small thing: …') is substituted and then flows on exactly like genuine "
-            "coaching — it is rendered in the email AND handed to "
-            "insight_writer.extract_daily_brief_insights at 2322-2329, which persists it into the "
-            "Insight Ledger where later briefs read it back as prior coaching. An AI-failure stub filed "
-            "as genuine content is the ADR-104 case the weekly-plate work already fixed elsewhere: it "
-            "should be marked so the ledger can exclude it. Hurts: Matthew — the compounding-insight "
-            "corpus is diluted with placeholder text he never received advice from."
-        ),
-    )
     def test_a_journal_coach_stub_is_not_filed_into_the_insight_ledger_as_real_coaching(self, handler_env, monkeypatch):
         from ai import ai_calls
 
