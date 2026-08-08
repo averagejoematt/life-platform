@@ -767,21 +767,27 @@ not as missing labs.
                     from intelligence.intelligence_common import compute_builders_paradox_score
 
                     bp = compute_builders_paradox_score(days=7)
-                    bp_block = (
-                        f"\nBUILDER'S PARADOX CHECK:\n"
-                        f"This week's score: {bp['score']}/100 ({bp['label']})\n"
-                        f"Platform tasks completed: {bp['platform_tasks']}\n"
-                        f"Workouts: {bp['workouts']}\n"
-                        f"Journal entries: {bp['journal_entries']}\n"
-                        f"Habit adherence: {bp['habit_adherence_pct']}%\n"
-                        f"Avg daily steps: {bp['avg_steps']}\n"
-                        f"\n{bp['interpretation']}\n"
-                        f"\nIf score > 50: You MUST address this directly. Not as a side note — "
-                        f'as the lead finding. The question to ask: "Is the building serving '
-                        f'the transformation, or replacing it?" Be direct. Matthew respects '
-                        f"honesty over comfort.\n"
-                    )
-                    preamble_block += bp_block
+                    if bp.get("label") == "insufficient_data":
+                        # #1658 (ADR-104): no platform AND no health observations in the
+                        # window — there is no ratio, so inject nothing rather than a
+                        # midpoint verdict derived from an absence.
+                        logger.info("Builder's Paradox unscored this window: %s", bp["interpretation"])
+                    else:
+                        bp_block = (
+                            f"\nBUILDER'S PARADOX CHECK:\n"
+                            f"This week's score: {bp['score']}/100 ({bp['label']})\n"
+                            f"Platform tasks completed: {bp['platform_tasks']}\n"
+                            f"Workouts: {bp['workouts']}\n"
+                            f"Journal entries: {bp['journal_entries']}\n"
+                            f"Habit adherence: {bp['habit_adherence_pct']}% (n={bp['habit_days']} days)\n"
+                            f"Avg daily steps: {bp['avg_steps']} (n={bp['step_days']} days)\n"
+                            f"\n{bp['interpretation']}\n"
+                            f"\nIf score > 50: You MUST address this directly. Not as a side note — "
+                            f'as the lead finding. The question to ask: "Is the building serving '
+                            f'the transformation, or replacing it?" Be direct. Matthew respects '
+                            f"honesty over comfort.\n"
+                        )
+                        preamble_block += bp_block
                 except Exception as _bp_e:
                     logger.warning("Builder's Paradox computation failed: %s", _bp_e)
             # V2.1: Thread injection — persistent memory for each coach

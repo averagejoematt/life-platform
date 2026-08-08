@@ -10,6 +10,7 @@ Bundled into every function's deploy package (#781 retired the shared layer).
 v1.0.0 — 2026-04-07 (Intelligence Layer V2 Session 1)
 """
 
+import hashlib
 import json
 import logging
 import os
@@ -19,7 +20,7 @@ from decimal import Decimal
 from typing import Any
 
 import boto3
-from boto3.dynamodb.conditions import Key
+from boto3.dynamodb.conditions import Attr, Key
 from coach.voice_register_guard import sanitize_summary  # #1987: deterministic voice-register check
 from common.text_utils import truncate_at_word  # #1224: word-boundary summary truncation (no mid-word cut)
 from experiment import calibration_core  # #538: the shared prediction-calibration scorer (Brier + reliability)
@@ -166,6 +167,26 @@ def build_data_inventory() -> dict:
                     )
                 )
                 count = cgm_resp.get("Count", 0)
+                # #1658: `latest_date` above is the newest apple_health row, and HAE writes
+                # apple_health EVERY day — so cgm inherited a permanently-fresh date and the
+                # >=3d/>=7d staleness directives in build_coach_preamble were structurally
+                # unreachable for glucose. Re-probe for the newest GLUCOSE-BEARING record.
+                # Deliberately NOT `Limit: 1` + filter: DynamoDB applies Limit before the
+                # FilterExpression (#1203), which is the exact trap this function documents.
+                # The 90-day key range bounds the read instead.
+                cgm_latest_resp = table.query(
+                    **with_phase_filter(
+                        {
+                            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{d90}", f"DATE#{today}~"),
+                            "FilterExpression": "attribute_exists(blood_glucose_avg)",
+                            "ScanIndexForward": False,
+                            "ProjectionExpression": "sk",
+                        },
+                        include_pilot=cross_phase,
+                    )
+                )
+                cgm_items = cgm_latest_resp.get("Items", [])
+                latest_date = cgm_items[0].get("sk", "").replace("DATE#", "")[:10] if cgm_items else None
 
             inventory[label] = {
                 "exists": count > 0,
@@ -618,6 +639,36 @@ _SOURCE_OF_TRUTH = {
 }
 
 
+# The checks validate_coach_output can actually emit. write_quality_results derives
+# `checks_run` from this tuple (#1658) — the count used to be a hardcoded 5 while only
+# four checks could fire, so the intelligence_quality partition asserted a check that
+# was structurally dark.
+_VALIDATOR_CHECKS = ("null_claim_vs_data", "stale_action", "cross_coach_contradiction", "overconfidence")
+
+# Numeric claims compared across coaches (check 4). #1658: `%` used to sit inside an
+# alternation closed by `\b`; `%` is a non-word character, so `22%` followed by a space
+# or end-of-string had no word boundary and NEVER matched — every percentage claim (body
+# fat, adherence, recovery) was invisible to the contradiction check. `%` now terminates
+# its own branch. No capturing groups: `findall` must return whole matches.
+_NUMERIC_CLAIM_RE = re.compile(r"\b\d+(?:\.\d+)?\s*(?:mg/dL|bpm|ms|lbs?|kcal|g)\b|\b\d+(?:\.\d+)?\s*%")
+
+# Definitive phrasing neither ORIENTATION nor EMERGING has earned (check 5). EMERGING_VOICE
+# instructs 'Do NOT use definitive language like "your pattern is" or "this shows"' — until
+# #1658 nothing checked it, so that rule was prompt-only (reference_prompt_structural_guarantees).
+_UNEARNED_CONFIDENCE_PHASES = ("orientation", "emerging")
+_CONFIDENT_PHRASES = (
+    "your pattern shows",
+    "this demonstrates",
+    "clearly indicates",
+    "the data confirms",
+    "we can see that",
+    "it's clear that",
+    "definitively",
+    "without question",
+    "conclusively",
+)
+
+
 def validate_coach_output(coach_id: str, domain: str, narrative: str, inventory: dict, maturity: dict, all_narratives: dict = None) -> list:
     """
     Run all validation checks against a coach narrative.
@@ -630,10 +681,15 @@ def validate_coach_output(coach_id: str, domain: str, narrative: str, inventory:
     text_lower = narrative.lower()
 
     # ── Check 1: Null claim vs actual data ─────────────────────────────
+    # #1658: scan EVERY occurrence of each phrase, not just the first. The old
+    # `text_lower.index(phrase)` read only occurrence #1, so a narrative that said
+    # "no data" once about a genuinely empty source and again about a source with 90
+    # records was never flagged for the second — and the false claim later in a long
+    # narrative is the one that ships.
     for phrase in _NULL_CLAIM_PHRASES:
-        if phrase in text_lower:
+        for match in re.finditer(re.escape(phrase), text_lower):
+            idx = match.start()
             # Find the surrounding context (±50 chars)
-            idx = text_lower.index(phrase)
             context = narrative[max(0, idx - 50) : idx + len(phrase) + 50]
 
             # Determine which domain the claim references
@@ -687,26 +743,25 @@ def validate_coach_output(coach_id: str, domain: str, narrative: str, inventory:
                             )
                             break
 
-    # ── Check 3: SOT violation ────────────────────────────────────────
-    # Check for step count discrepancies
-    step_match = re.search(r"(\d[,\d]*)\s*steps?", narrative)
-    if step_match:
-        int(step_match.group(1).replace(",", ""))
-        garmin_data = inventory.get("garmin", {})
-        apple_data = inventory.get("apple_health", {})
-        if garmin_data.get("exists") and apple_data.get("exists"):
-            # If steps cited and both sources exist, flag if it might be from wrong source
-            # (We can't know the exact value without querying, but we flag the presence)
-            pass  # Requires actual metric values — deferred to full implementation
+    # ── Check 3 (REMOVED, #1658) ──────────────────────────────────────
+    # The "SOT violation" check was a no-op: it parsed the step count into a
+    # discarded expression, confirmed garmin and apple_health both existed, and then
+    # executed `pass` behind a "deferred to full implementation" comment. It could
+    # not produce a flag, yet write_quality_results advertised checks_run=5 — a gate
+    # reporting green while dark (the ADR-125/#1927 class). Deleted rather than
+    # half-implemented; `_VALIDATOR_CHECKS` below is now the single source for the
+    # advertised count, so it cannot drift from the checks that can actually fire.
+    # Re-instating a real SOT comparison needs the cited figure checked against the
+    # garmin metric values, which this function does not have.
 
     # ── Check 4: Cross-coach contradiction ────────────────────────────
     if all_narratives:
         # Extract numeric claims from this narrative
-        this_numbers = set(re.findall(r"\b\d+(?:\.\d+)?\s*(?:mg/dL|bpm|ms|lbs?|%|kcal|g)\b", narrative))
+        this_numbers = set(_NUMERIC_CLAIM_RE.findall(narrative))
         for other_domain, other_text in all_narratives.items():
             if other_domain == domain:
                 continue
-            other_numbers = set(re.findall(r"\b\d+(?:\.\d+)?\s*(?:mg/dL|bpm|ms|lbs?|%|kcal|g)\b", other_text))
+            other_numbers = set(_NUMERIC_CLAIM_RE.findall(other_text))
             # Find numbers that appear in both but with different values for same unit
             # This is a simplified check — full implementation would parse metric+value pairs
             for num in this_numbers:
@@ -728,19 +783,8 @@ def validate_coach_output(coach_id: str, domain: str, narrative: str, inventory:
     # ── Check 5: Overconfidence without data ──────────────────────────
     domain_maturity = maturity.get(domain, {})
     phase = domain_maturity.get("phase", "orientation")
-    if phase == "orientation":
-        confident_phrases = [
-            "your pattern shows",
-            "this demonstrates",
-            "clearly indicates",
-            "the data confirms",
-            "we can see that",
-            "it's clear that",
-            "definitively",
-            "without question",
-            "conclusively",
-        ]
-        for phrase in confident_phrases:
+    if phase in _UNEARNED_CONFIDENCE_PHASES:
+        for phrase in _CONFIDENT_PHRASES:
             if phrase in text_lower:
                 flags.append(
                     {
@@ -769,7 +813,7 @@ def write_quality_results(date: str, coach_id: str, domain: str, flags: list):
         "date": date,
         "coach_id": coach_id,
         "domain": domain,
-        "checks_run": 5,
+        "checks_run": len(_VALIDATOR_CHECKS),  # #1658: derived, never a hand-typed count
         "errors": errors,
         "warnings": warnings,
         "flags": flags,
@@ -788,31 +832,12 @@ def write_quality_results(date: str, coach_id: str, domain: str, flags: list):
 # ══════════════════════════════════════════════════════════════════════════════
 # ACTION COMPLETION LOOP (Workstream 3)
 # ══════════════════════════════════════════════════════════════════════════════
-
-# Cache for detection rules
-_detection_rules_cache = None
-_detection_rules_cache_ts = 0
-_DETECTION_RULES_CACHE_TTL = 300  # 5 minutes
-
-
-def _load_detection_rules() -> dict:
-    """Load action detection rules from S3. Cached for Lambda warm instances."""
-    global _detection_rules_cache, _detection_rules_cache_ts
-    import time
-
-    now = time.time()
-
-    if _detection_rules_cache and (now - _detection_rules_cache_ts) < _DETECTION_RULES_CACHE_TTL:
-        return _detection_rules_cache
-
-    try:
-        resp = s3.get_object(Bucket=S3_BUCKET, Key="config/action_detection_rules.json")
-        _detection_rules_cache = json.loads(resp["Body"].read())
-        _detection_rules_cache_ts = now
-        return _detection_rules_cache
-    except Exception as e:
-        logger.warning("Failed to load action detection rules: %s — using empty ruleset", e)
-        return {"rules": [], "expiry_days": 14, "version": "0"}
+# #1658: `_load_detection_rules` and its two cache globals were deleted here. The
+# action-completion detection loop that consumed config/action_detection_rules.json
+# was removed by #1239; the loader had no caller anywhere in lambdas/ or mcp/ and
+# shipped in every bundle (#781). Coach actions are still completed manually via
+# `complete_action` — auto-detection would be a new feature, not a repair, so the
+# dead loader is removed rather than left looking like a live path.
 
 
 def _iso_week(date_str: str) -> str:
@@ -885,6 +910,13 @@ def complete_action(action_id: str, method: str = "manual", note: str = None) ->
     Mark an action as completed.
 
     Returns the updated action item dict.
+
+    #1658: guarded with `attribute_exists(pk)`. DynamoDB `update_item` UPSERTS, so an
+    unknown action id silently MINTED a SOURCE#coach_actions# row carrying nothing but
+    status=completed + completion_date — a phantom completed action with no text, domain
+    or issue date, which then flowed into get_action_history and the coach preamble. The
+    accountability record could gain completions for work never assigned. A conditional
+    failure now surfaces as the same raised exception every other write failure uses.
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     update_expr = "SET #st = :completed, completion_date = :cd, completion_method = :cm"
@@ -906,6 +938,7 @@ def complete_action(action_id: str, method: str = "manual", note: str = None) ->
                 "sk": f"SOURCE#coach_actions#{action_id}",
             },
             UpdateExpression=update_expr,
+            ConditionExpression=Attr("pk").exists(),
             ExpressionAttributeNames=attr_names,
             ExpressionAttributeValues=attr_values,
             ReturnValues="ALL_NEW",
@@ -1000,6 +1033,8 @@ def compute_builders_paradox_score(days: int = 7) -> dict:
         pass
 
     habit_adherence_pct = 0
+    habit_days = 0  # #1658 (ADR-105): the n behind habit_adherence_pct
+    step_days = 0  # #1658 (ADR-105): the n behind avg_steps
     try:
         resp = table.query(
             **with_phase_filter(
@@ -1016,7 +1051,7 @@ def compute_builders_paradox_score(days: int = 7) -> dict:
                 pcts.append(float(p) * (100 if float(p) <= 1 else 1))
         if pcts:
             habit_adherence_pct = round(sum(pcts) / len(pcts))
-            len(pcts)
+            habit_days = len(pcts)  # #1658: ADR-105 — publish n, don't discard it
     except Exception:
         pass
 
@@ -1029,9 +1064,21 @@ def compute_builders_paradox_score(days: int = 7) -> dict:
                 }
             )
         )
-        step_vals = [float(i.get("steps", 0)) for i in resp.get("Items", []) if i.get("steps")]
+        # #1658: filter on PRESENCE, not truth. `if i.get("steps")` is falsy for a
+        # genuine 0-step day, so sedentary days were dropped from the mean instead of
+        # pulling it down — a week with two zero days reported the average of the
+        # active ones, systematically flattering the health side of the ratio.
+        step_vals = []
+        for i in resp.get("Items", []):
+            if "steps" not in i:
+                continue
+            try:
+                step_vals.append(float(i["steps"]))
+            except (TypeError, ValueError):
+                continue
         if step_vals:
             avg_steps = round(sum(step_vals) / len(step_vals))
+            step_days = len(step_vals)
     except Exception:
         pass
 
@@ -1048,26 +1095,34 @@ def compute_builders_paradox_score(days: int = 7) -> dict:
     platform_intensity = min(100, platform_tasks * 3)  # ~33 tasks/week = max intensity
 
     # Builder's Paradox score: high platform + low health = high score (bad)
-    if health_score + platform_intensity == 0:
-        score = 50  # No data
+    # #1658 (ADR-104): a total absence of observations used to be mapped to score=50,
+    # which lands in the 'tipping' band and printed "Platform activity is outpacing
+    # health behaviors — watch this trend" alongside "0 platform tasks completed, 0
+    # workouts". That is a behavioural verdict derived from no behaviour. Absence now
+    # stays absent: no score, an explicit label, and no trend sentence.
+    no_observations = (health_score + platform_intensity) == 0
+    if no_observations:
+        score = None
+        label = "insufficient_data"
     else:
         # Weighted: platform overpowering health
         raw = (platform_intensity / max(1, health_score + platform_intensity)) * 100
         score = round(min(100, raw))
-
-    if score <= 30:
-        label = "healthy"
-    elif score <= 60:
-        label = "tipping"
-    else:
-        label = "displaced"
+        if score <= 30:
+            label = "healthy"
+        elif score <= 60:
+            label = "tipping"
+        else:
+            label = "displaced"
 
     interpretation = (
         f"{platform_tasks} platform tasks completed, {workouts} workouts, "
-        f"{journal_entries} journal entries, {habit_adherence_pct}% habit adherence, "
-        f"{avg_steps} avg steps."
+        f"{journal_entries} journal entries, {habit_adherence_pct}% habit adherence "
+        f"(n={habit_days} days), {avg_steps} avg steps (n={step_days} days)."
     )
-    if score > 50:
+    if no_observations:
+        interpretation += " No platform OR health activity was observed in this window — not enough to score."
+    elif score > 50:
         interpretation += " The platform is consuming the time and energy it was designed to protect."
     elif score > 30:
         interpretation += " Platform activity is outpacing health behaviors — watch this trend."
@@ -1081,7 +1136,9 @@ def compute_builders_paradox_score(days: int = 7) -> dict:
         "workouts": workouts,
         "journal_entries": journal_entries,
         "habit_adherence_pct": habit_adherence_pct,
+        "habit_days": habit_days,  # #1658 (ADR-105): n behind habit_adherence_pct
         "avg_steps": avg_steps,
+        "step_days": step_days,  # #1658 (ADR-105): n behind avg_steps
         "health_score": round(health_score),
         "platform_intensity": round(platform_intensity),
         "interpretation": interpretation,
@@ -1262,23 +1319,45 @@ def write_coach_thread(coach_id: str, entry: dict) -> bool:
         return False
 
 
+# #1658: Limit-before-Filter paging for the phase-filtered thread read. Over-fetch per
+# page so a run of pilot-tagged rows can't hide the live entries behind them, and cap
+# the walk so a partition of nothing but filtered-out rows can't spin.
+_THREAD_PAGE_OVERFETCH = 4
+_THREAD_MAX_PAGES = 5
+
+
 def read_coach_thread(coach_id: str, limit: int = 4) -> list:
     """Read recent thread entries for prompt injection.
 
     Returns list of thread entries, most recent first.
+
+    #1658 / #1203: this read pairs `Limit` with the ADR-058 phase FilterExpression, and
+    DynamoDB applies Limit BEFORE the filter — the same mechanism build_data_inventory
+    documents. When the newest `limit` rows are pilot-tagged (i.e. every cycle reset)
+    the single-shot read returned fewer rows than exist, or none at all, while live
+    entries sat just past the page; build_thread_prompt_block then told a coach with
+    months of history "This is your first assessment". So page until `limit` VISIBLE
+    rows are collected, over-fetching per page and bounded by _THREAD_MAX_PAGES.
     """
     try:
-        resp = table.query(
-            **with_phase_filter(
+        collected: list = []
+        start_key = None
+        for _page in range(_THREAD_MAX_PAGES):
+            params = with_phase_filter(
                 {  # ADR-058
                     "KeyConditionExpression": Key("pk").eq(f"USER#{USER_ID}") & Key("sk").begins_with(f"SOURCE#coach_thread#{coach_id}#"),
                     "ScanIndexForward": False,
-                    "Limit": limit,
+                    "Limit": max(1, limit) * _THREAD_PAGE_OVERFETCH,
                 }
             )
-        )
-        items = resp.get("Items", [])
-        return [_decimal_to_float(i) for i in items]
+            if start_key is not None:
+                params["ExclusiveStartKey"] = start_key
+            resp = table.query(**params)
+            collected.extend(resp.get("Items", []))
+            start_key = resp.get("LastEvaluatedKey")
+            if len(collected) >= limit or not start_key:
+                break
+        return [_decimal_to_float(i) for i in collected[:limit]]
     except Exception as e:
         logger.warning("Failed to read thread for %s: %s", coach_id, e)
         return []
@@ -1389,10 +1468,23 @@ def build_thread_prompt_block(coach_id: str, personality: dict = None) -> str:
 def _prediction_slug(text: str) -> str:
     """Deterministic semantic slug for a prediction claim (the dedup key).
 
-    Same construction as the canonical COACH#/PREDICTION# path in
-    coach_state_updater.py so both prediction stores read the same identity.
+    Claims of 40 characters or fewer keep the exact construction the canonical
+    COACH#/PREDICTION# path uses (coach_state_updater.py), so short claims still read
+    the same identity in both prediction stores.
+
+    #1658: longer claims additionally carry a digest of the FULL text. The bare
+    `[:40]` truncation collapsed two distinct forecasts sharing a 40-character prefix
+    ("Your resting heart rate will fall below 55 bpm" vs "…below 60 bpm") onto one
+    semantic_key, and `stamped[key] = rec` in stamp_thread_predictions then silently
+    dropped the first — a forecast the coach actually made was never recorded and
+    never graded. The digest is a pure function of the text, so the key stays stable
+    across days; only long-form claims get a different key than before.
     """
-    return re.sub(r"[^a-z0-9]+", "_", (text or "").lower()[:40]).strip("_")
+    t = (text or "").lower()
+    base = re.sub(r"[^a-z0-9]+", "_", t[:40]).strip("_")
+    if not base or len(t) <= 40:
+        return base
+    return f"{base}_{hashlib.sha256(t.encode('utf-8')).hexdigest()[:6]}"
 
 
 def _timeframe_to_window_days(timeframe: str) -> int:
@@ -1455,23 +1547,31 @@ def stamp_thread_predictions(coach_id: str, raw_predictions: list, today: str = 
         metric = (pred.get("metric") or "").strip() or None
         confidence = pred.get("confidence") or "medium"
 
+        window = _timeframe_to_window_days(pred.get("timeframe", ""))
+        target = (datetime.strptime(today, "%Y-%m-%d") + timedelta(days=max(1, window))).strftime("%Y-%m-%d")
+
         carried = prior_open.get(key)
         if carried:
             # Update in place: keep the original id + deadline, refresh confidence/metric.
+            # #1658: a prior written before #725 carries no target_date, and
+            # `carried.get("target_date")` then stamped target_date=None — ungradeable,
+            # permanently pending, and re-carried every day forever, inflating
+            # predictions_total. Re-stamp a missing deadline from today's timeframe.
+            # And first_seen is NOT back-filled from target_date any more: that is a
+            # FUTURE date, so "first seen" read later than the deadline it precedes.
+            # An unknown first_seen stays honestly unknown (None).
             rec = {
                 "prediction_id": carried.get("prediction_id") or f"pred_{day_compact}_{key}",
                 "semantic_key": key,
                 "text": text,
                 "confidence": confidence,
                 "metric": metric,
-                "target_date": carried.get("target_date"),
-                "first_seen": carried.get("first_seen") or carried.get("target_date"),
+                "target_date": carried.get("target_date") or target,
+                "first_seen": carried.get("first_seen"),
                 "status": "pending",
                 "reaffirmed_on": today,
             }
         else:
-            window = _timeframe_to_window_days(pred.get("timeframe", ""))
-            target = (datetime.strptime(today, "%Y-%m-%d") + timedelta(days=max(1, window))).strftime("%Y-%m-%d")
             rec = {
                 "prediction_id": f"pred_{day_compact}_{key}",
                 "semantic_key": key,
