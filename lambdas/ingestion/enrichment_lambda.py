@@ -1,6 +1,12 @@
 """
 Life Platform — Nightly Activity Enrichment Lambda
-Runs after all daily syncs complete (EventBridge: 06:00 UTC = 10pm PT).
+
+Schedule: EventBridge cron(30 15 * * ? *) — 15:30 UTC (08:30 PT / 07:30 PST),
+declared in `cdk/stacks/ingestion_stack.py`. This is NOT "after all daily syncs
+complete": Strava itself re-ingests hourly at :10 through 23:10 UTC, so the same
+day record is rewritten several times AFTER this run. Enrichment survives that
+because `strava_lambda.ENRICHMENT_CARRY_FORWARD_FIELDS` is merged forward by
+`ingestion_framework._store_item` (#2250) — not because of the slot's timing.
 
 For each Strava activity in the target date window, writes two fields
 back to the activity record in DynamoDB:
@@ -46,6 +52,11 @@ REGION = os.environ.get("AWS_REGION", "us-west-2")
 DYNAMODB_TABLE = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
+
+# The far edge of the archive. ONE constant for both the percentile-context read
+# and the backfill default: they used to be 2000-01-01 and 2020-01-01, so a "full
+# backfill" ranked against activities it then never enriched.
+ARCHIVE_START = "2000-01-01"
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(DYNAMODB_TABLE)
@@ -102,63 +113,109 @@ GENERIC_PREFIXES = [
     "short",
     "long",
 ]
+# Strava's auto-name is "{time of day} {sport display name}", and a sport display
+# name is not always one token — "Trail Run", "Mountain Bike Ride", "Weight
+# Training". Multi-word entries live here rather than in a second list so the
+# GENERIC_TYPES × GENERIC_PREFIXES set-guard in the test suite covers them too.
 GENERIC_TYPES = [
     "run",
     "ride",
     "walk",
     "hike",
     "workout",
-    "ride",
     "swim",
     "yoga",
     "cycling",
     "rowing",
     "elliptical",
     "activity",
+    "trail run",
+    "virtual run",
+    "virtual ride",
+    "mountain bike ride",
+    "gravel ride",
+    "e-bike ride",
+    "weight training",
+    "open water swim",
+    "stair stepper",
+    "inline skate",
+    "nordic ski",
+    "alpine ski",
 ]
 
 
 def is_generic_name(name: str) -> bool:
     """Return True if the activity name is a Strava auto-generated generic."""
-    n = name.lower().strip()
-    # Pure type name: "Run", "Hike", etc.
+    n = (name or "").lower().strip()
+    if not n:
+        return False
+    # Pure type name: "Run", "Hike", "Trail Run", etc.
     if n in GENERIC_TYPES:
         return True
-    # "Morning Run", "Afternoon Hike", etc.
-    parts = n.split()
-    if len(parts) == 2 and parts[0] in GENERIC_PREFIXES and parts[1] in GENERIC_TYPES:
-        return True
+    # "Morning Run", "Afternoon Mountain Bike Ride", etc. The WHOLE remainder must
+    # be a known type — "Long Walk to the Pier" is a name Matthew chose.
+    for prefix in GENERIC_PREFIXES:
+        if n.startswith(f"{prefix} ") and n[len(prefix) + 1 :].strip() in GENERIC_TYPES:
+            return True
     return False
 
 
 # ── Percentile rank helpers ───────────────────────────────────────────────────
 
 
+def _as_float(value):
+    """`float(value)` or None — never an exception.
+
+    `build_percentile_lookup` runs over the ENTIRE Strava archive before any day
+    is enriched, so an unguarded `float()` let one unparseable row anywhere in
+    history abort the whole nightly run (lambda_handler re-raises) and leave
+    every clean activity unenriched. The cost of a bad row is now that row.
+    """
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def build_percentile_lookup(all_strava_items):
     """
     Build sorted lists of all-time elevation and distance values
     for percentile ranking individual activities.
+
+    Membership is `is not None`, not truthiness: a measured 0 is a data point at
+    the bottom of the distribution, and dropping the bottom shrinks the
+    denominator, which understates every other activity's published rank
+    (ADR-104). NB: `strava_lambda._normalize` currently collapses a stored 0 to
+    None upstream, so this gate only bites on rows that already carry a real 0.
     """
     all_elevations = []
     all_distances = []
     for day in all_strava_items:
         for act in day.get("activities", []):
-            elev = act.get("total_elevation_gain_feet")
-            dist = act.get("distance_miles")
-            if elev:
-                all_elevations.append(float(elev))
-            if dist:
-                all_distances.append(float(dist))
+            elev = _as_float(act.get("total_elevation_gain_feet"))
+            dist = _as_float(act.get("distance_miles"))
+            if elev is not None:
+                all_elevations.append(elev)
+            if dist is not None:
+                all_distances.append(dist)
     return sorted(all_elevations), sorted(all_distances)
 
 
 def percentile(sorted_vals, val):
     """Return what percentile val falls at in sorted_vals (0–100)."""
-    if not sorted_vals or val is None:
+    numeric = _as_float(val)
+    if not sorted_vals or numeric is None:
         return None
     import bisect
 
-    pos = bisect.bisect_left(sorted_vals, float(val))
+    # bisect_LEFT — the share of the population STRICTLY BELOW. Deliberate, and
+    # deliberately not bisect_right: "top 1% ever" is a rarity claim, and
+    # at-or-below would award it to a value tied with the max even when that tie
+    # group IS most of the archive (ADR-104). See the tie test in
+    # tests/test_enrichment_lambda_behavior.py.
+    pos = bisect.bisect_left(sorted_vals, numeric)
     return round(100.0 * pos / len(sorted_vals), 1)
 
 
@@ -198,7 +255,13 @@ def recovery_emoji(recovery_score):
 
 
 def build_enriched_name(activity, recovery_score, elev_pcts, dist_pcts, sorted_elevations, sorted_distances):
-    name = activity.get("name", "").strip()
+    # `or ""` not `get(k, "")`: a stored key whose VALUE is None defeats the
+    # default, and .strip()/.title() on None raised out of the whole nightly run.
+    name = (activity.get("name") or "").strip()
+    # Strava's sport_type is a CamelCase token — TrailRun, MountainBikeRide,
+    # WeightTraining. `.title()` rewrote it to "Trailrun", which is the spelling
+    # that then reached the site, both digests and the MCP search index.
+    sport = (activity.get("sport_type") or "").strip()
     city = activity.get("location_city")
     state = activity.get("location_state")
     dist = activity.get("distance_miles")
@@ -211,11 +274,13 @@ def build_enriched_name(activity, recovery_score, elev_pcts, dist_pcts, sorted_e
     # Primary identifier: activity name, with location prepended if generic
     location_str = f"{city}, {state}" if city and state else (city or state or None)
     if is_generic_name(name) and location_str:
-        parts.append(f"{location_str} {activity.get('sport_type', '').title()}")
-    else:
-        parts.append(name)
-        if location_str:
-            parts[-1] = f"{parts[-1]} — {location_str}"
+        # .strip(): with no sport_type this used to store "Seattle, WA " —
+        # trailing whitespace rendered verbatim by every reader surface.
+        parts.append(f"{location_str} {sport}".strip())
+    elif name:
+        parts.append(f"{name} — {location_str}" if location_str else name)
+    elif location_str:
+        parts.append(location_str)
 
     stats = []
     if dist:
@@ -251,19 +316,36 @@ def build_enriched_name(activity, recovery_score, elev_pcts, dist_pcts, sorted_e
 # ── Main enrichment logic ─────────────────────────────────────────────────────
 
 
+def _day_date(day) -> str:
+    """The calendar date of a stored day record — `date` first, else its own `sk`.
+
+    The window filter used to read `d.get("date", "")` while the query that
+    returned the record selected on `sk`. A record that arrived without a `date`
+    attribute was therefore returned by the query and then silently dropped by
+    the filter: two notions of "which day is this" that must not disagree.
+    """
+    date_str = day.get("date")
+    if date_str:
+        return str(date_str)
+    sk = str(day.get("sk") or "")
+    if "DATE#" in sk:
+        return sk.split("DATE#", 1)[1][:10]
+    return ""
+
+
 def enrich_date_range(start_date: str, end_date: str):
     logger.info(f"[enrichment] Starting enrichment for {start_date} → {end_date}")
 
     # Load all Strava data (for percentile context) and target window
     logger.info("[enrichment] Loading all Strava data for percentile context...")
-    all_strava = query_source("strava", "2000-01-01", end_date)
+    all_strava = query_source("strava", ARCHIVE_START, end_date)
     sorted_elevations, sorted_distances = build_percentile_lookup(all_strava)
     logger.info(
         f"[enrichment] Percentile context: {len(sorted_elevations)} elevation datapoints, {len(sorted_distances)} distance datapoints"
     )
 
     # Filter to target window
-    target_days = [d for d in all_strava if start_date <= d.get("date", "") <= end_date]
+    target_days = [d for d in all_strava if start_date <= _day_date(d) <= end_date]
     logger.info(f"[enrichment] Target days in window: {len(target_days)}")
 
     # Load Whoop for recovery context (same window)
@@ -274,7 +356,7 @@ def enrich_date_range(start_date: str, end_date: str):
     skipped_count = 0
 
     for day in target_days:
-        date_str = day.get("date")
+        date_str = _day_date(day)
         activities = day.get("activities", [])
         if not activities:
             continue
@@ -288,7 +370,24 @@ def enrich_date_range(start_date: str, end_date: str):
 
         for act in activities:
             name = act.get("name", "")
-            enriched = build_enriched_name(act, recovery, None, None, sorted_elevations, sorted_distances)
+
+            # Per-activity error boundary. lambda_handler() re-raises, so without
+            # one, a single malformed row aborted the batch and every LATER day
+            # in the window went unenriched with no record of where it stopped.
+            # The row is left exactly as stored and logged at ERROR.
+            try:
+                enriched = build_enriched_name(act, recovery, None, None, sorted_elevations, sorted_distances)
+            except Exception as exc:  # noqa: BLE001 — one bad row must cost one bad row
+                logger.error(f"[enrichment] {date_str} | skipping malformed activity '{name}': {exc}", exc_info=True)
+                updated_activities.append(act)
+                continue
+
+            if not enriched:
+                # Nothing to say about this activity — storing "" would be a
+                # label that reads as content and would churn every night.
+                skipped_count += 1
+                updated_activities.append(act)
+                continue
 
             if enriched != act.get("enriched_name"):
                 act["enriched_name"] = enriched
@@ -333,12 +432,20 @@ def lambda_handler(event, context):
         yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
 
         if event.get("backfill"):
-            start_date = event.get("start_date", "2020-01-01")
+            # ARCHIVE_START, not 2020-01-01: the percentile context already reads
+            # back to ARCHIVE_START, so a "full backfill" that started in 2020
+            # RANKED against activities it then never enriched.
+            start_date = event.get("start_date", ARCHIVE_START)
             end_date = event.get("end_date", today)
             logger.info(f"[enrichment] Backfill mode: {start_date} → {end_date}")
-        elif "start_date" in event and "end_date" in event:
-            start_date = event["start_date"]
-            end_date = event["end_date"]
+        elif "start_date" in event or "end_date" in event:
+            # A one-sided range used to fall through to the nightly branch and
+            # enrich yesterday instead — the operator's window discarded with no
+            # warning (#1917 window-honesty class). Honour what was asked and
+            # report the window actually run.
+            start_date = event.get("start_date") or event.get("end_date") or yesterday
+            end_date = event.get("end_date") or today
+            logger.info(f"[enrichment] Explicit range: {start_date} → {end_date}")
         else:
             # Default: yesterday (nightly run)
             start_date = yesterday
