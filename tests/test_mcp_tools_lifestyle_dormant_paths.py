@@ -12,7 +12,10 @@ Writing that harness is what surfaced the S3-prefix defect below: the BP reader
 would not work today even if a tool called it tomorrow.
 
 Per the tranche contract, defects are REPORTED as xfail(strict=False), never
-fixed here.
+fixed here. That reported defect (#2278 — the BP reader read a prefix nothing
+has ever written) has since been fixed, so its xfail is now a live assertion,
+joined by one that pins the MECHANISM: the key comes from the registry's
+raw_layout facet, not from a literal a future reader can retype wrong.
 """
 
 from __future__ import annotations
@@ -190,6 +193,9 @@ _BP_DAY = [
     {"time": "2026-07-05 21:40", "systolic": 134, "diastolic": 86, "pulse": 66},
 ]
 
+# The one key health_auto_export_lambda.save_bp_readings_to_s3 writes for that day.
+_BP_KEY = "raw/matthew/blood_pressure/2026/07/05.json"
+
 
 def test_a_day_with_no_reading_is_an_empty_list_not_an_error(monkeypatch):
     monkeypatch.setattr(tl, "s3_client", _FakeS3())
@@ -208,48 +214,78 @@ def test_a_malformed_date_does_not_raise(monkeypatch):
 
 def test_every_reading_in_the_day_is_returned_when_the_object_is_found(monkeypatch):
     """When the key DOES resolve the reader must hand back each individual
-    cuff reading — a daily average would hide a 134/86 evening spike."""
-    fake = _FakeS3({"raw/blood_pressure/2026/07/05.json": _BP_DAY})
+    cuff reading — a daily average would hide a 134/86 evening spike.
+
+    #2278: this used to retry against whatever key the reader happened to ask
+    for, which made it pass no matter how wrong that key was. It now stocks the
+    ONE key the writer writes, so a reader pointed anywhere else fails here.
+    """
+    fake = _FakeS3({_BP_KEY: _BP_DAY})
     monkeypatch.setattr(tl, "s3_client", fake)
     got = tl._load_bp_readings("2026-07-05")
-    if got == []:  # the key the reader builds is the one under test below
-        fake = _FakeS3({fake.requested[0]: _BP_DAY})
-        monkeypatch.setattr(tl, "s3_client", fake)
-        got = tl._load_bp_readings("2026-07-05")
     assert len(got) == 2
     assert got[1]["systolic"] == 134
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT — mcp/tools_lifestyle.py:233. _load_bp_readings builds the S3 key "
-        "`raw/blood_pressure/{YYYY}/{MM}/{DD}.json`, with NO user segment. The writer "
-        "(lambdas/ingestion/health_auto_export_lambda.py:1058) writes "
-        "`raw/{USER_ID}/blood_pressure/{YYYY}/{MM}/{DD}.json` — i.e. "
-        "`raw/matthew/blood_pressure/...` — and source_registry.py:258 documents that "
-        "same `raw/matthew/{blood_pressure,...}` layout as the HAE sub-datatype location. "
-        "ACTUAL: every read misses, raises NoSuchKey, and is swallowed into `return []`. "
-        "SHOULD: read `raw/matthew/blood_pressure/...` (or derive the prefix from the "
-        "registry's raw_layout facet rather than hand-constructing it). "
-        "CONSEQUENCE: latent rather than live — nothing calls this helper today — but it "
-        "is a loaded gun: the moment a tool is wired to it, Matthew's individual cuff "
-        "readings silently read as 'no readings on file' instead of erroring, so a "
-        "hypertension trend would look like missing data rather than a missing code path. "
-        "Note the fail-soft `except NoSuchKey: return []` is exactly what makes the wrong "
-        "prefix invisible."
-    ),
-)
 def test_the_bp_reader_looks_where_the_ingestion_lambda_actually_writes():
     """Guard the reader/writer key agreement, not one hand-typed literal: the
-    expected prefix is derived from the registry facet the writer follows."""
+    expected prefix is derived from the registry facet the writer follows.
+
+    Fixed in #2278. The reader spent its whole life on
+    `raw/blood_pressure/{YYYY}/{MM}/{DD}.json` — no user segment, a prefix
+    nothing has ever written (verified against the live bucket: 10 objects under
+    `raw/matthew/blood_pressure/`, zero under `raw/blood_pressure/`). Every read
+    missed, raised NoSuchKey, and was swallowed into `return []`, so the first
+    caller wired to it would have read a hypertension history as "never logged".
+    """
     fake = _FakeS3()
     tl.s3_client, saved = fake, tl.s3_client
     try:
         tl._load_bp_readings("2026-07-05")
     finally:
         tl.s3_client = saved
+    assert fake.requested == [_BP_KEY]
     assert fake.requested == ["raw/matthew/blood_pressure/2026/07/05.json"]
+
+
+def test_the_bp_key_is_resolved_from_the_registry_not_hand_built():
+    """The acceptance is the mechanism, not the literal: fixing the string alone
+    leaves the next reader free to retype it wrong. The key the reader asks for
+    must be exactly what the registry's raw_layout facet yields for the HAE
+    blood-pressure sub-tree."""
+    from ingestion.source_registry import raw_date_key, raw_layout_for
+
+    layout = raw_layout_for("apple_health", sub="blood_pressure")
+    assert layout["prefix"] == "raw/matthew/blood_pressure"
+    assert layout["filename"] == "DD.json"  # HAE writes DD.json, not the SIMP-2 YYYY-MM-DD.json
+
+    fake = _FakeS3()
+    tl.s3_client, saved = fake, tl.s3_client
+    try:
+        tl._load_bp_readings("2026-07-05")
+    finally:
+        tl.s3_client = saved
+    assert fake.requested == [raw_date_key("apple_health", "2026-07-05", sub="blood_pressure")]
+
+
+def test_moving_the_registrys_bp_prefix_moves_the_reader(monkeypatch):
+    """The distinguishing test. Asserting the reader asks for
+    `raw/matthew/blood_pressure/...` cannot tell a registry lookup from a
+    correctly-retyped literal — and a retyped literal is the exact thing that
+    rotted here. So move the facet and require the reader to follow: only a
+    reader that actually READS the registry can pass this.
+    """
+    from ingestion import source_registry as sr
+
+    moved = dict(sr.SOURCE_REGISTRY["apple_health"]["raw_layout"])
+    moved["sub_layouts"] = dict(moved["sub_layouts"])
+    moved["sub_layouts"]["blood_pressure"] = {"prefix": "raw/elsewhere/bp", "scheme": "date-tree", "filename": "YYYY-MM-DD.json"}
+    monkeypatch.setitem(sr.SOURCE_REGISTRY["apple_health"], "raw_layout", moved)
+
+    fake = _FakeS3()
+    monkeypatch.setattr(tl, "s3_client", fake)
+    tl._load_bp_readings("2026-07-05")
+    assert fake.requested == ["raw/elsewhere/bp/2026/07/2026-07-05.json"]
 
 
 def test_the_bp_key_encodes_the_requested_day_not_todays_date(monkeypatch):

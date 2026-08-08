@@ -29,9 +29,15 @@ DynamoDB items:
   pk = USER#matthew#SOURCE#apple_health
   sk = DATE#YYYY-MM-DD
 
-S3 raw storage:
-  raw/health_auto_export/YYYY/MM/DD_HHmmss.json  (full payload)
-  raw/cgm_readings/YYYY/MM/DD.json                (individual glucose readings)
+S3 raw storage (user-segmented — the prefixes below are what this module ACTUALLY
+writes; #2278 found a reader following the old, un-segmented form documented here
+and reading a prefix nothing has ever written. Readers must resolve these from
+`source_registry.raw_date_key("apple_health", date, sub=...)`, not retype them):
+  raw/matthew/health_auto_export/YYYY/MM/DD_HHmmss.json  (full payload)
+  raw/matthew/cgm_readings/YYYY/MM/DD.json                (individual glucose readings)
+  raw/matthew/blood_pressure/YYYY/MM/DD.json              (individual cuff readings)
+  raw/matthew/state_of_mind/YYYY/MM/DD.json               (individual check-ins)
+  raw/matthew/workouts/YYYY/MM/DD.json                    (individual workouts)
 
 IAM role: lambda-health-auto-export-role
 Trigger: API Gateway HTTP API (bearer token auth)
@@ -60,13 +66,13 @@ v1.6.0 — Workout ingestion (Pliability, Breathwrk, recovery workouts)
     Yoga, Pilates, Cooldown, Tai Chi
   - Daily aggregates to DynamoDB: flexibility_minutes, flexibility_sessions,
     breathwork_minutes, breathwork_sessions, recovery_workout_minutes, recovery_workout_types
-  - Individual workouts stored to S3 raw/workouts/YYYY/MM/DD.json
+  - Individual workouts stored to S3 raw/matthew/workouts/YYYY/MM/DD.json
   - Non-recovery workouts (strength, running, etc.) stored to S3 but NOT
     aggregated to DynamoDB to avoid double-counting with Strava SOT
   - Enables mobility/recovery tracking and sleep-quality correlations
 v1.5.0 — State of Mind ingestion (How We Feel / Apple Health)
   - Detects State of Mind payloads (separate HAE automation Data Type)
-  - Stores individual check-ins to S3 raw/state_of_mind/YYYY/MM/DD.json
+  - Stores individual check-ins to S3 raw/matthew/state_of_mind/YYYY/MM/DD.json
   - Each entry: timestamp, kind (dailyMood/momentaryEmotion), valence (-1 to +1),
     valence_classification, labels (e.g. Happy, Stressed), associations (e.g. Work, Family)
   - Daily aggregates to DynamoDB: avg_valence, check_in_count, dominant labels/associations
@@ -74,7 +80,7 @@ v1.5.0 — State of Mind ingestion (How We Feel / Apple Health)
   - Source: How We Feel app → HealthKit State of Mind → Health Auto Export → webhook
 v1.4.0 — Blood pressure monitoring
   - Added blood_pressure_systolic, blood_pressure_diastolic to METRIC_MAP (Tier 1, avg)
-  - Individual BP readings stored in S3 raw/blood_pressure/YYYY/MM/DD.json
+  - Individual BP readings stored in S3 raw/matthew/blood_pressure/YYYY/MM/DD.json
   - Pulse from BP cuff tracked as blood_pressure_pulse
   - Enables cardiovascular risk tracking, sodium correlation
 v1.3.0 — Water intake tracking
