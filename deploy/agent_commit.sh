@@ -110,11 +110,31 @@ STAGED_PY="$(printf '%s\n' "${STAGED}" | grep -E '^(lambdas|mcp|cdk|tests|script
 # PATH is how an agent's green commit red-mained main's Lint job on 2026-08-08
 # (lambdas/emails/anomaly_detector_lambda.py). The repo keeps the pin in
 # .venv-black; use it when present and say loudly when it is not.
+#
+# MUST ALSO LOOK IN THE MAIN CHECKOUT, NOT JUST ${ROOT}. Implementers run in git
+# worktrees, and .venv-black is untracked — it exists only in the primary clone,
+# so a worktree-local lookup silently falls back to PATH and reintroduces exactly
+# the skew this guard exists to stop (observed the same day it was added).
+# `git rev-parse --git-common-dir` resolves to the primary clone's .git from any
+# worktree; its parent is that clone's root.
 BLACK="black"
-if [ -x "${ROOT}/.venv-black/bin/black" ]; then
-  BLACK="${ROOT}/.venv-black/bin/black"
-else
-  echo "[agent-commit] ⚠ .venv-black not found — falling back to black on PATH ($(black --version 2>/dev/null | head -1))." >&2
+_COMMON_DIR="$(git rev-parse --git-common-dir 2>/dev/null)"
+case "${_COMMON_DIR}" in
+  /*) ;;
+  *) _COMMON_DIR="${ROOT}/${_COMMON_DIR}" ;;
+esac
+_MAIN_ROOT="$(cd "${_COMMON_DIR}/.." 2>/dev/null && pwd)"
+
+for _cand in "${ROOT}/.venv-black/bin/black" "${_MAIN_ROOT}/.venv-black/bin/black"; do
+  if [ -x "${_cand}" ]; then
+    BLACK="${_cand}"
+    break
+  fi
+done
+
+if [ "${BLACK}" = "black" ]; then
+  echo "[agent-commit] ⚠ .venv-black not found (looked in ${ROOT} and ${_MAIN_ROOT:-?}) —" >&2
+  echo "[agent-commit]   falling back to black on PATH ($(black --version 2>/dev/null | head -1))." >&2
   echo "[agent-commit]   CI pins 26.3.1; a version skew here can pass locally and red main's Lint job." >&2
 fi
 
