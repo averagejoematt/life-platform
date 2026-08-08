@@ -37,7 +37,7 @@
     "note": "#2104's findings are fixed (closed 2026-08-05) but the alarm never got its 2 green nights — the 2026-08-05 scheduled run failed 2 content_truth with NEW causes: (1) whoop freshness (no DATE#2026-08-04 row) — the auth breaker re-latched 2026-08-04T00:00Z with 'refresh 400, unchanged refresh_token' (third credential loss; same owner re-auth path as #1934, carried on the owner list); (2) reader_truth high findings that are evidence, not new work: /api/sleep_detail claims total_sleep_hours with no night label while the whoop-based trend rows sit null during the outage (the #1968 class, evidence commented there), and Home's static 'sixteen prior climbs' lifetime count needs Matthew's factual call (owner list). Clears when whoop re-auths + the two reader_truth items are addressed + 2 green scheduled nights."
   },
   "slo-source-freshness": {
-    "citation": "none — the instrument is correct; reality is stale",
+    "citation": "incident 2026-08-08 — measured, no code defect (see note)",
     "note": "Red since 2026-08-05. MEASURED live 2026-08-08 against each source's own stale_hours in ingestion/source_registry.py, not inherited from a prior handover: food_delivery 133d (thr 14), measurements 132d (thr 60), macrofactor 45d (thr 4), strava 5d (thr 2), supplements 5d (thr 2), garmin 54d but PAUSED by ADR-074. Every one is a manual-drop or behavioural source with no writer running - i.e. the alarm is telling the truth and there is no code defect to fix. Kept RED on purpose: suppressing it would make the freshness SLO unable to report the condition it exists for. Re-measure before carrying this note forward; the set changes as Matthew drops files."
   }
 }
