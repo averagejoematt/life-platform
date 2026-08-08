@@ -53,14 +53,25 @@ jobs:
         with:
           python-cache: 'pip'
 
+      # DEP PARITY WITH ci-test.yml IS LOAD-BEARING (#2258). This lane previously
+      # omitted pyyaml, which ci-test.yml installs. A module importing yaml INSIDE a
+      # function is invisible to `--collect-only`, so the missing dep was undetectable
+      # pre-merge and red-mained main on landing (2026-08-08). Keep this list equal to
+      # ci-test.yml's install step (minus pytest-cov, which only the coverage job needs);
+      # tests/test_premerge_lane.py asserts the two stay in sync.
       - name: Install lane dependencies
-        run: pip install pytest boto3==1.43.62 botocore==1.43.62 black==26.3.1 hypothesis==6.165.0  # boto3/botocore/hypothesis pinned to match requirements-dev.txt (CQ-01, #2058)
+        run: pip install pytest==9.1.1 boto3==1.43.62 botocore==1.43.62 black==26.3.1 hypothesis==6.165.0 pyyaml==6.0.3  # pinned to match requirements-dev.txt + ci-test.yml (CQ-01, #2058, #2258)
 
       - name: Collection gate (the #1297 class dies here)
         run: python3 -m pytest tests/ --collect-only -q
 
-      - name: Deploy-critical lane (ADR-117 marker subset)
-        run: python3 -m pytest tests/ -m "deploy_critical and not integration" -q --tb=short
+      # #2258: the pre-merge lane must not be a strict SUBSET of the post-merge one.
+      # `premerge` is applied automatically by tests/conftest.py to every
+      # tests/*_behavior.py test PLUS everything deploy_critical — so this is a strict
+      # superset of the old ADR-117 subset, not a swap. ~6,075 tests in ~30s (measured
+      # 2026-08-08) against this job's timeout-minutes: 10.
+      - name: Pre-merge test lane (premerge marker — behaviour + deploy-critical)
+        run: python3 -m pytest tests/ -m "premerge and not integration" -q --tb=short
 
       - name: Format gate (same pin as ci-cd lint)
         run: black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
