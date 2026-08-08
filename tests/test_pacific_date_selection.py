@@ -108,5 +108,14 @@ def test_nutrition_latest_complete_day_is_pacific():
     assert "pacific_today" in src
     # the two cited "latest complete day" defaults must no longer use a UTC now-1d:
     assert "datetime.now(timezone.utc) - timedelta(days=1)" not in src
-    # but the 30/90-day window starts are intentionally left (boundary-immaterial):
-    assert re.search(r"timedelta\(days=29\)|timedelta\(days=89\)", src)
+    # CORRECTION: this used to require a surviving `timedelta(days=29)` on the premise that
+    # the 30-day window START was "boundary-immaterial". It was not. Pairing a UTC-derived
+    # start with the Pacific-anchored end made the window 30 dates in the PT morning and 29
+    # in the UTC-evening window — the frame mismatch changed its LENGTH, which every average
+    # and deficiency verdict is computed over. `_nutrition_default_range` derives the start
+    # from the RESOLVED Pacific end, so NO window start may read the UTC wall clock at all.
+    assert "_nutrition_default_range" in src
+    # Structural, not textual: the module no longer imports `timezone` at all, so no default
+    # in it CAN read the UTC wall clock. (`datetime.now(timezone.utc)` still appears in the
+    # helper's docstring, describing the bug it replaced — a grep would match that prose.)
+    assert re.search(r"^from datetime import datetime, timedelta$", src, re.M)
