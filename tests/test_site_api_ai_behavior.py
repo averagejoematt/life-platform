@@ -971,6 +971,28 @@ def test_the_grounding_gate_cannot_certify_a_figure_the_prompt_string_corrupted(
     assert "2026-08-03" in allowed_dates
 
 
+def test_explain_refuses_a_corrupted_figure_even_when_the_prompt_string_contains_it(monkeypatch):
+    """#2276 end-to-end — the wiring, not just the helper.
+
+    `_handle_explain` must build its allow-list from the SOURCE payload. With the
+    prompt string corrupted by (a stand-in for) truncation, the reader gets the
+    refusal, not a confidently-narrated wrong number.
+    """
+    ai = _ai()
+    payload = {"total_steps": 9876543}
+    _wire_explain(ai, monkeypatch, payload=payload)
+    # Stand in for any corruption of the prompt string — that is the point: the
+    # gate must hold however `payload_txt` was produced.
+    monkeypatch.setattr(ai, "_shrink_for_prompt", lambda d, cap=9000: '{"total_steps": 98765')
+    _wire_bedrock(monkeypatch, text="Matthew walked 98765 steps this week.")
+
+    resp = ai._handle_explain(_event("/api/explain", body={"surface": "what_changed"}))
+    assert resp["statusCode"] == 200
+    explanation = json.loads(resp["body"])["explanation"]
+    assert "rather not narrate numbers" in explanation, f"the corrupted figure was certified: {explanation!r}"
+    assert "98765" not in explanation
+
+
 def test_the_tier_zero_streak_reaches_the_prompt_when_habit_scores_exist(monkeypatch):
     ai = _ai()
     monkeypatch.setattr(ai, "_latest_item", lambda s: None)
