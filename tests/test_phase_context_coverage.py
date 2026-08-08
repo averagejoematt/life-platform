@@ -420,7 +420,7 @@ NARRATIVE_BUILDER_FILES = [
     "lambdas/emails/chronicle_data.py",  # #1654 — build_data_packet (the phase-context injector) split out here
     "lambdas/emails/coach_panel_podcast_lambda.py",
     "lambdas/emails/podcast_script_v2.py",
-    "lambdas/web/site_api_ai_lambda.py",
+    "lambdas/web/site_api_ai_prompt.py",  # #2276 — _phase_context_block (the phase-context injector) split out here when site_api_ai_lambda crossed the god-module gate
     "lambdas/intelligence/integrator_prompts.py",  # #1115 — synthesis / month-rollup / arc builders
     "lambdas/intelligence/challenge_generator_lambda.py",  # #1118 — hoped_outcome rides the generation prompt
 ]
