@@ -60,11 +60,18 @@ import sys
 # Ratcheted 58->66 by #1658 TRANCHE 2 (2026-08-08): 17 more behavioral test files
 # moved MEASURED coverage 63.14% -> 70.50% on this branch's base (+7.36pt, 5,208
 # statements newly covered across 17 modules that sat at 4-56%). 66 keeps the same
-# ~4.4pt headroom-under-measured convention. NOTE for whoever ticks #1658's third
-# acceptance box: measured coverage is now PAST 70, but this enforced floor is
-# deliberately NOT 70 — a floor set 0.4pt under measured flaps on every ordinary
-# run. Enforcing 70 as the merge gate needs measured ~74.6 first.
-RATCHET_FLOOR = 66
+# ~4.4pt headroom-under-measured convention.
+# Ratcheted 66->74 by #1658 TRANCHE 3 (2026-08-08): 15 more behavioral test files
+# moved MEASURED coverage 70.50% -> 78.24% on this branch's base 520a7c12 (+7.74pt,
+# 5,565 statements newly covered across 15 modules that sat at 0-72% — the email
+# renderers, the daily-brief HTML builder, the social write surface, the coach
+# honesty engine and the whole untested mcp/tools_* family). 74 keeps the same
+# ~4.2pt headroom-under-measured convention.
+# #1658's THIRD acceptance box ("enforce 70% as the merge gate") is SATISFIED at
+# this value: the enforced gate is 74, above 70, and it was set from a measurement
+# rather than a target — tranche 2's note said that needed measured ~74.6, and
+# measured is 78.24.
+RATCHET_FLOOR = 74
 
 # ── THE MEASURED-COVERAGE HIGH-WATER MARK. UP-ONLY. (#1658) ──────────────────
 # Actual measured line coverage (lambdas/ + mcp/) as of the PR that last raised
@@ -78,7 +85,10 @@ RATCHET_FLOOR = 66
 # CI job's exact invocation and pinned deps after rebasing onto 367896b4; the mark
 # is banked a tenth of a point UNDER that. The mark is a floor for real coverage,
 # so rounding down costs nothing and buys jitter margin against main's churn.
-RATCHET_HIGH_WATER = 70.40
+# Raised 70.40 -> 78.10 by #1658 tranche 3 (2026-08-08). Measured 78.24 with the
+# CI job's exact invocation and pinned deps on base 520a7c12; banked a tenth of a
+# point under, same convention. The regression catch line is therefore 76.60%.
+RATCHET_HIGH_WATER = 78.10
 
 # The regression tolerance CI runs with. Mirrors coverage_gap_warn.py's default;
 # asserted equal below so the two can't drift (the #1206 drift class again).
