@@ -22,59 +22,41 @@ inch before the wire. Under a dry run it logs what *would* have gone out and
 returns a synthetic response, so callers that read ``["MessageId"]`` keep
 working and the whole build path is still exercised.
 
-The set is kept honest by ``tests/test_ses_send_guard_set.py``, which derives
-the member list from source (AST) rather than from a hand-written list, and
-fails the day a 19th SES-sending handler ships without a suppressor.
+**What lives where.** This module owns the *send* half only. What counts as a
+dry run in the first place is `common.dry_run` — one vocabulary for sends and
+writes alike, so `{"no_send": true}` cannot suppress the SES call in one Lambda
+and be silently ignored by the write gate in another.
+`tests/test_ses_send_guard_set_2222.py` pins that the two entry points can
+never disagree.
+
+The set is kept honest by that same file, which derives the member list from
+source (AST) rather than from a hand-written list, and fails the day a 19th
+SES-sending handler ships without a suppressor.
 """
 
 from __future__ import annotations
 
-import os
 from typing import Any, Mapping, Optional
 
-# Event keys that request a build-but-do-not-send run. ``dryRun`` is accepted
-# because a hand-typed console invoke is as likely to camelCase it.
-SUPPRESSOR_EVENT_KEYS = ("dry_run", "dryRun", "no_send", "preview_mode", "test_mode")
-
-# Environment variables with the same meaning, for the modules whose trigger
-# payload is not under an operator's control (EventBridge scheduled rules).
-SUPPRESSOR_ENV_VARS = ("DRY_RUN", "NO_SEND", "PREVIEW_MODE", "TEST_MODE")
-
-_FALSEY_STRINGS = {"", "0", "false", "no", "off", "none"}
+from common import dry_run as _dry_run
 
 DRY_RUN_MESSAGE_ID = "dry-run-suppressed"
 
 
-def _truthy(value: Any) -> bool:
-    """Truthiness with string semantics — ``"false"``/``"0"`` are False."""
-    if isinstance(value, str):
-        return value.strip().lower() not in _FALSEY_STRINGS
-    return bool(value)
-
-
-def is_dry_run(event: Optional[Any] = None, env: Optional[Mapping[str, str]] = None) -> bool:
+def is_dry_run(event: Optional[Any] = None) -> bool:
     """True when this invoke asked for a build-but-don't-send run.
 
-    Checks the event payload first (``{"dry_run": true}`` and its aliases),
-    then the environment. Anything that is not a mapping is ignored rather
-    than raising — an S3/SES record list is a legitimate event shape.
-    """
-    if isinstance(event, Mapping):
-        for key in SUPPRESSOR_EVENT_KEYS:
-            if key in event and _truthy(event[key]):
-                return True
-        # A scheduled rule can carry the flag one level down in a wrapper.
-        detail = event.get("detail")
-        if isinstance(detail, Mapping):
-            for key in SUPPRESSOR_EVENT_KEYS:
-                if key in detail and _truthy(detail[key]):
-                    return True
+    This module deliberately does NOT define its own answer — it delegates to
+    `common.dry_run`, which is the single definition of what a dry run *is*
+    (#2255/#2222). Two modules resolving the same flag with different
+    vocabularies is how `{"no_send": true}` came to suppress 17 Lambdas while
+    the daily brief ignored it and sent for real.
 
-    environ = os.environ if env is None else env
-    for name in SUPPRESSOR_ENV_VARS:
-        if _truthy(environ.get(name, "")):
-            return True
-    return False
+    `_dry_run.is_dry_run` reads the decision a handler already `stash()`ed on
+    the event when there is one, so a send site can never reach a different
+    verdict than the write gate that ran earlier in the same invocation.
+    """
+    return _dry_run.is_dry_run(event)
 
 
 def _describe(kwargs: Mapping[str, Any]) -> str:

@@ -41,6 +41,7 @@ LAMBDAS = ROOT / "lambdas"
 if str(LAMBDAS) not in sys.path:
     sys.path.insert(0, str(LAMBDAS))
 
+from common import dry_run  # noqa: E402
 from common.send_guard import DRY_RUN_MESSAGE_ID, guarded_send_email, is_dry_run  # noqa: E402
 
 # The SES client methods that put mail on the wire.
@@ -49,7 +50,13 @@ SES_SEND_METHODS = frozenset({"send_email", "send_raw_email", "send_templated_em
 # The sanctioned gate. A member of the set is guarded when every send goes
 # through one of these AND the module derives the flag with `is_dry_run`.
 GUARD_HELPERS = frozenset({"guarded_send_email", "guarded_send_raw_email"})
-GUARD_FLAG_FN = "is_dry_run"
+
+# How a module derives the flag from the invoke. Both the bare-name form
+# (`is_dry_run(event)`) and the module-qualified form a write gate uses
+# (`dry_run.stash(event)`) count — after #2255/#2222 converged on one
+# vocabulary, a handler that already stashed the decision for its write gate
+# must not be told to re-derive it for its send gate.
+GUARD_FLAG_FNS = frozenset({"is_dry_run", "stash"})
 
 # ── Allowlist 1: modules that already carried an equivalent, hand-rolled gate
 # before #2222 and were left on it deliberately (converting them would be churn
@@ -123,10 +130,12 @@ def derive_ses_sending_handlers(root: Path) -> dict:
             func = node.func
             if isinstance(func, ast.Attribute) and func.attr in SES_SEND_METHODS:
                 facts.direct_ses_lines.append(node.lineno)
+            elif isinstance(func, ast.Attribute) and func.attr in GUARD_FLAG_FNS:
+                facts.derives_flag = True  # `dry_run.stash(event)` / `dry_run.is_dry_run(event)`
             elif isinstance(func, ast.Name):
                 if func.id in GUARD_HELPERS:
                     facts.guarded_lines.append(node.lineno)
-                elif func.id == GUARD_FLAG_FN:
+                elif func.id in GUARD_FLAG_FNS:
                     facts.derives_flag = True
 
         if facts.direct_ses_lines or facts.guarded_lines:
@@ -320,6 +329,118 @@ class _FakeSes:
         return {"MessageId": "real-raw-send"}
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# One definition of "dry run" — the SES gate and the write gate must agree
+#
+# #2255 (daily brief) and #2222 (the SES set) each shipped a module that
+# answers "is this invocation a dry run", with different vocabularies. The
+# divergence was not cosmetic: `{"no_send": true}` suppressed 17 Lambdas and
+# was silently ignored by the brief, which sent for real; `{"force_send": true}`
+# was honoured by the brief and ignored by the 17. `send_guard.is_dry_run` now
+# delegates to `common.dry_run`, and these tests are the property that stops
+# them drifting apart again — neither PR could have had them alone.
+# ──────────────────────────────────────────────────────────────────────────
+
+_AGREEMENT_EVENTS = [
+    {},
+    None,
+    [{"Records": []}],  # a non-mapping event must not raise on either side
+    {"dry_run": True},
+    {"dry_run": False},
+    {"dry_run": "true"},
+    {"dry_run": "false"},
+    {"dry_run": "0"},
+    {"dryRun": True},
+    {"no_send": True},
+    {"preview_mode": True},
+    {"test_mode": True},
+    {"detail": {"dry_run": True}},
+    {"detail": {"no_send": True}},
+    {"force_send": True},
+    {"dry_run": True, "force_send": True},
+    {dry_run.FLAG: True},  # a decision an earlier gate already stashed
+    {dry_run.FLAG: False, "dry_run": True},  # the stash wins — one decision per invoke
+]
+
+_AGREEMENT_ENVS = [{}, {"DRY_RUN": "true"}, {"DRY_RUN": "false"}, {"NO_SEND": "1"}, {"PREVIEW_MODE": "yes"}]
+
+
+@pytest.mark.parametrize("env", _AGREEMENT_ENVS)
+@pytest.mark.parametrize("event", _AGREEMENT_EVENTS)
+def test_the_send_gate_and_the_write_gate_never_disagree(event, env, monkeypatch):
+    """There is no event for which mail is suppressed but writes are not (or
+    vice versa). `persistence_enabled` is the write half of the same decision,
+    so with `demo_mode` off it must be the exact negation of the send half."""
+    for name in dry_run.SUPPRESSOR_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
+
+    suppresses_mail = is_dry_run(event)
+    may_write = dry_run.persistence_enabled(event, demo_mode=False)
+    assert suppresses_mail is not may_write, f"send gate and write gate disagree for event={event!r} env={env!r}"
+
+
+@pytest.mark.parametrize("key", list(dry_run.SUPPRESSOR_EVENT_KEYS))
+def test_every_alias_in_the_vocabulary_suppresses_both_halves(key, monkeypatch):
+    """Derived from the vocabulary itself, so a 6th alias added to
+    `common.dry_run` is automatically required to work on both halves — the
+    exact failure this convergence fixes."""
+    for name in dry_run.SUPPRESSOR_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+    event = {key: True}
+    assert is_dry_run(event) is True, f"{key!r} is in the vocabulary but does not suppress sends"
+    assert dry_run.persistence_enabled(event) is False, f"{key!r} is in the vocabulary but does not suppress writes"
+
+
+@pytest.mark.parametrize("name", list(dry_run.SUPPRESSOR_ENV_VARS))
+def test_every_env_var_in_the_vocabulary_suppresses_both_halves(name, monkeypatch):
+    for other in dry_run.SUPPRESSOR_ENV_VARS:
+        monkeypatch.delenv(other, raising=False)
+    monkeypatch.setenv(name, "true")
+    assert is_dry_run({}) is True
+    assert dry_run.persistence_enabled({}) is False
+
+
+def test_force_send_overrides_the_environment_on_both_halves(monkeypatch):
+    """An operator's one-off real send must behave the same whichever Lambda
+    they invoke — this was honoured by the brief and ignored by the 17."""
+    monkeypatch.setenv("DRY_RUN", "true")
+    assert is_dry_run({"force_send": True}) is False
+    assert dry_run.persistence_enabled({"force_send": True}) is True
+
+
+def test_an_explicit_suppressor_outranks_force_send(monkeypatch):
+    """Asking for both is a mistake; the safe reading of a mistake is "do not
+    send". Both halves must read it the same way."""
+    for name in dry_run.SUPPRESSOR_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+    event = {"dry_run": True, "force_send": True}
+    assert is_dry_run(event) is True
+    assert dry_run.persistence_enabled(event) is False
+
+
+def test_send_guard_does_not_define_its_own_resolution():
+    """The delegation is the point. If `send_guard` regrows a vocabulary, the
+    two halves can diverge again without any test above noticing."""
+    import common.send_guard as sg
+
+    for leaked in ("SUPPRESSOR_EVENT_KEYS", "SUPPRESSOR_ENV_VARS", "_FALSEY_STRINGS", "_truthy"):
+        assert not hasattr(sg, leaked), f"send_guard re-grew its own flag resolution ({leaked}) — delegate to common.dry_run"
+
+
+def test_resolve_rejects_the_string_false(monkeypatch):
+    """`resolve` used plain truthiness before this PR, so `{"dry_run": "false"}`
+    — the shape a hand-typed console payload produces — read as a dry run and
+    silently disabled the send it was meant to permit."""
+    for name in dry_run.SUPPRESSOR_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+    for falsey in ("false", "False", "0", "no", "off", "", "  "):
+        assert dry_run.resolve({"dry_run": falsey}) is False, f"{falsey!r} read as a dry run"
+    for truthy in ("true", "True", "1", "yes"):
+        assert dry_run.resolve({"dry_run": truthy}) is True
+
+
 @pytest.mark.parametrize(
     "event,expected",
     [
@@ -340,7 +461,7 @@ class _FakeSes:
     ],
 )
 def test_is_dry_run_event_shapes(event, expected, monkeypatch):
-    for name in ("DRY_RUN", "NO_SEND", "PREVIEW_MODE", "TEST_MODE"):
+    for name in dry_run.SUPPRESSOR_ENV_VARS:
         monkeypatch.delenv(name, raising=False)
     assert is_dry_run(event) is expected
 
