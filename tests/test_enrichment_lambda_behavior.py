@@ -3,11 +3,14 @@ nightly activity enricher (`lambdas/ingestion/enrichment_lambda.py`).
 
 The `activity-enrichment` Lambda is a WRITE-BACK enricher: it re-opens stored
 Strava day records and stamps `enriched_name` / `enriched_at` onto every nested
-activity. Five reader surfaces render that label —
-`lambdas/web/site_api_autonomic.py`, `lambdas/web/site_api_vitals_depth.py`,
-the weekly + monthly digest emails, and `mcp/tools_data.py::search_activities`
-(which SEARCHES it) — so a defect here is simultaneously a website defect, an
-email defect and a retrieval defect.
+activity. SEVEN reader surfaces render or search that label (grep `enriched_name`
+outside this module — the count was stated as five and was wrong):
+`lambdas/web/site_api_autonomic.py:303`, `lambdas/web/site_api_vitals_depth.py:237`,
+`lambdas/emails/weekly_digest_lambda.py:315`, `lambdas/emails/monthly_digest_lambda.py:236`,
+`mcp/tools_correlation.py:99`, `mcp/helpers.py:56`, and
+`mcp/tools_data.py:184::search_activities` (which SEARCHES it, case-insensitively
+on both sides) — so a defect here is simultaneously a website defect, an email
+defect and a retrieval defect.
 
 What these tests pin:
 
@@ -31,6 +34,11 @@ Tests marked xfail record defects discovered by the #1658 tranche-3 sweep and
 still open. The durability defect (#2250 — every enrichment destroyed by the next
 Strava ingest of the same day) WAS fixed: its xfail is now a real assertion driven
 through `ingestion_framework._store_item`, not a simulated replace.
+
+#2221 (2026-08-08) burned the remaining tranche-3 cluster: 11 of the 12 markers
+were real defects and are now fixed assertions. The ONE survivor is the
+bisect_left tie marker below — it describes CORRECT behaviour and its `reason`
+carries the full correction so nobody re-attempts it.
 """
 
 import ast
@@ -285,10 +293,39 @@ def test_the_label_names_the_metric_it_ranked():
         "1% elevation ever' label, and the rank shown is a false factual claim "
         "(ADR-104). bisect_right — the share at-or-below — is the honest statistic. "
         "Hurts every reader of enriched_name and every search over it."
+        "\n\n"
+        "CORRECTION (#2221, 2026-08-08) — LEFT AS CORRECT BEHAVIOUR, do not re-attempt. "
+        "The prescribed remedy is wrong on three counts. (1) bisect_right contradicts "
+        "three sibling contracts in this very file that define the statistic as the "
+        "share STRICTLY BELOW: the 0..99 population would rank 50.0 at 51.0, the "
+        "all-time best at 100.0 and Decimal('2') of [1,2,3] at 66.7. (2) It is "
+        "internally incoherent: under bisect_right a value TIED with the max scores "
+        "100.0 while the UNIQUE all-time best of a distinct hundred scores 99.0 — a "
+        "tie would outrank an outright win. (3) The stated harm does not occur at "
+        "production scale, which is what `test_a_tie_at_the_top_of_a_real_archive_"
+        "still_earns_the_label` now pins: three activities tied at the max of a "
+        "1,000-activity archive rank 99.7 and DO earn 'top 1% elevation ever'. The "
+        "n=3 reproduction is degenerate — there, all three efforts are simultaneously "
+        "the best AND the worst, and bisect_right would publish 'top 1% ever' for "
+        "100% of the archive. That is the ADR-104 fabrication class this marker "
+        "invokes, pointing the wrong way: the rarity claim would be the fabrication. "
+        "The 0.0 the marker measured is the honest answer to 'what share of my "
+        "activities did this beat' when the answer is none of them."
     ),
 )
 def test_an_effort_tied_with_the_all_time_best_still_ranks_at_the_top():
     assert en.percentile([1000.0, 1000.0, 1000.0], 1000.0) == 100.0
+
+
+def test_a_tie_at_the_top_of_a_real_archive_still_earns_the_label():
+    """The correction above, pinned: the tie only loses the label when the tie
+    group is genuinely too big to be rare. Three matching climbs in a thousand
+    activities are still top 1%; five hundred matching climbs are not."""
+    archive = [float(i) for i in range(997)] + [1000.0, 1000.0, 1000.0]
+    assert en.percentile_label(en.percentile(sorted(archive), 1000.0), "elevation") == "top 1% elevation ever"
+
+    half = [float(i) for i in range(500)] + [1000.0] * 500
+    assert en.percentile_label(en.percentile(sorted(half), 1000.0), "elevation") is None
 
 
 # ══════════════════════════════════════════════════════════════════════════════
