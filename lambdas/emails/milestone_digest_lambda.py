@@ -35,6 +35,7 @@ import boto3
 from coach import spiral_breaker  # noqa: F401 — registered celebratory emitter (#1627); used via check_celebration_allowed
 from common.pacific_time import pacific_today
 from common.secret_cache import get_secret_json
+from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 from experiment.phase_taxonomy import experiment_stamp
 from health import milestone_ledger
 
@@ -105,7 +106,7 @@ def _note(event: dict, name: str) -> tuple[str, str]:
     return f"From Matthew's experiment: {label}", "\n".join(lines)
 
 
-def _send(recipient: dict, reply_to: str | None, subject: str, body: str) -> bool:
+def _send(recipient: dict, reply_to: str | None, subject: str, body: str, dry_run: bool = False) -> bool:
     kwargs = {
         "FromEmailAddress": SENDER,
         "Destination": {"ToAddresses": [recipient["email"]]},
@@ -114,7 +115,7 @@ def _send(recipient: dict, reply_to: str | None, subject: str, body: str) -> boo
     if reply_to:
         kwargs["ReplyToAddresses"] = [reply_to]
     try:
-        ses.send_email(**kwargs)
+        guarded_send_email(ses, dry_run, **kwargs)
         return True
     except Exception as exc:  # noqa: BLE001 — one bad address must not sink the rest
         logger.error(f"[milestone-digest] send failed for one recipient: {exc}")
@@ -135,7 +136,7 @@ def _celebration_allowed() -> bool:
 
 def lambda_handler(event: dict, context) -> dict:  # noqa: ARG001
     try:
-        return _run()
+        return _run(dry_run=is_dry_run(event))
     except Exception:
         # I4: fail loudly into the DLQ/digest-alarm path — a swallowed error here
         # would silently kill the platform's best downturn-signal channel.
@@ -143,7 +144,7 @@ def lambda_handler(event: dict, context) -> dict:  # noqa: ARG001
         raise
 
 
-def _run() -> dict:
+def _run(dry_run: bool = False) -> dict:
     today = pacific_today()
     stamp = experiment_stamp()
 
@@ -184,7 +185,7 @@ def _run() -> dict:
     delivered = 0
     for recipient in recipients:
         subject, body = _note(ev, recipient["name"])
-        if _send(recipient, reply_to, subject, body):
+        if _send(recipient, reply_to, subject, body, dry_run=dry_run):
             delivered += 1
     if delivered == 0:
         # Nothing went out: leave the cursor untouched so tomorrow retries, and

@@ -40,6 +40,7 @@ from coach import coach_nudge_engine as engine
 from coach.coach_checkin import read_cycle
 from coach.persona_registry import OPERATIONAL_COACH_IDS
 from common.pacific_time import PACIFIC
+from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -397,7 +398,7 @@ def _gate(copy_text: str, firing: dict, coach_name: str) -> list:
     return findings
 
 
-def _send_email(coach_name: str, copy_text: str) -> None:
+def _send_email(coach_name: str, copy_text: str, dry_run: bool = False) -> None:
     subject = f"A note from {coach_name}"
     html = (
         "<div style='font-family:Georgia,serif;max-width:540px;margin:0 auto;padding:24px;color:#1a1a1a'>"
@@ -407,7 +408,9 @@ def _send_email(coach_name: str, copy_text: str) -> None:
         "fine to ignore — nothing is waiting on a reply.</p>"
         "</div>"
     )
-    _ses().send_email(
+    guarded_send_email(
+        _ses(),
+        dry_run,
         FromEmailAddress=SENDER,
         Destination={"ToAddresses": [RECIPIENT]},
         Content={
@@ -427,6 +430,7 @@ def _finalize(date_pt: str, nudge_item: dict) -> None:
 
 
 def lambda_handler(event: dict, context) -> dict:
+    dry_run = is_dry_run(event)
     now_utc = datetime.now(timezone.utc)
     now_pt = now_utc.astimezone(PACIFIC)
     date_pt = now_pt.date().isoformat()
@@ -474,7 +478,7 @@ def lambda_handler(event: dict, context) -> dict:
         return {"statusCode": 200, "graded": graded, "nudge": "blocked", "reason": "gate", "findings": findings}
 
     try:
-        _send_email(coach_name, copy_text)
+        _send_email(coach_name, copy_text, dry_run=dry_run)
     except Exception as e:  # noqa: BLE001
         logger.error("[nudge] SES send failed: %s", e)
         item = engine.build_nudge_item(

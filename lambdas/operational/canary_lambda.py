@@ -60,6 +60,7 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 from common.mcp_url import resolve_mcp_url  # SEC-02 #780: discover the URL at runtime, not a committed env var
+from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
 from operational.canary_lanes import (  # #2051: one registry decides what gates a rollback
     LANE_INFRA,
@@ -533,7 +534,7 @@ def check_subscribe_flow(canary_ts: str) -> tuple[bool, str, float, dict]:
         return False, f"subscribe canary error: {e}", latency, {}
 
 
-def send_alert(failures: list[dict], canary_ts: str) -> None:
+def send_alert(failures: list[dict], canary_ts: str, dry_run: bool = False) -> None:
     rows = ""
     for f in failures:
         # #2051: name the lane in the email. "Canary failed" was ambiguous
@@ -573,7 +574,9 @@ def send_alert(failures: list[dict], canary_ts: str) -> None:
 </div></body></html>"""
 
     try:
-        ses.send_email(
+        guarded_send_email(
+            ses,
+            dry_run,
             FromEmailAddress=SENDER,
             Destination={"ToAddresses": [RECIPIENT]},
             Content={
@@ -592,6 +595,7 @@ def send_alert(failures: list[dict], canary_ts: str) -> None:
 
 
 def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
+    dry_run = is_dry_run(event)
     try:
         canary_ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -729,7 +733,7 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
                 f"  Sending alert: {len(persistent_failures)} persistent + "
                 f"{len(first_occurrence_stored_state)} first-occurrence stored-state failure(s)"
             )
-            send_alert(to_alert, canary_ts)
+            send_alert(to_alert, canary_ts, dry_run=dry_run)
         elif failures:
             print(f"  Suppressed first-occurrence alert ({len(failures)} new infra failure(s)); will alert if repeat next run")
 

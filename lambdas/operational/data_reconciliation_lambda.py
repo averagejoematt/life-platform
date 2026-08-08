@@ -38,6 +38,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import boto3
+from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -207,6 +208,7 @@ def build_html_report(dates: list[str], source_results: list[dict], severity: st
 
 
 def lambda_handler(event, context):
+    dry_run = is_dry_run(event)
     logger.info("[reconciliation] Starting weekly data reconciliation")
 
     today = datetime.now(timezone.utc).date()
@@ -251,7 +253,9 @@ def lambda_handler(event, context):
     subject = f"📊 Weekly Reconciliation | {week_label} | {severity}"
 
     try:
-        ses.send_email(
+        guarded_send_email(
+            ses,
+            dry_run,
             FromEmailAddress=SENDER,
             Destination={"ToAddresses": [RECIPIENT]},
             Content={

@@ -61,6 +61,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 import boto3
+from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -440,7 +441,7 @@ def page_operator(escalations: list[dict]) -> None:
         logger.error(f"  Failed to publish SNS escalation: {e}")
 
 
-def send_alert(escalations: list[dict]) -> None:
+def send_alert(escalations: list[dict], dry_run: bool = False) -> None:
     """Send a single consolidated SES summary for all escalated failures in this run."""
     if not escalations:
         return
@@ -489,7 +490,9 @@ def send_alert(escalations: list[dict]) -> None:
 </div></body></html>"""
 
     try:
-        ses.send_email(
+        guarded_send_email(
+            ses,
+            dry_run,
             FromEmailAddress=SENDER,
             Destination={"ToAddresses": [RECIPIENT]},
             Content={
@@ -588,6 +591,7 @@ def _time_left_ms(context, started: float) -> int:
 
 
 def lambda_handler(event, context):
+    dry_run = is_dry_run(event)
     try:
         if not DLQ_URL:
             logger.error("DLQ_URL env var not set — cannot poll SQS")
@@ -630,7 +634,7 @@ def lambda_handler(event, context):
         # ── Escalate (page + summary) ──────────────────────────────────────────────
         if escalations:
             page_operator(escalations)
-            send_alert(escalations)
+            send_alert(escalations, dry_run=dry_run)
 
         logger.info(
             f"DLQ run complete: processed={processed} "
