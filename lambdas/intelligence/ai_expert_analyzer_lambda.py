@@ -1140,6 +1140,12 @@ def generate_and_cache(expert_key, shared_system=None):
         analysis_text = parts[0].rstrip()
         key_recommendation = parts[1].strip()
 
+    # #2218: an empty/refusal-shaped (or tag-extraction-consumed) response must never
+    # overwrite a good cached analysis — bail before touching the DDB record at all.
+    if not analysis_text.strip():
+        logger.warning("generate_and_cache: empty response for %s — cached record preserved (#2218)", expert_key)
+        return ""
+
     now = datetime.now(timezone.utc)
     ttl = int((now + timedelta(days=8)).timestamp())
 
@@ -1941,8 +1947,12 @@ def lambda_handler(event, context):
                 continue
             try:
                 text = generate_and_cache(expert_key, shared_system=shared_system)
-                results[expert_key] = {"status": "ok", "chars": len(text)}
-                all_outputs[expert_key] = text
+                if text and text.strip():
+                    results[expert_key] = {"status": "ok", "chars": len(text)}
+                    all_outputs[expert_key] = text
+                else:
+                    # #2218: empty generation — never "ok" (chars: 0 reads as success); excluded from synthesis.
+                    results[expert_key] = {"status": "skipped_empty", "chars": 0}
             except Exception as e:
                 logger.error(f"Failed to generate {expert_key}: {e}")
                 results[expert_key] = {"status": "error", "error": str(e)}
