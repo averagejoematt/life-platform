@@ -83,12 +83,31 @@ except ImportError:  # pragma: no cover — flat/layer bundle layout
 # work that belongs next to the gate, not smeared across every caller. Re-exported here
 # so no caller's import path changes; `LogAvailability` rides along because it is the
 # argument type callers now pass as `available_logs`.
+#
+# #2382 adds the absence-TRANSITION family alongside it: the sets answer "was there a log
+# that day", and could not tell "logged, then stopped four days ago" apart from "never
+# logged in this window at all" — so six live coach cards narrated a pause that never
+# happened. `AbsenceTransition` / `absence_transition_findings` ride along the same way.
 try:
-    from ai.behavior_logs import LOG_CATEGORIES, LogAvailability, ungrounded_behavioral_findings  # noqa: F401
+    from ai.behavior_logs import (  # noqa: F401
+        LOG_CATEGORIES,
+        AbsenceTransition,
+        LogAvailability,
+        absence_transition,
+        absence_transition_findings,
+        absence_transitions,
+        transition_from_presence_signal,
+        ungrounded_behavioral_findings,
+    )
 except ImportError:  # pragma: no cover — flat/layer bundle layout
     from behavior_logs import (  # type: ignore[no-redef]  # noqa: F401
         LOG_CATEGORIES,
+        AbsenceTransition,
         LogAvailability,
+        absence_transition,
+        absence_transition_findings,
+        absence_transitions,
+        transition_from_presence_signal,
         ungrounded_behavioral_findings,
     )
 

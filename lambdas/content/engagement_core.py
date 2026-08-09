@@ -470,6 +470,22 @@ def _num_or_none(v):
         return None
 
 
+def _food_absence_transition(sig):
+    """The food channel's `ai.behavior_logs.AbsenceTransition`, or None if unavailable.
+
+    Fail-soft by design: the import is local and guarded so this module — which the site
+    API and several non-AI renderers import — never hard-depends on the AI package being
+    present in a given bundle. A failed derivation degrades to the pre-derivation
+    `last_food_log_date is None` read below, never to the false-transition wording.
+    """
+    try:
+        from ai.behavior_logs import transition_from_presence_signal
+
+        return transition_from_presence_signal(sig, "nutrition")
+    except Exception:  # pragma: no cover - defensive; the fallback branch covers it
+        return None
+
+
 def presence_prompt_block(sig):
     """A steering block for when Matthew's OWN logging has gone quiet (or he just
     returned). Empty string when he's present. This is what stops a narrative
@@ -504,15 +520,21 @@ def presence_prompt_block(sig):
     else:
         gap = _num_or_none(sig.get("gap_days"))
         last = sig.get("last_food_log_date")
-        if last is None:
-            # #2382: last_food_log_date=None means NOTHING was logged this cycle —
-            # gap_days is the #955 genesis clamp measuring the WINDOW, not a pause.
-            # The old wording here ("it has been ~4 days since his last food log")
-            # handed every coach a transition that never happened, and six of the
-            # eight live cards narrated it ("your food logs paused four days ago",
-            # "dark since around August 2nd") while the cockpit one door away said
-            # the source was 44 days quiet. State the true fact; forbid the false one.
-            win = sig.get("experiment_window_start")
+        # #2382 (the structural half): the branch is DERIVED, not hand-read off a None.
+        # `transition_from_presence_signal` classifies the food channel from the DATES on
+        # the record — never_logged / paused / logged / unknown — and only `paused` ever
+        # carries a day-count. #2394 fixed the prompt wording here; a prompt rule is not a
+        # structure, so the wording now hangs off a kind the derivation cannot mislabel.
+        food_transition = _food_absence_transition(sig)
+        never_logged = food_transition.kind == "never_logged" if food_transition is not None else last is None
+        if never_logged:
+            # NOTHING was logged this cycle — gap_days is the #955 genesis clamp
+            # measuring the WINDOW, not a pause. The old wording here ("it has been ~4
+            # days since his last food log") handed every coach a transition that never
+            # happened, and six of the eight live cards narrated it ("your food logs
+            # paused four days ago", "dark since around August 2nd") while the cockpit
+            # one door away said the source was 44 days quiet.
+            win = food_transition.window_start or sig.get("experiment_window_start")
             gap_txt = f" — the window opened {f'{gap:g} days ago' if gap is not None else 'recently'}" + (f" ({win})" if win else "")
             lines.append(
                 f"NOTHING has been logged this cycle{gap_txt}, with no food log at any point in it. "
@@ -523,12 +545,20 @@ def presence_prompt_block(sig):
                 "'went silent N days ago': no pause happened this cycle, there was nothing to pause. Do NOT "
                 "date a transition ('since Tuesday', 'around August 2nd') — no such event exists."
             )
+            if food_transition is not None:
+                # The deterministic input itself, verbatim (ADR-105) — computed from the
+                # dates on the record before any model sees the block, and structurally
+                # incapable of carrying a day-count for a never-logged channel.
+                lines.append(f"GROUND TRUTH (derived, not narrated): {food_transition.narrative_input()}")
         else:
             gap_txt = f"~{gap} days" if gap is not None else "several days"
             lines.append(f"Matthew's OWN logging has gone quiet — it has been {gap_txt} since his last food log (last logged {last}).")
         quiet = sig.get("channels_quiet") or []
         if quiet:
-            lines.append(f"Channels gone silent: {', '.join(str(q) for q in quiet)}.")
+            # #2382: "gone silent" is a TRANSITION, and this list includes channels that
+            # never logged in the window at all — the block's own guard flags its own
+            # sentence. State the standing condition, which is true either way.
+            lines.append(f"Channels with no current logs: {', '.join(str(q) for q in quiet)}.")
         if sig.get("passive_still_flowing"):
             lines.append(
                 "His WEARABLES are still reporting — the passive data (sleep/recovery/RHR) keeps flowing even though he stopped logging, so you can see the consequences but not the cause."
