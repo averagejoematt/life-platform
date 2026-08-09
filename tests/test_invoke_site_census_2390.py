@@ -234,10 +234,6 @@ UNGATED_READER_KNOWN: dict[str, dict[str, object]] = {
         "note": "the anomaly hypothesis enters the chronicle data packet as a grounding SOURCE — model-introduced numbers become "
         "allow-list vocabulary for reader text.",
     },
-    "lambdas/emails/partner_email_lambda.py": {
-        "issue": 2423,
-        "note": "the only AI sender addressed to a human who is not Matthew, fully ungated, with a SECOND direct bedrock seam in its fallback.",
-    },
     "lambdas/intelligence/challenge_generator_lambda.py": {
         "issue": 2424,
         "note": "/api/challenges serves candidate rows, so LLM-authored challenge copy is reader-visible before review.",
@@ -527,6 +523,24 @@ class TestMutationProof:
         stale_table["lambdas/compute/module_that_was_deleted.py"] = _ex(OPERATIONAL, "x" * 61)
         stale = [m for m in stale_table if m not in SITES]
         assert stale == ["lambdas/compute/module_that_was_deleted.py"]
+
+
+class TestPartnerEmailResolved2423:
+    """#2423: the partner email left UNGATED_READER_KNOWN by landing a SURFACES
+    registration, and its second seam (the direct-bedrock fallback) is gone.
+    The census must see ONE seam, and it must classify as a registered surface."""
+
+    def test_partner_email_has_exactly_one_seam(self):
+        assert SITES.get("lambdas/emails/partner_email_lambda.py") == {"call_anthropic_raw"}, (
+            "partner_email_lambda must reach the model through retry_utils.call_anthropic_raw ONLY — "
+            "its direct-bedrock fallback seam was retired by #2423 and must not come back. "
+            f"seams seen: {sorted(SITES.get('lambdas/emails/partner_email_lambda.py', set()))}"
+        )
+
+    def test_partner_email_is_a_registered_surface_not_a_tracked_defect(self):
+        module = "lambdas/emails/partner_email_lambda.py"
+        assert classify(module, SURFACE_MODULES) == ["surfaces"]
+        assert module not in UNGATED_READER_KNOWN and module not in EXEMPTIONS
 
 
 class TestExtractThreadIsGuarded:
