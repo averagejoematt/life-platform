@@ -202,7 +202,13 @@ def vitals(date: str | None = None, *, _g) -> dict:
     # #1955: the shared PT day-index helper — the same formula the home og uses,
     # so this disclosure and the share card cannot disagree on the day number.
     _day_n = pacific_day_n(EXPERIMENT_START, on_date=today)
-    _bits = [f"Today is Day {_day_n} of the cycle that began {EXPERIMENT_START}, so at most {_day_n} day(s) of data can exist."]
+    if _day_n < 1:
+        # Pre-start countdown (#931/#939): the cycle hasn't begun, so "Day 0 of the
+        # cycle that began …" would claim a start that hasn't happened (reader-truth
+        # finding at the cycle-13 reset, genesis in the future).
+        _bits = [f"The cycle begins {EXPERIMENT_START}; today is pre-start, so no cycle data exists yet."]
+    else:
+        _bits = [f"Today is Day {_day_n} of the cycle that began {EXPERIMENT_START}, so at most {_day_n} day(s) of data can exist."]
     if weight_delta is not None and weight_delta_window_days is not None:
         _bits.append(
             f"weight_delta_lbs is the change between two weigh-ins {weight_delta_window_days} day(s) apart, both inside that window."

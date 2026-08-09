@@ -143,7 +143,7 @@ function entriesFor(s, data) {
     // date are the Prologue (numbered by date); after it they're Week N counted from
     // genesis. The raw `week` field can repeat (two "Week 1" shipped), so it never
     // drives the displayed label.
-    const GENESIS = "2026-08-03";
+    const GENESIS = "2026-08-10";
     const ROMAN = ["I", "II", "III", "IV", "V", "VI"];
     // #1988 — tie-break by the explicit `sequence` field (the same (date, sk)-derived
     // ordinal the server numbers labels/URLs from), not by date alone: two Prologue
