@@ -1561,6 +1561,42 @@ def test_deficit_sustainability_is_unavailable_and_says_why_below_seven_logged_d
     assert "7" in ds["reason"]
 
 
+def test_the_unavailable_reason_states_the_count_not_a_cause():
+    """#2386: with zero logged days the reason is the count-based truth. The old
+    copy asserted a cause — "the cut is too new to read its cost yet" — which is
+    false from Day 7 onward whenever the logger is simply dark. The data supports
+    a count; it does not support a cause."""
+    ds = sustainability(FakeSources())["deficit_sustainability"]
+    assert ds["days_logged"] == 0
+    assert ds["reason"] == "Needs ≥7 logged days — 0 so far."
+
+
+def test_the_unavailable_reason_carries_the_actual_logged_day_count():
+    # 3 logged days -> the reason states 3, not a canned zero and not a cause.
+    src = FakeSources(macrofactor=[mf(f"2026-05-0{d}", total_calories_kcal=2000) for d in (7, 8, 9)])
+    ds = sustainability(src)["deficit_sustainability"]
+    assert ds["days_logged"] == 3
+    assert "3 so far" in ds["reason"]
+
+
+def test_seven_logged_days_render_the_real_computation_with_no_reason_string():
+    """#2386 companion: at >=7 days the section is the real five-channel read —
+    no unavailable-state reason ships alongside it."""
+    ds = sustainability(_sust_sources(mf_days=7))["deficit_sustainability"]
+    assert ds["available"] is True
+    assert "reason" not in ds
+    assert "channels" in ds and "verdict" in ds
+
+
+def test_no_path_in_the_module_or_its_js_fallback_asserts_the_too_new_cause():
+    """#2386 source-level check: the false-cause phrasing is GONE — from the
+    handler module (every reason path) and from the evidence_nutrition.js
+    fallback that mirrors it as defense-in-depth."""
+    assert "too new" not in inspect.getsource(nut)
+    js = pathlib.Path(inspect.getfile(nut)).parent.parent.parent / "site" / "assets" / "js" / "evidence_nutrition.js"
+    assert "too new" not in js.read_text(encoding="utf-8")
+
+
 def test_deficit_sustainability_publishes_no_verdict_or_channels_when_unavailable():
     """An unavailable read must not ship a half-built payload the page can misread."""
     ds = sustainability(FakeSources())["deficit_sustainability"]

@@ -986,7 +986,11 @@ def deficit_sustainability(*, _g) -> dict:
                 "deficit_sustainability": {
                     "available": False,
                     "days_logged": len(mf),
-                    "reason": "Needs ≥7 logged days; the cut is too new to read its cost yet.",
+                    # #2386: state the count-based truth only. The old copy asserted a
+                    # cause (a freshly-started cut) that is false from Day 7 onward
+                    # whenever the logger is simply dark — the data supports the count,
+                    # not a cause. Mirrors the reconciliation copy's honest form.
+                    "reason": f"Needs ≥7 logged days — {len(mf)} so far.",
                 }
             },
             cache_seconds=3600,
