@@ -117,6 +117,15 @@ def vitals(date: str | None = None, *, _g) -> dict:
     else:
         _vr = vitals_resolver.resolve_vitals(table, USER_PREFIX)
 
+    # #2344: as_of_date is a SINGLE document-level date stamped over fields that
+    # can genuinely carry different as-of dates (recovery finalizes separately
+    # from sleep; weight is a same-day behavioral source that may lag both).
+    # Hoisted here (was computed further down, after the disclosure text was
+    # already built) so the divergence sentence below can actually see it.
+    _recovery_as_of = _vr.get("recovery_as_of")
+    _sleep_as_of = _vr.get("sleep_as_of")
+    _as_of = _recovery_as_of or _sleep_as_of or today
+
     # 30d averages + trends. Order by date (oldest→newest) explicitly so the
     # half-vs-half trend is chronological by construction, not dependent on query
     # return order (the prior constant-key sort was a no-op that only worked because
@@ -203,11 +212,29 @@ def vitals(date: str | None = None, *, _g) -> dict:
     _bits.append(
         "Fields named *_30d stay null until a genuine 30-day window exists; none of the numbers above claims more history than the cycle has."
     )
+    # #2344: as_of_date is one document-level date stamped over fields whose real
+    # as-of dates differ. Measured live 2026-08-09: weight_as_of 2026-08-03 next to
+    # as_of_date 2026-08-08 — NOT a stale number (cycle 12 genesis is 2026-08-03 and
+    # weight is a behavioral source; a Day-1 weigh-in can genuinely be the newest one
+    # that exists), but the document only ever said "as of 2026-08-08" and let the
+    # reader infer the weight was current too. Name the divergence instead of hiding
+    # it, and ONLY when it's real — most days weight_as_of == as_of_date and this
+    # stays silent.
+    if weight_as_of and weight_as_of != _as_of:
+        _bits.append(
+            f"weight_as_of ({weight_as_of}) is the most recent weigh-in and differs from as_of_date ({_as_of}) — "
+            "weight is a same-day behavioral source updated only when a scale reading exists, so an older weigh-in "
+            "can still be the newest one on record."
+        )
+    if _recovery_as_of and _sleep_as_of and _recovery_as_of != _sleep_as_of:
+        _bits.append(
+            f"recovery_pct/hrv_ms/rhr_bpm are as of {_recovery_as_of} while sleep_hours is as of {_sleep_as_of} — "
+            "recovery and sleep finalize from separate Whoop records."
+        )
     _window_disclosure = " ".join(_bits)
 
     # DPR-1.20: Page freshness for nav badges
     _today_iso = datetime.now(timezone.utc).isoformat()
-    _as_of = _vr.get("recovery_as_of") or _vr.get("sleep_as_of") or today
     # Temporal frame: sleep/recovery/HRV/RHR are wake-date-keyed (stored under the
     # morning they set up). The reading came from the night BEFORE that morning, so
     # night_of = as_of - 1 day. Surfacing this lets the front-end say "the night of
@@ -269,7 +296,13 @@ def vitals(date: str | None = None, *, _g) -> dict:
                 # never the old 0.0/"red" fabrication on an empty window.
                 "recovery_pct": round(_vr["recovery_pct"], 0) if _vr["recovery_pct"] is not None else None,
                 "recovery_status": _vr["recovery_status"],
+                # #2344: recovery/hrv/rhr and sleep_hours can legitimately finalize
+                # on different dates (see vitals_resolver's docstring) — as_of_date
+                # below is only ONE of these two, so publish both explicitly rather
+                # than making a reader infer which fields it actually covers.
+                "recovery_as_of": _recovery_as_of,
                 "sleep_hours": round(_vr["sleep_hours"], 1) if _vr["sleep_hours"] is not None else None,
+                "sleep_as_of": _sleep_as_of,
                 "as_of_date": _as_of,
                 # Temporal frame (additive): recovery/sleep/hrv/rhr are about last
                 # night and set up the as_of_date morning; weight (weight_as_of) is
