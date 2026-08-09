@@ -15,6 +15,8 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
 os.environ.setdefault("S3_BUCKET", "test-bucket")
+os.environ.setdefault("EMAIL_RECIPIENT", "qa@example.com")
+os.environ.setdefault("EMAIL_SENDER", "qa@example.com")
 
 from operational.qa_check_outputs import check_chronicle_sk_date_invariant  # noqa: E402
 
