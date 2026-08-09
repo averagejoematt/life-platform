@@ -210,3 +210,44 @@ class TestWritePathWiring:
     def test_the_helper_is_inert_on_empty_input(self):
         assert guard_derived_summary("", "src", "position_summary") == ""
         assert guard_derived_summary(None, "src", "position_summary") is None
+
+
+class TestFabricatedNumberFloor:
+    """#2390 (AIQ-1's A-half): the re-parse is a second model call, and a
+    condensation is not licensed to INTRODUCE data. The day-correspondence guard
+    above catches a real figure losing its night; this floor catches a figure the
+    source narrative never contained at all — which is how a summary invents a
+    reading no existence check downstream can distinguish from data."""
+
+    NARRATIVE = "On the night of 2026-08-06, WHOOP recorded a recovery score of 55% with HRV at 42 ms. I want protein at the floor before I trust the trend."
+
+    def test_a_number_absent_from_the_source_narrative_rejects_the_summary(self):
+        from coach.reading_date_fidelity import guard_derived_summary
+
+        out = guard_derived_summary(
+            "I'm seeing recovery in the low 60s and expecting 178 g protein days.", self.NARRATIVE, "position_summary"
+        )
+        assert out is None, "178 appears nowhere in the narrative — the condensation invented it"
+
+    def test_a_summary_restating_the_narratives_own_figures_passes(self):
+        from coach.reading_date_fidelity import guard_derived_summary
+
+        s = "On the night of 2026-08-06 recovery was 55% — I'm watching HRV at 42 ms before calling it."
+        assert guard_derived_summary(s, self.NARRATIVE, "position_summary") == s
+
+    def test_a_numberless_summary_passes(self):
+        from coach.reading_date_fidelity import guard_derived_summary
+
+        s = "I'm cautious about the recovery trend and want more protein data before I move."
+        assert guard_derived_summary(s, self.NARRATIVE, "position_summary") == s
+
+    def test_the_rejection_composes_with_the_date_guard_not_instead_of_it(self):
+        """Both classes live in one seam — a summary can fail EITHER. The date guard
+        fires first on a dropped night; the number floor fires on an invented figure
+        even when every dated figure kept its night."""
+        from coach.reading_date_fidelity import guard_derived_summary
+
+        dropped_night = "Whoop shows 55% recovery and HRV at 42 ms."
+        assert guard_derived_summary(dropped_night, self.NARRATIVE, "position_summary") is None
+        invented = "Night of 2026-08-06: recovery 55%. I project 91.4 kg by October."
+        assert guard_derived_summary(invented, self.NARRATIVE, "position_summary") is None

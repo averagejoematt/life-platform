@@ -176,12 +176,34 @@ def guard_derived_summary(summary, source_text, field, coach_id=None, logger=Non
     `position_summary`) apply this. It lives HERE rather than being restated at each
     call site so the two cannot drift, and so the two host modules — both at their
     #1665 size baseline — take three lines each instead of twenty.
+
+    Two classes, both derived-vs-source:
+
+      * reading-date fidelity (#2343) — a vitals figure that LOSES or SWAPS the
+        night its source attached to it;
+      * fabricated numbers (#2390 / AIQ-1) — a figure in the condensation that the
+        source narrative NEVER CONTAINED at all. The re-parse is a second model
+        call, and a condensation is not licensed to introduce data. The allow-list
+        is the source text itself, via the same `grounded_generation` extraction
+        every grounding surface uses — a paraphrased rounding of a real figure
+        passes (`_is_restatement`), an invented one rejects.
+
+    Either class rejects to ``None`` and the caller falls back to the truncated
+    source narrative — the artifact that actually carries the day and the numbers.
     """
     if not summary:
         return summary
     cleaned, rejected, findings = summary_keeps_reading_dates(summary, source_text=source_text)
     if rejected and logger is not None:
         logger.warning("%s rejected for %s (#2343 reading-date fidelity) — %s", field, coach_id, [f["detail"] for f in findings][:3])
+    if cleaned:
+        from ai.grounded_generation import allowed_numbers, fabricated_numbers
+
+        fab = fabricated_numbers(cleaned, allowed_numbers(source_text))
+        if fab:
+            if logger is not None:
+                logger.warning("%s rejected for %s (#2390 fabricated number(s) %s not in the source narrative)", field, coach_id, fab[:3])
+            return None
     return cleaned
 
 
