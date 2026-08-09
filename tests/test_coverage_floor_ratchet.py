@@ -94,7 +94,11 @@ RATCHET_FLOOR = 74
 # locally: the local interpreter has no pytest-cov at the pinned 7.1.0 and a
 # different cov version is a different measurement. Banked 0.12 under, same
 # convention. The regression catch line is therefore 77.40%.
-RATCHET_HIGH_WATER = 78.90
+# Raised 78.90 -> 80.20 (2026-08-09, #2374): tranche 5 measured 80.21% and the gain
+# sat unbanked — 2.81pt deletable inside the deadband with zero signal. Banked at
+# 80.20 (just under measured, conservative); the ±1.5pt deadband itself is the
+# documented nudge-fatigue design and stays.
+RATCHET_HIGH_WATER = 80.20
 
 # The regression tolerance CI runs with. Mirrors coverage_gap_warn.py's default;
 # asserted equal below so the two can't drift (the #1206 drift class again).
