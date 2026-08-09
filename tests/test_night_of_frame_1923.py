@@ -159,3 +159,88 @@ def test_payload_shape_contract():
     d_night = date.fromisoformat(payload["night_of"])
     assert (d_as_of - d_night).days == sac.NIGHT_OF_OFFSET_DAYS
     assert payload["frame"] == "last_night", "the frame must name which convention produced the offset"
+
+
+# ── #2344: widen the guarded set to date-KEYED ARRAYS, not just night_of dicts ──
+#
+# #2344's reproduction: `/api/sleep_detail`'s `sleep_trend` array is internally
+# fine (wake-date-keyed, value-identical to the `sleep_detail` block beside it),
+# but it publishes a bare `date` key with NO stated convention, while the block
+# one level up publishes `night_of` for the SAME night, one day earlier by label.
+# The original `_night_of_producers()` scan above only matches literal `night_of`
+# dict keys, so an array keyed by `date` sat entirely outside the guarded set —
+# exactly the #1917 lesson ("hand-listing surfaces is what let two field families
+# drift apart") recurring one level down, at the array rather than the scalar.
+
+
+def _date_array_producers():
+    """Every dict literal in lambdas/web/ that publishes a bare `date` key —
+    the *_trend row shape. Exact key match (not `as_of_date`/`weight_as_of`/etc,
+    which already carry their own name and need no separate convention label)."""
+    out = []
+    for path in sorted(WEB.glob("*.py")):
+        tree = ast.parse(path.read_text(), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Dict):
+                continue
+            for k, v in zip(node.keys, node.values):
+                if isinstance(k, ast.Constant) and k.value == "date":
+                    out.append((path.name, k.lineno, ast.unparse(v)))
+    return out
+
+
+def test_the_date_array_scan_finds_the_known_producer():
+    """Guard the guard: a scan finding nothing would pass everything (#1917 lesson)."""
+    producers = _date_array_producers()
+    assert producers, "AST scan found no date-keyed producers — the scan is broken or the field was renamed"
+    family = {p.name for p in family_paths("site_api_vitals")}
+    assert any(
+        f in family for f, _, _ in producers
+    ), f"no date-keyed producer in the site_api_vitals family; found {sorted({f for f, _, _ in producers})}"
+
+
+def _source_declares_trend_provenance(src: str) -> bool:
+    """The predicate the guard test below uses. Pulled out as its own function so
+    it can be mutation-proved directly against a stripped copy of the real source,
+    rather than only asserted true once and trusted."""
+    return "trend_date_convention" in src and "sleep_trend" in src
+
+
+def test_sleep_trend_date_convention_is_declared_in_source():
+    """#2344's fix: `sleep_trend`'s date convention must be published (via the
+    existing `figure_scope` seam), not left for a reader to infer from `night_of`
+    one level up."""
+    src = family_source("site_api_vitals")
+    assert _source_declares_trend_provenance(src)
+
+
+def test_provenance_predicate_actually_fires_when_stripped():
+    """Mutation-proof (per the repo's 'a mutation must actually mutate' lesson):
+    prove the predicate is a real gate, not a decorative always-true check, by
+    removing the provenance marker from a copy of the REAL source and watching
+    the same predicate flip to False."""
+    src = family_source("site_api_vitals")
+    assert _source_declares_trend_provenance(src), "sanity: must be true on the real, unmutated source first"
+    # Replace with an UNRELATED string rather than appending a suffix — a suffixed
+    # rename ("..._REMOVED") still contains the original substring, which would
+    # make this "mutation" a no-op and the predicate would trivially still fire.
+    stripped = src.replace("trend_date_convention", "XXX_FIELD_DELETED_XXX")
+    assert not _source_declares_trend_provenance(stripped), "the predicate never fires — it would pass with the field deleted"
+
+
+def test_vitals_recovery_and_sleep_as_of_are_individually_published():
+    """#2344 leg 1 (`/api/vitals`): recovery/hrv/rhr and sleep_hours can finalize on
+    different Whoop records — `as_of_date` is only ONE of the two. Both real as-ofs
+    must be on the payload so a reader isn't left inferring the one that lost."""
+    src = family_source("site_api_vitals")
+    assert '"recovery_as_of": _recovery_as_of' in src
+    assert '"sleep_as_of": _sleep_as_of' in src
+
+
+def test_vitals_window_disclosure_names_the_weight_divergence_conditionally():
+    """The divergence sentence must be a real conditional keyed off the two dates
+    actually differing — not decorative text that always prints (which would make
+    it noise) and not silently absent when it should fire."""
+    src = family_source("site_api_vitals")
+    assert "weight_as_of != _as_of" in src, "the weight-divergence sentence must be gated on the two dates actually differing"
+    assert "weight is a same-day behavioral source" in src

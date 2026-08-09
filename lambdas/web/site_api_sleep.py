@@ -495,6 +495,15 @@ def sleep_detail(*, _g) -> dict:
     _night_of = night_of_for(latest_date)
     _whoop_hours_present = whoop_latest.get("sleep_duration_hours") is not None
     _eight_hours_present = latest.get("sleep_duration_hours") is not None
+    # #2344: `sleep_trend` (a sibling array, not nested under `sleep_detail`) is
+    # keyed by a bare `date` field with no stated convention of its own. Measured
+    # live: the array's date IS the wake date — the same convention as as_of_date,
+    # NOT night_of — proven by value identity (the row dated `latest_date` is the
+    # same record as the `sleep_detail` block above, whose night_of is one day
+    # earlier). Without a stated convention a reader has no way to tell that
+    # `2026-08-08` in the array and `night_of 2026-08-07` one level up name the
+    # SAME night. Extending the existing figure_scope seam (not a second
+    # provenance mechanism) rather than adding a per-row field to every trend entry.
     _figure_scope = {
         "frame": NIGHT_OF_FRAME,
         "night_of": _night_of,
@@ -510,6 +519,14 @@ def sleep_detail(*, _g) -> dict:
             )
             if (_eight_hours_present and not _whoop_hours_present)
             else None
+        ),
+        # #2344: the sibling `sleep_trend` array's date convention, named once here
+        # rather than per-row.
+        "trend_date_field": "date",
+        "trend_date_convention": "wake_date",
+        "trend_note": (
+            f"sleep_trend rows are keyed by WAKE date (the same convention as as_of_date), not night_of — "
+            f"the row dated {latest_date} is the night of {_night_of}, the same night described above."
         ),
     }
 
