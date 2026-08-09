@@ -167,7 +167,11 @@ BASELINE = {
     "lambdas/coach/coach_history_summarizer.py": 1731,
     "lambdas/coach/coach_prediction_evaluator.py": 1638,
     "cdk/stacks/monitoring_stack.py": 1623,
-    "lambdas/compute/hypothesis_engine_lambda.py": 1556,
+    # 2026-08-09 (#2420): 1556 → 1637. The +81 is the ADR-104 grounding gate for the
+    # module's two reader-bound prose paths — kept IN-module deliberately: the #2390
+    # census matches SURFACES by module, so extracting the gate would unclassify the
+    # seam caller. A considered raise, not a reflexive one; the NEXT growth extracts.
+    "lambdas/compute/hypothesis_engine_lambda.py": 1637,
     "lambdas/ai/ai_context.py": 1415,
     "lambdas/content/output_writers.py": 1387,
     # 1369 -> 1370 by #2299: one `from intelligence.weight_recency import week_ago_weight`
