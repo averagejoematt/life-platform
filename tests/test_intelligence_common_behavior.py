@@ -765,7 +765,7 @@ class TestPreambleCredibility:
         assert "Track record: nascent" in text
 
     @pytest.mark.xfail(
-        strict=False,
+        strict=True,
         reason=(
             "DEFECT (P2, VERIFIED — diagnosis CORRECTED by #1658) intelligence_common.py "
             "load_credibility reads USER#matthew / SOURCE#coach_credibility#{coach_id}, and NO "
@@ -1222,7 +1222,7 @@ class TestMovementHonestyGuard:
             assert "not assessable" in out, phrase
 
     @pytest.mark.xfail(
-        strict=False,
+        strict=True,
         reason=(
             "DEFECT (P2, VERIFIED) intelligence_common.py:1121 _UNDERTRAINING_PATTERN is a "
             "phrase list, so semantically identical verdicts phrased outside it pass the guard "

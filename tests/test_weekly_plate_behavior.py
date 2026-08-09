@@ -431,7 +431,7 @@ class TestExtractPlateSummary:
         assert len(wp.extract_plate_summary(html, [], END)["wildcard"]) <= 80
 
     @pytest.mark.xfail(
-        strict=False,
+        strict=True,
         reason=(
             "DEFECT (tranche-2 discovery): extract_plate_summary's recipe regex scans the WHOLE "
             "email, not the 'Try This' section its docstring names. Bolded Greatest Hits food "
@@ -634,7 +634,7 @@ class TestExtractFoodData:
         assert not isinstance(days[0]["total_calories"], Decimal)
 
     @pytest.mark.xfail(
-        strict=False,
+        strict=True,
         reason=(
             "DEFECT (tranche-2 discovery, ADR-104): extract_food_data defaults a food item's "
             "calories/protein/carbs/fat to 0 when the field is absent (safe_float(..., 0)), while "
@@ -980,7 +980,7 @@ class TestHandlerGuards:
         assert called == []
 
     @pytest.mark.xfail(
-        strict=False,
+        strict=True,
         reason=(
             "DEFECT (tranche-2 discovery, ADR-104): the handler's data-sufficiency gate tests "
             "`if not days` — the count of macrofactor DAY RECORDS — but every reader-visible "
@@ -1182,7 +1182,7 @@ class TestHandlerAiDegradation:
         assert "Smoky Turkey Kofte Bowls" in html
 
     @pytest.mark.xfail(
-        strict=False,
+        strict=True,
         reason=(
             "DEFECT (tranche-2 discovery): the guard `'unavailable' not in ai_content[:50]` can "
             "never fire on this module's OWN failure stub. The stub opens with a 78-char inline-"

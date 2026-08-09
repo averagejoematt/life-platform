@@ -1115,7 +1115,7 @@ def test_the_board_call_asks_for_enough_tokens_for_six_sections(monkeypatch):
 
 
 @pytest.mark.xfail(
-    strict=False,
+    strict=True,
     reason=(
         "LEFT OPEN BY DECISION, not a defect (#1658 re-review of a tranche-3 xfail). The observation is accurate — "
         "call_haiku_monthly sends the whole board prompt as one user message with no `system` block, so no "

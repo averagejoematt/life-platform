@@ -466,7 +466,7 @@ class TestMindSnapshot:
         assert data["mood_readings"] == 1 and data["avg_valence"] == 0.5
 
     @pytest.mark.xfail(
-        strict=False,
+        strict=True,
         reason=(
             "DEFECT (tranche-2 discovery): with zero journal entries the mind snapshot reports "
             "avg_sentiment=0. sentiment_score is a -1..1 scale on which 0 is literally the "
@@ -482,7 +482,7 @@ class TestMindSnapshot:
         assert data["avg_sentiment"] is None
 
     @pytest.mark.xfail(
-        strict=False,
+        strict=True,
         reason=(
             "DEFECT (tranche-2 discovery): with zero State-of-Mind readings the mind snapshot "
             "reports avg_valence=0 — the neutral point of the valence scale — instead of honest "
@@ -545,7 +545,7 @@ class TestNutritionSnapshot:
         assert data["days_since_last_food_log"] == 9 and data["food_logs_last_14d"] == 1
 
     @pytest.mark.xfail(
-        strict=False,
+        strict=True,
         reason=(
             "DEFECT (tranche-2 discovery): when nutrition rows EXIST but carry no macro fields, "
             "avg_calories/avg_protein_g are reported as 0 with days_tracked>0 — 'he averaged 0 "
@@ -680,7 +680,7 @@ class TestPhysicalSnapshot:
         assert az.gather_data_for_expert("physical")["waist_height_ratio"] == 0.61
 
     @pytest.mark.xfail(
-        strict=False,
+        strict=True,
         reason=(
             "DEFECT (tranche-2 discovery): a DEXA record with no `scan_date` falls back to "
             "TODAY, so days_since_dexa is reported as 0 — an unknown scan date is handed to the "

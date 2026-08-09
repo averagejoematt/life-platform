@@ -491,7 +491,7 @@ class TestDetectMetricTrends:
         assert [d["metric"] for d in di.detect_metric_trends(recs)[0]] == ["recovery"]
 
     @pytest.mark.xfail(
-        strict=False,
+        strict=True,
         reason=(
             "DEFECT (tranche-2 discovery): detect_metric_trends hard-codes "
             "consecutive_days=3 on the last three RECORDS without checking that "
@@ -775,7 +775,7 @@ class TestIntentionPatterns:
         assert di._compute_intention_patterns(hist)["follow_through_rate_7d"] == 0.5
 
     @pytest.mark.xfail(
-        strict=False,
+        strict=True,
         reason=(
             "DEFECT (tranche-2 discovery): _load_intention_history queries with "
             "ScanIndexForward=False, so history_records arrive NEWEST-FIRST, but "
@@ -948,7 +948,7 @@ class TestDetectEarlyWarning:
         assert "habit_declining" not in di.detect_early_warning([], prior + recent, [])[1]
 
     @pytest.mark.xfail(
-        strict=False,
+        strict=True,
         reason=(
             "DEFECT (tranche-2 discovery): reader/writer field-name mismatch. "
             "detect_early_warning's habit_declining marker reads "
@@ -1530,7 +1530,7 @@ class TestDecisionFatigue:
         assert di._compute_decision_fatigue_alert(YESTERDAY, [_hs("2026-05-08", tier0_pct=0.30)]) == (False, "")
 
     @pytest.mark.xfail(
-        strict=False,
+        strict=True,
         reason=(
             "DEFECT (tranche-2 discovery): the T0 rate is read as "
             "`safe_float(r,'tier0_pct') or safe_float(r,'t0_completion_rate')`. A "
@@ -1979,7 +1979,7 @@ class TestHandler:
         assert "SOCIAL NOTE" in offline_handler.puts[-1]["ai_context_block"]
 
     @pytest.mark.xfail(
-        strict=False,
+        strict=True,
         reason=(
             "DEFECT (tranche-2 discovery): the handler anchors its 7d/14d windows "
             "on datetime.now() (`today - 7d`) but ends them at the event's "

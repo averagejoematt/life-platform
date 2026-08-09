@@ -1187,7 +1187,7 @@ class TestHandlerRouting:
         assert any("blood_pressure" in p["Key"] for p in s3.puts)
 
     @pytest.mark.xfail(
-        strict=False,
+        strict=True,
         reason=(
             "DEFECT (tranche-2 discovery): combined-format BP with no diastolic value "
             "writes a FABRICATED blood_pressure_diastolic of 0 — sum()/max(1, 0) — which "
