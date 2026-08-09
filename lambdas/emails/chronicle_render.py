@@ -250,6 +250,49 @@ def display_stats_line(stats_line, date_str, *, _g):
     return " | ".join(kept)
 
 
+def recall_card_for(table, text):
+    """#1384 AC3 — the recall card for this installment, or None. Fail-soft wrapper so a
+    missing bundle path can never break a publish."""
+    try:
+        from ai.recall_indexer import recall_card_for_text
+
+        return recall_card_for_text(table, text)
+    except Exception:  # noqa: BLE001 — the card is decoration; the read must publish regardless
+        return None
+
+
+def _recall_card_html(card):
+    """Render the recall card, or "" when there is no precedent.
+
+    ADR-105: similarity is a HYPOTHESIS GENERATOR, never a claim of sameness. The copy is
+    "resembles" and the score is shown in full next to it — a reader can see how strong
+    the match actually is instead of being told two weeks were the same. The date links
+    to the installment it names when that page exists, and carries no link at all when it
+    does not (#1827: a precedent's link is openable or absent, never a guess).
+    """
+    if not card:
+        return ""
+    import html as _html
+
+    date = _html.escape(str(card.get("resembles_date", "")))
+    sim = card.get("similarity")
+    if not date or not isinstance(sim, (int, float)):
+        return ""
+    link = _html.escape(str(card.get("link") or ""))
+    dated = f'<a href="{link}">the week of {date}</a>' if link else f"the week of {date}"
+    provenance = _html.escape(str(card.get("provenance", "")))
+    snippet = _html.escape(str(card.get("snippet", "") or ""))
+    quote = f'<p class="post-recall__snippet">&ldquo;{snippet}&rdquo;</p>' if snippet else ""
+    return (
+        '  <aside class="post-recall">\n'
+        '    <p class="post-recall__label">Echo</p>\n'
+        f'    <p class="post-recall__lede">This week resembles {dated}.</p>\n'
+        f"{quote}\n"
+        f'    <p class="post-recall__provenance">{provenance}. A resemblance, not a cause.</p>\n'
+        "  </aside>"
+    )
+
+
 def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_installments, write_to_s3=True, *, _g):
     """Publish installment to the Signal-themed journal on averagejoematt.com.
 
@@ -379,6 +422,11 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
         for ic, lbl, url in _social
     )
     social_foot_html = "".join(f'<a href="{url}" target="_blank" rel="me noopener">{lbl}</a>' for _ic, lbl, url in _social)
+    # #1384 AC3: the recall card. Computed here, during the render, so the corpus it
+    # searches holds strictly EARLIER weeks — this installment is indexed at publish,
+    # after this runs, so it cannot match itself. Renders nothing at all when no earlier
+    # week clears the cosine floor, which is the honest state and the common one.
+    recall_card_html = _recall_card_html(recall_card_for(_g.get("table"), f"{title} {body_html}"))
     post_html = f"""<!DOCTYPE html>
 <html lang="en" data-door="story">
 <head>
@@ -456,6 +504,13 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     .post-cta p {{ color:var(--ink-muted);font-size:var(--fs-small);margin:0 auto var(--sp-4);max-width:44ch; }}
     .post-cta a.cta-btn {{ display:inline-block;font-family:var(--font-mono);font-size:var(--fs-label);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--page);background:var(--ember);padding:10px 20px;border-radius:var(--radius-sm);text-decoration:none; }}
     .post-cta a.cta-btn:hover {{ filter:brightness(1.08); }}
+    /* #1384 AC3 — the recall card. Quieter than the CTA on purpose: it is a pointer
+       into the archive, not a call to action, and it renders only on a real match. */
+    .post-recall {{ margin:var(--sp-6) 0;padding:var(--sp-5);border-left:2px solid var(--ember);background:var(--ember-wash);border-radius:var(--radius-sm); }}
+    .post-recall__label {{ font-family:var(--font-mono);font-size:var(--fs-label);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--ink-faint);margin:0 0 var(--sp-2); }}
+    .post-recall__lede {{ font-family:var(--font-serif);font-size:var(--fs-h3);color:var(--ink);margin:0 0 var(--sp-2); }}
+    .post-recall__snippet {{ color:var(--ink-muted);font-style:italic;margin:0 0 var(--sp-2); }}
+    .post-recall__provenance {{ font-family:var(--font-mono);font-size:var(--fs-label);color:var(--ink-faint);margin:0; }}
     /* #1620 — outbound social follow row: the off-site next action at the end of the
        crawlable post (the page a shared/viral link actually lands on). Line-art marks
        from the shared sprite via inline <use> — renders with no JS. */
@@ -502,6 +557,7 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
       {body_html}
     </div>
   </article>
+{recall_card_html}
   <aside class="post-cta">
     <h2>Follow the experiment</h2>
     <p>A new installment every week — the data, the coaches, and what actually moved. No spam, unsubscribe anytime.</p>
