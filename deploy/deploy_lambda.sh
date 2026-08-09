@@ -107,6 +107,17 @@ if [ ! -f "$WORK_DIR/stage/$EXPECTED_FILENAME" ]; then
     exit 1
 fi
 
+# ── Step 3.4: Ancestry preflight (#2377) ──
+# Refuse to ship a tree that is an ANCESTOR of what is already live. The
+# 2026-08-08 race — an older CI run landing after a newer merge — passed every
+# check we had, because a bundle carried no commit fingerprint. It does now.
+# Override for a deliberate rollback: ALLOW_NON_FAST_FORWARD=1
+if ! AWS_REGION="$REGION" bash "$ROOT/deploy/verify_bundle_ancestry.sh" "$FUNCTION_NAME" preflight; then
+    echo "❌ Aborting deploy of $FUNCTION_NAME — see the [ancestry] line above."
+    rm -rf "$WORK_DIR"
+    exit 1
+fi
+
 # ── Step 3.5: S3 rollback artifact management ──
 S3_LATEST="deploys/${FUNCTION_NAME}/latest.zip"
 S3_PREVIOUS="deploys/${FUNCTION_NAME}/previous.zip"
@@ -130,12 +141,26 @@ aws lambda update-function-code \
     --no-cli-pager > /dev/null
 
 # ── Step 5: Verify ──
+aws lambda wait function-updated --function-name "$FUNCTION_NAME" --region "$REGION" >/dev/null 2>&1 || true
+
 LAST_MODIFIED=$(aws lambda get-function-configuration \
     --function-name "$FUNCTION_NAME" \
     --region "$REGION" \
     --query "LastModified" --output text --no-cli-pager)
 
+# #2377 postflight: the timestamp above proves *a* deploy happened; this proves
+# WHICH COMMIT is live. Non-fatal on its own (the code is already uploaded) —
+# but it is the deterministic detection that another run landed on top of ours.
+POSTFLIGHT_RC=0
+AWS_REGION="$REGION" bash "$ROOT/deploy/verify_bundle_ancestry.sh" "$FUNCTION_NAME" postflight || POSTFLIGHT_RC=$?
+
 echo "✅ Deployed $FUNCTION_NAME (modified: $LAST_MODIFIED)"
+
+if [ "$POSTFLIGHT_RC" -ne 0 ]; then
+    echo "❌ POSTFLIGHT MISMATCH: the bundle now live is not the one this run shipped."
+    rm -rf "$WORK_DIR"
+    exit 1
+fi
 
 # Cleanup
 rm -rf "$WORK_DIR"

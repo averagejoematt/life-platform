@@ -25,6 +25,10 @@ BUCKET="matthew-life-platform"
 LAMBDA_MAP="${LAMBDA_MAP:-ci/lambda_map.json}"
 DRY_RUN="${1:-}"
 SHA="$(git rev-parse --short HEAD 2>/dev/null || echo nogit)"
+# #2377: the ancestry check speaks in FULL shas, matching what build_bundle.py
+# stamps into build_info.json (CI's GITHUB_SHA first — a merge-ref checkout can
+# leave HEAD pointing somewhere other than the sha the run was dispatched for).
+SHA_FULL="${BUNDLE_GIT_SHA:-${GITHUB_SHA:-$(git rev-parse HEAD 2>/dev/null || echo "")}}"
 
 STAGE=/tmp/fleet_stage
 STAGE_MCP=/tmp/fleet_stage_mcp
@@ -49,6 +53,14 @@ fi
 echo "── 3. Fleet update ──"
 UPDATED=0; SKIPPED=0; FAILED=0
 declare -a UPDATED_FNS=()
+
+# #2377 ancestry gate. The fleet ships ONE identical bundle to every function, so
+# one probe answers for all of them — downloading 100+ live zips to ask the same
+# question would be the "slows deploys materially" failure mode. The probe is the
+# first function we would actually update (no hardcoded name to drift), and the
+# check runs BEFORE that first update, so a refusal leaves the fleet untouched.
+ANCESTRY_PROBE=""
+ANCESTRY_PROBE_REGION="$DEFAULT_REGION"
 
 # #1848: keep the per-function rollback artifact store honest on FLEET deploys too.
 # rollback_lambda.sh (and the CI auto-rollback job) redeploy deploys/<fn>/previous.zip;
@@ -85,6 +97,13 @@ while IFS=$'\t' read -r FUNC REGION NOT_DEPLOYED; do
   if [ "$DRY_RUN" = "--dry-run" ]; then
     echo "  ✓ would update $FUNC ($REGION, handler $HANDLER)"; UPDATED=$((UPDATED+1)); continue
   fi
+  if [ -z "$ANCESTRY_PROBE" ]; then
+    ANCESTRY_PROBE="$FUNC"; ANCESTRY_PROBE_REGION="$REGION"
+    if ! AWS_REGION="$REGION" bash "$ROOT/deploy/verify_bundle_ancestry.sh" "$FUNC" preflight "$SHA_FULL"; then
+      echo "❌ Aborting the FLEET deploy — see the [ancestry] line above. Nothing was updated."
+      exit 1
+    fi
+  fi
   # us-east-1 functions can't read a us-west-2 S3 object via S3Key — direct upload.
   if [ "$REGION" = "$DEFAULT_REGION" ]; then
     aws lambda update-function-code --function-name "$FUNC" --region "$REGION" \
@@ -115,6 +134,17 @@ if [ "$DRY_RUN" != "--dry-run" ] && [ ${#UPDATED_FNS[@]} -gt 0 ]; then
   done
 fi
 
+POSTFLIGHT_RC=0
+if [ "$DRY_RUN" != "--dry-run" ] && [ -n "$ANCESTRY_PROBE" ]; then
+  echo "── 6. Ancestry postflight (#2377) ──"
+  AWS_REGION="$ANCESTRY_PROBE_REGION" bash "$ROOT/deploy/verify_bundle_ancestry.sh" \
+    "$ANCESTRY_PROBE" postflight "$SHA_FULL" || POSTFLIGHT_RC=$?
+fi
+
 echo ""
 echo "═══ Fleet deploy: $UPDATED updated, $SKIPPED skipped, $FAILED failed ═══"
+if [ "$POSTFLIGHT_RC" -ne 0 ]; then
+  echo "❌ POSTFLIGHT MISMATCH on $ANCESTRY_PROBE — the live bundle is not the one this run shipped."
+  exit 1
+fi
 [ "$FAILED" -eq 0 ] || exit 1

@@ -20,6 +20,10 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 echo "→ Staging the full bundle (deploy/build_bundle.py) …"
 python3 "$ROOT/deploy/build_bundle.py" --out /tmp/siteapi_stage --zip /tmp/siteapi.zip
 
+# #2377: refuse to ship a tree that is an ancestor of what is already live
+# (the 2026-08-08 older-run-lands-later race). ALLOW_NON_FAST_FORWARD=1 to override.
+AWS_REGION="$REGION" bash "$ROOT/deploy/verify_bundle_ancestry.sh" "$FN" preflight
+
 echo "→ Deploying $FN …"
 aws lambda update-function-code --function-name "$FN" \
   --zip-file fileb:///tmp/siteapi.zip --region "$REGION" \
@@ -27,6 +31,9 @@ aws lambda update-function-code --function-name "$FN" \
 
 echo "→ Waiting for the code update to settle …"
 aws lambda wait function-updated --function-name "$FN" --region "$REGION"
+
+# #2377: which commit is actually live now? (a fresh LastModified is not an answer)
+AWS_REGION="$REGION" bash "$ROOT/deploy/verify_bundle_ancestry.sh" "$FN" postflight
 
 echo "→ Verifying handler import via $VERIFY_PATH …"
 aws lambda invoke --function-name "$FN" --region "$REGION" --cli-binary-format raw-in-base64-out \
