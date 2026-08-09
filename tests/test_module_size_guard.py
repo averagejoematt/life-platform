@@ -123,7 +123,10 @@ BASELINE = {
     # telegram_worker). This file is the least-privilege registry — one entry per
     # Lambda by design — so new-Lambda growth is its nature; what the ratchet
     # polices here is growth WITHOUT a new Lambda.
-    "cdk/stacks/role_policies.py": 3275,
+    # 3275 → 3291 (#2469): two scoped statements on the existing telegram_worker role
+    # (config/* s3:GetObject + PutMetricData) — a least-privilege grant has to live in
+    # its role's own entry, so this is policy substance, not sprawl.
+    "cdk/stacks/role_policies.py": 3291,
     # site_api_observatory.py drained to a ~150-line facade by #1654 slice 3 — the handler
     # logic now lives in cohesive web/site_api_{nutrition,meals,training,physical,mind}.py
     # (each well under the ceiling). The pure-subset ratchet allows removing a shrunk entry.

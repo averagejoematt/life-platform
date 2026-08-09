@@ -272,11 +272,11 @@ def _current_moment_line() -> str:
     surface (site convention). Joins the facts block AND the grounder's allowed
     vocabulary, so citing today's date is never flagged as fabrication."""
     try:
-        from zoneinfo import ZoneInfo
+        from common.pacific_time import pacific_now
 
-        now = datetime.now(ZoneInfo("America/Los_Angeles"))
+        now = pacific_now()
         return f"CURRENT MOMENT: {now.strftime('%A')}, {now.strftime('%Y-%m-%d')}, {now.strftime('%I:%M %p').lstrip('0')} Pacific."
-    except Exception as e:  # pragma: no cover — zoneinfo edge; honesty over crash
+    except Exception as e:  # pragma: no cover — import edge; honesty over crash
         logger.warning("[telegram] current-moment line failed: %s", e)
         return ""
 
