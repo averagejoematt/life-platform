@@ -15,6 +15,7 @@ against the real clock — silently, and only on the days the arithmetic happene
 
 import statistics
 from collections import defaultdict
+from datetime import datetime
 
 from common.digest_utils import (
     _normalize_whoop_sleep,
@@ -557,3 +558,45 @@ def compute_4week_trends(weekly_data):
             slope = v[0] - v[-1]
             trends[metric] = "→" if abs(slope) < 0.5 else ("↑" if slope > 0 else "↓")
     return trends
+
+
+def ex_nutrition_last_log_absence(table, user_id, genesis, today, logger):
+    """#2387 (ADR-104): what the digest may honestly say about an unlogged nutrition week.
+
+    One descending query for the newest macrofactor ``DATE#`` record — the source's own
+    data, not a hand-typed date. Three honest answers, in the #2382 vocabulary
+    (``lambdas/ai/behavior_logs.py``: a stopped log and a never-logged window are
+    different sentences):
+
+      ``{"last_log": "YYYY-MM-DD", "days_ago": N}`` — he logged this cycle and stopped;
+      ``{"last_log": None}`` — KNOWN never-logged-this-cycle: no record at all, or the
+          newest one predates the cycle genesis. Deliberately day-count-free — a count
+          measured against the cycle window would fabricate a transition that never
+          happened (the six-coach-card defect, #2382/#2394);
+      ``{}`` — the lookup itself failed. Unknown licenses nothing (#2056 semantics), so
+          the renderer states only the week, never the cycle.
+    """
+    try:
+        resp = table.query(
+            KeyConditionExpression="pk = :pk AND begins_with(sk, :pfx)",
+            ExpressionAttributeValues={":pk": f"USER#{user_id}#SOURCE#macrofactor", ":pfx": "DATE#"},
+            ScanIndexForward=False,
+            Limit=1,
+            ProjectionExpression="sk, #d",
+            ExpressionAttributeNames={"#d": "date"},  # `date` is a DDB reserved word
+        )
+        items = resp.get("Items") or []
+    except Exception as e:  # noqa: BLE001 — an absence line must never sink the digest
+        logger.info(f"[#2387] nutrition last-log lookup unavailable: {e}")
+        return {}
+    if not items:
+        return {"last_log": None}
+    it = items[0]
+    last = str(it.get("date") or str(it.get("sk", "")).replace("DATE#", ""))[:10]
+    if not last or last < genesis:
+        return {"last_log": None}
+    try:
+        days_ago = (today - datetime.strptime(last, "%Y-%m-%d").date()).days
+    except ValueError:
+        return {}
+    return {"last_log": last, "days_ago": days_ago}

@@ -142,7 +142,10 @@ BASELINE = {
     # 2216 -> 1828 by #2221: the pure record->summary extractors were lifted into
     # lambdas/emails/weekly_digest_extractors.py (559 lines, under the ceiling) so the
     # honest-numbers fixes could land without raising this number. The ratchet tightening.
-    "lambdas/emails/weekly_digest_lambda.py": 1828,
+    # 2026-08-09 (#2387): 1828 → 1843. The query helper moved to weekly_digest_extractors
+    # (the #2221 shape); the residual is the honest-absence render branch + the thin
+    # binding the tests patch. Next growth extracts renderers.
+    "lambdas/emails/weekly_digest_lambda.py": 1843,
     "lambdas/health/character_engine.py": 2117,
     "lambdas/content/html_builder.py": 2104,
     "lambdas/web/site_api_ai_lambda.py": 1991,

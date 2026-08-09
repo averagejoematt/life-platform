@@ -159,45 +159,9 @@ def query_journal_range(start_date, end_date):
 
 
 def nutrition_last_log_absence(today):
-    """#2387 (ADR-104): what the digest may honestly say about an unlogged nutrition week.
-
-    One descending query for the newest macrofactor ``DATE#`` record — the source's own
-    data, not a hand-typed date. Three honest answers, in the #2382 vocabulary
-    (``lambdas/ai/behavior_logs.py``: a stopped log and a never-logged window are
-    different sentences):
-
-      ``{"last_log": "YYYY-MM-DD", "days_ago": N}`` — he logged this cycle and stopped;
-      ``{"last_log": None}`` — KNOWN never-logged-this-cycle: no record at all, or the
-          newest one predates the cycle genesis. Deliberately day-count-free — a count
-          measured against the cycle window would fabricate a transition that never
-          happened (the six-coach-card defect, #2382/#2394);
-      ``{}`` — the lookup itself failed. Unknown licenses nothing (#2056 semantics), so
-          the renderer states only the week, never the cycle.
-    """
-    try:
-        resp = table.query(
-            KeyConditionExpression="pk = :pk AND begins_with(sk, :pfx)",
-            ExpressionAttributeValues={":pk": f"USER#{USER_ID}#SOURCE#macrofactor", ":pfx": "DATE#"},
-            ScanIndexForward=False,
-            Limit=1,
-            ProjectionExpression="sk, #d",
-            ExpressionAttributeNames={"#d": "date"},  # `date` is a DDB reserved word
-        )
-        items = resp.get("Items") or []
-    except Exception as e:  # noqa: BLE001 — an absence line must never sink the digest
-        logger.info(f"[#2387] nutrition last-log lookup unavailable: {e}")
-        return {}
-    if not items:
-        return {"last_log": None}
-    it = items[0]
-    last = str(it.get("date") or str(it.get("sk", "")).replace("DATE#", ""))[:10]
-    if not last or last < EXPERIMENT_START_DATE:
-        return {"last_log": None}
-    try:
-        days_ago = (today - datetime.strptime(last, "%Y-%m-%d").date()).days
-    except ValueError:
-        return {}
-    return {"last_log": last, "days_ago": days_ago}
+    """#2387: thin binding — the logic lives in weekly_digest_extractors (the #2221
+    split shape); this module supplies its own table/logger/genesis constants."""
+    return ex_nutrition_last_log_absence(table, USER_ID, EXPERIMENT_START_DATE, today, logger)
 
 
 def delta_html(cur, prev, unit="", dec=1, invert=False):
@@ -247,6 +211,7 @@ from emails.weekly_digest_extractors import (  # noqa: E402
     ex_hevy_workouts,
     ex_journal,
     ex_macrofactor,
+    ex_nutrition_last_log_absence,
     ex_strava,
     ex_todoist,
     ex_whoop,
@@ -709,10 +674,7 @@ def gather_all():
         # checks nutrition_delivery_public() before it touches the partition (#2233), so
         # with the flag off this is None and nothing renders.
         "delivery_line": get_food_delivery_digest_line(),
-        # #2387 (ADR-104): an unlogged nutrition week must be STATED, not elided — the
-        # extractor's None used to drop the whole section, and six consecutive digests
-        # shipped with no nutrition section and no "unlogged" line. Only looked up when
-        # the week is actually dark; a logged week needs no absence facts.
+        # #2387 (ADR-104): absence facts only when the week is actually dark
         "nutrition_absence": (nutrition_last_log_absence(today) if this.get("macrofactor") is None else None),
         # #2221: the component scorecard's raw grades. lambda_handler used to re-query
         # day_grade for exactly this window, a fourth read of a source already in hand.
@@ -1458,11 +1420,7 @@ def build_html(data, commentary, profile):
             nu_rows += row("Avg Fiber", fmt(m["fiber_avg_g"], "g"))
         nu_rows += row("Days Logged", str(m.get("days_logged", 0)))
     else:
-        # #2387 (ADR-104): an unlogged week is stated in one line, never elided — the
-        # dark stretch must be visible where it will actually be read. The last-log date
-        # comes from the source's own records (gather_all → nutrition_last_log_absence);
-        # a never-logged-this-cycle week says so WITHOUT a day-count (#2382: a count
-        # against the cycle window fabricates a "stopped N days ago" that never happened).
+        # #2387 (ADR-104): the unlogged week is stated in ONE line (dates from the source's own records), never elided
         _ab = data.get("nutrition_absence") or {}
         if _ab.get("last_log"):
             _ab_days = _ab.get("days_ago")
