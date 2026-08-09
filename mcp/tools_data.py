@@ -302,9 +302,16 @@ def tool_get_intelligence_quality(args):
     total_errors = sum(1 for f in all_flags if f.get("severity") == "error")
     total_warnings = sum(1 for f in all_flags if f.get("severity") == "warning")
 
+    # #2305: the denominator is the sum of what the validator actually ran —
+    # each row stores its own `checks_run` (derived from _VALIDATOR_CHECKS on
+    # the write side, #1658). Never a hand-typed check count here: a row
+    # missing `checks_run` is excluded rather than contributing a fabricated
+    # number. Guarded by tests/test_mcp_tools_data_behavior.py.
+    total_checks = sum(int(i["checks_run"]) for i in items if i.get("checks_run") is not None)
+
     return {
         "period": {"start": start_date, "end": end_date},
-        "total_checks": len(items) * 5,  # 5 checks per coach
+        "total_checks": total_checks,
         "total_flags": len(all_flags),
         "errors": total_errors,
         "warnings": total_warnings,
