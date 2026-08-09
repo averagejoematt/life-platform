@@ -10,6 +10,12 @@ import { genesisCount } from "/assets/js/coach_popover.js"; // P0.1 — the one 
 // only from the protein pct + avg_deficit — no fabricated mechanism, just the honest
 // read. Every "floor" word here grades the FLOOR pct (170), not the 190 stretch target.
 export function nutritionVerdict(n) {
+  // #2360: nothing logged, nothing to grade. The API now publishes null rates for an
+  // empty set, but the guard lives here too: a `0` reaching this function — from a
+  // CloudFront-cached payload predating that fix, or any future writer — used to
+  // render "Protein's under the floor every logged day" out of zero observations.
+  // Absence is not a failing grade (ADR-104).
+  if (Number(n.days_logged) === 0) return null;
   const hasDef = n.avg_deficit != null && Number.isFinite(Number(n.avg_deficit));
   const hasFloor = n.protein_floor_hit_pct != null && Number.isFinite(Number(n.protein_floor_hit_pct));
   const hasHit = hasFloor || (n.protein_hit_pct != null && Number.isFinite(Number(n.protein_hit_pct)));
@@ -61,6 +67,10 @@ export function nutritionHero(n) {
 // cleared (never an ember "win" block, honouring HARD RULE 3). Falls back to the old
 // target-graded read if the payload predates the floor fields.
 export function nutritionProteinLead(n) {
+  // #2360: see nutritionVerdict — with no logged days there is no adherence figure to
+  // lead with, and `low = h < 100` would flag the ember "under floor" treatment on a
+  // 0 that means "unmeasured", not "missed".
+  if (Number(n.days_logged) === 0) return "";
   const hasFloor = n.protein_floor_hit_pct != null && n.protein_floor_g != null;
   if (!hasFloor && n.protein_hit_pct == null) return "";
   const h = Number(hasFloor ? n.protein_floor_hit_pct : n.protein_hit_pct);
