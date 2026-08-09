@@ -20,6 +20,9 @@ stubs ``_integrator_digest`` and then calls ``_team_tensions`` — both fan-outs
 back through ``_g``, so the stubs land. This module does NOT import the facade.
 """
 
+import re
+from typing import Any
+
 from boto3.dynamodb.conditions import Key
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 
@@ -210,6 +213,31 @@ def _stance_block(coach_id, weight_lbs, *, _g):
     }
 
 
+# #2385 — the AI writers occasionally emit markdown emphasis despite prompt rules
+# ("prompt rules can't guarantee structure"), and the front-end esc()-renders these
+# fields verbatim as plain text, so `**bold**`/`*em*` reached readers as literal
+# asterisks. Deterministic strip at the serving seam: one place, covers every
+# stored row (including history written before this shipped) with no re-generation.
+# Ordered passes — `***both***` resolves bold first, then the leftover `*em*`.
+_MD_EMPHASIS_PASSES: tuple = (
+    re.compile(r"\*\*(.+?)\*\*", re.S),  # **bold**
+    re.compile(r"(?<!\*)\*([^*\n]+?)\*(?!\*)"),  # *em* (never a bare/mismatched asterisk)
+    re.compile(r"(?<!_)__(.+?)__(?!_)", re.S),  # __bold__
+)
+
+
+def _strip_md_emphasis(text: Any) -> Any:
+    """Strip markdown emphasis tokens from AI prose destined for plain-text
+    rendering. Keeps the words, drops the tokens; non-strings pass through
+    untouched (fields here are Optional). Unpaired asterisks (e.g. "5*10kg")
+    are left alone — only paired emphasis is markdown."""
+    if not isinstance(text, str) or ("*" not in text and "__" not in text):
+        return text
+    for _rx in _MD_EMPHASIS_PASSES:
+        text = _rx.sub(r"\1", text)
+    return text
+
+
 def _team_tensions(*, _g):
     """Live cross-coach disagreements from the integrator digest (CC-10).
     Same source as get_coach_disagreements; honest empty pre-data."""
@@ -240,11 +268,13 @@ def _team_tensions(*, _g):
             # a backfill, and the byline above it resolves from the registry either way.
             out.append(
                 {
-                    "topic": d.get("topic") or d.get("domain") or "",
+                    # #2385 — every prose field is markdown-stripped at the seam;
+                    # the front-end renders these verbatim via esc().
+                    "topic": _strip_md_emphasis(d.get("topic") or d.get("domain") or ""),
                     "coaches": coaches,
-                    "position_a": d.get("position_a") or d.get("coach_a_position"),
-                    "position_b": d.get("position_b") or d.get("coach_b_position"),
-                    "resolution": (
+                    "position_a": _strip_md_emphasis(d.get("position_a") or d.get("coach_a_position")),
+                    "position_b": _strip_md_emphasis(d.get("position_b") or d.get("coach_b_position")),
+                    "resolution": _strip_md_emphasis(
                         d.get("lead_call")
                         or d.get("nakamura_call")
                         or d.get("resolution_suggested")
