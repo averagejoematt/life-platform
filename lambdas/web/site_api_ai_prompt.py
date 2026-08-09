@@ -126,6 +126,8 @@ def board_grounding_findings(system_text: str, message_text: str, answer_text: s
 
 #: The domains /api/explain narrates a week over — prompt vocabulary, kept beside
 #: the prompt that consumes it.
+#: #2334 roster-copy waiver: a deliberate 6-domain SUBSET (no labs/explorer weeks
+#: to narrate), not a copy of the roster — adding a coach must not silently grow it.
 _EXPLAIN_WEEK_DOMAINS = ("sleep", "training", "nutrition", "glucose", "physical", "mind")
 
 

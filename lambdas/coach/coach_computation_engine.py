@@ -98,20 +98,13 @@ METRIC_DOMAIN = {
     "moving_time_seconds": "training",
 }
 
-# Coach IDs. CANONICAL: must equal the operational coaches in
-# config/personas.json / persona_registry.OPERATIONAL_COACH_IDS (enforced by
-# tests/test_persona_registry.py). Historically used by the removed duplicate
-# prediction grader (#813); kept as the module's canonical coach list.
-COACH_IDS = [
-    "sleep_coach",
-    "training_coach",
-    "nutrition_coach",
-    "mind_coach",
-    "physical_coach",
-    "glucose_coach",
-    "labs_coach",
-    "explorer_coach",
-]
+# Coach IDs — derived from persona_registry.OPERATIONAL_COACH_IDS instead of the
+# hand-typed copy that used to sit here claiming "must equal" it (#2334; guard:
+# tests/test_coach_roster_set_guard_2334.py). Historically used by the removed
+# duplicate prediction grader (#813); kept as the module's canonical coach list.
+from coach.persona_registry import OPERATIONAL_COACH_IDS
+
+COACH_IDS = list(OPERATIONAL_COACH_IDS)
 
 # Default EWMA decay params — used if S3 config unavailable
 DEFAULT_EWMA_PARAMS = {

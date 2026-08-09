@@ -92,9 +92,12 @@ CACHE_PK = f"{USER_PREFIX}ai_analysis"
 AI_SECRET_NAME = os.environ.get("AI_SECRET_NAME", "life-platform/ai-keys")
 AI_MODEL = os.environ.get("AI_MODEL", "claude-haiku-4-5-20251001")
 
+# #2334: derived from the persona registry; EXPERT_PERSONAS coverage asserted in the set guard.
+from coach.persona_registry import OPERATIONAL_SHORT_IDS
+
 from intelligence.expert_personas import BANNED_OPENER_SCAFFOLDS, EXPERT_PERSONAS  # noqa: F401  (re-export, #1654)
 
-EXPERTS = ["mind", "nutrition", "training", "physical", "explorer", "glucose", "labs", "sleep"]
+EXPERTS = list(OPERATIONAL_SHORT_IDS)
 
 dynamodb = boto3.resource("dynamodb", region_name="us-west-2")
 table = dynamodb.Table(TABLE_NAME)

@@ -162,11 +162,14 @@ BASELINE = {
     # 1886 → 1895 (#2391): the regenerate-or-hold branch — residual grounding
     # findings now HOLD publication instead of shipping keep-if-better text. New
     # behaviour, not sprawl; comments were compressed first (+16 draft → +9 landed).
-    "lambdas/intelligence/ai_expert_analyzer_lambda.py": 1895,
+    # 2026-08-09 (#2334): +3 — same registry-conversion shape as intelligence_common.
+    "lambdas/intelligence/ai_expert_analyzer_lambda.py": 1898,
     "deploy/archive/onetime/daily_brief_lambda.py": 1881,
     "lambdas/ingestion/health_auto_export_lambda.py": 1779,
     "deploy/sync_doc_metadata.py": 1807,
-    "lambdas/intelligence/intelligence_common.py": 1741,
+    # 2026-08-09 (#2334): +3 — a hand-typed roster literal became the registry import
+    # + derived assignment; the growth IS the fix (guard-the-SET conversion).
+    "lambdas/intelligence/intelligence_common.py": 1744,
     "lambdas/coach/coach_history_summarizer.py": 1731,
     "lambdas/coach/coach_prediction_evaluator.py": 1638,
     "cdk/stacks/monitoring_stack.py": 1623,

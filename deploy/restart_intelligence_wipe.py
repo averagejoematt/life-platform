@@ -46,6 +46,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "lambdas"))
 
+from coach.persona_registry import OPERATIONAL_COACH_IDS  # #2334: the canonical roster
 from experiment import phase_taxonomy as taxonomy  # ADR-077: single source of truth
 
 from lambdas.common.constants import EXPERIMENT_START_DATE
@@ -408,17 +409,11 @@ def assert_registry_coverage():
         "NARRATIVE#arc",
         "PERSONA#elena",
     } | {
+        # Derived from the registry (#2334): a coach added there now FAILS this
+        # coverage check until COACH_PARTITIONS above learns its partitions —
+        # loud at reset time instead of silently surviving the wipe.
         f"COACH#{c}"
-        for c in (
-            "sleep_coach",
-            "nutrition_coach",
-            "training_coach",
-            "mind_coach",
-            "physical_coach",
-            "glucose_coach",
-            "labs_coach",
-            "explorer_coach",
-        )
+        for c in OPERATIONAL_COACH_IDS
     }
     gap = [pk for pk in required_pks if pk not in covered_pks]
     if gap:

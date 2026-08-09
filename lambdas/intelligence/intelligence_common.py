@@ -1686,7 +1686,10 @@ Rules:
 # CREDIBILITY SCORES (V2.2 Workstream 4)
 # ══════════════════════════════════════════════════════════════════════════════
 
-COACH_IDS_ALL = ["sleep", "nutrition", "training", "mind", "physical", "glucose", "labs", "explorer"]
+# #2334: the registry's own short-id projection, never re-typed (see the set guard).
+from coach.persona_registry import OPERATIONAL_SHORT_IDS
+
+COACH_IDS_ALL = list(OPERATIONAL_SHORT_IDS)
 
 
 def compute_credibility(coach_id: str) -> dict:

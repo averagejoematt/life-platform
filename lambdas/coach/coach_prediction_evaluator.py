@@ -71,17 +71,12 @@ ALGO_VERSION = "1.0"
 # must never move a coach's Bayesian confidence or write to a coach's LEARNING# trail.
 DIARY_CLAIMS_PK = f"{USER_PREFIX}diary_claims"
 
-# Coach IDs — exhaustive list of all coaches that can issue predictions
-COACH_IDS = [
-    "sleep_coach",
-    "nutrition_coach",
-    "training_coach",
-    "mind_coach",
-    "physical_coach",
-    "glucose_coach",
-    "labs_coach",
-    "explorer_coach",
-]
+# Coach IDs — exhaustive list of all coaches that can issue predictions, derived
+# from the canonical persona registry, never re-typed (#2334; guard:
+# tests/test_coach_roster_set_guard_2334.py).
+from coach.persona_registry import OPERATIONAL_COACH_IDS
+
+COACH_IDS = list(OPERATIONAL_COACH_IDS)
 
 # Metric → DynamoDB source mapping. CONSOLIDATED 2026-06-28 (Coherence Program
 # Phase 2): this was a hand-synced duplicate of coach_state_updater's allowlist —

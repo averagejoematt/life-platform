@@ -68,17 +68,13 @@ AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 # Phase 2 target coach — will be parameterized in Phase 3
 TARGET_COACH = os.environ.get("TARGET_COACH", "sleep_coach")
 
-# All coach IDs in the system
-ALL_COACH_IDS = [
-    "sleep_coach",
-    "training_coach",
-    "nutrition_coach",
-    "mind_coach",
-    "physical_coach",
-    "glucose_coach",
-    "labs_coach",
-    "explorer_coach",
-]
+# All coach IDs in the system — derived from the canonical persona registry,
+# never re-typed (#2334; this copy had already drifted to a different order than
+# its sibling in coach_history_summarizer). Guard:
+# tests/test_coach_roster_set_guard_2334.py.
+from coach.persona_registry import OPERATIONAL_COACH_IDS
+
+ALL_COACH_IDS = list(OPERATIONAL_COACH_IDS)
 
 # Owner — challenges/experiments are keyed USER#{USER_ID}#SOURCE#... (mcp/config.py).
 USER_ID = os.environ.get("USER_ID", "matthew")

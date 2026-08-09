@@ -160,7 +160,11 @@ def handle_ai_analysis(event, *, _g):
     table = _g["table"]
     qs = event.get("queryStringParameters") or {}
     expert_key = qs.get("expert", "mind")
-    if expert_key not in ("mind", "nutrition", "training", "physical", "explorer", "labs", "glucose", "sleep"):
+    # Roster-derived whitelist, never re-typed (#2334; guard:
+    # tests/test_coach_roster_set_guard_2334.py).
+    from coach.persona_registry import OPERATIONAL_SHORT_IDS
+
+    if expert_key not in OPERATIONAL_SHORT_IDS:
         return _error(400, "Invalid expert key")
     ai_pk = f"{USER_PREFIX}ai_analysis"
     ai_item = table.get_item(Key={"pk": ai_pk, "sk": f"EXPERT#{expert_key}"}).get("Item")
