@@ -242,3 +242,57 @@ def test_json_file_itself_parses_with_stdlib_json():
     with open(path, encoding="utf-8") as fh:
         data = json.load(fh)
     assert isinstance(data, dict)
+
+
+# ── issueless_ancient_reds — the 14-day mandatory issue-or-fix tenure (#2378) ──
+
+
+def test_ancient_red_with_prose_citation_is_red_flagged():
+    """#2378 acceptance 3: past 14 days, a citation LINE without a filed-issue
+    reference no longer clears the board — the exact qa-smoke-warnings shape
+    (structurally red 21+ days behind a tidy prose citation)."""
+    now = datetime(2026, 8, 9, tzinfo=timezone.utc)
+    alarms = [_alarm("old-alarm", 15 * 24, now)]
+    citations = {"old-alarm": {"citation": "incident 2026-07-20 — measured, no code defect", "note": "..."}}
+    out = cac.issueless_ancient_reds(alarms, citations, now=now)
+    assert out == [("old-alarm", 15 * 24.0)]
+
+
+def test_ancient_red_with_issue_citation_is_not_flagged():
+    now = datetime(2026, 8, 9, tzinfo=timezone.utc)
+    alarms = [_alarm("old-alarm", 20 * 24, now)]
+    citations = {"old-alarm": {"citation": "#2378", "note": "tracked"}}
+    assert cac.issueless_ancient_reds(alarms, citations, now=now) == []
+
+
+def test_under_14_days_prose_citation_still_suffices():
+    """The 72h..14d band keeps the #1959 contract: any citation counts."""
+    now = datetime(2026, 8, 9, tzinfo=timezone.utc)
+    alarms = [_alarm("newish-alarm", 10 * 24, now)]
+    citations = {"newish-alarm": {"citation": "incident row 2026-08-01", "note": "..."}}
+    assert cac.issueless_ancient_reds(alarms, citations, now=now) == []
+    assert cac.uncited_long_reds(alarms, citations, now=now) == []
+
+
+def test_ancient_uncited_alarm_is_flagged_by_both_gates():
+    now = datetime(2026, 8, 9, tzinfo=timezone.utc)
+    alarms = [_alarm("forgotten-alarm", 30 * 24, now)]
+    assert cac.uncited_long_reds(alarms, citations={}, now=now) == [("forgotten-alarm", 30 * 24.0)]
+    assert cac.issueless_ancient_reds(alarms, citations={}, now=now) == [("forgotten-alarm", 30 * 24.0)]
+
+
+def test_unparseable_timestamp_never_manufactures_a_tenure_flag():
+    assert cac.issueless_ancient_reds([{"name": "x", "updated": "not-a-date"}], citations={}) == []
+
+
+def test_render_ancient_is_gate_failure_with_mandate_language():
+    code, message = cac.render([], unreachable_error=None, ancient=[("old-alarm", 15 * 24.0)])
+    assert code == 1
+    assert "MANDATORY issue-or-fix" in message
+    assert "old-alarm" in message
+
+
+def test_render_clean_board_mentions_both_contracts():
+    code, message = cac.render([], unreachable_error=None, ancient=[])
+    assert code == 0
+    assert "filed issue" in message

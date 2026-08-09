@@ -137,7 +137,14 @@ def check_score_sanity():
     def _range_check(name, value, lo, hi, unit="", optional=False):
         c = Check(f"value:{name}", "Score Sanity", CONTENT_TRUTH)
         if value is None:
-            return c.warn(f"{name} is null (may not have synced)") if optional else c.fail(f"{name} is null — expected data")
+            # #2378: a null on an OPTIONAL metric is the sweep-hour timing class
+            # (#1958) — the source is event-driven/sync-lagged by nature, and the
+            # 30-day measured record shows these nulls recur on a healthy
+            # platform (they were 4 of the 5-8 warns holding qa-smoke-warnings
+            # structurally red 21+ days). Chronic: reported + counted in
+            # ChronicWarnCount, never alarmed. A null on a REQUIRED metric and
+            # an out-of-range value both stay hard FAILs below.
+            return c.warn(f"{name} is null (may not have synced)", chronic=True) if optional else c.fail(f"{name} is null — expected data")
         if lo <= float(value) <= hi:
             return c.ok(f"{name} = {value}{unit}")
         return c.fail(f"{name} = {value}{unit} — outside plausible range [{lo},{hi}]")
@@ -175,7 +182,10 @@ def check_score_sanity():
 
     c = Check("score:hydration", "Score Sanity", CONTENT_TRUTH)
     if hydration is None:
-        c.warn("Hydration null — Apple Health water likely didn't sync")
+        # #2378: same timing class as the optional nulls above — HAE water is a
+        # webhook source that often hasn't synced by the sweep. Chronic; the
+        # low-but-present branch below stays alarmed (a real anomaly signal).
+        c.warn("Hydration null — Apple Health water likely didn't sync", chronic=True)
     elif hydration < 30:
         c.warn(f"Hydration = {hydration} — low, possible HAE sync gap (may be valid if <1L consumed)")
     else:

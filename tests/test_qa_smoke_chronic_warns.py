@@ -53,15 +53,33 @@ MONITORING = REPO / "cdk" / "stacks" / "monitoring_stack.py"
 # The ONE enumerated registry of sanctioned chronic call sites, by (file,
 # enclosing function). Extending the chronic set means extending THIS list in
 # the same PR — the AST scan below fails on any silent drift in either
-# direction. Both entries are the known-recurring timing class from #1958:
+# direction. #1958 entries are the known-recurring timing class:
 #   check_ddb_freshness   — an OPTIONAL (event-driven/manual) source with no
 #                           record yesterday; derived from the registry's
 #                           qa_tier facet, recurs on a healthy platform.
 #   check_mcp_tool_calls  — the cache-warm partial (warmer cadence vs the
 #                           10:30 PT sweep).
+# #2378 entries (the alarm sat structurally red 21+ days AFTER the #1958
+# split because these recurred nightly on the alarmed side):
+#   check_score_sanity / _range_check — a null on an OPTIONAL dashboard
+#                           metric ("may not have synced") + the hydration
+#                           None branch: the same event-driven timing class.
+#                           (_range_check is nested inside check_score_sanity,
+#                           so the AST scan attributes its site to BOTH
+#                           enclosing functions — both entries are the same
+#                           two call sites, not four.)
+#   check_canary_precision — the fail-soft unreadable branch, pinned to the
+#                           filed grant gap #1956; un-chronic when it lands.
+#   check_coach_ensemble_phase_stamp_coverage — the unstamped-rows warn,
+#                           pinned to the filed backfill gap #1970; the
+#                           errored branch stays alarmed.
 SANCTIONED_CHRONIC_SITES = {
     ("qa_smoke_lambda.py", "check_ddb_freshness"),
     ("qa_smoke_lambda.py", "check_mcp_tool_calls"),
+    ("qa_check_outputs.py", "check_score_sanity"),
+    ("qa_check_outputs.py", "_range_check"),
+    ("qa_smoke_lambda.py", "check_canary_precision"),
+    ("qa_smoke_lambda.py", "check_coach_ensemble_phase_stamp_coverage"),
 }
 
 
@@ -217,6 +235,113 @@ def test_optional_source_ddb_error_stays_alarmed(monkeypatch):
     alarmed, chronic = split_warns(checks)
     assert [c.name for c in alarmed] == ["DDB:withings"], "a DDB error on an optional source must increment the alarmed WarnCount"
     assert chronic == []
+
+
+# --- #2378: the sites that kept the alarm structurally red AFTER #1958 ------
+
+
+class _S3JsonStub:
+    """S3 stub returning one fixed JSON document for any get_object."""
+
+    class exceptions:
+        class NoSuchKey(Exception):
+            pass
+
+    def __init__(self, payload):
+        self._payload = payload
+
+    def get_object(self, Bucket=None, Key=None):  # noqa: N803 — boto3 surface
+        import io
+
+        return {"Body": io.BytesIO(json.dumps(self._payload).encode())}
+
+
+def _score_sanity_with(monkeypatch, payload):
+    from operational import qa_check_outputs as qco
+
+    monkeypatch.setattr(qco, "s3", _S3JsonStub(payload))
+    return {c.name: c for c in qco.check_score_sanity()}
+
+
+def test_optional_metric_null_is_chronic_out_of_range_stays_fail(monkeypatch):
+    """#2378: a null on an OPTIONAL dashboard metric ("may not have synced")
+    is the sweep-hour timing class — chronic. An out-of-range VALUE and a
+    null on a required metric keep their hard-FAIL semantics."""
+    by_name = _score_sanity_with(
+        monkeypatch,
+        {
+            "date": "2026-01-01",  # stale on purpose; dashboard:date is not under test
+            "readiness": {"score": 55},
+            "sleep": {"score": None},
+            "hrv": {"value": None},
+            "glucose": {"avg": 9999},  # out of range — must stay FAIL
+            "weight": {"current": 320},
+            "day_grade": {"letter": "B", "score": 80, "components": {"hydration": None}},
+        },
+    )
+    for name in ("value:sleep", "value:hrv"):
+        assert by_name[name].passed is None, f"{name} null should warn"
+        assert by_name[name].chronic is True, f"{name}'s optional-null warn must be chronic (#2378)"
+    assert by_name["value:glucose"].passed is False, "an out-of-range value must stay a FAIL, never chronic"
+    assert by_name["score:hydration"].passed is None
+    assert by_name["score:hydration"].chronic is True, "hydration-null (HAE webhook timing) must be chronic (#2378)"
+
+
+def test_low_hydration_value_stays_alarmed(monkeypatch):
+    """The low-but-present hydration branch is a data anomaly, not a timing
+    condition — it must stay on the alarmed side."""
+    by_name = _score_sanity_with(
+        monkeypatch,
+        {
+            "date": "2026-01-01",
+            "day_grade": {"letter": "B", "score": 80, "components": {"hydration": 5}},
+        },
+    )
+    c = by_name["score:hydration"]
+    assert c.passed is None and c.chronic is False, "a LOW hydration value must remain alarmed"
+
+
+class _CanaryS3Denied:
+    class exceptions:
+        class NoSuchKey(Exception):
+            pass
+
+    def get_object(self, Bucket=None, Key=None):  # noqa: N803 — boto3 surface
+        raise RuntimeError("AccessDenied (simulated) — no s3:GetObject on ai-canary-log/*")
+
+
+def test_canary_unreadable_branch_is_chronic(monkeypatch):
+    """#2378: the fail-soft unreadable branch is pinned to the filed grant gap
+    #1956 and recurred nightly — chronic until the grant lands."""
+    monkeypatch.setattr(qa, "s3", _CanaryS3Denied())
+    (c,) = qa.check_canary_precision()
+    assert c.passed is None
+    assert c.chronic is True, "the #1956 unreadable branch must be chronic (#2378)"
+    assert "#1956" in c.message
+
+
+class _UnstampedTable:
+    def query(self, **kw):
+        return {"Items": [{"sk": "BRIEF#2026-08-03"}]}
+
+
+class _ErroringTable:
+    def query(self, **kw):
+        raise RuntimeError("boom (simulated)")
+
+
+def test_phase_stamp_gap_is_chronic_but_check_error_stays_alarmed(monkeypatch):
+    """#2378: the known #1970 unstamped-rows gap (own operator backfill tool)
+    is chronic; the check ERRORING is a novel fault and stays alarmed."""
+    monkeypatch.setattr(qa, "table", _UnstampedTable())
+    (c,) = qa.check_coach_ensemble_phase_stamp_coverage()
+    assert c.passed is None
+    assert c.chronic is True, "the #1970 unstamped-rows warn must be chronic (#2378)"
+
+    monkeypatch.setattr(qa, "table", _ErroringTable())
+    (c,) = qa.check_coach_ensemble_phase_stamp_coverage()
+    assert c.passed is None
+    assert c.chronic is False, "the check ERRORING must stay on the alarmed side"
 
 
 # ---------------------------------------------------------------------------

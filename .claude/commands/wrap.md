@@ -383,7 +383,11 @@ incident row in the session ledger; a new red could hide among the chronic ones.
   `docs/alarm_citations.json` (exact `AlarmName` -> `{"citation": "#N or an incident
   row", "note": "..."}`, hand-maintained the same way `remediation/agent.py`'s
   `MANUAL_ROTATION_SECRETS` is). Every alarm that has been in ALARM **>72h** must
-  have an entry, or the gate names it explicitly and exits 1.
+  have an entry, or the gate names it explicitly and exits 1. **Tenure escalation
+  (#2378): any alarm in ALARM >14 days is a MANDATORY issue-or-fix — its citation
+  must reference a filed issue (`#N`), or the gate red-flags it; a prose/incident-row
+  citation line stops counting at that tenure (qa-smoke-warnings sat structurally red
+  21+ days behind a tidy citation).**
 - If a printed alarm is a genuine gap: add a `docs/alarm_citations.json` entry (file
   the issue first if none exists yet, ADR-099 shape) — or, if it's not really
   actionable this session, write the shortfall explicitly into the handover and

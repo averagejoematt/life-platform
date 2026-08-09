@@ -57,6 +57,16 @@ REGION = "us-west-2"
 # citations.py greps both source files to keep the two literals from drifting apart.
 ALARM_AGE_CITATION_HOURS = 72
 
+# #2378 (acceptance 3): an alarm in ALARM beyond this tenure is a MANDATORY
+# issue-or-fix, not a citation line — its registry entry must reference a filed
+# GitHub issue (`#N` somewhere in the citation string), or the gate red-flags it
+# by name. Prose/incident-row citations satisfy the 72h gate above but stop
+# sufficing here: qa-smoke-warnings sat structurally red 21+ days with a tidy
+# citation the whole time, which is exactly how a red board normalizes.
+ALARM_TENURE_ISSUE_DAYS = 14
+
+_ISSUE_REF = r"#\d+"
+
 
 def _parse_ts(ts):
     """Parse a CloudWatch StateUpdatedTimestamp string into an aware datetime, or
@@ -114,6 +124,28 @@ def uncited_long_reds(alarms, citations, now=None, threshold_hours=ALARM_AGE_CIT
     return out
 
 
+def issueless_ancient_reds(alarms, citations, now=None, threshold_days=ALARM_TENURE_ISSUE_DAYS):
+    """(alarm_name, age_hours) for every ALARM-state alarm older than
+    threshold_days whose citation carries no filed-issue reference (`#N`) —
+    including alarms with no citation at all. #2378: past this tenure a
+    citation LINE no longer clears the board; the alarm is a mandatory
+    issue-or-fix. Pure and deterministic, mirroring uncited_long_reds."""
+    import re
+
+    now = now or datetime.now(timezone.utc)
+    out = []
+    for a in alarms:
+        name = a.get("name") or "?"
+        age = alarm_age_hours(a, now)
+        if age is None or age <= threshold_days * 24.0:
+            continue
+        entry = citations.get(name) or {}
+        citation = str(entry.get("citation", ""))
+        if not re.search(_ISSUE_REF, citation):
+            out.append((name, age))
+    return out
+
+
 def fetch_alarms():
     """Live `describe_alarms(StateValue="ALARM")` read — read-only, no writes, no
     alarm mutation. Returns (alarms, error): `error` is a human string when AWS is
@@ -131,7 +163,7 @@ def fetch_alarms():
     return alarms, None
 
 
-def render(uncited, unreachable_error):
+def render(uncited, unreachable_error, ancient=()):
     """(exit_code, message) for a computed result. Pure — unit-tested offline."""
     if unreachable_error is not None:
         return 0, (
@@ -139,16 +171,33 @@ def render(uncited, unreachable_error):
             "alarm citations UNVERIFIED this run. Note that explicitly in the handover "
             "(`**Alarms:** unverified — AWS unreachable`) rather than claiming a clean board."
         )
-    if not uncited:
-        return 0, "✅ every alarm in ALARM state >72h cites an incident row or issue (or none are that old)."
-    lines = [f"❌ {len(uncited)} alarm(s) in ALARM >72h with no citation in {CITATIONS_PATH.relative_to(ROOT)}:"]
-    for name, age in sorted(uncited):
-        lines.append(f"   - {name}  (red {age / 24:.1f}d / {age:.0f}h)")
-    lines.append(
-        '   Add an entry to docs/alarm_citations.json — {"<AlarmName>": {"citation": "#N", '
-        '"note": "..."}} — or write the shortfall explicitly into the handover '
-        "(`**Alarms:** <M> uncited — named: ...`) and re-run with --decoded."
-    )
+    if not uncited and not ancient:
+        return 0, (
+            "✅ every alarm in ALARM state >72h cites an incident row or issue, and every one "
+            f"red >{ALARM_TENURE_ISSUE_DAYS}d cites a filed issue (#N) — or none are that old."
+        )
+    lines = []
+    if uncited:
+        lines.append(f"❌ {len(uncited)} alarm(s) in ALARM >72h with no citation in {CITATIONS_PATH.relative_to(ROOT)}:")
+        for name, age in sorted(uncited):
+            lines.append(f"   - {name}  (red {age / 24:.1f}d / {age:.0f}h)")
+        lines.append(
+            '   Add an entry to docs/alarm_citations.json — {"<AlarmName>": {"citation": "#N", '
+            '"note": "..."}} — or write the shortfall explicitly into the handover '
+            "(`**Alarms:** <M> uncited — named: ...`) and re-run with --decoded."
+        )
+    if ancient:
+        lines.append(
+            f"🚩 {len(ancient)} alarm(s) in ALARM >{ALARM_TENURE_ISSUE_DAYS} DAYS without a filed-issue citation "
+            "— MANDATORY issue-or-fix (#2378), a citation line alone no longer clears this tenure:"
+        )
+        for name, age in sorted(ancient):
+            lines.append(f"   - {name}  (red {age / 24:.1f}d)")
+        lines.append(
+            "   Either FIX the alarm this session, or file a GitHub issue for it and put `#N` in its "
+            "docs/alarm_citations.json citation. Prose/incident-row citations stop counting at this tenure — "
+            "that is how qa-smoke-warnings stayed structurally red 21+ days behind a tidy citation."
+        )
     return 1, "\n".join(lines)
 
 
@@ -157,7 +206,8 @@ def main():
     alarms, err = fetch_alarms()
     citations = load_citations()
     uncited = [] if err else uncited_long_reds(alarms, citations)
-    code, message = render(uncited, err)
+    ancient = [] if err else issueless_ancient_reds(alarms, citations)
+    code, message = render(uncited, err, ancient=ancient)
     print(message)
     if code == 0:
         return 0
