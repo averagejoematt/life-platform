@@ -360,7 +360,36 @@ def test_handler_routes_to_the_liveness_mode(monkeypatch, fake_lambda):
     assert json.loads(resp["body"])["unhealthy_count"] == 2
 
 
-def test_handler_compute_mode_pages_the_digest_when_records_are_missing(monkeypatch, fake_lambda, fake_table, aws):
+# ── The clock the handler reads (2026-08-09) ─────────────────────────────────
+# `lambda_handler` derives `today_str` from the REAL clock, then
+# `_check_compute_outputs` looks for YESTERDAY's rows relative to it. The module
+# constants below are fixed dates, so a handler-mode test that seeds `YESTERDAY`
+# rows and asserts `all_present is True` only passes on 2026-08-08 — it went red
+# at 2026-08-09T00:00Z, hours after it was written, having been green all day.
+#
+# This is the documented "fixture date + now-math = time bomb" class. The two
+# sibling handler tests survived only by accident: they assert rows are MISSING,
+# which a date mismatch also produces, so they were right for the wrong reason.
+#
+# Freezing is the fix, not re-deriving the fixture from `now()` — a test whose
+# expectation moves with the clock can't state a contract.
+@pytest.fixture
+def frozen_handler_clock(monkeypatch):
+    """Pin `lambda_handler`'s notion of "today" to the module's TODAY constant."""
+
+    class _FrozenDatetime(phc.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            # Derived from TODAY, never a second hardcoded date — two literals that
+            # must agree is how this drifts back into a bomb.
+            y, m, d = (int(x) for x in TODAY.split("-"))
+            return phc.datetime(y, m, d, 17, 0, 0, tzinfo=tz or timezone.utc)
+
+    monkeypatch.setattr(phc, "datetime", _FrozenDatetime)
+    return _FrozenDatetime
+
+
+def test_handler_compute_mode_pages_the_digest_when_records_are_missing(monkeypatch, fake_lambda, fake_table, aws, frozen_handler_clock):
     fake_lambda()
     fake_table(items=_compute_rows(("character_sheet",)))
     resp = phc.lambda_handler({"check_compute_outputs": True}, None)
@@ -372,7 +401,7 @@ def test_handler_compute_mode_pages_the_digest_when_records_are_missing(monkeypa
     assert "Daily Metrics" in pub["Message"]
 
 
-def test_handler_compute_mode_is_silent_when_the_cascade_is_whole(monkeypatch, fake_lambda, fake_table, aws):
+def test_handler_compute_mode_is_silent_when_the_cascade_is_whole(monkeypatch, fake_lambda, fake_table, aws, frozen_handler_clock):
     fake_lambda()
     fake_table(items=_compute_rows(_COMPUTE_PARTITIONS))
     resp = phc.lambda_handler({"check_compute_outputs": True}, None)
@@ -380,7 +409,7 @@ def test_handler_compute_mode_is_silent_when_the_cascade_is_whole(monkeypatch, f
     assert aws.publishes == []
 
 
-def test_handler_compute_mode_survives_a_failed_sns_publish(monkeypatch, fake_lambda, fake_table):
+def test_handler_compute_mode_survives_a_failed_sns_publish(monkeypatch, fake_lambda, fake_table, frozen_handler_clock):
     fake_lambda()
     fake_table(items={})
     monkeypatch.setattr(phc.boto3, "client", lambda name, region_name=None: _Recorder(boom=True))
