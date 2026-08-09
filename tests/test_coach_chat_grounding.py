@@ -2,13 +2,20 @@
 (#2364, epic #2363).
 
 The property under test is narrow and load-bearing: **a coach in a text message
-cannot state a number, a date, or a day that the facts do not support.** #2343 is
-the failure this is built against, and note its shape — the cited HRV and recovery
-were REAL readings, present in the platform, just belonging to a different day. An
-existence-only check passes that. Only the night class catches it.
+cannot state a number, a date, or a day that the material it was given does not
+support.** #2343 is the failure this is built against, and note its shape — the
+cited HRV and recovery were REAL readings, present in the platform, just belonging
+to a different day. An existence-only check passes that. Only the night class
+catches it.
+
+These tests run the REAL gate (``ai.grounded_generation`` and friends), not a
+double: the module under test is a thin arming layer, and testing it against a fake
+gate would prove nothing about the one property that matters.
 """
 
 from __future__ import annotations
+
+import os
 
 from coach import coach_chat_grounding as g
 
@@ -24,62 +31,82 @@ FACTS = {
 }
 
 
-# ── The allow-list is DERIVED, not hand-listed ────────────────────────────────
+def grounder(facts=FACTS, **kw):
+    kw.setdefault("generation_date_iso", "2026-08-08")
+    return g.build_grounder(facts, **kw)
 
 
-def test_every_number_in_the_facts_is_allowed_including_nested_ones():
-    a = g.allowed_numbers(FACTS)
-    for v in (55.0, 42.0, 58.0, 318.4, 148, 620, 970):
-        assert v in a, f"{v} is in the facts and must not read as fabricated"
+# ── Reuse is the design: this module must not fork the gate's vocabulary ──────
 
 
-def test_a_number_absent_from_the_facts_is_not_allowed():
-    assert 165 not in g.allowed_numbers(FACTS)
+def test_the_module_delegates_to_the_shared_allow_list_builders_rather_than_forking_them():
+    """The first draft reimplemented ``allowed_numbers``/``allowed_dates`` locally;
+    review caught that ``ai.grounded_generation`` already exports both, and the
+    shared versions are behaviourally better (they ground the memory block and the
+    thread, not just the fact dict). This guard keeps the fork from growing back —
+    a local reimplementation would drift from the gate's own extraction rules and
+    the two would disagree about what counts as a number."""
+    src = open(os.path.join(os.path.dirname(__file__), "..", "lambdas", "coach", "coach_chat_grounding.py")).read()
+    assert "from ai.grounded_generation import allowed_dates, allowed_numbers" in src
+    assert "def allowed_numbers" not in src
+    assert "def allowed_dates" not in src
+    import re
+
+    assert not re.search(r"^_BENIGN\w*\s*=", src, re.M), "benign smalls are the gate's own _BENIGN_NUMBERS, not a local list"
+
+
+# ── The allow-list covers everything the model was given ──────────────────────
+
+
+def test_numbers_from_the_facts_pass_including_nested_ones():
+    assert grounder()("Protein came in at 148 g against a 620 kcal deficit.") == []
+
+
+def test_a_number_absent_from_everything_is_caught():
+    findings = grounder()("You averaged 165 g of protein.")
+    assert findings, "165 appears nowhere in the facts"
+
+
+def test_a_number_from_the_MEMORY_block_is_not_a_fabrication():
+    """The behavioural reason the shared builders won over the local walker: a coach
+    quoting its own memory ("you committed to 170 g") must not read as inventing
+    170. The memory block rides in ``extra_sources``."""
+    memory = "You remember: he committed to 170 g protein as his floor."
+    strict = grounder()("Your floor is 170 g — that was the deal.")
+    assert strict, "without the memory in scope, 170 is ungrounded (the negative control)"
+    with_memory = grounder(extra_sources=(memory,))("Your floor is 170 g — that was the deal.")
+    assert with_memory == []
+
+
+def test_a_number_matthew_himself_said_can_be_quoted_back():
+    thread_text = "Matthew: I think I got about 132 g in yesterday."
+    assert grounder(extra_sources=(thread_text,))("132 g would put you under the floor.") == []
 
 
 def test_a_newly_added_fact_is_grounded_automatically():
     """A hand-listed allow-list rots the moment an upstream fact is added — the new
-    field reads as a fabrication on first appearance, and the reflex fix (widen the
-    list) is how allow-lists stop meaning anything. Derivation is the guard."""
-    assert 91.7 not in g.allowed_numbers(FACTS)
-    assert 91.7 in g.allowed_numbers(dict(FACTS, brand_new_metric=91.7))
-
-
-def test_booleans_are_not_treated_as_the_numbers_one_and_zero():
-    """`True` is an int in Python. Letting it seed the allow-list would silently
-    ground a literal 1 that no fact actually contains."""
-    a = g.allowed_numbers({"stalled": True, "ready": False})
-    assert a == set(g._BENIGN)
-
-
-def test_small_conversational_integers_stay_benign():
-    a = g.allowed_numbers({})
-    assert 1 in a and 3 in a, "a coach saying 'one more day' is not fabricating data"
-
-
-def test_the_allow_list_survives_an_empty_or_missing_fact_set():
-    assert g.allowed_numbers({}) == set(g._BENIGN)
-    assert g.allowed_numbers(None) == set(g._BENIGN)
+    field would read as a fabrication on first appearance. Derivation is the guard."""
+    assert grounder()("Your readiness index is 91.7.") != []
+    assert grounder(dict(FACTS, brand_new_metric=91.7))("Your readiness index is 91.7.") == []
 
 
 # ── Dates ─────────────────────────────────────────────────────────────────────
 
 
-def test_dates_present_in_the_facts_are_collected():
-    d = g.allowed_dates(FACTS)
-    assert "2026-08-07" in d and "2026-08-08" in d
+def test_a_date_present_in_the_facts_may_be_cited():
+    assert grounder()("Your last weigh-in was 2026-08-08.") == []
 
 
-def test_a_fact_set_with_no_dates_yields_an_EMPTY_set_not_none():
-    """Empty and None mean different things to the gate: empty says 'no date is
-    legitimate' (the correct posture), None switches the date class OFF."""
-    d = g.allowed_dates({"recovery_pct": 55})
-    assert d == set()
-    assert d is not None
+def test_a_fabricated_date_is_caught():
+    assert grounder()("Back on 2025-01-14 you were heavier."), "a date absent from the facts must not pass"
 
 
-def test_a_non_date_string_of_the_same_length_is_not_collected():
-    assert g.allowed_dates({"note": "abcd-ef-gh"}) == set()
+def test_a_fact_set_with_no_dates_means_no_date_is_legitimate():
+    """Empty and None mean different things to the gate: an empty allow-list says
+    'no date is legitimate' (the correct posture), None switches the class OFF.
+    The arming must produce the former."""
+    bare = {"recovery_pct": 55.0}
+    assert grounder(bare)("It was 2026-08-05 when this started."), "with no dates in scope, any cited date is fabricated"
 
 
 # ── The facts block ───────────────────────────────────────────────────────────
@@ -103,61 +130,58 @@ def test_a_populated_fact_set_renders_through_the_shared_renderer():
     assert "none available" not in block.lower()
 
 
-# ── The arming: all five classes, on a real gate call ─────────────────────────
-
-
-def test_a_reply_citing_only_grounded_numbers_passes():
-    grounder = g.build_grounder(FACTS, generation_date_iso="2026-08-08")
-    assert grounder("Protein came in at 148 g.") == []
-
-
-def test_a_fabricated_number_is_caught():
-    grounder = g.build_grounder(FACTS, generation_date_iso="2026-08-08")
-    findings = grounder("You averaged 165 g of protein.")
-    assert findings, "165 appears nowhere in the facts"
+# ── The #2343 class: day-correspondence, not existence ────────────────────────
 
 
 def test_the_2343_case_a_real_reading_attributed_to_the_WRONG_DAY_is_caught():
     """The whole reason this surface arms `night`. 55% and 42 ms are REAL — they are
     2026-08-07's readings, right there in the facts. Presented as today's they are a
     lie, and an existence-only allow-list passes them without complaint."""
-    grounder = g.build_grounder(FACTS, generation_date_iso="2026-08-08")
-    ungrounded = grounder("Whoop shows 55% recovery and HRV at 42 ms right now.")
+    ungrounded = grounder()("Whoop shows 55% recovery and HRV at 42 ms right now.")
     assert ungrounded, "a real reading attributed to the wrong day must not pass"
-    grounded = grounder("On the night of 2026-08-07 you came in at 55% recovery, HRV 42 ms.")
+    # NB the phrasing: "recovery 55%" and "HRV 42 ms" keep each figure adjacent to its
+    # own metric noun. The gate's proximity patterns read "recovery, HRV 42" as a
+    # recovery figure of 42 — correct behaviour for the gate (adjacency IS the claim
+    # structure in prose), and a phrasing this test must not manufacture.
+    grounded = grounder()("On the night of 2026-08-07 you came in at recovery 55%, with HRV 42 ms.")
     assert grounded == [], "the same values, correctly day-labelled, must pass"
 
 
 def test_naming_the_night_is_what_makes_the_claim_honest():
-    """Restating the positive half: the fix for a night-scope finding is to NAME the
+    """The positive half restated: the fix for a night-scope finding is to NAME the
     night, never to widen a tolerance."""
-    grounder = g.build_grounder(FACTS, generation_date_iso="2026-08-08")
-    assert grounder("Night of 2026-08-07: HRV 42 ms.") == []
+    assert grounder()("Night of 2026-08-07: HRV 42 ms.") == []
 
 
-def test_a_fabricated_date_is_caught():
-    grounder = g.build_grounder(FACTS, generation_date_iso="2026-08-08")
-    assert grounder("Back on 2025-01-14 you were heavier."), "a date absent from the facts must not pass"
+def test_a_remembered_vital_is_still_night_checked_even_though_the_number_is_allowed():
+    """extra_sources widen the NUMBER vocabulary, never the vitals adjudication: the
+    night map builds from the facts alone. A recovery figure that the memory block
+    happens to contain still may not be pinned to a night whose stored value
+    disagrees."""
+    memory = "Last week he bottomed out at recovery 31%."
+    findings = grounder(extra_sources=(memory,))("On the night of 2026-08-07 your recovery was 31%.")
+    assert findings, "31% is allowed as a NUMBER, but 2026-08-07's stored recovery is 55% — the night class must still fire"
+
+
+# ── Failure postures ──────────────────────────────────────────────────────────
+
+
+def test_an_empty_fact_set_still_gates_rather_than_failing_open():
+    """With MacroFactor quiet 45 days (#2326) this is the LIVE case for the nutrition
+    coach — no facts at all. It must be the strictest state, not the loosest."""
+    assert grounder({})("You hit 190 g of protein yesterday."), "no facts must mean no numbers, not a free pass"
+
+
+def test_a_reply_with_no_numbers_at_all_passes_on_an_empty_fact_set():
+    """The honest answer when there is nothing to cite — it must remain sayable."""
+    assert grounder({})("I don't have your food logs for that stretch, so I can't tell you.") == []
 
 
 def test_the_grounder_is_reusable_across_turns_without_rebuilding():
     """It is built once per turn and called up to twice (generate, then regenerate).
     A grounder that mutated its own allow-list would let attempt 2 pass what attempt
     1 failed."""
-    grounder = g.build_grounder(FACTS, generation_date_iso="2026-08-08")
-    first = grounder("You averaged 165 g.")
-    second = grounder("You averaged 165 g.")
+    gr = grounder()
+    first = gr("You averaged 165 g.")
+    second = gr("You averaged 165 g.")
     assert first and second and len(first) == len(second)
-
-
-def test_an_empty_fact_set_still_gates_rather_than_failing_open():
-    """With MacroFactor quiet 45 days (#2326) this is the LIVE case for the nutrition
-    coach — no facts at all. It must be the strictest state, not the loosest."""
-    grounder = g.build_grounder({}, generation_date_iso="2026-08-08")
-    assert grounder("You hit 190 g of protein yesterday."), "no facts must mean no numbers, not a free pass"
-
-
-def test_a_reply_with_no_numbers_at_all_passes_on_an_empty_fact_set():
-    """The honest answer when there is nothing to cite — it must remain sayable."""
-    grounder = g.build_grounder({}, generation_date_iso="2026-08-08")
-    assert grounder("I don't have your food logs for that stretch, so I can't tell you.") == []

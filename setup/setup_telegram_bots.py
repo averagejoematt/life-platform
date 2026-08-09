@@ -208,6 +208,19 @@ def main() -> int:
         state = " [already set — ENTER keeps it]" if existing.get("bot_token") else ""
         token = getpass.getpass(f"  {key:11s} {username:20s} {who}{state}\n    token: ").strip()
         if not token:
+            # ENTER on an already-configured bot still REFRESHES its chat ids using the
+            # stored token — so "say hi to the bot, re-run, press ENTER" completes the
+            # allow-list without re-pasting anything. A bot with no token is skipped.
+            stored = existing.get("bot_token")
+            if stored:
+                found = discover_chat_ids(stored)
+                fresh = [c for c in found if c not in (existing.get("chat_ids") or [])]
+                if fresh:
+                    existing["chat_ids"] = list(existing.get("chat_ids") or []) + fresh
+                    payload[key] = existing
+                    changed += 1
+                    print(f"    ✓ token kept; new chat id(s): {', '.join(str(c) for c in fresh)}\n")
+                    continue
             print("    skipped\n")
             continue
 

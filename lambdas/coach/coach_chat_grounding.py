@@ -3,9 +3,19 @@
 
 Kept separate from ``coach_chat`` so that module can stay a pure, AWS-free turn
 engine. This is the half that knows what is TRUE today, and it is deliberately thin:
-almost everything here is a call into machinery that already exists, because a chat
-surface inventing its own notion of "the facts" is exactly how two doors end up
-telling a reader two truths.
+everything here is a call into machinery that already exists, because a chat surface
+inventing its own notion of "the facts" is exactly how two doors end up telling a
+reader two truths.
+
+NOTHING IS REIMPLEMENTED. The first draft of this module carried its own
+``allowed_numbers``/``allowed_dates`` walkers; review caught that
+``ai.grounded_generation`` already exports both (``coach_history_summarizer``
+imports them), and the shared versions are *better*: they derive the allow-list from
+EVERYTHING the model was given — facts, memory, the thread — not just the fact dict.
+That difference is behavioural, not cosmetic: a coach quoting its own memory block
+("you committed to 170 g") must not read as fabricating 170, and a fact-dict-only
+walker would have flagged it. Benign small integers are likewise the gate's own
+``_BENIGN_NUMBERS``, not a local list.
 
 WHY THIS SURFACE ARMS ALL FIVE GATE CLASSES
 
@@ -20,8 +30,8 @@ night's real recovery and HRV as today's. The values existed; the DAY was wrong.
 
 So the arming is:
 
-  numbers    — the ADR-104 floor.
-  dates      — #1242, a cited calendar date must be one the facts contain.
+  numbers    — the ADR-104 floor, allow-list derived from facts + memory + thread.
+  dates      — #1242, a cited calendar date must appear in what the model was given.
   freshness  — #1691/#1897 via ``cycle_gate_params()``, spread LITERALLY at the call
                site so the registry's AST scan can see the class armed (folding it
                into a local dict is what made a freshness gate unverifiable in
@@ -32,11 +42,6 @@ So the arming is:
                into that silence.
   night      — #1968/#2343, the day-correspondence class. The one that matters most
                here and the one a chat can least afford to skip.
-
-THE ALLOW-LIST IS DERIVED, NOT HAND-LISTED. ``allowed_numbers`` walks the fact dict
-rather than naming fields, so a fact added upstream is grounded automatically instead
-of becoming a fabrication finding on its first appearance — the guard-the-SET
-discipline, applied to the numbers gate itself.
 """
 
 from __future__ import annotations
@@ -47,74 +52,8 @@ from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
 
-# Numbers that are never "fabricated" wherever they appear — small integers a coach
-# uses conversationally ("one more day", "the 3 sets you did"). The gate has its own
-# benign handling; this is the chat's narrow addition for ordinals in speech.
-_BENIGN = frozenset({0, 1, 2, 3, 4, 5, 6, 7, 10, 12, 24, 100})
 
-
-def allowed_numbers(facts: dict) -> set:
-    """Every numeric value the facts contain, flattened — the numbers gate's input.
-
-    DERIVED from the fact dict, never hand-listed. A hand list rots the moment an
-    upstream fact is added: the new field's value would read as a fabrication on its
-    first appearance, and the reflex fix (widen the list) is how allow-lists quietly
-    stop meaning anything. Walks nested dicts and lists because canonical_facts is
-    not flat.
-    """
-    out: set = set(_BENIGN)
-
-    def walk(node):
-        if isinstance(node, dict):
-            for v in node.values():
-                walk(v)
-        elif isinstance(node, (list, tuple)):
-            for v in node:
-                walk(v)
-        elif isinstance(node, bool):
-            return  # True/False are not numbers a coach cites
-        elif isinstance(node, (int, float)):
-            out.add(node)
-
-    walk(facts or {})
-    return out
-
-
-def _is_iso_date(v) -> bool:
-    """A real YYYY-MM-DD, not merely a 10-char string with well-placed dashes."""
-    if not (isinstance(v, str) and len(v) == 10):
-        return False
-    try:
-        datetime.strptime(v, "%Y-%m-%d")
-        return True
-    except ValueError:
-        return False
-
-
-def allowed_dates(facts: dict) -> set:
-    """Calendar dates the facts legitimately contain (#1242).
-
-    An EMPTY set is meaningful and is not the same as ``None``: it means "no date is
-    legitimate", which is the correct posture when the facts carry none. Passing
-    ``None`` would switch the date class off entirely.
-    """
-    out: set = set()
-
-    def walk(node):
-        if isinstance(node, dict):
-            for v in node.values():
-                walk(v)
-        elif isinstance(node, (list, tuple)):
-            for v in node:
-                walk(v)
-        elif _is_iso_date(node):
-            out.add(node)
-
-    walk(facts or {})
-    return out
-
-
-def build_facts_block(facts: dict, memory_block: str = "") -> str:
+def build_facts_block(facts: dict) -> str:
     """The AUTHORITATIVE FACTS block, from the one renderer every surface uses.
 
     Reuses ``grounded_generation.authoritative_facts_block`` rather than forking a
@@ -136,20 +75,34 @@ def build_facts_block(facts: dict, memory_block: str = "") -> str:
     return block
 
 
-def build_grounder(facts: dict, *, generation_date_iso: Optional[str] = None, available_logs=None) -> Callable[[str], list]:
+def build_grounder(
+    facts: dict,
+    *,
+    generation_date_iso: Optional[str] = None,
+    available_logs=None,
+    extra_sources=(),
+) -> Callable[[str], list]:
     """Return ``grounder(text) -> findings`` with all five gate classes armed.
 
     ``run_turn`` takes this closure rather than reaching for the gate itself, which
     keeps the turn engine pure AND puts the arming here, where the wiring registry's
     AST scan can see which classes this surface declares.
+
+    ``extra_sources`` is the rest of what the model was shown — the memory block and
+    the thread text. Numbers and dates appearing there are part of the model's
+    legitimate vocabulary (quoting the memory, or Matthew's own words back to him, is
+    not fabrication). The FACTS remain the only source of *vitals adjudication*: the
+    night map is built from ``facts`` alone, so a remembered figure quoted against the
+    wrong night is still caught by the night class even though the number itself is
+    allowed.
     """
-    from ai.grounded_generation import grounding_findings
+    from ai.grounded_generation import allowed_dates, allowed_numbers, grounding_findings
     from ai.grounding_gate_params import cycle_gate_params
     from ai.night_scope import nightly_vitals_from_facts
 
     gen_date = generation_date_iso or datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    allowed = allowed_numbers(facts)
-    dates = allowed_dates(facts)
+    allowed = allowed_numbers(facts or {}, *extra_sources)
+    dates = allowed_dates(facts or {}, *extra_sources)
     vitals = nightly_vitals_from_facts(facts)
 
     def grounder(text: str) -> list:
