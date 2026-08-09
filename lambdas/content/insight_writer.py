@@ -10,7 +10,10 @@ These records are the compounding substrate for IC-15 through IC-22:
 
 DynamoDB key pattern:
   pk = USER#{user_id}#SOURCE#insights
-  sk = INSIGHT#{ISO-timestamp}#{digest_type}
+  sk = INSIGHT#{date}#{digest_type}#{slug}   (deterministic — callers that pass a
+       stable per-insight slug get idempotent re-runs; a same-day re-invocation
+       overwrites the same key instead of minting a new row — #2368)
+  sk = INSIGHT#{ISO-timestamp}#{digest_type}  (legacy, when no slug is given)
 
 Bundled alongside each Lambda handler in its zip package.
 
@@ -85,6 +88,7 @@ def write_insight(
     date=None,
     component_scores=None,
     metadata=None,
+    slug=None,
 ):
     """Write a single insight record to DynamoDB.
 
@@ -101,6 +105,11 @@ def write_insight(
         date: The date this insight is about (YYYY-MM-DD), defaults to today
         component_scores: Optional dict of day grade component scores at time of insight
         metadata: Optional dict of additional metadata
+        slug: Optional stable per-insight identity (e.g. "bod", "guidance-0"). When
+              given, the sk is derived from (date, digest_type, slug) — NOT the
+              wall clock — so a same-day re-invocation overwrites instead of
+              duplicating (#2368: restart-day brief re-invokes wrote 7 insights
+              three times). When omitted, the legacy timestamp sk is used.
 
     Returns:
         The written record, or None if write fails.
@@ -115,11 +124,21 @@ def write_insight(
     ts = _now_iso()
     truncated = text[:800]
     thash = _text_hash(truncated)
+    date_val = date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    if slug:
+        # Deterministic key: (date, digest_type, slug) — idempotent under
+        # same-day re-invocation (#2368). Deliberately NOT derived from the
+        # wall clock or the text hash (regenerated AI text would re-duplicate).
+        sk = f"INSIGHT#{date_val}#{digest_type}#{slug}"
+    else:
+        sk = f"INSIGHT#{ts}#{digest_type}"  # legacy: one row per invocation
 
     item = {
         "pk": _PK,
-        "sk": f"INSIGHT#{ts}#{digest_type}",
-        "date": date or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "sk": sk,
+        "date": date_val,
+        "created_at": ts,
         "digest_type": digest_type,
         "insight_type": insight_type,
         "text": truncated,
@@ -289,6 +308,7 @@ def extract_daily_brief_insights(bod_insight, tldr_guidance, training_nutrition,
                 "actionable": False,
                 "date": date,
                 "component_scores": component_scores,
+                "slug": "bod",
             }
         )
 
@@ -305,12 +325,13 @@ def extract_daily_brief_insights(bod_insight, tldr_guidance, training_nutrition,
                 "confidence": "high",
                 "actionable": False,
                 "date": date,
+                "slug": "tldr",
             }
         )
 
     # Guidance items (each is actionable)
     guidance = tldr_guidance.get("guidance", []) if isinstance(tldr_guidance, dict) else []
-    for g_item in guidance:
+    for g_idx, g_item in enumerate(guidance):
         if isinstance(g_item, str) and len(g_item) > 10:
             insights.append(
                 {
@@ -322,6 +343,7 @@ def extract_daily_brief_insights(bod_insight, tldr_guidance, training_nutrition,
                     "confidence": "medium",
                     "actionable": True,
                     "date": date,
+                    "slug": f"guidance-{g_idx}",
                 }
             )
 
@@ -339,6 +361,7 @@ def extract_daily_brief_insights(bod_insight, tldr_guidance, training_nutrition,
                 "confidence": "medium",
                 "actionable": False,
                 "date": date,
+                "slug": "training",
             }
         )
 
@@ -356,6 +379,7 @@ def extract_daily_brief_insights(bod_insight, tldr_guidance, training_nutrition,
                 "confidence": "medium",
                 "actionable": True,
                 "date": date,
+                "slug": "nutrition",
             }
         )
 
@@ -372,6 +396,7 @@ def extract_daily_brief_insights(bod_insight, tldr_guidance, training_nutrition,
                 "confidence": "medium",
                 "actionable": True,
                 "date": date,
+                "slug": "journal",
             }
         )
 
