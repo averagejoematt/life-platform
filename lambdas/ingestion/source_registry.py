@@ -174,11 +174,12 @@ SOURCE_REGISTRY = {
         "active_api": True,
         "expected_days": 7,
         "qa_tier": "required",
-        "method": "OAuth API pull, hourly",
+        "method": "OAuth API pull, 5x daily",
         "metrics": "Recovery, sleep, HRV, resting HR, strain",
         "posture": "load-bearing",
         "raw_layout": {"prefix": "raw/matthew/whoop", "scheme": "date-tree", "filename": "YYYY-MM-DD.json"},
-        # TR-07 (#415): opt-in provider-diff reconciliation. Whoop runs hourly with
+        # TR-07 (#415): opt-in provider-diff reconciliation. Whoop pulls 5x daily
+        # (#2204 — the hourly cron spent a refresh-token rotation every run) with
         # no rate-limit breaker, so a daily trailing-window diff (sleeps + workouts)
         # against the API is cheap and catches the late-workout / dropped-day silent
         # drop the DDB-only checks are blind to. whoop_lambda._reconcile.

@@ -36,6 +36,18 @@ from stacks.lambda_helpers import create_platform_lambda, staged_tree_asset
 # Cost: ~$0/month — gap-aware Lambdas short-circuit in <50ms when no new data exists
 INGEST_HOURLY = "0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23"
 
+# ── Whoop cadence (#2204) — deliberately NOT hourly ──
+# Whoop's access token lives 3599s, one second SHORTER than an hourly interval, so
+# every hourly run found the stored token expired and spent a refresh-token rotation
+# (measured 2026-08-08, the first full day with #2196's gate logging: 14 exchanges
+# vs 6 reuses). Rotations are the risk unit — single-use refresh token × ~1%
+# vendor 5xx-after-consume means expected time-to-credential-loss ≈ 1/(N×1%) days.
+# Recovery/sleep/HRV update a few times daily, not hourly; 5 pulls across the
+# active window + the 17:30 UTC recovery refresh ⇒ N ≈ 19 → 6, expected
+# time-to-loss ~5 days → ~16 days. Gap-aware backfill makes the coarser cadence
+# lossless for data completeness.
+WHOOP_HOURS = "0,4,12,16,20"
+
 INGESTION_DLQ_ARN = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-ingestion-dlq"
 LIFE_PLATFORM_TABLE = TABLE_NAME
 LIFE_PLATFORM_BUCKET = S3_BUCKET
@@ -74,14 +86,14 @@ class IngestionStack(Stack):
             function_name="whoop-data-ingestion",
             source_file="lambdas/ingestion/whoop_lambda.py",
             handler="ingestion.whoop_lambda.lambda_handler",
-            schedule=f"cron(0 {INGEST_HOURLY} * * ? *)",
+            schedule=f"cron(0 {WHOOP_HOURS} * * ? *)",
             timeout_seconds=300,
             alarm_name="ingestion-error-whoop",
             # No async retry: Whoop rotates its refresh token on every refresh, so
             # a failed run is almost always a token-rotation race (HTTP 400). The
             # default 2 EventBridge retries just re-hit it with the same stale
             # token (the 19:00/19:01/19:03 clusters in the alarm digest); the next
-            # hourly run recovers via gap-fill. Same fix as Garmin.
+            # scheduled run recovers via gap-fill. Same fix as Garmin.
             retry_attempts=0,
             custom_policies=rp.ingestion_whoop(),
             **shared,

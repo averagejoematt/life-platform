@@ -1,7 +1,7 @@
 {
   "_meta": {
     "generated_by": "scripts/v4_build_data_sources.py — from lambdas/source_registry.py (#498); never hand-edit",
-    "updated": "2026-07-04",
+    "updated": "2026-08-09",
     "count": 21
   },
   "sources": [
@@ -58,7 +58,7 @@
       "name": "Whoop",
       "category": "Wearables",
       "metrics": "Recovery, sleep, HRV, resting HR, strain",
-      "method": "OAuth API pull, hourly",
+      "method": "OAuth API pull, 5x daily",
       "posture": "load-bearing"
     },
     {
