@@ -197,7 +197,7 @@ def _current_tier() -> Optional[int]:
 # ── The handler ───────────────────────────────────────────────────────────────
 
 
-def lambda_handler(event, context):  # noqa: ARG001 — Lambda signature
+def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — Lambda signature
     """One work order in, one Telegram reply out (or one honest refusal)."""
     order = event or {}
     coach_id = order.get("coach_id")

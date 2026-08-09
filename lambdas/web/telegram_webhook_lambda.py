@@ -93,7 +93,7 @@ def _allowed_chat_ids(store: dict) -> list:
     return ids
 
 
-def lambda_handler(event, context):  # noqa: ARG001 — Lambda signature
+def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — Lambda signature
     store = _store()
     try:
         order = gateway.route(
