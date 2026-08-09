@@ -205,10 +205,19 @@ def installment_grounding_findings(elena_prompt, user_message, text, archive_tex
     from ai import grounded_generation as _gg
     from ai.grounding_gate_params import cycle_gate_params  # #1967
 
+    from emails.chronicle_data import strip_model_conjecture  # #2422
+
+    # #2422: model-authored spans in the packet (the anomaly detector's Haiku-written
+    # hypothesis) arrive fenced by chronicle_data.mark_model_conjecture and must NOT
+    # widen the allow-list — model prose cannot ground other model prose, or a number
+    # hallucinated upstream would pass this gate as if it were measured data. Elena
+    # still sees the fenced text; only the allow-list derivation is narrowed. The
+    # anomaly's measured fields ride as plain packet lines and still ground.
+    _srcs = [strip_model_conjecture(s) if s is not None else None for s in (elena_prompt, user_message, archive_text)]
     findings = _gg.grounding_findings(
         text,
-        allowed=_gg.allowed_numbers(elena_prompt, user_message, archive_text),
-        allowed_dates=_gg.allowed_dates(elena_prompt, user_message, archive_text),
+        allowed=_gg.allowed_numbers(*_srcs),
+        allowed_dates=_gg.allowed_dates(*_srcs),
         # #1967: the cycle anchors arm stale_phase/stale_baseline/experiment_span
         # (#1691/#1897) — an installment framing the wrong "Day N" or a prior cycle's
         # starting weight is the class the number/date gates are structurally blind to.

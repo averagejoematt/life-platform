@@ -761,7 +761,10 @@ def test_packet_anomalies_filtered_to_moderate_and_high():
 
     assert "=== ANOMALY EVENTS ===" in text
     assert "2026-08-06: high — HRV, RHR" in text
-    assert "  Hypothesis: synthetic anomaly hypothesis" in text
+    # #2422: the hypothesis is still shown to Elena, but fenced as model conjecture
+    # so the grounding allow-list derivation can strip it.
+    assert "synthetic anomaly hypothesis" in text
+    assert f"  Hypothesis: {cd.MODEL_CONJECTURE_OPEN} synthetic anomaly hypothesis {cd.MODEL_CONJECTURE_CLOSE}" in text
     assert "2026-08-07: moderate — " in text
     assert "Steps" not in text
 
