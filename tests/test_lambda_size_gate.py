@@ -57,3 +57,21 @@ def test_grandfathered_set_does_not_rot():
         if n <= MAX_LINES:
             stale.append(f"{rel} (now {n} lines — drop from GRANDFATHERED)")
     assert not stale, "GRANDFATHERED has stale entries:\n" + "\n".join(f"  {s}" for s in stale)
+
+
+def test_grandfathered_is_covered_by_the_module_size_baseline():
+    """#2373: the two size guards are COUPLED, as an assertion, not a convention.
+
+    A GRANDFATHERED file escapes this gate's 2000-line cap, so its only live
+    ceiling is its int baseline in test_module_size_guard.BASELINE. If that
+    baseline entry were pruned (or the file renamed out from under it), the
+    grandfathered member would sit under NO per-file cap and an explicit raise
+    would be reviewed against one number with no second gate engaging.
+    """
+    from tests.test_module_size_guard import BASELINE
+
+    uncovered = sorted(GRANDFATHERED - set(BASELINE))
+    assert not uncovered, (
+        "GRANDFATHERED file(s) missing from test_module_size_guard.BASELINE — the ADR-080 "
+        "exemption has no transitively-capping baseline for: " + ", ".join(uncovered)
+    )
