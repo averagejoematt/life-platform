@@ -15,9 +15,12 @@ What is pinned here:
   - the HTML builders (`section_html`, `signal_dot`, `weight_sentence`,
     `build_html`) asserted on real rendered substrings
   - `_recipient`'s SSM lookup, its failure fallback, and its warm cache
-  - `build_commentary`'s prompt/payload composition + both inference paths
+  - `build_commentary`'s prompt/payload composition + the single retry_utils
+    inference seam (#2423 retired the direct-bedrock fallback) + the ADR-104
+    grounding gate: regenerate-once-then-HOLD, fabricated numbers held
   - `lambda_handler`: the kill switch must NOT send, the happy path composes the
-    exact SES payload, and an AI failure still sends the fallback commentary.
+    exact SES payload, and an AI failure or a grounding HOLD still sends the
+    deterministic data-only email — never a fabricated narrative to a third party.
 """
 
 import json
@@ -922,22 +925,75 @@ def test_build_commentary_renders_unknown_and_none_for_absent_signals(monkeypatc
     assert "Notable journal quotes: none" in prompt
 
 
-def test_build_commentary_falls_back_to_bedrock_when_retry_utils_is_absent(monkeypatch):
-    """ADR-062: the bundled bedrock_client is the no-layer escape hatch."""
-    import ai.bedrock_client as bedrock_client
-
-    captured = {}
-
-    def _fake_invoke(payload):
-        captured["payload"] = payload
-        return {"content": [{"text": "bedrock said this"}]}
-
-    monkeypatch.setattr(bedrock_client, "invoke", _fake_invoke)
+def test_build_commentary_holds_when_retry_utils_is_absent(monkeypatch):
+    """#2423: the direct-bedrock fallback seam is GONE. retry_utils ships in every
+    bundle (#781); if the import genuinely fails, the narrative is held (None) and
+    the handler sends the deterministic data-only email — never an ungated
+    narrative through a second seam."""
     monkeypatch.setitem(sys.modules, "common.retry_utils", None)  # → ImportError on the from-import
+    assert partner.build_commentary(_data()) is None
 
-    assert partner.build_commentary(_data()) == "bedrock said this"
-    assert captured["payload"]["max_tokens"] == 1400
-    assert "week 4 of his transformation" in captured["payload"]["messages"][0]["content"]
+
+def test_module_has_no_bedrock_import():
+    """The #2390 census counts seams; this module's second one must stay retired."""
+    import inspect
+
+    src = inspect.getsource(partner)
+    assert "bedrock_client" not in src
+
+
+# ── #2423: the grounding gate — regenerate once, then HOLD ────────────────────
+
+
+def _wire_model(monkeypatch, texts):
+    """Feed _call_model successive responses; capture the prompts it was sent."""
+    import common.retry_utils as retry_utils
+
+    calls = {"prompts": []}
+    replies = list(texts)
+
+    def _fake_call(req, timeout=55):
+        calls["prompts"].append(json.loads(req.data.decode())["messages"][0]["content"])
+        return {"content": [{"text": replies[len(calls["prompts"]) - 1]}]}
+
+    monkeypatch.setattr(retry_utils, "call_anthropic_raw", _fake_call)
+    return calls
+
+
+FABRICATED = "🪞 THIS WEEK IN ONE LINE\nHis recovery sat at 133 all week, which says everything."
+CLEAN = "🪞 THIS WEEK IN ONE LINE\nHe carried a heavy week without saying so out loud."
+
+
+def test_grounded_commentary_passes_on_the_first_call(monkeypatch):
+    calls = _wire_model(monkeypatch, [CLEAN])
+    assert partner.build_commentary(_data()) == CLEAN
+    assert len(calls["prompts"]) == 1
+
+
+def test_fabricated_number_triggers_one_regeneration_with_the_correction(monkeypatch):
+    calls = _wire_model(monkeypatch, [FABRICATED, CLEAN])
+    assert partner.build_commentary(_data()) == CLEAN
+    assert len(calls["prompts"]) == 2
+    assert "CORRECTION REQUIRED" in calls["prompts"][1]
+    assert calls["prompts"][1].startswith(calls["prompts"][0])  # base prompt + addendum
+
+
+def test_fabricated_number_that_survives_regeneration_is_held(monkeypatch):
+    """Regenerate-once-then-HOLD: a draft that still fabricates after the one
+    correction pass returns None — the partner never receives it."""
+    calls = _wire_model(monkeypatch, [FABRICATED, FABRICATED])
+    assert partner.build_commentary(_data()) is None
+    assert len(calls["prompts"]) == 2  # once, not a retry loop
+
+
+def test_gate_allows_numbers_the_prompt_actually_contains(monkeypatch):
+    """A guard that rejects everything is a guard nobody keeps: a figure handed to
+    the model in the prompt (the 70.0 sleep-score average — NOT in the benign set)
+    is grounded, not fabricated."""
+    grounded = "🪞 THIS WEEK IN ONE LINE\nHis sleep hovered around 70 and he kept showing up anyway."
+    calls = _wire_model(monkeypatch, [grounded])
+    assert partner.build_commentary(_data()) == grounded
+    assert len(calls["prompts"]) == 1
 
 
 def test_build_commentary_respects_the_ai_model_env_override(monkeypatch):
@@ -1032,9 +1088,24 @@ def test_handler_still_sends_a_fallback_when_the_ai_call_fails(monkeypatch):
     assert resp["statusCode"] == 200
     assert len(fake_ses.sends) == 1  # a failed AI call must not silence the week
     html = fake_ses.sends[0]["Content"]["Simple"]["Body"]["Html"]["Data"]
-    assert "Commentary unavailable this week." in html
-    assert "Check back next week." in html
-    assert ">This week</p>" not in html  # no lede was produced, so no lede card
+    assert "The written update is unavailable this week" in html
+    assert "The full written update returns next week." in html
+    # the data-only body carries the deterministic labels, never model prose
+    assert "Overall: solid week. Mood: neutral. Sleep: mixed." in html
+
+
+def test_handler_grounding_hold_sends_the_data_only_email(monkeypatch):
+    """#2423 regenerate-once-then-HOLD, end to end: build_commentary returning None
+    (a held draft) must produce the deterministic data-only email — a fabricated
+    narrative never reaches a third-party recipient."""
+    fake_ses = _wire_handler(monkeypatch, commentary=None)
+    resp = partner.lambda_handler({}, None)
+
+    assert resp["statusCode"] == 200
+    assert len(fake_ses.sends) == 1  # held narrative ≠ silenced week
+    html = fake_ses.sends[0]["Content"]["Simple"]["Body"]["Html"]["Data"]
+    assert "The written update is unavailable this week" in html
+    assert "Overall: solid week. Mood: neutral. Sleep: mixed." in html
 
 
 def test_handler_ships_clean_commentary_through_the_real_ai3_validator(monkeypatch):
@@ -1096,7 +1167,7 @@ def test_handler_stub_is_reachable_only_on_a_genuine_ai3_failure_and_logs_loudly
 
     assert resp["statusCode"] == 200
     html = fake_ses.sends[0]["Content"]["Simple"]["Body"]["Html"]["Data"]
-    assert "Commentary unavailable this week." in html
+    assert "The written update is unavailable this week" in html
     # logger.exception logs at ERROR level and (unlike the old logger.warning
     # one-liner) attaches exc_info — the traceback is what makes a genuine
     # validator bug findable instead of indistinguishable from a Bedrock hiccup.

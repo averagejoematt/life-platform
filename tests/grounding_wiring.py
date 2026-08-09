@@ -236,6 +236,14 @@ SURFACES = {
         ("numbers", "dates", "freshness", "behavioral"),
         {"night": _NO_NIGHT_MAP},
     ),
+    # #2423: the ONLY AI sender addressed to a human who is not Matthew (the partner
+    # address from SSM). Regenerate-once-then-HOLD; a held draft falls back to the
+    # deterministic data-only email. Its second seam (the direct-bedrock fallback)
+    # was retired in the same change — the #2390 census asserts one seam remains.
+    "lambdas/emails/partner_email_lambda.py::_grounding_gate": _entry(
+        ("numbers", "dates", "freshness"),
+        {"behavioral": _NOT_ABOUT_MATTHEW, "night": _NO_NIGHT_MAP},
+    ),
     "lambdas/intelligence/ai_expert_analyzer_lambda.py::generate_and_cache": _entry(
         ("numbers", "freshness", "night", "behavioral"),
         {

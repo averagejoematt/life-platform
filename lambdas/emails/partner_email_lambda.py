@@ -32,6 +32,8 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
 import boto3
+from ai.grounded_generation import allowed_dates, allowed_numbers, correction_prompt, grounding_findings  # ADR-104 gate (#2423)
+from ai.grounding_gate_params import cycle_gate_params  # #1967 — cycle anchors (#1691/#1897)
 from common import digest_utils  # shared query_range implementations (#970)
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
@@ -473,8 +475,33 @@ def build_commentary(data):
         journey_week=data.get("journey_week", 1),
     )
 
-    # V2 P1.4 + P2.8: route through retry_utils.call_anthropic_raw for
-    # 4-attempt backoff + token telemetry + env-overridable model.
+    # #2423: ONE model call, then the grounding chokepoint, regenerate-once-then-HOLD.
+    # A held draft returns None and the caller sends the deterministic data-only
+    # email — a third-party recipient never receives an ungated narrative.
+    try:
+        text = _call_model(prompt)
+        logger.debug("partner_ai_response_excerpt: %s", text[:300])
+        findings = _grounding_gate(text, prompt)
+        if findings:
+            logger.warning("[#2423] grounding findings on the partner draft (%s) — regenerating once", findings)
+            text = _call_model(prompt + "\n\n" + correction_prompt(findings))
+            findings = _grounding_gate(text, prompt)
+            if findings:
+                logger.warning("[#2423] regenerated draft still ungrounded (%s) — HOLD, data-only email", findings)
+                return None
+        return text
+    except ImportError:
+        # retry_utils ships in every bundle (#781). The old direct-bedrock fallback
+        # here was a SECOND ungated seam (#2390 census) and is deliberately gone:
+        # if the import genuinely fails, hold to the deterministic data-only email.
+        logger.warning("[#2423] retry_utils unavailable — holding to the data-only email (no direct-bedrock fallback, #2390)")
+        return None
+
+
+def _call_model(prompt):
+    """One call through the shared retry seam (V2 P1.4 + P2.8: 4-attempt backoff +
+    token telemetry + env-overridable model). Deliberately the module's ONLY model
+    seam — the #2390 census asserts it stays that way."""
     model = os.environ.get("AI_MODEL", "claude-sonnet-4-6")
     payload = json.dumps(
         {
@@ -489,22 +516,44 @@ def build_commentary(data):
         headers={"Content-Type": "application/json", "anthropic-version": "2023-06-01"},
         method="POST",
     )
+    from common.retry_utils import call_anthropic_raw
 
-    try:
-        from common.retry_utils import call_anthropic_raw
+    resp = call_anthropic_raw(req, timeout=45)
+    return resp["content"][0]["text"]
 
-        resp = call_anthropic_raw(req, timeout=45)
-        text = resp["content"][0]["text"]
-        logger.debug("partner_ai_response_excerpt: %s", text[:300])
-        return text
-    except ImportError:
-        # ADR-062: layer not attached — fall back to bedrock_client directly
-        # (bundled in /var/task via Code.from_asset, so it imports without the layer).
-        logger.warning("retry_utils unavailable — direct bedrock_client fallback")
-        from ai.bedrock_client import invoke as _bedrock_invoke
 
-        resp = _bedrock_invoke(json.loads(payload))
-        return resp["content"][0]["text"]
+def _grounding_gate(text, prompt):
+    """ADR-104 grounding chokepoint for the partner email (#2423) — registered in
+    tests/grounding_wiring.py SURFACES. The allow-lists derive from the prompt the
+    model was actually handed (the only data it ever saw), so any other number or
+    full calendar date in the draft is fabricated; the cycle anchors (#1691/#1897)
+    catch a stale "Day N"/baseline framing. Returns findings; empty = grounded."""
+    return grounding_findings(
+        text,
+        allowed=allowed_numbers(prompt),
+        allowed_dates=allowed_dates(prompt),
+        **cycle_gate_params(),
+    )
+
+
+def deterministic_commentary(data):
+    """The data-only fallback body (#2423): plain-language labels computed
+    deterministically in gather_all() from stored records — never model prose.
+    Sent when the grounding gate HELD the narrative, the model call failed, or
+    the AI-3 validator broke. Uses the section-header contract parse_sections /
+    build_html already render."""
+    dg = data.get("day_grade", {})
+    mood = data.get("mood", {})
+    sl = data.get("sleep", {})
+    return (
+        "🪞 THIS WEEK IN ONE LINE\n"
+        "The written update is unavailable this week — here is the plain summary from his tracked data.\n\n"
+        "💪 HIS BODY THIS WEEK — THE CHAIR\n"
+        "Overall: " + str(dg.get("week_summary", "no data")) + ". "
+        "Mood: " + str(mood.get("mood_label", "no data")) + ". "
+        "Sleep: " + str(sl.get("quality_label", "no data")) + ".\n"
+        "The full written update returns next week."
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -795,30 +844,32 @@ def lambda_handler(event, context):
     logger.info("Calling Sonnet 4.6 for Board commentary...")
     try:
         commentary = build_commentary(data)
-        logger.info("Commentary length: %s chars", len(commentary))
-        # AI-3: validate output before rendering
-        try:
-            from ai.ai_output_validator import AIOutputType, validate_ai_output
+        if commentary is None:
+            # #2423: the grounding gate HELD the narrative (or the retry seam was
+            # unavailable) — the partner gets the deterministic data-only email,
+            # never an ungated narrative.
+            logger.warning("[#2423] partner narrative held — sending the data-only email")
+            commentary = deterministic_commentary(data)
+        else:
+            logger.info("Commentary length: %s chars", len(commentary))
+            # AI-3: validate output before rendering
+            try:
+                from ai.ai_output_validator import AIOutputType, validate_ai_output
 
-            _val = validate_ai_output(commentary, AIOutputType.WEEKLY_DIGEST)
-            if _val.blocked:
-                logger.warning("[AI-3] Partner commentary replaced with fallback: %s", _val.block_reason)
-            commentary = _val.sanitized_text
-        except ImportError:
-            pass
+                _val = validate_ai_output(commentary, AIOutputType.WEEKLY_DIGEST)
+                if _val.blocked:
+                    logger.warning("[AI-3] Partner commentary replaced with fallback: %s", _val.block_reason)
+                commentary = _val.sanitized_text
+            except ImportError:
+                pass
     except Exception:
         # Log loudly (with traceback) — a swallowed AttributeError here once hid
         # a genuine bug for weeks (#2173): every successful build_commentary()
         # call was silently discarded because the AI-3 seam read the wrong
         # attribute names, and the generic "AI call failed" warning gave no
         # hint it wasn't actually a Bedrock/network failure.
-        logger.exception("AI call or AI-3 validation failed; falling back to the static stub")
-        commentary = (
-            "💚 HOW HE'S FEELING — COACH RODRIGUEZ\n"
-            "Commentary unavailable this week.\n\n"
-            "💪 HIS BODY THIS WEEK — THE CHAIR\n"
-            "Check back next week."
-        )
+        logger.exception("AI call or AI-3 validation failed; falling back to the data-only email")
+        commentary = deterministic_commentary(data)
 
     html = build_html(data, commentary)
 
