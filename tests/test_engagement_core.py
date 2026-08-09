@@ -259,3 +259,69 @@ def test_unclamped_callers_unchanged():
     empty = compute_presence(TODAY, {"macrofactor": [], "hevy": [], "habitify": [], "notion": []})
     assert empty["presence_class"] == DARK
     assert empty["gap_days"] is None
+
+
+# ── #2382: never-logged-this-cycle must not read as a pause ───────────────────
+# The live defect: with MacroFactor quiet since before genesis, the genesis clamp
+# (#955) supplies gap_days=4 with last_food_log_date=None, and the prompt block
+# rendered "it has been ~4 days since his last food log" — handing every coach a
+# transition that never happened. Six of eight live cards narrated it ("your food
+# logs paused four days ago", "dark since around August 2nd") while the cockpit
+# one door away said the source was 44 days quiet.
+
+
+def _never_logged_sig(gap=4):
+    """A clamped signal: real silence, but nothing EVER logged this cycle."""
+    return {
+        "presence_class": "dark",
+        "severity": "loud",
+        "gap_days": gap,
+        "last_food_log_date": None,
+        "experiment_window_start": "2026-08-03",
+        "channels_quiet": ["food"],
+        "returned": False,
+    }
+
+
+def test_never_logged_this_cycle_is_stated_as_absence_not_a_pause():
+    from content.engagement_core import presence_prompt_block
+
+    block = presence_prompt_block(_never_logged_sig())
+    assert "NOTHING has been logged this cycle" in block
+    assert "predates this cycle" in block
+    assert "since his last food log" not in block, "there is no last food log this cycle to count from"
+
+
+def test_never_logged_block_forbids_the_false_transition_phrasings():
+    from content.engagement_core import presence_prompt_block
+
+    block = presence_prompt_block(_never_logged_sig())
+    for forbidden in ("'paused'", "'went silent N days ago'", "date a transition"):
+        assert forbidden in block, f"the block must explicitly forbid {forbidden} phrasing"
+
+
+def test_a_real_in_window_gap_still_gets_the_day_count_phrasing():
+    """The negative control: when a real log exists this cycle, the pause framing is
+    TRUE and must survive — the fix must not lobotomise the honest case."""
+    from content.engagement_core import presence_prompt_block
+
+    sig = dict(_never_logged_sig(), last_food_log_date="2026-08-04")
+    block = presence_prompt_block(sig)
+    assert "since his last food log" in block
+    assert "last logged 2026-08-04" in block
+    assert "NOTHING has been logged this cycle" not in block
+
+
+def test_the_ai_calls_prompt_contract_no_longer_prescribes_the_fabrication():
+    """ai_calls' ENGAGEMENT bullet used to instruct the exact false phrasing by
+    example, unconditionally: 'e.g. "it's been four days since you logged a meal"'.
+    The exemplar is only honest when last_food_log_date is present; the NULL case
+    must mandate never-logged phrasing and forbid the pause framing. Source-level
+    pin, same idiom as the cast-roster and privacy literal guards."""
+    import os
+
+    src = open(os.path.join(os.path.dirname(__file__), "..", "lambdas", "ai", "ai_calls.py"), encoding="utf-8").read()
+    assert "If `last_food_log_date` is PRESENT" in src
+    assert "If `last_food_log_date` is NULL" in src
+    assert "nothing logged yet this cycle" in src
+    assert "NOT a pause" in src
