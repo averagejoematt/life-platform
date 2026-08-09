@@ -170,6 +170,27 @@ def stage_tree(out_dir):
         shutil.copy2(vocab, os.path.join(out_dir, "food_vocabulary.json"))
     else:
         print("⚠️  config/food_vocabulary.json missing — meal grouping will fail to load vocab", file=sys.stderr)
+    # Persona layer offline fallback: common.repo_config searches upward, so a
+    # config/ dir at the bundle root is what makes persona_registry/persona_core
+    # readable WITHOUT S3 — the Telegram worker ran nameless ("I'm mind_coach")
+    # because neither the S3 grant nor this fallback existed. Personas + voice
+    # specs only (~120 KB); stance files stay S3-only (volatile, engine-written).
+    cfg_out = os.path.join(out_dir, "config")
+    os.makedirs(cfg_out, exist_ok=True)
+    personas = os.path.join(REPO_ROOT, "config", "personas.json")
+    if os.path.isfile(personas):
+        shutil.copy2(personas, os.path.join(cfg_out, "personas.json"))
+    else:
+        print("⚠️  config/personas.json missing — persona registry will be S3-only", file=sys.stderr)
+    coaches_src = os.path.join(REPO_ROOT, "config", "coaches")
+    if os.path.isdir(coaches_src):
+        coaches_out = os.path.join(cfg_out, "coaches")
+        os.makedirs(coaches_out, exist_ok=True)
+        for name in sorted(os.listdir(coaches_src)):
+            if name.endswith(".json") and not name.endswith("_stance.json"):
+                shutil.copy2(os.path.join(coaches_src, name), os.path.join(coaches_out, name))
+    else:
+        print("⚠️  config/coaches/ missing — voice specs will be S3-only", file=sys.stderr)
     # #1430: redirects.map for qa_smoke_lambda's weekly legacy-redirect spot-check
     # (lambdas/redirect_spotcheck.py searches alongside its own module first, same
     # pattern as food_vocabulary.json above).

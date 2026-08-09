@@ -3272,4 +3272,20 @@ def telegram_worker() -> list[iam.PolicyStatement]:
                 f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle",
             ],
         ),
+        # #2469: the persona layer reads config/personas.json + config/coaches/*.json.
+        # Without this grant the worker's registry read failed silently and every
+        # conversation ran nameless and persona-free ("I'm mind_coach") — the config
+        # prefix is the narrowest slice that restores WHO the coach is.
+        iam.PolicyStatement(
+            sid="S3ConfigRead",
+            actions=["s3:GetObject"],
+            resources=[f"{BUCKET_ARN}/config/*"],
+        ),
+        # Fail-loud partner of the same fix: an empty persona/registry now emits
+        # TelegramPersonaMissing instead of a WARN nobody reads.
+        iam.PolicyStatement(
+            sid="Metrics",
+            actions=["cloudwatch:PutMetricData"],
+            resources=["*"],
+        ),
     ]

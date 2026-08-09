@@ -141,6 +141,11 @@ class TestWorker:
         monkeypatch.setattr(worker, "_memory_block", lambda cid: "You remember: the 170 g floor.")
         monkeypatch.setattr(worker, "_facts", dict)
         monkeypatch.setattr(worker, "_current_tier", lambda: 0)
+        # Hermetic: no real S3 client (registry reads fall through to the repo's
+        # local config/), and metric emissions are recorded, not sent.
+        self.metrics = []
+        monkeypatch.setattr(worker, "_s3_client", lambda: None)
+        monkeypatch.setattr(worker, "_emit_metric", lambda name, cid: self.metrics.append((name, cid)))
 
         class T:
             put_item = staticmethod(lambda Item: self.stored.append(Item))
@@ -197,3 +202,94 @@ class TestWorker:
         for order in ({}, {"coach_id": "x"}, {"coach_id": "x", "chat_id": 1, "text": "   "}):
             assert self.worker.lambda_handler(order, None)["ok"] is False
         assert called == []
+
+    # ── The transport truths (the go-live screenshot defects) ─────────────────
+
+    def test_a_redelivered_update_is_answered_exactly_once(self, monkeypatch):
+        """Telegram redelivers pending updates after an outage; the go-live
+        double-greeting was this. Same update_id ⇒ one inference, one reply."""
+        monkeypatch.setattr(self.worker, "_seen_update", lambda cid, uid: uid == 77)
+        called = []
+        monkeypatch.setattr(self.worker.coach_chat, "run_turn", lambda **kw: called.append(1))
+        out = self.worker.lambda_handler({"coach_id": "nutrition", "chat_id": 1, "text": "hi", "update_id": 77}, None)
+        assert out == {"ok": True, "reason": "duplicate"}
+        assert called == [] and self.sent == []
+
+    def test_seen_update_reads_the_conditional_failure_as_a_duplicate(self, monkeypatch):
+        class Dup(Exception):
+            pass
+
+        Dup.__name__ = "ConditionalCheckFailedException"
+
+        class T:
+            def put_item(self, **kw):
+                raise Dup()
+
+        monkeypatch.setattr(self.worker, "_table", lambda: T())
+        assert self.worker._seen_update("nutrition", 42) is True
+
+    def test_seen_update_fails_open_on_storage_errors(self, monkeypatch):
+        class T:
+            def put_item(self, **kw):
+                raise RuntimeError("ddb down")
+
+        monkeypatch.setattr(self.worker, "_table", lambda: T())
+        assert self.worker._seen_update("nutrition", 42) is False, "a dropped real message looks like a broken bot"
+
+    def test_a_stale_backlogged_message_is_skipped_without_inference(self, monkeypatch):
+        import time
+
+        called = []
+        monkeypatch.setattr(self.worker.coach_chat, "run_turn", lambda **kw: called.append(1))
+        old = time.time() - 7 * 3600
+        out = self.worker.lambda_handler({"coach_id": "nutrition", "chat_id": 1, "text": "hi", "message_date": old}, None)
+        assert out == {"ok": True, "reason": "stale"}
+        assert called == [] and ("TelegramStaleSkipped", "nutrition") in self.metrics
+
+    def test_the_coach_knows_what_day_it_is(self, monkeypatch):
+        """The screenshots' 'I don't have access to the current date or time' —
+        the current moment must reach BOTH the facts block and the grounder's
+        allowed vocabulary."""
+        seen = {}
+
+        def spy(**kw):
+            seen.update(kw)
+            return self.cc.TurnResult("ok.", "sent", [], 1)
+
+        monkeypatch.setattr(self.worker.coach_chat, "run_turn", spy)
+        self.worker.lambda_handler({"coach_id": "nutrition", "chat_id": 1, "text": "what day is it?"}, None)
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+
+        today = datetime.now(ZoneInfo("America/Los_Angeles")).strftime("%Y-%m-%d")
+        assert "CURRENT MOMENT:" in seen["facts_block"] and today in seen["facts_block"]
+
+    def test_an_unreadable_registry_degrades_to_an_honest_role_name_and_alarms(self, monkeypatch):
+        """'I'm mind_coach' must never happen again: a registry miss emits the
+        fail-loud metric and the coach speaks as a ROLE, never as an internal id."""
+        monkeypatch.setattr(self.worker, "display_name", lambda pid, s3_client=None, bucket=None: pid)
+        seen = {}
+
+        def spy(**kw):
+            seen.update(kw)
+            return self.cc.TurnResult("ok.", "sent", [], 1)
+
+        monkeypatch.setattr(self.worker.coach_chat, "run_turn", spy)
+        self.worker.lambda_handler({"coach_id": "mind", "chat_id": 1, "text": "who are you?"}, None)
+        assert seen["coach_name"] == "Matthew's mind coach"
+        assert ("TelegramPersonaMissing", "mind") in self.metrics
+
+    def test_a_healthy_registry_gives_the_coach_their_real_name(self, monkeypatch):
+        """With config/ readable (the repo's own file here, the bundled/S3 copy in
+        Lambda) the coach IS their cast name — the whole point of the fix."""
+        seen = {}
+
+        def spy(**kw):
+            seen.update(kw)
+            return self.cc.TurnResult("ok.", "sent", [], 1)
+
+        monkeypatch.setattr(self.worker.coach_chat, "run_turn", spy)
+        self.worker.lambda_handler({"coach_id": "nutrition", "chat_id": 1, "text": "hey"}, None)
+        assert seen["coach_name"] not in ("nutrition_coach", ""), "registry resolved a real display name"
+        assert seen["persona_block"], "voice spec loaded — the conversation is in character"
+        assert self.metrics == []
