@@ -148,6 +148,12 @@ NON_READERS = {
 GLOBAL_NON_RECORD_KEYS = {"Item", "Items", "Count", "Attributes", "Responses"}
 
 NON_RECORD_KEYS = {
+    "health/pillar_absence.py": {
+        # #2438: the pillar→evidence-source MAP names ingestion sources
+        # ("todoist", "habitify") as VALUES; the module queries per-source
+        # partitions via the registry, it never reads todoist record fields.
+        "habitify": "a source name in PILLAR_EVIDENCE_SOURCES, not a record field",
+    },
     "emails/weekly_digest_lambda.py": {
         # ex_todoist's RETURN dict is this module's own contract with the
         # renderer and the AI prompt — not a DynamoDB attribute name.
@@ -190,6 +196,10 @@ NON_RECORD_KEYS = {
 # Every module the scan classes as a todoist-record reader. Reviewed once, then
 # held: a module joining this set is a code change that must be looked at.
 READER_INVENTORY = {
+    # #2438: queries the todoist partition (Limit-1 last-write probe via the
+    # registry) for pillar-absence evidence; reads NO record fields (its one
+    # flagged token is a source name — see NON_RECORD_KEYS).
+    "health/pillar_absence.py",
     "emails/weekly_digest_lambda.py",
     "emails/monthly_digest_lambda.py",
     "emails/anomaly_detector_lambda.py",
