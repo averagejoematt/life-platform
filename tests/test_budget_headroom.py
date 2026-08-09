@@ -108,6 +108,9 @@ def test_governor_persists_breakdown_payload(gov, monkeypatch):
         "base_ceiling": gov._active_ceilings()[0],
         "surge_ceiling": max(gov._active_ceilings()[1], gov._active_ceilings()[0]),
         "ceiling_window": gov._active_ceiling_window(),
+        # #2381: the per-band crossing forecast, derived from this same call's
+        # mtd/burn/ceiling so the payload and the forecast can never disagree.
+        "tier_crossings": gov._tier_crossing_forecast(13.434, 83.239, 1.789 + 0.894, now, gov.MONTHLY_CEILING),
     }
 
 
@@ -325,6 +328,30 @@ def test_format_surge_absent_key_is_backward_compatible():
     all) must still render — .get() keeps this fail-soft."""
     line = budget_guard.format_headroom_line(TIER0)
     assert "SURGE" not in line
+
+
+def test_format_carries_the_next_tier_crossing_date():
+    """#2381: the clause names the NEXT band's projected in-force date, so the
+    posture decision date is visible in the brief ~two weeks out instead of
+    arriving as a mid-month scramble (July 2026's shape)."""
+    b = _breakdown(tier=1, projected=110.0, tier_crossings={"1": "2026-08-09", "2": "2026-08-17", "3": "2026-08-20"})
+    line = budget_guard.format_headroom_line(b)
+    assert "tier 2 ~2026-08-17 at this burn" in line
+    assert "tier 3" not in line  # only the NEXT band — one clause, not a table
+
+
+def test_format_without_crossings_key_is_backward_compatible():
+    """Older payloads (pre-#2381) omit tier_crossings; the line renders without
+    the clause rather than degrading to empty."""
+    line = budget_guard.format_headroom_line(TIER0)
+    assert line and "at this burn" not in line
+
+
+def test_format_no_upcoming_crossing_renders_no_clause():
+    """Every crossing at-or-below the current tier (or None) → no clause."""
+    b = _breakdown(tier=2, tier_crossings={"1": "2026-08-01", "2": "2026-08-05", "3": None})
+    line = budget_guard.format_headroom_line(b)
+    assert "at this burn" not in line
 
 
 def test_format_none_and_malformed_are_empty():
