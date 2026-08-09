@@ -15,8 +15,14 @@
 **Deadline discipline worked.** Computed and stated at the top of the first message: session start
 20:13Z → wrap 02:43Z. No inherited clock. Wrap started ~23:20Z, 3h20m early.
 
-**Main:** green (`585b1d58`) — `check_main_green.py` exit 0. It went red once for ~35 min on a
-transient I caused; see Incidents.
+**Main:** green **at the tip**, but read this before trusting the gate. `check_main_green.py`
+reports on the latest *completed* run, and at wrap time that was a **stale run for an older SHA**
+(`834e2a4f`) that finished AFTER the newer green one — so the gate flipped to red over a failure
+that was already fixed. The failure is the #1964 ISO-parse fork; its fix is `25c97c6a`, merged as
+PR #2345, and `tests/test_time_invariant_helpers_1964.py` passes 19/19 on the tip. Re-run the gate
+before believing either colour — with ~8 CI runs in flight at once, completion order and commit
+order come apart, which is a second face of the "a deploy timestamp is not the commit" class.
+It also went red once for ~35 min on a transient I caused; see Incidents.
 **Docs:** `docs/engines/HYPOTHESIS.md` re-verified against #2328 (read the diff, not a date bump —
 the SPEC_METRICS *vocabulary* changed and nothing else did). All four wiki checkers green.
 **Decisions:** none needed — the one governance-shaped call (which surfaces get the exact grounding
