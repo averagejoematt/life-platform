@@ -998,3 +998,127 @@ def test_the_docket_outcome_is_persisted_with_the_digest_that_produced_it(table,
 def test_an_empty_cycle_marks_itself_the_same_way_every_other_fallback_does(table):
     ced.lambda_handler({}, None)
     assert table.store[("ENSEMBLE#digest", f"CYCLE#{FROZEN_TODAY}")].get("_fallback") is True
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #2419 — the ADR-104 grounding gate on the digest writer
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def test_a_fabricated_number_in_the_disagreement_topic_holds_the_digest(table, monkeypatch):
+    """The #2419 class end to end: the LLM writes a figure its inputs never
+    contained into the disagreement topic — the field /api/coach_analysis serves
+    VERBATIM as cross_coach_reference. After the one corrective regen (stubbed to
+    repeat the offence) the digest must HOLD: the deterministic fallback persists,
+    the fabricated number reaches neither partition, and no disagreement row is
+    written for the ungrounded topic."""
+    _seed_one_coach(table)
+    _llm(
+        monkeypatch,
+        {
+            "coach_summaries": [],
+            "active_disagreements": [disagreement(topic="HRV sat at 133 all week — hold or push")],
+            "unanimous_flags": [],
+        },
+    )
+    result = ced.lambda_handler({"coach_ids": ["sleep_coach"]}, None)
+    stored = table.store[("ENSEMBLE#digest", f"CYCLE#{FROZEN_TODAY}")]
+    assert stored.get("_fallback") is True, "a gated-out digest must persist as the honest fallback, never the model text"
+    assert stored.get("_grounding_hold") is True, "a grounding HOLD must be distinguishable from a budget/LLM-failure fallback"
+    assert "133" not in json.dumps(stored, default=str), "the fabricated number reached the stored digest (#2419)"
+    assert result.get("_grounding_hold") is True
+    assert not any(pk == "ENSEMBLE#disagreements" for (pk, _sk) in table.store), "an ungrounded topic must not seed a disagreement row"
+
+
+def test_one_corrective_regen_can_save_the_digest(table, monkeypatch):
+    """regenerate-once-then-hold: the FIRST attempt fabricates, the regen is
+    faithful — the corrected digest persists and the run is not a fallback."""
+    _seed_one_coach(table)
+    payloads = [
+        {
+            "coach_summaries": [],
+            "active_disagreements": [disagreement(topic="HRV sat at 133 all week — hold or push")],
+            "unanimous_flags": [],
+        },
+        {
+            "coach_summaries": [],
+            "active_disagreements": [disagreement()],
+            "unanimous_flags": [],
+        },
+    ]
+
+    def _fake(req):
+        return {"content": [{"text": json.dumps(payloads.pop(0))}]}
+
+    monkeypatch.setattr(retry_utils, "call_anthropic_raw", _fake)
+    monkeypatch.setattr(dispute_docket, "open_from_disagreements", lambda d, c: {"opened": [], "skipped": []})
+    result = ced.lambda_handler({"coach_ids": ["sleep_coach"]}, None)
+    assert not payloads, "the corrective regen was never attempted"
+    assert result.get("_fallback") is None and result.get("_grounding_hold") is None
+    stored = table.store[("ENSEMBLE#digest", f"CYCLE#{FROZEN_TODAY}")]
+    assert stored["active_disagreements"][0]["topic"] == "Protein timing"
+    assert "133" not in json.dumps(stored, default=str)
+
+
+def test_a_grounded_digest_passes_without_a_second_model_call(table, monkeypatch):
+    """A gate that regenerates every clean digest doubles the module's spend and
+    is a gate nobody keeps. One payload in the stub: a second call would pop an
+    empty list and fail loudly."""
+    _seed_one_coach(table)
+    payloads = [{"coach_summaries": [], "active_disagreements": [disagreement()], "unanimous_flags": []}]
+
+    def _fake(req):
+        return {"content": [{"text": json.dumps(payloads.pop(0))}]}
+
+    monkeypatch.setattr(retry_utils, "call_anthropic_raw", _fake)
+    monkeypatch.setattr(dispute_docket, "open_from_disagreements", lambda d, c: {"opened": [], "skipped": []})
+    result = ced.lambda_handler({"coach_ids": ["sleep_coach"]}, None)
+    assert result.get("_fallback") is None
+    assert table.store[("ENSEMBLE#digest", f"CYCLE#{FROZEN_TODAY}")]["active_disagreements"][0]["topic"] == "Protein timing"
+
+
+def test_a_proposed_docket_criterion_is_not_graded_by_the_numbers_gate(table, monkeypatch):
+    """#1386: `resolution_criterion` thresholds are model-PROPOSED by design and
+    validated (or discarded) by dispute_docket's deterministic gate — the
+    grounding gate grading them would false-flag every honest criterion."""
+    _seed_one_coach(table)
+    d = disagreement(
+        resolution_criterion={
+            "metric": "hrv",
+            "condition": "gte",
+            "threshold": 68,
+            "resolution_days": 14,
+            "sides": {"sleep_coach": True, "nutrition_coach": False},
+        }
+    )
+    _llm(monkeypatch, {"coach_summaries": [], "active_disagreements": [d], "unanimous_flags": []})
+    monkeypatch.setattr(dispute_docket, "open_from_disagreements", lambda dd, c: {"opened": [], "skipped": []})
+    result = ced.lambda_handler({"coach_ids": ["sleep_coach"]}, None)
+    assert result.get("_fallback") is None and result.get("_grounding_hold") is None
+    stored = table.store[("ENSEMBLE#disagreements", "ACTIVE#protein_timing")]
+    assert stored["resolution_criterion"]["threshold"] == 68
+
+
+def test_the_census_now_counts_this_module_as_surfaces_covered():
+    """#2419's designed exit from UNGATED_READER_KNOWN: the module still touches
+    the model seam, and its ONE census bucket is a SURFACES registration."""
+    import test_invoke_site_census_2390 as census
+
+    module = "lambdas/coach/coach_ensemble_digest.py"
+    assert module in census.SITES, "the module no longer references a model seam — the census cannot see it"
+    assert census.classify(module, census.SURFACE_MODULES) == ["surfaces"]
+
+
+def test_removing_the_gate_call_reds_the_wiring_registry():
+    """Mutation proof (acceptance box 4): the SURFACES key must resolve to a real
+    DERIVED surface arming numbers+dates+freshness — a deleted or disarmed gate
+    call makes the registry entry stale, which fails grounding_wiring's own test."""
+    from grounding_wiring import SURFACES, scan_source
+
+    key = "lambdas/coach/coach_ensemble_digest.py::_apply_grounding_gate"
+    assert key in SURFACES
+    with open(os.path.join(ROOT, "lambdas", "coach", "coach_ensemble_digest.py"), encoding="utf-8") as fh:
+        source = fh.read()
+    derived = scan_source("lambdas/coach/coach_ensemble_digest.py", source)
+    assert key in derived, "the gate call is gone (or moved) — the registered surface no longer exists"
+    assert derived[key] >= SURFACES[key]["required"], f"gate call arms {derived[key]}, registry requires {SURFACES[key]['required']}"

@@ -106,6 +106,22 @@ def _slugify(text):
 # Canonical emitter lives in the layer — local copy removed 2026-06-12.
 from common.retry_utils import _emit_token_metrics  # noqa: E402,F401
 
+# #2419: the digest writer joins ADR-104's grounded-generation gate. The LLM-written
+# disagreement `topic` is served VERBATIM as `cross_coach_reference` on
+# /api/coach_analysis (site_api_coach_narrative), read by /api/coach_team's tension
+# map (site_api_coach_stance._latest_cycle_digest), and rendered into the public
+# Friday Panel script — with, until this gate, no grounding chokepoint anywhere in
+# the module. Fails open (gate becomes a no-op) if the shared module is missing from
+# the bundle — the summarizer's exact idiom; a gate must never sink the digest.
+try:
+    from ai.grounded_generation import allowed_dates, allowed_numbers, grounding_findings, regen_once
+    from ai.grounding_gate_params import cycle_gate_params  # #1967 — the cycle anchors, one provider
+except ImportError:  # pragma: no cover — environment-dependent
+    allowed_dates = allowed_numbers = grounding_findings = regen_once = None
+
+    def cycle_gate_params(generation_date_iso=None):  # type: ignore[misc]
+        return {}
+
 
 def _emit_failure_metric():
     """Emit API failure metric to CloudWatch (non-fatal)."""
@@ -521,6 +537,114 @@ def _build_default_digest(coach_data, cycle_date):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# GROUNDING GATE (#2419 / ADR-104)
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def _digest_prose_blob(digest):
+    """JSON blob of only the digest's reader-bound PROSE fields, for the ADR-104 gate.
+
+    Deliberately excluded:
+      * `resolution_criterion` — a model-PROPOSED docket criterion whose numeric
+        threshold is validated (and discarded when invalid) by dispute_docket's
+        deterministic gate (#1386); its threshold is a proposal by design, not a
+        data claim, so the numbers gate would false-flag every honest criterion.
+      * `confidence_state` — structure echoed from the coaches' own stored records,
+        not free prose.
+      * bookkeeping (`created_at`, `docket`, `_fallback`) — timestamps and counters
+        the gate must never grade (the summarizer's `_stance_prose_blob` rule).
+    """
+    disagreements = [
+        {
+            "topic": d.get("topic", ""),
+            "positions": d.get("positions", {}),
+            "data_needed_to_resolve": d.get("data_needed_to_resolve", ""),
+        }
+        for d in digest.get("active_disagreements", [])
+        if isinstance(d, dict)
+    ]
+    summaries = [
+        {
+            "key_concerns": s.get("key_concerns", []),
+            "key_recommendations": s.get("key_recommendations", []),
+            "predictions_active": s.get("predictions_active", []),
+            "wants_team_input_on": s.get("wants_team_input_on", []),
+        }
+        for s in digest.get("coach_summaries", [])
+        if isinstance(s, dict)
+    ]
+    return json.dumps(
+        {
+            "coach_summaries": summaries,
+            "active_disagreements": disagreements,
+            "unanimous_flags": digest.get("unanimous_flags", []),
+        },
+        default=str,
+    )
+
+
+def _apply_grounding_gate(digest, user_message):
+    """#2419: the ADR-104 grounded-generation gate joins the digest writer.
+
+    grounding_findings() runs the shared allow-list number + fabricated-date +
+    cycle-freshness checks over the digest's reader-bound prose fields, with the
+    digest's OWN inputs (`user_message` — exactly what the model saw) as the
+    allow-list. One corrective regen via the shared regen_once harness — the
+    summarizer/analyzer pattern, reused rather than reinvented. Findings that
+    survive the one regen are returned to the caller, which HOLDS: the handler
+    replaces the model digest with the deterministic `_build_default_digest`
+    fallback, so text that failed the gate is never persisted and
+    site_api_coach_stance / the Friday Panel never serve it.
+
+    Returns (digest, findings). Fail-open when the shared module is unavailable —
+    matches the module's own design and the summarizer's idiom.
+    """
+    if grounding_findings is None or regen_once is None or allowed_numbers is None:
+        return digest, []  # shared module unavailable — fail-open, matches its own design
+
+    allowed = allowed_numbers(user_message)
+    # The digest's allow-list source (`user_message`) is exactly what the model saw,
+    # so the date gate is built from the same material; the cycle anchors arm the
+    # phase-aware classes (#1691/#1897) — a digest topic narrating a stale "Day N"
+    # is the same failure class as a fabricated number.
+    _dates = allowed_dates(user_message) if allowed_dates is not None else None
+    holder = {"latest": digest}
+
+    def _findings_fn(text):
+        return grounding_findings(
+            text,
+            facts=None,
+            allowed=allowed,
+            allowed_dates=_dates,
+            **cycle_gate_params(),
+        )
+
+    def _regen_fn(correction):
+        strict_message = user_message + "\n\n" + correction
+        retry = _call_haiku(
+            system=_ensemble_system_prompt(),
+            user_message=strict_message,
+            max_tokens=6000,
+            temperature=0.2,
+        )
+        if not isinstance(retry, dict):
+            return ""
+        candidate = {
+            "coach_summaries": retry.get("coach_summaries", []),
+            "active_disagreements": retry.get("active_disagreements", []),
+            "unanimous_flags": retry.get("unanimous_flags", []),
+            "created_at": digest.get("created_at"),
+        }
+        holder["latest"] = candidate
+        return _digest_prose_blob(candidate)
+
+    text = _digest_prose_blob(digest)
+    _best_text, findings, corrected = regen_once(text, _findings_fn, _regen_fn)
+    best = holder["latest"] if corrected else digest
+    return best, findings
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # WRITE OPERATIONS
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -820,6 +944,23 @@ def lambda_handler(event, context):
                 len(digest["active_disagreements"]),
                 len(digest["unanimous_flags"]),
             )
+
+            # #2419 / ADR-104: gate the reader-bound prose against the digest's own
+            # inputs. Regenerate ONCE; findings that survive HOLD the model digest —
+            # the deterministic fallback (built from the coaches' stored, already-
+            # gated records) is what persists, never text that failed the gate.
+            digest, adr104_findings = _apply_grounding_gate(digest, user_message)
+            if adr104_findings:
+                logger.warning(
+                    "Ensemble digest failed the ADR-104 grounding gate after one regen "
+                    "(%d findings: %s) — holding; writing the deterministic fallback digest",
+                    len(adr104_findings),
+                    [f.get("type") for f in adr104_findings],
+                )
+                digest = _build_default_digest(coach_data, cycle_date)
+                # Distinguish a grounding HOLD from a budget/LLM-failure fallback so
+                # an operator reading the stored digest can tell which path ran.
+                digest["_grounding_hold"] = True
         else:
             logger.warning("LLM returned non-dict response — using fallback digest")
             digest = _build_default_digest(coach_data, cycle_date)

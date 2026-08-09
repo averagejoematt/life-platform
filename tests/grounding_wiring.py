@@ -183,6 +183,27 @@ SURFACES = {
         ("numbers", "dates", "freshness", "behavioral", "night"),
         {},
     ),
+    # #2419: the ensemble-digest writer, previously the census's tracked defect
+    # (UNGATED_READER_KNOWN) — the LLM-written disagreement `topic` served verbatim
+    # as /api/coach_analysis's cross_coach_reference with no chokepoint in the
+    # module. Now gated on the digest's own inputs, regenerate-once-then-HOLD (the
+    # deterministic fallback digest persists instead of gated-out text).
+    "lambdas/coach/coach_ensemble_digest.py::_apply_grounding_gate": _entry(
+        ("numbers", "dates", "freshness"),
+        {
+            "behavioral": (
+                "the digest is a cross-coach SYNTHESIS — its prose reports what the "
+                "coaches' stored outputs SAID (topics, positions, concerns), never a "
+                "second-person same-day completed-action claim to Matthew, which is the "
+                "only shape #1699 checks. And the pipeline reads ONLY the COACH# "
+                "partition (OUTPUT#/COMPRESSED#latest) — the same measured fact #2056 "
+                "recorded for the stance pipeline: no behavior log is in hand, so arming "
+                "would need a new read to grade a claim class this surface cannot emit. "
+                "Revisit if the digest prompt ever asks for direct address of Matthew."
+            ),
+            "night": _NO_NIGHT_MAP,
+        },
+    ),
     "lambdas/coach/coach_history_summarizer.py::_apply_grounding_gate": _entry(
         ("numbers", "dates", "freshness", "behavioral"),
         {"night": _NO_NIGHT_MAP},
