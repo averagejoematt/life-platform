@@ -956,6 +956,151 @@ def _load_prior_analysis(expert_key):
         return "", ""
 
 
+def _anthropic_req(prompt, api_key, max_tokens=2048):
+    """The one shaped messages-API POST this module's non-cached calls share (#2421)."""
+    return urllib.request.Request(
+        "https://api.anthropic.com/v1/messages",
+        data=json.dumps({"model": AI_MODEL, "max_tokens": max_tokens, "messages": [{"role": "user", "content": prompt}]}).encode(),
+        headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
+    )
+
+
+def _lenient_json(text, key, partial):
+    """Lenient parse of a model's structured response — the shape all three JSON-shaped
+    generators (synthesis / experiment arc / month rollup) shared verbatim before #2421
+    folded the three copies into one.
+
+    B4: subtly-malformed JSON (a trailing comma, an empty nested value) threw on
+    json.loads and fail-closed to yesterday's stale record (the /cockpit/ "collapsed to
+    one session/week" bug). Strip fences, take the outermost object, drop trailing
+    commas; if even that fails, regex-extract `key` so a FRESH record still lands
+    (`partial` supplies what the fallback cannot recover). None = no usable response."""
+    import re
+
+    s = (text or "").strip()
+    if s.startswith("```"):
+        s = s.split("\n", 1)[1] if "\n" in s else s[3:]
+    if s.endswith("```"):
+        s = s[:-3]
+    a, b = s.find("{"), s.rfind("}")
+    core = s[a : b + 1] if (a != -1 and b > a) else s  # noqa: E203
+    for cand in (core, re.sub(r",(\s*[}\]])", r"\1", core)):
+        try:
+            return json.loads(cand)
+        except Exception:  # noqa: BLE001
+            pass
+    m = re.search(rf'"{key}"\s*:\s*"((?:[^"\\]|\\.)*)"', core, re.DOTALL)
+    if not m:
+        return None
+    try:
+        value = json.loads(f'"{m.group(1)}"')  # unescape
+    except Exception:  # noqa: BLE001
+        value = m.group(1)
+    logger.warning("Full-JSON parse failed — used %s regex fallback", key)
+    return {key: value, "_partial": True, **partial}
+
+
+def _presence_logs(gen_date_iso):
+    """#1699 availability for `gen_date_iso` from engagement_state (fail-soft to none()).
+    The #2195 shape: `available_logs_from_presence` refuses to answer from a signal older
+    than the day asked about, so a stale read disarms the class honestly rather than
+    grading a same-day claim against yesterday's logs."""
+    try:
+        from ai.behavior_logs import LogAvailability, available_logs_from_presence
+
+        sig = _load_engagement_signal()
+        return available_logs_from_presence(sig, gen_date_iso) if sig else LogAvailability.none()
+    except Exception as _e:  # pragma: no cover — defensive
+        logger.warning("presence log-availability derivation failed: %s", _e)
+        return None
+
+
+def _gate_prose(label, text, prompt, api_key, *, shared_system=None, extra_sources=(), available_logs=None, extract=None):
+    """The module's ONE grounding chokepoint (#2421) — every model call routes here.
+
+    Before #2421 only the two `generate_and_cache` calls were gated: the Mode-B
+    correction rewrote the text AFTER the gate had run, and the weekly-priority
+    synthesis, the experiment arc and the month rollup never entered a gate at all —
+    four reader-bound paths (the #2390 census counted them). They now share this
+    function, so the registry sees ONE surface and a new call cannot fork the idiom.
+
+    Posture is #2391's, unchanged: allow-list numbers + canonical facts + the cycle
+    anchors + night scope + the #1699 behavioral map, ONE corrective rewrite via
+    `regen_once`, then **regenerate-or-HOLD** — residual findings return "" and the caller
+    keeps the prior cached record serving. Gate-INFRA failure still publishes.
+
+    `extract` maps a raw rewrite back to reader text for the JSON-shaped callers, which
+    also use it to capture the re-parsed record. Returns grounded text, or "" to hold.
+    """
+    facts = _load_canonical_facts()
+    allowed = _gg.allowed_numbers(prompt, shared_system, facts, *extra_sources)
+    gen_date_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    if available_logs is None:
+        available_logs = _presence_logs(gen_date_iso)
+
+    def _findings_fn(_t):
+        return _gg.grounding_findings(
+            _t,
+            facts=facts,
+            allowed=allowed,
+            generation_date_iso=gen_date_iso,
+            start_date_iso=EXPERIMENT_START,
+            nightly_vitals=_night_map(facts),  # #1968: the unlabeled "7.5-hour sleep"
+            available_logs=available_logs,  # #2056/#1699
+        )
+
+    def _regen(_correction):
+        from common.retry_utils import call_anthropic_raw
+
+        _req = _anthropic_req(prompt + "\n\n" + _correction, api_key)
+        _raw = "".join(b["text"] for b in call_anthropic_raw(_req, timeout=60).get("content", []) if b.get("type") == "text")
+        if extract is not None:
+            return extract(_raw)
+        return _raw.rsplit("KEY RECOMMENDATION:", 1)[0].rstrip() if "KEY RECOMMENDATION:" in _raw else _raw
+
+    _pre = _findings_fn(text)
+    if _pre:
+        logger.warning("[grounding] %s finding(s): %s", label, [f["detail"] for f in _pre][:6])
+    _new_text, _left, _corrected = _gg.regen_once(text, _findings_fn, _regen)
+    if _corrected:
+        text = _new_text
+        logger.info("[grounding] %s self-corrected: %d→%d finding(s)", label, len(_pre), len(_left))
+    if _left:
+        logger.warning(
+            "[grounding] %s HELD — %d residual finding(s); prior cached record preserved (#2391): %s",
+            label,
+            len(_left),
+            [f["detail"] for f in _left][:4],
+        )
+        return ""
+    return text
+
+
+def _gate_json_record(label, parsed, key, partial, prompt, api_key):
+    """#2421: gate the reader-bound field of a JSON-shaped generator (the weekly-priority
+    synthesis, the experiment arc, the month rollup — none of which was gated before).
+    `_gate_prose`'s rewrite comes back as raw JSON, so the extractor re-parses it and keeps
+    the WHOLE rewritten record: publishing a corrected headline beside the uncorrected
+    chapters/notes it was generated with would be the post-gate-mutation bug in another
+    costume. Returns the grounded record, or None to hold (prior record keeps serving)."""
+    fresh: dict = {}
+
+    def _extract(_raw):
+        _p = _lenient_json(_raw, key, partial)
+        if _p and _p.get(key):
+            fresh["parsed"] = _p
+            return _p[key]
+        return ""
+
+    text = _gate_prose(label, parsed[key], prompt, api_key, extract=_extract)
+    if not text:
+        logger.warning("%s HELD by the grounding gate (#2421/#2391) — prior cached record keeps serving", label)
+        return None
+    out = fresh.get("parsed", parsed)
+    out[key] = text
+    return out
+
+
 def generate_and_cache(expert_key, shared_system=None):
     logger.info(f"Generating analysis for expert: {expert_key}")
     data = gather_data_for_expert(expert_key)
@@ -1044,75 +1189,17 @@ def generate_and_cache(expert_key, shared_system=None):
     # contradictions PLUS the allow-list number gate (any number not present in the
     # prompt/system/facts is a fabrication — catches invented trend endpoints).
     # One corrective rewrite, kept only if strictly better (never regress).
+    # #2056: the #1699 map comes from the snapshot's own `days_since_last_*` fields —
+    # computed by `_recency_stats` from the rows THIS render already queried, so zero
+    # extra I/O. Coverage is per-expert and declared: the nutrition snapshot answers for
+    # food and stays silent about training. A category the expert cannot see is left
+    # UNKNOWN, never reported absent — what makes arming honest on partial visibility.
     if analysis_text:
         try:
-            _facts = _load_canonical_facts()
-            _allowed = _gg.allowed_numbers(prompt, shared_system, _facts)
-
-            # #1897: pass the cycle anchors so the phase-aware classes actually
-            # run. Omitting them is why "Zero food logs in seven days of an
-            # experiment" shipped on Day 1 — baseline_freshness and the new
-            # experiment_span class both no-op without them, and the digit gates
-            # cannot see a spelled-out number.
-            _gen_date_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-
-            def _findings_fn(_t):
-                return _gg.grounding_findings(
-                    _t,
-                    facts=_facts,
-                    allowed=_allowed,
-                    generation_date_iso=_gen_date_iso,
-                    start_date_iso=EXPERIMENT_START,
-                    nightly_vitals=_night_map(_facts),  # #1968: the unlabeled "7.5-hour sleep"
-                    # #2056: the #1699 behavioral class. The map comes from the snapshot's
-                    # own `days_since_last_*` fields — computed by `_recency_stats` from the
-                    # rows THIS render already queried, so zero extra I/O and no guessing.
-                    # Coverage is per-expert and declared: the nutrition snapshot answers
-                    # for food and stays silent about training, the mind snapshot for
-                    # journal, training for lifts. A category the expert cannot see is left
-                    # UNKNOWN, never reported absent — which is what makes arming honest on
-                    # a surface with partial visibility instead of noise that gets a gate
-                    # switched off. Since #2391 this gate is genuinely BLOCKING: one
-                    # rewrite via `regen_once`, then regenerate-or-hold — residual
-                    # findings mean the prior cached analysis keeps serving.
-                    available_logs=_avail_logs(data),
-                )
-
-            def _regen(_correction):
-                from common.retry_utils import call_anthropic_raw
-
-                _fix_req = urllib.request.Request(
-                    "https://api.anthropic.com/v1/messages",
-                    data=json.dumps(
-                        {"model": AI_MODEL, "max_tokens": 1200, "messages": [{"role": "user", "content": prompt + "\n\n" + _correction}]}
-                    ).encode(),
-                    headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
-                )
-                _fix_res = call_anthropic_raw(_fix_req, timeout=60)
-                _fixed = "".join(b["text"] for b in _fix_res.get("content", []) if b.get("type") == "text")
-                if "KEY RECOMMENDATION:" in _fixed:
-                    _fixed = _fixed.rsplit("KEY RECOMMENDATION:", 1)[0].rstrip()
-                return _fixed
-
-            _pre = _findings_fn(analysis_text)
-            if _pre:
-                logger.warning("[grounding] %s finding(s): %s", expert_key, [f["detail"] for f in _pre][:6])
-            _new_text, _left, _corrected = _gg.regen_once(analysis_text, _findings_fn, _regen)
-            if _corrected:
-                analysis_text = _new_text
-                logger.info("[grounding] %s self-corrected: %d→%d finding(s)", expert_key, len(_pre), len(_left))
-            if _left:
-                # #2391: "better" is not "clean" (prod 2026-08-08 shipped "6→2" with 2
-                # unresolved). Residual findings ⇒ hold — prior cached analysis keeps
-                # serving, this text never writes. Gate-infra failure (except below)
-                # still publishes: the hold triggers only on measured findings.
-                logger.warning(
-                    "[grounding] %s HELD — %d residual finding(s); prior cached analysis preserved (#2391): %s",
-                    expert_key,
-                    len(_left),
-                    [f["detail"] for f in _left][:4],
-                )
-                return ""
+            _gated = _gate_prose(expert_key, analysis_text, prompt, api_key, shared_system=shared_system, available_logs=_avail_logs(data))
+            if not _gated:
+                return ""  # #2391 hold — prior cached analysis keeps serving
+            analysis_text = _gated
         except Exception as _sc:
             logger.warning("grounding self-correction failed for %s: %s", expert_key, _sc)
 
@@ -1171,18 +1258,7 @@ def generate_and_cache(expert_key, shared_system=None):
                 correction_prompt = prompt + "\n\n" + "\n".join(correction_parts)
 
                 try:
-                    corr_body = json.dumps(
-                        {
-                            "model": AI_MODEL,
-                            "max_tokens": 1200,
-                            "messages": [{"role": "user", "content": correction_prompt}],
-                        }
-                    )
-                    corr_req = urllib.request.Request(
-                        "https://api.anthropic.com/v1/messages",
-                        data=corr_body.encode(),
-                        headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
-                    )
+                    corr_req = _anthropic_req(correction_prompt, api_key, max_tokens=1200)
                     # Phase 3.4 + CRIT-AI-01 (2026-05-16): correction call now retries via
                     # retry_utils (was raw urlopen, no retry — caused silent quality failures
                     # when Anthropic was briefly unavailable mid-observatory).
@@ -1203,8 +1279,19 @@ def generate_and_cache(expert_key, shared_system=None):
                         maturity=_maturity,
                     )
                     new_errors = sum(1 for f in _new_flags if f["severity"] == "error")
+                    # #2421: the Mode-B rewrite happens AFTER the grounding gate ran, so it
+                    # used to publish a post-gate mutation on the one path that WAS gated.
+                    # RE-GATE the rewritten text; a held rewrite is discarded and the already
+                    # gated draft (written above) keeps serving — never a downgrade.
+                    _regated = ""
                     if new_errors < len(errors):
-                        analysis_text = corrected_text
+                        _regated = _gate_prose(
+                            f"{expert_key}/mode-b", corrected_text, correction_prompt, api_key, available_logs=_avail_logs(data)
+                        )
+                        if not _regated:
+                            logger.warning("Mode B rewrite for %s failed re-grounding (#2421) — gated draft preserved", expert_key)
+                    if _regated:
+                        analysis_text = _regated
                         # Update cached item
                         table.update_item(
                             Key={"pk": CACHE_PK, "sk": f"EXPERT#{expert_key}"},
@@ -1371,57 +1458,19 @@ def generate_synthesis(all_coach_outputs):
 
     api_key = _get_api_key()
 
-    def _build_req():
-        # max_tokens 1200 truncated the JSON mid-string → json.loads threw and the whole
-        # synthesis fail-closed to the previous day's (stale) record (the /cockpit/ "collapsed
-        # to one session/week" bug). Raised to 2048 to fit the full structured response.
-        body = json.dumps({"model": AI_MODEL, "max_tokens": 2048, "messages": [{"role": "user", "content": prompt}]})
-        return urllib.request.Request(
-            "https://api.anthropic.com/v1/messages",
-            data=body.encode(),
-            headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
-        )
-
-    # Phase 3.4: retry via retry_utils. B4: the model emits subtly-malformed JSON (e.g. a
-    # trailing comma / empty value in the nested disagreements array) that threw on json.loads
-    # and fail-closed to yesterday's stale record (the /cockpit/ "collapsed to one session/week"
-    # bug). Parse LENIENTLY (strip fences, extract the outermost object, drop trailing commas),
-    # and if even that fails, regex-extract weekly_priority so a FRESH record always lands.
+    # _anthropic_req's max_tokens default is 2048 on purpose: 1200 truncated the JSON
+    # mid-string → json.loads threw and the whole synthesis fail-closed to the previous
+    # day's (stale) record (the /cockpit/ "collapsed to one session/week" bug).
+    # Phase 3.4: retry via retry_utils; lenient parse per _lenient_json (B4).
     from common.retry_utils import call_anthropic_raw
-
-    def _parse_synthesis(text):
-        import re
-
-        s = (text or "").strip()
-        if s.startswith("```"):
-            s = s.split("\n", 1)[1] if "\n" in s else s[3:]
-        if s.endswith("```"):
-            s = s[:-3]
-        a, b = s.find("{"), s.rfind("}")
-        core = s[a : b + 1] if (a != -1 and b > a) else s  # noqa: E203
-        for cand in (core, re.sub(r",(\s*[}\]])", r"\1", core)):
-            try:
-                return json.loads(cand)
-            except Exception:  # noqa: BLE001
-                pass
-        m = re.search(r'"weekly_priority"\s*:\s*"((?:[^"\\]|\\.)*)"', core, re.DOTALL)
-        if m:
-            wp = m.group(1)
-            try:
-                wp = json.loads(f'"{wp}"')  # unescape
-            except Exception:  # noqa: BLE001
-                pass
-            logger.warning("Synthesis full-JSON parse failed — used weekly_priority regex fallback")
-            return {"weekly_priority": wp, "cross_domain_notes": {}, "disagreements": [], "_partial": True}
-        return None
 
     synthesis = None
     last_err = None
     for attempt in (1, 2):
         try:
-            result = call_anthropic_raw(_build_req(), timeout=60)
+            result = call_anthropic_raw(_anthropic_req(prompt, api_key), timeout=60)
             text = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text")
-            synthesis = _parse_synthesis(text)
+            synthesis = _lenient_json(text, "weekly_priority", {"cross_domain_notes": {}, "disagreements": []})
             if synthesis and synthesis.get("weekly_priority"):
                 break
             last_err = f"no weekly_priority parsed (attempt {attempt})"
@@ -1431,6 +1480,13 @@ def generate_synthesis(all_coach_outputs):
             logger.error("Synthesis call failed (attempt %d/2): %s", attempt, e)
     if not synthesis or not synthesis.get("weekly_priority"):
         logger.error("Synthesis generation failed after retries: %s", last_err)
+        return None
+
+    # #2421: the Chair's weekly priority is the /cockpit/ headline verdict — gate it.
+    synthesis = _gate_json_record(
+        "weekly_priority", synthesis, "weekly_priority", {"cross_domain_notes": {}, "disagreements": []}, prompt, api_key
+    )
+    if synthesis is None:
         return None
 
     try:
@@ -1583,48 +1639,15 @@ def generate_experiment_arc():
 
     api_key = _get_api_key()
 
-    def _build_req():
-        body = json.dumps({"model": AI_MODEL, "max_tokens": 2048, "messages": [{"role": "user", "content": prompt}]})
-        return urllib.request.Request(
-            "https://api.anthropic.com/v1/messages",
-            data=body.encode(),
-            headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
-        )
-
     from common.retry_utils import call_anthropic_raw
-
-    def _parse(text):
-        import re
-
-        s = (text or "").strip()
-        if s.startswith("```"):
-            s = s.split("\n", 1)[1] if "\n" in s else s[3:]
-        if s.endswith("```"):
-            s = s[:-3]
-        a, b = s.find("{"), s.rfind("}")
-        core = s[a : b + 1] if (a != -1 and b > a) else s  # noqa: E203
-        for cand in (core, re.sub(r",(\s*[}\]])", r"\1", core)):
-            try:
-                return json.loads(cand)
-            except Exception:  # noqa: BLE001
-                pass
-        m = re.search(r'"arc"\s*:\s*"((?:[^"\\]|\\.)*)"', core, re.DOTALL)
-        if m:
-            try:
-                arc = json.loads(f'"{m.group(1)}"')
-            except Exception:  # noqa: BLE001
-                arc = m.group(1)
-            logger.warning("Experiment-arc full-JSON parse failed — used arc regex fallback")
-            return {"arc": arc, "throughline": "", "chapters": [], "_partial": True}
-        return None
 
     parsed = None
     last_err = None
     for attempt in (1, 2):
         try:
-            result = call_anthropic_raw(_build_req(), timeout=60)
+            result = call_anthropic_raw(_anthropic_req(prompt, api_key), timeout=60)
             text = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text")
-            parsed = _parse(text)
+            parsed = _lenient_json(text, "arc", {"throughline": "", "chapters": []})
             if parsed and parsed.get("arc"):
                 break
             last_err = f"no arc parsed (attempt {attempt})"
@@ -1633,6 +1656,11 @@ def generate_experiment_arc():
             logger.error("Experiment-arc call failed (attempt %d/2): %s", attempt, e)
     if not parsed or not parsed.get("arc"):
         logger.error("Experiment-arc generation failed after retries: %s", last_err)
+        return None
+
+    # #2421: EXPERT#experiment_arc is read straight onto the story surface — gate it.
+    parsed = _gate_json_record("experiment_arc", parsed, "arc", {"throughline": "", "chapters": []}, prompt, api_key)
+    if parsed is None:
         return None
 
     try:
@@ -1732,48 +1760,15 @@ def generate_month_rollup():
 
     api_key = _get_api_key()
 
-    def _build_req():
-        body = json.dumps({"model": AI_MODEL, "max_tokens": 1024, "messages": [{"role": "user", "content": prompt}]})
-        return urllib.request.Request(
-            "https://api.anthropic.com/v1/messages",
-            data=body.encode(),
-            headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
-        )
-
     from common.retry_utils import call_anthropic_raw
-
-    def _parse(text):
-        import re
-
-        s = (text or "").strip()
-        if s.startswith("```"):
-            s = s.split("\n", 1)[1] if "\n" in s else s[3:]
-        if s.endswith("```"):
-            s = s[:-3]
-        a, b = s.find("{"), s.rfind("}")
-        core = s[a : b + 1] if (a != -1 and b > a) else s  # noqa: E203
-        for cand in (core, re.sub(r",(\s*[}\]])", r"\1", core)):
-            try:
-                return json.loads(cand)
-            except Exception:  # noqa: BLE001
-                pass
-        m = re.search(r'"narrative"\s*:\s*"((?:[^"\\]|\\.)*)"', core, re.DOTALL)
-        if m:
-            try:
-                narrative = json.loads(f'"{m.group(1)}"')
-            except Exception:  # noqa: BLE001
-                narrative = m.group(1)
-            logger.warning("Month-rollup full-JSON parse failed — used narrative regex fallback")
-            return {"narrative": narrative, "headline": "", "_partial": True}
-        return None
 
     parsed = None
     last_err = None
     for attempt in (1, 2):
         try:
-            result = call_anthropic_raw(_build_req(), timeout=60)
+            result = call_anthropic_raw(_anthropic_req(prompt, api_key, max_tokens=1024), timeout=60)
             text = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text")
-            parsed = _parse(text)
+            parsed = _lenient_json(text, "narrative", {"headline": ""})
             if parsed and parsed.get("narrative"):
                 break
             last_err = f"no narrative parsed (attempt {attempt})"
@@ -1782,6 +1777,11 @@ def generate_month_rollup():
             logger.error("Month-rollup call failed (attempt %d/2): %s", attempt, e)
     if not parsed or not parsed.get("narrative"):
         logger.error("Month-rollup generation failed after retries: %s", last_err)
+        return None
+
+    # #2421: EXPERT#integrator_month feeds the site's Month lens — gate it.
+    parsed = _gate_json_record("integrator_month", parsed, "narrative", {"headline": ""}, prompt, api_key)
+    if parsed is None:
         return None
 
     try:

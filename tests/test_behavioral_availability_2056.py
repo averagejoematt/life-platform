@@ -292,7 +292,9 @@ class TestSurfaceCensus:
             "lambdas/ai/ai_calls.py::_ground_legacy_output",
             "lambdas/emails/daily_debrief_lambda.py::narrate",
             "lambdas/compute/state_of_matthew_lambda.py::narration_gate",
-            "lambdas/intelligence/ai_expert_analyzer_lambda.py::generate_and_cache",
+            # #2421 renamed this surface: the analyzer's four previously ungated paths
+            # joined `generate_and_cache` behind one `_gate_prose` chokepoint.
+            "lambdas/intelligence/ai_expert_analyzer_lambda.py::_gate_prose",
             # #2195 — #2056's one recorded residual, armed once its cost was measured.
             "lambdas/coach/coach_history_summarizer.py::_apply_grounding_gate",
         ):
