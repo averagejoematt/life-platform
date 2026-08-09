@@ -21,6 +21,7 @@ from typing import Any
 
 import boto3
 from boto3.dynamodb.conditions import Attr, Key
+from coach.reading_date_fidelity import summary_keeps_reading_dates  # #2343: derived-summary day correspondence
 from coach.voice_register_guard import sanitize_summary  # #1987: deterministic voice-register check
 from common.text_utils import truncate_at_word  # #1224: word-boundary summary truncation (no mid-word cut)
 from experiment import calibration_core  # #538: the shared prediction-calibration scorer (Brier + reliability)
@@ -1668,6 +1669,18 @@ Rules:
                 coach_id,
             )
             summary = truncate_at_word(narrative, 200)  # #1224: word boundary, no mid-word cut
+        # #2343: the sibling write path for the same class of defect — a derived summary
+        # that drops the night its source attached to a vital. Same rejection seam, same
+        # fallback (the truncated narrative, which keeps the date the narrative carried).
+        if summary:
+            summary, _date_rejected, _date_findings = summary_keeps_reading_dates(summary, source_text=narrative)
+            if _date_rejected:
+                logger.warning(
+                    "position_summary rejected for %s (#2343 reading-date fidelity) — %s",
+                    coach_id,
+                    [f["detail"] for f in _date_findings][:3],
+                )
+                summary = truncate_at_word(narrative, 200)
         parsed["position_summary"] = summary
         return parsed
 

@@ -300,6 +300,72 @@ def night_scoped_vitals_findings(text: str, *, nightly_vitals, generation_date_i
     return findings
 
 
+# ── public seams for sibling gates (#2343) ───────────────────────────────────
+#
+# `coach.reading_date_fidelity` asks a DIFFERENT question of the same vocabulary
+# ("did a derived summary keep the day its source gave a figure?"), and it must ask
+# it with the same metric patterns and the same night-naming rules or the two gates
+# drift apart. Exposing the three seams here — rather than letting the sibling reach
+# for `_NIGHT_METRICS` — is what keeps a metric added above covered in both places
+# for free (guard the SET, not the instance).
+
+
+def night_named_in(sentence: str, generation_date_iso: str = None):
+    """`(night_iso, how)` for a sentence, or `(None, None)` — see `_night_named_in`."""
+    return _night_named_in(sentence, generation_date_iso)
+
+
+def has_temporal_token(sentence: str) -> bool:
+    """True when the sentence gestures at a day at all (month, weekday, 'yesterday', …)."""
+    return bool(_ANY_TEMPORAL_TOKEN_RE.search(sentence or ""))
+
+
+def vital_claims_in(text: str, *, skip_targets: bool = True):
+    """`[(metric, value, sentence)]` — every vitals figure stated in `text`.
+
+    The MODAL guard is deliberately NOT applied: it exists to stop the night gate
+    grading advice as a claim, but "I can see your wearables data — Whoop shows 55%
+    recovery" is a statement of a measured reading that happens to contain "can", and
+    skipping it is exactly how #2343 stayed invisible. Callers that need the modal
+    guard use `night_scoped_vitals_findings`, which still applies it.
+
+    `skip_targets` drops target/prescription sentences (a target is not a reading —
+    the #1968 reasoning verbatim). It is the right default for anything establishing
+    what a text CLAIMS to have measured. #2343's summary side passes False: that check
+    only adjudicates a figure whose value the SOURCE already dated as a reading, and
+    the live sentence — "Whoop shows 55% recovery and HRV at 42 ms — but without meal
+    logs, I can't assess whether your 190g protein target is …" — was dropped whole
+    because of a protein target mentioned two clauses away from the vitals.
+    """
+    claims = []
+    for raw in _SENTENCE_SPLIT_RE.split((text or "").strip()):
+        sent = raw.strip()
+        if not sent or (skip_targets and _NSV_TARGET_RE.search(sent)):
+            continue
+        for metric, spec in _NIGHT_METRICS.items():
+            ctx = spec.get("context")
+            if ctx is not None and not ctx.search(sent):
+                continue
+            # EVERY pattern is tried, not just the first that hits. The night gate stops
+            # at the first match because it only needs one figure to adjudicate; a
+            # fidelity check needs the real one. "Whoop shows 55% recovery and HRV at 42
+            # ms" makes the leading `recovery\b\D{0,12}(\d+)` pattern read 42 (it reaches
+            # past "and HRV at" to the next number) and the correct `55% recovery`
+            # pattern never gets a turn. Collecting both costs nothing — a value the
+            # source never dated is simply not adjudicated.
+            for rx in spec["patterns"]:
+                m = rx.search(sent)
+                if not m:
+                    continue
+                try:
+                    claim = (metric, round(float(m.group("n")), 4), sent)
+                except (TypeError, ValueError):
+                    continue
+                if claim not in claims:
+                    claims.append(claim)
+    return claims
+
+
 # ── caller helpers: the two ways a night map / a night label gets built ──────
 
 
