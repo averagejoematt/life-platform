@@ -22,6 +22,7 @@ import { seasonBand } from "/assets/js/texture.js"; // #1471 — the season bann
 import { featuredQuoteHTML } from "/assets/js/journal_quotes.js"; // #1568 — the weekly featured line (ADR-142)
 import { heroProofLine, BRIEF_LINE_KICKER } from "/assets/js/daily_line.js"; // #1994/#1995 — Day-1-safe hero sentence + the one honest brief-line label
 import { sortChronicleNewestFirst } from "/assets/js/chronicle_order.js"; // #1988 — same-date part-sequence tie-break, shared with the server manifest
+import { absenceLine, isDark } from "/assets/js/absence_read.js"; // #2388 — a dark source never renders a trend verb
 
 const $ = (s, r = document) => r.querySelector(s);
 const bind = (n, r = document) => r.querySelector(`[data-bind="${n}"]`);
@@ -404,10 +405,21 @@ const OKAY_LEGIBLE = [
 // flat zero with no movement — never a faked "steady".
 function okayStatus(p) {
   if (!p) return { txt: "not measured this week", state: "absent" };
+  // #2388 — the source check comes FIRST, before any coverage heuristic and before any
+  // trend verb. The engine's ADR-104 zero (an unlogged habit scores 0 at full weight,
+  // data_coverage stays 1.0 — documented design, not a defect) is indistinguishable
+  // from a real decline at this layer; only the pillar's own ingestion source can tell
+  // them apart, and the server derives that from the registry's `stale_hours`. Over a
+  // cycle with zero food logs this chip said "EATING eased off a little".
+  if (isDark(p)) return { txt: absenceLine(p, { short: true }) || "nothing logged", state: "absent" };
   const cov = p.data_coverage;
   const absent = p.coverage_hold === true || (typeof cov === "number" && cov < 0.25) || (Number(p.raw_score) === 0 && !Number(p.xp_delta));
   if (absent) return { txt: "not measured this week", state: "absent" };
   const t = trend(p.xp_delta);
+  // A pillar carrying flagged absent behaviors has unlogged days inside the window. The
+  // score moved, but "eased off a little" attributes that move to effort rather than to
+  // the missing logs — so the chip names the absence instead of a trend it can't own.
+  if (t === "down" && (p.absent_behaviors || []).length) return { txt: "some days went unlogged", state: "absent" };
   if (t === "up") return { txt: "on the up", state: "up" };
   if (t === "down") return { txt: "eased off a little", state: "down" };
   return { txt: "holding steady", state: "flat" };
@@ -461,12 +473,17 @@ function renderOkay(charV, journeyV, presenceV, pre) {
     lead = "The short version — how the week's actually going, in plain terms:";
   }
 
-  const rows = OKAY_LEGIBLE.map(([name, label]) => ({
-    label,
-    s: inLull && OKAY_MANUAL.has(name)
-      ? { txt: `nothing logged for ${lullDays} days`, state: "absent" }
-      : okayStatus(byName[name]),
-  }));
+  const rows = OKAY_LEGIBLE.map(([name, label]) => {
+    const p = byName[name];
+    // #2388 — the pillar's OWN source state outranks the journal-keyed lull override.
+    // The lull is a whole-person signal measured off the journal channel; when this
+    // pillar's own source is dark we have the specific, measured sentence and it must
+    // win (a nutrition pillar reading its gap off the journal's day count is how the
+    // wrong number reaches a family reader).
+    if (isDark(p)) return { label, s: okayStatus(p) };
+    if (inLull && OKAY_MANUAL.has(name)) return { label, s: { txt: `nothing logged for ${lullDays} days`, state: "absent" } };
+    return { label, s: okayStatus(p) };
+  });
   const allAbsent = !inLull && rows.every((r) => r.s.state === "absent");
   const asofLine = asOf
     ? `<p class="okay-asof label">as of ${esc(asOf)} · plain-language, computed from the same numbers on <a href="/cockpit/">the cockpit</a></p>`

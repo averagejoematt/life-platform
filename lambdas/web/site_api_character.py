@@ -22,7 +22,7 @@ pre-split module).
 import json
 import os
 import re as _re
-from datetime import timedelta
+from datetime import date as _date, timedelta
 
 from boto3.dynamodb.conditions import Key
 from experiment.phase_filter import with_phase_filter  # ADR-058
@@ -37,6 +37,74 @@ from web.site_api_common import (
     _ok,
     logger,
 )
+
+
+def _attach_pillar_absence(pillars, *, table, now, window_start) -> None:
+    """#2388 — stamp each pillar with its honest absence state (mutates in place).
+
+    Reads, per mapped ingestion source, the latest ``DATE#`` day it wrote, and hands that
+    plus the source's OWN registry ``stale_hours`` to the pure
+    ``health.pillar_absence.pillar_absence``. Cross-phase (``include_pilot=True``) on
+    purpose, the same basis ``/api/last_sync`` uses: a source whose newest write predates
+    this cycle must be VISIBLE as a pre-window date, because that is precisely what makes
+    "nothing logged in this cycle" derivable instead of collapsing to unknown.
+
+    Fail-open by construction — any lookup failure leaves the source unobserved, the
+    pillar reads ``unknown``, and every surface keeps its pre-#2388 behavior. A serving
+    error must never manufacture an absence claim.
+    """
+    try:
+        from health.pillar_absence import PILLAR_SOURCES, pillar_absence
+        from ingestion.source_registry import DEFAULT_STALE_HOURS, stale_hours_overrides
+    except Exception as _e:  # pragma: no cover — import-time guard only
+        logger.warning("[/api/character] absence derivation unavailable: %s", _e)
+        return
+
+    needed = sorted({sid for names in PILLAR_SOURCES.values() for sid in names})
+    overrides = stale_hours_overrides()
+    today = now.date()
+    source_state: dict[str, dict] = {}
+    for sid in needed:
+        window = overrides.get(sid) or DEFAULT_STALE_HOURS
+        try:
+            resp = table.query(
+                **with_phase_filter(
+                    {
+                        "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}{sid}") & Key("sk").begins_with("DATE#"),
+                        "ScanIndexForward": False,
+                        "Limit": 1,
+                        "ProjectionExpression": "sk",
+                    },
+                    include_pilot=True,
+                )
+            )
+            items = resp.get("Items", [])
+        except Exception as _e:
+            logger.warning("[/api/character] absence lookup failed for %s: %s", sid, _e)
+            continue
+        last_day = str(items[0].get("sk", "")).replace("DATE#", "")[:10] if items else ""
+        if not last_day:
+            source_state[sid] = {"last_date": None, "age_hours": None, "stale_hours": window, "no_records": True}
+            continue
+        try:
+            age_days = (today - _date.fromisoformat(last_day)).days
+        except Exception:
+            continue
+        source_state[sid] = {"last_date": last_day, "age_hours": max(age_days, 0) * 24, "stale_hours": window}
+
+    reference_date = today.isoformat()
+    for p in pillars:
+        if not isinstance(p, dict):
+            continue
+        a = pillar_absence(
+            p.get("name"),
+            source_state=source_state,
+            absent_behaviors=p.get("absent_behaviors") or [],
+            reference_date=reference_date,
+            window_start=window_start,
+        )
+        if a is not None:
+            p["absence"] = a
 
 
 def character(date: str | None = None, *, _g) -> dict:
@@ -207,6 +275,13 @@ def character(date: str | None = None, *, _g) -> dict:
         # per-pillar day-over-day score move (aligned by PILLAR_ORDER)
         for _pp, _yd_s in zip(pillars, _yd_scores):
             _pp["score_delta"] = round(_pp["raw_score"] - _yd_s, 1)
+
+    # #2388 — the honest-absence state, derived HERE because it is a fact about the
+    # ingestion registry (per-source `stale_hours`), not about the score. Without it the
+    # reader surfaces translated an ADR-104 zero into a trend verb ("EATING eased off a
+    # little" over a cycle with zero food logs). Never narrated, never a number the front
+    # end re-derives: `state` ∈ {dark, logged, unknown} plus the #2382 transition kind.
+    _attach_pillar_absence(pillars, table=table, now=datetime.now(PT), window_start=EXPERIMENT_START)
 
     return _ok(
         {
