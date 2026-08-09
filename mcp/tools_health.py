@@ -4,6 +4,8 @@ Health & body composition tools.
 
 from datetime import datetime, timedelta, timezone
 
+from health import tdee as tdee_core  # ADR-152 / #2310: THE one TDEE definition
+
 from mcp.config import logger
 from mcp.core import date_diff_days, decimal_to_float, get_profile, query_source
 from mcp.helpers import normalize_whoop_sleep
@@ -737,7 +739,7 @@ def _get_energy_expenditure(args):
         return {"error": "No height_inches in profile — BMR cannot be computed without it, and will not be estimated."}
     dob_str = profile.get("date_of_birth")
     sex = profile.get("biological_sex", "male").lower()
-    target_deficit_kcal = args.get("target_deficit_kcal", 500)
+    target_deficit_kcal = args.get("target_deficit_kcal", tdee_core.DEFAULT_DEFICIT_KCAL)
 
     withings_recent = query_source("withings", d7_start, end_date)
     current_weight_lbs = None
@@ -750,90 +752,58 @@ def _get_energy_expenditure(args):
     if current_weight_lbs is None:
         return {"error": "No recent weight data. Ensure Withings is syncing."}
 
-    weight_kg = current_weight_lbs * 0.453592
-    height_cm = height_in * 2.54
-    age_years = None
-    if dob_str:
-        try:
-            dob = datetime.strptime(dob_str, "%Y-%m-%d")
-            # Both sides NAIVE. This was `datetime.now(timezone.utc) - dob`, an
-            # aware-minus-naive subtraction that raised TypeError on EVERY call;
-            # the bare `except Exception: pass` swallowed it, so the profile's real
-            # date_of_birth could never reach the BMR and the hardcoded 35 always
-            # won — dead code that looked live, worth ~5 kcal per year of error.
-            age_years = (datetime.now(timezone.utc).replace(tzinfo=None) - dob).days / 365.25
-        except Exception as _e:
-            # CodeQL #144 / ADR-104 + docs/DATA_GOVERNANCE.md: log the FAILURE, never the
-            # value. A date_of_birth is PII, CloudWatch retains it, and it is the one field
-            # PhenoAge Option A exists to keep off every returned surface — leaking it into
-            # an operator log is inconsistent with that posture for no debugging gain.
-            # Length + the exception identify a malformed stamp precisely enough; the
-            # `age_basis: date_of_birth_unparseable` marker two lines below is the signal a
-            # reader of the payload actually acts on.
-            logger.warning("_get_energy_expenditure: could not parse date_of_birth (len=%d) — %s", len(str(dob_str or "")), _e)
-    age_basis = (
-        "profile_date_of_birth" if age_years is not None else ("date_of_birth_unparseable" if dob_str else "no_date_of_birth_in_profile")
-    )
-    if age_years is None:
-        age_years = 35  # assumed — surfaced as bmr_age_basis so it is never mistaken for a measured input
-
-    if sex == "female":
-        bmr = round(10 * weight_kg + 6.25 * height_cm - 5 * age_years - 161, 0)
-    else:
-        bmr = round(10 * weight_kg + 6.25 * height_cm - 5 * age_years + 5, 0)
-
-    def exercise_kcal_from_strava(strava_items):
-        """Returns (kcal, basis). The basis is published: until the strava writer
-        rolled `total_kilojoules` up, `total_kj` was always 0 and EVERY TDEE this
-        tool returned came from the duration proxy while the payload said nothing
-        about which branch ran."""
-        total_kj = sum(float(d.get("total_kilojoules") or 0) for d in strava_items)
-        total_time = sum(float(d.get("total_moving_time_seconds") or 0) for d in strava_items)
-        if total_kj <= 0:
-            hours = total_time / 3600
-            return round(6 * weight_kg * hours, 0), ("duration_proxy_6_kcal_per_kg_hour" if total_time > 0 else "no_activity_in_window")
-        # Only power-equipped activities report kJ. Counting the day's kJ as the
-        # WHOLE day's expenditure would drop a run that shared the day with a
-        # ride, so the moving time NOT covered by a kJ reading still gets the
-        # proxy. Rows written before the writer recorded that split carry no
-        # covered-time field — for them, kJ is taken to cover the day (the old
-        # behaviour) rather than double-counting.
-        covered_s = sum(
-            float(
-                d.get("kilojoules_moving_time_seconds")
-                if d.get("kilojoules_moving_time_seconds") is not None
-                else (d.get("total_moving_time_seconds") or 0)
-            )
-            for d in strava_items
-            if float(d.get("total_kilojoules") or 0) > 0
-        )
-        uncovered_hours = max(0.0, total_time - covered_s) / 3600
-        # kJ of mechanical work ≈ kcal expended at ~25% gross efficiency.
-        kcal = total_kj * 1.0 + 6 * weight_kg * uncovered_hours
-        return round(kcal, 0), ("measured_kilojoules" if uncovered_hours <= 0 else "mixed_measured_kilojoules_and_duration_proxy")
+    height_cm = height_in * tdee_core.IN_TO_CM
+    # ADR-152 / #2310: age resolution, BMR and the exercise term all come from
+    # `health.tdee` — the ONE implementation this tool and `tools_nutrition` share.
+    age_years, age_basis, _age_err = tdee_core.resolve_age(dob_str, now=datetime.now(timezone.utc))
+    if _age_err is not None:
+        # CodeQL #144 / ADR-104 + docs/DATA_GOVERNANCE.md: log the FAILURE, never the
+        # value. A date_of_birth is PII, CloudWatch retains it, and it is the one field
+        # PhenoAge Option A exists to keep off every returned surface — leaking it into
+        # an operator log is inconsistent with that posture for no debugging gain.
+        # Length + the exception identify a malformed stamp precisely enough; the
+        # `age_basis: date_of_birth_unparseable` marker is the signal a reader acts on.
+        logger.warning("_get_energy_expenditure: could not parse date_of_birth (len=%d) — %s", len(str(dob_str or "")), _age_err)
 
     strava_7d = query_source("strava", d7_start, end_date)
     strava_30d = query_source("strava", d30_start, end_date)
 
-    ex_kcal_7d, ex_basis_7d = exercise_kcal_from_strava(strava_7d)
-    ex_kcal_30d, ex_basis_30d = exercise_kcal_from_strava(strava_30d)
-    ex_daily_7d_avg = round(ex_kcal_7d / _d7_days, 0)
-    ex_daily_30d_avg = round(ex_kcal_30d / _d30_days, 0)
+    weight_kg = current_weight_lbs * tdee_core.LB_TO_KG
+    ex_7d = tdee_core.exercise_energy(strava_7d, weight_kg)
+    ex_30d = tdee_core.exercise_energy(strava_30d, weight_kg)
 
-    tdee_7d_avg = round(bmr + ex_daily_7d_avg, 0)
-    tdee_30d_avg = round(bmr + ex_daily_30d_avg, 0)
-    calorie_target_7d = round(tdee_7d_avg - target_deficit_kcal, 0)
-    calorie_target_30d = round(tdee_30d_avg - target_deficit_kcal, 0)
-    implied_weekly_loss_lbs = round(target_deficit_kcal * 7 / 3500, 2)
+    def _budget(ex, window_days):
+        return tdee_core.energy_budget(
+            weight_lbs=current_weight_lbs,
+            height_inches=height_in,
+            age_years=age_years,
+            age_basis=age_basis,
+            sex=sex,
+            exercise_kcal=ex["kcal"],
+            exercise_energy_days=ex["days"],
+            exercise_energy_basis=ex["basis"],
+            window_days=window_days,
+            deficit_kcal=target_deficit_kcal,
+        )
+
+    budget_7d = _budget(ex_7d, _d7_days)
+    budget_30d = _budget(ex_30d, _d30_days)
+
+    bmr = budget_7d["inputs"]["bmr_kcal"]
+    ex_basis_7d, ex_basis_30d = ex_7d["basis"], ex_30d["basis"]
+    ex_daily_7d_avg = budget_7d["inputs"]["exercise_kcal_daily_avg"]
+    ex_daily_30d_avg = budget_30d["inputs"]["exercise_kcal_daily_avg"]
+    tdee_7d_avg = budget_7d["tdee"]
+    tdee_30d_avg = budget_30d["tdee"]
+    calorie_target_7d = budget_7d["target"]
+    calorie_target_30d = budget_30d["target"]
+    implied_weekly_loss_lbs = tdee_core.implied_weekly_loss_lbs(target_deficit_kcal)
 
     journey_start_wt = profile.get("journey_start_weight_lbs")
     bmr_change = None
     if journey_start_wt:
-        start_kg = float(journey_start_wt) * 0.453592
-        if sex == "female":
-            bmr_start = round(10 * start_kg + 6.25 * height_cm - 5 * age_years - 161, 0)
-        else:
-            bmr_start = round(10 * start_kg + 6.25 * height_cm - 5 * age_years + 5, 0)
+        start_kg = float(journey_start_wt) * tdee_core.LB_TO_KG
+        bmr_start = tdee_core.mifflin_bmr(start_kg, height_cm, age_years, sex)
         bmr_change = {
             "bmr_at_start_weight": bmr_start,
             "bmr_now": bmr,
@@ -872,6 +842,11 @@ def _get_energy_expenditure(args):
         "target_deficit_kcal": target_deficit_kcal,
         "calorie_target_based_on_7d": calorie_target_7d,
         "calorie_target_based_on_30d": calorie_target_30d,
+        # ADR-152/ADR-105: the same target, with its method and its inputs attached, so a
+        # reader can check the number without reading this source — and so this tool and
+        # `get_nutrition view=macros` are visibly answering from ONE definition.
+        "calorie_target": budget_7d,
+        "calorie_target_30d_basis": budget_30d,
         "implied_weekly_loss_lbs": implied_weekly_loss_lbs,
         "bmr_change_since_start": bmr_change,
         "coaching_note": "Recalculate targets every 10 lbs lost as BMR decreases. Eating below 1200 kcal (women) or 1500 kcal (men) risks lean mass loss even with adequate protein.",

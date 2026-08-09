@@ -223,6 +223,9 @@ def eightsleep(date: str, **fields) -> dict:
 
 
 PROFILE = {"pk": "USER#matthew", "sk": "PROFILE#v1", "tdee_estimate": 2500}
+#: ADR-152 (#2310): the TDEE estimate needs a profile HEIGHT — Mifflin is 6.25 kcal per
+#: cm — so a profile without one yields no estimate at all rather than a guess.
+PROFILE_WITH_HEIGHT = {"pk": "USER#matthew", "sk": "PROFILE#v1", "height_inches": 72}
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -917,17 +920,49 @@ def test_macros_rolling_window_spans_exactly_the_days_requested(monkeypatch):
 
 
 def test_macros_estimates_the_calorie_target_from_the_latest_weigh_in(monkeypatch):
-    """220 lbs -> 99.79024 kg
-    BMR = 10*99.79024 + 6.25*182.88 - 5*35 + 5 = 1970.9024
-    target = round(1970.9024 * 1.55) = 3055
+    """ADR-152 (#2310): 220 lbs -> 99.79024 kg
+    BMR   = 10*99.79024 + 6.25*182.88 - 5*35 + 5 = 1970.9024 -> 1971
+    TDEE  = BMR + measured 7d exercise energy / 7 = 1971 + 0 (no strava rows) = 1971
+    target = TDEE - 500 deficit                                               = 1471
+    The retired form published round(1970.9024 * 1.55) = 3055 — a MAINTENANCE figure,
+    from a flat multiplier, labelled as the day's calorie target.
     """
-    install(monkeypatch, MACRO_ROWS + [withings("2026-05-02", weight_lbs=220.0)])
+    install(monkeypatch, MACRO_ROWS + [withings("2026-05-02", weight_lbs=220.0)], profile=PROFILE_WITH_HEIGHT)
     out = tn.tool_get_nutrition({"view": "macros", "start_date": "2026-05-01", "end_date": "2026-05-02"})
-    assert out["targets"]["calories_kcal"] == 3055
+    assert out["targets"]["calories_kcal"] == 1471
+
+
+def test_macros_publishes_the_method_and_the_inputs_behind_its_calorie_target(monkeypatch):
+    """ADR-105/ADR-152: the number is checkable without reading the source — TDEE, the
+    deficit, the target, the method name, and the inputs (including the exercise-capture
+    gap tell `exercise_energy_days`) all ship on the payload."""
+    install(monkeypatch, MACRO_ROWS + [withings("2026-05-02", weight_lbs=220.0)], profile=PROFILE_WITH_HEIGHT)
+    t = tn.tool_get_nutrition({"view": "macros", "start_date": "2026-05-01", "end_date": "2026-05-02"})["targets"]
+    detail = t["calorie_target_detail"]
+    assert detail["method"] == "mifflin_bmr_plus_measured_7d_exercise"
+    assert (detail["tdee"], detail["deficit"], detail["target"]) == (1971, 500, 1471)
+    assert detail["target"] == t["calories_kcal"]  # the published target IS the payload's
+    assert detail["inputs"]["bmr_kcal"] == 1971 and detail["inputs"]["weight_lbs"] == 220.0
+    assert detail["inputs"]["age_basis"] == "no_date_of_birth_in_profile"
+    # honest absence, never a fabricated multiplier: no strava in the window
+    assert detail["inputs"]["exercise_energy_days"] == 0
+    assert detail["inputs"]["exercise_kcal_7d"] == 0
+    assert t["calorie_target_basis"] == "mifflin_bmr_plus_measured_7d_exercise_minus_deficit"
+
+
+def test_macros_grades_adherence_against_the_target_not_against_maintenance(monkeypatch):
+    """The re-base (#2310). A 1500 kcal day is 102% of the 1471 target -> a HIT; against
+    the retired 3055 maintenance figure it was 49% -> a miss. Same day, same food."""
+    rows = [mf("2026-05-01", total_calories_kcal=1500), withings("2026-05-01", weight_lbs=220.0)]
+    install(monkeypatch, rows, profile=PROFILE_WITH_HEIGHT)
+    out = tn.tool_get_nutrition({"view": "macros", "start_date": "2026-05-01", "end_date": "2026-05-01"})
+    assert out["targets"]["calories_kcal"] == 1471
+    assert out["daily_breakdown"][0]["hit_calorie_target"] is True
+    assert out["adherence"]["calorie_target_hit_pct"] == 100.0
 
 
 def test_macros_falls_back_to_the_flat_default_when_no_weigh_in_exists(monkeypatch):
-    install(monkeypatch, MACRO_ROWS)
+    install(monkeypatch, MACRO_ROWS, profile=PROFILE_WITH_HEIGHT)
     out = tn.tool_get_nutrition({"view": "macros", "start_date": "2026-05-01", "end_date": "2026-05-02"})
     assert out["targets"]["calories_kcal"] == 2400
     assert out["targets"]["protein_g"] == 180
@@ -940,7 +975,7 @@ def test_macros_errors_when_macrofactor_is_silent(monkeypatch):
 
 def test_macros_still_answers_when_the_weight_lookup_fails(monkeypatch):
     """A Withings outage costs the personalised target, not the whole report."""
-    install(monkeypatch, MACRO_ROWS, raise_sources={"withings"})
+    install(monkeypatch, MACRO_ROWS, profile=PROFILE_WITH_HEIGHT, raise_sources={"withings"})
     out = tn.tool_get_nutrition({"view": "macros", "start_date": "2026-05-01", "end_date": "2026-05-02"})
     assert out["targets"]["calories_kcal"] == 2400
     assert out["adherence"]["protein_target_hit_pct"] == 0.0  # 150 and 100 both short of 180*0.95
@@ -952,14 +987,16 @@ def test_macros_ignores_a_withings_row_that_carries_no_weight(monkeypatch):
     The surrounding try/except never caught it, because 0 is a perfectly good float. A
     Withings row that synced without a weight (body-composition-only, a partial sync) made
     the tool tell a 220 lb man to eat 1508 kcal/day. An absent weight is not a weight."""
-    install(monkeypatch, MACRO_ROWS + [withings("2026-05-02", fat_ratio=38.0)])
+    install(monkeypatch, MACRO_ROWS + [withings("2026-05-02", fat_ratio=38.0)], profile=PROFILE_WITH_HEIGHT)
     out = tn.tool_get_nutrition({"view": "macros", "start_date": "2026-05-01", "end_date": "2026-05-02"})
     assert out["targets"]["calories_kcal"] == 2400
+    assert out["targets"]["calorie_target_basis"] == "flat_default_no_weight_or_height"
+    assert out["targets"]["calorie_target_detail"] is None
     # and a weightless row NEWER than a real weigh-in must not mask the weigh-in either
     rows = MACRO_ROWS + [withings("2026-05-01", weight_lbs=220.0), withings("2026-05-02", fat_ratio=38.0)]
-    install(monkeypatch, rows)
+    install(monkeypatch, rows, profile=PROFILE_WITH_HEIGHT)
     out = tn.tool_get_nutrition({"view": "macros", "start_date": "2026-05-01", "end_date": "2026-05-02"})
-    assert out["targets"]["calories_kcal"] == 3055
+    assert out["targets"]["calories_kcal"] == 1471  # ADR-152: 1971 TDEE - 500 deficit
 
 
 def test_macros_excludes_a_day_with_no_calorie_rollup_from_the_hit_rate(monkeypatch):
@@ -977,30 +1014,32 @@ def test_macros_excludes_a_day_with_no_calorie_rollup_from_the_hit_rate(monkeypa
     assert day2["calories_kcal"] is None and day2["calories_pct"] is None and day2["hit_calorie_target"] is None
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "DEFECT (self-inconsistency, P1, mcp/tools_nutrition.py:450-455 vs "
-        "mcp/tools_health.py:611-646): both tools answer 'what should I eat?' from the SAME weight "
-        "and both call it Mifflin-St Jeor, and they disagree by ~1500 kcal. `_get_macro_targets` "
-        "hardcodes height 182.88 cm and age 35 and multiplies BMR by a 1.55 activity factor with no "
-        "deficit (220 lbs -> 3055 kcal, labelled 'calories_kcal' under `targets`), while "
-        "`_get_energy_expenditure` reads height from the profile, adds measured exercise energy "
-        "instead of a multiplier, and subtracts a 500 kcal deficit (-> 1557 kcal). A third figure, "
-        "2400, is hardcoded in `_get_nutrition_summary`. Three calorie targets for one day."
-    ),
-)
 def test_the_macro_target_and_the_energy_view_agree_on_todays_calorie_target(monkeypatch):
+    """ADR-152 / #2310 — the marker this replaces was accurate: both tools answered "what
+    should I eat?" from the SAME weight, both called it Mifflin-St Jeor, and they disagreed
+    by ~1500 kcal. `_get_macro_targets` hardcoded height 182.88 cm / age 35 and multiplied
+    BMR by a flat 1.55 with NO deficit (3055 kcal, labelled `calories_kcal` under
+    `targets`), while `_get_energy_expenditure` read height from the profile, added
+    MEASURED exercise energy, and subtracted 500 (1557 kcal).
+
+    Both now derive from the one implementation in `health.tdee`:
+        BMR(220 lb, 72 in, 35 y)             = 1971 kcal
+        measured 7d exercise (3600 s proxy)  = round(6 * 99.79 kg * 1 h) = 599 kcal
+        TDEE = 1971 + round(599 / 7)         = 2057 kcal   (MAINTENANCE)
+        target = 2057 - 500                  = 1557 kcal   (what he eats)
+    """
     from mcp import tools_health as th
 
     monkeypatch.setattr(th, "datetime", _FrozenDatetime)
     rows = MACRO_ROWS + [withings(PT_TODAY, weight_lbs=220.0), strava(PT_TODAY, total_moving_time_seconds=3600)]
-    install(monkeypatch, rows, profile={"pk": "USER#matthew", "sk": "PROFILE#v1", "height_inches": 72})
+    install(monkeypatch, rows, profile=PROFILE_WITH_HEIGHT)
     macros = tn.tool_get_nutrition({"view": "macros", "start_date": "2026-05-01", "end_date": PT_TODAY})
     energy = th.tool_get_daily_metrics({"view": "energy"})
-    # macros: round(Mifflin(220 lb, 72 in, 35 y) * 1.55)          = 3055 kcal
-    # energy: Mifflin 1971 + 86 kcal exercise - 500 kcal deficit  = 1557 kcal
-    assert macros["targets"]["calories_kcal"] == pytest.approx(energy["calorie_target_based_on_7d"], rel=0.1)
+    assert macros["targets"]["calories_kcal"] == energy["calorie_target_based_on_7d"] == 1557
+    # ...and not merely equal by luck: the same TDEE, deficit and method underneath.
+    assert macros["targets"]["calorie_target_detail"] == energy["calorie_target"]
+    assert energy["calorie_target"]["tdee"] == energy["tdee_7d_avg"] == 2057
+    assert energy["calorie_target"]["inputs"]["exercise_energy_days"] == 1
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1104,10 +1143,13 @@ def test_deficit_refuses_to_answer_from_fewer_than_seven_logged_days(monkeypatch
 
 
 def test_deficit_estimates_tdee_from_withings_when_the_profile_has_none(monkeypatch):
-    """220 lbs -> the same Mifflin*1.55 = 3055 the macros view computes."""
+    """ADR-152: the SAME definition the macros and energy views use — and TDEE means
+    MAINTENANCE here, because this tracker's whole signal is `tdee - intake`. Folding the
+    500 kcal deficit into the TDEE would double-count it. 220 lbs, 72 in, no strava in the
+    window -> BMR 1971 + 0 exercise = 1971."""
     rows = sust_rows(hrv=FLAT) + [withings("2026-05-08", weight_lbs=220.0)]
-    install(monkeypatch, rows, profile={"pk": "USER#matthew", "sk": "PROFILE#v1"})
-    assert tn.tool_get_deficit_sustainability(SUST_ARGS)["deficit"]["estimated_tdee"] == 3055
+    install(monkeypatch, rows, profile=PROFILE_WITH_HEIGHT)
+    assert tn.tool_get_deficit_sustainability(SUST_ARGS)["deficit"]["estimated_tdee"] == 1971
 
 
 def test_deficit_raises_a_watch_not_an_alarm_when_two_channels_degrade(monkeypatch):
@@ -1344,11 +1386,13 @@ def test_metabolic_adaptation_says_insufficient_data_when_there_was_no_deficit(m
 
 def test_metabolic_adaptation_estimates_base_tdee_from_the_first_weeks_weight(monkeypatch):
     """No `tdee_estimate` in the profile: 320 lbs -> 145.14944 kg
-    BMR = 10*145.14944 + 6.25*182.88 - 5*35 + 5 = 2424.4944
-    base_tdee = round(2424.4944 * 1.55) = 3758
+    BMR = 10*145.14944 + 6.25*182.88 - 5*35 + 5 = 2424.4944 -> 2424
+    base_tdee = BMR + measured 7d exercise energy (none in these rows) = 2424 (ADR-152).
+    The retired form published round(2424.4944 * 1.55) = 3758 — and an inflated BASE TDEE
+    inflates every "expected loss" this tracker grades actual loss against.
     """
-    install(monkeypatch, adapt_rows(days_per_week=7), profile={"pk": "USER#matthew", "sk": "PROFILE#v1"})
-    assert tn._get_metabolic_adaptation(ADAPT_ARGS)["metabolic_adaptation"]["estimated_base_tdee"] == 3758
+    install(monkeypatch, adapt_rows(days_per_week=7), profile=PROFILE_WITH_HEIGHT)
+    assert tn._get_metabolic_adaptation(ADAPT_ARGS)["metabolic_adaptation"]["estimated_base_tdee"] == 2424
 
 
 def test_metabolic_adaptation_needs_two_weeks_of_nutrition_before_it_speaks(monkeypatch):

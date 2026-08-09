@@ -116,7 +116,9 @@ def row(source: str, date: str, **fields) -> dict:
     return {"pk": f"USER#matthew#SOURCE#{source}", "sk": f"DATE#{date}", **fields}
 
 
-DEFAULT_PROFILE = {"protein_target_g": 190, "protein_floor_g": 170}
+# `height_inches` is what ADR-152 (#2310) added to the estimate path — Mifflin is
+# 6.25 kcal per cm, so without it the fallback publishes nothing rather than a guess.
+DEFAULT_PROFILE = {"protein_target_g": 190, "protein_floor_g": 170, "height_inches": 72}
 
 
 @pytest.fixture(autouse=True)
@@ -682,10 +684,12 @@ def test_without_an_uploaded_expenditure_the_tdee_falls_back_to_a_clearly_labell
     )
     n = overview(src)["nutrition"]
     assert n["tdee_source"] == "estimate_mifflin"
-    # Mifflin-St Jeor, 200 lb = 90.7184 kg:
-    #   (10*90.7184 + 6.25*182.88 - 5*35 + 5) * 1.55
-    # = (907.184 + 1143.0 - 175 + 5) * 1.55 = 1880.184 * 1.55 = 2914.2852 -> 2914
-    assert n["tdee"] == 2914
+    # ADR-152 (#2310) — Mifflin-St Jeor BMR + MEASURED 7d exercise energy, one definition
+    # shared with the two MCP surfaces. 200 lb = 90.7184 kg, 72 in = 182.88 cm:
+    #   BMR  = 10*90.7184 + 6.25*182.88 - 5*35 + 5 = 1880.184 -> 1880
+    #   TDEE = BMR + 0 (no strava rows in the window)          = 1880
+    # The retired form published 1880.184 * 1.55 = 2914 — a flat multiplier, ~55% higher.
+    assert n["tdee"] == 1880
 
 
 def test_with_neither_an_expenditure_nor_a_weigh_in_the_tdee_stays_absent():
@@ -1595,7 +1599,7 @@ def test_without_an_uploaded_expenditure_the_estimate_is_labelled_as_such():
     )
     ds = sustainability(src)["deficit_sustainability"]
     assert ds["deficit"]["tdee_source"] == "estimate_mifflin"
-    assert ds["deficit"]["tdee"] == 2914
+    assert ds["deficit"]["tdee"] == 1880  # ADR-152: BMR 1880 + measured exercise 0
 
 
 def test_with_neither_expenditure_nor_weight_the_default_estimate_is_named_as_a_default():

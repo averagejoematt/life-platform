@@ -4,7 +4,9 @@ Nutrition tools: micronutrients, meal timing, macros, food log.
 
 import math
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+from health import tdee as tdee_core  # ADR-152 / #2310: THE one TDEE definition
 
 from mcp.core import get_profile, pacific_today, parallel_query_sources, query_source
 
@@ -66,11 +68,63 @@ def _latest_weight_lbs(wt_items):
     return None
 
 
-def _mifflin_tdee(weight_lbs):
-    """Mifflin-St Jeor BMR x 1.55 moderate-activity multiplier, Matthew-specific
-    (height 72in = 182.88cm, age ~35 — only used when the profile lookup fails)."""
-    bmr = 10 * (weight_lbs * 0.453592) + 6.25 * 182.88 - 5 * 35 + 5
-    return round(bmr * 1.55)
+#: Last-resort calorie target when neither a weigh-in nor a profile height exists.
+#: Kept flat and labelled as such — it is the "we could not compute one" branch.
+_DEFAULT_CALORIE_TARGET = 2400
+
+
+def _energy_budget(end_date, deficit_kcal=tdee_core.DEFAULT_DEFICIT_KCAL, weight_lbs=None):
+    """The ADR-152 energy budget for `end_date`, or None when it cannot be computed.
+
+    ONE definition, shared with `mcp/tools_health._get_energy_expenditure` and the site's
+    `estimate_mifflin` fallback: Mifflin-St Jeor BMR + MEASURED trailing-7-day exercise
+    energy, deficit applied to the TARGET only (#2310). The flat x1.55 activity
+    multiplier this module used to carry is retired — it published 3055 kcal as "today's
+    calorie target" while the energy view published 1557 for the same day and the same
+    weight.
+
+    Returns None (never a guess) when weight or profile height is absent: Mifflin is
+    6.25 kcal per cm of height, so assuming one publishes a number he would eat to,
+    derived from a guess, with nothing saying so (ADR-104).
+    """
+    try:
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+    except (TypeError, ValueError):
+        return None
+    if weight_lbs is None:
+        try:
+            weight_lbs = _latest_weight_lbs(query_source("withings", (end_dt - timedelta(days=14)).strftime("%Y-%m-%d"), end_date))
+        except Exception:
+            return None
+    if weight_lbs is None:
+        return None
+
+    profile = get_profile() or {}
+    height_in = profile.get("height_inches")
+    if not height_in:
+        return None
+    age_years, age_basis, _ = tdee_core.resolve_age(profile.get("date_of_birth"), now=datetime.now(timezone.utc))
+
+    weight_kg = float(weight_lbs) * tdee_core.LB_TO_KG
+    d7_start = (end_dt - timedelta(days=tdee_core.EXERCISE_WINDOW_DAYS - 1)).strftime("%Y-%m-%d")
+    try:
+        strava_7d = query_source("strava", d7_start, end_date)
+    except Exception:
+        strava_7d = []
+    ex = tdee_core.exercise_energy(strava_7d, weight_kg)
+
+    return tdee_core.energy_budget(
+        weight_lbs=weight_lbs,
+        height_inches=height_in,
+        age_years=age_years,
+        age_basis=age_basis,
+        sex=(profile.get("biological_sex") or "male"),
+        exercise_kcal=ex["kcal"],
+        exercise_energy_days=ex["days"],
+        exercise_energy_basis=ex["basis"],
+        window_days=tdee_core.EXERCISE_WINDOW_DAYS,
+        deficit_kcal=deficit_kcal,
+    )
 
 
 # ── MacroFactor reference data ──
@@ -584,19 +638,17 @@ def _get_macro_targets(args):
     if not items:
         return {"error": "No MacroFactor data found.", "start_date": start_date, "end_date": end_date}
 
-    # Pull current weight for TDEE estimate if no calorie_target override
-    if not calorie_target:
-        try:
-            wt_items = query_source(
-                "withings", (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=14)).strftime("%Y-%m-%d"), end_date
-            )
-            weight_lbs = _latest_weight_lbs(wt_items)
-            if weight_lbs is not None:
-                calorie_target = _mifflin_tdee(weight_lbs)
-        except Exception:
-            pass
-    calorie_target = calorie_target or 2400  # Matthew-specific targets: 2400 kcal deficit, 180g protein (~0.8g/lb BW)
-    protein_target = protein_target or 180  # Matthew-specific targets: 2400 kcal deficit, 180g protein (~0.8g/lb BW)
+    # ADR-152 (#2310): the published target is `tdee - deficit`, from the ONE definition
+    # in `health.tdee`. This view used to publish a MAINTENANCE figure (BMR x 1.55, no
+    # deficit) as "calories_kcal" under `targets` and grade adherence against it, while
+    # `get_daily_metrics view=energy` told him to eat ~1500 kcal less. Adherence is now
+    # re-based on the target he is actually asked to hit — changeover 2026-08-09, cycle
+    # 13's genesis, so the denominator break lands on a cycle boundary.
+    budget = None if calorie_target else _energy_budget(end_date)
+    if budget:
+        calorie_target = budget["target"]
+    calorie_target = calorie_target or _DEFAULT_CALORIE_TARGET
+    protein_target = protein_target or 180  # Matthew-specific: 180g protein (~0.8g/lb BW)
 
     def measured(item, field):
         """The day's rollup for `field`, or None when the day carries none.
@@ -659,7 +711,22 @@ def _get_macro_targets(args):
             "calories_kcal": calorie_target,
             "protein_g": protein_target,
             "fiber_g": _FIBER_TARGET_G,
-            "note": "Calorie target estimated from TDEE (Mifflin-St Jeor × 1.55 activity factor) unless overridden.",
+            # ADR-105: the target ships with its method and its inputs, so the number is
+            # checkable without reading this source. `None` when it was overridden by the
+            # caller or fell back to the flat default — see `calorie_target_basis`.
+            "calorie_target_detail": budget,
+            "calorie_target_basis": (
+                "caller_override"
+                if args.get("calorie_target")
+                else ("mifflin_bmr_plus_measured_7d_exercise_minus_deficit" if budget else "flat_default_no_weight_or_height")
+            ),
+            "note": (
+                "Calorie target = TDEE − deficit, where TDEE is Mifflin-St Jeor BMR plus MEASURED trailing-7-day "
+                "exercise energy (ADR-152). It is the same figure get_daily_metrics(view='energy') publishes as "
+                "calorie_target_based_on_7d. Adherence below is graded against this target."
+                if budget
+                else "No weigh-in or profile height available, so no TDEE could be computed — this is a flat default, not an estimate."
+            ),
         },
         "adherence": {
             "calorie_target_hit_pct": hit_pct("calorie"),
@@ -731,9 +798,11 @@ def tool_get_deficit_sustainability(args):
     profile = get_profile()
     tdee_estimate = profile.get("tdee_estimate")
     if not tdee_estimate:
-        weight_lbs = _latest_weight_lbs(query_source("withings", start_date, end_date))
-        # Matthew-specific TDEE fallback for ~220lb moderately active male when the scale is silent
-        tdee_estimate = _mifflin_tdee(weight_lbs) if weight_lbs is not None else 2400
+        # ADR-152: TDEE means MAINTENANCE. This tracker's whole signal is `tdee - intake`,
+        # so no deficit may be folded into the TDEE itself — `budget["tdee"]`, not
+        # `budget["target"]`. One definition, shared with the macros and energy views.
+        _b = _energy_budget(end_date)
+        tdee_estimate = _b["tdee"] if _b else _DEFAULT_CALORIE_TARGET
 
     deficit_kcal = round(tdee_estimate - avg_cal)
     deficit_pct = round(deficit_kcal / tdee_estimate * 100, 1) if tdee_estimate else 0
@@ -944,7 +1013,10 @@ def _get_metabolic_adaptation(args):
     base_tdee = profile.get("tdee_estimate")
     if not base_tdee:
         first_wt = sum(weekly_wt[weeks_sorted[0]]) / len(weekly_wt[weeks_sorted[0]])
-        base_tdee = _mifflin_tdee(first_wt)
+        # ADR-152: the baseline is MAINTENANCE at the starting weight — one definition,
+        # fed the first week's weight rather than today's.
+        _b = _energy_budget(end_date, weight_lbs=first_wt)
+        base_tdee = _b["tdee"] if _b else _DEFAULT_CALORIE_TARGET
 
     weekly_data = []
     for wk in weeks_sorted:
