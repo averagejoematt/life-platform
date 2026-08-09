@@ -114,7 +114,6 @@ EXPECTED_ROUTE_MAP = {
     "/api/last_sync": "handle_last_sync",
     "/api/ledger": "handle_ledger",
     "/api/meal_glucose": "handle_meal_glucose",
-    "/api/meal_responses": "handle_meal_responses",
     "/api/methods": "handle_methods",
     "/api/mind_overview": "handle_mind_overview",
     "/api/month_rollup": "handle_month_rollup",

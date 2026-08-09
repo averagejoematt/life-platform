@@ -437,14 +437,12 @@ export async function renderNutrition(d) {
 }
 
 export async function renderGlucose(d) {
-  const [mg, mr] = await Promise.all([tryJSON("/api/meal_glucose"), tryJSON("/api/meal_responses")]);
+  const mg = await tryJSON("/api/meal_glucose");
   const cur = d && d.glucose;
-  // #2329: an EMPTY `meals: []` from the primary arm is truthy in JS, so the old
-  // `(mr && mr.meals) || (mg && mg.meals)` never actually fell back — and
-  // /api/meal_responses is a dead partition that always serves [] (#2327). Fall
-  // back on emptiness, not just absence, so meal_glucose's rows can ever render.
-  const mrRows = (mr && mr.meals) || [];
-  const rows = mrRows.length ? mrRows : ((mg && mg.meals) || []);
+  // #2327: /api/meal_responses retired — SOURCE#meal_responses was a dead partition
+  // with no writer, fetched on every glucose-door load and always serving []. The
+  // meal table binds the one endpoint that has data.
+  const rows = (mg && mg.meals) || [];
   const trend = (d && d.glucose_trend) || [];
   // #2329: the columns bind ONLY keys /api/meal_glucose actually publishes — `meal`,
   // `spike`, `grade`, `curve`. The old headers (`peak`, `Δ rise`) sat over keys no

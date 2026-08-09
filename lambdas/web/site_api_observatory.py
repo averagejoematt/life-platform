@@ -4,7 +4,7 @@ lambdas/web/site_api_observatory.py — observatory page endpoint FACADE.
 Extracted from lambdas/web/site_api_lambda.py (P1.1 Phase B step 2, 2026-05-26).
 These serve /api/{nutrition,training,physical,mind}_overview plus supporting
 endpoints (frequent meals, meal glucose, strength benchmarks, food delivery,
-strength deep-dive, journal analysis, benchmark trends, meal responses, workouts).
+strength deep-dive, journal analysis, benchmark trends, workouts).
 
 #1654 slice 3 (god-module breakup): the handler LOGIC was split, by concern, into
 cohesive sibling modules — logic lives there, the routed entrypoints stay HERE as
@@ -15,7 +15,7 @@ and the test monkeypatch surface are all unchanged:
       TDEE/deficit helpers _resolve_mf_tdee / _mifflin_tdee / _latest_weight_lbs /
       _recovery_deficit_overlay)
   web/site_api_meals.py     — protein_sources, frequent_meals, meal_glucose,
-      food_delivery_overview, meal_responses
+      food_delivery_overview
   web/site_api_training.py  — training_overview, strength_benchmarks,
       strength_deep_dive, benchmark_trends, workouts (+ muscle-volume helpers)
   web/site_api_physical.py  — weekly_physical_summary, physical_overview
@@ -100,11 +100,6 @@ def handle_meal_glucose() -> dict:
 def handle_food_delivery_overview() -> dict:
     """GET /api/food_delivery_overview — delegated to web.site_api_meals."""
     return _meals.food_delivery_overview(_g=globals())
-
-
-def handle_meal_responses() -> dict:
-    """GET /api/meal_responses — delegated to web.site_api_meals."""
-    return _meals.meal_responses(_g=globals())
 
 
 def handle_training_overview() -> dict:

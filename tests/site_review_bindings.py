@@ -71,7 +71,7 @@ EVIDENCE_SECONDARY = {
     "physical": ["/api/weight_progress", "/api/journey"],  # evidence.js:renderPhysical
     "training": ["/api/strength_benchmarks", "/api/weekly_physical_summary", "/api/workouts"],  # renderTraining
     "sleep": ["/api/circadian"],  # renderSleep (#487: /api/sleep_reconciliation retired)
-    "glucose": ["/api/meal_glucose", "/api/meal_responses"],  # renderGlucose
+    "glucose": ["/api/meal_glucose"],  # renderGlucose (#2327: /api/meal_responses retired)
     "nutrition": ["/api/frequent_meals", "/api/protein_sources"],  # renderNutrition
     "habits": ["/api/habit_registry"],  # renderHabits
 }

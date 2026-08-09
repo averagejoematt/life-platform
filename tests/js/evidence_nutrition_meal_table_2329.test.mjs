@@ -2,8 +2,8 @@
 // meal table prints a real value in every column it prints a header for.
 //
 // The live defect: the table's headers were `meal | peak | Δ rise`, but
-// /api/meal_glucose (the only arm that ever has data — /api/meal_responses is a
-// dead partition, #2327) publishes `meal, category, calories, protein, carbs,
+// /api/meal_glucose (the only arm — /api/meal_responses was retired by #2327 as a
+// dead partition) publishes `meal, category, calories, protein, carbs,
 // spike, grade, curve`. `m.peak ?? m.peak_mgdl` and `m.delta ?? m.rise` were
 // undefined on every row, so the reader got meal names next to two columns of
 // em-dashes the moment nutrition data returned (#2326).
@@ -33,14 +33,13 @@ function stubFetch(payloads) {
 
 async function renderWithFixtures() {
   stubFetch({
-    // The primary arm is empty — as it always is live (#2327: no writer exists).
-    "/api/meal_responses": { meals: [] },
+    // #2327: /api/meal_responses is retired — meal_glucose is the only arm.
     "/api/meal_glucose": { meals: [MEASURED, UNMEASURED], period_days: 30, has_cgm: true },
   });
   return renderGlucose({ glucose: { avg: 104, tir: 91 }, glucose_trend: [] });
 }
 
-test("with meal_responses empty and meal_glucose populated, no numeric cell is blank", async () => {
+test("with meal_glucose populated, no numeric cell is blank", async () => {
   const html = await renderWithFixtures();
   assert.match(html, /Meal glucose response/, "the meal section must render when the fallback arm has rows");
   // Every <td> carries visible content — never an empty cell, never JS stringified absence.
@@ -80,7 +79,6 @@ test("the unbacked headers are gone — no column claims a per-meal peak the dat
 
 test("with zero meals everywhere the section is skipped entirely, not rendered empty", async () => {
   stubFetch({
-    "/api/meal_responses": { meals: [] },
     "/api/meal_glucose": { meals: [], period_days: 6, has_cgm: true },
   });
   const html = await renderGlucose({ glucose: null, glucose_trend: [] });
