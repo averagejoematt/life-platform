@@ -85,11 +85,12 @@ def test_source_list_is_the_registry_plus_the_local_computed_partitions():
     assert all(e == 7 for _, e, _ in dr.COMPUTED_PARTITIONS), "every computed partition runs daily"
 
 
-def test_skip_set_is_empty_so_no_source_is_silently_unchecked():
-    """Census: ``_SKIP_SOURCES`` is an empty set, so the ``continue`` arm in the
-    handler is unreachable today. If a source is ever added here it stops being
-    reconciled — with no line in the report saying so."""
-    assert dr._SKIP_SOURCES == set()
+def test_the_inert_skip_set_stays_deleted_so_no_source_can_be_silently_unchecked():
+    """#2308 (ADR-103/144): ``_SKIP_SOURCES`` was an empty set consulted by a
+    ``continue`` arm — dead machinery whose only possible future was a source
+    silently dropping out of reconciliation with no line in the report saying
+    so. It was deleted; every entry in SOURCES is reconciled."""
+    assert not hasattr(dr, "_SKIP_SOURCES")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -230,25 +231,41 @@ def test_report_renders_unknown_days_as_question_marks_not_crosses():
     assert "❓" in html
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "DEFECT: the summary bar's inline style is a Python conditional that was "
-        "never evaluated. build_html_report emits "
-        "`background:#f0fdf4 if {total_gaps}==0 else #fef3c7;` inside an f-string "
-        "— only `{total_gaps}` interpolates, so the literal text "
-        "'#f0fdf4 if 0==0 else #fef3c7' ships as the CSS value, every client "
-        "discards the declaration, and the green/amber summary bar has never once "
-        "rendered its colour in any weekly report. Correct behaviour: a single "
-        "valid hex colour chosen in Python before the f-string. Reported by "
-        "#1658 coverage tranche 5; not fixed here."
-    ),
-)
-def test_defect_summary_bar_background_is_a_valid_css_colour():
-    html = dr.build_html_report(DATES, [_result("whoop", 7)], "GREEN", "#059669")
+_SUMMARY_STATES = [
+    pytest.param([_result("whoop", 7)], "GREEN — Full Coverage", "#059669", "#f0fdf4", id="no-gaps-green"),
+    pytest.param([_result("notion", 5)], "YELLOW — Monitor", "#d97706", "#fef3c7", id="gaps-amber"),
+]
+
+
+def _style_attributes(html: str) -> list[str]:
+    """Every inline style attribute value the report emits (both quote styles)."""
+    return [a or b for a, b in re.findall(r"style=(?:\"([^\"]*)\"|'([^']*)')", html)]
+
+
+@pytest.mark.parametrize(("rows", "severity", "header_color", "expected_bg"), _SUMMARY_STATES)
+def test_summary_bar_background_is_a_valid_css_colour_per_state(rows, severity, header_color, expected_bg):
+    """#2308: the bar's colour is chosen in Python before the f-string — a real
+    hex value, green when there are no gaps and amber when there are. The old
+    template shipped the literal text '#f0fdf4 if 0==0 else #fef3c7' and the
+    bar never once rendered."""
+    html = dr.build_html_report(DATES, rows, severity, header_color)
     (summary_style,) = re.findall(r'<div style="(padding:16px 24px;background:[^"]*)"', html)
     background = re.search(r"background:([^;]+);", summary_style).group(1).strip()
     assert re.fullmatch(r"#[0-9a-fA-F]{3,8}", background), f"not a CSS colour: {background!r}"
+    assert background == expected_bg
+
+
+@pytest.mark.parametrize(("rows", "severity", "header_color", "expected_bg"), _SUMMARY_STATES)
+def test_no_style_attribute_in_the_report_contains_an_unevaluated_conditional(rows, severity, header_color, expected_bg):
+    """#2308, derived over the WHOLE built HTML rather than pinned to one line:
+    no style attribute the report emits may carry Python conditional text or a
+    literal brace token — either means an expression never evaluated."""
+    html = dr.build_html_report(DATES, rows, severity, header_color)
+    styles = _style_attributes(html)
+    assert len(styles) > 10, "the report should emit many inline styles — the extractor is broken if not"
+    for style in styles:
+        assert " if " not in style and " else " not in style, f"Python conditional shipped as CSS: {style!r}"
+        assert "{" not in style and "}" not in style, f"literal brace token shipped as CSS: {style!r}"
 
 
 # ──────────────────────────────────────────────────────────────────────────────
