@@ -129,7 +129,7 @@ CORS_HEADERS = {
 PLATFORM_STATS = {
     "data_sources": 20,
     "mcp_tools": 76,
-    "lambdas": 101,
+    "lambdas": 103,
     "cdk_stacks": 8,
     "alarms": 93,
     "adrs": 148,
