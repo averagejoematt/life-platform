@@ -7,6 +7,13 @@
 # merge, so a fresh timestamp routinely accompanies stale code. The only honest
 # check is to pull the deployed bundle and read it.
 #
+# #2377: this answers "is this SYMBOL live?" — you must already know which symbol
+# to look for. For the structural question ("which COMMIT is live, and is the tree
+# I'm about to ship a descendant of it?") use
+#   bash deploy/verify_bundle_ancestry.sh <function-name> [preflight|postflight]
+# which reads the build_info.json every bundle now carries. The deploy scripts run
+# it automatically; this one stays for targeted spot-checks.
+#
 # Usage: bash deploy/verify_deployed_symbol.sh <function-name> <path-in-bundle> <symbol>
 #   e.g. bash deploy/verify_deployed_symbol.sh daily-brief emails/daily_brief_lambda.py nutrition_delivery_public
 #
