@@ -282,6 +282,107 @@ def test_the_empty_state_trend_is_an_empty_series_not_a_row_of_zeros():
     assert overview(FakeSources())["nutrition_trend"] == []
 
 
+# ── #2360: a rate over an empty set is undefined, not 0% ──────────────────────
+# The live defect: with MacroFactor quiet (#2326) the empty branch IS the live
+# branch, and it published `protein_floor_hit_pct: 0` next to `days_logged: 0`.
+# The front-end graded that 0 and told a public reader "Protein's under the floor
+# every logged day — it isn't being cleared yet" out of zero observations. This is
+# the mirror of the 2026-08-08 fix where an unlogged day rendered GREEN because
+# `0 <= target` clears trivially: same class, opposite sign.
+
+
+def test_no_logged_food_reports_an_absent_adherence_rate_not_a_zero_percent():
+    n = overview(FakeSources())["nutrition"]
+    assert n["protein_hit_pct"] is None, "0% is a GRADE; an ungraded set has no rate (ADR-104)"
+    assert n["protein_floor_hit_pct"] is None
+
+
+def test_the_empty_loss_rate_block_also_withholds_the_adherence_rates():
+    """The same two rates ship a second time inside loss_rate — the copy the
+    front-end's §1 readout binds to. Fixing only the headline would leave the
+    fabricated grade reachable one panel over."""
+    lr = overview(FakeSources())["loss_rate"]
+    assert lr["protein_hit_pct"] is None
+    assert lr["protein_floor_hit_pct"] is None
+
+
+def test_the_empty_weekday_weekend_split_withholds_its_adherence_rates_too():
+    wvw = overview(FakeSources())["weekday_vs_weekend"]
+    assert wvw["weekday"]["protein_hit_pct"] is None
+    assert wvw["weekend"]["protein_hit_pct"] is None
+
+
+def test_a_bucket_with_no_logged_days_has_no_adherence_rate_of_its_own():
+    """The split's own grader (`_group_pro_hit`) divides by the days that logged
+    protein, so an EMPTY bucket is the same undefined rate — reached on the populated
+    branch, which the shape-parity empty-state test above cannot exercise. Weekdays
+    logged, no weekend logged: the weekend panel must not read "0% of weekend days
+    cleared the target"."""
+    src = FakeSources(
+        macrofactor=[
+            mf("2026-05-06", total_protein_g=200),  # Wed
+            mf("2026-05-07", total_protein_g=200),  # Thu
+            mf("2026-05-08", total_protein_g=200),  # Fri
+        ]
+    )
+    wvw = overview(src)["weekday_vs_weekend"]
+    assert wvw["weekday"]["protein_hit_pct"] == 100, "the logged side still grades"
+    assert wvw["weekend"]["days"] == 0
+    assert wvw["weekend"]["protein_hit_pct"] is None, "an unlogged weekend is unmeasured, not a 0% failure"
+
+
+def test_days_logged_with_no_protein_cell_still_have_no_adherence_rate():
+    """`items` non-empty does NOT mean the graded set is non-empty. Days logged with
+    calories but no protein value divide by zero protein observations — the populated
+    branch's `else` fallback published 0 for exactly that case, so the bug survived
+    the moment logging resumed without protein."""
+    src = FakeSources(macrofactor=[mf("2026-05-06", total_calories_kcal=2000), mf("2026-05-07", total_calories_kcal=2100)])
+    n = overview(src)["nutrition"]
+    assert n["days_logged"] == 2, "the days themselves were logged"
+    assert n["avg_protein_g"] is None
+    assert n["protein_hit_pct"] is None, "two logged days, zero protein readings — nothing to grade"
+    assert n["protein_floor_hit_pct"] is None
+
+
+def test_a_real_adherence_rate_is_still_published_when_protein_was_logged():
+    """The guard must not swallow a genuine 0%: three days logged, all under the
+    floor, is a measured failure and must read as one."""
+    src = FakeSources(
+        macrofactor=[
+            mf("2026-05-06", total_protein_g=100),
+            mf("2026-05-07", total_protein_g=110),
+            mf("2026-05-08", total_protein_g=120),
+        ]
+    )
+    n = overview(src)["nutrition"]
+    assert n["protein_floor_hit_pct"] == 0, "a measured 0% is a real grade and must survive the None guard"
+    assert n["protein_floor_hit_days"] == 0
+
+
+# ── #2337: both branches read the configured protein lines ────────────────────
+
+
+def test_the_empty_state_serves_the_configured_protein_lines_not_the_defaults(monkeypatch):
+    """The empty branch used to hardcode 190/170 in three places while the populated
+    branch read the profile, so the two states could state different targets for the
+    same field — and with the source quiet, the hardcoded one was the live one."""
+    monkeypatch.setattr(nut, "_get_profile", lambda: {"protein_target_g": 205, "protein_floor_g": 185})
+    body = overview(FakeSources())
+    assert body["nutrition"]["protein_target_g"] == 205
+    assert body["nutrition"]["protein_floor_g"] == 185
+    assert body["loss_rate"]["protein_floor_g"] == 185, "the loss_rate copy drifted independently"
+
+
+def test_both_branches_agree_on_the_protein_lines_for_one_profile(monkeypatch):
+    """The property that matters is not the literal — it is that a reader cannot see
+    two targets depending on whether the cycle has data yet."""
+    monkeypatch.setattr(nut, "_get_profile", lambda: {"protein_target_g": 205, "protein_floor_g": 185})
+    empty = overview(FakeSources())["nutrition"]
+    populated = overview(FakeSources(macrofactor=[mf(TODAY, total_protein_g=200)]))["nutrition"]
+    for field in ("protein_target_g", "protein_floor_g"):
+        assert empty[field] == populated[field], f"the empty and populated branches disagree on {field}"
+
+
 def test_a_future_genesis_yields_the_empty_state_rather_than_an_error(monkeypatch):
     """A reset stages EXPERIMENT_START in the FUTURE; the window collapses and the
     page must render an honest pre-start empty state, never a 500."""
@@ -460,13 +561,21 @@ def test_protein_hit_percentage_is_over_days_with_protein_data_not_over_all_days
     assert n["protein_hit_days"] == 1
 
 
-def test_no_protein_data_at_all_reports_zero_hit_percent_alongside_a_null_average():
-    """The percentage is a completion count over an empty set; the AVERAGE is what
-    must stay null so no fabricated gram count is published."""
+def test_no_protein_data_at_all_reports_an_absent_hit_percent_alongside_a_null_average():
+    """#2360 CORRECTS this test. It previously asserted `protein_hit_pct == 0` and
+    justified it as "a completion count over an empty set" — but the field is a
+    PERCENTAGE, not a count, and a percentage with no denominator is undefined, not
+    zero. That reasoning is what let the live nutrition door grade a protein failure
+    ("under floor", "missed every logged day · 0/0") from zero observations.
+
+    The original intent — the AVERAGE must stay null so no gram count is fabricated —
+    is preserved, and now the rate is held to the same standard as the average it
+    sits next to. `protein_hit_days` stays 0 because that IS a count."""
     n = overview(FakeSources(macrofactor=[mf("2026-05-06", total_calories_kcal=2000)]))["nutrition"]
     assert n["avg_protein_g"] is None
-    assert n["protein_hit_pct"] == 0
-    assert n["protein_floor_hit_pct"] == 0
+    assert n["protein_hit_pct"] is None
+    assert n["protein_floor_hit_pct"] is None
+    assert n["protein_hit_days"] == 0
 
 
 def test_the_loss_rate_panel_repeats_the_same_protein_percentages_as_the_headline():

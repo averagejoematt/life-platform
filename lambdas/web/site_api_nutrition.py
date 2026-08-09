@@ -258,10 +258,43 @@ def nutrition_overview(*, _g) -> dict:
     d30 = _experiment_date(30)
     d7 = _experiment_date(7)
 
+    # One protein story on every door: target (stretch) and floor (graded) are the
+    # SAME profile values daily_metrics_compute writes into canonical_facts
+    # (protein_g_target/protein_g_floor). This page used to hardcode 190 and call it
+    # the "floor" while the coaches graded against the real 170 floor — a reader
+    # crossing doors saw two truths.
+    # #2221: coerced through `_num` like every other read — a non-numeric
+    # protein_target_g in canonical_facts used to 500 the whole nutrition door rather
+    # than fall back to the documented default. Found by the derived AST guard in
+    # tests/test_site_api_nutrition_behavior.py, not by any marker.
+    #
+    # #2337: read ABOVE the empty-branch return, so the genesis/no-data branch serves
+    # the same configured numbers the populated branch does. It used to hardcode 190
+    # and 170 in three further places below; with MacroFactor quiet (#2326) the empty
+    # branch is the LIVE branch, so those copies were the ones a reader actually saw.
+    #
+    # The `.get("<key>", <default>)` LITERAL shape is load-bearing:
+    # tests/test_protein_contract.py regex-matches key+default here against
+    # daily_metrics_compute's producer so the doors cannot tell two protein truths
+    # again. Keep the literal; add the guard around it, never instead of it.
+    _prof = _get_profile()
+    protein_target = _num(_prof.get("protein_target_g", 190))
+    if protein_target is None:
+        protein_target = _PROTEIN_TARGET_FALLBACK_G
+    protein_floor = _num(_prof.get("protein_floor_g", 170))
+    if protein_floor is None:
+        protein_floor = _PROTEIN_FLOOR_FALLBACK_G
+
     items = _query_source("macrofactor", d30, today)
     if not items:
         # Genesis week / no logging yet — return a shaped-but-empty 200 so the
         # site renders an honest empty state instead of a console 503.
+        #
+        # #2360: the adherence RATES are None here, never 0. A rate over an empty set
+        # is undefined, not zero (ADR-104) — publishing 0 made the front-end grade a
+        # protein failure out of no observations at all ("floor missed every logged
+        # day · 0/0"). The *day counts* stay 0 because those are honest counts of a
+        # thing that did not happen; it is the percentage that has no denominator.
         _empty_grp = {
             "avg_calories": None,
             "avg_protein_g": None,
@@ -270,7 +303,7 @@ def nutrition_overview(*, _g) -> dict:
             "avg_fiber_g": None,
             "days": 0,
             "count": 0,
-            "protein_hit_pct": 0,
+            "protein_hit_pct": None,
         }
         return _ok(
             {
@@ -280,11 +313,11 @@ def nutrition_overview(*, _g) -> dict:
                     "avg_carbs_g": None,
                     "avg_fat_g": None,
                     "avg_fiber_g": None,
-                    "protein_target_g": 190,
-                    "protein_hit_pct": 0,
+                    "protein_target_g": protein_target,
+                    "protein_hit_pct": None,
                     "protein_hit_days": 0,
-                    "protein_floor_g": 170,
-                    "protein_floor_hit_pct": 0,
+                    "protein_floor_g": protein_floor,
+                    "protein_floor_hit_pct": None,
                     "protein_floor_hit_days": 0,
                     "days_logged": 0,
                     "tdee": None,
@@ -330,9 +363,9 @@ def nutrition_overview(*, _g) -> dict:
                     "implied_rate_lb_wk": None,
                     "deficit_pct": None,
                     "deficit_label": None,
-                    "protein_hit_pct": 0,
-                    "protein_floor_hit_pct": 0,
-                    "protein_floor_g": 170,
+                    "protein_hit_pct": None,
+                    "protein_floor_hit_pct": None,
+                    "protein_floor_g": protein_floor,
                 },
                 "meal_rhythm": {
                     "avg_protein_per_meal": None,
@@ -378,31 +411,17 @@ def nutrition_overview(*, _g) -> dict:
     fat_vals = [_mf(i, "fat_g", "total_fat_g") for i in items if _mf(i, "fat_g", "total_fat_g") is not None]
     fiber_vals = [_mf(i, "fiber_g", "total_fiber_g") for i in items if _mf(i, "fiber_g", "total_fiber_g") is not None]
 
-    # One protein story on every door: target (stretch) and floor (graded) are the
-    # SAME profile values daily_metrics_compute writes into canonical_facts
-    # (protein_g_target/protein_g_floor). This page used to hardcode 190 and call it
-    # the "floor" while the coaches graded against the real 170 floor — a reader
-    # crossing doors saw two truths.
-    # #2221: coerced through `_num` like every other read — a non-numeric
-    # protein_target_g in canonical_facts used to 500 the whole nutrition door rather
-    # than fall back to the documented default. Found by the derived AST guard in
-    # tests/test_site_api_nutrition_behavior.py, not by any marker.
+    # protein_target / protein_floor are read from the profile ABOVE the empty-branch
+    # return (#2337) so both branches serve the same configured numbers.
     #
-    # The `.get("<key>", <default>)` LITERAL shape is load-bearing:
-    # tests/test_protein_contract.py regex-matches key+default here against
-    # daily_metrics_compute's producer so the doors cannot tell two protein truths
-    # again. Keep the literal; add the guard around it, never instead of it.
-    _prof = _get_profile()
-    protein_target = _num(_prof.get("protein_target_g", 190))
-    if protein_target is None:
-        protein_target = _PROTEIN_TARGET_FALLBACK_G
-    protein_floor = _num(_prof.get("protein_floor_g", 170))
-    if protein_floor is None:
-        protein_floor = _PROTEIN_FLOOR_FALLBACK_G
+    # #2360: `else None`, never `else 0`. `items` can be non-empty while `pro_vals` is
+    # empty — days logged with no protein cell — and that is still a rate with no
+    # denominator. The old `else 0` published "0% of days cleared the floor" for a set
+    # nobody graded, which the front-end then rendered as an active failure.
     protein_hit_days = sum(1 for v in pro_vals if v >= protein_target)
-    protein_hit_pct = round(protein_hit_days / len(pro_vals) * 100) if pro_vals else 0
+    protein_hit_pct = round(protein_hit_days / len(pro_vals) * 100) if pro_vals else None
     floor_hit_days = sum(1 for v in pro_vals if v >= protein_floor)
-    floor_hit_pct = round(floor_hit_days / len(pro_vals) * 100) if pro_vals else 0
+    floor_hit_pct = round(floor_hit_days / len(pro_vals) * 100) if pro_vals else None
 
     # Latest day
     latest = items[-1] if items else {}
@@ -479,8 +498,12 @@ def nutrition_overview(*, _g) -> dict:
         # EVERY day in the bucket and coerced a missing value to 0 via `(… or 0) >=`,
         # so an unlogged macro counted as a MISS. One field name, two definitions: a
         # reader comparing the panels saw 100% and 50%. Absence is not a miss (ADR-104).
+        # #2360: `else None` — an empty bucket (a weekend with nothing logged) has no
+        # adherence rate to report, and `_empty_grp` publishes None for exactly this
+        # key. Returning 0 made "no weekend data" render as "cleared the target on 0%
+        # of weekend days."
         vals = [v for v in (_mf(x, "protein_g", "total_protein_g") for x in group) if v is not None]
-        return round(sum(1 for v in vals if v >= protein_target) / len(vals) * 100) if vals else 0
+        return round(sum(1 for v in vals if v >= protein_target) / len(vals) * 100) if vals else None
 
     weekday_vs_weekend = {
         "weekday": {
