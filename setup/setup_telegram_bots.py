@@ -5,8 +5,9 @@ Run this yourself. The tokens go from your keyboard straight to AWS: they are ne
 printed, never written to a file, never placed in shell history, and never shown to
 an agent. Nothing needs to see a token except the Lambda that sends the message.
 
-    python3 setup/setup_telegram_bots.py            # all nine, blank to skip any
+    python3 setup/setup_telegram_bots.py            # the seven contacts, blank to skip any
     python3 setup/setup_telegram_bots.py nutrition  # just one (or a few)
+    python3 setup/setup_telegram_bots.py glucose    # an optional one, if you change your mind
     python3 setup/setup_telegram_bots.py --show     # what is configured, no secrets
 
 WHAT IT DOES PER BOT
@@ -20,10 +21,15 @@ WHAT IT DOES PER BOT
   3. Calls ``getUpdates`` to discover your numeric chat id, if you have already sent
      the bot a message. The chat id is not a secret — it is the allow-list entry that
      stops a stranger who finds the bot from interrogating your health data.
-  4. Merges into ONE secret, ``life-platform/telegram``. One secret rather than nine:
-     it matches the ``life-platform/<source>`` convention every other integration
-     uses, needs a single IAM grant and a single cached read, and costs ~$3.20/month
-     less against a ceiling where that is real money.
+  4. Merges into ONE secret, ``life-platform/telegram``. One secret rather than one
+     per bot: it matches the ``life-platform/<source>`` convention every other
+     integration uses, needs a single IAM grant and a single cached read, and costs
+     ~$2.40/month less against a ceiling where that is real money.
+
+GLUCOSE AND LABS ARE DELIBERATELY NOT CREATED. Both coaches keep running on the
+platform — daily cards, narratives, the board — but Matthew does not want them as
+texting contacts, and an uncreated bot is one fewer public webhook endpoint to
+defend. Either can be added later by naming it explicitly.
 
 RE-RUNNABLE. It merges rather than replaces, so adding the sixth bot later leaves the
 first five untouched. Re-entering a token for an existing bot updates just that one.
@@ -51,22 +57,41 @@ REGION = "us-west-2"
 SECRET_NAME = "life-platform/telegram"  # noqa: S105 — the secret's NAME, not a credential
 TELEGRAM_API = "https://api.telegram.org/bot{token}/{method}"
 
-# routing key -> (suggested @username, the coach who answers there).
+# routing key -> (suggested @username, the Telegram display name).
+#
 # The ROUTING KEY is what the webhook path carries and what the platform calls the
-# coach internally. The display name is Telegram-side and Matthew can change it any
-# time with /setname — which is the whole reason the key is a domain, not a person.
+# coach internally. The display name is Telegram-side and can be changed any time
+# with /setname — which is the whole reason the key is a domain, not a person.
+#
+# The board's display name is the ROOM, not its chair. "Grand Rounds" is the real
+# clinical institution this group is: the whole specialist team convening on one
+# case. Dr. Eli Marsh still moderates inside it (he is the lead: true persona in
+# config/personas.json) — but the contact you open is the room, which is what you
+# actually want to reach when the question spans domains.
 BOTS = [
     ("nutrition", "ajm_nutrition_bot", "Dr. Marcus Webb"),
     ("training", "ajm_training_bot", "Dr. Sarah Chen"),
     ("sleep", "ajm_sleep_bot", "Dr. Lisa Park"),
     ("mind", "ajm_mind_bot", "Dr. Nathan Reeves"),
-    ("glucose", "ajm_glucose_bot", "Dr. Amara Patel"),
-    ("labs", "ajm_labs_bot", "Dr. James Okafor"),
     ("physical", "ajm_longevity_bot", "Dr. Victor Reyes"),
     ("explorer", "ajm_research_bot", "Dr. Henning Brandt"),
-    ("board", "ajm_board_bot", "Dr. Eli Marsh (board group)"),
+    ("board", "ajm_board_bot", "Grand Rounds"),
 ]
+
+# Coaches who keep running on the platform — daily cards, narratives, the board —
+# but whom Matthew does not want as a texting contact. Deliberately NOT created:
+# an unused bot is a live public webhook endpoint, so it is attack surface bought
+# for no benefit. They stay listed so the decision is visible rather than looking
+# like an oversight, and either can be added later with an explicit argument:
+#     python3 setup/setup_telegram_bots.py glucose
+OPTIONAL_BOTS = [
+    ("glucose", "ajm_glucose_bot", "Dr. Amara Patel"),
+    ("labs", "ajm_labs_bot", "Dr. James Okafor"),
+]
+
+ALL_BOTS = BOTS + OPTIONAL_BOTS
 KEYS = [b[0] for b in BOTS]
+ALL_KEYS = [b[0] for b in ALL_BOTS]
 
 
 def _api(token: str, method: str, timeout: int = 15) -> dict:
@@ -140,13 +165,22 @@ def show(payload: dict) -> None:
         tok = "set" if e.get("bot_token") else "—"
         ids = ", ".join(str(c) for c in (e.get("chat_ids") or [])) or "—"
         print(f"  {key:11s} {tok:8s} {ids:22s} {username} ({who})")
+    for key, username, who in OPTIONAL_BOTS:
+        e = payload.get(key) or {}
+        state = "set" if e.get("bot_token") else "—"
+        ids = ", ".join(str(c) for c in (e.get("chat_ids") or [])) or "—"
+        print(f"  {key:11s} {state:8s} {ids:22s} {username} ({who})  · not created by choice")
     missing = [k for k in KEYS if not (payload.get(k) or {}).get("bot_token")]
     print(f"\n  {len(KEYS) - len(missing)}/{len(KEYS)} configured" + (f" — still to do: {', '.join(missing)}" if missing else " — all set"))
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Store Telegram coach bot tokens in Secrets Manager.")
-    ap.add_argument("keys", nargs="*", help=f"routing keys to configure (default: all). one of: {', '.join(KEYS)}")
+    ap.add_argument(
+        "keys",
+        nargs="*",
+        help=f"routing keys to configure (default: the {len(KEYS)} texting contacts). also available: {', '.join(k for k in ALL_KEYS if k not in KEYS)}",
+    )
     ap.add_argument("--show", action="store_true", help="print what is configured (never a token) and exit")
     args = ap.parse_args()
 
@@ -158,16 +192,16 @@ def main() -> int:
         return 0
 
     wanted = args.keys or KEYS
-    unknown = [k for k in wanted if k not in KEYS]
+    unknown = [k for k in wanted if k not in ALL_KEYS]
     if unknown:
-        sys.stderr.write(f"unknown key(s): {', '.join(unknown)}\nvalid: {', '.join(KEYS)}\n")
+        sys.stderr.write(f"unknown key(s): {', '.join(unknown)}\nvalid: {', '.join(ALL_KEYS)}\n")
         return 2
 
     print("Paste each bot token from @BotFather. Input is hidden. Press ENTER alone to skip a bot.")
     print("Tip: message each bot once from your phone first and the chat id is found automatically.\n")
 
     changed = 0
-    for key, username, who in BOTS:
+    for key, username, who in ALL_BOTS:
         if key not in wanted:
             continue
         existing = payload.get(key) or {}
