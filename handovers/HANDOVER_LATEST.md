@@ -6,11 +6,14 @@
 > the runbook as the sanctioned fallback, wrap deadline T+7.5h = 15:28Z. The deadline was
 > missed — see the honest-miss paragraph — but the burn itself over-delivered.*
 
-**Main:** red → recovering at the wrap commit — decode: TWO union reds surfaced by the
-full-suite dispatches (the pillar_absence×todoist contract, fixed #2463; then the stale
-stack manifest from #2406/#2436's derived facets, regenerated `5f164b5d4`); the
-deploy-of-record dispatch (take 3, run 31327743460) was in flight with a self-approving
-gate waiter when this wrap committed — **#2465 carries its green verification as box 1**.
+**Main:** GREEN (`75fdbd9e`) — the deploy of record (run 31330030258, dispatch take 4)
+went green end to end at 19:44Z: fleet deploy_all + integration checks + smoke + visual
+QA, no rollback; ancestry postflight ✅ deployed sha == shipping sha; the #2366 recall
+repair applied live; #2424/#2456 spot-checked live. Along the way: two union reds fixed
+(#2463; the stack manifest `5f164b5d4`) and THE WEDGE'S TRUE ROOT CAUSE measured — the
+session's first merge run gate-parked 11h holding the deploy slot, freed by REJECTING its
+pending deployment; full story + the scanner/watcher fix spec on **#2467**, ledger row 6
+in CONVENTIONS §4d, the lease memory posture rewritten.
 **Docs:** ADR-133 August amendment + ADR-148 2026-08-09 amendment + ADR-152 (one TDEE) in
 DECISIONS.md; SCHEMA.md chronicle sk-invariant; PROPORTIONALITY 3 rows + re-stamp (#2380);
 CONVENTIONS §1a (bundle fingerprint, via #2408); wrap.md gained the ledger gate line.
@@ -32,8 +35,11 @@ live evidence was missing).
 effectively drained; what remains is Later + the census-filed gate stories + fable-only.
 **Alarms:** cited per the registry at last check; qa-smoke-warnings expected to go quiet
 (chronic reclassification #2378) and receipt_replay expected to HEAL at the cycle-13 reset.
-**CI warnings:** triage at next green main (this wrap's dispatch); nothing outstanding from
-the last green run.
+**CI warnings:** 1 — Plan warns `LifePlatformIngestion` carries a Lambda CONFIG change
+(handler/runtime/memory/timeout/env) that CI's code-deploy cannot ship; the cure is a
+local `cd cdk && npx cdk deploy LifePlatformIngestion`, which is owner-ask-gated by
+standing rule (the CDK classifier) — added to the morning list / #2465; deliberate
+no-action this session, not silence.
 **Stash/hooks:** clean (stash empty; hooks 🟢 at postflight).
 
 ---
@@ -115,6 +121,8 @@ python3 deploy/restart_pipeline.py --genesis 2026-08-09 --keep-chronicle DATE#20
 ## Morning owner list
 
 1. **Run the cycle-13 reset** (runbook above — #2465) after the weigh-in syncs.
+1b. `cd cdk && npx cdk deploy LifePlatformIngestion` — a config-plane delta CI can't ship
+   (the green run's one Plan warning); one command, then the warning clears.
 2. Create explorer+board bots (BotFather limit expired) → `python3 setup/setup_telegram_bots.py`
    → `python3 setup/register_telegram_webhooks.py --url https://hvqippdqcrbngivi5qifoaqmd40owrxu.lambda-url.us-west-2.on.aws` — not-work — owner phone actions (epic #2363).
 3. Say "hi" to sleep/mind/physical bots + ENTER-keep re-run — not-work — owner phone actions.
