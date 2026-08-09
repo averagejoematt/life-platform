@@ -221,11 +221,11 @@ UNGATED_READER_KNOWN: dict[str, dict[str, object]] = {
     # (grounding_wiring: "lambdas/coach/coach_ensemble_digest.py::_apply_grounding_gate").
     # (#2420 RESOLVED 2026-08-09: hypothesis_engine_lambda.py left this table the designed
     # way — both prose paths are now registered SURFACES in tests/grounding_wiring.py.)
-    "lambdas/intelligence/ai_expert_analyzer_lambda.py": {
-        "issue": 2421,
-        "note": "4 of 6 model calls (:1188/:1419/:1622/:1771) reach readers with no chokepoint, including a rewrite AFTER the gate ran; "
-        "only :997/:1088 are gated — hence the PARTIAL_COVERAGE overlap with its SURFACES entry.",
-    },
+    # ai_expert_analyzer_lambda.py left this table 2026-08-09 the designed way (#2421):
+    # all six model calls — including the Mode-B rewrite that used to mutate the text
+    # AFTER the gate ran — route through one registered SURFACES chokepoint
+    # (grounding_wiring: "lambdas/intelligence/ai_expert_analyzer_lambda.py::_gate_prose"),
+    # so its DECLARED_OVERLAPS entry retired with it.
     "lambdas/emails/anomaly_detector_lambda.py": {
         "issue": 2422,
         "note": "the anomaly hypothesis enters the chronicle data packet as a grounding SOURCE — model-introduced numbers become "
@@ -280,7 +280,6 @@ UNGATED_READER_KNOWN: dict[str, dict[str, object]] = {
 # decision someone wrote down, not a side effect of two tables disagreeing.
 DECLARED_OVERLAPS: dict[str, tuple] = {
     # registered for some calls, tracked as ungated for the rest
-    "lambdas/intelligence/ai_expert_analyzer_lambda.py": ("surfaces", "known"),
     "lambdas/coach/coach_history_summarizer.py": ("surfaces", "known"),
     # registered surface is a DIFFERENT function from the seam call: review_pack_ranker's
     # `baseline_mismatch_findings` is a registered freshness AUDITOR, while the seam

@@ -279,7 +279,13 @@ SURFACES = {
         ("numbers", "dates", "freshness"),
         {"behavioral": _NOT_ABOUT_MATTHEW, "night": _NO_NIGHT_MAP},
     ),
-    "lambdas/intelligence/ai_expert_analyzer_lambda.py::generate_and_cache": _entry(
+    # #2421: the module's SINGLE chokepoint. It used to be `generate_and_cache` and only
+    # that — the Mode-B correction rewrote the text AFTER this gate ran, and the weekly
+    # priority, the experiment arc and the month rollup never entered a gate at all (the
+    # #2390 census's PARTIAL_COVERAGE overlap). All six model calls now route through
+    # `_gate_prose`, so the overlap retired and there is one surface to keep honest
+    # instead of four idioms to keep in sync.
+    "lambdas/intelligence/ai_expert_analyzer_lambda.py::_gate_prose": _entry(
         ("numbers", "freshness", "night", "behavioral"),
         {
             "dates": (
