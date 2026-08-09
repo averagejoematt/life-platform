@@ -129,6 +129,7 @@ Generated from `ci/lambda_map.json` by `deploy/sync_deploy_doc_map.py` (#2005);
 - coach-quality-gate → `lambdas/coach/coach_quality_gate.py`
 - coach-state-updater → `lambdas/coach/coach_state_updater.py`
 - inter-coach-dialogue → `lambdas/coach/inter_coach_dialogue_lambda.py` (cdk_only†)
+- telegram-coach-worker → `lambdas/coach/telegram_worker_lambda.py`
 - voice-fidelity-harness → `lambdas/coach/voice_fidelity_harness.py` (cdk_only†)
 
 **Emails** (`lambdas/emails/`):
@@ -191,6 +192,7 @@ Generated from `ci/lambda_map.json` by `deploy/sync_deploy_doc_map.py` (#2005);
 - og-image-generator → `lambdas/web/og_image_lambda.py`
 - site-stats-refresh → `lambdas/web/site_stats_refresh_lambda.py`
 - subscriber-onboarding → `lambdas/web/subscriber_onboarding_lambda.py`
+- telegram-webhook → `lambdas/web/telegram_webhook_lambda.py`
 
 **Special:**
 - life-platform-mcp → `mcp_server.py` + `mcp/` — SPECIAL BUILD (see above)

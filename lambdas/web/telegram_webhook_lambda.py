@@ -93,7 +93,7 @@ def _allowed_chat_ids(store: dict) -> list:
     return ids
 
 
-def handler(event, context):  # noqa: ARG001 — Lambda signature
+def lambda_handler(event, context):  # noqa: ARG001 — Lambda signature
     store = _store()
     try:
         order = gateway.route(
@@ -125,3 +125,7 @@ def handler(event, context):  # noqa: ARG001 — Lambda signature
         logger.error("[webhook] worker invoke failed — message dropped: %s", e)
 
     return gateway.silent_ok()
+
+
+# Alias kept for callers/tests that used the short name pre-I3 rename.
+handler = lambda_handler

@@ -1,13 +1,13 @@
 {
-  "_comment": "Lambda source file \u2192 AWS function name mapping for CI/CD. Used by .github/workflows/ci-cd.yml",
-  "_updated": "2026-07-28 (#1653): removed 4 orphan top-level sections left by the 2026-05-25 subpackage reorg (acwr_compute, chronicle_email_sender, circadian_compliance, email_subscriber). They pointed at lambdas/<name>.py paths that no longer existed and carried FLAT handler strings (e.g. 'acwr_compute_lambda.lambda_handler') that live no longer matches ('compute.acwr_compute_lambda.lambda_handler'). Nothing read them \u2014 CI validates only the .lambdas section via jq '.lambdas | keys[]' \u2014 so they were dead JSON, but a reader or a future script could have believed the stale handlers. Their notes/stack were migrated into the real .lambdas entries below.",
+  "_comment": "Lambda source file → AWS function name mapping for CI/CD. Used by .github/workflows/ci-cd.yml",
+  "_updated": "2026-07-28 (#1653): removed 4 orphan top-level sections left by the 2026-05-25 subpackage reorg (acwr_compute, chronicle_email_sender, circadian_compliance, email_subscriber). They pointed at lambdas/<name>.py paths that no longer existed and carried FLAT handler strings (e.g. 'acwr_compute_lambda.lambda_handler') that live no longer matches ('compute.acwr_compute_lambda.lambda_handler'). Nothing read them — CI validates only the .lambdas section via jq '.lambdas | keys[]' — so they were dead JSON, but a reader or a future script could have believed the stale handlers. Their notes/stack were migrated into the real .lambdas entries below.",
   "lambda_edge": {
-    "_comment": "Lambda@Edge functions \u2014 deployed in us-east-1, manually managed outside CDK. NOT auto-deployed via CI/CD pipeline. Metrics aggregated to us-east-1 per AWS requirement.",
+    "_comment": "Lambda@Edge functions — deployed in us-east-1, manually managed outside CDK. NOT auto-deployed via CI/CD pipeline. Metrics aggregated to us-east-1 per AWS requirement.",
     "functions": {
       "lambdas/cf-auth/index.mjs": {
         "cloudfront_distribution": "EM5NPX6NJN095",
         "function": "life-platform-cf-auth",
-        "note": "Manually deployed \u2014 NOT CDK-managed. Lambda@Edge requires us-east-1 and cannot be deployed from us-west-2 CDK stacks. Secret: life-platform/cf-auth (must exist in us-east-1). Alarm: life-platform-cf-auth-errors (us-east-1 CloudWatch).",
+        "note": "Manually deployed — NOT CDK-managed. Lambda@Edge requires us-east-1 and cannot be deployed from us-west-2 CDK stacks. Secret: life-platform/cf-auth (must exist in us-east-1). Alarm: life-platform-cf-auth-errors (us-east-1 CloudWatch).",
         "protects": "dash.averagejoematt.com",
         "region": "us-east-1"
       }
@@ -49,10 +49,10 @@
     "lambdas/coach/voice_fidelity_harness.py": {
       "function": "voice-fidelity-harness",
       "handler": "coach.voice_fidelity_harness.lambda_handler",
-      "note": "#545: monthly blind voice-fidelity harness \u2014 1st of month 15:00 UTC. Writes VOICEFIDELITY# judgments + scoreboard.",
+      "note": "#545: monthly blind voice-fidelity harness — 1st of month 15:00 UTC. Writes VOICEFIDELITY# judgments + scoreboard.",
       "stack": "LifePlatformCompute",
       "cdk_only": true,
-      "_cdk_only_reason": "Imports persona_registry + voice_fidelity_core (bundled/layer siblings) \u2014 single-file hot-deploy risks stripping/staling them before the layer catches up."
+      "_cdk_only_reason": "Imports persona_registry + voice_fidelity_core (bundled/layer siblings) — single-file hot-deploy risks stripping/staling them before the layer catches up."
     },
     "lambdas/compute/acwr_compute_lambda.py": {
       "function": "acwr-compute",
@@ -361,10 +361,20 @@
     },
     "lambdas/emails/coach_nudge_lambda.py": {
       "function": "coach-nudge"
+    },
+    "lambdas/coach/telegram_worker_lambda.py": {
+      "function": "telegram-coach-worker",
+      "note": "#2364 Telegram coach chat — async worker (persona+memory+facts -> Bedrock -> sendMessage). Deployed by CDK first (LifePlatformServe); tree-bundle hot deploys fine after.",
+      "stack": "LifePlatformServe"
+    },
+    "lambdas/web/telegram_webhook_lambda.py": {
+      "function": "telegram-webhook",
+      "note": "#2364 Telegram coach chat — public FunctionURL front door; near-powerless role (one secret read + one invoke).",
+      "stack": "LifePlatformServe"
     }
   },
   "mcp": {
-    "_comment": "MCP server is special \u2014 requires full mcp/ package; lives at project root not lambdas/",
+    "_comment": "MCP server is special — requires full mcp/ package; lives at project root not lambdas/",
     "function": "life-platform-mcp",
     "package_dir": "mcp/",
     "source": "mcp_server.py",
@@ -373,7 +383,7 @@
       "mcp/"
     ]
   },
-  "shared_layer_retired": "#781 (2026-07-06): the shared layer is gone \u2014 shared modules ship inside every function bundle (deploy/build_bundle.py). CI fleet-deploys on any unmapped lambdas/ change.",
+  "shared_layer_retired": "#781 (2026-07-06): the shared layer is gone — shared modules ship inside every function bundle (deploy/build_bundle.py). CI fleet-deploys on any unmapped lambdas/ change.",
   "skip_deploy": {
     "_comment": "Files that are part of the repo but not directly deployable Lambdas (Layer modules or utilities). V2 P0.8: 17 layer-resident shared modules added 2026-05-17.",
     "files": [
@@ -409,7 +419,7 @@
     ]
   },
   "_retired_sleep_reconciler": {
-    "_comment": "sleep-reconciler RETIRED 2026-07-05 (#487 / ADR-113). Dead per-field merge (read fields that never existed) + 1\u20132 nights stale, zero compute consumers. Lambda + EventBridge rule + IAM role + /api/sleep_reconciliation removed. LifePlatformCompute needs a deploy to drop the live function."
+    "_comment": "sleep-reconciler RETIRED 2026-07-05 (#487 / ADR-113). Dead per-field merge (read fields that never existed) + 1–2 nights stale, zero compute consumers. Lambda + EventBridge rule + IAM role + /api/sleep_reconciliation removed. LifePlatformCompute needs a deploy to drop the live function."
   },
   "_retired_hevy_webhook": {
     "_comment": "hevy-webhook FunctionURL RETIRED 2026-07-06 (#756 / ADR-103 retire-candidate, R21 kill list #8). Hevy publishes no webhooks so the standing public FunctionURL served nothing. Lambda + FunctionURL + error alarm + IAM policy (ingestion_hevy_webhook) removed from cdk/stacks/ingestion_stack.py + role_policies.py. lambdas/ingestion/hevy_webhook_lambda.py is kept in git (moved to skip_deploy above) for revival if Hevy ever ships webhooks. LifePlatformIngestion needs a deploy to drop the live function + FunctionURL."

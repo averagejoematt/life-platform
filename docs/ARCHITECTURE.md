@@ -408,6 +408,7 @@ The count and the table below must agree, and the count's `live-verified` stamp 
 | `life-platform/youtube` | `youtube-social-ingestion` — owner-provisioned channel id |
 | `life-platform/bluesky` | Syndication — handle + scoped app password (`docs/RUNBOOK_SYNDICATION.md`) |
 | `life-platform/digest` | `milestone-digest` — operator-configured recipient list (kept out of git) |
+| `life-platform/telegram` | Telegram coach chat (#2364) — per-bot tokens, chat-id allow-list, webhook secret |
 | ~~`life-platform/dropbox`~~ | **DELETED** — window closed 2026-05; the `ingestion-keys` bundle is authoritative |
 | ~~`life-platform/anthropic-api-key`~~ | **DELETED** — window closed 2026-05 (orphan, no consumer in source) |
 | ~~`life-platform/webhook-key`~~ | **HARD-DELETED 2026-03-14** |

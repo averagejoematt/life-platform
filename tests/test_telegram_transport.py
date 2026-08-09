@@ -52,7 +52,7 @@ def tg_event(*, text="protein?", chat_id=8675309, secret="wh-secret", path="/tel
 
 
 def test_a_valid_message_is_handed_to_the_worker_async(_wire):
-    resp = hook.handler(tg_event(), None)
+    resp = hook.lambda_handler(tg_event(), None)
     assert resp["statusCode"] == 200
     assert len(_wire.lam.invocations) == 1
     inv = _wire.lam.invocations[0]
@@ -65,31 +65,31 @@ def test_a_valid_message_is_handed_to_the_worker_async(_wire):
 
 def test_a_rejected_request_gets_the_IDENTICAL_response_and_no_worker_call(_wire):
     """A distinguishable rejection is an oracle; a non-2xx makes Telegram redeliver."""
-    ok = hook.handler(tg_event(), None)
+    ok = hook.lambda_handler(tg_event(), None)
     for bad in (
         tg_event(secret="wrong"),
         tg_event(chat_id=424242),
         tg_event(path="/telegram/unknown-bot"),
     ):
-        rej = hook.handler(bad, None)
+        rej = hook.lambda_handler(bad, None)
         assert rej == ok, "accepted and rejected must be indistinguishable to the caller"
     assert len(_wire.lam.invocations) == 1, "only the valid message reached the worker"
 
 
 def test_a_garbage_event_answers_200_rather_than_500ing_into_telegram_retries(_wire):
-    assert hook.handler({"rawPath": None, "headers": None, "body": "\x00"}, None)["statusCode"] == 200
-    assert hook.handler({}, None)["statusCode"] == 200
+    assert hook.lambda_handler({"rawPath": None, "headers": None, "body": "\x00"}, None)["statusCode"] == 200
+    assert hook.lambda_handler({}, None)["statusCode"] == 200
     assert _wire.lam.invocations == []
 
 
 def test_an_unreadable_secret_store_fails_closed(_wire, monkeypatch):
     monkeypatch.setattr(hook, "_store", dict)  # empty store — no webhook_secret
-    assert hook.handler(tg_event(), None)["statusCode"] == 200
+    assert hook.lambda_handler(tg_event(), None)["statusCode"] == 200
     assert _wire.lam.invocations == []
 
 
 def test_the_board_group_routes_with_its_negative_chat_id(_wire):
-    hook.handler(tg_event(path="/telegram/board", chat_id=-100999888), None)
+    hook.lambda_handler(tg_event(path="/telegram/board", chat_id=-100999888), None)
     assert json.loads(_wire.lam.invocations[0]["Payload"])["coach_id"] == "board"
 
 
@@ -97,7 +97,7 @@ def test_chat_ids_authorize_across_bots_so_a_new_bots_first_message_routes(_wire
     """The union decision: training has no discovered chat id yet, but the id is
     known from the nutrition bot — Matthew's first message to the new contact must
     not read as a stranger."""
-    hook.handler(tg_event(path="/telegram/training"), None)
+    hook.lambda_handler(tg_event(path="/telegram/training"), None)
     assert len(_wire.lam.invocations) == 1
 
 
@@ -107,7 +107,7 @@ def test_a_worker_invoke_failure_still_answers_200(_wire, monkeypatch):
             raise RuntimeError("throttled")
 
     monkeypatch.setattr(hook, "_lambda", Boom())
-    assert hook.handler(tg_event(), None)["statusCode"] == 200
+    assert hook.lambda_handler(tg_event(), None)["statusCode"] == 200
 
 
 def test_every_setup_roster_key_is_routable():
@@ -158,7 +158,7 @@ class TestWorker:
             "run_turn",
             lambda **kw: self.cc.TurnResult(reply_text, "sent", [], 1),
         )
-        return self.worker.handler({"coach_id": "nutrition", "chat_id": 8675309, "text": "protein?"}, None)
+        return self.worker.lambda_handler({"coach_id": "nutrition", "chat_id": 8675309, "text": "protein?"}, None)
 
     def test_a_turn_sends_typing_then_the_reply(self, monkeypatch):
         out = self._run(monkeypatch)
@@ -188,12 +188,12 @@ class TestWorker:
         monkeypatch.setattr(self.worker, "_bot_token", lambda key: None)
         called = []
         monkeypatch.setattr(self.worker.coach_chat, "run_turn", lambda **kw: called.append(1))
-        out = self.worker.handler({"coach_id": "nutrition", "chat_id": 1, "text": "hi"}, None)
+        out = self.worker.lambda_handler({"coach_id": "nutrition", "chat_id": 1, "text": "hi"}, None)
         assert out["ok"] is False and called == []
 
     def test_a_malformed_order_is_refused_without_inference(self, monkeypatch):
         called = []
         monkeypatch.setattr(self.worker.coach_chat, "run_turn", lambda **kw: called.append(1))
         for order in ({}, {"coach_id": "x"}, {"coach_id": "x", "chat_id": 1, "text": "   "}):
-            assert self.worker.handler(order, None)["ok"] is False
+            assert self.worker.lambda_handler(order, None)["ok"] is False
         assert called == []

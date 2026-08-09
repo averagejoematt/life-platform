@@ -92,6 +92,7 @@ KNOWN_SECRETS = [
     "life-platform/mastodon",  # #1676 (epic #1668): inbound-social Mastodon instance + handle (keys `instance`/`handle`). Keyless public REST pull needs no token — this secret carries only the owner-supplied instance/handle. Must be created in Secrets Manager before the source goes live (GetSecretValue-only IAM).
     "life-platform/digest",  # #1623 (2026-07-26): private milestone-digest recipient list + reply-to — real people's contact details, operator-provisioned, NEVER in git (DATA_GOVERNANCE). Digest runs disarmed (logged no-op) until Matthew creates it.
     "life-platform",  # Wildcard prefix — pipeline_health_check reads all secrets to verify they exist
+    "life-platform/telegram",  # #2364: Telegram coach chat (tokens + allow-list + webhook_secret)
 ]
 
 # Secrets that have been permanently deleted — must not appear in IAM policies.
@@ -232,7 +233,7 @@ def test_s4_known_secrets_count_matches_architecture():
     #   (CDK deploy-time env resolution since #815); first RUNTIME reader is the AI-quality
     #   canary, so it now needs registry membership.
     # Total = 22 actual secrets + 1 wildcard = 23.
-    EXPECTED_COUNT = 27  # #1676: +life-platform/bluesky +life-platform/mastodon (inbound social, epic #1668)
+    EXPECTED_COUNT = 28  # +1 2026-08-09: life-platform/telegram (#2364)  # #1676: +life-platform/bluesky +life-platform/mastodon (inbound social, epic #1668)
     actual = len(KNOWN_SECRETS)
     assert actual == EXPECTED_COUNT, (
         f"S4 FAIL: KNOWN_SECRETS has {actual} entries, expected {EXPECTED_COUNT}. "

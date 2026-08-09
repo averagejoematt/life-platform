@@ -197,7 +197,7 @@ def _current_tier() -> Optional[int]:
 # ── The handler ───────────────────────────────────────────────────────────────
 
 
-def handler(event, context):  # noqa: ARG001 — Lambda signature
+def lambda_handler(event, context):  # noqa: ARG001 — Lambda signature
     """One work order in, one Telegram reply out (or one honest refusal)."""
     order = event or {}
     coach_id = order.get("coach_id")
@@ -270,3 +270,7 @@ def handler(event, context):  # noqa: ARG001 — Lambda signature
 
 def _now_iso() -> str:  # pragma: no cover — debugging aid
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+# Alias kept for callers/tests that used the short name pre-I3 rename.
+handler = lambda_handler
