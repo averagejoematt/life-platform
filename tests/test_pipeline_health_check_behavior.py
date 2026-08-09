@@ -445,7 +445,17 @@ def test_default_mode_probes_every_pipeline_and_tallies(probe_env):
     c, t, rec = probe_env(pipelines=_TWO)
     body = json.loads(phc.lambda_handler({}, None)["body"])
     assert sorted(c.invoked) == ["strava-data-ingestion", "whoop-data-ingestion"]
-    assert body == {"passed": 2, "failed": 0, "paused": 0, "total": 2, "failures": []}
+    assert body == {
+        "passed": 2,
+        "failed": 0,
+        "paused": 0,
+        "total": 2,
+        "failures": [],
+        # #2309: the secret axis rides alongside, never inside, the pipeline tally
+        "secrets_failed": 0,
+        "secrets_total": body["secrets_total"],
+    }
+    assert body["secrets_total"] >= 8  # the audited REQUIRED_SECRETS list, not an empty stub
 
 
 def test_default_mode_skips_the_boot_probe_for_a_paused_source(probe_env):
@@ -492,24 +502,16 @@ def test_default_mode_stores_the_run_and_survives_a_failed_store(probe_env):
     assert phc.lambda_handler({}, None)["statusCode"] == 200
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "DEFECT: the health-check tally does not add up. `total` is hardcoded to "
-        "len(PIPELINES), but a deleted/missing REQUIRED_SECRET increments "
-        "fail_count and appends to `results` without being part of that total — "
-        "so a run with two dead secrets reports e.g. total=2, passed=2, failed=2, "
-        "and both the API response and the DDB item the status page reads are "
-        "internally inconsistent (passed+failed+paused > total). Correct "
-        "behaviour: total counts everything evaluated, or the secret findings are "
-        "tallied on their own axis. ADR-105. Reported by #1658 coverage tranche 5; "
-        "not fixed here."
-    ),
-)
-def test_defect_health_check_tally_must_reconcile(probe_env):
+def test_health_check_tally_reconciles_and_secrets_have_their_own_axis(probe_env):
+    """#2309 fixed: passed+failed+paused == total, and secret findings count on
+    secrets_failed/secrets_total instead of inflating a denominator that never
+    counted them. The failures list still carries the secret entries, so the
+    status page's failure set keeps seeing them."""
     c, t, rec = probe_env(pipelines=_TWO, secret_state={"life-platform/whoop": "deleted", "life-platform/hevy": "missing"})
     body = json.loads(phc.lambda_handler({}, None)["body"])
     assert body["passed"] + body["failed"] + body["paused"] == body["total"], body
+    assert body["secrets_failed"] == 2
+    assert body["secrets_total"] >= body["secrets_failed"]  # the axis carries its own denominator
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -530,10 +532,10 @@ def test_active_and_best_effort_sets_are_derived_from_the_registry():
 
 
 def test_no_per_source_gap_override_is_currently_needed():
-    """Census: SOURCE_MAX_GAP_MINUTES is empty, so every source uses the 1560-minute
-    (26h) default. A sparser-than-daily source added without an entry here would
-    alarm every day."""
-    assert phc.SOURCE_MAX_GAP_MINUTES == {}
+    """#2309: the empty override map was an inert mechanism and is DELETED
+    (ADR-103/144) — every source uses the 1560-minute (~26h) default inline.
+    Reintroducing a map is fine only WITH a first real entry."""
+    assert not hasattr(phc, "SOURCE_MAX_GAP_MINUTES")
 
 
 def test_environment_defaults_are_the_documented_ones():
