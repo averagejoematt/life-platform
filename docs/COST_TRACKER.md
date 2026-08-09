@@ -156,7 +156,7 @@ Then update the two **Verified:** stamps in this doc — CI flags the doc at 45 
 |---------|-----------|-------|
 | **Bedrock (AI)** | ~$24–44 (dev-heavy months' observed range) | Haiku (structured) + Sonnet (narrative), prompt-cached; tracked near-real-time by the governor; CE lags 24–48h. |
 | **CloudWatch** | ~$11.5–14.9 | Dominated by the alarm estate: **74 metric alarms live** (`aws cloudwatch describe-alarms`, 2026-07-19; the CDK stacks define 75 — one not yet deployed). ~$0.10/alarm ≈ $7.40, + logs/metrics/dashboard. The old claim "consolidated to ~25, no safe consolidation remains" was stale: the estate re-grew with the platform (per-Lambda error alarms are deliberate, ADR-scoped coverage). |
-| **Secrets Manager** | $10.00 | 25 active secrets × $0.40/secret/month (live count: `aws secretsmanager list-secrets`; inventory: docs/SECRETS_MAP.md). Jul MTD shows $5.48 (partial month). Mostly irreducible per-service OAuth isolation. |
+| **Secrets Manager** | $10.40 | 26 active secrets × $0.40/secret/month (live count: `aws secretsmanager list-secrets`; inventory: docs/SECRETS_MAP.md). Jul MTD shows $5.48 (partial month). Mostly irreducible per-service OAuth isolation. |
 | **Tax** | ~$4.6–7.6 | Scales with the bill. |
 | **Cost Explorer API** | ~$1.3–3.0 | The governor's own CE polling (1 DAILY query per 8h run) + ad-hoc queries. |
 | **KMS** | ~$0.6–1.0 | DynamoDB CMK. |

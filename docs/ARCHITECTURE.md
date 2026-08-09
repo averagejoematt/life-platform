@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-18
 
-Last updated: 2026-08-09 (v8.6.0 — 76 tools, 38-module MCP package, 20 data sources, 101 Lambdas, 25 secrets, 93 alarms, 9 CDK stacks deployed).
+Last updated: 2026-08-09 (v8.6.0 — 76 tools, 38-module MCP package, 20 data sources, 101 Lambdas, 26 secrets, 93 alarms, 9 CDK stacks deployed).
 
 > **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **Home + five doors** (v5 IA): the cockpit (`/cockpit/`, live data), the data (`/data/`, the evidence archive — old `/evidence/*` slugs 301), the coaching, the protocols, and the story (`/story/`, the writing hub); the pre-v4 site is preserved verbatim at `/legacy`. Shared code ships **bundled inside every function** (#781/ADR-131 — the shared layer is retired; see [CONVENTIONS.md §1](CONVENTIONS.md)). **148 ADRs** (ADR-001 → ADR-150 — full index auto-generated in [DECISIONS.md](DECISIONS.md)). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
 
@@ -74,7 +74,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | SQS queue | Dead-letter queue | `life-platform-ingestion-dlq` |
 | Lambda Function URL (remote MCP) | Remote MCP HTTPS endpoint | `<not committed — SEC-02 #780; read live: aws lambda get-function-url-config --function-name life-platform-mcp --region us-west-2>` (OAuth 2.1 auto-approve + HMAC Bearer) |
 | API Gateway | HTTP endpoint | `health-auto-export-api` (a76xwxt2wa) — webhook ingest |
-| Secrets Manager | Credential store | **25 active secrets** at $0.40/month each = **~$10.00/month**
+| Secrets Manager | Credential store | **26 active secrets** at $0.40/month each = **~$10.40/month**
 | SNS topic | Alert routing | `life-platform-alerts` (urgent) + `life-platform-alerts-digest` (batched daily by `alert-digest-lambda` per ADR-050) |
 | CloudFront (amj) | CDN (public) | `E3S424OXQZ8NBE` → site-api Lambda + S3 `/site`, alias `averagejoematt.com` |
 | CloudFront (dash) | CDN + auth | `EM5NPX6NJN095` (`d14jnhrgfrte42.cloudfront.net`) → S3 `/dashboard`, Lambda@Edge auth, alias `dash.averagejoematt.com` |
@@ -377,7 +377,7 @@ Active role categories (approx counts):
 
 ## Secrets Manager
 
-**25 active secrets** at $0.40/month each = **~$10.00/month**
+**26 active secrets** at $0.40/month each = **~$10.40/month**
 
 The count and the table below must agree, and the count's `live-verified` stamp must be under 90 days old — both enforced by `scripts/check_doc_facts.py` (#1957). Re-verify against AWS with `python3 deploy/sync_doc_metadata.py --refresh-secrets` (read-only), then `--apply` to propagate. Per-secret consumers, rotation procedures and the retire ledger live in [SECRETS_MAP.md](SECRETS_MAP.md).
 
@@ -423,7 +423,7 @@ Target: within the **$85/mo all-in budget ceiling** (ADR-063; surge-to-$100 per 
 
 | Driver | Monthly Cost |
 |---|---|
-| Secrets Manager (25 active secrets) | ~$10.00 |
+| Secrets Manager (26 active secrets) | ~$10.40 |
 | Lambda invocations (~2,000/mo) | ~$0.50 |
 | DynamoDB (on-demand) | ~$1.00 |
 | S3 (~2.5 GB + requests) | ~$0.50 |
