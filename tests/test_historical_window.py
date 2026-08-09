@@ -74,9 +74,9 @@ def test_observatory_week_future_clamps_to_today(monkeypatch):
     # prev window's genesis lower-bound (max(anchor-8d, EXPERIMENT_START))
     # legitimately exceeds today when genesis is tomorrow, so "max end == today"
     # only holds once the experiment is running.
-    import datetime as _dt
+    from common.pacific_time import pacific_today
 
-    today = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%d")
+    today = pacific_today()  # #2392: the endpoint anchors "today" in Pacific, like the cockpit
     monkeypatch.setattr(data, "EXPERIMENT_START", "2026-06-08")
     seen = {"ends": []}
 
@@ -91,6 +91,34 @@ def test_observatory_week_future_clamps_to_today(monkeypatch):
     # the primary window end (the max across the current+prev queries) is clamped to today
     assert max(seen["ends"]) == today
     assert body["as_of_date"] == today
+
+
+def test_observatory_week_evening_pt_boundary_stamps_pacific_day(monkeypatch):
+    """#2392: every evening 17:00–24:00 PT (00:00–07:00 UTC) a UTC-anchored "today"
+    is TOMORROW in Pacific — the observatory stamped a different day than the
+    cockpit. Frozen clock at 02:00 UTC == 19:00 PT the *previous* day: the stamp
+    must be the PT date, never the UTC date. (Clock is frozen — no now-math.)"""
+    from datetime import datetime as _real_dt, timezone as _tz
+
+    from web import site_api_rollups as rollups
+
+    _PINNED = _real_dt(2026, 8, 9, 2, 0, 0, tzinfo=_tz.utc)  # == 2026-08-08 19:00 PT
+
+    class _Frozen(_real_dt):
+        # Subclass, not a Mock — strptime/timedelta arithmetic on the same name keep working.
+        @classmethod
+        def now(cls, tz=None):
+            return _PINNED.astimezone(tz) if tz is not None else _PINNED.replace(tzinfo=None)
+
+    monkeypatch.setattr(rollups, "datetime", _Frozen)
+    monkeypatch.setattr(data, "EXPERIMENT_START", "2026-08-03")
+    monkeypatch.setattr(data, "pre_start_meta", lambda: None)  # genesis is in the past here
+    monkeypatch.setattr(data, "_query_source", lambda *a, **k: [])
+    resp = data.handle_observatory_week({"domain": "sleep"})
+    assert resp["statusCode"] == 200
+    body = json.loads(resp["body"])
+    assert body["as_of_date"] == "2026-08-08"  # the PT day — NOT the UTC day 2026-08-09
+    assert body["period"]["end"] == "2026-08-08"
 
 
 def test_observatory_week_pre_start_future_genesis_is_honest_200(monkeypatch):
