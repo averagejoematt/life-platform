@@ -3132,9 +3132,10 @@ def test_a_corrected_challenge_catalog_starts_serving_without_a_container_recycl
 
 def test_the_current_challenge_banner_is_absent_rather_than_a_fake_day_zero(monkeypatch):
     """ADR-104: the old "Check back soon" placeholder leaked to the UI as a real
-    day-0-of-7 challenge. Absence is `None`, and it is cached briefly so a real
-    challenge appears fast."""
+    day-0-of-7 challenge. Absence is `None`, and it is edge-cached at the #2289
+    class floor (300s — this door is unmetered by design, so even the empty state
+    must be absorbable by CloudFront; a new Monday challenge appears within 5 min)."""
     wire(monkeypatch, s3=FakeS3())
     resp = social.handle_current_challenge()
     assert ok_body(resp)["current_challenge"] is None
-    assert resp["headers"]["Cache-Control"] == "public, max-age=60, s-maxage=60"
+    assert resp["headers"]["Cache-Control"] == "public, max-age=300, s-maxage=300"
