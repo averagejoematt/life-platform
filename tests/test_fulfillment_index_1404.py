@@ -180,7 +180,15 @@ class TestEndpoint:
 
     def test_endpoint_serves_index_with_honest_states(self, monkeypatch):
         from fakes import FakeDdbTable
-        from web import site_api_data as api
+        from web import site_api_common as common, site_api_data as api
+
+        # Pin a well-past genesis: the trend window is genesis-clamped ("clamped,
+        # not hidden"), so a young or future genesis honestly collapses trend_7d
+        # to a single day and the pre-adoption assertion below has no day to bite
+        # on (hit live at the cycle-13 re-anchor). Two seams: the facade global
+        # the endpoint reads via _g, and _experiment_date's own module global.
+        monkeypatch.setattr(api, "EXPERIMENT_START", "2026-07-01", raising=False)
+        monkeypatch.setattr(common, "EXPERIMENT_START", "2026-07-01", raising=False)
 
         u = "USER#matthew#SOURCE#"
         today = __import__("datetime").datetime.now(api.PT).strftime("%Y-%m-%d")

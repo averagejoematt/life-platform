@@ -48,6 +48,7 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas", "compute"))
 
 import character_sheet_lambda as csl  # noqa: E402
 import pytest  # noqa: E402
+from common import constants  # noqa: E402
 from content import site_writer  # noqa: E402
 from experiment import effect_fitter  # noqa: E402
 from health import (  # noqa: E402
@@ -58,7 +59,11 @@ from health import (  # noqa: E402
 )
 
 PREFIX = "USER#matthew#SOURCE#"
-DATE = "2026-08-05"  # post-genesis (EXPERIMENT_START_DATE 2026-08-03), a Wednesday
+# A Wednesday. The whole fixture web below hardcodes dates around it; tests whose
+# assertions depend on where genesis falls relative to DATE pin the genesis via
+# monkeypatch (see the `wired` fixture) — the live constant moves every re-anchor
+# and made this date pre-genesis at the cycle-13 reset (genesis 2026-08-10).
+DATE = "2026-08-05"
 _NOW = datetime(2026, 8, 6, 17, 35, tzinfo=timezone.utc)  # the 17:35 UTC cron slot, the day after
 
 
@@ -911,6 +916,13 @@ class TestHandlerFullCompute:
         captured = {}
 
         monkeypatch.setattr(sick_day_checker, "check_sick_day", lambda t, u, d: None)
+        # Pin the genesis this fixture web was authored against — the live constant
+        # moves every re-anchor (cycle 13 made DATE pre-genesis → phase flipped to
+        # "pilot"). Two seams: character_engine's import-time copy, and
+        # compute_metadata._infer_phase_from_record's call-time `from common.constants
+        # import …`, which reads the constants module attribute fresh each call.
+        monkeypatch.setattr(character_engine, "EXPERIMENT_START_DATE", "2026-08-03")
+        monkeypatch.setattr(constants, "EXPERIMENT_START_DATE", "2026-08-03")
         monkeypatch.setattr(character_engine, "load_character_config", lambda s3, bucket: config)
         monkeypatch.setattr(personal_baselines, "effective_character_config", lambda cfg, tbl, prefix: cfg)
         monkeypatch.setattr(effect_fitter, "load_latest_fit", lambda tbl, user: None)

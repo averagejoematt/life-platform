@@ -204,20 +204,27 @@ def dashboard_s3(fake_s3):
 
 @pytest.fixture()
 def no_grace(monkeypatch):
-    """Force the post-genesis (strict) frame: genesis well in the past."""
+    """Force the post-genesis (strict) frame: genesis well in the past.
+
+    Two seams (the import-time-frozen-globals trap, hit live at the cycle-13
+    re-anchor): the grace derivation does a call-time `from common.constants
+    import …` (the constants patch), but the pre-genesis day-grade arm reads
+    qco's own module global, frozen at import."""
     from common import constants, pacific_time
 
     monkeypatch.setattr(constants, "EXPERIMENT_START_DATE", "2026-01-01", raising=False)
+    monkeypatch.setattr(qco, "EXPERIMENT_START_DATE", "2026-01-01", raising=False)
     monkeypatch.setattr(pacific_time, "pacific_today", lambda: "2026-08-08")
     return None
 
 
 @pytest.fixture()
 def in_grace(monkeypatch):
-    """Force the pre-start / Day-1 frame."""
+    """Force the pre-start / Day-1 frame. (Both seams — see no_grace.)"""
     from common import constants, pacific_time
 
     monkeypatch.setattr(constants, "EXPERIMENT_START_DATE", "2026-08-08", raising=False)
+    monkeypatch.setattr(qco, "EXPERIMENT_START_DATE", "2026-08-08", raising=False)
     monkeypatch.setattr(pacific_time, "pacific_today", lambda: "2026-08-08")
     return None
 
