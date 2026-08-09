@@ -3209,3 +3209,67 @@ def subscriber_onboarding() -> list[iam.PolicyStatement]:
             resources=_s3("generated/journal/posts.json"),
         ),
     ]
+
+
+def telegram_webhook(worker_arn: str) -> list[iam.PolicyStatement]:
+    """Telegram webhook (#2364): the public front door, deliberately near-powerless.
+
+    It can read ONE secret (the telegram store — for the echoed secret-token check
+    and the chat-id allow-list) and async-invoke ONE function (the worker). No DDB,
+    no S3, no Bedrock: a compromised webhook must be able to do nothing but hand
+    validated work orders to the worker it already hands work orders to.
+    """
+    return [
+        iam.PolicyStatement(
+            sid="TelegramSecretRead",
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn("life-platform/telegram")],
+        ),
+        iam.PolicyStatement(
+            sid="InvokeWorker",
+            actions=["lambda:InvokeFunction"],
+            resources=[worker_arn],
+        ),
+    ]
+
+
+def telegram_worker() -> list[iam.PolicyStatement]:
+    """Telegram coach worker (#2364): the chat brain's runtime grants.
+
+    DDB is read-wide (persona/memory/facts assembly spans COACH#, computed_metrics
+    and engagement partitions) but WRITE-SCOPED to the COACH#* partition family via
+    LeadingKeys — the chat stores CHAT# turn records and must never be able to touch
+    a DATE# timeseries row. Bedrock through the ADR-062 chokepoint; the telegram
+    store for bot tokens; SSM for the budget tier + cycle stamp (read-only).
+    """
+    return [
+        iam.PolicyStatement(
+            sid="DynamoDBRead",
+            actions=["dynamodb:GetItem", "dynamodb:Query"],
+            resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="DynamoDBCoachChatWrite",
+            actions=["dynamodb:PutItem"],
+            resources=[TABLE_ARN],
+            conditions={
+                "ForAllValues:StringLike": {
+                    "dynamodb:LeadingKeys": ["COACH#*"],
+                },
+            },
+        ),
+        _bedrock_statement(),
+        iam.PolicyStatement(
+            sid="TelegramSecretRead",
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn("life-platform/telegram")],
+        ),
+        iam.PolicyStatement(
+            sid="SSMRead",
+            actions=["ssm:GetParameter"],
+            resources=[
+                f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/budget-tier",
+                f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle",
+            ],
+        ),
+    ]
