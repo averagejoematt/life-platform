@@ -239,3 +239,110 @@ def test_two_records_claiming_one_date_are_not_reported_twice():
     a = {"pk": "p", "sk": f"DATE#{W1}", "date": W3, "status": "published", "phase": "experiment"}
     b = {"pk": "p", "sk": f"DATE#{W2}", "date": W3, "status": "published", "phase": "experiment"}
     assert rf.published_installment_dates([a, b]) == [W1, W2]
+
+
+# ── LINK PARITY (#2366) — the sensor owns link CORRECTNESS, not just existence ──
+LIVE_LINK = "/journal/posts/week-01/"
+DEAD_LINK = "/chronicle/week-0/"  # #1827's retired scheme — the form on all 17 live rows
+
+
+def test_a_stored_dead_link_reds_the_qa_and_names_the_repair():
+    """The mutation proof, half one: a row that EXISTS but carries a rotted link must
+    flag. Existence-only was green on exactly this state for the whole life of #1827."""
+    state, msg = rf.assess([W1], [W1], expected_links={W1: LIVE_LINK}, stored_links={W1: DEAD_LINK})
+    assert state == rf.FAIL
+    assert W1 in msg
+    assert "backfill_recall_embeddings.py --apply" in msg  # the report carries its own repair
+
+
+def test_the_same_row_with_the_resolving_link_is_green():
+    """Half two: the identical fixture with the derived link must NOT flag — a parity
+    check that reds on correct rows would teach its reader to ignore it."""
+    state, msg = rf.assess([W1], [W1], expected_links={W1: LIVE_LINK}, stored_links={W1: LIVE_LINK})
+    assert state == rf.OK
+    assert "links matching" in msg
+
+
+def test_a_wiped_installments_stored_link_must_be_absent_not_stale():
+    """Honest absence is a value too: a phase-wiped installment derives NO link, so a
+    stored leftover URL is rot, not a bonus."""
+    state, _ = rf.assess([W1], [W1], expected_links={W1: ""}, stored_links={W1: DEAD_LINK})
+    assert state == rf.FAIL
+
+
+def test_a_missing_row_is_reported_once_as_missing_not_twice():
+    """`missing_dates` owns absence; `link_mismatches` must not turn one gap into two."""
+    assert rf.link_mismatches({W1: LIVE_LINK}, {}) == []
+    state, msg = rf.assess([W1], [], expected_links={W1: LIVE_LINK}, stored_links={})
+    assert state == rf.FAIL
+    assert "MISSING" in msg
+    assert "diverge" not in msg
+
+
+def test_a_budget_pause_does_not_excuse_a_rotted_link():
+    """Band 2 excuses a corpus that stopped ADVANCING — the embed spend. A wrong stored
+    link is not a budget consequence and both repair paths are free, so parity stays a
+    FAIL at any tier."""
+    state, _ = rf.assess([W1], [W1], expected_links={W1: LIVE_LINK}, stored_links={W1: DEAD_LINK}, indexing_paused=True)
+    assert state == rf.FAIL
+
+
+def test_gaps_and_mismatches_are_both_named_in_one_report():
+    state, msg = rf.assess([W1, W2], [W1], expected_links={W1: LIVE_LINK, W2: LIVE_LINK}, stored_links={W1: DEAD_LINK})
+    assert state == rf.FAIL
+    assert W2 in msg and "MISSING" in msg
+    assert W1 in msg and "diverge" in msg
+
+
+def test_assess_without_link_inputs_still_assesses_existence():
+    """The pure core stays callable the old way — parity is additive, not a rewrite."""
+    assert rf.assess([W1], [W1])[0] == rf.OK
+    assert rf.assess([W1, W2], [W1])[0] == rf.FAIL
+
+
+def test_expectation_scope_matches_the_existence_scope():
+    """Drafts and phase-invisible installments are exempt from BOTH sides — demanding a
+    link for a row the writer refuses to create would red the check on correct
+    behaviour."""
+    insts = [_inst(W1), _inst(W2, status="draft"), _inst("2026-03-04", phase="pilot")]
+    assert sorted(rf.published_link_expectations(insts)) == rf.published_installment_dates(insts)
+
+
+def test_expected_links_are_the_writers_own_derivation():
+    """Parity by construction: the sensor's expected value is the exact expression
+    `recall_indexer.chronicle_doc` stores, keyed the same way — the two cannot drift
+    apart without this test failing."""
+    from ai.recall_indexer import published_post_links
+
+    insts = [_inst(W1), _inst(W2)]
+    links = published_post_links(insts)
+    assert rf.published_link_expectations(insts) == {
+        W1: links[(W1, f"DATE#{W1}")],
+        W2: links[(W2, f"DATE#{W2}")],
+    }
+
+
+def test_end_to_end_a_dead_link_row_flags_and_a_resolving_row_does_not():
+    """The assembled mutation pair through `checks()` itself, with the good link DERIVED
+    from the current scheme rather than hardcoded — so this test keeps proving parity
+    even if the scheme changes again."""
+    from ai import semantic_recall as sr
+    from ai.recall_indexer import published_post_links
+    from operational.qa_check import CONTENT_TRUTH, Check
+
+    def run(stored_link):
+        class _T:
+            def query(self, **kwargs):
+                if sr.RECALL_PK in condition_values(kwargs.get("KeyConditionExpression")):
+                    return {"Items": [{"kind": sr.KIND_CHRONICLE, "doc_date": W1, "link": stored_link}]}
+                return {"Items": [_inst(W1)]}
+
+        (c,) = rf.checks(_T(), "USER#matthew#SOURCE#chronicle", Check, CONTENT_TRUTH)
+        return c
+
+    dead = run(DEAD_LINK)
+    assert dead.passed is False
+    assert W1 in dead.message
+
+    good = run(published_post_links([_inst(W1)])[(W1, f"DATE#{W1}")])
+    assert good.passed is True
