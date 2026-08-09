@@ -204,6 +204,16 @@ SURFACES = {
             "night": _NO_NIGHT_MAP,
         },
     ),
+    # #2428: the module's SECOND surface — the COMPRESSED#latest compression writer,
+    # previously the census's tracked defect (UNGATED_READER_KNOWN): the compressed
+    # state replays into board-answer prompts (site_api_ai_lambda._coach_memory_bits),
+    # an internal input laundered into a reader surface. Same arms as the stance
+    # surface below; regenerate-once-then-HOLD (the prior COMPRESSED#latest is kept —
+    # write skipped — or the deterministic structural fallback stands in).
+    "lambdas/coach/coach_history_summarizer.py::_apply_compression_gate": _entry(
+        ("numbers", "dates", "freshness", "behavioral"),
+        {"night": _NO_NIGHT_MAP},
+    ),
     "lambdas/coach/coach_history_summarizer.py::_apply_grounding_gate": _entry(
         ("numbers", "dates", "freshness", "behavioral"),
         {"night": _NO_NIGHT_MAP},

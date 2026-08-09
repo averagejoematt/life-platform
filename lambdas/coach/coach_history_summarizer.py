@@ -166,6 +166,10 @@ from common.numeric import (
 # Canonical emitter lives in the layer — local copy removed 2026-06-12.
 from common.retry_utils import _emit_token_metrics  # noqa: E402,F401
 
+# #2428: deterministic builders split out to pay the module-size ratchet when the
+# compression path joined the ADR-104 gate — same behavior, one home.
+from coach.coach_summarizer_support import build_fallback_compressed_state, summarize_track_record  # noqa: E402
+
 # #534: the STANCE# writer joins ADR-104's grounded-generation gate (the named
 # fast-follow from ADR-104's honest residual — "the STANCE# writer gate is a
 # named fast-follow"). Fails open (gate becomes a no-op) if the shared module
@@ -856,74 +860,8 @@ def _build_compression_message(coach_id, state):
 
 
 def _build_fallback_compressed_state(coach_id, state):
-    """Build a minimal compressed state when the LLM call fails.
-
-    Better than nothing — preserves structural data without AI narrative.
-    """
-    meta = _coach_meta(coach_id)
-    now_iso = datetime.now(timezone.utc).isoformat()
-
-    # Derive last output date from outputs
-    outputs = state.get("outputs", [])
-    last_output_date = None
-    if outputs:
-        for output in outputs:
-            sk = output.get("sk", "")
-            if sk.startswith("OUTPUT#"):
-                date_part = sk.replace("OUTPUT#", "").split("#")[0]
-                if date_part:
-                    last_output_date = date_part
-                    break
-
-    # Build confidence state from records
-    confidence_state = {}
-    for conf in state.get("confidence_records", []):
-        subdomain = conf.get("subdomain", conf.get("sk", "").replace("CONFIDENCE#", ""))
-        mean = conf.get("mean_confidence", 0.5)
-        confidence_state[subdomain] = round(mean, 3)
-
-    # Extract recent themes from last 5 outputs
-    recent_themes = []
-    for output in outputs[:5]:
-        for theme in output.get("themes", []):
-            if theme not in recent_themes:
-                recent_themes.append(theme)
-                if len(recent_themes) >= 10:
-                    break
-        if len(recent_themes) >= 10:
-            break
-
-    return {
-        "coach_id": coach_id,
-        "display_name": meta["display_name"],
-        "domain": meta["domain"],
-        "summary": f"[FALLBACK — LLM compression failed] Coach {meta['display_name']} "
-        f"has {len(outputs)} outputs, "
-        f"{len(state.get('open_threads', []))} open threads, "
-        f"{len(state.get('active_predictions', []))} active predictions. "
-        f"Manual review recommended.",
-        "key_concerns": [],
-        "key_recommendations": [],
-        "active_threads": [
-            {"id": t.get("sk", "").replace("THREAD#", ""), "summary": t.get("summary", "")} for t in state.get("open_threads", [])[:5]
-        ],
-        "active_predictions": [
-            {
-                "id": p.get("prediction_id", p.get("sk", "").replace("PREDICTION#", "")),
-                "claim": p.get("claim_natural", ""),
-                "status": p.get("status", "pending"),
-            }
-            for p in state.get("active_predictions", [])[:5]
-        ],
-        "confidence_state": confidence_state,
-        "recent_themes": recent_themes[:10],
-        "positions_taken": [],
-        "corrections_made": [],
-        "relationship_notes": "",
-        "last_output_date": last_output_date,
-        "compressed_at": now_iso,
-        "_fallback": True,
-    }
+    """Thin binder — the structural fallback lives in coach_summarizer_support (#2428)."""
+    return build_fallback_compressed_state(coach_id, _coach_meta(coach_id), state)
 
 
 def _build_bounded_compression_message(coach_id, state):
@@ -961,11 +899,136 @@ def _build_bounded_compression_message(coach_id, state):
     return message
 
 
-def _compress_coach(coach_id, state):
+# #2428: prose-bearing fields the compression gate checks — the #534
+# _STANCE_PROSE_FIELDS decision applied to the compression: bookkeeping
+# (ids, timestamps, the derived confidence_state numbers) is excluded so a
+# compressed_at timestamp can never read as a fabricated number.
+_COMPRESSED_PROSE_FIELDS = (
+    "summary",
+    "key_concerns",
+    "key_recommendations",
+    "active_threads",
+    "active_predictions",
+    "recent_themes",
+    "positions_taken",
+    "corrections_made",
+    "relationship_notes",
+)
+
+
+def _compressed_prose_blob(compressed):
+    """JSON blob of only the compression's prose-bearing fields, for the ADR-104 gate."""
+    return json.dumps({k: compressed.get(k) for k in _COMPRESSED_PROSE_FIELDS}, default=str)
+
+
+def _finalize_compressed(result, coach_id, meta, state, now_iso):
+    """Defaults + deterministic derivations on a raw LLM compression.
+
+    Shared by the first-pass call and the #2428 gate's corrective regen, so a
+    retry is finalized identically to the draft it replaces.
+    """
+    result.setdefault("coach_id", coach_id)
+    result.setdefault("display_name", meta["display_name"])
+    result.setdefault("domain", meta["domain"])
+    result.setdefault("summary", "")
+    result.setdefault("key_concerns", [])
+    result.setdefault("key_recommendations", [])
+    result.setdefault("active_threads", [])
+    result.setdefault("active_predictions", [])
+    result.setdefault("confidence_state", {})
+    result.setdefault("recent_themes", [])
+    result.setdefault("positions_taken", [])
+    result.setdefault("corrections_made", [])
+    result.setdefault("relationship_notes", "")
+    result.setdefault("last_output_date", None)
+    result["compressed_at"] = now_iso
+
+    # If LLM didn't populate confidence_state, derive from records
+    if not result["confidence_state"]:
+        for conf in state.get("confidence_records", []):
+            subdomain = conf.get("subdomain", conf.get("sk", "").replace("CONFIDENCE#", ""))
+            mean = conf.get("mean_confidence", 0.5)
+            result["confidence_state"][subdomain] = round(mean, 3)
+
+    # If LLM didn't populate last_output_date, derive from outputs
+    if not result["last_output_date"]:
+        outputs = state.get("outputs", [])
+        if outputs:
+            sk = outputs[0].get("sk", "")
+            if sk.startswith("OUTPUT#"):
+                result["last_output_date"] = sk.replace("OUTPUT#", "").split("#")[0]
+    return result
+
+
+def _apply_compression_gate(coach_id, meta, state, user_message, result, presence_signal=None):
+    """#2428: the ADR-104 grounded-generation gate joins the COMPRESSED#latest writer.
+
+    The compression was this module's ungated half — the stance path is gated by
+    _apply_grounding_gate below — while its output replays into board-answer
+    prompt assembly (site_api_ai_lambda._coach_memory_bits): an internal input
+    laundered into a reader surface. Same idiom as the stance gate, deliberately:
+    the allow-list comes from the compression's OWN inputs (`user_message` —
+    exactly what the model saw), the cycle anchors arm the phase-aware classes
+    (#1691/#1897), the #2195 presence-derived availability map arms the #1699
+    behavioral class, and there is ONE corrective regen via the shared regen_once
+    harness. Findings that survive the regen are returned to the caller, which
+    HOLDS: the previous COMPRESSED#latest is kept (write skipped), or the
+    deterministic structural fallback stands in when there is no prior — a
+    compression that still cites an untraceable number is never written.
+    Fail-open when the shared module is unavailable, matching the stance gate.
+    """
+    if grounding_findings is None or regen_once is None or allowed_numbers is None:
+        return result, []  # shared module unavailable — fail-open, matches its own design
+
+    allowed = allowed_numbers(user_message)
+    _dates = allowed_dates(user_message) if allowed_dates is not None else None
+    # The compression's generation date is its own compressed_at — same weekly-run
+    # ordering fact as the stance (`_presence_signal`), so the map is real here too.
+    _logs = (
+        available_logs_from_presence(presence_signal, str(result.get("compressed_at", ""))[:10])
+        if (presence_signal and available_logs_from_presence is not None)
+        else None
+    )
+    holder = {"latest": result}
+
+    def _findings_fn(text):
+        return grounding_findings(
+            text,
+            facts=None,
+            allowed=allowed,
+            allowed_dates=_dates,
+            available_logs=_logs,
+            **cycle_gate_params(),
+        )
+
+    def _regen_fn(correction):
+        retry = _call_haiku(
+            system=COMPRESSION_SYSTEM_PROMPT,
+            user_message=user_message + "\n\n" + correction,
+            max_tokens=4000,
+            temperature=0.2,
+        )
+        if not isinstance(retry, dict):
+            return ""
+        holder["latest"] = _finalize_compressed(retry, coach_id, meta, state, result.get("compressed_at"))
+        return _compressed_prose_blob(holder["latest"])
+
+    _best_text, findings, corrected = regen_once(_compressed_prose_blob(result), _findings_fn, _regen_fn)
+    best = holder["latest"] if corrected else result
+    return best, findings
+
+
+def _compress_coach(coach_id, state, presence_signal=None):
     """Compress a single coach's history via Haiku LLM call.
 
     Returns the compressed state dict ready for DynamoDB write.
     Falls back to structural-only compression if the LLM call fails.
+
+    #2428: the result passes the module's own ADR-104 gate before it can be
+    written; on surviving findings the caller receives the PRIOR compressed
+    state marked `_held` (write skipped) or, with no prior, the deterministic
+    structural fallback. `presence_signal` arms the #1699 behavioral class,
+    exactly as on the stance path (omitted => unarmed, unchanged).
     """
     meta = _coach_meta(coach_id)
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -996,37 +1059,7 @@ def _compress_coach(coach_id, state):
             logger.warning("LLM returned non-dict for %s compression — using fallback", coach_id)
             return _build_fallback_compressed_state(coach_id, state)
 
-        # Ensure required fields are present with defaults
-        result.setdefault("coach_id", coach_id)
-        result.setdefault("display_name", meta["display_name"])
-        result.setdefault("domain", meta["domain"])
-        result.setdefault("summary", "")
-        result.setdefault("key_concerns", [])
-        result.setdefault("key_recommendations", [])
-        result.setdefault("active_threads", [])
-        result.setdefault("active_predictions", [])
-        result.setdefault("confidence_state", {})
-        result.setdefault("recent_themes", [])
-        result.setdefault("positions_taken", [])
-        result.setdefault("corrections_made", [])
-        result.setdefault("relationship_notes", "")
-        result.setdefault("last_output_date", None)
-        result["compressed_at"] = now_iso
-
-        # If LLM didn't populate confidence_state, derive from records
-        if not result["confidence_state"]:
-            for conf in state.get("confidence_records", []):
-                subdomain = conf.get("subdomain", conf.get("sk", "").replace("CONFIDENCE#", ""))
-                mean = conf.get("mean_confidence", 0.5)
-                result["confidence_state"][subdomain] = round(mean, 3)
-
-        # If LLM didn't populate last_output_date, derive from outputs
-        if not result["last_output_date"]:
-            outputs = state.get("outputs", [])
-            if outputs:
-                sk = outputs[0].get("sk", "")
-                if sk.startswith("OUTPUT#"):
-                    result["last_output_date"] = sk.replace("OUTPUT#", "").split("#")[0]
+        result = _finalize_compressed(result, coach_id, meta, state, now_iso)
 
         logger.info(
             "Compressed %s — summary=%d chars, concerns=%d, recs=%d, threads=%d, preds=%d",
@@ -1037,6 +1070,23 @@ def _compress_coach(coach_id, state):
             len(result.get("active_threads", [])),
             len(result.get("active_predictions", [])),
         )
+
+        # #2428: the compression joins the module's ADR-104 gate before the
+        # COMPRESSED#latest write — this output replays into board-answer prompts
+        # (site_api_ai_lambda._coach_memory_bits), so it is a reader surface's input.
+        result, findings = _apply_compression_gate(coach_id, meta, state, user_message, result, presence_signal=presence_signal)
+        if findings:
+            prior = _get_item(f"COACH#{coach_id}", "COMPRESSED#latest")
+            logger.warning(
+                "[compression] %s ADR-104 gate still failing after regen (%d finding(s)) — %s",
+                coach_id,
+                len(findings),
+                "holding prior COMPRESSED#latest" if prior else "no prior to hold — structural fallback",
+            )
+            if prior:
+                return {**prior, "_held": True}
+            return _build_fallback_compressed_state(coach_id, state)
+        result["grounding_gated"] = True
         return result
 
     except Exception as e:
@@ -1175,103 +1225,12 @@ def _gather_learning(coach_id, limit=40):
 
 
 def _summarize_track_record(learning, confidence_records):
-    """Reduce LEARNING#/CONFIDENCE# into the grounding block the stance reasons from.
+    """Thin binder — the rollup lives in coach_summarizer_support (#2428 split).
 
-    Mirrors the hit/miss accounting site_api_coach._track_record surfaces publicly,
-    so the stance's self-assessment agrees with the coach page's headline stat.
-
-    #1481 (ADR-141): conversation-channel learnings are split out — they carry
-    Matthew's own words, never a graded verdict, so they ground the stance as a
-    DISTINCT evidence class and are structurally excluded from the hit rate.
+    Keeps the module-local ADR-141 screen as the ONLY takeaway route: the support
+    module receives `_screened_takeaway` as a callable, never raw takeaway text.
     """
-    _hit = {"confirmed", "correct", "hit", "true"}
-    _miss = {"refuted", "incorrect", "miss", "false"}
-    confirmed = refuted = 0
-    recent = []
-    conversation_recent = []
-    conversation_count = 0
-    concessions = []  # #1386: docket disputes this coach LOST — future reads must cite them
-    concession_count = 0
-    for rec in learning or []:
-        if (rec.get("channel") or "data") == "conversation":
-            conversation_count += 1
-            if len(conversation_recent) < 6:
-                conversation_recent.append(
-                    {
-                        "date": rec.get("date") or rec.get("sk", "").replace("LEARNING#", "").split("#")[0],
-                        "subdomain": rec.get("subdomain", ""),
-                        "confidence_direction": rec.get("confidence_direction", "hold"),
-                        # ADR-141 §4 (#1789): no verbatim answer text in the stance
-                        # grounding message — STANCE# prose serves publicly — and the
-                        # coach's own takeaway crosses only through the deterministic
-                        # screen (the numeric gates downstream read digits, not
-                        # semantics). checkin_id is the pointer for audit.
-                        "takeaway": _screened_takeaway(rec),
-                        "checkin_id": rec.get("checkin_id", ""),
-                    }
-                )
-            continue  # never in the verdict tally — hit rates stay data-derived
-        verdict = (rec.get("verdict") or rec.get("outcome") or rec.get("result") or "").lower()
-        if verdict in _hit:
-            confirmed += 1
-        elif verdict in _miss:
-            refuted += 1
-        # #1386: a lost docket dispute wrote its concession VERBATIM to this
-        # coach's memory — surface it as a standing, citable evidence class
-        # (it also counts as a refuted verdict above, channel=data).
-        if rec.get("record_type") == "docket_concession":
-            concession_count += 1
-            if len(concessions) < 5:
-                concessions.append(
-                    {
-                        "date": rec.get("date") or rec.get("sk", "").replace("LEARNING#", "").split("#")[0],
-                        "topic": rec.get("topic", ""),
-                        "concession": rec.get("concession", ""),
-                        "docket_ref": rec.get("docket_ref", ""),
-                    }
-                )
-        if len(recent) < 8:
-            recent.append(
-                {
-                    "date": rec.get("sk", "").replace("LEARNING#", "").split("#")[0],
-                    "verdict": verdict or "pending",
-                    "claim": (rec.get("claim_natural") or rec.get("claim") or "")[:160],
-                }
-            )
-    decided = confirmed + refuted
-    confidence = {}
-    confidence_provenance = {}
-    for conf in confidence_records or []:
-        sub = conf.get("subdomain", conf.get("sk", "").replace("CONFIDENCE#", ""))
-        confidence[sub] = round(conf.get("mean_confidence", 0.5), 3)
-        confidence_provenance[sub] = conf.get("source") or "data"
-    return {
-        "confirmed": confirmed,
-        "refuted": refuted,
-        "decided": decided,
-        "hit_rate_pct": round(100 * confirmed / decided) if decided else None,
-        "recent": recent,
-        "confidence": confidence,
-        "confidence_provenance": confidence_provenance,
-        "conversation_learnings": {
-            "count": conversation_count,
-            "recent": conversation_recent,
-            "note": (
-                "channel=conversation — what this coach learned from Matthew's own check-in answers "
-                "(self-graded, bounded). A different evidence class than the data-derived verdicts above; "
-                "never counted in the hit rate."
-            ),
-        },
-        "standing_concessions": {
-            "count": concession_count,
-            "recent": concessions,
-            "note": (
-                "Docket disputes this coach LOST (#1386) — resolved by deterministic code against a "
-                "criterion agreed at open, concession recorded verbatim. When the stance touches one of "
-                "these topics it must cite the concession, never relitigate it."
-            ),
-        },
-    }
+    return summarize_track_record(learning, confidence_records, _screened_takeaway)
 
 
 def _build_stance_message(coach_id, compressed, track, prior_stance):
@@ -1674,14 +1633,17 @@ def lambda_handler(event, context):
                     }
                     continue
 
-                # Compress via LLM
-                compressed = _compress_coach(coach_id, state)
+                # Compress via LLM (presence_signal also arms the compression
+                # gate's behavioral class — #2428, same read as the stances)
+                compressed = _compress_coach(coach_id, state, presence_signal=presence_signal)
 
-                # Write to DynamoDB
-                success = _write_compressed_state(coach_id, compressed)
+                # Write to DynamoDB — unless the #2428 gate HELD, in which case the
+                # prior COMPRESSED#latest row stays and this run writes nothing.
+                held = compressed.pop("_held", False)
+                success = held or _write_compressed_state(coach_id, compressed)
 
                 results[coach_id] = {
-                    "status": "success" if success else "write_failed",
+                    "status": "held_kept_prior" if held else ("success" if success else "write_failed"),
                     "summary_length": len(compressed.get("summary", "")),
                     "key_concerns": len(compressed.get("key_concerns", [])),
                     "active_threads": len(compressed.get("active_threads", [])),

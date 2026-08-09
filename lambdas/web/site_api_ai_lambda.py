@@ -934,14 +934,14 @@ def _coach_stance_bits(pid: str) -> str:
 
 
 def _coach_memory_bits(pid: str) -> str:
-    """#531: the coach's compressed memory (COMPRESSED#latest, maintained weekly
-    by the history summarizer) — the same state the daily-brief self reasons
-    from. Summary + top concerns, bounded. Empty pre-data / on any error."""
+    """#531: the coach's compressed memory (COMPRESSED#latest, weekly summarizer
+    output). Summary + top concerns, bounded. Empty pre-data / on any error."""
     try:
         item = table.get_item(Key={"pk": f"COACH#{pid}", "sk": "COMPRESSED#latest"}).get("Item")
-        # #1085 (extends #946): COMPRESSED#latest is experiment-scoped and tombstoned
-        # at reset — unguarded, the WIPED cycle's memory kept grounding board answers.
-        if not singleton_visible(item):
+        # #1085/#946: tombstoned at reset must not ground board answers. #2428: nor may
+        # UNGATED state — only rows the summarizer's ADR-104 compression gate stamped
+        # (`grounding_gated`); a legacy row is excluded until regenerated, gated.
+        if not singleton_visible(item) or not item.get("grounding_gated"):
             return ""
         item = _decimal_to_float(item)
         bits = []

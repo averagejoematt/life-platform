@@ -242,11 +242,12 @@ UNGATED_READER_KNOWN: dict[str, dict[str, object]] = {
     # "lambdas/reading/reading_constellation.py::_idea_grounding_findings").
     # field_notes_lambda left this table via #2426 — registered in SURFACES
     # (::_note_grounding_findings), regenerate-once-then-hold.
-    "lambdas/coach/coach_history_summarizer.py": {
-        "issue": 2428,
-        "note": "its :980 COMPRESSED#latest compression is ungated and replays into board-answer prompts — an internal input laundered "
-        "into a reader surface. Its stance path IS registered, hence the PARTIAL_COVERAGE overlap.",
-    },
+    # coach_history_summarizer.py left this table 2026-08-09 the designed way (#2428):
+    # its COMPRESSED#latest compression writer landed a SURFACES registration
+    # (grounding_wiring: "lambdas/coach/coach_history_summarizer.py::_apply_compression_gate",
+    # regenerate-once-then-hold), and the board-answer reader (_coach_memory_bits)
+    # now excludes ungated legacy rows — so the module's whole coverage is genuine
+    # and its DECLARED_OVERLAPS entry is gone with it.
     # — the partial-gate cluster: a real deterministic check, no registered decision —
     "lambdas/emails/coach_panel_podcast_lambda.py": {
         "issue": 2430,
@@ -277,7 +278,9 @@ UNGATED_READER_KNOWN: dict[str, dict[str, object]] = {
 # decision someone wrote down, not a side effect of two tables disagreeing.
 DECLARED_OVERLAPS: dict[str, tuple] = {
     # registered for some calls, tracked as ungated for the rest
-    "lambdas/coach/coach_history_summarizer.py": ("surfaces", "known"),
+    # (#2421 and #2428 both RESOLVED 2026-08-09: the analyzer's four paths and the
+    # summarizer's compression call are gated + registered — no declared overlaps remain
+    # for either; a new second-generation path in either module must register or red.)
     # registered surface is a DIFFERENT function from the seam call: review_pack_ranker's
     # `baseline_mismatch_findings` is a registered freshness AUDITOR, while the seam
     # itself is the critic's ranking call, which produces a float and no prose.

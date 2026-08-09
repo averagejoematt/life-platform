@@ -449,7 +449,9 @@ def test_board_coach_memory_hidden_when_tombstoned(monkeypatch):
 
 def test_board_coach_memory_serves_clean_record(monkeypatch):
     ai = _ai()
-    monkeypatch.setattr(ai, "table", _FakeTable(item={"summary": "fresh cycle memory", "phase": "experiment"}))
+    # grounding_gated: a clean post-#2428 row carries the compression gate's stamp —
+    # without it the board reader excludes the row as ungated legacy state.
+    monkeypatch.setattr(ai, "table", _FakeTable(item={"summary": "fresh cycle memory", "phase": "experiment", "grounding_gated": True}))
     assert "fresh cycle memory" in ai._coach_memory_bits("sleep_coach")
 
 
