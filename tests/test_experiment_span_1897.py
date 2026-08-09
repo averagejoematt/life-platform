@@ -127,7 +127,11 @@ def test_grounding_findings_skips_the_class_without_the_anchors():
 
 def test_the_analyzer_now_passes_the_cycle_anchors():
     """The gate exists only if its caller feeds it. The analyzer's findings_fn
-    omitted both anchors, which is why every phase-aware class no-opped there."""
+    omitted both anchors, which is why every phase-aware class no-opped there.
+
+    #2421 moved the findings_fn into the module's single `_gate_prose` chokepoint (the
+    four previously ungated paths now share it), so the anchors are asserted there — the
+    local name changed, the requirement did not."""
     src = open(os.path.join(_LAMBDAS, "intelligence", "ai_expert_analyzer_lambda.py"), encoding="utf-8").read()
-    assert "generation_date_iso=_gen_date_iso" in src
+    assert "generation_date_iso=gen_date_iso" in src
     assert "start_date_iso=EXPERIMENT_START" in src
