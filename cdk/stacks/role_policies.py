@@ -3214,10 +3214,9 @@ def subscriber_onboarding() -> list[iam.PolicyStatement]:
 def telegram_webhook() -> list[iam.PolicyStatement]:
     """Telegram webhook (#2364): the public front door, deliberately near-powerless.
 
-    One secret read + one lambda:InvokeFunction, nothing else — a compromised
-    front door can only hand validated work orders to the worker. Zero-arg by
-    contract: test_iam_secrets_consistency ENUMERATES policy functions by calling
-    them, so the worker ARN builds from constants (the name is fixed).
+    One secret read + one lambda:InvokeFunction, nothing else. Zero-arg by
+    contract: test_iam_secrets_consistency enumerates policy functions by CALLING
+    them; the worker ARN builds from constants (the name is fixed).
     """
     return [
         iam.PolicyStatement(
@@ -3236,11 +3235,10 @@ def telegram_webhook() -> list[iam.PolicyStatement]:
 def telegram_worker() -> list[iam.PolicyStatement]:
     """Telegram coach worker (#2364): the chat brain's runtime grants.
 
-    DDB is read-wide (persona/memory/facts assembly spans COACH#, computed_metrics
-    and engagement partitions) but WRITE-SCOPED to the COACH#* partition family via
-    LeadingKeys — the chat stores CHAT# turn records and must never be able to touch
-    a DATE# timeseries row. Bedrock through the ADR-062 chokepoint; the telegram
-    store for bot tokens; SSM for the budget tier + cycle stamp (read-only).
+    DDB read-wide (persona/memory/facts span COACH#, computed_metrics, engagement)
+    but WRITE-SCOPED to COACH#* via LeadingKeys — the chat stores CHAT# turns and
+    must never touch a DATE# timeseries row. Bedrock via the ADR-062 statement;
+    the telegram store; read-only SSM for budget tier + cycle.
     """
     return [
         iam.PolicyStatement(
@@ -3248,6 +3246,8 @@ def telegram_worker() -> list[iam.PolicyStatement]:
             actions=["dynamodb:GetItem", "dynamodb:Query"],
             resources=[TABLE_ARN],
         ),
+        # CMK table (R1/R2): DDB is dead without the key grants.
+        iam.PolicyStatement(sid="KMS", actions=["kms:Decrypt", "kms:GenerateDataKey"], resources=[KMS_KEY_ARN]),
         iam.PolicyStatement(
             sid="DynamoDBCoachChatWrite",
             actions=["dynamodb:PutItem"],
