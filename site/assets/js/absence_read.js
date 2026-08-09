@@ -75,6 +75,25 @@ export function absenceLine(pillar, { short = false } = {}) {
   return short ? "nothing logged" : "Nothing is being logged for this right now, so there is no trend to read.";
 }
 
+/* The family panel's chip, for the pillars where absence outranks the trend (#2388).
+
+   Returns {txt, state} when the honest answer is an absence, or null when the pillar is
+   free to render its normal trend copy. story.js calls this BEFORE its coverage heuristic
+   and before any trend verb — the gating decision lives here, not in the DOM module, so
+   it is reachable by `await import()` and a sabotage of it fails a test.
+
+   `trendState` is the caller's already-computed "up" | "down" | "flat".
+*/
+export function familyChip(pillar, trendState) {
+  if (isDark(pillar)) return { txt: absenceLine(pillar, { short: true }) || "nothing logged", state: "absent" };
+  // Not dark, but the engine flagged behaviors that didn't happen inside the window. The
+  // score moved; attributing that move to effort ("eased off a little") credits a trend
+  // to days that were simply never logged. Name the absence instead.
+  const flagged = pillar && Array.isArray(pillar.absent_behaviors) ? pillar.absent_behaviors.length : 0;
+  if (trendState === "down" && flagged) return { txt: "some days went unlogged", state: "absent" };
+  return null;
+}
+
 /* The cockpit's deterministic pillar read, when no coach analysis is served.
 
    `label` is the display name, `pillar` the /api/character pillar object. A dark pillar

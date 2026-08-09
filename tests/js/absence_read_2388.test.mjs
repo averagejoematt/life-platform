@@ -14,7 +14,7 @@ import "./support/loader.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { pillarAbsence, isDark, absenceLine, deterministicPillarRead, coachPayloadRead } = await import("../../site/assets/js/absence_read.js");
+const { pillarAbsence, isDark, absenceLine, familyChip, deterministicPillarRead, coachPayloadRead } = await import("../../site/assets/js/absence_read.js");
 
 // The live /api/character nutrition pillar, with the #2388 absence block the API now
 // derives from MacroFactor's registry stale_hours (96h) and its last DATE# write.
@@ -146,4 +146,30 @@ test("an empty / null payload yields empty strings, never a crash", () => {
 test("small-n coach observations still degrade to the honest confidence label", () => {
   assert.equal(coachPayloadRead({ analysis: "x", n: 8 }).confidence, "preliminary pattern");
   assert.equal(coachPayloadRead({ analysis: "x", observations: 20 }).confidence, "low confidence (n<30)");
+});
+
+/* ── the family panel's gating decision (story.js okayStatus) ────────────── */
+
+test("the family chip refuses a trend verb on a dark pillar — the #2388 headline", () => {
+  const chip = familyChip(DARK_NUTRITION, "down");
+  assert.deepEqual(chip, { txt: "nothing logged this cycle", state: "absent" });
+  // The exact live sentence this replaces.
+  assert.ok(!/eased off/i.test(chip.txt));
+});
+
+test("a reporting pillar is not gated — story.js keeps its trend copy", () => {
+  assert.equal(familyChip(LIVE_SLEEP, "up"), null);
+  assert.equal(familyChip(LIVE_SLEEP, "down"), null);
+});
+
+test("flagged absent behaviors on a down trend name the absence, not the trend", () => {
+  const partial = { name: "consistency", xp_delta: -0.3, absent_behaviors: ["habit_ticks"] };
+  assert.deepEqual(familyChip(partial, "down"), { txt: "some days went unlogged", state: "absent" });
+  // …and never on an UP trend: unlogged days can't be used to sour a real climb either.
+  assert.equal(familyChip(partial, "up"), null);
+});
+
+test("a pillar with neither a dark source nor flagged absences is never gated", () => {
+  assert.equal(familyChip({ name: "mind", absent_behaviors: [] }, "down"), null);
+  assert.equal(familyChip(null, "down"), null);
 });

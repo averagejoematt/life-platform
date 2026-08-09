@@ -22,7 +22,7 @@ import { seasonBand } from "/assets/js/texture.js"; // #1471 — the season bann
 import { featuredQuoteHTML } from "/assets/js/journal_quotes.js"; // #1568 — the weekly featured line (ADR-142)
 import { heroProofLine, BRIEF_LINE_KICKER } from "/assets/js/daily_line.js"; // #1994/#1995 — Day-1-safe hero sentence + the one honest brief-line label
 import { sortChronicleNewestFirst } from "/assets/js/chronicle_order.js"; // #1988 — same-date part-sequence tie-break, shared with the server manifest
-import { absenceLine, isDark } from "/assets/js/absence_read.js"; // #2388 — a dark source never renders a trend verb
+import { familyChip, isDark } from "/assets/js/absence_read.js"; // #2388 — a dark source never renders a trend verb
 
 const $ = (s, r = document) => r.querySelector(s);
 const bind = (n, r = document) => r.querySelector(`[data-bind="${n}"]`);
@@ -411,15 +411,12 @@ function okayStatus(p) {
   // from a real decline at this layer; only the pillar's own ingestion source can tell
   // them apart, and the server derives that from the registry's `stale_hours`. Over a
   // cycle with zero food logs this chip said "EATING eased off a little".
-  if (isDark(p)) return { txt: absenceLine(p, { short: true }) || "nothing logged", state: "absent" };
+  const gated = familyChip(p, trend(p.xp_delta));
+  if (gated) return gated;
   const cov = p.data_coverage;
   const absent = p.coverage_hold === true || (typeof cov === "number" && cov < 0.25) || (Number(p.raw_score) === 0 && !Number(p.xp_delta));
   if (absent) return { txt: "not measured this week", state: "absent" };
   const t = trend(p.xp_delta);
-  // A pillar carrying flagged absent behaviors has unlogged days inside the window. The
-  // score moved, but "eased off a little" attributes that move to effort rather than to
-  // the missing logs — so the chip names the absence instead of a trend it can't own.
-  if (t === "down" && (p.absent_behaviors || []).length) return { txt: "some days went unlogged", state: "absent" };
   if (t === "up") return { txt: "on the up", state: "up" };
   if (t === "down") return { txt: "eased off a little", state: "down" };
   return { txt: "holding steady", state: "flat" };
