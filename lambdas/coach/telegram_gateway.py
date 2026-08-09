@@ -164,7 +164,31 @@ def route(event: dict, *, secret: Optional[str], routing: dict, allowed_chat_ids
         "text": message.get("text") or "",
         "message_id": message.get("message_id"),
         "is_group": str(((message.get("chat") or {}).get("type") or "")).endswith("group"),
+        # Telegram redelivers pending updates after an outage/late webhook
+        # registration — update_id is the dedupe key, date the staleness signal.
+        "update_id": update.get("update_id"),
+        "message_date": message.get("date"),
     }
+
+
+# Telegram retries within ~24h; go-live registered the webhook hours after the
+# first texts and every backlogged message got a fresh late answer. Older than
+# this and a reply reads as a bot waking up, not a person answering.
+STALE_AFTER_S = 6 * 3600
+
+
+def is_stale(message_date, now_ts: float, stale_after_s: int = STALE_AFTER_S) -> bool:
+    """True when an inbound message is too old to answer like a live text.
+
+    A missing/garbled timestamp is NOT stale — dropping real messages on a parse
+    edge would look exactly like a broken bot, the failure this module exists to
+    avoid.
+    """
+    try:
+        age = float(now_ts) - float(message_date)
+    except (TypeError, ValueError):
+        return False
+    return age > stale_after_s
 
 
 def _bot_key_from_path(event: dict) -> str:

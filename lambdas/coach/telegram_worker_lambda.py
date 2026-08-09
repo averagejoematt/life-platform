@@ -40,12 +40,13 @@ except ImportError:  # pragma: no cover
     logger = logging.getLogger("telegram-worker")
     logger.setLevel(logging.INFO)
 
-from coach import coach_chat
+from coach import coach_chat, telegram_gateway
 from coach.coach_chat_grounding import build_facts_block, build_grounder
 from coach.persona_registry import display_name
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
+S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 STORE_PATH = os.environ.get("TELEGRAM_SECRET_ID", "life-platform/telegram")
 TELEGRAM_API = "https://api.telegram.org/bot{token}/{method}"
 
@@ -56,6 +57,8 @@ MODEL = os.environ.get("AI_MODEL", "us.anthropic.claude-sonnet-4-6")
 
 _dynamodb = None
 _secrets = None
+_s3 = None
+_cw = None
 
 
 def _table():
@@ -63,6 +66,36 @@ def _table():
     if _dynamodb is None:
         _dynamodb = boto3.resource("dynamodb", region_name=REGION)
     return _dynamodb.Table(TABLE_NAME)
+
+
+def _s3_client():
+    global _s3
+    if _s3 is None:
+        _s3 = boto3.client("s3", region_name=REGION)
+    return _s3
+
+
+def _emit_metric(name: str, coach_id: str) -> None:
+    """Fail-loud partner of the persona fix: a coach chatting without its identity
+    is an incident, not a WARN. Emission itself is fail-soft — a metrics outage
+    must not block the reply."""
+    global _cw
+    try:
+        if _cw is None:
+            _cw = boto3.client("cloudwatch", region_name=REGION)
+        _cw.put_metric_data(
+            Namespace="LifePlatform/Telegram",
+            MetricData=[
+                {
+                    "MetricName": name,
+                    "Dimensions": [{"Name": "Coach", "Value": coach_id}],
+                    "Value": 1,
+                    "Unit": "Count",
+                }
+            ],
+        )
+    except Exception as e:
+        logger.warning("[telegram] metric %s emit failed: %s", name, e)
 
 
 def _bot_token(coach_key: str) -> Optional[str]:
@@ -203,6 +236,51 @@ def _current_tier() -> Optional[int]:
 # ── The handler ───────────────────────────────────────────────────────────────
 
 
+def _seen_update(coach_id: str, update_id) -> bool:
+    """True when this Telegram update was already processed (redelivery).
+
+    Conditional put on a TTL'd DEDUPE row in the coach's own partition — the
+    write the worker is already scoped to (LeadingKeys COACH#*). Fail-OPEN on
+    any storage error: a dropped real message looks exactly like a broken bot,
+    a rare double-answer merely looks eager.
+    """
+    if update_id is None:
+        return False
+    import time as _time
+
+    try:
+        _table().put_item(
+            Item={
+                "pk": coach_chat.chat_pk(coach_id),
+                "sk": f"DEDUPE#{update_id}",
+                "type": "telegram_dedupe",
+                "ttl": int(_time.time()) + 24 * 3600,
+            },
+            ConditionExpression="attribute_not_exists(sk)",
+        )
+        return False
+    except Exception as e:
+        if e.__class__.__name__ == "ConditionalCheckFailedException":
+            return True
+        logger.warning("[telegram] dedupe check failed (proceeding): %s", e)
+        return False
+
+
+def _current_moment_line() -> str:
+    """WHAT TIME IT IS — the context the screenshots proved missing ("I don't
+    have access to the current date or time"). Pacific, matching every other
+    surface (site convention). Joins the facts block AND the grounder's allowed
+    vocabulary, so citing today's date is never flagged as fabrication."""
+    try:
+        from common.pacific_time import pacific_now
+
+        now = pacific_now()
+        return f"CURRENT MOMENT: {now.strftime('%A')}, {now.strftime('%Y-%m-%d')}, {now.strftime('%I:%M %p').lstrip('0')} Pacific."
+    except Exception as e:  # pragma: no cover — import edge; honesty over crash
+        logger.warning("[telegram] current-moment line failed: %s", e)
+        return ""
+
+
 def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — Lambda signature
     """One work order in, one Telegram reply out (or one honest refusal)."""
     order = event or {}
@@ -213,6 +291,21 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
         logger.warning("[telegram] malformed work order: %s", {k: order.get(k) for k in ("coach_id", "chat_id")})
         return {"ok": False, "reason": "malformed order"}
 
+    # Redelivered update (Telegram retries after outages/late webhook registration)
+    # — already answered once; answering again is the double-greeting from go-live.
+    if _seen_update(coach_id, order.get("update_id")):
+        logger.info("[telegram] duplicate update %s for %s — skipping", order.get("update_id"), coach_id)
+        return {"ok": True, "reason": "duplicate"}
+
+    # A backlogged message from hours ago reads as a bot waking up, not a person
+    # answering. Skip inference; the message stays visible in the Telegram chat.
+    import time as _time
+
+    if telegram_gateway.is_stale(order.get("message_date"), _time.time()):
+        _emit_metric("TelegramStaleSkipped", coach_id)
+        logger.info("[telegram] stale message for %s (sent %s) — skipping", coach_id, order.get("message_date"))
+        return {"ok": True, "reason": "stale"}
+
     token = _bot_token(coach_id)
     if not token:
         logger.warning("[telegram] no bot token for %s — dropping", coach_id)
@@ -220,7 +313,16 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
 
     _tg(token, "sendChatAction", {"chat_id": chat_id, "action": "typing"})
 
-    coach_name = display_name(f"{coach_chat.normalize_coach_id(coach_id)}_coach") or coach_id
+    persona_id = f"{coach_chat.normalize_coach_id(coach_id)}_coach"
+    # S3 first (fresh config without a redeploy), bundled config/ as the offline
+    # fallback — the pair of paths that was MISSING when every conversation ran
+    # nameless ("I'm mind_coach") and persona-free. Both failing is an incident:
+    # metric + alarm, and an honest role-name instead of a leaked internal id.
+    coach_name = display_name(persona_id, s3_client=_s3_client(), bucket=S3_BUCKET)
+    if not coach_name or coach_name == persona_id:
+        _emit_metric("TelegramPersonaMissing", coach_id)
+        logger.error("[telegram] persona registry unreadable for %s — degraded name", persona_id)
+        coach_name = f"Matthew's {coach_chat.normalize_coach_id(coach_id)} coach"
     thread = _thread_today(coach_id)
     facts = _facts()
     memory = _memory_block(coach_id)
@@ -228,19 +330,29 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
     try:
         from coach.persona_core import persona_block
 
-        persona = persona_block(f"{coach_chat.normalize_coach_id(coach_id)}_coach")
+        persona = persona_block(persona_id, s3_client=_s3_client(), bucket=S3_BUCKET)
     except Exception as e:
         logger.warning("[telegram] persona load failed: %s", e)
         persona = ""
+    if not persona:
+        _emit_metric("TelegramVoiceSpecMissing", coach_id)
+        logger.error("[telegram] voice spec unreadable for %s — replying without persona", persona_id)
 
     from ai import bedrock_client
+
+    # The current moment joins the FACTS the coach may cite — and the grounder's
+    # allowed vocabulary, so naming today is never flagged as a fabricated date.
+    moment = _current_moment_line()
+    facts_block = build_facts_block(facts)
+    if moment:
+        facts_block = f"{facts_block}\n{moment}"
 
     result = coach_chat.run_turn(
         coach_id=coach_id,
         coach_name=coach_name,
         persona_block=persona,
         memory_block=memory,
-        facts_block=build_facts_block(facts),
+        facts_block=facts_block,
         thread=thread,
         inbound=text,
         model=MODEL,
@@ -248,7 +360,7 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
         # All five gate classes armed; the memory block and thread text widen the
         # NUMBER vocabulary (quoting memory is not fabrication) while the night map
         # stays facts-only — #2343's class is checked even on remembered figures.
-        grounder=build_grounder(facts, extra_sources=(memory, " ".join(t.get("text") or "" for t in thread))),
+        grounder=build_grounder(facts, extra_sources=(memory, moment, " ".join(t.get("text") or "" for t in thread))),
         tier=_current_tier(),
         turns_today=_turns_today(thread),
     )

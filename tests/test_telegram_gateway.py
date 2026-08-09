@@ -240,3 +240,36 @@ def test_an_unmapped_bot_is_caught_before_the_chat_id_is_examined():
     with pytest.raises(tg.Rejected) as e:
         route(event(path="/telegram/nope", chat_id=999))
     assert "no coach mapped" in e.value.reason
+
+
+# ── The work order carries the redelivery + staleness signals (#2364 go-live) ─
+
+
+def test_the_order_carries_update_id_and_message_date():
+    """update_id keys the worker's dedupe (Telegram redelivers pending updates);
+    the message date is the staleness signal. Both ride the work order so the
+    worker never re-parses transport."""
+    msg = {"message_id": 11, "text": "hi", "chat": {"id": 8675309, "type": "private"}, "date": 1754700000}
+    ev = {
+        "rawPath": "/telegram/webb",
+        "headers": {"X-Telegram-Bot-Api-Secret-Token": SECRET},
+        "body": json.dumps({"update_id": 4242, "message": msg}),
+    }
+    order = route(ev)
+    assert order["update_id"] == 4242
+    assert order["message_date"] == 1754700000
+
+
+def test_a_missing_date_or_update_id_still_routes():
+    order = route(event())
+    assert order["update_id"] == 1  # the event() helper's update_id
+    assert order["message_date"] is None
+
+
+def test_is_stale_truth_table():
+    now = 1_754_700_000.0
+    assert tg.is_stale(now - 60, now) is False, "a minute old is a live text"
+    assert tg.is_stale(now - 5 * 3600, now) is False, "inside the window still answers"
+    assert tg.is_stale(now - 7 * 3600, now) is True, "a 7h backlog reads as a bot waking up"
+    assert tg.is_stale(None, now) is False, "no timestamp must NOT drop a real message"
+    assert tg.is_stale("garbage", now) is False, "unparseable is not stale — fail open"
