@@ -219,6 +219,13 @@ def _team_tensions(*, _g):
         if not item:
             return []
         raw = item.get("disagreements") or item.get("active_disagreements") or []
+        # #2383 (ADR-104 honest dating) — every tension carries the digest's
+        # generated_at so the front-end can date the band ("as of <date>") and
+        # refuse to render undated argument prose as today's live coaching.
+        # No fallback mark here: this writer (ai-expert-analyzer's weekly
+        # synthesis) has no fallback path — a failed synthesis writes nothing —
+        # unlike the ensemble digest's `_fallback` (#2333).
+        gen = item.get("generated_at")
         out = []
         for d in raw if isinstance(raw, list) else []:
             if not isinstance(d, dict):
@@ -245,6 +252,7 @@ def _team_tensions(*, _g):
                         or d.get("summary")
                         or ""
                     ),
+                    "generated_at": gen,
                 }
             )
         return out
