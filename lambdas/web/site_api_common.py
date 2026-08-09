@@ -131,7 +131,7 @@ PLATFORM_STATS = {
     "mcp_tools": 76,
     "lambdas": 103,
     "cdk_stacks": 8,
-    "alarms": 93,
+    "alarms": 95,
     "adrs": 148,
     "monthly_cost": "~$80",  # GROUND-TRUTH run-rate, pinned (#1232). Source = the budget
     # governor's own numbers: June 2026 actual $79.80 (Cost Explorer), July projects $82.22
