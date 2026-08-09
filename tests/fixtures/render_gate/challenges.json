@@ -33,26 +33,6 @@
       "badge_earned": ""
     },
     {
-      "challenge_id": "morning-zone-2-block_2026-07-14",
-      "id": "morning-zone-2-block",
-      "name": "Morning Zone-2 Block",
-      "description": "The movement pillar sits in Foundation tier while the calendar keeps eating the afternoon slot.",
-      "source": "data_signal",
-      "source_detail": "pillar_movement level 24 (Foundation) + workout skipped 3× in 14d",
-      "domain": "movement",
-      "difficulty": "moderate",
-      "duration_days": 14,
-      "protocol": "30 minutes of zone-2 cardio before 9am, five days a week.",
-      "success_criteria": "10 of 14 mornings logged",
-      "hoped_outcome": "A visible cluster of morning sessions in the training log — enough to test whether the AM slot survives contact with real weeks.",
-      "verification_method": "metric_auto",
-      "status": "candidate",
-      "origin": "live",
-      "daily_checkins": [],
-      "character_xp_awarded": 0,
-      "badge_earned": ""
-    },
-    {
       "challenge_id": "screens-off-by-ten_2026-06-01",
       "id": "screens-off-by-ten",
       "name": "Screens Off By Ten",
@@ -165,9 +145,9 @@
       "icon": ""
     }
   ],
-  "count": 8,
+  "count": 7,
   "summary": {
-    "total": 8,
+    "total": 7,
     "active": 1,
     "available": 2,
     "backlog": 2,

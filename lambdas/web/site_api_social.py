@@ -1279,7 +1279,9 @@ def handle_challenges() -> dict:
         )
         for item in resp.get("Items", []):
             status = item.get("status", "candidate")
-            if status not in ("active", "candidate", "completed", "failed"):
+            # #2424: the deliberate public set — owner-activated statuses ONLY. LLM-authored 'candidate' rows
+            # (challenge_generator, unreviewed) stay owner-side/MCP until Matthew activates; unknown stay private.
+            if status not in ("active", "completed", "failed"):
                 continue
             ch = _decimal_to_float(item)
             ch.pop("pk", None)
@@ -1287,12 +1289,10 @@ def handle_challenges() -> dict:
             raw_id = sk_val.replace("CHALLENGE#", "")
             ch["challenge_id"] = raw_id
             ch["id"] = _re.sub(r"_\d{4}-\d{2}-\d{2}$", "", raw_id)
-            # ER-06: check name AND id — a blocked keyword often lives only in the
-            # entry id while the display name is benign; `name or id` missed it.
+            # ER-06: check name AND id — a blocked keyword often lives only in the id; `name or id` missed it.
             if _is_blocked_vice(ch.get("name", "")) or _is_blocked_vice(ch.get("id", "")):
                 continue
-            # #2238: reader-supplied check-in notes are published with this row —
-            # screen them before they leave, including rows stored pre-#2238.
+            # #2238: reader-supplied check-in notes publish with this row — screen them, incl. rows stored pre-#2238.
             if "daily_checkins" in ch:
                 ch["daily_checkins"] = _public_checkins(ch.get("daily_checkins"))
             ch["origin"] = "live"
