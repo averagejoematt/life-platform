@@ -172,7 +172,7 @@ jobs:
         # line coverage is 79.02% (read out of this job's own output on green main
         # e806d7e4 / run 31274908729, after #1658's fourth tranche; the third took it
         # from 70.50% to 78.24% — +7.74pt / 5,565 newly-covered statements across 15
-        # modules that sat at 0-72%). The --high-water mark below is banked at 78.90,
+        # modules that sat at 0-72%). The --high-water mark below is banked at 80.20,
         # a tenth of a point UNDER measured on purpose — the mark is a floor for real
         # coverage, so rounding it down costs nothing and buys jitter margin. This floor (74%) prevents BACKSLIDING with ~5.0pt
         # headroom under measured so normal fluctuation doesn't red main — it is
@@ -255,7 +255,7 @@ jobs:
           DURATION_SECONDS=$(( $(date +%s) - "${UNIT_TESTS_START_EPOCH:-$(date +%s)}" ))
           python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 74 --gap-threshold 10 \
               --duration-seconds "$DURATION_SECONDS" --duration-budget-seconds 1200 \
-              --high-water 78.90 --fail-on-regression
+              --high-water 80.20 --fail-on-regression
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
