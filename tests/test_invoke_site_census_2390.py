@@ -216,10 +216,9 @@ UNGATED_READER_KNOWN: dict[str, dict[str, object]] = {
         "issue": 2418,
         "note": "observatory_summary — the primary text /api/coach_analysis serves — carries guard_derived_summary only, unregistered.",
     },
-    "lambdas/coach/coach_ensemble_digest.py": {
-        "issue": 2419,
-        "note": "the LLM-written disagreement topic serves verbatim as cross_coach_reference; no chokepoint in the module.",
-    },
+    # coach_ensemble_digest.py left this table 2026-08-09 the designed way (#2419):
+    # its digest writer landed a SURFACES registration
+    # (grounding_wiring: "lambdas/coach/coach_ensemble_digest.py::_apply_grounding_gate").
     "lambdas/compute/hypothesis_engine_lambda.py": {
         "issue": 2420,
         "note": "hypothesis prose + narrate_resolution publish to /api/hypotheses ungated — the freeze protects the verdict, not the text.",
