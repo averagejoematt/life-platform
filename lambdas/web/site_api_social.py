@@ -639,7 +639,7 @@ def handle_experiment_library() -> dict:
     # count, group or publish them. total_experiments/total_votes are computed from
     # the screened list, so a blocked entry is not even visible as a count.
     experiments = [
-        e for e in library.get("experiments", []) if not (_is_blocked_vice(e.get("name", "")) or _is_blocked_vice(e.get("id", "")))
+        e for e in (library.get("experiments") or []) if not (_is_blocked_vice(e.get("name", "")) or _is_blocked_vice(e.get("id", "")))
     ]
     pillar_map = {}
     pillar_meta = library.get("pillars", {})
@@ -721,7 +721,7 @@ def _valid_library_ids() -> frozenset:
         # derived from the same catalog and must not readmit what the read doors drop.
         ids = frozenset(
             (e.get("id") or "").lower()
-            for e in library.get("experiments", [])
+            for e in (library.get("experiments") or [])
             if e.get("id") and not (_is_blocked_vice(e.get("name", "")) or _is_blocked_vice(e.get("id", "")))
         )
         _library_ids_cache = (_time.time(), ids)
@@ -891,7 +891,7 @@ def _handle_experiment_detail(event: dict) -> dict:
         return _error(503, "Experiment library not available")
 
     lib_exp = None
-    for exp in library.get("experiments", []):
+    for exp in library.get("experiments") or []:
         if exp.get("id") == lib_id:
             lib_exp = exp
             break
@@ -902,7 +902,7 @@ def _handle_experiment_detail(event: dict) -> dict:
     if not lib_exp:
         return _error(404, f"Experiment '{lib_id}' not found in library")
 
-    pillar_meta = library.get("pillars", {}).get(lib_exp.get("pillar", ""), {})
+    pillar_meta = (library.get("pillars") or {}).get(lib_exp.get("pillar", ""), {})
     lib_exp["pillar_label"] = pillar_meta.get("label", lib_exp.get("pillar", "").title())
     lib_exp["pillar_icon"] = pillar_meta.get("icon", "circle")
 

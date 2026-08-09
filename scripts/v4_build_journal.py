@@ -415,7 +415,7 @@ def render(post: dict) -> str:
 
 def load_posts() -> list[dict]:
     data = json.loads(BLOG_SRC.read_text(encoding="utf-8"))
-    return [p for p in data.get("posts", []) if p.get("date") and p.get("title") and p.get("url")]
+    return [p for p in (data.get("posts") or []) if p.get("date") and p.get("title") and p.get("url")]
 
 
 def build(write: bool, check: bool) -> int:

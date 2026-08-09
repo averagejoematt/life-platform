@@ -158,7 +158,7 @@ def _experiment_catalog(exclude_ids: set, exclude_names: set) -> list:
     except Exception as e:
         logger.warning("[experiments] library unavailable: %s", e)
         return out
-    for exp in lib.get("experiments", []):
+    for exp in lib.get("experiments") or []:
         # #2240: same never-public-vocabulary screen the challenge routes apply —
         # name AND id (a keyword often lives only in the id, ER-06).
         if _is_blocked_vice(exp.get("name", "")) or _is_blocked_vice(exp.get("id", "") or ""):

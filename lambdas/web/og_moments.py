@@ -183,7 +183,7 @@ def _sweep_board_answers(s3):
     except Exception:
         return {}
     out = {}
-    for a in feed.get("answers", []):
+    for a in feed.get("answers") or []:
         mid = str(a.get("id", "")).strip()
         question = (a.get("question") or "").strip()
         if not mid or not question:
@@ -230,7 +230,7 @@ def _sweep_predictions(s3):
         print(f"[moments] predictions fetch skipped: {e}")
         return []
     out = []
-    for p in data.get("predictions", []):
+    for p in data.get("predictions") or []:
         if p.get("status") not in ("confirmed", "refuted"):
             continue
         text = (p.get("text") or "").strip()
@@ -279,7 +279,7 @@ def _sweep_wrong(s3):
         print(f"[moments] wrong feed fetch skipped: {e}")
         return {}
     out = {}
-    for o in data.get("obituaries", []):
+    for o in data.get("obituaries") or []:
         oid = str(o.get("id", "")).strip()
         believed = (o.get("believed") or "").strip()
         if not oid or not believed:

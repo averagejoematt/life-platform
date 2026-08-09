@@ -15,12 +15,14 @@ instance"):
 
 2. **The null-coercion class.** ``d.get(k, {})`` defaults only on a MISSING key;
    an explicitly stored ``null`` returns ``None`` and the next ``.get`` raises.
-   An AST sweep over ``lambdas/operational/`` flags that form wherever the
-   receiver is a parsed-JSON document (``json.loads`` output — the only values
-   that can actually be ``null``). boto3 response shapes (``Contents``,
-   ``Items``, ``Error``, ``Datapoints``…) are never explicitly null and are
-   deliberately NOT flagged; that narrowness is what makes the guard enforceable
-   (59 hits in this package with the naive rule, 5 with this one).
+   An AST sweep over ``lambdas/``, ``mcp/`` and ``scripts/`` (widened from
+   ``lambdas/operational/`` by #2336) flags that form wherever the receiver is a
+   parsed-JSON document (``json.loads`` output — the only values that can
+   actually be ``null``). boto3 response shapes (``Contents``, ``Items``,
+   ``Error``, ``Datapoints``…) are never explicitly null and are deliberately
+   NOT flagged; that narrowness is what makes the guard enforceable (574 hits
+   repo-wide with the naive rule, 21 with this one at widening time — all 21
+   were converted to the ``or``-form in the #2336 PR).
 
 Fully offline — no AWS, no SES (the handler runs dry-run).
 """
@@ -48,7 +50,16 @@ sys.path.insert(0, str(REPO / "lambdas"))
 from operational import qa_smoke_lambda as qa  # noqa: E402
 from operational.qa_check import CONTENT_TRUTH, Check, run_isolated  # noqa: E402
 
-OPERATIONAL = REPO / "lambdas" / "operational"
+# The null-coercion scan set (#2336). Widen by APPENDING roots — never narrow
+# it back, and never carve out a directory wholesale. All 21 hits found at
+# widening time were the real defect and were converted to the `or`-form; if a
+# future site genuinely wants the missing-key-only default, exempt that ONE
+# line via a `# null-coercion-ok: <reason>` trailing comment (honored below).
+NULL_COERCION_SCAN_ROOTS = (
+    REPO / "lambdas",
+    REPO / "mcp",
+    REPO / "scripts",
+)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -170,7 +181,7 @@ def test_run_isolated_passes_a_healthy_check_through_untouched():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 2. The null-coercion defect class — AST-derived over lambdas/operational/
+# 2. The null-coercion defect class — AST-derived over lambdas/, mcp/, scripts/
 # ──────────────────────────────────────────────────────────────────────────────
 
 
@@ -205,10 +216,17 @@ def _is_empty_container(node):
 
 
 def find_null_unsafe_gets(root):
-    """`x.get(<literal>, {}/[])` immediately consumed, where `x` is parsed JSON."""
+    """`x.get(<literal>, {}/[])` immediately consumed, where `x` is parsed JSON.
+
+    Per-line waiver (#2336): a trailing `# null-coercion-ok: <reason>` comment
+    exempts exactly that line — for the rare site where the missing-key-only
+    default is deliberate. Never exempt a file or directory wholesale.
+    """
     offenders = []
     for path in sorted(pathlib.Path(root).rglob("*.py")):
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        text = path.read_text(encoding="utf-8")
+        source_lines = text.splitlines()
+        tree = ast.parse(text, filename=str(path))
         for fn in [n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]:
             docs = _json_doc_names(fn)
             if not docs:
@@ -228,19 +246,24 @@ def find_null_unsafe_gets(root):
                     isinstance(parent, (ast.comprehension, ast.For)) and parent.iter is node
                 )
                 if consumed:
+                    if "# null-coercion-ok:" in source_lines[node.lineno - 1]:
+                        continue
                     offenders.append(f"{os.path.relpath(path, REPO)}:{node.lineno}  {ast.unparse(node)}")
     return sorted(set(offenders))
 
 
-def test_no_null_unsafe_get_default_in_the_operational_package():
+def test_no_null_unsafe_get_default_in_any_scanned_root():
     """`.get(k, {})` against a stored value that can be null is the #2307 class.
 
-    Five sites existed when this landed — qa_check_outputs.py:148 (the one that
-    aborted the nightly), canary_lambda.py:314, pip_audit_lambda.py:288, and
-    qa_smoke_lambda.py:300 and :842. All were converted to `or {}` / `or []`.
-    Use that form, never a second default argument, on parsed-JSON reads.
+    Five sites existed in lambdas/operational/ when this landed —
+    qa_check_outputs.py:148 (the one that aborted the nightly),
+    canary_lambda.py:314, pip_audit_lambda.py:288, and qa_smoke_lambda.py:300
+    and :842. #2336 widened the scan to lambdas/, mcp/ and scripts/, which
+    surfaced 21 more (17 in lambdas/, 1 in mcp/, 3 in scripts/). All were
+    converted to `or {}` / `or []`. Use that form, never a second default
+    argument, on parsed-JSON reads.
     """
-    offenders = find_null_unsafe_gets(OPERATIONAL)
+    offenders = [o for root in NULL_COERCION_SCAN_ROOTS for o in find_null_unsafe_gets(root)]
     assert not offenders, (
         "`.get(<key>, {}/[])` on parsed JSON defaults only when the key is MISSING — a stored "
         "null returns None and the next access raises (#2307). Write `(x.get(k) or {})`:\n  " + "\n  ".join(offenders)
@@ -263,3 +286,34 @@ def test_the_null_coercion_guard_can_actually_fire():
             encoding="utf-8",
         )
         assert not find_null_unsafe_gets(tmp), "the AST guard fires on the CORRECT form — it would block the fix"
+
+
+def test_the_per_line_waiver_exempts_exactly_the_waived_line():
+    """The `# null-coercion-ok:` idiom (#2336) must silence a waived offender —
+    and ONLY the waived one, so a waiver can never blanket a file."""
+    with tempfile.TemporaryDirectory() as tmp:
+        pathlib.Path(tmp, "waived.py").write_text(
+            "import json\n\n\ndef f(raw):\n"
+            "    data = json.loads(raw)\n"
+            "    a = data.get('a', {}).get('x')  # null-coercion-ok: synthetic waiver for the guard's own test\n"
+            "    return a, data.get('b', {}).get('y')\n",
+            encoding="utf-8",
+        )
+        hits = find_null_unsafe_gets(tmp)
+        assert len(hits) == 1 and ":7" in hits[0], f"waiver must exempt line 6 only, got: {hits}"
+
+
+def test_the_widened_scan_actually_covers_each_root():
+    """Mutation proof for the #2336 widening: a synthetic offender dropped into
+    EACH scan root is caught — the roots are wired, not just declared."""
+    mutant_src = "import json\n\n\ndef f(raw):\n    data = json.loads(raw)\n    return data.get('day_grade', {}).get('components')\n"
+    for root in NULL_COERCION_SCAN_ROOTS:
+        assert root.is_dir(), f"scan root vanished: {root}"
+        mutant = root / "_null_coercion_mutation_proof_2336.py"
+        assert not mutant.exists(), f"stale mutation-proof file left behind: {mutant}"
+        try:
+            mutant.write_text(mutant_src, encoding="utf-8")
+            hits = [h for h in find_null_unsafe_gets(root) if "_null_coercion_mutation_proof_2336" in h]
+            assert hits, f"a synthetic offender in {root.name}/ was NOT caught — the widened scan is vacuous there"
+        finally:
+            mutant.unlink(missing_ok=True)

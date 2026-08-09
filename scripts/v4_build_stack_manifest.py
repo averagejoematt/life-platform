@@ -318,7 +318,7 @@ def main() -> None:
     if OUT.exists():
         try:
             current = json.loads(OUT.read_text(encoding="utf-8"))
-            stamp = current.get("_meta", {}).get("updated")
+            stamp = (current.get("_meta") or {}).get("updated")
             probe = json.loads(json.dumps(payload))
             probe["_meta"]["updated"] = stamp
             if current == probe:
