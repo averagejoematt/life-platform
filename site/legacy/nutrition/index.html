@@ -338,6 +338,8 @@
     .n-meal__grade--a { color: var(--c-green-500); background: rgba(0,229,160,0.1); }
     .n-meal__grade--b { color: var(--accent); background: rgba(212,168,71,0.12); }
     .n-meal__grade--c { color: var(--c-red-status); background: rgba(255,82,82,0.1); }
+    /* #2330: uncomputed state — calories never logged, no grade earned */
+    .n-meal__grade--na { color: var(--text-muted); background: rgba(128,128,128,0.1); }
 
     @media (max-width: 720px) {
       .n-extra { padding: 24px 20px; }
@@ -883,9 +885,13 @@
         if (!meals.length) return;
         document.getElementById('n-meals-section').style.display = '';
         document.getElementById('n-meals-grid').innerHTML = meals.map(function(m) {
-          var ppc = m.protein_cal_pct || 0;
-          var grade = ppc >= 30 ? 'a' : ppc >= 20 ? 'b' : 'c';
-          var gradeText = ppc >= 30 ? 'HIGH' : ppc >= 20 ? 'MOD' : 'LOW';
+          // #2330 (ADR-104): null = calories never logged, the share is
+          // uncomputable — render an explicit "not computed" state, never a
+          // grade. A measured 0 (calories logged, zero protein) still grades LOW.
+          var ppc = m.protein_cal_pct;
+          var hasPpc = (ppc !== null && ppc !== undefined);
+          var grade = !hasPpc ? 'na' : ppc >= 30 ? 'a' : ppc >= 20 ? 'b' : 'c';
+          var gradeText = !hasPpc ? 'PROTEIN NOT COMPUTED' : (ppc >= 30 ? 'HIGH' : ppc >= 20 ? 'MOD' : 'LOW') + ' PROTEIN';
           return '<div class="n-meal">' +
             '<div class="n-meal__name">' + (m.name || '—') + '</div>' +
             '<div class="n-meal__freq">' + (m.frequency || 0) + 'x logged</div>' +
@@ -895,8 +901,8 @@
               '<div class="n-meal__macro"><div class="n-meal__macro-val">' + (m.avg_carbs_g || 0) + 'g</div><div class="n-meal__macro-label">carbs</div></div>' +
             '</div>' +
             '<div class="n-meal__footer">' +
-              '<div>P/cal ' + ppc + '%</div>' +
-              '<div class="n-meal__grade n-meal__grade--' + grade + '">' + gradeText + ' PROTEIN</div>' +
+              '<div>P/cal ' + (hasPpc ? ppc + '%' : '—') + '</div>' +
+              '<div class="n-meal__grade n-meal__grade--' + grade + '">' + gradeText + '</div>' +
             '</div>' +
           '</div>';
         }).join('');

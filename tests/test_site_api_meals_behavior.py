@@ -618,12 +618,10 @@ def test_a_food_with_no_calorie_figure_reports_an_absent_protein_calorie_share()
     "none of this food's calories are protein", the exact inverse of the truth for
     a hand-entered pure-protein whole food.
 
-    KNOWN SIBLING, deliberately NOT changed here: `frequent_meals` publishes its
-    own `protein_cal_pct` and still ships 0 for a calorie-less meal, pinned by
-    test_a_frequent_meal_with_no_calories_logged_reports_a_zero_protein_share_not_a_crash.
-    That one has a live reader — `site/legacy/nutrition/index.html:886` grades it
-    HIGH/MOD/LOW off `m.protein_cal_pct || 0` — so flipping it to None is a
-    front-end change, not an API-only one, and is out of this cluster's scope."""
+    The `frequent_meals` sibling shipped 0 for the same situation until #2330
+    flipped it (paired with the legacy nutrition page's grade rendering); the two
+    endpoints' agreement on None is pinned by
+    test_frequent_meals_and_protein_sources_agree_on_the_absence_value."""
     src = FakeSources(macrofactor=[mf("2026-04-15", {"food_name": "Chicken Breast", "protein_g": 40})])
     assert call("protein_sources", src)["protein_sources"][0]["protein_cal_pct"] is None
 
@@ -805,12 +803,32 @@ def test_frequent_meals_drops_short_names_the_same_way_the_protein_table_does():
     assert [m["name"] for m in call("frequent_meals", src)["meals"]] == ["Chili"]
 
 
-def test_a_frequent_meal_with_no_calories_logged_reports_a_zero_protein_share_not_a_crash():
-    """`avg_cal > 0` is the divide-by-zero guard. Pinned so the guard cannot be
-    removed silently — the crash it prevents would take the whole table down."""
+def test_a_frequent_meal_with_no_calories_logged_reports_an_absent_protein_share_not_a_crash():
+    """FIXED (#2330): `avg_cal > 0` is still the divide-by-zero guard, but the
+    absent arm now publishes None, not 0 — a meal whose calories were never
+    logged has no protein share to grade (ADR-104). The legacy nutrition page
+    renders this as an explicit "not computed" state instead of coercing it
+    through `|| 0` into a LOW grade."""
     src = FakeSources(filter_window=False, macrofactor=[mf("2026-04-15", {"food_name": "Mystery Bowl", "protein_g": 30})])
     m = call("frequent_meals", src)["meals"][0]
-    assert m["avg_calories"] == 0 and m["protein_cal_pct"] == 0
+    assert m["avg_calories"] == 0 and m["protein_cal_pct"] is None
+
+
+def test_frequent_meals_and_protein_sources_agree_on_the_absence_value():
+    """#2330 closed the asymmetry #2221 left behind: the SAME calorie-less food
+    must publish the SAME absence value (None) from both endpoints on the page."""
+    src = FakeSources(filter_window=False, macrofactor=[mf("2026-04-15", {"food_name": "Chicken Breast", "protein_g": 40})])
+    meal = call("frequent_meals", src)["meals"][0]
+    source = call("protein_sources", src)["protein_sources"][0]
+    assert meal["protein_cal_pct"] is None and source["protein_cal_pct"] is None
+
+
+def test_a_frequent_meal_with_measured_zero_protein_still_computes_a_real_share():
+    """Measured-zero is not absence: calories WERE logged, protein is genuinely
+    0% of them — the honest figure is 0 and the page may grade it LOW."""
+    src = FakeSources(filter_window=False, macrofactor=[mf("2026-04-15", food("White Rice", protein_g=0, calories_kcal=300))])
+    m = call("frequent_meals", src)["meals"][0]
+    assert m["avg_calories"] == 300 and m["protein_cal_pct"] == 0
 
 
 # ── meal_glucose ──────────────────────────────────────────────────────────────

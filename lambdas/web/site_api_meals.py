@@ -182,7 +182,12 @@ def frequent_meals(*, _g) -> dict:
             avg_cal = round(m["cal"] / cnt)
             avg_pro = round(m["protein"] / cnt)
             avg_carb = round(m["carbs"] / cnt)
-            ppc = round((avg_pro * 4 / avg_cal * 100)) if avg_cal > 0 else 0
+            # ADR-104 (#2330): a meal whose calories were never logged has no
+            # measurable protein share — publishing 0 graded it LOW on the legacy
+            # nutrition page for protein it was never measured for. None matches
+            # the protein_sources sibling above. Measured-zero (calories logged,
+            # zero protein) still computes honestly to 0.
+            ppc = round((avg_pro * 4 / avg_cal * 100)) if avg_cal > 0 else None
             top_meals.append(
                 {
                     "name": name,
