@@ -504,12 +504,28 @@ def presence_prompt_block(sig):
     else:
         gap = _num_or_none(sig.get("gap_days"))
         last = sig.get("last_food_log_date")
-        gap_txt = f"~{gap} days" if gap is not None else "several days"
-        lines.append(
-            f"Matthew's OWN logging has gone quiet — it has been {gap_txt} since his last food log"
-            + (f" (last logged {last})" if last else "")
-            + "."
-        )
+        if last is None:
+            # #2382: last_food_log_date=None means NOTHING was logged this cycle —
+            # gap_days is the #955 genesis clamp measuring the WINDOW, not a pause.
+            # The old wording here ("it has been ~4 days since his last food log")
+            # handed every coach a transition that never happened, and six of the
+            # eight live cards narrated it ("your food logs paused four days ago",
+            # "dark since around August 2nd") while the cockpit one door away said
+            # the source was 44 days quiet. State the true fact; forbid the false one.
+            win = sig.get("experiment_window_start")
+            gap_txt = f" — the window opened {f'{gap:g} days ago' if gap is not None else 'recently'}" + (f" ({win})" if win else "")
+            lines.append(
+                f"NOTHING has been logged this cycle{gap_txt}, with no food log at any point in it. "
+                "His last food log predates this cycle."
+            )
+            lines.append(
+                "Say THAT — 'nothing logged yet this cycle'. Do NOT say his logging 'paused', 'stopped', or "
+                "'went silent N days ago': no pause happened this cycle, there was nothing to pause. Do NOT "
+                "date a transition ('since Tuesday', 'around August 2nd') — no such event exists."
+            )
+        else:
+            gap_txt = f"~{gap} days" if gap is not None else "several days"
+            lines.append(f"Matthew's OWN logging has gone quiet — it has been {gap_txt} since his last food log (last logged {last}).")
         quiet = sig.get("channels_quiet") or []
         if quiet:
             lines.append(f"Channels gone silent: {', '.join(str(q) for q in quiet)}.")
