@@ -203,8 +203,10 @@ def lambda_handler(event, context):
                 },
             )
             sent_count += 1
-            logger.info(f"Onboarding email sent to {email}")
+            # PII discipline (#2369): never the full address in CloudWatch — truncate
+            # per the sibling send-loop convention (email[:6]…).
+            logger.info("Onboarding email sent (%s...)", email[:6])
         except Exception as e:
-            logger.error(f"Failed to send onboarding to {email}: {e}")
+            logger.error("Failed to send onboarding to %s...: %s", email[:6], e)
 
     return {"statusCode": 200, "body": json.dumps({"sent": sent_count, "checked": len(subscribers)})}

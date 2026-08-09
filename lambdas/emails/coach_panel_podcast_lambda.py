@@ -1516,7 +1516,7 @@ def _email_subscribers(ep: dict, test_to: str = None) -> dict:
             sent += 1
         except Exception as e:
             failed += 1
-            logger.warning("[panel] subscriber send failed (%s) — %s", email, e)
+            logger.warning("[panel] subscriber send failed (%s...) — %s", email[:6], e)
     logger.info("[panel] subscriber notify — sent=%d failed=%d test=%s", sent, failed, bool(test_to))
     return {"sent": sent, "failed": failed, "test": bool(test_to)}
 
