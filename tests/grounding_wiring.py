@@ -212,6 +212,41 @@ SURFACES = {
         ("numbers", "dates", "freshness"),
         {"behavioral": _NOT_ABOUT_MATTHEW, "night": _NO_NIGHT_MAP},
     ),
+    # #2420: the hypothesis engine's TWO reader-bound prose paths (/api/hypotheses
+    # serves the stored rows verbatim). The frozen test_spec already protects the
+    # verdict (ADR-105); these surfaces protect the prose around it. Generation
+    # holds an ungrounded candidate (dropping it — a batch re-call would re-roll
+    # the grounded ones); resolution narration regenerates once then holds to the
+    # deterministic evidence sentence.
+    "lambdas/compute/hypothesis_engine_lambda.py::generate_hypotheses": _entry(
+        ("numbers", "dates", "freshness"),
+        {
+            "behavioral": (
+                "the #1699 gate grades a SECOND-PERSON same-day completed-action claim, and "
+                "this surface has none by construction: the prompt asks the data-scientist "
+                "voice for 'One clear sentence stating the relationship' over a 14-day "
+                "window — analytic pattern claims about metrics, addressed to nobody, never "
+                "an account of what Matthew did today. Grading it against a same-day log map "
+                "would be a no-op dressed as coverage. Revisit if the prompt ever asks for "
+                "day-of framing."
+            ),
+            "night": _NO_NIGHT_MAP,
+        },
+    ),
+    "lambdas/compute/hypothesis_engine_lambda.py::narrate_resolution": _entry(
+        ("numbers", "dates", "freshness"),
+        {
+            "behavioral": (
+                "the resolution sentence restates a multi-week deterministic verdict for a "
+                "general reader ('Write ONE plain-language sentence explaining what "
+                "happened') — retrospective, about the monitoring window's arms and effect, "
+                "never a second-person same-day completed-action claim, which is the only "
+                "class the #1699 gate checks. Its numeric honesty is exactly what the "
+                "required numbers/dates classes cover."
+            ),
+            "night": _NO_NIGHT_MAP,
+        },
+    ),
     "lambdas/compute/state_of_matthew_lambda.py::narration_gate": _entry(
         ("numbers", "dates", "freshness", "behavioral"),
         {"night": _NO_NIGHT_MAP},

@@ -61,6 +61,14 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
+
+# #2420: ADR-104 grounding chokepoint for the two reader-bound prose paths.
+# /api/hypotheses (site_api_lambda -> handle_hypotheses) serves the stored
+# HYPOTHESIS# rows, so the generated hypothesis prose and the narrate_resolution
+# sentence are READER text. The frozen test_spec protects the VERDICT (ADR-105);
+# these imports are the gate that protects the WORDS around it.
+from ai.grounded_generation import allowed_dates, allowed_numbers, correction_prompt, grounding_findings
+from ai.grounding_gate_params import cycle_gate_params  # arms the #1691/#1897 cycle-freshness classes
 from common import (
     digest_utils,  # shared query_range implementations (#970)
     stats_core,  # bundled shared module (#529): effect sizes + block-bootstrap CIs for the deterministic verdict
@@ -126,6 +134,16 @@ REQUIRED_HYPOTHESIS_FIELDS = {
     "test_spec",  # #530: no pre-registered spec, no hypothesis
 }
 VALID_CONFIDENCE_LEVELS = {"low", "medium", "high"}
+# #2420: the generated fields a reader can see verbatim via /api/hypotheses — the
+# text the ADR-104 prose gate in generate_hypotheses() must cover before persistence.
+READER_PROSE_FIELDS = (
+    "hypothesis",
+    "evidence",
+    "confirmation_criteria",
+    "effect_size_observed",
+    "confidence_reason",
+    "actionable_if_confirmed",
+)
 # Pattern: confirmation criteria should contain at least one number (threshold/percentage)
 NUMERIC_PATTERN = re.compile(r"\d+\.?\d*\s*(%|days?|hours?|minutes?|ms|points?|g|kg|lbs?|cal|kcal|bpm|mg)")
 
@@ -782,7 +800,16 @@ def narrate_resolution(hyp, det_evidence, new_status):
     """#530: Haiku narrates a resolution the deterministic test already decided
     (ADR-104 pattern). Fail-soft: any error returns '' and the stored evidence
     stays the deterministic sentence. Only called on resolutions, so v2's check
-    path costs ~nothing in normal weeks."""
+    path costs ~nothing in normal weeks.
+
+    #2420: the sentence ships to readers verbatim (update_hypothesis_status appends
+    it to last_evidence, which /api/hypotheses serves), so it passes the ADR-104
+    grounding chokepoint BEFORE persistence: every number/date it cites must exist
+    in the deterministic result, the hypothesis's own frozen test_spec, or the
+    hypothesis text the reader already sees. Regenerate ONCE with the correction
+    addendum, then HOLD — returning '' keeps the deterministic sentence as the only
+    stored evidence, which is exactly the frozen spec's numbers (the deterministic
+    fallback the issue's regenerate-or-hold contract asks for)."""
     prompt = (
         f"A pre-registered health hypothesis just resolved as {new_status.upper()}.\n"
         f"Hypothesis: {hyp.get('hypothesis', '')}\n"
@@ -791,14 +818,27 @@ def narrate_resolution(hyp, det_evidence, new_status):
         "Use ONLY numbers that appear in the result above; do not invent, extrapolate, or add any. "
         "Respond with the sentence only."
     )
-    payload = json.dumps({"model": AI_MODEL_HAIKU, "max_tokens": 150, "messages": [{"role": "user", "content": prompt}]}).encode()
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=payload,
-        headers={"Content-Type": "application/json", "anthropic-version": "2023-06-01"},
-        method="POST",
-    )
-    try:
+
+    def _findings(text):
+        # Allow-list = the engine's own computed inputs: the deterministic evidence
+        # sentence (every stat the verdict used), the frozen spec's registered
+        # thresholds/window, and the hypothesis sentence itself. Nothing else is
+        # legitimate vocabulary for a sentence whose one job is restating the result.
+        return grounding_findings(
+            text,
+            allowed=allowed_numbers(det_evidence, hyp.get("hypothesis", ""), hyp.get("test_spec"), hyp.get("monitoring_window_days")),
+            allowed_dates=allowed_dates(det_evidence, hyp.get("hypothesis", ""), hyp.get("created_at", "")),
+            **cycle_gate_params(),
+        )
+
+    def _call(prompt_text):
+        payload = json.dumps({"model": AI_MODEL_HAIKU, "max_tokens": 150, "messages": [{"role": "user", "content": prompt_text}]}).encode()
+        req = urllib.request.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=payload,
+            headers={"Content-Type": "application/json", "anthropic-version": "2023-06-01"},
+            method="POST",
+        )
         from common.retry_utils import call_anthropic_raw
 
         resp = call_anthropic_raw(req)
@@ -808,6 +848,18 @@ def narrate_resolution(hyp, det_evidence, new_status):
             if val.blocked:
                 logger.warning("[#530] narration blocked: %s", val.block_reason)
                 return ""
+        return text
+
+    try:
+        text = _call(prompt)
+        findings = _findings(text) if text else []
+        if text and findings:
+            logger.warning("[#2420] resolution narration ungrounded (%d finding(s)) — one correction pass", len(findings))
+            text = _call(prompt + "\n\n" + correction_prompt(findings))
+            findings = _findings(text) if text else []
+        if findings:
+            logger.warning("[#2420] resolution narration HELD after regen (findings=%s) — deterministic evidence only", findings)
+            return ""
         return text
     except Exception as e:
         logger.info(f"[#530] narration skipped (non-fatal): {e}")
@@ -1036,7 +1088,36 @@ test_spec field notes:
                 return None
             if val_result.warnings:
                 logger.warning("[AI-3] generate_hypotheses warnings: %s", val_result.warnings)
-        return json.loads(raw.strip())
+        parsed = json.loads(raw.strip())
+        # #2420: ADR-104 grounding chokepoint BEFORE persistence. The reader-bound
+        # prose fields may only cite numbers/dates present in what the model was
+        # given (this exact user_message, which embeds daily_rows + the profile
+        # targets) or in the candidate's OWN frozen test_spec — the deterministic
+        # contract the verdict machinery will run. Regenerate-or-hold degrades to
+        # HOLD per candidate: a batch re-call for one ungrounded candidate would
+        # re-roll the grounded ones, so the bad candidate is dropped and readers
+        # see fewer hypotheses, never failed text.
+        if isinstance(parsed, dict) and isinstance(parsed.get("hypotheses"), list):
+            kept = []
+            for hyp in parsed["hypotheses"]:
+                if not isinstance(hyp, dict):
+                    continue
+                findings = grounding_findings(
+                    " ".join(str(hyp.get(f) or "") for f in READER_PROSE_FIELDS),
+                    allowed=allowed_numbers(user_message, hyp.get("test_spec"), hyp.get("monitoring_window_days")),
+                    allowed_dates=allowed_dates(user_message),
+                    **cycle_gate_params(),
+                )
+                if findings:
+                    logger.warning(
+                        "[#2420] hypothesis %r HELD — ungrounded reader prose (findings=%s)",
+                        hyp.get("hypothesis_id", "?"),
+                        findings,
+                    )
+                    continue
+                kept.append(hyp)
+            parsed["hypotheses"] = kept
+        return parsed
     # #2221: IndexError (empty `content`) / TypeError (null payload) escaped this handler and killed the weekly run.
     except (json.JSONDecodeError, KeyError, IndexError, TypeError) as e:
         logger.error(f"Hypothesis parse error: {e}")
