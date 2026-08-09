@@ -3,7 +3,7 @@
   "_meta": {
     "generated_by": "scripts/v4_build_stack_manifest.py — derived from source_registry.py + the public protocol/supplement catalogues (#1401); never hand-edit",
     "schema_version": "1.0.0",
-    "updated": "2026-08-08",
+    "updated": "2026-08-09",
     "framing": "Fork the architecture, not the data. This describes the instrument — what measures and how — and contains no health metrics, no personal records, and no account-specific identifiers.",
     "license": "The manifest is published for reuse. It is a description, not a guarantee."
   },
@@ -163,7 +163,7 @@
       "name": "Whoop",
       "category": "Wearables",
       "measures": "Recovery, sleep, HRV, resting HR, strain",
-      "method": "OAuth API pull, hourly",
+      "method": "OAuth API pull, 5x daily",
       "posture": "load-bearing",
       "ingest_pattern": "scheduled_credentialed_pull",
       "behavioral": false,
