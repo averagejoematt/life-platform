@@ -696,7 +696,7 @@ SOURCE_REGISTRY = {
         "expected_days": 7,
         "qa_tier": None,
         "method": "Open-Meteo API pull, 2x daily",
-        "metrics": "Temperature, precipitation, daylight",
+        "metrics": "Temperature, precipitation, daylight, conditions, sunrise/sunset, AQI",
         "posture": "portfolio",
         "raw_layout": {
             "prefix": "raw/weather",

@@ -109,12 +109,33 @@ def test_todoist_api_get_now_retries_network_errors():
 # ══════════════════════════════════════════════════════════════════════════
 def test_weather_fetch_day_retries_on_503():
     """Previously a bare urlopen with zero retry — one transient 5xx dropped
-    the whole day."""
+    the whole day. Since #2311 fetch_day makes a second call (air-quality,
+    us_aqi) after the weather call succeeds."""
     with patch("urllib.request.urlopen") as m:
-        m.side_effect = [_http_error(503), _fake_ok({"daily": {"time": ["2026-07-01"]}})]
+        m.side_effect = [
+            _http_error(503),
+            _fake_ok({"daily": {"time": ["2026-07-01"]}}),
+            _fake_ok({"hourly": {"us_aqi": [40]}}),
+        ]
         result = weather_lambda.fetch_day({}, "2026-07-01")
-    assert result == {"daily": {"time": ["2026-07-01"]}}
-    assert m.call_count == 2
+    assert result["daily"] == {"time": ["2026-07-01"]}
+    assert result["air_quality"] == {"hourly": {"us_aqi": [40]}}
+    assert m.call_count == 3
+
+
+def test_weather_aqi_outage_is_fail_soft_never_the_day():
+    """#2311: the air-quality product going down (all retries exhausted) must
+    cost the aqi field only — the weather record still lands."""
+    with patch("urllib.request.urlopen") as m:
+        m.side_effect = [
+            _fake_ok({"daily": {"time": ["2026-07-01"]}}),
+            _http_error(503),
+            _http_error(503),
+            _http_error(503),  # retry policy exhausted on the AQI call
+        ]
+        result = weather_lambda.fetch_day({}, "2026-07-01")
+    assert result["daily"] == {"time": ["2026-07-01"]}
+    assert "air_quality" not in result
 
 
 # ══════════════════════════════════════════════════════════════════════════
