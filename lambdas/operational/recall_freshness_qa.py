@@ -14,9 +14,16 @@ stayed closed — the pairing the platform keeps re-learning: the mechanism does
 a separate check proves the work happened. A hook with no detector is one silent
 regression away from being the old outage again.
 
-WHAT IT COMPARES. Every phase-visible chronicle installment should have a row in the
-recall partition. The check names the specific missing dates rather than reporting a
-count, because "3 missing" sends someone to query the table and a list does not.
+WHAT IT COMPARES. Two properties, because each has silently failed alone:
+  EXISTENCE — every phase-visible published chronicle installment has a row in the
+    recall partition. The check names the specific missing dates rather than reporting a
+    count, because "3 missing" sends someone to query the table and a list does not.
+  LINK PARITY (#2366) — every indexed installment's stored `link` equals the value
+    `recall_indexer.published_post_links` derives TODAY (the same derivation
+    `chronicle_render.journal_post_ref` pins). Existence alone could not see #1827's
+    scheme change: all 17 live rows carried a retired `/chronicle/week-N/` 404 while
+    this check would have reported green, because the rows *existed*. Parity, not
+    presence.
 
 WHY A BUDGET PAUSE IS NOT A FAILURE. Recall indexing is band-2 gated (ADR-125) — it
 pauses with the reader narrative it decorates. At a paused tier the corpus is SUPPOSED to
@@ -73,6 +80,41 @@ def published_installment_dates(installments) -> list:
     )
 
 
+def published_link_expectations(installments) -> dict:
+    """{sk-date: derived reader link} for every installment `published_installment_dates`
+    counts — the parity side's ground truth (#2366).
+
+    The value is EXACTLY the expression the writer stores (`recall_indexer.chronicle_doc`
+    reads the same `published_post_links` map with the same `(date, sk)` key), so the
+    sensor and the writer cannot disagree by construction — including the honest-absence
+    case: a phase-wiped installment derives "" and its stored link must be "" too, not a
+    leftover URL from a retired scheme.
+    """
+    from ai.recall_indexer import date_from_sk, published_post_links
+    from experiment.phase_filter import singleton_visible
+
+    links = published_post_links(installments)
+    return {
+        date_from_sk(str(i.get("sk", ""))): links.get((i.get("date", ""), str(i.get("sk", ""))), "")
+        for i in installments
+        if singleton_visible(i) and date_from_sk(str(i.get("sk", ""))) and str(i.get("status", "")) == "published"
+    }
+
+
+def link_mismatches(expected_links, stored_links) -> list:
+    """Indexed dates whose stored corpus link differs from the derived link. Pure.
+
+    Only dates that ARE in the corpus can mismatch — an absent row is `missing_dates`'
+    finding, and reporting it twice would turn one gap into two accusations.
+    """
+    stored = {str(k): str(v or "") for k, v in (stored_links or {}).items()}
+    return [
+        d
+        for d, expected in sorted((str(k), str(v or "")) for k, v in (expected_links or {}).items())
+        if d in stored and stored[d] != expected
+    ]
+
+
 def missing_dates(published, embedded) -> list:
     """Published installment dates with no embedding row. Pure set arithmetic.
 
@@ -84,29 +126,55 @@ def missing_dates(published, embedded) -> list:
     return [d for d in sorted(str(p) for p in (published or [])) if d not in have]
 
 
-def assess(published, embedded, *, indexing_paused=False):
-    """(state, message) for the corpus-freshness check. Pure."""
+def _named(dates) -> str:
+    """The first _MAX_NAMED dates, honestly counting the elided rest."""
+    return ", ".join(dates[:_MAX_NAMED]) + (f" (+{len(dates) - _MAX_NAMED} more)" if len(dates) > _MAX_NAMED else "")
+
+
+def assess(published, embedded, *, expected_links=None, stored_links=None, indexing_paused=False):
+    """(state, message) for the corpus-freshness check. Pure.
+
+    `expected_links`/`stored_links` feed the link-parity side (#2366); passing neither
+    assesses existence only, which keeps the pure core callable without a table.
+
+    A link mismatch reports FAIL even at a budget-paused tier: the pause excuses a
+    corpus that stopped ADVANCING (band 2 stops the embed spend), but a stored link
+    being WRONG is not a budget consequence, and both repair paths — the publish-time
+    metadata refresh and the operator script — cost nothing. A pause that excused rot
+    would let a scheme change hide behind any lean month.
+    """
     if not published:
         # Genesis week, or a fresh reset: nothing has published yet, so an empty corpus
         # is the correct state and not evidence of a broken writer.
         return OK, "no published installments yet — nothing to index"
 
     gaps = missing_dates(published, embedded)
-    if not gaps:
-        return OK, f"all {len(published)} published installment(s) are in the recall corpus"
+    bad_links = link_mismatches(expected_links, stored_links)
 
-    if indexing_paused:
+    if gaps and not indexing_paused:
+        also = f" ALSO: {len(bad_links)} stored link(s) diverge from the derived scheme ({_named(bad_links)})." if bad_links else ""
+        return FAIL, (
+            f"{len(gaps)} published installment(s) MISSING from the recall corpus: {_named(gaps)}. "
+            f"The publish-time indexer did not write them, so 'when did I feel like this before?' "
+            f"cannot cite these weeks — and returns silence rather than an error." + also
+        )
+
+    if bad_links:
+        return FAIL, (
+            f"{len(bad_links)} indexed installment(s) carry a stored link that no longer matches the derived "
+            f"reader link: {_named(bad_links)}. The corpus rotted under a link-scheme change — retrieval would "
+            f"cite URLs a reader cannot open (ADR-104). Repair costs nothing (metadata refresh, no re-embed): "
+            f"python3 deploy/backfill_recall_embeddings.py --apply --kinds chronicle"
+        )
+
+    if gaps:  # and indexing_paused
         return PAUSED, (
             f"{len(gaps)} published installment(s) not indexed — recall indexing is budget-paused "
             f"at this tier (band 2, ADR-125), so the corpus is intentionally not advancing"
         )
 
-    named = ", ".join(gaps[:_MAX_NAMED]) + (f" (+{len(gaps) - _MAX_NAMED} more)" if len(gaps) > _MAX_NAMED else "")
-    return FAIL, (
-        f"{len(gaps)} published installment(s) MISSING from the recall corpus: {named}. "
-        f"The publish-time indexer did not write them, so 'when did I feel like this before?' "
-        f"cannot cite these weeks — and returns silence rather than an error."
-    )
+    parity = " with stored links matching the derived scheme" if expected_links is not None else ""
+    return OK, f"all {len(published)} published installment(s) are in the recall corpus{parity}"
 
 
 def _indexing_paused() -> bool:
@@ -119,20 +187,26 @@ def _indexing_paused() -> bool:
         return False
 
 
-def _embedded_chronicle_dates(table) -> list:
-    """`doc_date` of every chronicle row in the recall partition."""
+def _chronicle_corpus_links(table) -> dict:
+    """{doc_date: stored link} for every chronicle row in the recall partition.
+
+    One structure serves both sides of the check: its keys are the existence set
+    (what `_embedded_chronicle_dates` used to return) and its values are the parity
+    side's stored links (#2366).
+    """
     from ai import semantic_recall as sr
     from boto3.dynamodb.conditions import Key
 
-    dates, kwargs = [], {"KeyConditionExpression": Key("pk").eq(sr.RECALL_PK)}
+    rows: dict = {}
+    kwargs: dict = {"KeyConditionExpression": Key("pk").eq(sr.RECALL_PK)}
     while True:
         resp = table.query(**kwargs)
         for it in resp.get("Items", []):
             if it.get("kind") == sr.KIND_CHRONICLE and it.get("doc_date"):
-                dates.append(str(it["doc_date"]))
+                rows[str(it["doc_date"])] = str(it.get("link", "") or "")
         lek = resp.get("LastEvaluatedKey")
         if not lek:
-            return dates
+            return rows
         kwargs["ExclusiveStartKey"] = lek
 
 
@@ -143,8 +217,15 @@ def checks(table, chronicle_pk, Check, partition):  # noqa: N803 — `Check` is 
     c = Check("recall:corpus_freshness", CATEGORY, partition)
     try:
         resp = table.query(KeyConditionExpression=Key("pk").eq(chronicle_pk) & Key("sk").begins_with("DATE#"))
-        published = published_installment_dates(resp.get("Items", []))
-        state, msg = assess(published, _embedded_chronicle_dates(table), indexing_paused=_indexing_paused())
+        installments = resp.get("Items", [])
+        corpus = _chronicle_corpus_links(table)
+        state, msg = assess(
+            published_installment_dates(installments),
+            list(corpus),
+            expected_links=published_link_expectations(installments),
+            stored_links=corpus,
+            indexing_paused=_indexing_paused(),
+        )
     except Exception as e:  # noqa: BLE001 — an unreadable table is a warn, not a false accusation
         return [c.warn(f"could not assess recall-corpus freshness: {e}")]
 

@@ -45,9 +45,11 @@ from __future__ import annotations
 
 from ai import semantic_recall as sr
 
-# Status strings returned by the indexing entry points. Callers log these; the only one
-# that means "the corpus changed" is INDEXED.
+# Status strings returned by the indexing entry points. Callers log these; the two
+# that mean "the corpus changed" are INDEXED (a row was embedded + written) and
+# REPAIRED (stale metadata refreshed on an already-embedded row, no spend — #2366).
 INDEXED = "indexed"
+REPAIRED = "repaired"
 UNCHANGED = "unchanged"
 SKIPPED_BUDGET = "skipped:budget"
 SKIPPED_NO_RECORD = "skipped:no-record"
@@ -128,6 +130,55 @@ def chronicle_doc(item: dict, links: dict) -> dict | None:
     }
 
 
+def metadata_drift(stored: dict, doc: dict) -> dict:
+    """{attr: new_value} for the metadata that no longer matches the source record —
+    `{}` when the stored row is already correct. Compares only what a refresh can fix
+    without re-embedding: the reader `link` and the source `cycle` stamp.
+
+    This is the repair half of the idempotency gate (#2366): `text_sha` correctly says
+    "do not pay to re-embed", but the link scheme and cycle stamp can rot UNDER an
+    unchanged text — #1827's retired `/chronicle/week-N/` slug sat on all 17 live rows
+    precisely because the sha compare early-returned before anyone looked at the link.
+    """
+    drift: dict = {}
+    new_link = doc.get("link", "") or ""
+    if (stored.get("link") or "") != new_link:
+        drift["link"] = new_link
+    old_cycle = stored.get("cycle")
+    new_cycle = doc.get("cycle")
+    old_i = int(old_cycle) if old_cycle is not None else None
+    new_i = int(new_cycle) if new_cycle is not None else None
+    if old_i != new_i:
+        drift["cycle"] = new_i
+    return drift
+
+
+def refresh_metadata(table, sk: str, drift: dict) -> None:
+    """Write ONLY the drifted metadata attributes — no embedding call, no spend. A
+    `cycle` that went away (source record lost its stamp) is REMOVED, not zeroed, so
+    `_cycle_label` makes no cycle claim rather than a false one."""
+    sets: list = []
+    removes: list = []
+    names: dict = {}
+    values: dict = {}
+    for i, (attr, val) in enumerate(sorted(drift.items())):
+        names[f"#a{i}"] = attr
+        if val is None:
+            removes.append(f"#a{i}")
+        else:
+            sets.append(f"#a{i} = :v{i}")
+            values[f":v{i}"] = val
+    expr = " ".join(filter(None, ["SET " + ", ".join(sets) if sets else "", "REMOVE " + ", ".join(removes) if removes else ""]))
+    kwargs: dict = {
+        "Key": {"pk": sr.RECALL_PK, "sk": sk},
+        "UpdateExpression": expr,
+        "ExpressionAttributeNames": names,
+    }
+    if values:
+        kwargs["ExpressionAttributeValues"] = values
+    table.update_item(**kwargs)
+
+
 def _budget_allows() -> bool:
     """Band-2 gate (ADR-125): recall pauses with the reader narrative it decorates.
 
@@ -147,14 +198,22 @@ def index_document(table, doc: dict, *, embed=None, now=None, model: str = "", f
 
     Idempotency is the `text_sha` compare against the stored row, the same key the
     backfill uses, so the script and this Lambda path cannot double-embed each other's
-    work. Returns a status string; never raises.
+    work — but the gate REPAIRS before it early-returns (#2366): a matching text whose
+    stored `link`/`cycle` no longer equal the derived values gets a metadata refresh
+    (one update_item, no embed, no spend) instead of a blind UNCHANGED. Without this,
+    a link-scheme change rots every existing row and only an operator `--force` (paying
+    to re-embed unchanged text) could touch them again.
 
-    `embed`/`now` are injected so tests run with no Bedrock and no wall clock.
+    Returns a status string; never raises. `embed`/`now` are injected so tests run with
+    no Bedrock and no wall clock.
+
+    GATE ORDER: the budget gate sits between the repair path and the embed, not at the
+    top — the repair is free (no Bedrock call), so a band-2 pause (ADR-125) must not be
+    able to hold the corpus in a known-rotted state. Only the embed costs money; only
+    the embed is gated.
     """
     if not doc or not (doc.get("text") or "").strip():
         return SKIPPED_NO_TEXT
-    if not _budget_allows():
-        return SKIPPED_BUDGET
 
     sk = sr.sk_for(doc["kind"], doc["date"])
     new_sha = sr.sha_text(doc["text"])
@@ -164,7 +223,17 @@ def index_document(table, doc: dict, *, embed=None, now=None, model: str = "", f
         except Exception:  # noqa: BLE001 — an unreadable row is treated as absent, and re-embedding is idempotent
             stored = {}
         if stored.get("text_sha") == new_sha:
-            return UNCHANGED
+            drift = metadata_drift(stored, doc)
+            if not drift:
+                return UNCHANGED
+            try:
+                refresh_metadata(table, sk, drift)
+            except Exception:  # noqa: BLE001 — a failed repair is a fault the freshness guard keeps reporting
+                return FAILED
+            return REPAIRED
+
+    if not _budget_allows():
+        return SKIPPED_BUDGET
 
     try:
         if embed is None:

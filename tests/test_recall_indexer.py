@@ -108,6 +108,7 @@ class FakeTable:
         self.installments = list(installments)
         self.rows = dict(rows or {})
         self.puts = []
+        self.updates = []
         self.query_calls = 0
 
     def query(self, **kwargs):
@@ -121,6 +122,20 @@ class FakeTable:
     def put_item(self, Item):  # noqa: N803 — boto3's parameter name
         self.puts.append(Item)
         self.rows[Item["sk"]] = Item
+
+    def update_item(self, Key, UpdateExpression, ExpressionAttributeNames, ExpressionAttributeValues=None):  # noqa: N803
+        """Applies the exact contract `refresh_metadata` emits: a name WITH a value is a
+        SET, a name with no value is a REMOVE."""
+        self.updates.append(UpdateExpression)
+        row = self.rows.setdefault(Key["sk"], {})
+        values = ExpressionAttributeValues or {}
+        for ph, attr in ExpressionAttributeNames.items():
+            vph = ":v" + ph[2:]
+            if vph in values:
+                row[attr] = values[vph]
+            else:
+                row.pop(attr, None)
+        return {}
 
 
 # ── WRITER ──────────────────────────────────────────────────────────────────
@@ -504,3 +519,99 @@ def test_the_post_template_actually_interpolates_the_card():
     src = inspect.getsource(_render().publish_to_journal)
     assert "recall_card_html" in src
     assert "{recall_card_html}" in src
+
+
+# ── REPAIR (#2366): the idempotency gate fixes rot instead of shrugging at it ──
+def _boom(text):
+    raise AssertionError("re-embedded unchanged text — the repair path must never pay for an embed")
+
+
+def _indexed(table, date, **kwargs):
+    return ri.index_chronicle_installment(table, CHRONICLE_PK, date, **kwargs)
+
+
+def test_a_rotted_link_on_unchanged_text_is_repaired_without_a_reembed():
+    """THE defect: all 17 live rows carried #1827's retired `/chronicle/week-N/` slug, and
+    because `text_sha` matched, `index_document` early-returned UNCHANGED forever — the
+    corpus was unrepairable without an operator `--force` paying to re-embed unchanged
+    text. The gate must repair the metadata for free instead."""
+    date = WEEK_2
+    table = FakeTable([_inst(date)])
+    assert _indexed(table, date, embed=_vec, now=_NOW) == ri.INDEXED
+
+    sk = sr.sk_for(sr.KIND_CHRONICLE, date)
+    good_link = table.rows[sk]["link"]
+    assert good_link.startswith("/journal/posts/week-")
+    table.rows[sk]["link"] = "/chronicle/week-1/"  # the retired scheme
+
+    assert _indexed(table, date, embed=_boom, now=_NOW) == ri.REPAIRED
+    assert table.rows[sk]["link"] == good_link
+    assert len(table.puts) == 1  # metadata refresh only — no second embedded row
+
+
+def test_the_mutation_pair_a_correct_row_is_left_untouched():
+    """The other half of the proof: a row whose link already resolves must NOT be
+    rewritten — otherwise every publish would churn the corpus and REPAIRED would stop
+    meaning anything."""
+    date = WEEK_2
+    table = FakeTable([_inst(date)])
+    assert _indexed(table, date, embed=_vec, now=_NOW) == ri.INDEXED
+    assert _indexed(table, date, embed=_boom, now=_NOW) == ri.UNCHANGED
+    assert table.updates == []
+
+
+def test_a_drifted_cycle_stamp_is_refreshed_with_the_link():
+    """#2366 sub-face: a reset's carry-forward re-stamps the chronicle record's `cycle`
+    while the corpus row keeps the value frozen at embed time."""
+    date = WEEK_2
+    table = FakeTable([_inst(date, cycle=10)])
+    assert _indexed(table, date, embed=_vec, now=_NOW) == ri.INDEXED
+
+    table.installments = [_inst(date, cycle=12)]  # the reset re-stamped the source record
+    assert _indexed(table, date, embed=_boom, now=_NOW) == ri.REPAIRED
+    assert table.rows[sr.sk_for(sr.KIND_CHRONICLE, date)]["cycle"] == 12
+
+
+def test_a_cycle_that_went_away_is_removed_not_zeroed():
+    """An unstamped source record must yield NO cycle claim on the corpus row rather
+    than a stale or invented one (ADR-104)."""
+    date = WEEK_2
+    table = FakeTable([_inst(date, cycle=12)])
+    assert _indexed(table, date, embed=_vec, now=_NOW) == ri.INDEXED
+
+    table.installments = [_inst(date, cycle=None)]
+    assert _indexed(table, date, embed=_boom, now=_NOW) == ri.REPAIRED
+    assert "cycle" not in table.rows[sr.sk_for(sr.KIND_CHRONICLE, date)]
+
+
+def test_repair_runs_even_when_the_budget_is_paused(monkeypatch):
+    """The repair is one update_item — no Bedrock, no spend — so a band-2 pause
+    (ADR-125) must not hold the corpus in a known-rotted state. The embed path, which
+    DOES cost money, stays gated."""
+    date = WEEK_2
+    table = FakeTable([_inst(date)])
+    assert _indexed(table, date, embed=_vec, now=_NOW) == ri.INDEXED
+    sk = sr.sk_for(sr.KIND_CHRONICLE, date)
+    table.rows[sk]["link"] = "/chronicle/week-1/"
+
+    monkeypatch.setattr(ri, "_budget_allows", lambda: False)
+    assert _indexed(table, date, embed=_boom, now=_NOW) == ri.REPAIRED
+
+    fresh = FakeTable([_inst(date)])  # nothing stored ⇒ would need a paid embed ⇒ gated
+    assert _indexed(fresh, date, embed=_boom, now=_NOW) == ri.SKIPPED_BUDGET
+    assert fresh.puts == []
+
+
+def test_a_failed_repair_reports_failed_not_a_raise():
+    """Fail-soft like every other indexer outcome — and FAILED, not UNCHANGED, so the
+    freshness guard keeps reporting the rot instead of a quiet no-op."""
+    date = WEEK_2
+
+    class _Throttled(FakeTable):
+        def update_item(self, **kwargs):
+            raise RuntimeError("throttled")
+
+    table = _Throttled([_inst(date)])
+    assert _indexed(table, date, embed=_vec, now=_NOW) == ri.INDEXED
+    table.rows[sr.sk_for(sr.KIND_CHRONICLE, date)]["link"] = "/chronicle/week-1/"
+    assert _indexed(table, date, embed=_boom, now=_NOW) == ri.FAILED

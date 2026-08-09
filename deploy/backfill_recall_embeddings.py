@@ -47,6 +47,11 @@ from boto3.dynamodb.conditions import Key  # noqa: E402
 _date_from_sk = ri.date_from_sk
 _snippet = ri.snippet
 published_post_links = ri.published_post_links
+# The metadata repair pair moved into `ai.recall_indexer` too (#2366) so the publish-time
+# Lambda's idempotency gate can self-repair a rotted link/cycle without an operator run —
+# same motivation, same re-export contract.
+metadata_drift = ri.metadata_drift
+refresh_metadata = ri.refresh_metadata
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE = os.environ.get("TABLE_NAME", "life-platform")
@@ -161,46 +166,6 @@ def existing_rows(table):
             break
         kwargs["ExclusiveStartKey"] = lek
     return out
-
-
-def metadata_drift(existing: dict, doc: dict) -> dict:
-    """{attr: new_value} for the metadata that no longer matches the source record —
-    `{}` when the stored row is already correct. Compares only what a re-run can fix
-    without re-embedding: the reader `link` and the source `cycle` stamp."""
-    drift = {}
-    new_link = doc.get("link", "") or ""
-    if (existing.get("link") or "") != new_link:
-        drift["link"] = new_link
-    old_cycle = existing.get("cycle")
-    new_cycle = doc.get("cycle")
-    old_i = int(old_cycle) if old_cycle is not None else None
-    new_i = int(new_cycle) if new_cycle is not None else None
-    if old_i != new_i:
-        drift["cycle"] = new_i
-    return drift
-
-
-def refresh_metadata(table, sk: str, drift: dict) -> None:
-    """Write ONLY the drifted metadata attributes — no embedding call, no spend. A
-    `cycle` that went away (source record lost its stamp) is REMOVED, not zeroed, so
-    `_cycle_label` makes no cycle claim rather than a false one."""
-    sets, removes, names, values = [], [], {}, {}
-    for i, (attr, val) in enumerate(sorted(drift.items())):
-        names[f"#a{i}"] = attr
-        if val is None:
-            removes.append(f"#a{i}")
-        else:
-            sets.append(f"#a{i} = :v{i}")
-            values[f":v{i}"] = val
-    expr = " ".join(filter(None, ["SET " + ", ".join(sets) if sets else "", "REMOVE " + ", ".join(removes) if removes else ""]))
-    kwargs = {
-        "Key": {"pk": sr.RECALL_PK, "sk": sk},
-        "UpdateExpression": expr,
-        "ExpressionAttributeNames": names,
-    }
-    if values:
-        kwargs["ExpressionAttributeValues"] = values
-    table.update_item(**kwargs)
 
 
 def main():
