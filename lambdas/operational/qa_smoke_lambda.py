@@ -86,6 +86,10 @@ from operational.qa_check_outputs import (  # noqa: E402,F401
     check_s3_freshness,
     check_score_sanity,
 )
+
+# #2335: the email HTML renderer lives in its own module; imported into this
+# namespace so the test seam (monkeypatch on qa.build_report_html) is unchanged.
+from operational.qa_smoke_report import build_report_html  # noqa: E402
 from operational.weight_truth_qa import WEIGHT_RECONCILE_TOL, assess_hero_weight  # noqa: E402,F401
 
 S3_BUCKET = os.environ["S3_BUCKET"]
@@ -843,11 +847,7 @@ def check_canary_precision():
             if any(str(a).endswith(":grounded") for a in rec.get("alarms") or []):
                 alarmed_dates.append(d)
     except Exception as e:
-        # #2378: chronic while the s3:GetObject grant gap is open — this exact
-        # AccessDenied recurred nightly for weeks (tracked in #1956) and held
-        # qa-smoke-warnings structurally red. Stays visible in the email +
-        # ChronicWarnCount; un-chronic this branch when the grant lands. The
-        # no-sighted-runs and cried-wolf branches below stay ALARMED.
+        # #2378: chronic while the #1956 grant gap is open; branches below stay ALARMED.
         return [c.warn(f"canary precision unreadable ({e}) — fail-soft; needs s3:GetObject on {CANARY_LOG_PREFIX}/* (#1956)", chronic=True)]
     if runs == 0:
         return [c.warn(f"no sighted canary runs in trailing {CANARY_PRECISION_WINDOW_DAYS}d — grounded precision unmeasurable")]
@@ -910,12 +910,7 @@ def check_coach_ensemble_phase_stamp_coverage():
     if unstamped:
         sample = ", ".join(unstamped[:5])
         more = f" (+{len(unstamped) - 5} more)" if len(unstamped) > 5 else ""
-        # #2378: chronic — the docstring above already declares this a "known,
-        # low-severity data-hygiene gap" whose remedy is the reviewed operator
-        # backfill (#1970); the same count recurring nightly held
-        # qa-smoke-warnings structurally red without adding information. The
-        # gap stays visible nightly (email + ChronicWarnCount) until the
-        # backfill lands; the errored branch above stays ALARMED.
+        # #2378: chronic — awaiting the #1970 backfill; errored branch above stays ALARMED.
         return [
             c.warn(
                 f"{len(unstamped)} row(s) on tagger-blind COACH#/ENSEMBLE# partitions carry no phase attribute "
@@ -925,75 +920,6 @@ def check_coach_ensemble_phase_stamp_coverage():
             )
         ]
     return [c.ok(f"all rows across {len(pks)} tagger-blind COACH#/ENSEMBLE# partitions carry a phase stamp")]
-
-
-def build_report_html(all_checks, run_time_str):
-    fails = [c for c in all_checks if c.passed is False]
-    warns = [c for c in all_checks if c.passed is None]
-    paused = [c for c in all_checks if c.paused]
-    passes = [c for c in all_checks if c.passed is True and not c.paused]
-
-    # #1921: the email must say which SIDE failed. A content-truth failure no
-    # longer reverts the fleet, so this line is the reader's only cue that a red
-    # run did not (and should not have) triggered a rollback.
-    n_deploy = sum(1 for c in fails if c.partition == DEPLOY_HEALTH)
-    n_content = sum(1 for c in fails if c.partition == CONTENT_TRUTH)
-    split = f" &middot; {n_deploy} deploy-health &middot; {n_content} content-truth" if fails else ""
-
-    overall = "ALL CLEAR" if not fails else f"{len(fails)} FAILURE(S)"
-    banner_emoji = "✅" if not fails else "🔴"
-    hdr_bg = "#064e3b" if not fails else "#450a0a"
-    hdr_fg = "#d1fae5" if not fails else "#fecaca"
-
-    cats = {}
-    for c in all_checks:
-        cats.setdefault(c.category, []).append(c)
-
-    html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
-<body style="margin:0;padding:0;background:#0f0f23;font-family:'SF Pro Display','Segoe UI',sans-serif;">
-<div style="max-width:600px;margin:0 auto;background:#1a1a2e;">
-  <div style="background:{hdr_bg};padding:20px 24px;border-bottom:3px solid #2d2d5e;">
-    <p style="color:#94a3b8;font-size:10px;margin:0 0 4px;font-weight:700;">LIFE PLATFORM · QA SMOKE TEST</p>
-    <h1 style="color:{hdr_fg};font-size:24px;font-weight:700;margin:0 0 4px;">{banner_emoji} {overall}</h1>
-    <p style="color:#94a3b8;font-size:11px;margin:0;">{run_time_str} &middot; {len(passes)} passed &middot; {len(paused)} paused &middot; {len(warns)} warnings &middot; {len(fails)} failed{split}</p>
-  </div>"""
-
-    for cat, checks in cats.items():
-        cat_fails = sum(1 for c in checks if c.passed is False)
-        cat_warns = sum(1 for c in checks if c.passed is None)
-        cat_paused = sum(1 for c in checks if c.paused)
-        if cat_fails:
-            icon = "🔴"
-        elif cat_warns:
-            icon = "🟡"
-        elif cat_paused and cat_paused == len(checks):
-            icon = "⏸️"
-        else:
-            icon = "🟢"
-        html += f"""
-  <div style="padding:14px 24px;border-bottom:1px solid #2d2d5e;">
-    <p style="color:#64748b;font-size:10px;margin:0 0 8px;font-weight:700;">{icon} {cat.upper()}</p>"""
-        for c in checks:
-            if c.paused:
-                ci, cc = ("⏸️", "#94a3b8")
-            elif c.passed is True:
-                ci, cc = ("✅", "#22c55e")
-            elif c.passed is False:
-                ci, cc = ("❌", "#f87171")
-            else:
-                ci, cc = ("⚠️", "#fbbf24")
-            html += f"""    <p style="margin:2px 0;font-size:11px;">
-      <span style="color:{cc}">{ci} <strong>{c.name}</strong></span>
-      <span style="color:#9ca3af;"> — {c.message}</span></p>"""
-        html += "\n  </div>"
-
-    html += """
-  <div style="background:#111827;padding:10px 24px;text-align:center;">
-    <p style="color:#374151;font-size:9px;margin:0;">Life Platform QA · auto-generated</p>
-  </div>
-</div></body></html>"""
-
-    return html
 
 
 # ---------------------------------------------------------------------------

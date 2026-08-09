@@ -445,17 +445,10 @@ class MonitoringStack(Stack):
         #                          DELIBERATELY unalarmed (their honest daily
         #                          floor was 4-11, which held this alarm red 15+
         #                          consecutive nights against the >= 1
-        #                          threshold; ADR-105). #2378 extended the
-        #                          chronic set — optional-metric nulls in
-        #                          check_score_sanity (timing class) plus the
-        #                          issue-pinned recurring warns #1956/#1970 —
-        #                          after the residual alarmed set kept this
-        #                          alarm structurally red 21+ more days. The
-        #                          full sanctioned set is AST-guarded in
-        #                          tests/test_qa_smoke_chronic_warns.py. Do
-        #                          not add an alarm on ChronicWarnCount, and
-        #                          do not shorten the 86400s Maximum window
-        #                          below — both are load-bearing.
+        #                          threshold; ADR-105). #2378: chronic set
+        #                          AST-guarded in test_qa_smoke_chronic_warns. No
+        #                          ChronicWarnCount alarm; keep the 86400s
+        #                          Maximum window — load-bearing.
         _heartbeat_alarm(
             "QaSmokeHeartbeat",
             "qa-smoke-heartbeat",
