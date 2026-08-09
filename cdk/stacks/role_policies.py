@@ -3209,3 +3209,67 @@ def subscriber_onboarding() -> list[iam.PolicyStatement]:
             resources=_s3("generated/journal/posts.json"),
         ),
     ]
+
+
+def telegram_webhook() -> list[iam.PolicyStatement]:
+    """Telegram webhook (#2364): the public front door, deliberately near-powerless.
+
+    One secret read + one lambda:InvokeFunction, nothing else. Zero-arg by
+    contract: test_iam_secrets_consistency enumerates policy functions by CALLING
+    them; the worker ARN builds from constants (the name is fixed).
+    """
+    return [
+        iam.PolicyStatement(
+            sid="TelegramSecretRead",
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn("life-platform/telegram")],
+        ),
+        iam.PolicyStatement(
+            sid="InvokeWorker",
+            actions=["lambda:InvokeFunction"],
+            resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:telegram-coach-worker"],
+        ),
+    ]
+
+
+def telegram_worker() -> list[iam.PolicyStatement]:
+    """Telegram coach worker (#2364): the chat brain's runtime grants.
+
+    DDB read-wide (persona/memory/facts span COACH#, computed_metrics, engagement)
+    but WRITE-SCOPED to COACH#* via LeadingKeys — the chat stores CHAT# turns and
+    must never touch a DATE# timeseries row. Bedrock via the ADR-062 statement;
+    the telegram store; read-only SSM for budget tier + cycle.
+    """
+    return [
+        iam.PolicyStatement(
+            sid="DynamoDBRead",
+            actions=["dynamodb:GetItem", "dynamodb:Query"],
+            resources=[TABLE_ARN],
+        ),
+        # CMK table (R1/R2): DDB is dead without the key grants.
+        iam.PolicyStatement(sid="KMS", actions=["kms:Decrypt", "kms:GenerateDataKey"], resources=[KMS_KEY_ARN]),
+        iam.PolicyStatement(
+            sid="DynamoDBCoachChatWrite",
+            actions=["dynamodb:PutItem"],
+            resources=[TABLE_ARN],
+            conditions={
+                "ForAllValues:StringLike": {
+                    "dynamodb:LeadingKeys": ["COACH#*"],
+                },
+            },
+        ),
+        _bedrock_statement(),
+        iam.PolicyStatement(
+            sid="TelegramSecretRead",
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn("life-platform/telegram")],
+        ),
+        iam.PolicyStatement(
+            sid="SSMRead",
+            actions=["ssm:GetParameter"],
+            resources=[
+                f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/budget-tier",
+                f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle",
+            ],
+        ),
+    ]

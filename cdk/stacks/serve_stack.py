@@ -324,6 +324,67 @@ class ServeStack(Stack):
         # life-platform-site-api-dashboard / -latency dashboards + the alarms above.
         # Re-add a Dashboard construct here (fresh name) if a curated board is wanted.
 
+        # ── Telegram coach chat (#2364, epic #2363) — webhook front door + async worker.
+        # Two Lambdas because the trust boundary is between them: the webhook is a
+        # PUBLIC FunctionURL and is deliberately near-powerless (one secret read, one
+        # invoke); the worker holds the real grants (DDB, Bedrock) and is reachable
+        # only via that invoke. Serving path, so it lives in this stack (#793).
+        telegram_worker_fn = create_platform_lambda(
+            self,
+            "TelegramCoachWorker",
+            function_name="telegram-coach-worker",
+            source_file="lambdas/coach/telegram_worker_lambda.py",
+            handler="coach.telegram_worker_lambda.lambda_handler",
+            table=local_table,
+            bucket=local_bucket,
+            dlq=None,
+            alerts_topic=None,
+            custom_policies=rp.telegram_worker(),
+            timeout_seconds=60,  # typing → memory reads → Bedrock (regen possible) → send
+            memory_mb=512,
+            environment={
+                "USER_ID": "matthew",
+                "TABLE_NAME": TABLE_NAME,
+                "TELEGRAM_SECRET_ID": "life-platform/telegram",
+            },
+        )
+        # A chatty evening must not starve the site: the worker gets a small reserved
+        # slice, sized like site-api-ai's (sequential model calls, one user).
+        telegram_worker_fn.node.default_child.add_property_override("ReservedConcurrentExecutions", 2)
+
+        telegram_webhook_fn = create_platform_lambda(
+            self,
+            "TelegramWebhook",
+            function_name="telegram-webhook",
+            source_file="lambdas/web/telegram_webhook_lambda.py",
+            handler="web.telegram_webhook_lambda.lambda_handler",
+            # The helper reads table.table_name/bucket for env wiring unconditionally,
+            # so the objects are passed — but the ROLE carries no DDB/S3 statement at
+            # all (custom_policies is the only grant path): the webhook can read one
+            # secret and invoke one function, nothing else.
+            table=local_table,
+            bucket=local_bucket,
+            dlq=None,
+            alerts_topic=None,
+            custom_policies=rp.telegram_webhook(),
+            timeout_seconds=10,  # verify + async-invoke only; inference is the worker's
+            memory_mb=256,
+            environment={
+                "TELEGRAM_SECRET_ID": "life-platform/telegram",
+                "TELEGRAM_WORKER_FUNCTION": "telegram-coach-worker",
+            },
+        )
+        telegram_webhook_url = telegram_webhook_fn.add_function_url(
+            auth_type=_lambda.FunctionUrlAuthType.NONE,  # Telegram can't sign; the gate is the echoed secret token
+        )
+
+        cdk.CfnOutput(
+            self,
+            "TelegramWebhookUrl",
+            value=telegram_webhook_url.url,
+            description="FunctionURL for telegram-webhook — pass to setup/register_telegram_webhooks.py --url",
+        )
+
         cdk.CfnOutput(
             self,
             "SiteApiFunctionUrl",
