@@ -219,10 +219,8 @@ UNGATED_READER_KNOWN: dict[str, dict[str, object]] = {
     # coach_ensemble_digest.py left this table 2026-08-09 the designed way (#2419):
     # its digest writer landed a SURFACES registration
     # (grounding_wiring: "lambdas/coach/coach_ensemble_digest.py::_apply_grounding_gate").
-    "lambdas/compute/hypothesis_engine_lambda.py": {
-        "issue": 2420,
-        "note": "hypothesis prose + narrate_resolution publish to /api/hypotheses ungated — the freeze protects the verdict, not the text.",
-    },
+    # (#2420 RESOLVED 2026-08-09: hypothesis_engine_lambda.py left this table the designed
+    # way — both prose paths are now registered SURFACES in tests/grounding_wiring.py.)
     "lambdas/intelligence/ai_expert_analyzer_lambda.py": {
         "issue": 2421,
         "note": "4 of 6 model calls (:1188/:1419/:1622/:1771) reach readers with no chokepoint, including a rewrite AFTER the gate ran; "
