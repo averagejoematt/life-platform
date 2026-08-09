@@ -1,0 +1,20 @@
+{
+  "as_of_weight_lbs": 318.2,
+  "lead": null,
+  "team_focus": ["protein at every meal"],
+  "huddle": [],
+  "tensions": [
+    {
+      "topic": "Zone 2 volume vs. lifting recovery",
+      "coaches": ["training_coach", "strength_coach"],
+      "position_a": "Add a third Zone 2 session — the aerobic base is the limiter right now.",
+      "position_b": "Hold at two — squat recovery is already marginal at this deficit.",
+      "resolution": "Hold at two sessions until the deficit shallows; revisit on the next weigh-in trend.",
+      "generated_at": "2026-08-05T14:00:00+00:00"
+    }
+  ],
+  "dispute": null,
+  "all_same_stage": false,
+  "current_stage": null,
+  "disclosure": "AI coaching characters — every number comes from the live data."
+}

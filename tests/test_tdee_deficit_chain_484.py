@@ -103,14 +103,34 @@ def test_summary_ingest_omits_tdee_when_no_expenditure():
 # ── the labeled Mifflin estimate fallback ─────────────────────────────────────
 
 
+_PROFILE_72IN = {"height_inches": 72}
+
+
 def test_mifflin_estimate_from_weight():
-    # 300 lb → ~136 kg; Mifflin-St Jeor × 1.55 ≈ a plausible TDEE for that mass.
-    est = _mifflin_tdee(300)
+    # ADR-152 (#2310): Mifflin-St Jeor BMR + MEASURED trailing-7d exercise energy — the
+    # flat x1.55 multiplier is retired. 300 lb → ~136 kg, no exercise rows → BMR alone.
+    est = _mifflin_tdee(300, profile=_PROFILE_72IN)
     assert est is not None
-    assert 3000 < est < 4200  # sanity band, not a magic number
+    assert 2200 < est < 3200  # sanity band, not a magic number
+
+
+def test_mifflin_estimate_adds_measured_exercise_energy_not_a_multiplier():
+    """The exercise term is real data: one hour of moving time at ~6 kcal/kg/hour over a
+    136 kg body is ~816 kcal for the window, ~117 kcal/day across the 7-day window."""
+    base = _mifflin_tdee(300, profile=_PROFILE_72IN)
+    with_ex = _mifflin_tdee(300, [{"total_moving_time_seconds": 3600}], profile=_PROFILE_72IN)
+    assert with_ex > base
+    assert with_ex - base == 117
 
 
 def test_mifflin_none_on_missing_weight():
-    assert _mifflin_tdee(None) is None
-    assert _mifflin_tdee(0) is None
-    assert _mifflin_tdee("nope") is None
+    assert _mifflin_tdee(None, profile=_PROFILE_72IN) is None
+    assert _mifflin_tdee(0, profile=_PROFILE_72IN) is None
+    assert _mifflin_tdee("nope", profile=_PROFILE_72IN) is None
+
+
+def test_mifflin_none_without_a_profile_height():
+    """ADR-104/ADR-152: Mifflin is 6.25 kcal per cm of height. Assuming a height would
+    publish a BMR, a TDEE and a number he eats to, all from a guess, with nothing saying
+    so — so the estimate is withheld instead."""
+    assert _mifflin_tdee(300, profile={}) is None

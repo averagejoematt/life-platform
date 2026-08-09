@@ -373,79 +373,40 @@ def test_get_workout_detail_reports_not_found_rather_than_an_empty_workout(patch
     assert out == {"error": "workout not found for uid 'hevy:w1'"}
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "DEFECT: a legacy-bridge workout can never be opened. tool_get_workouts "
-        "publishes legacy aggregates with workout_uid 'mf:<hash>' (_content_uid), "
-        "but tool_get_workout_detail splits the uid on ':' and rejects any source "
-        "not in _WORKOUT_SOURCES = ('hevy','macrofactor_export') — 'mf' is in "
-        "neither, so every legacy workout the list tool returns 404s on detail. "
-        "Correct behaviour: a uid this module MINTS must round-trip through its "
-        "own detail lookup. Reported by #1658 coverage tranche 5; not fixed here."
-    ),
-)
-def test_defect_legacy_uid_from_get_workouts_round_trips_through_get_workout_detail(patched_range):
+def test_legacy_uid_from_get_workouts_round_trips_through_get_workout_detail(patched_range):
+    """#2304: a uid this module MINTS must round-trip through its own detail
+    lookup. Asserted as a property over the uids ``tool_get_workouts``
+    actually returns — never a hand-typed uid string."""
     patched_range({"macrofactor_workouts": [LEGACY_AGGREGATE]})
     listed = th.tool_get_workouts({"source": "macrofactor_export", "start_date": "2026-07-01", "end_date": "2026-08-01"})
-    uid = listed["workouts"][0]["workout_uid"]
+    assert listed["workouts"], "precondition: the legacy bridge listed at least one workout"
 
-    detail = th.tool_get_workout_detail({"workout_uid": uid})
-    assert "error" not in detail, detail
-    assert detail["workout"]["workout_uid"] == uid
+    for row in listed["workouts"]:
+        uid = row["workout_uid"]
+        detail = th.tool_get_workout_detail({"workout_uid": uid})
+        assert "error" not in detail, detail
+        assert detail["workout"]["workout_uid"] == uid
+        # The sets the list tool advertised are the sets detail returns.
+        assert detail["workout"]["exercises"] == row["exercises"]
+
+
+def test_legacy_uid_detail_reports_not_found_for_an_unminted_legacy_hash(patched_range):
+    patched_range({"macrofactor_workouts": [LEGACY_AGGREGATE]})
+    out = th.tool_get_workout_detail({"workout_uid": "mf:0000000000000000"})
+    assert out == {"error": "workout not found for uid 'mf:0000000000000000'"}
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# _latest_per_workout_record — reachable only from here
+# dead-code census (#1658 tranche 5) — resolved by #2304
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-class _FakeTable:
-    def __init__(self, items=None, boom=False):
-        self._items = items
-        self._boom = boom
-        self.kwargs = None
-
-    def query(self, **kwargs):
-        self.kwargs = kwargs
-        if self._boom:
-            raise RuntimeError("throttled")
-        return {"Items": list(self._items or [])}
-
-
-def test_latest_per_workout_record_asks_for_the_newest_experiment_phase_row(monkeypatch):
-    fake = _FakeTable([_per_workout()])
-    monkeypatch.setattr(th, "table", fake)
-    got = th._latest_per_workout_record("hevy")
-    assert got["workout_uid"] == "hevy:w1"
-    assert fake.kwargs["ScanIndexForward"] is False and fake.kwargs["Limit"] == 1
-    assert "attribute_exists(source_workout_id)" in fake.kwargs["FilterExpression"]
-    assert fake.kwargs["ExpressionAttributeValues"] == {":exp": "experiment"}
-
-
-def test_latest_per_workout_record_returns_empty_on_no_rows_or_error(monkeypatch):
-    monkeypatch.setattr(th, "table", _FakeTable([]))
-    assert th._latest_per_workout_record("hevy") == {}
-    monkeypatch.setattr(th, "table", _FakeTable(boom=True))
-    assert th._latest_per_workout_record("hevy") == {}
-
-
-def test_dead_code_census_latest_per_workout_record_has_no_caller():
-    """#1658 census note: this helper is called by nothing in lambdas/, mcp/ or
-    tests/ other than this file, and the module docstring advertises a third
-    tool (``get_workout_source_status``) that does not exist here. Recorded so
-    the next reader knows the coverage above is testing an orphan, not a
-    served surface."""
-    import pathlib
-    import re
-
-    repo = pathlib.Path(__file__).resolve().parents[1]
-    hits = []
-    for d in ("mcp", "lambdas"):
-        for p in (repo / d).rglob("*.py"):
-            if p.name == "tools_hevy.py":
-                continue
-            if re.search(r"\b_latest_per_workout_record\b", p.read_text(encoding="utf-8")):
-                hits.append(str(p.relative_to(repo)))
-    assert hits == [], f"helper is no longer an orphan — update the census note: {hits}"
-    assert not hasattr(th, "tool_get_workout_source_status"), "docstring's third tool now exists — update the docstring claim"
+def test_dead_code_census_resolved_orphan_helper_and_phantom_tool_are_gone():
+    """#1658 census recorded two facts: ``_latest_per_workout_record`` had no
+    caller anywhere, and the module docstring advertised a third tool
+    (``get_workout_source_status``) that does not exist. #2304 resolved both
+    by deletion; this pins that neither quietly returns half-way (an orphan
+    helper or a docstring promising an unshipped tool)."""
+    assert not hasattr(th, "_latest_per_workout_record"), "orphan helper is back — give it a caller or delete it again"
+    assert not hasattr(th, "tool_get_workout_source_status"), "third tool now exists — update this census and the docstring"
+    assert "get_workout_source_status" not in (th.__doc__ or ""), "docstring re-advertises a tool that does not exist"

@@ -242,16 +242,24 @@ def test_find_days_requires_source_and_both_dates():
         td.tool_find_days({"source": "whoop", "start_date": "2026-08-01"})
 
 
-@pytest.mark.parametrize(
-    "op,value,expected_dates",
-    [
-        (">", 50, ["2026-08-02", "2026-08-03"]),
-        (">=", 70, ["2026-08-02", "2026-08-03"]),
-        ("<", 70, ["2026-08-01"]),
-        ("<=", 30, ["2026-08-01"]),
-        ("=", 70, ["2026-08-02", "2026-08-03"]),
-    ],
-)
+# Hand-derived expectations, one row per operator. The coverage test below pins
+# this list to the FIND_DAYS_OPERATORS dispatch table, so adding an operator to
+# the table without a behaviour row here fails the suite (#2306).
+OPERATOR_CASES = [
+    (">", 50, ["2026-08-02", "2026-08-03"]),
+    (">=", 70, ["2026-08-02", "2026-08-03"]),
+    ("<", 70, ["2026-08-01"]),
+    ("<=", 30, ["2026-08-01"]),
+    ("=", 70, ["2026-08-02", "2026-08-03"]),
+]
+
+
+def test_find_days_operator_cases_cover_the_dispatch_table():
+    """Guard the SET: every operator the tool supports has a behaviour case."""
+    assert {op for op, _, _ in OPERATOR_CASES} == set(td.FIND_DAYS_OPERATORS)
+
+
+@pytest.mark.parametrize("op,value,expected_dates", OPERATOR_CASES)
 def test_find_days_applies_each_comparison_operator(fake_query_source, op, value, expected_dates):
     fake_query_source(DAYS)
     got = td.tool_find_days(
@@ -323,29 +331,27 @@ def test_find_days_under_the_slim_threshold_keeps_every_field(fake_query_source)
     assert all(r["note"] == "keep me" for r in got)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "DEFECT: tool_find_days silently ignores any operator outside "
-        "{>, >=, <, <=, =} — the `passes()` chain has no else, so a filter with "
-        "op '!=' (or a typo like '==' or '>>') matches EVERY day and the tool "
-        "answers a question it was not asked. Correct behaviour: an "
-        "unrecognised op raises ValueError like the other argument-validation "
-        "paths in this module, or at minimum matches nothing. Reported by "
-        "#1658 coverage tranche 5; not fixed here."
-    ),
-)
-def test_defect_find_days_unknown_operator_must_not_match_everything(fake_query_source):
+@pytest.mark.parametrize("bad_op", ["!=", "==", ">>", None])
+def test_find_days_unknown_operator_raises_naming_it_and_the_supported_set(fake_query_source, bad_op):
+    """An unrecognised operator errors instead of matching every day (#2306).
+
+    The message names the offending operator and lists the supported set,
+    which is read from the dispatch table itself — never hand-listed.
+    """
     fake_query_source(DAYS)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError) as excinfo:
         td.tool_find_days(
             {
                 "source": "whoop",
                 "start_date": "2026-08-01",
                 "end_date": "2026-08-03",
-                "filters": [{"field": "recovery_score", "op": "!=", "value": 70}],
+                "filters": [{"field": "recovery_score", "op": bad_op, "value": 70}],
             }
         )
+    msg = str(excinfo.value)
+    assert f"'{bad_op}'" in msg
+    for supported in td.FIND_DAYS_OPERATORS:
+        assert supported in msg
 
 
 # ──────────────────────────────────────────────────────────────────────────────

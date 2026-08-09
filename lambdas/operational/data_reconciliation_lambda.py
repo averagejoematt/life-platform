@@ -81,8 +81,10 @@ COMPUTED_PARTITIONS = [
 
 SOURCES = reconciliation_sources() + COMPUTED_PARTITIONS
 
-# Sources that DON'T use DATE# sk prefix (skip or handle differently)
-_SKIP_SOURCES: set[str] = set()
+# #2308 (ADR-103/144): the former `_SKIP_SOURCES` empty-set skip mechanism was
+# inert dead machinery — deleted. Every entry in SOURCES is reconciled; a source
+# that must not be checked belongs out of the registry facet, not in a silent
+# skip list with no line in the report saying so.
 
 
 # ── AWS clients ────────────────────────────────────────────────────────────────
@@ -164,6 +166,10 @@ def build_html_report(dates: list[str], source_results: list[dict], severity: st
 
     total_gaps = sum(r["gaps"] for r in source_results)
     sources_with_gaps = sum(1 for r in source_results if r["gaps"] > 0)
+    # #2308: choose the summary-bar colour HERE, in Python — a conditional written
+    # inside the f-string template below is literal text, not an expression, and
+    # shipped as an unparseable CSS value for every report ever sent.
+    summary_bg = "#f0fdf4" if total_gaps == 0 else "#fef3c7"
 
     return f"""<!DOCTYPE html>
 <html>
@@ -174,7 +180,7 @@ def build_html_report(dates: list[str], source_results: list[dict], severity: st
     <h2 style="color:white;margin:0;font-size:20px;">📊 Weekly Data Reconciliation</h2>
     <p style="color:rgba(255,255,255,.9);margin:4px 0 0;font-size:13px;">{week_start} → {week_end} | {severity} | Generated {generated_at}</p>
   </div>
-  <div style="padding:16px 24px;background:#f0fdf4 if {total_gaps}==0 else #fef3c7;border-bottom:1px solid #e5e7eb;">
+  <div style="padding:16px 24px;background:{summary_bg};border-bottom:1px solid #e5e7eb;">
     <strong>Summary:</strong> {len(source_results)} sources checked | {total_gaps} total gaps | {sources_with_gaps} sources affected
     {" | <span style='color:#059669;'>All systems nominal ✅</span>" if total_gaps == 0 else ""}
   </div>
@@ -196,7 +202,7 @@ def build_html_report(dates: list[str], source_results: list[dict], severity: st
   <div style="padding:16px 24px;border-top:1px solid #e5e7eb;background:#fef3c7;">
     <strong>🔧 Recommended actions:</strong>
     <ul style="margin:8px 0 0;padding-left:20px;">
-      {"".join(f"<li><code>{r['source']}</code>: {r['gaps']} gap{'s' if r['gaps']>1 else ''} ({', '.join(d for d in dates if r['coverage'].get(d) is False)})</li>" for r in source_results if r['gaps'] > 0)}
+      {"".join(f"<li><code>{r['source']}</code>: {r['gaps']} gap{'s' if r['gaps'] > 1 else ''} ({', '.join(d for d in dates if r['coverage'].get(d) is False)})</li>" for r in source_results if r['gaps'] > 0)}
     </ul>
     <p style="margin:8px 0 0;font-size:12px;color:#666;">Gap-aware backfill (LOOKBACK_DAYS=7) will self-heal most gaps on next scheduled run.</p>
   </div>'''}
@@ -218,8 +224,6 @@ def lambda_handler(event, context):
 
     source_results = []
     for source, expected_days, notes in SOURCES:
-        if source in _SKIP_SOURCES:
-            continue
         coverage = check_source_coverage(source, dates)
         days_present = sum(1 for v in coverage.values() if v is True)
         # Only count as "gap" if below expected_days threshold
