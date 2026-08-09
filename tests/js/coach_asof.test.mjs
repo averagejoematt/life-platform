@@ -28,7 +28,7 @@ import { fileURLToPath } from "node:url";
 // Dynamic import after loader registration (the
 // reference_site_js_test_and_build_pairs gotcha — a static import would resolve
 // the graph before the "/assets/…" resolver exists).
-const { coachAsOf, regenerationPaused } = await import("../../site/assets/js/coach_asof.js");
+const { coachAsOf, regenerationPaused, ensembleFallback } = await import("../../site/assets/js/coach_asof.js");
 
 const SITE_JS = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "site", "assets", "js");
 
@@ -79,6 +79,24 @@ test("explicit false, absent field, and no payload all read not-paused", () => {
 test("shape-drifted truthy values never fabricate a pause banner", () => {
   assert.equal(regenerationPaused({ regeneration_paused: "true" }), false);
   assert.equal(regenerationPaused({ regeneration_paused: 1 }), false);
+});
+
+/* ── ensembleFallback: same discipline, for the cross-coach digest (#2333) ── */
+
+test("ensemble_fallback === true is the ONLY fallback reading", () => {
+  assert.equal(ensembleFallback({ ensemble_fallback: true }), true);
+});
+
+test("explicit false, absent field, and no payload all read not-fallback", () => {
+  assert.equal(ensembleFallback({ ensemble_fallback: false }), false);
+  assert.equal(ensembleFallback({}), false); // absent = unknown → nothing new
+  assert.equal(ensembleFallback(null), false);
+  assert.equal(ensembleFallback(undefined), false);
+});
+
+test("shape-drifted truthy values never fabricate a fallback banner", () => {
+  assert.equal(ensembleFallback({ ensemble_fallback: "true" }), false);
+  assert.equal(ensembleFallback({ ensemble_fallback: 1 }), false);
 });
 
 /* ── set-guard: no call site may hardcode the paused argument ────────────── */

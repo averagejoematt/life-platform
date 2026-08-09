@@ -277,3 +277,98 @@ def test_coach_analysis_not_paused_at_tier_0(monkeypatch):
     monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
     data = _body(api.handle_coach_analysis({"queryStringParameters": {"domain": "sleep"}}))
     assert data["regeneration_paused"] is False
+
+
+# ── /api/coach_analysis ensemble-fallback disclosure (#2333) ──────────────────
+# coach_ensemble_digest stamps `_fallback: True` on a digest produced without the
+# LLM (budget-paused at tier >= 1, ADR-125 — the common case per #1927, not the
+# rare one). Nothing downstream of _latest_cycle_digest checked the mark, so a
+# template-generated digest served on /api/coach_analysis indistinguishably from
+# a genuine cross-coach read. `ensemble_fallback` closes that.
+
+
+def _fake_query_by_pk(routes, default_out=None):
+    """table.query stub that routes by the queried pk (extracted from the real
+    boto3 Key(...) condition tree) rather than by call order — the OUTPUT# lookup
+    happens first, but the ensemble-digest lookup (#1085: pk=ENSEMBLE#digest) can
+    land on any later call, and this test cares about that read succeeding."""
+
+    def _pk_of(condition):
+        expr = condition.get_expression()
+        if expr["operator"] == "AND":
+            for v in expr["values"]:
+                found = _pk_of(v)
+                if found is not None:
+                    return found
+            return None
+        key = expr["values"][0]
+        return expr["values"][1] if getattr(key, "name", None) == "pk" else None
+
+    def _query(**kwargs):
+        pk = _pk_of(kwargs["KeyConditionExpression"])
+        return {"Items": routes.get(pk, default_out or [])}
+
+    return _query
+
+
+def test_coach_analysis_flags_ensemble_fallback(monkeypatch):
+    out_item = {
+        "pk": "COACH#sleep_coach",
+        "sk": "OUTPUT#2026-06-29",
+        "content": "the analysis text",
+        "generated_at": "2026-06-29T14:00:00Z",
+    }
+    digest_item = {
+        "pk": "ENSEMBLE#digest",
+        "sk": "CYCLE#2026-06-29",
+        "_fallback": True,
+        "active_disagreements": [],
+        "coach_summaries": [],
+    }
+    monkeypatch.setattr(
+        api.table,
+        "query",
+        _fake_query_by_pk({"COACH#sleep_coach": [out_item], "ENSEMBLE#digest": [digest_item]}),
+    )
+    monkeypatch.setattr(api.table, "get_item", lambda Key: {})
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
+    data = _body(api.handle_coach_analysis({"queryStringParameters": {"domain": "sleep"}}))
+    assert data["ensemble_fallback"] is True
+
+
+def test_coach_analysis_ensemble_fallback_false_for_a_genuine_digest(monkeypatch):
+    out_item = {
+        "pk": "COACH#sleep_coach",
+        "sk": "OUTPUT#2026-06-29",
+        "content": "the analysis text",
+        "generated_at": "2026-06-29T14:00:00Z",
+    }
+    digest_item = {
+        "pk": "ENSEMBLE#digest",
+        "sk": "CYCLE#2026-06-29",
+        "active_disagreements": [],
+        "coach_summaries": [],
+    }
+    monkeypatch.setattr(
+        api.table,
+        "query",
+        _fake_query_by_pk({"COACH#sleep_coach": [out_item], "ENSEMBLE#digest": [digest_item]}),
+    )
+    monkeypatch.setattr(api.table, "get_item", lambda Key: {})
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
+    data = _body(api.handle_coach_analysis({"queryStringParameters": {"domain": "sleep"}}))
+    assert data["ensemble_fallback"] is False
+
+
+def test_coach_analysis_ensemble_fallback_false_with_no_digest_at_all(monkeypatch):
+    out_item = {
+        "pk": "COACH#sleep_coach",
+        "sk": "OUTPUT#2026-06-29",
+        "content": "the analysis text",
+        "generated_at": "2026-06-29T14:00:00Z",
+    }
+    monkeypatch.setattr(api.table, "query", _fake_query_by_pk({"COACH#sleep_coach": [out_item]}))
+    monkeypatch.setattr(api.table, "get_item", lambda Key: {})
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
+    data = _body(api.handle_coach_analysis({"queryStringParameters": {"domain": "sleep"}}))
+    assert data["ensemble_fallback"] is False

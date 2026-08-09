@@ -350,6 +350,12 @@ def _render_coach_card(domain, include_threads=True):
 
     # ── 4. Ensemble digest — cross-coach references ─────────────────────────
     cross_coach_reference = None
+    # #2333: coach_ensemble_digest stamps `_fallback: True` on a digest produced
+    # without the LLM (budget-paused at tier >= 1, ADR-125 — the common case, not
+    # the rare one, per #1927). Nothing read the mark here either, so a
+    # template-generated digest rendered on the observatory as if a coach had
+    # actually reasoned about it. ADR-104: surface the paused state honestly.
+    ensemble_fallback = False
     digest_records = _query_begins_with(
         "ENSEMBLE#digest",
         "CYCLE#",
@@ -359,6 +365,7 @@ def _render_coach_card(domain, include_threads=True):
 
     if digest_records:
         digest = digest_records[0]
+        ensemble_fallback = bool(digest.get("_fallback"))
         # Search coach_summaries and active_disagreements for cross-coach refs
         # involving this coach's domain
         _extract_cross_coach_ref(digest, coach_id, domain)
@@ -573,6 +580,10 @@ def _render_coach_card(domain, include_threads=True):
         "track_record": track_record,
         "proactivity": proactivity,  # #1382: graded proactive-nudge record
         "cross_coach_reference": cross_coach_reference,
+        # #2333: True only when the newest ENSEMBLE#digest CYCLE# record was
+        # produced without the LLM — see the note above `ensemble_fallback`'s
+        # assignment. Always present (never None) so the front end can rely on it.
+        "ensemble_fallback": ensemble_fallback,
         "confidence_language": confidence_language,
         "confidence_provenance": confidence_provenance,  # #1481 (ADR-141): data vs conversation
         "data_availability": data_availability,

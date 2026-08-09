@@ -304,9 +304,17 @@ def handle_coach_analysis(event, *, _g):
 
         # 3. Ensemble digest — cross-coach references (#1085: tombstone/phase-guarded)
         cross_coach_reference = None
+        # #2333: coach_ensemble_digest stamps `_fallback: True` on a digest produced
+        # without the LLM (budget-paused at tier >= 1, ADR-125 — the common case, not
+        # the rare one, per #1927). Nothing downstream of _latest_cycle_digest checked
+        # it, so a template-generated digest rendered indistinguishably from a genuine
+        # cross-coach read. ADR-104 behavioral-absence semantics: disclose the paused
+        # state explicitly rather than staying silent about it.
+        ensemble_fallback = False
         try:
             digest = _latest_cycle_digest()
             if digest:
+                ensemble_fallback = bool(digest.get("_fallback"))
                 disagreements = digest.get("active_disagreements", [])
                 for d in disagreements:
                     coaches = d.get("coaches", [])
@@ -404,6 +412,11 @@ def handle_coach_analysis(event, *, _g):
             "thread_reference": thread_reference,
             "revision_signal": revision_signal,
             "cross_coach_reference": cross_coach_reference,
+            # #2333: True only when the newest ENSEMBLE#digest CYCLE# record was
+            # produced without the LLM (budget-paused or an LLM failure) — a reader
+            # can then label `cross_coach_reference` (or its absence) honestly instead
+            # of presenting a template as a coach's cross-domain reasoning.
+            "ensemble_fallback": ensemble_fallback,
             "confidence_language": confidence_language,
             "data_availability": data_availability,
             "generated_at": output.get("created_at") or output.get("generated_at", ""),
