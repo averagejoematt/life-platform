@@ -768,7 +768,7 @@ def call_haiku(data, profile):
     # Trim activities for token economy
     for wk in ("this", "prior"):
         if pd.get(wk, {}).get("strava"):
-            pd[wk]["strava"]["activities"] = pd[wk]["strava"].get("activities", [])[:5]
+            pd[wk]["strava"]["activities"] = (pd[wk]["strava"].get("activities") or [])[:5]
 
     # Build grade summary
     grades = data.get("this", {}).get("day_grades")

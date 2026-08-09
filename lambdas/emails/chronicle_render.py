@@ -368,7 +368,7 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
         if editorial_image.enabled():
             try:
                 _pj = json.loads(s3.get_object(Bucket=S3_BUCKET, Key="generated/journal/posts.json")["Body"].read())
-                for _p in _pj.get("posts", []):
+                for _p in _pj.get("posts") or []:
                     if _p.get("image_url"):
                         _prior_imgs[_p.get("url")] = {"image_url": _p["image_url"], "image_credit": _p.get("image_credit", "")}
             except Exception:

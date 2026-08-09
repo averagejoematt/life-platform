@@ -1305,7 +1305,7 @@ def _handle_ask(event: dict) -> dict:
         # V2 follow-up: emit token metrics (was dark)
         _emit_token_metrics(result.get("usage", {}), endpoint="api_ask")
 
-        answer = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text")
+        answer = "".join(b["text"] for b in (result.get("content") or []) if b.get("type") == "text")
 
         # ADR-104 grounding gate (reader-facing → fail-closed): every number in
         # the answer must exist in what the model was given (system context,
@@ -1674,7 +1674,7 @@ def _handle_board_ask(event: dict) -> dict:
             result = _bedrock_invoke(json.loads(req_body))
             # V2 follow-up: emit per-persona token metrics (was dark)
             _emit_token_metrics(result.get("usage", {}), endpoint="api_board_ask")
-            _txt = _scrub_blocked_terms("".join(b["text"] for b in result.get("content", []) if b.get("type") == "text"))
+            _txt = _scrub_blocked_terms("".join(b["text"] for b in (result.get("content") or []) if b.get("type") == "text"))
 
             # ADR-104 grounding gate (reader-facing → fail-closed, no regen —
             # board_ask already costs ~6 calls/request): any number the coach

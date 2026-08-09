@@ -244,7 +244,7 @@ def lambda_handler(event, context):
         "character": existing_char or None,
         "_meta": {
             **existing.get("_meta", {}),
-            "generated_at": existing.get("_meta", {}).get("generated_at"),  # keep morning time
+            "generated_at": (existing.get("_meta") or {}).get("generated_at"),  # keep morning time
             "refreshed_at": datetime.now(timezone.utc).isoformat(),
             "generated_by": "daily-brief-lambda",
         },

@@ -99,7 +99,7 @@ def _blog_posts() -> list[dict]:
         data = json.loads(BLOG_SRC.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return []
-    return [p for p in data.get("posts", []) if p.get("date") and p.get("title") and p.get("url")]
+    return [p for p in (data.get("posts") or []) if p.get("date") and p.get("title") and p.get("url")]
 
 
 def build_broadcast_feed() -> int:

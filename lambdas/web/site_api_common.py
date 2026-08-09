@@ -450,7 +450,7 @@ def _load_supp_metadata() -> dict:
         data = json.loads(resp["Body"].read())
         _supp_metadata_cache = data
         _supp_metadata_cache_at = time.monotonic()
-        total = sum(len(g.get("items", [])) for g in data.get("groups", {}).values())
+        total = sum(len(g.get("items", [])) for g in (data.get("groups") or {}).values())
         logger.info(f"[supp_registry] Loaded: {total} supplements in {len(data.get('groups', {}))} groups")
     except Exception as e:
         logger.warning(f"[supp_registry] Failed to load from S3: {e}")

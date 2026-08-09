@@ -626,7 +626,7 @@ def _load_library_entry(library_id):
     try:
         obj = s3_client.get_object(Bucket=S3_BUCKET, Key="config/experiment_library.json")
         lib = json.loads(obj["Body"].read())
-        for entry in lib.get("experiments", []):
+        for entry in lib.get("experiments") or []:
             if entry.get("id") == library_id:
                 return entry
     except Exception as e:  # noqa: BLE001 — fail-soft: no trigger means honest-empty, never a blocked creation

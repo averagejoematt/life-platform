@@ -74,7 +74,7 @@ def ledger(*, _g) -> dict:
     # 4. Build by_cause with merged metadata
     by_cause_raw = totals_item.get("by_cause", {})
     earned_causes = []
-    for cause_cfg in ledger_config.get("earned_causes", []):
+    for cause_cfg in ledger_config.get("earned_causes") or []:
         cid = cause_cfg.get("id", "")
         cause_data = by_cause_raw.get(cid, {})
         earned_causes.append(
@@ -86,7 +86,7 @@ def ledger(*, _g) -> dict:
         )
 
     reluctant_causes = []
-    for cause_cfg in ledger_config.get("reluctant_causes", []):
+    for cause_cfg in ledger_config.get("reluctant_causes") or []:
         cid = cause_cfg.get("id", "")
         cause_data = by_cause_raw.get(cid, {})
         reluctant_causes.append(
@@ -198,7 +198,7 @@ def discoveries(*, _g) -> dict:
         except Exception as se:
             logger.warning(f"[discoveries] supplement registry read failed: {se}")
 
-        for exp in lib.get("experiments", []):
+        for exp in lib.get("experiments") or []:
             if exp.get("status") != "active":
                 continue
             # #2240: active hypotheses publish the catalog entry's name — screen
