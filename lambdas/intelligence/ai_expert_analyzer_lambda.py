@@ -1033,6 +1033,86 @@ def generate_and_cache(expert_key, shared_system=None):
         logger.warning("generate_and_cache: empty response for %s — cached record preserved (#2218)", expert_key)
         return ""
 
+    # Phase-4 SELF-CORRECTION (ADR-104/ADR-108, #2391) — BEFORE the cache write:
+    # it used to run AFTER put_item with keep-if-better semantics, so the ungrounded
+    # original published first and a merely-improved rewrite shipped over it.
+    # Log-only wasn't enough — coaches kept serving a wrong RHR (53 vs the canonical
+    # 64) that the Coherence Sentinel caught daily. Findings = hard canonical
+    # contradictions PLUS the allow-list number gate (any number not present in the
+    # prompt/system/facts is a fabrication — catches invented trend endpoints).
+    # One corrective rewrite, kept only if strictly better (never regress).
+    if analysis_text:
+        try:
+            _facts = _load_canonical_facts()
+            _allowed = _gg.allowed_numbers(prompt, shared_system, _facts)
+
+            # #1897: pass the cycle anchors so the phase-aware classes actually
+            # run. Omitting them is why "Zero food logs in seven days of an
+            # experiment" shipped on Day 1 — baseline_freshness and the new
+            # experiment_span class both no-op without them, and the digit gates
+            # cannot see a spelled-out number.
+            _gen_date_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+            def _findings_fn(_t):
+                return _gg.grounding_findings(
+                    _t,
+                    facts=_facts,
+                    allowed=_allowed,
+                    generation_date_iso=_gen_date_iso,
+                    start_date_iso=EXPERIMENT_START,
+                    nightly_vitals=_night_map(_facts),  # #1968: the unlabeled "7.5-hour sleep"
+                    # #2056: the #1699 behavioral class. The map comes from the snapshot's
+                    # own `days_since_last_*` fields — computed by `_recency_stats` from the
+                    # rows THIS render already queried, so zero extra I/O and no guessing.
+                    # Coverage is per-expert and declared: the nutrition snapshot answers
+                    # for food and stays silent about training, the mind snapshot for
+                    # journal, training for lifts. A category the expert cannot see is left
+                    # UNKNOWN, never reported absent — which is what makes arming honest on
+                    # a surface with partial visibility instead of noise that gets a gate
+                    # switched off. Since #2391 this gate is genuinely BLOCKING: one
+                    # rewrite via `regen_once`, then regenerate-or-hold — residual
+                    # findings mean the prior cached analysis keeps serving.
+                    available_logs=_avail_logs(data),
+                )
+
+            def _regen(_correction):
+                from common.retry_utils import call_anthropic_raw
+
+                _fix_req = urllib.request.Request(
+                    "https://api.anthropic.com/v1/messages",
+                    data=json.dumps(
+                        {"model": AI_MODEL, "max_tokens": 1200, "messages": [{"role": "user", "content": prompt + "\n\n" + _correction}]}
+                    ).encode(),
+                    headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
+                )
+                _fix_res = call_anthropic_raw(_fix_req, timeout=60)
+                _fixed = "".join(b["text"] for b in _fix_res.get("content", []) if b.get("type") == "text")
+                if "KEY RECOMMENDATION:" in _fixed:
+                    _fixed = _fixed.rsplit("KEY RECOMMENDATION:", 1)[0].rstrip()
+                return _fixed
+
+            _pre = _findings_fn(analysis_text)
+            if _pre:
+                logger.warning("[grounding] %s finding(s): %s", expert_key, [f["detail"] for f in _pre][:6])
+            _new_text, _left, _corrected = _gg.regen_once(analysis_text, _findings_fn, _regen)
+            if _corrected:
+                analysis_text = _new_text
+                logger.info("[grounding] %s self-corrected: %d→%d finding(s)", expert_key, len(_pre), len(_left))
+            if _left:
+                # #2391: "better" is not "clean" (prod 2026-08-08 shipped "6→2" with 2
+                # unresolved). Residual findings ⇒ hold — prior cached analysis keeps
+                # serving, this text never writes. Gate-infra failure (except below)
+                # still publishes: the hold triggers only on measured findings.
+                logger.warning(
+                    "[grounding] %s HELD — %d residual finding(s); prior cached analysis preserved (#2391): %s",
+                    expert_key,
+                    len(_left),
+                    [f["detail"] for f in _left][:4],
+                )
+                return ""
+        except Exception as _sc:
+            logger.warning("grounding self-correction failed for %s: %s", expert_key, _sc)
+
     now = datetime.now(timezone.utc)
     ttl = int((now + timedelta(days=8)).timestamp())
 
@@ -1167,77 +1247,6 @@ def generate_and_cache(expert_key, shared_system=None):
                     logger.warning("[grounding] %s: %s", expert_key, _gr.warnings[:5])
         except Exception as _ge2:
             logger.warning("grounding backstop failed for %s: %s", expert_key, _ge2)
-
-    # Phase-4 SELF-CORRECTION (ADR-104: via the shared grounded_generation harness).
-    # Log-only wasn't enough — coaches kept serving a wrong RHR (53 vs the canonical
-    # 64) that the Coherence Sentinel caught daily. Findings = hard canonical
-    # contradictions PLUS the allow-list number gate (any number not present in the
-    # prompt/system/facts is a fabrication — catches invented trend endpoints).
-    # One corrective rewrite, kept only if strictly better (never regress).
-    if analysis_text:
-        try:
-            _facts = _load_canonical_facts()
-            _allowed = _gg.allowed_numbers(prompt, shared_system, _facts)
-
-            # #1897: pass the cycle anchors so the phase-aware classes actually
-            # run. Omitting them is why "Zero food logs in seven days of an
-            # experiment" shipped on Day 1 — baseline_freshness and the new
-            # experiment_span class both no-op without them, and the digit gates
-            # cannot see a spelled-out number.
-            _gen_date_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-
-            def _findings_fn(_t):
-                return _gg.grounding_findings(
-                    _t,
-                    facts=_facts,
-                    allowed=_allowed,
-                    generation_date_iso=_gen_date_iso,
-                    start_date_iso=EXPERIMENT_START,
-                    nightly_vitals=_night_map(_facts),  # #1968: the unlabeled "7.5-hour sleep"
-                    # #2056: the #1699 behavioral class. The map comes from the snapshot's
-                    # own `days_since_last_*` fields — computed by `_recency_stats` from the
-                    # rows THIS render already queried, so zero extra I/O and no guessing.
-                    # Coverage is per-expert and declared: the nutrition snapshot answers
-                    # for food and stays silent about training, the mind snapshot for
-                    # journal, training for lifts. A category the expert cannot see is left
-                    # UNKNOWN, never reported absent — which is what makes arming honest on
-                    # a surface with partial visibility instead of noise that gets a gate
-                    # switched off. Unlike coach-v2 this one is BLOCKING-ish by inheritance:
-                    # a finding rides the existing keep-if-strictly-improved `regen_once`,
-                    # which makes at most one rewrite no matter how many classes fired.
-                    available_logs=_avail_logs(data),
-                )
-
-            def _regen(_correction):
-                from common.retry_utils import call_anthropic_raw
-
-                _fix_req = urllib.request.Request(
-                    "https://api.anthropic.com/v1/messages",
-                    data=json.dumps(
-                        {"model": AI_MODEL, "max_tokens": 1200, "messages": [{"role": "user", "content": prompt + "\n\n" + _correction}]}
-                    ).encode(),
-                    headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
-                )
-                _fix_res = call_anthropic_raw(_fix_req, timeout=60)
-                _fixed = "".join(b["text"] for b in _fix_res.get("content", []) if b.get("type") == "text")
-                if "KEY RECOMMENDATION:" in _fixed:
-                    _fixed = _fixed.rsplit("KEY RECOMMENDATION:", 1)[0].rstrip()
-                return _fixed
-
-            _pre = _findings_fn(analysis_text)
-            if _pre:
-                logger.warning("[grounding] %s finding(s): %s", expert_key, [f["detail"] for f in _pre][:6])
-            _new_text, _left, _corrected = _gg.regen_once(analysis_text, _findings_fn, _regen)
-            if _corrected:
-                analysis_text = _new_text
-                table.update_item(
-                    Key={"pk": CACHE_PK, "sk": f"EXPERT#{expert_key}"},
-                    UpdateExpression="SET analysis = :a",
-                    ExpressionAttributeValues={":a": analysis_text},
-                )
-                logger.info("[grounding] %s self-corrected: %d→%d finding(s)", expert_key, len(_pre), len(_left))
-        except Exception as _sc:
-            logger.warning("grounding self-correction failed for %s: %s", expert_key, _sc)
 
     # V2.1: Thread extraction — extract and write coach thread entry
     if _HAS_INTELLIGENCE_COMMON and analysis_text:
