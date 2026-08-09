@@ -123,7 +123,13 @@ def _memory_block(coach_id: str) -> str:
     pk = coach_chat.chat_pk(coach_id)
     lines = []
     try:
+        # #946/#1969: a restart tombstones singletons IN PLACE — an unguarded get_item
+        # would feed the wiped cycle's relationship arc into a fresh-cycle chat.
+        from experiment.phase_filter import singleton_visible
+
         rel = _table().get_item(Key={"pk": pk, "sk": "RELATIONSHIP#state"}).get("Item") or {}
+        if not singleton_visible(rel):
+            rel = {}
         phase = rel.get("phase")
         if phase:
             lines.append(f"Your working relationship with Matthew is in the '{phase}' phase.")
