@@ -5,8 +5,8 @@
     "note": "budget-tier cutoff-1 band (incl. qa-paused-by-budget's own AI gates) was off 26 of the last 30 days; fires whenever a qa-smoke run overlaps a paused feature. Red continuously since 2026-07-18."
   },
   "qa-smoke-warnings": {
-    "citation": "#1958 (closed 2026-08-02)",
-    "note": "WarnCount's honest daily floor is 4-11 against a >=1 threshold, so red carried no information (15 consecutive red nights). Reclassification fix merged 2026-08-02 but not yet deployed live as of this filing — the alarm clears once the deploy ships (cdk_deploy.sh / deploy_all)."
+    "citation": "#2378",
+    "note": "#1958's chronic split deployed 2026-08-02 (ChronicWarnCount live) but the residual ALARMED set — 4 optional-metric nulls (sleep/hrv/glucose/hydration), the #1956 canary grant gap, the #1970 phase-stamp gap — still floored WarnCount at 5-8 nightly, so the alarm stayed structurally red. #2378 reclassifies those chronic; after its deploy WarnCount should drop to the genuine-signal set (character:receipt_replay + reader_truth verdicts). If still red a week after the #2378 deploy, the survivors are real findings — file them, don't re-cite."
   },
   "ingest-auth-unhealthy-whoop": {
     "citation": "#1934",

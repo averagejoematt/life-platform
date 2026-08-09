@@ -843,7 +843,12 @@ def check_canary_precision():
             if any(str(a).endswith(":grounded") for a in rec.get("alarms") or []):
                 alarmed_dates.append(d)
     except Exception as e:
-        return [c.warn(f"canary precision unreadable ({e}) — fail-soft; needs s3:GetObject on {CANARY_LOG_PREFIX}/* (#1956)")]
+        # #2378: chronic while the s3:GetObject grant gap is open — this exact
+        # AccessDenied recurred nightly for weeks (tracked in #1956) and held
+        # qa-smoke-warnings structurally red. Stays visible in the email +
+        # ChronicWarnCount; un-chronic this branch when the grant lands. The
+        # no-sighted-runs and cried-wolf branches below stay ALARMED.
+        return [c.warn(f"canary precision unreadable ({e}) — fail-soft; needs s3:GetObject on {CANARY_LOG_PREFIX}/* (#1956)", chronic=True)]
     if runs == 0:
         return [c.warn(f"no sighted canary runs in trailing {CANARY_PRECISION_WINDOW_DAYS}d — grounded precision unmeasurable")]
     rate = len(alarmed_dates) / runs
@@ -905,11 +910,18 @@ def check_coach_ensemble_phase_stamp_coverage():
     if unstamped:
         sample = ", ".join(unstamped[:5])
         more = f" (+{len(unstamped) - 5} more)" if len(unstamped) > 5 else ""
+        # #2378: chronic — the docstring above already declares this a "known,
+        # low-severity data-hygiene gap" whose remedy is the reviewed operator
+        # backfill (#1970); the same count recurring nightly held
+        # qa-smoke-warnings structurally red without adding information. The
+        # gap stays visible nightly (email + ChronicWarnCount) until the
+        # backfill lands; the errored branch above stays ALARMED.
         return [
             c.warn(
                 f"{len(unstamped)} row(s) on tagger-blind COACH#/ENSEMBLE# partitions carry no phase attribute "
                 f"(#1970) — survives PHASE_FILTER_EXPRESSION forever until backfilled: {sample}{more}. Run "
-                "deploy/backfill_coach_ensemble_phase_stamps.py --apply."
+                "deploy/backfill_coach_ensemble_phase_stamps.py --apply.",
+                chronic=True,
             )
         ]
     return [c.ok(f"all rows across {len(pks)} tagger-blind COACH#/ENSEMBLE# partitions carry a phase stamp")]

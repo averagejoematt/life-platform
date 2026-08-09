@@ -82,17 +82,24 @@ class Check:
         return self
 
     def warn(self, msg="", chronic=False):
-        """Yellow. `chronic=True` is RESERVED for the enumerated known-recurring
-        timing conditions (#1958: an OPTIONAL registry source with no record
-        yesterday, and the MCP cache-warm partial) — warns that recur on a
-        healthy platform by the source's own event-driven nature. A chronic
-        warn stays fully visible (email, logs, ChronicWarnCount metric) but
-        does NOT increment the alarmed WarnCount, so qa-smoke-warnings can
-        reach green and a NOVEL warn class is unmissable again. The default is
-        deliberately False: a new warn call site is alarmed unless it
-        explicitly opts out, and tests/test_qa_smoke_chronic_warns.py
-        AST-guards the full set of chronic=True call sites — extending the set
-        means updating that test's enumerated registry, never a silent drift.
+        """Yellow. `chronic=True` is RESERVED for two enumerated classes:
+        (a) known-recurring TIMING conditions (#1958: an OPTIONAL registry
+        source with no record yesterday, the MCP cache-warm partial; #2378
+        adds the optional-metric nulls of check_score_sanity — same class:
+        the source is event-driven/sync-lagged and the null recurs on a
+        healthy platform), and (b) known-recurring warns PINNED TO A FILED
+        TRACKING ISSUE (#2378: the canary-log grant gap #1956, the
+        phase-stamp backfill gap #1970 — cite the issue in a call-site
+        comment and un-chronic the branch when it lands; the alarm firing
+        nightly over an already-filed issue carried zero marginal
+        information, ADR-105). A chronic warn stays fully visible (email,
+        logs, ChronicWarnCount metric) but does NOT increment the alarmed
+        WarnCount, so qa-smoke-warnings can reach green and a NOVEL warn
+        class is unmissable again. The default is deliberately False: a new
+        warn call site is alarmed unless it explicitly opts out, and
+        tests/test_qa_smoke_chronic_warns.py AST-guards the full set of
+        chronic=True call sites — extending the set means updating that
+        test's enumerated registry, never a silent drift.
         """
         self.passed = None
         self.chronic = bool(chronic)
