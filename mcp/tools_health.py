@@ -763,7 +763,14 @@ def _get_energy_expenditure(args):
             # won — dead code that looked live, worth ~5 kcal per year of error.
             age_years = (datetime.now(timezone.utc).replace(tzinfo=None) - dob).days / 365.25
         except Exception as _e:
-            logger.warning(f"_get_energy_expenditure: could not parse date_of_birth {dob_str!r} — {_e}")
+            # CodeQL #144 / ADR-104 + docs/DATA_GOVERNANCE.md: log the FAILURE, never the
+            # value. A date_of_birth is PII, CloudWatch retains it, and it is the one field
+            # PhenoAge Option A exists to keep off every returned surface — leaking it into
+            # an operator log is inconsistent with that posture for no debugging gain.
+            # Length + the exception identify a malformed stamp precisely enough; the
+            # `age_basis: date_of_birth_unparseable` marker two lines below is the signal a
+            # reader of the payload actually acts on.
+            logger.warning("_get_energy_expenditure: could not parse date_of_birth (len=%d) — %s", len(str(dob_str or "")), _e)
     age_basis = (
         "profile_date_of_birth" if age_years is not None else ("date_of_birth_unparseable" if dob_str else "no_date_of_birth_in_profile")
     )
