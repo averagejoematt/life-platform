@@ -156,20 +156,29 @@ def save_secret(client, payload: dict) -> None:
         )
 
 
+def _safe_ids(entry: dict) -> str:
+    """Chat ids for display, coerced through int().
+
+    Two jobs in one: chat ids are numeric by Telegram's contract, so int() is
+    lossless — and it is a taint SANITIZER: nothing printed here can carry secret
+    text even if the stored entry were corrupted, which is what lets a static
+    analyzer (and a reader) verify this script never prints a token.
+    """
+    return ", ".join(str(int(c)) for c in (entry.get("chat_ids") or [])) or "—"
+
+
 def show(payload: dict) -> None:
     """Print what is configured WITHOUT printing any token."""
     print(f"\n{SECRET_NAME}:\n")
     print(f"  {'key':11s} {'token':8s} {'chat ids':22s} bot")
     for key, username, who in BOTS:
         e = payload.get(key) or {}
-        tok = "set" if e.get("bot_token") else "—"
-        ids = ", ".join(str(c) for c in (e.get("chat_ids") or [])) or "—"
-        print(f"  {key:11s} {tok:8s} {ids:22s} {username} ({who})")
+        tok = "set" if bool(e.get("bot_token")) else "—"
+        print(f"  {key:11s} {tok:8s} {_safe_ids(e):22s} {username} ({who})")
     for key, username, who in OPTIONAL_BOTS:
         e = payload.get(key) or {}
-        state = "set" if e.get("bot_token") else "—"
-        ids = ", ".join(str(c) for c in (e.get("chat_ids") or [])) or "—"
-        print(f"  {key:11s} {state:8s} {ids:22s} {username} ({who})  · not created by choice")
+        state = "set" if bool(e.get("bot_token")) else "—"
+        print(f"  {key:11s} {state:8s} {_safe_ids(e):22s} {username} ({who})  · not created by choice")
     missing = [k for k in KEYS if not (payload.get(k) or {}).get("bot_token")]
     print(f"\n  {len(KEYS) - len(missing)}/{len(KEYS)} configured" + (f" — still to do: {', '.join(missing)}" if missing else " — all set"))
 
@@ -219,7 +228,7 @@ def main() -> int:
                     existing["chat_ids"] = list(existing.get("chat_ids") or []) + fresh
                     payload[key] = existing
                     changed += 1
-                    print(f"    ✓ token kept; new chat id(s): {', '.join(str(c) for c in fresh)}\n")
+                    print(f"    ✓ token kept; new chat id(s): {', '.join(str(int(c)) for c in fresh)}\n")
                     continue
             print("    skipped\n")
             continue
@@ -237,9 +246,9 @@ def main() -> int:
         if found:
             merged = list(dict.fromkeys(list(existing.get("chat_ids") or []) + found))
             entry["chat_ids"] = merged
-            print(f"    ✓ chat id(s): {', '.join(str(c) for c in merged)}")
+            print(f"    ✓ chat id(s): {', '.join(str(int(c)) for c in merged)}")
         elif existing.get("chat_ids"):
-            print(f"    · keeping known chat id(s): {', '.join(str(c) for c in existing['chat_ids'])}")
+            print(f"    · keeping known chat id(s): {', '.join(str(int(c)) for c in existing['chat_ids'])}")
         else:
             print("    · no chat id yet — send the bot a message, then re-run for this key")
         payload[key] = entry
