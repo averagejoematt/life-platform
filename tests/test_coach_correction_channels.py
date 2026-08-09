@@ -141,7 +141,7 @@ def email_parser(monkeypatch):
     monkeypatch.setattr(
         iep,
         "_send_correction_confirmation",
-        lambda applied, unresolved, recipient, subject="": sent.update(
+        lambda applied, unresolved, recipient, subject="", dry_run=False: sent.update(
             {"applied": applied, "unresolved": unresolved, "recipient": recipient}
         ),
     )

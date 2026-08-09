@@ -57,6 +57,17 @@ v1.0.0 — 2026-03-16 (BS-03)
 v1.1.0 — 2026-07-08 (#885): SEC-04 origin-header guard — 403 direct Function-URL
          requests when SITE_API_ORIGIN_SECRET is configured (CloudFront injects
          the X-AMJ-Origin header on the SubscriberLambdaOrigin origin).
+
+Dry-run posture (#2291): this module is EVENT-driven (a reader's HTTP request via
+the CloudFront /api/subscribe* Function URL), never scheduled, so it is exempt
+from #2222's DEFAULT dry-run suppression — the declared `SES_EXEMPT_EVENT_DRIVEN`
+marker below is what the guard test derives that exemption from, and it also
+asserts the function has no EventBridge schedule= in cdk/stacks/. An EXPLICIT
+`{"dry_run": true}` at the TOP LEVEL of the invoke event (an operator console
+replay — a real HTTP request cannot place keys there: CloudFront/Function URL
+events carry the client's data only under body/queryStringParameters/headers)
+is still honored: sends route through common.send_guard.guarded_send_email and
+the subscriber-record writes are suppressed.
 """
 
 import hashlib
@@ -79,6 +90,7 @@ import boto3
 # deploy path ships the full-tree bundle (#781), so web/site_api_common.py is
 # guaranteed present alongside this module.
 from common.client_ip import extract_client_ip  # #1221 — the ONE edge-observed client-IP helper
+from common.send_guard import guarded_send_email, is_dry_run  # #2291 — explicit dry_run honored
 from common.utm import (
     normalize as _utm_normalize,  # #1621 — shared with the outbound link tagger
     referrer_host as _referrer_host,
@@ -107,6 +119,14 @@ SENDER = os.environ.get("EMAIL_SENDER", "lifeplatform@mattsusername.com")
 SITE_URL = os.environ.get("SITE_URL", "https://averagejoematt.com")
 
 SUBSCRIBERS_PK = f"USER#{USER_ID}#SOURCE#subscribers"
+
+# #2291: DECLARED trigger-type exemption from the DEFAULT SES dry-run suppression.
+# The exemption axis is TRIGGER TYPE, not recipient consent: this handler runs only
+# in direct response to a reader's HTTP request (CloudFront /api/subscribe* →
+# Function URL), so a stray operator invoke with an empty event returns 405 and
+# mails nobody. tests/test_ses_send_guard_set_2222.py derives the exempt set from
+# this marker and fails if this function ever grows an EventBridge schedule=.
+SES_EXEMPT_EVENT_DRIVEN = "reader HTTP request via CloudFront /api/subscribe*; double-opt-in mail to the requester only, never scheduled"
 
 # #1621: the utm_* keys accepted off the subscribe POST body. A subset of utm.UTM_KEYS —
 # content/term are ad-level detail this platform has no use for and no reason to retain.
@@ -288,7 +308,9 @@ def build_attribution(source: str = "", referrer: str = "", utm: dict | None = N
     return attrs
 
 
-def handle_subscribe(email: str, source_ip: str = "", referrer: str = "", source: str = "", utm: dict | None = None) -> dict:
+def handle_subscribe(
+    email: str, source_ip: str = "", referrer: str = "", source: str = "", utm: dict | None = None, dry_run: bool = False
+) -> dict:
     """Create/update pending record and send confirmation email.
 
     source='canary' skips the confirmation email (the canary POSTs a synthetic
@@ -353,23 +375,30 @@ def handle_subscribe(email: str, source_ip: str = "", referrer: str = "", source
     if existing:
         # Preserve original created_at and confirmed_at if resubscribing
         item["created_at"] = existing.get("created_at", now_iso)
-    try:
-        table.put_item(Item=item)
-    except Exception as exc:
-        logger.error("subscribe: DDB write failed: %s", exc)
-        return _json_response(500, {"error": "Database error. Please try again."})
+    if dry_run:
+        # #2291: an explicit dry run writes nothing — no pending record, no token.
+        logger.info("subscribe: dry run — subscriber write suppressed for %s", email_hash[:8])
+    else:
+        try:
+            table.put_item(Item=item)
+        except Exception as exc:
+            logger.error("subscribe: DDB write failed: %s", exc)
+            return _json_response(500, {"error": "Database error. Please try again."})
 
     # Send confirmation email (Ava: warm, specific, on-brand)
     # Skipped for canary synthetic subscribers — see handle_subscribe docstring.
     if is_canary:
         logger.info("subscribe: canary synthetic — skipping confirmation email for %s", email_hash[:8])
     else:
-        _send_confirmation_email(email, confirm_url)
+        _send_confirmation_email(email, confirm_url, dry_run=dry_run)
         logger.info("subscribe: pending confirmation sent to %s", email_hash[:8])
-    return _json_response(200, {"status": "pending_confirmation", "message": "Check your inbox."})
+    body = {"status": "pending_confirmation", "message": "Check your inbox."}
+    if dry_run:
+        body["dry_run"] = True
+    return _json_response(200, body)
 
 
-def _send_confirmation_email(email: str, confirm_url: str) -> None:
+def _send_confirmation_email(email: str, confirm_url: str, dry_run: bool = False) -> None:
     """Ava Moreau directive: warm, specific, on-brand. Not 'please confirm your email'."""
     subject = "One click to confirm — then the actual numbers every Wednesday"
     html = f"""<!DOCTYPE html>
@@ -405,7 +434,9 @@ def _send_confirmation_email(email: str, confirm_url: str) -> None:
 </html>"""
 
     try:
-        ses.send_email(
+        guarded_send_email(
+            ses,
+            dry_run,
             FromEmailAddress=SENDER,
             Destination={"ToAddresses": [email]},
             Content={
@@ -425,8 +456,10 @@ def _send_confirmation_email(email: str, confirm_url: str) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def handle_confirm(token: str, email_hash_prefix: str) -> dict:
-    """Validate token, confirm subscription, send welcome email."""
+def handle_confirm(token: str, email_hash_prefix: str, dry_run: bool = False) -> dict:
+    """Validate token, confirm subscription, send welcome email.
+
+    #2291: an explicit dry run suppresses the status flip and the welcome email."""
     if not token or len(token) != 64:
         return _redirect(f"{SITE_URL}/subscribe/confirm/?error=invalid_token")
 
@@ -466,19 +499,23 @@ def handle_confirm(token: str, email_hash_prefix: str) -> dict:
 
     # Confirm
     now_iso = datetime.now(timezone.utc).isoformat()
-    try:
-        table.update_item(
-            Key={"pk": SUBSCRIBERS_PK, "sk": record["sk"]},
-            UpdateExpression="SET #s = :s, confirmed_at = :c, updated_at = :u REMOVE confirm_token, token_expires",
-            ExpressionAttributeNames={"#s": "status"},
-            ExpressionAttributeValues={":s": "confirmed", ":c": now_iso, ":u": now_iso},
-        )
-    except Exception as exc:
-        logger.error("confirm: DDB update failed: %s", exc)
-        return _redirect(f"{SITE_URL}/subscribe/confirm/?error=server_error")
+    if dry_run:
+        # #2291: dry run — report what would happen, flip nothing, mail nobody.
+        logger.info("confirm: dry run — status flip suppressed for %s", record.get("email_hash", "")[:8])
+    else:
+        try:
+            table.update_item(
+                Key={"pk": SUBSCRIBERS_PK, "sk": record["sk"]},
+                UpdateExpression="SET #s = :s, confirmed_at = :c, updated_at = :u REMOVE confirm_token, token_expires",
+                ExpressionAttributeNames={"#s": "status"},
+                ExpressionAttributeValues={":s": "confirmed", ":c": now_iso, ":u": now_iso},
+            )
+        except Exception as exc:
+            logger.error("confirm: DDB update failed: %s", exc)
+            return _redirect(f"{SITE_URL}/subscribe/confirm/?error=server_error")
 
     logger.info("confirmed subscriber: %s", record.get("email_hash", "")[:8])
-    _send_welcome_email(email)
+    _send_welcome_email(email, dry_run=dry_run)
     return _redirect(f"{SITE_URL}/subscribe/confirm/?confirmed=true")
 
 
@@ -515,13 +552,15 @@ Unsubscribe: {unsub_url}"""
     return subject, body_text
 
 
-def _send_welcome_email(email: str) -> None:
+def _send_welcome_email(email: str, dry_run: bool = False) -> None:
     """Welcome email — direct dispatch from Matthew. Sets honest expectations
     and gives the subscriber one concrete thing to do right now."""
     subject, body_text = _welcome_email_content(email)
 
     try:
-        ses.send_email(
+        guarded_send_email(
+            ses,
+            dry_run,
             FromEmailAddress=SENDER,
             Destination={"ToAddresses": [email]},
             Content={
@@ -601,10 +640,16 @@ def lambda_handler(event, context):
         # the ONE shared helper so this can never drift from the site-api handlers.
         source_ip = extract_client_ip(event)
 
+        # #2291: explicit operator dry run. Only a console/CLI invoke can set
+        # top-level event keys — a real HTTP request's data arrives under
+        # body/queryStringParameters/headers, which is_dry_run never consults —
+        # so real traffic can never trip this.
+        dry_run = is_dry_run(event)
+
         if action == "confirm":
             token = params.get("token", "")
             email_hash_pfx = params.get("h", "")
-            return handle_confirm(token, email_hash_pfx)
+            return handle_confirm(token, email_hash_pfx, dry_run=dry_run)
 
         if action == "unsubscribe":
             email = params.get("email", "")
@@ -630,7 +675,7 @@ def lambda_handler(event, context):
             except Exception:
                 return _json_response(400, {"error": "Invalid request body."})
             referrer = (event.get("headers") or {}).get("referer", "")
-            return handle_subscribe(email, source_ip=source_ip, referrer=referrer, source=source, utm=utm)
+            return handle_subscribe(email, source_ip=source_ip, referrer=referrer, source=source, utm=utm, dry_run=dry_run)
 
         return _json_response(405, {"error": "Method not allowed."})
     except Exception as e:

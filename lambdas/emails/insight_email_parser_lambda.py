@@ -20,6 +20,15 @@ Changes v1.1.0:
   - Subdomain routing: insight@aws.mattsusername.com (avoids SimpleLogin conflict)
   - Dynamic reply-to-sender for confirmation emails
   - ALLOWED_SENDERS from env var for easier config updates
+
+Dry-run posture (#2291): this module is EVENT-driven (SES inbound receipt →
+S3 → Lambda), never scheduled, so it is exempt from #2222's DEFAULT dry-run
+suppression — the declared `SES_EXEMPT_EVENT_DRIVEN` marker below is what the
+guard test derives that exemption from, and it also asserts the function has no
+EventBridge schedule= in cdk/stacks/. An EXPLICIT `{"dry_run": true}` on the
+event is still honored: every send routes through
+common.send_guard.guarded_send_email and the insight/correction writes are
+suppressed, so replaying a captured S3/SES event with the flag added is safe.
 """
 
 import email
@@ -33,6 +42,15 @@ from email import policy
 from html import escape as html_escape
 
 import boto3
+from common.send_guard import guarded_send_email, is_dry_run
+
+# #2291: DECLARED trigger-type exemption from the DEFAULT SES dry-run suppression.
+# The exemption axis is TRIGGER TYPE, not recipient consent: this handler runs only
+# when SES receives a real inbound email (receipt rule → S3 → Lambda), so a stray
+# operator invoke with an empty event sends nothing — there are no Records to mail
+# about. tests/test_ses_send_guard_set_2222.py derives the exempt set from this
+# marker and fails if this function ever grows an EventBridge schedule=.
+SES_EXEMPT_EVENT_DRIVEN = "SES inbound receipt rule -> S3 -> Lambda; sends only in reply to a real inbound email, never on a schedule"
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -130,8 +148,11 @@ def extract_reply_text(email_body):
     return text
 
 
-def save_insight(text, source_email_subject=""):
-    """Save the insight to DynamoDB insights partition."""
+def save_insight(text, source_email_subject="", dry_run=False):
+    """Save the insight to DynamoDB insights partition.
+
+    Under an explicit dry run (#2291) the write is suppressed — a dry run must
+    leave no record claiming the real run happened."""
     now = datetime.now(timezone.utc)
     insight_id = now.isoformat()
     date_saved = now.strftime("%Y-%m-%d")
@@ -161,12 +182,15 @@ def save_insight(text, source_email_subject=""):
     }
 
     item = json.loads(json.dumps(item), parse_float=Decimal)
-    table.put_item(Item=item)
+    if dry_run:
+        print(f"[DRY-RUN] insight write suppressed — {len(text)} chars, tags={tags}")
+    else:
+        table.put_item(Item=item)
 
     return insight_id, date_saved
 
 
-def send_confirmation(insight_text, insight_id, recipient_email):
+def send_confirmation(insight_text, insight_id, recipient_email, dry_run=False):
     """Send a brief confirmation email back to the sender."""
     preview = insight_text[:80] + ("..." if len(insight_text) > 80 else "")
 
@@ -191,7 +215,9 @@ def send_confirmation(insight_text, insight_id, recipient_email):
 </body>
 </html>"""
 
-    ses.send_email(
+    guarded_send_email(
+        ses,
+        dry_run,
         FromEmailAddress=SENDER,
         Destination={"ToAddresses": [recipient_email]},
         Content={
@@ -213,7 +239,7 @@ def _is_review_pack_reply(subject):
     return "review pack" in (subject or "").lower()
 
 
-def _send_correction_confirmation(applied, unresolved, recipient_email, subject=""):
+def _send_correction_confirmation(applied, unresolved, recipient_email, subject="", dry_run=False):
     """Echo back what landed and what didn't (AC3: unresolved is never silently dropped)."""
     applied_rows = "".join(
         f'<li style="margin:2px 0;">#{a["n"]} — {html_escape(str(a.get("surface") or ""))}'
@@ -254,7 +280,9 @@ def _send_correction_confirmation(applied, unresolved, recipient_email, subject=
   </div>
 </body>
 </html>"""
-    ses.send_email(
+    guarded_send_email(
+        ses,
+        dry_run,
         FromEmailAddress=SENDER,
         Destination={"ToAddresses": [recipient_email]},
         Content={
@@ -266,7 +294,7 @@ def _send_correction_confirmation(applied, unresolved, recipient_email, subject=
     )
 
 
-def handle_review_pack_reply(reply_text, subject, sender):
+def handle_review_pack_reply(reply_text, subject, sender, dry_run=False):
     """Land '#N <correction>' reply lines in the corrections ledger (#1690).
 
     Each #N resolves — via the shared coach_correction_resolver, the SAME numbering the
@@ -295,7 +323,9 @@ def handle_review_pack_reply(reply_text, subject, sender):
         except Exception as e:  # noqa: BLE001 — a broken read is reported, not swallowed
             print(f"[ERROR] could not assemble review-pack week: {e}")
             try:
-                _send_correction_confirmation([], [f"could not read this week's review pack ({e}) — please retry"], sender, subject)
+                _send_correction_confirmation(
+                    [], [f"could not read this week's review pack ({e}) — please retry"], sender, subject, dry_run=dry_run
+                )
             except Exception as se:  # pragma: no cover
                 print(f"[WARN] correction confirmation email failed: {se}")
             return {"applied": [], "unresolved": ["archive read failed"]}
@@ -305,19 +335,24 @@ def handle_review_pack_reply(reply_text, subject, sender):
             if not resolution.get("ok"):
                 unresolved.append(f"#{n}: {resolution.get('error')}")
                 continue
-            try:
-                sk = coach_corrections.write_correction(table, resolution["item_ref"], text, "other")
-            except Exception as e:  # noqa: BLE001 — a lost correction must be loud
-                print(f"[ERROR] correction write failed for #{n}: {e}")
-                unresolved.append(f"#{n}: could not be saved ({e})")
-                continue
+            if dry_run:
+                # #2291: a dry run resolves and reports but never writes the ledger.
+                sk = "dry-run-suppressed"
+                print(f"[DRY-RUN] correction write suppressed for #{n}")
+            else:
+                try:
+                    sk = coach_corrections.write_correction(table, resolution["item_ref"], text, "other")
+                except Exception as e:  # noqa: BLE001 — a lost correction must be loud
+                    print(f"[ERROR] correction write failed for #{n}: {e}")
+                    unresolved.append(f"#{n}: could not be saved ({e})")
+                    continue
             entry = resolution["entry"]
             applied.append({"n": resolution["n"], "surface": entry.get("surface"), "coach": entry.get("variant"), "sk": sk})
             print(f"[INFO] correction logged for #{resolution['n']} -> {sk}")
 
     print(f"[INFO] review-pack reply: {len(applied)} applied, {len(unresolved)} unresolved")
     try:
-        _send_correction_confirmation(applied, unresolved, sender, subject)
+        _send_correction_confirmation(applied, unresolved, sender, subject, dry_run=dry_run)
     except Exception as e:  # pragma: no cover — confirmation is best-effort
         print(f"[WARN] correction confirmation email failed: {e}")
     return {"applied": applied, "unresolved": unresolved}
@@ -333,6 +368,13 @@ def lambda_handler(event, context):
         2. SES direct invocation (has 'Records' with ses info)
         """
         print("[INFO] Insight Email Parser v1.1.0 triggered")
+
+        # #2291: this handler is exempt from DEFAULT dry-run suppression (it is
+        # SES-receipt-triggered — see SES_EXEMPT_EVENT_DRIVEN), but an EXPLICIT
+        # {"dry_run": true} on a replayed event suppresses every send and write.
+        dry_run = is_dry_run(event)
+        if dry_run:
+            print("[DRY-RUN] explicit dry run — sends and writes will be suppressed")
 
         for record in event.get("Records", []):
             # Handle S3 trigger
@@ -404,7 +446,7 @@ def lambda_handler(event, context):
             # reply is processed (and any malformed/unknown line is reported back).
             if _is_review_pack_reply(subject):
                 print(f"[INFO] review-pack reply detected (subject: {subject[:80]!r}) — routing to corrections ledger")
-                handle_review_pack_reply(reply_text, subject, sender)
+                handle_review_pack_reply(reply_text, subject, sender, dry_run=dry_run)
                 continue
 
             if not reply_text or len(reply_text) < 5:
@@ -414,17 +456,17 @@ def lambda_handler(event, context):
             print(f"[INFO] Extracted reply ({len(reply_text)} chars): {reply_text[:100]}...")
 
             # Save as insight
-            insight_id, date_saved = save_insight(reply_text, source_email_subject=subject)
+            insight_id, date_saved = save_insight(reply_text, source_email_subject=subject, dry_run=dry_run)
             print(f"[INFO] Insight saved: {insight_id}")
 
             # Send confirmation back to sender
             try:
-                send_confirmation(reply_text, insight_id, recipient_email=sender)
+                send_confirmation(reply_text, insight_id, recipient_email=sender, dry_run=dry_run)
                 print(f"[INFO] Confirmation email sent to {sender}")
             except Exception as e:
                 print(f"[WARN] Confirmation email failed: {e}")
 
-        return {"statusCode": 200, "body": json.dumps({"status": "ok"})}
+        return {"statusCode": 200, "body": json.dumps({"status": "ok", "dry_run": dry_run})}
     except Exception as e:
         logger.error("lambda_handler failed: %s", e, exc_info=True)
         raise
