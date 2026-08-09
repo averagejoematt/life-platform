@@ -158,6 +158,12 @@ def query_journal_range(start_date, end_date):
     return dict(entries_by_date)
 
 
+def nutrition_last_log_absence(today):
+    """#2387: thin binding — the logic lives in weekly_digest_extractors (the #2221
+    split shape); this module supplies its own table/logger/genesis constants."""
+    return ex_nutrition_last_log_absence(table, USER_ID, EXPERIMENT_START_DATE, today, logger)
+
+
 def delta_html(cur, prev, unit="", dec=1, invert=False):
     if cur is None or prev is None:
         return ""
@@ -205,6 +211,7 @@ from emails.weekly_digest_extractors import (  # noqa: E402
     ex_hevy_workouts,
     ex_journal,
     ex_macrofactor,
+    ex_nutrition_last_log_absence,
     ex_strava,
     ex_todoist,
     ex_whoop,
@@ -667,6 +674,8 @@ def gather_all():
         # checks nutrition_delivery_public() before it touches the partition (#2233), so
         # with the flag off this is None and nothing renders.
         "delivery_line": get_food_delivery_digest_line(),
+        # #2387 (ADR-104): absence facts only when the week is actually dark
+        "nutrition_absence": (nutrition_last_log_absence(today) if this.get("macrofactor") is None else None),
         # #2221: the component scorecard's raw grades. lambda_handler used to re-query
         # day_grade for exactly this window, a fourth read of a source already in hand.
         "_raw_grades": raw_this["day_grade"],
@@ -1410,6 +1419,17 @@ def build_html(data, commentary, profile):
         if m.get("fiber_avg_g"):
             nu_rows += row("Avg Fiber", fmt(m["fiber_avg_g"], "g"))
         nu_rows += row("Days Logged", str(m.get("days_logged", 0)))
+    else:
+        # #2387 (ADR-104): the unlogged week is stated in ONE line (dates from the source's own records), never elided
+        _ab = data.get("nutrition_absence") or {}
+        if _ab.get("last_log"):
+            _ab_days = _ab.get("days_ago")
+            _ab_text = f'Nothing logged this week; last log {_ab["last_log"]}, {_ab_days} day{"s" if _ab_days != 1 else ""} ago'
+        elif "last_log" in _ab:
+            _ab_text = "Nothing logged this cycle"
+        else:  # lookup failed — unknown licenses no cycle claim, only the week itself
+            _ab_text = "Nothing logged this week"
+        nu_rows += row("Logging", f'<span style="color:#e67e22;font-weight:700;">{_ab_text}</span>', highlight=True)
     # #2221: the delivery-free streak finally reaches the section it was written for.
     # `get_food_delivery_digest_line` documented itself as the weekly-digest nutrition
     # line and had no call site anywhere in the repo, so the behaviour-change loop the
