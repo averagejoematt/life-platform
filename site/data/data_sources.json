@@ -113,7 +113,7 @@
       "id": "weather",
       "name": "Weather",
       "category": "Inputs",
-      "metrics": "Temperature, precipitation, daylight",
+      "metrics": "Temperature, precipitation, daylight, conditions, sunrise/sunset, AQI",
       "method": "Open-Meteo API pull, 2x daily",
       "posture": "portfolio"
     },
