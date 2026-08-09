@@ -56,8 +56,44 @@ config = IngestionConfig(
 _OPEN_METEO_FIELDS = (
     "temperature_2m_max,temperature_2m_min,temperature_2m_mean,"
     "relative_humidity_2m_mean,precipitation_sum,wind_speed_10m_max,"
-    "surface_pressure_mean,daylight_duration,uv_index_max,sunshine_duration"
+    "surface_pressure_mean,daylight_duration,uv_index_max,sunshine_duration,"
+    # #2311: the brief's Conditions / Sunrise / Sunset cells had no writer.
+    "weather_code,sunrise,sunset"
 )
+
+# ── WMO weather interpretation codes → the brief's condition string (#2311) ──
+# Open-Meteo's daily `weather_code` is a WMO 4677-derived code. Unknown codes
+# map to no condition at all (honest absence, ADR-104) — never a guess.
+_WMO_CONDITIONS: dict[int, str] = {
+    0: "Clear",
+    1: "Mainly clear",
+    2: "Partly cloudy",
+    3: "Overcast",
+    45: "Fog",
+    48: "Rime fog",
+    51: "Light drizzle",
+    53: "Drizzle",
+    55: "Dense drizzle",
+    56: "Freezing drizzle",
+    57: "Freezing drizzle",
+    61: "Light rain",
+    63: "Rain",
+    65: "Heavy rain",
+    66: "Freezing rain",
+    67: "Freezing rain",
+    71: "Light snow",
+    73: "Snow",
+    75: "Heavy snow",
+    77: "Snow grains",
+    80: "Light showers",
+    81: "Showers",
+    82: "Violent showers",
+    85: "Snow showers",
+    86: "Snow showers",
+    95: "Thunderstorm",
+    96: "Thunderstorm with hail",
+    99: "Thunderstorm with hail",
+}
 
 
 # ── Source callbacks ──────────────────────────────────────────────────────────
@@ -83,7 +119,44 @@ def fetch_day(creds, date_str):
     )
     req = urllib.request.Request(url, headers={"User-Agent": "life-platform/1.0"})
     with urlopen_with_retry(req, timeout=15) as resp:
+        data = json.loads(resp.read().decode())
+
+    # #2311 AQI decision: SOURCED, from Open-Meteo's air-quality product
+    # (air-quality-api.open-meteo.com, hourly `us_aqi`) — same provider, no
+    # auth, one extra call. Fail-soft: an AQI outage costs the aqi field for
+    # the day (honest absence), never the weather record.
+    try:
+        data["air_quality"] = _fetch_air_quality(date_str)
+    except Exception as e:
+        logger.warning("air-quality fetch failed for %s — aqi omitted: %s", date_str, e)
+    return data
+
+
+def _fetch_air_quality(date_str):
+    """Fetch hourly US AQI for one day from Open-Meteo's air-quality API (#2311)."""
+    url = (
+        f"https://air-quality-api.open-meteo.com/v1/air-quality?"
+        f"latitude={LAT}&longitude={LON}"
+        f"&start_date={date_str}&end_date={date_str}"
+        f"&hourly=us_aqi&timezone=America/Los_Angeles"
+    )
+    req = urllib.request.Request(url, headers={"User-Agent": "life-platform/1.0"})
+    with urlopen_with_retry(req, timeout=15) as resp:
         return json.loads(resp.read().decode())
+
+
+def _local_hhmm(iso_ts):
+    """HH:MM from an Open-Meteo local ISO timestamp ('2026-07-01T05:16'), else None."""
+    if isinstance(iso_ts, str) and "T" in iso_ts:
+        return iso_ts.split("T", 1)[1][:5]
+    return None
+
+
+def _daily_aqi(raw):
+    """Max hourly US AQI for the day, or None when nothing was measured (ADR-104)."""
+    hourly = (raw.get("air_quality") or {}).get("hourly") or {}
+    vals = [v for v in hourly.get("us_aqi") or [] if v is not None]
+    return max(vals) if vals else None
 
 
 def transform(raw, date_str):
@@ -111,6 +184,13 @@ def transform(raw, date_str):
         "daylight_hours": round(daylight_secs / 3600, 2),
         "sunshine_hours": round(sunshine_secs / 3600, 2),
         "uv_index_max": daily.get("uv_index_max", [None])[i],
+        # #2311: the four field names html_builder's weather block already
+        # reads. None values (old-style response, unknown code, AQI outage)
+        # are stripped below — the brief omits the cell rather than fabricate.
+        "condition": _WMO_CONDITIONS.get(daily.get("weather_code", [None])[i]),
+        "sunrise_local": _local_hhmm(daily.get("sunrise", [None])[i]),
+        "sunset_local": _local_hhmm(daily.get("sunset", [None])[i]),
+        "aqi": _daily_aqi(raw),
     }
 
     # Strip None values (missing fields)

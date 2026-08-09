@@ -1239,10 +1239,9 @@ def _brief_lifestyle(data, profile, tldr_guidance):
             temp_hi = safe_float(weather, "temp_high_f")
             temp_lo = safe_float(weather, "temp_low_f")
             condition = weather.get("condition", "")
-            precip = safe_float(weather, "precip_in")
             aqi = safe_float(weather, "aqi")
             sunrise = weather.get("sunrise_local", "")
-            weather.get("sunset_local", "")
+            sunset = weather.get("sunset_local", "")
 
             out += '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;">'
             if temp_hi:
@@ -1264,10 +1263,10 @@ def _brief_lifestyle(data, profile, tldr_guidance):
                     '<div><p style="color:#fbbf24;font-size:12px;margin:0;">' + sunrise[:5] + "</p>"
                     '<p style="color:#475569;font-size:9px;margin:0;">Sunrise</p></div>'
                 )
-            if precip and precip > 0:
+            if sunset:
                 out += (
-                    '<div><p style="color:#60a5fa;font-size:12px;margin:0;">' + str(round(precip, 2)) + '"</p>'
-                    '<p style="color:#475569;font-size:9px;margin:0;">Precip</p></div>'
+                    '<div><p style="color:#fb923c;font-size:12px;margin:0;">' + sunset[:5] + "</p>"
+                    '<p style="color:#475569;font-size:9px;margin:0;">Sunset</p></div>'
                 )
             if aqi:
                 aqi_color = "#22c55e" if aqi < 50 else "#f59e0b" if aqi < 100 else "#ef4444"
@@ -1275,11 +1274,15 @@ def _brief_lifestyle(data, profile, tldr_guidance):
                     '<div><p style="color:' + aqi_color + ';font-size:12px;margin:0;">' + str(round(aqi)) + "</p>"
                     '<p style="color:#475569;font-size:9px;margin:0;">AQI</p></div>'
                 )
-            # Reader/writer parity: `condition`, `precip_in`, `aqi`, `sunrise_local` and
-            # `sunset_local` above have NO writer anywhere in the repo, so four of the
-            # card's five cells had never rendered and the section was a bare Hi/Lo. The
-            # reads stay (a future writer, or a hand-entered record, still lights them up);
-            # what weather_lambda.transform() actually stores is rendered here.
+            # Reader/writer parity (#2311): `condition`, `aqi`, `sunrise_local` and
+            # `sunset_local` are written by weather_lambda.transform() since #2311
+            # (weather_code + sunrise/sunset from the daily endpoint, us_aqi from the
+            # air-quality endpoint). Rows ingested before that lack the fields and the
+            # cells are simply omitted — never fabricated (ADR-104). Precipitation is
+            # rendered ONLY by weather_context_cells below, in the writer's own unit
+            # (mm) — the old dead `precip_in` inches read was removed, not given a
+            # second conversion. The contract test deriving these reads against the
+            # writer's fields is tests/test_weather_reader_writer_contract_2311.py.
             out += weather_context_cells(weather)
             out += "</div></div>"
         out += "<!-- /S:weather -->"

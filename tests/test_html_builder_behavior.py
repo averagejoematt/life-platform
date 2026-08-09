@@ -1406,15 +1406,14 @@ def test_weather_card_renders_the_fields_the_weather_lambda_actually_writes():
     assert ">78°/55°F</p>" in html  # this part works
     assert "Precip" in html  # precipitation was measured and is nowhere in the card
     assert "5.1 mm" in html  # ...and in the writer's unit, not the read side's fictional inches
-    # CORRECTION to the marker's third clause. It asked for "Conditions" or "Sunrise" on
-    # this record, but neither can be honest: the writer emits no condition string and no
-    # sunrise/sunset, so there is nothing to render. Reader/writer parity here means
-    # rendering what weather_lambda.transform() DOES store. Lighting up the Conditions and
-    # Sunrise cells is a weather_lambda change (request weather_code + sunrise/sunset from
-    # Open-Meteo), and it does not belong in the renderer.
+    # This record is the PRE-#2311 shape — every row ingested before weather_lambda
+    # started requesting weather_code/sunrise/sunset/us_aqi looks like this. Honest
+    # absence (ADR-104): the four #2311 cells must be omitted for such a row, never
+    # fabricated from what was measured.
     for label in ("Humidity", "Wind max", "UV max", "Daylight"):
         assert label in html, label
     assert "Conditions" not in html and "Sunrise" not in html
+    assert "Sunset" not in html and "AQI" not in html
 
 
 def test_task_load_missing_counts_are_not_reported_as_zero():
@@ -1855,27 +1854,29 @@ def test_hevy_set_detail_renders_reps_weight_and_rir():
 
 
 def test_weather_card_renders_every_cell_when_given_the_names_it_reads():
-    """Control for the weather mismatch xfail: the rendering logic is fine.
+    """The #2311 cells light up when the record carries the fields.
 
-    This is the shape `_brief_lifestyle` expects — and which nothing in the repo
-    writes. Feeding it by hand proves the four dark cells are a naming defect,
-    not missing code.
+    Since #2311 `weather_lambda.transform()` writes exactly these names
+    (condition / aqi / sunrise_local / sunset_local); the reader/writer
+    derivation lives in tests/test_weather_reader_writer_contract_2311.py.
+    The dead `precip_in` inches read was removed with it — precipitation
+    renders once, in the writer's mm, via `weather_context_cells`.
     """
     rec = {
         "temp_high_f": 78.0,
         "temp_low_f": 55.0,
         "condition": "Partly cloudy",
-        "precip_in": 0.24,
         "aqi": 42.0,
-        "sunrise_local": "05:42:00",
-        "sunset_local": "20:31:00",
+        "sunrise_local": "05:42",
+        "sunset_local": "20:31",
     }
     html = _lifestyle(data=_data(weather_yesterday=rec))
     assert "Partly cloudy" in html and "Conditions" in html
-    assert '>0.24"</p>' in html and "Precip" in html  # round(0.24, 2)
     assert ">42</p>" in html and "AQI" in html and "#22c55e" in html  # aqi < 50 -> green
     assert ">05:42</p>" in html and "Sunrise" in html  # sunrise_local[:5]
-    assert "Sunset" not in html  # read on line 1421 and discarded
+    assert ">20:31</p>" in html and "Sunset" in html  # was read-and-discarded pre-#2311
+    # no precipitation_mm on this record and precip_in is dead -> no Precip cell at all
+    assert "Precip" not in html
 
 
 def test_weather_falls_back_to_todays_record_when_yesterdays_is_missing():
