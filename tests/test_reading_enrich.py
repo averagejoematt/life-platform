@@ -58,7 +58,7 @@ def test_subscores_clamped_and_capped():
     def caller(_body):
         return _resp(
             {
-                "domainTags": ["a", "b", "c", "d", "e", "f"],
+                "domainTags": ["history", "science", "fiction", "poetry", "memoir", "nature"],
                 "themes": ["t1", "t2", "t3", "t4", "t5"],
                 "era": "bogus",
                 "difficulty": {"density": 9, "prose": 0, "structure": 3},
@@ -69,6 +69,54 @@ def test_subscores_clamped_and_capped():
     assert len(out["domainTags"]) == 4 and len(out["themes"]) == 4  # capped
     assert out["era"] is None  # invalid era dropped
     assert out["difficulty"]["density"] == 5 and out["difficulty"]["prose"] == 1  # clamped to 1..5
+
+
+# ── #2425: the per-field grounding gate ──────────────────────────────────────
+def test_out_of_vocabulary_tag_never_ships():
+    """The deterministic half: domainTags is a closed set, enforced in code."""
+
+    def caller(_body):
+        return _resp({"domainTags": ["history", "cyberpunk-noir", "SCIENCE", "astrology"], "themes": [], "era": None, "difficulty": {}})
+
+    out = re_mod.enrich_book({"title": "T", "author": "A"}, caller=caller)
+    assert out["domainTags"] == ["history", "science"]  # out-of-vocab dropped, case-normalized
+
+
+def test_prompt_tag_list_is_built_from_the_vocab():
+    """Prompt and validator cannot drift: every vocab tag appears in the prompt."""
+    for tag in re_mod.DOMAIN_TAG_VOCAB:
+        assert tag in re_mod._USER_TEMPLATE
+    for era in re_mod.ERA_VOCAB:
+        assert era in re_mod._USER_TEMPLATE
+
+
+def test_theme_with_fabricated_number_is_held():
+    """The free-text half: a theme citing a number the prompt never contained is
+    dropped; grounded themes still ship (a gate that rejects everything is a gate
+    nobody keeps)."""
+
+    def caller(_body):
+        return _resp(
+            {
+                "domainTags": ["sci-fi"],
+                "themes": ["surviving 47 days alone", "problem-solving"],
+                "era": "contemporary",
+                "difficulty": {},
+            }
+        )
+
+    out = re_mod.enrich_book({"title": "Project Hail Mary", "author": "Andy Weir", "pageCount": 496}, caller=caller)
+    assert out["themes"] == ["problem-solving"], "the 47 appears nowhere in the prompt — the theme must be held (#2425)"
+
+
+def test_theme_number_grounded_in_the_prompt_survives():
+    """A number the model WAS given (the page count, a title figure) is legitimate."""
+
+    def caller(_body):
+        return _resp({"domainTags": ["classics"], "themes": ["the world of 1984"], "era": "modern", "difficulty": {}})
+
+    out = re_mod.enrich_book({"title": "1984", "author": "George Orwell", "pageCount": 328}, caller=caller)
+    assert out["themes"] == ["the world of 1984"]
 
 
 def test_fail_soft_on_bad_json():

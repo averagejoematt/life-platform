@@ -50,6 +50,57 @@ def test_extract_grounded_and_failsoft():
     assert rcst.extract_ideas("X", "some notes", caller=boom) == []
 
 
+# ── #2425: the code-level grounding gate over the owner's own words ──────────
+def test_idea_with_number_not_in_owners_words_is_held():
+    """The prompt said 'grounded ONLY in the text you're given'; #2425 makes that
+    code. A label/gist carrying a figure the owner never wrote is dropped."""
+
+    def caller(_b):
+        return {
+            "content": [
+                {
+                    "type": "text",
+                    "text": json.dumps(
+                        {
+                            "ideas": [
+                                {"label": "the 10,000 hour rule", "gist": "mastery takes 10000 hours of practice"},
+                                {"label": "quiet persistence", "gist": "small steady acts compound"},
+                            ]
+                        }
+                    ),
+                }
+            ]
+        }
+
+    ideas = rcst.extract_ideas("Stoner", "A life of quiet persistence, small steady acts.", caller=caller)
+    assert [i["label"] for i in ideas] == ["quiet persistence"], "the 10000 appears nowhere in his notes — held (#2425)"
+
+
+def test_idea_number_grounded_in_owners_words_survives():
+    def caller(_b):
+        return {
+            "content": [
+                {"type": "text", "text": json.dumps({"ideas": [{"label": "the 40-hour myth", "gist": "he wrote 40 hours is a myth"}]})}
+            ]
+        }
+
+    ideas = rcst.extract_ideas("Rest", "His notes: the 40-hour work week is mostly myth.", caller=caller)
+    assert len(ideas) == 1 and ideas[0]["label"] == "the 40-hour myth"
+
+
+def test_gate_unavailable_holds_everything(monkeypatch):
+    """Fail-closed: no gate module → no idea ships (and no idea is invented)."""
+    monkeypatch.setattr(rcst, "_gg", None)
+    called = {"n": 0}
+
+    def caller(_b):
+        called["n"] += 1
+        return {"content": [{"type": "text", "text": json.dumps({"ideas": [{"label": "anything", "gist": ""}]})}]}
+
+    assert rcst.extract_ideas("X", "some notes", caller=caller) == []
+    assert called["n"] == 0, "fail-closed must also mean no tokens spent"
+
+
 def test_is_ready_gate():
     assert rcst.is_ready(3) is False
     assert rcst.is_ready(4) is True
