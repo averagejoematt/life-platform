@@ -86,12 +86,16 @@ def _rows():
 
 
 def _fake_experiment_date(genesis):
-    """Mirror site_api_common._experiment_date with a pinned genesis: max(today-N, genesis),
-    clamped to today — deterministic regardless of the repo's live EXPERIMENT_START."""
+    """Mirror site_api_common._experiment_date with a pinned genesis — deterministic
+    regardless of the repo's live EXPERIMENT_START.
+
+    #2338: the helper returns the INCLUSIVE start of a `days_back`-day window ending
+    today, i.e. `today - (days_back - 1)`. This fake mirrors that; the old `today - N`
+    form is what made a 30-day strip render 31 dots."""
 
     def _fn(days_back=30):
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        raw = (datetime.now(timezone.utc) - timedelta(days=days_back)).strftime("%Y-%m-%d")
+        raw = (datetime.now(timezone.utc) - timedelta(days=max(days_back - 1, 0))).strftime("%Y-%m-%d")
         return min(max(raw, genesis), today)
 
     return _fn

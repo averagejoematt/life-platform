@@ -228,7 +228,14 @@ def test_the_real_numbers_are_still_published(short_cycle):
     assert v["weight_delta_window_days"] == 5, "the span between the first and last weigh-in used"
     assert v["hrv_avg_ms"] is not None
     assert v["hrv_avg_n"] == 5
-    assert v["hrv_avg_window_days"] == 5
+    # #2338: SIX, not five. The HRV window is the genesis-clamped query window
+    # [genesis, today], inclusive on both ends — on Day 6 of a cycle that is six
+    # calendar dates carrying five readings. The old exclusive count said "5 days"
+    # next to a `window_disclosure` that says "Day 6", which is the same
+    # label-vs-denominator contradiction #1917 set out to remove. (Contrast
+    # `weight_delta_window_days`, still 5: that one is a SPAN BETWEEN two weigh-ins,
+    # not a window, and is deliberately unaffected.)
+    assert v["hrv_avg_window_days"] == 6
 
 
 def test_window_numbers_are_explained_in_words(short_cycle):

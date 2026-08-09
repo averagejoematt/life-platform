@@ -121,7 +121,10 @@ def fulfillment_index(*, _g) -> dict:
     # mean_7d/mean_30d toward 0 right after every reset. `_experiment_date` here
     # clamps the day-loop to the same genesis floor the queries already use, so
     # the fabricated pre-genesis zero days can no longer be constructed.
-    trend_start = _experiment_date(29)
+    # #2338: was `_experiment_date(29)` — the same hand-rolled -1 as the habits
+    # dot-strip, compensating for the helper's old off-by-one. The helper is now
+    # inclusive-safe, so the 30-day trend asks for 30.
+    trend_start = _experiment_date(30)
 
     def _window(source, projection=None):
         kwargs = {

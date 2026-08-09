@@ -409,12 +409,15 @@ def nutrition_overview(*, _g) -> dict:
     latest_date = latest.get("date") or latest.get("sk", "").replace("DATE#", "")
 
     # 7-day vs 30-day comparison.
-    # #2221: the lower bound is EXCLUSIVE. `d7` is `today - 7`, so `>= d7` admitted
-    # EIGHT calendar dates (today-7 … today) into a figure `_window_span` reports as
-    # actual_days=7 and the payload names `cal_7d_avg` — an eighth day averaged into a
-    # seven-day label (#1917). `> d7` makes the set of dates and the published span the
-    # same seven days, and stays consistent when genesis clamps the window shorter.
-    items_7d = [i for i in items if (i.get("date") or i.get("sk", "").replace("DATE#", "")) > d7]
+    # #2221 fixed the eighth-day bug HERE, in this one filter, by making the lower bound
+    # exclusive (`> d7`) while `d7` was still `today - 7`. #2338 moved the repair upstream:
+    # `_experiment_date(7)` now returns `today - 6`, the inclusive start of a 7-day window,
+    # matching the inclusive `between` every other query in this file already uses. The
+    # bound is therefore INCLUSIVE again — keeping `>` on top of the fixed helper would
+    # drop the oldest day and average a 7-day label over six days, the same class of error
+    # in the other direction. The set of dates and the `_window_span` below stay identical,
+    # and both still shrink together when genesis clamps the window.
+    items_7d = [i for i in items if (i.get("date") or i.get("sk", "").replace("DATE#", "")) >= d7]
     cal_7d = [_mf(i, "calories") for i in items_7d if _mf(i, "calories") is not None]
     pro_7d = [_mf(i, "protein_g", "total_protein_g") for i in items_7d if _mf(i, "protein_g", "total_protein_g") is not None]
     # #1919: `d7` is genesis-clamped (_experiment_date), so `items_7d` can hold far
