@@ -1,12 +1,12 @@
 {
   "artifact": "genesis_preregistration.json",
-  "genesis": "2026-08-03",
+  "genesis": "2026-08-10",
   "algorithm": "sha256",
-  "sha256": "3a4f5872b934ec376d057647f2c96f7c3939c67248b07a8ebb3b6bcf30c70527",
-  "frozen_generated_at": "2026-08-03T17:38:31.709037+00:00",
-  "stamped_at": "2026-08-03T17:38:31.710233+00:00",
+  "sha256": "c380329e6298711cccc1c2ec2fcaa26d7d187656af1021db16cf3d49695157a6",
+  "frozen_generated_at": "2026-08-09T21:51:19.957193+00:00",
+  "stamped_at": "2026-08-09T21:51:19.959722+00:00",
   "stamp_note": "Hash stamped at freeze time.",
-  "public_artifact_url": "https://averagejoematt.com/experiments/prereg/genesis-2026-08-03.json",
-  "public_stamp_url": "https://averagejoematt.com/experiments/prereg/genesis-2026-08-03.sha256.json",
-  "verify": "curl -s https://averagejoematt.com/experiments/prereg/genesis-2026-08-03.json | shasum -a 256"
+  "public_artifact_url": "https://averagejoematt.com/experiments/prereg/genesis-2026-08-10.json",
+  "public_stamp_url": "https://averagejoematt.com/experiments/prereg/genesis-2026-08-10.sha256.json",
+  "verify": "curl -s https://averagejoematt.com/experiments/prereg/genesis-2026-08-10.json | shasum -a 256"
 }

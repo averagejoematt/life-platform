@@ -183,7 +183,10 @@ def test_prompt_truncates_oversized_prose():
     pages = [{"name": "Big", "path": "/big/", "prose": "x" * (rtq.MAX_PROSE_CHARS + 500)}]
     prompt = rtq.build_prompt(pages, rtq.phase_context(_DAY_2))
     assert "…[truncated]" in prompt
-    assert len(prompt) < rtq.MAX_PROSE_CHARS + 4000
+    # Overhead allowance = rubric + footer, not prose. 4000 → 5000 on 2026-08-09:
+    # the DO-NOT-flag ledger grew the two pre-start clauses ("··" honest-absence
+    # glyph + habitual-present design copy, the cycle-13 false-positive class).
+    assert len(prompt) < rtq.MAX_PROSE_CHARS + 5000
 
 
 def test_batching_four_to_six_surfaces_per_call():

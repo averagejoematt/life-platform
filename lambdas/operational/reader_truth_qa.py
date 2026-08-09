@@ -158,6 +158,14 @@ def _phase_line(phase):
 
 
 # ── prompt ─────────────────────────────────────────────────────────────────────
+# The DO-NOT-flag list is the rubric's false-positive ledger, grown the same way
+# #1917 grew the lower-bound clause: only after a repeated, verified-false finding
+# class, stated as the general principle. 2026-08-09 (cycle-13 reset, the first
+# truth-gated FUTURE genesis): the grader flagged the "··" honest-absence glyph
+# (ADR-104) and durable design copy ("starts at the Day-1 weigh-in") as claims of
+# existing data on a countdown day — four highs, all against the DESIGNED #931/#939
+# pre-start state. The two clauses below teach it what "··" and habitual-present
+# design copy mean; genuinely-asserted past measurements stay flaggable.
 
 _PROMPT_HEADER = """You are a meticulous editorial truth reviewer for a public "measured life" \
 experiment site. Below is the RENDERED TEXT of {k} of its surfaces (page prose and/or API payloads — \
@@ -188,6 +196,15 @@ DO NOT flag (these are CORRECT):
 before Day 1 legitimately exists and may be large;
 - the pre-start countdown copy itself, and honest sparse/empty states ("awaiting data", "N readings \
 so far", "no data yet");
+- the "··" placeholder glyph — it is the site's honest-absence marker (ADR-104): a tile, chart, \
+metric or section reading "··" is DECLARING that no data exists, never claiming data. Pre-start and \
+early-cycle pages deliberately stage their instruments with "··" (empty scaffolding is the designed \
+honest state, not an implied history);
+- durable design copy and structural UI affordances describing what the experiment DOES once \
+running — "starts at the Day-1 weigh-in", "tap any day", "the week ahead", section headings for \
+instruments that currently read "··". Habitual-present descriptions of the design are correct in \
+every phase, including pre-start; flag only prose asserting that specific measurements or progress \
+ALREADY happened when the phase makes that impossible;
 - story/archive/chronicle content clearly dated before the current cycle;
 - the same header/nav/footer chrome appearing on every page;
 - API field names or JSON structure — judge only human-readable narrative values inside them;
