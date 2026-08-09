@@ -2440,6 +2440,15 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/2438"
         }
       ]
+    },
+    {
+      "id": "2026-08-10-the-countdown-day",
+      "date": "2026-08-09",
+      "title": "The countdown day: moving genesis 24 hours broke the site's honesty in four places",
+      "shipped": "Cycle 13 is re-anchored: the experiment now starts Monday, August 10 — the platform's first reset where genesis lands in the FUTURE while the truth gates watch. One command re-tagged the database, rolled the ledger, rebuilt the character, curated the chronicle, and re-verified all 96 public URLs; the cycle-13 pre-registration is frozen and fingerprinted (16 coach predictions, 2 hypotheses, SHA-256 stamped) before a single data point exists. The countdown day itself forced four honesty fixes: a carried prologue essay whose opening claimed a morning that hadn't happened, an API disclosure saying the cycle 'began' on a date still in the future, a home page declaring 'it's running now' a day early, and an AI truth-reviewer that had to be taught the difference between empty instruments and false claims.",
+      "why_it_mattered": "The whole premise of this site is that the numbers can't lie by construction — and a pre-start countdown is the adversarial case: every surface is built to show live data, and for one day the honest answer everywhere is 'nothing yet.' The reset's three verification gates (a token sweep of all 96 pages, a semantic pass, and an AI reader-truth reviewer) each caught a different piece of that, which is exactly what layered gates are for. The fixes are durable: the pre-start wording now derives from the phase instead of assuming the experiment is running, so the next future-genesis reset inherits a site that tells the truth on day zero.",
+      "gotcha": "The AI truth reviewer flagged the site's own honesty machinery as lying: the '··' placeholder glyph — the deliberate mark for 'no data exists' — read to the model as an implied claim that data was coming from somewhere. Four high-severity findings, all against designed behavior. The fix wasn't to soften the reviewer but to state the allowance explicitly in its rubric: a tile reading '··' DECLARES absence, and habitual-present design copy ('starts at the Day-1 weigh-in') is correct in every phase. Same pattern as the last rubric growth: only after repeated verified-false findings, stated as a general principle.",
+      "honest_miss": "Three unit tests went red on main purely because the calendar moved — fixtures that hardcoded dates which were post-genesis last week and pre-genesis this week. They were each pinned to the constant's seams the same evening, but main spent about an hour red on wall-clock assumptions the test suite had been silently carrying for cycles. And the concurrent fleet deploy raced the reset pipeline's own deploy hard enough to fail one function's update — same code on both paths, so nothing shipped stale, but the run read red and had to be superseded."
     }
   ]
 }
