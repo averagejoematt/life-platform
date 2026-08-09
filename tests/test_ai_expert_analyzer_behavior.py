@@ -1164,7 +1164,12 @@ class TestGenerateAndCache:
 
 
 class TestGroundingSelfCorrection:
-    """ADR-104 regen-once: one corrective rewrite, kept only if strictly better."""
+    """ADR-104/ADR-108 (#2391): one corrective rewrite, then regenerate-or-HOLD.
+
+    The gate runs BEFORE the cache write. Publication requires ZERO residual
+    findings — 'better than before' is not 'clean', and the pre-#2391 semantics
+    were measured shipping a narrative with 2 known unresolved findings
+    ('sleep self-corrected: 6→2') on 2026-08-08."""
 
     @pytest.fixture(autouse=True)
     def _env(self, monkeypatch, table):
@@ -1180,22 +1185,30 @@ class TestGroundingSelfCorrection:
         assert m.calls == 2, "the fabricated figure did not trigger the regen-once pass"
 
     def test_the_corrected_text_replaces_the_published_analysis(self, model):
+        """#2391 moved the gate ABOVE the write: the corrected text arrives in the
+        ONE put_item — there is no publish-then-patch update any more, because the
+        ungrounded original must never be visible even transiently."""
         model("Recovery averaged 88.7 percent this week.", "Recovery held steady this week.")
         text = az.generate_and_cache("sleep")
         assert text == "Recovery held steady this week."
-        assert self.table.updates and self.table.updates[0]["Key"]["sk"] == "EXPERT#sleep"
+        cached = self.table.items[(az.CACHE_PK, "EXPERT#sleep")]
+        assert cached["analysis"] == "Recovery held steady this week."
+        assert self.table.updates == [], "correction happens pre-write; a patch update would mean the original was published first"
 
     def test_the_correction_prompt_names_the_fabricated_figure(self, model):
         m = model("Recovery averaged 88.7 percent this week.", "Recovery held steady this week.")
         az.generate_and_cache("sleep")
         assert "88.7" in m.prompts[1]
 
-    def test_a_rewrite_that_is_no_better_is_discarded_never_published(self, model):
-        """regen_once must never regress — a second fabrication keeps the original."""
+    def test_a_rewrite_that_is_no_better_HOLDS_rather_than_publishing_either_text(self, model):
+        """#2391: the old semantics kept the original — which still had findings —
+        and PUBLISHED it. Now neither text may reach the cache: residual findings
+        after the one rewrite mean hold."""
         m = model("Recovery averaged 88.7 percent.", "Recovery averaged 77.3 percent.")
         text = az.generate_and_cache("sleep")
-        assert text == "Recovery averaged 88.7 percent."
-        assert m.calls == 2 and self.table.updates == []
+        assert text == ""
+        assert m.calls == 2
+        assert (az.CACHE_PK, "EXPERT#sleep") not in self.table.items, "an ungrounded analysis reached the cache"
 
     def test_a_grounded_analysis_is_never_regenerated(self, model):
         """No finding, no rewrite — the harness must not burn a second call (or risk a
@@ -1213,15 +1226,31 @@ class TestGroundingSelfCorrection:
         text = az.generate_and_cache("sleep")
         assert m.calls == 2 and text == "Recovery held steady all week."
 
-    def test_a_regeneration_failure_leaves_the_original_analysis_published(self, model):
+    def test_a_regeneration_failure_holds_because_the_original_findings_still_stand(self, model):
+        """#2391: the regen model being down does not make the original's fabricated
+        figure true. Measured findings ⇒ hold; only a failure of the GATE ITSELF
+        (see the next test) publishes, because there the findings are unknown."""
         m = model("Recovery averaged 88.7 percent.", RuntimeError("model down"))
         text = az.generate_and_cache("sleep")
-        assert text == "Recovery averaged 88.7 percent." and m.calls == 2
+        assert text == "" and m.calls == 2
+        assert (az.CACHE_PK, "EXPERT#sleep") not in self.table.items
 
     def test_the_grounding_pass_never_breaks_a_successful_generation(self, monkeypatch, model):
+        """Gate-INFRA failure (the gate itself cannot run) fails soft and publishes —
+        distinct from measured findings, which hold. A grounding gate must never be
+        the thing that takes the surface down."""
         monkeypatch.setattr(az._gg, "allowed_numbers", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
         model(FULL_REPLY)
         assert az.generate_and_cache("sleep").startswith("Deep sleep held")
+
+    def test_a_hold_preserves_the_PRIOR_good_analysis_in_the_cache(self, model):
+        """The ADR-108 point of holding: yesterday's clean analysis keeps serving.
+        A hold must not delete or overwrite it."""
+        prior = {"pk": az.CACHE_PK, "sk": "EXPERT#sleep", "analysis": "Yesterday's clean read.", "generated_at": "2026-08-07T17:00:00Z"}
+        self.table.items[(az.CACHE_PK, "EXPERT#sleep")] = dict(prior)
+        model("Recovery averaged 88.7 percent.", "Recovery averaged 77.3 percent.")
+        assert az.generate_and_cache("sleep") == ""
+        assert self.table.items[(az.CACHE_PK, "EXPERT#sleep")]["analysis"] == "Yesterday's clean read."
 
 
 class TestValidatorAttributeContract:
@@ -1247,7 +1276,10 @@ class TestValidatorAttributeContract:
             return az._aiv.AIValidationResult(original_text=text, output_type=output_type, warnings=["w"])
 
         monkeypatch.setattr(az._aiv, "validate_ai_output", _fake_validate)
-        model("Recovery sat at 61, HRV 43.2 ms, RHR 58 bpm.")
+        # #2391: the first reply's unlabeled vitals figures HOLD publication, so a
+        # clean rewrite is queued — this test exercises the validator contract on a
+        # PUBLISHED analysis, and only grounded text publishes now.
+        model("Recovery sat at 61, HRV 43.2 ms, RHR 58 bpm.", "A quiet, steady week of sleep.")
         az.generate_and_cache("sleep")
         assert seen["ctx"] == {"recovery_score": 61.0, "hrv": 43.2, "resting_heart_rate": 58.0}
 
@@ -1262,7 +1294,9 @@ class TestValidatorAttributeContract:
             lambda text, output_type, health_context=None, max_length=None: calls.append(health_context)
             or az._aiv.AIValidationResult(original_text=text, output_type=output_type),
         )
-        model("Recovery sat at 61 this week.")
+        # #2391: queue a clean rewrite — only grounded text publishes, and the
+        # backstop runs on the published text.
+        model("Recovery sat at 61 this week.", "Sleep held its shape all week.")
         az.generate_and_cache("sleep")
         assert calls == [{"recovery_score": 61.0}]
 

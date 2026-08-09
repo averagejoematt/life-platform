@@ -152,7 +152,10 @@ BASELINE = {
     # #1654 — the handler logic now lives in cohesive web/site_api_coach_{profile,stance,
     # ledger,narrative}.py + web/site_api_thirdwall.py, each well under the ceiling. The
     # pure-subset ratchet allows removing a shrunk entry.
-    "lambdas/intelligence/ai_expert_analyzer_lambda.py": 1886,
+    # 1886 → 1895 (#2391): the regenerate-or-hold branch — residual grounding
+    # findings now HOLD publication instead of shipping keep-if-better text. New
+    # behaviour, not sprawl; comments were compressed first (+16 draft → +9 landed).
+    "lambdas/intelligence/ai_expert_analyzer_lambda.py": 1895,
     "deploy/archive/onetime/daily_brief_lambda.py": 1881,
     "lambdas/ingestion/health_auto_export_lambda.py": 1779,
     "deploy/sync_doc_metadata.py": 1807,
