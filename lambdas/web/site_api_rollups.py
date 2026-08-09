@@ -241,14 +241,17 @@ def observatory_week(qs: dict = None, *, _g) -> dict:
         return _error(400, f"Invalid domain. Use: {', '.join(sorted(valid_domains))}")
 
     import re as _re
-    from datetime import datetime, timedelta, timezone
 
     date = (qs.get("date") or "").strip()
     if date and not _re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
         return _error(400, "date must be YYYY-MM-DD")
     ip = bool(date)  # ADR-058: include pilot/prior-cycle records only when time-travelling
 
-    now = datetime.now(timezone.utc)
+    # #2392: anchor "today" in Pacific, like the cockpit. A UTC anchor stamped
+    # tomorrow's as_of_date on the observatory every night 17:00–24:00 PT
+    # (00:00–07:00 UTC), so the two doors disagreed what day it was. `datetime`
+    # resolves at MODULE level (no in-function re-import) so tests can freeze it.
+    now = datetime.now(PT)
 
     # PRE-START (#948, the #939 contract): with genesis staged in the FUTURE the 7-day
     # window inverts (start 2026-07-12 > end 2026-07-11) and every branch below emits
