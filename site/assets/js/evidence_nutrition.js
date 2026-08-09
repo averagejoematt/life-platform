@@ -205,7 +205,7 @@ export function nutritionDeficitSustainability(ds) {
   if (!ds) return "";
   if (!ds.available) {
     return sec("Is the cut costing you? — the five-channel read",
-      `<p class="rd-meta label">${esc(ds.reason || "The cut is too new to read its cost yet.")} It needs ~a week of logged days before the five recovery channels mean anything.</p>`);
+      `<p class="rd-meta label">${esc(ds.reason || "Needs ≥7 logged days — none yet.")} The five recovery channels only mean anything with that week of logged days behind them.</p>`);
   }
   const def = ds.deficit || {};
   const ARROW = { improving: "↑", declining: "↓", stable: "→", insufficient_data: "·" };
