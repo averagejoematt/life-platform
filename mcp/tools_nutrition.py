@@ -4,7 +4,7 @@ Nutrition tools: micronutrients, meal timing, macros, food log.
 
 import math
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from health import tdee as tdee_core  # ADR-152 / #2310: THE one TDEE definition
 
@@ -103,7 +103,11 @@ def _energy_budget(end_date, deficit_kcal=tdee_core.DEFAULT_DEFICIT_KCAL, weight
     height_in = profile.get("height_inches")
     if not height_in:
         return None
-    age_years, age_basis, _ = tdee_core.resolve_age(profile.get("date_of_birth"), now=datetime.now(timezone.utc))
+    # No `now=` on purpose: this module must not import `timezone` at all, so no default
+    # in it CAN read the UTC wall clock (tests/test_pacific_date_selection.py — the frame
+    # mismatch that made a 30-day window 29 days in the UTC-evening hour). An AGE is not a
+    # window boundary, so `resolve_age`'s own clock is the right one here.
+    age_years, age_basis, _ = tdee_core.resolve_age(profile.get("date_of_birth"))
 
     weight_kg = float(weight_lbs) * tdee_core.LB_TO_KG
     d7_start = (end_dt - timedelta(days=tdee_core.EXERCISE_WINDOW_DAYS - 1)).strftime("%Y-%m-%d")
