@@ -678,7 +678,8 @@ class TestBoardContext:
         _install_board(monkeypatch, {"members": {"webb": _BOARD_CONFIG["members"]["webb"]}})
         out = mc._build_board_context_for_compass({"weakest_pillar": "nutrition", "recovery": 70}, {"total_overdue": 0})
         assert "Dr. Webb" not in out
-        assert "Dr. Elena Rodriguez (Behavioral Scientist)" in out  # the fallback text
+        # #2384: the fallback names the LIVE mind coach, not the phantom "Dr. Elena Rodriguez"
+        assert "Dr. Nathan Reeves (Mind & Behaviour Coach)" in out  # the fallback text
 
     def test_missing_board_config_uses_fallback(self, monkeypatch):
         _install_board(monkeypatch, None)
@@ -688,7 +689,7 @@ class TestBoardContext:
 
     def test_loader_absent_uses_fallback(self, monkeypatch):
         monkeypatch.setattr(mc, "_HAS_BOARD_LOADER", False)
-        assert "Dr. Elena Rodriguez" in mc._build_board_context_for_compass({"weakest_pillar": "sleep"}, {})
+        assert "Dr. Nathan Reeves" in mc._build_board_context_for_compass({"weakest_pillar": "sleep"}, {})
 
 
 # ═══════════════════════════════════════════════════════════════════════════

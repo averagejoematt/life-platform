@@ -241,27 +241,43 @@ def _get_confirmed_subscribers() -> list[dict]:
 # EMAIL BUILDER
 # ─────────────────────────────────────────────────────────────────────────────
 
-BOARD_MEMBERS = {
-    "sarah_chen": {"name": "Dr. Sarah Chen", "title": "Sports Scientist", "color": "#0ea5e9", "emoji": "\U0001f3cb\ufe0f"},
-    "marcus_webb": {"name": "Dr. Marcus Webb", "title": "Nutritionist", "color": "#22c55e", "emoji": "\U0001f957"},
-    "lisa_park": {"name": "Dr. Lisa Park", "title": "Sleep & Circadian Specialist", "color": "#8b5cf6", "emoji": "\U0001f634"},
-    "james_okafor": {"name": "Dr. James Okafor", "title": "Longevity & Preventive Medicine", "color": "#f59e0b", "emoji": "\U0001fa7a"},
-    "maya_rodriguez": {"name": "Coach Maya Rodriguez", "title": "Behavioural Performance Coach", "color": "#ec4899", "emoji": "\U0001f9e0"},
-    "the_chair": {"name": "The Chair", "title": "Board Chair \u2014 Verdict & Priority", "color": "#6366f1", "emoji": "\U0001f3af"},
-    "layne_norton": {"name": "Dr. Marcus Webb", "title": "Macros, Protein & Adherence", "color": "#10b981", "emoji": "\U0001f4aa"},
-    "rhonda_patrick": {"name": "Dr. Amara Patel", "title": "Micronutrients & Longevity", "color": "#8b5cf6", "emoji": "\U0001f9ec"},
-    "peter_attia": {"name": "Dr. James Okafor", "title": "Metabolic Health & Longevity", "color": "#f59e0b", "emoji": "\U0001f4ca"},
-    "andrew_huberman": {"name": "Dr. Kai Nakamura", "title": "Neuroscience & Protocols", "color": "#06b6d4", "emoji": "\U0001f52c"},
-    "elena_voss": {"name": "Elena Voss", "title": "Embedded Journalist", "color": "#94a3b8", "emoji": "\u270d\ufe0f"},
-    "paul_conti": {"name": "Dr. Nathan Reeves", "title": "Psychiatrist \u2014 Self-Structure", "color": "#7c3aed", "emoji": "\U0001f9e0"},
-    "margaret_calloway": {
-        "name": "Margaret Calloway",
-        "title": "Senior Editor \u2014 Longform",
-        "color": "#b45309",
-        "emoji": "\u270f\ufe0f",
-    },
-    "vivek_murthy": {"name": "Dr. Daniel Murthy", "title": "Social Connection & Loneliness", "color": "#0891b2", "emoji": "\U0001f91d"},
-}
+# #2384: the byline map is DERIVED from the persona registry, never hand-typed.
+# The previous literal map had forked three ways from the registry: a retired
+# key rendered "Dr. Kai Nakamura" to subscribers, "vivek_murthy" rendered a
+# phantom "Dr. Daniel Murthy", and "peter_attia" rendered the wrong live coach.
+# Rule: a key earns a byline card only if its registry persona is on the cast
+# the public site bills \u2014 operational coaches, the lead, and the narrator/meta
+# show personas. A retired board twin staged by an old draft falls back to The
+# Chair instead of resurrecting a name readers can't find on the team page.
+_CHAIR_FALLBACK = {"name": "The Chair", "title": "Board Chair \u2014 Verdict & Priority", "color": "#6366f1", "emoji": "\U0001f3af"}
+
+
+def _derive_board_members() -> dict:
+    try:
+        from coach import persona_registry
+
+        live_names = {p.get("name") for p in persona_registry.operational_personas().values()}
+        live_names.add((persona_registry.lead_persona() or {}).get("name"))
+        members = {}
+        for pid, persona in persona_registry.personas().items():
+            name = persona.get("name")
+            if not name or not (name in live_names or persona.get("type") in ("narrator", "meta")):
+                continue
+            key = persona.get("board_persona_key") or pid
+            members[key] = {
+                "name": name,
+                "title": persona.get("board_role") or persona.get("title", ""),
+                "color": persona.get("color", "#6366f1"),
+                "emoji": persona.get("emoji", ""),
+            }
+        members.setdefault("the_chair", dict(_CHAIR_FALLBACK))
+        return members
+    except Exception as exc:  # registry unreadable \u2192 every byline degrades to The Chair
+        logger.warning("persona registry unavailable, bylines degrade to The Chair: %s", exc)
+        return {"the_chair": dict(_CHAIR_FALLBACK)}
+
+
+BOARD_MEMBERS = _derive_board_members()
 
 
 # ── #593: engraved coach portraits travel into the email ──────────────────────

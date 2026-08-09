@@ -540,7 +540,7 @@ def _build_board_context_for_compass(week_state, todoist_data):
 def _fallback_board_context(week_state):
     weakest = week_state.get("weakest_pillar", "consistency")
     return (
-        "Dr. Elena Rodriguez (Behavioral Scientist) — domains: decision fatigue, willpower, behavioral change\n"
+        "Dr. Nathan Reeves (Mind & Behaviour Coach) — domains: decision fatigue, willpower, behavioral change\n"
         "  Principle: 'You cannot out-willpower a bad environment. Design the week before it designs you.'\n\n"
         f"Relevant expert for {weakest} pillar improvement\n"
         "The Chair (Platform Intelligence) — domains: cross-pillar optimization, compounding leverage\n"
@@ -632,7 +632,7 @@ Ground every recommendation in the specific data provided. No generic advice.
 State the overdue count. Group by project/pillar. For each overdue cluster:
 - Name it, count it.
 - One-line recommendation: commit this week | defer to next | delete it.
-Framing: this is cognitive debt. Every unreviewed overdue task is background anxiety. The goal is to clear or consciously defer it, not feel guilty. Rodriguez would say: "An unreviewed backlog is a willpower tax."
+Framing: this is cognitive debt. Every unreviewed overdue task is background anxiety. The goal is to clear or consciously defer it, not feel guilty. Reeves would say: "An unreviewed backlog is a willpower tax."
 
 ### Section 5: "💡 Board Pro Tips"
 2-3 Board member recommendations, each in a small card:
