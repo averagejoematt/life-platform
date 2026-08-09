@@ -50,6 +50,7 @@ import boto3
 # Import the genesis anchor from the same generated constants the lambdas use.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lambdas"))
 from common.constants import EXPERIMENT_PHASE_CURRENT, EXPERIMENT_START_DATE  # noqa: E402
+from common.text_utils import truncate_at_word  # noqa: E402  # #2389: word-boundary excerpts, parity with chronicle_render (#1224)
 
 REGION = "us-west-2"
 TABLE_NAME = "life-platform"
@@ -114,6 +115,13 @@ def body_html_from_record(item):
             flags=re.DOTALL,
         ).strip()
     return markdown_to_html(body_markdown_from_record(item))
+
+
+def excerpt_from_record(item, limit=300):
+    """Manifest excerpt for a lead-in record — word-boundary + ellipsis, never a raw
+    mid-word slice (#2389; same `truncate_at_word` idiom as the standing writer in
+    lambdas/emails/chronicle_render.py, #1224)."""
+    return truncate_at_word(body_markdown_from_record(item), limit)
 
 
 def body_markdown_from_record(item):
@@ -510,7 +518,9 @@ def run(apply: bool = False, no_invalidate: bool = False) -> int:
                 "stats_line": display_stats_line(item.get("stats_line", ""), date_str),  # #949 — prologue-framed dek
                 "url": f"/journal/posts/week-{seq:02d}/",
                 # Prose-only excerpt (header stripped) — same field the reader shows verbatim.
-                "excerpt": body_markdown_from_record(item)[:300].strip(),
+                # #2389: word-boundary + ellipsis via the ONE shared helper (#1224), matching
+                # the standing writer (chronicle_render.py) — never a raw mid-word slice cut.
+                "excerpt": excerpt_from_record(item),
                 "word_count": int(item.get("word_count", 0) or 0),
                 "has_board_interview": bool(item.get("has_board_interview", False)),
                 "image_url": "",
