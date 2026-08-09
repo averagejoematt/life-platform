@@ -16,6 +16,7 @@ from common import (
     digest_utils,  # bundled shared module — compute_confidence tiering (ADR-105)
     stats_core,  # bundled shared module (#529): the one sanctioned stats implementation
 )
+from health import tdee as health_tdee  # ADR-152 / #2310: THE one TDEE definition
 
 from web.site_api_common import (
     _get_profile,
@@ -108,18 +109,37 @@ def _resolve_mf_tdee(items):
     return None, None
 
 
-def _mifflin_tdee(weight_lbs):
-    """Profile-derived TDEE estimate: Mifflin-St Jeor × 1.55 activity, from body weight
-    (height 183 cm / age 35 / male are the profile constants). Callers label this
-    'estimate_mifflin' — it is never conflated with MacroFactor's measured adaptive
-    expenditure (#484). Returns None when weight is missing."""
-    try:
-        wkg = float(weight_lbs) * 0.453592
-    except (TypeError, ValueError):
-        return None
-    if wkg <= 0:
-        return None
-    return round((10 * wkg + 6.25 * 182.88 - 5 * 35 + 5) * 1.55)
+def _mifflin_tdee(weight_lbs, strava_items=None, profile=None):
+    """The ADR-152 TDEE estimate — Mifflin-St Jeor BMR + MEASURED trailing-7-day exercise
+    energy — from the ONE shared implementation in ``health.tdee`` (#2310).
+
+    This is the ESTIMATE fallback only: MacroFactor's measured adaptive expenditure stays
+    the site's primary whenever it is fresh, and callers keep labelling this branch
+    ``estimate_mifflin`` so it is never conflated with the measured figure (#484).
+    What changed is the formula behind the label: the flat × 1.55 activity multiplier is
+    retired, so the public door and the two MCP surfaces now publish ONE definition
+    instead of two ~2× apart. Maintenance only — no deficit is folded in here; callers
+    that publish a target subtract it explicitly.
+
+    Returns None when weight or profile height is missing (ADR-104: Mifflin is 6.25 kcal
+    per cm of height — assuming one would publish a guess as a measurement)."""
+    prof = profile if profile is not None else (_get_profile() or {})
+    height_in = prof.get("height_inches")
+    age_years, age_basis, _ = health_tdee.resolve_age(prof.get("date_of_birth"))
+    wkg = _num(weight_lbs)
+    ex = health_tdee.exercise_energy(strava_items, (wkg or 0.0) * health_tdee.LB_TO_KG)
+    budget = health_tdee.energy_budget(
+        weight_lbs=weight_lbs,
+        height_inches=height_in,
+        age_years=age_years,
+        age_basis=age_basis,
+        sex=(prof.get("biological_sex") or "male"),
+        exercise_kcal=ex["kcal"],
+        exercise_energy_days=ex["days"],
+        exercise_energy_basis=ex["basis"],
+        deficit_kcal=0,  # TDEE means MAINTENANCE (ADR-152)
+    )
+    return budget["tdee"] if budget else None
 
 
 def _latest_weight_lbs(start, today, *, _g):
@@ -452,7 +472,7 @@ def nutrition_overview(*, _g) -> dict:
     # shows a real (honestly-flagged) number instead of None.
     tdee, tdee_source = _resolve_mf_tdee(items)
     if tdee is None:
-        est = _mifflin_tdee(_latest_weight_lbs(d30, today, _g=_g))
+        est = _mifflin_tdee(_latest_weight_lbs(d30, today, _g=_g), _g["_query_source"]("strava", d7, today))
         if est:
             tdee, tdee_source = est, "estimate_mifflin"
     avg_cal = round(sum(cal_vals) / len(cal_vals)) if cal_vals else None
@@ -982,7 +1002,10 @@ def deficit_sustainability(*, _g) -> dict:
     avg_cal = round(sum(cals) / len(cals)) if cals else 0
     tdee, tdee_source = _resolve_mf_tdee(mf)
     if not tdee:  # Fallback: profile-derived Mifflin estimate from the latest weigh-in (#484)
-        est = _mifflin_tdee(_latest_weight_lbs(start, today, _g=_g))
+        est = _mifflin_tdee(
+            _latest_weight_lbs(start, today, _g=_g),
+            _query_source("strava", (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=6)).strftime("%Y-%m-%d"), today),
+        )
         if est:
             tdee, tdee_source = est, "estimate_mifflin"
         else:
