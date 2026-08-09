@@ -27,6 +27,7 @@ from datetime import datetime, timedelta, timezone
 import boto3
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1969
 
+from coach.reading_date_fidelity import SUMMARY_DAY_CORRESPONDENCE_RULE, guard_derived_summary  # #2343
 from coach.relationship_engine import compute_relationship_update  # #536
 from coach.voice_register_guard import sanitize_summary  # #1987: deterministic voice-register check
 
@@ -516,7 +517,8 @@ EXTRACTION_SYSTEM_PROMPT = (
     "recommendation. Write it AS the coach, in first person — never refer "
     "to the coach in third person (do not write 'the coach believes...' or "
     "'the sleep coach is...'; write 'I believe...' or 'I'm...' instead). "
-    "This will be shown on the public observatory page.\n\n"
+    + SUMMARY_DAY_CORRESPONDENCE_RULE
+    + "This will be shown on the public observatory page.\n\n"
     "9. **key_recommendation**: Extract the single most actionable "
     "recommendation from the output as a standalone 1-2 sentence string.\n\n"
     "10. **elena_quote**: If the output contains or implies a meta-observation "
@@ -602,11 +604,9 @@ def _write_output_record(coach_id, date, output_type, output_text, extraction):
     # fallback rather than inventing a new one here.
     observatory_summary, register_rejected = sanitize_summary(extraction.get("observatory_summary"))
     if register_rejected:
-        logger.warning(
-            "observatory_summary rejected for %s (third-person coach register) — " "falling back to full content at read time",
-            coach_id,
-        )
-
+        logger.warning("observatory_summary rejected for %s (third-person coach register) — falling back to content at read time", coach_id)
+    # #2343: same rejection seam, for the night the CONDENSATION dropped (see the module).
+    observatory_summary = guard_derived_summary(observatory_summary, output_text, "observatory_summary", coach_id, logger)
     item = {
         "pk": f"COACH#{coach_id}",
         "sk": f"OUTPUT#{date}#{output_type}",
