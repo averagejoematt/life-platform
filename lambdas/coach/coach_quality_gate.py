@@ -259,16 +259,11 @@ def _fetch_other_coaches_recent_outputs(coach_id, other_coach_ids=None):
 
     Returns a dict of {coach_id: output_content_preview}.
     """
-    all_coach_ids = [
-        "sleep_coach",
-        "nutrition_coach",
-        "training_coach",
-        "mind_coach",
-        "physical_coach",
-        "glucose_coach",
-        "labs_coach",
-        "explorer_coach",
-    ]
+    # Derived from the canonical persona registry, never re-typed (#2334; guard:
+    # tests/test_coach_roster_set_guard_2334.py).
+    from coach.persona_registry import OPERATIONAL_COACH_IDS
+
+    all_coach_ids = list(OPERATIONAL_COACH_IDS)
 
     if other_coach_ids:
         compare_ids = other_coach_ids

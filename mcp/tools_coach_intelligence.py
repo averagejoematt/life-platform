@@ -15,7 +15,12 @@ from mcp.core import decimal_to_float, table
 
 logger = logging.getLogger(__name__)
 
-COACH_IDS = ["sleep", "nutrition", "training", "mind", "physical", "glucose", "labs", "explorer"]
+# Derived from the canonical persona registry, never re-typed (#2334; guard:
+# tests/test_coach_roster_set_guard_2334.py). The coach package is on the MCP
+# bundle's path already (tools_coach_checkin imports persona_registry the same way).
+from coach.persona_registry import OPERATIONAL_SHORT_IDS
+
+COACH_IDS = list(OPERATIONAL_SHORT_IDS)
 COACH_NAMES = {
     "sleep": "Dr. Lisa Park",
     "nutrition": "Dr. Marcus Webb",

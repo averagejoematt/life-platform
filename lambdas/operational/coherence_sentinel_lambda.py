@@ -57,29 +57,16 @@ table = dynamodb.Table(TABLE)
 _cw = boto3.client("cloudwatch", region_name=REGION)
 _s3 = boto3.client("s3", region_name=REGION)
 
-COACH_IDS = [
-    "sleep_coach",
-    "nutrition_coach",
-    "training_coach",
-    "mind_coach",
-    "physical_coach",
-    "glucose_coach",
-    "labs_coach",
-    "explorer_coach",
-]
-EXPERTS = ["mind", "nutrition", "training", "physical", "explorer", "glucose", "labs", "sleep"]
+# All three rosters below are derived from the canonical persona registry, never
+# re-typed (#2334; guard: tests/test_coach_roster_set_guard_2334.py) — this file
+# held THREE hand-typed copies, two of them in different orders.
+from coach.persona_registry import OPERATIONAL_COACH_IDS, OPERATIONAL_SHORT_IDS
+
+COACH_IDS = list(OPERATIONAL_COACH_IDS)
+EXPERTS = list(OPERATIONAL_SHORT_IDS)
 # ADR-104: the V2 operational coaches whose served OUTPUT# narratives the facts
 # pass now also covers (matches coach_narrative_orchestrator.ALL_COACH_IDS).
-V2_COACHES = [
-    "sleep_coach",
-    "training_coach",
-    "nutrition_coach",
-    "mind_coach",
-    "physical_coach",
-    "glucose_coach",
-    "labs_coach",
-    "explorer_coach",
-]
+V2_COACHES = list(OPERATIONAL_COACH_IDS)
 
 try:
     from experiment.phase_filter import with_phase_filter

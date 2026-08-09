@@ -35,17 +35,13 @@ from grounding_guard import hard_canonical_contradictions  # noqa: E402
 
 table = boto3.resource("dynamodb", region_name="us-west-2").Table("life-platform")
 
-EXPERTS = ["mind", "nutrition", "training", "physical", "explorer", "glucose", "labs", "sleep", "integrator"]
-V2_COACHES = [
-    "sleep_coach",
-    "training_coach",
-    "nutrition_coach",
-    "mind_coach",
-    "physical_coach",
-    "glucose_coach",
-    "labs_coach",
-    "explorer_coach",
-]
+# Rosters derived from the canonical persona registry, never re-typed (#2334;
+# guard: tests/test_coach_roster_set_guard_2334.py). "integrator" is the extra
+# non-coach expert surface this sweep also covers.
+from coach.persona_registry import OPERATIONAL_COACH_IDS, OPERATIONAL_SHORT_IDS  # noqa: E402
+
+EXPERTS = list(OPERATIONAL_SHORT_IDS) + ["integrator"]
+V2_COACHES = list(OPERATIONAL_COACH_IDS)
 
 
 def _d2f(o):

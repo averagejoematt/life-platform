@@ -38,19 +38,14 @@ USER = "matthew"
 CALIBRATION_PK = f"USER#{USER}#SOURCE#calibration"
 HYPOTHESES_PK = f"USER#{USER}#SOURCE#hypotheses"
 
-# Coaches that can carry open PREDICTION# bets. Hardcoded (not imported from
-# coach_prediction_evaluator) to keep the reset tools free of the evaluator's heavy
-# lambda-bundle imports — same posture as restart_pipeline.bust_lambda_warm_cache.
-VOID_COACH_IDS = (
-    "sleep_coach",
-    "nutrition_coach",
-    "training_coach",
-    "mind_coach",
-    "physical_coach",
-    "glucose_coach",
-    "labs_coach",
-    "explorer_coach",
-)
+# Coaches that can carry open PREDICTION# bets. Derived from the canonical persona
+# registry (#2334; guard: tests/test_coach_roster_set_guard_2334.py) — NOT from
+# coach_prediction_evaluator, to keep the reset tools free of the evaluator's heavy
+# lambda-bundle imports (same posture as restart_pipeline.bust_lambda_warm_cache;
+# persona_registry itself is stdlib + common.repo_config, no boto3 at import).
+from coach.persona_registry import OPERATIONAL_COACH_IDS
+
+VOID_COACH_IDS = tuple(OPERATIONAL_COACH_IDS)
 
 
 def open_table(table=None):

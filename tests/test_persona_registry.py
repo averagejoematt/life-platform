@@ -16,7 +16,6 @@ the registry agree — which is what makes a coach's public byline provably the
 coach that authored the data.
 """
 
-import ast
 import glob
 import json
 import os
@@ -38,18 +37,6 @@ VALID_TYPES = {"board", "coach", "both", "narrator", "meta"}
 def _load_json(*parts):
     with open(os.path.join(_REPO, *parts), encoding="utf-8") as fh:
         return json.load(fh)
-
-
-def _ast_list_const(rel_path, name):
-    """Extract a module-level ``name = [..str..]`` list via AST (no import side-effects)."""
-    with open(os.path.join(_REPO, rel_path), encoding="utf-8") as fh:
-        tree = ast.parse(fh.read())
-    for node in tree.body:
-        if isinstance(node, ast.Assign):
-            for tgt in node.targets:
-                if isinstance(tgt, ast.Name) and tgt.id == name:
-                    return [el.value for el in node.value.elts if isinstance(el, ast.Constant)]
-    raise AssertionError(f"{name} not found as a list literal in {rel_path}")
 
 
 def _registry():
@@ -141,24 +128,27 @@ def test_persona_registry_constant_matches_json():
 
 
 def test_engine_and_evaluator_and_orchestrator_match_operational():
-    canonical = set(persona_registry.OPERATIONAL_COACH_IDS)
+    """#2334: these id-spaces are now DERIVED from the registry, not hand-typed —
+    the old AST-literal extraction here would raise, because the literals no longer
+    exist. Runtime equality keeps the no-orphans contract; the set-wide scan lives
+    in tests/test_coach_roster_set_guard_2334.py."""
+    from coach import coach_computation_engine, coach_narrative_orchestrator, coach_prediction_evaluator
+
+    canonical = list(persona_registry.OPERATIONAL_COACH_IDS)
     spaces = {
-        "coach_computation_engine.COACH_IDS": _ast_list_const("lambdas/coach/coach_computation_engine.py", "COACH_IDS"),
-        "coach_prediction_evaluator.COACH_IDS": _ast_list_const("lambdas/coach/coach_prediction_evaluator.py", "COACH_IDS"),
-        "coach_narrative_orchestrator.ALL_COACH_IDS": _ast_list_const("lambdas/coach/coach_narrative_orchestrator.py", "ALL_COACH_IDS"),
+        "coach_computation_engine.COACH_IDS": coach_computation_engine.COACH_IDS,
+        "coach_prediction_evaluator.COACH_IDS": coach_prediction_evaluator.COACH_IDS,
+        "coach_narrative_orchestrator.ALL_COACH_IDS": coach_narrative_orchestrator.ALL_COACH_IDS,
     }
     for where, ids in spaces.items():
-        assert set(ids) == canonical, (
-            f"{where} diverges from the registry: " f"extra={set(ids) - canonical}, missing={canonical - set(ids)}"
-        )
+        assert list(ids) == canonical, f"{where} diverges from the registry: {ids} != {canonical}"
 
 
 def test_intelligence_common_short_ids_match():
-    canonical_short = set(persona_registry.OPERATIONAL_SHORT_IDS)
-    short_ids = set(_ast_list_const("lambdas/intelligence/intelligence_common.py", "COACH_IDS_ALL"))
-    assert short_ids == canonical_short, (
-        f"intelligence_common.COACH_IDS_ALL diverges: " f"extra={short_ids - canonical_short}, missing={canonical_short - short_ids}"
-    )
+    """#2334: COACH_IDS_ALL is now list(OPERATIONAL_SHORT_IDS) — asserted at runtime."""
+    from intelligence import intelligence_common
+
+    assert list(intelligence_common.COACH_IDS_ALL) == list(persona_registry.OPERATIONAL_SHORT_IDS)
 
 
 # ── no orphans: registry <-> board_of_directors.json ─────────────────────────

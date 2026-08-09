@@ -148,7 +148,11 @@ def state_of_matthew(*, _g) -> dict:
 # Nothing here is curated. An empty refuted column after a reset is honest,
 # not flattering — the ledger fills as calls resolve.
 # ══════════════════════════════════════════════════════════════════════════════
-_WRONG_COACHES = ("sleep", "nutrition", "training", "glucose", "mind", "physical", "labs", "explorer")
+# Derived from the canonical persona registry, never re-typed (#2334; guard:
+# tests/test_coach_roster_set_guard_2334.py).
+from coach.persona_registry import OPERATIONAL_SHORT_IDS
+
+_WRONG_COACHES = tuple(OPERATIONAL_SHORT_IDS)
 
 # #1377 (The Wrong Feed): plain-English phrasing for a graded verdict's comparison
 # operator. Templated only — the obituary NEVER lets an LLM assert wrongness; every

@@ -236,6 +236,8 @@ def observatory_week(qs: dict = None, *, _g) -> dict:
     pre_start_meta = _g["pre_start_meta"]
     qs = qs or {}
     domain = (qs.get("domain") or "sleep").lower().strip()
+    # #2334 roster-copy waiver: a deliberate 6-domain SUBSET — rollups exist only
+    # for these; labs/explorer have no rollup surface, so this must not track the roster.
     valid_domains = {"sleep", "glucose", "nutrition", "training", "mind", "physical"}
     if domain not in valid_domains:
         return _error(400, f"Invalid domain. Use: {', '.join(sorted(valid_domains))}")

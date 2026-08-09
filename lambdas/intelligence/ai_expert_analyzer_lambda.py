@@ -92,9 +92,14 @@ CACHE_PK = f"{USER_PREFIX}ai_analysis"
 AI_SECRET_NAME = os.environ.get("AI_SECRET_NAME", "life-platform/ai-keys")
 AI_MODEL = os.environ.get("AI_MODEL", "claude-haiku-4-5-20251001")
 
+# Derived from the canonical persona registry, never re-typed (#2334; guard:
+# tests/test_coach_roster_set_guard_2334.py). EXPERT_PERSONAS keys must track it —
+# asserted in the same guard, so a registry addition fails loudly, not at runtime.
+from coach.persona_registry import OPERATIONAL_SHORT_IDS
+
 from intelligence.expert_personas import BANNED_OPENER_SCAFFOLDS, EXPERT_PERSONAS  # noqa: F401  (re-export, #1654)
 
-EXPERTS = ["mind", "nutrition", "training", "physical", "explorer", "glucose", "labs", "sleep"]
+EXPERTS = list(OPERATIONAL_SHORT_IDS)
 
 dynamodb = boto3.resource("dynamodb", region_name="us-west-2")
 table = dynamodb.Table(TABLE_NAME)

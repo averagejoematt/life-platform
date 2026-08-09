@@ -57,13 +57,16 @@ REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE = os.environ.get("TABLE_NAME", "life-platform")
 USER_PK_PREFIX = "USER#matthew#SOURCE#"
 
-# Coach roster for OUTPUT# enumeration (COACH#<id>), mirrored from the orchestrator's
-# deterministic routing config so a coach add is a one-line change there, not here.
+# Coach roster for OUTPUT# enumeration (COACH#<id>) — the canonical persona
+# registry, so a coach add is a one-line change there, not here (#2334; was the
+# orchestrator's routing-config keys, itself now registry-derived).
 try:
-    from coach.coach_narrative_orchestrator import COACH_DOMAINS as _COACH_DOMAINS
+    from coach.persona_registry import OPERATIONAL_COACH_IDS
 
-    DEFAULT_COACHES = sorted(_COACH_DOMAINS.keys())
+    DEFAULT_COACHES = sorted(OPERATIONAL_COACH_IDS)
 except Exception:  # noqa: BLE001 — fall back to the known roster if the import path shifts
+    # #2334 roster-copy waiver: fail-soft literal fallback for a standalone backfill
+    # script — deriving it is the try-branch; this only serves when that import breaks.
     DEFAULT_COACHES = [
         "sleep_coach",
         "training_coach",

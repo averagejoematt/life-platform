@@ -58,16 +58,12 @@ SUBSCRIBERS_PK = f"{USER_PREFIX}subscribers"
 MARKER_PK = f"{USER_PREFIX}email_digest"
 MARKER_SK = "STATE#between_chronicle"
 
-COACH_IDS = [
-    "sleep_coach",
-    "nutrition_coach",
-    "training_coach",
-    "mind_coach",
-    "physical_coach",
-    "glucose_coach",
-    "labs_coach",
-    "explorer_coach",
-]
+# The coach roster — derived from the canonical persona registry, never re-typed
+# (#2334; guard: tests/test_coach_roster_set_guard_2334.py). Same import its
+# sibling chronicle_data.py already uses.
+from coach.persona_registry import OPERATIONAL_COACH_IDS
+
+COACH_IDS = list(OPERATIONAL_COACH_IDS)
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE_NAME)

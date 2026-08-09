@@ -810,6 +810,8 @@ def _build_reasoning_trace(coach_id, date, output_type, extraction):
     for ref in extraction.get("threads_referenced", []):
         topic = ref.get("topic", "")
         context = ref.get("context", "")
+        # #2334 roster-copy waiver: NOT a roster — a free-text keyword sniff for
+        # "does this thread mention another coach"; substrings, not coach ids.
         if any(kw in topic.lower() or kw in context.lower() for kw in ["coach", "training", "nutrition", "mind", "glucose", "labs"]):
             cross_coach_inputs.append(f"{topic}: {context}")
 
