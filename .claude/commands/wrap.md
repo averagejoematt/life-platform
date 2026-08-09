@@ -374,6 +374,11 @@ advisory only (a next-picks note, no `describe-alarms` enumeration, no fail
 condition). At the 2026-07-28 review 6 alarms were red simultaneously against one
 incident row in the session ledger; a new red could hide among the chronic ones.
 
+**Proportionality ledger gate (#2380):** if this session landed a NEW standing CI gate,
+scheduled writer, or watcher, the wrap names its `docs/PROPORTIONALITY.md` row (posture +
+rent + demote trigger) or writes an explicit "ledger: omitted — <reason>" line in the
+handover. Silent omission is how the ledger became a snapshot.
+
 - Run:
   ```bash
   python3 scripts/check_alarm_citations.py

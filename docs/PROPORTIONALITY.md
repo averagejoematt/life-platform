@@ -1,6 +1,6 @@
 # The Proportionality Ledger — does this complexity earn its keep?
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-26
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-09
 
 > **The maintained home of the complexity-posture ledger** (ADR-103 established it;
 > ADR-144 made it legible and moved it here). Consult BEFORE adding or removing
@@ -56,6 +56,9 @@ standing subsystem names what it costs, what it earns, and what would demote it.
 | Stats/forecast machinery (stats_core, hypothesis tester, calibration ledger) | Load-bearing | mind | The credibility moat (ADR-105) |
 | personal-baselines monthly compute | Load-bearing | $ (small) | Bands from own variance (ADR-105 r4); retire only if banded verdicts stop |
 | AI-vision QA (Bedrock semantic screenshots) | Load-bearing | $, CI | Gating CI since 2026-06-05 |
+| Required pre-merge lane (ADR-148 + the structural-gate extension, #1662/#2372-adjacent) | Load-bearing | CI | Rent: ~3 min CI per PR. Earned same-fortnight: caught I5/SR1/I3/type-hints on the Telegram surface pre-merge and 3 union/size breaches on 2026-08-09 alone. Demote trigger: a quarter with zero pre-merge catches (2026-08-09) |
+| Module-size ratchets ×2 (1200-line hard ceiling + BASELINE no-grow, #1665) | Load-bearing | CI | Self-justified by four same-day catches at BASELINE enforcement start (2026-08-09, incl. two on this very ledger's fortnight PRs); the #2373 coupling assertion is its named follow-up. Demote trigger: per the guard's own text — baselines only shrink |
+| Recall corpus writer + freshness watcher (semantic_recall, #1384/ADR-150) | Load-bearing (small) | $ (embeddings, small), CI | Publish-time indexing + nightly link/existence QA; corpus froze 18 days when it had no automated writer — the watcher is the anti-recurrence. Demote/scope trigger: #2347's corpus-scope decision (2026-08-09) |
 | SDLC review rituals (/fullreview, /platform-review, /site-review, /accuracy-review, /sdlc-review) | Load-bearing (rotating) | $ (~2–3M tokens/run), attention | Demote any ritual findings-empty twice consecutively (standing rule above) |
 | golden-brief-eval workflow | Load-bearing | CI | Deterministic canary gating every push |
 | Remediation agent (ADR-064/065) | **Portfolio** | CI, surface | In `shadow` (ADR-129); earns `auto` only via the 10-clean-run bar; earns Load-bearing only shipping real fixes monthly |
