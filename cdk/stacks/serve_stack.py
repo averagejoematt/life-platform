@@ -334,7 +334,7 @@ class ServeStack(Stack):
             "TelegramCoachWorker",
             function_name="telegram-coach-worker",
             source_file="lambdas/coach/telegram_worker_lambda.py",
-            handler="coach.telegram_worker_lambda.handler",
+            handler="coach.telegram_worker_lambda.lambda_handler",
             table=local_table,
             bucket=local_bucket,
             dlq=None,
@@ -357,7 +357,7 @@ class ServeStack(Stack):
             "TelegramWebhook",
             function_name="telegram-webhook",
             source_file="lambdas/web/telegram_webhook_lambda.py",
-            handler="web.telegram_webhook_lambda.handler",
+            handler="web.telegram_webhook_lambda.lambda_handler",
             # The helper reads table.table_name/bucket for env wiring unconditionally,
             # so the objects are passed — but the ROLE carries no DDB/S3 statement at
             # all (custom_policies is the only grant path): the webhook can read one
