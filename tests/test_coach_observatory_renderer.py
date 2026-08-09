@@ -480,6 +480,48 @@ def test_card_survives_unparseable_coach_summaries(monkeypatch):
     assert "cross_coach_reference" not in card
 
 
+# ── ensemble_fallback disclosure (#2333) ───────────────────────────────────────
+# coach_ensemble_digest stamps `_fallback: True` on a digest produced without the
+# LLM (budget-paused at tier >= 1, ADR-125 — the common case per #1927, not the
+# rare one). Nothing here checked the mark, so a template-generated digest
+# rendered on the observatory indistinguishably from a genuine cross-coach read.
+
+
+def test_card_flags_ensemble_fallback_when_the_digest_is_fallback_generated(monkeypatch):
+    rows = [
+        _output(content="analysis"),
+        {
+            "pk": "ENSEMBLE#digest",
+            "sk": "CYCLE#2026-08-09",
+            "_fallback": True,
+            "active_disagreements": [],
+            "coach_summaries": [],
+        },
+    ]
+    _install(monkeypatch, rows)
+    assert cobs._render_coach_card("sleep")["ensemble_fallback"] is True
+
+
+def test_card_ensemble_fallback_false_for_a_genuine_digest(monkeypatch):
+    rows = [
+        _output(content="analysis"),
+        {
+            "pk": "ENSEMBLE#digest",
+            "sk": "CYCLE#2026-08-09",
+            "active_disagreements": [{"coaches": ["nutrition_coach", "training_coach"], "topic": "the deficit size"}],
+            "coach_summaries": [],
+        },
+    ]
+    _install(monkeypatch, rows)
+    assert cobs._render_coach_card("sleep")["ensemble_fallback"] is False
+
+
+def test_card_ensemble_fallback_false_with_no_digest_at_all(monkeypatch):
+    rows = [_output(content="analysis")]
+    _install(monkeypatch, rows)
+    assert cobs._render_coach_card("sleep")["ensemble_fallback"] is False
+
+
 def test_card_still_renders_when_the_window_queries_fail(monkeypatch):
     """The track-record and proactivity reads are best-effort — a failure must not
     take the whole card down."""

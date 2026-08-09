@@ -30,3 +30,14 @@ export function coachAsOf(generatedAt, paused) {
 export function regenerationPaused(payload) {
   return !!payload && payload.regeneration_paused === true;
 }
+
+// #2333 — the same honest reading, for the cross-coach ensemble digest.
+// coach_ensemble_digest stamps `_fallback: true` on a digest produced without
+// the LLM (budget-paused at tier >= 1, ADR-125 — the common case, not the
+// rare one). /api/coach_analysis and the observatory renderer both propagate
+// that mark as `ensemble_fallback` so a template-generated cross-coach read
+// never renders indistinguishably from a genuine one. STRICTLY `=== true` —
+// same absent-is-unknown discipline as regenerationPaused() above.
+export function ensembleFallback(payload) {
+  return !!payload && payload.ensemble_fallback === true;
+}
