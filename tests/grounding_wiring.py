@@ -229,6 +229,25 @@ SURFACES = {
             ),
         },
     ),
+    # #2426: the weekly field note (/api/field_notes) — was gated by the single-row
+    # hard_canonical_contradictions count only, and invisible to this registry.
+    # Allow-list = the generation prompt (the week's computed data + prior-note
+    # excerpts); regenerate-once-then-hold in the caller.
+    "lambdas/intelligence/field_notes_lambda.py::_note_grounding_findings": _entry(
+        ("numbers", "dates", "freshness"),
+        {
+            "behavioral": (
+                "the field note narrates the CLOSED prior week (generated after the week "
+                "ends), while the #1699 gate checks a completed-action claim framed for "
+                "TODAY. The module's only availability facts are that week's day rows — "
+                "passing them as available_logs would grade a same-day claim against last "
+                "week's records, a wrong answer rather than a partial one (the nudge "
+                "shell's prior-day shape, a week wider). Arming this needs a "
+                "generation-day probe this weekly pipeline does not otherwise perform."
+            ),
+            "night": _NO_NIGHT_MAP,
+        },
+    ),
     "lambdas/reading/horizons_retrospective.py::_grounding_gate": _entry(
         ("numbers", "dates", "freshness"),
         {"behavioral": _NOT_ABOUT_MATTHEW, "night": _NOT_A_VITALS_SURFACE},

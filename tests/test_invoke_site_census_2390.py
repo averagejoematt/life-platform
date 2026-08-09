@@ -250,10 +250,8 @@ UNGATED_READER_KNOWN: dict[str, dict[str, object]] = {
         "issue": 2425,
         "note": "same defect, same issue: constellation fields publish with prompt-only grounding.",
     },
-    "lambdas/intelligence/field_notes_lambda.py": {
-        "issue": 2426,
-        "note": "gates on the weaker hard_canonical_contradictions count rather than grounding_findings, and is absent from SURFACES.",
-    },
+    # field_notes_lambda left this table via #2426 — registered in SURFACES
+    # (::_note_grounding_findings), regenerate-once-then-hold.
     "lambdas/coach/coach_history_summarizer.py": {
         "issue": 2428,
         "note": "its :980 COMPRESSED#latest compression is ungated and replays into board-answer prompts — an internal input laundered "
