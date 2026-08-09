@@ -1,15 +1,12 @@
 {
   "permissions": {
     "ask": [
-      "Bash(git push:*)",
       "Bash(git push --force:*)",
       "Bash(git push -f:*)",
-      "Bash(gh pr merge:*)",
       "Bash(cdk deploy:*)",
       "Bash(npx cdk deploy:*)",
       "Bash(aws lambda update-function-code:*)",
       "Bash(aws lambda invoke:*)",
-      "Bash(aws s3 sync:*)",
       "Bash(aws s3 cp:*)",
       "Bash(aws s3 rm:*)",
       "Bash(aws ssm put-parameter:*)",
@@ -96,6 +93,42 @@
       "Bash(git commit -n:*)",
       "Bash(mv .git/hooks/pre-commit:*)",
       "Bash(rm .git/hooks/pre-commit:*)"
+    ],
+    "allow": [
+      "Bash(aws logs filter-log-events *)",
+      "Bash(aws logs describe-* *)",
+      "Bash(aws lambda get-function*)",
+      "Bash(aws lambda list-* *)",
+      "Bash(aws dynamodb query *)",
+      "Bash(aws dynamodb get-item *)",
+      "Bash(aws dynamodb describe-table *)",
+      "Bash(aws s3 ls *)",
+      "Bash(aws ssm get-parameter*)",
+      "Bash(aws cloudwatch describe-alarms *)",
+      "Bash(aws cloudwatch get-metric-* *)",
+      "Bash(aws cloudwatch list-metrics *)",
+      "Bash(aws secretsmanager describe-secret *)",
+      "Bash(aws sts get-caller-identity*)",
+      "Bash(aws cloudformation describe-* *)",
+      "Bash(aws cloudformation list-* *)",
+      "Bash(git push)",
+      "Bash(git push *)",
+      "Bash(gh pr merge *)",
+      "Bash(gh pr create *)",
+      "Bash(gh issue *)",
+      "Bash(git worktree *)",
+      "Bash(git rebase)",
+      "Bash(git rebase *)",
+      "Bash(git stash)",
+      "Bash(git stash *)",
+      "Bash(gh workflow run *)",
+      "Bash(gh run cancel *)",
+      "Bash(gh run rerun *)",
+      "Bash(gh api *)",
+      "Bash(bash deploy/approve_deployment.sh *)",
+      "Bash(bash deploy/agent_commit.sh *)",
+      "Bash(aws s3 sync /Users/matthewwalker/.claude/projects/-Users-matthewwalker-Documents-Claude-life-platform/memory/ s3://matthew-life-platform/claude-memory-backup/ *)",
+      "Bash(aws s3 sync ~/.claude/projects/-Users-matthewwalker-Documents-Claude-life-platform/memory/ s3://matthew-life-platform/claude-memory-backup/ *)"
     ]
   }
 }
