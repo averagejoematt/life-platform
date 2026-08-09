@@ -40,6 +40,39 @@ ships is byte-identical by construction.
   missing-from-allowlist, single-file-deploy-strips-siblings, MCP zip missing
   `reading/`): see git history of this section + `docs/DECISIONS.md`.
 
+### 1a. Every bundle carries its commit — and deploys refuse to go backwards (#2377)
+
+`build_bundle.py` stages **`build_info.json`** (`{git_sha, git_short_sha, built_at,
+dirty, builder}`) at the root of every bundle, both shapes, every path. The sha
+resolves `BUNDLE_GIT_SHA` → `GITHUB_SHA` → `git rev-parse HEAD`, and is `null`
+(honest) rather than absent when there is no checkout.
+
+Why: a `LastModified` timestamp only proves *a* deploy happened. On 2026-08-08 an
+older CI run deployed **after** a newer merge, and nothing refused or even detected
+it — `verify_deployed_symbol.sh` could only answer "is this symbol live?", which
+requires already knowing which symbol to look for.
+
+- **The gate:** `bash deploy/verify_bundle_ancestry.sh <fn> [preflight|postflight]`
+  pulls the live bundle, reads its `build_info.json`, and classifies via
+  `deploy/bundle_ancestry.py`: `same` / `fast_forward` → OK; **`stale`** (the tree
+  you are shipping is an *ancestor* of what is live — the 08-08 race) and
+  **`diverged`** → **exit 2, deploy refused**; `unknown` (no fingerprint on one
+  side, or git can't resolve a sha) → loud warning, allowed.
+- **Wired into** `deploy_lambda.sh` (preflight + postflight), `deploy_fleet.sh`
+  (one probe preflight before the first update — the fleet ships one identical
+  bundle, so one probe answers for all of them — plus a postflight) and
+  `deploy_site_api.sh`.
+- **Postflight is stricter than preflight:** what is live afterwards must *be* the
+  sha you shipped, not merely a descendant. A descendant means someone else's
+  deploy landed on top of yours.
+- **Escape hatches:** `ALLOW_NON_FAST_FORWARD=1` (deliberate rollback — shipping
+  older code on purpose), `SKIP_ANCESTRY_CHECK=1` (break-glass). AWS/network
+  failure is fail-soft: it prints an unverified line and allows.
+- **Cost:** the sha is in the bundle, so the **CDK asset hash now changes per
+  commit** — a `cdk deploy` re-uploads code even when `lambdas/` is untouched.
+  Deliberate: §2's "unexpected 0-diff" tell is replaced by a stronger one, an
+  explicit sha comparison the deploy path performs for you.
+
 ## 2. Deploy from `main`, not the worktree branch
 
 `cdk deploy` and the `deploy/*.sh` scripts package the **current working tree**, not

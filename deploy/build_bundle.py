@@ -30,6 +30,7 @@ stage_tree()/stage_mcp() directly at synth time.
 """
 
 import argparse
+import datetime
 import json
 import os
 import shutil
@@ -38,6 +39,11 @@ import sys
 import zipfile
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+# #2377: the fingerprint file every bundle carries. Read back out of a DEPLOYED
+# bundle by deploy/verify_bundle_ancestry.sh so "which commit is live?" is a
+# structural question, not a symbol-grep guess.
+BUILD_INFO_NAME = "build_info.json"
 
 # Mirror of the old CDK _ASSET_EXCLUDES — one list, one place.
 EXCLUDE_DIRS = {"__pycache__", "dashboard", "cf-auth", "requirements"}
@@ -87,6 +93,71 @@ def stage_qa_coverage(out_dir):
         )
 
 
+def _git(args, cwd=REPO_ROOT):
+    """Run a git command, returning stripped stdout or None (never raises)."""
+    try:
+        proc = subprocess.run(["git"] + list(args), cwd=cwd, capture_output=True, text=True, timeout=30)
+    except Exception:
+        return None
+    if proc.returncode != 0:
+        return None
+    return proc.stdout.strip() or None
+
+
+def git_fingerprint(repo_root=REPO_ROOT, now=None):
+    """Build the {git_sha, built_at, …} payload staged as build_info.json (#2377).
+
+    Resolution order for the commit sha — CI first, because a GitHub Actions
+    checkout of a merge ref can leave HEAD pointing at something that isn't the
+    sha the run was dispatched for:
+      1. BUNDLE_GIT_SHA  (explicit override, used by tests + replays)
+      2. GITHUB_SHA      (the CI run's commit)
+      3. `git rev-parse HEAD`
+
+    Never raises: a bundle built outside a git checkout stages a fingerprint
+    with git_sha=None, which the ancestry check reads as "unknown" (warn, don't
+    refuse) rather than as a false clean bill of health.
+    """
+    sha = os.environ.get("BUNDLE_GIT_SHA") or os.environ.get("GITHUB_SHA") or _git(["rev-parse", "HEAD"], repo_root)
+    if sha:
+        sha = sha.strip().lower()
+    # Dirty only means anything for a locally-built bundle; when the sha came
+    # from the environment we are describing that commit, not this worktree.
+    dirty = None
+    if sha and not (os.environ.get("BUNDLE_GIT_SHA") or os.environ.get("GITHUB_SHA")):
+        porcelain = _git(["status", "--porcelain"], repo_root)
+        dirty = bool(porcelain)
+    built = now or datetime.datetime.now(datetime.timezone.utc)
+    return {
+        "git_sha": sha,
+        "git_short_sha": sha[:8] if sha else None,
+        "built_at": built.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "dirty": dirty,
+        "builder": os.environ.get("GITHUB_WORKFLOW") or os.environ.get("USER") or "unknown",
+        "schema": 1,
+    }
+
+
+def stage_build_info(out_dir, info=None):
+    """Write build_info.json at the bundle root (#2377).
+
+    WHY this is in the bundle and not a tag/timestamp: a LastModified stamp only
+    proves *a* deploy happened. The fingerprint has to travel with the code, so
+    the only way to read it back is to pull what AWS actually holds.
+
+    Cost note: this DOES make the CDK asset hash change per commit (the sha is in
+    the file), so a `cdk deploy` after any commit re-uploads code even when
+    lambdas/ is untouched. That is the deliberate trade — the "unexpected 0-diff"
+    tell is replaced by a stronger one: an explicit sha comparison (#2377).
+    """
+    payload = info if info is not None else git_fingerprint()
+    path = os.path.join(out_dir, BUILD_INFO_NAME)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, sort_keys=True, indent=2)
+        f.write("\n")
+    return path
+
+
 def stage_tree(out_dir):
     """Stage the full lambdas/ tree + food_vocabulary.json into out_dir (fresh)."""
     if os.path.exists(out_dir):
@@ -109,6 +180,8 @@ def stage_tree(out_dir):
         print("⚠️  redirects.map missing — the #1430 weekly redirect spot-check will warn+skip", file=sys.stderr)
     # #1446: QA-coverage snapshot for the Monday ops green report (fail-soft).
     stage_qa_coverage(out_dir)
+    # #2377: commit fingerprint — every bundle, every path, no exceptions.
+    stage_build_info(out_dir)
     return out_dir
 
 
@@ -147,6 +220,14 @@ def main():
     out = stage_mcp(args.out) if args.mcp else stage_tree(args.out)
     n_files = sum(len(f) for _, _, f in os.walk(out))
     print(f"✅ Staged {'mcp' if args.mcp else 'tree'} bundle: {n_files} files → {out}")
+    try:
+        with open(os.path.join(out, BUILD_INFO_NAME), encoding="utf-8") as f:
+            bi = json.load(f)
+        print(
+            f"   🔖 {BUILD_INFO_NAME}: {bi.get('git_short_sha')} built {bi.get('built_at')}" + (" (DIRTY tree)" if bi.get("dirty") else "")
+        )
+    except Exception:
+        pass
     if args.zip_path:
         zip_dir(out, args.zip_path)
         size_mb = os.path.getsize(args.zip_path) / 1e6
