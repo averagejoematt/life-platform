@@ -370,18 +370,41 @@ def note_contradiction_hits(analysis, metrics_record):
     return hits
 
 
-def _grounding_contradictions(analysis):
-    """SS-10 — deterministic canonical-facts contradiction count for a generated note.
+def _note_grounding_findings(analysis, prompt):
+    """#2426 — the standard ``grounding_findings`` chokepoint for the field note.
 
-    Uses the shared TIGHT guard (grounding_guard.hard_canonical_contradictions — the
-    analyzer's proven detector, grounded-anywhere semantics so a legit trend citing
-    the true value never fires). Deliberately NOT the layer's check_facts_agreement:
-    that one is precision-tuned for the daily alarm (20-25% tolerances) and the live
-    RHR-53-vs-64 incident — a 17% miss — passes it by design. Facts come from
-    canonical_facts.build_canonical_facts, the same schema the coaches are grounded
-    on. Fail-soft (0, "") when the record/helpers are unavailable: grounding never
-    blocks the note outright, only triggers the one corrective rewrite below.
+    Replaces the weaker single-check gate (hard_canonical_contradictions against one
+    computed_metrics row, fail-soft to "served unchecked"). The allow-list is the
+    PROMPT — literally what the model was given (the week's computed data section +
+    prior-note excerpts), the horizons/analyzer discipline — so a number or calendar
+    date the inputs never contained cannot ship, whether or not the metrics row
+    exists. ``**cycle_gate_params()`` arms the #1691/#1897 cycle anchors.
+
+    The canonical-facts contradiction check is KEPT, via ``note_contradiction_hits``
+    (the #812 extraction the golden-surface eval harness replays fixtures through);
+    it stays best-effort — a missing metrics row degrades to allow-list-only gating,
+    it no longer waves the note through entirely.
+
+    Fail-closed at the top level: if the gate machinery itself is unavailable or
+    raises, a synthetic finding is returned and the caller HOLDS — a broken gate
+    withholds, it never waves reader text through (the horizons/#2395 posture).
     """
+    try:
+        from ai.grounded_generation import allowed_dates, allowed_numbers, grounding_findings
+        from ai.grounding_gate_params import cycle_gate_params
+
+        text = "\n\n".join(str(analysis.get(f) or "") for f in _NOTE_FIELDS)
+        findings = list(
+            grounding_findings(
+                text,
+                allowed=allowed_numbers(prompt),
+                allowed_dates=allowed_dates(prompt),
+                **cycle_gate_params(),
+            )
+        )
+    except Exception as e:  # noqa: BLE001 — a broken gate holds; it never waves text through
+        return [{"type": "gate_error", "detail": f"grounding gate unavailable ({type(e).__name__}) — note held, never served ungated"}]
+
     try:
         resp = table.query(
             KeyConditionExpression=Key("pk").eq("USER#matthew#SOURCE#computed_metrics"),
@@ -389,13 +412,12 @@ def _grounding_contradictions(analysis):
             Limit=1,
         )
         items = resp.get("Items", [])
-        if not items:
-            return 0, ""
-        hits = note_contradiction_hits(analysis, items[0])
-        return len(hits), "; ".join(h["detail"] for h in hits[:3])
-    except Exception as e:  # noqa: BLE001 — check is best-effort by design
-        logger.info(f"[grounding] check unavailable ({type(e).__name__}) — note served unchecked")
-        return 0, ""
+        if items:
+            for h in note_contradiction_hits(analysis, items[0]):
+                findings.append({"type": "contradiction", **h})
+    except Exception as e:  # noqa: BLE001 — facts check stays best-effort; the allow-list classes above still gate
+        logger.info(f"[grounding] canonical-facts check unavailable ({type(e).__name__}) — allow-list gating only")
+    return findings
 
 
 def generate_field_notes(iso_week):
@@ -420,46 +442,55 @@ def generate_field_notes(iso_week):
     api_key = _get_api_key()
     analysis = _call_notes_model(prompt, api_key)
 
-    # SS-10 block-and-regen: the field note is the public Third Wall — a canonical-
-    # facts contradiction (wrong RHR/recovery/HRV/weight) must not ship as written.
-    # One strict regeneration with the contradictions named; keep the rewrite only
-    # if it strictly improves (the analyzer's proven keep-if-improved pattern —
-    # never regress to a worse draft, never loop chasing stochastic output).
-    n_bad, detail = _grounding_contradictions(analysis)
-    if n_bad:
+    # #2426 (was SS-10): the field note is the public Third Wall — a fabricated
+    # number/date, a stale-cycle framing, or a canonical-facts contradiction must
+    # not ship as written. One strict regeneration with the findings named, kept
+    # only if it strictly improves (the analyzer's proven keep-if-improved pattern
+    # — never regress to a worse draft, never loop chasing stochastic output) —
+    # and if the best draft STILL carries findings, the note is HELD: nothing is
+    # written, so /api/field_notes never serves failed text (regenerate-once-
+    # then-hold, the ADR-151/#2395 posture).
+    findings = _note_grounding_findings(analysis, prompt)
+    if findings:
+        detail = "; ".join(str(f.get("detail", "")) for f in findings[:3])
         _draft_note = {f: analysis.get(f) for f in _NOTE_FIELDS}  # #812/#744: pre-rewrite note for retention
-        logger.info(f"[grounding] {n_bad} contradiction(s) in {iso_week}: {detail} — one corrective rewrite")
+        logger.info(f"[grounding] {len(findings)} finding(s) in {iso_week}: {detail} — one corrective rewrite")
         fix_prompt = (
             prompt
-            + "\n\nCORRECTION REQUIRED — your previous draft contradicted the week's authoritative "
-            + f"record: {detail}. Rewrite the full JSON response. Never state a recovery/HRV/RHR/weight "
-            + "number that is not in the data above; when unsure, describe the pattern without a number."
+            + "\n\nCORRECTION REQUIRED — your previous draft was not grounded in the week's "
+            + f"data: {detail}. Rewrite the full JSON response. Never state a number or date "
+            + "that is not in the data above; when unsure, describe the pattern without one."
         )
-        _corrected = False
         try:
             retry = _call_notes_model(fix_prompt, api_key)
-            n_retry, _ = _grounding_contradictions(retry)
-            if n_retry < n_bad:
-                logger.info(f"[grounding] rewrite kept ({n_bad} → {n_retry})")
-                analysis = retry
-                _corrected = True
+            retry_findings = _note_grounding_findings(retry, prompt)
+            if len(retry_findings) < len(findings):
+                logger.info(f"[grounding] rewrite kept ({len(findings)} → {len(retry_findings)})")
+                analysis, findings = retry, retry_findings
             else:
-                logger.warning(f"[grounding] rewrite not better ({n_bad} → {n_retry}) — keeping the original")
-        except Exception as e:  # noqa: BLE001 — regen is best-effort
-            logger.warning(f"[grounding] rewrite failed ({type(e).__name__}) — keeping the original")
+                logger.warning(f"[grounding] rewrite not better ({len(findings)} → {len(retry_findings)}) — keeping the original")
+        except Exception as e:  # noqa: BLE001 — regen is best-effort; a failed rewrite falls through to the HOLD below
+            logger.warning(f"[grounding] rewrite failed ({type(e).__name__})")
         try:  # #812/#744: a fired note gate is labeled eval data — retain the pair (fail-soft)
             from experiment import eval_retention
 
             eval_retention.retain(
                 "field_notes",
-                "flagged_corrected" if _corrected else "flagged_kept_best",
+                # empty findings here implies the rewrite was kept and cleared them; anything else holds below
+                "flagged_corrected" if not findings else "flagged_held",
                 draft=json.dumps(_draft_note),
                 final=json.dumps({f: analysis.get(f) for f in _NOTE_FIELDS}),
-                findings=[{"type": "contradiction", "detail": detail}],
-                extra={"week": iso_week, "n_contradictions": n_bad},
+                findings=[{"type": str(f.get("type", "finding")), "detail": str(f.get("detail", ""))} for f in findings[:10]],
+                extra={"week": iso_week, "n_findings": len(findings)},
             )
         except Exception:  # noqa: BLE001 — retention is never load-bearing
             pass
+        if findings:
+            # HOLD — the one rewrite did not clear the findings. No write: the reader
+            # surface reads the WEEK# row, so an absent row is an absent note, never
+            # failed text. A later manual invoke can regenerate the week.
+            logger.warning(f"[grounding] HELD {iso_week}: {len(findings)} finding(s) after the one rewrite — {detail}")
+            return {"status": "held", "week": iso_week, "findings": len(findings)}
 
     now = datetime.now(timezone.utc).isoformat()
 
