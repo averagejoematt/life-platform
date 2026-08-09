@@ -3,6 +3,7 @@ packet builder, split out of wednesday_chronicle_lambda.py (#1654). Reads the
 facade's live (monkeypatchable) module state via the `_g` hand-off; does NOT
 import the facade (no import cycle)."""
 
+import re
 from datetime import datetime, timedelta, timezone
 
 from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context
@@ -10,6 +11,38 @@ from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS
 from common.digest_utils import d2f, safe_float
 from experiment.phase_filter import singleton_visible
 from privacy import diary_consent  # #1483 (ADR-142 tier 2): the conversation-allude projection + prompt block
+
+# ── #2422: model-authored prose must not widen the grounding allow-list ───────
+# The anomaly detector's "hypothesis" is Haiku-WRITTEN text persisted on the
+# anomalies partition. The packet used to inline it bare, so the chronicle's
+# number/date allow-list (derived from the whole packet by
+# chronicle_prompt.installment_grounding_findings) treated it as SOURCE
+# material — a figure the model invented upstream would GROUND the same figure
+# in reader text (laundering: model text grounding other model text). These
+# fence markers mark any model-authored span in the packet;
+# installment_grounding_findings strips fenced spans before deriving the
+# allow-list, so Elena still SEES the hypothesis as context but its numbers and
+# dates cannot ground anything. The anomaly's MEASURED fields (value, baseline,
+# z — the detector's deterministic statistics) are emitted as separate plain
+# lines and remain groundable. The markers deliberately contain no digits.
+MODEL_CONJECTURE_OPEN = "<<model-conjecture (AI-written, not measured data — never cite its numbers)>>"
+MODEL_CONJECTURE_CLOSE = "<<end model-conjecture>>"
+_MODEL_CONJECTURE_RE = re.compile(re.escape(MODEL_CONJECTURE_OPEN) + r".*?" + re.escape(MODEL_CONJECTURE_CLOSE), re.DOTALL)
+
+
+def mark_model_conjecture(text):
+    """Fence a model-authored string so allow-list derivation can strip it.
+
+    Any marker text already present inside the span is removed first, so a
+    (model-authored) payload can never close the fence early and leak its tail
+    into the allow-list."""
+    clean = (text or "").replace(MODEL_CONJECTURE_OPEN, "").replace(MODEL_CONJECTURE_CLOSE, "")
+    return f"{MODEL_CONJECTURE_OPEN} {clean} {MODEL_CONJECTURE_CLOSE}"
+
+
+def strip_model_conjecture(text):
+    """Remove every fenced model-conjecture span (the allow-list derivation path)."""
+    return _MODEL_CONJECTURE_RE.sub("", text or "")
 
 
 def gather_chronicle_data(*, _g):
@@ -583,8 +616,28 @@ def build_data_packet(data):
             hyp = a.get("hypothesis", "")
             labels = [m.get("label", "?") for m in metrics]
             packet.append(f"{d}: {sev} — {', '.join(labels)}")
+            # #2422: the MEASURED fields — the detector's deterministic statistics.
+            # These are the groundable facts about the anomaly; before this, the only
+            # numbers the packet carried for an anomaly lived inside the AI-written
+            # hypothesis, which is exactly the text that must not ground anything.
+            for m in metrics:
+                val = safe_float(m, "yesterday_val")
+                if val is None:
+                    continue
+                line = f"    {m.get('label', '?')}: {val:g}"
+                mean = safe_float(m, "baseline_mean")
+                if mean is not None:
+                    line += f" (baseline {mean:g}"
+                    z = safe_float(m, "z_score")
+                    if z is not None:
+                        line += f", z {z:g}"
+                    line += ")"
+                if m.get("direction"):
+                    line += f" — {m['direction']}"
+                packet.append(line)
             if hyp:
-                packet.append(f"  Hypothesis: {hyp}")
+                # #2422: Haiku-authored — fenced so it cannot widen the allow-list.
+                packet.append(f"  Hypothesis: {mark_model_conjecture(hyp)}")
         packet.append("")
 
     # --- Weather (for setting/atmosphere) ---
