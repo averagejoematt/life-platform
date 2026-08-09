@@ -235,14 +235,11 @@ UNGATED_READER_KNOWN: dict[str, dict[str, object]] = {
         "issue": 2424,
         "note": "/api/challenges serves candidate rows, so LLM-authored challenge copy is reader-visible before review.",
     },
-    "lambdas/reading/reading_enrich.py": {
-        "issue": 2425,
-        "note": "publishes LLM fields to the public reading allow-list with prompt-level instructions as the only grounding.",
-    },
-    "lambdas/reading/reading_constellation.py": {
-        "issue": 2425,
-        "note": "same defect, same issue: constellation fields publish with prompt-only grounding.",
-    },
+    # reading_enrich.py + reading_constellation.py left this table 2026-08-09 the
+    # designed way (#2425): closed-vocabulary deterministic validation (domainTags/era)
+    # plus the numbers/dates/freshness chokepoint on the free-text fields landed
+    # SURFACES registrations ("lambdas/reading/reading_enrich.py::_grounded_themes",
+    # "lambdas/reading/reading_constellation.py::_idea_grounding_findings").
     # field_notes_lambda left this table via #2426 — registered in SURFACES
     # (::_note_grounding_findings), regenerate-once-then-hold.
     "lambdas/coach/coach_history_summarizer.py": {

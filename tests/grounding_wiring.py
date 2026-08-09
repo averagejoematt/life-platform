@@ -322,6 +322,47 @@ SURFACES = {
         ("numbers", "dates", "freshness"),
         {"behavioral": _NOT_ABOUT_MATTHEW, "night": _NOT_A_VITALS_SURFACE},
     ),
+    # #2425: the constellation's idea extraction — labels/gists land on the IDEA
+    # public allowlist (/api/constellation). The prompt's own grounding contract
+    # ("grounded ONLY in the text you're given") is now code: the allow-list is
+    # derived from the owner's takeaway/notes + the book title, and an idea whose
+    # label or gist carries a number/date he never wrote is HELD (dropped — "no
+    # invented ideas" is the module contract, and the fill machinery can re-run).
+    "lambdas/reading/reading_constellation.py::_idea_grounding_findings": _entry(
+        ("numbers", "dates", "freshness"),
+        {
+            "behavioral": (
+                "the #1699 gate checks a SECOND-PERSON same-day completed-action claim, and an "
+                "idea label/gist is a 2-5 word portable BOOK concept distilled from the owner's "
+                "own written notes — never an address to Matthew about what he did today. The "
+                "numbers/dates classes against his own quoted words are the load-bearing check. "
+                "Revisit if the extraction prompt ever asks for behavioral narration."
+            ),
+            "night": _NO_NIGHT_MAP,
+        },
+    ),
+    # #2425: the reading shelf's enrichment writer (/api/reading_shelf via the BOOK
+    # public allowlist). The load-bearing gate is DETERMINISTIC where the field is a
+    # closed set — domainTags/era ship only from the in-module vocab constants (the
+    # prompt's tag list is generated from the same constants, so prompt and validator
+    # cannot drift) and the difficulty subscores are clamped ints plus a page-derived
+    # length — because for an enum a vocabulary check is exact where number-grounding
+    # would be a no-op dressed as coverage. The ONE free-text field (themes) is what
+    # crosses this chokepoint, against the assembled prompt — literally what the
+    # model was given. Fail-closed both halves: a missing gate holds all themes.
+    "lambdas/reading/reading_enrich.py::_grounded_themes": _entry(
+        ("numbers", "dates", "freshness"),
+        {
+            "behavioral": (
+                "the surface tags a BOOK — the system prompt's own rule is 'never opinions "
+                "about the reader', and its output is tags and short theme phrases about the "
+                "text, so there is no second-person same-day completed-action claim (#1699's "
+                "only shape) to grade, and no behavior log could make one legitimate. Revisit "
+                "if enrichment ever starts describing Matthew's reading behavior."
+            ),
+            "night": _NOT_A_VITALS_SURFACE,
+        },
+    ),
     # #2276/#1654: moved to web/site_api_ai_prompt.py when site_api_ai_lambda crossed the
     # god-module gate. Same function, same arms — only the module owning it changed.
     "lambdas/web/site_api_ai_prompt.py::board_grounding_findings": _entry(

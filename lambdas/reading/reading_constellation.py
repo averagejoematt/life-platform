@@ -28,6 +28,18 @@ MODEL = "claude-haiku-4-5-20251001"
 ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
 MIN_NODES = 4  # the Constellation refuses to render below this (brief §2)
 
+# The ADR-104 grounded-generation harness (#2425). The prompt's grounding
+# contract ("grounded ONLY in the text you're given … never invent") was a
+# prompt rule, and idea labels/gists land on the IDEA public allowlist
+# (/api/constellation) — so the contract is now CODE: every candidate idea is
+# checked against the owner's own quoted words before it ships. FAIL-CLOSED:
+# if the gate module is missing from the bundle, no idea ships ungated (the
+# fill machinery can simply run again — the surface stays honestly empty).
+try:
+    from ai import grounded_generation as _gg
+except ImportError:  # pragma: no cover — environment-dependent; hold, never pass through
+    _gg = None
+
 _EXTRACT_SYSTEM = (
     "You distill the DURABLE IDEAS a reader kept from a book, grounded ONLY in the text you're given "
     "(his takeaway + notes). Never invent an idea that isn't supported by his words. An idea is a "
@@ -55,10 +67,29 @@ def _parse(text: str) -> dict | None:
         return None
 
 
+def _idea_grounding_findings(candidate: str, allowed: set, allowed_dates: set) -> list:
+    """#2425 chokepoint: one candidate idea (label + gist) against the owner's words.
+
+    ``allowed``/``allowed_dates`` are derived from the source text the model was
+    given — his takeaway + notes plus the book title — so a label or gist carrying
+    a number or calendar date he never wrote is a finding, and the caller HOLDS
+    that idea (drops it; "no invented ideas" is the module contract). The cycle
+    anchors (#1691/#1897) are framing-scoped and ride along free.
+    """
+    from ai.grounding_gate_params import cycle_gate_params  # #1967 — one provider for the freshness anchors
+
+    return _gg.grounding_findings(candidate, facts=None, allowed=allowed, allowed_dates=allowed_dates, **cycle_gate_params())
+
+
 def extract_ideas(book_title: str, source_text: str, *, caller=None) -> list:
     """Distill the durable ideas from his own takeaway/notes. Fail-soft: returns []
-    on any failure (no invented ideas). Grounded ONLY in `source_text`."""
+    on any failure (no invented ideas). Grounded ONLY in `source_text` — and since
+    #2425 that grounding is enforced in code, not just the prompt: each idea must
+    clear `_idea_grounding_findings` against his own words or it is held."""
     if not source_text or not source_text.strip():
+        return []
+    if _gg is None:  # fail-closed (#2425): without the gate, no idea ships — and no tokens are spent
+        logger.warning("[reading_constellation] grounded_generation unavailable — holding all ideas (fail-closed)")
         return []
     body = {
         "model": MODEL,
@@ -86,11 +117,25 @@ def extract_ideas(book_title: str, source_text: str, *, caller=None) -> list:
     except Exception as e:  # noqa: BLE001 — fail-soft, never invent
         logger.warning("[reading_constellation] idea extraction failed (%s)", type(e).__name__)
         return []
+    allowed = _gg.allowed_numbers(source_text, book_title)
+    allowed_dates = _gg.allowed_dates(source_text, book_title)
     out = []
     for it in (parsed.get("ideas") or [])[:3]:
         label = str(it.get("label") or "").strip().lower()
-        if label:
-            out.append({"ideaId": idea_id(label), "label": label, "gist": str(it.get("gist") or "").strip()[:160]})
+        if not label:
+            continue
+        gist = str(it.get("gist") or "").strip()[:160]
+        try:
+            findings = _idea_grounding_findings(f"{label}. {gist}", allowed, allowed_dates)
+        except Exception as e:  # noqa: BLE001 — a broken gate holds the idea, never waves it through
+            logger.warning("[reading_constellation] grounding gate failed (%s) — holding idea %r", type(e).__name__, label)
+            continue
+        if findings:
+            logger.warning(
+                "[reading_constellation] idea held (ungrounded, #2425): %r — %s", label, sorted({f.get("type", "?") for f in findings})
+            )
+            continue
+        out.append({"ideaId": idea_id(label), "label": label, "gist": gist})
     return out
 
 
