@@ -82,10 +82,9 @@ ACTIVE_API_SOURCES = active_api_source_ids()
 # sleep/HRV/recovery are covered by Whoop + Eight Sleep. Flagged best_effort in the registry.
 BEST_EFFORT_SOURCES = best_effort_source_ids()
 
-# Per-source attempt-gap overrides (minutes). Unlisted sources use the default in
-# ingest_health (~26h). Garmin runs only 4x/day but still attempts daily, so the
-# default holds; this map exists for future sources with sparser-than-daily cadence.
-SOURCE_MAX_GAP_MINUTES: dict[str, int] = {}
+# Per-source attempt-gap overrides were an EMPTY dict read with a 1560 fallback —
+# an inert mechanism (#2309 census note, ADR-103/144): deleted; every source uses
+# the 1560-minute (~26h) default below. Reintroduce a map only WITH a first entry.
 
 try:
     from ingestion.ingest_health import SYSTEM_PK, evaluate_source_health
@@ -148,10 +147,11 @@ def _check_compute_outputs(today_str: str) -> dict:
     If any expected partition is missing its expected-date record, daily-brief
     will read older data silently. Flag it loudly here.
 
-    Each compute Lambda writes for a different reference date — most write
-    YESTERDAY's record (computing metrics for the completed day) but some
-    write TODAY (e.g., adaptive_mode sets today's mode). The EXPECTED list
-    encodes this per-partition.
+    Each compute Lambda writes for a different reference date — the EXPECTED
+    list below encodes it per-partition and was VERIFIED against each writer
+    (#2309): adaptive_mode, like most, is checked against YESTERDAY's record.
+    Trust the list over any prose summary; an inverted docstring here is what
+    makes a future reader "correct" a working check.
     """
     from datetime import timedelta as _td
 
@@ -228,7 +228,7 @@ def _check_ingest_liveness(now: datetime) -> dict:
         verdict = evaluate_source_health(
             sentinels.get(source),
             now=now,
-            max_gap_minutes=SOURCE_MAX_GAP_MINUTES.get(source, 1560),
+            max_gap_minutes=1560,
             source=source,
         )
         verdicts.append(verdict)
@@ -377,7 +377,11 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
                 fail_count += 1
                 logger.warning(f"FAIL: {result['display_name']} — {result.get('error_type')}: {result.get('error_message')}")
 
-    # Secret health check — detect deleted/missing secrets
+    # Secret health check — detect deleted/missing secrets. #2309: secret
+    # findings get their OWN axis (secrets_failed/secrets_total) instead of
+    # folding into fail_count against a total that never counted them — the
+    # tally must reconcile: passed + failed + paused == total (ADR-105).
+    secrets_failed = 0
     sm = boto3.client("secretsmanager", region_name=REGION)
     # #518: audited against `aws secretsmanager list-secrets` 2026-07-04.
     # `life-platform/dropbox` NEVER existed (dropbox creds live in
@@ -401,7 +405,7 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
         try:
             desc = sm.describe_secret(SecretId=secret_name)
             if desc.get("DeletedDate"):
-                fail_count += 1
+                secrets_failed += 1
                 results.append(
                     {
                         "function_name": f"secret:{secret_name}",
@@ -415,7 +419,7 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
                 logger.warning(f"SECRET DELETED: {secret_name}")
         except Exception as e:
             if "ResourceNotFoundException" in str(e):
-                fail_count += 1
+                secrets_failed += 1
                 results.append(
                     {
                         "function_name": f"secret:{secret_name}",
@@ -440,11 +444,15 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
                 "passed": pass_count,
                 "failed": fail_count,
                 "paused": paused_count,
+                "secrets_total": len(REQUIRED_SECRETS),
+                "secrets_failed": secrets_failed,
                 "results": json.dumps(results),
                 "failures": json.dumps([r for r in results if not r.get("paused") and not r["healthy"]]),
             }
         )
-        logger.info(f"Health check stored: {pass_count} pass, {fail_count} fail, {paused_count} paused")
+        logger.info(
+            f"Health check stored: {pass_count} pass, {fail_count} fail, {paused_count} paused, {secrets_failed}/{len(REQUIRED_SECRETS)} secrets failed"
+        )
     except Exception as e:
         logger.error(f"Failed to store health check: {e}")
 
@@ -456,6 +464,8 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
                 "failed": fail_count,
                 "paused": paused_count,
                 "total": len(PIPELINES),
+                "secrets_total": len(REQUIRED_SECRETS),
+                "secrets_failed": secrets_failed,
                 "failures": [
                     {"name": r["display_name"], "error": r.get("error_message", "")}
                     for r in results
