@@ -154,8 +154,8 @@ def _breakdown(ceiling, projected, tier, mtd=10.0):
     }
 
 
-def test_percentage_is_against_the_effective_ceiling_july_window(monkeypatch):
-    """Inside the ADR-133 dated window the ceiling is $115, not the $85 base."""
+def test_percentage_is_against_the_effective_ceiling_dated_window(monkeypatch):
+    """Inside an ADR-133 dated window the ceiling is $115, not the $85 base."""
     cost = _run_status(monkeypatch, _breakdown(115.0, 102.10, 2))
     assert cost["budget"] == 115.0
     assert cost["pct_of_budget"] == 89, "102.10/115 = 89% — correctly tier 2, not 627%"
@@ -164,7 +164,7 @@ def test_percentage_is_against_the_effective_ceiling_july_window(monkeypatch):
 
 
 def test_percentage_is_against_the_effective_ceiling_after_the_revert(monkeypatch):
-    """The window auto-reverted on 2026-08-01; the endpoint must follow it."""
+    """Outside any dated window the endpoint follows the $85 base."""
     cost = _run_status(monkeypatch, _breakdown(85.0, 18.8, 0, mtd=0.4))
     assert cost["budget"] == 85.0
     assert cost["pct_of_budget"] == 22
@@ -222,24 +222,24 @@ def _ceilings_on(monkeypatch, when):
     return cg._active_ceilings()
 
 
-def test_governor_effective_ceiling_moves_across_the_july_boundary(monkeypatch):
-    """The acceptance clause 'including inside the dated July window'.
+def test_governor_effective_ceiling_moves_across_the_window_boundary(monkeypatch):
+    """The acceptance clause 'including inside the dated window' (now August 2026).
 
     /api/status now inherits whatever ceiling the governor computed, so the honesty
     of the published percentage rests on THIS function being right about the date.
     """
-    base_july, surge_july = _ceilings_on(monkeypatch, datetime(2026, 7, 15, tzinfo=timezone.utc))
-    base_aug, _surge_aug = _ceilings_on(monkeypatch, datetime(2026, 8, 15, tzinfo=timezone.utc))
+    base_aug, surge_aug = _ceilings_on(monkeypatch, datetime(2026, 8, 15, tzinfo=timezone.utc))
+    base_sep, _surge_sep = _ceilings_on(monkeypatch, datetime(2026, 9, 15, tzinfo=timezone.utc))
 
-    assert base_july == cg._TEMP_CEILING_USD, "inside the window the raised ceiling must apply"
-    assert surge_july == cg._TEMP_SURGE_CEILING_USD
-    assert base_aug == cg.MONTHLY_CEILING, "August must be back on the standing ceiling"
-    assert base_july > base_aug
+    assert base_aug == cg._TEMP_CEILING_USD, "inside the window the raised ceiling must apply"
+    assert surge_aug == cg._TEMP_SURGE_CEILING_USD
+    assert base_sep == cg.MONTHLY_CEILING, "September must be back on the standing ceiling"
+    assert base_aug > base_sep
 
 
 def test_the_window_reverts_on_its_own_date_with_no_deploy(monkeypatch):
-    """The half-open bound is the whole mechanism: 08-01 is already reverted."""
-    last_july, _ = _ceilings_on(monkeypatch, datetime(2026, 7, 31, 23, 59, tzinfo=timezone.utc))
-    first_aug, _ = _ceilings_on(monkeypatch, datetime(2026, 8, 1, 0, 0, tzinfo=timezone.utc))
-    assert last_july == cg._TEMP_CEILING_USD
-    assert first_aug == cg.MONTHLY_CEILING
+    """The half-open bound is the whole mechanism: 09-01 is already reverted."""
+    last_aug, _ = _ceilings_on(monkeypatch, datetime(2026, 8, 31, 23, 59, tzinfo=timezone.utc))
+    first_sep, _ = _ceilings_on(monkeypatch, datetime(2026, 9, 1, 0, 0, tzinfo=timezone.utc))
+    assert last_aug == cg._TEMP_CEILING_USD
+    assert first_sep == cg.MONTHLY_CEILING

@@ -35,7 +35,7 @@ def _pin_normal_thresholds(gov, monkeypatch):
 @pytest.fixture(autouse=True)
 def _pin_base_ceilings(gov, monkeypatch):
     """Same treatment for the calendar-scoped CEILING override
-    (_TEMP_CEILING_WINDOW, July 2026). The assertions in this module are written
+    (_TEMP_CEILING_WINDOW, August 2026). The assertions in this module are written
     against the $85/$100 base pair; without this pin every ceiling test in here
     false-fails for the duration of any raise window and silently passes again
     once it lapses. The window's own behaviour is tested explicitly below, with
@@ -285,9 +285,9 @@ def test_tier_for_scales_proportionally_with_surge_ceiling(gov):
 
 
 # ── temporary raise window (_TEMP_CEILING_WINDOW) ────────────────────────────
-# July 2026 is raised to $115/$135 for one month and reverts on its own date.
+# August 2026 is raised to $115/$135 for one month and reverts on its own date.
 # These tests inject the date instead of reading the clock, so they assert the
-# same thing in August 2026 as they did the day they were written.
+# same thing in September 2026 as they did the day they were written.
 
 
 def _clock_at(day):
@@ -309,17 +309,17 @@ def _clock_at(day):
 @pytest.mark.parametrize(
     "today,expected",
     [
-        (date(2026, 6, 30), (85.0, 100.0)),  # day before the window opens
-        (date(2026, 7, 1), (115.0, 135.0)),  # inclusive start
-        (date(2026, 7, 21), (115.0, 135.0)),  # the day it was decided
-        (date(2026, 7, 31), (115.0, 135.0)),  # last day inside
-        (date(2026, 8, 1), (85.0, 100.0)),  # EXCLUSIVE end — reverts unattended
-        (date(2027, 7, 15), (85.0, 100.0)),  # does not recur next July
+        (date(2026, 7, 31), (85.0, 100.0)),  # day before the window opens
+        (date(2026, 8, 1), (115.0, 135.0)),  # inclusive start
+        (date(2026, 8, 9), (115.0, 135.0)),  # the day it was decided
+        (date(2026, 8, 31), (115.0, 135.0)),  # last day inside
+        (date(2026, 9, 1), (85.0, 100.0)),  # EXCLUSIVE end — reverts unattended
+        (date(2027, 8, 15), (85.0, 100.0)),  # does not recur next August
     ],
 )
 def test_temp_ceiling_window_opens_and_self_reverts(gov, monkeypatch, today, expected):
     """The whole point of a dated window is that nobody has to remember it.
-    August must revert with no deploy, no SSM flip, and no human in the loop."""
+    September must revert with no deploy, no SSM flip, and no human in the loop."""
     monkeypatch.setattr(gov, "datetime", _clock_at(today))
     assert gov._REAL_ACTIVE_CEILINGS() == expected
 
@@ -328,7 +328,7 @@ def test_env_override_defeats_the_window(gov, monkeypatch):
     """An operator who explicitly sets MONTHLY_CEILING_USD takes full control.
     Without this, setting the env var mid-window would silently do nothing."""
     monkeypatch.setattr(gov, "_CEILING_ENV_OVERRIDE", True)
-    monkeypatch.setattr(gov, "datetime", _clock_at(date(2026, 7, 21)))
+    monkeypatch.setattr(gov, "datetime", _clock_at(date(2026, 8, 9)))
     assert gov._REAL_ACTIVE_CEILINGS() == (gov.MONTHLY_CEILING, gov.SURGE_CEILING_USD)
 
 
@@ -362,6 +362,53 @@ def test_decide_tier_default_ceiling_is_the_base(gov):
     assert gov._decide_tier(projected=157.0, mtd=28.86, elapsed_days=5.8) == gov._decide_tier(
         projected=157.0, mtd=28.86, elapsed_days=5.8, ceiling=85.0
     )
+
+
+# ── _tier_crossing_forecast: the #2381 crossing-date visibility ──────────────
+
+
+def test_tier_crossing_forecast_the_2381_fixture(gov):
+    """The live 2026-08-09 read that produced the August amendment: mtd $32.51,
+    projected $121.79, ~$3.9/day at the $85 base. The projection pins tier 3,
+    so every band is actual-mtd-bound: tier 1 today (the +1 cap always allows
+    it), tier 2 when actual crosses the tier-1 band, tier 3 a band later —
+    the verifier's own derivation, now published instead of re-derived."""
+    now = datetime(2026, 8, 9, 12, tzinfo=timezone.utc)
+    f = gov._tier_crossing_forecast(32.51, 121.79, 3.9, now, ceiling=85.0)
+    assert f["1"] == "2026-08-09"
+    assert f["2"] == "2026-08-17"  # (62.33 - 32.51) / 3.9 → first closed-over day
+    assert f["3"] == "2026-08-20"  # (73.67 - 32.51) / 3.9
+
+
+def test_tier_crossing_forecast_projection_blocks_a_tier(gov):
+    """A projection under a band Nones that tier outright — the projection arm
+    of _decide_tier's min() would never let it engage this month."""
+    now = datetime(2026, 8, 9, 12, tzinfo=timezone.utc)
+    f = gov._tier_crossing_forecast(10.0, 64.0, 2.0, now, ceiling=85.0)  # projected tier 1 only
+    assert f["1"] == "2026-08-09"
+    assert f["2"] is None and f["3"] is None
+
+
+def test_tier_crossing_forecast_month_end_bounds_it(gov):
+    """A crossing past the month's last day is None: the month (and the whole
+    month-to-date estimate) rolls over before it happens."""
+    now = datetime(2026, 8, 28, 12, tzinfo=timezone.utc)
+    f = gov._tier_crossing_forecast(30.0, 90.0, 1.0, now, ceiling=85.0)
+    assert f["1"] == "2026-08-28"
+    assert f["2"] is None and f["3"] is None  # 30+ days out at $1/day — August ends first
+
+
+def test_tier_crossing_forecast_is_total(gov):
+    """Display-only payload: zero burn forecasts nothing it can't know, and
+    garbage input returns the all-None shape rather than raising into the
+    breakdown write."""
+    now = datetime(2026, 8, 9, 12, tzinfo=timezone.utc)
+    assert gov._tier_crossing_forecast(10.0, 121.0, 0.0, now, ceiling=85.0) == {
+        "1": "2026-08-09",
+        "2": None,
+        "3": None,
+    }
+    assert gov._tier_crossing_forecast(None, None, None, None) == {"1": None, "2": None, "3": None}
 
 
 # ── _recent_unique_visitors: reads the traffic digest's CloudWatch metric ────
@@ -424,7 +471,7 @@ def test_alert_surge_engage_uses_active_ceilings_in_temp_window(gov, monkeypatch
     # pair for every OTHER test in this module; undo that here so _alert_surge
     # sees the real, date-scoped resolution this test is about.
     monkeypatch.setattr(gov, "_active_ceilings", gov._REAL_ACTIVE_CEILINGS)
-    monkeypatch.setattr(gov, "datetime", _clock_at(date(2026, 7, 21)))  # inside the $115/$135 window
+    monkeypatch.setattr(gov, "datetime", _clock_at(date(2026, 8, 9)))  # inside the $115/$135 window
     fake_sns = _FakeSNS()
     monkeypatch.setattr(gov, "_sns", fake_sns)
 
@@ -440,7 +487,7 @@ def test_alert_surge_engage_uses_active_ceilings_in_temp_window(gov, monkeypatch
 
 def test_alert_surge_disengage_uses_active_ceilings_in_temp_window(gov, monkeypatch):
     monkeypatch.setattr(gov, "_active_ceilings", gov._REAL_ACTIVE_CEILINGS)
-    monkeypatch.setattr(gov, "datetime", _clock_at(date(2026, 7, 21)))
+    monkeypatch.setattr(gov, "datetime", _clock_at(date(2026, 8, 9)))
     fake_sns = _FakeSNS()
     monkeypatch.setattr(gov, "_sns", fake_sns)
 

@@ -336,6 +336,15 @@ def format_headroom_line(breakdown) -> str:
         if breakdown.get("surge_active"):
             uniques = breakdown.get("recent_uniques")
             line += f" — SURGE mode ({uniques} uniques/7d, readers not spend)"
+        # #2381: the crossing-date clause — the NEXT tier band's projected
+        # in-force date at this burn, so a budget-posture decision is visible
+        # ~two weeks out instead of arriving as a mid-month scramble (July
+        # 2026's shape). Optional key: older payloads simply omit the clause.
+        crossings = breakdown.get("tier_crossings") or {}
+        for _t in (1, 2, 3):
+            if _t > tier and crossings.get(str(_t)):
+                line += f" · tier {_t} ~{crossings[str(_t)]} at this burn"
+                break
         line += format_paused_clause(tier)
         return line
     except Exception:

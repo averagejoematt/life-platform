@@ -45,7 +45,7 @@ AI at the moment of success. When the traffic digest's trailing 7-day unique
 visitor count (LifePlatform/Traffic::UniqueVisitors7d, emitted weekly by
 traffic_digest_lambda) crosses SURGE_UNIQUES_THRESHOLD, the effective monthly
 ceiling floats from the base to the surge ceiling ($85 → $100 normally; $115 →
-$135 during the July-2026 window, see _TEMP_CEILING_WINDOW) — the pair in effect
+$135 during the August-2026 window, see _TEMP_CEILING_WINDOW) — the pair in effect
 today comes from _active_ceilings, and surge is floored at the base so it can
 never tighten the guard. See _effective_ceiling.
 Tier thresholds scale proportionally with whatever ceiling is in effect (see
@@ -118,22 +118,25 @@ MONTHLY_CEILING = float(os.environ.get("MONTHLY_CEILING_USD", "85"))
 SURGE_UNIQUES_THRESHOLD = int(os.environ.get("SURGE_UNIQUES_THRESHOLD", "900"))
 SURGE_CEILING_USD = float(os.environ.get("SURGE_CEILING_USD", "100"))
 SSM_SURGE_PARAM = os.environ.get("SURGE_ACTIVE_PARAM", "/life-platform/surge-active")
-# JULY 2026 ONLY (auto-reverts 2026-08-01, no manual step): Matthew's call on
-# 2026-07-21, with July already projecting $96.09 against the $85 base (113%) and
-# the guard parked at tier 2 — reader narratives paused for the rest of the month.
-# Raised for ONE month to un-pause them; August returns to $85/$100 automatically.
+# AUGUST 2026 ONLY (auto-reverts 2026-09-01, no manual step): Matthew's call on
+# 2026-08-09 (#2381) — decided in week 2 on purpose, not in a cutoff scramble
+# like July's. The 08-09 governor read: mtd $32.51, projected $121.79 against
+# the $85 base, ~$3.9/day run-rate; _decide_tier's actual+1 cap put the tier-2
+# reader-narrative pause on track for mid-month, and this month a tier-2 pause
+# also silences the new Telegram coach chat (ADR-151 budget-ranks it with the
+# daily brief). Raised for ONE month; September returns to $85/$100 automatically.
 #
-# $115 not $110: the tier bands are fixed FRACTIONS of the ceiling (≈73/87/97%),
-# so $110 leaves the projection at 87.4% — still tier 2. $110 would have paid the
-# full cost of raising the ceiling and changed nothing. $115 lands at 83.6% (tier
-# 1) with ~$5 of headroom as the projection drifts.
+# $115/$135 deliberately repeats the July-2026 amendment's shape: the tier bands
+# are fixed FRACTIONS of the ceiling (≈73/87/97%), so one raised number moves
+# the whole ladder coherently (the July rationale for $115-not-$110 is in the
+# ADR-133 2026-07-21 amendment; this window is the 2026-08-09 amendment).
 #
 # The surge value moves WITH the base ($135 keeps the same ~1.18 ratio as 85→100).
 # It has to: _effective_ceiling returns the surge ceiling unconditionally, so a
 # surge ceiling BELOW the base would tighten the guard exactly when readers
 # arrive. _effective_ceiling now floors it with max() as a structural guard, but
 # keeping the pair coherent here means that floor never has to fire.
-_TEMP_CEILING_WINDOW = (date(2026, 7, 1), date(2026, 8, 1))  # [start, end)
+_TEMP_CEILING_WINDOW = (date(2026, 8, 1), date(2026, 9, 1))  # [start, end)
 _TEMP_CEILING_USD = 115.0
 _TEMP_SURGE_CEILING_USD = 135.0
 # One sentence of WHY, carried in the breakdown payload so a public receipt can
@@ -141,8 +144,8 @@ _TEMP_SURGE_CEILING_USD = 135.0
 # (#1999). Reader-facing prose: no dollar figures (the payload carries those),
 # no operator jargon.
 _TEMP_CEILING_REASON = (
-    "A one-month raise Matthew approved on 2026-07-21 (ADR-133 amendment) so the reader-facing "
-    "AI would come back on for the rest of July instead of staying paused. It reverts on its own date."
+    "A one-month raise Matthew approved on 2026-08-09 (ADR-133 amendment) so the reader-facing "
+    "AI and the coach chat stay on through August instead of pausing mid-month. It reverts on its own date."
 )
 # An explicit MONTHLY_CEILING_USD in the environment is an operator override and
 # defeats the window entirely — otherwise setting the env var during July would
@@ -372,7 +375,7 @@ def _active_ceilings() -> tuple[float, float]:
 
     Mirrors _active_thresholds: a calendar-scoped override that reverts on its
     own date rather than needing anyone to remember. See _TEMP_CEILING_WINDOW
-    for why July 2026 is raised and why the number is $115.
+    for why August 2026 is raised and why the number is $115.
     """
     if _CEILING_ENV_OVERRIDE:
         return MONTHLY_CEILING, SURGE_CEILING_USD
@@ -474,6 +477,52 @@ def _decide_tier(projected: float, mtd: float, elapsed_days: float, ceiling: flo
     return tier
 
 
+def _tier_crossing_forecast(mtd: float, projected: float, daily_burn: float, now: datetime, ceiling: float = None) -> dict:
+    """#2381: the projected DATE each tier band comes into force this month.
+
+    _decide_tier caps the tier at actual_tier + 1 outside the early-month
+    window, so once the projection has pinned above a band the binding
+    constraint for tier t (t >= 2) is ACTUAL mtd crossing the band BELOW it —
+    the derivation that put July's tier-2 scramble a week earlier than the
+    naive projection read, and the reason this forecast exists: the next
+    posture decision's date should be visible ~two weeks out in the daily
+    brief, not discovered at the cutoff. Tier 1 needs no actual spend once the
+    projection clears its own band (the +1 cap always allows it).
+
+    A crossing later than the month's last day is None — the month rolls over
+    (and the estimate resets) before it happens. Day arithmetic treats mtd as
+    an end-of-day figure, so the crossing lands on the first day whose close
+    is over the band. Returns {"1": iso-date|None, "2": ..., "3": ...} with
+    string keys because the dict ships inside the breakdown JSON. Total
+    function: any bad input returns the all-None shape (the payload is
+    display-only and must never sink the breakdown write).
+    """
+    empty = {"1": None, "2": None, "3": None}
+    out = dict(empty)
+    try:
+        if ceiling is None:
+            ceiling = MONTHLY_CEILING
+        ratio = ceiling / _THRESHOLD_REFERENCE_CEILING
+        bands = {tier: threshold * ratio for threshold, tier in _active_thresholds()}
+        projected_tier = _tier_for(projected, ceiling)
+        _, days_in_month = _month_bounds(now)
+        month_end = now.replace(day=days_in_month).date()
+        today = now.date()
+        for t in (1, 2, 3):
+            if projected_tier < t:
+                continue  # the projection arm of _decide_tier's min() blocks this tier outright
+            needed = 0.0 if t == 1 else bands[t - 1]
+            if mtd >= needed:
+                out[str(t)] = today.isoformat()
+            elif daily_burn > 0:
+                crossing = today + timedelta(days=int((needed - mtd) / daily_burn) + 1)
+                if crossing <= month_end:
+                    out[str(t)] = crossing.isoformat()
+    except Exception:
+        return empty
+    return out
+
+
 def _read_tier() -> int:
     try:
         return int(_ssm.get_parameter(Name=SSM_TIER_PARAM)["Parameter"]["Value"])
@@ -560,6 +609,10 @@ def _write_breakdown(
         # None when no dated window is in effect (the normal case) — the key is
         # always present so a consumer distinguishes "no window" from "old payload".
         "ceiling_window": _active_ceiling_window(),
+        # #2381: projected in-force date per tier band at this run's actual mtd
+        # and run-rate, so the brief can say WHEN the next pause arrives, not
+        # just that headroom is thin. Derivation in _tier_crossing_forecast.
+        "tier_crossings": _tier_crossing_forecast(mtd, projected, ai_daily + non_ai_daily, now, ceiling),
     }
     try:
         _ssm.put_parameter(Name=SSM_BREAKDOWN_PARAM, Value=json.dumps(payload), Type="String", Overwrite=True)
