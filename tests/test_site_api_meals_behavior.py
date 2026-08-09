@@ -1519,3 +1519,79 @@ def test_a_delivery_flag_recorded_as_the_string_false_is_counted_as_a_binge(deli
 
     honest = FakeSources(food_delivery=[delivery("2026-04-15", amount=20.0, binge=False), delivery("2026-04-16", amount=20.0, binge=0)])
     assert call("food_delivery_overview", honest)["food_delivery"]["binge_days_30d"] == 0
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# §12 — The glucose door's meal table binds only keys this module publishes (#2329)
+# ──────────────────────────────────────────────────────────────────────────────
+#
+# The front-end (`site/assets/js/evidence_nutrition.js` renderGlucose) prints a
+# table header for every column it renders. #2329's defect: two headers (`peak`,
+# `Δ rise`) bound keys (`peak`/`peak_mgdl`, `delta`/`rise`) that NO serving
+# endpoint publishes — every row rendered two blank cells. These guards pin the
+# binding to the endpoint's real contract, in both directions: every `m.<key>`
+# accessor in the table template must be a key a populated `meal_glucose` row
+# actually carries, and every header must have a cell. They fail the moment a
+# header is added without a backing key — or a published key is renamed out from
+# under the door.
+
+
+def _meal_table_template() -> str:
+    import pathlib
+    import re as _re
+
+    js = (pathlib.Path(__file__).resolve().parents[1] / "site" / "assets" / "js" / "evidence_nutrition.js").read_text()
+    m = _re.search(r'sec\("Meal glucose response",\s*`(.*?)`\s*\)', js, _re.S)
+    assert m, "the glucose door's meal-table template moved — update this guard alongside it"
+    return m.group(1)
+
+
+def _populated_meal_glucose_row() -> dict:
+    """One real row from the handler on a populated fixture — the published contract."""
+    src = FakeSources(
+        filter_window=False,
+        macrofactor=[mf(TODAY, food("Chicken Burrito Bowl", protein_g=45, calories_kcal=650, carbs_g=55, time="12:30"))],
+        apple_health=[cgm(TODAY, avg=105, peak=145, low=88, tir=92)],
+    )
+    meals_out = call("meal_glucose", src)["meals"]
+    assert meals_out, "the fixture must produce at least one meal row"
+    return meals_out[0]
+
+
+def test_every_key_the_meal_table_binds_is_one_meal_glucose_publishes():
+    """#2329 acceptance: the rendered column set is a subset of the keys the
+    serving endpoint publishes. `m.<key>` accessors are read out of the template
+    itself, so a header added over a phantom key fails here before it ships two
+    blank columns to a reader."""
+    import re as _re
+
+    tmpl = _meal_table_template()
+    bound = set(_re.findall(r"\bm\.([A-Za-z_]\w*)", tmpl))
+    assert bound, "no bindings found in the meal-table template — the extraction regex has gone stale"
+    published = set(_populated_meal_glucose_row())
+    missing = bound - published
+    assert not missing, f"the meal table binds keys /api/meal_glucose never publishes: {sorted(missing)}"
+
+
+def test_the_meal_table_prints_exactly_one_cell_per_header():
+    """A header with no cell — or a cell with no header — is the same reader lie
+    in column form; the render-level twin lives in
+    tests/js/evidence_nutrition_meal_table_2329.test.mjs."""
+    import re as _re
+
+    tmpl = _meal_table_template()
+    headers = _re.findall(r"<th>", tmpl)
+    cells = _re.findall(r"<td[^>]*>", tmpl)
+    assert len(headers) == len(cells), f"{len(headers)} headers over {len(cells)} cells"
+
+
+def test_the_retired_phantom_columns_stay_retired():
+    """`peak`/`delta` per meal are not derivable from the daily CGM aggregates
+    this endpoint reads (`blood_glucose_avg/max/min` per DAY) — a day-level max
+    attributed to a single meal would be a fabricated number (ADR-104/105). The
+    honest per-meal figure is the carb-weighted `spike` estimate, which is what
+    the door now renders. If a future writer lands true per-meal CGM windows
+    (#2327 direction 2), delete this test alongside that contract change."""
+    row = _populated_meal_glucose_row()
+    for phantom in ("peak", "peak_mgdl", "delta", "rise"):
+        assert phantom not in row, f"meal_glucose now publishes {phantom!r} — retire this guard and rebind the door"

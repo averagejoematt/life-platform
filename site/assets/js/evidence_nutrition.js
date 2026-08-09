@@ -439,9 +439,24 @@ export async function renderNutrition(d) {
 export async function renderGlucose(d) {
   const [mg, mr] = await Promise.all([tryJSON("/api/meal_glucose"), tryJSON("/api/meal_responses")]);
   const cur = d && d.glucose;
-  const rows = ((mr && mr.meals) || (mg && mg.meals) || []);
+  // #2329: an EMPTY `meals: []` from the primary arm is truthy in JS, so the old
+  // `(mr && mr.meals) || (mg && mg.meals)` never actually fell back — and
+  // /api/meal_responses is a dead partition that always serves [] (#2327). Fall
+  // back on emptiness, not just absence, so meal_glucose's rows can ever render.
+  const mrRows = (mr && mr.meals) || [];
+  const rows = mrRows.length ? mrRows : ((mg && mg.meals) || []);
   const trend = (d && d.glucose_trend) || [];
-  const mealSec = rows.length ? sec("Meal glucose response", `<table class="rd-tbl"><thead><tr><th>meal</th><th>peak</th><th>Δ rise</th></tr></thead><tbody>${rows.slice(0, 25).map((m) => `<tr><td class="rd-name">${esc(m.name || m.meal)}</td><td class="num">${fmt(m.peak ?? m.peak_mgdl)}</td><td class="num">${fmt(m.delta ?? m.rise)}</td></tr>`).join("")}</tbody></table>`) : "";
+  // #2329: the columns bind ONLY keys /api/meal_glucose actually publishes — `meal`,
+  // `spike`, `grade`, `curve`. The old headers (`peak`, `Δ rise`) sat over keys no
+  // endpoint served, so every row rendered two blank cells. A per-meal peak is NOT
+  // derivable from the daily CGM aggregates the endpoint reads (attributing a
+  // day-level max to one meal would fabricate precision — ADR-104/105), so the
+  // front-end moved to the keys it receives. `spike` is the endpoint's carb-weighted
+  // estimate of the day's excursion (hence "est."); an unmeasured meal arrives as
+  // spike:null / grade:"?" and renders "—" / "?" — absent, never blank. Binding is
+  // pinned to the endpoint's contract by tests/test_site_api_meals_behavior.py
+  // (subset guard) + tests/js/evidence_nutrition_meal_table_2329.test.mjs (render).
+  const mealSec = rows.length ? sec("Meal glucose response", `<table class="rd-tbl"><thead><tr><th>meal</th><th>Δ spike est.</th><th>response</th></tr></thead><tbody>${rows.slice(0, 25).map((m) => { const resp = [m.grade, m.curve && m.curve !== "unknown" ? m.curve : null].filter((x) => x != null && x !== "").join(" · "); return `<tr><td class="rd-name">${esc(m.meal)}</td><td class="num">${fmt(m.spike)}</td><td class="num">${resp ? esc(resp) : "—"}</td></tr>`; }).join("")}</tbody></table>`) : "";
   // #1098 — no sensor: the head figure row is SKIPPED (no fig("no") chip) and the
   // designed ghost-curve empty state holds the space — an honest "sensor not active"
   // instrument read, never a mysteriously absent panel. (The old !head.includes("fig-v")
