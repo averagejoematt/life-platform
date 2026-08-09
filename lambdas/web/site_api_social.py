@@ -19,22 +19,11 @@ the Anthropic API key as the signing secret), per-IP rate-limit stores
 for nudge/submit_finding, and the rate-limit EMF metric emitter — since
 nothing outside this cluster uses them.
 
-CLASS RULE — the unmetered public-read posture (#2289, decided 2026-08-09):
-every ``handle_*``/``_handle_*`` in this module is either (a) rate-limited
-(``_rate_check``/``_rate_limited`` — the metered write/oracle set, #2237/#2239),
-or (b) an **edge-cached public read**: every success response declares
-``cache_seconds >= 300`` (the ``_ok`` default is 300), so the CloudFront
-``/api/*`` behaviour (min 0 / default 300 / max 3600, honors origin
-Cache-Control — ``cdk/stacks/web_stack.py``) absorbs abuse at the edge.
-These reads get NO per-IP DynamoDB metering **deliberately**: their answer is
-the same for every caller (the parameterized ones select from public catalogs
-against closed sets), so the exposure is read *spend*, not information — and a
-DDB counter would add a write per read, which costs more than what it protects.
-Caching removes the spend instead of counting it. Sole exception: a write door
-whose one-shot ``ConditionExpression`` dedup is itself the meter
-(``_handle_replicate_certify``, #1825). The posture is enforced structurally by
-``tests/test_unmetered_public_read_class_2289.py`` — a new unmetered,
-under-cached public read fails the suite by name.
+CLASS RULE (#2289): every handler here is rate-limited OR an edge-cached public
+read (``cache_seconds >= 300`` — CloudFront absorbs abuse; a DDB counter would
+cost more than the read spend it counts). Full reasoning + enforcement:
+``tests/test_unmetered_public_read_class_2289.py`` (a new unmetered,
+under-cached public read fails the suite by name).
 """
 
 import base64 as _b64
