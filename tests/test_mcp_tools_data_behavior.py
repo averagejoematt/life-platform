@@ -556,34 +556,63 @@ def test_intelligence_quality_surfaces_a_query_failure_as_an_error_payload(quali
     assert set(out) == {"error"}, "a failed read must not also report zero flags as if it had looked"
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "DEFECT: total_checks is a fabricated number. mcp/tools_data.py computes "
-        "`len(items) * 5  # 5 checks per coach`, but the writer "
-        "(lambdas/intelligence/intelligence_common.py::write_quality_results) "
-        "stores checks_run = len(_VALIDATOR_CHECKS) = 4 on every row — the "
-        "hardcoded 5 was already corrected on the WRITE side by an earlier #1658 "
-        "tranche and the MCP reader was left behind, so it over-reports the "
-        "denominator by 25% and any 'flags per check' rate read off it is wrong. "
-        "Correct behaviour: sum each row's own checks_run. ADR-104/105. "
-        "Reported by #1658 coverage tranche 5; not fixed here."
-    ),
-)
-def test_defect_intelligence_quality_total_checks_must_come_from_the_rows(quality_table):
-    import inspect
-    import re
+def test_intelligence_quality_total_checks_is_the_sum_of_each_rows_own_checks_run(quality_table):
+    # #2305: the denominator comes from what the validator actually stored per
+    # row — heterogeneous counts, so no `len(items) * K` can reproduce the sum
+    # (2 rows, total 7: any uniform multiplier gives an even number).
+    rows = [
+        {"date": "2026-08-06", "coach_id": "physiology", "domain": "recovery", "checks_run": 4, "flags": []},
+        {"date": "2026-08-07", "coach_id": "nutrition", "domain": "fuel", "checks_run": 3, "flags": []},
+    ]
+    quality_table(rows)
+    out = td.tool_get_intelligence_quality({})
+    assert out["total_checks"] == 7, "total_checks must follow the rows' own checks_run, not a per-coach constant"
 
-    from intelligence.intelligence_common import _VALIDATOR_CHECKS
-
-    # The evidence, derived rather than restated: the reader's literal
-    # multiplier vs the validator's own check registry.
-    (literal,) = re.findall(r"len\(items\) \* (\d+)", inspect.getsource(td.tool_get_intelligence_quality))
-    assert int(literal) == 5 and len(_VALIDATOR_CHECKS) == 4, (
-        f"the defect has moved — reader multiplies by {literal}, validator runs "
-        f"{len(_VALIDATOR_CHECKS)} checks ({', '.join(_VALIDATOR_CHECKS)}); update this census entry"
-    )
-
+    # The default fixture too: rows store the writer's derived count.
     quality_table()
     out = td.tool_get_intelligence_quality({})
     assert out["total_checks"] == sum(r["checks_run"] for r in QUALITY_ROWS)
+
+
+def test_intelligence_quality_a_row_missing_checks_run_contributes_nothing_not_a_fabricated_count(quality_table):
+    # #2305 acceptance: a row without checks_run is excluded from the
+    # denominator — it must not be backfilled with any assumed check count.
+    rows = [
+        {"date": "2026-08-06", "coach_id": "physiology", "domain": "recovery", "checks_run": 4, "flags": []},
+        {"date": "2026-08-07", "coach_id": "nutrition", "domain": "fuel", "flags": []},  # no checks_run
+    ]
+    quality_table(rows)
+    out = td.tool_get_intelligence_quality({})
+    assert out["total_checks"] == 4, "a row missing checks_run is absent from the denominator, never invented"
+
+
+def test_guard_intelligence_quality_reader_carries_no_hand_typed_check_count():
+    """#2305 set-guard: the reader must never re-learn the validator's check count.
+
+    The forbidden band is DERIVED from ``_VALIDATOR_CHECKS`` (never hand-typed
+    here): any integer literal within ±1 of the registry's size appearing in
+    the reader's source is treated as a re-introduced hand-typed check count —
+    that band catches both the historical ``* 5`` (off-by-one against the
+    4-check registry) and a "corrected" ``* 4`` that would silently drift the
+    next time the check set changes. Legitimate literals in the reader (the
+    7-day default window, the 20-flag display cap) sit outside the band.
+    """
+    import ast
+    import inspect
+    import textwrap
+
+    from intelligence.intelligence_common import _VALIDATOR_CHECKS
+
+    n = len(_VALIDATOR_CHECKS)
+    forbidden = {n - 1, n, n + 1}
+    tree = ast.parse(textwrap.dedent(inspect.getsource(td.tool_get_intelligence_quality)))
+    offenders = [
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant) and isinstance(node.value, int) and not isinstance(node.value, bool) and node.value in forbidden
+    ]
+    assert not offenders, (
+        f"hand-typed check count(s) {offenders} in tool_get_intelligence_quality — "
+        f"the validator registry has {n} checks ({', '.join(_VALIDATOR_CHECKS)}); "
+        "the denominator must be summed from each row's stored checks_run, never a literal"
+    )
