@@ -5,6 +5,14 @@ Sends curated Chronicle installments to new subscribers who confirmed
 
 Schedule: EventBridge cron(5 17 * * ? *) — 10:05 AM PT daily (CDK SubscriberOnboarding,
 staggered from the daily brief; the old cron(0 16) hand-created rule was an orphan, #1257).
+
+Dry-run posture (#2291): this module is SCHEDULE-triggered, so it is NOT exempt
+from the default SES send-suppressor — #2222's "event-driven" exemption for it was
+factually wrong (the exemption axis is trigger type, and this function carries an
+EventBridge schedule= in cdk/stacks/email_stack.py). It now routes every send
+through common.send_guard.guarded_send_email: an operator invoke with
+{"dry_run": true} (or the DRY_RUN env var) suppresses every send AND the
+onboarding_sent marker write, and reports what would have gone out.
 """
 
 import json
@@ -14,6 +22,7 @@ import urllib.parse
 from datetime import datetime, timezone
 
 import boto3
+from common.send_guard import guarded_send_email, is_dry_run
 
 try:
     from common.platform_logger import get_logger
@@ -137,9 +146,17 @@ def _build_onboarding_email(email: str) -> tuple[str, str]:
 
 
 def lambda_handler(event, context):
-    """Query new subscribers and send Day 2 bridge email."""
+    """Query new subscribers and send Day 2 bridge email.
+
+    #2291: `{"dry_run": true}` (or DRY_RUN env) suppresses every send and the
+    `onboarding_sent` marker write — the run reports what it would have sent.
+    """
     if hasattr(logger, "set_date"):
         logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+
+    dry_run = is_dry_run(event)
+    if dry_run:
+        logger.info("dry run — sends and onboarding_sent markers will be suppressed")
 
     now = datetime.now(timezone.utc)
     days_to_wed = _days_until_wednesday()
@@ -161,6 +178,7 @@ def lambda_handler(event, context):
         return {"statusCode": 500, "body": "Internal server error"}
 
     sent_count = 0
+    would_send_count = 0
     for sub in subscribers:
         confirmed_at = sub.get("confirmed_at", "")
         if not confirmed_at:
@@ -182,7 +200,9 @@ def lambda_handler(event, context):
 
         try:
             subject, html = _build_onboarding_email(email)
-            ses.send_email(
+            guarded_send_email(
+                ses,
+                dry_run,
                 FromEmailAddress=SENDER,
                 Destination={"ToAddresses": [email]},
                 Content={
@@ -192,6 +212,13 @@ def lambda_handler(event, context):
                     }
                 },
             )
+
+            if dry_run:
+                # #2291: a dry run must leave no record claiming the real run
+                # happened — an onboarding_sent marker with no mail behind it
+                # would silently starve the subscriber of their bridge email.
+                would_send_count += 1
+                continue
 
             # Mark as sent
             table.update_item(
@@ -209,4 +236,8 @@ def lambda_handler(event, context):
         except Exception as e:
             logger.error("Failed to send onboarding to %s...: %s", email[:6], e)
 
-    return {"statusCode": 200, "body": json.dumps({"sent": sent_count, "checked": len(subscribers)})}
+    body = {"sent": sent_count, "checked": len(subscribers)}
+    if dry_run:
+        body["dry_run"] = True
+        body["would_send"] = would_send_count
+    return {"statusCode": 200, "body": json.dumps(body)}

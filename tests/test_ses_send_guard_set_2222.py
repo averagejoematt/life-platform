@@ -24,6 +24,29 @@ guarded one, and a near-miss that imports the helper but still calls SES
 directly. Three privacy screens shipped in this repo whose full suite passed
 with the screen deleted; that is what those tests exist to prevent.
 
+**The exemption axis (#2291, decided): TRIGGER TYPE, not recipient consent.**
+The guard's purpose is operator-invocation safety — "will invoking this by hand
+mail someone?" — and a recipient's consent doesn't change what a stray manual
+invoke does. A module may therefore be exempt from DEFAULT dry-run suppression
+only when its sends are caused by an external event (an inbound email arriving,
+a reader's HTTP request), never by a schedule. The exempt set is no longer a
+hand-typed list: each exempt module DECLARES `SES_EXEMPT_EVENT_DRIVEN = "<one-line
+reason naming its external trigger>"` at module level, this file derives the set
+from that marker, asserts each marker-carrying module still sends SES mail (a
+stale exemption fails), and asserts its function carries NO EventBridge
+`schedule=` in cdk/stacks/ (a scheduled function claiming the exemption fails).
+Per-module verdicts:
+  - emails/insight_email_parser_lambda.py — STAYS exempt (SES receipt rule →
+    S3 → Lambda). #2222 never reviewed this one; reviewed now, same axis.
+  - web/email_subscriber_lambda.py — STAYS exempt (reader HTTP request via the
+    CloudFront /api/subscribe* Function URL).
+  - web/subscriber_onboarding_lambda.py — exemption REVOKED: it is EventBridge-
+    scheduled (cron(5 17 * * ? *), email_stack.py), so #2222's "event-driven"
+    reasoning was factually wrong for it. It now uses the shared suppressor.
+Exempt modules still honor an EXPLICIT `{"dry_run": true}` payload (sends
+suppressed via the shared helper, would-have-sent summary reported) — behavior
+tested handler-level in tests/test_ses_event_driven_exempt_2291.py.
+
 Everything here is offline: no module under test is imported, no AWS client is
 constructed, and no Lambda is invoked.
 """
@@ -72,18 +95,77 @@ PRE_EXISTING_GUARD = {
     "emails/wednesday_chronicle_lambda.py": "PREVIEW_MODE",
 }
 
-# ── Allowlist 2: event-driven handlers, not scheduled ones. These send in
-# direct response to a real-time action by a real person (a reader subscribing,
-# an inbound email arriving), so an operator will never "invoke it to see what
-# happens" the way they would with a scheduled digest — and a `dry_run` payload
-# flag is arguably the wrong shape for them. #2222 excluded the first two by
-# name; `insight_email_parser_lambda` is the same class and is excluded here on
-# the same reasoning (see the module docstring of this file's PR).
-EVENT_DRIVEN_EXEMPT = {
-    "emails/insight_email_parser_lambda.py",
-    "web/email_subscriber_lambda.py",
-    "web/subscriber_onboarding_lambda.py",
-}
+# ── Allowlist 2 (#2291): event-driven handlers, not scheduled ones — no longer
+# a hand-typed list. Each exempt module declares the marker below at module
+# level with a one-line reason naming its external trigger; the set is DERIVED
+# from source (see `derive_event_driven_exemptions`), each member must still be
+# an SES-sending handler (stale exemptions fail), and each member's function
+# must carry NO EventBridge schedule= in cdk/stacks/ (a scheduled function
+# claiming the exemption fails — that is exactly how subscriber_onboarding's
+# wrong exemption was caught). Note the exemption no longer waives the shared
+# gate: exempt modules must STILL honor an explicit {"dry_run": true} payload
+# through `guarded_send_email`; what they are exempt from is only the "an
+# operator will invoke this by hand" default posture — their trigger is an
+# external event, so a schedule appearing on one is a classification change
+# that must be re-reviewed.
+EXEMPT_MARKER = "SES_EXEMPT_EVENT_DRIVEN"
+CDK_STACKS = ROOT / "cdk" / "stacks"
+
+
+def derive_event_driven_exemptions(root: Path) -> dict:
+    """Every module under `root` declaring `SES_EXEMPT_EVENT_DRIVEN = "<reason>"`
+    at module (top) level. Returns {rel_path: reason}."""
+    found = {}
+    for path in sorted(root.rglob("*.py")):
+        if "__pycache__" in path.parts:
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except SyntaxError:  # pragma: no cover — a broken file is another gate's problem
+            continue
+        for node in tree.body:
+            targets = []
+            if isinstance(node, ast.Assign):
+                targets = [t.id for t in node.targets if isinstance(t, ast.Name)]
+            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                targets = [node.target.id]
+            if EXEMPT_MARKER in targets:
+                value = node.value
+                reason = value.value if isinstance(value, ast.Constant) and isinstance(value.value, str) else ""
+                found[path.relative_to(root).as_posix()] = reason
+    return found
+
+
+def cdk_schedule_facts(module_rel: str, cdk_root: Path) -> dict:
+    """Whether cdk stacks define a Lambda for `lambdas/<module_rel>`, and where
+    a `schedule=` keyword is attached to that definition.
+
+    Text-derived from the CDK source (AST): every Call carrying a
+    `source_file="lambdas/<module_rel>"` keyword is this module's function
+    definition; a `schedule=` keyword on it (other than a literal None) makes
+    the function EventBridge-scheduled."""
+    source_literal = f"lambdas/{module_rel}"
+    facts = {"defined_in": [], "scheduled_at": []}
+    for path in sorted(cdk_root.glob("*.py")):
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except SyntaxError:  # pragma: no cover
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            kws = {kw.arg: kw.value for kw in node.keywords if kw.arg}
+            sf = kws.get("source_file")
+            if not (isinstance(sf, ast.Constant) and sf.value == source_literal):
+                continue
+            facts["defined_in"].append(f"{path.name}:{node.lineno}")
+            sched = kws.get("schedule")
+            if sched is not None and not (isinstance(sched, ast.Constant) and sched.value is None):
+                facts["scheduled_at"].append(f"{path.name}:{node.lineno}")
+    return facts
+
+
+EVENT_DRIVEN_EXEMPT = frozenset(derive_event_driven_exemptions(LAMBDAS))
 
 
 @dataclass
@@ -169,8 +251,12 @@ def test_every_ses_sending_handler_honors_a_suppressor(derived):
     without mailing anyone — via the shared gate, or via a named exception."""
     unguarded = []
     for rel, facts in sorted(derived.items()):
-        if rel in EVENT_DRIVEN_EXEMPT or rel in PRE_EXISTING_GUARD:
+        if rel in PRE_EXISTING_GUARD:
             continue
+        # #2291: EVENT_DRIVEN_EXEMPT members are deliberately NOT skipped here —
+        # the exemption covers default posture, not the gate itself. Since they
+        # must honor an explicit {"dry_run": true}, they route through the
+        # shared helper like everyone else.
         if not facts.is_guarded_by_shared_helper:
             unguarded.append(f"{rel} (raw SES sends at lines {facts.direct_ses_lines or '—'}; derives_flag={facts.derives_flag})")
     assert not unguarded, (
@@ -207,8 +293,51 @@ def test_pre_existing_guards_are_not_stale(derived):
 
 
 def test_event_driven_exemptions_are_not_stale(derived):
-    for rel in EVENT_DRIVEN_EXEMPT:
-        assert rel in derived, f"EVENT_DRIVEN_EXEMPT entry {rel} is no longer an SES-sending handler — drop it"
+    """A marker on a module that no longer sends SES is a stale exemption; a
+    marker with no stated reason is an undeclared one. Both fail."""
+    exemptions = derive_event_driven_exemptions(LAMBDAS)
+    for rel, reason in exemptions.items():
+        assert rel in derived, f"{EXEMPT_MARKER} marker on {rel}, but it is no longer an SES-sending handler — remove the marker"
+        assert reason.strip(), f"{EXEMPT_MARKER} on {rel} must carry a one-line reason naming its external trigger"
+
+
+def test_exemption_covers_the_known_event_driven_pair(derived):
+    """Sanity floor for the derivation (mirrors test_derivation_finds_the_real_set):
+    the two genuinely event-driven senders carry the marker, and the module whose
+    #2222 exemption was WRONG — subscriber_onboarding is EventBridge-scheduled —
+    does not."""
+    assert "emails/insight_email_parser_lambda.py" in EVENT_DRIVEN_EXEMPT
+    assert "web/email_subscriber_lambda.py" in EVENT_DRIVEN_EXEMPT
+    assert (
+        "web/subscriber_onboarding_lambda.py" not in EVENT_DRIVEN_EXEMPT
+    ), "subscriber_onboarding is scheduled (email_stack.py) — it must use the shared suppressor, not the event-driven exemption (#2291)"
+
+
+def test_exempt_modules_are_genuinely_event_driven(derived):
+    """THE #2291 rule: a module claiming the trigger-type exemption must have a
+    CDK-defined function with NO EventBridge schedule=. A schedule appearing on
+    an exempt function is a classification change and must fail loudly."""
+    for rel in sorted(EVENT_DRIVEN_EXEMPT):
+        facts = cdk_schedule_facts(rel, CDK_STACKS)
+        assert facts["defined_in"], f"{rel} claims {EXEMPT_MARKER} but no cdk/stacks definition was found — cannot verify its trigger"
+        assert not facts["scheduled_at"], (
+            f"{rel} claims the event-driven exemption but its function is EventBridge-scheduled at {facts['scheduled_at']} — "
+            "a scheduled sender must use the DEFAULT dry-run suppression (#2291)"
+        )
+
+
+def test_exempt_modules_still_route_through_the_shared_gate(derived):
+    """The exemption is about default posture, never about the gate: an exempt
+    module must still honor an explicit {'dry_run': true} payload, which means
+    every send routes through the shared helper and the flag is derived from
+    the event. (Handler-level behavior — SES mock uncalled under dry_run —
+    is tested in tests/test_ses_event_driven_exempt_2291.py.)"""
+    for rel in sorted(EVENT_DRIVEN_EXEMPT):
+        facts = derived[rel]
+        assert facts.is_guarded_by_shared_helper, (
+            f"{rel} is event-driven-exempt but does not route every send through guarded_send_email with a derived flag — "
+            "explicit dry_run would be undefined behavior again (#2291)"
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -309,6 +438,111 @@ def test_derivation_ignores_modules_without_a_handler(tmp_path):
     itself invocable, so it is not a member of the set."""
     found = _tree(tmp_path, **{"emails/helper_only.py": _NO_HANDLER})
     assert found == {}
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Non-vacuity for the #2291 exemption machinery
+# ──────────────────────────────────────────────────────────────────────────
+
+_EXEMPT_GUARDED = _GUARDED.replace(
+    "def lambda_handler",
+    'SES_EXEMPT_EVENT_DRIVEN = "synthetic external trigger for the mutation test"\n\ndef lambda_handler',
+)
+
+_EXEMPT_NO_SES = """
+SES_EXEMPT_EVENT_DRIVEN = "a marker left behind after the sends were removed"
+
+def lambda_handler(event, context):
+    return {"statusCode": 200}
+"""
+
+_EXEMPT_EMPTY_REASON = _GUARDED.replace(
+    "def lambda_handler",
+    'SES_EXEMPT_EVENT_DRIVEN = ""\n\ndef lambda_handler',
+)
+
+_CDK_UNSCHEDULED = """
+def build(scope):
+    create_platform_lambda(
+        scope,
+        "SyntheticFn",
+        function_name="synthetic-fn",
+        source_file="lambdas/emails/synthetic_lambda.py",
+        handler="emails.synthetic_lambda.lambda_handler",
+    )
+"""
+
+_CDK_SCHEDULED = """
+def build(scope):
+    create_platform_lambda(
+        scope,
+        "SyntheticFn",
+        function_name="synthetic-fn",
+        source_file="lambdas/emails/synthetic_lambda.py",
+        handler="emails.synthetic_lambda.lambda_handler",
+        schedule="cron(0 17 * * ? *)",
+    )
+"""
+
+
+def _cdk_tree(tmp_path, src):
+    cdk_dir = tmp_path / "cdk_stacks"
+    cdk_dir.mkdir(parents=True, exist_ok=True)
+    (cdk_dir / "synthetic_stack.py").write_text(src, encoding="utf-8")
+    return cdk_dir
+
+
+def test_mutation_marker_derivation_finds_a_declared_exemption(tmp_path):
+    """Positive control: a module-level marker with a reason is derived."""
+    (tmp_path / "emails").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "emails" / "synthetic_lambda.py").write_text(_EXEMPT_GUARDED, encoding="utf-8")
+    exemptions = derive_event_driven_exemptions(tmp_path)
+    assert exemptions == {"emails/synthetic_lambda.py": "synthetic external trigger for the mutation test"}
+
+
+def test_mutation_a_stale_marker_is_caught(tmp_path):
+    """A marker on a module that no longer sends SES must be flagged: it is in
+    the exemption derivation but NOT in the SES-sender derivation — exactly the
+    condition test_event_driven_exemptions_are_not_stale asserts on the real
+    tree."""
+    (tmp_path / "emails").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "emails" / "synthetic_lambda.py").write_text(_EXEMPT_NO_SES, encoding="utf-8")
+    exemptions = derive_event_driven_exemptions(tmp_path)
+    derived = derive_ses_sending_handlers(tmp_path)
+    assert "emails/synthetic_lambda.py" in exemptions
+    assert "emails/synthetic_lambda.py" not in derived, "stale marker module must NOT count as an SES sender"
+
+
+def test_mutation_an_empty_reason_is_caught(tmp_path):
+    """The marker's value IS the recorded decision — an empty string is an
+    undeclared exemption and must fail the reason assertion."""
+    (tmp_path / "emails").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "emails" / "synthetic_lambda.py").write_text(_EXEMPT_EMPTY_REASON, encoding="utf-8")
+    exemptions = derive_event_driven_exemptions(tmp_path)
+    assert exemptions["emails/synthetic_lambda.py"].strip() == ""
+
+
+def test_mutation_a_schedule_added_to_an_exempt_function_is_caught(tmp_path):
+    """#2291 mutation-proof (a): add a schedule= to an exempt function's CDK
+    definition in a scratch tree — the schedule check must flag it. This is the
+    exact mutation that revealed subscriber_onboarding's exemption was wrong."""
+    facts = cdk_schedule_facts("emails/synthetic_lambda.py", _cdk_tree(tmp_path, _CDK_SCHEDULED))
+    assert facts["defined_in"], "the synthetic CDK definition must be found"
+    assert facts["scheduled_at"], "a schedule= on the definition must be detected"
+
+
+def test_mutation_an_unscheduled_exempt_function_is_accepted(tmp_path):
+    """Positive control — the schedule check must not flag every definition."""
+    facts = cdk_schedule_facts("emails/synthetic_lambda.py", _cdk_tree(tmp_path, _CDK_UNSCHEDULED))
+    assert facts["defined_in"]
+    assert not facts["scheduled_at"]
+
+
+def test_mutation_a_missing_cdk_definition_is_caught(tmp_path):
+    """An exempt module with no CDK definition at all cannot have its trigger
+    verified — the real-tree test fails on empty defined_in."""
+    facts = cdk_schedule_facts("emails/some_other_lambda.py", _cdk_tree(tmp_path, _CDK_UNSCHEDULED))
+    assert not facts["defined_in"]
 
 
 # ──────────────────────────────────────────────────────────────────────────
