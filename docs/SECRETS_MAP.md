@@ -79,6 +79,7 @@ Last reconciled: **2026-07-10**. 21 active, 0 in deletion window, all under `lif
 | CloudFront → site-api origin verification | `life-platform/site-api-origin-secret` | Shared header secret so the site-api Function URL only serves CloudFront (`cdk/stacks/constants.py`; referenced by NAME — partial-ARN resolution breaks on `…-secret` suffixes) | ✅ 2026-07-10 |
 | Google Cloud TTS (podcasts) | `life-platform/google-tts` | API key — Chirp/Gemini TTS (`lambdas/ai/google_tts.py`, `lambdas/ai/gemini_tts.py`, ADR-087) | ✅ 2026-07-10 |
 | Pexels (editorial images) | `life-platform/pexels` | API key (`lambdas/content/editorial_image.py`) | ✅ 2026-07-10 |
+| Telegram coach chat (#2363) | `life-platform/telegram` | per-bot tokens + chat-id allow-list + `webhook_secret` (`coach/telegram_worker_lambda.py`, `web/telegram_webhook_lambda.py`; owner-provisioned via `setup/setup_telegram_bots.py`) | ✅ 2026-08-09 |
 
 ---
 
@@ -144,6 +145,7 @@ Cache TTL note: COST-OPT-1 uses `secret_cache.py` (15-min in-memory TTL — a bu
 | `life-platform/site-api-origin-secret` | CDK-injected (CloudFront custom origin header ↔ site-api verification; `cdk/stacks/constants.py`) + runtime read by `life-platform-ai-quality-canary` (#1589 — probes present the header) | reference by NAME, not partial ARN |
 | `life-platform/google-tts` | podcast pipeline (`google_tts.py`, `gemini_tts.py`) | ADR-087 |
 | `life-platform/pexels` | editorial image fetcher (`editorial_image.py`) | free-tier API key |
+| `life-platform/telegram` | Telegram coach chat webhook + worker (#2364) | bot tokens (BotFather), chat ids, webhook secret |
 | `life-platform/youtube` | `youtube-social-ingestion` (`lambdas/ingestion/youtube_lambda.py`) | owner-provisioned channel id; RSS pull needs no paid token |
 | `life-platform/bluesky` | syndication (staged — `docs/RUNBOOK_SYNDICATION.md`) | handle + **scoped app password**, never the account password |
 | `life-platform/digest` | `milestone-digest` (`DIGEST_SECRET` env) | operator-configured recipient list, deliberately outside git |

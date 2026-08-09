@@ -2382,6 +2382,37 @@
         }
       ],
       "why_it_mattered": "A recorded number that nothing reads is not a record, it is decoration — and it is worse than having no number at all, because everyone downstream assumes someone is watching it. That list of oversized files looked like a debt being paid down. It was actually a debt growing, with a tidy ledger next to it that nobody reconciled. The same shape turned up in a build check yesterday that could never fail, and I expect it will turn up again, because it is easy to write a number down and hard to notice that nothing compares it to reality. The test I now apply: what would break if this figure were wrong? If the honest answer is nothing, it is not a measurement, it is a comment. That question is the same one this whole project is built on — a health metric nobody checks against an outcome is decoration too."
+    },
+    {
+      "id": "2026-08-09-the-coaches-got-phones",
+      "date": "2026-08-09",
+      "title": "The coaches got phones",
+      "shipped": "The eight AI coaches became Telegram contacts — text Dr. Webb about food, Dr. Chen mid-workout — with replies in each coach's own authored voice, grounded on the same daily facts the site serves. The surprise was how little brain there was to build: the personalities, per-coach voice rules, relationship arcs and memory partitions all already existed for the daily cards; this was a transport. What was genuinely new is the honesty machinery around a freeform chat: every reply crosses all five grounding gate classes with zero exemptions (the only surface on the platform that can claim that), and a reply that can't be grounded is regenerated once and then HELD — the coach says 'let me check that' instead of sending a number it can't stand behind. Same night, the quarterly review's 41 findings were fully dispositioned: six fixed and deployed (the nutrition door grading a protein failure from zero logged days; six coach cards narrating a food-log 'pause' that never happened — prescribed by the prompt itself; the analyzer publishing narratives with known-unresolved grounding findings), 24 filed, the rest verified or refuted.",
+      "why_it_mattered": "A wrong number in a trusted voice on a phone is worse than the same number on a web page — you act on it, and there's no cockpit beside it to contradict it. So the chat had to launch as the strictest AI surface here, not the loosest: in a broadcast the platform picks the subject, so a card that never discusses sleep can skip the sleep checks; in a chat the human picks the subject, which means no check is skippable. And the conversation writes into the coach's real memory — texting Webb makes Webb know you better everywhere he appears, not just in the thread.",
+      "gotcha": "The pre-merge gates refused the transport PR three separate times — unmapped Lambdas, an unregistered secret name, untyped handlers — every refusal correct. Then the IAM review caught the one that would have been a silent runtime failure: the worker's DynamoDB grants were dead on the CMK-encrypted table, missing kms:Decrypt. Without that gate, the first text would have produced a coach who reads nothing — a confusing silence instead of an error.",
+      "honest_miss": "Ask the nutrition coach about food and he'll honestly tell you he has nothing: the food-logging source has been quiet 46 days, so cycle 12 has zero nutrition data behind his entire domain. The bot works; the data it exists to discuss doesn't exist yet. And the coaches currently text like coaching cards pasted into a chat — the per-coach texting registers are filed, not built.",
+      "prs": [
+        {
+          "label": "PR #2365",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2365"
+        },
+        {
+          "label": "PR #2397",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2397"
+        },
+        {
+          "label": "PR #2401",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2401"
+        },
+        {
+          "label": "PR #2394",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2394"
+        },
+        {
+          "label": "PR #2395",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2395"
+        }
+      ]
     }
   ]
 }
