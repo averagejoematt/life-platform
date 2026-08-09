@@ -18,6 +18,23 @@ Also owns the supporting machinery — subscriber-token HMAC (which uses
 the Anthropic API key as the signing secret), per-IP rate-limit stores
 for nudge/submit_finding, and the rate-limit EMF metric emitter — since
 nothing outside this cluster uses them.
+
+CLASS RULE — the unmetered public-read posture (#2289, decided 2026-08-09):
+every ``handle_*``/``_handle_*`` in this module is either (a) rate-limited
+(``_rate_check``/``_rate_limited`` — the metered write/oracle set, #2237/#2239),
+or (b) an **edge-cached public read**: every success response declares
+``cache_seconds >= 300`` (the ``_ok`` default is 300), so the CloudFront
+``/api/*`` behaviour (min 0 / default 300 / max 3600, honors origin
+Cache-Control — ``cdk/stacks/web_stack.py``) absorbs abuse at the edge.
+These reads get NO per-IP DynamoDB metering **deliberately**: their answer is
+the same for every caller (the parameterized ones select from public catalogs
+against closed sets), so the exposure is read *spend*, not information — and a
+DDB counter would add a write per read, which costs more than what it protects.
+Caching removes the spend instead of counting it. Sole exception: a write door
+whose one-shot ``ConditionExpression`` dedup is itself the meter
+(``_handle_replicate_certify``, #1825). The posture is enforced structurally by
+``tests/test_unmetered_public_read_class_2289.py`` — a new unmetered,
+under-cached public read fails the suite by name.
 """
 
 import base64 as _b64
@@ -166,7 +183,9 @@ def handle_current_challenge() -> dict:
         logger.warning(f"[site_api] current_challenge S3 fetch failed: {e}")
         # No active challenge → return null so the banner simply doesn't render. The old
         # "Check back soon" placeholder leaked to the UI as a fake day-0-of-7 challenge.
-        return _ok({"current_challenge": None}, cache_seconds=60)
+        # 300s not 60s (#2289): this door is unmetered by design, so the empty state
+        # must be edge-cacheable too — a new Monday challenge appears within 5 min.
+        return _ok({"current_challenge": None}, cache_seconds=300)
 
 
 _SUBSCRIBER_TOKEN_SECRET_NAME = os.environ.get("SUBSCRIBER_TOKEN_SECRET_NAME", "life-platform/subscriber-token-secret")
@@ -1802,7 +1821,8 @@ def handle_predict_week_tally(event: dict) -> dict:
     """
     subj = _predict_subject()
     if subj is None:
-        return _ok({"active": False}, cache_seconds=120)
+        # 300s (#2289 class rule): unmetered public read → every response edge-cached.
+        return _ok({"active": False}, cache_seconds=300)
     qs = (event.get("queryStringParameters") or {}) or {}
     metric = (qs.get("metric") or "").strip().lower()
     if metric and metric not in subj["metrics"]:
@@ -1817,7 +1837,10 @@ def handle_predict_week_tally(event: dict) -> dict:
             "result": subj.get("result"),
             "tallies": tallies,
         },
-        cache_seconds=60,
+        # 300s not 60s (#2289): the tally is the only thing between an abusive
+        # crawler and a DDB query per hit — the class rule trades ≤5 min of tally
+        # staleness for edge absorption. The reader's own POST is unaffected.
+        cache_seconds=300,
     )
 
 
@@ -2649,8 +2672,10 @@ def handle_cohort_strip() -> dict:
     n = len(values)
 
     # HARD k-anonymity gate — below the floor, no distribution is emitted at all.
+    # 300s (#2289 class rule): crossing the floor shows within 5 min; the held state
+    # is the cheap-to-recompute one an unmetered crawler would otherwise hammer.
     if n < COHORT_K_FLOOR:
-        return _ok({**base, "visible": False, "n": n}, cache_seconds=60)
+        return _ok({**base, "visible": False, "n": n}, cache_seconds=300)
 
     values.sort()
     span = amax - amin
@@ -2688,5 +2713,7 @@ def handle_cohort_strip() -> dict:
             "max": round(values[-1], 2),
             "matthew_percentile": m_pctile,
         },
-        cache_seconds=120,
+        # 300s not 120s (#2289): weekly distribution, unmetered by design — the
+        # class rule wants every response of this door edge-cacheable at >=300.
+        cache_seconds=300,
     )
