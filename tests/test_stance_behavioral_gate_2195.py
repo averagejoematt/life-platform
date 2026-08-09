@@ -229,7 +229,8 @@ class TestTheReadIsOnePerInvocation:
         calls = []
         monkeypatch.setattr(chs, "_presence_signal", lambda: calls.append(1) or _signal(macrofactor=GENERATION_DAY))
         monkeypatch.setattr(chs, "_gather_coach_state", lambda cid: {"outputs": [{"sk": "OUTPUT#1"}]})
-        monkeypatch.setattr(chs, "_compress_coach", lambda cid, st: {"summary": "s"})
+        # #2428: the compression takes the same hoisted signal (its own gate arms #1699 too)
+        monkeypatch.setattr(chs, "_compress_coach", lambda cid, st, presence_signal=None: {"summary": "s"})
         monkeypatch.setattr(chs, "_write_compressed_state", lambda cid, c: True)
         seen = []
         monkeypatch.setattr(

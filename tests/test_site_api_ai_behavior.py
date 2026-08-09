@@ -1313,6 +1313,8 @@ def test_a_coachs_compressed_memory_and_concerns_reach_the_board_prompt(monkeypa
                 "sk": "COMPRESSED#latest",
                 "summary": "Habits are holding.",
                 "key_concerns": ["evening snacking", "late screens", "stress", "ignored fourth"],
+                # #2428: the gate's stamp — an ungated row would be excluded as legacy
+                "grounding_gated": True,
             }
         ]
     )
