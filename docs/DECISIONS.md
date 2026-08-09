@@ -4260,6 +4260,17 @@ Read literally: GitHub refuses an `Integration` bypass actor for an app unless t
 
 ---
 
+
+### ADR-148 Amendment (2026-08-09, #2371 — point 5 re-decided against the union-breach evidence; strict=false STANDS, and the mitigation is now a measured mechanism)
+
+Point 5 (`strict_required_status_checks_policy=false`) predated the #2258/#2299×#2297 union breaches. Re-decided 2026-08-09 with the strongest evidence available — a live ~40-merge overnight wave:
+
+**strict=false stands.** With merges landing every 3–6 minutes, strict=true would have invalidated every open PR's checks on every sibling merge (~15 min re-mint each), collapsing the wave to roughly four merges an hour. The cost is real and measured, not hypothesized.
+
+**The mitigation is a mechanism, exercised on that same wave:** the required pre-merge lane runs the structural/size guard set against the PR's **merge ref**, so the union of (branch × current main) IS tested before merge without strict. On 2026-08-09 it caught four union-class breaches pre-merge (module-size baselines on #2446/#2448/#2454's lanes, the cache-tier PR's baseline on #2429) — the class that previously reached main. Residual risk, named: a structural guard that lives post-merge-only is invisible to the lane until #2372's derivation lands, and a breach whose two halves merge within one lane's mint window can still race.
+
+**Revisit triggers added:** (1) any union-class breach that reaches main *despite* the merge-ref lane; (2) #2372 landing (the derivation changes the calculus); (3) a wave where lane re-mint latency, not driver verification, becomes the merge bottleneck.
+
 ## ADR-149: Native social embeds get one third-party frame origin, shipped inert — the CSP is built once, and the facade stays the fallback (#1678)
 
 **Date:** 2026-08-06 · **Status:** Accepted · **Story:** #1678 (epic #1668, the Social Membrane) · **Owner sign-off:** recorded on #1678, 2026-08-02
