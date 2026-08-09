@@ -171,6 +171,18 @@ SURFACES = {
         ("numbers", "freshness", "behavioral", "night"),
         {"dates": _PRECEDENT_SCOPED_DATES},
     ),
+    # The ONLY surface with no exemption, and the reason is structural rather than
+    # diligence. Every other entry here is a BROADCAST: the platform chooses the
+    # subject, so a surface that never discusses sleep can honestly exempt `night`.
+    # In a chat MATTHEW chooses the subject — he can ask the nutrition coach about
+    # his HRV, which is #2343 exactly (a card whose fact block queried macrofactor
+    # only, citing one night's real recovery and HRV as today's; the values existed,
+    # the DAY was wrong). A surface that cannot predict its own topic cannot exempt
+    # a class on the grounds that the topic will not come up.
+    "lambdas/coach/coach_chat_grounding.py::build_grounder": _entry(
+        ("numbers", "dates", "freshness", "behavioral", "night"),
+        {},
+    ),
     "lambdas/coach/coach_history_summarizer.py::_apply_grounding_gate": _entry(
         ("numbers", "dates", "freshness", "behavioral"),
         {"night": _NO_NIGHT_MAP},
