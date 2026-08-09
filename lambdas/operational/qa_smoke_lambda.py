@@ -82,6 +82,7 @@ from operational.qa_check import (  # noqa: E402,F401
 # stay valid entrypoints. (#2307 deleted the orphaned blog-links sweep there.)
 from operational.qa_check_outputs import (  # noqa: E402,F401
     check_avatar_assets,
+    check_chronicle_sk_date_invariant,
     check_lambda_secrets,
     check_s3_freshness,
     check_score_sanity,
@@ -969,6 +970,8 @@ def check_steps():
         ("canary_precision", check_canary_precision),  # #1956: AI-canary grounded false-positive-rate (sensor on the sensor)
         ("phase_stamp_coverage", check_coach_ensemble_phase_stamp_coverage),  # #1970: tagger-blind COACH#/ENSEMBLE# gap
         ("recall_freshness", lambda: recall_freshness_qa.checks(table, f"{USER_PREFIX}chronicle", Check, CONTENT_TRUTH)),  # #1384
+        # #2367: sk is identity, `date` is display — mismatch legal only with the carry-forward marker
+        ("chronicle_sk_invariant", lambda: check_chronicle_sk_date_invariant(table, Check, CONTENT_TRUTH)),
         # Blog moved to /story/ in v4: retired, not broken, so it reports PAUSED —
         # visible, never a fault. (#2307 deleted the orphaned check_blog_links
         # implementation this hand-built Check had already replaced.)

@@ -279,3 +279,47 @@ def check_avatar_assets():
     else:
         c.ok(f"All {total} avatar sprites present")
     return [c]
+
+
+def check_chronicle_sk_date_invariant(table, check_cls=Check, partition=CONTENT_TRUTH):
+    """#2367: sk is the chronicle row's IDENTITY; `date` is display/as-of.
+
+    The ADR-077 --keep-chronicle carry-forward deliberately rewrites `date`
+    while keeping the sk, and stamps `redated_from_sk` when it does — so a
+    date/sk mismatch is legal ONLY on a row carrying that marker. Anything
+    else is drift of the kind that made #2352's freshness build accuse an
+    already-indexed week. Exemption is BY MARKER, never by hand-listed sks,
+    so the next reset's carried lead-ins are born compliant.
+    """
+    name = "data:chronicle_sk_date_invariant"
+    try:
+        rows = []
+        kwargs = {
+            "KeyConditionExpression": "pk = :pk AND begins_with(sk, :skp)",
+            "ExpressionAttributeValues": {":pk": "USER#matthew#SOURCE#chronicle", ":skp": "DATE#"},
+        }
+        while True:
+            resp = table.query(**kwargs)
+            rows.extend(resp.get("Items", []))
+            lek = resp.get("LastEvaluatedKey")
+            if not lek:
+                break
+            kwargs["ExclusiveStartKey"] = lek
+    except Exception as e:
+        return [check_cls(name, "Schema Invariants", partition).warn(f"chronicle sk/date invariant unreadable ({e}) — fail-soft")]
+    offenders = []
+    for it in rows:
+        if it.get("tombstone"):
+            continue  # archived rows carry the closing cycle's history, not the live surface
+        sk_date = str(it.get("sk", ""))[len("DATE#") :]
+        attr_date = str(it.get("date", "")) or None
+        if attr_date and attr_date != sk_date and not it.get("redated_from_sk"):
+            offenders.append(f"{it.get('sk')} (date={attr_date})")
+    c = check_cls(name, "Schema Invariants", partition)
+    if offenders:
+        return [
+            c.fail(
+                f"{len(offenders)} live chronicle row(s) contradict their sk without the carry-forward marker: " + "; ".join(offenders[:4])
+            )
+        ]
+    return [c.ok(f"{len(rows)} chronicle DATE# rows: date==sk or carried (redated_from_sk) — invariant holds")]
