@@ -564,7 +564,9 @@ def habits(*, _g) -> dict:
     # _experiment_date floors the start at EXPERIMENT_START, so on genesis day the strip
     # is honestly 1 day long — pre-cycle days are clamped out entirely, never rendered
     # as unlabeled prior-cycle history.
-    strip_start = _experiment_date(29)  # 29 back + today = a 30-day window, max
+    # #2338: was `_experiment_date(29)` — a hand-rolled -1 to undo the helper's old
+    # off-by-one. The helper now returns an inclusive N-day start, so ask for 30.
+    strip_start = _experiment_date(30)  # inclusive start of a 30-day window ending today
     strip_dates = []
     try:
         _sd = datetime.strptime(strip_start, "%Y-%m-%d")

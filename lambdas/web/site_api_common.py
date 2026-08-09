@@ -220,10 +220,43 @@ def pre_start_meta() -> dict | None:
 
 
 def _experiment_date(days_back=30):
-    """Compute a date N days ago, clamped to EXPERIMENT_START (lower) and today (upper).
-    Use this for ALL date range queries to prevent pre-experiment data leaking through.
-    The today-clamp (via _clamp_today) prevents the future-genesis 500 — see that helper."""
-    raw = (datetime.now(timezone.utc) - timedelta(days=days_back)).strftime("%Y-%m-%d")
+    """The INCLUSIVE lower bound of a `days_back`-day window ending today, clamped to
+    EXPERIMENT_START (lower) and today (upper).
+
+    ── THE CONVENTION (#2338), and it is a convention, not an implementation detail ──
+
+    `_experiment_date(N)` returns `today - (N - 1)`, NOT `today - N`. It is the START
+    OF AN N-DAY WINDOW, not "the date N days ago". The rule callers may rely on:
+
+        Key('sk').between(_experiment_date(N), today)   spans EXACTLY N dates.
+        _query_source(src, _experiment_date(N), today)  returns EXACTLY N dates.
+
+    Every lower bound in this codebase is INCLUSIVE — DynamoDB `between` is inclusive
+    on both ends, and so is `_query_source`. So a helper returning `today - N` made an
+    "N-day" window fetch N+1 calendar dates, every time, everywhere. #1917 made the
+    published *labels* honest; the queries stayed off by one, and by #2338 the repo had
+    grown two conflicting repairs for the same bug: some callers asked for `N-1` to get
+    N dates (the habits dot-strip, the fulfillment trend) while one flipped its own
+    filter to `>` to drop the extra day (#2221, nutrition `items_7d`). Both are now
+    unnecessary and both are gone — the fix lives HERE so a new caller inherits it.
+
+    Consequences a caller must know:
+      * `_experiment_date(1)` == today (a one-day window is today).
+      * Do NOT subtract 1 yourself. `_experiment_date(29)` now means a 29-day window.
+      * Keep lower bounds INCLUSIVE (`>=`, `between`). An exclusive `>` bound against
+        this start silently drops the oldest day and yields N-1.
+      * For a window that does NOT end today (a prior/offset window), see
+        `_window_span` and pass that window's own inclusive end date.
+
+    Enforced by tests/test_window_inclusive_2338.py, which AST-derives the caller set
+    from lambdas/web/ — a NEW off-by-one window fails without anyone listing it.
+
+    The today-clamp (via _clamp_today) prevents the future-genesis 500 — see that
+    helper. The EXPERIMENT_START floor is ADR-077 "clamped, not hidden": at a reset the
+    window shrinks rather than reaching into prior-cycle rows, and `_window_span` is
+    how a caller learns that it shrank.
+    """
+    raw = (datetime.now(timezone.utc) - timedelta(days=max(days_back - 1, 0))).strftime("%Y-%m-%d")
     return _clamp_today(max(raw, EXPERIMENT_START))
 
 
@@ -269,7 +302,14 @@ def _window_span(start, end, requested_days):
     The enforcement half is `tests/test_window_name_honesty_1917.py`, which
     AST-scans lambdas/web/ so a NEW window-named field cannot ship undeclared.
     """
-    actual = (datetime.strptime(end, "%Y-%m-%d") - datetime.strptime(start, "%Y-%m-%d")).days
+    # #2338: INCLUSIVE count. `start` and `end` are both inclusive bounds everywhere in
+    # this codebase (DynamoDB `between`, `_query_source`), so the span of [start, end] is
+    # the date difference PLUS ONE — [today-29, today] is 30 dates, not 29. The old
+    # exclusive form is exactly why an N-day window fetched N+1 dates while reporting N:
+    # the arithmetic here agreed with the label, and the query agreed with neither.
+    # A caller measuring a window that does NOT end today (training's prior-30d block)
+    # must pass that window's own inclusive END date, not the next window's start.
+    actual = (datetime.strptime(end, "%Y-%m-%d") - datetime.strptime(start, "%Y-%m-%d")).days + 1
     actual = max(actual, 0)  # a staged FUTURE genesis makes start > end: zero window, never negative
     return {"start": start, "requested_days": requested_days, "actual_days": actual, "full": actual >= requested_days}
 

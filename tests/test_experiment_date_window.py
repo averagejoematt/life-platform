@@ -43,12 +43,25 @@ def test_future_genesis_clamps_to_today(monkeypatch):
 
 
 def test_normal_genesis_unchanged(monkeypatch):
-    """Genesis well in the past → behaves exactly as before (N days ago)."""
+    """Genesis well in the past → the unclamped, inclusive start of an N-day window.
+
+    #2338: this is `today - (N-1)`, not `today - N`. `_experiment_date(N)` is the
+    START OF AN N-DAY WINDOW, not "the date N days ago" — because every lower bound it
+    feeds (DynamoDB `between`, `_query_source`) is inclusive, so `today - N` made an
+    N-day window fetch N+1 dates.
+    """
     past = (datetime.now(timezone.utc) - timedelta(days=400)).strftime("%Y-%m-%d")
     monkeypatch.setattr(C, "EXPERIMENT_START", past)
     start = C._experiment_date(90)
-    expected = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d")
-    assert start == expected, f"expected 90d-ago {expected}, got {start}"
+    expected = (datetime.now(timezone.utc) - timedelta(days=89)).strftime("%Y-%m-%d")
+    assert start == expected, f"expected the inclusive 90-day start {expected}, got {start}"
+
+
+def test_a_one_day_window_is_today(monkeypatch):
+    """#2338 boundary: N=1 is a single-date window, and that date is today."""
+    past = (datetime.now(timezone.utc) - timedelta(days=400)).strftime("%Y-%m-%d")
+    monkeypatch.setattr(C, "EXPERIMENT_START", past)
+    assert C._experiment_date(1) == _today()
 
 
 def test_genesis_today_is_valid(monkeypatch):

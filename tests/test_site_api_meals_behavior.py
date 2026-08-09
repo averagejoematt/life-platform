@@ -62,7 +62,10 @@ DEFAULT_NOW = datetime(2026, 5, 10, 17, 40, 0, tzinfo=timezone.utc)  # 10:40 PT 
 _FROZEN = [DEFAULT_NOW]
 
 TODAY = "2026-05-10"
-D30 = "2026-04-10"  # TODAY - 30
+# #2338: the INCLUSIVE start of a 30-day window ending TODAY — TODAY - 29, not
+# TODAY - 30. `_query_source`/`between` are inclusive on both ends, so [D30, TODAY]
+# is exactly 30 calendar dates.
+D30 = "2026-04-11"
 GENESIS_FAR = "2026-01-01"  # far enough back that no 30-day window is genesis-clamped
 
 
@@ -1127,7 +1130,7 @@ def test_a_short_window_still_publishes_the_real_average_under_the_window_generi
     src = FakeSources(macrofactor=[mf("2026-05-06", food("Chicken Breast", protein_g=50, calories_kcal=250))])
     b = call("protein_sources", src)
     assert b["total_protein_avg_g"] == 50.0  # 50 g over the 1 logged day
-    assert b["total_protein_avg_g_window_days"] == 5  # 2026-05-05 -> 2026-05-10
+    assert b["total_protein_avg_g_window_days"] == 6  # 2026-05-05 -> 2026-05-10 inclusive = 6 dates (#2338)
 
 
 def test_the_thirty_day_named_key_reads_absent_until_the_window_really_spans_thirty_days(monkeypatch):
@@ -1225,8 +1228,10 @@ def test_frequent_meals_asks_for_a_thirty_day_span():
     src = FakeSources(filter_window=False)
     meals.frequent_meals(_g=make_g(src))
     start, end = src.window_for("macrofactor")
+    # #2338: the span is measured INCLUSIVELY — [start, end] covers 30 dates, so the
+    # bare date difference is 29. Asserting 30 here is what let the endpoint fetch 31.
     span = datetime.strptime(end, "%Y-%m-%d") - datetime.strptime(start, "%Y-%m-%d")
-    assert span == timedelta(days=30)
+    assert span + timedelta(days=1) == timedelta(days=30), f"{start}..{end} must span exactly 30 dates"
 
 
 def test_frequent_meals_clamps_its_window_to_genesis_like_every_sibling(monkeypatch):
@@ -1260,7 +1265,8 @@ def test_the_published_period_matches_the_window_actually_queried(monkeypatch):
     src = FakeSources(filter_window=False)
     body = body_of(meals.meal_glucose(_g=make_g(src)))
     start, end = src.window_for("macrofactor")
-    actual = (datetime.strptime(end, "%Y-%m-%d") - datetime.strptime(start, "%Y-%m-%d")).days
+    # #2338: both bounds are inclusive, so the queried span is the difference PLUS ONE.
+    actual = (datetime.strptime(end, "%Y-%m-%d") - datetime.strptime(start, "%Y-%m-%d")).days + 1
     assert body["period_days"] == actual, f"claims {body['period_days']}d, queried {actual}d"
 
 

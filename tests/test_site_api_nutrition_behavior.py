@@ -45,9 +45,12 @@ from web import site_api_common as sac, site_api_nutrition as nut
 
 FROZEN_NOW = datetime(2026, 5, 10, 17, 40, 0, tzinfo=timezone.utc)
 TODAY = "2026-05-10"  # Sunday
-D7 = "2026-05-03"  # TODAY - 7 (Sunday)
-D30 = "2026-04-10"  # TODAY - 30
-D14 = "2026-04-26"  # TODAY - 14
+# #2338: these are INCLUSIVE window starts, not "TODAY minus N". `_experiment_date(N)`
+# returns TODAY - (N-1), so [DN, TODAY] spans exactly N calendar dates under DynamoDB's
+# inclusive `between`. The old TODAY-N values encoded the off-by-one this issue removed.
+D7 = "2026-05-04"  # inclusive start of the 7-day window ending TODAY (7 dates: 05-04..05-10)
+D30 = "2026-04-11"  # inclusive start of the 30-day window ending TODAY
+D14 = "2026-04-27"  # inclusive start of the 14-day window ending TODAY
 GENESIS_FAR = "2026-01-01"  # far enough back that no window is genesis-clamped
 
 
@@ -509,14 +512,16 @@ def test_older_days_are_excluded_from_the_recent_average_but_kept_in_the_thirty_
 def test_the_seven_day_named_average_is_withheld_when_the_cycle_is_younger_than_seven_days(monkeypatch):
     """#1917: a key named `_7d` must span a real 7 days or carry no value. The
     honest number still ships under the window-generic name."""
-    monkeypatch.setattr(sac, "EXPERIMENT_START", "2026-05-08")  # genesis 2 days ago
+    # #2338: genesis 2026-05-08 with TODAY 2026-05-10 is a THREE-date window
+    # (05-08, 05-09, 05-10) — inclusive on both ends, like every query in this file.
+    monkeypatch.setattr(sac, "EXPERIMENT_START", "2026-05-08")
     src = FakeSources(macrofactor=[mf("2026-05-09", total_calories_kcal=2000, total_protein_g=180)])
     n = overview(src)["nutrition"]
     assert n["cal_7d_avg"] is None
     assert n["pro_7d_avg"] is None
     assert n["cal_avg_recent"] == 2000
     assert n["pro_avg_recent_g"] == 180.0
-    assert n["cal_avg_recent_window_days"] == 2
+    assert n["cal_avg_recent_window_days"] == 3
 
 
 def test_the_seven_day_named_average_ships_once_the_window_genuinely_covers_seven_days():
@@ -527,17 +532,23 @@ def test_the_seven_day_named_average_ships_once_the_window_genuinely_covers_seve
 
 
 def test_the_recent_window_days_shrinks_with_a_young_cycle_rather_than_claiming_seven(monkeypatch):
-    monkeypatch.setattr(sac, "EXPERIMENT_START", "2026-05-07")  # genesis 3 days ago
+    # #2338: 05-07..05-10 inclusive = 4 dates.
+    monkeypatch.setattr(sac, "EXPERIMENT_START", "2026-05-07")
     src = FakeSources(macrofactor=[mf("2026-05-09", total_calories_kcal=2000)])
-    assert overview(src)["nutrition"]["cal_avg_recent_window_days"] == 3
+    assert overview(src)["nutrition"]["cal_avg_recent_window_days"] == 4
 
 
 def test_the_seven_day_window_covers_exactly_seven_calendar_dates():
     # One record on each of the 8 dates today-7..today, all 1000 kcal except the
-    # oldest (today-7 = 2026-05-03) at 8000. A true 7-day window excludes 05-03,
-    # giving 1000; an 8-day window gives (8000 + 7*1000)/8 = 1875.
+    # oldest (2026-05-03) at 8000. #2338: D7 is the INCLUSIVE start (2026-05-04), so a
+    # true 7-day window is 05-04..05-10 and excludes 05-03, giving 1000; the historical
+    # off-by-one window admitted 05-03 too and gave (8000 + 7*1000)/8 = 1875.
+    # The outlier date is derived from D7, not hard-coded, so this test still means
+    # "the day just outside the window" if the frozen clock ever moves.
+    outside = (datetime.strptime(D7, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
     days = [(datetime(2026, 5, 10) - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(8)]
-    rows = [mf(d, total_calories_kcal=(8000 if d == D7 else 1000)) for d in days]
+    assert outside in days and D7 in days, "fixture must straddle the window boundary"
+    rows = [mf(d, total_calories_kcal=(8000 if d == outside else 1000)) for d in days]
     assert overview(FakeSources(macrofactor=rows))["nutrition"]["cal_avg_recent"] == 1000
 
 
@@ -1247,7 +1258,9 @@ def test_the_overlay_walks_every_calendar_day_so_a_missing_sync_stays_a_visible_
     o = overview(src)["recovery_deficit_overlay"]
     dates = [d["date"] for d in o["days"]]
     assert dates[0] == D30 and dates[-1] == TODAY
-    assert len(dates) == 31  # inclusive both ends
+    # #2338: 30 dates, not 31. D30 is the inclusive START of a 30-day window; the
+    # overlay walks [D30, TODAY] inclusive, so a "30-day" overlay renders 30 cells.
+    assert len(dates) == 30
     assert o["days"][0]["recovery"] is None
     assert o["days"][0]["prior_deficit_kcal"] is None
 
@@ -1677,9 +1690,10 @@ def test_the_reported_period_starts_at_the_genesis_clamped_window_start(monkeypa
 
 
 def test_the_reported_period_length_matches_the_window_it_actually_covers(monkeypatch):
-    monkeypatch.setattr(sac, "EXPERIMENT_START", "2026-05-03")  # genesis 7 days ago
+    # #2338: 05-03..05-10 inclusive = 8 dates, and the payload now says 8.
+    monkeypatch.setattr(sac, "EXPERIMENT_START", "2026-05-03")
     ds = sustainability(_sust_sources())["deficit_sustainability"]
-    assert ds["period"]["days"] == 7
+    assert ds["period"]["days"] == 8
 
 
 def test_days_with_no_readable_calorie_field_never_publish_a_zero_intake():

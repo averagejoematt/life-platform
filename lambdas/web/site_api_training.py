@@ -294,7 +294,12 @@ def training_overview(*, _g) -> dict:
     # nothing" read, not an honest comparison. Gate the published field on the
     # prior window actually spanning 30 real days; `count_30d` (already EXTENSIVE
     # and unconditional) stays the real, always-published number.
-    _prior_window_full = _window_span(d60, d30, 30)["full"]
+    # #2338: `_window_span` counts INCLUSIVELY now, and the prior window here is the
+    # half-open `d60 <= d < d30` used by the loop above — its real inclusive end is the
+    # day BEFORE d30, not d30 itself. Passing d30 would count 31 dates and call a
+    # 29-real-day prior window "full". Measure the window the loop actually reads.
+    _prior_end = (datetime.strptime(d30, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
+    _prior_window_full = _window_span(d60, _prior_end, 30)["full"]
 
     for a in all_activities_30d:
         sport = a.get("sport_type") or a.get("type") or "Other"
