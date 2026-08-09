@@ -1686,10 +1686,7 @@ Rules:
 # CREDIBILITY SCORES (V2.2 Workstream 4)
 # ══════════════════════════════════════════════════════════════════════════════
 
-# Short-form coach ids (the intelligence layer's thread vocabulary) — the SAME
-# roster as coach.persona_registry, just without the `_coach` suffix, so it is
-# derived from the registry's own short-id projection rather than re-typed
-# (#2334; guard: tests/test_coach_roster_set_guard_2334.py).
+# #2334: the registry's own short-id projection, never re-typed (see the set guard).
 from coach.persona_registry import OPERATIONAL_SHORT_IDS
 
 COACH_IDS_ALL = list(OPERATIONAL_SHORT_IDS)
