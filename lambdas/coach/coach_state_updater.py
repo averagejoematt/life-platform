@@ -805,8 +805,7 @@ def _build_reasoning_trace(coach_id, date, output_type, extraction):
     # Predictions
     predictions = [p.get("claim_natural", "") for p in extraction.get("predictions_made", [])]
 
-    # Cross-coach inputs — extracted from threads_referenced that mention other coaches
-    cross_coach_inputs = []
+    cross_coach_inputs = []  # from threads_referenced that mention other coaches
     for ref in extraction.get("threads_referenced", []):
         topic = ref.get("topic", "")
         context = ref.get("context", "")
