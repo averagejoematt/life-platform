@@ -1973,14 +1973,41 @@ def test_the_live_challenge_query_failing_leaves_the_catalog_page_standing(monke
 
 
 def test_a_live_challenge_in_an_unrecognised_state_is_not_shown(monkeypatch):
-    """The status allowlist is active/candidate/completed/failed. Anything else —
+    """The public status set is active/completed/failed (#2424). Anything else —
     a draft, an abandoned row, a schema experiment — stays private."""
     rows = [
         {"pk": "USER#matthew#SOURCE#challenges", "sk": "CHALLENGE#draft", "name": "Draft", "status": "draft"},
-        {"pk": "USER#matthew#SOURCE#challenges", "sk": "CHALLENGE#real", "name": "Real", "status": "candidate"},
+        {"pk": "USER#matthew#SOURCE#challenges", "sk": "CHALLENGE#real", "name": "Real", "status": "completed"},
     ]
     wire(monkeypatch, table=FakeSocialTable(rows), s3=_catalog_s3({"challenges": []}))
     assert [c["id"] for c in ok_body(social.handle_challenges())["challenges"]] == ["real"]
+
+
+def test_an_unreviewed_candidate_challenge_never_reaches_the_public_payload(monkeypatch):
+    """#2424: challenge_generator writes LLM-authored rows with status='candidate';
+    they are owner-only (MCP) until Matthew activates one. A candidate row in the
+    table is absent from GET /api/challenges — name AND description — while an
+    activated sibling still serves."""
+    rows = [
+        {
+            "pk": "USER#matthew#SOURCE#challenges",
+            "sk": "CHALLENGE#llm-idea_2026-08-09",
+            "name": "LLM idea",
+            "description": "unreviewed model copy",
+            "status": "candidate",
+        },
+        {
+            "pk": "USER#matthew#SOURCE#challenges",
+            "sk": "CHALLENGE#approved-one",
+            "name": "Approved one",
+            "status": "active",
+            "duration_days": 7,
+        },
+    ]
+    wire(monkeypatch, table=FakeSocialTable(rows), s3=_catalog_s3({"challenges": []}))
+    body = ok_body(social.handle_challenges())
+    assert [c["id"] for c in body["challenges"]] == ["approved-one"]
+    assert "llm-idea" not in json.dumps(body) and "unreviewed model copy" not in json.dumps(body)
 
 
 def test_a_dated_live_challenge_id_is_normalised_back_to_its_catalog_id(monkeypatch):
@@ -1992,7 +2019,7 @@ def test_a_dated_live_challenge_id_is_normalised_back_to_its_catalog_id(monkeypa
             "pk": "USER#matthew#SOURCE#challenges",
             "sk": "CHALLENGE#cold-shower-finish_2026-05-04",
             "name": "Cold shower finish",
-            "status": "candidate",
+            "status": "completed",
         }
     ]
     wire(monkeypatch, table=FakeSocialTable(rows), s3=_catalog_s3())
