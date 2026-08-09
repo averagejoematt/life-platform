@@ -92,6 +92,23 @@ Set top-level "severity" to the maximum of the issue severities, or "ok" if ther
 
 _ICON = {"ok": "✅", "low": "🔵", "med": "🟡", "high": "🔴"}
 
+# #2383 — per-page semantic rules, appended verbatim to the generic prompt for
+# the matching harness path. Written with a "med" ceiling so a model misread can
+# warn but never single-handedly block the pipeline (prompt rules alone can't
+# guarantee structure — reference_prompt_structural_guarantees; _parse_verdict
+# still caps stated severity at what the issues support).
+_PAGE_RULES = {
+    "/coaching/": (
+        "PAGE-SPECIFIC RULE (honest dating, ADR-104): every AI-authored band on this page — each "
+        'coach\'s read card, the "where the board disagrees" tensions band (including "the '
+        "integrator's call\" inside it), and any narrative attributed to a coach — must carry a "
+        'visible as-of date: an "as of <date>" kicker or an equivalent dated stamp (e.g. "held '
+        'since <date>", a dated week label). If a band presents AI-authored argument or narrative '
+        'prose with NO visible date, add an issue of type "undated_ai_band" at severity "med", '
+        'naming the band. Honest empty states ("No live disagreements right now…") need no date.'
+    ),
+}
+
 
 def _import_bedrock():
     """Import the shared Bedrock client from lambdas/ (added to sys.path)."""
@@ -151,7 +168,10 @@ def _assess_page(bedrock, name, path, shots):
     if not shots:
         return {"severity": "ok", "renders_ok": True, "summary": "(no usable screenshots — skipped)"}
     content = [_image_block(s["path"]) for s in shots]
-    content.append({"type": "text", "text": _PROMPT.format(name=name, path=path)})
+    prompt = _PROMPT.format(name=name, path=path)
+    if path in _PAGE_RULES:  # #2383 — page-specific semantic rule (not .format-ed: rules may carry literal braces)
+        prompt += "\n\n" + _PAGE_RULES[path]
+    content.append({"type": "text", "text": prompt})
     body = {"messages": [{"role": "user", "content": content}], "max_tokens": 700}
     resp = bedrock.invoke(body, model_name=_VISION_MODEL)
     text = "".join(b.get("text", "") for b in resp.get("content", []) if b.get("type") == "text")

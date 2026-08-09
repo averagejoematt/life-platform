@@ -28,7 +28,7 @@ import { fileURLToPath } from "node:url";
 // Dynamic import after loader registration (the
 // reference_site_js_test_and_build_pairs gotcha — a static import would resolve
 // the graph before the "/assets/…" resolver exists).
-const { coachAsOf, regenerationPaused, ensembleFallback } = await import("../../site/assets/js/coach_asof.js");
+const { coachAsOf, regenerationPaused, ensembleFallback, weeklyAsOf, datableTensions } = await import("../../site/assets/js/coach_asof.js");
 
 const SITE_JS = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "site", "assets", "js");
 
@@ -97,6 +97,53 @@ test("explicit false, absent field, and no payload all read not-fallback", () =>
 test("shape-drifted truthy values never fabricate a fallback banner", () => {
   assert.equal(ensembleFallback({ ensemble_fallback: "true" }), false);
   assert.equal(ensembleFallback({ ensemble_fallback: 1 }), false);
+});
+
+/* ── weeklyAsOf + datableTensions: the tensions band (#2383) ─────────────── */
+
+test("weeklyAsOf: a mid-week digest is current — dated, no pending/paused claim", () => {
+  const threeDaysAgo = new Date(Date.now() - 72 * 3600e3).toISOString();
+  const s = weeklyAsOf(threeDaysAgo);
+  assert.match(s, /^as of /);
+  assert.ok(!s.includes("pending") && !s.includes("paused"), `mid-cadence stamp must be plain-dated: "${s}"`);
+});
+
+test("weeklyAsOf: past the weekly cadence (>8d) — 'next refresh pending'", () => {
+  const tenDaysAgo = new Date(Date.now() - 240 * 3600e3).toISOString();
+  assert.match(weeklyAsOf(tenDaysAgo), /^as of .+ — next refresh pending$/);
+});
+
+test("weeklyAsOf: dates render Pacific (site convention)", () => {
+  // Fixed instant; only the date part is asserted — the staleness suffix is
+  // wall-clock-relative by design (reference_golden_tests_wallclock).
+  assert.match(weeklyAsOf("2026-07-27T14:00:00Z"), /^as of Jul 27/);
+});
+
+test("weeklyAsOf: no/invalid date renders nothing — never a fabricated stamp", () => {
+  assert.equal(weeklyAsOf(""), "");
+  assert.equal(weeklyAsOf(undefined), "");
+  assert.equal(weeklyAsOf("not-a-date"), "");
+});
+
+test("datableTensions REFUSES undated argument prose (#2383)", () => {
+  const dated = { topic: "zone 2", position_a: "a", position_b: "b", generated_at: "2026-08-05T14:00:00Z" };
+  const undated = { topic: "protein", position_a: "x", position_b: "y" }; // absent = unknown (deploy race) → refuse
+  const garbled = { topic: "sleep", position_a: "x", generated_at: "not-a-date" };
+  assert.deepEqual(datableTensions([dated, undated, garbled]), [dated]);
+});
+
+test("datableTensions keeps the substance filter — a dated but position-less tension still drops", () => {
+  assert.deepEqual(datableTensions([{ topic: "t", generated_at: "2026-08-05T14:00:00Z" }]), []);
+  assert.deepEqual(datableTensions([null, undefined]), []);
+  assert.deepEqual(datableTensions(null), []);
+  assert.deepEqual(datableTensions(undefined), []);
+});
+
+test("tensionsHTML wires the pair: datableTensions filter + the tt-asof stamp (#2383)", () => {
+  const src = readFileSync(join(SITE_JS, "coaching.js"), "utf8");
+  assert.match(src, /datableTensions\(/, "tensionsHTML must filter argument prose through datableTensions");
+  assert.match(src, /tt-asof/, "the tensions band must render the tt-asof as-of stamp");
+  assert.match(src, /weeklyAsOf\(/, "the band's stamp must come from weeklyAsOf (writer-cadence staleness)");
 });
 
 /* ── set-guard: no call site may hardcode the paused argument ────────────── */

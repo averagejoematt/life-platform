@@ -41,3 +41,36 @@ export function regenerationPaused(payload) {
 export function ensembleFallback(payload) {
   return !!payload && payload.ensemble_fallback === true;
 }
+
+// #2383 — the as-of stamp for a WEEKLY AI-authored band (the tensions band and
+// the integrator's call it carries — the EXPERT#integrator digest). Same honest-
+// dating copy as coachAsOf, but staleness derives from the WRITER's cadence
+// (weekly synthesis; the record's own TTL is 8 days), never the daily 48h
+// window — a mid-week argument is current, not "pending". No `paused` argument:
+// this writer has no budget-guard feature gate and no fallback path (a failed
+// synthesis writes nothing), so the honest states are dated / dated-stale /
+// undated — and an undated band must not render (datableTensions below).
+const WEEKLY_STALE_HOURS = 8 * 24; // the writer's cadence + the record's TTL
+
+export function weeklyAsOf(generatedAt) {
+  const d = generatedAt ? new Date(generatedAt) : null;
+  if (!d || isNaN(d.getTime())) return "";
+  const dateStr = d.toLocaleDateString("en-US", { timeZone: PT_TZ, month: "short", day: "numeric" });
+  return (Date.now() - d.getTime()) / 36e5 > WEEKLY_STALE_HOURS ? `as of ${dateStr} — next refresh pending` : `as of ${dateStr}`;
+}
+
+// #2383 — the tensions band REFUSES to render argument prose it cannot date: a
+// tension with position text but no parseable generated_at is dropped (the band
+// falls back to its honest-empty copy), so a paused/stale week's argument can
+// never read as today's live coaching. The substance filter matches the
+// historical tensionsHTML one (position_a / position_b / summary). Absent-field
+// discipline mirrors regenerationPaused above: during an API-deploy/site-deploy
+// race the field is UNKNOWN — the band renders its honest-empty state, never a
+// fabricated date and never undated prose.
+export function datableTensions(tensions) {
+  return (Array.isArray(tensions) ? tensions : []).filter((t) => {
+    if (!t || !(t.position_a || t.position_b || t.summary)) return false;
+    const d = t.generated_at ? new Date(t.generated_at) : null;
+    return !!d && !isNaN(d.getTime());
+  });
+}

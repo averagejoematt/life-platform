@@ -37,7 +37,7 @@ import { portrait, markStanceChange } from "/assets/js/portraits.js"; // §8.7 �
 import { momentsIndex, shareMount } from "/assets/js/share.js"; // #404 moment permalinks
 import { wireTabList, markActiveTab } from "/assets/js/tabs.js"; // #579 — real ARIA tabs
 import { BRIEF_LINE_KICKER } from "/assets/js/daily_line.js"; // #1995 — the one honest label for the morning brief's daily line
-import { coachAsOf, regenerationPaused } from "/assets/js/coach_asof.js"; // #802/#1971 — the honest "as of / refresh paused" disclosure
+import { coachAsOf, datableTensions, regenerationPaused, weeklyAsOf } from "/assets/js/coach_asof.js"; // #802/#1971/#2383 — the honest "as of / refresh paused" disclosure
 
 const SECTIONS = [
   { key: "read", label: "The Read", kicker: "what your board is saying — now", kind: "read" },
@@ -380,7 +380,11 @@ function coachLiveRecordHTML(d) {
 
 // ── THE TENSIONS BAND — the board's disagreements (reused by The Read) ──
 function tensionsHTML(d) {
-  const _tt = (d.tensions || []).filter((t) => t && (t.position_a || t.position_b || t.summary));
+  // #2383 (ADR-104 honest dating) — every AI-authored band is datable: undated
+  // argument prose refuses to render (datableTensions — the band shows its
+  // honest-empty copy instead), and the band carries its own as-of stamp, so a
+  // paused week's argument reads "as of <date>", never as today's live coaching.
+  const _tt = datableTensions(d.tensions);
   let h = `<section class="team-tension"><p class="dx-kicker label">where the board disagrees — the argument, not the headline</p>`;
   if (_tt.length) {
     const _pretty = (id) => String(id || "").replace(/_coach$/, "").replace(/_/g, " ") || "a coach";
@@ -393,6 +397,9 @@ function tensionsHTML(d) {
         (call ? `<p class="tt-call"><span class="tt-call-k label">the integrator's call</span> ${esc(call)}</p>` : "") +
         `</li>`;
     }).join("")}</ul>`;
+    // One band-level stamp — every tension comes from the same weekly integrator
+    // digest, so they share one generated_at (#2383).
+    h += `<p class="tt-asof label">${esc(weeklyAsOf(_tt[0].generated_at))} · the integrator's weekly synthesis</p>`;
   } else {
     h += `<p class="dx-prose">No live disagreements right now — the board's aligned (or it's early and the threads haven't formed). When they pull in different directions, the tradeoff shows here.</p>`;
   }

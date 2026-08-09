@@ -184,6 +184,15 @@ POPULATED_GATE_PAGES = [
                 "min_count": 3,
                 "desc": "every card's as-of kicker carries the budget-guard paused disclosure (#1971/#802)",
             },
+            # #2383 — the tensions band renders its dated argument (coach_team
+            # fixture carries generated_at) AND the band-level as-of stamp, so a
+            # paused week's argument can never read as today's live coaching.
+            {
+                "selector": ".tt-card",
+                "min_count": 1,
+                "desc": "tensions band renders the dated argument from the coach_team fixture (#2383)",
+            },
+            {"selector": ".tt-asof", "min_count": 1, "desc": "the tensions band carries its as-of stamp (#2383 honest dating)"},
         ],
     },
     {
@@ -245,6 +254,7 @@ POPULATED_API_MOCKS = {
     "**/api/presence": "presence.json",
     "**/api/routine": "routine.json",
     "**/api/coaching-dashboard": "coaching_dashboard_paused.json",  # #1971 — paused-board disclosure
+    "**/api/coach_team": "coach_team.json",  # #2383 — dated tensions → the band's as-of stamp
 }
 
 

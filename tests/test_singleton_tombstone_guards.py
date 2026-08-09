@@ -237,6 +237,38 @@ def test_team_tensions_reads_guarded_accessor(monkeypatch):
     assert len(out) == 1 and out[0]["topic"] == "zone 2"
 
 
+def test_team_tensions_carry_generated_at(monkeypatch):
+    # #2383 (ADR-104 honest dating) — every tension carries the digest's
+    # generated_at so /coaching/ can date the band ("as of <date>"); the
+    # front-end refuses to render undated argument prose as today's coaching.
+    monkeypatch.setattr(
+        capi,
+        "_integrator_digest",
+        lambda: {
+            "generated_at": "2026-08-05T14:00:00+00:00",
+            "disagreements": [
+                {"topic": "zone 2", "coaches_involved": ["training", "glucose"], "position_a": "a", "position_b": "b"},
+                {"topic": "protein", "coaches_involved": ["nutrition", "strength"], "position_a": "x", "position_b": "y"},
+            ],
+        },
+    )
+    out = capi._team_tensions()
+    assert len(out) == 2
+    assert all(t["generated_at"] == "2026-08-05T14:00:00+00:00" for t in out)
+
+
+def test_team_tensions_generated_at_none_when_digest_undated(monkeypatch):
+    # An undated digest propagates generated_at=None — the front-end's
+    # datableTensions then refuses the prose (honest-empty), never fabricates.
+    monkeypatch.setattr(
+        capi,
+        "_integrator_digest",
+        lambda: {"disagreements": [{"topic": "zone 2", "coaches_involved": ["a", "b"], "position_a": "a", "position_b": "b"}]},
+    )
+    out = capi._team_tensions()
+    assert len(out) == 1 and out[0]["generated_at"] is None
+
+
 # ── Elena: persona running state (database-4) ─────────────────────────────────
 
 
