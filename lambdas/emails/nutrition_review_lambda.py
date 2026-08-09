@@ -487,7 +487,7 @@ def _render_board_prompt(calorie_target, protein_target_g):
         expert_blocks.append(section)
 
         # Track colors for HTML format rules
-        short_name = member["name"].split()[-1]  # Norton, Patrick, Attia
+        short_name = member["name"].split()[-1]  # Webb, Patel, Reyes
         color_rules.append(f"- {short_name} card: left border {color}")
 
     experts_text = "\n\n".join(expert_blocks)
@@ -586,7 +586,7 @@ Current supplementation vs genome gaps. Redundancies? Additions?
 ## FORMAT
 Write clean HTML with inline styles. Design:
 - Card backgrounds: #16213e. Text: #e0e0e0. Accent: #4cc9f0
-- Norton card: left border #10b981. Patrick: #8b5cf6. Attia: #f59e0b
+- Webb card: left border #10b981. Patel: #8b5cf6. Okafor: #f59e0b
 - Unified section: border #4cc9f0
 - Grocery list: checkboxes for print
 - ~1500-2000 words. No <html>/<head>/<body> tags.

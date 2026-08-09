@@ -415,8 +415,8 @@ Coach Maya Rodriguez specialises in the psychology of behaviour change. She read
 3 short paragraphs. Cover: What is Matthew's emotional state this week? What's driving it?
 What should Partner know about where he is right now — not just the data, but the person?
 
-🧠 WHAT'S HAPPENING UNDERNEATH — DR. CONTI
-Dr. Conti is a psychiatrist who pays attention to what's not being said.
+🧠 WHAT'S HAPPENING UNDERNEATH — DR. REEVES
+Dr. Nathan Reeves is a psychiatrist who pays attention to what's not being said.
 3 short paragraphs. Cover: What psychological patterns are showing up this week?
 What might Matthew be protecting himself from? What does Partner need to understand
 about how to reach him — not what to do, but how to be with him?

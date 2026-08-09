@@ -677,7 +677,7 @@ def build_sustained_alert_html(sustained_list, date_str):
     """Build HTML email for sustained anomaly alerts.
 
     Design: yellow accent, softer language. No 'WARNING'. (Board v2)
-    Rodriguez: alert copy must include a behavioral interpretation frame.
+    Reeves: alert copy must include a behavioral interpretation frame.
     """
     try:
         dt = datetime.strptime(date_str, "%Y-%m-%d")
@@ -726,7 +726,7 @@ def build_sustained_alert_html(sustained_list, date_str):
       {"".join(rows)}
     </table>
 
-    <!-- Behavioral frame (Rodriguez: mandatory) -->
+    <!-- Behavioral frame (Reeves: mandatory) -->
     <div style="padding:16px 24px;background:#fef9f0;border-top:1px solid #fef3c7;">
       <p style="margin:0;color:#78350f;font-size:14px;line-height:1.5;">
         <strong>Before adjusting anything:</strong> check whether your training load,
