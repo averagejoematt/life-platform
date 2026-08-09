@@ -48,6 +48,8 @@ from stacks.secrets_helpers import site_api_origin_secret_value
 THROTTLE_ALARMED_FUNCTIONS = (
     ("life-platform-site-api", "SiteApiThrottles"),
     ("life-platform-site-api-ai", "SiteApiAiThrottles"),
+    ("telegram-coach-worker", "TelegramWorkerThrottles"),
+    ("telegram-webhook", "TelegramWebhookThrottles"),
 )
 
 REGION = "us-west-2"
@@ -316,6 +318,45 @@ class ServeStack(Stack):
             treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
         )
         _site_api_ai_throttles.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
+
+        # #2364: the Telegram pair. The worker's reserved concurrency is 2 — a binding
+        # cap means the owner's texts are silently queueing/dropping, which reads as
+        # "the coach ignored me". Same threshold rationale as its siblings above.
+        _telegram_worker_throttles = cloudwatch.Alarm(
+            self,
+            "TelegramWorkerThrottles",
+            alarm_name="telegram-worker-throttles",
+            metric=cloudwatch.Metric(
+                namespace="AWS/Lambda",
+                metric_name="Throttles",
+                dimensions_map={"FunctionName": "telegram-coach-worker"},
+                period=Duration.minutes(15),
+                statistic="Sum",
+            ),
+            threshold=5,
+            evaluation_periods=1,
+            comparison_operator=GTE,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
+        _telegram_worker_throttles.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
+
+        _telegram_webhook_throttles = cloudwatch.Alarm(
+            self,
+            "TelegramWebhookThrottles",
+            alarm_name="telegram-webhook-throttles",
+            metric=cloudwatch.Metric(
+                namespace="AWS/Lambda",
+                metric_name="Throttles",
+                dimensions_map={"FunctionName": "telegram-webhook"},
+                period=Duration.minutes(15),
+                statistic="Sum",
+            ),
+            threshold=5,
+            evaluation_periods=1,
+            comparison_operator=GTE,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
+        _telegram_webhook_throttles.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
         # NOTE (2026-06-08): the "life-platform-site-api" CloudWatch Dashboard was
         # removed from CDK after it was deleted out-of-band — CFN tried to UPDATE a
