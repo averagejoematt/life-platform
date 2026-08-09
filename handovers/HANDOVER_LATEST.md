@@ -1,171 +1,160 @@
-# HANDOVER — Run 3 fully dispositioned + the coaches got phones: 41 findings closed out, 8 PRs merged, Telegram LIVE end-to-end — 2026-08-09 ~02:30Z → ~07:30Z
+# HANDOVER — The overnight burn: 46 PRs merged, 49 issues closed (95→60), the census armed, the reset handed as a runbook — 2026-08-09 ~07:58Z → ~17:4xZ
 
-> Instruction thread: *resumed via `claude --continue` into the post-wrap tail of the
-> gates session; the owner then drove three asks in sequence: (1) finish everything the
-> /fullreview run 3 left half-done ("complete everything now"), (2) a NEW feature ask —
-> "I want all my coaches as a contact in telegram… and while not telegram specific, i
-> really want those coaches to feel human… their memories, and be invested in me" —
-> prioritized in-session, and (3) "can you do it all if i authorize" for the full CDK
-> go-live sequence. Mid-session the owner discovered the session was running on Opus
-> for what he considered Fable work — "Abort and review, i just switched to fable" —
-> the park/review/resume is a section below.*
+> Instruction thread: *the planned overnight burn (`~/.claude/plans/kind-moseying-crayon.md`,
+> owner-approved): fully autonomous, waves of 4 worktree-implementers, Now→Next→Later by
+> stored rank, driver verifies everything, cycle-13 reset time-boxed to the final 75 min with
+> the runbook as the sanctioned fallback, wrap deadline T+7.5h = 15:28Z. The deadline was
+> missed — see the honest-miss paragraph — but the burn itself over-delivered.*
 
-**Main:** green (`c1eb156d`) — the #2404 run, full pipeline end to end, `check_main_green.py` exit 0 read at wrap.
-THREE unit-tests reds along the way, every one with Deploy green throughout: the
-stamped-literal red (~65 min, incident row 1), then the post-merge suite **serially
-catching the new Telegram surface on two set guards** — the #946 tombstone guard
-(unguarded `RELATIONSHIP#state` read, PR #2403) and the serve-stack Throttles-alarm
-guard (both new Lambdas alarm-less, PR #2404 + a 39s stack update; alarms verified
-live in CloudWatch) — incident row 2 covers the pair.
-**Docs:** ARCHITECTURE secrets table + stamped inventory (26) via #2399/#2400,
-SECRETS_MAP (+`life-platform/telegram`), INCIDENT_LOG (+2 rows), DECISIONS (ADR-151 +
-index), deploy.md map regenerated. All wiki checkers green at commit.
-**Decisions:** ADR-151 filed — Telegram coach chat: private-tier egress to the owner's
-device sanctioned, the two-Lambda trust boundary, the no-exemption grounding posture,
-budget rank with the daily brief.
-**Build beat:** `2026-08-09-the-coaches-got-phones`.
-**Incidents:** 2 rows added — (1) main unit-tests red ~65 min on the stamped
-secret-count literal after a `deploy/`-only merge that triggered neither ci-cd nor its
-reconcile job; (2) main unit-tests red ~2h on the #946 singleton-tombstone guard
-catching the chat worker's unguarded singleton read, then the serve-stack
-Throttles-alarm set guard on the same new surface — both POST-MERGE-ONLY guards the PR
-lane could not show; fixed forward #2403/#2404, deploys healthy throughout.
-**Closures:** 13 commented — #2360 #2337 #2391 #2364 (this session's merges, all with
-live evidence) + #2343 #2344 #2333 #2338 #2204 #2346 #2353 #2213 #1940 (today's
-overnight closures; verdicts honest — 3 `partial`, 1 `not-realized`).
-**Backlog:** Now live at 8 actionable (no refill needed); Later sweep — zero stale; the
-whole 95-issue corpus passes blocking hygiene (60 violations on this session's own
-filings were fixed at wrap — see gotchas).
-**Alarms:** all red >72h cited (registry clean on `check_alarm_citations.py`).
-**CI warnings:** none to triage — the newest main run completed green at wrap; the
-prior completed run was the doc-literal red, owned by (e2)'s decode + the incident row.
-**Stash/hooks:** clean — stash empty, hook freshness 🟢.
+**Main:** red → recovering at the wrap commit — decode: TWO union reds surfaced by the
+full-suite dispatches (the pillar_absence×todoist contract, fixed #2463; then the stale
+stack manifest from #2406/#2436's derived facets, regenerated `5f164b5d4`); the
+deploy-of-record dispatch (take 3, run 31327743460) was in flight with a self-approving
+gate waiter when this wrap committed — **#2465 carries its green verification as box 1**.
+**Docs:** ADR-133 August amendment + ADR-148 2026-08-09 amendment + ADR-152 (one TDEE) in
+DECISIONS.md; SCHEMA.md chronicle sk-invariant; PROPORTIONALITY 3 rows + re-stamp (#2380);
+CONVENTIONS §1a (bundle fingerprint, via #2408); wrap.md gained the ledger gate line.
+**Decisions:** ADR-152 filed (one TDEE definition); ADR-133 amended (Aug $115/$135,
+auto-revert 09-01, Budgets backstop stays $85); ADR-148 amended (strict=false re-decided on
+the measured wave; merge-ref lane = the named mechanism).
+**Build beat:** `2026-08-09-the-overnight-burn` (46 merged+deploying PRs; see beats.json).
+**Incidents:** 2 rows added — (1) the #2052-class phantom deploy wedge, ~09:51→16:17Z:
+the merge storm's survivor ci-cd run sat "pending, 0 jobs" (concurrency evaluates before
+the environment rule), the wedge-watch failed loudly hourly, recovery via
+`check_deploy_wedge.py --recover`; compounded by TWO session harness stalls (~10:00–12:16
+and ~12:45–16:00) during which the driver could not act; (2) main unit-tests red from the
+first full-union suite run: #2438's new `pillar_absence` × the derived todoist reader
+contract — the PR-lane-invisible union class, fixed forward by #2463.
+**Closures:** 49 issues closed by this session, every one with an ADR-099 verdict comment
+(see the list in the session ledger; verdicts include honest partials/not-realized where
+live evidence was missing).
+**Backlog:** 95 → **60 open** (16 epics + ~8 gate:owner inside that). Now/Next workable is
+effectively drained; what remains is Later + the census-filed gate stories + fable-only.
+**Alarms:** cited per the registry at last check; qa-smoke-warnings expected to go quiet
+(chronic reclassification #2378) and receipt_replay expected to HEAL at the cycle-13 reset.
+**CI warnings:** triage at next green main (this wrap's dispatch); nothing outstanding from
+the last green run.
+**Stash/hooks:** clean (stash empty; hooks 🟢 at postflight).
 
 ---
 
-## Part 1 — the /fullreview run-3 disposition (the "complete everything" ask)
+## What shipped (46 PRs, all merged; deploying via the final dispatch)
 
-Run 3's delta (produced on Fable by the prior workflow, `wf_e2e70bb0`) was found
-untracked at session start with Phase 4 never run. It is now **fully dispositioned**:
+**The burn, by family:**
+- **Budget/governance (driver):** #2406 the August ceiling window $115/$135 + the
+  `tier_crossings` forecast in the breakdown/brief (closes #2381); ADR-148 amendment
+  (#2371); PROPORTIONALITY refresh (#2380); ratchet banked 80.20 (#2455/#2374).
+- **The #2390 grounding program — the census armed and then USED:** the three-seam
+  invoke-site census (#2432; discovered `call_anthropic_api` as seam 3, corrected the
+  issue's own premise), 11 findings filed (#2418–#2428,#2430), then SEVEN of them fixed
+  the same session: ensemble digest (#2444), partner email + its second seam deleted
+  (#2445), hypothesis prose (#2446), field notes (#2450), candidates-private (#2451),
+  anomaly conjecture fence (#2453), reading pair (#2458), analyzer 4 paths incl. the
+  Mode-B re-gate (#2457), compression path (#2459). The registry's UNGATED tracked table
+  is down to a handful, each still filed.
+- **Honest-absence/reader-truth:** date-carrying LogAvailability (#2413), family panel +
+  the cockpit string-bind bug (#2438), weekly-digest absence line (#2448), protein null
+  (#2433), meal columns rebound + the truthy-[] fallback bug (#2434), deficit copy
+  (#2456), tensions dated (#2417), observatory Pacific day (#2411), md tokens (#2449).
+- **Structure/guards:** bundle fingerprint + ancestry refusal (#2408), PII log guard
+  (#2407), SES declared-rule + a revoked mislabeled exemption (#2431), cache-tier posture
+  (#2429), null-coercion widened — all 21 hits real, fixed (#2452), roster registry ×17
+  copies (#2454), cast guard over prompt literals — 8 live offender files incl. phantom
+  chronicle interviewees (#2462), wallclock-bomb gate (#2461), strict xfails (#2441),
+  guard coupling (#2439), chronicle sk-invariant (#2435), qa-warnings chronic (#2409 +
+  the build_report_html extraction closing #2335), health tally axis (#2447), recall
+  link sensor+repair (#2437), brief idempotency (#2440), lead-in word-boundary (#2442),
+  weather 4 cells (#2436), find_days operators (#2415), workout uid round-trip (#2412),
+  intelligence-quality denominator (#2405), summary bar (#2416), meal_responses retired
+  (#2443), union-red fix (#2463).
+- **Reconciles without PRs:** #1383 closed as shipped-by-#2363; #2427 keep-both decision;
+  #2402 proposals doc committed (`docs/design/TEXTING_REGISTERS_PROPOSAL.md` — taste
+  session pending, ADR-106).
 
-- **Scorecard banked** (#2362): security **F → B+** (the #1943 genome absolute verified
-  cleared live), cto B+→A-, reader B→B+, data-architect B-→B+, narrative B-→B.
-- **6 findings fixed, merged AND deployed:**
-  | finding | PR | what a reader stops seeing |
-  |---|---|---|
-  | R1/NAR-2 | #2361 | "Protein's under the floor every logged day" graded from **0/0** — `else None` at four API sites + `days_logged===0` render guards; also closed #2337 (the hoisted profile read) |
-  | NAR-1/AIQ-3 | #2394 | six coach cards narrating a food-log "pause four days ago" that never happened — the prompt contract *prescribed* the phrasing; the never-logged branch now states the true fact and forbids the transition |
-  | AIQ-2 | #2395 | the analyzer publishing with known-unresolved findings ("6→2" shipped 2 in prod) — regenerate-or-HOLD, gate moved **above** the cache write, ordering itself mutation-proved |
-  | AIQ-1 (A-half) | #2396 | a Haiku condensation inventing a figure its source never contained — the fabricated-number floor on `guard_derived_summary`, covering BOTH derived-summary writers via the existing seam |
-- **24 findings filed** (#2366–#2393 + the earlier #2360), each with the verifier's
-  corrections embedded — several findings' prescribed fixes were WRONG and the issues
-  say so (R4's "fix the writer" pointed at already-fixed code; the real culprit is
-  `restart_leadin_pages.py`'s raw `[:300]` slice; R3's "coverage must not be 1.0" would
-  contradict ADR-104's documented design).
-- **The rest:** linked to open issues, verified-shipped-with-linked-fixes (DA-5, AIQ-7,
-  AIQ-8 — checked against the actual merged diffs, not trusted), or refuted (exp-3).
-- **Re-verification that mattered:** six findings were dispositioned "LINKED, not
-  re-filed" against issues that CLOSED under the run (its SHA pin predated four merges).
-  R2's live confirmation — the Webb card citing 2026-08-07's real HRV as current
-  *after* #2343's fix merged — exposed the mechanism as the ungated `position_summary`
-  re-parse, now #2390's subject.
+## The deploy story (read this before touching CI)
 
-## Part 2 — Telegram: idea → LIVE in one session (epic #2363)
+The merge storm (~20 merges/hour) meant EVERY ci-cd Deploy was superseded — nothing
+deployed all night, by design safe but then the survivor run hit the **#2052 phantom
+wedge** (run-level pending forever, `pending_deployments` empty, the approval watcher
+correctly never fires because the run never reaches the gate). The wedge-watch workflow
+caught it (hourly failures + a remediation urgent_alarm). Recovery is ONE command:
+`python3 scripts/check_deploy_wedge.py --recover` (cancel + `deploy_all=true` dispatch).
+The first recovery dispatch then FAILED unit tests on the union red (see Incidents),
+fixed by #2463. **The deploy of record is dispatch take 3 (run 31327743460)** — takes 1–2 died to the
+phantom wedge and the two union reds above; approve via `deploy/approve_deployment.sh <run>`
+if its gate is still waiting when you read this. After green: run
+`bash /private/tmp/claude-501/-Users-matthewwalker-Documents-Claude-life-platform/e3618407-6df2-4ec3-b0a3-a6c7b76af781/scratchpad/post_deploy_verify.sh`
+(bundle symbol + ancestry postflight + the #2366 recall repair + live spot-checks).
 
-**The insight that sized it:** the personality/memory/investment layer the owner asked
-for already existed (voice specs with forbidden openings + humor styles + declared
-inter-coach relationships; `relationship_engine`'s rapport arc; the `COACH#` memory
-partitions; the fidelity harness). This was a **transport build**, and it shipped
-end-to-end: PR #2365 (turn engine + 3-gate webhook gateway + setup script), #2397
-(webhook + worker Lambdas + registration script), #2401 (CDK: FunctionURL + the
-two-role trust boundary), all merged; `LifePlatformServe` deployed (74s); all 5
-created bots registered; **the owner texted the coaches and they replied**.
+## The honest miss
 
-Load-bearing design (ADR-151 records it): regenerate-once-then-HOLD (never
-keep-if-better); the only no-exemption entry in the grounding registry (all 5 classes —
-in a chat the owner picks the subject); budget rank with the daily brief (survives
-tier 1, honest pause at ≥2, 40-turn/day cap); the chat writes `CHAT#` rows on the real
-`COACH#` partitions so texting a coach feeds the dossier; routing keys are DOMAINS so
-display names stay a `/setname` away from changing; glucose/labs deliberately not
-created (attack surface); the board contact is the ROOM ("Grand Rounds", Eli Marsh
-moderates inside it).
+The wrap deadline (15:28Z) was missed by ~2.5h and **Phase 3 (the cycle-13 reset) was NOT
+applied** — not by choice: the session harness stalled twice (~10:00–12:16Z and
+~12:45–16:00Z, ~5.5h total dead time) spanning exactly the reset window, while the deploy
+sat wedged. Per the owner's own standing instruction ("the fallback is a prepared runbook
+I run after my morning weigh-in, never a rushed --apply"), the reset is handed over as the
+prepared runbook below, dry-run-verified overnight. Applying it at 10am PDT with main
+mid-recovery would have been the rushed apply the instruction forbids.
 
-**Owner state:** 5/7 bots configured (`life-platform/telegram`, chat id 8724185006
-discovered); sleep/mind/physical still need a "hi" + `setup_telegram_bots.py` re-run
-(ENTER-keep now refreshes ids); explorer + board wait on BotFather's 24h limit —
-tomorrow: create both, run the setup script, re-run
-`register_telegram_webhooks.py --url https://hvqippdqcrbngivi5qifoaqmd40owrxu.lambda-url.us-west-2.on.aws`.
+## CYCLE-13 RESET — the runbook (owner runs after weigh-in) — #2465
 
-## The model-identity park (mid-session)
+Dry-run verified at 09:05Z: census preflight 93 pk families all classify (the new CHAT#
+rows are covered — the `COACH#<coach>` "all"-mode wipe archives them with cycle=12,
+restorable); override 321.6 resolves; keep-chronicle cross-check green; ~98 prereg bets
+void; ~94 items tag. The reset-path hardenings (#2440 idempotent brief, #2442 lead-in
+slicer, #2435 sk-invariant check) all merged first. Full runbook with post-checks:
+`/private/tmp/claude-501/-Users-matthewwalker-Documents-Claude-life-platform/e3618407-6df2-4ec3-b0a3-a6c7b76af781/scratchpad/cycle13_runbook.md`
+(also mirrored in issue #2465). The command (after the weigh-in has synced, drop the
+override; before it, keep it):
+```bash
+git pull --ff-only
+python3 deploy/restart_pipeline.py --genesis 2026-08-09 --keep-chronicle DATE#2026-08-02   # review dry-run
+python3 deploy/restart_pipeline.py --genesis 2026-08-09 --keep-chronicle DATE#2026-08-02 --apply
+```
 
-The owner discovered the session had run on Opus and called an abort/review. The
-review's material finding: **the /fullreview ritual itself was never run on Opus** —
-the run-3 delta was authored by the prior Fable workflow; this session only banked and
-dispositioned it, so the ritual's model-identity rule was not breached. Everything
-Opus-decided was either mechanically verified (mutation proofs) or sat on the unmerged
-PR #2365, which the Fable resume then genuinely reviewed — and the review caught a real
-defect: the grounding module had REIMPLEMENTED `allowed_numbers`/`allowed_dates` when
-`ai.grounded_generation` already exports better versions (the fork would have made a
-coach quoting its own memory read as fabrication). A source guard now pins the
-delegation.
+## Morning owner list
+
+1. **Run the cycle-13 reset** (runbook above — #2465) after the weigh-in syncs.
+2. Create explorer+board bots (BotFather limit expired) → `python3 setup/setup_telegram_bots.py`
+   → `python3 setup/register_telegram_webhooks.py --url https://hvqippdqcrbngivi5qifoaqmd40owrxu.lambda-url.us-west-2.on.aws` — not-work — owner phone actions (epic #2363).
+3. Say "hi" to sleep/mind/physical bots + ENTER-keep re-run — not-work — owner phone actions.
+4. MacroFactor export — #2326 (47 days quiet; Webb has nothing to say about food until it lands).
+5. #2402 taste session: `docs/design/TEXTING_REGISTERS_PROPOSAL.md` (4-item checklist at the end).
+6. Cycle-12 CHAT# rows (yesterday's first coach conversations) archive at the reset —
+   say the word to restore/reclassify — not-work — owner preference call.
 
 ## Gotchas (the ones that will recur)
 
-- **`agent_commit.sh`'s doc-literal restore SILENTLY REVERTS unnamed wrap edits when you
-  commit on a side branch mid-wrap.** ADR-151, the SECRETS_MAP rows, both incident rows and
-  the CLAUDE.md status block were all quietly checked out during the #2403/#2404 commits
-  (only the named paths survive; handovers/ and site/ are outside the restore set, which is
-  why the handover lived). Later edits then no-op'd against missing anchors while printing
-  success. Wrap docs commit via PLAIN git (step f's own instruction), or name every doc.
-
-- **The gates refused the transport work FIVE times, all correctly** — I5 (unmapped
-  lambdas), SR1 (unregistered secret name), I3 (`lambda_handler` naming) + the
-  handler-type-hint ratchet pre-merge; then R1/R2 caught the **KMS-on-CMK-table gap**
-  (a silent runtime AccessDenied-in-waiting); then, post-merge only, the **#946
-  singleton-tombstone guard** caught the worker's unguarded `RELATIONSHIP#state` read
-  (the wiped cycle's rapport arc feeding a fresh-cycle chat — the #1897 vector);
-  then, also post-merge-only, the serve-stack **Throttles-alarm set guard** (#1328's
-  rule — for the worker at reserved-concurrency 2, a throttle is the owner's text
-  silently queueing). New-Lambda registration is a SEVEN-gate affair (lambda_map +
-  deploy.md, KNOWN_SECRETS ×2 + ARCHITECTURE table + S4 count, handler naming, type
-  hints, role_policies IAM/KMS gates, tombstone guard, throttles-alarm set) — the
-  post-merge-only members are candidates for the premerge lane (#2372's derivation
-  would force the decision).
-- **A `deploy/`-only merge triggers neither ci-cd nor the reconcile bot** — the stamped
-  secret count redded main with no run to re-prove green and no bot to fix the four
-  dependent doc literals (#2399/#2400, incident row). Check the trigger paths before
-  assuming the bot will come.
-- **Local black 25.9.0 vs the 26.3.1 pin bit again** — it "reformatted" ai_calls +3
-  lines over an EXACT baseline. The repo now carries `.venv-black/` (agent_commit's own
-  error message points at it); use it, never PATH black.
-- **A branch cut from another feature branch goes CONFLICTING after the parent
-  squash-merges** (#2398 → re-cut clean as #2401 via cherry-pick onto main).
-- **`gh issue list --json -q length` defaults to 30** — the corpus is ~95; pass --limit.
-- **The hygiene gate's audience vocabulary is exact** — 26 issues filed with
-  "Owner"/"Readers" audiences cost a 60-violation fix-up at wrap. File with the
-  sanctioned strings (`Matthew (the N=1 subject)` · `operator` · `Health /
-  quantified-self enthusiasts` · `Friends & family` · `Reddit newcomers`) the first time.
+- **`agent_commit.sh` can print a black/ruff ❌ and still EXIT 0** — read its output, never
+  trust the exit code in a `&&` chain (cost one worktree of redone edits tonight). #2464.
+- **The PR fast lane NOW RUNS the mypy clean-set gate AND the size baselines against the
+  MERGE REF** — the memory `reference_pr_checks_lack_mypy_gate` is superseded (rewritten);
+  brief implementers to annotate new dicts and budget lines on at-baseline files.
+- **Merge-storm supersession means NOTHING deploys until a quiesce** — plan explicit
+  quiesce windows; and the quiesce's survivor run can phantom-wedge (#2052) — the
+  wedge-watch + `check_deploy_wedge.py --recover` is the loop.
+- **The union class is real and the lane can't see all of it**: a new module × a derived
+  contract scan neither PR executed (tonight: pillar_absence × the todoist reader scan)
+  reds only the full suite. The first full-union run after a storm is the moment to watch.
+- **Five size-baseline catches in one night** — the ratchet earns its ledger row; the
+  legitimate escapes used: compress comments, extract a module (build_report_html,
+  weekly-digest absence query, summarizer support), or a CONSIDERED raise with the reason
+  in-code (hypothesis gate, registry-import conversions).
+- **BotFather-style external limits and `gh pr view mergeable=UNKNOWN`** both just need
+  patience loops — poll until recompute, don't force.
 
 ## Residual / next picks
 
-- **#2402** — the coaches text like coaching cards pasted into a chat (owner's own
-  verdict after first use); per-coach texting registers, message bursts, memory depth.
-  `model:fable`, owner taste session.
-- **#2326** — MacroFactor now 46 days quiet; **the single highest-leverage owner action
-  for the new chat**: Webb has a voice but nothing to say about food until an export
-  lands. `gate:owner`.
-- **#2381** — August's tier-2 pause is arithmetically due **~08-16** (verifier moved it
-  earlier than the seed); decide the posture this week or it's July's scramble again —
-  and it pauses the Telegram chat too. `gate:owner`.
-- **#2390** — the invoke-site census: measured 64 modules invoking a model seam, 53
-  unregistered; each needs its destination VERIFIED before an honest exemption. Also
-  carries the R2/AIQ-6 live check: confirm the Webb card renders day-honest after the
-  next 17:02Z generation.
-- **#2377** — bundle commit fingerprints (the 08-08 deploy race, unmechanized), `Now`.
-- **#2369** — raw subscriber emails in CloudWatch logs ×3 + the standing PII-log guard, `Now`.
-- **#2382 residue** — the deterministic absence-transition guard (LogAvailability
-  carries category sets, not dates — its own change).
-- Tomorrow's bot completions (explorer + board + the three chat-id refreshes) are owner
-  steps recorded in the memory topic. not-work — owner phone actions, not backlog.
-- The two zombie gated runs stay pin-excluded in `deploy/watch_deploy_gate.sh`.
-  not-work — documented leave-alone; GitHub expires them at 30d.
+- **Deploy-of-record dispatch green + post_deploy_verify.sh** — the one operational loose
+  end this wrap leaves; steps in "The deploy story". #2465 carries it with the reset.
+- **#2418** — observatory_summary registration: THE Webb-card mechanism candidate; the
+  17:02Z day-honesty live check rides it (was #2390's residual acceptance box).
+- **#2430** — the five partial-gate reader surfaces (podcast, reflection, memoir, eyeball,
+  chronicle_personas) — the census's remaining tracked defects.
+- **#2414** — the UTC-today class sweep (~15 sites) + premerge guard.
+- **#2379** — qa-smoke FailCount live-confirm post-reset + the day-correspondence move.
+- **#2464** — agent_commit.sh exit-code fix (filed this wrap).
+- **#2326** — MacroFactor export, `gate:owner`.
+- **#2402** — texting registers taste session, `gate:owner` (proposals ready).
+- Remaining Later families: #2372 (premerge derivation), #2332, #2349, #2350, #2351,
+  #2347, #2348, #2331, #2311-adjacent weather follow-ons — all filed, ranked, clean.

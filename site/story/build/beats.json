@@ -2413,6 +2413,33 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/2395"
         }
       ]
+    },
+    {
+      "id": "2026-08-09-the-overnight-burn",
+      "date": "2026-08-09",
+      "title": "The overnight burn: 46 merges, and the gates that paid rent all night",
+      "shipped": "One autonomous overnight session merged 46 pull requests and closed 49 backlog issues (the open corpus went 95 → 60). The headline machinery: a three-seam census that maps every AI model call in the platform to a registered grounding gate, a written exemption, or a tracked defect — and seven of the eleven defects it found were fixed the same night, including a coach-analysis rewrite path that could ship a fabricated number over already-gated text. The August budget window went live with a new forecast line that names the DATE the next spending tier arrives, and the honest-absence work now means an unlogged food week says 'nothing logged' instead of a softened trend claim.",
+      "why_it_mattered": "The platform's whole pitch is that AI narration is structurally prevented from inventing things — and the census turned that from a per-surface habit into a closed-world claim: every model call is now accounted for, and a new one that isn't cannot merge. The same night stress-tested the engineering gates themselves at ~20 merges/hour: the module-size ratchet caught five real breaches before merge, and the pre-merge lane caught union states no single PR could see.",
+      "gotcha": "GitHub evaluates workflow concurrency BEFORE environment approval rules — so after a merge storm, the surviving deploy run can sit 'waiting for approval' forever while the approval queue is provably empty. A standing wedge-watch workflow caught it failing loudly, and recovery was one script. The UI state was a lie; the measured state wasn't.",
+      "honest_miss": "The session's own harness stalled twice for ~5.5 hours total, which ate the time-boxed experiment-reset window — so cycle 13's reset shipped as a verified runbook for the owner to run, not as a done thing. The wrap deadline was missed by hours. The burn numbers are real; so is that.",
+      "prs": [
+        {
+          "label": "PR #2432",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2432"
+        },
+        {
+          "label": "PR #2457",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2457"
+        },
+        {
+          "label": "PR #2406",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2406"
+        },
+        {
+          "label": "PR #2438",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2438"
+        }
+      ]
     }
   ]
 }
