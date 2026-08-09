@@ -366,7 +366,7 @@ class ServeStack(Stack):
             bucket=local_bucket,
             dlq=None,
             alerts_topic=None,
-            custom_policies=rp.telegram_webhook(telegram_worker_fn.function_arn),
+            custom_policies=rp.telegram_webhook(),
             timeout_seconds=10,  # verify + async-invoke only; inference is the worker's
             memory_mb=256,
             environment={
