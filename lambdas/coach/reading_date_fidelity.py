@@ -166,3 +166,33 @@ def summary_keeps_reading_dates(summary, *, source_text, generation_date_iso=Non
     if findings:
         return None, True, findings
     return summary, False, []
+
+
+def guard_derived_summary(summary, source_text, field, coach_id=None, logger=None):
+    """The whole write-path seam in one call: `summary` or `None`, with the warning logged.
+
+    Both derived-summary writers (`coach_state_updater._write_output_record` for
+    `observatory_summary`, `intelligence_common.extract_thread_from_narrative` for
+    `position_summary`) apply this. It lives HERE rather than being restated at each
+    call site so the two cannot drift, and so the two host modules — both at their
+    #1665 size baseline — take three lines each instead of twenty.
+    """
+    if not summary:
+        return summary
+    cleaned, rejected, findings = summary_keeps_reading_dates(summary, source_text=source_text)
+    if rejected and logger is not None:
+        logger.warning("%s rejected for %s (#2343 reading-date fidelity) — %s", field, coach_id, [f["detail"] for f in findings][:3])
+    return cleaned
+
+
+# The item-8 extraction-prompt rider, kept beside the deterministic check it backstops.
+# A prompt asking nicely is not a guarantee (ADR-105) — the guard above is the guarantee —
+# but without the rider the model loses the day on most renders and the card falls back to
+# a truncated narrative every time, which is honest and worse.
+SUMMARY_DAY_CORRESPONDENCE_RULE = (
+    "DAY CORRESPONDENCE (#2343): if the output dates a recovery, HRV, resting-HR or sleep figure to a specific "
+    "night or date, the condensed version MUST keep that night or date attached to the figure. Never turn "
+    "'Whoop caught 55% recovery on the night of 2026-08-06' into 'Whoop shows 55% recovery' — the card sits "
+    "beside a cockpit publishing today's reading, so an undated figure reads as today's. Drop the figure "
+    "entirely rather than drop its day. "
+)

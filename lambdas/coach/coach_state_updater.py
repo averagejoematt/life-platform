@@ -27,7 +27,7 @@ from datetime import datetime, timedelta, timezone
 import boto3
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1969
 
-from coach.reading_date_fidelity import summary_keeps_reading_dates  # #2343: derived-summary day correspondence
+from coach.reading_date_fidelity import SUMMARY_DAY_CORRESPONDENCE_RULE, guard_derived_summary  # #2343
 from coach.relationship_engine import compute_relationship_update  # #536
 from coach.voice_register_guard import sanitize_summary  # #1987: deterministic voice-register check
 
@@ -517,13 +517,8 @@ EXTRACTION_SYSTEM_PROMPT = (
     "recommendation. Write it AS the coach, in first person — never refer "
     "to the coach in third person (do not write 'the coach believes...' or "
     "'the sleep coach is...'; write 'I believe...' or 'I'm...' instead). "
-    "DAY CORRESPONDENCE (#2343): if the output dates a recovery, HRV, resting-HR "
-    "or sleep figure to a specific night or date, the condensed version MUST keep "
-    "that night or date attached to the figure. Never turn 'Whoop caught 55% "
-    "recovery on the night of 2026-08-06' into 'Whoop shows 55% recovery' — the card "
-    "sits beside a cockpit publishing today's reading, so an undated figure reads as "
-    "today's. Drop the figure entirely rather than drop its day. "
-    "This will be shown on the public observatory page.\n\n"
+    + SUMMARY_DAY_CORRESPONDENCE_RULE
+    + "This will be shown on the public observatory page.\n\n"
     "9. **key_recommendation**: Extract the single most actionable "
     "recommendation from the output as a standalone 1-2 sentence string.\n\n"
     "10. **elena_quote**: If the output contains or implies a meta-observation "
@@ -609,28 +604,9 @@ def _write_output_record(coach_id, date, output_type, output_text, extraction):
     # fallback rather than inventing a new one here.
     observatory_summary, register_rejected = sanitize_summary(extraction.get("observatory_summary"))
     if register_rejected:
-        logger.warning(
-            "observatory_summary rejected for %s (third-person coach register) — " "falling back to full content at read time",
-            coach_id,
-        )
-
-    # #2343: day-correspondence on the DERIVED summary. Every grounding gate runs on
-    # `output_text`; this field is condensed from it afterwards and is what
-    # /api/coaching-dashboard actually publishes in the `position_summary` slot. On
-    # 2026-08-08 the narrative correctly said "Whoop caught 55% recovery on the night of
-    # 2026-08-06" and the condensation republished it as "Whoop shows 55% recovery and
-    # HRV at 42 ms" beside a cockpit serving 31% / 32 ms. Same rejection seam as #1987 —
-    # reject to None and the read sites' existing `observatory_summary or content`
-    # fallback serves the dated narrative instead.
-    if observatory_summary:
-        observatory_summary, _date_rejected, _date_findings = summary_keeps_reading_dates(observatory_summary, source_text=output_text)
-        if _date_rejected:
-            logger.warning(
-                "observatory_summary rejected for %s (#2343 reading-date fidelity) — %s",
-                coach_id,
-                [f["detail"] for f in _date_findings][:3],
-            )
-
+        logger.warning("observatory_summary rejected for %s (third-person coach register) — falling back to content at read time", coach_id)
+    # #2343: same rejection seam, for the night the CONDENSATION dropped (see the module).
+    observatory_summary = guard_derived_summary(observatory_summary, output_text, "observatory_summary", coach_id, logger)
     item = {
         "pk": f"COACH#{coach_id}",
         "sk": f"OUTPUT#{date}#{output_type}",

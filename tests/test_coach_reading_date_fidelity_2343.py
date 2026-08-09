@@ -31,7 +31,7 @@ These tests are built from the two verbatim strings above.
 
 import pytest
 from ai import night_scope
-from coach.reading_date_fidelity import dropped_reading_date_findings, summary_keeps_reading_dates
+from coach.reading_date_fidelity import dropped_reading_date_findings, guard_derived_summary, summary_keeps_reading_dates
 
 # Verbatim from COACH#nutrition_coach / OUTPUT#2026-08-08#daily_brief_nutrition.
 LIVE_NARRATIVE = (
@@ -178,7 +178,7 @@ class TestWritePathWiring:
         assert captured["content"] == LIVE_NARRATIVE  # the dated artifact still ships
 
         captured.clear()
-        monkeypatch.setattr(csu, "summary_keeps_reading_dates", lambda s, **kw: (s, False, []))
+        monkeypatch.setattr(csu, "guard_derived_summary", lambda s, *a, **kw: s)
         csu._write_output_record(
             "nutrition_coach", "2026-08-08", "daily_brief_nutrition", LIVE_NARRATIVE, {"observatory_summary": LIVE_SUMMARY}
         )
@@ -192,3 +192,21 @@ class TestWritePathWiring:
         monkeypatch.setattr(csu, "_put_item", lambda item: captured.update(item) or True)
         csu._write_output_record("nutrition_coach", "2026-08-08", "daily_brief_nutrition", LIVE_NARRATIVE, {"observatory_summary": good})
         assert captured["observatory_summary"] == good
+
+    def test_both_derived_summary_writers_are_wired(self):
+        """Guard the SET: the two places that persist an LLM condensation of a coach
+        narrative both apply the check. A third writer added later without it is the
+        recurrence, so this asserts on the write modules rather than on one call."""
+        import inspect
+
+        from coach import coach_state_updater
+        from intelligence import intelligence_common
+
+        for mod, field in ((coach_state_updater, "observatory_summary"), (intelligence_common, "position_summary")):
+            src = inspect.getsource(mod)
+            assert "guard_derived_summary(" in src, f"{mod.__name__} does not apply the #2343 check"
+            assert f'"{field}"' in src
+
+    def test_the_helper_is_inert_on_empty_input(self):
+        assert guard_derived_summary("", "src", "position_summary") == ""
+        assert guard_derived_summary(None, "src", "position_summary") is None

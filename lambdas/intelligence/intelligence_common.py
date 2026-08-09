@@ -21,7 +21,7 @@ from typing import Any
 
 import boto3
 from boto3.dynamodb.conditions import Attr, Key
-from coach.reading_date_fidelity import summary_keeps_reading_dates  # #2343: derived-summary day correspondence
+from coach.reading_date_fidelity import guard_derived_summary  # #2343: derived-summary day correspondence
 from coach.voice_register_guard import sanitize_summary  # #1987: deterministic voice-register check
 from common.text_utils import truncate_at_word  # #1224: word-boundary summary truncation (no mid-word cut)
 from experiment import calibration_core  # #538: the shared prediction-calibration scorer (Brier + reliability)
@@ -1664,24 +1664,11 @@ Rules:
         # block below already uses on a hard parse failure — no new control flow.
         summary, register_rejected = sanitize_summary(parsed.get("position_summary"))
         if register_rejected:
-            logger.warning(
-                "position_summary rejected for %s (third-person coach register) — " "falling back to truncated narrative",
-                coach_id,
-            )
-            summary = truncate_at_word(narrative, 200)  # #1224: word boundary, no mid-word cut
-        # #2343: the sibling write path for the same class of defect — a derived summary
-        # that drops the night its source attached to a vital. Same rejection seam, same
-        # fallback (the truncated narrative, which keeps the date the narrative carried).
-        if summary:
-            summary, _date_rejected, _date_findings = summary_keeps_reading_dates(summary, source_text=narrative)
-            if _date_rejected:
-                logger.warning(
-                    "position_summary rejected for %s (#2343 reading-date fidelity) — %s",
-                    coach_id,
-                    [f["detail"] for f in _date_findings][:3],
-                )
-                summary = truncate_at_word(narrative, 200)
-        parsed["position_summary"] = summary
+            logger.warning("position_summary rejected for %s (third-person coach register) — falling back to narrative", coach_id)
+        # #2343: sibling write path, same defect class — a derived summary that drops the
+        # night its source attached to a vital. Both rejections take the same fallback.
+        summary = guard_derived_summary(summary, narrative, "position_summary", coach_id, logger)
+        parsed["position_summary"] = summary or truncate_at_word(narrative, 200)  # #1224: word boundary
         return parsed
 
     except Exception as e:
