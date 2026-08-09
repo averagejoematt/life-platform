@@ -447,6 +447,7 @@ fix before #2052 was shipped **blind**: nothing measured the wedge while it was 
 | 3 | 2026-08-02 | same, group otherwise EMPTY | salt `-v4` | recurred same day |
 | 4 | 2026-08-02 | same, sole member of its group | **#2009 redesign** — workflow group per-`run_id`; the real invariant moved to a job-level group on `deploy` | moved the wedge, did not remove it |
 | 5 | 2026-08-02 | **5 green jobs**, `Deploy` blocked, gate never opens | **#2052** — detection + escape hatch (`check_deploy_wedge.py`, `deploy-wedge-watch.yml`) | measured for the first time |
+| 6 | 2026-08-09 | all-day wedge; THREE `deploy_all` dispatches blocked in sequence; `--recover` looped | **root cause finally measured (#2467): not phantom** — two 8-day-old gated runs (08-01/02) sat `waiting` with Deploy parked at the gate, silently holding the job-level slot; the script's recent-run window couldn't see them, so it read "no holder = phantom". Cure: **REJECT the zombies' pending_deployments** (state=rejected — run dies, nothing stale ships, slot frees). The "pin-exclude and leave waiting" zombie posture is retired — leave-waiting = hold-the-fleet-hostage; and "GitHub expires them at 30d" was false at day 8 | the sixth entry closes the ledger's question: entries 1–5's "phantom" may have been unseen gate-parked holders all along |
 
 Two things the ledger settles. **Salting never worked** — three attempts, three
 recurrences, median 3 days; a `-v5` is not a fix. And **#2009's consolation was wrong**:
