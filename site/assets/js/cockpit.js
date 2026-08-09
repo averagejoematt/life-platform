@@ -27,6 +27,7 @@ import { momentsIndex, shareMount } from "/assets/js/share.js"; // #404 moment p
 import { preStart, GENESIS_ISO } from "/assets/js/coach_popover.js"; // #931 pre-start countdown · #1088 scrub-floor fallback
 import { cohortAheadPercent } from "/assets/js/cohort_math.js"; // #1820 — direction-aware cohort percentile
 import { BRIEF_LINE_KICKER } from "/assets/js/daily_line.js"; // #1995 — the one honest label for the morning brief's daily line
+import { coachPayloadRead, deterministicPillarRead, isDark } from "/assets/js/absence_read.js"; // #2388 — real payload fields + no trend verb on a dark source
 
 const API = "/api";
 
@@ -517,24 +518,27 @@ async function loadPillarRead(key) {
   let text = "", action = "", confidence = "", asOf = "";
   try {
     const data = await getJSON(`${API}/coach_analysis?domain=${encodeURIComponent(key)}`);
-    const a = data.analysis || data.coach_analysis || data;
-    text = a.summary || a.analysis || a.read || "";
-    action = a.action || a.recommendation || a.one_thing || "";
-    const n = a.observations ?? a.n ?? a.sample_size;
-    if (typeof n === "number") {
-      confidence = n < 12 ? "preliminary pattern" : n < 30 ? "low confidence (n<30)" : `n=${n}`;
-    }
+    // #2388: `data.analysis` is a STRING at the top level of this payload. The old read
+    // (`const a = data.analysis || …; a.summary || a.analysis || a.read`) asked a string
+    // for object attributes — all undefined — so the served coach read was discarded and
+    // the deterministic fallback fired on every pillar that had one. coachPayloadRead
+    // reads the real fields (analysis / key_recommendation / confidence_language).
+    const r = coachPayloadRead(data);
+    text = r.text;
+    action = r.action;
+    confidence = r.confidence;
     // #802: disclose only when it's noteworthy — the budget guard paused this
     // coach's regeneration, or the served read is >48h old (see pillarAsOf()).
     asOf = pillarAsOf(data.generated_at, !!data.regeneration_paused);
   } catch (e) { /* fall through to the deterministic read */ }
 
-  if (!text) {
-    const p = state.pillars[key] || {};
-    const dir = trendOf(p.xp_delta);
-    const moving = dir === "up" ? "climbing" : dir === "down" ? "slipping" : "holding";
-    text = `${PILLAR_LABEL[key]} is at ${Math.round(p.raw_score ?? 0)} and ${moving} (${p.tier || "Foundation"}). ` +
-           `Correlative read only — open the Data door for the components behind it.`;
+  const pFall = state.pillars[key] || {};
+  // #2388: a pillar whose own source is dark never renders a trend claim — not from the
+  // fallback ("Nutrition is at 1 and slipping" over a cycle with zero food logs), and not
+  // from a held coach read written before the source went quiet.
+  if (!text || isDark(pFall)) {
+    text = deterministicPillarRead(PILLAR_LABEL[key], pFall);
+    if (isDark(pFall)) { action = ""; confidence = "no data logged"; }
     asOf = "";  // the deterministic fallback has no coach generation to date-stamp
   }
   const out = { text: escapeHTML(text).replace(/^&gt;\s*/, ""), action, confidence: confidence || "correlative", asOf };
