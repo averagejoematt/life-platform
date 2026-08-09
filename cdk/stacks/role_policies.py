@@ -3214,14 +3214,10 @@ def subscriber_onboarding() -> list[iam.PolicyStatement]:
 def telegram_webhook() -> list[iam.PolicyStatement]:
     """Telegram webhook (#2364): the public front door, deliberately near-powerless.
 
-    It can read ONE secret (the telegram store — for the echoed secret-token check
-    and the chat-id allow-list) and async-invoke ONE function (the worker). No DDB,
-    no S3, no Bedrock: a compromised webhook must be able to do nothing but hand
-    validated work orders to the worker it already hands work orders to.
-
-    Zero-arg by contract: tests/test_iam_secrets_consistency.py enumerates every
-    policy function by CALLING it, so the worker ARN is built from constants (the
-    function name is fixed) rather than passed from the CDK object graph.
+    One secret read + one lambda:InvokeFunction, nothing else — a compromised
+    front door can only hand validated work orders to the worker. Zero-arg by
+    contract: test_iam_secrets_consistency ENUMERATES policy functions by calling
+    them, so the worker ARN builds from constants (the name is fixed).
     """
     return [
         iam.PolicyStatement(
