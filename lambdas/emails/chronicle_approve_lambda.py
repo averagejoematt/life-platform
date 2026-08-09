@@ -246,6 +246,27 @@ def _commit_recap(item: dict) -> None:
         logger.warning("[recap] _commit_recap failed (non-fatal): %s", exc)
 
 
+def _index_for_recall(date_str: str) -> None:
+    """#1384 write-side: add the freshly published week to the semantic-recall corpus.
+
+    Must run AFTER `_mark_published` — the indexer only accepts a `published` record, and
+    the reader link it stores is derived from the published ordering, so a week indexed
+    while still a draft would carry no link and could later change text.
+
+    Fail-soft, like `_commit_recap`: publishing a week must never depend on an embedding
+    call succeeding. A miss costs exactly one precedent and is reported by the qa_smoke
+    freshness check rather than passing silently — which is what happened for the whole
+    life of this feature, when no automated writer existed at all.
+    """
+    try:
+        from ai import recall_indexer
+
+        status = recall_indexer.index_chronicle_installment(table, CHRONICLE_PK, date_str)
+        logger.info("[recall] index %s: %s", date_str, status)
+    except Exception as exc:  # noqa: BLE001 — recall indexing is never load-bearing
+        logger.warning("[recall] indexing failed for %s (non-fatal): %s", date_str, exc)
+
+
 def _mark_changes_requested(date_str: str) -> None:
     """Update DynamoDB status to changes_requested."""
     try:
@@ -366,6 +387,7 @@ def _sweep_stale_drafts(hours: float, max_days: float = 10.0, dry_run: bool = Fa
             _invalidate_cloudfront(paths)
             _commit_recap(item)  # Phase 3: commit the "previously on" recap with the week
             _mark_published(date_str)
+            _index_for_recall(date_str)  # #1384: published → it can be cited as a precedent
             _invoke_elena_state_updater(date_str)  # #537: published → update her memory
             published.append({"date": date_str, "week": wk})
             logger.info("sweep: auto-published Week %s (%s) — no approval within %sh", wk, date_str, hours)
@@ -480,6 +502,7 @@ def _handle(event: dict) -> dict:
         _invalidate_cloudfront(invalidation_paths)
         _commit_recap(item)  # Phase 3: commit the "previously on" recap with the week
         _mark_published(date_str)
+        _index_for_recall(date_str)  # #1384: published → it can be cited as a precedent
         _invoke_email_sender()
         _invoke_elena_state_updater(date_str)  # #537: published → update her memory
         _invoke_coach_panel_podcast()  # #734: a published week earns a Panel episode

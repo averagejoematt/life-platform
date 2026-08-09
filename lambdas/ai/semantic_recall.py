@@ -7,6 +7,13 @@ embedding partition loads in ONE DynamoDB Query and cosine is a dot product over
 normalized vectors. Retrieval spans resets, so the multi-cycle archive becomes
 load-bearing memory instead of decoration.
 
+That choice was RE-EXAMINED against DynamoDB's native vector search when it went GA and
+DELIBERATELY KEPT — **ADR-150**, which carries the measurements (17 rows / ~24 KB against
+a feature built for trillions of vectors, billed at a 1 KB floor per operation) and the
+numeric revisit trigger: ~5,000+ embedding rows AND retrieval on a synchronous reader
+path measuring >500 ms p95. Read the ADR before re-litigating this; the arithmetic is
+already done. The WRITE side lives in `ai/recall_indexer.py`.
+
 Rigor (ADR-105): similarity is a HYPOTHESIS GENERATOR, never a claim of sameness.
 The copy this module renders says "resembles" / "echoes" — never "caused", never
 "because". A precedent is a pointer to a dated, openable artifact with its

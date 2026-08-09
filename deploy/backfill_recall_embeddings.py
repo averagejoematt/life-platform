@@ -34,9 +34,19 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 import boto3  # noqa: E402
 from ai import (
     bedrock_client as bc,  # noqa: E402
+    recall_indexer as ri,  # noqa: E402
     semantic_recall as sr,  # noqa: E402
 )
 from boto3.dynamodb.conditions import Key  # noqa: E402
+
+# The doc-shaping helpers live in `ai.recall_indexer` (bundled) so the Lambda that indexes
+# a week AT PUBLISH and this catch-up script share ONE definition — most importantly of
+# `published_post_links`, whose previous single-caller life is what let #1827's dead
+# `/chronicle/week-N/` slug reach all 17 live rows. Re-exported under the old names so
+# this module's public surface (and the tests that load it by path) is unchanged.
+_date_from_sk = ri.date_from_sk
+_snippet = ri.snippet
+published_post_links = ri.published_post_links
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE = os.environ.get("TABLE_NAME", "life-platform")
@@ -61,73 +71,18 @@ except Exception:  # noqa: BLE001 — fall back to the known roster if the impor
     ]
 
 
-def _date_from_sk(sk: str, prefix: str = "DATE#") -> str:
-    """Extract YYYY-MM-DD from a DATE#/OUTPUT# sort key (the token after the marker)."""
-    if prefix not in sk:
-        return ""
-    tail = sk.split(prefix, 1)[1]
-    return tail.split("#", 1)[0]
-
-
-def _snippet(text: str, n: int = 240) -> str:
-    text = " ".join((text or "").split())
-    return text[:n]
-
-
-def published_post_links(installments) -> dict:
-    """{(date, sk): "/journal/posts/week-NN/"} for the installments that are ACTUALLY
-    PUBLISHED — #1827.
-
-    The original backfill emitted `/chronicle/week-{week_number}/`, which is not a page
-    on the live site (all 17 live rows 404'd, and the form was non-unique across cycles:
-    `week-0` appeared 6 times). Installments publish at `/journal/posts/week-{seq:02d}/`
-    where `seq` is the position in the (date, sk)-sorted list of VISIBLE installments —
-    exactly `chronicle_render.publish_to_journal::_seq_for` / `journal_post_ref`, which
-    `tests/test_recall_precedent_links_1827.py` pins this against.
-
-    Visibility matters: only phase-visible installments are published, so a wiped
-    prior-cycle installment gets NO url here. It stays in the recall corpus (cross-cycle
-    memory is the point) but is cited by DATE alone — an honest absence beats a link to
-    some other week's page.
-    """
-    from experiment.phase_filter import singleton_visible
-
-    keys = sorted((i.get("date", ""), str(i.get("sk", ""))) for i in installments if singleton_visible(i) and i.get("date"))
-    return {key: f"/journal/posts/week-{n + 1:02d}/" for n, key in enumerate(keys)}
-
-
 def gather_chronicle(table):
     """Chronicle installments — pk SOURCE#chronicle, sk DATE#<date>. One doc/week.
 
     Queried UNFILTERED (cross-reset recall is the point), but the reader link is derived
-    from the PUBLISHED ordering (#1827) so every link that renders is a real page.
+    from the PUBLISHED ordering (#1827) so every link that renders is a real page. The
+    per-record shaping is `recall_indexer.chronicle_doc`, shared with the publish-time
+    indexer so a week embedded by either path produces the identical row.
     """
-    docs = []
     resp = table.query(KeyConditionExpression=Key("pk").eq(f"{USER_PK_PREFIX}chronicle") & Key("sk").begins_with("DATE#"))
     items = list(resp.get("Items", []))
     links = published_post_links(items)
-    for it in items:
-        date = _date_from_sk(it.get("sk", ""))
-        if not date:
-            continue
-        text = " ".join(s for s in (it.get("title", ""), it.get("subtitle", ""), it.get("content_markdown", "")) if s).strip()
-        if not text:
-            continue
-        docs.append(
-            {
-                "kind": sr.KIND_CHRONICLE,
-                "date": date,
-                "text": text,
-                "artifact_pk": it["pk"],
-                "artifact_sk": it["sk"],
-                # Published → its real post URL. Not published (wiped prior cycle) → no
-                # link at all; `semantic_recall.render_precedent_line` then cites the
-                # date alone rather than a URL that 404s or points at another week.
-                "link": links.get((it.get("date", ""), str(it.get("sk", ""))), ""),
-                "cycle": it.get("cycle"),
-            }
-        )
-    return docs
+    return [doc for doc in (ri.chronicle_doc(it, links) for it in items) if doc]
 
 
 def gather_coach_outputs(table, coaches):

@@ -1103,6 +1103,20 @@ def lambda_handler(event: dict, context) -> dict:
         except Exception as e:
             logger.warning(f"[journal] publish_to_journal failed (non-fatal): {e}")
 
+        # #1384 write-side: this path publishes without ever passing through
+        # chronicle-approve, so it carries its own recall index call — otherwise a
+        # directly-published week would be the one shape of week the corpus never sees.
+        try:
+            from ai import recall_indexer
+
+            logger.info(
+                "[recall] index %s: %s",
+                date_str,
+                recall_indexer.index_chronicle_installment(table, f"USER#{USER_ID}#SOURCE#chronicle", date_str),
+            )
+        except Exception as e:  # noqa: BLE001 — recall indexing is never load-bearing
+            logger.warning(f"[recall] indexing failed (non-fatal): {e}")
+
         # #405: write the share kit to its stable generated location (immediate-publish path).
         if share_kit and share_kit_json:
             try:
