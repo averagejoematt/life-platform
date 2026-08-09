@@ -3,6 +3,7 @@ Data access tools: sources, latest, daily summary, date range, search, compare.
 """
 
 import bisect
+import operator
 from datetime import datetime, timedelta, timezone
 
 from boto3.dynamodb.conditions import Key
@@ -101,6 +102,17 @@ def tool_get_date_range(args):
     return {"note": "Raw daily data.", "source": source, "items": items}
 
 
+# The single source of truth for find_days comparison operators: validation and
+# evaluation both read this table, so the supported set cannot drift (#2306).
+FIND_DAYS_OPERATORS = {
+    ">": operator.gt,
+    ">=": operator.ge,
+    "<": operator.lt,
+    "<=": operator.le,
+    "=": operator.eq,
+}
+
+
 def tool_find_days(args):
     source = args.get("source")
     start_date = args.get("start_date")
@@ -108,6 +120,9 @@ def tool_find_days(args):
     filters = args.get("filters", [])
     if not all([source, start_date, end_date]):
         raise ValueError("'source', 'start_date', and 'end_date' are required")
+    for f in filters:
+        if f.get("op") not in FIND_DAYS_OPERATORS:
+            raise ValueError(f"Unknown operator '{f.get('op')}'. Supported: {sorted(FIND_DAYS_OPERATORS)}")
 
     items = query_source(source, start_date, end_date)
 
@@ -117,18 +132,7 @@ def tool_find_days(args):
             actual = item.get(field)
             if actual is None:
                 return False
-            actual = float(actual)
-            value = float(f["value"])
-            op = f["op"]
-            if op == ">" and not actual > value:
-                return False
-            if op == ">=" and not actual >= value:
-                return False
-            if op == "<" and not actual < value:
-                return False
-            if op == "<=" and not actual <= value:
-                return False
-            if op == "=" and not actual == value:
+            if not FIND_DAYS_OPERATORS[f["op"]](float(actual), float(f["value"])):
                 return False
         return True
 
