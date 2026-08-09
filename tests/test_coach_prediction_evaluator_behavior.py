@@ -591,7 +591,7 @@ class TestEwmaTrend:
         assert ev._get_ewma_trend("hrv", {}, TODAY)[0] == "up"
 
     @pytest.mark.xfail(
-        strict=False,
+        strict=True,
         reason=(
             "DEFECT (tranche-2 discovery): _get_ewma_trend documents and guards a five-observation "
             "floor (`if len(values) < 5: return None, None`) but the prior-EWMA branch below it needs "
@@ -736,7 +736,7 @@ class TestConditionalPredictions:
         assert table.updates == []
 
     @pytest.mark.xfail(
-        strict=False,
+        strict=True,
         reason=(
             "DEFECT (tranche-2 discovery): _evaluate_all applies _check_expiry only to the "
             "'inconclusive' branch, so a conditional whose precondition never materialises stays "
@@ -1433,7 +1433,7 @@ class TestSecondLook:
         assert json.loads(stored["outcome_notes"])["algo_version"] == ev.ALGO_VERSION
 
     @pytest.mark.xfail(
-        strict=False,
+        strict=True,
         reason=(
             "DEFECT (tranche-2 discovery): a forecast graded 'inconclusive' purely because the "
             "metric had no reading on the day its window closed is terminal. _evaluate_all writes "

@@ -731,7 +731,7 @@ def test_the_lag_grace_runs_out_and_a_lagged_source_does_go_yellow(monkeypatch):
 
 
 @pytest.mark.xfail(
-    strict=False,
+    strict=True,
     reason=(
         "DEFECT (tranche-2 discovery, CAUSE CORRECTED and DELIBERATELY LEFT by #2221). The premise "
         "is confirmed: _comp_status() takes yellow_h and never reads it — the yellow boundary is "

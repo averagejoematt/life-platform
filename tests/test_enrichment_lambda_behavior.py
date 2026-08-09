@@ -283,7 +283,7 @@ def test_the_label_names_the_metric_it_ranked():
 
 
 @pytest.mark.xfail(
-    strict=False,
+    strict=True,
     reason=(
         "DEFECT (tranche-3 discovery): enrichment_lambda.py:161 percentile() uses "
         "bisect_LEFT, which counts only values STRICTLY below. An activity tied with "
