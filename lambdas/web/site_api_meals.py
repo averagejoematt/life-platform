@@ -1,4 +1,4 @@
-"""lambdas/web/site_api_meals.py — meal-level nutrition endpoints (protein_sources, frequent_meals, meal_glucose, food_delivery_overview, meal_responses).
+"""lambdas/web/site_api_meals.py — meal-level nutrition endpoints (protein_sources, frequent_meals, meal_glucose, food_delivery_overview).
 
 Split out of site_api_observatory.py (#1654 slice 3 — god-module breakup). The
 routed handler entrypoints stay in the site_api_observatory facade as thin
@@ -9,15 +9,12 @@ import the facade — no import cycle. All other shared helpers come straight fr
 site_api_common (identical binding semantics to the pre-split facade).
 """
 
-import json
 from datetime import datetime, timezone
 from typing import Any
 
 from web.site_api_common import (
-    CORS_HEADERS,
     _error,
     _ok,
-    _request_id_headers,
     _window_span,
     logger,
     nutrition_delivery_public,
@@ -404,47 +401,3 @@ def food_delivery_overview(*, _g) -> dict:
         },
         cache_seconds=3600,
     )
-
-
-def meal_responses(*, _g) -> dict:
-    """GET /api/meal_responses — Returns CGM x MacroFactor meal response data.
-
-    Hand-rolls its envelope rather than going through `site_api_common._ok`, and
-    deliberately keeps doing so: the captured live schema
-    (`tests/api_schemas/api_meal_responses.json`) records `meals` as the SOLE
-    top-level key (no `_meta`), the bare `max-age=600` Cache-Control is a
-    different CloudFront shared-cache contract from `_ok`'s `public, ...` pair,
-    and `json.dumps(default=str)` publishes Decimals as JSON strings where `_ok`
-    would float them. What it must NOT drop is `x-request-id` — that header is
-    how a reader-reported "this page is wrong" is tied to a CloudWatch line, and
-    every sibling endpoint ships it via `_ok`. So the header is spliced in
-    explicitly from the same `_request_id_headers()` helper `_ok` uses.
-    """
-    table = _g["table"]
-    try:
-        # ADR-058: phase=pilot hidden by default.
-        from experiment.phase_filter import with_phase_filter
-
-        resp = table.query(
-            **with_phase_filter(
-                {
-                    "KeyConditionExpression": "pk = :pk",
-                    "ExpressionAttributeValues": {":pk": "USER#matthew#SOURCE#meal_responses"},
-                    "ScanIndexForward": False,
-                    "Limit": 50,
-                }
-            )
-        )
-        items = resp.get("Items", [])
-        return {
-            "statusCode": 200,
-            "headers": {**CORS_HEADERS, **_request_id_headers(), "Cache-Control": "max-age=600"},
-            "body": json.dumps({"meals": items}, default=str),
-        }
-    except Exception as e:
-        logger.warning(f"[site_api] meal_responses: {e}")
-        return {
-            "statusCode": 200,
-            "headers": {**CORS_HEADERS, **_request_id_headers(), "Cache-Control": "max-age=600"},
-            "body": json.dumps({"meals": []}),
-        }

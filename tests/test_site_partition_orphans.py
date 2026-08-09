@@ -51,10 +51,10 @@ ALLOWLIST_ORPHANS = {
     # Wednesday-chronicle hook and the "will re-populate" empty-state copy. Remove
     # this entry only once a real writer for the partition ships.
     "benchmarks": "#1218 — retired: no writer exists; chronicle hook + empty-state copy fixed in this PR",
-    # Pre-existing orphans surfaced by this new guard, OUT OF SCOPE for #1218 —
-    # allowlisted so the guard lands green; each warrants its own follow-up.
-    "meal_responses": "pre-existing orphan (out of #1218 scope): /api/meal_responses reads SOURCE#meal_responses "
-    "but the CGM x MacroFactor join that would write it was never built — no writer anywhere",
+    # Pre-existing orphan surfaced by this guard, OUT OF SCOPE for #1218 —
+    # allowlisted so the guard lands green; warrants its own follow-up.
+    # (meal_responses was retired in one direction by #2327: the read, the route,
+    # and the front-end fetch were deleted — no waiver survives it.)
     "state_of_mind": "pre-existing orphan (out of #1218 scope): the reader queries SOURCE#state_of_mind, but HAE "
     "merges State-of-Mind aggregates into SOURCE#apple_health (merge_day_to_dynamo), so the dedicated partition "
     "has no writer",

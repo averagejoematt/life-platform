@@ -1,11 +1,13 @@
-"""tests/test_site_api_meals_behavior.py — behavioral contracts for the five
+"""tests/test_site_api_meals_behavior.py — behavioral contracts for the four
 reader-facing meal endpoints served by ``lambdas/web/site_api_meals.py``:
 
     GET /api/protein_sources          (protein_sources)
     GET /api/frequent_meals           (frequent_meals)
     GET /api/meal_glucose             (meal_glucose)
     GET /api/food_delivery_overview   (food_delivery_overview)
-    GET /api/meal_responses           (meal_responses)
+
+(``/api/meal_responses`` was retired by #2327 — SOURCE#meal_responses was a dead
+partition with no writer, queried on every glucose-door load.)
 
 These are the numbers a human reader sees on averagejoematt.com's nutrition and
 glucose doors: which foods actually carry the protein, what gets eaten over and
@@ -27,7 +29,6 @@ serves them (`site/assets/js/evidence_nutrition.js`,
     nutrition door after a cycle reset).
   * Privacy — food delivery / binge frequency is PRIVATE-by-default elsewhere in
     the serving path (`site_api_nutrition._DELIVERY_PUBLIC`, P2.3).
-  * ADR-058 phase filtering on the one handler that queries DynamoDB directly.
 
 Everything is driven through the real handler with the facade's injection surface
 (`_g`) supplied by hand, a frozen clock, and hand-rolled bounded fakes — never a
@@ -36,7 +37,7 @@ MagicMock inside a pagination-shaped read, never a real AWS or HTTP call.
 Arithmetic expectations are hand-derived in the test body and written as literals
 with the derivation shown in a comment — never "whatever the code returned".
 
-CLOCK CAVEAT (a real property of the module, asserted in §7): ``frequent_meals``
+CLOCK CAVEAT (a real property of the module, asserted in §5): ``frequent_meals``
 and ``meal_glucose`` re-import ``datetime`` INSIDE the function body, which
 shadows the module-level binding — so ``monkeypatch.setattr(meals, "datetime",
 ...)`` cannot reach them. Content tests for those two therefore use a source fake
@@ -146,43 +147,6 @@ class FakeSources:
         raise AssertionError(f"{source!r} was never queried; calls={self.calls}")
 
 
-class FakeTable:
-    """A DynamoDB Table stand-in for the one handler that queries directly.
-
-    ``meal_responses`` issues a single string-expression query
-    (``pk = :pk``) with ``ScanIndexForward=False`` and ``Limit=50``, wrapped by
-    ``with_phase_filter``. This fake honours all four, in DynamoDB's real
-    ordering: **Limit is applied BEFORE FilterExpression**, so a partition whose
-    newest rows are pilot-phase really does return fewer than Limit items. A fake
-    that filtered first would flatter the handler.
-
-    The phase value is read out of the query's own
-    ``ExpressionAttributeValues[':phase_experiment']`` rather than restated here,
-    so the test cannot drift from ``phase_filter``'s definition.
-    """
-
-    def __init__(self, items, raises: Exception | None = None):
-        self.items = list(items)
-        self.queries: list[dict] = []
-        self.raises = raises
-
-    def query(self, **kwargs):
-        self.queries.append(kwargs)
-        if self.raises is not None:
-            raise self.raises
-        values = kwargs.get("ExpressionAttributeValues") or {}
-        rows = [i for i in self.items if i.get("pk") == values[":pk"]]
-        rows.sort(key=lambda r: r.get("sk", ""), reverse=not kwargs.get("ScanIndexForward", True))
-        limit = kwargs.get("Limit")
-        if limit is not None:
-            rows = rows[:limit]
-        fexpr = kwargs.get("FilterExpression") or ""
-        if "attribute_not_exists(#phase)" in fexpr:
-            want = values[":phase_experiment"]
-            rows = [r for r in rows if r.get("phase") is None or r.get("phase") == want]
-        return {"Items": [dict(r) for r in rows]}
-
-
 def mf(date: str, *food_log, **fields) -> dict:
     """A MacroFactor day record keyed the way the real partition keys it."""
     rec = {"pk": "USER#matthew#SOURCE#macrofactor", "sk": f"DATE#{date}", **fields}
@@ -217,10 +181,6 @@ def cgm(date: str, avg=None, peak=None, low=None, tir=None) -> dict:
 
 def delivery(date: str, amount=0.0, platform="DoorDash", **extra) -> dict:
     return {"pk": "USER#matthew#SOURCE#food_delivery", "sk": f"DATE#{date}", "amount": amount, "platform": platform, **extra}
-
-
-def mr(date: str, **fields) -> dict:
-    return {"pk": "USER#matthew#SOURCE#meal_responses", "sk": f"DATE#{date}", **fields}
 
 
 @pytest.fixture(autouse=True)
@@ -271,16 +231,15 @@ def delivery_public(monkeypatch):
     monkeypatch.setattr(meals, "_DELIVERY_PUBLIC", True)
 
 
-def make_g(sources: FakeSources | None = None, table: FakeTable | None = None) -> dict:
+def make_g(sources: FakeSources | None = None) -> dict:
     """The facade's injection surface, hand-built.
 
-    Mirrors what ``site_api_observatory.handle_*`` passes (`globals()`): the three
+    Mirrors what ``site_api_observatory.handle_*`` passes (`globals()`): the
     names every handler in this module reads off ``_g``.
     """
     return {
         "_query_source": sources if sources is not None else FakeSources(),
         "_experiment_date": sac._experiment_date,
-        "table": table if table is not None else FakeTable([]),
     }
 
 
@@ -289,8 +248,8 @@ def body_of(resp: dict) -> dict:
     return json.loads(resp["body"])
 
 
-def call(name: str, sources=None, table=None) -> dict:
-    return body_of(HANDLERS[name](_g=make_g(sources, table)))
+def call(name: str, sources=None) -> dict:
+    return body_of(HANDLERS[name](_g=make_g(sources)))
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -374,8 +333,6 @@ def _populated_g(name: str) -> dict:
         )
     if name == "food_delivery_overview":
         return make_g(FakeSources(food_delivery=[delivery("2026-04-15", amount=24.5)]))
-    if name == "meal_responses":
-        return make_g(table=FakeTable([mr("2026-04-15", meal="Pizza", peak=155)]))
     raise AssertionError(f"no populated fixture registered for new handler {name!r} — add one")
 
 
@@ -447,33 +404,16 @@ def test_frequent_meals_and_meal_glucose_cache_for_an_hour():
         assert fn(_g=make_g())["headers"]["Cache-Control"] == "public, max-age=3600, s-maxage=3600"
 
 
-def test_meal_responses_caches_for_ten_minutes_because_it_is_a_direct_partition_read():
-    """meal_responses hand-rolls its envelope rather than going through `_ok`, so
-    its Cache-Control is the bare `max-age` form, not `_ok`'s `public, ...`
-    pair. Pinned because CloudFront's shared-cache behaviour differs between the
-    two forms."""
-    resp = meals.meal_responses(_g=make_g())
-    assert resp["headers"]["Cache-Control"] == "max-age=600"
-
-
-@pytest.mark.parametrize("name", sorted(n for n in HANDLERS if n != "meal_responses"))
+@pytest.mark.parametrize("name", sorted(HANDLERS))
 def test_every_ok_enveloped_endpoint_publishes_generated_at_so_the_reader_can_date_the_page(name):
     meta = json.loads(HANDLERS[name](_g=make_g())["body"])["_meta"]
     assert meta["generated_at"].startswith("2026-05-10T17:40")
 
 
-def test_meal_responses_publishes_no_meta_block_at_all():
-    """The captured live schema (tests/api_schemas/api_meal_responses.json) records
-    `meals` as the sole key. Pinned so a reader-facing consumer never assumes the
-    `_meta.generated_at` that every sibling ships."""
-    assert set(call("meal_responses")) == {"meals"}
-
-
 @pytest.mark.parametrize("name", sorted(HANDLERS))
 def test_a_request_id_set_by_the_lambda_is_echoed_back_for_support_correlation(name):
     """`set_request_id` is how a reader-reported "this page is wrong" is tied to a
-    CloudWatch line. Every `_ok` response echoes it; meal_responses builds its
-    headers by hand and drops it."""
+    CloudWatch line. Every `_ok` response echoes it."""
     sac.set_request_id("req-abc-123")
     resp = HANDLERS[name](_g=make_g())
     assert resp["headers"].get("x-request-id") == "req-abc-123"
@@ -499,7 +439,6 @@ def _data_keys(payload: dict) -> set[str]:
     [
         "frequent_meals",
         "meal_glucose",
-        "meal_responses",
         "protein_sources",
         "food_delivery_overview",
     ],
@@ -1351,86 +1290,7 @@ def test_the_delivery_gate_is_what_withholds_the_data_and_not_an_empty_fixture(d
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 7. meal_responses — the one handler that queries DynamoDB directly
-# ──────────────────────────────────────────────────────────────────────────────
-
-
-def test_meal_responses_reads_only_the_meal_responses_partition():
-    table = FakeTable([])
-    meals.meal_responses(_g=make_g(table=table))
-    assert table.queries[0]["ExpressionAttributeValues"][":pk"] == "USER#matthew#SOURCE#meal_responses"
-
-
-def test_meal_responses_returns_the_newest_meals_first():
-    """The front-end slices the first 25 rows, so ordering IS the selection: a
-    forward scan would show the reader the oldest meals it ever recorded."""
-    table = FakeTable([mr("2026-04-10", meal="Old"), mr("2026-05-01", meal="New"), mr("2026-04-20", meal="Middle")])
-    assert [m["meal"] for m in call("meal_responses", table=table)["meals"]] == ["New", "Middle", "Old"]
-
-
-def test_meal_responses_caps_the_read_at_fifty_rows():
-    """An uncapped partition scan would grow the response without bound as the
-    record accumulates; 50 is the published cap."""
-    table = FakeTable([mr(f"2026-0{1 + i // 28}-{1 + i % 28:02d}", meal=f"Meal {i}") for i in range(70)])
-    assert len(call("meal_responses", table=table)["meals"]) == 50
-
-
-def test_meal_responses_hides_pilot_phase_rows_from_the_reader():
-    """ADR-058: a previous experiment's meal responses are archived, not served."""
-    table = FakeTable([mr("2026-05-01", meal="Current"), mr("2026-04-30", meal="Pilot Era", phase="pilot")])
-    assert [m["meal"] for m in call("meal_responses", table=table)["meals"]] == ["Current"]
-
-
-def test_meal_responses_still_serves_rows_that_carry_no_phase_attribute():
-    """Config-era and pre-tagging rows have no `phase`; the filter passes them
-    through by design, and dropping them would blank the panel after a restart."""
-    table = FakeTable([mr("2026-05-01", meal="Untagged")])
-    assert [m["meal"] for m in call("meal_responses", table=table)["meals"]] == ["Untagged"]
-
-
-def test_the_read_cap_is_applied_before_the_phase_filter_as_dynamodb_really_does():
-    """Not a nitpick: with 60 pilot rows newer than the current ones, the reader
-    gets an EMPTY panel even though current-phase data exists. Pinned so the
-    behaviour is a known property rather than a mystery empty state."""
-    table = FakeTable(
-        [mr(f"2026-06-{d:02d}", meal=f"Pilot {d}", phase="pilot") for d in range(1, 29)]
-        + [mr(f"2026-07-{d:02d}", meal=f"Pilot {d}", phase="pilot") for d in range(1, 29)]
-        + [mr("2026-05-01", meal="Current")]
-    )
-    assert call("meal_responses", table=table)["meals"] == []
-
-
-def test_a_dynamodb_failure_leaves_the_glucose_page_standing_with_an_empty_panel():
-    """Fail-soft by design: /api/meal_glucose and /api/meal_responses feed the same
-    table in the front-end, so a 200-with-nothing degrades one panel instead of
-    breaking the page."""
-    table = FakeTable([], raises=RuntimeError("ProvisionedThroughputExceededException"))
-    resp = meals.meal_responses(_g=make_g(table=table))
-    assert resp["statusCode"] == 200
-    assert json.loads(resp["body"]) == {"meals": []}
-
-
-def test_the_failure_path_still_ships_the_security_headers_and_cache_policy():
-    table = FakeTable([], raises=RuntimeError("boom"))
-    resp = meals.meal_responses(_g=make_g(table=table))
-    assert resp["headers"]["Cache-Control"] == "max-age=600"
-    assert resp["headers"]["X-Content-Type-Options"] == "nosniff"
-
-
-def test_meal_responses_serialises_a_decimal_measurement_rather_than_crashing():
-    """`json.dumps(..., default=str)` is the guard. NOTE the divergence it creates:
-    unlike every sibling (which passes through `_decimal_to_float`), a DynamoDB
-    Decimal arrives at the browser as a JSON STRING. evidence_shared.js `fmt()`
-    coerces with `Number(v)` so the reader is unharmed today — but the endpoint's
-    published types differ from its siblings'."""
-    from decimal import Decimal
-
-    table = FakeTable([mr("2026-05-01", meal="Pasta", peak=Decimal("155.5"))])
-    assert call("meal_responses", table=table)["meals"][0]["peak"] == "155.5"
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# 8. Malformed data — one bad row must not take a page down
+# 7. Malformed data — one bad row must not take a page down
 # ──────────────────────────────────────────────────────────────────────────────
 
 

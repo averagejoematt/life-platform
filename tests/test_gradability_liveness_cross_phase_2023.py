@@ -365,10 +365,6 @@ _SANCTIONED_CURRENT_CYCLE_VIEWS: dict[str, str] = {
         "the function's phase-filtered queries read coach_actions and COACH# (EXPERIMENT_SCOPED). "
         "Function-granularity co-location, not a phase-filtered raw read."
     ),
-    "lambdas/web/site_api_meals.py::meal_responses": (
-        "SOURCE#meal_responses is a derived CGM x MacroFactor projection, not a raw timeseries — "
-        "and it is absent from SOURCE_CLASS with no writer anywhere in the repo (dead partition)."
-    ),
     "lambdas/web/site_stats_refresh_lambda.py::_get_latest": (
         "Two-day bounded Limit:1 read: it means 'today's number', not 'is this pipe alive'. On a "
         "miss it falls back to the previously published S3 value rather than claiming no data."

@@ -166,7 +166,6 @@ from web.site_api_observatory import (
     handle_frequent_meals,
     handle_journal_analysis,
     handle_meal_glucose,
-    handle_meal_responses,
     handle_mind_overview,
     handle_nutrition_overview,
     handle_physical_overview,
@@ -483,9 +482,9 @@ ROUTES = {
     "/api/food_delivery_overview": handle_food_delivery_overview,
     "/api/meal_glucose": handle_meal_glucose,
     "/api/strength_benchmarks": handle_strength_benchmarks,
-    # Benchmark trends + meal responses (stub endpoints)
+    # Benchmark trends (stub endpoint); /api/meal_responses retired (#2327 — dead
+    # partition with no writer; the glucose door reads /api/meal_glucose)
     "/api/benchmark_trends": handle_benchmark_trends,
-    "/api/meal_responses": handle_meal_responses,
     # Tools page: baseline vs current comparison
     "/api/tools_baseline": handle_tools_baseline,
     # Platform stats: single source of truth for all site pages
