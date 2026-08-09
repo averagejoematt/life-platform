@@ -1,12 +1,11 @@
 """
 tools_hevy.py — MCP read tools for workout data (per SPEC §2.6).
 
-Three tools, source-agnostic by design so future MacroFactor workouts
+Two tools, source-agnostic by design so future MacroFactor workouts
 (WS-2) plug in via the same interface:
 
   get_workouts(start, end, source?)        — list normalized workouts
   get_workout_detail(workout_uid)          — full per-set detail
-  get_workout_source_status()              — last-ingested per source
 
 Reads the NEW per-workout schema (sk = DATE#yyyy-mm-dd#WORKOUT#<id>).
 The OLD daily-aggregate schema (sk = DATE#yyyy-mm-dd, no #WORKOUT#) is
@@ -21,11 +20,15 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from boto3.dynamodb.conditions import Key
-
-from mcp.core import query_source_range, table
+from mcp.core import query_source_range
 
 _WORKOUT_SOURCES = ("hevy", "macrofactor_export")
+
+# uid prefix minted by _content_uid for legacy-bridge aggregates. Both halves
+# of the module must agree on it: tool_get_workouts publishes these uids and
+# tool_get_workout_detail resolves them (#2304 — a uid this module mints must
+# round-trip through its own detail lookup).
+_LEGACY_UID_PREFIX = "mf"
 
 # Legacy daily-aggregate partitions that pre-date the per-workout schema.
 # The MCP read layer expands them into virtual per-workout records on the fly
@@ -56,7 +59,7 @@ def _content_uid(source_label: str, date_str: str, title: str, start_time: str) 
     import hashlib
 
     key = f"{source_label}|{date_str}|{(start_time or '').strip()}|{(title or '').strip()}"
-    return f"mf:{hashlib.sha256(key.encode()).hexdigest()[:16]}"
+    return f"{_LEGACY_UID_PREFIX}:{hashlib.sha256(key.encode()).hexdigest()[:16]}"
 
 
 def _expand_legacy_aggregate(item: dict, source_label: str) -> list[dict]:
@@ -227,34 +230,35 @@ def tool_get_workout_detail(args: dict) -> dict:
         return {"error": f"invalid workout_uid (expected '<source>:<id>'): {uid!r}"}
     source, source_id = uid.split(":", 1)
     source = source.lower()
+
+    # Bounded lookback for both lookup paths. Workouts are rare, this is fine
+    # for an MCP tool's latency budget. Look back 5 years.
+    today = date.today()
+    start_date = (today - timedelta(days=5 * 365)).isoformat()
+    end_date = today.isoformat()
+
+    if source == _LEGACY_UID_PREFIX:
+        # Legacy-bridge uid minted by _content_uid: the underlying record is a
+        # daily aggregate in a legacy partition, so re-expand the aggregates
+        # exactly as tool_get_workouts does and match on the full uid (#2304).
+        for legacy_src, label in _LEGACY_AGGREGATE_SOURCES.items():
+            try:
+                items = query_source_range(legacy_src, start_date, end_date, include_pilot=True) or []
+            except Exception:
+                items = []
+            for it in items:
+                for w in _expand_legacy_aggregate(it, label):
+                    if w.get("workout_uid") == uid:
+                        return {"workout": _slim_workout(w, include_sets=True)}
+        return {"error": f"workout not found for uid {uid!r}"}
+
     if source not in _WORKOUT_SOURCES:
         return {"error": f"unknown source in uid: {source!r}"}
 
     # Use the DDB GSI-less pattern: walk recent dates by source and match on
-    # source_workout_id. Bounded scan — workouts are rare, this is fine for
-    # an MCP tool's latency budget. Look back 5 years.
-    today = date.today()
-    start_date = (today - timedelta(days=5 * 365)).isoformat()
-    items = query_source_range(source, start_date, today.isoformat(), include_pilot=True) or []
+    # source_workout_id.
+    items = query_source_range(source, start_date, end_date, include_pilot=True) or []
     for it in items:
         if it.get("source_workout_id") == source_id:
             return {"workout": _slim_workout(it, include_sets=True)}
     return {"error": f"workout not found for uid {uid!r}"}
-
-
-def _latest_per_workout_record(source: str) -> dict:
-    """Return most-recent per-workout (post-genesis) record for a source, or {}."""
-    pk = f"USER#matthew#SOURCE#{source}"
-    try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(pk) & Key("sk").begins_with("DATE#"),
-            FilterExpression="attribute_exists(source_workout_id) " "AND (#phase = :exp OR attribute_not_exists(#phase))",
-            ExpressionAttributeNames={"#phase": "phase"},
-            ExpressionAttributeValues={":exp": "experiment"},
-            ScanIndexForward=False,
-            Limit=1,
-        )
-        items = resp.get("Items") or []
-        return items[0] if items else {}
-    except Exception:
-        return {}
