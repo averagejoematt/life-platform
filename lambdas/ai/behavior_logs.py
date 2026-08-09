@@ -148,7 +148,7 @@ def _norm_dates(pairs) -> frozenset:
     """
     if isinstance(pairs, dict):
         pairs = pairs.items()
-    out = {}
+    out: dict[str, str | None] = {}
     for item in pairs or ():
         try:
             cat, value = item
@@ -224,7 +224,7 @@ def available_logs_from_presence(signal, date_iso) -> LogAvailability:
     detail = detail if isinstance(detail, dict) else {}
 
     present, covered = set(), set()
-    dates = {}
+    dates: dict[str, str | None] = {}
     for channel, category in PRESENCE_CHANNEL_CATEGORIES.items():
         entry = detail.get(channel)
         if not isinstance(entry, dict):
@@ -284,7 +284,7 @@ def available_logs_from_recency(data, reference_date=None) -> LogAvailability:
     data = data if isinstance(data, dict) else {}
     ref = _iso(reference_date)
     present, covered = set(), set()
-    dates = {}
+    dates: dict[str, str | None] = {}
     for field, category in RECENCY_FIELD_CATEGORIES.items():
         if field not in data:
             continue
