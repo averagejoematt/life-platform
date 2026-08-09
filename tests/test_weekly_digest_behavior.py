@@ -171,13 +171,15 @@ class FakeTable:
         rows = [v for (p, _s), v in self.items.items() if p == vals.get(":pk")]
         if ":s" in vals and ":e" in vals:
             rows = [r for r in rows if vals[":s"] <= r["sk"] <= vals[":e"]]
+        if ":pfx" in vals:  # begins_with(sk, :pfx) — the #2387 newest-record lookup
+            rows = [r for r in rows if r["sk"].startswith(vals[":pfx"])]
         filt = kwargs.get("FilterExpression") or ""
         if PHASE_FILTER_EXPRESSION in filt:
             rows = [r for r in rows if r.get("phase") in (None, EXPERIMENT_PHASE_CURRENT)]
         names = kwargs.get("ExpressionAttributeNames") or {}
         if "#st" in names:  # the subscribers filter (_count_real_subscribers / _attribution_breakdown)
             rows = [r for r in rows if r.get("status") == "confirmed" and r.get("source") != "canary"]
-        rows.sort(key=lambda r: r["sk"])
+        rows.sort(key=lambda r: r["sk"], reverse=not kwargs.get("ScanIndexForward", True))
         limit = kwargs.get("Limit")
         if limit is not None:
             rows = rows[:limit]
@@ -841,6 +843,80 @@ class TestExMacrofactor:
         # The reader never sees a bare 100% — the sample size is on the row.
         assert "Protein Hit Rate" in html
         assert "n=1 of 1 logged" in html
+
+
+class TestNutritionAbsenceLine:
+    """#2387 (ADR-104): an unlogged week's nutrition section states the absence in one
+    line instead of silently vanishing — six consecutive digests shipped with no
+    nutrition section at all. The last-log date comes from the source's own records
+    (`nutrition_last_log_absence`), and a never-logged-this-cycle week is stated
+    WITHOUT a day-count (#2382: a count measured against the cycle window fabricates
+    a "stopped N days ago" transition that never happened)."""
+
+    # ── the renderer: what the reader sees on a dark week ─────────────────────
+
+    def test_unlogged_week_renders_the_one_line_absence_with_the_real_last_log(self):
+        html = wd.build_html(
+            digest_data(this={}, nutrition_absence={"last_log": "2026-07-24", "days_ago": 16}),
+            BOARD_TEXT,
+            profile_row(),
+        )
+        assert "Nutrition" in html  # the section renders — never omitted
+        assert "Nothing logged this week; last log 2026-07-24, 16 days ago" in html
+
+    def test_a_one_day_gap_reads_day_not_days(self):
+        html = wd.build_html(
+            digest_data(this={}, nutrition_absence={"last_log": "2026-08-07", "days_ago": 1}),
+            BOARD_TEXT,
+            profile_row(),
+        )
+        assert "last log 2026-08-07, 1 day ago" in html
+
+    def test_never_logged_this_cycle_says_so_without_a_date_or_day_count(self):
+        html = wd.build_html(digest_data(this={}, nutrition_absence={"last_log": None}), BOARD_TEXT, profile_row())
+        assert "Nothing logged this cycle" in html
+        assert "last log" not in html  # no fabricated transition (#2382)
+
+    def test_a_failed_lookup_states_only_the_week_never_the_cycle(self):
+        # {} is UNKNOWN (#2056 semantics): it licenses neither a last-log date nor the
+        # "this cycle" claim — only the directly observed empty week.
+        html = wd.build_html(digest_data(this={}, nutrition_absence={}), BOARD_TEXT, profile_row())
+        assert "Nothing logged this week" in html
+        assert "this cycle" not in html
+        assert "last log" not in html
+
+    def test_a_logged_week_renders_the_normal_section_with_no_absence_line(self):
+        m = as_range("macrofactor", {"2026-08-02": {"total_calories_kcal": Decimal("1500"), "total_protein_g": Decimal("200")}})
+        out = wd.ex_macrofactor(m, profile_row())
+        html = wd.build_html(digest_data(this={"macrofactor": out}), BOARD_TEXT, profile_row())
+        assert "Avg Calories" in html
+        assert "Nothing logged" not in html
+
+    # ── the lookup: the date is the source's own newest record ────────────────
+
+    @staticmethod
+    def _mf_row(date_iso, **extra):
+        return {"pk": f"USER#{wd.USER_ID}#SOURCE#macrofactor", "sk": f"DATE#{date_iso}", "date": date_iso, **extra}
+
+    def test_last_log_is_the_newest_record_and_the_gap_is_measured_from_today(self, table, monkeypatch):
+        monkeypatch.setattr(wd, "EXPERIMENT_START_DATE", "2026-08-01")
+        table.add(self._mf_row("2026-08-02"))
+        table.add(self._mf_row("2026-08-04"))  # newest must win, not dict order
+        out = wd.nutrition_last_log_absence(datetime(2026, 8, 9).date())
+        assert out == {"last_log": "2026-08-04", "days_ago": 5}
+
+    def test_a_newest_record_before_genesis_is_never_logged_this_cycle(self, table, monkeypatch):
+        monkeypatch.setattr(wd, "EXPERIMENT_START_DATE", "2026-08-01")
+        table.add(self._mf_row("2026-06-24"))  # pre-genesis: a prior cycle's log
+        out = wd.nutrition_last_log_absence(datetime(2026, 8, 9).date())
+        assert out == {"last_log": None}
+
+    def test_no_records_at_all_is_never_logged(self, table):
+        assert wd.nutrition_last_log_absence(datetime(2026, 8, 9).date()) == {"last_log": None}
+
+    def test_a_failed_query_is_unknown_not_a_cycle_claim(self, table):
+        table.query_error = RuntimeError("throttled")
+        assert wd.nutrition_last_log_absence(datetime(2026, 8, 9).date()) == {}
 
 
 class TestExHevyWorkouts:
@@ -1673,8 +1749,13 @@ class TestPresenceBlock:
 class TestBuildHtmlSections:
     def test_a_week_with_no_data_renders_no_empty_sections(self):
         html = wd.build_html(digest_data(), BOARD_TEXT, profile_row())
-        for title in ("Training</h2>", "Recovery &amp; HRV", "Nutrition</h2>", "Weight &amp; Body Composition"):
+        for title in ("Training</h2>", "Recovery &amp; HRV", "Weight &amp; Body Composition"):
             assert title not in html
+        # Nutrition is the sanctioned exception (#2387, ADR-104): a dark week renders
+        # the one-line absence statement, never nothing — six consecutive digests once
+        # shipped with the section silently missing.
+        assert "Nutrition</h2>" in html
+        assert "Nothing logged this week" in html
         # the Board and the load model always render
         assert "Board of Advisors" in html
         assert "Training Load — Banister" in html
