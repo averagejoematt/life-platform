@@ -42,6 +42,9 @@ _MAX_FIELD_CHARS = 400
 _MAX_LIST_ITEMS = 6
 
 
+_SHARED_STANDARD_ID = "_shared_standard"
+
+
 def _local_path(coach_id: str) -> str:
     """Offline fallback: config/coaches/{id}.json. Depth-independent — see
     common.repo_config (#1653)."""
@@ -84,6 +87,48 @@ def _items(seq) -> list:
     return [str(x).strip() for x in (seq or [])[:_MAX_LIST_ITEMS] if str(x).strip()]
 
 
+def shared_block(s3_client=None, bucket=None) -> str:
+    """The MOS shared character standard, rendered as the byte-stable substrate
+    every coach inherits (config/coaches/_shared_standard.json).
+
+    Same loader + cache as the voice specs (S3-first, bundled file offline), and
+    deliberately FIRST in persona_block: it is identical across coaches and stable
+    across days, which is exactly what the COST-OPT-2 cached prefix wants. "" on
+    any failure — a coach without the substrate still has its own voice.
+    """
+    std = load_voice_spec(_SHARED_STANDARD_ID, s3_client=s3_client, bucket=bucket)
+    if not isinstance(std, dict):
+        return ""
+    lines = []
+    if std.get("mission"):
+        lines.append(f"YOUR SHARED STANDARD (every coach on Matthew's staff inherits this):\nMISSION: {_clip(std['mission'])}")
+    rules = [str(r).strip() for r in (std.get("constitutional_rules") or [])[:12] if str(r).strip()]
+    if rules:
+        lines.append("RULES: " + "; ".join(rules) + ".")
+    model = [str(m).strip() for m in (std.get("matt_model") or [])[:9] if str(m).strip()]
+    if model:
+        lines.append("WORKING MODEL OF MATTHEW (living context, never permanent labels): " + "; ".join(model) + ".")
+    stages = std.get("relationship_stages") or {}
+    stage_bits = [f"{k}: {_clip(v)}" for k, v in stages.items() if v]
+    if stage_bits:
+        lines.append("RELATIONSHIP STAGES: " + " | ".join(stage_bits))
+    if std.get("disengagement_rule"):
+        lines.append(f"DISENGAGEMENT: {_clip(std['disengagement_rule'])}")
+    avoid = [str(a).strip() for a in (std.get("communication_avoid") or [])[:9] if str(a).strip()]
+    if avoid:
+        lines.append("EVERY COACH AVOIDS: " + "; ".join(avoid) + ".")
+    loop = [str(q).strip() for q in (std.get("reasoning_loop") or [])[:9] if str(q).strip()]
+    if loop:
+        lines.append("BEFORE REPLYING, SILENTLY ASK: " + " ".join(loop))
+    evidence = [str(e).strip() for e in (std.get("evidence_rules") or [])[:6] if str(e).strip()]
+    if evidence:
+        lines.append("EVIDENCE: " + "; ".join(evidence) + ".")
+    safety = [str(s).strip() for s in (std.get("safety_boundaries") or [])[:6] if str(s).strip()]
+    if safety:
+        lines.append("HARD BOUNDARIES: " + "; ".join(safety) + ".")
+    return "\n".join(lines)
+
+
 def voice_block(spec: dict) -> str:
     """Render a voice spec as the compact shared persona block.
 
@@ -96,6 +141,38 @@ def voice_block(spec: dict) -> str:
     decision = spec.get("decision_style") or {}
     anti = spec.get("anti_pattern_detection") or {}
     lines = []
+
+    # Character layer (the MOS bible transplant, #2402): who this coach IS —
+    # rendered ahead of the mechanics so the voice rules read as expressions of a
+    # person rather than a style guide. Every field optional; absent fields cost
+    # zero bytes so pre-transplant specs render exactly as before.
+    identity_bits = []
+    if spec.get("bio"):
+        identity_bits.append(f"WHO YOU ARE: {_clip(spec['bio'])}")
+    if spec.get("defining_tension"):
+        identity_bits.append(f"YOUR DEFINING TENSION: {_clip(spec['defining_tension'])}")
+    philosophy = _items(spec.get("philosophy"))
+    if philosophy:
+        identity_bits.append("WHAT YOU BELIEVE: " + "; ".join(philosophy) + ".")
+    if spec.get("relationship_style"):
+        identity_bits.append(f"YOUR RELATIONSHIP WITH MATTHEW: {_clip(spec['relationship_style'])}")
+    phrases = _items(spec.get("signature_phrases"))
+    if phrases:
+        identity_bits.append("SIGNATURE LANGUAGE (use naturally, never mechanically): " + "; ".join(f'"{p}"' for p in phrases))
+    blind = _items(spec.get("blind_spots"))
+    if blind:
+        identity_bits.append("YOUR BLIND SPOTS (own them when they show): " + "; ".join(blind))
+    bounds = spec.get("boundaries") or {}
+    owns = _items(bounds.get("owns"))
+    not_owns = _items(bounds.get("does_not_own"))
+    if owns or not_owns:
+        b = []
+        if owns:
+            b.append("you own " + ", ".join(owns))
+        if not_owns:
+            b.append("you do NOT own " + ", ".join(not_owns) + " — hand those off by name")
+        identity_bits.append("SCOPE: " + "; ".join(b) + ".")
+    lines.extend(identity_bits)
 
     voice_bits = []
     if rules.get("sentence_rhythm"):
@@ -135,10 +212,51 @@ def voice_block(spec: dict) -> str:
     return "\n".join(lines)
 
 
+def texting_block(spec: dict) -> str:
+    """The coach's texting register (#2402) — rendered ONLY on the chat surface.
+
+    The board answers in 3-5 sentences and the observatory experts in paragraphs;
+    telling them how to text would be noise. The Telegram worker appends this to
+    persona_block. "" when the spec carries no texting_style.
+    """
+    if not isinstance(spec, dict):
+        return ""
+    style = spec.get("texting_style") or {}
+    if not isinstance(style, dict) or not style:
+        return ""
+    labels = (
+        ("burst_shape", "Bursts"),
+        ("message_length", "Length"),
+        ("punctuation", "Punctuation"),
+        ("opening_register", "Openings"),
+        ("double_text", "Double-texting"),
+        ("emoji_posture", "Emoji"),
+    )
+    bits = [f"- {label}: {_clip(style[key])}" for key, label in labels if style.get(key)]
+    if not bits:
+        return ""
+    block = "HOW YOU TEXT (this surface only — a phone, not a report):\n" + "\n".join(bits)
+    # Bubble-shaped few-shots (#2402): the bibles' dialogue examples re-cut for a
+    # phone. Two at most, generously clipped — register calibration, not a corpus.
+    shots = [str(s).strip()[:600] for s in (spec.get("texting_few_shots") or [])[:2] if str(s).strip()]
+    if shots:
+        block += "\n\nHOW A REAL EXCHANGE READS (register calibration, never scripts to reuse):\n" + "\n\n".join(shots)
+    return block
+
+
 def persona_block(coach_id: str, s3_client=None, bucket=None) -> str:
-    """load_voice_spec + voice_block in one call. "" on any failure."""
+    """shared substrate + load_voice_spec + voice_block in one call. "" on any failure.
+
+    The substrate joins ONLY when the coach's own voice resolves: a substrate-only
+    persona would make every degraded coach sound like the same generic person,
+    which is the nameless-coach defect in a nicer shirt.
+    """
     try:
-        return voice_block(load_voice_spec(coach_id, s3_client=s3_client, bucket=bucket))
+        voice = voice_block(load_voice_spec(coach_id, s3_client=s3_client, bucket=bucket))
+        if not voice:
+            return ""
+        shared = shared_block(s3_client=s3_client, bucket=bucket)
+        return f"{shared}\n\n{voice}" if shared else voice
     except Exception as e:  # never let a persona render break a caller
         logger.warning("[persona_core] persona_block failed for %s: %s", coach_id, e)
         return ""

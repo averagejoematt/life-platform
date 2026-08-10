@@ -137,7 +137,14 @@ def _thread_today(coach_id: str, limit: int = 40) -> list:
             Limit=limit,
         )
         items = list(reversed(resp.get("Items") or []))
-        return [{"role": i.get("role"), "text": i.get("text")} for i in items]
+        # Role filter, not just a text filter: CHAT#summary# rows live inside the
+        # CHAT# prefix by design (one cross-phase family) and must never be read
+        # back as turns.
+        return [
+            {"role": i.get("role"), "text": i.get("text")}
+            for i in items
+            if i.get("role") in (coach_chat.ROLE_MATTHEW, coach_chat.ROLE_COACH)
+        ]
     except Exception as e:
         logger.warning("[telegram] thread read failed for %s: %s", coach_id, e)
         return []
@@ -145,6 +152,15 @@ def _thread_today(coach_id: str, limit: int = 40) -> list:
 
 def _turns_today(thread: list) -> int:
     return len([t for t in thread if t.get("role") == coach_chat.ROLE_MATTHEW])
+
+
+def _last_reply_had_emoji(thread: list) -> bool:
+    """Whether the coach's most recent stored reply carried an emoji — feeds the
+    never-twice-in-a-row half of the deterministic emoji ceiling."""
+    for t in reversed(thread or []):
+        if t.get("role") == coach_chat.ROLE_COACH:
+            return coach_chat.has_emoji(t.get("text") or "")
+    return False
 
 
 def _memory_block(coach_id: str) -> str:
@@ -182,7 +198,18 @@ def _memory_block(coach_id: str) -> str:
                 lines.append(f"{label}: " + " · ".join(rows))
         except Exception as e:
             logger.warning("[telegram] %s read failed: %s", prefix, e)
-    return ("WHAT YOU REMEMBER ABOUT MATTHEW:\n" + "\n".join(f"- {ln}" for ln in lines)) if lines else ""
+    block = ("WHAT YOU REMEMBER ABOUT MATTHEW:\n" + "\n".join(f"- {ln}" for ln in lines)) if lines else ""
+    # The long memory: yesterday-and-earlier compressed to a paragraph, so what
+    # he told this coach three days ago survives MAX_THREAD_TURNS.
+    try:
+        from coach.coach_chat_summary import read_recent_summaries
+
+        summaries = read_recent_summaries(_table(), pk)
+        if summaries:
+            block = f"{block}\n\n{summaries}" if block else summaries
+    except Exception as e:
+        logger.warning("[telegram] chat summaries unavailable: %s", e)
+    return block
 
 
 def _facts() -> dict:
@@ -328,9 +355,14 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
     memory = _memory_block(coach_id)
 
     try:
-        from coach.persona_core import persona_block
+        from coach.persona_core import load_voice_spec, persona_block, texting_block
 
         persona = persona_block(persona_id, s3_client=_s3_client(), bucket=S3_BUCKET)
+        # The texting register joins ONLY here — the board and the observatory
+        # keep the same soul without being told how to text (#2402).
+        texting = texting_block(load_voice_spec(persona_id, s3_client=_s3_client(), bucket=S3_BUCKET))
+        if persona and texting:
+            persona = f"{persona}\n\n{texting}"
     except Exception as e:
         logger.warning("[telegram] persona load failed: %s", e)
         persona = ""
@@ -340,12 +372,23 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
 
     from ai import bedrock_client
 
-    # The current moment joins the FACTS the coach may cite — and the grounder's
-    # allowed vocabulary, so naming today is never flagged as a fabricated date.
+    # The current moment + the coach's DOMAIN pack join the FACTS the coach may
+    # cite — and the grounder's allowed vocabulary, so naming today or its own
+    # domain numbers is never flagged as fabrication. The night map stays
+    # canonical-facts-only (#2343): the pack widens vocabulary, never vitals.
     moment = _current_moment_line()
+    domain = ""
+    try:
+        from coach.coach_domain_facts import domain_facts_block
+
+        domain = domain_facts_block(coach_id, _table())
+    except Exception as e:
+        logger.warning("[telegram] domain facts unavailable: %s", e)
     facts_block = build_facts_block(facts)
     if moment:
         facts_block = f"{facts_block}\n{moment}"
+    if domain:
+        facts_block = f"{facts_block}\n\n{domain}"
 
     result = coach_chat.run_turn(
         coach_id=coach_id,
@@ -360,12 +403,20 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
         # All five gate classes armed; the memory block and thread text widen the
         # NUMBER vocabulary (quoting memory is not fabrication) while the night map
         # stays facts-only — #2343's class is checked even on remembered figures.
-        grounder=build_grounder(facts, extra_sources=(memory, moment, " ".join(t.get("text") or "" for t in thread))),
+        grounder=build_grounder(facts, extra_sources=(memory, moment, domain, " ".join(t.get("text") or "" for t in thread))),
         tier=_current_tier(),
         turns_today=_turns_today(thread),
+        last_reply_had_emoji=_last_reply_had_emoji(thread),
     )
 
-    _tg(token, "sendMessage", {"chat_id": chat_id, "text": result.text})
+    # A burst goes out as separate bubbles ~1s apart with the typing indicator
+    # between — the texture of a person, not a report renderer. Bounded: at most
+    # MAX_BUBBLES-1 pauses on a Lambda already sized for a Bedrock round-trip.
+    for i, bubble in enumerate(result.bubbles or [result.text]):
+        if i:
+            _tg(token, "sendChatAction", {"chat_id": chat_id, "action": "typing"})
+            _time.sleep(1.0)
+        _tg(token, "sendMessage", {"chat_id": chat_id, "text": bubble})
 
     # The exchange joins the coach's real memory — including a held turn, with its
     # findings, so a later reader sees the coach declined and why, not a gap.
@@ -381,6 +432,18 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
             table.put_item(Item=item)
     except Exception as e:
         logger.warning("[telegram] turn storage failed (reply already sent): %s", e)
+
+    # Long-memory upkeep AFTER the reply is out: summarize the most recent
+    # un-summarized past chat day (lazily scheduled — no cron, no cdk). Shares
+    # the chat's own budget posture; a tier that pauses chat never summarizes.
+    try:
+        tier = _current_tier()
+        if tier is None or tier < 2:
+            from coach.coach_chat_summary import ensure_daily_summary
+
+            ensure_daily_summary(_table(), coach_chat.chat_pk(coach_id), coach_name, lambda body: bedrock_client.invoke(body), cycle=cycle)
+    except Exception as e:
+        logger.warning("[telegram] chat summary upkeep failed (reply already sent): %s", e)
 
     logger.info("[telegram] %s turn %s (attempts=%d findings=%d)", coach_id, result.status, result.attempts, len(result.findings))
     return {"ok": True, "status": result.status}

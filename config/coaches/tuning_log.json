@@ -86,6 +86,69 @@
       "rationale": "CC-09: each coach now has a per-stage philosophy (read_of_him / cares_most / cares_less_right_now / plan / graduation_gate / watches) so the coaching visibly levels up as Matthew progresses. Nutrition stance wellbeing-guarded.",
       "ref": "BACKLOG CC-09; SPEC_COACHES_AS_CHARACTERS_2026-06-13",
       "observed_effect": null
+    },
+    {
+      "date": "2026-08-09",
+      "coach": "all",
+      "change_type": "prompt",
+      "summary": "Shared MOS character substrate added (config/coaches/_shared_standard.json, rendered by persona_core.shared_block ahead of every voice spec).",
+      "rationale": "The 8 coaches shared no behavioural floor — constitutional rules, the Matt model, relationship stages, the avoid-list, and the silent reasoning loop now precede every persona on every surface, as one cached stable prefix.",
+      "ref": "coaching-team v2 big-bang session (epic #2363 / #2402); MOS character bibles v1",
+      "observed_effect": null
+    },
+    {
+      "date": "2026-08-09",
+      "coach": "all",
+      "change_type": "prompt",
+      "summary": "Texting registers (texting_style + texting_few_shots) added; burst mechanics ≤3 bubbles; deterministic emoji ceiling (≤1/reply, end-position, never consecutive) enforced in coach_chat, not just requested in the prompt.",
+      "rationale": "#2402: chat replies read as reports. Owner call 2026-08-09: human-style emoji, ceiling enforced in the gate; 3-bubble burst max.",
+      "ref": "coaching-team v2 big-bang session (epic #2363 / #2402); MOS character bibles v1",
+      "observed_effect": null
+    },
+    {
+      "date": "2026-08-09",
+      "coach": "nutrition_coach",
+      "change_type": "persona",
+      "summary": "MOS bible transplant (01 Marcus Hale): bio, defining tension, philosophy, relationship style, signature phrases, blind spots, boundaries + texting register.",
+      "rationale": "Wave 2 of the coaching-team v2 session — the soul under the platform voice; environment-beats-willpower behavioural depth Webb lacked.",
+      "ref": "coaching-team v2 big-bang session (epic #2363 / #2402); MOS character bibles v1",
+      "observed_effect": null
+    },
+    {
+      "date": "2026-08-09",
+      "coach": "sleep_coach",
+      "change_type": "persona",
+      "summary": "MOS bible transplant (04 Lena Park): reassuring sleep scientist who protects sleep without making it fragile; anti-catastrophizing register.",
+      "rationale": "Near-perfect bible fit; adds the can-recommend-no-action posture and measurement-caution Park's platform spec only implied.",
+      "ref": "coaching-team v2 big-bang session (epic #2363 / #2402); MOS character bibles v1",
+      "observed_effect": null
+    },
+    {
+      "date": "2026-08-09",
+      "coach": "mind_coach",
+      "change_type": "persona",
+      "summary": "MOS bible transplant (05 Samira Patel, male-adapted for Dr. Nathan Reeves): what-is-this-protecting reasoning, acceptance+values register.",
+      "rationale": "Gives Reeves the shame/avoidance craft the screenshots showed missing; validates emotion, not every interpretation.",
+      "ref": "coaching-team v2 big-bang session (epic #2363 / #2402); MOS character bibles v1",
+      "observed_effect": null
+    },
+    {
+      "date": "2026-08-09",
+      "coach": "physical_coach",
+      "change_type": "persona",
+      "summary": "MOS bible transplant (03 Asha Kapoor, male-adapted): keep-the-identity-adjust-the-dose coaching; earned-💪 emoji posture (the one canonical exception).",
+      "rationale": "The merged Performance seat's soul ahead of the Wave-3 roster merge; continuity-through-low-capacity is the exact coaching Matthew's relapse cycle needs.",
+      "ref": "coaching-team v2 big-bang session (epic #2363 / #2402); MOS character bibles v1",
+      "observed_effect": null
+    },
+    {
+      "date": "2026-08-09",
+      "coach": "explorer_coach",
+      "change_type": "persona",
+      "summary": "MOS bible transplant (07 Theo Grant): evidence appraisal re-mission — claim definition, effect-size-vs-quality split, belief retirement.",
+      "rationale": "Grounds the re-missioned Research & Longevity seat (anti-pseudoscience, N-of-1 methodology) in a coherent character.",
+      "ref": "coaching-team v2 big-bang session (epic #2363 / #2402); MOS character bibles v1",
+      "observed_effect": null
     }
   ]
 }

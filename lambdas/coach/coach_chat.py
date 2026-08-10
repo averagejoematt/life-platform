@@ -71,6 +71,33 @@ MAX_THREAD_TURNS = 12
 MAX_INBOUND_CHARS = 2000
 MAX_REPLY_CHARS = 1200
 
+# Burst mechanics (#2402, owner call 08-09): a coach may answer in up to THREE
+# separate bubbles, like a person. The model marks a bubble break with a line
+# containing only the delimiter; parsing fails soft to one bubble because a
+# prompt rule is a request, not a guarantee (the podcast-gate lesson).
+MAX_BUBBLES = 3
+BUBBLE_DELIM = "---"
+
+# Emoji ceiling (owner, revised 08-09): human-style — at most ONE per reply, at
+# the END of a bubble, never in consecutive coach replies. The per-coach
+# emoji_posture prompt sets the register; THIS is the enforcement (a prompt
+# politely requests, the gate guarantees). Ranges cover the emoji blocks without
+# touching typography — the "··" honest-absence glyph (U+00B7) and em-dashes must
+# never be stripped.
+_EMOJI_RE = re.compile(
+    "["
+    "\U0001f1e6-\U0001f1ff"  # regional indicators (flags)
+    "\U0001f300-\U0001f5ff"
+    "\U0001f600-\U0001f64f"
+    "\U0001f680-\U0001f6ff"
+    "\U0001f900-\U0001f9ff"
+    "\U0001fa70-\U0001faff"
+    "☀-➿"
+    "⬅-⭕"
+    "️"
+    "]+"
+)
+
 # Budget posture. Tier 2 is "reader narratives paused" — a private chat is closer to
 # the daily brief in priority than to a website narrative, so it survives tier 1 and
 # stops at 2 rather than sharing the reader-narrative band.
@@ -162,7 +189,10 @@ def build_system_prompt(persona_block: str, memory_block: str, facts_block: str,
             persona_block,
             f"You are texting Matthew directly. You ARE {coach_name} — first person, no third-person self-reference, "
             "no salutation or sign-off. This is a text message, not a report: short, one idea, the way a person who "
-            "knows him would actually text. If a longer answer is genuinely warranted, earn it.",
+            "knows him would actually text. If a longer answer is genuinely warranted, earn it. "
+            f"You may split a reply into separate bubbles the way a person fires off consecutive texts: put a line "
+            f'containing only "{BUBBLE_DELIM}" between bubbles, {MAX_BUBBLES} bubbles at most. Most replies are one '
+            "bubble; use two or three only when the rhythm genuinely calls for it.",
             memory_block,
             facts_block,
             "HARD RULE: every number, date, and day-reference you state must come from the facts above. If the facts "
@@ -220,6 +250,64 @@ def clip_reply(text: str) -> str:
     return cut[: m[-1].end()].strip() if m else cut.rstrip()
 
 
+def split_bubbles(text: str, max_bubbles: int = MAX_BUBBLES) -> list:
+    """Model reply -> 1..max_bubbles message bubbles.
+
+    A bubble break is a line containing only ``BUBBLE_DELIM``. No delimiter means
+    one bubble (the fail-soft a prompt rule needs). Overflow beyond the ceiling is
+    MERGED into the last bubble, never dropped — the grounding gate has passed
+    this text and a formatter must not invent an omission after the fact.
+    """
+    segments: list = []
+    current: list = []
+    for line in (text or "").splitlines():
+        if line.strip() == BUBBLE_DELIM:
+            if current:
+                segments.append("\n".join(current).strip())
+                current = []
+            continue
+        current.append(line)
+    if current:
+        segments.append("\n".join(current).strip())
+    segments = [s for s in segments if s]
+    if len(segments) > max_bubbles:
+        segments = segments[: max_bubbles - 1] + ["\n\n".join(segments[max_bubbles - 1 :])]
+    return segments
+
+
+def has_emoji(text: str) -> bool:
+    return bool(_EMOJI_RE.search(text or ""))
+
+
+def enforce_emoji_policy(bubbles: list, last_reply_had_emoji: bool = False) -> list:
+    """Deterministic emoji ceiling — at most ONE per reply, end-of-bubble only,
+    never in consecutive coach replies (owner call 08-09).
+
+    Keeps the LAST bubble-terminal emoji when one is allowed; everything else is
+    stripped. Deterministic computation before any model verdict (ADR-105): the
+    prompt shapes the habit, this guarantees the ceiling.
+    """
+    bubbles = list(bubbles or [])
+    if not any(has_emoji(b) for b in bubbles):
+        return bubbles
+
+    def _strip(s: str) -> str:
+        return re.sub(r" {2,}", " ", _EMOJI_RE.sub("", s)).rstrip()
+
+    if last_reply_had_emoji:
+        return [_strip(b) for b in bubbles]
+
+    keep_idx = None
+    for i, b in enumerate(bubbles):
+        m = list(_EMOJI_RE.finditer(b))
+        if m and m[-1].end() >= len(b.rstrip()) and len(m) == 1 and not _EMOJI_RE.search(b[: m[-1].start()]):
+            keep_idx = i
+    out = []
+    for i, b in enumerate(bubbles):
+        out.append(b if i == keep_idx else _strip(b))
+    return out
+
+
 # ── Budget posture ────────────────────────────────────────────────────────────
 
 
@@ -251,13 +339,16 @@ class TurnResult:
     findings that caused a hold so the failure is inspectable rather than a mystery.
     """
 
-    __slots__ = ("text", "status", "findings", "attempts")
+    __slots__ = ("text", "status", "findings", "attempts", "bubbles")
 
-    def __init__(self, text: str, status: str, findings: Optional[list] = None, attempts: int = 0):
+    def __init__(self, text: str, status: str, findings: Optional[list] = None, attempts: int = 0, bubbles: Optional[list] = None):
         self.text = text
         self.status = status
         self.findings = findings or []
         self.attempts = attempts
+        # What the transport actually sends: 1..MAX_BUBBLES messages. Defaults to
+        # the single-text shape so refusals/holds stay one honest bubble.
+        self.bubbles = bubbles or ([text] if text else [])
 
     @property
     def grounded(self) -> bool:
@@ -282,6 +373,7 @@ def run_turn(
     tier: Optional[int] = None,
     turns_today: int = 0,
     cap: int = DAILY_TURN_CAP,
+    last_reply_had_emoji: bool = False,
 ) -> TurnResult:
     """One conversational turn: budget -> generate -> ground -> regenerate-or-hold.
 
@@ -322,9 +414,14 @@ def run_turn(
         if not text:
             last_findings = [{"type": "empty_reply", "detail": "model returned no text"}]
             continue
-        findings = grounder(text) or []
+        # Bubble split + the deterministic emoji ceiling run BEFORE the grounding
+        # gate, so the gate adjudicates exactly the text that will be sent — a
+        # formatter must never touch a reply after it has been gated.
+        bubbles = enforce_emoji_policy(split_bubbles(text), last_reply_had_emoji=last_reply_had_emoji)
+        final_text = "\n\n".join(bubbles)
+        findings = grounder(final_text) or []
         if not findings:
-            return TurnResult(text, "sent" if attempt == 0 else "regenerated", [], attempts)
+            return TurnResult(final_text, "sent" if attempt == 0 else "regenerated", [], attempts, bubbles=bubbles)
         last_findings = findings
         logger.warning("[coach_chat] %s grounding findings on attempt %d: %s", coach_id, attempts, [f.get("type") for f in findings])
         # The retry is told what it got wrong. A blind re-roll is a coin flip; naming
