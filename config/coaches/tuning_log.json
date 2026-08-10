@@ -257,6 +257,15 @@
       "rationale": "A coach that says 'I'll check in Friday' and then never does is worse for trust than one that never offered. The extraction is deterministic and refuses more than it accepts (an offer, a question, a hedge, or a sentence with no resolvable day produces nothing) because the alternative — inferring an intent — is exactly the ADR-104 fabrication this surface cannot afford in a trusted voice. No derived row is written: the CHAT# turn IS the record, so the follow-up quotes what was actually said and the chat path stays the only writer of that partition.",
       "ref": "#2486 (also delivers #2491); epic #2363",
       "observed_effect": null
+    },
+    {
+      "date": "2026-08-10",
+      "coach": "all",
+      "change_type": "prompt",
+      "summary": "Inside-references ledger (#2487): the existing daily chat summarizer now also returns a 'BITS:' tail — the pair's recurring inside references, copied word-for-word from the day's transcript — into a capped RELATIONSHIP#bits row (hard ceiling 10, at most 3 new per day). It renders back into the memory block through read_recent_summaries, so the coach can call a running bit back weeks later. Zero lines added to telegram_worker_lambda.py.",
+      "rationale": "Recurring bits are how a real texting relationship accumulates texture, and they were washing out of the rolling summary. One extraction path, not two: the summarizer had already read the transcript, so this is one more instruction on an existing Haiku call rather than a second model pass. Honesty (ADR-104) is enforced deterministically, not by prompt: a candidate is stored only if its normalized text is literally present in the transcript, so a paraphrased or invented bit — a fabricated shared history — cannot land. The cap has a written, total eviction rule (sightings desc, then last_seen desc, then alphabetical) so the ledger records what RECURS rather than what is merely recent. The row is CROSS_PHASE with the rest of the texting relationship (ADR-153): a reset re-anchors the experiment, it does not un-say a shared joke.",
+      "ref": "#2487 (epic #2363)",
+      "observed_effect": null
     }
   ]
 }
