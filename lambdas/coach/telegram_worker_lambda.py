@@ -20,8 +20,10 @@ tested elsewhere — the design rule of the whole epic:
 The only genuinely new behaviour here is Telegram's sendMessage/sendChatAction —
 urllib, per the no-HTTP-libraries rule.
 
-OUTBOUND (Act 1b). Two paths let a coach text FIRST — a referral handoff after a
-reply, and Eli's weekday morning check-in on a scheduled event. Both assemble
+OUTBOUND (Act 1b, extended by #2490). Three paths let a coach text FIRST — a
+referral handoff after a reply, Eli's weekday morning check-in on a scheduled
+event, and the daily EVENT sweep, where the data itself starts the conversation
+(a lift PR, a milestone, a three-day recovery slide). All three assemble
 exactly the same way as an inbound turn (same persona, same memory, same facts,
 same full grounding gate); what differs is the gate in front of them, which lives
 in ``coach.coach_outbound``: a shared daily ledger, quiet hours, and a hard
@@ -85,10 +87,16 @@ def _s3_client():
     return _s3
 
 
-def _emit_metric(name: str, coach_id: str) -> None:
+def _emit_metric(name: str, coach_id: str, value: float = 1) -> None:
     """Fail-loud partner of the persona fix: a coach chatting without its identity
     is an incident, not a WARN. Emission itself is fail-soft — a metrics outage
-    must not block the reply."""
+    must not block the reply.
+
+    ``value`` exists for the sweep heartbeat (#2490), where the useful number is
+    "how many events did this run find" and the useful ALARM is on the datapoint's
+    existence (SampleCount) rather than its size — one series answering both
+    "did it run" and "is detection alive".
+    """
     global _cw
     try:
         if _cw is None:
@@ -99,7 +107,7 @@ def _emit_metric(name: str, coach_id: str) -> None:
                 {
                     "MetricName": name,
                     "Dimensions": [{"Name": "Coach", "Value": coach_id}],
-                    "Value": 1,
+                    "Value": value,
                     "Unit": "Count",
                 }
             ],
@@ -509,6 +517,35 @@ def _grounder_for(a: dict, *extra: str):
     )
 
 
+def _unsolicited_turn(a: dict, frame: str, tier: Optional[int], *extra_sources: str):
+    """Run ONE coach's unsolicited turn — the same assembly and the same gate for
+    all three outbound paths.
+
+    Three near-identical ``run_turn`` calls were three chances for the referral,
+    the check-in and the event ping to drift into three slightly different
+    coaches wearing the same name. One runner also means the NEXT outbound
+    feature costs this size-capped module a call, not a block.
+    """
+    from ai import bedrock_client
+
+    return coach_chat.run_turn(
+        coach_id=a["persona_id"],
+        coach_name=a["coach_name"],
+        persona_block=a["persona"],
+        memory_block=a["memory"],
+        facts_block=a["facts_block"],
+        thread=a["thread"],
+        inbound=frame,
+        model=MODEL,
+        caller=lambda body: bedrock_client.invoke(body),
+        grounder=_grounder_for(a, *extra_sources),
+        tier=tier,
+        turns_today=_turns_today(a["thread"]),
+        last_reply_had_emoji=_last_reply_had_emoji(a["thread"]),
+        colleagues_block=a["colleagues"],
+    )
+
+
 def _send_bubbles(token: str, chat_id, bubbles: list, *, max_bubbles: Optional[int] = None) -> list:
     """Send 1..n bubbles ~1s apart with the typing indicator between — the texture
     of a person, not a report renderer. Markers are stripped on EVERY path here,
@@ -589,7 +626,9 @@ def _maybe_refer(*, marker: Optional[str], referring: dict, chat_id, thread: lis
     # The claim comes BEFORE inference, not before the send: a crash between
     # generating and sending must not license a second attempt later (#1382's
     # reserve-then-act idiom).
-    if not coach_outbound.claim_outbound(_table(), now.strftime("%Y-%m-%d"), referral=True):
+    if not coach_outbound.claim_outbound(
+        _table(), now.strftime("%Y-%m-%d"), referral=True, provenance=coach_outbound.PROVENANCE_REFERRAL, now_pt=now
+    ):
         return None
 
     a = _assemble(target, target)
@@ -599,6 +638,9 @@ def _maybe_refer(*, marker: Optional[str], referring: dict, chat_id, thread: lis
         referring["coach_name"],
     )
     frame = coach_outbound.referral_frame(referring["coach_name"], tail)
+    # The tail joins the allowed vocabulary: a coach repeating a number its
+    # colleague just cited is quoting, not fabricating.
+    result = _unsolicited_turn(a, frame, tier, tail)
 
     from ai import bedrock_client
 
@@ -674,11 +716,12 @@ def _morning_checkin() -> dict:
         logger.info("[telegram] morning check-in skipped — budget tier %s", tier)
         return {"ok": True, "reason": "budget"}
 
-    if not coach_outbound.claim_outbound(_table(), now.strftime("%Y-%m-%d")):
+    if not coach_outbound.claim_outbound(_table(), now.strftime("%Y-%m-%d"), provenance=coach_outbound.PROVENANCE_CHECKIN, now_pt=now):
         return {"ok": True, "reason": "capped"}
 
     a = _assemble(persona_id, persona_id)
     frame = coach_outbound.checkin_frame()
+    result = _unsolicited_turn(a, frame, tier)
 
     from ai import bedrock_client
 
@@ -711,6 +754,77 @@ def _morning_checkin() -> dict:
     return {"ok": True, "status": result.status, "bubbles": len(sent)}
 
 
+# ── Outbound path 3: the event trigger (#2490) ────────────────────────────────
+
+
+def _bot_seat(persona_id: str) -> tuple:
+    """(token, chat_id) for a coach who can actually be texted, else (None, None)."""
+    from coach.persona_registry import resolve
+
+    route = (resolve(persona_id, _s3_client(), S3_BUCKET) or {}).get("telegram_route")
+    token = _bot_token(route) if route else None
+    chats = _bot_chat_ids(route) if route else []
+    return (token, chats[0]) if token and chats else (None, None)
+
+
+def _speak_unsolicited(event: dict, token: str, chat_id) -> dict:
+    """Say one event-triggered thing, with the full grounding gate over its evidence.
+
+    Only the transport lives here. Detection, the personal-variance thresholds, the
+    ordering and both claims are ``coach_event_triggers``' — deliberately, because
+    this module sits under a size ceiling and each outbound feature that inlined
+    itself would spend a share of it.
+    """
+    a = _assemble(event["persona_id"], event["persona_id"])
+    # The triggering rows join the allowed vocabulary — the coach is quoting the
+    # evidence it was handed, which is the whole point of an event-shaped ping.
+    result = _unsolicited_turn(a, event["frame"], _current_tier(), event["evidence"])
+    if not result.grounded:
+        logger.info("[telegram] event ping held (%s) — not sending unsolicited", result.status)
+        return {"ok": True, "reason": "held"}
+    sent = _send_bubbles(token, chat_id, result.bubbles or [result.text], max_bubbles=1)
+    if not sent:
+        return {"ok": True, "reason": "empty"}
+    _store_outbound(
+        event["persona_id"], a["coach_name"], event["frame"], result, event["provenance"], extra={"event_id": event["event_id"]}
+    )
+    logger.info("[telegram] event ping sent (%s / %s)", event["persona_id"], event["event_id"])
+    return {"ok": True, "status": result.status, "event_id": event["event_id"], "persona_id": event["persona_id"]}
+
+
+EVENT_SWEEP_METRIC = "EventSweepCompleted"
+EVENT_SWEEP_DIMENSION = "sweep"
+
+
+def _event_outbound() -> dict:
+    """The daily sweep: does anything in the data deserve a first move today?
+
+    The metric is not decoration. This path's failure mode is INVISIBLE ABSENCE —
+    a rule that stops firing, or a sweep that stands down for a bad reason, looks
+    exactly like a quiet week, and the only person who could notice is the one who
+    never got the text. Lambda ``Invocations`` cannot tell the story either: this
+    function's primary traffic is inbound chat, so its invocation count says
+    nothing about whether the CRON ran. So the sweep reports itself on every
+    completed run, carrying the number of events it found, and
+    ``telegram-event-sweep-heartbeat`` alarms on that datapoint being ABSENT.
+    Errors remain the ``telegram-worker-errors`` alarm's job — the two together
+    are "it broke" and "it stopped", which are different questions.
+    """
+    from coach import coach_event_triggers
+
+    out = coach_event_triggers.run_sweep(
+        now_pt=_pacific_now(),
+        table=_table(),
+        seat=_bot_seat,
+        speak=_speak_unsolicited,
+        chat_rows=_chat_rows,
+        tier=_current_tier(),
+    )
+    _emit_metric(EVENT_SWEEP_METRIC, EVENT_SWEEP_DIMENSION, float(out.get("candidates") or 0))
+    logger.info("[telegram] event sweep done (reason=%s candidates=%s)", out.get("reason"), out.get("candidates"))
+    return out
+
+
 def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — Lambda signature
     """One work order in, one Telegram reply out (or one honest refusal).
 
@@ -721,6 +835,8 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
     """
     if (event or {}).get("kind") == "morning_checkin":
         return _morning_checkin()
+    if (event or {}).get("kind") == "event_outbound":
+        return _event_outbound()
 
     order = event or {}
     coach_id = order.get("coach_id")

@@ -363,6 +363,13 @@ _PK_RULES: list = [
     # Telegram update_id dedupe rows: transport plumbing with a 24h self-TTL —
     # system state, never tagged, never wiped by a reset.
     (lambda pk, sk: pk.startswith("COACH#") and sk.startswith("DEDUPE#"), SYSTEM_STATE),
+    # #2490: the event-outbound write-once claims (COACH#outbound_events /
+    # EVENT#<id>) — a dedupe tracker with a 90-day self-TTL, same class as the row
+    # above. It matters that a reset does NOT wipe these: the claim records that a
+    # coach already TEXTED him about a lift PR, and a wiped claim would let the
+    # next sweep say the same thing twice. "I already said this" is not an
+    # artifact of the cycle that produced it.
+    (lambda pk, sk: pk == "COACH#outbound_events" and sk.startswith("EVENT#"), SYSTEM_STATE),
     # Coach intelligence tier — all experiment-scoped.
     (lambda pk, sk: pk.startswith("COACH#"), EXPERIMENT_SCOPED),
     (lambda pk, sk: pk == "ENSEMBLE#digest", EXPERIMENT_SCOPED),

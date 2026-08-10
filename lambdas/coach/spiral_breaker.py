@@ -138,6 +138,12 @@ CELEBRATORY_EMITTERS = {
     # #1623: the private milestone digest — no celebratory note to the named
     # humans during a suspected downturn (fail-closed; event stays pending).
     "milestone_digest": {"path": "lambdas/emails/milestone_digest_lambda.py", "wired": True},
+    # #2490: a coach texting Matthew's phone about a lift PR or a milestone. The
+    # loudest celebratory surface there is — it buzzes — so it is gated here
+    # (fail-closed: an unreadable breaker holds the ping). The SOFT-CONCERN half of
+    # that same sweep is deliberately ungated: checking in on him is the behaviour
+    # this breaker exists to leave room for, not one it should suppress.
+    "coach_event_outbound": {"path": "lambdas/coach/coach_event_triggers.py", "wired": True},
 }
 
 USER_PREFIX = "USER#matthew#SOURCE#"

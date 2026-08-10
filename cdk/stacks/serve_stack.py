@@ -448,6 +448,74 @@ class ServeStack(Stack):
             )
         )
 
+        # The event-triggered outbound sweep (#2490) — the data's chance to start a
+        # conversation. cron(0 16 * * ? *) UTC = 09:00 PDT / 08:00 PST, UTC-fixed.
+        #
+        # Two things pin that hour. It runs EARLY, before the check-in rule above, so
+        # that on a day with real news (a lift PR, a milestone, a slide) the news takes
+        # the day's first slot and the routine good-morning stands down — better in that
+        # order than the reverse. And it runs at/below coach_outbound's 09:00 PT
+        # reserved-slot cutoff in BOTH offsets, so exactly one routine outbound can be
+        # spent per day and the second slot stays available for a reactive text later.
+        #
+        # Daily, not weekday-only: a Saturday PR is still a PR. As with the check-in,
+        # the rule firing is not the same thing as a text being sent — the handler is
+        # dark until the owning coach's bot is registered, needs a real detected event,
+        # and the message still has to pass the grounding gate.
+        event_outbound_rule = events.Rule(
+            self,
+            "TelegramEventOutbound",
+            rule_name="telegram-coach-event-outbound",
+            description="Daily event-triggered coach outbound sweep (celebration + soft concern; dark until the coaches' bots are registered)",
+            schedule=events.Schedule.expression("cron(0 16 * * ? *)"),
+        )
+        event_outbound_rule.add_target(
+            targets.LambdaFunction(
+                telegram_worker_fn,
+                event=events.RuleTargetInput.from_object({"kind": "event_outbound"}),
+            )
+        )
+
+        # The sweep's LIVENESS signal — the absence-is-failure shape monitoring_stack's
+        # `_heartbeat_alarm` uses for every other silent daily producer (SampleCount < 1
+        # over N whole days, treat_missing=BREACHING, digest not page).
+        #
+        # It exists because an error alarm cannot see this failure. `telegram-worker-errors`
+        # needs an invocation to fire; a rule that quietly stops firing produces none, and
+        # "no celebration this week" is indistinguishable from "nothing worth celebrating".
+        # Lambda `Invocations` is no help either — this function's primary traffic is
+        # inbound chat, so its invocation count answers "did Matthew text" and never "did
+        # the cron run". So the handler emits its own datapoint on every completed sweep
+        # (LifePlatform/Telegram :: EventSweepCompleted, value = events found) and this
+        # alarms on that datapoint being missing. Errors = "it broke"; this = "it stopped".
+        #
+        # Deliberately co-located with the rule it watches rather than living in the
+        # monitoring stack: two stacks means a deploy order where the alarm exists before
+        # the schedule does, and BREACHING-on-missing would then correctly-but-uselessly
+        # fire for two days on nothing. One stack, one deploy, both arrive together.
+        #
+        # 2 consecutive days (the #1455 convention) — a missed ping is a next-morning
+        # finding, not a page, and one whole silent day is inside the deploy window
+        # between this stack and the worker's code bundle.
+        _telegram_event_sweep_heartbeat = cloudwatch.Alarm(
+            self,
+            "TelegramEventSweepHeartbeat",
+            alarm_name="telegram-event-sweep-heartbeat",
+            metric=cloudwatch.Metric(
+                namespace="LifePlatform/Telegram",
+                metric_name="EventSweepCompleted",
+                dimensions_map={"Coach": "sweep"},
+                period=Duration.seconds(86400),
+                statistic="SampleCount",
+            ),
+            threshold=1,
+            evaluation_periods=2,
+            datapoints_to_alarm=2,
+            comparison_operator=cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
+            treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
+        )
+        _telegram_event_sweep_heartbeat.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
+
         telegram_webhook_fn = create_platform_lambda(
             self,
             "TelegramWebhook",
