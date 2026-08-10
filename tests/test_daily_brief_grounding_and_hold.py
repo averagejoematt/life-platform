@@ -234,6 +234,9 @@ _PIPELINE_KWARGS = dict(
 _COACH_FN_NAMES = [
     "call_sleep_coach_v2",
     "call_nutrition_coach_v2",
+    # ADR-153: call_training_coach_v2 stays mocked here even though the seat is
+    # retired from the brief's v2 roster — a regression re-adding the call must
+    # hit a mock, never a real Bedrock invocation.
     "call_training_coach_v2",
     "call_mind_coach_v2",
     "call_physical_coach_v2",
@@ -260,7 +263,11 @@ def _mock_brief_ai(monkeypatch, m, v2_returns=None):
     monkeypatch.setattr(m, "_daily_brief_ai_allowed", lambda: True)
 
 
-def test_quality_hold_on_training_drops_legacy_training_only(monkeypatch):
+def test_training_seat_retired_v2_never_called_legacy_intact(monkeypatch):
+    """ADR-153 (the Performance merge): the training v2 seat is retired from the
+    brief's roster. Its call must never be attempted, its _v2_text stays "", and
+    the legacy training/nutrition narrative flows through undropped — no hold
+    can originate from a seat that no longer runs."""
     import daily_brief_lambda as m
 
     _mock_brief_ai(
@@ -270,12 +277,12 @@ def test_quality_hold_on_training_drops_legacy_training_only(monkeypatch):
     )
     result = m._run_ai_coach_pipeline(**_PIPELINE_KWARGS)
 
-    # The held sentinel is never rendered as coach text.
+    # The retired seat is never invoked — even a would-be hold is unreachable.
+    m.ai_calls.call_training_coach_v2.assert_not_called()
     assert result["training_coach_v2_text"] == ""
-    # Legacy call still runs (nutrition is not held) but the held domain's
-    # ungated narrative is dropped: hold, don't publish — actually holds.
+    # Legacy call runs and keeps BOTH domains: no gate judged training.
     m.ai_calls.call_training_nutrition_coach.assert_called_once()
-    assert result["training_nutrition"] == {"nutrition": "legacy nutrition text"}
+    assert result["training_nutrition"] == _LEGACY_TN
 
 
 def test_presence_ack_hold_on_nutrition_drops_legacy_nutrition_only(monkeypatch):
@@ -292,22 +299,25 @@ def test_presence_ack_hold_on_nutrition_drops_legacy_nutrition_only(monkeypatch)
     assert result["training_nutrition"] == {"training": "legacy training text"}
 
 
-def test_both_domains_held_skips_legacy_call_entirely(monkeypatch):
+def test_nutrition_quality_hold_drops_legacy_nutrition_only(monkeypatch):
+    """With the training seat retired (ADR-153), nutrition is the only
+    training_nutrition domain that can still be held. A quality-gate hold on it
+    drops the legacy nutrition narrative but keeps training — the both-held
+    legacy-skip branch is unreachable by design and stays as dead armor."""
     import daily_brief_lambda as m
 
     _mock_brief_ai(
         monkeypatch,
         m,
         v2_returns={
-            "call_training_coach_v2": ai_calls.CoachHold("training_coach", "quality_gate"),
             "call_nutrition_coach_v2": ai_calls.CoachHold("nutrition_coach", "quality_gate"),
         },
     )
     result = m._run_ai_coach_pipeline(**_PIPELINE_KWARGS)
 
-    # Both domains held ⇒ the ungated legacy call is never even made.
-    m.ai_calls.call_training_nutrition_coach.assert_not_called()
-    assert result["training_nutrition"] == {}
+    assert result["nutrition_coach_v2_text"] == ""
+    m.ai_calls.call_training_nutrition_coach.assert_called_once()
+    assert result["training_nutrition"] == {"training": "legacy training text"}
 
 
 def test_error_caused_none_still_falls_back_to_legacy(monkeypatch):
