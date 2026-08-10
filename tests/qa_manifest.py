@@ -896,11 +896,16 @@ def visual_pages():
             d["path"] = p["path"]
             d["name"] = p["name"]
             d["tier"] = p["tier"]
+            # The page's API deps ride along so the sweep can tell an honest
+            # data-absence (the API itself is empty — genesis week) from a
+            # broken render (#2500 rollback loop, 2026-08-10).
+            d["api_deps"] = list(p.get("api_deps") or [])
             out.append(d)
         for var in p.get("visual_variants", []) or []:
             d = dict(var)
             d["path"] = p["path"] + d.pop("fragment", "")
             d["tier"] = p["tier"]
+            d.setdefault("api_deps", list(p.get("api_deps") or []))
             out.append(d)
     return out
 

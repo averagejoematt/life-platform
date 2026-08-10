@@ -123,6 +123,42 @@ PAGES = visual_pages()
 _EMPTY_SENTINELS = ("", "—", "...", "··", "•", "Loading", "LOADING", "Loading…")
 
 
+def _payload_is_empty(data) -> bool:
+    """True only for an AFFIRMATIVELY empty collection payload.
+
+    A top-level empty list, or a dict whose every list value is empty and whose
+    numeric counts are zero. Anything unrecognized returns False — an API we
+    can't read stays a gating failure, never a silent pass.
+    """
+    if isinstance(data, list):
+        return len(data) == 0
+    if isinstance(data, dict):
+        lists = [v for v in data.values() if isinstance(v, list)]
+        counts = [v for k, v in data.items() if isinstance(v, (int, float)) and ("count" in k or "total" in k)]
+        if not lists and not counts:
+            return False
+        return all(len(v) == 0 for v in lists) and all(v == 0 for v in counts)
+    return False
+
+
+def _api_deps_all_empty(page, api_deps) -> bool:
+    """Probe the page's own API deps: True iff EVERY dep answers 200 with an
+    affirmatively-empty payload (see _payload_is_empty). Used to tell a genesis
+    dark state (honest data absence rendered as placeholders) from a broken
+    data bind. Fail-closed: no deps, a non-200, or an unparseable body → False.
+    """
+    if not api_deps:
+        return False
+    for dep in api_deps:
+        try:
+            resp = page.request.get(f"{SITE_URL}{dep}", timeout=10000)
+            if resp.status != 200 or not _payload_is_empty(resp.json()):
+                return False
+        except Exception:
+            return False
+    return True
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Page-level checks (run in the browser)
 # ══════════════════════════════════════════════════════════════════════════════
@@ -130,7 +166,8 @@ _EMPTY_SENTINELS = ("", "—", "...", "··", "•", "Loading", "LOADING", "Load
 
 def _scroll_and_reveal(page):
     """Scroll the page top-to-bottom, then force all .reveal animations visible."""
-    page.evaluate("""
+    page.evaluate(
+        """
         () => new Promise(resolve => {
             let y = 0; const step = 400;
             const timer = setInterval(() => {
@@ -142,12 +179,15 @@ def _scroll_and_reveal(page):
             }, 80);
             setTimeout(() => { clearInterval(timer); window.scrollTo(0, 0); resolve(); }, 10000);
         })
-    """)
-    page.evaluate("""
+    """
+    )
+    page.evaluate(
+        """
         () => document.querySelectorAll('.reveal').forEach(el => {
             el.classList.add('is-visible'); el.style.opacity = '1'; el.style.transform = 'none';
         })
-    """)
+    """
+    )
     page.wait_for_timeout(1500)
 
 
@@ -180,7 +220,8 @@ def _constellation_edge_cpts(page):
     no data-cpts attribute at all, so this fails regardless of how many edges the live
     coupling data currently has (it fails even at 0 edges) — see test_constellation_edge_cpts.
     """
-    return page.evaluate("""() => {
+    return page.evaluate(
+        """() => {
         const svg = document.querySelector('.constellation svg');
         if (!svg) return { skip: 'no constellation svg on this page' };
         const edges = svg.querySelectorAll('[data-edges] line').length;
@@ -192,12 +233,14 @@ def _constellation_edge_cpts(page):
         const n = Array.isArray(pts) ? pts.length : -1;
         if (n < edges) return { ok: false, edges, n, reason: `data-cpts has ${n} point(s) < ${edges} served edge line(s)` };
         return { ok: true, edges, n };
-    }""")
+    }"""
+    )
 
 
 def _check_sections_for_blank(page):
     """Visible sections >100px tall with <5 chars of text and no chart (excludes closed <details>)."""
-    return page.evaluate("""
+    return page.evaluate(
+        """
         () => {
             const issues = [];
             const insideClosedDetails = (el) => {
@@ -215,12 +258,14 @@ def _check_sections_for_blank(page):
             });
             return issues;
         }
-    """)
+    """
+    )
 
 
 def _check_stale_text(page):
     """Visible development/placeholder/stuck-loading copy that should never ship."""
-    return page.evaluate(r"""
+    return page.evaluate(
+        r"""
         () => {
             const body = document.body.innerText;
             const issues = [];
@@ -253,7 +298,8 @@ def _check_stale_text(page):
             }
             return issues;
         }
-    """)
+    """
+    )
 
 
 def _mobile_overflow(page):
@@ -288,7 +334,8 @@ TAP_TARGET_SEL = ".doors .theme-toggle, .tt-scrubber, .intro-close, .breadcrumbs
 def _app_bar_overflow(page):
     """px by which the fixed bottom app-bar (.doors) row exceeds the viewport at the
     current width — >2 is the #1003 overflow (clipped toggle / truncated door)."""
-    return page.evaluate("""() => {
+    return page.evaluate(
+        """() => {
         const bar = document.querySelector('.doors');
         if (!bar) return null;                       // page has no app-bar → n/a
         const vw = document.documentElement.clientWidth;
@@ -301,7 +348,8 @@ def _app_bar_overflow(page):
             far = Math.max(far, c.getBoundingClientRect().right);
         });
         return Math.round(Math.max(bar.scrollWidth - vw, far - vw));
-    }""")
+    }"""
+    )
 
 
 def _stuck_reveals(page, sel):
@@ -329,10 +377,12 @@ def _stuck_reveals(page, sel):
 
 def _viewport_meta_ok(page):
     """True if a width=device-width viewport meta is present (the #1004 class)."""
-    return page.evaluate("""() => {
+    return page.evaluate(
+        """() => {
         const m = document.querySelector('meta[name="viewport"]');
         return !!(m && /width\\s*=\\s*device-width/i.test(m.getAttribute('content') || ''));
-    }""")
+    }"""
+    )
 
 
 def _tap_target_audit(page, sel):
@@ -667,7 +717,17 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capt
                     if txt in _EMPTY_SENTINELS:
                         empties += 1
                 if els and empties == len(els):
-                    issues.append(f"All '{check['selector']}' empty/placeholder — {check['desc']}")
+                    # Genesis dark-state discrimination (2026-08-10): on cycle Day 1
+                    # /protocols/discoveries/ rendered every readout as a placeholder
+                    # because the API held zero discoveries YET — an honest absence,
+                    # not a broken bind — and the deterministic FAIL rolled back a
+                    # privacy fix in a loop. If the page's own API deps are all
+                    # honestly empty, this is a data-driven dark state: WARN (so the
+                    # AI layer and a human still see it) instead of gating.
+                    if _api_deps_all_empty(page, page_def.get("api_deps")):
+                        warnings.append(f"All '{check['selector']}' empty — API honestly empty (genesis dark state) — {check['desc']}")
+                    else:
+                        issues.append(f"All '{check['selector']}' empty/placeholder — {check['desc']}")
                 elif not els:
                     issues.append(f"'{check['selector']}' not found — {check['desc']}")
 
