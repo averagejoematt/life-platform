@@ -1121,3 +1121,58 @@ def test_weather_storage_failure_costs_the_section_not_the_block():
     block = cdf.domain_facts_block("sleep_coach", _BoomOnWeather([]), today="2026-08-09")
     assert "TODAY'S CONDITIONS" not in block
     assert "EXPERIMENT FRAME:" in block
+
+
+# ── B13: one inference per unsolicited turn (#2527 regression) ───────────────
+
+
+def test_each_unsolicited_path_makes_exactly_one_inference_call():
+    """An outbound path must call the model ONCE.
+
+    The live defect: `_maybe_refer` and `_morning_checkin` each did
+
+        result = _unsolicited_turn(...)      # a full run_turn -> Bedrock
+        result = coach_chat.run_turn(...)    # ...immediately overwritten
+
+    so every referral and every morning check-in paid for TWO Bedrock round-trips
+    and threw the first away. The two calls were argument-for-argument equivalent
+    (`_assemble(target, target)` makes `a["persona_id"] == coach_id`, and run_turn
+    resolves `persona_id or coach_id`), so the waste was invisible in behaviour —
+    it cost money and latency against an $85/month ceiling and nothing else.
+
+    It reads as a botched conflict resolution when #2527's `_unsolicited_turn`
+    refactor landed: the helper was added and the inline block was never deleted.
+    That is exactly the shape a rebase reintroduces, which is why this is pinned
+    structurally rather than left to a behavioural test — every existing coach
+    test passed with the bug in place.
+
+    Pinned as "no direct run_turn in these functions" rather than by counting
+    Bedrock invocations, because the helper is the single sanctioned assembly
+    point (its own docstring: one runner so three outbound paths cannot drift
+    into three slightly different coaches wearing the same name).
+    """
+    import ast
+    import os
+
+    path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "lambdas",
+        "coach",
+        "telegram_worker_lambda.py",
+    )
+    tree = ast.parse(open(path, encoding="utf-8").read())
+
+    unsolicited = {"_maybe_refer", "_morning_checkin", "_speak_unsolicited"}
+    seen = set()
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.FunctionDef) and node.name in unsolicited):
+            continue
+        seen.add(node.name)
+        direct = [n for n in ast.walk(node) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "run_turn"]
+        via_helper = [
+            n for n in ast.walk(node) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "_unsolicited_turn"
+        ]
+        assert not direct, f"{node.name} calls run_turn directly; the unsolicited paths must go through _unsolicited_turn"
+        assert len(via_helper) == 1, f"{node.name} makes {len(via_helper)} unsolicited turns, expected exactly 1"
+
+    assert seen == unsolicited, f"expected to check {sorted(unsolicited)}, found {sorted(seen)}"
