@@ -559,6 +559,24 @@ def test_every_social_endpoint_sets_an_explicit_cache_control(name, monkeypatch)
     assert _call(name, monkeypatch)["headers"].get("Cache-Control"), name
 
 
+# ── #2515: the module is a facade + cohesive split siblings ───────────────────
+# Every STRUCTURAL guard in this file is AST-derived from source text. After the
+# split the handler bodies live in `site_api_social_{challenges,engage,experiments,
+# ladder,membrane}.py`, so a facade-only scan would quietly empty each derived set
+# (a guard that cannot fail). These two helpers are the family the guards scan.
+
+
+def _social_family_paths() -> list:
+    """The facade plus every split sibling, discovered by glob — never hand-listed,
+    so a sixth sibling joins every guard below automatically."""
+    facade = pathlib.Path(inspect.getfile(social))
+    return [facade] + sorted(facade.parent.glob("site_api_social_*.py"))
+
+
+def _social_family_source() -> str:
+    return "\n".join(p.read_text() for p in _social_family_paths())
+
+
 def test_no_endpoint_hand_rolls_its_response_envelope(monkeypatch):
     """Fixed by #2221 (was an xfail on the two doors whose DEFAULT path hand-rolled
     it): 29 branches in this module built a bare
@@ -567,7 +585,7 @@ def test_no_endpoint_hand_rolls_its_response_envelope(monkeypatch):
     a dict display with a literal ``statusCode`` key is no longer expressible in the
     module, so a new door cannot reintroduce the class. ``_ok``/``_error``/
     ``_envelope`` — all three in ``site_api_common`` — are the only builders."""
-    tree = ast.parse(pathlib.Path(inspect.getfile(social)).read_text())
+    tree = ast.parse(_social_family_source())
     offenders = [
         n.lineno
         for n in ast.walk(tree)
@@ -1772,7 +1790,7 @@ def _functions_reading_the_rate_limiter_flag() -> set:
     now structural: a new write door CANNOT open-code the flag and CANNOT forget a
     fallback, because there is exactly one fallback and one place to reach it.
     """
-    tree = ast.parse(pathlib.Path(inspect.getfile(social)).read_text())
+    tree = ast.parse(_social_family_source())
     parents = {c: p for p in ast.walk(tree) for c in ast.iter_child_nodes(p)}
     readers = set()
     for node in ast.walk(tree):
@@ -1798,7 +1816,7 @@ def test_the_rate_limiter_flag_is_read_in_exactly_one_function():
 def _handlers_using_the_rate_chokepoint() -> set:
     """Every handler that calls `_rate_check` — the derived set of rate-limited
     public write doors. A new door joins the mutation sweep below automatically."""
-    tree = ast.parse(pathlib.Path(inspect.getfile(social)).read_text())
+    tree = ast.parse(_social_family_source())
     users = set()
     for fn in ast.walk(tree):
         if not isinstance(fn, ast.FunctionDef):
@@ -2126,7 +2144,7 @@ def test_no_429_is_built_outside_the_one_metered_refusal_builder():
     called it. Emitting inside `_rate_limited` fixes today's ten; this makes a
     NEW unmetered 429 unexpressible — the literal `429` may appear only in that
     builder's own signature-free body and in the `_rate_limited` call sites."""
-    tree = ast.parse(pathlib.Path(inspect.getfile(social)).read_text())
+    tree = ast.parse(_social_family_source())
     builder = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "_rate_limited")
     exempt = {id(n) for n in ast.walk(builder)}
     offenders = [n.lineno for n in ast.walk(tree) if isinstance(n, ast.Constant) and n.value == 429 and id(n) not in exempt]
@@ -2136,7 +2154,7 @@ def test_no_429_is_built_outside_the_one_metered_refusal_builder():
 def test_the_metered_refusal_builder_covers_every_public_write_door():
     """...and the set it covers is DERIVED: every `_rate_limited(...)` call site is
     counted, so a door that drops its refusal shows up as a shrinking number."""
-    tree = ast.parse(pathlib.Path(inspect.getfile(social)).read_text())
+    tree = ast.parse(_social_family_source())
     endpoints = {
         n.args[0].value
         for n in ast.walk(tree)
