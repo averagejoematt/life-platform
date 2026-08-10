@@ -78,6 +78,13 @@ _LAMBDAS = _REPO / "lambdas"
 # files also use the constant for date arithmetic / row-building / assertion
 # text, which is what keeps them in the scan.
 EXEMPT_DATED_FIXTURE_FILES: dict[str, str] = {
+    "test_quiet_behavioral_notice_2326.py": (
+        "every scan_quiet_behavioral_sources call receives _TODAY explicitly as an "
+        "argument — the module under test takes today as a parameter and consults no "
+        "call-time clock on any asserted path; freshness_checker_lambda is imported "
+        "only for set-membership asserts (SOURCES/BEHAVIORAL_SOURCES) and a "
+        "count_infra_stale call on a literal list, never its handler"
+    ),
     "test_anomaly_detector_lambda.py": (
         "check_anomalies(yesterday, today) takes BOTH days as arguments (_run_check "
         "passes YESTERDAY straight through and derives today as yesterday+1); the "
