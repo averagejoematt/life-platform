@@ -6,6 +6,18 @@ on the facade (a source-scan privacy gate pins it there). Facade state via `_g`.
 import re
 
 
+def _vice_terms_clause():
+    """The never-name substance/vice enumeration for the system prompt, built at
+    runtime from the ER-06 non-committed channel (#2370 — the never-public category
+    names must not live in this public repo). Fail-closed (require=True): no
+    vocabulary, no prompt, no installment — the run errors instead of writing with
+    an unenumerated guardrail."""
+    from privacy import content_filter_channel
+
+    terms = content_filter_channel.blocked_keywords(require=True)
+    return ", ".join(list(terms) + ["alcohol", "drinking", "nicotine", "vaping"])
+
+
 def _build_elena_prompt_from_config(*, _g):
     """Build the Elena Voss system prompt from S3 board config.
 
@@ -138,7 +150,7 @@ WHAT NOT TO DO:
 - Don't use emoji or markdown headers. Write clean prose.
 - GENOME PRIVACY: NEVER reference specific gene names (FTO, MTHFR, APOE, etc.), rsID numbers, or genotype strings (e.g. "A;T", "C;C") in your writing. If genome-informed insights are relevant, use non-specific language only: "genetic predisposition," "genomic variants suggest," "his DNA tilts the odds toward." Raw identifiers are private medical data.
 - REAL PEOPLE — ONLY THE FICTIONAL BOARD (#803): NEVER name, quote, or attribute an idea to a real-world doctor, author, researcher, athlete, podcaster, or other public figure — not even to illustrate a point in passing ("the kind of thing Dr. So-and-So talks about"). The ONLY named experts who may appear are Matthew's own fictional Board of Directors (Dr. Max Reyes, Dr. Lisa Park, Dr. Marcus Webb, Dr. Nathan Reeves, Margaret Calloway, Dr. Henning Brandt, plus whoever this week's config lists). If you feel the pull to cite a real expert on sleep, training, nutrition, or mental health, redirect that thought to the matching Board member instead — that instinct is exactly how a real name slips in and gets an installment held before it ever publishes.
-- SUBSTANCE & VICE PRIVACY — ABSOLUTE: NEVER name a specific vice or substance Matthew is working to quit or moderate — marijuana, cannabis, weed, alcohol, drinking, nicotine, vaping, pornography, and the like. This holds EVEN THOUGH you see it in his journal or habit data, and even when it connects to grief, his mother, or his coping history. These are the most private facts in the dataset and they must never appear in a public chronicle. If his progress on a private habit is genuinely central to the week's story, refer to it only in non-specific terms ("an old coping habit," "a vice he's working to leave behind," "the marker he checks each night") — never the substance, never the habit-tracker label. When in doubt, leave it out entirely; a missing detail is always safer than a named one. Grief and loss themselves may be written about with compassion, but the specific substances tangled up in them may not.
+- SUBSTANCE & VICE PRIVACY — ABSOLUTE: NEVER name a specific vice or substance Matthew is working to quit or moderate — {_vice_terms_clause()}, and the like. This holds EVEN THOUGH you see it in his journal or habit data, and even when it connects to grief, his mother, or his coping history. These are the most private facts in the dataset and they must never appear in a public chronicle. If his progress on a private habit is genuinely central to the week's story, refer to it only in non-specific terms ("an old coping habit," "a vice he's working to leave behind," "the marker he checks each night") — never the substance, never the habit-tracker label. When in doubt, leave it out entirely; a missing detail is always safer than a named one. Grief and loss themselves may be written about with compassion, but the specific substances tangled up in them may not.
 
 FORMAT:
 Return the installment as clean markdown with:

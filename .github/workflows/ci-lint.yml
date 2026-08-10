@@ -251,11 +251,20 @@ jobs:
           fi
 
       - name: Content-policy scan (ENFORCED — #354)
-        # Scans public-facing surfaces (site/, email lambdas, mcp/) for blocked terms
-        # from config/content_filter.json — the same list the runtime filter enforces.
+        # Scans public-facing surfaces (site/, email lambdas, mcp/) for the
+        # blocked-category terms — the same vocabulary the runtime filter enforces.
         # Catches personal-content leaks before they reach the public repo.
+        # #2370: the blocked-category vocabulary is channel-derived (never
+        # committed). The CONTENT_FILTER_JSON repo secret arms both scans; when
+        # it is absent they SKIP with a ::warning:: annotation (exit 0) rather
+        # than red-walling public CI — the deploy path (sync_site_to_s3.sh)
+        # still REQUIRES the vocabulary fail-closed.
         if: always()
-        run: python3 scripts/content_policy_scan.py
+        env:
+          CONTENT_FILTER_JSON: ${{ secrets.CONTENT_FILTER_JSON }}
+        run: |
+          python3 scripts/content_policy_scan.py
+          python3 deploy/pii_surface_guard.py --tracked
 
       # ── Doc-drift + wiki gates: MOVED to docs-ci.yml (#1908) ──────────────────
       # The literal-drift gate (sync_doc_metadata --check, #389) and the wiki drift

@@ -23,29 +23,54 @@ import re
 
 # Bump when the banned sets below change; publish paths refuse drafts stamped older.
 # 2026-07-26 (#1804): the vocabulary genuinely widened on this date (journal_quotes'
-# SUBSTANCE_EXTRA gained the beverage-noun family, VICE_KEYWORDS gained edible/
-# edibles per AUDIT PRIV-01) without the version ever being bumped — bumping it now
+# SUBSTANCE_EXTRA gained the beverage-noun family, VICE_KEYWORDS gained two extra
+# keyword forms per AUDIT PRIV-01) without the version ever being bumped — bumping it
 # so guard_version-stamped records from before this date correctly read as stale.
+# 2026-08-09 (#2370): the vocabulary SOURCE moved to the non-committed channel; the
+# set itself is unchanged, so the version deliberately stays put.
 GUARD_VERSION = "2026-07-26"
 
-# Vices/substances — never public. Must be a SUPERSET of config/content_filter.json
-# `blocked_vice_keywords` (enforced by test_privacy_guard); this deterministic gate
-# is the chronicle's only hard guarantee, so it can never be narrower than the
-# configured public filter. Plus nicotine (not in content_filter). Alcohol is
-# deliberately NOT a hard block — it appears in too much legitimate nutrition
-# context; the prompt handles it. "edible"/"edibles" added per AUDIT PRIV-01 (an
-# explicitly-moderated cannabis form the gate previously missed).
-VICE_KEYWORDS = (
-    "marijuana",
-    "cannabis",
-    "weed",
-    "thc",
-    "edible",
-    "edibles",
-    "pornography",
-    "porn",
-    "nicotine",
-)
+# Vices/substances — never public. The blocked-category vocabulary is DERIVED from
+# the ER-06 non-committed channel (content_filter_channel — env / local file / the
+# private S3 config), never written here: this repo is public, and the category
+# names themselves are the guarded data (#2370). This gate is the chronicle's only
+# hard guarantee, so it can never be narrower than the configured public filter —
+# it consumes that exact set, plus the extra keywords below that are hard-blocked
+# here without being part of the public content filter. Alcohol is deliberately
+# NOT a hard block — it appears in too much legitimate nutrition context; the
+# prompt handles it.
+_EXTRA_VICE_KEYWORDS = ("nicotine",)
+
+# Fail-closed: when NO channel source is available this raises
+# content_filter_channel.ContentFilterUnavailable rather than scanning with a
+# vocabulary of one — a publish gate with an empty banned set guards nothing.
+_vice_cache = None
+
+
+def _vice_keywords():
+    """The banned vice vocabulary: channel set + _EXTRA_VICE_KEYWORDS (cached)."""
+    global _vice_cache
+    if _vice_cache is None:
+        from privacy import content_filter_channel as _channel
+
+        base = _channel.blocked_keywords(require=True)
+        _vice_cache = tuple(dict.fromkeys(tuple(base) + _EXTRA_VICE_KEYWORDS))
+    return _vice_cache
+
+
+def reset_vocabulary_cache():
+    """Test hook: forget the cached vocabulary (pairs with content_filter_channel.reset_cache)."""
+    global _vice_cache
+    _vice_cache = None
+
+
+def __getattr__(name):
+    # Back-compat: `privacy_guard.VICE_KEYWORDS` keeps working for every consumer,
+    # now lazily resolved through the non-committed channel (PEP 562).
+    if name == "VICE_KEYWORDS":
+        return _vice_keywords()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 # Real public figures (health/fitness influencers) the AI tends to name as coaches.
 # Match on the FULL name — unambiguous.
@@ -90,7 +115,7 @@ def find_violations(text):
         return []
     lowered = text.lower()
     hits = []
-    for kw in VICE_KEYWORDS:
+    for kw in _vice_keywords():
         if _word(kw).search(text):
             hits.append(("vice", kw))
     for nm in BANNED_FULL_NAMES:
@@ -124,7 +149,7 @@ def scrub(text, redaction="[redacted]"):
         return text, 0
     n = 0
     out = text
-    for kw in VICE_KEYWORDS:
+    for kw in _vice_keywords():
         out, c = _word(kw).subn(redaction, out)
         n += c
     for sn in BANNED_SURNAMES:

@@ -891,7 +891,7 @@ Each `by_group` entry:
   "completed": 3,
   "possible": 5,
   "pct": 0.6,
-  "habits_done": ["Cold Shower", "No alcohol", "No porn"]
+  "habits_done": ["Cold Shower", "No alcohol", "Morning Sunlight"]
 }
 ```
 
@@ -1494,7 +1494,7 @@ The `demo_mode_rules` field controls how the daily brief is sanitized when invok
 
 ```json
 {
-  "redact_patterns": ["marijuana", "thc", "cannabis", "weed", "alcohol", "bourbon"],
+  "redact_patterns": ["<blocked keyword>", "<blocked keyword>", "alcohol", "bourbon"],
   "replace_values": {
     "weight_lbs": "•••",
     "calories": "•,•••",
@@ -1649,7 +1649,7 @@ One item per day. Written by the Daily Brief Lambda (v2.47.0+) after computing t
 | `tier1_pct` | number | Tier 1 completion percentage |
 | `vices_held` | number | Count of vices successfully avoided |
 | `vices_total` | number | Total tracked vices |
-| `vice_streaks` | map | Per-vice streak snapshot: `{"No Alcohol": 14, "No THC": 7, ...}` |
+| `vice_streaks` | map | Per-vice streak snapshot: `{"No Alcohol": 14, "<blocked habit>": 7, ...}` |
 | `synergy_groups` | map | Per-group completion %: `{"Sleep Stack": 0.8, "Morning Routine": 1.0, ...}` |
 | `missed_tier0` | list | Names of missed Tier 0 habits (for pattern detection) |
 | `composite_score` | number | Tier-weighted composite score (T0=3x, T1=1x, T2=0.5x) |

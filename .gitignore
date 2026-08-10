@@ -110,6 +110,10 @@ htmlcov/
 # ER-06: personal PII denylist — real literals (partner name, employer, …) never
 # committed to this PUBLIC repo. Only config/pii_denylist.example.json is tracked.
 config/pii_denylist.local.json
+# ER-06 / #2370: the blocked-content vocabulary (the never-public category names)
+# lives in the same non-committed channel. Only content_filter.example.json is
+# tracked; the runtime source of truth stays the private S3 copy.
+config/content_filter.local.json
 cdk/_bundle_staging/
 .worktrees/
 

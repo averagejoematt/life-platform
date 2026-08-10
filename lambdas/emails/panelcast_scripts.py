@@ -33,6 +33,8 @@ except ImportError:
 
 from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
 
+from emails.chronicle_prompt import _vice_terms_clause  # #2370: channel-derived never-name enumeration
+
 # Shared writer directive — make the SCRIPT genuinely conversational so the voice has
 # something human to perform (Gemini reads what's written; banter must be on the page).
 CONVO_DIRECTIVE = (
@@ -169,7 +171,7 @@ def build_weekly_script(beats: dict, bible: dict, deps: dict) -> dict:
         "process over outcome — never a report-card or judgmental tone; handle a hard week with compassion; never open a line with 'Matt'. "
         "This is a forward-looking PERFORMANCE & HEALTH review, NOT a grief or personal-history piece. NEVER mention or allude to: "
         "a death, grief, a funeral, cancer, or any named family member (mother/father/sister/brother/girlfriend/wife/etc.); any specific "
-        "vice or substance (marijuana, alcohol, nicotine, pornography — not even non-specifically as 'his vices' or 'private habits'); "
+        "vice or substance (" + _vice_terms_clause() + " — not even non-specifically as 'his vices' or 'private habits'); "
         "or any body weight at all — numeric OR spelled-out ('nine pounds' is just as forbidden as '305 lbs'). Stay on training, sleep, recovery, habits, the deficit's effects, the bet, and the week's effort. "  # noqa: E501
         "THE BAR (this is the whole point): the TRANSCRIPT must pass for a real, human-made podcast — if a person read it aloud, "
         "nobody could tell it was AI-written. Earn a real hook in the first two lines, real human interest, genuine dry humor, and "

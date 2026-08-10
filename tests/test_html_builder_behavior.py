@@ -899,10 +899,10 @@ def test_scorecard_colour_bands(score, colour):
 
 def test_scorecard_habit_tier_breakdown_and_vice_streaks():
     details = {"habits_mvp": {"tier0": {"done": 5, "total": 7}, "tier1": {"done": 2, "total": 4}}}
-    html = _scorecards(component_details=details, vice_streaks={"Weed": 12, "Porn": 0})
+    html = _scorecards(component_details=details, vice_streaks={"Zzq": 12, "Grumbleflax": 0})
     assert "T0 (non-neg): 5/7" in html and "T1 (high): 2/4" in html
-    assert "Weed: 12d streak avoided" in html
-    assert "Porn" not in html  # a 0-day streak is not a streak
+    assert "Zzq: 12d streak avoided" in html
+    assert "Grumbleflax" not in html  # a 0-day streak is not a streak
 
 
 def test_scorecard_sleep_architecture_numbers():
@@ -1981,7 +1981,7 @@ def test_build_html_a_rich_packet_still_renders_no_section_errors():
         journal_coach_text="You noticed it. || Write it down.",
         mvp_streak=12,
         full_streak=3,
-        vice_streaks={"Weed": 12},
+        vice_streaks={"Zzq": 12},
         character_sheet=_sheet(),
         brief_mode="flourishing",
         triggered_rewards=[{"title": "New shoes", "description": "30 workouts"}],

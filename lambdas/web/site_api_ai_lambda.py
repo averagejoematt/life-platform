@@ -712,6 +712,17 @@ def _ask_question_safe(question: str) -> tuple:
     return True, ""
 
 
+def _blocked_terms_clause() -> str:
+    """The never-mention term enumeration for the system prompt, built at runtime
+    from the ER-06 non-committed channel (#2370 — the category names must not live
+    in this public repo). Fail-closed: raises ContentFilterUnavailable when no
+    channel source is reachable, so the request errors instead of running with an
+    unenumerated filter."""
+    from privacy import content_filter_channel
+
+    return ", ".join(content_filter_channel.blocked_keywords(require=True))
+
+
 def _ask_build_prompt(ctx: dict) -> str:
     pillars_str = ""
     if "pillars" in ctx:
@@ -757,7 +768,7 @@ SAFETY (WR-40):
 - NEVER provide: medical diagnoses, medication recommendations, mental health assessments.
 - Stick to publicly shared health metrics: weight, HRV, sleep, recovery, training, habits, nutrition trends.
 - If asked about something outside your data, say "I don't have that data" — don't speculate.
-- CONTENT FILTER: NEVER mention porn, pornography, marijuana, cannabis, weed, THC, or any related terms.
+- CONTENT FILTER: NEVER mention {_blocked_terms_clause()}, or any related terms.
 - If asked about these topics, respond only with: I don't have data on that specific topic."""
 
 

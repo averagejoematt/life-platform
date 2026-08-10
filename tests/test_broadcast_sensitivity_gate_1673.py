@@ -4,7 +4,7 @@ Epic #1668 (The Social Membrane, inbound half). Decision (2) makes the Broadcast
 (#1672, S4) automatic; this gate is what lets it be low-touch WITHOUT ever leaking a
 sensitive post or auto-publishing Matthew's words blind (#1563). These tests pin the AC:
 
-  * every flagged category (marijuana / porn / PII / off-topic) HOLDS (does not publish);
+  * every flagged category (vice / PII / off-topic) HOLDS (does not publish);
   * a clearly-safe post auto-publishes with no manual step;
   * error / low-confidence / no-classifier ⇒ HOLD (privacy_guard's fail-closed posture);
   * held posts are surfaced (with a recorded reason), never silently dropped;
@@ -61,17 +61,19 @@ def test_clearly_safe_post_auto_publishes():
 
 
 # ── AC: each flagged category HOLDS (a post with it does NOT auto-publish) ────────────
-def test_marijuana_holds():
+def test_long_vice_term_holds():
     # An on-topic classifier must NOT be able to rescue a vice hit — deterministic first.
-    v = gate.classify_sensitivity("Recovery day. Tried an edible to sleep — marijuana helps.", offtopic_classifier=_on_topic)
+    # (Neutral fixture vocabulary from conftest — #2370: the real category names never
+    # appear in this public repo; the channel supplies them at runtime.)
+    v = gate.classify_sensitivity("Recovery day. Tried a fizzlewick to sleep — it helps.", offtopic_classifier=_on_topic)
     assert v.status == gate.SENSITIVITY_HELD
-    assert gate.CATEGORY_MARIJUANA in v.categories
+    assert gate.CATEGORY_VICE in v.categories
 
 
-def test_porn_holds():
-    v = gate.classify_sensitivity("Rest day thoughts on porn and dopamine.", offtopic_classifier=_on_topic)
+def test_second_vice_term_holds():
+    v = gate.classify_sensitivity("Rest day thoughts on grumbleflax and dopamine.", offtopic_classifier=_on_topic)
     assert v.status == gate.SENSITIVITY_HELD
-    assert gate.CATEGORY_PORN in v.categories
+    assert gate.CATEGORY_VICE in v.categories
 
 
 def test_pii_holds():
@@ -93,10 +95,9 @@ def test_off_topic_holds():
 
 
 def test_every_flagged_category_is_covered():
-    """The four AC-named categories all resolve to HOLD via a representative post."""
+    """The AC-named categories all resolve to HOLD via a representative post."""
     cases = {
-        gate.CATEGORY_MARIJUANA: ("weed after the workout", _on_topic),
-        gate.CATEGORY_PORN: ("pornography discussion", _on_topic),
+        gate.CATEGORY_VICE: ("zzq after the workout", _on_topic),
         gate.CATEGORY_PII: ("email me at a@b.com", _on_topic),
         gate.CATEGORY_OFF_TOPIC: ("unrelated political rant", _off_topic),
     }
@@ -139,7 +140,7 @@ def test_auto_publish_only_through_the_gate():
     on-topic verdict. Every other path (vice/PII hit, off-topic, uncertain, error, no
     classifier) holds — so nothing reaches the feed 'blind'."""
     # Deterministic hit cannot be overridden by a confident on-topic classifier.
-    assert gate.classify_sensitivity("marijuana", offtopic_classifier=_on_topic).status == gate.SENSITIVITY_HELD
+    assert gate.classify_sensitivity("fizzlewick", offtopic_classifier=_on_topic).status == gate.SENSITIVITY_HELD
     # The read-side seam only admits an EXPLICIT cleared stamp.
     assert gate.is_cleared({gate.STATUS_ATTR: gate.SENSITIVITY_CLEARED})
     assert not gate.is_cleared({gate.STATUS_ATTR: gate.SENSITIVITY_HELD})
@@ -165,19 +166,19 @@ def test_cleared_filter_is_a_positive_match():
 
 # ── AC: held posts are surfaced to Matthew (not silently dropped); reason recorded ───
 def test_held_post_is_surfaced_with_recorded_reason():
-    v = gate.classify_sensitivity("smoked weed", offtopic_classifier=_on_topic)
+    v = gate.classify_sensitivity("smoked zzq", offtopic_classifier=_on_topic)
     attrs = gate.sensitivity_attrs(v)
     # The reason and categories are persisted on the row → reviewable, not dropped.
     assert attrs[gate.STATUS_ATTR] == gate.SENSITIVITY_HELD
     assert attrs[gate.REASON_ATTR]
-    assert gate.CATEGORY_MARIJUANA in attrs[gate.CATEGORIES_ATTR]
+    assert gate.CATEGORY_VICE in attrs[gate.CATEGORIES_ATTR]
 
     held_row = {"post_id": "vid1", "channel": "youtube", "title": "t", "url": "u", **attrs}
     rec = gate.review_record(held_row)
     assert rec["post_id"] == "vid1"
     assert rec["status"] == gate.SENSITIVITY_HELD
     assert rec["reason"]
-    assert gate.CATEGORY_MARIJUANA in rec["categories"]
+    assert gate.CATEGORY_VICE in rec["categories"]
     # The review-surface filter selects held rows (the inverse of the feed filter).
     he = gate.held_filter_expression().get_expression()
     assert he["operator"] == "<>"
@@ -187,12 +188,12 @@ def test_held_post_is_surfaced_with_recorded_reason():
 # ── AC: the vice policy is DERIVED from privacy_guard (canonical), not ad-hoc ─────────
 def test_vice_policy_is_sourced_from_privacy_guard():
     """Every canonical privacy_guard vice keyword classifies to a flagged category — proof
-    the marijuana/porn list is the canonical one (a superset of content_filter.json), not a
-    second hand-rolled list that could silently drift narrower."""
+    the vice list is the canonical channel-derived one, not a second hand-rolled list
+    that could silently drift narrower (#2370)."""
     for kw in privacy_guard.VICE_KEYWORDS:
         v = gate.classify_sensitivity(f"a post mentioning {kw} here", offtopic_classifier=_on_topic)
         assert v.status == gate.SENSITIVITY_HELD, kw
-        assert set(v.categories) & {gate.CATEGORY_MARIJUANA, gate.CATEGORY_PORN}, kw
+        assert gate.CATEGORY_VICE in v.categories, kw
     # A banned real public figure (privacy_guard's other guard) also holds — extra privacy.
     v = gate.classify_sensitivity("as Andrew Huberman says", offtopic_classifier=_on_topic)
     assert v.status == gate.SENSITIVITY_HELD

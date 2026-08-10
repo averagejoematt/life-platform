@@ -266,14 +266,15 @@ def test_a_line_only_the_narrower_filter_would_alter_is_withheld_and_counted(she
     which is exactly what happens here, so this is the ONLY one of the two
     screens this fixture exercises.
 
-    The vice term is pulled live from config/content_filter.json rather than
-    hardcoded, so the fixture tracks the real vocabulary instead of a copy of it."""
+    The vice term is pulled live from the ER-06 channel (#2370 — the unit suite
+    sees conftest's neutral fixture vocabulary) rather than hardcoded, so the
+    fixture tracks the configured vocabulary instead of a copy of it."""
     sd, ft = shelf
-    cf_path = os.path.join(_REPO, "config", "content_filter.json")
-    with open(cf_path, encoding="utf-8") as f:
-        cf = json.load(f)
+    from privacy import content_filter_channel
+
+    keywords = content_filter_channel.blocked_keywords(require=True)
     term = min(
-        (kw for kw in cf["blocked_vice_keywords"] if len(sac._normalize_for_detection(kw)) >= 7),
+        (kw for kw in keywords if len(sac._normalize_for_detection(kw)) >= 7),
         key=len,
     )
     obfuscated_term = " ".join(term)
@@ -529,17 +530,17 @@ def test_a_public_claim_only_the_narrow_scrub_would_catch_withholds_the_prose(sh
     obfuscation slips past it) but that `_public_decision_note`'s underlying
     `_scrub_blocked_terms` catches via its normalized (de-spaced/de-punctuated)
     fail-safe — the #2203 technique. The term is read live off
-    config/content_filter.json rather than hardcoded, per #2206's privacy note,
-    so the fixture tracks the real vocabulary instead of a copy of it."""
+    the ER-06 channel rather than hardcoded, per #2206's privacy note (#2370),
+    so the fixture tracks the configured vocabulary instead of a copy of it."""
     sd, ft = shelf
-    cf_path = os.path.join(_REPO, "config", "content_filter.json")
-    with open(cf_path, encoding="utf-8") as f:
-        cf = json.load(f)
+    from privacy import content_filter_channel
+
+    keywords = content_filter_channel.blocked_keywords(require=True)
     # _scrub_blocked_terms's normalized fail-safe only fires for terms whose
     # de-spaced form is >=7 chars (see its docstring) — pick the shortest one
     # that qualifies, so the fixture stays as mild as the vocabulary allows.
     term = min(
-        (kw for kw in cf["blocked_vice_keywords"] if len(sac._normalize_for_detection(kw)) >= 7),
+        (kw for kw in keywords if len(sac._normalize_for_detection(kw)) >= 7),
         key=len,
     )
     obfuscated_term = " ".join(term)  # defeats the \b-anchored regex both screens' literal passes use

@@ -104,7 +104,7 @@
  },
  "compassion_safety_rules": {
   "fail_closed_hold": [
-   "Any blocked vice (porn / marijuana / cannabis / weed / thc / edibles) — never voiced publicly.",
+   "Any blocked vice (the channel-derived blocked_vice_keywords set — see config/content_filter.example.json) — never voiced publicly.",
    "Any specific body weight or body-composition number.",
    "Causal-claim language.",
    "Any number not present in the provided inputs.",

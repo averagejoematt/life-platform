@@ -42,7 +42,7 @@ import journal_enrichment_lambda as jel  # noqa: E402
 
 _PAGE = "1f2e3d4c-5b6a-7980-1234-abcdef012345"
 _UID = _PAGE.replace("-", "")[-12:]
-_SECRET_BODY = "Relapsed after the fight with Dana. Smoked, then porn until 3am. The debt terrifies me."
+_SECRET_BODY = "Relapsed after the fight with Dana. Smoked, then zzq until 3am. The debt terrifies me."
 
 
 def _item(**over):
@@ -141,7 +141,7 @@ def test_end_to_end_consented_entry_stores_a_reaction():
     assert item["tier"] == "allude" and "quote" not in item
     # the private body never rides along into the stored (publicly served) row
     blob = " ".join(str(v) for v in item.values()).lower()
-    for canary in ("dana", "smoked", "porn", "3am", "debt", "relapsed"):
+    for canary in ("dana", "smoked", "zzq", "3am", "debt", "relapsed"):
         assert canary not in blob
 
 

@@ -156,7 +156,7 @@ class TestJournalMoodForBrief:
             "dominant_themes": [],
             "social_quality_distribution": {},
             "alone_ratio": None,
-            "notable_quote": "Smoked some weed to take the edge off tonight.",
+            "notable_quote": "Smoked some zzq to take the edge off tonight.",
             "notable_quote_date": "2026-07-02",
         }
         out = orch._journal_mood_for_brief(signal)

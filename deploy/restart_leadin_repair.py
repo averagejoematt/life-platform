@@ -191,17 +191,30 @@ _FORBIDDEN_AFTER_VET = [
     "Norton",
     "Brittany",
     "alcohol",
-    "marijuana",
     "genome",
     "gene ",
     "thirty-seven",
 ]
 
 
+def _forbidden_tokens():
+    """_FORBIDDEN_AFTER_VET plus the channel-derived blocked-category vocabulary
+    (#2370 — the never-public category names must not live in this public repo).
+    Fail-closed: this owner-run script requires a channel source (local file /
+    env / S3) — no vocabulary, no vetting."""
+    import sys as _sys
+
+    _sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lambdas"))
+    from privacy import content_filter_channel
+
+    return list(_FORBIDDEN_AFTER_VET) + content_filter_channel.blocked_keywords(require=True)
+
+
 def assert_vetted(body: str):
-    hits = [t for t in _FORBIDDEN_AFTER_VET if t.lower() in body.lower()]
+    hits = [t for t in _forbidden_tokens() if t.lower() in body.lower()]
     if hits:
-        raise RuntimeError(f"vetted body still contains forbidden token(s): {hits}")
+        # Never echo vocabulary tokens; static tokens are safe but masking is simpler.
+        raise RuntimeError(f"vetted body still contains {len(hits)} forbidden token(s)")
 
 
 def html_body_to_markdown(body_html: str) -> str:

@@ -651,7 +651,7 @@ def habit_registry(*, _g) -> dict:
     page shows "everything I'm trying to do" even right after an experiment reset
     (when the PROFILE#v1 registry and the phase-scoped habit_scores are empty).
 
-    Blocked vice/habit names (porn, marijuana, …) are stripped server-side via
+    Blocked vice/habit names (the never-public categories) are stripped server-side via
     ``_is_blocked_vice`` — content_filter.json's ``habit_data`` rule — so they
     never reach the client even though Habitify tracks them.
     """

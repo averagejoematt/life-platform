@@ -62,7 +62,7 @@ def test_publish_gate_blocks_vice_terms_fail_closed():
     pba = _publish_mod()
     bad = {
         "id": "x",
-        "question": "What happened during the marijuana experiment?",
+        "question": "What happened during the fizzlewick experiment?",
         "responses": [],
     }
     with pytest.raises(privacy_guard.PrivacyViolation):
