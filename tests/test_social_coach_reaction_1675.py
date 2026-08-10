@@ -270,7 +270,12 @@ def test_one_producer_and_one_serve_path_exist():
     import glob
 
     producers = [p for p in glob.glob(os.path.join(_REPO, "lambdas", "coach", "*reaction*.py"))]
-    assert [os.path.basename(p) for p in producers] == ["coach_diary_reaction.py"]
+    # ``coach_reactions.py`` is the Telegram ``setMessageReaction`` path (#2485): an
+    # emoji tapped on MATTHEW's own chat message, which is a different surface and a
+    # different audience from the AI-authored reaction to a published post that this
+    # file guards. The glob matches on name, so it is listed explicitly here rather
+    # than silently tolerated — a THIRD file still has to be justified in this test.
+    assert sorted(os.path.basename(p) for p in producers) == ["coach_diary_reaction.py", "coach_reactions.py"]
     api = open(os.path.join(_REPO, "lambdas", "web", "site_api_lambda.py"), encoding="utf-8").read()
     assert api.count("/api/diary_reactions") == 1
     assert "social_reactions" not in api, "a second reactions endpoint would be the divergence AC4 forbids"

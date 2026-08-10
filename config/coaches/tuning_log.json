@@ -239,6 +239,15 @@
       "rationale": "The coach package contained the word 'weather' zero times, so a coach could not mention the sky without inventing it. Making the row a SOURCE is the grounding half: a true, sourced 'overcast and 68F' would otherwise trip fabricated_number, which is #2517's failure mode (evidence the model has but the gate does not). It is not a bypass — only the figures on the row enter the allow-list, so an invented temperature still fails, and no row for the day renders nothing at all rather than a default (ADR-104). Day-of-week texture was NOT built: _current_moment_line() has shipped it since the humanity pass.",
       "ref": "#2493 (epic #2363)",
       "observed_effect": null
+    },
+    {
+      "date": "2026-08-10",
+      "coach": "all",
+      "change_type": "voice",
+      "summary": "Reaction emojis (#2485): a bare acknowledgement (\"thanks\", \"got it\") can now be closed with a Telegram setMessageReaction on his message instead of a reply bubble. Whether a coach reacts at all is read off its own texting_style.emoji_posture — the five coaches whose posture opens \"Essentially never\" / \"Rare to never\" never react. Which emoji: a Telegram-legal emoji the posture itself names, else the new texting_style.reaction_emoji field, added here to physical_coach (\\ud83d\\udc4d) and nutrition_coach (\\ud83d\\udc4c) only.",
+      "rationale": "Answering a \"thanks\" with a fresh paragraph is the tell that nobody is there; a real person taps a reaction and lets the thread close. No shared default exists at the end of the resolution chain, because one would make every coach react identically and erase the per-coach posture. Telegram permits only a fixed reaction set, so persona config is validated against it rather than trusted — physical's \\ud83d\\udcaa and explorer's \\ud83d\\udcc9/\\ud83d\\udcc8 are not on that list, which is why physical needed an explicit reaction emoji and explorer deliberately gets none (ADR-104: no configured mark, no reaction).",
+      "ref": "#2485 (epic #2363)",
+      "observed_effect": null
     }
   ]
 }
