@@ -490,20 +490,21 @@ class TestDetectMetricTrends:
         recs = [_cm("2026-05-06", recovery=80), _cm("2026-05-07", recovery=70), _cm("2026-05-08", recovery=60)]
         assert [d["metric"] for d in di.detect_metric_trends(recs)[0]] == ["recovery"]
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "DEFECT (tranche-2 discovery): detect_metric_trends hard-codes "
-            "consecutive_days=3 on the last three RECORDS without checking that "
-            "their dates are adjacent. A window with gaps (e.g. 05-01/05-05/05-09) "
-            "publishes 'declining 3 days' — and build_ai_context_block renders that "
-            "literally as 'LEADING INDICATOR: … declining 3 days'."
-        ),
-    )
     def test_a_run_spanning_gaps_does_not_claim_three_consecutive_days(self):
+        """#2221: the days between were never scored — unscored is absence, not a reading."""
         recs = [_cm("2026-05-01", readiness_score=80), _cm("2026-05-05", readiness_score=70), _cm("2026-05-09", readiness_score=60)]
         declining, _ = di.detect_metric_trends(recs)
         assert declining == [], "a gapped window must not be published as a 3-day consecutive run"
+
+    def test_a_single_missing_day_inside_the_run_withdraws_the_claim(self):
+        """The realistic shape: one unscored day in an otherwise adjacent window."""
+        recs = [_cm("2026-05-06", recovery=80), _cm("2026-05-08", recovery=70), _cm("2026-05-09", recovery=60)]
+        assert di.detect_metric_trends(recs) == ([], [])
+
+    def test_an_undatable_window_publishes_no_run_claim(self):
+        """Adjacency we cannot verify is not adjacency we may assert."""
+        recs = [{"component_scores": {}, "readiness_score": v} for v in (80, 70, 60)]
+        assert di.detect_metric_trends(recs) == ([], [])
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -774,16 +775,6 @@ class TestIntentionPatterns:
         ]
         assert di._compute_intention_patterns(hist)["follow_through_rate_7d"] == 0.5
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "DEFECT (tranche-2 discovery): _load_intention_history queries with "
-            "ScanIndexForward=False, so history_records arrive NEWEST-FIRST, but "
-            "_compute_intention_patterns takes day_rates[-7:] — the seven OLDEST "
-            "days. With >7 days of history the published '7-day follow-through "
-            "rate' describes days 8-14, not the last week."
-        ),
-    )
     def test_the_seven_day_rate_describes_the_most_recent_seven_days(self):
         recent = [
             {"date": f"2026-05-{d:02d}", "evaluations": [{"type": "a", "executed": True, "confidence": "high"}]} for d in range(9, 2, -1)
@@ -793,6 +784,18 @@ class TestIntentionPatterns:
         ]
         newest_first = recent + older  # exactly what ScanIndexForward=False returns
         assert di._compute_intention_patterns(newest_first)["follow_through_rate_7d"] == 1.0
+
+    def test_the_same_answer_comes_back_when_the_caller_hands_them_over_oldest_first(self):
+        """#2221: the window is derived from the records' dates, not the query direction."""
+        recs = [
+            {"date": f"2026-05-{d:02d}", "evaluations": [{"type": "a", "executed": d >= 3, "confidence": "high"}]} for d in range(1, 15)
+        ]
+        assert di._compute_intention_patterns(recs)["follow_through_rate_7d"] == 1.0
+
+    def test_the_published_rate_states_how_many_days_it_actually_spans(self):
+        """ADR-105: a two-day rate must not be published under a seven-day label."""
+        hist = [{"date": "2026-05-0%d" % d, "evaluations": [{"type": "a", "executed": True, "confidence": "high"}]} for d in (8, 9)]
+        assert di._compute_intention_patterns(hist)["follow_through_days_n"] == 2
 
 
 class TestLoadIntentionHistory:
@@ -947,21 +950,17 @@ class TestDetectEarlyWarning:
         recent = [_hs(f"2026-05-0{d}", t0_completion_rate=0.80) for d in (6, 7, 8)]
         assert "habit_declining" not in di.detect_early_warning([], prior + recent, [])[1]
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "DEFECT (tranche-2 discovery): reader/writer field-name mismatch. "
-            "detect_early_warning's habit_declining marker reads "
-            "`t0_completion_rate`, but BOTH writers of the habit_scores partition "
-            "(daily_brief_lambda.store_habit_scores and daily_metrics_compute) "
-            "write `tier0_pct` and nothing writes `t0_completion_rate` anywhere in "
-            "the repo. On real data the marker is permanently dark — one of the "
-            "four IC-5 markers can never contribute to the 2-marker warning gate."
-        ),
-    )
     def test_the_habit_marker_fires_on_the_field_the_writers_actually_write(self):
+        """#2221: both writers of habit_scores write `tier0_pct`; the marker read an alias
+        nothing has ever written, so on real data it could never contribute to the gate."""
         prior = [_hs(f"2026-05-0{d}", tier0_pct=0.95) for d in (1, 2, 3, 4)]
         recent = [_hs(f"2026-05-0{d}", tier0_pct=0.20) for d in (6, 7, 8)]
+        assert "habit_declining" in di.detect_early_warning([], prior + recent, [])[1]
+
+    def test_a_zero_completion_day_pulls_the_habit_marker_average_down(self):
+        """ADR-104 the other way: a measured 0.0 is data, and it is the day that matters."""
+        prior = [_hs(f"2026-05-0{d}", tier0_pct=0.90) for d in (1, 2, 3, 4)]
+        recent = [_hs("2026-05-06", tier0_pct=0.0), _hs("2026-05-07", tier0_pct=0.9), _hs("2026-05-08", tier0_pct=0.9)]
         assert "habit_declining" in di.detect_early_warning([], prior + recent, [])[1]
 
 
@@ -1529,18 +1528,9 @@ class TestDecisionFatigue:
         table.query_error = RuntimeError("throttled")
         assert di._compute_decision_fatigue_alert(YESTERDAY, [_hs("2026-05-08", tier0_pct=0.30)]) == (False, "")
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "DEFECT (tranche-2 discovery): the T0 rate is read as "
-            "`safe_float(r,'tier0_pct') or safe_float(r,'t0_completion_rate')`. A "
-            "genuine 0.0 completion day is falsy, so it coalesces to the (never-"
-            "written) fallback field and is dropped from the 7-day mean — the "
-            "worst days are exactly the ones excluded, biasing the average UP and "
-            "suppressing the alert when it is most warranted."
-        ),
-    )
     def test_a_zero_completion_day_counts_toward_the_weekly_habit_average(self, table):
+        """#2221/ADR-104: `a or b` read a measured 0.0 as absence and dropped exactly the
+        worst days out of the mean, biasing it UP and silencing the alert when it mattered."""
         seed(table, _todoist("DATE#2026-05-09", active_task_count=300, overdue_count=20, due_today_count=5))
         habits = [_hs("2026-05-07", tier0_pct=0.0), _hs("2026-05-08", tier0_pct=1.0)]
         # true mean = 0.5 < 0.60 → should fire; dropping the zero gives 1.0 → silent
@@ -1978,21 +1968,22 @@ class TestHandler:
         di.lambda_handler({}, None)
         assert "SOCIAL NOTE" in offline_handler.puts[-1]["ai_context_block"]
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "DEFECT (tranche-2 discovery): the handler anchors its 7d/14d windows "
-            "on datetime.now() (`today - 7d`) but ends them at the event's "
-            "`date`. Backfilling any date older than a week produces an INVERTED "
-            "range (start > end), so momentum, metric trends and habit patterns "
-            "silently read zero records — while slow drift and changepoints, "
-            "which anchor on yesterday_str, read correctly. The backfilled record "
-            "is half-computed with no error raised."
-        ),
-    )
     def test_a_backfilled_date_reads_the_window_ending_at_that_date(self, offline_handler):
+        """#2221: `today - 7` .. event date is an INVERTED range for any backfill older than
+        a week, so momentum/trends/habits read zero records and store half-computed."""
         target = "2026-04-09"
         for d in ("2026-04-08", "2026-04-07", "2026-04-01", "2026-03-31"):
             seed(offline_handler, _date_row("day_grade", d, total_score=Decimal("90" if d > "2026-04-02" else "60")))
         out = di.lambda_handler({"date": target}, None)
         assert out["momentum"] != "unknown", "a backfilled day must see its own trailing window"
+
+    def test_the_daily_run_still_reads_exactly_the_same_windows_as_before(self, offline_handler, monkeypatch):
+        """The anchor moved from the clock to the target date; on the normal run the spans
+        must be unchanged — yesterday-6 == today-7 and yesterday-13 == today-14."""
+        seen = []
+        real = di.fetch_range
+        monkeypatch.setattr(di, "fetch_range", lambda s, a, b: seen.append((s, a, b)) or real(s, a, b))
+        di.lambda_handler({}, None)
+        assert ("computed_metrics", "2026-05-03", YESTERDAY) in seen
+        assert ("habit_scores", "2026-05-03", YESTERDAY) in seen
+        assert ("day_grade", "2026-04-26", YESTERDAY) in seen
