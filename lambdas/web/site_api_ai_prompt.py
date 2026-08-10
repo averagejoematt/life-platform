@@ -93,6 +93,14 @@ def _grounding_allow_lists(gg, payload, prompt_txt: str, day_ctx: str):
     )
 
 
+#: ADR-104 fail-closed refusal copy for /api/explain — served both when the gate finds
+#: ungrounded numbers AND when the gate helper itself fails to import (#2393: a partial
+#: bundle regression must fail CLOSED, not silently serve ungated output).
+_EXPLAIN_GROUNDING_REFUSAL = (
+    "I'd rather not narrate numbers I can't ground in this page's data. " "The chart itself is the honest read — try again in a moment."
+)
+
+
 _EXPLAIN_SYSTEM = (
     "You are the plain-English tour guide for averagejoematt.com — Matthew's public, single-subject (N=1) "
     "health experiment. A reader tapped 'explain this page' on a data-dense surface. You receive the page's "
