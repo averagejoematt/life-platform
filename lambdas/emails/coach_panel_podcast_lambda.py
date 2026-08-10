@@ -28,7 +28,7 @@ import boto3
 from ai import google_tts
 from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
 from boto3.dynamodb.conditions import Key
-from coach import persona_registry
+from coach import coach_derived_prose, persona_registry  # #2418: served_summary falls back to gated `content`
 from common.constants import EXPERIMENT_START_DATE  # ADR-058/077 — current-cycle genesis anchor
 from experiment import er03_gate
 from experiment.phase_filter import with_phase_filter
@@ -111,7 +111,7 @@ def _coach_latest(coach_id: str) -> dict | None:
     if not items:
         return None
     it = items[0]
-    summary = it.get("key_recommendation") or it.get("observatory_summary") or ""
+    summary = coach_derived_prose.served_summary(it)
     return {"summary": summary, "themes": (it.get("themes") or [])[:4]} if summary else None
 
 

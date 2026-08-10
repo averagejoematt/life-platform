@@ -366,7 +366,7 @@ def vital_claims_in(text: str, *, skip_targets: bool = True):
     return claims
 
 
-# ── caller helpers: the two ways a night map / a night label gets built ──────
+# ── caller helpers: the ways a night map / a night label gets built ──────────
 
 
 def nightly_vitals_from_facts(facts) -> dict:
@@ -387,6 +387,33 @@ def nightly_vitals_from_facts(facts) -> dict:
         return {}
     vals = {k: facts.get(k) for k in ("recovery_pct", "hrv_ms", "rhr_bpm") if facts.get(k) is not None}
     return {night: vals}
+
+
+def nightly_vitals_from_narrative(text, generation_date_iso=None) -> dict:
+    """`{night: {metric: value}}` from a narrative's OWN DATED claims (#2418).
+
+    `nightly_vitals_from_facts` arms a GENERATOR against the fact snapshot it was
+    handed. A gate on a text that was CONDENSED from an already-gated narrative has a
+    different and better authority available: the source narrative itself. It passed
+    its own #1968 gate, and it carries the night each figure belongs to — so grading
+    the condensation against it asks exactly the right question ("did the shorter text
+    keep the reading and its night?") with no lookup, no clock and no I/O.
+
+    A figure the source never dated contributes nothing to the map. That is the honest
+    behaviour and not a gap: the `unlabeled_night_figure` class still asks the
+    condensation to name a night, and this helper refuses to invent an adjudicating
+    authority the source did not have (ADR-104 — unknown means unknown).
+
+    Only the FIRST dated value per (night, metric) is kept: a narrative that walks a
+    week night by night states many recovery figures, and the map's job is to answer
+    "what does the source say this night's value was", not to merge them.
+    """
+    night_map: dict = {}
+    for metric, value, sentence in vital_claims_in(text):
+        night, _how = night_named_in(sentence, generation_date_iso)
+        if night:
+            night_map.setdefault(night, {}).setdefault(metric, value)
+    return night_map
 
 
 def night_label_line(facts) -> str:

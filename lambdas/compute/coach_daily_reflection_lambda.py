@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 
 import boto3
 from boto3.dynamodb.conditions import Key
-from coach import persona_registry
+from coach import coach_derived_prose, persona_registry  # #2418: served_summary falls back to gated `content`
 from experiment import er03_gate
 from experiment.phase_filter import with_phase_filter
 
@@ -65,7 +65,7 @@ def _gather_facts(table, coach_id):
     if not items:
         return None
     it = items[0]
-    summary = it.get("key_recommendation") or it.get("observatory_summary") or ""
+    summary = coach_derived_prose.served_summary(it)
     if not summary:
         return None
     themes = it.get("themes") or []
