@@ -210,7 +210,7 @@ def _track_record_block(coach_id: str) -> str:
             "own the misses plainly; credibility here comes from being scored, not from being right."
         )
         return "\n".join(lines)
-    except Exception as _e:
+    except Exception:
         return "Track record unavailable this run."
 
 

@@ -1587,7 +1587,7 @@ def build_html(data, commentary, profile):
             f'<div style="background:#fffbeb;border:2px solid #f59e0b;border-radius:10px;'
             f'padding:16px 20px;margin-bottom:24px;">'
             f'<p style="font-size:13px;font-weight:700;color:#92400e;margin:0 0 10px;">'
-            f'⏳ {len(oi)} Open Insight{"s" if len(oi)>1 else ""}</p>{items}</div>'
+            f'⏳ {len(oi)} Open Insight{"s" if len(oi) > 1 else ""}</p>{items}</div>'
         )
 
     board_section = section(
