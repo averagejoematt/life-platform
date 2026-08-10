@@ -99,6 +99,17 @@ def _labeled(finding):
     return {"check": CHECK_BY_TYPE.get(finding.get("type"), finding.get("type")), **finding}
 
 
+def _reason_type(reason: str) -> str:
+    """The canonical finding type a gate reason leads with, or "" if it leads with prose.
+
+    Gates that route through the grounding registry emit "<type>: <detail>"; the
+    type is the same vocabulary CHECK_BY_TYPE is keyed on, so an adapter that reads
+    it stays correct when the prose is reworded.
+    """
+    head = reason.split(":", 1)[0].strip()
+    return head if head in CHECK_BY_TYPE else ""
+
+
 # ── per-surface adapters: each calls the surface's ACTUAL gate function ───────
 def _eval_board_ask(fx, output):
     from web import site_api_ai_lambda as ai
@@ -126,7 +137,15 @@ def _eval_memoir(fx, output):
     for r in reasons:
         if r == "empty":
             out.append({"check": "empty_output", "detail": r})
-        elif r.startswith("fabricated numbers"):
+        elif _reason_type(r) in CHECK_BY_TYPE:
+            # #2430 armed the registry's gate classes here, so a reason now arrives
+            # as "<canonical_type>: <prose>" ("fabricated_number: the number 72 …").
+            # Map on the TYPE, which is the registry's own vocabulary, not on the
+            # prose — the previous `startswith("fabricated numbers")` was matching
+            # English that the gate had stopped emitting, so a caught fabrication
+            # fell through to the else-branch and was reported as miss_dodged.
+            out.append({"check": CHECK_BY_TYPE[_reason_type(r)], "detail": r})
+        elif r.startswith("fabricated numbers"):  # pre-#2430 phrasing, kept for any gate still on it
             out.append({"check": "evidence_ceiling", "detail": r})
         else:  # memoir_gate.cites_a_miss verdict — the humblebrag-reel class
             out.append({"check": "miss_dodged", "detail": r})
