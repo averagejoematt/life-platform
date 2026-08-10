@@ -32,9 +32,10 @@ Data provenance (verified against live DDB, 2026-07-08):
 """
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from web.site_api_common import (
+    PT,
     _error,
     _ok,
     _query_source,
@@ -55,11 +56,11 @@ _FITNESS_BASIS_DAYS = 180  # VO2max readings feeding the fitness-age estimate (r
 
 
 def _today() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return datetime.now(PT).strftime("%Y-%m-%d")
 
 
 def _days_ago(n: int) -> str:
-    return (datetime.now(timezone.utc) - timedelta(days=n)).strftime("%Y-%m-%d")
+    return (datetime.now(PT) - timedelta(days=n)).strftime("%Y-%m-%d")
 
 
 # ── Fitness age (Option A privacy) ───────────────────────────────────────────────────────────

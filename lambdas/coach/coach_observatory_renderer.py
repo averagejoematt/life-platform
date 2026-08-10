@@ -25,7 +25,7 @@ v1.0.0 — 2026-04-06 (Coach Intelligence)
 import json
 import logging
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -49,6 +49,7 @@ TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
 
 from common.constants import EXPERIMENT_START_DATE as EXPERIMENT_START  # ADR-058
+from common.pacific_time import PACIFIC as PT  # #2414: reader-bound "today"/windows anchor in the Pacific day
 
 # AWS clients
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
@@ -234,7 +235,7 @@ def _compute_experiment_timing():
     """Compute current week number and days in experiment."""
     try:
         start = datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()
-        today = datetime.now(timezone.utc).date()
+        today = datetime.now(PT).date()  # #2414: "Week N / Day N" is the reader's Pacific day
         days_in = max(1, (today - start).days + 1)
         week_number = max(1, (days_in - 1) // 7 + 1)
         return week_number, days_in
@@ -467,7 +468,7 @@ def _render_coach_card(domain, include_threads=True):
     # type=position_revision). This query uses an SK-between bound on date.
     track_record = None
     try:
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+        cutoff = (datetime.now(PT) - timedelta(days=30)).strftime("%Y-%m-%d")  # #2414: PT — sk days are Pacific
         tr_resp = table.query(
             **with_phase_filter(
                 {  # ADR-058
@@ -511,7 +512,7 @@ def _render_coach_card(domain, include_threads=True):
     try:
         from coach.coach_nudge_engine import NUDGE_SK_PREFIX, proactivity_summary
 
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+        cutoff = (datetime.now(PT) - timedelta(days=30)).strftime("%Y-%m-%d")  # #2414: PT — sk days are Pacific
         nudge_resp = table.query(
             **with_phase_filter(
                 {  # ADR-058

@@ -29,6 +29,7 @@ from boto3.dynamodb.conditions import Key
 from web.site_api_common import (
     DDB_REGION,
     PLATFORM_STATS,
+    PT,
     STATUS_CACHE_TTL,
     USER_PREFIX,
     _ok,
@@ -472,7 +473,7 @@ def status(*, _g) -> dict:
             last_dt = datetime.strptime(last_date_str[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
         except (ValueError, TypeError):
             return "yellow", "unknown", "Freshness unreadable — the newest record's date could not be parsed"
-        now = datetime.now(timezone.utc)
+        now = datetime.now(PT)
         days_ago = (now.date() - last_dt.date()).days
 
         # Sleep/recovery sources are keyed by wake date — yesterday is current
@@ -520,7 +521,7 @@ def status(*, _g) -> dict:
         """
         try:
             epoch_start = datetime(2026, 3, 28, tzinfo=timezone.utc).date()
-            today = datetime.now(timezone.utc).date()
+            today = datetime.now(PT).date()
             window_days = min(90, (today - epoch_start).days + 1)
             if window_days < 1:
                 return [2]  # pre-epoch: neutral
@@ -579,11 +580,11 @@ def status(*, _g) -> dict:
             last_dt = datetime.strptime(last_date_str[:10], "%Y-%m-%d").date()
         except (ValueError, TypeError):
             return False, None
-        days_silent = (datetime.now(timezone.utc).date() - last_dt).days
+        days_silent = (datetime.now(PT).date() - last_dt).days
         return days_silent > _WEEKLY_CYCLE_DAYS, _DOW_NAMES[exp_dow]
 
     # Build data source components
-    now = datetime.now(timezone.utc)
+    now = datetime.now(PT)
     ds_components = []
     for row in _DATA_SOURCES:
         sid, name, desc, yh, rh = row[0], row[1], row[2], row[3], row[4]
@@ -622,7 +623,7 @@ def status(*, _g) -> dict:
             except (ValueError, TypeError):
                 last_dt = None
             if last_dt is not None:
-                days_ago = (datetime.now(timezone.utc).date() - last_dt.date()).days
+                days_ago = (datetime.now(PT).date() - last_dt.date()).days
                 months_ago = days_ago / 30.0
                 due_date = last_dt + timedelta(days=due_mo * 30)
                 due_str = due_date.strftime("%b %Y")

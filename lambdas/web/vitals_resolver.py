@@ -87,6 +87,8 @@ def resolve_vitals(table, user_prefix, now=None):
     absence, they never substitute a zero.
     """
     now = now or datetime.now(timezone.utc)
+    # utc-exempt(#2414): deliberately WIDENED scan bounds, not a reader "today" —
+    # the +1d/-LOOKBACK window covers both frames and the newest record wins.
     end = (now + timedelta(days=1)).strftime("%Y-%m-%d")  # TZ boundary: a PT record can be dated "tomorrow" in UTC
     start = (now - timedelta(days=LOOKBACK_DAYS)).strftime("%Y-%m-%d")
 
@@ -128,6 +130,7 @@ def resolve_vitals(table, user_prefix, now=None):
             break
 
     # Steps: garmin (watch of record) then apple_health, recent days only.
+    # utc-exempt(#2414): same widened-bounds scan as above — frame-tolerant by design.
     steps_start = (now - timedelta(days=STEPS_LOOKBACK_DAYS)).strftime("%Y-%m-%d")
     for source in ("garmin", "apple_health"):
         try:

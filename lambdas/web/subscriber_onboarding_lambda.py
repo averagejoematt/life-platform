@@ -22,6 +22,7 @@ import urllib.parse
 from datetime import datetime, timezone
 
 import boto3
+from common.pacific_time import PACIFIC as PT  # #2414: reader-facing days anchor in the Pacific frame
 from common.send_guard import guarded_send_email, is_dry_run
 
 try:
@@ -152,7 +153,7 @@ def lambda_handler(event, context):
     `onboarding_sent` marker write — the run reports what it would have sent.
     """
     if hasattr(logger, "set_date"):
-        logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+        logger.set_date(datetime.now(PT).strftime("%Y-%m-%d"))
 
     dry_run = is_dry_run(event)
     if dry_run:

@@ -34,11 +34,12 @@ Read-only: GETs S3 objects. Never writes platform data. Honest empty state — a
 week with no activity says so plainly rather than padding the feed.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 import boto3
 
 from web.site_api_common import (
+    PT,
     S3_REGION,
     _error,
     _ok,
@@ -193,7 +194,7 @@ def _monday_of(d):
 def _parse_week(qs):
     """Resolve the requested week to (monday_date, [7 date objs]). Defaults to the
     current week. A ?week=YYYY-MM-DD param anchors to that day's Monday."""
-    anchor = datetime.now(timezone.utc).date()
+    anchor = datetime.now(PT).date()
     raw = (qs or {}).get("week")
     if raw:
         try:

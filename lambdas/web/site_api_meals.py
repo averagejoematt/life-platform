@@ -9,10 +9,11 @@ import the facade — no import cycle. All other shared helpers come straight fr
 site_api_common (identical binding semantics to the pre-split facade).
 """
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from web.site_api_common import (
+    PT,
     _error,
     _ok,
     _window_span,
@@ -35,7 +36,7 @@ def protein_sources(*, _g) -> dict:
     """
     _query_source = _g["_query_source"]
     _experiment_date = _g["_experiment_date"]
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(PT).strftime("%Y-%m-%d")
     d30 = _experiment_date(30)
     # #1919: `d30` is genesis-clamped, so `days_count` (already published beside
     # this field, ADR-105) can be far fewer than 30 early in a cycle while
@@ -145,7 +146,7 @@ def frequent_meals(*, _g) -> dict:
     # module-level binding on line 13, so `monkeypatch.setattr(meals, "datetime",
     # ...)` — the seam every #1084/#1917 window test uses — silently no-opped for
     # this handler and its date arithmetic could not be pinned at a boundary.
-    end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    end_date = datetime.now(PT).strftime("%Y-%m-%d")
     # Genesis clamp (ADR-077). This was the only meal endpoint deriving its lower
     # bound as `now - 30d` with no EXPERIMENT_START clamp, so a prior-cycle row
     # not yet phase-tagged (the reset tags asynchronously) surfaced on the new
@@ -212,7 +213,7 @@ def meal_glucose(*, _g) -> dict:
     from collections import defaultdict
 
     # No `from datetime import ...` re-import here either — see frequent_meals.
-    end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    end_date = datetime.now(PT).strftime("%Y-%m-%d")
     start_date = _experiment_date(30)
     period_days = _window_span(start_date, end_date, 30)["actual_days"]
 
@@ -350,7 +351,7 @@ def food_delivery_overview(*, _g) -> dict:
 
     _query_source = _g["_query_source"]
     _experiment_date = _g["_experiment_date"]
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(PT).strftime("%Y-%m-%d")
     d30 = _experiment_date(30)
 
     try:

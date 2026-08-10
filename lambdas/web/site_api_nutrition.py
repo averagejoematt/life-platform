@@ -10,7 +10,7 @@ site_api_common (identical binding semantics to the pre-split facade).
 """
 
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from common import (
     digest_utils,  # bundled shared module — compute_confidence tiering (ADR-105)
@@ -19,6 +19,7 @@ from common import (
 from health import tdee as health_tdee  # ADR-152 / #2310: THE one TDEE definition
 
 from web.site_api_common import (
+    PT,
     _get_profile,
     _ok,
     _window_span,
@@ -274,7 +275,7 @@ def nutrition_overview(*, _g) -> dict:
     """
     _query_source = _g["_query_source"]
     _experiment_date = _g["_experiment_date"]
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(PT).strftime("%Y-%m-%d")  # #2414: the reader's "today" is the Pacific day
     d30 = _experiment_date(30)
     d7 = _experiment_date(7)
 
@@ -757,7 +758,7 @@ def nutrition_overview(*, _g) -> dict:
         if target_w == cur_weight:  # already standing on a mark — bet the next one down
             target_w -= 5
         to_go = cur_weight - target_w
-        now = datetime.now(timezone.utc)
+        now = datetime.now(PT)  # #2414: projected dates are reader-facing — anchor in the Pacific day
 
         def _proj(rate):
             return (now + timedelta(weeks=to_go / rate)).strftime("%Y-%m-%d")
@@ -977,7 +978,7 @@ def deficit_sustainability(*, _g) -> dict:
     """
     _query_source = _g["_query_source"]
     _experiment_date = _g["_experiment_date"]
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(PT).strftime("%Y-%m-%d")  # #2414: the reader's "today" is the Pacific day
     start = _experiment_date(14)
     mf = _query_source("macrofactor", start, today)
     if len(mf) < 7:

@@ -46,6 +46,8 @@ def pulse(*, _g) -> dict:
     table = _g["table"]
 
     today_pt = datetime.now(PT).strftime("%Y-%m-%d")
+    # utc-exempt(#2414): NOT a reader "today" — widens the DDB query range below so
+    # UTC-keyed boundary records are caught; the displayed day (_pulse_day) is PT.
     today_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     yesterday_pt = (datetime.now(PT) - timedelta(days=1)).strftime("%Y-%m-%d")
     # Display day number in PT; query DynamoDB covering both PT and UTC dates

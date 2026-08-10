@@ -6,7 +6,7 @@ facade's injectable/monkeypatched state via `_g["<name>"]` — same object the t
 from datetime import datetime, timezone
 
 from boto3.dynamodb.conditions import Key
-from common.pacific_time import parse_iso_utc  # #1964: THE ISO parser (naive input == UTC)
+from common.pacific_time import PACIFIC as PT, parse_iso_utc  # #1964: THE one Pacific frame + ISO parser
 from experiment.phase_filter import singleton_visible, with_phase_filter
 
 from web.site_api_common import USER_PREFIX, _decimal_to_float, _error, _ok, logger
@@ -253,7 +253,7 @@ def device_agreement(*, _g) -> dict:
     """
     # Facade state injected via `_g` (the delegator's globals()) — same module the test patched.
     _query_source = _g["_query_source"]
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(PT).strftime("%Y-%m-%d")
     try:
         whoop_items = _query_source("whoop", _DEVICE_AGREEMENT_START, today, include_pilot=True)
         garmin_items = _query_source("garmin", _DEVICE_AGREEMENT_START, today, include_pilot=True)

@@ -19,12 +19,13 @@ facade; no import cycle.
 """
 
 import hashlib
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from boto3.dynamodb.conditions import Key
 from experiment.phase_filter import singleton_visible  # ADR-058 / #946 / #1197
 
 from web.site_api_common import (
+    PT,
     USER_ID,
     USER_PREFIX,
     _decimal_to_float,
@@ -233,7 +234,7 @@ def wrong(*, _g) -> dict:
 
     try:
         # 1. Validator catches (last 120 days)
-        start = (datetime.now(timezone.utc) - timedelta(days=120)).strftime("%Y-%m-%d")
+        start = (datetime.now(PT) - timedelta(days=120)).strftime("%Y-%m-%d")
         resp = table.query(
             KeyConditionExpression=Key("pk").eq("USER#matthew")
             & Key("sk").between(f"SOURCE#intelligence_quality#{start}", "SOURCE#intelligence_quality#~"),

@@ -17,15 +17,15 @@ owner-only (MCP), deliberately NOT surfaced on any public endpoint.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta
 
 from reading import reading_constellation, reading_store, reading_visibility as rv
 
-from web.site_api_common import _ok
+from web.site_api_common import PT, _ok
 
 
 def _today() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return datetime.now(PT).strftime("%Y-%m-%d")  # #2414: the reader's "today" is the Pacific day
 
 
 def _public_shelf_item(state: dict) -> dict:
@@ -46,7 +46,7 @@ def _public_shelf_item(state: dict) -> dict:
 
 def _input_streak(sessions: list) -> int:
     days = {s.get("date") for s in sessions if s.get("date")}
-    streak, cursor = 0, datetime.now(timezone.utc).date()
+    streak, cursor = 0, datetime.now(PT).date()  # #2414: streak walks back from the Pacific day
     while cursor.isoformat() in days:
         streak += 1
         cursor = cursor.fromordinal(cursor.toordinal() - 1)
@@ -159,9 +159,7 @@ def handle_horizons():
 def handle_reading_overview():
     """Roundedness wheel + public stats + the cockpit reading line."""
     today = _today()
-    sessions_90 = reading_store.history(
-        (datetime.now(timezone.utc).date().fromordinal(datetime.now(timezone.utc).date().toordinal() - 90)).isoformat(), today
-    )
+    sessions_90 = reading_store.history((datetime.now(PT).date() - timedelta(days=90)).isoformat(), today)
     streak = _input_streak(sessions_90)
     read_today = any(s.get("date") == today for s in sessions_90)
     wheel = reading_store.wheel_distribution()

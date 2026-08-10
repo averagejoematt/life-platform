@@ -35,13 +35,13 @@ def tools_baseline(*, _g) -> dict:
     # Facade state injected via `_g` (the delegator's globals()) — same module the test patched.
     EXPERIMENT_START = _g["EXPERIMENT_START"]
     _query_source = _g["_query_source"]
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(PT).strftime("%Y-%m-%d")  # #2414: the reader's "today" is the Pacific day
 
     # Baseline: first 7 days of the experiment
     baseline_end = (datetime.strptime(EXPERIMENT_START, "%Y-%m-%d") + timedelta(days=7)).strftime("%Y-%m-%d")
 
     # Current: last 7 days
-    d7 = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
+    d7 = (datetime.now(PT) - timedelta(days=7)).strftime("%Y-%m-%d")
 
     baseline_whoop = _query_source("whoop", EXPERIMENT_START, baseline_end)
     current_whoop = _query_source("whoop", d7, today)
@@ -110,8 +110,10 @@ def changes_since(qs: dict = None, *, _g) -> dict:
 
     from datetime import datetime, timedelta, timezone
 
-    since_dt = datetime.fromtimestamp(since_ts, tz=timezone.utc)
-    now = datetime.now(timezone.utc)
+    # #2414: the window's date labels are reader-facing — render both ends in the
+    # Pacific frame (the epoch instant itself is frame-free).
+    since_dt = datetime.fromtimestamp(since_ts, tz=timezone.utc).astimezone(PT)
+    now = datetime.now(PT)
     days_ago = max(1, (now - since_dt).days)
     # Cap lookback to 30 days
     if days_ago > 30:
