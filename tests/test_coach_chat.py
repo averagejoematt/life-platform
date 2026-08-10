@@ -369,3 +369,85 @@ def test_two_turns_in_the_same_second_do_not_collide():
     a = cc.turn_records("nutrition", "X", "hi", cc.TurnResult("y", "sent"))
     b = cc.turn_records("nutrition", "X", "hi", cc.TurnResult("y", "sent"))
     assert {r["sk"] for r in a}.isdisjoint({r["sk"] for r in b})
+
+
+def test_eli_marsh_chats_land_on_the_partition_every_other_surface_reads():
+    """The lead's registry id carries no _coach suffix; blindly appending one
+    (COACH#eli_marsh_coach) would strand his chats in a partition RELATIONSHIP#,
+    the profile surface, and the evaluator never read. Fixed before any eli
+    traffic existed, so no rows migrate."""
+    assert cc.chat_pk("eli_marsh") == "COACH#eli_marsh"
+
+
+def test_every_texting_persona_keys_chat_to_its_own_registry_partition():
+    """Set-derived, not instance: for every persona that can text, the chat
+    partition must be COACH#{persona_id} — the same partition the rest of the
+    coach engine keys that persona by."""
+    from coach.persona_registry import TEXTING_PERSONA_IDS
+
+    for pid in TEXTING_PERSONA_IDS:
+        assert cc.chat_pk(pid) == f"COACH#{pid}"
+
+
+# ── The system message actually caches (the docstring is no longer a lie) ─────
+
+
+def test_build_request_sends_system_as_blocks_with_a_cached_stable_prefix():
+    req = cc.build_request(
+        persona_block="PERSONA_MARKER",
+        memory_block="MEM_MARKER",
+        facts_block="FACTS_MARKER",
+        coach_name="Dr. Lisa Park",
+        thread=[],
+        inbound="hey",
+        model="m",
+        colleagues_block="COLLEAGUES_MARKER",
+    )
+    blocks = req["system"]
+    assert isinstance(blocks, list) and len(blocks) == 2
+    assert blocks[0]["cache_control"] == {"type": "ephemeral"}
+    assert "cache_control" not in blocks[1]
+    # The stable identity lives in the cached prefix; everything volatile behind it.
+    assert "PERSONA_MARKER" in blocks[0]["text"] and "COLLEAGUES_MARKER" in blocks[0]["text"]
+    assert "MEM_MARKER" in blocks[1]["text"] and "FACTS_MARKER" in blocks[1]["text"]
+    assert "HARD RULE" in blocks[1]["text"]
+
+
+def test_the_blocks_and_the_flat_string_cannot_fork():
+    """Both renderers derive from _system_parts — joined blocks must equal the
+    string form byte-for-byte, or a future edit to one silently diverges the
+    tested prompt from the shipped prompt."""
+    args = dict(persona_block="P", memory_block="M", facts_block="F", coach_name="X", colleagues_block="C")
+    joined = "\n\n".join(b["text"] for b in cc.build_system_blocks(**args))
+    assert joined == cc.build_system_prompt(**args)
+
+
+# ── The humanity rules from the first real transcripts (2026-08-10) ───────────
+
+
+def test_the_rules_teach_register_matching_not_briefing():
+    s = cc.build_system_prompt("V", "M", "F", "Dr. Lisa Park")
+    assert "a bare 'hey' gets a bare hey back" in s
+    assert "end on a statement" in s
+
+
+def test_the_rules_ban_filler_questions_and_assistant_isms():
+    s = cc.build_system_prompt("V", "M", "F", "Dr. Lisa Park")
+    assert "What's on your mind?" in s  # named as the banned example
+    assert "Honest answer:" in s  # named as the banned example
+    assert "use his name sparingly" in s
+
+
+def test_the_persona_outranks_a_poisoned_memory_about_identity():
+    """The go-live corpus contains a summary row memorializing 'I'm not Lisa'
+    from the pre-fix identity bug. The prompt must tell the coach its persona
+    outranks remembered notes, or the poisoned row re-teaches the error."""
+    s = cc.build_system_prompt("V", "M", "F", "Dr. Lisa Park")
+    assert "authoritative over remembered notes" in s
+    assert "never tell him he has your name wrong" in s
+
+
+def test_the_rules_welcome_off_lane_conversation():
+    """He should be able to text a coach about anything — a person first."""
+    s = cc.build_system_prompt("V", "M", "F", "Dr. Lisa Park")
+    assert "engage with it as yourself first" in s
