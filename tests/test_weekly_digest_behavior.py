@@ -1130,6 +1130,54 @@ class TestExTodoist:
         assert "↑9" in html  # week-over-week delta: 12 vs 3, not the →0 of two dead zeros
         assert "→0" not in html
 
+    def test_the_rendered_average_states_the_n_it_actually_divided_by(self):
+        """#2332 acceptance bullet 2 (the renderer half; the extractor half landed in
+        #2516). A week with an ingestion gap averages over the REPORTING days only — the
+        digest must say which n that was, and that n must be the denominator the
+        arithmetic used, not the number of records loaded for the week.
+
+        The n is derived from the extractor's own output, not hardcoded: a renderer that
+        printed `len(recs)` would satisfy a literal `n=2` written by hand on some other
+        fixture, but cannot satisfy `n == out["days"]` on a week where the two differ.
+        """
+        t = as_range(
+            "todoist",
+            {
+                "2026-08-02": {"completed_count": 5},
+                "2026-08-03": {"completed_count": 7},
+                "2026-08-04": {},  # ingestion gap — loaded, but never reported a count
+            },
+        )
+        out = wd.ex_todoist(t)
+        html = wd.build_html(digest_data(this={"todoist": out}), BOARD_TEXT, profile_row())
+        assert "Avg Per Day" in html
+        assert "6.0" in html  # 12 over 2 reporting days, not 12/3 = 4.0
+        assert f'n={out["days"]} reporting' in html  # the stated n IS the denominator
+        assert out["days"] == 2 and len(t) == 3  # the two genuinely differ on this week
+        assert "n=3" not in html  # the record count is not the n
+
+    def test_a_bare_average_with_no_n_is_what_this_pin_forbids(self):
+        """#2332 mutation proof for the RENDER half. Reverting the cell to the old bare
+        `fmt(td.get("avg_per_day"))` — or pointing the n at `len(recs)` — reds this: the
+        first loses the `n=` token entirely, the second prints `n=3`. A gate-level test on
+        `ex_todoist` alone passes with either mutation present, because the extractor is
+        already correct; only the rendered string catches a renderer that misreports n.
+        """
+        out = wd.ex_todoist(as_range("todoist", {"2026-08-02": {"completed_count": 4}, "2026-08-03": {}}))
+        html = wd.build_html(digest_data(this={"todoist": out}), BOARD_TEXT, profile_row())
+        assert "n=" in html, "the digest states an average with no n behind it"
+        assert "n=1 reporting day" in html  # singular, and 1 — not the 2 records loaded
+
+    def test_a_week_with_no_reported_counts_renders_absence_not_a_number(self):
+        """ADR-104 at the render layer: zero reporting days means the source never gave a
+        count. The cell says so rather than printing a figure the reader would read as a
+        measured average — and it must never print `n=0`, which would imply an average
+        divided by nothing."""
+        out = wd.ex_todoist(as_range("todoist", {"2026-08-02": {}, "2026-08-03": {}}))
+        html = wd.build_html(digest_data(this={"todoist": out}), BOARD_TEXT, profile_row())
+        assert "no reporting days" in html
+        assert "n=0" not in html
+
     def test_the_board_prompt_payload_carries_the_real_completion_count(self, monkeypatch):
         """The same `this`/`prior` dict is serialised verbatim into BOARD_PROMPT's
         data_json — a permanently-zero todoist signal was being reasoned over."""

@@ -164,29 +164,8 @@ def nutrition_last_log_absence(today):
     return ex_nutrition_last_log_absence(table, USER_ID, EXPERIMENT_START_DATE, today, logger)
 
 
-def delta_html(cur, prev, unit="", dec=1, invert=False):
-    if cur is None or prev is None:
-        return ""
-    diff = round(cur - prev, dec)
-    if diff == 0:
-        return '<span style="color:#888;font-size:11px;"> →0</span>'
-    better = (diff < 0) if invert else (diff > 0)
-    color = "#27ae60" if better else "#e74c3c"
-    arrow = "↑" if diff > 0 else "↓"
-    return f'<span style="color:{color};font-size:11px;"> {arrow}{abs(diff)}{unit}</span>'
-
-
-def hit_bar(pct, color="#27ae60"):
-    if pct is None:
-        return "—"
-    w = max(0, min(100, pct))
-    return (
-        f'<span style="font-weight:600;">{pct}%</span> '
-        f'<span style="display:inline-block;width:80px;height:8px;background:#eee;'
-        f'border-radius:4px;vertical-align:middle;">'
-        f'<span style="display:inline-block;width:{w}%;height:8px;background:{color};'
-        f'border-radius:4px;"></span></span>'
-    )
+# delta_html / hit_bar moved to weekly_digest_extractors (#2332) — pure cell
+# formatters, re-exported below with the extractors so `wd.delta_html` still resolves.
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -204,6 +183,7 @@ def hit_bar(pct, color="#27ae60"):
 from emails.weekly_digest_extractors import (  # noqa: E402
     compute_4week_trends,
     compute_banister,
+    delta_html,
     ex_apple_health,
     ex_character_sheet,
     ex_day_grades,
@@ -217,6 +197,8 @@ from emails.weekly_digest_extractors import (  # noqa: E402
     ex_whoop,
     ex_whoop_sleep,
     ex_withings,
+    hit_bar,
+    todoist_avg_per_day_cell,
 )
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1555,7 +1537,7 @@ def build_html(data, commentary, profile):
         pr_rows += row(
             "Tasks Completed", str(td.get("tasks_completed", 0)), delta_html(td.get("tasks_completed"), tdp.get("tasks_completed"))
         )
-        pr_rows += row("Avg Per Day", fmt(td.get("avg_per_day")))
+        pr_rows += row("Avg Per Day", todoist_avg_per_day_cell(td))  # #2332: states the n it divided by
     productivity_section = section("Productivity", "✅", tbl(pr_rows)) if pr_rows else ""
 
     # ── MCP write-audit trail (#753, owner-private ops line) ──

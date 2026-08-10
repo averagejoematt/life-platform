@@ -22,8 +22,62 @@ from common.digest_utils import (
     avg,
     compute_banister_from_dict,  # #490: shared TSS-like Banister
     dedup_activities,
+    fmt,
     safe_float,
 )
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PURE CELL FORMATTERS — summary dict → the HTML fragment a table cell carries.
+# Lifted out of weekly_digest_lambda.py (#2332) for the same reason the extractors
+# were (#2221): that module sits ON its size ratchet, and the honest-numbers work
+# has to land without raising a BASELINE. Like the extractors these take no table,
+# no clock and no SES client, and the handler re-exports them by name.
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def delta_html(cur, prev, unit="", dec=1, invert=False):
+    if cur is None or prev is None:
+        return ""
+    diff = round(cur - prev, dec)
+    if diff == 0:
+        return '<span style="color:#888;font-size:11px;"> →0</span>'
+    better = (diff < 0) if invert else (diff > 0)
+    color = "#27ae60" if better else "#e74c3c"
+    arrow = "↑" if diff > 0 else "↓"
+    return f'<span style="color:{color};font-size:11px;"> {arrow}{abs(diff)}{unit}</span>'
+
+
+def hit_bar(pct, color="#27ae60"):
+    if pct is None:
+        return "—"
+    w = max(0, min(100, pct))
+    return (
+        f'<span style="font-weight:600;">{pct}%</span> '
+        f'<span style="display:inline-block;width:80px;height:8px;background:#eee;'
+        f'border-radius:4px;vertical-align:middle;">'
+        f'<span style="display:inline-block;width:{w}%;height:8px;background:{color};'
+        f'border-radius:4px;"></span></span>'
+    )
+
+
+def todoist_avg_per_day_cell(td):
+    """#2332 / ADR-104 — the Productivity "Avg Per Day" cell, stated with its own n.
+
+    `ex_todoist` averages only over the days that actually carried a `completed_count`
+    (absence is not a measured zero), so `days` is the denominator that produced
+    `avg_per_day` — NOT the number of records loaded for the week. Rendering the figure
+    bare let a 2-reporting-day average read as a 7-day one. The n printed here is that
+    same denominator, so the stated n and the arithmetic can never disagree.
+
+    Zero reporting days means the source never gave us a count: say so, rather than
+    letting `fmt(None)`'s dash sit where a number belongs with no explanation.
+    """
+    n = int(td.get("days") or 0)
+    if n == 0:
+        return '<span style="color:#888;">no reporting days</span>'
+    unit = "day" if n == 1 else "days"
+    return f'{fmt(td.get("avg_per_day"))} <span style="color:#888;font-size:11px;">(n={n} reporting {unit})</span>'
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # EXTRACTORS — return summarized dicts from raw records

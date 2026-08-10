@@ -150,7 +150,12 @@ BASELINE = {
     # 2026-08-09 (#2387): 1828 → 1843. The query helper moved to weekly_digest_extractors
     # (the #2221 shape); the residual is the honest-absence render branch + the thin
     # binding the tests patch. Next growth extracts renderers.
-    "lambdas/emails/weekly_digest_lambda.py": 1843,
+    # 2026-08-10 (#2332): 1843 → 1825. That "next growth extracts renderers" came due —
+    # the Productivity row had to state the n `ex_todoist` actually divided by, and this
+    # file had ZERO headroom. delta_html + hit_bar (pure summary→cell formatters, no
+    # table/clock/SES) moved to weekly_digest_extractors and are re-exported, paying for
+    # the new cell formatter and handing 18 lines back. Lowering, never raising.
+    "lambdas/emails/weekly_digest_lambda.py": 1825,
     "lambdas/health/character_engine.py": 2117,
     "lambdas/content/html_builder.py": 2104,
     "lambdas/web/site_api_ai_lambda.py": 1991,
