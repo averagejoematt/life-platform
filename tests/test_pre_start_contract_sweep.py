@@ -31,7 +31,7 @@ All offline; genesis dates derive from now(PT) (no wall-clock time bombs).
 import json
 import os
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
@@ -118,7 +118,7 @@ def test_observatory_week_pre_start_time_travel_still_serves_history(monkeypatch
 
 def test_observatory_week_inert_when_genesis_past(monkeypatch):
     _past(monkeypatch)
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = _iso(_today_pt())  # the handler's own frame (Pacific) — a UTC today is stale every UTC evening
     d3 = _iso(_today_pt() - timedelta(days=3))
     d10 = _iso(_today_pt() - timedelta(days=10))
 
@@ -141,7 +141,7 @@ def test_observatory_week_week1_no_fabricated_comparison(monkeypatch):
     # Week 1 of a cycle: there is no prior window inside the cycle (#1977: it is
     # never manufactured by clamping) — never "vs 0 last week" (ADR-104).
     _past(monkeypatch, days=3)
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = _iso(_today_pt())  # the handler's own frame (Pacific) — a UTC today is stale every UTC evening
     d1 = _iso(_today_pt() - timedelta(days=1))
 
     def qs(source, s, e, include_pilot=False):
@@ -221,7 +221,7 @@ def test_observatory_week_partial_prior_week_still_compares(monkeypatch):
     # prev window never intersects the current week.
     genesis = _past(monkeypatch, days=10)
     g = datetime.strptime(genesis, "%Y-%m-%d")
-    anchor = datetime.now(timezone.utc)
+    anchor = _today_pt()  # same frame as the handler's window math
     windows = _stub_table(
         monkeypatch,
         [_whoop(_iso(g + timedelta(days=1)), 8.0), _whoop(_iso(anchor - timedelta(days=1)), 7.0)],
@@ -241,7 +241,7 @@ def test_observatory_week_tie_is_flat_not_down(monkeypatch):
     # Both weeks present at the same average: delta 0.0 must read 'flat' with a
     # neutral notable — pre-fix the tie mapped to 'down' ("declined 0.0h").
     _past(monkeypatch, days=30)
-    anchor = datetime.now(timezone.utc)
+    anchor = _today_pt()  # same frame as the handler's window math
     _stub_table(monkeypatch, [_whoop(_iso(anchor - timedelta(days=1)), 7.5), _whoop(_iso(anchor - timedelta(days=9)), 7.5)])
     b = _body(data.handle_observatory_week({"domain": "sleep"}))
     p = b["summary"]["primary"]
@@ -263,7 +263,7 @@ def test_observatory_week_nutrition_week1_absence_and_tie(monkeypatch):
     assert windows == [(b["period"]["start"], b["period"]["end"])]
 
     _past(monkeypatch, days=30)
-    anchor = datetime.now(timezone.utc)
+    anchor = _today_pt()  # same frame as the handler's window math
     _stub_table(monkeypatch, [_mf(_iso(anchor - timedelta(days=1))), _mf(_iso(anchor - timedelta(days=9)))])
     b2 = _body(data.handle_observatory_week({"domain": "nutrition"}))
     p2 = b2["summary"]["primary"]
@@ -274,7 +274,7 @@ def test_observatory_week_nutrition_week1_absence_and_tie(monkeypatch):
 def test_observatory_week_physical_tie_is_flat(monkeypatch):
     # Physical's intra-week delta: an unchanged weight is 'flat', never "gained 0.0 lbs".
     _past(monkeypatch, days=30)
-    anchor = datetime.now(timezone.utc)
+    anchor = _today_pt()  # same frame as the handler's window math
     _stub_table(
         monkeypatch,
         [{"sk": f"DATE#{_iso(anchor - timedelta(days=d))}", "weight_lbs": 200.0} for d in (5, 1)],
