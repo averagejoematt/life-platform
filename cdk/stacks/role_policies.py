@@ -3262,7 +3262,7 @@ def telegram_worker() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="TelegramSecretRead",
             actions=["secretsmanager:GetSecretValue"],
-            resources=[_secret_arn("life-platform/telegram")],
+            resources=[_secret_arn("life-platform/telegram"), _secret_arn("life-platform/google-tts")],  # google-tts: voice notes (#2494)
         ),
         iam.PolicyStatement(
             sid="SSMRead",
