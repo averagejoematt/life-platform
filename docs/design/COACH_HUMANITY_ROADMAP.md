@@ -107,6 +107,50 @@ which is itself a humanity feature: a friend who makes things up stops being one
 | 51 | Succession done humanly — Max carries the training thread forward; history stays under Sarah's byline | **shipped** (route re-point + voice-structure port, outbound PR) |
 | 52 | Coach-to-coach visible disagreement in Grand Rounds (two coaches, two readings, both grounded) | horizon (after #50) |
 
+## 7. Measured 2026-08-10 — the simulation sweep
+
+Added from `docs/design/COACH_SIM_FINDINGS_2026_08_10.md`: 120 simulated conversations
+(536 turns) across all 8 texting personas, run through the production reply path by
+`scripts/coach_chat_sim.py`. These are the items the *measurement* surfaced, as distinct
+from the items the first real transcripts surfaced (§1–6 above). What makes them
+different in kind: each holds the message constant across all eight coaches, so a finding
+is attributable to the engine rather than to one voice spec.
+
+**The baseline this ledger now has to move: a blind 3-judge panel called 64% of the 120
+transcripts AI.** Not uniformly — 100% of identity conversations, 87% of long ones, 75%
+of off-lane and disagreement, and only 12% of short closes. The shortest exchanges pass;
+the longest fail. What gives the coaches away is not missing texture but unbroken
+competence: 25% of the 2,404 judge tells cite rhetorical symmetry and balanced clauses,
+21% cite relentless helpfulness and on-cue emotional attunement, 16% "too polished."
+
+**That reorders this whole document.** Most of §1–6 is *additive* — a life, inside
+references, reactions, voice notes. The measurement says the cheapest available wins are
+*subtractive*, and that adding texture on top of a voice that is still too composed will
+not move 64%. The moments judges credited as human were all subtractions: a blunt
+admission of error, a deferral to a colleague, a short reply with no closing question.
+Repeatedly they named *Matthew's own messages* as the most human thing in the transcript.
+
+| # | Idea | Status |
+|---|------|--------|
+| 53 | **Adjudicate the identity stance.** The north star ("a cold reader couldn't tell") and `_shared_standard.json`'s `safety_boundaries` ("never claim to be a real human professional") contradict each other; in the gap the model picks, identically, in all 8 voices — `"No — I'm a…"` opens 6 of 8 verbatim | **owner decision** (#2533) |
+| 54 | Per-persona identity stance in each voice spec — the concession made once, in character, without narrating inference architecture | filed (#2533) |
+| 55 | **Deterministic style gate** in `run_turn` — em-dash ceiling + banned-phrase list, sibling to `enforce_emoji_policy`, applied before the grounding gate. Measured: 77% of replies carry an em-dash and the voice spec makes no difference (the coach *permitted* them 80%, the coach told "complete sentences, periods" 78%) | filed (#2535) |
+| 56 | Enforce the #2481 phrase ban deterministically — "Honest answer" appears 23× in 536 replies despite being banned by name. Prompt rules are requests (the standing lesson); the gate in 55 should carry the list | filed (#2535) |
+| 57 | Break the acknowledge→echo→menu template on emotional openers. Given "I'm just tired of all of this", 6 of 8 coaches produce demonstrative-ack → his phrase quoted back → menu question. `"that kind of "` opens replies from 6 different coaches | filed (#2536) |
+| 57b | **Break the composure — the highest-leverage item in this document.** Sanction blunt, incomplete, and briefly unhelpful replies in the voice specs; attack rhetorical symmetry and on-cue attunement directly. 25% + 21% of all judge tells; the two least-flagged coaches (Vale, Marsh, both 46%) are the two whose specs are most clipped and least warm | filed (#2534) |
+| 57c | Widen the "not X, but Y" detector to the general balanced-clause class — it is the #1 judge tell at 25% but matched only 9 times deterministically, so the metric nearly missed the corpus's loudest signal | filed (#2537) |
+| 57d | Length variance must be *real*, not performed — a judge caught a short reply landing after a run of verbose ones and read it as "AI recognizing it should vary length." Variance bolted onto a consistent baseline is worse than consistency | horizon (depends on 57b) |
+| 58 | Voice-flat honest refusals — absence is handled correctly but identically: `"let me check that"` (3 coaches), `"i don't have your"` (3), `"honest answer: i don't"` (3) | filed (#2536) |
+| 59 | **Write the inner-life boundary** before implementing #29/#35 — across 536 replies, essentially zero reference anything outside the conversation and his data. Needs the written rule (bible-derived texture is voice; invented events are lies) first | filed (#2538) |
+| 60 | Wire the sim harness as a standing regression measure — re-run after each humanity change; the §7 metrics are gate-shaped | filed (#2539) |
+
+**Confirmed working by the same sweep** (measured, not assumed): register symmetry holds
+("Hey" → "Hey" from 8/8; median reply 195 chars, median ratio 3.1×, down from the 5–10×
+the first transcripts showed); closing-question rate 20%, with Dr. Nathan Reeves highest
+*by spec* ("He asks more than he concludes") rather than by defect; zero formatting
+violations in 536 replies; the honesty gate firing at 13 regenerated / 7 held; colleague
+referrals by real name; off-lane engagement.
+
 ## Porting beyond Telegram
 
 The register rules (§1) are chat-specific. Everything else — first-person memory,
