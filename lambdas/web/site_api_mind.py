@@ -9,12 +9,13 @@ import the facade — no import cycle. All other shared helpers come straight fr
 site_api_common (identical binding semantics to the pre-split facade).
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from boto3.dynamodb.conditions import Key
 from experiment.phase_filter import with_phase_filter  # ADR-058
 
 from web.site_api_common import (
+    PT,
     USER_PREFIX,
     _decimal_to_float,
     _is_blocked_vice,
@@ -30,7 +31,7 @@ def journal_analysis(*, _g) -> dict:
     """
     table = _g["table"]
     _experiment_date = _g["_experiment_date"]
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(PT).strftime("%Y-%m-%d")  # #2414: the reader's "today" is the Pacific day
     d90 = _experiment_date(90)
 
     ja_pk = f"{USER_PREFIX}journal_analysis"
@@ -106,8 +107,8 @@ def mind_overview(*, _g) -> dict:
     table = _g["table"]
     _query_source = _g["_query_source"]
     _experiment_date = _g["_experiment_date"]
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    today = datetime.now(PT).strftime("%Y-%m-%d")  # #2414: the reader's "today" is the Pacific day
+    yesterday = (datetime.now(PT) - timedelta(days=1)).strftime("%Y-%m-%d")
     d30 = _experiment_date(30)
     d90 = _experiment_date(90)
 

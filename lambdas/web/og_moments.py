@@ -24,6 +24,8 @@ import json
 import urllib.request
 from datetime import datetime, timezone
 
+from common.pacific_time import PACIFIC as PT  # #2414: reader-facing dates anchor in the Pacific day
+
 S3_BUCKET = "matthew-life-platform"
 SITE_BASE = "https://averagejoematt.com"
 MOMENTS_PREFIX = "generated/moments/"
@@ -147,7 +149,7 @@ def _sweep_week_recap(s3, stats):
     platform = stats.get("platform") or {}
     if not (journey or vitals):
         return None  # empty moment → no card, no shell
-    iso = datetime.now(timezone.utc).isocalendar()
+    iso = datetime.now(PT).isocalendar()  # #2414: the week id is the reader's Pacific week
     wid = f"{iso.year}-W{iso.week:02d}"
     bits = []
     if journey.get("lost_lbs") is not None:
@@ -160,7 +162,7 @@ def _sweep_week_recap(s3, stats):
         bits.append(f"day {int(platform['days_in'])}")
     meta = " · ".join(bits)
     title = f"The week so far — {wid}"
-    card = build_moment_card("the weekly recap", title, meta, f"live numbers as of {datetime.now(timezone.utc):%Y-%m-%d}")
+    card = build_moment_card("the weekly recap", title, meta, f"live numbers as of {datetime.now(PT):%Y-%m-%d}")
     body = f"<p>{html.escape(meta)}</p><p>The full instruments — sparklines, deltas, and the honest gaps — live on the cockpit's week view.</p>"
     shell = _shell_html(
         "the weekly recap",
@@ -416,7 +418,7 @@ def _sweep_fingerprint(s3, stats):
 
         from web.fingerprint import SIGNAL_COUNT, build_mark
 
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now(PT).strftime("%Y-%m-%d")  # #2414: the mark's day must agree with the cockpit (PT)
         mark = build_mark(today, _fingerprint_metrics(stats))
         payload = fb.build_broadcast(
             date_str=today,

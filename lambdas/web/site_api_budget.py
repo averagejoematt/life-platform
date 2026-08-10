@@ -464,6 +464,8 @@ def receipts() -> dict:
         # forecast (the DOLLAR figure is the governor's projected_month_end_usd, below)
         # — just the x-axis anchor the spend curve extends its dashed projection to, so
         # the front-end never has to derive a date and risk a second projection (#1618).
+        # utc-exempt(#2414): the AWS billing month is a UTC calendar month (Cost
+        # Explorer / the governor's projection window) — not the reader's Pacific day.
         month_end_date = now.replace(day=calendar.monthrange(now.year, now.month)[1]).strftime("%Y-%m-%d")
 
         try:

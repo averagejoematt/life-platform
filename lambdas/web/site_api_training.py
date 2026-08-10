@@ -19,6 +19,7 @@ from experiment.phase_filter import with_phase_filter  # ADR-058
 
 from web.site_api_common import (
     CORS_HEADERS,
+    PT,
     USER_PREFIX,
     _decimal_to_float,
     _error,
@@ -157,7 +158,7 @@ def training_overview(*, _g) -> dict:
     _query_source = _g["_query_source"]
     _experiment_date = _g["_experiment_date"]
     EXPERIMENT_START = _g["EXPERIMENT_START"]
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(PT).strftime("%Y-%m-%d")
     d90 = _experiment_date(90)
     d30 = _experiment_date(30)
 
@@ -338,7 +339,7 @@ def training_overview(*, _g) -> dict:
     # Staleness honesty (truth audit 2026-07-10): the 30d average masks a quiet current
     # week (218 min/wk average over weeks at 21 and 15 min). Track the trailing-7d Z2
     # alongside it so the front-end can show the CURRENT week vs target honestly.
-    _d7_cal = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
+    _d7_cal = (datetime.now(PT) - timedelta(days=7)).strftime("%Y-%m-%d")
     z2_minutes_30d = 0
     z2_trailing_7d = 0.0
     for a in all_activities_30d:
@@ -491,7 +492,7 @@ def training_overview(*, _g) -> dict:
     _days_since_exp = (datetime.now(timezone.utc) - _exp_start_date.replace(tzinfo=timezone.utc)).days + 1
     _mod_range = min(30, _days_since_exp)
     for i in range(_mod_range):
-        dt = datetime.now(timezone.utc) - timedelta(days=_mod_range - 1 - i)
+        dt = datetime.now(PT) - timedelta(days=_mod_range - 1 - i)
         _dm_d = dt.strftime("%Y-%m-%d")
         _dm_entry = {"date": _dm_d}
         _dm_total = 0
@@ -721,9 +722,9 @@ def training_overview(*, _g) -> dict:
 def strength_benchmarks(*, _g) -> dict:
     """GET /api/strength_benchmarks — Current 1RM and progress from Hevy data."""
     _query_source = _g["_query_source"]
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(PT)
     end_date = now.strftime("%Y-%m-%d")
     start_date = (now - timedelta(days=90)).strftime("%Y-%m-%d")
 
@@ -801,9 +802,9 @@ def strength_deep_dive(*, _g) -> dict:
     """
     _query_source = _g["_query_source"]
     _experiment_date = _g["_experiment_date"]
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(PT).strftime("%Y-%m-%d")
     d90 = _experiment_date(90)
-    d30 = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+    d30 = (datetime.now(PT) - timedelta(days=30)).strftime("%Y-%m-%d")
 
     items = _query_source("hevy", d90, today)
     if not items:
@@ -900,8 +901,8 @@ def workouts(*, _g) -> dict:
     Cache: 900s.
     """
     table = _g["table"]
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d30 = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+    today = datetime.now(PT).strftime("%Y-%m-%d")
+    d30 = (datetime.now(PT) - timedelta(days=30)).strftime("%Y-%m-%d")
     try:
         resp = table.query(
             **with_phase_filter(

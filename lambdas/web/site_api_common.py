@@ -145,7 +145,7 @@ PLATFORM_STATS = {
     "review_grade": "A",
     "active_secrets": 21,
     "site_pages": 77,
-    "test_count": 14117,
+    "test_count": 14133,
     "board_technical": 12,
     "board_product": 8,
     "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,
@@ -256,7 +256,7 @@ def _experiment_date(days_back=30):
     window shrinks rather than reaching into prior-cycle rows, and `_window_span` is
     how a caller learns that it shrank.
     """
-    raw = (datetime.now(timezone.utc) - timedelta(days=max(days_back - 1, 0))).strftime("%Y-%m-%d")
+    raw = (datetime.now(PT) - timedelta(days=max(days_back - 1, 0))).strftime("%Y-%m-%d")
     return _clamp_today(max(raw, EXPERIMENT_START))
 
 

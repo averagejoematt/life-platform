@@ -52,6 +52,7 @@ from web.site_api_ai_prompt import (  # noqa: F401
     board_grounding_findings,
 )
 from web.site_api_common import (
+    PT,  # #2414: the reader's "today" is the Pacific day
     SITE_API_ORIGIN_SECRET,  # #815 R22-SEC-03: shared with site_api_lambda's SEC-04 guard
     _scrub_blocked_terms as _scrub_blocked_terms_base,  # canonical shared helpers (#368)
 )
@@ -417,8 +418,8 @@ def _ask_fetch_context() -> dict:
     into a blanket `500 AI service error` for a question the vitals could have
     answered.
     """
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    yesterday_str = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    today_str = datetime.now(PT).strftime("%Y-%m-%d")  # #2414: the reader's "today" is the Pacific day
+    yesterday_str = (datetime.now(PT) - timedelta(days=1)).strftime("%Y-%m-%d")
     ctx: dict = {
         # Pre-seeded so a profile blip leaves the journey framing intact rather
         # than undefined; the profile block overwrites both on success.
@@ -998,13 +999,13 @@ def _write_board_interaction(pid: str, question: str, answer: str, grounded: boo
     try:
         from experiment.phase_taxonomy import experiment_stamp
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(timezone.utc)  # created_at stays a UTC instant; the sk DAY is Pacific (#2414)
         qid = hashlib.sha256(question.encode()).hexdigest()[:8]
         table.put_item(
             Item={
                 **experiment_stamp(),
                 "pk": f"COACH#{pid}",
-                "sk": f"INTERACTION#{now.strftime('%Y-%m-%d')}#{qid}",
+                "sk": f"INTERACTION#{now.astimezone(PT).strftime('%Y-%m-%d')}#{qid}",
                 "interaction_type": "board_qa",
                 "channel": "public_board",
                 "question": question[:500],
@@ -1451,8 +1452,9 @@ def _handle_explain(event: dict) -> dict:
     payload_txt = _shrink_for_prompt(payload)
     try:
         from common.constants import EXPERIMENT_START_DATE
+        from common.pacific_time import pacific_day_n
 
-        _day_n = (datetime.now(timezone.utc).date() - datetime.strptime(EXPERIMENT_START_DATE, "%Y-%m-%d").date()).days + 1
+        _day_n = pacific_day_n(EXPERIMENT_START_DATE)  # #2414/#1955: THE one PT day-index formula
         day_ctx = f"Experiment day {_day_n} (restarted {EXPERIMENT_START_DATE}) — a young record is short by design."
     except Exception:
         day_ctx = ""

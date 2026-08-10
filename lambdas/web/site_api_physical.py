@@ -16,6 +16,7 @@ from boto3.dynamodb.conditions import Key
 from experiment.phase_filter import with_phase_filter  # ADR-058
 
 from web.site_api_common import (
+    PT,
     USER_PREFIX,
     _decimal_to_float,
     _ok,
@@ -72,7 +73,7 @@ def weekly_physical_summary(*, _g) -> dict:
     """
     _query_source = _g["_query_source"]
     _experiment_date = _g["_experiment_date"]
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(PT).strftime("%Y-%m-%d")
     d7 = _experiment_date(7)
 
     strava_items = _query_source("strava", d7, today)
@@ -105,7 +106,7 @@ def weekly_physical_summary(*, _g) -> dict:
     # Build 7-day array
     days = []
     for i in range(7):
-        dt = datetime.now(timezone.utc) - timedelta(days=6 - i)
+        dt = datetime.now(PT) - timedelta(days=6 - i)
         d = dt.strftime("%Y-%m-%d")
         dow = dt.strftime("%a")
         garmin = garmin_by_date.get(d, {})
@@ -145,7 +146,7 @@ def physical_overview(*, _g) -> dict:
     """
     table = _g["table"]
     EXPERIMENT_START = _g["EXPERIMENT_START"]
-    datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    datetime.now(PT).strftime("%Y-%m-%d")
 
     # ── 1. DEXA scans (all, sorted ascending) ──
     dexa_pk = f"{USER_PREFIX}dexa"

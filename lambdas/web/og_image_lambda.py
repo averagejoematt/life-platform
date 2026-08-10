@@ -349,12 +349,14 @@ def build_fingerprint(stats):
     """#1379: today's Daily Fingerprint as an OG share card. The mark is the SAME
     deterministic artifact the cockpit masthead and /data/wall/ render — a pure
     function of today's real vitals, earned glow only."""
-    from datetime import datetime, timezone
+    from datetime import datetime
+
+    from common.pacific_time import PACIFIC as PT  # #2414: the mark's day must agree with the cockpit (PT)
 
     from web.fingerprint import build_mark
 
     metrics = fingerprint_metrics(stats)
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(PT).strftime("%Y-%m-%d")
     mark = build_mark(today, metrics)
 
     img, draw = _base_image()
