@@ -463,7 +463,17 @@ def test_search_activities_on_an_empty_corpus_reports_no_percentiles(monkeypatch
     monkeypatch.setattr(td, "get_sot", lambda domain: "strava")
     fake_query_source([])
     out = td.tool_search_activities({})
-    assert out == {"total_matched": 0, "showing": 0, "sorted_by": "distance_miles", "all_time_total_acts": 0, "activities": []}
+    # `population` (#2331) names what `all_time_total_acts` counts — it is a definition,
+    # not a measurement, so it is stated even when the corpus is empty and no percentile
+    # is claimed. That is the point: the denominator's meaning does not depend on data.
+    assert out == {
+        "total_matched": 0,
+        "showing": 0,
+        "sorted_by": "distance_miles",
+        "all_time_total_acts": 0,
+        "population": td._population_label("distance_miles"),
+        "activities": [],
+    }
 
 
 # ──────────────────────────────────────────────────────────────────────────────

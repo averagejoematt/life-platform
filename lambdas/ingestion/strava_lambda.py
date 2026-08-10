@@ -35,6 +35,7 @@ except ImportError:
     logger = logging.getLogger("strava")
     logger.setLevel(logging.INFO)
 
+from ingestion import strava_population
 from ingestion.ingestion_framework import IngestionConfig, run_ingestion
 
 SECRET_NAME = os.environ.get("SECRET_NAME", "life-platform/strava")
@@ -157,9 +158,14 @@ def _normalize(activity: dict, zone_data: dict = None, hr_recovery: dict = None)
         "moving_time_seconds": activity.get("moving_time"),
         "elapsed_time_seconds": activity.get("elapsed_time"),
         "distance_meters": activity.get("distance"),
-        "distance_miles": round(activity["distance"] * 0.000621371, 2) if activity.get("distance") else None,
+        # #2331 / ADR-104: `if activity.get("distance")` collapsed a genuine zero to
+        # absent, and un-collapsing it blindly would have swept every gym session into
+        # the distance population. `strava_population` decides membership per activity
+        # type AND per measurement channel — see that module for the rule and the
+        # archive evidence behind it.
+        "distance_miles": strava_population.distance_miles(activity, activity.get("distance")),
         "total_elevation_gain_meters": activity.get("total_elevation_gain"),
-        "total_elevation_gain_feet": round(activity["total_elevation_gain"] * 3.28084, 1) if activity.get("total_elevation_gain") else None,
+        "total_elevation_gain_feet": strava_population.elevation_gain_feet(activity, activity.get("total_elevation_gain")),
         "elev_high_meters": activity.get("elev_high"),
         "elev_low_meters": activity.get("elev_low"),
         "average_speed_ms": activity.get("average_speed"),
@@ -294,7 +300,17 @@ def fetch_day(credentials: dict, date_str: str) -> dict | None:
 
 
 def transform(raw: dict, date_str: str) -> list[dict]:
-    """Aggregate the day's activities into a single record."""
+    """Aggregate the day's activities into a single record.
+
+    Population of the distance/elevation totals (#2331): `total_distance_miles` and
+    `total_elevation_gain_feet` are EXTENSIVE sums over the whole day — an activity
+    with no measured distance (a gym session, an indoor-trainer ride) contributes
+    nothing, which is the same arithmetic whether its `distance_miles` is absent or a
+    measured 0.0. So these two totals are invariant under the #2331 fix by design; the
+    figures that move with population membership are the all-time percentiles built in
+    `ingestion/enrichment_lambda.build_percentile_lookup`, whose denominator IS the
+    measured population.
+    """
     if not raw or not raw.get("activities"):
         return []
     activities = raw["activities"]

@@ -1,0 +1,97 @@
+{
+  "_provenance": {
+    "generated_by": "scripts/strava_type_census.py",
+    "generated_at": "2026-08-10",
+    "source": "DynamoDB life-platform pk=USER#matthew#SOURCE#strava (read-only query)",
+    "day_records": 1207,
+    "activities": 2769,
+    "note": "Every type listed here MUST carry an explicit decision in lambdas/ingestion/strava_population.py."
+  },
+  "types": {
+    "Walk": {
+      "activities": 883,
+      "zero_distance": 377,
+      "zero_elevation": 379
+    },
+    "Workout": {
+      "activities": 758,
+      "zero_distance": 758,
+      "zero_elevation": 758
+    },
+    "WeightTraining": {
+      "activities": 452,
+      "zero_distance": 451,
+      "zero_elevation": 452
+    },
+    "Ride": {
+      "activities": 235,
+      "zero_distance": 177,
+      "zero_elevation": 184
+    },
+    "Run": {
+      "activities": 235,
+      "zero_distance": 92,
+      "zero_elevation": 95
+    },
+    "VirtualRide": {
+      "activities": 159,
+      "zero_distance": 0,
+      "zero_elevation": 0
+    },
+    "Hike": {
+      "activities": 17,
+      "zero_distance": 7,
+      "zero_elevation": 7
+    },
+    "HighIntensityIntervalTraining": {
+      "activities": 16,
+      "zero_distance": 16,
+      "zero_elevation": 16
+    },
+    "Golf": {
+      "activities": 2,
+      "zero_distance": 2,
+      "zero_elevation": 2
+    },
+    "Pickleball": {
+      "activities": 2,
+      "zero_distance": 1,
+      "zero_elevation": 2
+    },
+    "Sail": {
+      "activities": 2,
+      "zero_distance": 0,
+      "zero_elevation": 0
+    },
+    "Soccer": {
+      "activities": 2,
+      "zero_distance": 2,
+      "zero_elevation": 2
+    },
+    "Tennis": {
+      "activities": 2,
+      "zero_distance": 0,
+      "zero_elevation": 2
+    },
+    "Elliptical": {
+      "activities": 1,
+      "zero_distance": 1,
+      "zero_elevation": 1
+    },
+    "StairStepper": {
+      "activities": 1,
+      "zero_distance": 1,
+      "zero_elevation": 1
+    },
+    "Swim": {
+      "activities": 1,
+      "zero_distance": 0,
+      "zero_elevation": 1
+    },
+    "Yoga": {
+      "activities": 1,
+      "zero_distance": 0,
+      "zero_elevation": 1
+    }
+  }
+}

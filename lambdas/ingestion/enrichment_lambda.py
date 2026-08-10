@@ -187,8 +187,16 @@ def build_percentile_lookup(all_strava_items):
     Membership is `is not None`, not truthiness: a measured 0 is a data point at
     the bottom of the distribution, and dropping the bottom shrinks the
     denominator, which understates every other activity's published rank
-    (ADR-104). NB: `strava_lambda._normalize` currently collapses a stored 0 to
-    None upstream, so this gate only bites on rows that already carry a real 0.
+    (ADR-104).
+
+    THE POPULATION these percentiles are percentiles OF (#2331) — `is not None` is
+    exactly the writer's rule, so this denominator is:
+      * distance  — distance-bearing activities recorded with a distance channel
+      * elevation — land-locomotion activities recorded with an elevation channel
+    i.e. gym/court/studio sessions and indoor-trainer or manually-entered records are
+    NOT in it, because distance and elevation were never measured for them. Every
+    "top N% ever" label built from these pools inherits that population; see
+    `ingestion/strava_population.py` for the per-type decision table.
     """
     all_elevations = []
     all_distances = []
