@@ -55,10 +55,21 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "coach"))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+# The summarizer stamps a stance's as_of from the UTC wall clock (chs `today =
+# datetime.now(timezone.utc)`), and behavior_logs treats a presence signal older
+# than the target day as answering NOTHING. So these fixture days must TRACK the
+# clock — the original dated literals were a #2376-class midnight bomb, and they
+# detonated at 2026-08-10T00:00Z (genesis midnight), reddening main.
+from datetime import datetime, timedelta, timezone  # noqa: E402
+
 import coach_history_summarizer as chs  # noqa: E402
 from ai import behavior_logs as bl  # noqa: E402
 
-GENERATION_DAY = "2026-08-09"
+_NOW = datetime.now(timezone.utc)
+GENERATION_DAY = _NOW.strftime("%Y-%m-%d")
+STALE_LOG_DAY = (_NOW - timedelta(days=2)).strftime("%Y-%m-%d")  # a log that predates the stance's day
+YESTERDAY = (_NOW - timedelta(days=1)).strftime("%Y-%m-%d")
+WINDOW_START = (_NOW - timedelta(days=6)).strftime("%Y-%m-%d")
 
 
 def _signal(**channels):
@@ -70,7 +81,7 @@ def _signal(**channels):
     """
     return {
         "date": channels.pop("_date", GENERATION_DAY),
-        "experiment_window_start": channels.pop("_window", "2026-08-03"),
+        "experiment_window_start": channels.pop("_window", WINDOW_START),
         "channel_detail": {src: {"last_log_date": d, "gap_days": 0} for src, d in channels.items()},
     }
 
@@ -126,7 +137,7 @@ class TestGateActuallyFires:
 
     def test_negative_ungrounded_same_day_claim_is_flagged(self, monkeypatch):
         """The claim no number or date gate can see: a completed ACTION with no log."""
-        sig = _signal(macrofactor="2026-08-07")  # latest food log predates the stance's day
+        sig = _signal(macrofactor=STALE_LOG_DAY)  # latest food log predates the stance's day
         found = _gate(self.UNGROUNDED, sig, monkeypatch)
         assert [f["type"] for f in found] == ["ungrounded_behavioral"]
         assert found[0]["category"] == "nutrition"
@@ -139,7 +150,7 @@ class TestGateActuallyFires:
         """The differential proper: identical stance text, identical everything else —
         the ONLY variable is whether the caller handed the gate a map. Without it the
         surface behaves exactly as it did before #2195 (the opt-out contract)."""
-        sig = _signal(macrofactor="2026-08-07")
+        sig = _signal(macrofactor=STALE_LOG_DAY)
         assert _gate(self.UNGROUNDED, sig, monkeypatch) != []
         assert _gate(self.UNGROUNDED, None, monkeypatch) == []
 
@@ -152,23 +163,23 @@ class TestGateActuallyFires:
         assert _gate(self.UNSEEN, sig, monkeypatch) == []
 
     def test_workout_and_journal_are_covered_too(self, monkeypatch):
-        sig = _signal(macrofactor=GENERATION_DAY, hevy="2026-08-07", notion="2026-08-07")
+        sig = _signal(macrofactor=GENERATION_DAY, hevy=STALE_LOG_DAY, notion=STALE_LOG_DAY)
         found = _gate("You completed your workout today and you journaled today.", sig, monkeypatch)
         assert sorted(f["category"] for f in found) == ["journal", "workout"]
 
     def test_advice_framing_is_not_a_completed_action_claim(self, monkeypatch):
-        sig = _signal(macrofactor="2026-08-07")
+        sig = _signal(macrofactor=STALE_LOG_DAY)
         assert _gate("You should log your meals today.", sig, monkeypatch) == []
 
     def test_prior_period_claim_stays_out_of_scope(self, monkeypatch):
-        sig = _signal(macrofactor="2026-08-07")
+        sig = _signal(macrofactor=STALE_LOG_DAY)
         assert _gate("Last week you logged your meals every day.", sig, monkeypatch) == []
 
     def test_a_finding_survives_a_regen_that_does_not_improve(self, monkeypatch):
         """Disposition is INHERITED, not chosen here: findings that survive the one
         regen flow back to `_run_stance`, which fail-keep-priors. Proving the finding
         reaches the caller is proving the gate has consequences."""
-        sig = _signal(macrofactor="2026-08-07")
+        sig = _signal(macrofactor=STALE_LOG_DAY)
         monkeypatch.setattr(chs, "_call_haiku", lambda **kw: {"headline_read": "You logged your meals today."})
         result = _stance(self.UNGROUNDED)
         best, findings = chs._apply_grounding_gate("nutrition_coach", _META, {}, None, _USER_MESSAGE, result, presence_signal=sig)
@@ -191,7 +202,7 @@ class TestEndToEndStancePath:
             "_call_haiku",
             lambda **kw: {"headline_read": "You logged your meals today, and that is the read I hold."},
         )
-        sig = _signal(macrofactor="2026-08-07")
+        sig = _signal(macrofactor=STALE_LOG_DAY)
         armed = chs._generate_stance("nutrition_coach", {}, {}, None, presence_signal=sig)
         unarmed = chs._generate_stance("nutrition_coach", {}, {}, None)
         assert [f["type"] for f in armed["_adr104_findings"]] == ["ungrounded_behavioral"]
@@ -210,7 +221,7 @@ class TestEndToEndStancePath:
         monkeypatch.setattr(chs, "_get_item", lambda pk, sk: None)
         writes = []
         monkeypatch.setattr(chs, "_write_stance", lambda cid, st: writes.append(cid) or True)
-        out = chs._run_stance("nutrition_coach", {}, {}, presence_signal=_signal(macrofactor="2026-08-07"))
+        out = chs._run_stance("nutrition_coach", {}, {}, presence_signal=_signal(macrofactor=STALE_LOG_DAY))
         assert out["written"] is False
         assert out["reason"] == "adr104_gate_failed_no_prior"
         assert writes == []
@@ -287,7 +298,7 @@ class TestTheOrderingThatMakesTheMapReal:
         """The mid-week event path, which fires from the 16:00 UTC evaluator — BEFORE
         adaptive-mode's 16:35 write. The record still carries yesterday, so the honest
         answer is `none()`, not yesterday's logs applied to today's claim."""
-        stale = _signal(_date="2026-08-08", macrofactor="2026-08-08")
+        stale = _signal(_date=YESTERDAY, macrofactor=YESTERDAY)
         assert bl.available_logs_from_presence(stale, GENERATION_DAY) == bl.LogAvailability.none()
         assert _cron("coach-prediction-evaluator") < _cron("adaptive-mode-compute")
 
