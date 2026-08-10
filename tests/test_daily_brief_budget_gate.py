@@ -56,12 +56,17 @@ _PIPELINE_KWARGS = dict(
 _COACH_FN_NAMES = [
     "call_sleep_coach_v2",
     "call_nutrition_coach_v2",
-    "call_training_coach_v2",
     "call_mind_coach_v2",
     "call_physical_coach_v2",
     "call_glucose_coach_v2",
     "call_labs_coach_v2",
     "call_explorer_coach_v2",
+]
+# ADR-153: the training v2 seat is retired from the brief's roster (the
+# Performance merge) — still mocked so a regression that re-adds the call is
+# caught as a hard assertion, not a real Bedrock invocation.
+_RETIRED_COACH_FN_NAMES = [
+    "call_training_coach_v2",
 ]
 _MAIN_AI_FN_NAMES = [
     "call_board_of_directors",
@@ -74,7 +79,7 @@ _MAIN_AI_FN_NAMES = [
 def _mock_ai_calls(monkeypatch, m):
     """Replace every ai_calls.* function the pipeline can call with a Mock, so
     a call is unambiguous evidence of an attempted AI invocation."""
-    for name in _COACH_FN_NAMES + _MAIN_AI_FN_NAMES + ["daily_brief_shared_system"]:
+    for name in _COACH_FN_NAMES + _RETIRED_COACH_FN_NAMES + _MAIN_AI_FN_NAMES + ["daily_brief_shared_system"]:
         monkeypatch.setattr(m.ai_calls, name, MagicMock(return_value="mock text"))
     # Prevent any real network/AWS call from the ensemble-digest kick-off.
     monkeypatch.setattr(m, "boto3", MagicMock())
@@ -138,7 +143,7 @@ def test_pipeline_takes_data_only_path_when_budget_denies(monkeypatch):
     # The contract: at tier 3, NOT ONE ai_calls.* function is invoked — this is
     # the thing the issue says was previously unenforced (only a coincidental
     # BudgetExceeded catch deep inside a call that never even fires here).
-    for name in _COACH_FN_NAMES + _MAIN_AI_FN_NAMES:
+    for name in _COACH_FN_NAMES + _RETIRED_COACH_FN_NAMES + _MAIN_AI_FN_NAMES:
         getattr(m.ai_calls, name).assert_not_called()
 
     assert result == {
@@ -170,6 +175,11 @@ def test_pipeline_attempts_ai_path_when_budget_allows(monkeypatch):
 
     for name in _COACH_FN_NAMES + _MAIN_AI_FN_NAMES:
         getattr(m.ai_calls, name).assert_called_once()
+    # ADR-153: the retired training seat must stay retired even on the full AI
+    # path — its _v2_text renders as "" and the v2 call is never attempted.
+    for name in _RETIRED_COACH_FN_NAMES:
+        getattr(m.ai_calls, name).assert_not_called()
+    assert result["training_coach_v2_text"] == ""
 
     assert result["bod_insight"] == "mock text"
     assert result["sleep_coach_v2_text"] == "mock text"
@@ -211,6 +221,6 @@ def test_end_to_end_gate_denies_at_hard_stop_tier_3(monkeypatch):
     monkeypatch.setattr(budget_guard, "current_tier", lambda: 3)
 
     result = m._run_ai_coach_pipeline(**_PIPELINE_KWARGS)
-    for name in _COACH_FN_NAMES + _MAIN_AI_FN_NAMES:
+    for name in _COACH_FN_NAMES + _RETIRED_COACH_FN_NAMES + _MAIN_AI_FN_NAMES:
         getattr(m.ai_calls, name).assert_not_called()
     assert result["tldr_guidance"] == {}
