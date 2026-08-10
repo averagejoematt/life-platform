@@ -26,14 +26,29 @@
 #
 # Refuses to commit if: no paths given, an unresolved merge conflict (UU) exists,
 # a named path is a doc-sync literal file, or black/ruff reject the staged Python.
+# EVERY refusal exits nonzero and prints a terminal "REFUSED" line (#2464) — a
+# success is exit 0 plus the "✅ committed N path(s)" line, nothing else is.
 set -uo pipefail
 
-ROOT="$(git rev-parse --show-toplevel)"
+# ── The refusal funnel (#2464) ─────────────────────────────────────────────────
+# EVERY path that discards the commit must exit through here, nonzero, so a
+# caller's `&&` chain stops at the refusal instead of pushing nothing and then
+# destroying the worktree. The terminal REFUSED line is the output-level tell for
+# callers whose invocation eats the exit status (`... | tee`/`| tail` reports the
+# pipe's last command, and separate tool calls don't chain at all) — if you see
+# it, NOTHING was committed. Never add a refusal that bypasses this funnel.
+refuse() {
+  _code="${1:-1}"
+  echo "[agent-commit] ✋ REFUSED — nothing was committed (exit ${_code})." >&2
+  exit "${_code}"
+}
+
+ROOT="$(git rev-parse --show-toplevel)" || exit 1
 cd "${ROOT}" || exit 1
 
 if [ "$#" -lt 2 ]; then
   echo "[agent-commit] ❌ usage: bash deploy/agent_commit.sh \"<message>\" <path> [<path> ...]" >&2
-  exit 2
+  refuse 2
 fi
 
 MSG="$1"
@@ -43,11 +58,15 @@ PATHS=("$@")
 # ── Refuse on an unresolved conflict ──────────────────────────────────────────
 # `git add`-ing a file that still carries <<<<<<< markers has shipped to main
 # before. A `UU` anywhere means the tree is mid-merge and not commit-ready.
-if git status --porcelain | grep -qE '^(UU|AA|DD|AU|UA|DU|UD) '; then
+# Capture, don't `grep -q` (#2464): under pipefail, `-q` exits on first match and
+# can SIGPIPE `git status`, turning a REAL conflict into a pipeline failure that
+# reads as "no conflict" — the check would fail OPEN. Plain grep drains its input.
+CONFLICTED="$(git status --porcelain | grep -E '^(UU|AA|DD|AU|UA|DU|UD) ' || true)"
+if [ -n "${CONFLICTED}" ]; then
   echo "[agent-commit] ❌ unresolved merge conflict in the tree:" >&2
-  git status --porcelain | grep -E '^(UU|AA|DD|AU|UA|DU|UD) ' >&2
+  printf '%s\n' "${CONFLICTED}" >&2
   echo "[agent-commit]    resolve every conflicted path, then re-run." >&2
-  exit 1
+  refuse 1
 fi
 
 # ── Refuse to let an agent commit a doc-sync literal ───────────────────────────
@@ -66,7 +85,7 @@ for p in "${PATHS[@]}"; do
   if is_literal_file "${p}" && [ "${ALLOW_DOC_LITERALS:-0}" != "1" ]; then
     echo "[agent-commit] ❌ '${p}' is a doc-sync literal file — the driver reconciles these on main." >&2
     echo "[agent-commit]    If this is a genuine content edit, re-run with ALLOW_DOC_LITERALS=1." >&2
-    exit 1
+    refuse 1
   fi
 done
 
@@ -90,15 +109,15 @@ git reset -q
 for p in "${PATHS[@]}"; do
   if [ ! -e "${p}" ]; then
     echo "[agent-commit] ❌ path does not exist: ${p}" >&2
-    exit 1
+    refuse 1
   fi
-  git add -- "${p}" || exit 1
+  git add -- "${p}" || refuse 1
 done
 
 STAGED="$(git diff --cached --name-only)"
 if [ -z "${STAGED}" ]; then
   echo "[agent-commit] ❌ nothing staged — the named paths have no changes vs HEAD." >&2
-  exit 1
+  refuse 1
 fi
 
 # ── The format gate, kept (this is the half CI actually enforces) ─────────────
@@ -142,11 +161,11 @@ if [ -n "${STAGED_PY}" ]; then
   if command -v "${BLACK}" >/dev/null 2>&1 || [ -x "${BLACK}" ]; then
     if ! "${BLACK}" --check ${STAGED_PY}; then
       echo "[agent-commit] ❌ black would reformat — run: ${BLACK} ${STAGED_PY}" >&2
-      exit 1
+      refuse 1
     fi
     if ! ruff check ${STAGED_PY}; then
       echo "[agent-commit] ❌ ruff check failed — run: ruff check --fix ${STAGED_PY}" >&2
-      exit 1
+      refuse 1
     fi
     echo "[agent-commit] ✓ black + ruff clean"
   else
@@ -156,7 +175,8 @@ fi
 
 # --no-verify is deliberate: the gate above replaces the hook's useful half, and
 # skipping the hook is the entire point (it would re-stage the doc literals).
-git commit --no-verify -m "${MSG}" || exit 1
+git commit --no-verify -m "${MSG}" || refuse 1
 
 echo "[agent-commit] ✅ committed $(printf '%s\n' "${STAGED}" | wc -l | tr -d ' ') path(s)"
 echo "[agent-commit]    next: git push -u origin \$(git branch --show-current)"
+exit 0
