@@ -376,6 +376,112 @@ def test_worker_thread_reader_excludes_summary_rows():
     assert [t["text"] for t in thread] == ["hi"]
 
 
+# ── B9: time-gap awareness (#2489) ────────────────────────────────────────────
+#
+# "been a minute" after a quiet week. The line is folded into
+# ``read_recent_summaries`` rather than added at a new call site — see the
+# module docstring in ``coach_chat_summary.py`` for why (the actual assembly
+# point, ``telegram_worker_lambda._memory_block``, is a concurrently-edited,
+# size-guarded file this feature must not touch).
+
+
+def test_no_gap_line_on_a_genuinely_empty_partition():
+    """Never invent a gap that isn't there: a coach Matthew has never texted
+    must not open with 'been a minute' — there is nothing to be quiet about."""
+    from coach import coach_chat_summary as ccs
+
+    pk = "COACH#training_coach"
+    table = _FakeTable([])
+    assert ccs.time_gap_line(table, pk, today="2026-08-10") == ""
+
+
+def test_no_gap_line_within_the_quiet_threshold():
+    """A same-day or few-day-old thread is normal texting, not a gap — the coach
+    must never remark on it."""
+    from coach import coach_chat_summary as ccs
+
+    pk = "COACH#sleep_coach"
+    table = _FakeTable([_turn(pk, "2026-08-05", "aa", "matthew", "hey")])
+    # 2026-08-10 minus 2026-08-05 = 5 days, under QUIET_GAP_DAYS (7).
+    assert ccs.time_gap_line(table, pk, today="2026-08-10") == ""
+
+
+def test_no_gap_line_the_same_day_as_the_last_turn():
+    from coach import coach_chat_summary as ccs
+
+    pk = "COACH#sleep_coach"
+    table = _FakeTable([_turn(pk, "2026-08-10", "aa", "matthew", "morning")])
+    assert ccs.time_gap_line(table, pk, today="2026-08-10") == ""
+
+
+def test_gap_line_present_and_exact_format_past_the_threshold():
+    from coach import coach_chat_summary as ccs
+
+    pk = "COACH#nutrition_coach"
+    table = _FakeTable([_turn(pk, "2026-08-01", "aa", "matthew", "how's my protein")])
+    # 2026-08-10 minus 2026-08-01 = 9 days, past QUIET_GAP_DAYS (7).
+    line = ccs.time_gap_line(table, pk, today="2026-08-10")
+    assert line == (
+        "TIME GAP: it has been 9 days since your last conversation with Matthew (you last texted on "
+        "2026-08-01). That is a real quiet stretch, not an ongoing thread — acknowledge it naturally and briefly, "
+        "the way a person notices time passed with someone they know ('hey, been a minute'), then move on to what "
+        "he actually said. Never mention this, or any gap, when the thread has been active."
+    )
+
+
+def test_gap_line_triggers_exactly_at_the_threshold_boundary():
+    """QUIET_GAP_DAYS is inclusive: exactly 7 days is already a quiet week."""
+    from coach import coach_chat_summary as ccs
+
+    pk = "COACH#mind_coach"
+    table = _FakeTable([_turn(pk, "2026-08-03", "aa", "matthew", "hey")])
+    assert ccs.time_gap_line(table, pk, today="2026-08-10") != ""
+    table6 = _FakeTable([_turn(pk, "2026-08-04", "aa", "matthew", "hey")])
+    assert ccs.time_gap_line(table6, pk, today="2026-08-10") == ""
+
+
+def test_gap_line_uses_the_real_turn_date_not_a_lagging_summary_row():
+    """A summary is written lazily on the FOLLOWING day's first turn, so its date
+    can lag the true last-chat date. The gap must be computed from the real
+    CHAT# turn, never the CHAT#summary# row."""
+    from coach import coach_chat_summary as ccs
+
+    pk = "COACH#sleep_coach"
+    table = _FakeTable(
+        [
+            _turn(pk, "2026-08-01", "aa", "matthew", "hey"),
+            {"pk": pk, "sk": "CHAT#summary#2026-08-01", "type": "chat_summary", "text": "he said hey"},
+        ]
+    )
+    assert ccs._latest_chat_date(table, pk) == "2026-08-01"
+    assert ccs.time_gap_line(table, pk, today="2026-08-10") != ""
+
+
+def test_read_recent_summaries_prepends_the_gap_line_when_both_present():
+    from coach import coach_chat_summary as ccs
+
+    pk = "COACH#sleep_coach"
+    table = _FakeTable(
+        [
+            _turn(pk, "2026-08-01", "aa", "matthew", "hey"),
+            {"pk": pk, "sk": "CHAT#summary#2026-08-01", "text": "day one"},
+        ]
+    )
+    block = ccs.read_recent_summaries(table, pk, today="2026-08-10")
+    assert block.startswith("TIME GAP:")
+    assert "RECENT CONVERSATIONS" in block
+    assert block.index("TIME GAP") < block.index("RECENT CONVERSATIONS")
+
+
+def test_read_recent_summaries_unaffected_when_no_gap_and_no_summaries():
+    """The existing no-history behaviour ('') must be untouched by this feature."""
+    from coach import coach_chat_summary as ccs
+
+    pk = "COACH#career_coach"
+    table = _FakeTable([])
+    assert ccs.read_recent_summaries(table, pk, today="2026-08-10") == ""
+
+
 # ── B8: domain fact packs (site-parity nutrition, absence-honest) ────────────
 
 
