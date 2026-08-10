@@ -465,30 +465,19 @@ class TestMindSnapshot:
         data = az.gather_data_for_expert("mind")
         assert data["mood_readings"] == 1 and data["avg_valence"] == 0.5
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "DEFECT (tranche-2 discovery): with zero journal entries the mind snapshot reports "
-            "avg_sentiment=0. sentiment_score is a -1..1 scale on which 0 is literally the "
-            "'neutral' label (journal_analyzer_lambda), so absence is handed to the coach as a "
-            "real, neutral reading — the ADR-104 absent-as-zero violation. Sibling branches in "
-            "the same function return None for the same shape (glucose avg, sleep avgs, "
-            "avg_recovery, avg_fiber_g)."
-        ),
-    )
     def test_no_journal_entries_reports_absent_sentiment_not_a_neutral_zero(self, table):
+        """ADR-104: sentiment_score is a -1..1 scale on which 0 is literally the
+        'neutral' label (journal_analyzer_lambda), so silence must never be handed
+        to the coach as a real, neutral reading."""
         data = az.gather_data_for_expert("mind")
         assert data["journal_entry_count"] == 0
         assert data["avg_sentiment"] is None
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "DEFECT (tranche-2 discovery): with zero State-of-Mind readings the mind snapshot "
-            "reports avg_valence=0 — the neutral point of the valence scale — instead of honest "
-            "absence (ADR-104). Same class as avg_sentiment above."
-        ),
-    )
+    def test_a_genuinely_neutral_journal_entry_still_averages_to_a_measured_zero(self, table):
+        """The other half of ADR-104: absence is null, but a MEASURED 0 is a reading."""
+        table.add("journal_analysis", TODAY, sentiment_score=Decimal("0"))
+        assert az.gather_data_for_expert("mind")["avg_sentiment"] == 0
+
     def test_no_mood_readings_reports_absent_valence_not_a_neutral_zero(self, table):
         data = az.gather_data_for_expert("mind")
         assert data["mood_readings"] == 0
@@ -544,21 +533,25 @@ class TestNutritionSnapshot:
         data = az.gather_data_for_expert("nutrition")
         assert data["days_since_last_food_log"] == 9 and data["food_logs_last_14d"] == 1
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "DEFECT (tranche-2 discovery): when nutrition rows EXIST but carry no macro fields, "
-            "avg_calories/avg_protein_g are reported as 0 with days_tracked>0 — 'he averaged 0 "
-            "kcal across 2 tracked days'. The empty-store early return does not cover this shape, "
-            "and avg_fiber_g in the very same block correctly returns None. ADR-104 absent-as-zero."
-        ),
-    )
     def test_logged_days_with_no_macros_report_absent_averages_not_zero(self, table):
+        """ADR-104: the empty-store early return does not cover 'rows exist, macros
+        absent' — without this the coach is handed 'he averaged 0 kcal across 2
+        tracked days' and 'he hit protein on 0% of days'."""
         table.add("macrofactor", TODAY, note="ate out, nothing logged")
         table.add("macrofactor", _days_ago(1), note="ate out, nothing logged")
         data = az.gather_data_for_expert("nutrition")
         assert data["days_tracked"] == 2
         assert data["avg_calories"] is None and data["avg_protein_g"] is None
+        assert data["protein_adherence_pct"] is None
+
+    def test_a_genuinely_logged_zero_calorie_day_stays_in_the_average(self, table):
+        """The overcorrection guard: a logged fast is a measured 0, not absence, so it
+        belongs in the numerator that `days_tracked` is the denominator of."""
+        table.add("macrofactor", TODAY, total_calories_kcal=Decimal("0"))
+        table.add("macrofactor", _days_ago(1), total_calories_kcal=Decimal("2200"))
+        data = az.gather_data_for_expert("nutrition")
+        assert data["days_tracked"] == 2 and data["zero_calorie_days"] == 1
+        assert data["avg_calories"] == 1100
 
 
 class TestTrainingSnapshot:
@@ -679,19 +672,28 @@ class TestPhysicalSnapshot:
         table.add("measurements", _days_ago(4), waist_height_ratio=Decimal("0.61"))
         assert az.gather_data_for_expert("physical")["waist_height_ratio"] == 0.61
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "DEFECT (tranche-2 discovery): a DEXA record with no `scan_date` falls back to "
-            "TODAY, so days_since_dexa is reported as 0 — an unknown scan date is handed to the "
-            "longevity coach as 'scanned today', the exact #1894 stale-reading-as-current class "
-            "on the body-composition surface."
-        ),
-    )
     def test_a_dexa_with_no_scan_date_is_never_narrated_as_a_same_day_scan(self, table):
+        """#1894 class on the body-composition surface: an unknown scan date defaulted to
+        TODAY hands the longevity coach a fabricated clinical date ('scanned today')."""
         table.add("dexa", _days_ago(60), body_composition={"body_fat_pct": Decimal("38.2")})
         data = az.gather_data_for_expert("physical")
         assert data.get("days_since_dexa") != 0
+        # Absence stated as absence: the scan is published, its age is withheld.
+        assert "days_since_dexa" not in data
+        assert data["dexa_scan_date"] == "unknown"
+        assert data["body_fat_pct"] == 38.2
+
+    def test_an_unparseable_dexa_scan_date_neither_crashes_nor_invents_an_age(self, table):
+        """`strptime` was called unguarded, so one malformed row raised out of the whole
+        physical snapshot — and a null `scan_date` raised TypeError, not ValueError."""
+        table.add("dexa", _days_ago(60), scan_date="unknown", body_composition={"body_fat_pct": Decimal("38.2")})
+        data = az.gather_data_for_expert("physical")
+        assert "days_since_dexa" not in data and data["dexa_scan_date"] == "unknown"
+
+    def test_a_dated_dexa_still_publishes_its_scan_date_alongside_the_age(self, table):
+        table.add("dexa", _days_ago(30), scan_date=_days_ago(30), body_composition={"body_fat_pct": Decimal("38.2")})
+        data = az.gather_data_for_expert("physical")
+        assert data["dexa_scan_date"] == _days_ago(30) and data["days_since_dexa"] == 30
 
 
 class TestExplorerSnapshot:
