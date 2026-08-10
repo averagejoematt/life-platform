@@ -221,8 +221,65 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_leak_token_sweep.py",
         "test_csp_native_embeds_1678.py",
         "test_archive_handover.py",  # a dated handover committed to main (#1650)
+        # ── #2372: the hand-list becomes a derivation — every file
+        # tests/premerge_derivation.py finds below, classified in this same PR ──
+        "test_blocked_vice_screen_set_2212.py",
+        "test_board_lead_single_character.py",
+        "test_cast_roster_consistency.py",
+        "test_coach_ensemble_writer_phase_stamp_guard_2119.py",
+        "test_coach_roster_set_guard_2334.py",
+        "test_ddb_key_contracts.py",
+        "test_ddb_patterns.py",
+        "test_design_sync_bundle.py",
+        "test_ensemble_digest_fallback_reader_set_2333.py",
+        "test_experiment_surface_vice_screen_2240.py",
+        "test_food_delivery_gate_2209.py",
+        "test_food_delivery_gate_2233.py",
+        "test_food_delivery_streak_freshness_2235.py",
+        "test_gradability_liveness_cross_phase_2023.py",
+        "test_intake_privacy_contract.py",
+        "test_invoke_site_census_2390.py",
+        "test_iso_week_pairing_2256.py",
+        "test_lambda_handlers.py",
+        "test_lambda_map_imports.py",
+        "test_legacy_real_person_attributions_1905.py",
+        "test_milestone_ledger_1626.py",
+        "test_pacific_today_guard_2414.py",
+        "test_pii_log_guard_2369.py",
+        "test_qa_smoke_fault_isolation_2307.py",
+        "test_secret_references.py",
+        "test_ses_send_guard_set_2222.py",
+        "test_site_chrome.py",
+        "test_site_orphans.py",
+        "test_site_partition_orphans.py",
+        "test_tier0_streak_writer_2242.py",
+        "test_timezone_discipline.py",
+        "test_todoist_reader_writer_contract.py",
+        "test_wayfinding.py",
+        "test_wiring_coverage.py",
+        "test_xfail_hygiene.py",
+        # the derivation guard itself — its own docstring/synthetic-fixture text
+        # mentions the three sweep idioms, so it self-matches; it belongs pre-merge
+        # regardless (it IS the structural gate this whole entry is about).
+        "test_premerge_extra_files_derivation_2372.py",
     }
 )
+
+# THE OTHER HALF OF THE #2372 DERIVATION — named, checked exclusions.
+#
+# tests/premerge_derivation.discover_tree_sweeping_test_files() is a SYNTACTIC
+# detector: it flags any non-behaviour test_*.py file that sweeps a directory tree,
+# regardless of WHY. Some of what it flags is a behaviour suite in substance, not a
+# repo-shape ratchet — #2345 already made this call, in prose, for the two files
+# below; this dict makes it a maintained, checked fact instead of a comment nobody
+# re-reads. tests/test_premerge_extra_files_derivation_2372.py requires every name
+# the detector returns to be in EITHER this dict or _PREMERGE_EXTRA_FILES above —
+# so a new exclusion still has to be a deliberate, reasoned decision, not silence.
+_PREMERGE_TREE_SWEEP_EXCLUDED = {
+    "test_diary_publish_1845.py": (
+        "behaviour suite over diary-publishing semantics (63 tests), not a repo-shape " "ratchet — #2345's own call, made explicit here"
+    ),
+}
 
 
 def pytest_collection_modifyitems(config, items):
