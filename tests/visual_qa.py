@@ -166,8 +166,7 @@ def _api_deps_all_empty(page, api_deps) -> bool:
 
 def _scroll_and_reveal(page):
     """Scroll the page top-to-bottom, then force all .reveal animations visible."""
-    page.evaluate(
-        """
+    page.evaluate("""
         () => new Promise(resolve => {
             let y = 0; const step = 400;
             const timer = setInterval(() => {
@@ -179,15 +178,12 @@ def _scroll_and_reveal(page):
             }, 80);
             setTimeout(() => { clearInterval(timer); window.scrollTo(0, 0); resolve(); }, 10000);
         })
-    """
-    )
-    page.evaluate(
-        """
+    """)
+    page.evaluate("""
         () => document.querySelectorAll('.reveal').forEach(el => {
             el.classList.add('is-visible'); el.style.opacity = '1'; el.style.transform = 'none';
         })
-    """
-    )
+    """)
     page.wait_for_timeout(1500)
 
 
@@ -220,8 +216,7 @@ def _constellation_edge_cpts(page):
     no data-cpts attribute at all, so this fails regardless of how many edges the live
     coupling data currently has (it fails even at 0 edges) — see test_constellation_edge_cpts.
     """
-    return page.evaluate(
-        """() => {
+    return page.evaluate("""() => {
         const svg = document.querySelector('.constellation svg');
         if (!svg) return { skip: 'no constellation svg on this page' };
         const edges = svg.querySelectorAll('[data-edges] line').length;
@@ -233,14 +228,12 @@ def _constellation_edge_cpts(page):
         const n = Array.isArray(pts) ? pts.length : -1;
         if (n < edges) return { ok: false, edges, n, reason: `data-cpts has ${n} point(s) < ${edges} served edge line(s)` };
         return { ok: true, edges, n };
-    }"""
-    )
+    }""")
 
 
 def _check_sections_for_blank(page):
     """Visible sections >100px tall with <5 chars of text and no chart (excludes closed <details>)."""
-    return page.evaluate(
-        """
+    return page.evaluate("""
         () => {
             const issues = [];
             const insideClosedDetails = (el) => {
@@ -258,14 +251,12 @@ def _check_sections_for_blank(page):
             });
             return issues;
         }
-    """
-    )
+    """)
 
 
 def _check_stale_text(page):
     """Visible development/placeholder/stuck-loading copy that should never ship."""
-    return page.evaluate(
-        r"""
+    return page.evaluate(r"""
         () => {
             const body = document.body.innerText;
             const issues = [];
@@ -298,8 +289,7 @@ def _check_stale_text(page):
             }
             return issues;
         }
-    """
-    )
+    """)
 
 
 def _mobile_overflow(page):
@@ -334,8 +324,7 @@ TAP_TARGET_SEL = ".doors .theme-toggle, .tt-scrubber, .intro-close, .breadcrumbs
 def _app_bar_overflow(page):
     """px by which the fixed bottom app-bar (.doors) row exceeds the viewport at the
     current width — >2 is the #1003 overflow (clipped toggle / truncated door)."""
-    return page.evaluate(
-        """() => {
+    return page.evaluate("""() => {
         const bar = document.querySelector('.doors');
         if (!bar) return null;                       // page has no app-bar → n/a
         const vw = document.documentElement.clientWidth;
@@ -348,8 +337,7 @@ def _app_bar_overflow(page):
             far = Math.max(far, c.getBoundingClientRect().right);
         });
         return Math.round(Math.max(bar.scrollWidth - vw, far - vw));
-    }"""
-    )
+    }""")
 
 
 def _stuck_reveals(page, sel):
@@ -377,12 +365,10 @@ def _stuck_reveals(page, sel):
 
 def _viewport_meta_ok(page):
     """True if a width=device-width viewport meta is present (the #1004 class)."""
-    return page.evaluate(
-        """() => {
+    return page.evaluate("""() => {
         const m = document.querySelector('meta[name="viewport"]');
         return !!(m && /width\\s*=\\s*device-width/i.test(m.getAttribute('content') || ''));
-    }"""
-    )
+    }""")
 
 
 def _tap_target_audit(page, sel):

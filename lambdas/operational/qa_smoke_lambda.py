@@ -1156,7 +1156,7 @@ def lambda_handler(event, context):
             return {"statusCode": 200, "body": _body(False)}
 
         subject = (
-            f"🔴 QA: {len(fails)} failure{'s' if len(fails)>1 else ''} "
+            f"🔴 QA: {len(fails)} failure{'s' if len(fails) > 1 else ''} "
             f"({len(fails_deploy)} deploy-health, {len(fails_content)} content-truth) — {run_time.strftime('%b %-d')}"
         )
 
