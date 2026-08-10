@@ -65,11 +65,26 @@ from datetime import datetime, timedelta, timezone  # noqa: E402
 import coach_history_summarizer as chs  # noqa: E402
 from ai import behavior_logs as bl  # noqa: E402
 
-_NOW = datetime.now(timezone.utc)
-GENERATION_DAY = _NOW.strftime("%Y-%m-%d")
-STALE_LOG_DAY = (_NOW - timedelta(days=2)).strftime("%Y-%m-%d")  # a log that predates the stance's day
-YESTERDAY = (_NOW - timedelta(days=1)).strftime("%Y-%m-%d")
-WINDOW_START = (_NOW - timedelta(days=6)).strftime("%Y-%m-%d")
+# CALL-TIME derivation, not module globals: a module-level `_NOW` is the #2223
+# class this repo's wallclock-globals guard exists for (collection before
+# midnight + execution after = desync). Each helper reads the clock when the
+# test actually runs, in the same UTC frame the summarizer stamps as_of with.
+
+
+def _gen_day() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
+def _stale_log_day() -> str:
+    return (datetime.now(timezone.utc) - timedelta(days=2)).strftime("%Y-%m-%d")
+
+
+def _yesterday() -> str:
+    return (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+
+
+def _window_start() -> str:
+    return (datetime.now(timezone.utc) - timedelta(days=6)).strftime("%Y-%m-%d")
 
 
 def _signal(**channels):
@@ -80,8 +95,8 @@ def _signal(**channels):
     what this one is asserting about a different surface.
     """
     return {
-        "date": channels.pop("_date", GENERATION_DAY),
-        "experiment_window_start": channels.pop("_window", WINDOW_START),
+        "date": channels.pop("_date", _gen_day()),
+        "experiment_window_start": channels.pop("_window", _window_start()),
         "channel_detail": {src: {"last_log_date": d, "gap_days": 0} for src, d in channels.items()},
     }
 
@@ -99,8 +114,8 @@ def _stance(headline):
         "coach_id": "nutrition_coach",
         "display_name": "Nutrition Coach",
         "domain": "nutrition",
-        "as_of": GENERATION_DAY,
-        "generated_at": GENERATION_DAY + "T17:00:00+00:00",
+        "as_of": _gen_day(),
+        "generated_at": _gen_day() + "T17:00:00+00:00",
     }
 
 
@@ -137,20 +152,20 @@ class TestGateActuallyFires:
 
     def test_negative_ungrounded_same_day_claim_is_flagged(self, monkeypatch):
         """The claim no number or date gate can see: a completed ACTION with no log."""
-        sig = _signal(macrofactor=STALE_LOG_DAY)  # latest food log predates the stance's day
+        sig = _signal(macrofactor=_stale_log_day())  # latest food log predates the stance's day
         found = _gate(self.UNGROUNDED, sig, monkeypatch)
         assert [f["type"] for f in found] == ["ungrounded_behavioral"]
         assert found[0]["category"] == "nutrition"
 
     def test_positive_same_claim_with_the_log_present_passes(self, monkeypatch):
-        sig = _signal(macrofactor=GENERATION_DAY)
+        sig = _signal(macrofactor=_gen_day())
         assert _gate(self.UNGROUNDED, sig, monkeypatch) == []
 
     def test_unarmed_is_the_difference(self, monkeypatch):
         """The differential proper: identical stance text, identical everything else —
         the ONLY variable is whether the caller handed the gate a map. Without it the
         surface behaves exactly as it did before #2195 (the opt-out contract)."""
-        sig = _signal(macrofactor=STALE_LOG_DAY)
+        sig = _signal(macrofactor=_stale_log_day())
         assert _gate(self.UNGROUNDED, sig, monkeypatch) != []
         assert _gate(self.UNGROUNDED, None, monkeypatch) == []
 
@@ -159,27 +174,27 @@ class TestGateActuallyFires:
         (no engagement channel records them, and garmin is paused per ADR-074), so a step
         claim is UNKNOWN, never "absent". A gate that fires when it could not see is the
         noise that gets a gate switched off."""
-        sig = _signal(macrofactor=GENERATION_DAY)
+        sig = _signal(macrofactor=_gen_day())
         assert _gate(self.UNSEEN, sig, monkeypatch) == []
 
     def test_workout_and_journal_are_covered_too(self, monkeypatch):
-        sig = _signal(macrofactor=GENERATION_DAY, hevy=STALE_LOG_DAY, notion=STALE_LOG_DAY)
+        sig = _signal(macrofactor=_gen_day(), hevy=_stale_log_day(), notion=_stale_log_day())
         found = _gate("You completed your workout today and you journaled today.", sig, monkeypatch)
         assert sorted(f["category"] for f in found) == ["journal", "workout"]
 
     def test_advice_framing_is_not_a_completed_action_claim(self, monkeypatch):
-        sig = _signal(macrofactor=STALE_LOG_DAY)
+        sig = _signal(macrofactor=_stale_log_day())
         assert _gate("You should log your meals today.", sig, monkeypatch) == []
 
     def test_prior_period_claim_stays_out_of_scope(self, monkeypatch):
-        sig = _signal(macrofactor=STALE_LOG_DAY)
+        sig = _signal(macrofactor=_stale_log_day())
         assert _gate("Last week you logged your meals every day.", sig, monkeypatch) == []
 
     def test_a_finding_survives_a_regen_that_does_not_improve(self, monkeypatch):
         """Disposition is INHERITED, not chosen here: findings that survive the one
         regen flow back to `_run_stance`, which fail-keep-priors. Proving the finding
         reaches the caller is proving the gate has consequences."""
-        sig = _signal(macrofactor=STALE_LOG_DAY)
+        sig = _signal(macrofactor=_stale_log_day())
         monkeypatch.setattr(chs, "_call_haiku", lambda **kw: {"headline_read": "You logged your meals today."})
         result = _stance(self.UNGROUNDED)
         best, findings = chs._apply_grounding_gate("nutrition_coach", _META, {}, None, _USER_MESSAGE, result, presence_signal=sig)
@@ -202,7 +217,7 @@ class TestEndToEndStancePath:
             "_call_haiku",
             lambda **kw: {"headline_read": "You logged your meals today, and that is the read I hold."},
         )
-        sig = _signal(macrofactor=STALE_LOG_DAY)
+        sig = _signal(macrofactor=_stale_log_day())
         armed = chs._generate_stance("nutrition_coach", {}, {}, None, presence_signal=sig)
         unarmed = chs._generate_stance("nutrition_coach", {}, {}, None)
         assert [f["type"] for f in armed["_adr104_findings"]] == ["ungrounded_behavioral"]
@@ -221,7 +236,7 @@ class TestEndToEndStancePath:
         monkeypatch.setattr(chs, "_get_item", lambda pk, sk: None)
         writes = []
         monkeypatch.setattr(chs, "_write_stance", lambda cid, st: writes.append(cid) or True)
-        out = chs._run_stance("nutrition_coach", {}, {}, presence_signal=_signal(macrofactor=STALE_LOG_DAY))
+        out = chs._run_stance("nutrition_coach", {}, {}, presence_signal=_signal(macrofactor=_stale_log_day()))
         assert out["written"] is False
         assert out["reason"] == "adr104_gate_failed_no_prior"
         assert writes == []
@@ -238,7 +253,7 @@ class TestTheReadIsOnePerInvocation:
         — if someone moves `_presence_signal()` inside the loop this goes to 8 and
         fails, which is the whole cost argument turning into a regression test."""
         calls = []
-        monkeypatch.setattr(chs, "_presence_signal", lambda: calls.append(1) or _signal(macrofactor=GENERATION_DAY))
+        monkeypatch.setattr(chs, "_presence_signal", lambda: calls.append(1) or _signal(macrofactor=_gen_day()))
         monkeypatch.setattr(chs, "_gather_coach_state", lambda cid: {"outputs": [{"sk": "OUTPUT#1"}]})
         # #2428: the compression takes the same hoisted signal (its own gate arms #1699 too)
         monkeypatch.setattr(chs, "_compress_coach", lambda cid, st, presence_signal=None: {"summary": "s"})
@@ -259,7 +274,7 @@ class TestTheReadIsOnePerInvocation:
         goes through `_get_item` — so a restart's TOMBSTONED record (#1895/#1969) is
         filtered out and cannot seed a fresh cycle's availability map."""
         seen = {}
-        monkeypatch.setattr(chs, "_get_item", lambda pk, sk: seen.update(pk=pk, sk=sk) or {"date": GENERATION_DAY})
+        monkeypatch.setattr(chs, "_get_item", lambda pk, sk: seen.update(pk=pk, sk=sk) or {"date": _gen_day()})
         chs._presence_signal()
         assert seen == {"pk": "USER#matthew#SOURCE#engagement_state", "sk": "STATE#current"}
 
@@ -298,8 +313,8 @@ class TestTheOrderingThatMakesTheMapReal:
         """The mid-week event path, which fires from the 16:00 UTC evaluator — BEFORE
         adaptive-mode's 16:35 write. The record still carries yesterday, so the honest
         answer is `none()`, not yesterday's logs applied to today's claim."""
-        stale = _signal(_date=YESTERDAY, macrofactor=YESTERDAY)
-        assert bl.available_logs_from_presence(stale, GENERATION_DAY) == bl.LogAvailability.none()
+        stale = _signal(_date=_yesterday(), macrofactor=_yesterday())
+        assert bl.available_logs_from_presence(stale, _gen_day()) == bl.LogAvailability.none()
         assert _cron("coach-prediction-evaluator") < _cron("adaptive-mode-compute")
 
     def test_the_stance_prompt_is_still_a_second_person_surface_about_matthew(self):
