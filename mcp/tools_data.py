@@ -3,6 +3,7 @@ Data access tools: sources, latest, daily summary, date range, search, compare.
 """
 
 import bisect
+import math
 import operator
 from datetime import datetime, timedelta, timezone
 
@@ -113,7 +114,202 @@ FIND_DAYS_OPERATORS = {
 }
 
 
-def tool_find_days(args):
+# ── find_days mode='similar' knobs (#2351) ────────────────────────────────────
+# All three are part of the tool's stated, stable contract (ADR-105): the method
+# string in the response derives from them, and the tests pin the arithmetic.
+SIMILAR_DEFAULT_K = 5
+SIMILAR_MAX_K = 20
+# A feature must be carried by at least this many candidate days to contribute —
+# below this the z-normalization is too noisy to call two days "alike" on it.
+SIMILAR_MIN_FEATURE_N = 10
+# The honesty floor: a candidate further than this RMS z-distance is not a
+# "comparable day"; with nothing under the floor the answer is no matches,
+# never the least-bad five (issue #2351 acceptance).
+SIMILAR_MAX_RMS_Z = 1.0
+# Default feature vector per source. Only sources listed here have a default;
+# any other source requires an explicit `features` list from the caller.
+SIMILAR_DEFAULT_FEATURES = {
+    "whoop": ["recovery_score", "hrv", "resting_heart_rate", "strain", "sleep_duration_hours"],
+}
+
+
+def _numeric(item, field):
+    """The numeric value of `field` on a day record, or None. Absence (or a
+    non-numeric value) is None — never imputed to a mean or zero (ADR-104)."""
+    value = item.get(field)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
+def _next_date(date_str):
+    return (datetime.strptime(date_str, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+
+
+def _find_similar_days(args):
+    """mode='similar': nearest-neighbour retrieval over day vectors (#2351).
+
+    Deterministic arithmetic only — no AI call, no budget band (ADR-105):
+    each feature is z-scored against the candidate window (population mean/std
+    over the candidate days that carry it, target excluded), distance is the
+    RMS z-difference over the used features, ties break by date ascending.
+    A day missing a used feature is excluded from comparability rather than
+    imputed (ADR-104). "What happened next" is a described distribution of the
+    next calendar day after each match, with its n — never a prediction.
+    """
+    source = args.get("source")
+    start_date = args.get("start_date")
+    end_date = args.get("end_date")
+    target_date = args.get("target_date")
+    if not all([source, start_date, end_date, target_date]):
+        raise ValueError("mode='similar' requires 'source', 'start_date', 'end_date', and 'target_date'")
+    features = args.get("features") or SIMILAR_DEFAULT_FEATURES.get(source)
+    if not features:
+        raise ValueError(
+            f"'features' is required for source '{source}' (no default feature vector). "
+            f"Defaults exist for: {sorted(SIMILAR_DEFAULT_FEATURES)}"
+        )
+    k = max(1, min(int(args.get("k", SIMILAR_DEFAULT_K)), SIMILAR_MAX_K))
+
+    resolved = []
+    for f in features:
+        rf = resolve_field(source, f)
+        if rf not in resolved:
+            resolved.append(rf)
+
+    items = query_source(source, start_date, end_date)
+    # One record per date, deterministically (first by sort key on collision).
+    by_date = {}
+    for item in sorted(items, key=lambda i: str(i.get("sk", ""))):
+        d = item.get("date")
+        if d and d not in by_date:
+            by_date[d] = item
+
+    if start_date <= target_date <= end_date:
+        target = by_date.get(target_date)
+    else:
+        target_items = query_source(source, target_date, target_date)
+        target = target_items[0] if target_items else None
+    if target is None:
+        return {
+            "mode": "similar",
+            "source": source,
+            "target_date": target_date,
+            "matches": [],
+            "note": f"No data for target_date {target_date} in source '{source}' — nothing to compare against.",
+        }
+
+    candidate_dates = sorted(d for d in by_date if d != target_date)
+
+    used, dropped, stats = [], {}, {}
+    for f in resolved:
+        target_value = _numeric(target, f)
+        if target_value is None:
+            dropped[f] = "missing on the target day — absence is not imputed (ADR-104)"
+            continue
+        present = [v for v in (_numeric(by_date[d], f) for d in candidate_dates) if v is not None]
+        if len(present) < SIMILAR_MIN_FEATURE_N:
+            dropped[f] = f"only {len(present)} candidate day(s) carry it (floor: {SIMILAR_MIN_FEATURE_N})"
+            continue
+        mean = sum(present) / len(present)
+        std = math.sqrt(sum((v - mean) ** 2 for v in present) / len(present))
+        if std == 0:
+            dropped[f] = "zero variance across candidate days — cannot discriminate on it"
+            continue
+        stats[f] = (mean, std)
+        used.append(f)
+
+    method = (
+        f"Deterministic feature-vector retrieval: per-feature z-score against the candidate window "
+        f"(population mean/std over candidate days carrying the feature, target excluded); "
+        f"distance = RMS z-difference over the used features; similarity floor = {SIMILAR_MAX_RMS_Z} RMS z; "
+        f"ties break by date. No AI involved."
+    )
+    result = {
+        "mode": "similar",
+        "source": source,
+        "target_date": target_date,
+        "features_used": used,
+        "features_dropped": dropped,
+        "method": method,
+        "n_candidate_days": len(candidate_dates),
+        "similarity_floor_rms_z": SIMILAR_MAX_RMS_Z,
+    }
+    if not used:
+        result["matches"] = []
+        result["note"] = "No usable features — see features_dropped for why each was excluded."
+        return result
+
+    target_z = {f: (_numeric(target, f) - stats[f][0]) / stats[f][1] for f in used}
+    result["target_values"] = {f: _numeric(target, f) for f in used}
+
+    scored, excluded_missing = [], 0
+    for d in candidate_dates:
+        z = {}
+        for f in used:
+            v = _numeric(by_date[d], f)
+            if v is None:
+                z = None
+                break
+            z[f] = (v - stats[f][0]) / stats[f][1]
+        if z is None:
+            excluded_missing += 1
+            continue
+        distance = math.sqrt(sum((z[f] - target_z[f]) ** 2 for f in used) / len(used))
+        scored.append((distance, d))
+    scored.sort(key=lambda t: (t[0], t[1]))
+
+    result["n_comparable"] = len(scored)
+    result["n_excluded_missing_features"] = excluded_missing
+    within = [t for t in scored if t[0] <= SIMILAR_MAX_RMS_Z]
+    matches = []
+    for distance, d in within[:k]:
+        match = {
+            "date": d,
+            "rms_z_distance": round(distance, 3),
+            "values": {f: _numeric(by_date[d], f) for f in used},
+        }
+        next_day = by_date.get(_next_date(d))
+        if next_day is not None:
+            next_values = {f: v for f in used if (v := _numeric(next_day, f)) is not None}
+            if next_values:
+                match["next_day"] = {"date": _next_date(d), "values": next_values}
+        matches.append(match)
+    result["n_matches"] = len(matches)
+    result["matches"] = matches
+
+    if not matches:
+        nearest = (
+            f"nearest candidate was {round(scored[0][0], 3)} RMS z on {scored[0][1]}"
+            if scored
+            else "no candidate carried all used features"
+        )
+        result["note"] = f"No comparable days: nothing within {SIMILAR_MAX_RMS_Z} RMS z-distance of the target ({nearest})."
+        return result
+
+    next_distribution = {}
+    for f in used:
+        values = sorted(m["next_day"]["values"][f] for m in matches if "next_day" in m and f in m["next_day"]["values"])
+        if values:
+            mid = len(values) // 2
+            next_distribution[f] = {
+                "n": len(values),
+                "mean": round(sum(values) / len(values), 2),
+                "median": values[mid] if len(values) % 2 else round((values[mid - 1] + values[mid]) / 2, 2),
+                "min": values[0],
+                "max": values[-1],
+            }
+    result["what_happened_next"] = {
+        "note": (
+            f"Described distribution of the next calendar day after each of the {len(matches)} matched day(s) — "
+            "a matched sample, not a prediction (ADR-105). Per-feature n reflects days actually carrying the feature."
+        ),
+        "features": next_distribution,
+    }
+    return result
+
+
+def _find_days_filter(args):
     source = args.get("source")
     start_date = args.get("start_date")
     end_date = args.get("end_date")
@@ -154,6 +350,17 @@ def tool_find_days(args):
         matched = [{k: v for k, v in m.items() if k in key_fields} for m in matched]
 
     return matched
+
+
+def tool_find_days(args):
+    """Two modes over day-level aggregates: 'filter' (threshold conditions, the
+    original behavior and the default) and 'similar' (#2351 — nearest-neighbour
+    retrieval: 'the days most like this one', deterministic vector math)."""
+    mode = (args.get("mode") or "filter").lower().strip()
+    modes = {"filter": _find_days_filter, "similar": _find_similar_days}
+    if mode not in modes:
+        raise ValueError(f"Unknown mode '{mode}'. Valid: {sorted(modes)}")
+    return modes[mode](args)
 
 
 def tool_search_activities(args):
