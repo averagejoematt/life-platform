@@ -93,7 +93,7 @@ which is itself a humanity feature: a friend who makes things up stops being one
 | 42 | Deterministic repetition detector — "said the same thing nine times" becomes measurable | filed (#2350, promoted) |
 | 43 | Conversational repair — when corrected, "ah, my bad", not "Thank you for the correction" | filed (prompt-pass v3 bundle) |
 | 44 | Experiment-aware conversation — Day N framing, the coach's own open predictions cited naturally ("I called 7h+ sleep this week — holding so far") | **shipped** (experiment-awareness PR) |
-| 45 | Track-record humility — "I called this one wrong last cycle" (prediction outcomes, not just open calls) | filed |
+| 45 | Track-record humility — "I called this one wrong last cycle" (prediction outcomes, not just open calls) | **shipped** (#2496 — graded calls join the fact block; a miss is guaranteed a slot over newer hits) |
 | 46 | Multi-day thread pickup — resume exactly where things left off | **shipped** in substance (summaries; open-loops line strengthens it) |
 
 ## 6. The relationship arc & the team
@@ -102,7 +102,7 @@ which is itself a humanity feature: a friend who makes things up stops being one
 |---|------|--------|
 | 47 | Relationship stages shape formality and bluntness over weeks | **shipped** substrate (RELATIONSHIP#state already feeds the prompt); tuning continues |
 | 48 | Handoff continuity — the referred coach opens with the referral context, like colleagues actually talking | **shipped** (outbound PR) |
-| 49 | Team texture — "we talked about you Tuesday — good things", grounded in real team-meeting artifacts | filed |
+| 49 | Team texture — "we talked about you Tuesday — good things", grounded in real team-meeting artifacts | **shipped** (#2496 — TEAM ROOM from the inter-coach threads the coach was in, with a gate that refuses an invented meeting) |
 | 50 | Grand Rounds — the board bot becomes a true group chat, multiple coaches responding in sequence with distinct voices | filed (epic #2363 roster item) |
 | 51 | Succession done humanly — Max carries the training thread forward; history stays under Sarah's byline | **shipped** (route re-point + voice-structure port, outbound PR) |
 | 52 | Coach-to-coach visible disagreement in Grand Rounds (two coaches, two readings, both grounded) | horizon (after #50) |

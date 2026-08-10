@@ -29,6 +29,13 @@ The same honesty contract applies: pre-genesis renders a countdown, never a fake
 Day 1; the prereg rows are READ-ONLY here; a tombstoned integrator record from a
 wiped cycle contributes nothing (``singleton_visible``, #946/#1969).
 
+#2496 adds the two sections that make a coach sound like a colleague rather than a
+service: its own GRADED calls (misses guaranteed a slot — see
+``coach_team_texture.terminal_prediction_lines``) and the TEAM ROOM, the inter-coach
+threads it was actually a party to. Both are grounded reads of existing rows, and
+the team-room section renders even when EMPTY, because its heading is the evidence
+``coach_team_texture.team_meeting_findings`` gates against.
+
 Fail-soft everywhere: any storage/import surprise returns "" and the chat runs
 on canonical facts alone, exactly as it did before this module existed.
 """
@@ -39,6 +46,8 @@ import logging
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
+
+from coach import coach_team_texture
 
 logger = logging.getLogger(__name__)
 
@@ -244,12 +253,16 @@ _OPEN_PREDICTION_STATUSES = ("pending", "confirming")
 _MAX_PREDICTION_PAGES = 5  # a chat turn is latency-bound; the partition is small
 
 
-def _own_predictions_lines(coach_id: str, table) -> list:
-    """The coach's still-open PREDICTION# claims — at most three, newest first.
+def _fetch_own_predictions(coach_id: str, table) -> list:
+    """Every visible PREDICTION# row in this coach's partition.
 
     Read-only: this surface never writes a prediction, never grades one, and never
     touches the frozen genesis prereg artifact. ``with_phase_filter`` is mandatory
     (ADR-058) — without it a reset's pilot-tagged calls keep being quoted as live.
+
+    ONE fetch serves both the open calls and the graded ones (#2496). Splitting it
+    into a query per renderer would double the round-trips on the platform's most
+    latency-sensitive surface to read the same small partition twice.
     """
     from experiment.phase_filter import with_phase_filter
 
@@ -264,7 +277,11 @@ def _own_predictions_lines(coach_id: str, table) -> list:
         if "LastEvaluatedKey" not in resp:
             break
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+    return items
 
+
+def _open_predictions_lines(items: list) -> list:
+    """The coach's still-open PREDICTION# claims — at most three, newest first."""
     open_calls = [
         i
         for i in items
@@ -352,13 +369,33 @@ def domain_facts_block(coach_id: str, table, today: Optional[str] = None) -> str
         frame += _experiment_frame_lines(today)
     except Exception as e:
         logger.warning("[domain_facts] experiment frame failed: %s", e)
+
+    # The forecasting seats only. A chat-tier coach makes no preregistered calls and
+    # is not a party to an inter-coach thread, so reading either partition for one
+    # could only ever return nothing — and the absence sections below already tell
+    # it, in words, that it has no record to claim.
+    operational = False
     try:
         from coach.persona_registry import OPERATIONAL_COACH_IDS
 
-        if persona in OPERATIONAL_COACH_IDS:
-            frame += _own_predictions_lines(persona, table)
-    except Exception as e:
-        logger.warning("[domain_facts] own predictions unavailable for %s: %s", persona, e)
+        operational = persona in OPERATIONAL_COACH_IDS
+    except Exception as e:  # pragma: no cover — bundle edge
+        logger.warning("[domain_facts] persona registry unavailable: %s", e)
+
+    track_lines: list = []
+    if operational:
+        try:
+            predictions = _fetch_own_predictions(persona, table)
+            frame += _open_predictions_lines(predictions)
+            track_lines = coach_team_texture.terminal_prediction_lines(predictions)
+        except Exception as e:
+            logger.warning("[domain_facts] own predictions unavailable for %s: %s", persona, e)
+
+    # The TEAM ROOM section renders for EVERY texting coach, with or without a
+    # record. Its absence form is not decoration: ``team_meeting_findings`` reads
+    # the heading as its evidence, and a coach told nothing about its team fills
+    # the silence from the persona's general idea of what a coaching staff does.
+    meeting_lines = coach_team_texture.team_meeting_lines(persona, table) if operational else []
 
     lines: list = []
     pack = _PACKS.get(key)
@@ -372,6 +409,10 @@ def domain_facts_block(coach_id: str, table, today: Optional[str] = None) -> str
     sections = []
     if frame:
         sections.append("EXPERIMENT FRAME:\n" + "\n".join(f"- {ln}" for ln in frame))
+    track_section = coach_team_texture.track_record_section(track_lines)
+    if track_section:
+        sections.append(track_section)
+    sections.append(coach_team_texture.team_room_section(meeting_lines))
     if lines:
         sections.append("YOUR DOMAIN FACTS (yours specifically, same sources as the site):\n" + "\n".join(f"- {ln}" for ln in lines))
     return "\n\n".join(sections)
