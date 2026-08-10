@@ -937,6 +937,12 @@ _GENERATION_GET_ITEM_EXEMPT: dict = {
         "summary_sk(target)",
     ): "CHAT#summary — CROSS_PHASE since ADR-153 (the texting relationship survives resets); never tombstoned",
     (
+        "coach/coach_chat_summary.py",
+        "BITS_SK",
+    ): "RELATIONSHIP#bits (#2487) — the inside-references ledger rides the same ADR-153 CROSS_PHASE rule as "
+    "RELATIONSHIP#state and CHAT#summary: a reset re-anchors the experiment, it does not un-say a shared joke, "
+    "so the row is never tombstoned and a visibility filter would hide memory that is supposed to survive",
+    (
         "coach/coach_domain_facts.py",
         "'PROFILE#v1'",
     ): "user profile — cross_phase, no phase attr, never tombstoned (same as intelligence_common's entry)",

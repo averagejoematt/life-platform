@@ -235,7 +235,7 @@ def merge_bits(existing, new_bits, date: str) -> list:
         norm = _normalize(text)
         if norm in index:
             continue
-        row = {
+        row: dict = {
             "text": text,
             "first_seen": str(b.get("first_seen") or date),
             "last_seen": str(b.get("last_seen") or date),
@@ -254,8 +254,8 @@ def merge_bits(existing, new_bits, date: str) -> list:
             index[norm] = row
             merged.append(row)
         elif row["last_seen"] != date:
-            row["count"] += 1
-            row["last_seen"] = max(row["last_seen"], date)
+            row["count"] = int(row["count"]) + 1
+            row["last_seen"] = max(str(row["last_seen"]), date)
     # Stable sorts compose: text asc, then last_seen desc, then count desc.
     merged.sort(key=lambda b: b["text"])
     merged.sort(key=lambda b: b["last_seen"], reverse=True)
