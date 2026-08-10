@@ -1,0 +1,64 @@
+{
+  "_provenance": "Reconstructed from the 2026-08-09 all-day wedge (#2467) — run ids, ages and states are the incident's measured facts (zombies 30727225837/30723876315 minted 2026-08-01/02, still status=waiting with Deploy parked at the production gate and pending_deployments NON-EMPTY at day 8; a fresh deploy_all dispatch blocked pending behind them). Not a raw API capture: the live scan at the time COULD NOT capture the zombies — that recency-bounded window is the bug this fixture pins. Field shapes copied from the captured fixtures in this directory.",
+  "now": "2026-08-09T20:00:00Z",
+  "runs": [
+    {
+      "id": 30934111222,
+      "status": "pending",
+      "conclusion": null,
+      "event": "workflow_dispatch",
+      "head_branch": "main",
+      "head_sha": "d524eeea00000000000000000000000000000000",
+      "created_at": "2026-08-09T19:20:00Z"
+    },
+    {
+      "id": 30727225837,
+      "status": "waiting",
+      "conclusion": null,
+      "event": "push",
+      "head_branch": "main",
+      "head_sha": "aa01020300000000000000000000000000000000",
+      "created_at": "2026-08-01T18:04:00Z"
+    },
+    {
+      "id": 30723876315,
+      "status": "waiting",
+      "conclusion": null,
+      "event": "push",
+      "head_branch": "main",
+      "head_sha": "bb04050600000000000000000000000000000000",
+      "created_at": "2026-08-01T15:30:00Z"
+    }
+  ],
+  "jobs": {
+    "30934111222": [
+      {"name": "Reconcile derived artifacts", "status": "completed", "conclusion": "success", "started_at": "2026-08-09T19:20:10Z"},
+      {"name": "lint / Lint + Syntax Check", "status": "completed", "conclusion": "success", "started_at": "2026-08-09T19:20:30Z"},
+      {"name": "Deploy-critical tests", "status": "completed", "conclusion": "success", "started_at": "2026-08-09T19:23:00Z"},
+      {"name": "test / Unit Tests", "status": "completed", "conclusion": "success", "started_at": "2026-08-09T19:23:05Z"},
+      {"name": "Plan deployments", "status": "completed", "conclusion": "success", "started_at": "2026-08-09T19:27:00Z"},
+      {"name": "Deploy", "status": "pending", "conclusion": null, "started_at": "2026-08-09T19:35:00Z"}
+    ],
+    "30727225837": [
+      {"name": "Reconcile derived artifacts", "status": "completed", "conclusion": "success", "started_at": "2026-08-01T18:04:10Z"},
+      {"name": "lint / Lint + Syntax Check", "status": "completed", "conclusion": "success", "started_at": "2026-08-01T18:04:30Z"},
+      {"name": "test / Unit Tests", "status": "completed", "conclusion": "success", "started_at": "2026-08-01T18:07:00Z"},
+      {"name": "Deploy-critical tests", "status": "completed", "conclusion": "success", "started_at": "2026-08-01T18:07:10Z"},
+      {"name": "Plan deployments", "status": "completed", "conclusion": "success", "started_at": "2026-08-01T18:10:00Z"},
+      {"name": "Deploy", "status": "waiting", "conclusion": null, "started_at": "2026-08-01T18:15:00Z"}
+    ],
+    "30723876315": [
+      {"name": "Reconcile derived artifacts", "status": "completed", "conclusion": "success", "started_at": "2026-08-01T15:30:10Z"},
+      {"name": "lint / Lint + Syntax Check", "status": "completed", "conclusion": "success", "started_at": "2026-08-01T15:30:30Z"},
+      {"name": "test / Unit Tests", "status": "completed", "conclusion": "success", "started_at": "2026-08-01T15:33:00Z"},
+      {"name": "Deploy-critical tests", "status": "completed", "conclusion": "success", "started_at": "2026-08-01T15:33:10Z"},
+      {"name": "Plan deployments", "status": "completed", "conclusion": "success", "started_at": "2026-08-01T15:36:00Z"},
+      {"name": "Deploy", "status": "waiting", "conclusion": null, "started_at": "2026-08-01T15:41:00Z"}
+    ]
+  },
+  "pending": {
+    "30934111222": [],
+    "30727225837": [{"environment": {"name": "production"}, "current_user_can_approve": true}],
+    "30723876315": [{"environment": {"name": "production"}, "current_user_can_approve": true}]
+  }
+}

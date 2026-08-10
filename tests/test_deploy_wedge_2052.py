@@ -333,3 +333,204 @@ def test_absent_wedge_detection_leaves_the_legacy_verdict_untouched():
 
     assert cmg.classify_pipeline(_green_runs(), deploy_wedge=None)["kind"] == cmg.GREEN
     assert cmg.classify_pipeline(_green_runs())["kind"] == cmg.GREEN
+
+
+# --------------------------------------------------------------------------
+# #2467 — the sixth wedge: gate-parked holders older than the scan window.
+#
+# The 2026-08-09 all-day wedge was misclassified as phantom because collect() read one
+# bounded recent-run page; the REAL holders were two 8-day-old gated runs still
+# `waiting` at the production gate. Two invariants are pinned here: (a) a gate-parked
+# run of ANY age visible to the classifier is the HOLDER, never phantom; (b) collect()
+# actually enumerates waiting runs with no recency bound, so it IS visible.
+# --------------------------------------------------------------------------
+
+_ZOMBIES = {30727225837, 30723876315}
+_FRESH_DISPATCH = 30934111222
+
+
+def test_a_gate_parked_run_of_any_age_is_the_holder_never_phantom():
+    """Acceptance bullet 1 of #2467: never 'phantom' while a gate-parked run exists."""
+    state = classify("zombie_gate_holder")
+    by_id = {v["run_id"]: v for v in state["verdicts"]}
+    fresh = by_id[_FRESH_DISPATCH]
+    assert fresh["kind"] == cdw.QUEUED_BEHIND
+    assert fresh["kind"] != cdw.PHANTOM_WEDGE
+    assert set(fresh["holders"]) == _ZOMBIES
+
+
+def test_the_zombie_wedge_is_an_incident_not_the_invariant_working():
+    """The fleet verdict must page a human: the holders are stranded, not healthy."""
+    state = classify("zombie_gate_holder")
+    assert state["kind"] == cdw.STRANDED_APPROVAL
+    code, _ = cdw.render(state)
+    assert code == 1
+
+
+def test_queued_behind_detail_names_the_holder_with_its_age():
+    state = classify("zombie_gate_holder")
+    fresh = next(v for v in state["verdicts"] if v["run_id"] == _FRESH_DISPATCH)
+    assert "8.1d" in fresh["detail"] or "8.0d" in fresh["detail"]
+    assert "STALE" in fresh["detail"]
+    assert "reject_deployment.sh" in fresh["detail"]
+
+
+def test_stale_gate_holder_recovery_is_reject_not_approve():
+    """Approving an 8-day-old run deploys the sha it was minted from; leaving it waiting
+    holds the deploy slot. The ONLY sanctioned exit is the reject API."""
+    state = classify("zombie_gate_holder")
+    for zombie in _ZOMBIES:
+        v = next(x for x in state["verdicts"] if x["run_id"] == zombie)
+        assert v["kind"] == cdw.STRANDED_APPROVAL
+        assert v.get("stale_holder") is True
+        assert "reject_deployment.sh" in v["detail"]
+        assert "state=rejected" in v["detail"]
+        assert "approve_deployment.sh" not in v["detail"]
+
+
+def test_fresh_stranded_approval_keeps_the_approve_path():
+    """The reject posture is for STALE holders only — a run stranded for ~2.6h is still
+    current code and gets approved, exactly as before #2467."""
+    state = classify("stranded_approval")
+    v = next(x for x in state["verdicts"] if x["kind"] == cdw.STRANDED_APPROVAL)
+    assert v.get("stale_holder") is not True
+    assert "approve_deployment.sh" in v["detail"]
+    assert "reject_deployment.sh" not in v["detail"]
+
+
+def test_zombie_wedge_render_names_both_zombies_and_the_reject_recovery():
+    _, message = cdw.render(classify("zombie_gate_holder"))
+    for zombie in _ZOMBIES:
+        assert str(zombie) in message
+    assert "reject_deployment.sh" in message
+    assert "PHANTOM" not in message
+
+
+# --- collect() enumeration — the actual #2467 bug. Mutation-proof: the pre-fix
+# collect() read one recent-run page and never queried status=waiting, so these tests
+# FAIL against it (the zombie simply never appears in its output). ---
+
+
+def _run_stub(run_id, status, created_at):
+    return {"id": run_id, "status": status, "conclusion": None, "head_branch": "main", "head_sha": "ab" * 20, "created_at": created_at}
+
+
+def _fake_api(monkeypatch, waiting_pages):
+    """Wire cdw._gh_api to a fake Actions API whose RECENT window contains only
+    completed runs, while gate-parked zombies live solely behind ?status=waiting."""
+    from urllib.parse import parse_qs, urlparse
+
+    calls = []
+
+    def fake(path):
+        calls.append(path)
+        parsed = urlparse(path)
+        if parsed.path.endswith(f"/workflows/{cdw.WORKFLOW}/runs"):
+            q = parse_qs(parsed.query)
+            status = q.get("status", [None])[0]
+            page = int(q.get("page", ["1"])[0])
+            if status is None:
+                # The recent window: full of completed runs — the zombies aged out.
+                if page == 1:
+                    return {"workflow_runs": [_run_stub(30934000000 + i, "completed", "2026-08-09T10:00:00Z") for i in range(20)]}
+                return {"workflow_runs": []}
+            if status == "waiting":
+                return {"workflow_runs": waiting_pages.get(page, [])}
+            return {"workflow_runs": []}
+        if "/jobs" in parsed.path:
+            rid = parsed.path.split("/runs/")[1].split("/")[0]
+            return {"jobs": [{"name": "Deploy", "status": "waiting", "conclusion": None, "started_at": "2026-08-01T18:15:00Z", "run": rid}]}
+        if parsed.path.endswith("/pending_deployments"):
+            return [{"environment": {"name": "production"}, "current_user_can_approve": True}]
+        raise AssertionError(f"unexpected API path {path}")
+
+    monkeypatch.setattr(cdw, "_gh_api", fake)
+    return calls
+
+
+def test_collect_finds_a_waiting_run_far_outside_the_recent_window(monkeypatch):
+    zombie = _run_stub(30727225837, "waiting", "2026-08-01T18:04:00Z")
+    _fake_api(monkeypatch, waiting_pages={1: [zombie]})
+    in_flight, jobs_by_run, pending_by_run = cdw.collect()
+    assert [r["id"] for r in in_flight] == [30727225837]
+    assert cdw.deploy_job(jobs_by_run["30727225837"])["status"] == "waiting"
+    assert pending_by_run["30727225837"], "the gate-parked zombie's pending_deployments must be fetched too"
+
+
+def test_collect_paginates_waiting_runs_to_exhaustion(monkeypatch):
+    """Bumping per_page is not the fix — a zombie on page 2 must still be found."""
+    page1 = [_run_stub(30800000000 + i, "waiting", "2026-08-05T00:00:00Z") for i in range(cdw._RUNS_PAGE_SIZE)]
+    zombie = _run_stub(30723876315, "waiting", "2026-08-01T15:30:00Z")
+    _fake_api(monkeypatch, waiting_pages={1: page1, 2: [zombie]})
+    in_flight, _, _ = cdw.collect()
+    ids = {r["id"] for r in in_flight}
+    assert 30723876315 in ids
+    assert len(ids) == cdw._RUNS_PAGE_SIZE + 1
+
+
+def test_collect_queries_every_in_flight_status_explicitly(monkeypatch):
+    """The measured 2026-08-08 fact behind sweeping ALL statuses: a live run whose
+    Deploy sat at the gate reported run-level `in_progress`, not `waiting` — so a
+    waiting-only sweep would have missed it. Each status must be enumerated."""
+    calls = _fake_api(monkeypatch, waiting_pages={})
+    cdw.collect()
+    queried = {s for c in calls if "status=" in c for s in [c.split("status=")[1].split("&")[0]]}
+    assert queried == set(cdw.IN_FLIGHT_RUN_STATUSES)
+    assert "waiting" in queried
+
+
+def test_collect_dedupes_runs_seen_by_both_sweeps(monkeypatch):
+    """A young waiting run appears in the recent window AND the status sweep — once."""
+    from urllib.parse import parse_qs, urlparse
+
+    young = _run_stub(30934111222, "waiting", "2026-08-09T19:20:00Z")
+
+    def fake(path):
+        parsed = urlparse(path)
+        if parsed.path.endswith(f"/workflows/{cdw.WORKFLOW}/runs"):
+            q = parse_qs(parsed.query)
+            status = q.get("status", [None])[0]
+            page = int(q.get("page", ["1"])[0])
+            if page == 1 and status in (None, "waiting"):
+                return {"workflow_runs": [dict(young)]}
+            return {"workflow_runs": []}
+        if "/jobs" in parsed.path:
+            return {"jobs": []}
+        if parsed.path.endswith("/pending_deployments"):
+            return []
+        raise AssertionError(path)
+
+    monkeypatch.setattr(cdw, "_gh_api", fake)
+    in_flight, _, _ = cdw.collect()
+    assert [r["id"] for r in in_flight] == [30934111222]
+
+
+# --- watch_deploy_gate.sh — the posture change, text-pinned like the workflow tests
+# (CI installs no PyYAML/shell harness; these are structural invariants). ---
+
+_GATE_WATCH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "deploy", "watch_deploy_gate.sh")
+
+
+def test_gate_watch_dropped_the_pin_exclude_zombie_list():
+    """The hardcoded zombie ids and the leave-waiting posture are retired (#2467)."""
+    with open(_GATE_WATCH, encoding="utf-8") as f:
+        body = f.read()
+    for zombie in _ZOMBIES:
+        assert str(zombie) not in body, f"zombie {zombie} must not be pinned — stale runs are rejected, not skipped"
+    assert 'ZOMBIES="' not in body
+
+
+def test_gate_watch_rejects_stale_runs_instead_of_skipping():
+    with open(_GATE_WATCH, encoding="utf-8") as f:
+        body = f.read()
+    assert "reject_deployment.sh" in body
+    assert "GATE_STALE_REJECT_HOURS" in body
+
+
+def test_reject_wrapper_exists_and_posts_state_rejected():
+    reject = os.path.join(os.path.dirname(_GATE_WATCH), "reject_deployment.sh")
+    with open(reject, encoding="utf-8") as f:
+        body = f.read()
+    assert '"state": "rejected"' in body
+    assert "pending_deployments" in body
+    assert os.access(reject, os.X_OK), "reject_deployment.sh must be executable like approve_deployment.sh"

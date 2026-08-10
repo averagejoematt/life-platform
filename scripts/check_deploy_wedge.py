@@ -51,6 +51,19 @@ stays empty and there is literally nothing to approve. Evidence: the wedged Depl
 ran zero steps, was never assigned a runner (`runner_id=0`), and `pending_deployments`
 was empty for the full 12+ minutes while all five dependencies were green.
 
+THE SIXTH WEDGE (2026-08-09, #2467)
+-----------------------------------
+The all-day wedge was misclassified as phantom because the holder scan read ONE bounded
+recent-run page: the REAL holders were two 8-day-old gated runs (30727225837/30723876315)
+still `waiting` with Deploy parked at the production gate — and a job parked at the gate
+occupies the job-level `ci-cd-deploy-<ref>` slot. The scan now enumerates every
+non-completed run status explicitly, paginated to exhaustion, with NO recency bound
+(collect() below), so a gate-parked run of ANY age is named as the holder before
+"phantom" can be concluded. A stale gate holder (>= STALE_GATE_REJECT_HOURS at the gate)
+gets REJECT recovery, never approve (that would deploy the old sha it was minted from)
+and never leave-waiting (that holds the whole fleet hostage — "GitHub expires them at
+30d" was measured false at day 8).
+
 WHAT THIS DOES NOT DO
 ---------------------
 It does not touch `ci-cd.yml`'s concurrency semantics. `cancel-in-progress: false` on the
@@ -98,6 +111,13 @@ DEFAULT_THRESHOLD_MIN = 10.0
 # post-merge state. Kept identical to check_main_green.STRANDED_WAIT_HOURS on purpose —
 # the two gates must not disagree about when a wait becomes stranded.
 STRANDED_WAIT_HOURS = 2.0
+
+# Hours at the gate after which a waiting run is a STALE holder (#2467). Approving it
+# would deploy the old sha it was minted from; leaving it waiting keeps the job-level
+# deploy slot occupied and wedges every later run (the 2026-08-09 all-day wedge — two
+# 8-day-old gated runs). Posture: fresh (< this) → action the gate on Matthew's say-so;
+# stale (>= this) → REJECT its pending deployment.
+STALE_GATE_REJECT_HOURS = 24.0
 
 # GitHub reports a concurrency-blocked job as `pending`; the web UI labels it "queued"
 # and older API responses have used that spelling. Accept both — the issue body recorded
@@ -214,7 +234,22 @@ def classify_run(
         # empty here GitHub is mid-transition, which is not an incident on its own.
         wait_h = (blocked_min or 0.0) / 60.0
         approvable = bool(pending)
-        if wait_h >= STRANDED_WAIT_HOURS:
+        if wait_h >= STALE_GATE_REJECT_HOURS:
+            # #2467: a run parked at the gate for this long is pinned to a stale sha,
+            # and while it waits it OCCUPIES the job-level deploy slot — this exact
+            # shape held the fleet hostage for 8 days and read as "phantom" to a
+            # recency-bounded scan.
+            verdict["kind"] = STRANDED_APPROVAL
+            verdict["stale_holder"] = True
+            verdict["detail"] = (
+                f"Deploy has been parked at the `production` gate for {wait_h / 24.0:.1f} DAYS — a STALE gate "
+                "holder (#2467). While it waits it occupies the job-level deploy slot and wedges every later run. "
+                "Recovery: REJECT it — `bash deploy/reject_deployment.sh " + str(run_id) + "` "
+                "(POST …/actions/runs/<id>/pending_deployments with state=rejected: the run dies, nothing stale "
+                "deploys, the slot frees). Do NOT approve it — that deploys the old sha it was minted from — and "
+                "do NOT leave it waiting: GitHub does not reliably expire it (measured alive at day 8)."
+            )
+        elif wait_h >= STRANDED_WAIT_HOURS:
             verdict["kind"] = STRANDED_APPROVAL
             verdict["detail"] = (
                 f"Deploy has been at the `production` approval gate for {wait_h:.1f}h. "
@@ -244,12 +279,30 @@ def classify_run(
 
         if held_by:
             verdict["kind"] = QUEUED_BEHIND
-            names = ", ".join(str(h.get("id")) for h in held_by)
+            descs, stale_ids = [], []
+            for h in held_by:
+                hid = h.get("id")
+                hjob = deploy_job(jobs_by_run.get(str(hid), []))
+                h_min = _minutes_since((hjob or {}).get("started_at"), now)
+                if hjob is not None and hjob.get("status") == "waiting" and h_min is not None and h_min >= STALE_GATE_REJECT_HOURS * 60.0:
+                    stale_ids.append(hid)
+                    descs.append(f"{hid} (Deploy parked at the gate {h_min / 1440.0:.1f}d — STALE holder, #2467)")
+                elif h_min is not None and hjob is not None:
+                    descs.append(f"{hid} (Deploy {hjob.get('status')} {h_min:.0f}m)")
+                else:
+                    descs.append(str(hid))
             verdict["detail"] = (
-                f"Deploy blocked {blocked_min:.1f}m behind run {names}, which really does hold "
+                f"Deploy blocked {blocked_min:.1f}m behind run {', '.join(descs)}, which really does hold "
                 "the deploy group. This is the invariant working, NOT a wedge — resolve the "
-                "holder (approve or let it finish) and this run proceeds on its own."
+                "holder and this run proceeds on its own."
             )
+            if stale_ids:
+                verdict["detail"] += (
+                    " A STALE holder gets REJECTED — never approved (stale sha), never left waiting "
+                    "(it holds the deploy slot): " + " ".join(f"`bash deploy/reject_deployment.sh {i}`" for i in stale_ids) + " (#2467)."
+                )
+            else:
+                verdict["detail"] += " Fresh holder: approve or let it finish (`bash deploy/approve_deployment.sh <run_id>`)."
             return verdict
 
         verdict["kind"] = PHANTOM_WEDGE
@@ -572,10 +625,56 @@ def _gh_api(path: str):
     return json.loads(out)
 
 
+# Every status the Actions API can report for a run that is not `completed`. The holder
+# scan enumerates EACH of these explicitly, paginated to exhaustion (#2467): the old scan
+# read one bounded recent-run page, so the 2026-08-09 wedge's REAL holders — two 8-day-old
+# gated runs still `waiting` at the production gate — were invisible, and the wedge was
+# misclassified as phantom. A recency-bounded window is not a holder scan.
+IN_FLIGHT_RUN_STATUSES = ("waiting", "action_required", "in_progress", "queued", "requested", "pending")
+
+_RUNS_PAGE_SIZE = 100
+# A hard stop against a pathological API loop, NOT a recency window: 10 pages × 100 runs
+# PER STATUS. Real in-flight run counts are single digits.
+_RUNS_MAX_PAGES = 10
+
+
+def _list_runs(status: str | None, page_size: int = _RUNS_PAGE_SIZE, max_pages: int = _RUNS_MAX_PAGES) -> list[dict]:
+    """Runs of the workflow with `status` (None = any), paginated to exhaustion (#2467)."""
+    out: list[dict] = []
+    for page in range(1, max_pages + 1):
+        path = f"repos/{REPO}/actions/workflows/{WORKFLOW}/runs?per_page={page_size}&page={page}"
+        if status is not None:
+            path += f"&status={status}"
+        batch = _gh_api(path).get("workflow_runs", [])
+        out.extend(batch)
+        if len(batch) < page_size:
+            break
+    return out
+
+
 def collect(limit: int = 20) -> tuple[list[dict], dict, dict]:
-    """Fetch in-flight runs + their jobs + pending_deployments from the live API."""
-    runs = _gh_api(f"repos/{REPO}/actions/workflows/{WORKFLOW}/runs?per_page={limit}").get("workflow_runs", [])
-    in_flight = [r for r in runs if r.get("status") != "completed"]
+    """Fetch ALL in-flight runs + their jobs + pending_deployments from the live API.
+
+    Two sweeps, merged by run id (#2467):
+      1. the recent window (`limit` newest runs, any status) — catches a run GitHub is
+         mid-transition on, whatever status string it happens to carry;
+      2. an explicit, exhaustively-paginated enumeration of every non-completed status —
+         so a gate-parked `waiting` run of ANY age is seen. This is the sweep the
+         2026-08-09 wedge was missing: its two 8-day-old holders sat far outside any
+         recent-run window, so the scan read "no holder" and called a real gate-park
+         "phantom".
+    """
+    by_id: dict = {}
+    for run in _list_runs(None, page_size=limit, max_pages=1):
+        by_id[run.get("id")] = run
+    for status in IN_FLIGHT_RUN_STATUSES:
+        for run in _list_runs(status):
+            by_id.setdefault(run.get("id"), run)
+    in_flight = sorted(
+        (r for r in by_id.values() if r.get("status") != "completed"),
+        key=lambda r: str(r.get("created_at") or ""),
+        reverse=True,
+    )
     jobs_by_run: dict = {}
     pending_by_run: dict = {}
     for run in in_flight:

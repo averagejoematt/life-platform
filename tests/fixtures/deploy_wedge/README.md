@@ -15,3 +15,4 @@ wrong discriminator — which is exactly the mistake the five recurrences kept m
 | `stranded_approval.json` | gate OPEN, aged past the threshold | live capture, clock advanced |
 | `queued_behind.json` | Deploy blocked, a real holder exists | live, 2026-08-03 |
 | `phantom_wedge.json` | Deploy blocked, **no** holder | 2026-08-02 recurrence |
+| `zombie_gate_holder.json` | Deploy blocked behind 8-day-old gate-parked runs (#2467) | reconstructed from the 2026-08-09 incident — the recency-bounded scan of the time could not capture it (that IS the bug it pins) |
