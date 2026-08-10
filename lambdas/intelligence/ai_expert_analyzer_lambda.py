@@ -34,6 +34,7 @@ Can also be invoked manually with {"expert": "mind"} for a single expert.
 v3.0.0 — 2026-04-07 (Intelligence Layer V2.1)
 """
 
+import contextlib
 import json
 import logging
 import os
@@ -260,10 +261,9 @@ def gather_data_for_expert(expert_key):
         # SoM daily aggregates live on the apple_health partition (som_avg_valence),
         # not a separate state_of_mind partition.
         som_items = [s for s in _query_source("apple_health", d30, today) if s.get("som_avg_valence") is not None]
-        avg_sentiment = 0
-        if ja_items:
-            scores = [float(i.get("sentiment_score", 0)) for i in ja_items]
-            avg_sentiment = round(sum(scores) / len(scores), 2) if scores else 0
+        # ADR-104 (#2221): 0 is literally the "neutral" label on this -1..1 scale — absence must be null.
+        scores = [float(i["sentiment_score"]) for i in ja_items if i.get("sentiment_score") is not None]
+        avg_sentiment = round(sum(scores) / len(scores), 2) if scores else None
         # Top themes
         theme_counts = {}
         for item in ja_items:
@@ -271,10 +271,8 @@ def gather_data_for_expert(expert_key):
                 theme_counts[t] = theme_counts.get(t, 0) + 1
         top_themes = sorted(theme_counts.items(), key=lambda x: x[1], reverse=True)[:5]
 
-        avg_valence = 0
-        if som_items:
-            vals = [float(s.get("som_avg_valence", 0)) for s in som_items if s.get("som_avg_valence") is not None]
-            avg_valence = round(sum(vals) / len(vals), 2) if vals else 0
+        vals = [float(s["som_avg_valence"]) for s in som_items]  # som_items is already the non-null set
+        avg_valence = round(sum(vals) / len(vals), 2) if vals else None  # ADR-104: 0 is the neutral point, not absence
 
         # #914 anti-dilution: recency alongside the whole-window totals.
         _j_since, _j_14 = _recency_stats(_item_dates(ja_items), today)
@@ -305,17 +303,19 @@ def gather_data_for_expert(expert_key):
                 "food_logs_last_14d": 0,
                 "recency_note": _recency_note,
             }
-        cal_vals = [float(i["total_calories_kcal"]) for i in items if i.get("total_calories_kcal")]
-        pro_vals = [float(i["total_protein_g"]) for i in items if i.get("total_protein_g")]
-        fiber_vals = [float(i["total_fiber_g"]) for i in items if i.get("total_fiber_g")]
-        avg_cal = round(sum(cal_vals) / len(cal_vals)) if cal_vals else 0
-        avg_pro = round(sum(pro_vals) / len(pro_vals), 1) if pro_vals else 0
+        # ADR-104 (#2221): `is not None`, not truthiness — a row that EXISTS with no macro fields is absence (a null
+        # average, never "0 kcal across N tracked days"); a logged 0 (the fast `zero_calorie_days` counts) stays in.
+        cal_vals = [float(i["total_calories_kcal"]) for i in items if i.get("total_calories_kcal") is not None]
+        pro_vals = [float(i["total_protein_g"]) for i in items if i.get("total_protein_g") is not None]
+        fiber_vals = [float(i["total_fiber_g"]) for i in items if i.get("total_fiber_g") is not None]
+        avg_cal = round(sum(cal_vals) / len(cal_vals)) if cal_vals else None
+        avg_pro = round(sum(pro_vals) / len(pro_vals), 1) if pro_vals else None
         avg_fiber = round(sum(fiber_vals) / len(fiber_vals), 1) if fiber_vals else None
         # Phase-3: target from the canonical facts (computed_metrics), not a hardcoded 190
         # that drifts from scoring_engine/profile. avg_pro is the real intake (~140).
         _facts = _load_canonical_facts()
         protein_target = int(_facts.get("protein_g_target") or 190)
-        adherence = sum(1 for v in pro_vals if v >= protein_target) / max(len(pro_vals), 1) * 100
+        adherence = round(sum(1 for v in pro_vals if v >= protein_target) / len(pro_vals) * 100) if pro_vals else None
         zero_cal_days = sum(1 for i in items if i.get("total_calories_kcal") is not None and float(i.get("total_calories_kcal", 0)) == 0)
         # #914 anti-dilution: recency alongside the whole-window averages.
         _f_since, _f_14 = _recency_stats(_item_dates(items), today)
@@ -328,7 +328,7 @@ def gather_data_for_expert(expert_key):
             "avg_protein_g": avg_pro,
             "avg_fiber_g": avg_fiber,
             "protein_target_g": protein_target,
-            "protein_adherence_pct": round(adherence),
+            "protein_adherence_pct": adherence,
             "days_tracked": len(items),
             "zero_calorie_days": zero_cal_days,
             "recency_note": _recency_note,
@@ -443,17 +443,17 @@ def gather_data_for_expert(expert_key):
             **weight_recency.summarize_weight_readings(weight_items, today),
         }
         if dexa:
-            bc = dexa.get("body_composition", {})
-            data["body_fat_pct"] = float(bc.get("body_fat_pct", 0)) if bc.get("body_fat_pct") else None
-            data["lean_mass_lb"] = float(bc.get("lean_mass_lb", 0)) if bc.get("lean_mass_lb") else None
-            data["visceral_fat_lb"] = float(bc.get("visceral_fat_lb", 0)) if bc.get("visceral_fat_lb") else None
-            data["days_since_dexa"] = (
-                datetime.now(timezone.utc) - datetime.strptime(dexa.get("scan_date", today), "%Y-%m-%d").replace(tzinfo=timezone.utc)
-            ).days
-        if meas:
-            whr = meas.get("waist_height_ratio")
-            if whr:
-                data["waist_height_ratio"] = float(whr)
+            bc = dexa.get("body_composition") or {}
+            for _bc_key in ("body_fat_pct", "lean_mass_lb", "visceral_fat_lb"):
+                data[_bc_key] = float(bc[_bc_key]) if bc.get(_bc_key) is not None else None
+            # #1894/#2221: an unknown/unparseable scan date is NEVER "scanned today" — the old default put a
+            # fabricated clinical date in the coach's prose (and raised out of the whole snapshot when malformed).
+            data["dexa_scan_date"] = str(dexa.get("scan_date") or "unknown")
+            with contextlib.suppress(ValueError):
+                _scan_dt = datetime.strptime(data["dexa_scan_date"], "%Y-%m-%d").date()
+                data["days_since_dexa"] = (datetime.now(timezone.utc).date() - _scan_dt).days
+        if meas and meas.get("waist_height_ratio") is not None:
+            data["waist_height_ratio"] = float(meas["waist_height_ratio"])
         return data
 
     elif expert_key == "explorer":
