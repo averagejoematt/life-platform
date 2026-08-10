@@ -193,7 +193,10 @@ def test_accessors_resolve_known_coach():
     # Route → persona resolution is registry data, never string surgery.
     assert persona_registry.persona_for_telegram_route("headcoach")[0] == "eli_marsh"
     assert persona_registry.persona_for_telegram_route("pattern")[0] == "pattern_coach"
-    assert persona_registry.persona_for_telegram_route("training") == (None, None)  # retired: no live route
+    # The retired seat's route survives as a SUCCESSION alias on the persona that
+    # absorbed the lane — the bot chat continues, under the new coach's name.
+    assert persona_registry.persona_for_telegram_route("training")[0] == "physical_coach"
+    assert persona_registry.persona_for_telegram_route("astrology") == (None, None)  # unclaimed: fails closed
 
 
 def test_lead_persona_nonoperational_with_distinct_voice():

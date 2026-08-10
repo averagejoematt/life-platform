@@ -377,6 +377,16 @@ COVERAGE = {
         "so no-invocation alarms would be noise at the send layer; the observatory proactivity card surfaces sent/graded "
         "counts, and a dead cron shows as a permanently-stale card. Revisit once nudges have a real send history.",
     ),
+    "telegram-coach-worker": (
+        EXEMPT,
+        "2026-08-09",
+        "The schedule is the weekday morning check-in (Act 1b), not a data path: the same function's PRIMARY traffic is "
+        "webhook-driven chat, so invocation counts cannot separate 'cron dead' from 'nobody texted'. The scheduled run is "
+        "designed to be a no-op most days — dark until the lead's bot is registered, skipped at the weekend, skipped after "
+        "two ignored check-ins, skipped at budget tier 2 — so an absence alarm would false-fire on four sanctioned states. "
+        "A missing good-morning is noticed by its one reader; error-mode is covered by the function's error + throttle "
+        "alarms. Revisit once the bot exists and the check-in has a real send history.",
+    ),
     "weekly-plate": (EXEMPT, "2026-07-19", "Operator email (weekly plate planning); a missing issue is noticed by its reader."),
     "weekly-signal": (EXEMPT, "2026-07-19", "Operator email (weekly signal summary); a missing Sunday issue is noticed by its reader."),
     "partner-weekly-email": (

@@ -87,12 +87,15 @@ BOTS = [
     ("board", "ajm_board_bot", "Grand Rounds"),
 ]
 
-# Retired seats keep their historical entry VISIBLE but are never configured:
-# the training route retired with Dr. Sarah Chen (2026-08-10, ADR-153). If the
-# owner previously created @ajm_training_bot, delete its webhook + revoke the
-# token via BotFather — an orphaned live webhook is attack surface.
-RETIRED_BOTS = [
-    ("training", "ajm_training_bot", "Dr. Sarah Chen (retired)"),
+# Succession routes: the SEAT retired, the CHAT did not. Dr. Sarah Chen retired
+# at the cycle-13 genesis (2026-08-10, ADR-153), but @ajm_training_bot is a
+# thread Matthew already has open — so the route now carries to the persona that
+# absorbed the lane (Dr. Max Reyes, `telegram_route_aliases` in
+# config/personas.json) instead of dead-ending at a silent rejection. Run
+# `python3 setup/setup_telegram_bots.py training` to push the /setname rename
+# through BotFather; the token stays live and is NOT revoked.
+ALIAS_BOTS = [
+    ("training", "ajm_training_bot", "Dr. Max Reyes"),
 ]
 
 # Coaches who keep running on the platform — daily cards, narratives, the board —
@@ -106,7 +109,7 @@ OPTIONAL_BOTS = [
     ("labs", "ajm_labs_bot", "Dr. James Okafor"),
 ]
 
-ALL_BOTS = BOTS + OPTIONAL_BOTS
+ALL_BOTS = BOTS + OPTIONAL_BOTS + ALIAS_BOTS
 KEYS = [b[0] for b in BOTS]
 ALL_KEYS = [b[0] for b in ALL_BOTS]
 

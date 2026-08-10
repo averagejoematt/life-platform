@@ -52,8 +52,14 @@ ROUTING = {
     "board": "board",
     "glucose": "glucose",  # consulting tier: routable only if ever created
     "labs": "labs",
-    # "training" removed 2026-08-10 (ADR-153): the seat retired; an unknown
-    # bot key fails CLOSED in gateway.resolve_coach, which is the point.
+    # "training" is a SUCCESSION route, not a live seat (ADR-153 amendment,
+    # 2026-08-10): Dr. Sarah Chen retired, but @ajm_training_bot is a chat
+    # Matthew already has open, and cycle-13 messages to it were dead-ending at a
+    # silent Rejected. The key routes to the persona that absorbed the lane
+    # (Dr. Max Reyes, via `telegram_route_aliases` in config/personas.json), so
+    # the thread continues with the coach who now holds it — one partition, one
+    # memory. An unknown bot key still fails CLOSED in gateway.resolve_coach.
+    "training": "training",
 }
 
 _secrets = None

@@ -234,8 +234,23 @@ def persona_for_telegram_route(route, s3_client=None, bucket=None):
 
     Chat-tier coaches broke the old ``f"{route}_coach"`` derivation (eli_marsh
     has no ``_coach`` suffix), so the route → persona mapping is registry data
-    (``telegram_route``), never string surgery."""
-    return _find("telegram_route", route, s3_client, bucket)
+    (``telegram_route``), never string surgery.
+
+    ``telegram_route_aliases`` carries the SUCCESSION cases: a Telegram chat is a
+    thread Matthew already has open, and a retired seat's bot is a conversation
+    with history, not a dead key. When a seat is absorbed rather than closed, the
+    absorbing persona claims the old route as an alias and his existing chat
+    simply continues with the coach who now holds that lane (ADR-153: `training`
+    → the Performance seat). The primary field stays single-valued and remains
+    the canonical route for outbound.
+    """
+    pid, p = _find("telegram_route", route, s3_client, bucket)
+    if pid:
+        return pid, p
+    for pid, p in personas(s3_client, bucket).items():
+        if route in (p.get("telegram_route_aliases") or []):
+            return pid, p
+    return None, None
 
 
 def tts_voice(persona_id, s3_client=None, bucket=None):
