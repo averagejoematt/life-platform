@@ -183,6 +183,8 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_restart_pipeline_hooks.py",
         # ── one-idiom ratchets: the fork is invisible until someone edits one copy ──
         "test_time_invariant_helpers_1964.py",  # the #2339 red that widened this whole list
+        "test_wallclock_globals_2223.py",  # 2026-08-10: #2472's own fix reddened main on this post-merge-only guard
+        "test_singleton_tombstone_guards.py",  # 2026-08-10: Wave-2 call sites + Wave-3 exemptions split across PRs = main red between them
         "test_wallclock_fixture_bombs_2376.py",  # #2376: dated fixture + unfrozen handler clock (the #2354 midnight red)
         "test_raw_key_registry_guard.py",  # #2286: no hand-built raw/ S3 keys
         "test_no_hardcoded_feature_tier.py",
