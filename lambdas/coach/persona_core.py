@@ -239,6 +239,13 @@ def texting_block(spec: dict) -> str:
         # 100% of those conversations AI). The board and the observatory never
         # face the question, which is why it rides here and not in voice_block.
         ("identity_stance", "Identity"),
+        # #2534 — when this coach stops. Measured: the two least-flagged coaches are
+        # the two whose specs already instruct stopping ("then quiet", "silence is a
+        # valid output"); the most-flagged instruct warmth and questions. Restraint
+        # is the dimension the roster was missing, and it is per-persona because a
+        # single shared sentence would fix the tone and leave the collapse untouched
+        # (the #2533 lesson).
+        ("restraint", "Restraint"),
     )
     bits = [f"- {label}: {_clip(style[key])}" for key, label in labels if style.get(key)]
     if not bits:
