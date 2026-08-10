@@ -359,6 +359,10 @@ _PK_RULES: list = [
     # it at a reset would make every coach a stranger each Monday. Evaluated
     # BEFORE the blanket COACH#* rule (first match wins).
     (lambda pk, sk: pk.startswith("COACH#") and sk.startswith("CHAT#"), CROSS_PHASE),
+    # #2487 rides this same rule ON PURPOSE: RELATIONSHIP#bits (the inside-
+    # references ledger) is a fact about the pair, not about the cycle it was
+    # born in. A reset re-anchors the EXPERIMENT; it does not un-say a shared
+    # joke, so a bit must survive one exactly as RELATIONSHIP#state does.
     (lambda pk, sk: pk.startswith("COACH#") and sk.startswith("RELATIONSHIP#"), CROSS_PHASE),
     # Telegram update_id dedupe rows: transport plumbing with a 24h self-TTL —
     # system state, never tagged, never wiped by a reset.
