@@ -1059,15 +1059,65 @@ class TestExTodoist:
         """Regression guard for #2245 in the other direction: a record carrying ONLY the
         dead `tasks_completed` name is not silently counted. No record in the live
         partition has carried that name since 2022 — reading it back would re-introduce
-        exactly the ambiguity the rename removed."""
+        exactly the ambiguity the rename removed. Neither record carries `completed_count`
+        at all, so #2332's absence semantics apply: `days` is 0 (nothing backed the
+        average) and `avg_per_day` is None, not a fabricated 0/2."""
         t = as_range("todoist", {"2026-08-02": {"tasks_completed": 5}, "2026-08-03": {"tasks_completed": 7}})
         out = wd.ex_todoist(t)
         assert out["tasks_completed"] == 0
+        assert out["avg_per_day"] is None
+        assert out["days"] == 0
+
+    def test_a_null_completed_count_is_excluded_not_zeroed(self):
+        """#2332: `completed_count: None` is absence (an explicit null write), same as a
+        missing key — it must not count as a measured zero in the denominator."""
+        t = as_range("todoist", {"2026-08-02": {"completed_count": None}, "2026-08-03": {"completed_count": 4}})
+        out = wd.ex_todoist(t)
+        assert out["tasks_completed"] == 4
+        assert out["avg_per_day"] == 4.0  # over the 1 reporting day, not 2.0 (4/2)
+        assert out["days"] == 1
+
+    def test_a_mixed_week_averages_over_reporting_days_only(self):
+        """#2332: the bug this issue names. A week with a genuine ingestion gap (no
+        `completed_count` key at all, not even a 0) used to fold that day in as a measured
+        zero and drag avg_per_day down. 5 + 7 over 2 REPORTING days is 6.0, not 12/3 = 4.0."""
+        t = as_range(
+            "todoist",
+            {
+                "2026-08-02": {"completed_count": 5},
+                "2026-08-03": {"completed_count": 7},
+                "2026-08-04": {},  # ingestion gap — no completed_count field at all
+            },
+        )
+        out = wd.ex_todoist(t)
+        assert out["tasks_completed"] == 12
+        assert out["avg_per_day"] == 6.0
         assert out["days"] == 2
 
-    def test_a_null_completed_count_is_treated_as_zero_not_a_crash(self):
-        t = as_range("todoist", {"2026-08-02": {"completed_count": None}, "2026-08-03": {"completed_count": 4}})
-        assert wd.ex_todoist(t)["tasks_completed"] == 4
+    def test_a_week_with_no_counts_at_all_is_absence_not_zero(self):
+        """#2332 acceptance: a week where every record exists but none carry
+        `completed_count` yields absence (None) for the average, not a fabricated 0."""
+        t = as_range("todoist", {"2026-08-02": {}, "2026-08-03": {}})
+        out = wd.ex_todoist(t)
+        assert out["avg_per_day"] is None
+        assert out["days"] == 0
+
+    def test_mutation_proof_restoring_the_or_0_coercion_reds_this_test(self):
+        """#2332 mutation proof: if `ex_todoist` reverts to
+        `int(r.get("completed_count", 0) or 0)` for every record instead of filtering
+        absent ones out first, the ingestion gap in the mixed week folds in as a measured
+        zero and this assertion catches it: 12/3 = 4.0, not the honest 12/2 = 6.0."""
+        t = as_range(
+            "todoist",
+            {
+                "2026-08-02": {"completed_count": 5},
+                "2026-08-03": {"completed_count": 7},
+                "2026-08-04": {},
+            },
+        )
+        out = wd.ex_todoist(t)
+        assert out["avg_per_day"] != 4.0
+        assert out["avg_per_day"] == 6.0
 
     def test_the_rendered_row_and_its_delta_carry_the_real_count(self):
         """End-to-end over the real extractor: raw records → ex_todoist → build_html.
