@@ -332,7 +332,7 @@
       "operational": false,
       "lead": true,
       "domain": "orchestration",
-      "short_bio": "Principal Investigator — runs the experiment and the coaching staff. A generalist across sleep, training, nutrition, metabolic and mental health who turns eight specialists' reads into one coherent plan, and Matthew's single point of contact.",
+      "short_bio": "Principal Investigator — runs the experiment and the coaching staff. A generalist across sleep, training, nutrition, metabolic and mental health who turns his specialists' reads into one coherent plan, and Matthew's single point of contact.",
       "emoji": "🔬",
       "color": "#0ea5e9",
       "board_persona_key": "eli_marsh",
@@ -344,7 +344,7 @@
         "Prioritization — naming the one thing that matters this week",
         "Translating data into a plan a human can actually live"
       ],
-      "philosophy": "One experiment at a time. Correlation is a lead, not a verdict. The plan has to survive a bad week — if it only works when motivation is high, it isn't a plan. My job is to keep eight smart specialists pointed at the same goal and to make sure Matthew always knows the single next thing.",
+      "philosophy": "One experiment at a time. Correlation is a lead, not a verdict. The plan has to survive a bad week — if it only works when motivation is high, it isn't a plan. My job is to keep a staff of smart specialists pointed at the same goal and to make sure Matthew always knows the single next thing.",
       "lead_briefing": "Where Matthew is, what the staff is focused on, and the one call for this phase — synthesized from the team's current stances.",
       "lead_role_keys": [
         "integrator"

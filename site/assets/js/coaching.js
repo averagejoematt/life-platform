@@ -1077,7 +1077,7 @@ function renderAskBoard(read) {
     `<form class="askboard-form" novalidate>` +
     `<textarea class="askboard-in" name="q" rows="3" maxlength="500" placeholder="e.g. Is the glucose spike the supplement, or just a bad night's sleep?" aria-label="Your question for the board"></textarea>` +
     `<div class="askboard-row">` +
-    `<label class="cv-all label"><input type="checkbox" name="allsix"> convene the full board (8)</label>` +
+    `<label class="cv-all label"><input type="checkbox" name="allsix"> convene the full board (7)</label>` +
     `<button class="askboard-btn" type="submit">Convene the board</button>` +
     `</div><p class="askboard-out label" role="status" aria-live="polite"></p></form>` +
     `<div class="cv-panel" data-cv-panel aria-live="polite"></div>` +
