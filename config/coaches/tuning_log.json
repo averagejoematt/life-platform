@@ -248,6 +248,15 @@
       "rationale": "Answering a \"thanks\" with a fresh paragraph is the tell that nobody is there; a real person taps a reaction and lets the thread close. No shared default exists at the end of the resolution chain, because one would make every coach react identically and erase the per-coach posture. Telegram permits only a fixed reaction set, so persona config is validated against it rather than trusted — physical's \\ud83d\\udcaa and explorer's \\ud83d\\udcc9/\\ud83d\\udcc8 are not on that list, which is why physical needed an explicit reaction emoji and explorer deliberately gets none (ADR-104: no configured mark, no reaction).",
       "ref": "#2485 (epic #2363)",
       "observed_effect": null
+    },
+    {
+      "date": "2026-08-10",
+      "coach": "all",
+      "change_type": "prompt",
+      "summary": "Open-loop keeping (#2486/#2491): two new unsolicited frames — PROMISE_FRAME (a coach keeps a follow-up it named in a text, on the day it named) and PRE_EVENT_FRAME (the morning of a hard thing Matthew told that coach about). Both ride the existing event_frame lookup, the existing daily cap, quiet hours, silence-respect and write-once event claim; the only evidence either frame carries is the verbatim sentence, re-read from the stored CHAT# turn.",
+      "rationale": "A coach that says 'I'll check in Friday' and then never does is worse for trust than one that never offered. The extraction is deterministic and refuses more than it accepts (an offer, a question, a hedge, or a sentence with no resolvable day produces nothing) because the alternative — inferring an intent — is exactly the ADR-104 fabrication this surface cannot afford in a trusted voice. No derived row is written: the CHAT# turn IS the record, so the follow-up quotes what was actually said and the chat path stays the only writer of that partition.",
+      "ref": "#2486 (also delivers #2491); epic #2363",
+      "observed_effect": null
     }
   ]
 }

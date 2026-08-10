@@ -14,6 +14,19 @@ Three triggers, one per acceptance bullet on #2490:
   * **recovery slide** (soft concern) — three consecutive days below HIS OWN p25
     recovery band.
 
+Two more triggers joined for #2486/#2491, and they are a different species — the
+CONVERSATION starts them, not the data:
+
+  * **promise** (kept word) — a coach said "I'll check in Friday" in a text, and it
+    is Friday.
+  * **pre-event** (support) — Matthew said he had a hard thing on a named day, and
+    that day is this morning.
+
+Both are extracted deterministically from the stored ``CHAT#`` turns by
+``coach_open_loops`` (which also carries the partition decision: there is no derived
+row — the turn he was sent IS the record). They enter here as ordinary candidates,
+claim the same write-once event ledger, and spend the same two daily slots.
+
 The rules the design is actually made of:
 
 * **Thresholds come from personal variance, never from a round number**
@@ -87,6 +100,10 @@ EVENT_FRESH_DAYS = 2
 KIND_LIFT_PR = "lift_pr"
 KIND_MILESTONE = "milestone"
 KIND_RECOVERY_SLIDE = "recovery_slide"
+# #2486/#2491: the fourth and fifth triggers — the ones a CONVERSATION started rather
+# than the data. Same candidate shape, same claim, same sweep.
+KIND_PROMISE = "promise"
+KIND_PRE_EVENT = "pre_event"
 
 # ── Who owns the lane ─────────────────────────────────────────────────────────
 # The ping comes from the DOMAIN-OWNING coach (the #2490 acceptance bullet), and
@@ -351,6 +368,43 @@ def detect_recovery_slide(recovery: dict, today: str) -> Optional[dict]:
     )
 
 
+# ── Triggers 4 + 5: the open loops a conversation opened (#2486/#2491) ────────
+
+
+def detect_open_loops(loops: list, today: str) -> list:
+    """Every promise/pre-event that comes due today — one candidate each.
+
+    The only detector here that returns a LIST, because the other three answer "what
+    is the single most notable thing in this signal family" while this one answers
+    "which obligations are due", and two coaches can owe him something on the same
+    morning. The sweep still sends at most one text; what a list buys is that a
+    promise the sweep cannot send (a dark bot, a held generation) does not silently
+    swallow an unrelated one.
+
+    Ordering inside the family is by DUE DATE, oldest first: the loop that has been
+    open longest is the one most in danger of being the promise that never landed.
+    Nothing is inferred — ``coach_open_loops`` has already refused every sentence it
+    could not resolve to a day, so a loop reaching here is one he was actually told.
+    """
+    from coach import coach_open_loops
+
+    events = []
+    for loop in sorted(loops or [], key=lambda ln: (str((ln or {}).get("due") or ""), str((ln or {}).get("loop_id") or ""))):
+        if not coach_open_loops.is_due(loop, today):
+            continue
+        promise = loop.get("kind") == coach_open_loops.KIND_PROMISE
+        ev = _event(
+            kind=KIND_PROMISE if promise else KIND_PRE_EVENT,
+            event_id=f"open_loop#{loop.get('loop_id')}",
+            provenance=coach_outbound.PROVENANCE_PROMISE if promise else coach_outbound.PROVENANCE_PRE_EVENT,
+            persona_id=str(loop.get("persona_id") or ""),
+            evidence=coach_open_loops.evidence_lines(loop, today),
+        )
+        if ev:
+            events.append(ev)
+    return events
+
+
 # ── Candidates ────────────────────────────────────────────────────────────────
 
 
@@ -384,6 +438,7 @@ def candidates(signals: dict, today: str) -> list:
     """
     found = []
     for detector, arg in (
+        (detect_open_loops, (signals or {}).get("open_loops") or []),
         (detect_recovery_slide, (signals or {}).get("recovery") or {}),
         (detect_lift_pr, (signals or {}).get("lift_bests") or {}),
         (detect_milestone, (signals or {}).get("milestones") or []),
@@ -394,7 +449,8 @@ def candidates(signals: dict, today: str) -> list:
             logger.warning("[event-triggers] %s failed: %s", detector.__name__, e)
             ev = None
         if ev:
-            found.append(ev)
+            # A detector answers with one event or, for the open-loop family, several.
+            found.extend(ev if isinstance(ev, list) else [ev])
     return sorted(found, key=lambda e: coach_outbound.priority(e["provenance"]))
 
 
@@ -447,6 +503,16 @@ def gather_signals(table, today: str) -> dict:
         signals["milestones"] = read_announced_events(table, "USER#matthew")
     except Exception as e:
         logger.warning("[event-triggers] milestone ledger read failed: %s", e)
+
+    # #2486/#2491: the conversation itself is a signal family. Read, never written —
+    # the stored CHAT# turn IS the record of the promise, so there is no derived row
+    # to keep in sync and no second writer on a partition the chat path owns.
+    try:
+        from coach import coach_open_loops
+
+        signals["open_loops"] = coach_open_loops.gather_open_loops(table, today)
+    except Exception as e:
+        logger.warning("[event-triggers] open-loop read failed: %s", e)
 
     return signals
 

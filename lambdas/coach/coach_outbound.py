@@ -96,6 +96,21 @@ CELEBRATION_FRAME = (
     "write that sentence.]\n\nWhat happened:\n{evidence}"
 )
 
+PROMISE_FRAME = (
+    "[You told Matthew you would come back to him, and today is the day you named. There is no inbound message — "
+    "he has not texted you; you are keeping your word. Send ONE short text that simply DOES the thing you said you "
+    "would do — pick the thread back up where you left it. Do not announce that you are keeping a promise, do not "
+    "apologise for the gap, do not recap the conversation, and do not open with an apology or a preamble. Use ONLY "
+    "the evidence below.]\n\nWhat you said:\n{evidence}"
+)
+
+PRE_EVENT_FRAME = (
+    "[Matthew told you he has a hard thing today, and this is the morning of it. There is no inbound message — he "
+    "has not texted you; you are opening this thread yourself. Send ONE short text that shows you remembered: name "
+    "the thing once, plainly, and say the human thing. No advice, no protocol, no list, no plan, no question at the "
+    "end, and never invent a detail he did not give you. Use ONLY the evidence below.]\n\nWhat he told you:\n{evidence}"
+)
+
 CONCERN_FRAME = (
     "[Something in the data has been sliding for a few days and it is YOUR lane. There is no inbound message — "
     "Matthew has not texted you; you are opening this thread yourself. Send ONE short text that checks in like a "
@@ -137,6 +152,11 @@ LOWEST_PRIORITY = max(OUTBOUND_PRIORITY.values()) + 1
 EVENT_FRAMES = {
     PROVENANCE_CELEBRATION: CELEBRATION_FRAME,
     PROVENANCE_CONCERN: CONCERN_FRAME,
+    # #2486/#2491: the two open-loop classes. They ride the SAME frame lookup as the
+    # data-triggered pings — an unsolicited text is an unsolicited text, whatever
+    # opened the loop — so nothing downstream needs a new branch to send one.
+    PROVENANCE_PROMISE: PROMISE_FRAME,
+    PROVENANCE_PRE_EVENT: PRE_EVENT_FRAME,
 }
 
 # How much of the referring conversation the referred coach is shown.
