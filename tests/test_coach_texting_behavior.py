@@ -578,3 +578,62 @@ def test_worker_colleagues_block_names_and_pronouns():
     assert "Dr. Lisa Park" not in block  # never lists the coach to themself
     assert "Dr. Amara Patel (she/her)" in block  # consulting tier is citable by name
     assert "Dr. Sarah Chen" not in block  # retired seats are not colleagues to cite
+
+
+# ── The inbound message is evidence (live regression, 2026-08-10) ─────────────
+
+
+def test_the_inbound_message_reaches_the_grounder_on_the_path_that_carries_his_words():
+    """A number Matthew states in his own message must be quotable back to him.
+
+    The live failure: he texted "...just doing a 2.5 mile walk outside instead",
+    the reply held TWICE on `fabricated_number`, and he got the deferral string.
+    `_assemble` runs BEFORE the turn, so `a["thread"]` holds only PRIOR turns —
+    the current message reached the MODEL (`inbound=text`) but not the GATE, so
+    the coach could not acknowledge anything he had just said that carried a
+    number.
+
+    Pinned at the call site, not on the gate: `build_grounder` was always capable
+    of widening on an extra source, and a gate-level test passes with the bug
+    still in place. The defect was the wiring.
+
+    Deliberately NOT a blanket rule over every `run_turn` — the other two callers
+    are correct as they stand: `_maybe_refer` passes its conversation `tail`, and
+    `_morning_checkin`'s frame is a static constant with no numbers in it. This
+    pins the one path whose `inbound` is Matthew's own text.
+    """
+    import ast
+    import os
+
+    path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "lambdas",
+        "coach",
+        "telegram_worker_lambda.py",
+    )
+    tree = ast.parse(open(path, encoding="utf-8").read())
+
+    checked = 0
+    for fn in ast.walk(tree):
+        if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        for node in ast.walk(fn):
+            if not (isinstance(node, ast.Call) and getattr(node.func, "attr", "") == "run_turn"):
+                continue
+            kw = {k.arg: k.value for k in node.keywords}
+            inbound = kw.get("inbound")
+            grounder = kw.get("grounder")
+            if inbound is None or grounder is None:
+                continue
+            # Only the path whose inbound is the raw user message.
+            if not (isinstance(inbound, ast.Name) and inbound.id == "text"):
+                continue
+            checked += 1
+            sources = {ast.unparse(arg) for arg in grounder.args}
+            assert "text" in sources, (
+                f"{fn.name}: run_turn gets inbound=text but its grounder is "
+                f"{ast.unparse(grounder)} — the message he just sent must be an "
+                f"evidence source, or every number he states reads as fabricated"
+            )
+
+    assert checked == 1, f"expected exactly one inbound=text run_turn call site, found {checked}"
