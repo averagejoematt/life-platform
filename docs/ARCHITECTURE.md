@@ -428,7 +428,7 @@ Target: within the **$85/mo all-in budget ceiling** (ADR-063; surge-to-$100 per 
 | DynamoDB (on-demand) | ~$1.00 |
 | S3 (~2.5 GB + requests) | ~$0.50 |
 | CloudFront (4 distributions) | ~$1.50 |
-| CloudWatch (~86 alarms + logs) | ~$4-5 |
+| CloudWatch (~97 alarms + logs) | ~$4-5 |
 | Bedrock — Claude Sonnet/Haiku via `bedrock_client.py`, prompt-cached (ADR-062/049); the dominant driver, governed by `cost_governor` tiering | ~$60-65 |
 | **Total** | **~$78-82** |
 
