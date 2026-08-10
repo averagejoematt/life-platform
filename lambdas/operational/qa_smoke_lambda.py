@@ -605,46 +605,15 @@ def check_hero_weight_arithmetic():
 
 
 # ---------------------------------------------------------------------------
-# CHECK 10a2 — cross-surface as_of agreement (#2414, completing #2392)
+# CHECK 10a2 — cross-surface as_of agreement (#2414 clock, #2379 served data)
 # ---------------------------------------------------------------------------
-# No reader payload may stamp a document day AHEAD of the PT-expected day —
-# the runtime sensor for the one-Pacific-frame invariant the premerge AST guard
-# (tests/test_pacific_today_guard_2414.py) enforces in code. Judging is pure
-# (operational/as_of_agreement_qa); this block only fetches and wraps.
-
-_AS_OF_ENDPOINTS = (
-    "/api/vitals",
-    "/api/observatory_week?domain=sleep",  # #2392's original defect site
-    "/api/habit_streaks",
-    "/api/vice_streaks",
-    "/api/journey",
-)
-
-
-def check_as_of_agreement():
-    from operational import as_of_agreement_qa
-
-    pt_today = pt_now().strftime("%Y-%m-%d")
-    checks_out, total_stamps = [], 0
-    for ep in _AS_OF_ENDPOINTS:
-        label = ep.split("?")[0].rsplit("/", 1)[-1]
-        check = Check(f"as_of:{label}", "Reader Truth", CONTENT_TRUTH)
-        try:
-            req = urllib.request.Request(SITE_BASE_URL + ep, headers={"User-Agent": "life-platform-qa-smoke"})
-            with urllib.request.urlopen(req, timeout=15) as r:
-                payload = json.loads(r.read().decode("utf-8", "replace"))
-        except Exception as e:
-            # Fail-soft: a fetch/parse blip must never red the nightly.
-            checks_out.append(check.warn(f"{ep} fetch failed (fail-soft): {str(e)[:120]}"))
-            continue
-        verdict = as_of_agreement_qa.assess_as_of(payload, pt_today)
-        total_stamps += verdict["stamps"]
-        if verdict["violations"]:
-            checks_out.append(check.fail(f"{ep}: " + "; ".join(verdict["violations"][:5])))
-        else:
-            checks_out.append(check.ok(f"{ep}: {verdict['stamps']} day-stamp(s) <= PT day {pt_today}"))
-    return checks_out
-
+# Two deterministic assertions over one fetched payload: the document day-stamp
+# may never run AHEAD of the PT-expected day (#2414), and it may never run more
+# than a week ahead of the newest day the same document actually serves (#2379).
+# Lives in operational/qa_check_as_of.py (the module-size ceiling split idiom,
+# #1665/#1944); re-exported here so qa_smoke_lambda.check_as_of_agreement stays
+# a valid public entrypoint for tests and callers.
+from operational.qa_check_as_of import check_as_of_agreement  # noqa: F401,E402
 
 # ---------------------------------------------------------------------------
 # CHECK 10b — Coach labs truth (#1993)
@@ -1011,7 +980,8 @@ def check_steps():
         ("reader_truth", check_reader_truth),  # #1096: phase-aware narrative truth (Haiku, budget-aware, fail-soft)
         ("predict_week_freshness", check_predict_week_freshness),  # #1198: predict-the-week never live on a stale ISO week
         ("hero_weight_arithmetic", check_hero_weight_arithmetic),  # #1225: home hero stat row reconciles + trend-honest
-        ("as_of_agreement", check_as_of_agreement),  # #2414: no reader day-stamp runs AHEAD of the PT-expected day
+        # #2414: no reader day-stamp runs AHEAD of the PT-expected day. #2379: and none runs ahead of the data it serves.
+        ("as_of_agreement", check_as_of_agreement),
         ("coach_labs_truth", check_coach_labs_truth),  # #1993: no served coach text may narrate an empty labs store
         # #1972: chronicle/podcast lists must carry a next-date OR an honest-pending line, never neither
         ("content_cadence", check_content_cadence),
