@@ -177,13 +177,28 @@ TOOLS = {
         "fn": tool_find_days,
         "schema": {
             "name": "find_days",
-            "description": "Find days within a date range where numeric fields meet filter conditions. For Strava, use field names: 'total_distance_miles', 'total_elevation_gain_feet'. For Whoop: 'hrv', 'recovery_score', 'strain'. Great for correlations. IMPORTANT: This tool operates on day-level aggregates only — it cannot search inside individual activity names or sport types. For any query involving specific activity names, first/longest/highest achievements, named events, or sport-type filtering, you MUST use search_activities instead.",
+            "description": "Find days within a date range where numeric fields meet filter conditions. For Strava, use field names: 'total_distance_miles', 'total_elevation_gain_feet'. For Whoop: 'hrv', 'recovery_score', 'strain'. Great for correlations. IMPORTANT: This tool operates on day-level aggregates only — it cannot search inside individual activity names or sport types. For any query involving specific activity names, first/longest/highest achievements, named events, or sport-type filtering, you MUST use search_activities instead. mode='similar' (#2351) answers 'the days most like this one': ranks the window's days by RMS z-distance to target_date over a feature vector (deterministic arithmetic, no AI), reports each match's similarity plus a what-happened-next distribution with its n, and honestly returns no matches when nothing is within the similarity floor.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "source": {"type": "string", "description": f"Data source. Valid: {SOURCES}"},
                     "start_date": {"type": "string", "description": "Start date YYYY-MM-DD."},
                     "end_date": {"type": "string", "description": "End date YYYY-MM-DD."},
+                    "mode": {
+                        "type": "string",
+                        "enum": ["filter", "similar"],
+                        "description": "Default 'filter' (threshold conditions). 'similar' = nearest-neighbour day retrieval around target_date.",
+                    },
+                    "target_date": {
+                        "type": "string",
+                        "description": "[similar] Anchor day YYYY-MM-DD to find analogs of (e.g. today). Required for mode='similar'.",
+                    },
+                    "features": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "[similar] Numeric day-level fields forming the vector. Default for whoop: recovery_score, hrv, resting_heart_rate, strain, sleep_duration_hours. Required for other sources.",
+                    },
+                    "k": {"type": "number", "description": "[similar] Max matches to return (default 5, cap 20)."},
                     "filters": {
                         "type": "array",
                         "description": "List of field filter conditions.",
