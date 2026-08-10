@@ -2449,6 +2449,33 @@
       "why_it_mattered": "The whole premise of this site is that the numbers can't lie by construction — and a pre-start countdown is the adversarial case: every surface is built to show live data, and for one day the honest answer everywhere is 'nothing yet.' The reset's three verification gates (a token sweep of all 96 pages, a semantic pass, and an AI reader-truth reviewer) each caught a different piece of that, which is exactly what layered gates are for. The fixes are durable: the pre-start wording now derives from the phase instead of assuming the experiment is running, so the next future-genesis reset inherits a site that tells the truth on day zero.",
       "gotcha": "The AI truth reviewer flagged the site's own honesty machinery as lying: the '··' placeholder glyph — the deliberate mark for 'no data exists' — read to the model as an implied claim that data was coming from somewhere. Four high-severity findings, all against designed behavior. The fix wasn't to soften the reviewer but to state the allowance explicitly in its rubric: a tile reading '··' DECLARES absence, and habitual-present design copy ('starts at the Day-1 weigh-in') is correct in every phase. Same pattern as the last rubric growth: only after repeated verified-false findings, stated as a general principle.",
       "honest_miss": "Three unit tests went red on main purely because the calendar moved — fixtures that hardcoded dates which were post-genesis last week and pre-genesis this week. They were each pinned to the constant's seams the same evening, but main spent about an hour red on wall-clock assumptions the test suite had been silently carrying for cycles. And the concurrent fleet deploy raced the reset pipeline's own deploy hard enough to fail one function's update — same code on both paths, so nothing shipped stale, but the run read red and had to be superseded."
+    },
+    {
+      "id": "2026-08-10-coaches-get-souls",
+      "date": "2026-08-10",
+      "title": "The coaches learned to text like people — and the roster grew up",
+      "shipped": "Every coach you can text now has a real character under the hood: a shared behavioural standard, a durable personality with signature phrases and blind spots, a texting register that sends short bursts instead of reports, human-style emoji restraint enforced by code, a long memory that survives past the last dozen messages, and their own domain numbers (the nutrition coach finally knows the calorie target — computed exactly the way the site computes it). The staff also restructured: the Performance seat absorbed training under one coach, Dr. Max Reyes; Dr. Sarah Chen retired with her published record intact; a Pattern Detective and a Career coach joined; and every page, email, and prompt now derives the cast from one registry instead of a dozen hand-copied lists. First live QA the same evening caught three robotic tells — stats recaps opening every reply, cold re-answers, the date announced as a message — and the fix (conversation rules plus a staff roster with real names and pronouns) shipped before the night ended.",
+      "why_it_mattered": "The first live conversations exposed coaches that didn't know their own names — the persona layer never loaded, and even at its best it produced report-prose with no memory of yesterday. A coaching product you text has exactly one bar: it has to feel like a person who knows you. Splitting one training domain across two coaches also meant split memory and split accountability; the merge puts one name on the mandate. And the registry work means a rename or retirement is now a config change, not a dozen-file hunt — which is what made this restructure shippable in one night.",
+      "gotcha": "Genesis midnight set off two independent test time-bombs within the hour: fixtures that computed 'today' in UTC while the product thinks in Pacific, and a fix for the first bomb that itself sampled the clock at import time and tripped a different guard after merge. Meanwhile, two failures that looked caused by this work weren't: a render gate red that a previous day's PR had planted (it never ran the gate), and an accessibility failure from a badge style that only produced its first live render at the genesis flip. The night's rule: before fixing a 'regression' on your branch, run the failing gate against clean main.",
+      "honest_miss": "The wipe that runs at experiment resets would have deleted the chat history the design says must survive them — the registry said 'cross-phase' while the wipe walked partitions blind; the dry-run caught it and it's fixed, but it shipped broken for a night. Three new bots (head coach, Pattern Detective, Career) exist as characters but not yet as contacts — bot creation is owner-gated. And the coaches' new S3 config reads still run on the bundled fallback until an IAM deploy that's also owner-gated, which additionally strands the CI deploy pipeline behind its IAM-review gate.",
+      "prs": [
+        {
+          "label": "PR #2470",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2470"
+        },
+        {
+          "label": "PR #2471",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2471"
+        },
+        {
+          "label": "PR #2474",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2474"
+        },
+        {
+          "label": "PR #2478",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2478"
+        }
+      ]
     }
   ]
 }

@@ -1,104 +1,43 @@
-# HANDOVER — The cycle-13 reset: genesis moved to Monday 2026-08-10, the first truth-gated FUTURE genesis — 2026-08-09 ~20:45Z → ~23:0xZ
+# HANDOVER — Coaching-team v2: the big-bang overnight (bugs → souls → roster → site) — 2026-08-09 ~23:40Z → 2026-08-10 ~02:5xZ
 
-> Instruction thread: *Matthew, directly: "can you run the reset so the experiment starts
-> Monday August 10th please" — the #2465 runbook (dry-run-verified overnight for genesis
-> 08-09) executed with the genesis moved one day forward, which turned the same-day reset
-> the runbook assumed into a countdown-day reset and surfaced a whole class of pre-start
-> honesty work. Then the owner asked for this wrap.*
+> Instruction thread: *the plan file `~/.claude/plans/abstract-cuddling-neumann.md` (all owner decisions pre-resolved 2026-08-09): "Continue the coaching-team v2 big-bang session… Merge PR #2470 when green, then execute Waves 2–5 through the night."* Mid-session, Matthew woke and ran live QA with screenshots — his findings became the ninth PR.
 
-## What shipped (all direct to `main` — owner-authorized reset ops, no PRs)
+**The one-line outcome:** all five waves executed in one night and the felt change is LIVE — coaches that text like people (souls, ≤3-bubble bursts, enforced emoji restraint, domain numbers, long memory, conversation continuity) on a restructured roster (ADR-153), shipped via the sanctioned direct-script path while CI deploys sit IAM-stranded pending the owner cdk window.
 
-- **`fde52829`** — the reset itself: `restart_pipeline.py --genesis 2026-08-10
-  --keep-chronicle DATE#2026-08-02 --override-weight-lbs 321.6 --apply` (override
-  mandatory: no weigh-in can exist for a future genesis) + the first three countdown-day
-  fixes: the new `deploy/vet_plan_on_record_leadin.py` (date-agnostic vet of the carried
-  lead-in's opening — "This morning — August 3, 2026 —" tripped the rendered gate via the
-  posts.json excerpt; backup-first/exactly-once/idempotent per the existing vet-script
-  discipline), the `/api/vitals` window_disclosure pre-start branch ("The cycle begins…",
-  not "Day 0 of the cycle that began <future>"), and the Home h2 phase-neutral copy
-  ("every number lands in public" — "it's running now" was false pre-start).
-- **`c056dab9`** — `docs/engines/CHARACTER.md` cycle-13 re-verify (baseline block only;
-  the engine-doc drift gate had correctly redded Docs CI).
-- **`1e6dd794`** — cycle-13 prereg **seeded**: 16 coach PREDICTION# + 2 HYPOTHESIS#
-  frozen + stamped (sha `c380329e…`), cycle-12 pair archived by the
-  `genesis_preregistration_<date>_cycle<N>` convention (heals the `test_prereg_seal_1980`
-  family); **the reader-truth rubric grew two DO-NOT-flag clauses** (the "··"
-  honest-absence glyph, ADR-104, and habitual-present design copy — the grader had raised
-  FOUR verified-false highs against the designed #931/#939 pre-start state; the #1917
-  rubric-growth pattern, truncation-test overhead allowance 4000→5000).
-- **`076d348b`** — the three genesis-seam test fixes (character-sheet phase tag,
-  qa_check grace fixtures, fulfillment trend window): each pinned genesis-relative
-  fixtures and redded main on the calendar; genesis seams (import-time module copies AND
-  call-time constants reads) now pinned explicitly.
-- **Issue #2468 filed** — four stacks carry Lambda config drift CI's code-deploy cannot
-  ship (the Plan warnings); owner-run `cdk deploy`, gate:owner, Now.
+## Merged (9 PRs, all green at merge)
+- **#2470** Wave 1 transport truths (+ its 2 structural-gate fixes: `pacific_now` canonicalization, role_policies baseline 3275→3291).
+- **#2471** Wave 2 character layer: MOS shared substrate (`_shared_standard.json` → `persona_core.shared_block`), 5 bible transplants, texting registers, burst mechanics (≤3 bubbles, fail-soft parse), deterministic emoji ceiling (≤1/reply, end-position, never consecutive — enforced in `coach_chat` BEFORE the grounding gate so the gate adjudicates exactly what sends), lazy `CHAT#summary` long memory (no cron), per-coach domain fact packs (nutrition = the site's exact ADR-152 assembly, parity-pinned), shared banned-phrase floor in the quality gate. 43 new tests.
+- **#2472 + #2473** two INDEPENDENT genesis-midnight wall-clock bombs that reddened main (pre-existing, not this work): UTC-today fixtures vs Pacific handlers, then the first fix's own module-level `_NOW` tripping the #2223 guard post-merge. Fixture days are now call-time helpers.
+- **#2474** Wave 3 roster (ADR-153): tiers — operational **7** (training_coach RETIRED byline-preserving; physical renamed **Dr. Max Reyes**, absorbs training/cardio/mobility) · chat (**Dr. Nora Vale** `pattern_coach`, **Steve Brooks** `career_coach`, `eli_marsh`) · consulting (glucose/labs). ~12 surfaces de-hardcoded onto `persona_registry` (`short_id_names`/`display_map`/`persona_for_telegram_route`; `title`/`lens` registry data). CHAT#/CHAT#summary#/RELATIONSHIP# CROSS_PHASE + DEDUPE# SYSTEM_STATE (owner reset-proofing). Telegram routing is registry data; the training route fails closed.
+- **#2476** genesis-fallout pair: carried-badge AA contrast (first live render at the genesis flip failed axe on the roster merge's site deploy → auto-rollback) + **the wipe consults `phase_taxonomy.classify()` per row inside COACH#*** — the dry-run had Matthew's real go-live chats in the would-tombstone surface (guard-the-set, caught before any reset ran it; 232→209 rows, zero chat keys).
+- **#2475** Wave 4 site/docs regen (registry-hydrated surfaces barely move; BOARDS.md refreshed off the dead pre-CC-00 id list).
+- **#2477** premerge lane learns tonight's two post-merge-only reds (wallclock-globals + tombstone guards; lane 6,891 passed).
+- **#2478** conversation continuity — Matthew's LIVE QA found three robotic tells (stats-recap openers, cold re-answers after "hey", the CURRENT MOMENT line parroted as a bubble; Park called Reeves "her"): CONVERSATION RULES in the system prompt + pronouns in personas.json + a YOUR COLLEAGUES roster block threaded through `run_turn`.
 
-## Verified
+## Deployed (direct scripts from a main-pinned worktree; every deploy sha-verified by the ancestry postflight)
+S3: personas.json + all non-stance coach specs + substrate + catalogs. Fleet: site-api (`deploy_site_api.sh`) + 19 roster-affected functions + MCP + telegram worker/webhook (worker last at `dbfd0847` with the continuity fix, 02:18Z — `verify_deployed_symbol.sh` confirms `_colleagues_block` + the conversation rules in the live bundle). Live checks: `/api/coaches` serves Eli(lead)+7 with Dr. Max Reyes; telegram log groups clean; #2476's site deploy passed the full gate sweep (smoke + visual-QA).
 
-- Pipeline gates GREEN on the re-run + standalone passes: **rendered 96/96** (0 forbidden
-  tokens), **semantic 8/8**, **truth clean at 1d pre-start** (8 surfaces), post-verify
-  hook (`fix_prologue_cycle_and_subscribe_ttl`) run clean. Carried lead-in carries
-  `redated_from_sk` + cycle=13.
-- Live: `/api/journey` `pre_start: true, days_until_start: 1, start_date: 2026-08-10`;
-  `/api/vitals` disclosure reads the pre-start line; posts.json excerpt date-agnostic;
-  Home shows the new h2. site-api, qa-smoke, traffic-digest hand-deployed with ancestry
-  postflight `deployed sha == 076d348b`; the fleet deployed via run 31337080891 (103/104)
-  + the pipeline's own stack deploys.
-- **Main: green (`076d348b`)** — CI/CD, Docs CI, CodeQL, wedge watch all success; the
-  exhaustive unit suite fully green (ahead of the Tuesday wall-clock self-heal it would
-  otherwise have waited on).
+## Gotchas (novel this session — durable copies in memory)
+- **R8-ST6 end-to-end:** #2470's IAM merge reds EVERY main Plan job → all CI deploys stranded until the owner's Serve cdk deploy; the sanctioned bridge is the direct deploy scripts. cdk_only functions (inter-coach-dialogue, voice-fidelity, coach-panel-podcast) still run OLD 8-coach roster constants until then — inter-coach-dialogue's Sun 18:00 UTC run may write one training_coach dispute row (harmless, self-heals post-cdk).
+- **Data-driven dark states** (new memory `reference_data_driven_dark_states`): the challenges render-gate red was planted by #2451 a day earlier (fixture trimmed below the gate's 3-annotated contract; the gate never ran on that PR); the carried-badge axe failure shipped weeks ago but first RENDERED at genesis; a CI-pass/local-fail on the coaching hub was pure UTC-vs-PT calendar-date divergence.
+- The lead page's public contract pins `voice: null` for eli_marsh — his chat-tier spec must NOT be linked via `coach_config_key`/`voice_spec_ref` (the worker loads it by persona id directly).
+- zsh doesn't word-split unquoted vars — a `set -- $pair` deploy loop no-op'd; use `while read -r`. Local black 25.9.0 vs the 26.3.1 pin lies both ways; prefix the pinned venv onto PATH for the pre-commit hook.
 
-## Gotchas hit (durable copies in memory)
+## Residuals / next picks
+- **Owner:** ① Serve+4 cdk deploy — command handed to Matthew in-session, possibly already running (#2468; also un-strands CI, R8-ST6); ② BotFather: create @ajm_headcoach_bot/@ajm_pattern_bot/@ajm_career_bot → `setup_telegram_bots.py headcoach pattern career` + `register_telegram_webhooks.py`; rename @ajm_longevity_bot display → Dr. Max Reyes; retire @ajm_training_bot (not-work — BotFather is owner-only by standing rule)
+- **Owner:** portraits contact-sheet for Vale/Brooks (sigil-only until sign-off) (not-work — ADR-106 gate is Matthew-only)
+- **Owner:** #2465 Monday rituals — `restart_verify.py` + the Day-1 weigh-in supersede reflex
+- Live texting re-test of the continuity fix + the remaining bots' felt register (not-work — the Wave-5 acceptance bar is Matthew's thumbs, mid-flight as the session closed)
+- MacroFactor 45-day silence #2326 — the nutrition fact pack states the absence honestly meanwhile
+- `test_i16_recent_ingest_records_exist` fails on local real-creds runs (not-work — genesis-day empty ingest windows, self-heals as cycle-13 data accrues; CI unaffected via FAKE-creds parity)
 
-- The runbook was authored for a SAME-DAY genesis; moving genesis +1 day put the site in
-  a countdown state the truth gate had never graded — expect the pre-start class at any
-  future future-genesis reset (now largely rubric-covered and test-pinned).
-- The CI fleet deploy raced the pipeline's own re-run: `ResourceConflictException` on one
-  function, 103/104, rollback correctly did not fire (incident row added). Rejected the
-  superseded gate per the #2467 no-parked-zombies discipline; tip run green.
-- `gh run watch | tail` masks exit codes (the pipe-eats-exit-code class) — read
-  conclusions via `--json`.
-- A tests-only push SKIPS the ci-cd Deploy job by path classifier — a lambda change in
-  the PRIOR commit whose gated deploy you rejected does NOT ride the next run; hand-deploy
-  its consumers (qa-smoke + traffic-digest here).
-
-## Gate lines
-
-**Build beat:** 2026-08-10-the-countdown-day
-**Docs:** docs/engines/CHARACTER.md re-verified (baseline-only); docs/INCIDENT_LOG.md +1
-row; docs/restart/* reports + RESET_LOG regenerated by the pipeline; CLAUDE.md genesis
-literals auto-synced. All checkers green.
-**Decisions:** none needed — the rubric growth follows the documented #1917 pattern and
-the reset followed standing ADR-058/077 machinery; no posture change.
-**Main:** green (`076d348b`)
-**Incidents:** 1 row added — the reset's CI fleet deploy racing the pipeline re-run
-(P4, ResourceConflictException, 103/104, no rollback, superseded gate rejected).
-**Closures:** none — no issues closed this session (#2465 stays open: its last box —
-receipt_replay at the first post-reset nightly — is tomorrow's observation).
-**Stash/hooks:** clean (empty stash; hook freshness 🟢).
-**Backlog:** Now live and hygiene OK (63 open issues, 0 violations; #2468 filed→Now);
-no stale Later issues.
-**Alarms:** clean — every alarm red >72h cited, none >14d uncited.
-**CI warnings:** 4 — the Plan job's "Lambda config change CI cannot ship" warnings on
-LifePlatformOperational/Email/Compute/Ingestion; triage = filed as **#2468**
-(owner-run `cdk deploy`, the prior wrap's morning-list warning grown to four).
-**Ledger:** omitted — no new standing gate/writer/watcher landed (the vet script is
-one-shot durable machinery matching the existing vet pattern, not a watcher).
-
-## Residual / next picks
-
-- **Tonight, eve-only, owner-attended (#2465):** `publish_genesis_preregistration.py`
-  (dry-run review → `--apply`) + `genesis_prereg_stamp.py --apply`;
-  `build_genesis_predict_week.py --apply`; `send_prereg_lock_email.py --apply` (refuses
-  late).
-- **Monday morning (#2465):** post-genesis `restart_verify.py` (its check 14 sweeps the
-  countdown window; escapees → `reconcile_countdown_gap.py`); watch receipt_replay heal
-  at the first nightly (#2378's prediction — file its own issue if it doesn't).
-- **When the real Day-1 weigh-in lands (#2465):** the supersede reflex — profile +
-  `config/user_goals.json` + constants generator + rebakes + CHARACTER.md Verified bump;
-  if the pipeline re-runs, re-run `seed_genesis_preregistration.py --apply` after (it
-  wipes PREDICTION#; frozen claims re-land verbatim).
-- **#2468:** the four-stack owner-run `cdk deploy` (config drift CI cannot ship).
-- Carried from the overnight burn's morning list: Telegram go-live (#2363), MacroFactor
-  export — cycle 12 had zero nutrition data (#2326), the texting-registers taste session
-  (#2402).
+**Main:** stranded — R8-ST6 class: every Plan job red on the #2470 IAM diff pending the owner cdk deploy (`bash deploy/cdk_deploy.sh LifePlatformServe …` handed over in-session), then a `deploy_all=true` dispatch; tests themselves green on the latest run (Unit Tests passed at `70ff1cbc`-era; overnight shipping went via the script path with per-function sha postflights).
+**Build beat:** 2026-08-10-coaches-get-souls
+**Docs:** BOARDS.md (v2 roster + registry-derived ids), ADD_A_COACH.md (tier model + §10 config-gap closed), DECISIONS.md (ADR-153 + index), INCIDENT_LOG.md (rollback row)
+**Decisions:** ADR-153 filed (coaching-team v2 — tiers, merge/retire, cross-phase chats)
+**Incidents:** 1 row added — site auto-rollback on the roster merge's deploy (carried-badge axe contrast, genesis-day first-render; TTR ~40min via #2476)
+**Closures:** #2402, #2469 commented
+**Stash/hooks:** clean (empty stash; hook freshness 🟢)
+**Backlog:** Now live at 4 (≥3 actionable: #2464, #2370 top-ranked); Later sweep — hygiene OK, no stale issues printed
+**Alarms:** clean — every red >72h cited, none >14d uncited
+**CI warnings:** n/a — latest main run not green (the stranded R8-ST6 decode above owns it)
