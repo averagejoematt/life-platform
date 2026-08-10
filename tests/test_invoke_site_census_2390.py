@@ -74,7 +74,16 @@ OPERATIONAL = "operational"  # a verdict/metric/score, never rendered as prose
 INTERNAL_INPUT = "internal-input"  # feeds a DOWNSTREAM gated generator
 SEAM_DEF = "seam-def"  # defines/relays the seam; not a generation site
 DELEGATED_GATED = "delegated-gated"  # the generation IS gated, at another module's surface
-DESTINATION_CLASSES = frozenset({OWNER_EMAIL, OWNER_CHAT_MCP, OPERATIONAL, INTERNAL_INPUT, SEAM_DEF, DELEGATED_GATED})
+# #2430. The one class whose destination IS a reader surface. It exists so a partial gate
+# stops being invisible without being dressed up as coverage: the entry must say what the
+# deterministic gate DOES check, NAME the classes it does not arm, and say why the surface
+# is declared rather than registered. It is a weaker record than a SURFACES entry by
+# construction — use it only where registering is blocked by something written down, and
+# never to retire a class someone could arm today.
+READER_DECLARED_PARTIAL = "reader-prose/declared-partial"
+DESTINATION_CLASSES = frozenset(
+    {OWNER_EMAIL, OWNER_CHAT_MCP, OPERATIONAL, INTERNAL_INPUT, SEAM_DEF, DELEGATED_GATED, READER_DECLARED_PARTIAL}
+)
 
 
 def _ex(destination, reason, gated_by=None):
@@ -193,6 +202,21 @@ EXEMPTIONS: dict[str, dict[str, str]] = {
         "(site_api_diary.py: an unmarked line is structurally unreachable), and causal hints whose verbatim quote is absent from the entry "
         "are dropped deterministically.",
     ),
+    # — reader prose, declared partial (the ONE entry in this class) —
+    "lambdas/emails/coach_panel_podcast_lambda.py": _ex(
+        READER_DECLARED_PARTIAL,
+        "The Panel podcast — generated/panelcast/{wk<N>.mp3, episodes.json, feed.xml} served at /panelcast/*, so the destination IS a "
+        "reader surface (verified: the S3GeneratedOrigin CloudFront behavior, and /story/panel/ links it). WHAT IS CHECKED, all "
+        "deterministic and all fail-closed: er03_gate.er03_check per line on all three script paths (weekly, intro, repair) — "
+        "correlative-only plus an allow-list numbers check against the week's own source; the Day-Zero hallucination regex; and the "
+        "compassion/safety filter, which HOLDS the whole episode for a human on any hit. The panelcast_qa Haiku judges sit on top of "
+        "that. CLASSES NOT ARMED, named rather than implied: dates (#1242), night-scope (#1968) and behavioral (#1699) — a two-host "
+        "script about the week can carry a date the chronicle never contained. WHY DECLARED, NOT REGISTERED: the module sits AT its "
+        "recorded cap of 1904 lines in tests/test_module_size_guard.py::BASELINE with zero headroom, so wiring grounding_findings in "
+        "place costs net lines the ratchet refuses, and the sanctioned outcome for #2430 was to write the state down rather than "
+        "raise a baseline or extract under time pressure. The extraction that would let it register is the follow-on work; until then "
+        "this entry is the record, and the file's own docstring points here.",
+    ),
     # — seam-def —
     "lambdas/common/retry_utils.py": _ex(
         SEAM_DEF, "DEFINES call_anthropic_raw/call_anthropic_api and relays to bedrock_client.invoke. A transport, not a generation site."
@@ -250,23 +274,19 @@ UNGATED_READER_KNOWN: dict[str, dict[str, object]] = {
     # regenerate-once-then-hold), and the board-answer reader (_coach_memory_bits)
     # now excludes ungated legacy rows — so the module's whole coverage is genuine
     # and its DECLARED_OVERLAPS entry is gone with it.
-    # — the partial-gate cluster: a real deterministic check, no registered decision —
-    "lambdas/emails/coach_panel_podcast_lambda.py": {
-        "issue": 2430,
-        "note": "reader podcast; er03_gate per line + the panelcast_qa judges, but no grounding surface (no date/freshness/night decision).",
-    },
-    "lambdas/compute/coach_daily_reflection_lambda.py": {
-        "issue": 2430,
-        "note": "reader S3 generated/coach_daily.json; ER-03 fail-closed (drops rather than ships) but unregistered.",
-    },
-    "lambdas/compute/coach_memoir_lambda.py": {
-        "issue": 2430,
-        "note": "reader S3 coach_memoirs.json; grounded_generation.fabricated_numbers + memoir_gate.cites_a_miss, unregistered.",
-    },
-    "lambdas/experiment/eyeball_calibration.py": {
-        "issue": 2430,
-        "note": "reader aggregate on /method/eyeball/; the #1390 partition isolation is the whole contract — no grounding findings.",
-    },
+    # — the partial-gate cluster (#2430) —
+    # THREE of the four left this table 2026-08-10 the designed way, by registering the
+    # classes each can answer honestly in tests/grounding_wiring.py::SURFACES:
+    #   coach_daily_reflection_lambda.py::_grounding_findings  (numbers/dates/freshness)
+    #   coach_memoir_lambda.py::gate_check                     (numbers/dates/freshness)
+    #   eyeball_calibration.py::_grounded_note                 (numbers/dates/freshness)
+    # The fourth, coach_panel_podcast_lambda.py, moved to EXEMPTIONS as the single
+    # READER_DECLARED_PARTIAL entry — a weaker record, and deliberately a written one:
+    # the file is at its size-guard cap, so registering it is blocked until the
+    # extraction lands. Read that entry, not this comment, for the reason.
+    # STILL TRACKED. It carries #2430's number because the same census sweep filed it, but
+    # it is OUTSIDE that issue's scope — the issue title names the other four — so it needs
+    # its own issue once #2430 closes rather than inheriting a closed one.
     "lambdas/emails/chronicle_personas.py": {
         "issue": 2430,
         "note": "Margaret's revision + editor's note run AFTER the chronicle's grounding gate (wednesday_chronicle_lambda.py:768). The "

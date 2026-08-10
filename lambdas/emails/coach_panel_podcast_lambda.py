@@ -1,19 +1,19 @@
 """coach_panel_podcast_lambda.py — "The Panel": a weekly two-host show (2026-06-14).
 
-Each week Elena Voss hosts and a rotating coach co-reviews the week — the
-chronicle plus that coach's recent reads. Bedrock (Haiku) writes a short
-conversational script as a list of {speaker, line}; every line passes the ER-03
-gate (correlative, no fabricated numbers, no Matt-prefix) before it's voiced;
-each line is synthesized in that persona's persistent Chirp 3: HD voice
-(persona_registry.tts_voice) and the turns are concatenated into one MP3.
+Each week Elena Voss hosts and a rotating coach co-reviews the week — the chronicle plus that coach's recent reads. Bedrock (Haiku)
+writes a short conversational script as a list of {speaker, line}; every line passes the ER-03 gate (correlative, no fabricated
+numbers, no Matt-prefix) before it's voiced; each line is synthesized in that persona's persistent Chirp 3: HD voice
+(persona_registry.tts_voice) and the turns are concatenated into one MP3. Outputs generated/panelcast/{wk<N>.mp3, episodes.json,
+feed.xml} → served at /panelcast/* via the S3GeneratedOrigin CloudFront behavior. Self-skips at budget tier >= 2 (PG-10).
+Idempotent: existing weeks skipped unless {"force": true}. This is the only NEW-inference podcast; the chronicle read-aloud stays
+a straight single-voice narration. Cost: Chirp 3: HD is free under 1M chars/mo; Bedrock Haiku script-gen is pennies.
 
-Outputs generated/panelcast/{wk<N>.mp3, episodes.json, feed.xml} → served at
-/panelcast/* via the S3GeneratedOrigin CloudFront behavior. Self-skips at budget
-tier >= 2 (PG-10). Idempotent: existing weeks skipped unless {"force": true}.
-
-This is the only NEW-inference podcast; the chronicle read-aloud stays a straight
-single-voice narration. Cost: Chirp 3: HD is free under 1M chars/mo; Bedrock
-Haiku script-gen is pennies.
+GROUNDING (#2430) — DECLARED-PARTIAL, not registered, and the decision is written where this repo keeps per-module grounding
+decisions: tests/test_invoke_site_census_2390.py::EXEMPTIONS. The standing contract is deterministic and fail-closed — the
+per-line er03_gate.er03_check (correlative + allow-listed numbers), the Day-Zero hallucination regex, the compassion/safety
+filter — with the panelcast_qa judges on top; the classes NOT armed are dates, night-scope and behavioral. It is declared
+rather than registered because this file sits AT its recorded cap (1904 lines, tests/test_module_size_guard.py) with zero
+headroom, so wiring grounding_findings in place costs net lines the ratchet will not take. Never raise the baseline for it.
 """
 
 import importlib

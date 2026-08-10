@@ -248,6 +248,46 @@ SURFACES = {
         ("numbers", "dates", "freshness"),
         {"behavioral": _NOT_ABOUT_MATTHEW, "night": _NO_NIGHT_MAP},
     ),
+    # #2430: the once-a-day coach reflection published to generated/coach_daily.json and
+    # rendered on the coach pages. It was never ungated — every line crossed ER-03 —
+    # but ER-03 answers "correlative, hedged, no number outside the facts" and nothing
+    # else, so a fabricated calendar date or a stale Day-N framing walked straight
+    # through a check that looked like a gate. Both checks are fail-closed and both must
+    # pass; a held reflection is dropped, and the coach is listed in `skipped`.
+    "lambdas/compute/coach_daily_reflection_lambda.py::_grounding_findings": _entry(
+        ("numbers", "dates", "freshness"),
+        {
+            "behavioral": (
+                "the reflection re-voices ONE stored COACH#{id} OUTPUT# row — that row is the module's "
+                "entire read, and it opens no log partition at all (the same measured fact #2056 recorded "
+                "for the stance pipeline and #2419 for the digest). Its subject is the coach's own recent "
+                "read of its own domain, not an account of what Matthew did today, which is the only shape "
+                "#1699 checks. Arming it would buy a same-day availability probe purely to grade a claim "
+                "class this re-voicing does not emit. Revisit if the prompt ever asks for direct address."
+            ),
+            "night": _NO_NIGHT_MAP,
+        },
+    ),
+    # #2430: the quarterly in-voice memoir (generated/coach_memoirs.json). Its gate was
+    # real but partial — fabricated_numbers + the cites_a_miss bar — and invisible here,
+    # so the two classes a QUARTER-long retrospective most obviously carries were nobody's
+    # decision: the dates of calls it claims to have made, and the span/Day-N framing it
+    # sets them in. Allow-lists stay the pre-existing `facts`-wide scope, so this adds
+    # classes and narrows nothing. Fail-closed, unchanged: one stricter retry, then drop.
+    "lambdas/compute/coach_memoir_lambda.py::gate_check": _entry(
+        ("numbers", "dates", "freshness"),
+        {
+            "behavioral": (
+                "the memoir is FIRST-PERSON and retrospective — the prompt's own rule is 'This is YOU "
+                "thinking about YOUR OWN calls' over a CLOSED quarter graded weeks earlier — while #1699 "
+                "checks a second-person completed-action claim framed for TODAY. The module's only "
+                "availability facts are that quarter's LEARNING# rows; passing them as available_logs "
+                "would grade a same-day claim against a closed quarter's records, which is the field "
+                "note's wrong-day shape a quarter wide — a wrong answer, not a partial one."
+            ),
+            "night": _NO_NIGHT_MAP,
+        },
+    ),
     # #2420: the hypothesis engine's TWO reader-bound prose paths (/api/hypotheses
     # serves the stored rows verbatim). The frozen test_spec already protects the
     # verdict (ADR-105); these surfaces protect the prose around it. Generation
@@ -314,6 +354,28 @@ SURFACES = {
     "lambdas/emails/partner_email_lambda.py::_grounding_gate": _entry(
         ("numbers", "dates", "freshness"),
         {"behavioral": _NOT_ABOUT_MATTHEW, "night": _NO_NIGHT_MAP},
+    ),
+    # #2430: the meal-photo calibration probe. The macro ESTIMATE is deliberately outside
+    # every gate class — it is a guess whose whole purpose is to be graded, and grading it
+    # is the exhibit (/method/eyeball/). The `note` is the module's ONE free-text field:
+    # prose the model writes about the photo, stored on the estimate row beside the numbers
+    # the reliability chart is built from. Same shape as reading_enrich's `themes` — the
+    # deterministic parts (macros, the closed confidence set) are checked as data, and the
+    # one string that can carry a CLAIM crosses the chokepoint. Fail-closed on the note
+    # alone: a flagged note is dropped and the graded estimate stands.
+    "lambdas/experiment/eyeball_calibration.py::_grounded_note": _entry(
+        ("numbers", "dates", "freshness"),
+        {
+            "behavioral": (
+                "the surface is a phrase describing FOOD IN A PHOTOGRAPH — 'one short phrase on what you "
+                "saw', written by a probe the prompt tells in as many words is NOT a food logger. There is "
+                "no second-person same-day completed-action claim to grade (#1699's only shape) and no "
+                "behavior log could make one legitimate; what is load-bearing here is that the phrase "
+                "invents no number the estimate itself does not assert, and cites no calendar date at all "
+                "(allowed_dates=set() — for a description of a photo, every date is fabricated)."
+            ),
+            "night": _NOT_A_VITALS_SURFACE,
+        },
     ),
     # #2421: the module's SINGLE chokepoint. It used to be `generate_and_cache` and only
     # that — the Mode-B correction rewrote the text AFTER this gate ran, and the weekly

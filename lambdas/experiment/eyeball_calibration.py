@@ -202,9 +202,47 @@ def estimate_from_photo(
         "status": "ok",
         "macros": macros,
         "confidence": parsed.get("confidence"),
-        "note": parsed.get("note"),
+        "note": _grounded_note(parsed.get("note"), macros, now=now),
         "model": _HAIKU_MODEL,
     }
+
+
+def _grounded_note(note: Optional[str], macros: dict, *, now: Optional[datetime] = None) -> Optional[str]:
+    """#2430: the registered grounding surface for this module's ONE free-text field.
+
+    The macro ESTIMATE is deliberately outside every grounding class — it is a guess
+    that exists to be graded, and grading it is the exhibit. `note` is different: it is
+    prose the model writes about the photo, stored on the estimate row alongside the
+    numbers the reliability chart is built from, and it is the one string here that can
+    carry a claim rather than a measurement. So it crosses the chokepoint:
+
+      * numbers  — a note may restate the estimate it ships with ("about 600 kcal");
+        a note that names a DIFFERENT figure is a second, contradicting estimate and
+        is not published. The allow-list is the estimate's own macros — literally the
+        numbers this response asserted.
+      * dates    — `allowed_dates=set()` (an empty set means "no date is legitimate",
+        #1242): a phrase describing a photograph cites no calendar date, ever.
+      * freshness — the note is written on a known day against a known cycle anchor, so
+        a "Day N"/experiment-span framing smuggled into it is checkable here (#1691/
+        #1897) with no extra I/O.
+
+    Fail-CLOSED on the note only: a flagged note is DROPPED (returns None) and the
+    estimate stands. Holding the whole estimate would delete a graded data point over a
+    descriptive phrase; dropping the phrase costs nothing the chart reads.
+    """
+    if not (note or "").strip():
+        return None
+    from ai import grounded_generation  # lazy: offline tests of the pure builders need no gate import
+    from common.constants import EXPERIMENT_START_DATE  # ADR-058/077 — the current-cycle genesis anchor
+
+    findings = grounded_generation.grounding_findings(
+        str(note),
+        allowed=grounded_generation.allowed_numbers(macros),
+        allowed_dates=set(),
+        generation_date_iso=(now or datetime.now(timezone.utc)).strftime("%Y-%m-%d"),
+        start_date_iso=EXPERIMENT_START_DATE,
+    )
+    return None if findings else str(note)
 
 
 def _first_text(resp: dict) -> str:
