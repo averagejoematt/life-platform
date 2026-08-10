@@ -12,6 +12,13 @@ Cost & safety rails:
   * bedrock_client enforces the tier-3 hard stop too.
   * ER-03 gate is fail-closed: anything that doesn't pass is dropped, not shipped.
   * Honest empty: a coach with no recent output yet is simply skipped.
+
+#2430 — the ER-03 check is no longer the WHOLE gate. ER-03 answers "correlative,
+hedged, no number outside the facts"; it says nothing about a fabricated calendar
+date or a stale "Day N"/starting-weight framing, and this text is published to
+generated/coach_daily.json and rendered on the coach pages. `_grounding_findings`
+is the registered surface (tests/grounding_wiring.py) and arms the numbers, dates
+and freshness classes; both checks are fail-closed and both must pass.
 """
 
 import json
@@ -20,8 +27,10 @@ import os
 from datetime import datetime, timezone
 
 import boto3
+from ai import grounded_generation
 from boto3.dynamodb.conditions import Key
 from coach import coach_derived_prose, persona_registry  # #2418: served_summary falls back to gated `content`
+from common.constants import EXPERIMENT_START_DATE  # ADR-058/077 — current-cycle genesis anchor (#1691 freshness class)
 from experiment import er03_gate
 from experiment.phase_filter import with_phase_filter
 
@@ -74,8 +83,42 @@ def _gather_facts(table, coach_id):
         "summary": summary,
         "themes": themes[:4],
         "numbers": er03_gate.numbers_in(facts),
+        # #2430: the grounding allow-lists, derived from the SAME text the model is
+        # shown (summary + themes) — literally the vocabulary it was given.
+        "allowed": grounded_generation.allowed_numbers(facts),
+        "allowed_dates": grounded_generation.allowed_dates(facts),
         "n": int(it.get("word_count") or 10),  # small-sample → forces a hedge
     }
+
+
+def _grounding_findings(text, facts, generation_date_iso):
+    """#2430: the registered grounding surface for the daily reflection.
+
+    Arms numbers (#ADR-104), dates (#1242) and freshness (#1691/#1897) — every class
+    this layer can answer honestly from what it already holds. `behavioral` and `night`
+    are exempt with written reasons in tests/grounding_wiring.py::SURFACES.
+    """
+    return grounded_generation.grounding_findings(
+        text,
+        allowed=facts["allowed"],
+        allowed_dates=facts["allowed_dates"],
+        generation_date_iso=generation_date_iso,
+        start_date_iso=EXPERIMENT_START_DATE,
+    )
+
+
+def _accepts(text, facts, generation_date_iso):
+    """(ok, reasons) — fail-CLOSED: ER-03 *and* the #2430 grounding classes.
+
+    Either check firing holds the reflection; a held reflection is dropped (the coach is
+    listed in `skipped`), never shipped, because the published artifact is read by the
+    coach pages with no second gate downstream.
+    """
+    if not (text or "").strip():
+        return False, ["empty"]
+    ok, reasons = er03_gate.er03_check(text, allowed_numbers=facts["numbers"], n=facts["n"])
+    findings = _grounding_findings(text, facts, generation_date_iso)
+    return (ok and not findings), list(reasons or []) + [f.get("type", "grounding") for f in findings]
 
 
 def _voice(s3, coach_config_key):
@@ -145,13 +188,11 @@ def lambda_handler(event, context):
             continue  # honest empty — nothing to reflect on yet
         voice_rules, example = _voice(s3, persona.get("coach_config_key", coach_id))
         text = _generate(persona, voice_rules, example, facts)
-        ok = False
-        if text:
-            ok, reasons = er03_gate.er03_check(text, allowed_numbers=facts["numbers"], n=facts["n"])
-            if not ok:
-                logger.info("[coach_daily] %s failed ER-03 (%s) — retrying stricter", coach_id, reasons)
-                text = _generate(persona, voice_rules, example, facts, stricter=True)
-                ok = bool(text) and er03_gate.er03_check(text, allowed_numbers=facts["numbers"], n=facts["n"])[0]
+        ok, reasons = _accepts(text, facts, today)
+        if not ok:
+            logger.info("[coach_daily] %s failed the gate (%s) — retrying stricter", coach_id, reasons)
+            text = _generate(persona, voice_rules, example, facts, stricter=True)
+            ok, _reasons2 = _accepts(text, facts, today)
         if ok:
             reflections[coach_id] = {"text": text, "date": today, "framing": "correlative"}
         else:

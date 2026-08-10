@@ -20,9 +20,10 @@ Cost & safety rails:
     8 operational coaches x <=2 calls (one retry on a failed gate) = a hard
     ceiling of 16 Sonnet calls/quarter, budgeted around #553's "8 Sonnet-class
     calls/quarter" framing (1 call/coach in the common case).
-  * ADR-104 grounded generation: every number in the output must appear in
-    the coach's real facts (grounded_generation.fabricated_numbers); a
-    memoir that dodges every real miss is rejected (memoir_gate.cites_a_miss).
+  * ADR-104 grounded generation: `gate_check` is the REGISTERED grounding
+    surface (#2430, tests/grounding_wiring.py) — numbers, dates and cycle
+    freshness all cross `grounded_generation.grounding_findings`; a memoir
+    that dodges every real miss is rejected too (memoir_gate.cites_a_miss).
     Fail-closed — anything that doesn't pass is dropped, not published.
   * Honest empty: a coach with no graded LEARNING# this quarter is skipped —
     there is nothing real to reckon with yet.
@@ -38,6 +39,7 @@ from ai import grounded_generation
 from boto3.dynamodb.conditions import Key
 from coach import persona_registry
 from common import quarter_utils
+from common.constants import EXPERIMENT_START_DATE  # ADR-058/077 — current-cycle genesis anchor (#1691 freshness class)
 from common.numeric import decimals_to_float, floats_to_decimal
 from experiment import calibration_core
 from experiment.phase_filter import with_phase_filter
@@ -252,16 +254,32 @@ def _call_model(persona, voice_rules, example, facts_text, quarter, extra_system
     return text or None
 
 
-def gate_check(text, facts):
-    """(ok, reasons) — ADR-104 checks: no fabricated numbers, and if a real
-    miss exists this quarter, the memoir must engage with at least one."""
+def gate_check(text, facts, generation_date_iso=None):
+    """(ok, reasons) — the registered grounding surface for the memoir (#2430).
+
+    Was `fabricated_numbers` + `cites_a_miss` only: a real check, but a partial one,
+    invisible to the surface registry and blind to two classes this text can carry.
+    A memoir narrates a quarter, so it cites DATES (#1242 — a graded call it never
+    made, on a day that never happened) and it frames time against the cycle (#1691/
+    #1897 — a "Day N"/"the first three months" span that outruns the current
+    experiment). Both now cross `grounding_findings`; the miss bar is unchanged.
+
+    Allow-lists come from the whole `facts` dict rather than the truncated prompt
+    render — deliberately the pre-existing `allowed_numbers(facts)` scope, so this
+    change adds classes and never narrows the one that was already there.
+    """
     reasons = []
     if not (text or "").strip():
         return False, ["empty"]
-    allowed = grounded_generation.allowed_numbers(facts)
-    fabricated = grounded_generation.fabricated_numbers(text, allowed)
-    if fabricated:
-        reasons.append(f"fabricated numbers: {fabricated}")
+    findings = grounded_generation.grounding_findings(
+        text,
+        allowed=grounded_generation.allowed_numbers(facts),
+        allowed_dates=grounded_generation.allowed_dates(facts),
+        generation_date_iso=generation_date_iso or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        start_date_iso=EXPERIMENT_START_DATE,
+    )
+    for f in findings:
+        reasons.append(f"{f.get('type', 'grounding')}: {f.get('detail', '')}".strip())
     ok_miss, why = memoir_gate.cites_a_miss(text, facts.get("learnings_raw"))
     if not ok_miss:
         reasons.append(why)
