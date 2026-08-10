@@ -879,7 +879,13 @@ def test_a_chat_tier_coach_reads_no_dispute_partition_at_all():
     # Scoped to the DISPUTE partition, which is the property under test. #2493 added a
     # weather read that every texting coach makes, so "no queries at all" would now
     # assert something this test never meant.
-    dispute_reads = [kw for kw in table.query_kwargs if "ENSEMBLE" in str(kw.get("ExpressionAttributeValues", {}).get(":prefix", ""))]
+    #
+    # Scope on :pk, NOT :prefix. The dispute read is pk=ENSEMBLE#dispute /
+    # prefix=THREAD# (coach_team_texture.py:132), so a :prefix filter looking for
+    # "ENSEMBLE" matches nothing whether or not the read happens — it would pass
+    # vacuously and guard exactly nothing. Derived from the module's own constant
+    # so a repartition renames it here too.
+    dispute_reads = [kw for kw in table.query_kwargs if kw.get("ExpressionAttributeValues", {}).get(":pk") == ctt.DISPUTE_PK]
     assert not dispute_reads, table.query_kwargs
 
 
