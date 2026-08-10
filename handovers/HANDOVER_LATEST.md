@@ -40,12 +40,29 @@ Triage: epic #1024 closed complete; 7 Later→Next promotions; 2 fable→opus re
 ## Residuals / next picks
 
 - **Owner ①** `bash deploy/cdk_deploy.sh LifePlatformServe` — **required, and now live-blocking**: #2505 MERGED at close (main `1a7d66c4`), carrying new infra (EventBridge weekday rule + worker `UpdateItem` IAM + a `telegram-worker-errors` alarm). Per R8-ST6 an undeployed IAM merge **reds every later main Plan job and strands all CI deploys** — so this is the first command of the morning, before anything else ships. Until it runs: Eli's check-in has no schedule (independently dark anyway — no bot token), and the referral path's ledger write would fail on a missing `UpdateItem` grant if it ever fired (it can't, same darkness). Also owed after it: `deploy/deploy_lambda.sh telegram-coach-worker …`, `telegram-webhook`, and `python3 deploy/config_twin_sync.py --apply` (personas.json gained `telegram_route_aliases`).
-- **Owner ②** BotFather trio (@ajm_headcoach_bot / @ajm_pattern_bot / @ajm_career_bot) → `setup_telegram_bots.py headcoach pattern career` + `register_telegram_webhooks.py`; rename @ajm_longevity_bot's display to Dr. Max Reyes. The morning check-in and all Vale/Brooks referrals light up the moment Eli's token lands in the secret.
+- **Owner ②** *(not-work — BotFather is owner-only by standing rule; no issue can move it)* BotFather trio (@ajm_headcoach_bot / @ajm_pattern_bot / @ajm_career_bot) → `setup_telegram_bots.py headcoach pattern career` + `register_telegram_webhooks.py`; rename @ajm_longevity_bot's display to Dr. Max Reyes. The morning check-in and all Vale/Brooks referrals light up the moment Eli's token lands in the secret.
 - **Owner ③** `CONTENT_FILTER_JSON` repo secret + `config/content_filter.local.json` on the main checkout (#2503) — until then the two scrub CI gates skip with a visible warning and the game-page regen holds.
-- **Owner ④** `python3 scripts/reconcile_strava_measured_zero.py` (review the 6-row plan, then `--apply`) — optional; new ingests are already correct.
+- **Owner ④** `python3 scripts/reconcile_strava_measured_zero.py` (review the 6-row plan, then `--apply`) — optional; new ingests are already correct (#2331, closed: the code fix shipped, only these 6 historical rows remain).
 - **Owner ⑤** the ratification list — epics #723 / #1668 / #2363, and the close recommendations on #1414 / #1402 / #1401 / #1631.
 - **Owner ⑥** portraits contact-sheet for Vale/Brooks (ADR-106); #2465 Monday rituals.
 - **Live QA is the acceptance bar for Act 1** — text the coaches in the morning: do they match your register, skip the stat recital, take an off-topic message like a person, and cite their own predictions naturally? #2492 (prompt-pass v3: grounded pushback + conversational repair) is the filed follow-up.
+
+## Wrap gate ledger
+
+- **Main:** green (`5914d111`) — `check_main_green.py` ✅ on the last completed ci-cd run, which deployed through the gate.
+- **Build beat:** `2026-08-10-coaches-that-text-like-people` (merged + deployed; `validate_beats.py` OK, 99 beats).
+- **Docs:** `docs/INCIDENT_LOG.md` (+4 rows), `docs/design/COACH_HUMANITY_ROADMAP.md` (new, shipped in #2484), `CLAUDE.md` status block. Doc-link, tombstone, index and ADR-index checkers green. No page taught a retired path this session, so no tombstone rule was needed.
+- **Decisions:** none needed — no governance-consequential choice was made that isn't already covered. The coaching work executes ADR-153's roster and ADR-104/105's honesty bars; the outbound caps are owner decisions pre-resolved in the plan file, recorded in the roadmap doc rather than as a new ADR.
+- **Incidents:** 4 rows added — the discoveries eternal-skeleton auto-rollback (P4), the reconcile-lane fail-closed outage (P3), the silent Lint red (P4), and a swallowed push event on the #2505 merge (P4).
+- **Closures:** #2467, #2464, #2414, #2370, #2351, #2350, #2331, #2326, #1905, #2402, #1024 commented with the ADR-099 two-line verdict. Several are honestly `partial` (#2370 git history + CI secret; #2350 advisory-only; #2331 pending the owner's reconcile).
+- **Backlog:** `Now` refilled to 4 actionable (promoted #2485, #2489, #2490 by stored rank; score lines updated to match). Three `score_line_canonical` violations my own triage introduced (#1400, #2348, #2430 — milestones moved without their score lines) fixed. `check_backlog_hygiene.py` → OK, 64 open issues. `Later` sweep was done in-session as the triage pass (promote/close/keep calls with comments on every stale item).
+- **Alarms:** clean — `check_alarm_citations.py` ✅, every alarm red >72h cites an incident row or issue, none red >14d without a filed issue.
+- **CI warnings:** 4 — **7 stacks** carry Lambda config drift CI can't ship (`Web`, `Mcp`, `Serve`, `Operational`, `Email`, `Compute`, `Ingestion`) → **#2468 REOPENED**, see the correction note below; and `content-policy-scan skipped` for want of the `CONTENT_FILTER_JSON` secret → owner step ③, tracked on #2370's closure comment.
+- **Stash/hooks:** stash stack clean (empty).
+
+### Correction: I closed #2468 on a bad read, and reopened it
+
+I closed it claiming the Plan job emitted zero "cannot ship" warnings. I had grepped the raw job log for `::warning title=Run`, which matches only the workflow's own `echo` statement — the warnings are **check-run annotations**, invisible to that grep. The drift never cleared and is now **wider** than when the issue was filed: seven stacks, not four. Reopened with the measured evidence and the correct verification method (`gh api .../check-runs/<job>/annotations`, or just `scripts/check_ci_warnings.py`). The lesson is banked in memory: **never verify a CI warning by grepping the log.**
 
 ## Exact CI/deploy state at close (read before shipping anything)
 
