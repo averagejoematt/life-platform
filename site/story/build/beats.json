@@ -2499,6 +2499,21 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/2478"
         }
       ]
+    },
+    {
+      "id": "2026-08-10-the-coaches-couldnt-hear-you",
+      "date": "2026-08-10",
+      "title": "The coaches couldn't hear him — a safety rail that muted his own words",
+      "shipped": "A fix to the texting coaches, found by reading the actual conversation rather than the to-do list. The morning after the personality work went live, Matthew told a coach he'd woken up late and gone for a short walk instead of lifting — and the coach refused to answer, twice, saying it would rather check than give him a number it couldn't stand behind. Nothing was wrong with the walk. The problem was that the safety check which stops a coach inventing numbers was never shown the message it was checking: it saw every earlier message in the thread, but not the one being answered. So any figure he mentioned himself — a distance, a weight, hours of sleep — looked to the system like something the coach had made up, and the reply was withheld. One line put his own words back in front of the check.",
+      "why_it_mattered": "This is the difference between a safety rail and a gag. The rail was working exactly as designed and still produced the worst possible outcome: a coach that cannot acknowledge what you just told it, and that promises to get back to you in a minute when nothing in the system will. It would have silently swallowed every 'I ran three miles' and 'I weighed 214 today' — the ordinary sentences that make a conversation a conversation. It was also invisible: no alarm fires for a reply that was politely withheld, so the only trace was one warning line in a log and a thread where he stopped texting.",
+      "gotcha": "The fix had to be provably not a hole. Widening what a grounding check accepts is exactly how a safety gate quietly becomes a rubber stamp, so the change ships with the opposite test as well: the same number, with nobody having said it, must still be caught. And the test that matters was pinned at the call site rather than the check itself — the check was always capable of doing the right thing, so a test aimed at it would have passed with the bug still in place.",
+      "honest_miss": "It was live for about nine hours before anyone noticed, and it was found by hand. Nothing in the monitoring distinguishes 'the coach chose not to answer' from 'the coach answered fine', which is why a session had to go and read the transcript to find it. That gap is still open.",
+      "prs": [
+        {
+          "label": "#2518",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2518"
+        }
+      ]
     }
   ]
 }
