@@ -1133,7 +1133,7 @@ function calcVO2() {
   else if (vo2r >= norm.p25) { pctile='Below average (25th–50th)'; pctColor='amber'; }
   else { pctile='Low (below 25th)'; pctColor='amber'; }
 
-  // Peter Attia centenarian target: maintain VO2max ≥32 for men, ≥28 for women at age 80+
+  // Longevity-medicine centenarian target: maintain VO2max ≥32 for men, ≥28 for women at age 80+
   const cenTarget = sex===1 ? 32 : 28;
   const cenStatus = vo2r >= cenTarget ? '✅ On track' : '⚠️ Below target';
 
@@ -1141,7 +1141,7 @@ function calcVO2() {
     <div class="result-row"><span class="result-row__label">Estimated VO2max</span><span class="result-row__value accent">${vo2r}<span class="result-row__unit"> ml/kg/min</span></span></div>
     <div class="result-row"><span class="result-row__label">Percentile (age ${norm.label})</span><span class="result-row__value ${pctColor}">${pctile}</span></div>
     <div class="result-row"><span class="result-row__label">Benchmarks (age ${norm.label})</span><span class="result-row__value" style="font-size:var(--text-xs);color:var(--text-muted)">25th: ${norm.p25} · 50th: ${norm.p50} · 75th: ${norm.p75} · top: ${norm.excellent}</span></div>
-    <div class="result-row"><span class="result-row__label">Centenarian target (Attia)</span><span class="result-row__value" style="font-size:var(--text-xs);color:var(--text-muted)">${cenStatus} (need ≥${cenTarget} at age 80+)</span></div>
+    <div class="result-row"><span class="result-row__label">Centenarian target</span><span class="result-row__value" style="font-size:var(--text-xs);color:var(--text-muted)">${cenStatus} (need ≥${cenTarget} at age 80+)</span></div>
     <div class="result-tip"><strong>// Rockport walk test is a validated submaximal estimate.</strong> Lab-tested VO2max will be more accurate. For most people, the walk test is within ±3–5 ml/kg/min of lab values. To improve: Zone 2 training 3–4x/week for 30–45 min.</div>`;
 }
 
