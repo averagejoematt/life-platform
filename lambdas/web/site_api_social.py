@@ -14,16 +14,33 @@ Endpoints:
   /api/challenge_catalog, /api/challenges, /api/current_challenge,
   /api/challenge_vote, /api/challenge_follow, /api/challenge_checkin
 
+  /api/ritual_log, /api/predict_week, /api/board_question
+  /api/broadcast, /api/social_context, /api/membrane
+  /api/ladder_counts, /api/replicate_certify, /api/cohort_submit, /api/cohort_strip
+
 Also owns the supporting machinery — subscriber-token HMAC (which uses
 the Anthropic API key as the signing secret), per-IP rate-limit stores
 for nudge/submit_finding, and the rate-limit EMF metric emitter — since
 nothing outside this cluster uses them.
 
+FACADE (#2515). At 2,707 lines this was one line under its own module-size
+baseline. The handler BODIES were extracted into cohesive siblings —
+``web/site_api_social_{experiments,challenges,membrane,ladder,engage}.py``, each
+well under the 1,200-line ceiling — and this file keeps the 26 routed entrypoints
+as thin delegators plus the shared + monkeypatched state the split modules read
+back through the ``_g`` facade-globals hand-off (each delegator passes its own
+``globals()``). Routes, handler names, signatures, response contracts and the
+test patch surface are all unchanged; the split modules never import this one, so
+there is no cycle. Deploy stays the full-tree bundle
+(``deploy/deploy_site_api.sh``) — a single-file deploy would strip the siblings.
+
 CLASS RULE (#2289): every handler here is rate-limited OR an edge-cached public
 read (``cache_seconds >= 300`` — CloudFront absorbs abuse; a DDB counter would
 cost more than the read spend it counts). Full reasoning + enforcement:
 ``tests/test_unmetered_public_read_class_2289.py`` (a new unmetered,
-under-cached public read fails the suite by name).
+under-cached public read fails the suite by name) — that guard, and every other
+structural sweep over this module, now scans the whole ``site_api_social*.py``
+family, so moving a body into a sibling cannot empty a derived set.
 """
 
 import base64 as _b64

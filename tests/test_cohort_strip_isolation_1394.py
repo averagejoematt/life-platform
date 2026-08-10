@@ -21,6 +21,7 @@ never vacuously pass.
 import inspect
 import io
 import os
+import re
 import sys
 import tokenize
 
@@ -107,10 +108,35 @@ def _code_without_comments(src: str) -> str:
     return " ".join(out)
 
 
+_DELEGATION_RE = re.compile(r"return (_[a-z]+)\.(\w+)\(")
+
+
+def _handler_source(fn) -> str:
+    """The source that actually RUNS for a routed entrypoint.
+
+    #2515 split site_api_social.py into a facade + cohesive siblings, so the routed
+    entrypoint is now a three-line delegator. Reading only that would make Direction B
+    below a guard that cannot fail (no partition key of any kind appears in a
+    delegator). Follow the delegation to the implementation and assert on it; a
+    non-delegating handler is read directly, so this works either way.
+    """
+    src = inspect.getsource(fn)
+    m = _DELEGATION_RE.search(src)
+    if not m:
+        return src
+    return inspect.getsource(getattr(getattr(se, m.group(1)), m.group(2)))
+
+
+def test_the_handler_source_probe_reaches_the_real_body():
+    """Non-vacuity for the probe itself: the delegation must actually be followed."""
+    for fn in (se._handle_cohort_submit, se.handle_cohort_strip):
+        assert _handler_source(fn) != inspect.getsource(fn), f"{fn.__name__} delegation not followed"
+
+
 def test_cohort_handlers_never_touch_matthew_partitions():
     """DIRECTION B: the cohort handlers only touch the COHORT family, never USER#…#SOURCE#."""
     for fn in (se._handle_cohort_submit, se.handle_cohort_strip):
-        raw = inspect.getsource(fn)
+        raw = _handler_source(fn)
         assert "COHORT#" in raw or "_cohort_partition" in raw, f"{fn.__name__} does not use the cohort partition"
         code = _code_without_comments(raw)  # comments legitimately reference the family they avoid
         assert "USER#" not in code, f"{fn.__name__} references a USER partition in code"

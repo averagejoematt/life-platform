@@ -48,7 +48,9 @@ def test_probe_metrics_ride_the_ritual_rail():
 def test_ritual_log_routes_probe_to_felt_probe_partition():
     """The write destination literal must be INLINE in the update_item call
     (orphan-gate rule) and route probe metrics to felt_probe."""
-    src_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas", "web", "site_api_social.py")
+    src_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas", "web", "site_api_social_engage.py"
+    )  # #2515: _handle_ritual_log split out of site_api_social.py
     src = open(src_path).read()
     handler = src.split("def _handle_ritual_log", 1)[1].split("\ndef ", 1)[0]
     assert 'f"{USER_PREFIX}felt_probe"' in handler, "probe taps must route to the felt_probe partition inline"
