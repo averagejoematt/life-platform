@@ -681,29 +681,9 @@ def _maybe_refer(*, marker: Optional[str], referring: dict, chat_id, thread: lis
     frame = coach_outbound.referral_frame(referring["coach_name"], tail)
     # The tail joins the allowed vocabulary: a coach repeating a number its
     # colleague just cited is quoting, not fabricating.
+    # The tail joins the allowed vocabulary inside _unsolicited_turn: a coach
+    # repeating a number its colleague just cited is quoting, not fabricating.
     result = _unsolicited_turn(a, frame, tier, tail)
-
-    from ai import bedrock_client
-
-    result = coach_chat.run_turn(
-        coach_id=target,
-        persona_id=target,
-        coach_name=a["coach_name"],
-        persona_block=a["persona"],
-        memory_block=a["memory"],
-        facts_block=a["facts_block"],
-        thread=a["thread"],
-        inbound=frame,
-        model=MODEL,
-        caller=lambda body: bedrock_client.invoke(body),
-        # The tail joins the allowed vocabulary: a coach repeating a number its
-        # colleague just cited is quoting, not fabricating.
-        grounder=_grounder_for(a, tail),
-        tier=tier,
-        turns_today=_turns_today(a["thread"]),
-        last_reply_had_emoji=_last_reply_had_emoji(a["thread"]),
-        colleagues_block=a["colleagues"],
-    )
     if not result.grounded:
         # An unsolicited "let me check that" is a buzz that says nothing. A reply
         # earns the honest deferral because he asked; this does not.
@@ -763,26 +743,6 @@ def _morning_checkin() -> dict:
     a = _assemble(persona_id, persona_id)
     frame = coach_outbound.checkin_frame()
     result = _unsolicited_turn(a, frame, tier)
-
-    from ai import bedrock_client
-
-    result = coach_chat.run_turn(
-        coach_id=persona_id,
-        persona_id=persona_id,
-        coach_name=a["coach_name"],
-        persona_block=a["persona"],
-        memory_block=a["memory"],
-        facts_block=a["facts_block"],
-        thread=a["thread"],
-        inbound=frame,
-        model=MODEL,
-        caller=lambda body: bedrock_client.invoke(body),
-        grounder=_grounder_for(a),
-        tier=tier,
-        turns_today=_turns_today(a["thread"]),
-        last_reply_had_emoji=_last_reply_had_emoji(a["thread"]),
-        colleagues_block=a["colleagues"],
-    )
     if not result.grounded:
         logger.info("[telegram] morning check-in held (%s) — not sending unsolicited", result.status)
         return {"ok": True, "reason": "held"}
